@@ -20,6 +20,7 @@
                 <option value="tutorial">Interactive Tutorial</option>
                 <option value="visualizer">Instruction Visualizer</option>
                 <option value="capabilities">Capability Explorer</option>
+                <option value="dnseditor">Capability DNS Editor</option>
                 <option value="editor">Assembly Editor</option>
             </select>
         </div>
@@ -384,6 +385,103 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="dnseditor" class="view">
+            <div class="dns-layout">
+                <div class="dns-panel dns-mint">
+                    <h2>MINT New Capability</h2>
+                    <p class="dns-intro">Create a new Golden Token with custom access rights</p>
+                    
+                    <div class="mint-form">
+                        <div class="mint-field">
+                            <label>Capability Name</label>
+                            <input type="text" id="mintName" placeholder="e.g., USER_FILE, API_KEY" value="NEW_CAP">
+                        </div>
+                        
+                        <div class="mint-field">
+                            <label>Location / Size</label>
+                            <select id="mintLocationType">
+                                <option value="literal">Literal (Named Resource)</option>
+                                <option value="local">Local (Offset-based)</option>
+                            </select>
+                            <input type="text" id="mintLocation" placeholder="Resource name or offset" value="user.data">
+                        </div>
+                        
+                        <div class="mint-field">
+                            <label>Access Permissions</label>
+                            <div class="mint-perms">
+                                <label class="mint-perm" title="Read - View data or code">
+                                    <input type="checkbox" id="mintPermR" checked>
+                                    <span class="perm-badge perm-r">R</span>
+                                </label>
+                                <label class="mint-perm" title="Write - Modify data">
+                                    <input type="checkbox" id="mintPermW">
+                                    <span class="perm-badge perm-w">W</span>
+                                </label>
+                                <label class="mint-perm" title="Execute - Run as code">
+                                    <input type="checkbox" id="mintPermX">
+                                    <span class="perm-badge perm-x">X</span>
+                                </label>
+                                <label class="mint-perm" title="Load - Load capabilities from children">
+                                    <input type="checkbox" id="mintPermL">
+                                    <span class="perm-badge perm-l">L</span>
+                                </label>
+                                <label class="mint-perm" title="Store - Store capabilities to children">
+                                    <input type="checkbox" id="mintPermS">
+                                    <span class="perm-badge perm-s">S</span>
+                                </label>
+                                <label class="mint-perm" title="Enter - Switch namespace or call procedure">
+                                    <input type="checkbox" id="mintPermE">
+                                    <span class="perm-badge perm-e">E</span>
+                                </label>
+                                <label class="mint-perm" title="Bind - Save token to namespace DNA">
+                                    <input type="checkbox" id="mintPermB">
+                                    <span class="perm-badge perm-b">B</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mint-field">
+                            <label>Target Register</label>
+                            <select id="mintTarget">
+                                <option value="1" selected>CR1 (Default)</option>
+                                <option value="0">CR0</option>
+                                <option value="2">CR2</option>
+                                <option value="3">CR3</option>
+                                <option value="4">CR4</option>
+                                <option value="5">CR5</option>
+                            </select>
+                        </div>
+                        
+                        <button onclick="mintCapability()" class="btn btn-mint">MINT Capability</button>
+                    </div>
+                </div>
+                
+                <div class="dns-panel dns-result">
+                    <h2>Minted Token Preview</h2>
+                    <div class="mint-preview" id="mintPreview">
+                        <div class="preview-empty">
+                            <p>Configure and MINT a capability to see it here</p>
+                        </div>
+                    </div>
+                    
+                    <div class="dns-registry">
+                        <h3>Capability Registry</h3>
+                        <p class="dns-intro">All minted capabilities in this session</p>
+                        <div class="registry-list" id="registryList">
+                            <div class="registry-empty">No capabilities minted yet</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dns-panel dns-log">
+                    <h3>DNS Operations Log</h3>
+                    <div class="dns-log-output" id="dnsLogOutput">
+                        <div class="log-entry log-info">DNS Editor initialized. Ready to MINT capabilities.</div>
                     </div>
                 </div>
             </div>
