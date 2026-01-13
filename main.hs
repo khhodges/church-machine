@@ -260,7 +260,6 @@ showHelp = do
 
 runConsole :: CPUState -> IO ()
 runConsole cpu = do
-    displayHUD cpu 
     putStr ">> CMD (HELP for commands): "
     hFlush stdout
     input <- getLine
