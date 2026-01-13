@@ -25,6 +25,7 @@ import PP250.Instructions.LoadSave (instrLOAD, instrSAVE)
 import PP250.Instructions.Call (instrCALL)
 import PP250.Instructions.Return (instrRETURN)
 import PP250.Instructions.Change (instrCHANGE)
+import PP250.Instructions.Switch (instrSWITCH)
 
 -- | Format flags for display
 formatFlags :: ConditionFlags -> String
@@ -321,6 +322,14 @@ runConsole cpu = do
                 putStrLn $ "        IP restored to: " ++ show (ip_Offset newCpu)
                 runConsole newCpu
             Left e -> putStrLn ("[TRAP] " ++ e) >> runConsole cpu
+
+        ("SWITCH":rStr:_) -> case readInt rStr of
+            Just r -> case instrSWITCH cpu r of
+                Right newCpu -> do
+                    putStrLn $ "   [OK] Namespace Switched to: " ++ cachedName (cr15_NS newCpu)
+                    runConsole newCpu
+                Left e -> putStrLn ("[TRAP] " ++ e) >> runConsole cpu
+            Nothing -> putStrLn "[ERROR] Invalid Register Index" >> runConsole cpu
                 
         [] -> runConsole cpu
         

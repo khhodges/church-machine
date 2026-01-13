@@ -16,6 +16,7 @@ PP250/
 │   ├── Shift.hs            # LSL, LSR, ASR, ROR
 │   ├── Compare.hs          # CMP, CMN, TST, TEQ + condition checker
 │   ├── Branch.hs           # B, BL with condition codes
+│   ├── Switch.hs           # SWITCH instruction (namespace relocation)
 │   ├── LoadSave.hs         # LOAD, SAVE capability operations
 │   ├── Call.hs             # CALL instruction (procedure entry)
 │   ├── Return.hs           # RETURN instruction (procedure exit)
@@ -134,6 +135,7 @@ Used with conditional branches (e.g., `B EQ 10` branches if equal).
 | CALL reg | Enter procedure |
 | RETURN | Exit procedure |
 | CHANGE offset | Switch thread |
+| SWITCH reg | Set CR15 (Namespace) to capability in CR[reg] |
 
 ## Recent Changes
 - 2026-01-13: Added full ARM-style instruction set (arithmetic, logic, shifts, compare, branch)

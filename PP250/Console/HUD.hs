@@ -130,5 +130,6 @@ showHelp = do
     putStrLn "    CALL   <reg>            Call procedure in CR[reg] (requires Enter)"
     putStrLn "    RETURN                  Return from procedure (pop stack frame)"
     putStrLn "    CHANGE <offset>         Switch to thread at scope offset"
+    putStrLn "    SWITCH <reg>            Set CR15 (Namespace) to capability in CR[reg]"
     putStrLn ""
     putStrLn "======================================================================================"
