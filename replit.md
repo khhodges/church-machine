@@ -100,6 +100,32 @@ runghc -i. metaMachine.hs
 | B cond offset | Conditional branch (EQ/NE/GT/LT/etc) |
 | BL offset | Branch with link |
 
+### Condition Codes
+Used with conditional branches (e.g., `B EQ 10` branches if equal).
+
+| Code | Name | Meaning | Flag Test |
+|------|------|---------|-----------|
+| EQ | Equal | Result was zero | Z=1 |
+| NE | Not Equal | Result was non-zero | Z=0 |
+| CS/HS | Carry Set / Unsigned Higher or Same | Unsigned >= (no borrow) | C=1 |
+| CC/LO | Carry Clear / Unsigned Lower | Unsigned < (borrow occurred) | C=0 |
+| MI | Minus (Negative) | Result is negative | N=1 |
+| PL | Plus (Positive or Zero) | Result is positive or zero | N=0 |
+| VS | Overflow Set | Signed overflow occurred | V=1 |
+| VC | Overflow Clear | No signed overflow | V=0 |
+| HI | Unsigned Higher | Unsigned > | C=1 AND Z=0 |
+| LS | Unsigned Lower or Same | Unsigned <= | C=0 OR Z=1 |
+| GE | Signed Greater or Equal | Signed >= | N=V |
+| LT | Signed Less Than | Signed < | N!=V |
+| GT | Signed Greater Than | Signed > | Z=0 AND N=V |
+| LE | Signed Less or Equal | Signed <= | Z=1 OR N!=V |
+| AL | Always | Unconditional (default) | Always true |
+
+**Examples:**
+- `CMP 0 1` then `B EQ 100` - Branch to 100 if DR0 equals DR1
+- `CMP 0 1` then `B GT 50` - Branch to 50 if DR0 > DR1 (signed)
+- `CMP 0 1` then `B HI 50` - Branch to 50 if DR0 > DR1 (unsigned)
+
 ### Capabilities
 | Command | Description |
 |---------|-------------|
