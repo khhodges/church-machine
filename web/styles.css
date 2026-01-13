@@ -661,6 +661,273 @@ main {
     color: var(--warning);
 }
 
+/* ==================== CAPABILITY DNS EDITOR ==================== */
+
+.dns-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr auto;
+    gap: 1.5rem;
+    min-height: calc(100vh - 200px);
+}
+
+.dns-panel {
+    background: var(--bg-panel);
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+}
+
+.dns-panel h2 {
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+}
+
+.dns-panel h3 {
+    color: var(--warning);
+    margin-bottom: 0.8rem;
+}
+
+.dns-intro {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 1.5rem;
+}
+
+.dns-log {
+    grid-column: 1 / -1;
+}
+
+.mint-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.mint-field label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+}
+
+.mint-field input[type="text"],
+.mint-field select {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.mint-field input[type="text"]:focus,
+.mint-field select:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.mint-field select {
+    margin-bottom: 0.5rem;
+}
+
+.mint-perms {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.mint-perm {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.mint-perm input[type="checkbox"] {
+    display: none;
+}
+
+.mint-perm .perm-badge {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    border-radius: 6px;
+    transition: all 0.2s;
+    opacity: 0.4;
+    border: 2px solid transparent;
+}
+
+.mint-perm input:checked + .perm-badge {
+    opacity: 1;
+    border-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-mint {
+    padding: 0.8rem 1.5rem;
+    background: linear-gradient(135deg, #d4af37, #aa8c2c);
+    border: none;
+    border-radius: 6px;
+    color: #1a1a2e;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.5rem;
+}
+
+.btn-mint:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
+}
+
+.mint-preview {
+    min-height: 200px;
+}
+
+.preview-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-secondary);
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+}
+
+.preview-token {
+    background: linear-gradient(135deg, #d4af37, #aa8c2c);
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(212, 175, 55, 0.3);
+}
+
+.preview-token-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.8rem;
+}
+
+.preview-token-icon {
+    font-size: 1.5rem;
+}
+
+.preview-token-name {
+    color: #1a1a2e;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.preview-token-key {
+    font-family: 'Consolas', monospace;
+    font-size: 0.7rem;
+    color: #1a1a2e;
+    opacity: 0.8;
+    word-break: break-all;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+
+.preview-token-perms {
+    display: flex;
+    justify-content: center;
+    gap: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.preview-perm {
+    padding: 0.3rem 0.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    color: #1a1a2e;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.preview-token-target {
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+    color: #1a1a2e;
+    font-size: 0.85rem;
+}
+
+.dns-registry {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.registry-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.registry-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 1rem;
+    text-align: center;
+}
+
+.registry-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-input);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid var(--warning);
+}
+
+.registry-item-name {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.registry-item-perms {
+    display: flex;
+    gap: 0.2rem;
+}
+
+.registry-item-perm {
+    padding: 0.15rem 0.4rem;
+    background: var(--bg-panel);
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.dns-log-output {
+    max-height: 150px;
+    overflow-y: auto;
+    font-family: 'Consolas', monospace;
+    font-size: 0.85rem;
+    background: var(--bg-dark);
+    border-radius: 4px;
+    padding: 0.8rem;
+}
+
+.dns-log-output .log-entry {
+    margin-bottom: 0.3rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.dns-log-output .log-entry:last-child {
+    border-bottom: none;
+}
+
 /* ==================== INTERACTIVE TUTORIAL ==================== */
 
 .tutorial-layout {

@@ -1195,6 +1195,115 @@ function loadCR7() {
     editorLog('CR7 capability loaded into editor', 'success');
 }
 
+const mintedCapabilities = [];
+
+function mintCapability() {
+    const name = document.getElementById('mintName').value.trim() || 'NEW_CAP';
+    const locationType = document.getElementById('mintLocationType').value;
+    const locationValue = document.getElementById('mintLocation').value.trim();
+    const targetReg = parseInt(document.getElementById('mintTarget').value);
+    
+    let location;
+    if (locationType === 'local') {
+        const offset = parseInt(locationValue) || 0;
+        location = { type: 'Local', offset: offset };
+    } else {
+        location = { type: 'Literal', name: locationValue || 'resource' };
+    }
+    
+    const perms = [];
+    if (document.getElementById('mintPermR').checked) perms.push('R');
+    if (document.getElementById('mintPermW').checked) perms.push('W');
+    if (document.getElementById('mintPermX').checked) perms.push('X');
+    if (document.getElementById('mintPermL').checked) perms.push('L');
+    if (document.getElementById('mintPermS').checked) perms.push('S');
+    if (document.getElementById('mintPermE').checked) perms.push('E');
+    if (document.getElementById('mintPermB').checked) perms.push('B');
+    
+    const goldenKey = generateGoldenKey();
+    
+    const newCapability = {
+        name: name,
+        location: location,
+        perms: perms,
+        locked: true,
+        goldenKey: goldenKey
+    };
+    
+    simulator.contextRegs[targetReg] = newCapability;
+    
+    mintedCapabilities.push({
+        ...newCapability,
+        targetReg: targetReg,
+        timestamp: new Date().toLocaleTimeString()
+    });
+    
+    updateMintPreview(newCapability, targetReg);
+    updateRegistryList();
+    dnsLog(`MINTED: ${name} [${perms.join('')}] -> CR${targetReg}`, 'success');
+    
+    updateDisplay();
+    updateCapabilityExplorer();
+    log(`Capability minted: ${name} [${perms.join('')}] in CR${targetReg}`, 'success');
+}
+
+function updateMintPreview(cap, targetReg) {
+    const preview = document.getElementById('mintPreview');
+    const locationStr = cap.location.type === 'Local' 
+        ? `local:${cap.location.offset}` 
+        : cap.location.name;
+    
+    let permsHtml = cap.perms.map(p => `<span class="preview-perm">${p}</span>`).join('');
+    
+    preview.innerHTML = `
+        <div class="preview-token">
+            <div class="preview-token-header">
+                <span class="preview-token-icon">🔑</span>
+                <span class="preview-token-name">${cap.name}</span>
+            </div>
+            <div class="preview-token-key">${cap.goldenKey}</div>
+            <div class="preview-token-perms">${permsHtml}</div>
+            <div class="preview-token-target">Stored in CR${targetReg} | Location: ${locationStr}</div>
+        </div>
+    `;
+}
+
+function updateRegistryList() {
+    const list = document.getElementById('registryList');
+    
+    if (mintedCapabilities.length === 0) {
+        list.innerHTML = '<div class="registry-empty">No capabilities minted yet</div>';
+        return;
+    }
+    
+    let html = '';
+    mintedCapabilities.slice().reverse().forEach(cap => {
+        const permsHtml = cap.perms.map(p => {
+            const permClass = `perm-${p.toLowerCase()}`;
+            return `<span class="registry-item-perm ${permClass}">${p}</span>`;
+        }).join('');
+        
+        html += `
+            <div class="registry-item">
+                <span class="registry-item-name">${cap.name} (CR${cap.targetReg})</span>
+                <div class="registry-item-perms">${permsHtml}</div>
+            </div>
+        `;
+    });
+    
+    list.innerHTML = html;
+}
+
+function dnsLog(message, type = 'info') {
+    const logOutput = document.getElementById('dnsLogOutput');
+    const entry = document.createElement('div');
+    entry.className = `log-entry log-${type}`;
+    const timestamp = new Date().toLocaleTimeString();
+    entry.textContent = `[${timestamp}] ${message}`;
+    logOutput.appendChild(entry);
+    logOutput.scrollTop = logOutput.scrollHeight;
+}
+
 function saveCR7() {
     const name = document.getElementById('cr7Name').value.trim() || 'NUCLEUS';
     const locationStr = document.getElementById('cr7Location').value.trim();
