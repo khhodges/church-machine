@@ -690,4 +690,357 @@ function resetVisualization() {
 
 document.addEventListener('DOMContentLoaded', () => {
     updateVizInstruction();
+    setupCodeEditor();
 });
+
+// ==================== ASSEMBLY EDITOR ====================
+
+let editorState = {
+    program: [],
+    pc: 0,
+    running: false,
+    parsed: []
+};
+
+const examplePrograms = {
+    counter: `; Counter Loop - Count from 0 to 5
+ADDI 0 0      ; DR0 = 0 (counter)
+ADDI 1 5      ; DR1 = 5 (limit)
+ADDI 2 1      ; DR2 = 1 (increment)
+
+; Loop start (address 3)
+ADD 0 2       ; DR0 = DR0 + 1
+CMP 0 1       ; Compare counter to limit
+; When DR0 < DR1, loop continues`,
+
+    fibonacci: `; Fibonacci Sequence
+; Calculates first few Fibonacci numbers
+ADDI 0 0      ; DR0 = 0 (F(0))
+ADDI 1 1      ; DR1 = 1 (F(1))
+ADDI 2 0      ; DR2 = temp
+
+; Calculate F(2) = F(0) + F(1)
+MOV 2 0       ; temp = F(0)
+ADD 2 1       ; temp = F(0) + F(1)
+MOV 0 1       ; F(0) = F(1)
+MOV 1 2       ; F(1) = temp
+
+; Calculate F(3)
+MOV 2 0       ; temp = F(0)
+ADD 2 1       ; temp = F(0) + F(1)
+MOV 0 1       ; F(0) = F(1)
+MOV 1 2       ; F(1) = temp`,
+
+    multiply: `; Multiply 6 * 7 using repeated addition
+ADDI 0 0      ; DR0 = 0 (result)
+ADDI 1 6      ; DR1 = 6 (multiplicand)
+ADDI 2 7      ; DR2 = 7 (multiplier/counter)
+ADDI 3 1      ; DR3 = 1 (decrement)
+
+; Loop: Add DR1 to result DR2 times
+ADD 0 1       ; result += multiplicand
+SUB 2 3       ; counter--
+; Repeat until DR2 = 0
+; Final result in DR0 = 42`,
+
+    flags: `; Flag Demo - Shows how NZCV flags work
+ADDI 0 10     ; DR0 = 10
+ADDI 1 10     ; DR1 = 10
+CMP 0 1       ; Compare equal: Z=1
+
+ADDI 2 5      ; DR2 = 5
+CMP 2 0       ; Compare 5 < 10: N=1 (negative result)
+
+ADDI 3 0      ; DR3 = 0
+SUB 3 0       ; DR3 = 0 - 10: N=1, C=0 (borrow)`
+};
+
+function setupCodeEditor() {
+    const editor = document.getElementById('codeEditor');
+    if (!editor) return;
+    
+    editor.addEventListener('input', updateLineNumbers);
+    editor.addEventListener('scroll', syncScroll);
+    editor.addEventListener('keydown', handleTab);
+    editor.addEventListener('click', updateLineInfo);
+    editor.addEventListener('keyup', updateLineInfo);
+    
+    updateLineNumbers();
+}
+
+function updateLineNumbers() {
+    const editor = document.getElementById('codeEditor');
+    const lineNumbers = document.getElementById('lineNumbers');
+    if (!editor || !lineNumbers) return;
+    
+    const lines = editor.value.split('\n').length;
+    let nums = '';
+    for (let i = 1; i <= lines; i++) {
+        nums += i + '\n';
+    }
+    lineNumbers.textContent = nums;
+}
+
+function syncScroll() {
+    const editor = document.getElementById('codeEditor');
+    const lineNumbers = document.getElementById('lineNumbers');
+    if (lineNumbers && editor) {
+        lineNumbers.scrollTop = editor.scrollTop;
+    }
+}
+
+function handleTab(e) {
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const editor = e.target;
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+        editor.selectionStart = editor.selectionEnd = start + 4;
+    }
+}
+
+function updateLineInfo() {
+    const editor = document.getElementById('codeEditor');
+    const lineInfo = document.getElementById('lineInfo');
+    if (!editor || !lineInfo) return;
+    
+    const text = editor.value.substring(0, editor.selectionStart);
+    const line = text.split('\n').length;
+    lineInfo.textContent = `Line ${line}`;
+}
+
+function parseProgram(code) {
+    const lines = code.split('\n');
+    const program = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i].trim();
+        
+        const commentIdx = line.indexOf(';');
+        if (commentIdx !== -1) {
+            line = line.substring(0, commentIdx).trim();
+        }
+        
+        if (line === '') continue;
+        
+        const parts = line.split(/\s+/);
+        const instr = parts[0].toUpperCase();
+        const args = parts.slice(1).map(a => parseInt(a));
+        
+        program.push({
+            line: i + 1,
+            instr: instr,
+            args: args,
+            raw: lines[i]
+        });
+    }
+    
+    return program;
+}
+
+function editorLog(msg, type = 'info') {
+    const console = document.getElementById('editorConsole');
+    if (!console) return;
+    
+    const line = document.createElement('div');
+    line.className = `console-line ${type}`;
+    line.textContent = msg;
+    console.appendChild(line);
+    console.scrollTop = console.scrollHeight;
+}
+
+function clearEditorConsole() {
+    const console = document.getElementById('editorConsole');
+    if (console) {
+        console.innerHTML = '';
+    }
+}
+
+function runProgram() {
+    const code = document.getElementById('codeEditor').value;
+    editorState.program = parseProgram(code);
+    editorState.pc = 0;
+    
+    if (editorState.program.length === 0) {
+        editorLog('No instructions to execute', 'error');
+        return;
+    }
+    
+    clearEditorConsole();
+    editorLog('Running program...', 'info');
+    simulator.reset();
+    
+    while (editorState.pc < editorState.program.length) {
+        const instr = editorState.program[editorState.pc];
+        executeEditorInstruction(instr);
+        editorState.pc++;
+    }
+    
+    editorLog('Program completed', 'success');
+    updateEditorStatus();
+    updateEditorRegisters();
+    updateParsedView();
+    updateDisplay();
+}
+
+function stepProgram() {
+    if (editorState.program.length === 0) {
+        const code = document.getElementById('codeEditor').value;
+        editorState.program = parseProgram(code);
+        editorState.pc = 0;
+        simulator.reset();
+        clearEditorConsole();
+        editorLog('Starting step execution...', 'info');
+        updateParsedView();
+    }
+    
+    if (editorState.pc >= editorState.program.length) {
+        editorLog('Program completed', 'success');
+        return;
+    }
+    
+    const instr = editorState.program[editorState.pc];
+    executeEditorInstruction(instr);
+    editorState.pc++;
+    
+    updateEditorStatus();
+    updateEditorRegisters();
+    highlightCurrentLine();
+    updateDisplay();
+}
+
+function executeEditorInstruction(instr) {
+    const { instr: op, args, line } = instr;
+    
+    try {
+        let result;
+        switch (op) {
+            case 'ADD':
+            case 'SUB':
+            case 'MUL':
+            case 'AND':
+            case 'ORR':
+            case 'EOR':
+            case 'MOV':
+            case 'MVN':
+            case 'NEG':
+            case 'NOT':
+            case 'CMP':
+            case 'CMN':
+            case 'TST':
+            case 'TEQ':
+                result = simulator.execute(op, args[0], args[1]);
+                break;
+            case 'ADDI':
+            case 'SUBI':
+                result = simulator.execute(op, args[0], args[1]);
+                break;
+            case 'LSL':
+            case 'LSR':
+            case 'ASR':
+            case 'ROR':
+                result = simulator.execute(op, args[0], args[1], args[2]);
+                break;
+            default:
+                result = `Unknown instruction: ${op}`;
+        }
+        editorLog(`[${line}] ${op} ${args.join(' ')}: ${result}`, 'exec');
+    } catch (e) {
+        editorLog(`[${line}] Error: ${e.message}`, 'error');
+    }
+}
+
+function resetProgram() {
+    editorState.program = [];
+    editorState.pc = 0;
+    simulator.reset();
+    
+    clearEditorConsole();
+    editorLog('Program reset', 'info');
+    editorLog('Write code and click Run or Step to execute', 'info');
+    
+    updateEditorStatus();
+    updateEditorRegisters();
+    updateDisplay();
+    
+    const parsed = document.getElementById('editorParsed');
+    if (parsed) parsed.innerHTML = '';
+}
+
+function updateEditorStatus() {
+    document.getElementById('editorPC').textContent = editorState.pc;
+    
+    const status = editorState.pc >= editorState.program.length ? 'Completed' : 'Running';
+    document.getElementById('editorStatus').textContent = status;
+}
+
+function updateEditorRegisters() {
+    const container = document.getElementById('editorRegisters');
+    if (!container) return;
+    
+    let html = '<div class="reg-display">';
+    for (let i = 0; i < 8; i++) {
+        const val = simulator.dataRegs[i].toString(16).toUpperCase().padStart(4, '0');
+        html += `<div class="reg-item"><div class="name">DR${i}</div><div class="val">0x${val}</div></div>`;
+    }
+    html += '</div>';
+    
+    html += '<div style="margin-top: 1rem;"><strong style="color: var(--text-secondary);">Flags:</strong> ';
+    html += `N=${simulator.flags.N ? 1 : 0} Z=${simulator.flags.Z ? 1 : 0} `;
+    html += `C=${simulator.flags.C ? 1 : 0} V=${simulator.flags.V ? 1 : 0}</div>`;
+    
+    container.innerHTML = html;
+}
+
+function updateParsedView() {
+    const container = document.getElementById('editorParsed');
+    if (!container) return;
+    
+    let html = '';
+    editorState.program.forEach((p, i) => {
+        const current = i === editorState.pc ? 'current-line' : '';
+        html += `<div class="parsed-line ${current}">`;
+        html += `<span class="parsed-addr">${i.toString().padStart(2, '0')}</span>`;
+        html += `<span class="parsed-instr">${p.instr}</span> `;
+        html += `<span class="parsed-args">${p.args.join(', ')}</span>`;
+        html += '</div>';
+    });
+    
+    container.innerHTML = html || '<div class="console-line info">No instructions parsed</div>';
+}
+
+function highlightCurrentLine() {
+    const parsed = document.getElementById('editorParsed');
+    if (!parsed) return;
+    
+    parsed.querySelectorAll('.parsed-line').forEach((el, i) => {
+        el.classList.toggle('current-line', i === editorState.pc);
+    });
+}
+
+function switchOutputTab(tab) {
+    document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.output-content').forEach(c => c.classList.add('hidden'));
+    
+    event.target.classList.add('active');
+    
+    const content = document.getElementById(
+        tab === 'console' ? 'editorConsole' : 
+        tab === 'registers' ? 'editorRegisters' : 'editorParsed'
+    );
+    if (content) content.classList.remove('hidden');
+    
+    if (tab === 'registers') updateEditorRegisters();
+    if (tab === 'parsed') updateParsedView();
+}
+
+function loadExample(name) {
+    const code = examplePrograms[name];
+    if (code) {
+        document.getElementById('codeEditor').value = code;
+        updateLineNumbers();
+        resetProgram();
+        editorLog(`Loaded example: ${name}`, 'success');
+    }
+}

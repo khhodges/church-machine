@@ -324,9 +324,86 @@
         </section>
 
         <section id="editor" class="view">
-            <div class="editor-content">
-                <h2>Assembly Editor</h2>
-                <p class="coming-soon">Coming soon - Write and debug PP250 programs</p>
+            <div class="editor-layout">
+                <div class="editor-sidebar">
+                    <h2>Assembly Editor</h2>
+                    <p class="editor-intro">Write and run PP250 assembly programs</p>
+                    
+                    <div class="editor-controls">
+                        <button onclick="runProgram()" class="btn btn-run-prog">Run Program</button>
+                        <button onclick="stepProgram()" class="btn btn-step-prog" id="stepBtn">Step</button>
+                        <button onclick="resetProgram()" class="btn btn-reset-prog">Reset</button>
+                    </div>
+                    
+                    <div class="editor-status">
+                        <div class="status-item">
+                            <label>Program Counter:</label>
+                            <span id="editorPC">0</span>
+                        </div>
+                        <div class="status-item">
+                            <label>Status:</label>
+                            <span id="editorStatus">Ready</span>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-examples">
+                        <h3>Example Programs</h3>
+                        <button onclick="loadExample('counter')" class="btn-example">Counter Loop</button>
+                        <button onclick="loadExample('fibonacci')" class="btn-example">Fibonacci</button>
+                        <button onclick="loadExample('multiply')" class="btn-example">Multiply</button>
+                        <button onclick="loadExample('flags')" class="btn-example">Flag Demo</button>
+                    </div>
+                    
+                    <div class="editor-help">
+                        <h3>Quick Reference</h3>
+                        <div class="help-section">
+                            <strong>Arithmetic:</strong> ADD, SUB, MUL, NEG
+                        </div>
+                        <div class="help-section">
+                            <strong>Logic:</strong> AND, ORR, EOR, NOT
+                        </div>
+                        <div class="help-section">
+                            <strong>Move:</strong> MOV, MVN, ADDI, SUBI
+                        </div>
+                        <div class="help-section">
+                            <strong>Compare:</strong> CMP, CMN, TST, TEQ
+                        </div>
+                        <div class="help-section">
+                            <strong>Comments:</strong> ; semicolon
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="editor-main">
+                    <div class="code-editor-panel">
+                        <div class="editor-header">
+                            <span>program.asm</span>
+                            <span class="line-info" id="lineInfo">Line 1</span>
+                        </div>
+                        <div class="code-container">
+                            <div class="line-numbers" id="lineNumbers">1</div>
+                            <textarea id="codeEditor" spellcheck="false" placeholder="; Write your PP250 assembly here
+; Example:
+ADDI 0 10    ; DR0 = 10
+ADDI 1 5     ; DR1 = 5
+ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-output-panel">
+                        <div class="output-tabs">
+                            <button class="output-tab active" onclick="switchOutputTab('console')">Console</button>
+                            <button class="output-tab" onclick="switchOutputTab('registers')">Registers</button>
+                            <button class="output-tab" onclick="switchOutputTab('parsed')">Parsed</button>
+                        </div>
+                        <div class="output-content" id="editorConsole">
+                            <div class="console-line info">PP250 Assembly Editor Ready</div>
+                            <div class="console-line info">Write code and click Run or Step to execute</div>
+                        </div>
+                        <div class="output-content hidden" id="editorRegisters"></div>
+                        <div class="output-content hidden" id="editorParsed"></div>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
