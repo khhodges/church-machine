@@ -214,21 +214,20 @@ function log(message, type = 'info') {
     logContainer.scrollTop = logContainer.scrollHeight;
 }
 
-function resetCPU() {
-    simulator.reset();
+function runBootSequence() {
+    if (bootState.complete) {
+        log('System already booted. Use Reset to restart.', 'info');
+        return;
+    }
+    while (bootState.step < 4) {
+        executeBootStep(bootState.step);
+        bootState.step++;
+    }
+    bootState.complete = true;
+    updateBootDisplay();
     updateDisplay();
-    document.getElementById('outputLog').innerHTML = '';
-    log('CPU Reset - All registers cleared', 'info');
-}
-
-function stepInstruction() {
-    simulator.ip++;
-    updateDisplay();
-    log(`Step: IP now ${simulator.ip}`, 'info');
-}
-
-function runProgram() {
-    log('Run mode not yet implemented', 'info');
+    updateCapabilityExplorer();
+    log('Boot sequence complete - system ready', 'success');
 }
 
 const instructionInfo = {
