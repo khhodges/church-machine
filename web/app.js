@@ -1165,3 +1165,72 @@ function loadExample(name) {
         editorLog(`Loaded example: ${name}`, 'success');
     }
 }
+
+function loadCR7() {
+    const cr7 = simulator.contextRegs[7];
+    
+    document.getElementById('cr7Name').value = cr7.name || 'NULL';
+    
+    if (cr7.location) {
+        if (cr7.location.type === 'Literal') {
+            document.getElementById('cr7Location').value = cr7.location.name || '';
+        } else if (cr7.location.type === 'Local') {
+            document.getElementById('cr7Location').value = `local:${cr7.location.offset || 0}`;
+        }
+    } else {
+        document.getElementById('cr7Location').value = '';
+    }
+    
+    const perms = cr7.perms || [];
+    document.getElementById('cr7PermR').checked = perms.includes('R');
+    document.getElementById('cr7PermW').checked = perms.includes('W');
+    document.getElementById('cr7PermX').checked = perms.includes('X');
+    document.getElementById('cr7PermL').checked = perms.includes('L');
+    document.getElementById('cr7PermS').checked = perms.includes('S');
+    document.getElementById('cr7PermE').checked = perms.includes('E');
+    document.getElementById('cr7PermB').checked = perms.includes('B');
+    
+    document.getElementById('cr7Key').textContent = cr7.goldenKey || 'Not initialized';
+    
+    editorLog('CR7 capability loaded into editor', 'success');
+}
+
+function saveCR7() {
+    const name = document.getElementById('cr7Name').value.trim() || 'NUCLEUS';
+    const locationStr = document.getElementById('cr7Location').value.trim();
+    
+    let location;
+    if (locationStr.startsWith('local:')) {
+        const offset = parseInt(locationStr.substring(6)) || 0;
+        location = { type: 'Local', offset: offset };
+    } else {
+        location = { type: 'Literal', name: locationStr || 'kernel.code' };
+    }
+    
+    const perms = [];
+    if (document.getElementById('cr7PermR').checked) perms.push('R');
+    if (document.getElementById('cr7PermW').checked) perms.push('W');
+    if (document.getElementById('cr7PermX').checked) perms.push('X');
+    if (document.getElementById('cr7PermL').checked) perms.push('L');
+    if (document.getElementById('cr7PermS').checked) perms.push('S');
+    if (document.getElementById('cr7PermE').checked) perms.push('E');
+    if (document.getElementById('cr7PermB').checked) perms.push('B');
+    
+    const existingKey = simulator.contextRegs[7].goldenKey;
+    const goldenKey = existingKey || generateGoldenKey();
+    
+    simulator.contextRegs[7] = {
+        name: name,
+        location: location,
+        perms: perms,
+        locked: true,
+        goldenKey: goldenKey
+    };
+    
+    document.getElementById('cr7Key').textContent = goldenKey;
+    
+    updateDisplay();
+    updateCapabilityExplorer();
+    editorLog(`CR7 updated: ${name} [${perms.join('')}]`, 'success');
+    log(`CR7 capability saved: ${name}`, 'success');
+}

@@ -338,7 +338,39 @@
             <div class="editor-layout">
                 <div class="editor-sidebar">
                     <h2>Assembly Editor</h2>
-                    <p class="editor-intro">Write and run PP250 assembly programs</p>
+                    <p class="editor-intro">Edit CR7 (Nucleus) code capability</p>
+                    
+                    <div class="cr7-panel">
+                        <h3>CR7 Nucleus Capability</h3>
+                        <div class="cr7-field">
+                            <label>Name:</label>
+                            <input type="text" id="cr7Name" value="NUCLEUS" placeholder="Capability name">
+                        </div>
+                        <div class="cr7-field">
+                            <label>Location:</label>
+                            <input type="text" id="cr7Location" value="kernel.code" placeholder="Location reference">
+                        </div>
+                        <div class="cr7-field">
+                            <label>Permissions:</label>
+                            <div class="perm-checkboxes">
+                                <label><input type="checkbox" id="cr7PermR" checked> R</label>
+                                <label><input type="checkbox" id="cr7PermW"> W</label>
+                                <label><input type="checkbox" id="cr7PermX" checked> X</label>
+                                <label><input type="checkbox" id="cr7PermL"> L</label>
+                                <label><input type="checkbox" id="cr7PermS"> S</label>
+                                <label><input type="checkbox" id="cr7PermE" checked> E</label>
+                                <label><input type="checkbox" id="cr7PermB"> B</label>
+                            </div>
+                        </div>
+                        <div class="cr7-field">
+                            <label>Golden Key:</label>
+                            <span id="cr7Key" class="golden-key-display">Not initialized</span>
+                        </div>
+                        <div class="cr7-actions">
+                            <button onclick="loadCR7()" class="btn btn-load">Load CR7</button>
+                            <button onclick="saveCR7()" class="btn btn-save">Save CR7</button>
+                        </div>
+                    </div>
                     
                     <div class="editor-controls">
                         <button onclick="runProgram()" class="btn btn-run-prog">Run Program</button>

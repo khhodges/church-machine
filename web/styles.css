@@ -1030,6 +1030,120 @@ main {
     margin-bottom: 1.5rem;
 }
 
+.cr7-panel {
+    background: var(--bg-input);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+}
+
+.cr7-panel h3 {
+    color: var(--warning);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+}
+
+.cr7-field {
+    margin-bottom: 0.8rem;
+}
+
+.cr7-field label {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-bottom: 0.3rem;
+}
+
+.cr7-field input[type="text"] {
+    width: 100%;
+    padding: 0.4rem 0.6rem;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: 'Consolas', monospace;
+    font-size: 0.85rem;
+}
+
+.cr7-field input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.perm-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.perm-checkboxes label {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.perm-checkboxes input[type="checkbox"] {
+    accent-color: var(--accent);
+}
+
+.golden-key-display {
+    display: block;
+    font-family: 'Consolas', monospace;
+    font-size: 0.65rem;
+    color: var(--warning);
+    word-break: break-all;
+    background: var(--bg-dark);
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.2rem;
+}
+
+.cr7-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn-load {
+    flex: 1;
+    padding: 0.5rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+
+.btn-load:hover {
+    background: var(--accent);
+    color: var(--bg-dark);
+}
+
+.btn-save {
+    flex: 1;
+    padding: 0.5rem;
+    background: var(--success);
+    border: none;
+    border-radius: 4px;
+    color: var(--bg-dark);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-save:hover {
+    opacity: 0.9;
+}
+
 .editor-controls {
     display: flex;
     flex-direction: column;
