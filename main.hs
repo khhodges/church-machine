@@ -1,17 +1,18 @@
 -- =========================================================================
--- PP250 SIMULATOR: FULL BOOT SEQUENCE WITH HUD TELEMETRY
+-- PP250 SIMULATOR: ROBUST CONSOLE (EXCEPTION HANDLING FIXED)
 -- =========================================================================
 -- Architect: Kenneth James Hamer-Hodges
--- Features:
---   1. Full HUD Display (CRs, DRs, System Regs) at every step.
---   2. Sequential Boot (Hardware -> Namespace -> Thread -> Code).
---   3. Consolidated Instruction Set (CHANGE, EXECUTE, LOAD, SAVE).
+-- Fix:
+--   1. Added 'safeRead' to prevent runtime crashes on bad input.
+--   2. Console loop now catches invalid integers (e.g., "ADD a b").
+--   3. Instruction logic remains 2-Address Accumulator (Dest = Dest op Src).
 -- =========================================================================
 
 import qualified Data.Map as Map
 import Data.Word (Word64)
 import System.IO (hFlush, stdout)
 import Text.Printf (printf)
+import Text.Read (readMaybe) -- Imported for safe parsing
 
 -- =========================================================================
 -- 1. ARCHITECTURE & STATE
@@ -80,6 +81,8 @@ displayHUD cpu = do
     putStrLn $ "| CR15 (NAMESPACE)          | " ++ pad 25 (cachedName (cr15_NS cpu)) ++ "                    |"
     putStrLn $ "| CR8  (THREAD/USER)        | " ++ pad 25 (cachedName (cr8_Thread cpu)) ++ "                    |"
     putStrLn $ "| IP   (INSTRUCTION PTR)    | " ++ pad 25 (show (ip_Offset cpu)) ++ "                    |"
+    putStrLn $ "| DR0  (ACCUMULATOR 0)      | " ++ pad 25 (printf "0x%X" (Map.findWithDefault 0 0 (d_regs cpu))) ++ "                    |"
+    putStrLn $ "| DR1  (ACCUMULATOR 1)      | " ++ pad 25 (printf "0x%X" (Map.findWithDefault 0 1 (d_regs cpu))) ++ "                    |"
     putStrLn "============================================================================"
   where
     printCR i = do
@@ -93,7 +96,7 @@ emptyCR :: ContextRegister
 emptyCR = ContextReg (Local 0) "NULL" [] False
 
 -- =========================================================================
--- 3. THE BOOT STEPS (With HUD)
+-- 3. THE BOOT STEPS
 -- =========================================================================
 
 emptyState :: SavedThreadState
@@ -102,7 +105,6 @@ emptyState = SavedState 0 [] Map.empty Map.empty []
 mkCR :: String -> Location -> [Permission] -> ContextRegister
 mkCR name loc perms = ContextReg loc name perms False
 
--- STEP 1: HARDWARE RESET
 bootStep1_HardwareReset :: IO CPUState
 bootStep1_HardwareReset = do
     putStrLn "\n[BOOT STEP 1] HARDWARE RESET"
@@ -110,10 +112,9 @@ bootStep1_HardwareReset = do
     let emptyRegs = Map.fromList [(i, emptyCR) | i <- [0..7]]
     let emptyData = Map.fromList [(i, 0) | i <- [0..7]]
     let cpu = CPUState emptyRegs emptyData 0 ["RESET"] [] emptyCR emptyCR Map.empty Map.empty
-    displayHUD cpu -- SHOW HUD
+    displayHUD cpu 
     return cpu
 
--- STEP 2: LOAD NAMESPACE (CR15)
 bootStep2_LoadNamespace :: CPUState -> IO CPUState
 bootStep2_LoadNamespace cpu = do
     putStrLn "\n[BOOT STEP 2] LOAD NAMESPACE (CR15)"
@@ -121,20 +122,18 @@ bootStep2_LoadNamespace cpu = do
     let bootNS = mkCR "Boot Namespace" (Local 4000) [PermRead, PermLoad]
     putStrLn "   > LOADING CR15..."
     let newCpu = cpu { cr15_NS = bootNS }
-    displayHUD newCpu -- SHOW HUD
+    displayHUD newCpu
     return newCpu
 
--- STEP 3: LOAD THREAD (CR8)
 bootStep3_LoadThread :: CPUState -> IO CPUState
 bootStep3_LoadThread cpu = do
     putStrLn "\n[BOOT STEP 3] LOAD THREAD CONTEXT (CR8)"
     putStrLn "   > Fetching 'Kenneth' (Entry 1) -> CR8..."
     let kennethCR = mkCR "Kenneth" (Local 8000) []
     let newCpu = cpu { cr8_Thread = kennethCR }
-    displayHUD newCpu -- SHOW HUD
+    displayHUD newCpu
     return newCpu
 
--- STEP 4: LOAD CODE & TOOLS
 bootStep4_LoadResources :: CPUState -> IO CPUState
 bootStep4_LoadResources cpu = do
     putStrLn "\n[BOOT STEP 4] LOAD CODE & TOOLS (CR7/CR6)"
@@ -151,8 +150,11 @@ bootStep4_LoadResources cpu = do
     let ram     = Map.fromList [("Operator", opState)]
     let queue   = Map.fromList [(1, opCR8)]
     
-    let newCpu = cpu { c_regs = newRegs, ram_Threads = ram, scope_CList = queue, ip_Offset = 100 }
-    displayHUD newCpu -- SHOW HUD
+    -- Pre-load Data Registers for testing math (DR0=10, DR1=5)
+    let dataRegs = Map.fromList [(0, 10), (1, 5)]
+    
+    let newCpu = cpu { c_regs = newRegs, d_regs = dataRegs, ram_Threads = ram, scope_CList = queue, ip_Offset = 100 }
+    displayHUD newCpu
     return newCpu
 
 -- =========================================================================
@@ -192,12 +194,17 @@ instrCHANGE cpu offset = do
         putStrLn $ "   > RESTORED: " ++ newName
         return newCPU
 
-instrEXECUTE_Math :: CPUState -> String -> Int -> Int -> Int -> CPUState
-instrEXECUTE_Math cpu op d s1 s2 = 
-    let v1 = Map.findWithDefault 0 s1 (d_regs cpu)
-        v2 = Map.findWithDefault 0 s2 (d_regs cpu)
-        res = case op of "ADD" -> v1+v2; "SUB" -> v1-v2; "POW" -> v1^v2; _ -> 0
-    in cpu { d_regs = Map.insert d res (d_regs cpu) }
+instrEXECUTE_Math :: CPUState -> String -> Int -> Int -> CPUState
+instrEXECUTE_Math cpu op destIdx srcIdx = 
+    let vDest = Map.findWithDefault 0 destIdx (d_regs cpu)
+        vSrc  = Map.findWithDefault 0 srcIdx (d_regs cpu)
+        res = case op of 
+            "ADD" -> vDest + vSrc
+            "SUB" -> vDest - vSrc
+            "POW" -> vDest ^ vSrc
+            _     -> vDest
+        newDRs = Map.insert destIdx res (d_regs cpu)
+    in cpu { d_regs = newDRs }
 
 instrLOAD :: CPUState -> Int -> Int -> Int -> Either String CPUState
 instrLOAD cpu d s i = 
@@ -212,24 +219,51 @@ instrSAVE cpu d s =
     if not (PermSave `elem` activePerms dst) then Left "TRAP: No SAVE Perm" else Right "SUCCESS: Bound."
 
 -- =========================================================================
--- 5. CONSOLE
+-- 5. CONSOLE (CRASH-PROOF)
 -- =========================================================================
+
+-- Helper: Safe Integer Parser
+readInt :: String -> Maybe Int
+readInt s = readMaybe s
 
 runConsole :: CPUState -> IO ()
 runConsole cpu = do
-    -- Display HUD before prompting command
     displayHUD cpu 
     putStr ">> CMD (CHANGE/ADD/SUB/LOAD/SAVE/EXIT): "
     hFlush stdout
     input <- getLine
+    
     case words input of
         ["EXIT"] -> putStrLn "--- SHUTDOWN ---"
-        ("CHANGE":x:_) -> instrCHANGE cpu (read x) >>= runConsole
-        ("ADD":d:s1:s2:_) -> runConsole (instrEXECUTE_Math cpu "ADD" (read d) (read s1) (read s2))
-        ("SUB":d:s1:s2:_) -> runConsole (instrEXECUTE_Math cpu "SUB" (read d) (read s1) (read s2))
-        ("LOAD":d:s:i:_)  -> case instrLOAD cpu (read d) (read s) (read i) of Right c -> runConsole c; Left e -> putStrLn e >> runConsole cpu
-        ("SAVE":d:s:_)    -> case instrSAVE cpu (read d) (read s) of Right m -> putStrLn m >> runConsole cpu; Left e -> putStrLn e >> runConsole cpu
-        _ -> putStrLn "Unknown" >> runConsole cpu
+        
+        -- CHANGE Process
+        ("CHANGE":xStr:_) -> case readInt xStr of
+            Just x  -> instrCHANGE cpu x >>= runConsole
+            Nothing -> putStrLn "[CONSOLE ERROR] Invalid Argument (Expected Integer)" >> runConsole cpu
+            
+        -- MATH: ADD/SUB/POW Dest Src (2 Args)
+        (op:dStr:sStr:_) | op `elem` ["ADD", "SUB", "POW"] -> 
+            case (readInt dStr, readInt sStr) of
+                (Just d, Just s) -> runConsole (instrEXECUTE_Math cpu op d s)
+                _                -> putStrLn "[CONSOLE ERROR] Invalid Register Index" >> runConsole cpu
+
+        -- LOAD Dest Src Index (3 Args)
+        ("LOAD":dStr:sStr:iStr:_) -> 
+            case (readInt dStr, readInt sStr, readInt iStr) of
+                (Just d, Just s, Just i) -> case instrLOAD cpu d s i of
+                    Right c -> runConsole c
+                    Left e  -> putStrLn ("[TRAP] " ++ e) >> runConsole cpu
+                _ -> putStrLn "[CONSOLE ERROR] Invalid Arguments" >> runConsole cpu
+
+        -- SAVE Dest Src (2 Args)
+        ("SAVE":dStr:sStr:_) ->
+            case (readInt dStr, readInt sStr) of
+                (Just d, Just s) -> case instrSAVE cpu d s of
+                    Right m -> putStrLn ("   " ++ m) >> runConsole cpu
+                    Left e  -> putStrLn ("[TRAP] " ++ e) >> runConsole cpu
+                _ -> putStrLn "[CONSOLE ERROR] Invalid Arguments" >> runConsole cpu
+                
+        _ -> putStrLn "[CONSOLE ERROR] Unknown Command or Wrong Syntax" >> runConsole cpu
 
 -- =========================================================================
 -- 6. MAIN
@@ -249,6 +283,7 @@ main = do
     putStrLn ">> Press ENTER for Step 4..." >> getLine
     
     cpu4 <- bootStep4_LoadResources cpu3
-    putStrLn ">> BOOT COMPLETE. ENTERING CONSOLE..." >> getLine
+    putStrLn ">> BOOT COMPLETE. ENTERING CONSOLE..."
+    putStrLn ">> Try: ADD 0 1 (Computes DR0 = DR0 + DR1)" >> getLine
     
     runConsole cpu4
