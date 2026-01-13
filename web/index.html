@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PP250 Meta-Machine Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>PP250 Meta-Machine Simulator</h1>
+        <p class="subtitle">Capability-Based Security Architecture</p>
+    </header>
+
+    <nav class="controls">
+        <div class="view-selector">
+            <label for="viewSelect">View:</label>
+            <select id="viewSelect" onchange="switchView(this.value)">
+                <option value="dashboard">CPU State Dashboard</option>
+                <option value="tutorial">Interactive Tutorial</option>
+                <option value="visualizer">Instruction Visualizer</option>
+                <option value="capabilities">Capability Explorer</option>
+                <option value="editor">Assembly Editor</option>
+            </select>
+        </div>
+        <div class="action-buttons">
+            <button onclick="resetCPU()" class="btn btn-reset">Reset</button>
+            <button onclick="stepInstruction()" class="btn btn-step">Step</button>
+            <button onclick="runProgram()" class="btn btn-run">Run</button>
+        </div>
+    </nav>
+
+    <main id="mainContent">
+        <section id="dashboard" class="view active">
+            <div class="dashboard-grid">
+                <div class="panel context-registers">
+                    <h2>Context Registers (Capabilities)</h2>
+                    <div class="register-list" id="contextRegs"></div>
+                </div>
+
+                <div class="panel data-registers">
+                    <h2>Data Registers (64-bit)</h2>
+                    <div class="register-list" id="dataRegs"></div>
+                </div>
+
+                <div class="panel system-state">
+                    <h2>System State</h2>
+                    <div class="state-info">
+                        <div class="state-row">
+                            <span class="label">CR15 (Namespace):</span>
+                            <span id="cr15Name" class="value">NULL</span>
+                        </div>
+                        <div class="state-row">
+                            <span class="label">CR8 (Thread):</span>
+                            <span id="cr8Name" class="value">NULL</span>
+                        </div>
+                        <div class="state-row">
+                            <span class="label">IP (Instruction Ptr):</span>
+                            <span id="ipValue" class="value">0</span>
+                        </div>
+                        <div class="state-row">
+                            <span class="label">Stack Depth:</span>
+                            <span id="stackDepth" class="value">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel flags">
+                    <h2>Condition Flags (NZCV)</h2>
+                    <div class="flag-display">
+                        <div class="flag" id="flagN" title="Negative: Result has sign bit set">
+                            <span class="flag-letter">N</span>
+                            <span class="flag-name">Negative</span>
+                        </div>
+                        <div class="flag" id="flagZ" title="Zero: Result is zero">
+                            <span class="flag-letter">Z</span>
+                            <span class="flag-name">Zero</span>
+                        </div>
+                        <div class="flag" id="flagC" title="Carry: Unsigned overflow">
+                            <span class="flag-letter">C</span>
+                            <span class="flag-name">Carry</span>
+                        </div>
+                        <div class="flag" id="flagV" title="Overflow: Signed overflow">
+                            <span class="flag-letter">V</span>
+                            <span class="flag-name">Overflow</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel command-panel">
+                    <h2>Command Input</h2>
+                    <div class="command-input-area">
+                        <select id="instrSelect" onchange="updateInstrHelp()">
+                            <optgroup label="Arithmetic">
+                                <option value="ADD">ADD - Add</option>
+                                <option value="SUB">SUB - Subtract</option>
+                                <option value="MUL">MUL - Multiply</option>
+                                <option value="NEG">NEG - Negate</option>
+                                <option value="ADDI">ADDI - Add Immediate</option>
+                                <option value="SUBI">SUBI - Subtract Immediate</option>
+                            </optgroup>
+                            <optgroup label="Data Movement">
+                                <option value="MOV">MOV - Move</option>
+                                <option value="MVN">MVN - Move NOT</option>
+                            </optgroup>
+                            <optgroup label="Logic">
+                                <option value="AND">AND - Bitwise AND</option>
+                                <option value="ORR">ORR - Bitwise OR</option>
+                                <option value="EOR">EOR - Bitwise XOR</option>
+                                <option value="BIC">BIC - Bit Clear</option>
+                                <option value="NOT">NOT - Bitwise NOT</option>
+                            </optgroup>
+                            <optgroup label="Shifts">
+                                <option value="LSL">LSL - Logical Shift Left</option>
+                                <option value="LSR">LSR - Logical Shift Right</option>
+                                <option value="ASR">ASR - Arithmetic Shift Right</option>
+                                <option value="ROR">ROR - Rotate Right</option>
+                            </optgroup>
+                            <optgroup label="Compare">
+                                <option value="CMP">CMP - Compare</option>
+                                <option value="CMN">CMN - Compare Negative</option>
+                                <option value="TST">TST - Test Bits</option>
+                                <option value="TEQ">TEQ - Test Equal</option>
+                            </optgroup>
+                        </select>
+                        <div class="operands" id="operandInputs"></div>
+                        <button onclick="executeCommand()" class="btn btn-execute">Execute</button>
+                    </div>
+                    <div class="instruction-help" id="instrHelp"></div>
+                </div>
+
+                <div class="panel output-panel">
+                    <h2>Output Log</h2>
+                    <div class="output-log" id="outputLog"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tutorial" class="view">
+            <div class="tutorial-content">
+                <h2>Interactive Tutorial</h2>
+                <p class="coming-soon">Coming soon - Step-by-step lessons on capability-based security</p>
+            </div>
+        </section>
+
+        <section id="visualizer" class="view">
+            <div class="visualizer-content">
+                <h2>Instruction Visualizer</h2>
+                <p class="coming-soon">Coming soon - Watch data flow through registers</p>
+            </div>
+        </section>
+
+        <section id="capabilities" class="view">
+            <div class="capabilities-content">
+                <h2>Capability Explorer</h2>
+                <p class="coming-soon">Coming soon - Explore Golden Tokens and permissions</p>
+            </div>
+        </section>
+
+        <section id="editor" class="view">
+            <div class="editor-content">
+                <h2>Assembly Editor</h2>
+                <p class="coming-soon">Coming soon - Write and debug PP250 programs</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="simulator.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

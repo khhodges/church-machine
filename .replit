@@ -1,4 +1,4 @@
-modules = ["haskell-ghc9.8"]
+modules = ["haskell-ghc9.8", "python-3.11"]
 [agent]
 expertMode = true
 
@@ -14,6 +14,10 @@ author = "agent"
 task = "workflow.run"
 args = "Run Haskell"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "PP250 Web Simulator"
+
 [[workflows.workflow]]
 name = "Run Haskell"
 author = "agent"
@@ -24,3 +28,19 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "runghc -i. metaMachine.hs"
+
+[[workflows.workflow]]
+name = "PP250 Web Simulator"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python web/server.py"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80

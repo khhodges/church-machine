@@ -29,9 +29,17 @@ PP250/
 ```
 
 ## Running the Project
+
+### Console Simulator (Haskell)
 ```bash
 runghc -i. metaMachine.hs
 ```
+
+### Web Visualization
+```bash
+python web/server.py
+```
+Then open http://localhost:5000 in your browser.
 
 ## Key Concepts
 - **Context Registers (CR0-CR7)**: Hold capability keys granting access rights
