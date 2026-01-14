@@ -996,11 +996,11 @@ function updateLineNumbers() {
     if (!editor || !lineNumbers) return;
     
     const lines = editor.value.split('\n').length;
-    let nums = '';
+    let nums = [];
     for (let i = 1; i <= lines; i++) {
-        nums += i + '\n';
+        nums.push(i);
     }
-    lineNumbers.textContent = nums;
+    lineNumbers.innerHTML = nums.join('<br>');
 }
 
 function syncScroll() {
