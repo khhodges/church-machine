@@ -457,6 +457,23 @@ function updateFlags() {
             el.classList.remove('active');
         }
     });
+    
+    const flagP = document.getElementById('flagP');
+    const flagB = document.getElementById('flagB');
+    if (flagP) {
+        if (simulator.flags.C) {
+            flagP.classList.add('active');
+        } else {
+            flagP.classList.remove('active');
+        }
+    }
+    if (flagB) {
+        if (simulator.flags.V) {
+            flagB.classList.add('active');
+        } else {
+            flagB.classList.remove('active');
+        }
+    }
 }
 
 function log(message, type = 'info') {

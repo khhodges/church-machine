@@ -280,6 +280,25 @@ main {
     text-align: center;
 }
 
+.flag-display-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.flag-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.flag-row-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    min-width: 50px;
+    font-weight: 500;
+}
+
 .flag-display {
     display: flex;
     justify-content: space-around;
@@ -290,10 +309,10 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 1rem;
+    padding: 0.6rem;
     background: var(--bg-input);
-    border-radius: 8px;
-    min-width: 70px;
+    border-radius: 6px;
+    min-width: 55px;
     transition: all 0.3s;
 }
 
@@ -303,14 +322,14 @@ main {
 }
 
 .flag-letter {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: bold;
 }
 
 .flag-name {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     color: var(--text-secondary);
-    margin-top: 0.3rem;
+    margin-top: 0.2rem;
 }
 
 .flag.active .flag-name {

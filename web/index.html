@@ -87,23 +87,37 @@
                 </div>
 
                 <div class="panel flags">
-                    <h2>Condition Flags (NZCV)</h2>
-                    <div class="flag-display">
-                        <div class="flag" id="flagN" data-tooltip="Negative flag. Set when result has sign bit set (negative number).">
-                            <span class="flag-letter">N</span>
-                            <span class="flag-name">Negative</span>
+                    <h2>Condition Flags</h2>
+                    <div class="flag-display-container">
+                        <div class="flag-row">
+                            <span class="flag-row-label">Turing:</span>
+                            <div class="flag" id="flagN" data-tooltip="Negative flag. Set when result has sign bit set (negative number). TPERM: Set if no permissions.">
+                                <span class="flag-letter">N</span>
+                                <span class="flag-name">Negative</span>
+                            </div>
+                            <div class="flag" id="flagZ" data-tooltip="Zero flag. Set when result equals zero. TPERM: Set if all checks pass (safe to use).">
+                                <span class="flag-letter">Z</span>
+                                <span class="flag-name">Zero</span>
+                            </div>
+                            <div class="flag" id="flagC" data-tooltip="Carry flag. Set on unsigned overflow (ADD) or no borrow (SUB). TPERM: Set if permissions OK.">
+                                <span class="flag-letter">C</span>
+                                <span class="flag-name">Carry</span>
+                            </div>
+                            <div class="flag" id="flagV" data-tooltip="Overflow flag. Set when signed arithmetic overflows. TPERM: Set if bounds OK.">
+                                <span class="flag-letter">V</span>
+                                <span class="flag-name">Overflow</span>
+                            </div>
                         </div>
-                        <div class="flag" id="flagZ" data-tooltip="Zero flag. Set when result equals zero.">
-                            <span class="flag-letter">Z</span>
-                            <span class="flag-name">Zero</span>
-                        </div>
-                        <div class="flag" id="flagC" data-tooltip="Carry flag. Set on unsigned overflow (ADD) or no borrow (SUB).">
-                            <span class="flag-letter">C</span>
-                            <span class="flag-name">Carry</span>
-                        </div>
-                        <div class="flag" id="flagV" data-tooltip="Overflow flag. Set when signed arithmetic overflows.">
-                            <span class="flag-letter">V</span>
-                            <span class="flag-name">Overflow</span>
+                        <div class="flag-row">
+                            <span class="flag-row-label">Church:</span>
+                            <div class="flag" id="flagP" data-tooltip="Permission flag. Set when capability has required permissions (TPERM result).">
+                                <span class="flag-letter">P</span>
+                                <span class="flag-name">Perm OK</span>
+                            </div>
+                            <div class="flag" id="flagB" data-tooltip="Bounds flag. Set when access is within capability bounds (TPERM result).">
+                                <span class="flag-letter">B</span>
+                                <span class="flag-name">Bounds OK</span>
+                            </div>
                         </div>
                     </div>
                 </div>
