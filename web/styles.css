@@ -1961,6 +1961,8 @@ main {
     user-select: none;
     border-right: 1px solid var(--border);
     min-width: 40px;
+    white-space: pre;
+    overflow-y: auto;
 }
 
 #codeEditor {
