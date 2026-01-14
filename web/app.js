@@ -2394,6 +2394,29 @@ function contextMenuAction(action) {
     }
 }
 
+function updatePermissionsForType(type) {
+    const dataPerms = ['R', 'W', 'X'];
+    const capPerms = ['L', 'S', 'E', 'B'];
+    
+    const isDataType = (type === 'Data');
+    
+    dataPerms.forEach(p => {
+        const checkbox = document.getElementById(`modalPerm${p}`);
+        const label = checkbox.parentElement;
+        checkbox.disabled = !isDataType;
+        label.classList.toggle('perm-disabled', !isDataType);
+        if (!isDataType) checkbox.checked = false;
+    });
+    
+    capPerms.forEach(p => {
+        const checkbox = document.getElementById(`modalPerm${p}`);
+        const label = checkbox.parentElement;
+        checkbox.disabled = isDataType;
+        label.classList.toggle('perm-disabled', isDataType);
+        if (isDataType) checkbox.checked = false;
+    });
+}
+
 function openAddObjectModal() {
     contextMenuState.editMode = false;
     document.getElementById('modalTitle').textContent = 'Add New Object';
@@ -2406,6 +2429,8 @@ function openAddObjectModal() {
     ['R', 'W', 'X', 'L', 'S', 'E', 'B'].forEach(p => {
         document.getElementById(`modalPerm${p}`).checked = (p === 'R');
     });
+    
+    updatePermissionsForType('Data');
     
     populateParentSelect();
     document.getElementById('modalParent').value = contextMenuState.targetObject || 'Boot';
@@ -2433,8 +2458,13 @@ function openEditObjectModal() {
     document.getElementById('modalObjType').value = obj.type;
     document.getElementById('modalObjSize').value = obj.size.toString();
     
+    updatePermissionsForType(obj.type);
+    
     ['R', 'W', 'X', 'L', 'S', 'E', 'B'].forEach(p => {
-        document.getElementById(`modalPerm${p}`).checked = obj.perms.includes(p);
+        const checkbox = document.getElementById(`modalPerm${p}`);
+        if (!checkbox.disabled) {
+            checkbox.checked = obj.perms.includes(p);
+        }
     });
     
     populateParentSelect();

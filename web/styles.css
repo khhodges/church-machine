@@ -2716,6 +2716,17 @@ main {
     color: var(--text-secondary);
 }
 
+.modal-perm-check.perm-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.modal-perm-check.perm-disabled span {
+    background: #333;
+    color: #666;
+}
+
 .modal-footer {
     display: flex;
     justify-content: flex-end;

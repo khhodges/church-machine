@@ -713,7 +713,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                 </div>
                 <div class="modal-field">
                     <label>Object Type</label>
-                    <select id="modalObjType">
+                    <select id="modalObjType" onchange="updatePermissionsForType(this.value)">
                         <option value="Data">Data (storage)</option>
                         <option value="C-List">C-List (capability container)</option>
                         <option value="GT">GT (Golden Token function)</option>
