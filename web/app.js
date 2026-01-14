@@ -975,8 +975,8 @@ CALL 0        ; Call via CR0 capability
 
 ; Step 4: After RETURN
 ; DR0 = status (0=OK, 1=ERR)
-; DR1-DR3 = return values
-; DR4-DR7 = GT vars (GT0-GT3)`,
+; DR1-DR3 = return data values
+; CR0-CR3 = GT vars (type-safe caps)`,
 
     guardCode: `; ========== GUARD CODE ==========
 ; Entry point at offset 0
@@ -1000,8 +1000,9 @@ CMP 0 5       ; Is GT == DELETE?
 
 ; ========== RETURN PROTOCOL ==========
 ; DR0 = return status (0=OK, 1=ERR)
-; DR1-DR3 = return values
-; DR4-DR7 = GT variables (GT0-GT3)
+; DR1-DR3 = return data values
+; CR0-CR3 = GT variables (type-safe)
+; Capabilities stay in CR domain!
 ; RETURN unwinds to caller context
 RETURN`
 };
