@@ -34,7 +34,7 @@ header {
 }
 
 header h1 {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     color: var(--accent);
     text-shadow: 0 0 20px var(--accent-glow);
 }
@@ -142,7 +142,7 @@ main {
 }
 
 .panel h2 {
-    font-size: 1rem;
+    font-size: 0.9rem;
     color: var(--accent);
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;

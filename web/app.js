@@ -393,10 +393,10 @@ function updateContextRegisters() {
         7: 'NUCLEUS'
     };
     
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
         const reg = simulator.contextRegs[i];
         const isNull = reg.name === 'NULL';
-        const role = roles[i] || 'GENERAL';
+        const role = 'GENERAL';
         const tooltip = crTooltips[i];
         const permTooltip = reg.perms.length > 0 ? 
             `Permissions: ${reg.perms.map(p => {
