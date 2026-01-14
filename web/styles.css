@@ -2460,6 +2460,63 @@ main {
     cursor: help;
 }
 
+/* ==================== NAMESPACE TOOLBAR ==================== */
+
+.namespace-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #1e1e2e 0%, #252538 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.toolbar-label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.toolbar-label span {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.toolbar-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-toolbar {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-toolbar:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.btn-toolbar.btn-danger:hover {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+.ns-object.selected,
+.hier-item.selected > .hier-node {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    background: rgba(233, 69, 96, 0.15);
+}
+
 /* ==================== CONTEXT MENU ==================== */
 
 .context-menu {

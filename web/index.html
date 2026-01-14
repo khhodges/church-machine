@@ -163,10 +163,19 @@
         </section>
 
         <section id="namespace" class="view">
+            <div class="namespace-toolbar">
+                <span class="toolbar-label">Selected: <span id="selectedObjectName">None</span></span>
+                <div class="toolbar-buttons">
+                    <button class="btn btn-toolbar" onclick="toolbarAction('add')" title="Add new object as child of selected">+ Add</button>
+                    <button class="btn btn-toolbar" onclick="toolbarAction('edit')" title="Edit selected object">Edit</button>
+                    <button class="btn btn-toolbar" onclick="toolbarAction('link')" title="Link selected object to another C-List">Link</button>
+                    <button class="btn btn-toolbar btn-danger" onclick="toolbarAction('delete')" title="Delete selected object">Delete</button>
+                </div>
+            </div>
             <div class="namespace-layout">
                 <div class="ns-panel ns-objects">
                     <h2>Namespace Objects</h2>
-                    <p class="ns-intro">Flat list of all objects by location and metadata</p>
+                    <p class="ns-intro">Click to select, then use toolbar buttons above</p>
                     <div class="ns-list" id="namespaceList">
                         <div class="ns-empty">Boot system to view namespace</div>
                     </div>

@@ -2308,6 +2308,46 @@ let contextMenuState = {
 let dynamicObjects = [];
 let nextAddress = 0x8000;
 
+let selectedObject = {
+    name: null,
+    type: null
+};
+
+function selectObject(name, type) {
+    selectedObject.name = name;
+    selectedObject.type = type;
+    
+    document.querySelectorAll('.ns-object.selected, .hier-item.selected').forEach(el => {
+        el.classList.remove('selected');
+    });
+    
+    document.querySelectorAll(`.ns-object[data-name="${name}"], .hier-item[data-name="${name}"]`).forEach(el => {
+        el.classList.add('selected');
+    });
+    
+    const label = document.getElementById('selectedObjectName');
+    if (label) {
+        label.textContent = name || 'None';
+    }
+    
+    contextMenuState.targetObject = name;
+    contextMenuState.targetType = type;
+}
+
+function toolbarAction(action) {
+    if (!selectedObject.name && action !== 'add') {
+        log('Please select an object first by clicking on it', 'warning');
+        return;
+    }
+    
+    if (action === 'add' && !selectedObject.name) {
+        contextMenuState.targetObject = 'Boot';
+        contextMenuState.targetType = 'Root';
+    }
+    
+    contextMenuAction(action);
+}
+
 function hideContextMenu() {
     document.getElementById('contextMenu').classList.remove('visible');
 }
@@ -2683,18 +2723,31 @@ function confirmLinkModal() {
 
 function attachContextMenuListeners() {
     document.querySelectorAll('.ns-object').forEach(el => {
+        el.addEventListener('click', function(e) {
+            const name = this.dataset.name;
+            const type = this.dataset.type;
+            selectObject(name, type);
+        });
         el.addEventListener('contextmenu', function(e) {
             const name = this.dataset.name;
             const type = this.dataset.type;
+            selectObject(name, type);
             showContextMenu(e, name, type);
         });
     });
     
     document.querySelectorAll('.hier-item').forEach(el => {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const name = this.dataset.name;
+            const type = this.dataset.type || 'unknown';
+            selectObject(name, type);
+        });
         el.addEventListener('contextmenu', function(e) {
             e.stopPropagation();
             const name = this.dataset.name;
             const type = this.dataset.type || 'unknown';
+            selectObject(name, type);
             showContextMenu(e, name, type);
         });
     });
