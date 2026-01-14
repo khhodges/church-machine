@@ -165,6 +165,10 @@ Used with conditional branches (e.g., `B EQ 10` branches if equal).
 | SWITCH reg | Set CR15 (Namespace) to capability in CR[reg] |
 
 ## Recent Changes
+- 2026-01-14: Enhanced Command Input with categorized dropdown for all instructions (Arithmetic, Logic, Shifts, Compare, Branch, Capability Church)
+- 2026-01-14: Added Church Instructions to web simulator (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH) with permission checking
+- 2026-01-14: Added condition code dropdown for branch instructions (EQ/NE/GT/LT/CS/CC/MI/PL/VS/VC/HI/LS/GE/LE)
+- 2026-01-14: Added CR register selector with CR8 (Thread) and CR15 (Namespace) options
 - 2026-01-14: Added TPERM instruction for validating gifted capabilities (permission mask + optional bounds check)
 - 2026-01-13: Added Capability DNS Editor with MINT function for creating new capabilities with custom size/permissions
 - 2026-01-13: Added Interactive Tutorial with 5 lessons on capability-based security concepts

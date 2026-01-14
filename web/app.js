@@ -369,56 +369,12 @@ function executeCommand() {
     });
     
     try {
-        let result;
-        if (instr === 'TPERM') {
-            result = simulator.execute('TPERM', args[0], args[1], args[2]);
-        } else if (instr === 'B') {
-            const cond = args[0] || '';
-            const offset = args[1];
-            simulator.ip = offset;
-            result = `Branch${cond ? ' (' + cond + ')' : ''} to ${offset}`;
-        } else if (instr === 'BL') {
-            simulator.dataRegs[7] = BigInt(simulator.ip + 1);
-            simulator.ip = args[0];
-            result = `Branch with Link to ${args[0]}, return addr saved to DR7`;
-        } else if (instr === 'LOAD') {
-            const destCR = args[0];
-            const srcCR = args[1];
-            const idx = args[2];
-            simulator.contextRegs[destCR] = {
-                name: `LOADED_${idx}`,
-                location: { type: 'Local', offset: idx * 256 },
-                perms: ['R'],
-                locked: false,
-                goldenKey: generateGoldenKey()
-            };
-            result = `Loaded capability into CR${destCR} via CR${srcCR}[${idx}]`;
-        } else if (instr === 'SAVE') {
-            result = `Saved DR${args[1]} via CR${args[0]}`;
-        } else if (instr === 'CALL') {
-            simulator.stackDepth++;
-            result = `Called procedure in CR${args[0]}, stack depth: ${simulator.stackDepth}`;
-        } else if (instr === 'RETURN') {
-            if (simulator.stackDepth > 0) {
-                simulator.stackDepth--;
-                result = `Returned from procedure, stack depth: ${simulator.stackDepth}`;
-            } else {
-                result = 'Error: Stack underflow - no procedure to return from';
-            }
-        } else if (instr === 'CHANGE') {
-            result = `Changed to thread at offset ${args[0]}`;
-        } else if (instr === 'SWITCH') {
-            const cr = simulator.contextRegs[args[0]];
-            if (cr && cr.name !== 'NULL') {
-                simulator.cr15 = { ...cr };
-                result = `Switched namespace to ${cr.name}`;
-            } else {
-                result = `Error: CR${args[0]} is NULL`;
-            }
-        } else {
-            result = simulator.execute(instr, ...args.filter(a => a !== undefined));
-        }
-        log(`${instr} ${args.filter(a => a !== undefined).join(' ')}: ${result}`, 'success');
+        const result = simulator.execute(instr, ...args.filter(a => a !== undefined));
+        
+        const argsStr = args.filter(a => a !== undefined).join(' ');
+        const isError = result.startsWith('Error:');
+        log(`${instr} ${argsStr}: ${result}`, isError ? 'error' : 'success');
+        
         updateDisplay();
         updateCapabilityExplorer();
     } catch (e) {
