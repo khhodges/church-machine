@@ -2449,11 +2449,6 @@ function openEditObjectModal() {
         return;
     }
     
-    if (!obj.dynamic) {
-        log('Cannot edit built-in objects', 'warning');
-        return;
-    }
-    
     document.getElementById('modalObjName').value = obj.name;
     document.getElementById('modalObjType').value = obj.type;
     document.getElementById('modalObjSize').value = obj.size.toString();
@@ -2578,47 +2573,61 @@ function findAllCListReferences(name) {
 
 function updateObject(oldName, updates) {
     let obj = dynamicObjects.find(o => o.name === oldName);
-    if (obj) {
-        const oldParent = obj.parent;
-        const parentChanged = oldParent !== updates.parent;
-        
-        const allRefs = findAllCListReferences(oldName);
-        
-        removeFromCLists(oldName);
-        
-        if (oldName !== updates.name && dynamicCLists[oldName]) {
-            dynamicCLists[updates.name] = dynamicCLists[oldName];
-            delete dynamicCLists[oldName];
-        }
-        
-        Object.assign(obj, updates);
-        
-        const addedParents = new Set();
-        
-        allRefs.forEach(ref => {
-            if (parentChanged && ref.parent === oldParent) {
-                return;
-            }
-            if (!addedParents.has(ref.parent)) {
-                addToCList(ref.parent, updates.name, updates.type, updates.perms);
-                addedParents.add(ref.parent);
-            }
-        });
-        
-        if (!addedParents.has(updates.parent)) {
-            addToCList(updates.parent, updates.name, updates.type, updates.perms);
-        }
-        
-        dynamicObjects.forEach(child => {
-            if (child.parent === oldName) {
-                child.parent = updates.name;
-            }
-        });
-        
-        log(`Updated object "${updates.name}"`, 'info');
-    } else {
-        log('Cannot edit built-in objects', 'warning');
+    let isBuiltIn = false;
+    
+    if (!obj) {
+        obj = namespaceObjects.find(o => o.name === oldName);
+        isBuiltIn = true;
     }
+    
+    if (!obj) {
+        log('Object not found', 'error');
+        return;
+    }
+    
+    const oldParent = obj.parent;
+    const parentChanged = oldParent !== updates.parent;
+    
+    const allRefs = findAllCListReferences(oldName);
+    
+    removeFromCLists(oldName);
+    
+    if (oldName !== updates.name && dynamicCLists[oldName]) {
+        dynamicCLists[updates.name] = dynamicCLists[oldName];
+        delete dynamicCLists[oldName];
+    }
+    
+    obj.name = updates.name;
+    obj.type = updates.type;
+    obj.size = updates.size;
+    obj.perms = updates.perms;
+    if (!isBuiltIn) {
+        obj.parent = updates.parent;
+    }
+    
+    const addedParents = new Set();
+    
+    allRefs.forEach(ref => {
+        if (parentChanged && ref.parent === oldParent) {
+            return;
+        }
+        if (!addedParents.has(ref.parent)) {
+            addToCList(ref.parent, updates.name, updates.type, updates.perms);
+            addedParents.add(ref.parent);
+        }
+    });
+    
+    if (!addedParents.has(updates.parent)) {
+        addToCList(updates.parent, updates.name, updates.type, updates.perms);
+    }
+    
+    dynamicObjects.forEach(child => {
+        if (child.parent === oldName) {
+            child.parent = updates.name;
+        }
+    });
+    
+    log(`Updated object "${updates.name}"`, 'info');
 }
 
 function deleteObjectRecursive(name) {
