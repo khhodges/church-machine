@@ -569,10 +569,13 @@
                     
                     <div class="editor-examples">
                         <h3>Example Programs</h3>
-                        <button onclick="loadExample('counter')" class="btn-example">Counter Loop</button>
-                        <button onclick="loadExample('fibonacci')" class="btn-example">Fibonacci</button>
-                        <button onclick="loadExample('multiply')" class="btn-example">Multiply</button>
-                        <button onclick="loadExample('flags')" class="btn-example">Flag Demo</button>
+                        <div class="example-list">
+                            <button onclick="loadExample('counter')" class="btn-example">Counter Loop</button>
+                            <button onclick="loadExample('fibonacci')" class="btn-example">Fibonacci</button>
+                            <button onclick="loadExample('multiply')" class="btn-example">Multiply</button>
+                            <button onclick="loadExample('flags')" class="btn-example">Flag Demo</button>
+                            <button onclick="loadExample('funcDispatch')" class="btn-example">Function Dispatch</button>
+                        </div>
                     </div>
                     
                     <div class="editor-help">
@@ -588,6 +591,9 @@
                         </div>
                         <div class="help-section">
                             <strong>Compare:</strong> CMP, CMN, TST, TEQ
+                        </div>
+                        <div class="help-section">
+                            <strong>Capability:</strong> LOAD, SAVE, CALL, RETURN
                         </div>
                         <div class="help-section">
                             <strong>Comments:</strong> ; semicolon

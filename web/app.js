@@ -951,7 +951,30 @@ ADDI 2 5      ; DR2 = 5
 CMP 2 0       ; Compare 5 < 10: N=1 (negative result)
 
 ADDI 3 0      ; DR3 = 0
-SUB 3 0       ; DR3 = 0 - 10: N=1, C=0 (borrow)`
+SUB 3 0       ; DR3 = 0 - 10: N=1, C=0 (borrow)`,
+
+    funcDispatch: `; Function Dispatch with GT Literals
+; DR0 = function selector (GT literal)
+; CALL validates E permission automatically
+; Offset 0 dispatches based on selector
+
+; Setup: Set selector in DR0
+ADDI 0 2      ; DR0 = 2 (select function 2)
+ADDI 1 1      ; DR1 = function ID 1
+ADDI 2 2      ; DR2 = function ID 2
+ADDI 3 3      ; DR3 = function ID 3
+
+; Dispatch table (offset 0 entry point)
+CMP 0 1       ; Is selector == 1?
+; B EQ 20     ; Branch to func1 if equal
+CMP 0 2       ; Is selector == 2?
+; B EQ 30     ; Branch to func2 if equal
+CMP 0 3       ; Is selector == 3?
+; B EQ 40     ; Branch to func3 if equal
+
+; Each function has its own body
+; Meta-machine CALL already validated E
+; No permission check needed here`
 };
 
 function setupCodeEditor() {

@@ -420,8 +420,8 @@ class PP250Simulator {
                 const dest = destCR < 8 ? this.contextRegs[destCR] : 
                             destCR === 8 ? this.cr8 : this.cr15;
                 
-                if (!dest.perms.includes('S') && !dest.perms.includes('W')) {
-                    return `Error: CR${destCR} lacks Store/Write permission`;
+                if (!dest.perms.includes('S')) {
+                    return `Error: CR${destCR} lacks Store permission (S required for capability operations)`;
                 }
                 return `Saved DR${srcDR} (0x${this.dataRegs[srcDR].toString(16)}) via CR${destCR}`;
             }

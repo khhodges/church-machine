@@ -1871,6 +1871,12 @@ main {
     margin-bottom: 0.8rem;
 }
 
+.example-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
 .btn-example {
     display: block;
     width: 100%;
