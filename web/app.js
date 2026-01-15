@@ -316,6 +316,7 @@ const bootSteps = [
 ];
 
 function stepInstruction() {
+    switchView('dashboard');
     if (bootState.step < 4) {
         executeBootStep(bootState.step);
         bootState.step++;
@@ -365,6 +366,7 @@ function updateBootDisplay() {
 }
 
 function resetCPU() {
+    switchView('dashboard');
     simulator.reset();
     bootState.step = 0;
     bootState.complete = false;
@@ -660,6 +662,7 @@ function log(message, type = 'info') {
 }
 
 function runBootSequence() {
+    switchView('dashboard');
     if (bootState.complete) {
         log('System already booted. Use Reset to restart.', 'info');
         return;
