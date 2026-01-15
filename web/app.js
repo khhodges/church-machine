@@ -3275,6 +3275,39 @@ function hideCodeContextMenu() {
     document.getElementById('codeContextMenu').classList.remove('visible');
 }
 
+const instructionComments = {
+    'ADD': 'Add: DR[dest] = DR[dest] + DR[src]',
+    'SUB': 'Subtract: DR[dest] = DR[dest] - DR[src]',
+    'MUL': 'Multiply: DR[dest] = DR[dest] * DR[src]',
+    'NEG': 'Negate: DR[dest] = -DR[src]',
+    'ADDI': 'Add immediate: DR[dest] = DR[dest] + imm',
+    'SUBI': 'Subtract immediate: DR[dest] = DR[dest] - imm',
+    'AND': 'Bitwise AND: DR[dest] = DR[dest] AND DR[src]',
+    'ORR': 'Bitwise OR: DR[dest] = DR[dest] OR DR[src]',
+    'EOR': 'Bitwise XOR: DR[dest] = DR[dest] XOR DR[src]',
+    'BIC': 'Bit clear: DR[dest] = DR[dest] AND NOT DR[src]',
+    'NOT': 'Bitwise NOT: DR[dest] = NOT DR[src]',
+    'MOV': 'Move: DR[dest] = DR[src]',
+    'MVN': 'Move NOT: DR[dest] = NOT DR[src]',
+    'LSL': 'Logical shift left by amt bits',
+    'LSR': 'Logical shift right by amt bits',
+    'ASR': 'Arithmetic shift right (preserves sign)',
+    'ROR': 'Rotate right by amt bits',
+    'CMP': 'Compare: sets flags from DR[r1] - DR[r2]',
+    'CMN': 'Compare negative: sets flags from DR[r1] + DR[r2]',
+    'TST': 'Test bits: sets flags from DR[r1] AND DR[r2]',
+    'TEQ': 'Test equal: sets flags from DR[r1] XOR DR[r2]',
+    'B': 'Branch to offset (conditional if code given)',
+    'BL': 'Branch with link: saves return address',
+    'LOAD': 'Load capability from namespace into CR',
+    'SAVE': 'Save data using capability permissions',
+    'CALL': 'Call procedure via capability',
+    'RETURN': 'Return from procedure call',
+    'CHANGE': 'Context switch to thread at offset',
+    'SWITCH': 'Set CR15 namespace to capability in CR',
+    'TPERM': 'Test permissions on capability'
+};
+
 function insertInstruction(instr, operands) {
     const editor = document.getElementById('codeEditor');
     const text = editor.value;
@@ -3288,6 +3321,11 @@ function insertInstruction(instr, operands) {
     const isEmptyLine = currentLine === '';
     
     let insertText = operands ? `${instr} ${operands}` : instr;
+    
+    const comment = instructionComments[instr];
+    if (comment) {
+        insertText += `  ; ${comment}`;
+    }
     
     if (!isEmptyLine) {
         insertText = '\n' + insertText;
