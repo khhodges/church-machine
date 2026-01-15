@@ -3114,11 +3114,12 @@ main {
     color: var(--text-primary);
     font-size: 0.8rem;
     font-weight: normal;
-    white-space: nowrap;
     border-radius: 6px;
     border: 1px solid var(--accent);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 280px;
     max-width: 600px;
+    width: max-content;
     white-space: normal;
     text-align: center;
     line-height: 1.4;
