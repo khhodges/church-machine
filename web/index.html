@@ -51,18 +51,6 @@
                     <div class="register-list" id="contextRegs"></div>
                 </div>
 
-                <div class="panel data-registers">
-                    <div class="panel-header-with-nav">
-                        <h2>Turing Registers</h2>
-                        <div class="register-nav">
-                            <button id="drPrev" class="nav-btn" onclick="showDataRegPage(0)" disabled>&lt;</button>
-                            <span id="drPageLabel">0-7</span>
-                            <button id="drNext" class="nav-btn" onclick="showDataRegPage(1)">&gt;</button>
-                        </div>
-                    </div>
-                    <div class="register-list" id="dataRegs"></div>
-                </div>
-
                 <div class="panel system-state">
                     <h2>Lambda Registers</h2>
                     <div class="state-info">
@@ -91,6 +79,18 @@
                             <span id="stackDepth" class="value">0</span>
                         </div>
                     </div>
+                </div>
+
+                <div class="panel data-registers">
+                    <div class="panel-header-with-nav">
+                        <h2>Turing Registers</h2>
+                        <div class="register-nav">
+                            <button id="drPrev" class="nav-btn" onclick="showDataRegPage(0)" disabled>&lt;</button>
+                            <span id="drPageLabel">0-7</span>
+                            <button id="drNext" class="nav-btn" onclick="showDataRegPage(1)">&gt;</button>
+                        </div>
+                    </div>
+                    <div class="register-list" id="dataRegs"></div>
                 </div>
 
                 <div class="panel flags">

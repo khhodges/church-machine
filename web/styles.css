@@ -28,31 +28,32 @@ body {
 
 header {
     background: linear-gradient(135deg, var(--bg-panel) 0%, var(--bg-dark) 100%);
-    padding: 1.5rem 2rem;
+    padding: 0.6rem 1rem;
     border-bottom: 2px solid var(--accent);
     text-align: center;
 }
 
 header h1 {
-    font-size: 1.6rem;
+    font-size: 1.3rem;
     color: var(--accent);
     text-shadow: 0 0 20px var(--accent-glow);
 }
 
 .subtitle {
     color: var(--text-secondary);
-    margin-top: 0.3rem;
+    margin-top: 0.2rem;
+    font-size: 0.85rem;
 }
 
 nav.controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2rem;
+    padding: 0.5rem 1rem;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.5rem;
 }
 
 .view-selector {
@@ -66,25 +67,25 @@ nav.controls {
 }
 
 .view-selector select {
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.8rem;
     background: var(--bg-input);
     color: var(--text-primary);
     border: 1px solid var(--border);
     border-radius: 4px;
-    font-size: 1rem;
+    font-size: 0.85rem;
     cursor: pointer;
 }
 
 .action-buttons {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .btn {
-    padding: 0.5rem 1.2rem;
+    padding: 0.4rem 1rem;
     border: none;
     border-radius: 4px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.2s;
 }
@@ -117,7 +118,7 @@ nav.controls {
 }
 
 main {
-    padding: 1.5rem;
+    padding: 0.8rem;
 }
 
 .view {
@@ -130,22 +131,22 @@ main {
 
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.8rem;
 }
 
 .panel {
     background: var(--bg-panel);
-    border-radius: 8px;
-    padding: 1.2rem;
+    border-radius: 6px;
+    padding: 0.8rem;
     border: 1px solid var(--border);
 }
 
 .panel h2 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     color: var(--accent);
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--border);
 }
 
@@ -153,8 +154,8 @@ main {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
     border-bottom: 1px solid var(--border);
 }
 
@@ -206,17 +207,18 @@ main {
 .register-list {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.3rem;
 }
 
 .register-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem;
+    padding: 0.35rem 0.5rem;
     background: var(--bg-input);
     border-radius: 4px;
     font-family: 'Consolas', monospace;
+    font-size: 0.85rem;
 }
 
 .register-row .name {
@@ -240,15 +242,16 @@ main {
 .state-info {
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.3rem;
 }
 
 .state-row {
     display: flex;
     justify-content: space-between;
-    padding: 0.5rem;
+    padding: 0.35rem 0.5rem;
     background: var(--bg-input);
     border-radius: 4px;
+    font-size: 0.85rem;
 }
 
 .state-row .label {
@@ -337,24 +340,24 @@ main {
 .boot-sequence-banner {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.8rem 1rem;
+    gap: 0.6rem;
+    padding: 0.5rem 0.8rem;
     background: var(--bg-panel);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid var(--border);
-    margin-bottom: 1rem;
+    margin-bottom: 0.6rem;
     flex-wrap: wrap;
 }
 
 .boot-label {
     color: var(--warning);
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
 }
 
 .boot-steps-horizontal {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     flex: 1;
 }
 
@@ -362,9 +365,9 @@ main {
     flex: 1;
     justify-content: center;
     border-left: none;
-    border-bottom: 3px solid var(--border);
-    font-size: 0.75rem;
-    padding: 0.4rem 0.5rem;
+    border-bottom: 2px solid var(--border);
+    font-size: 0.7rem;
+    padding: 0.3rem 0.4rem;
 }
 
 .boot-sequence-banner .boot-step.active {
@@ -379,42 +382,43 @@ main {
 
 .boot-sequence-banner .boot-status {
     margin-top: 0;
-    padding: 0.4rem 0.8rem;
-    min-width: 120px;
+    padding: 0.3rem 0.6rem;
+    min-width: 100px;
+    font-size: 0.75rem;
 }
 
 .flag-display-container {
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 0.4rem;
 }
 
 .flag-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .flag-row-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-secondary);
-    min-width: 50px;
+    min-width: 45px;
     font-weight: 500;
 }
 
 .flag-display {
     display: flex;
     justify-content: space-around;
-    gap: 1rem;
+    gap: 0.6rem;
 }
 
 .flag {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 0.6rem;
+    padding: 0.4rem;
     background: var(--bg-input);
-    border-radius: 6px;
+    border-radius: 4px;
     min-width: 55px;
     transition: all 0.3s;
 }
