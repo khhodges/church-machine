@@ -3353,7 +3353,138 @@ reject:
 ; Capability failed validation - potential malware
 NEG 0 0           ; Set error flag (DR0 = 0)
 SUBI 0 1          ; DR0 = -1 (error code)
-RETURN            ; Return with error`
+RETURN            ; Return with error`,
+
+    'church_bool': `; ================================================
+; CHURCH BOOLEANS using Golden Tokens
+; TRUE  = λx.λy.x  (select first)
+; FALSE = λx.λy.y  (select second)
+; ================================================
+
+; TRUE: Returns first argument (CR1)
+true:
+LOAD 0 1 0        ; CR0 = first argument GT
+RETURN            ; Return first
+
+; FALSE: Returns second argument (CR2)
+false:
+LOAD 0 2 0        ; CR0 = second argument GT
+RETURN            ; Return second
+
+; IF-THEN-ELSE: λb.λt.λf. b t f
+; Input: CR0=bool, CR1=then-branch, CR2=else-branch
+if_then_else:
+TPERM 0 X         ; Verify bool is callable
+CALL 0            ; Call bool with then/else in CR1/CR2
+RETURN            ; Result is in CR0
+
+; NOT: λb. b FALSE TRUE
+not:
+; Swap CR1 and CR2, then call bool
+LOAD 3 1 0        ; CR3 = temp = CR1
+LOAD 1 2 0        ; CR1 = CR2 (FALSE position)
+LOAD 2 3 0        ; CR2 = temp (TRUE position)
+CALL 0            ; bool selects opposite
+RETURN`,
+
+    'church_num': `; ================================================
+; CHURCH NUMERALS using Golden Tokens
+; 0 = λf.λx.x           (apply f zero times)
+; 1 = λf.λx.f x         (apply f once)
+; n = λf.λx.f^n x       (apply f n times)
+; ================================================
+
+; ZERO: λf.λx.x (identity on x)
+zero:
+LOAD 0 2 0        ; CR0 = x (second arg, ignore f)
+RETURN
+
+; SUCC: λn.λf.λx.f(n f x)
+; Add one to Church numeral
+; Input: CR0=n, CR1=f, CR2=x
+succ:
+; First compute (n f x)
+LOAD 3 0 0        ; CR3 = n (save numeral)
+CALL 3            ; Apply n to f,x -> result in CR0
+
+; Then apply f one more time
+LOAD 3 0 0        ; CR3 = (n f x) result
+LOAD 0 1 0        ; CR0 = f
+LOAD 1 3 0        ; CR1 = previous result
+CALL 0            ; f(n f x)
+RETURN
+
+; ADD: λm.λn.λf.λx. m f (n f x)
+; Input: CR0=m, CR1=n, CR2=f, CR3=x
+add:
+; First: (n f x)
+LOAD 4 1 0        ; CR4 = n
+LOAD 5 2 0        ; Prepare f for n
+CALL 4            ; n f x -> CR0
+
+; Then: m f (result)
+LOAD 4 0 0        ; CR4 = m
+LOAD 1 0 0        ; CR1 = (n f x) as new x
+LOAD 0 2 0        ; CR0 = f
+CALL 4            ; m f (n f x)
+RETURN`,
+
+    'pair': `; ================================================
+; PAIR (CONS) using Golden Tokens
+; PAIR = λa.λb.λf. f a b
+; FST  = λp. p TRUE
+; SND  = λp. p FALSE
+; ================================================
+
+; PAIR: Create a pair from two values
+; Input: CR1=first, CR2=second
+; Returns: GT that when called with selector returns element
+pair:
+; Store a and b, return selector function
+; The returned GT captures CR1 and CR2
+LOAD 0 6 0        ; CR0 = GT to pair_select
+RETURN
+
+; Called when pair is applied to selector
+pair_select:
+; CR0 = selector (TRUE or FALSE)
+; CR1, CR2 still hold the paired values
+CALL 0            ; Selector chooses CR1 or CR2
+RETURN
+
+; FST: Get first element of pair
+; Input: CR0 = pair
+fst:
+LOAD 1 15 1       ; CR1 = TRUE GT
+CALL 0            ; pair(TRUE) -> first element
+RETURN
+
+; SND: Get second element of pair
+; Input: CR0 = pair
+snd:
+LOAD 1 15 2       ; CR1 = FALSE GT
+CALL 0            ; pair(FALSE) -> second element
+RETURN`,
+
+    'omega': `; ================================================
+; OMEGA - Non-termination example
+; ω = λx.x x
+; Ω = ω ω = (λx.x x)(λx.x x) -> infinite loop
+; WARNING: This will not terminate!
+; ================================================
+
+; Self-application: λx.x x
+omega:
+LOAD 0 0 0        ; CR0 = self (x)
+TPERM 0 X         ; Verify executable
+CALL 0            ; x x (call self with self)
+; Never reaches here if truly self-referential
+RETURN
+
+; To create Ω, call omega with itself:
+; LOAD 0 [omega_gt]
+; CALL 0
+; This demonstrates non-termination in lambda calc`
 };
 
 const instructionComments = {
