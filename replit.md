@@ -191,6 +191,9 @@ Used with conditional branches (e.g., `B EQ 10` branches if equal).
 | SWITCH reg | Set CR15 (Namespace) to capability in CR[reg] |
 
 ## Recent Changes
+- 2026-01-15: Assembly Editor: Static "Boot/Nucleus" namespace path (security - no direct access)
+- 2026-01-15: Assembly Editor: Three output tabs - Console, TURING (DR0-DR15), CHURCH (CR0-CR15)
+- 2026-01-15: Assembly Editor: SPARE registers (CR9-CR14) greyed out, narrower panel for wider code editor
 - 2026-01-15: Assembly Editor redesigned with fixed horizontal toolbar (no sidebar)
 - 2026-01-15: Examples moved to Command Input dropdown menu
 - 2026-01-15: Removed Quick Reference and Church/Turing paradigm tabs from Assembly
