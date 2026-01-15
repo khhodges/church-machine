@@ -3281,9 +3281,11 @@ const codeTemplates = {
 ; Fixed-point combinator for recursion via capabilities
 ; Y = λf.(λx.f(x x))(λx.f(x x))
 ; ================================================
+; CR6 = Nodal C-List (where GTs are stored)
+; CR5 = Thread context
 
-; Setup: Load the self-referencing GT into CR0
-LOAD 0 15 0       ; CR0 = GT to self (the function to recurse)
+; Setup: Load the self-referencing GT from C-List (CR6)
+LOAD 0 6 0        ; CR0 = GT to self from nodal C-List
 
 ; Step 1: Create inner lambda (λx.f(x x))
 ; The GT in CR0 points to code that will call itself
@@ -3309,6 +3311,7 @@ MOV 0 0           ; NOP - handle error`,
 ; fact(n) = n * fact(n-1), fact(0) = 1
 ; Input: DR0 = n, Output: DR0 = n!
 ; ================================================
+; CR6 = Nodal C-List (GTs stored here)
 
 ; Base case check
 CMP 0 0           ; Compare DR0 with 0
@@ -3318,8 +3321,8 @@ B EQ base_case    ; If n == 0, return 1
 MOV 1 0           ; DR1 = n (save for multiplication)
 SUBI 0 1          ; DR0 = n - 1
 
-; Load recursive GT and call
-LOAD 0 15 0       ; CR0 = GT to factorial function
+; Load recursive GT from nodal C-List (CR6)
+LOAD 0 6 0        ; CR0 = GT to factorial from C-List
 TPERM 0 X         ; Verify execute permission
 CALL 0            ; Recurse: DR0 = fact(n-1)
 
@@ -3360,6 +3363,8 @@ RETURN            ; Return with error`,
 ; TRUE  = λx.λy.x  (select first)
 ; FALSE = λx.λy.y  (select second)
 ; ================================================
+; CR6 = Nodal C-List (GTs stored here)
+; CR5 = Thread context
 
 ; TRUE: Returns first argument (CR1)
 true:
@@ -3379,8 +3384,8 @@ CALL 0            ; Call bool with then/else in CR1/CR2
 RETURN            ; Result is in CR0
 
 ; NOT: λb. b FALSE TRUE
+; Load TRUE/FALSE from nodal C-List (CR6)
 not:
-; Swap CR1 and CR2, then call bool
 LOAD 3 1 0        ; CR3 = temp = CR1
 LOAD 1 2 0        ; CR1 = CR2 (FALSE position)
 LOAD 2 3 0        ; CR2 = temp (TRUE position)
@@ -3393,6 +3398,8 @@ RETURN`,
 ; 1 = λf.λx.f x         (apply f once)
 ; n = λf.λx.f^n x       (apply f n times)
 ; ================================================
+; CR6 = Nodal C-List (GTs stored here)
+; CR5 = Thread context
 
 ; ZERO: λf.λx.x (identity on x)
 zero:
@@ -3435,6 +3442,7 @@ RETURN`,
 ; FST  = λp. p TRUE
 ; SND  = λp. p FALSE
 ; ================================================
+; CR6 = Nodal C-List (GTs stored here)
 
 ; PAIR: Create a pair from two values
 ; Input: CR1=first, CR2=second
@@ -3442,7 +3450,7 @@ RETURN`,
 pair:
 ; Store a and b, return selector function
 ; The returned GT captures CR1 and CR2
-LOAD 0 6 0        ; CR0 = GT to pair_select
+LOAD 0 6 0        ; CR0 = GT to pair_select from C-List
 RETURN
 
 ; Called when pair is applied to selector
@@ -3455,14 +3463,14 @@ RETURN
 ; FST: Get first element of pair
 ; Input: CR0 = pair
 fst:
-LOAD 1 15 1       ; CR1 = TRUE GT
+LOAD 1 6 1        ; CR1 = TRUE GT from C-List
 CALL 0            ; pair(TRUE) -> first element
 RETURN
 
 ; SND: Get second element of pair
 ; Input: CR0 = pair
 snd:
-LOAD 1 15 2       ; CR1 = FALSE GT
+LOAD 1 6 2        ; CR1 = FALSE GT from C-List
 CALL 0            ; pair(FALSE) -> second element
 RETURN`,
 
@@ -3472,6 +3480,8 @@ RETURN`,
 ; Ω = ω ω = (λx.x x)(λx.x x) -> infinite loop
 ; WARNING: This will not terminate!
 ; ================================================
+; CR6 = Nodal C-List (GTs stored here)
+; CR5 = Thread context
 
 ; Self-application: λx.x x
 omega:
@@ -3482,8 +3492,8 @@ CALL 0            ; x x (call self with self)
 RETURN
 
 ; To create Ω, call omega with itself:
-; LOAD 0 [omega_gt]
-; CALL 0
+; LOAD 0 6 n      ; Load omega GT from C-List (CR6)
+; CALL 0          ; This triggers infinite recursion
 ; This demonstrates non-termination in lambda calc`
 };
 
