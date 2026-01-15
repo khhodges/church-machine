@@ -1964,17 +1964,6 @@ function loadCR7() {
         document.getElementById('cr7Location').value = '';
     }
     
-    const perms = cr7.perms || [];
-    document.getElementById('cr7PermR').checked = perms.includes('R');
-    document.getElementById('cr7PermW').checked = perms.includes('W');
-    document.getElementById('cr7PermX').checked = perms.includes('X');
-    document.getElementById('cr7PermL').checked = perms.includes('L');
-    document.getElementById('cr7PermS').checked = perms.includes('S');
-    document.getElementById('cr7PermE').checked = perms.includes('E');
-    document.getElementById('cr7PermB').checked = perms.includes('B');
-    
-    document.getElementById('cr7Key').textContent = cr7.goldenKey || 'Not initialized';
-    
     editorLog('CR7 capability loaded into editor', 'success');
 }
 
