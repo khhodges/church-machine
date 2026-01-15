@@ -701,6 +701,15 @@ const instructionInfo = {
 
 function updateInstrHelp() {
     const instr = document.getElementById('instrSelect').value;
+    
+    if (instr.startsWith('EX_')) {
+        const exampleName = instr.substring(3);
+        loadExample(exampleName);
+        document.getElementById('instrSelect').value = 'ADD';
+        updateInstrHelp();
+        return;
+    }
+    
     const info = instructionInfo[instr];
     
     const operandContainer = document.getElementById('operandInputs');
