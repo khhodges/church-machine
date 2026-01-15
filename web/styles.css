@@ -2268,6 +2268,12 @@ main {
     color: var(--accent);
 }
 
+#editor.view {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+}
+
 .editor-content {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2275,7 +2281,29 @@ main {
     flex: 1;
     overflow: hidden;
     padding: 1rem;
-    height: calc(100vh - 160px);
+}
+
+.code-editor-panel,
+.editor-output-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.code-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+#codeEditor {
+    flex: 1;
+    resize: none;
+}
+
+.output-content {
+    flex: 1;
+    overflow-y: auto;
 }
 
 .editor-intro {
