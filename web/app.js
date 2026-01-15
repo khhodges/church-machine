@@ -115,19 +115,6 @@ const bootSteps = [
         }
     },
     {
-        name: "Load Nucleus",
-        description: "Loading kernel code capability into CR7...",
-        action: () => {
-            simulator.contextRegs[7] = {
-                name: "NUCLEUS",
-                location: { type: "Literal", name: "kernel.code" },
-                perms: ["R", "X", "E"],
-                locked: true,
-                goldenKey: generateGoldenKey()
-            };
-        }
-    },
-    {
         name: "Load Namespace",
         description: "Setting CR15 with Boot namespace capability...",
         action: () => {
@@ -164,6 +151,19 @@ const bootSteps = [
                 goldenKey: generateGoldenKey()
             };
             updateNamespaceDisplay();
+        }
+    },
+    {
+        name: "Load Nucleus",
+        description: "Loading kernel code capability into CR7...",
+        action: () => {
+            simulator.contextRegs[7] = {
+                name: "NUCLEUS",
+                location: { type: "Literal", name: "kernel.code" },
+                perms: ["R", "X", "E"],
+                locked: true,
+                goldenKey: generateGoldenKey()
+            };
         }
     }
 ];
@@ -1898,9 +1898,9 @@ const lessons = [
                     <div class="demo-visual">
                         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                             <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid var(--accent);">1. Hardware Reset</div>
-                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid var(--warning);">2. Load Nucleus</div>
-                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid var(--success);">3. Load Namespace</div>
-                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid #60a5fa;">4. Initialize Thread</div>
+                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid var(--success);">2. Load Namespace</div>
+                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid #60a5fa;">3. Initialize Thread</div>
+                            <div style="padding: 0.8rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid var(--warning);">4. Load Nucleus</div>
                         </div>
                     </div>
                     <div class="demo-explanation">
@@ -1911,12 +1911,12 @@ const lessons = [
             {
                 text: `<h3>Step 1: Hardware Reset</h3>
                 <p>All registers are cleared to <code>NULL</code>. This ensures no leftover data from previous sessions.</p>
-                <h3>Step 2: Load Nucleus</h3>
-                <p>The kernel code capability is loaded into <code>CR7</code>. This is the core operating system code with <code>RXE</code> permissions.</p>
-                <h3>Step 3: Load Namespace</h3>
+                <h3>Step 2: Load Namespace</h3>
                 <p><code>CR15</code> receives the system namespace capability with <code>RLSEB</code> permissions - the root of all accessible resources.</p>
-                <h3>Step 4: Initialize Thread</h3>
-                <p><code>CR8</code> gets the user thread capability, and <code>CR6</code> receives the C-List (capability list) for user access.</p>`,
+                <h3>Step 3: Initialize Thread</h3>
+                <p><code>CR8</code> gets the user thread capability, and <code>CR6</code> receives the C-List (capability list) for user access.</p>
+                <h3>Step 4: Load Nucleus</h3>
+                <p>The kernel code capability is loaded into <code>CR7</code>. This is the core operating system code with <code>RXE</code> permissions.</p>`,
                 demo: `<div class="demo-title">Register States After Boot</div>
                 <div class="demo-content">
                     <div class="demo-visual register-demo">
