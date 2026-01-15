@@ -3077,6 +3077,7 @@ body.tooltip-hidden [data-tooltip]:hover::after {
 
 .code-context-menu {
     min-width: 200px;
+    overflow: visible;
 }
 
 .context-menu-header {

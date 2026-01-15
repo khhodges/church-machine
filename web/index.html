@@ -731,90 +731,88 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
     <!-- Code Editor Instruction Context Menu -->
     <div class="context-menu code-context-menu" id="codeContextMenu">
         <div class="context-menu-header">Insert Instruction</div>
-        <div class="context-menu-submenu">
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">+</span>
-                <span>Arithmetic</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('ADD', 'dest src')">ADD dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('SUB', 'dest src')">SUB dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('MUL', 'dest src')">MUL dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('NEG', 'dest src')">NEG dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('ADDI', 'dest imm')">ADDI dest imm</div>
-                    <div class="context-menu-item" onclick="insertInstruction('SUBI', 'dest imm')">SUBI dest imm</div>
-                </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">+</span>
+            <span>Arithmetic</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('ADD', 'dest src')">ADD dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('SUB', 'dest src')">SUB dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('MUL', 'dest src')">MUL dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('NEG', 'dest src')">NEG dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('ADDI', 'dest imm')">ADDI dest imm</div>
+                <div class="context-menu-item" onclick="insertInstruction('SUBI', 'dest imm')">SUBI dest imm</div>
             </div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">&amp;</span>
-                <span>Logic</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('AND', 'dest src')">AND dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('ORR', 'dest src')">ORR dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('EOR', 'dest src')">EOR dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('BIC', 'dest src')">BIC dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('NOT', 'dest src')">NOT dest src</div>
-                </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">&amp;</span>
+            <span>Logic</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('AND', 'dest src')">AND dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('ORR', 'dest src')">ORR dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('EOR', 'dest src')">EOR dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('BIC', 'dest src')">BIC dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('NOT', 'dest src')">NOT dest src</div>
             </div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">→</span>
-                <span>Move</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('MOV', 'dest src')">MOV dest src</div>
-                    <div class="context-menu-item" onclick="insertInstruction('MVN', 'dest src')">MVN dest src</div>
-                </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">→</span>
+            <span>Move</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('MOV', 'dest src')">MOV dest src</div>
+                <div class="context-menu-item" onclick="insertInstruction('MVN', 'dest src')">MVN dest src</div>
             </div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">⟷</span>
-                <span>Shift</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('LSL', 'dest src amt')">LSL dest src amt</div>
-                    <div class="context-menu-item" onclick="insertInstruction('LSR', 'dest src amt')">LSR dest src amt</div>
-                    <div class="context-menu-item" onclick="insertInstruction('ASR', 'dest src amt')">ASR dest src amt</div>
-                    <div class="context-menu-item" onclick="insertInstruction('ROR', 'dest src amt')">ROR dest src amt</div>
-                </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">⟷</span>
+            <span>Shift</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('LSL', 'dest src amt')">LSL dest src amt</div>
+                <div class="context-menu-item" onclick="insertInstruction('LSR', 'dest src amt')">LSR dest src amt</div>
+                <div class="context-menu-item" onclick="insertInstruction('ASR', 'dest src amt')">ASR dest src amt</div>
+                <div class="context-menu-item" onclick="insertInstruction('ROR', 'dest src amt')">ROR dest src amt</div>
             </div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">=</span>
-                <span>Compare</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('CMP', 'r1 r2')">CMP r1 r2</div>
-                    <div class="context-menu-item" onclick="insertInstruction('CMN', 'r1 r2')">CMN r1 r2</div>
-                    <div class="context-menu-item" onclick="insertInstruction('TST', 'r1 r2')">TST r1 r2</div>
-                    <div class="context-menu-item" onclick="insertInstruction('TEQ', 'r1 r2')">TEQ r1 r2</div>
-                </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">=</span>
+            <span>Compare</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('CMP', 'r1 r2')">CMP r1 r2</div>
+                <div class="context-menu-item" onclick="insertInstruction('CMN', 'r1 r2')">CMN r1 r2</div>
+                <div class="context-menu-item" onclick="insertInstruction('TST', 'r1 r2')">TST r1 r2</div>
+                <div class="context-menu-item" onclick="insertInstruction('TEQ', 'r1 r2')">TEQ r1 r2</div>
             </div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">↷</span>
-                <span>Branch</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('B', 'offset')">B offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('B', 'EQ offset')">B EQ offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('B', 'NE offset')">B NE offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('B', 'GT offset')">B GT offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('B', 'LT offset')">B LT offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('BL', 'offset')">BL offset</div>
-                </div>
+        </div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">↷</span>
+            <span>Branch</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('B', 'offset')">B offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('B', 'EQ offset')">B EQ offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('B', 'NE offset')">B NE offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('B', 'GT offset')">B GT offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('B', 'LT offset')">B LT offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('BL', 'offset')">BL offset</div>
             </div>
-            <div class="context-menu-separator"></div>
-            <div class="context-menu-item has-submenu">
-                <span class="menu-icon">🔑</span>
-                <span>Capability</span>
-                <span class="submenu-arrow">▶</span>
-                <div class="submenu">
-                    <div class="context-menu-item" onclick="insertInstruction('LOAD', 'destCR srcCR idx')">LOAD destCR srcCR idx</div>
-                    <div class="context-menu-item" onclick="insertInstruction('SAVE', 'destCR srcDR')">SAVE destCR srcDR</div>
-                    <div class="context-menu-item" onclick="insertInstruction('CALL', 'cr')">CALL cr</div>
-                    <div class="context-menu-item" onclick="insertInstruction('RETURN', '')">RETURN</div>
-                    <div class="context-menu-item" onclick="insertInstruction('CHANGE', 'offset')">CHANGE offset</div>
-                    <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'cr')">SWITCH cr</div>
-                    <div class="context-menu-item" onclick="insertInstruction('TPERM', 'cr mask')">TPERM cr mask</div>
-                </div>
+        </div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item has-submenu">
+            <span class="menu-icon">🔑</span>
+            <span>Capability</span>
+            <span class="submenu-arrow">▶</span>
+            <div class="submenu">
+                <div class="context-menu-item" onclick="insertInstruction('LOAD', 'destCR srcCR idx')">LOAD destCR srcCR idx</div>
+                <div class="context-menu-item" onclick="insertInstruction('SAVE', 'destCR srcDR')">SAVE destCR srcDR</div>
+                <div class="context-menu-item" onclick="insertInstruction('CALL', 'cr')">CALL cr</div>
+                <div class="context-menu-item" onclick="insertInstruction('RETURN', '')">RETURN</div>
+                <div class="context-menu-item" onclick="insertInstruction('CHANGE', 'offset')">CHANGE offset</div>
+                <div class="context-menu-item" onclick="insertInstruction('SWITCH', 'cr')">SWITCH cr</div>
+                <div class="context-menu-item" onclick="insertInstruction('TPERM', 'cr mask')">TPERM cr mask</div>
             </div>
         </div>
     </div>
