@@ -2299,7 +2299,7 @@ main {
 
 .editor-content {
     display: grid;
-    grid-template-columns: 1fr 280px;
+    grid-template-columns: 1fr 300px;
     gap: 1rem;
     flex: 1;
     min-height: 0;
@@ -2743,15 +2743,16 @@ main {
 }
 
 .output-tab {
-    padding: 0.5rem 0.8rem;
+    padding: 0.4rem 0.3rem;
     background: transparent;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.65rem;
     flex: 1;
-    font-size: 0.9rem;
+    text-align: center;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .output-tab:hover {
