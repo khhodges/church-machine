@@ -797,9 +797,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const cr7Row = document.getElementById('cr7Row');
     if (cr7Row) {
         cr7Row.addEventListener('click', () => {
-            switchView('editor');
-            document.getElementById('viewSelector').value = 'editor';
-            log('Switched to Assembly Editor (CR7 Nucleus)', 'info');
+            const editorView = document.getElementById('editor');
+            if (editorView) {
+                document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+                editorView.classList.add('active');
+                document.getElementById('viewSelect').value = 'editor';
+                log('Switched to Assembly Editor (CR7 Nucleus)', 'info');
+            }
         });
     }
 });
