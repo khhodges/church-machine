@@ -555,13 +555,13 @@ function updateContextRegisters() {
             }).join(', ')}` : 'No capability loaded. Register is empty.';
         
         const row = document.createElement('div');
-        row.className = `register-row ${isNull ? 'null' : ''}`;
+        row.className = `register-row tooltip-bottom ${isNull ? 'null' : ''}`;
         row.setAttribute('data-tooltip', tooltip);
         row.innerHTML = `
             <span class="name">CR${i}</span>
             <span class="role">${role}</span>
             <span class="value">${reg.name}</span>
-            <span class="perms" data-tooltip="${permTooltip}">${reg.perms.join('') || '---'}</span>
+            <span class="perms tooltip-bottom" data-tooltip="${permTooltip}">${reg.perms.join('') || '---'}</span>
         `;
         container.appendChild(row);
     }
@@ -600,7 +600,7 @@ function updateDataRegisters() {
         const hexStr = value.toString(16).toUpperCase().padStart(16, '0');
         
         const row = document.createElement('div');
-        row.className = 'register-row';
+        row.className = 'register-row tooltip-bottom';
         row.setAttribute('data-tooltip', '64-bit data register. Holds numeric values for arithmetic operations.');
         row.innerHTML = `
             <span class="name">DR${i}</span>

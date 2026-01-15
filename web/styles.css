@@ -3169,6 +3169,19 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     transform: none;
 }
 
+/* Tooltip appears BELOW the element (for items near top of viewport) */
+[data-tooltip].tooltip-bottom::before {
+    bottom: auto;
+    top: calc(100% + 8px);
+}
+
+[data-tooltip].tooltip-bottom::after {
+    bottom: auto;
+    top: calc(100% + 2px);
+    border-top-color: transparent;
+    border-bottom-color: var(--accent);
+}
+
 .btn[data-tooltip]::before {
     bottom: calc(100% + 10px);
 }
