@@ -51,27 +51,27 @@
                 <div class="panel system-state">
                     <h2>Lambda Registers</h2>
                     <div class="state-info">
-                        <div class="state-row" data-tooltip="Root capability defining the current namespace scope. All access is relative to this.">
+                        <div class="state-row tooltip-bottom" data-tooltip="Root capability defining the current namespace scope. All access is relative to this.">
                             <span class="label">CR15 (Namespace):</span>
                             <span id="cr15Name" class="value">NULL</span>
                         </div>
-                        <div class="state-row" data-tooltip="Current thread identity. Determines which user/process is executing.">
+                        <div class="state-row tooltip-bottom" data-tooltip="Current thread identity. Determines which user/process is executing.">
                             <span class="label">CR8 (Thread):</span>
                             <span id="cr8Name" class="value">NULL</span>
                         </div>
-                        <div class="state-row" data-tooltip="CR6 holds the current C-List capability for context access.">
+                        <div class="state-row tooltip-bottom" data-tooltip="CR6 holds the current C-List capability for context access.">
                             <span class="label">CR6 (C-List):</span>
                             <span id="cr6Name" class="value">NULL</span>
                         </div>
-                        <div class="state-row clickable" id="cr7Row" data-tooltip="CR7 holds the Nucleus (kernel) code capability. Click to view/edit in Assembly Editor.">
+                        <div class="state-row tooltip-bottom clickable" id="cr7Row" data-tooltip="CR7 holds the Nucleus (kernel) code capability. Click to view/edit in Assembly Editor.">
                             <span class="label">CR7 (Nucleus):</span>
                             <span id="cr7NameDisplay" class="value">NULL</span>
                         </div>
-                        <div class="state-row" data-tooltip="Instruction Pointer. Address of the next instruction to execute.">
+                        <div class="state-row tooltip-bottom" data-tooltip="Instruction Pointer. Address of the next instruction to execute.">
                             <span class="label">IP (Instruction Ptr):</span>
                             <span id="ipValue" class="value">0</span>
                         </div>
-                        <div class="state-row" data-tooltip="Current call stack depth. Increases with CALL, decreases with RETURN.">
+                        <div class="state-row tooltip-bottom" data-tooltip="Current call stack depth. Increases with CALL, decreases with RETURN.">
                             <span class="label">Stack Depth:</span>
                             <span id="stackDepth" class="value">0</span>
                         </div>
