@@ -194,12 +194,12 @@ const bootCList = {
     entries: [
         // Index 0: Nucleus code (GT pointing to namespace offset 3)
         { index: 0, name: "Access", nsOffset: 3, perms: ["R", "X"], type: "Code", desc: "Nucleus code" },
-        // Index 1: Kenneth thread (GT pointing to namespace offset 2, M=Meta-Machine)
-        { index: 1, name: "Kenneth", nsOffset: 2, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
-        // Index 2: Matthew thread (GT pointing to namespace offset 4, M=Meta-Machine)
-        { index: 2, name: "Matthew", nsOffset: 4, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
-        // Index 3: Daniel thread (GT pointing to namespace offset 5, M=Meta-Machine)
-        { index: 3, name: "Daniel", nsOffset: 5, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
+        // Index 1: Kenneth thread (GT pointing to namespace offset 2, M=Meta-Machine only)
+        { index: 1, name: "Kenneth", nsOffset: 2, perms: ["M"], type: "Thread", desc: "User thread" },
+        // Index 2: Matthew thread (GT pointing to namespace offset 4, M=Meta-Machine only)
+        { index: 2, name: "Matthew", nsOffset: 4, perms: ["M"], type: "Thread", desc: "User thread" },
+        // Index 3: Daniel thread (GT pointing to namespace offset 5, M=Meta-Machine only)
+        { index: 3, name: "Daniel", nsOffset: 5, perms: ["M"], type: "Thread", desc: "User thread" },
         // Index 4: SlideRule abstraction (GT pointing to namespace offset 6)
         { index: 4, name: "SlideRule", nsOffset: 6, perms: ["E"], type: "Abstraction", desc: "Float operations" },
         // Index 5: Abacus abstraction (GT pointing to namespace offset 7)
@@ -220,23 +220,23 @@ const bootNamespace = {
 // Namespace Table: 3-word entries (Location, Limit, Seals/MAC)
 // offset = index into this table
 const namespaceObjects = [
-    // Offset 0: Namespace self-reference (M=Meta-Machine for hardware-level)
-    { offset: 0, location: 0x0000, name: "Namespace", type: "System", perms: ["R", "M"], size: 4096,
+    // Offset 0: Namespace self-reference (M=Meta-Machine only for hardware-level)
+    { offset: 0, location: 0x0000, name: "Namespace", type: "System", perms: ["M"], size: 4096,
       word1_location: 0x0000, word2_limit: 4096, word3_seals: 0n },
     // Offset 1: Boot C-List abstraction
     { offset: 1, location: 0x1000, name: "Boot", type: "C-List", perms: ["E"], size: 1024,
       word1_location: 0x1000, word2_limit: 1024, word3_seals: 0n },
-    // Offset 2: Kenneth thread (M=Meta-Machine for hardware-level)
-    { offset: 2, location: 0x2000, name: "Kenneth", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
+    // Offset 2: Kenneth thread (M=Meta-Machine only for hardware-level)
+    { offset: 2, location: 0x2000, name: "Kenneth", type: "Thread", perms: ["M"], size: 1024,
       word1_location: 0x2000, word2_limit: 1024, word3_seals: 0n },
     // Offset 3: Boot/Access.asm (Nucleus code)
     { offset: 3, location: 0x3000, name: "Access", type: "Code", perms: ["R", "X"], size: 512,
       word1_location: 0x3000, word2_limit: 512, word3_seals: 0n, linkage: "Boot/Access.asm" },
-    // Offset 4: Matthew thread (M=Meta-Machine for hardware-level)
-    { offset: 4, location: 0x4000, name: "Matthew", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
+    // Offset 4: Matthew thread (M=Meta-Machine only for hardware-level)
+    { offset: 4, location: 0x4000, name: "Matthew", type: "Thread", perms: ["M"], size: 1024,
       word1_location: 0x4000, word2_limit: 1024, word3_seals: 0n },
-    // Offset 5: Daniel thread (M=Meta-Machine for hardware-level)
-    { offset: 5, location: 0x5000, name: "Daniel", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
+    // Offset 5: Daniel thread (M=Meta-Machine only for hardware-level)
+    { offset: 5, location: 0x5000, name: "Daniel", type: "Thread", perms: ["M"], size: 1024,
       word1_location: 0x5000, word2_limit: 1024, word3_seals: 0n },
     // Offset 6: SlideRule abstraction
     { offset: 6, location: 0x6000, name: "SlideRule", type: "Abstraction", perms: ["E"], size: 2048,
@@ -2807,7 +2807,7 @@ const lessons = [
                 text: `<h3>Step 1: Hardware Reset</h3>
                 <p>All registers are cleared to <code>NULL</code>. This ensures no leftover data from previous sessions.</p>
                 <h3>Step 2: Load Namespace</h3>
-                <p><code>CR15</code> receives the system namespace capability with <code>RM</code> permissions - the root of all accessible resources. The M (Meta-Machine) permission marks hardware-level access.</p>
+                <p><code>CR15</code> receives the system namespace capability with <code>M</code> permission only - the root of all accessible resources. The M (Meta-Machine) permission marks hardware-level access exclusively.</p>
                 <h3>Step 3: Initialize Thread</h3>
                 <p><code>CR8</code> gets the user thread capability, and <code>CR6</code> receives the C-List (capability list) for user access.</p>
                 <h3>Step 4: Load Nucleus</h3>
@@ -2816,8 +2816,8 @@ const lessons = [
                 <div class="demo-content">
                     <div class="demo-visual register-demo">
                         <div class="reg-demo-item"><span class="reg-demo-name">CR7</span><span class="reg-demo-value">NUCLEUS [RXE]</span></div>
-                        <div class="reg-demo-item"><span class="reg-demo-name">CR15</span><span class="reg-demo-value">NAMESPACE [RM]</span></div>
-                        <div class="reg-demo-item"><span class="reg-demo-name">CR8</span><span class="reg-demo-value">KENNETH [RWEM]</span></div>
+                        <div class="reg-demo-item"><span class="reg-demo-name">CR15</span><span class="reg-demo-value">NAMESPACE [M]</span></div>
+                        <div class="reg-demo-item"><span class="reg-demo-name">CR8</span><span class="reg-demo-value">KENNETH [M]</span></div>
                         <div class="reg-demo-item"><span class="reg-demo-name">CR6</span><span class="reg-demo-value">BOOT [E]</span></div>
                     </div>
                     <div class="demo-explanation">

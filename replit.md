@@ -58,7 +58,7 @@ The web interface is composed of five distinct views, accessible via a dropdown:
 ## Recent Changes
 
 - 2026-01-16: Added M (Meta-Machine) permission bit to distinguish hardware-level access (Namespace, Threads) from software-level permissions
-- 2026-01-16: M permission now set on Namespace (offset 0) and all Thread entries (Kenneth, Matthew, Daniel)
+- 2026-01-16: M is now the ONLY permission on Namespace (offset 0) and all Thread entries (Kenneth, Matthew, Daniel) - no other permissions when M is set
 - 2026-01-16: Removed Context section from Capabilities Explorer - now only System and C-List views
 - 2026-01-16: Removed Permission Reference section from Capabilities Explorer
 - 2026-01-16: Clicking CR6 now populates C-List section with all 7 GTs from the Boot C-List
