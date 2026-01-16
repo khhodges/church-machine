@@ -3045,12 +3045,12 @@ function exportNamespaceState() {
             perms: o.perms,
             address: o.address
         })),
-        cpuState: {
-            contextRegs: cpuState.contextRegs,
-            dataRegs: cpuState.dataRegs,
-            flags: cpuState.flags,
-            ip: cpuState.ip,
-            bootStep: cpuState.bootStep
+        simulatorState: {
+            contextRegs: simulator.contextRegs,
+            dataRegs: simulator.dataRegs,
+            flags: simulator.flags,
+            ip: simulator.ip,
+            bootStep: simulator.bootStep
         }
     };
     
