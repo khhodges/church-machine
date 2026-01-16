@@ -273,6 +273,8 @@ const bootSteps = [
             // Save thread state before reset (simulates fault recovery)
             saveThreadState();
             simulator.reset();
+            // Clear editor to match reset state - no code loaded
+            setEditorCode('', '', '');
         }
     },
     {
@@ -350,6 +352,8 @@ function executeFaultRestart() {
         simulator.reset();
         bootState.step = 1; // Step 1 (Fault Restart) is now complete
         bootState.complete = false;
+        // Clear editor to match reset state - no code loaded
+        setEditorCode('', '', '');
         updateBootDisplay();
         updateDisplay();
         updateCapabilityExplorer();
