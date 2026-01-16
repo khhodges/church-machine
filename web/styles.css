@@ -2273,6 +2273,13 @@ main {
     border-radius: 3px;
 }
 
+.editor-file-path {
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-family: 'Fira Code', monospace;
+    font-weight: 500;
+}
+
 .perm-badge-green {
     display: inline-block;
     background: var(--success);

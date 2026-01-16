@@ -572,10 +572,8 @@
         <section id="editor" class="view">
             <div class="editor-toolbar">
                 <div class="toolbar-group">
-                    <label>CR7:</label>
-                    <input type="text" id="cr7Name" value="NUCLEUS" placeholder="Name" class="toolbar-input" readonly>
-                    <span class="namespace-path">Boot/Nucleus</span>
-                    <span class="perm-badge-green">XR</span>
+                    <span class="editor-file-path" id="editorFilePath">Boot/Nucleus/program.asm</span>
+                    <span class="perm-badge-green" id="editorPerms">[RX]</span>
                 </div>
                 <div class="toolbar-group">
                     <button onclick="runProgram()" class="btn btn-sm btn-run" data-tooltip="Execute the entire program at once">Run</button>

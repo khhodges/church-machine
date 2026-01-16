@@ -2170,6 +2170,9 @@ function resetProgram() {
     updateEditorRegisters();
     updateDisplay();
     
+    document.getElementById('editorFilePath').textContent = 'Boot/Nucleus/program.asm';
+    document.getElementById('editorPerms').textContent = '[RX]';
+    
     const parsed = document.getElementById('editorParsed');
     if (parsed) parsed.innerHTML = '';
 }
@@ -4689,6 +4692,11 @@ function openFunctionInEditor(funcName, parentAbstraction) {
             size: funcGT?.size || 0
         };
         updateSystemState();
+        updateCapabilityExplorer();
+        
+        const permsStr = funcGT?.perms ? `[${funcGT.perms.join('')}]` : '[RX]';
+        document.getElementById('editorFilePath').textContent = `${linkagePath}.asm`;
+        document.getElementById('editorPerms').textContent = permsStr;
         
         log(`Loaded ${linkagePath} [${(funcGT?.perms || ["R","X"]).join('')}] Base:0x${(funcGT?.base || 0).toString(16).toUpperCase()} Size:${funcGT?.size || 0}`, 'info');
     } else {

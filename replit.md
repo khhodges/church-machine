@@ -297,6 +297,9 @@ Exported state includes:
 
 ## Recent Changes
 
+- 2026-01-16: Assembly Editor toolbar now shows dynamic linkage path (e.g., Boot/SlideRule/GT_ADD.asm) with permissions badge
+- 2026-01-16: CR7 Lambda Register tooltip shows code preview (first 4 assembly lines)
+- 2026-01-16: Clicking function GTs now updates Capabilities Explorer view
 - 2026-01-16: Abstractions (SlideRule, Abacus, Circle) now have E-only (Enter) permissions
 - 2026-01-16: Code GTs (GT_ADD, GT_SUB, etc.) now have RX-only permissions with base address and size
 - 2026-01-16: Clicking code items updates CR7 display with GT name, linkage path (Boot/SlideRule/GT_ADD), and capability structure
