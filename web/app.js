@@ -1803,10 +1803,15 @@ function setupCodeEditor() {
     const editor = document.getElementById('codeEditor');
     if (!editor) return;
     
-    // Load saved content from localStorage if available
+    // Load saved content and linkage from localStorage if available
     const savedContent = localStorage.getItem('ctmm_editor_content');
+    const savedLinkage = localStorage.getItem('ctmm_editor_linkage');
+    const savedPerms = localStorage.getItem('ctmm_editor_perms');
     if (savedContent) {
         editor.value = savedContent;
+        if (savedLinkage) editorState.currentLinkage = savedLinkage;
+        if (savedPerms) editorState.currentPerms = savedPerms;
+        updateEditorToolbar();
     }
     
     editor.addEventListener('input', () => {
@@ -1844,6 +1849,8 @@ function markEditorSaved() {
     
     // Persist to localStorage so changes carry between sessions
     localStorage.setItem('ctmm_editor_content', editor.value);
+    localStorage.setItem('ctmm_editor_linkage', editorState.currentLinkage);
+    localStorage.setItem('ctmm_editor_perms', editorState.currentPerms);
     
     setTimeout(() => {
         editor.classList.remove('editor-saved');
