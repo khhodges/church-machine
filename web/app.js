@@ -1030,12 +1030,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cr6Row) {
         cr6Row.addEventListener('click', () => {
             switchView('capabilities');
-            // After switching, select CR6 in the explorer
+            // After switching, select CR6 in the explorer (use longer timeout for DOM update)
             setTimeout(() => {
                 const cr6Cap = simulator.contextRegs[6];
                 if (cr6Cap) {
+                    // Show the capability detail panel first (this clears selections)
                     showCapabilityDetail(null, cr6Cap, 'CR6');
-                    // Highlight the CR6 card
+                    // Then find and select the CR6 card after showCapabilityDetail clears them
                     document.querySelectorAll('.token-card').forEach(card => {
                         const regBadge = card.querySelector('.token-reg');
                         if (regBadge && regBadge.textContent === 'CR6') {
@@ -1043,7 +1044,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
                 }
-            }, 50);
+            }, 100);
             log('Switched to Capabilities Explorer (CR6 C-List)', 'info');
         });
     }
