@@ -194,12 +194,12 @@ const bootCList = {
     entries: [
         // Index 0: Nucleus code (GT pointing to namespace offset 3)
         { index: 0, name: "Access", nsOffset: 3, perms: ["R", "X"], type: "Code", desc: "Nucleus code" },
-        // Index 1: Kenneth thread (GT pointing to namespace offset 2)
-        { index: 1, name: "Kenneth", nsOffset: 2, perms: ["R", "W", "E"], type: "Thread", desc: "User thread" },
-        // Index 2: Matthew thread (GT pointing to namespace offset 4)
-        { index: 2, name: "Matthew", nsOffset: 4, perms: ["R", "W", "E"], type: "Thread", desc: "User thread" },
-        // Index 3: Daniel thread (GT pointing to namespace offset 5)
-        { index: 3, name: "Daniel", nsOffset: 5, perms: ["R", "W", "E"], type: "Thread", desc: "User thread" },
+        // Index 1: Kenneth thread (GT pointing to namespace offset 2, M=Meta-Machine)
+        { index: 1, name: "Kenneth", nsOffset: 2, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
+        // Index 2: Matthew thread (GT pointing to namespace offset 4, M=Meta-Machine)
+        { index: 2, name: "Matthew", nsOffset: 4, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
+        // Index 3: Daniel thread (GT pointing to namespace offset 5, M=Meta-Machine)
+        { index: 3, name: "Daniel", nsOffset: 5, perms: ["R", "W", "E", "M"], type: "Thread", desc: "User thread" },
         // Index 4: SlideRule abstraction (GT pointing to namespace offset 6)
         { index: 4, name: "SlideRule", nsOffset: 6, perms: ["E"], type: "Abstraction", desc: "Float operations" },
         // Index 5: Abacus abstraction (GT pointing to namespace offset 7)
@@ -220,23 +220,23 @@ const bootNamespace = {
 // Namespace Table: 3-word entries (Location, Limit, Seals/MAC)
 // offset = index into this table
 const namespaceObjects = [
-    // Offset 0: Namespace self-reference
-    { offset: 0, location: 0x0000, name: "Namespace", type: "System", perms: ["R"], size: 4096,
+    // Offset 0: Namespace self-reference (M=Meta-Machine for hardware-level)
+    { offset: 0, location: 0x0000, name: "Namespace", type: "System", perms: ["R", "M"], size: 4096,
       word1_location: 0x0000, word2_limit: 4096, word3_seals: 0n },
     // Offset 1: Boot C-List abstraction
     { offset: 1, location: 0x1000, name: "Boot", type: "C-List", perms: ["E"], size: 1024,
       word1_location: 0x1000, word2_limit: 1024, word3_seals: 0n },
-    // Offset 2: Kenneth thread
-    { offset: 2, location: 0x2000, name: "Kenneth", type: "Thread", perms: ["R", "W", "E"], size: 1024,
+    // Offset 2: Kenneth thread (M=Meta-Machine for hardware-level)
+    { offset: 2, location: 0x2000, name: "Kenneth", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
       word1_location: 0x2000, word2_limit: 1024, word3_seals: 0n },
     // Offset 3: Boot/Access.asm (Nucleus code)
     { offset: 3, location: 0x3000, name: "Access", type: "Code", perms: ["R", "X"], size: 512,
       word1_location: 0x3000, word2_limit: 512, word3_seals: 0n, linkage: "Boot/Access.asm" },
-    // Offset 4: Matthew thread
-    { offset: 4, location: 0x4000, name: "Matthew", type: "Thread", perms: ["R", "W", "E"], size: 1024,
+    // Offset 4: Matthew thread (M=Meta-Machine for hardware-level)
+    { offset: 4, location: 0x4000, name: "Matthew", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
       word1_location: 0x4000, word2_limit: 1024, word3_seals: 0n },
-    // Offset 5: Daniel thread  
-    { offset: 5, location: 0x5000, name: "Daniel", type: "Thread", perms: ["R", "W", "E"], size: 1024,
+    // Offset 5: Daniel thread (M=Meta-Machine for hardware-level)
+    { offset: 5, location: 0x5000, name: "Daniel", type: "Thread", perms: ["R", "W", "E", "M"], size: 1024,
       word1_location: 0x5000, word2_limit: 1024, word3_seals: 0n },
     // Offset 6: SlideRule abstraction
     { offset: 6, location: 0x6000, name: "SlideRule", type: "Abstraction", perms: ["E"], size: 2048,
