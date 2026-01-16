@@ -61,9 +61,39 @@ header h1 {
 nav.controls {
     display: flex;
     align-items: center;
-    gap: 1rem;
     flex: 1;
+    justify-content: center;
+}
+
+.header-left {
+    flex: 1;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.header-right {
+    flex: 1;
+    display: flex;
     justify-content: flex-end;
+}
+
+.btn-back {
+    padding: 0.35rem 0.7rem;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+
+.btn-back:hover:not(:disabled) {
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
+.btn-back:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .view-selector {

@@ -57,16 +57,16 @@ The web interface is composed of five distinct views, accessible via a dropdown:
 
 ## Recent Changes
 
+- 2026-01-16: Added Back button to left of view buttons for navigating to previous views
+- 2026-01-16: View history tracking stores up to 20 previous views for back navigation
+- 2026-01-16: View buttons (Dashboard, Namespace, etc.) properly centered using flex layout
 - 2026-01-16: Namespace restructured with proper offsets: 0=Namespace (self-ref), 1=Boot C-List, 2=Kenneth, 3=Access code, etc.
 - 2026-01-16: Boot C-List now contains GT entries with nsOffset pointers to namespace entries
 - 2026-01-16: Boot Step 3 loads CR6 from NS offset 1 (Boot C-List), CR8 from offset 2 (Kenneth), shows [n] count
 - 2026-01-16: Boot Step 4 loads CR7 from C-List[0] pointing to NS offset 3 (Boot/Access.asm)
 - 2026-01-16: Namespace Browser now displays table format with Offset, Name, Type, Word1, Word2, Perms columns
 - 2026-01-16: View button highlighting syncs with active view (Assembly button highlights when editor open)
-- 2026-01-16: Dashboard view buttons are now centered
 - 2026-01-16: Editor content cleared and localStorage updated on Fault Restart
 - 2026-01-16: Removed Reset button - "Fault Restart" (boot step 1) now handles state save and reset
-- 2026-01-16: Boot step 1 renamed to "Fault Restart" - simulates unrecoverable fault recovery with state save
-- 2026-01-16: CR7 display fixed - shows "NULL" for code objects, "NULL []" only for empty C-Lists
 - 2026-01-16: View selector changed from dropdown to horizontal row of buttons
 - 2026-01-16: Simplified Dashboard - removed Command Input and Output Log, now pure Thread View

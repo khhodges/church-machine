@@ -11,6 +11,9 @@
         <header>
             <h1>CTMM Simulator</h1>
             <nav class="controls">
+                <div class="header-left">
+                    <button onclick="goBack()" class="btn btn-back" id="backBtn" data-tooltip="Go back to previous view" disabled>&larr; Back</button>
+                </div>
                 <div class="view-buttons">
                     <button onclick="switchView('dashboard')" class="btn btn-view active" id="viewBtn-dashboard" data-tooltip="View registers and system state">Dashboard</button>
                     <button onclick="switchView('namespace')" class="btn btn-view" id="viewBtn-namespace" data-tooltip="Browse namespace objects">Namespace</button>
@@ -18,6 +21,7 @@
                     <button onclick="switchView('capabilities')" class="btn btn-view" id="viewBtn-capabilities" data-tooltip="Explore Golden Tokens">Capabilities</button>
                     <button onclick="switchView('tutorial')" class="btn btn-view" id="viewBtn-tutorial" data-tooltip="Learn CTMM concepts">Tutorial</button>
                 </div>
+                <div class="header-right"></div>
             </nav>
         </header>
     </div>
