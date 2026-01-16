@@ -652,7 +652,18 @@ function updateSystemState() {
         
         const cr7Row = document.getElementById('cr7Row');
         if (cr7Row && cr7.linkage) {
-            cr7Row.setAttribute('data-tooltip', `Linkage: ${cr7.linkage} | Perms: ${permsStr} | Base: 0x${(cr7.base || 0).toString(16).toUpperCase()} | Size: ${cr7.size || 0} bytes`);
+            let codePreview = '';
+            const parentName = cr7.linkage.split('/')[1];
+            let codeKey = cr7.name;
+            if (parentName === 'Abacus' && ['GT_ADD', 'GT_SUB', 'GT_MUL', 'GT_DIV'].includes(cr7.name)) {
+                codeKey = 'Abacus_' + cr7.name;
+            }
+            const code = functionBetaCode[codeKey] || functionBetaCode[cr7.name];
+            if (code) {
+                const lines = code.split('\n').filter(l => l.trim() && !l.trim().startsWith(';')).slice(0, 4);
+                codePreview = ' | Code: ' + lines.join(' / ');
+            }
+            cr7Row.setAttribute('data-tooltip', `Linkage: ${cr7.linkage} | Perms: ${permsStr} | Base: 0x${(cr7.base || 0).toString(16).toUpperCase()} | Size: ${cr7.size || 0} bytes${codePreview}`);
         }
     } else {
         document.getElementById('cr7NameDisplay').textContent = 'NULL';
