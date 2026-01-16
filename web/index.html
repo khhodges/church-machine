@@ -302,7 +302,6 @@
                 <div class="cap-nav-bar">
                     <select id="capViewSelect" onchange="switchCapView(this.value)" data-tooltip="Switch between capability views">
                         <option value="system">System Registers</option>
-                        <option value="context">Context (CR0-CR7)</option>
                         <option value="clist">C-List</option>
                     </select>
                     <button onclick="createSampleCapabilities()" class="btn btn-step" data-tooltip="Load example capabilities into context registers">Load Samples</button>
@@ -312,11 +311,6 @@
                         <div class="cap-section" id="capSystemSection">
                             <h3>System</h3>
                             <div class="token-list" id="systemTokens"></div>
-                        </div>
-                        
-                        <div class="cap-section" id="capContextSection">
-                            <h3>Context</h3>
-                            <div class="token-list" id="contextTokens"></div>
                         </div>
                         
                         <div class="cap-section" id="capClistSection">

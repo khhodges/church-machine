@@ -57,7 +57,6 @@ function updateBackButton() {
 function switchCapView(section) {
     const sections = {
         system: 'capSystemSection',
-        context: 'capContextSection',
         clist: 'capClistSection'
     };
     Object.values(sections).forEach(id => {
@@ -1334,22 +1333,15 @@ function recalculateMAC() {
 
 function updateCapabilityExplorer() {
     const systemContainer = document.getElementById('systemTokens');
-    const contextContainer = document.getElementById('contextTokens');
     const clistContainer = document.getElementById('clistTokens');
     
     if (!systemContainer) return;
     
     systemContainer.innerHTML = '';
-    contextContainer.innerHTML = '';
     clistContainer.innerHTML = '';
     
     systemContainer.appendChild(createTokenCard(simulator.cr15, 'CR15 (Namespace)'));
     systemContainer.appendChild(createTokenCard(simulator.cr8, 'CR8 (Thread)'));
-    
-    for (let i = 0; i < 8; i++) {
-        const cap = simulator.contextRegs[i];
-        contextContainer.appendChild(createTokenCard(cap, `CR${i}`));
-    }
     
     if (simulator.clist && simulator.clist.length > 0) {
         simulator.clist.forEach((cap, i) => {
