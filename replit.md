@@ -34,7 +34,7 @@ The CTMM simulator provides both a Haskell console interface and a primary web-b
 
 The web interface is composed of five distinct views, accessible via a dropdown:
 
-1.  **Dashboard**: Main control panel displaying registers (Church and Turing), condition flags, command input, and output log. Features a visual boot sequence banner.
+1.  **Dashboard**: Thread View displaying registers (Church CR0-CR15 and Turing DR0-DR15), condition flags, and visual boot sequence banner. The current thread is defined by CR8.
 2.  **Namespace Browser**: Visual exploration of the capability namespace, displaying objects, C-List hierarchy, and providing tools to manage objects and state.
 3.  **Assembly Editor**: A syntax-highlighted code editor for CTMM assembly with example programs and output tabs for console, Turing registers, and Church registers. Enforces security by restricting direct namespace access from code.
 4.  **Capabilities Explorer**: Provides a detailed view of Golden Token structure, allowing interactive editing of bit fields and namespace entries, including live MAC validation.
@@ -54,3 +54,10 @@ The web interface is composed of five distinct views, accessible via a dropdown:
 -   **Python HTTP Server**: Used to serve the web interface files.
 -   **Haskell GHC**: For the console-based simulator backend.
 -   **`localStorage`**: Browser API used for client-side state persistence.
+
+## Recent Changes
+
+- 2026-01-16: Simplified Dashboard - removed Command Input and Output Log, now pure Thread View
+- 2026-01-16: Bidirectional editor linkage - toolbar shows current loaded object path (e.g., Boot/SlideRule/GT_ADD.asm)
+- 2026-01-16: CR7 tooltip shows code preview (first 4 assembly lines)
+- 2026-01-16: Abstractions have E-only permissions, code GTs have RX-only with base/size
