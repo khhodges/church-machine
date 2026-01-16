@@ -1142,90 +1142,74 @@ function showCapabilityDetail(evt, cap, regLabel) {
         `<option value="${t}" ${t === getTypeFromSeals(cap.nsEntry) ? 'selected' : ''}>${t}</option>`
     ).join('');
     
+    const macPopupContent = macValidation.valid 
+        ? `MAC Valid | Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')} | Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}`
+        : `SECURITY TRAP! MAC Mismatch | Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')} | Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}`;
+    
     panel.innerHTML = `
         <h2>${cap.name} <span class="reg-badge">${regLabel}</span></h2>
         
-        <div class="gt-section gt-compact">
-            <h3 class="section-title">Golden Token (64-bit)</h3>
-            <div class="gt-64bit-row">
-                <div class="gt-64bit-hex" data-tooltip="Full 64-bit Golden Token: Spare[48:63] | Perms[32:47] | Offset[0:31]">
-                    <code id="gtHexValue">${formatGTHex(gt)}</code>
-                </div>
-                <div class="gt-64bit-fields">
-                    <span class="gt-field" data-tooltip="Namespace offset [0:31]">
-                        <label>Off:</label>
-                        <input type="text" id="gtOffset" class="gt-mini-input" value="0x${offset.toString(16).toUpperCase()}" onchange="updateGTFromEditor()">
-                    </span>
-                    <span class="gt-field" data-tooltip="Spare bits [48:63]">
-                        <label>Sp:</label>
-                        <input type="text" id="gtSpare" class="gt-mini-input" value="0x${spare.toString(16).toUpperCase().padStart(4, '0')}" onchange="updateGTFromEditor()">
-                    </span>
-                </div>
-            </div>
-            <div class="gt-perms-row">
-                <span class="gt-perms-label">Perms [32:47]:</span>
-                <div class="perm-checkboxes">${permCheckboxes}</div>
-                <span class="perm-hex">= 0x${gtDecoded.permBits.toString(16).toUpperCase().padStart(4, '0')}</span>
-            </div>
-        </div>
-        
-        <div class="ns-entry-section">
-            <h3 class="section-title">Namespace Entry (3-Word Descriptor)</h3>
-            <p class="ns-intro-text">Pointed to by GT Offset. Hardware validates MAC on every LOAD.</p>
-            
-            <div class="ns-word-layout">
-                <div class="ns-word" data-tooltip="Physical RAM address or URL (network/cloud)">
-                    <div class="word-header">
-                        <span class="word-num">Word 1</span>
-                        <span class="word-name">Location</span>
+        <div class="word-stack">
+            <div class="word-row gt-row">
+                <div class="word-key">GT</div>
+                <code class="word-hex" id="gtHexValue">${formatGTHex(gt)}</code>
+                <div class="word-fields">
+                    <div class="field-group field-left">
+                        <span class="field-label">Perms [32:47]</span>
+                        <div class="perm-checkboxes">${permCheckboxes}</div>
+                        <span class="perm-hex">= 0x${gtDecoded.permBits.toString(16).toUpperCase().padStart(4, '0')}</span>
                     </div>
-                    <input type="text" id="nsLocation" class="word-input" value="${formatWord(cap.nsEntry.word1_location)}" onchange="updateNSFromEditor()">
-                </div>
-                
-                <div class="ns-word" data-tooltip="Object size in bytes - defines the access boundary">
-                    <div class="word-header">
-                        <span class="word-num">Word 2</span>
-                        <span class="word-name">Limit</span>
+                    <div class="field-group field-center">
+                        <span class="field-label">Spare [48:63]</span>
+                        <input type="text" id="gtSpare" class="field-input" value="0x${spare.toString(16).toUpperCase().padStart(4, '0')}" onchange="updateGTFromEditor()">
                     </div>
-                    <input type="text" id="nsLimit" class="word-input" value="${formatWord(cap.nsEntry.word2_limit)}" onchange="updateNSFromEditor()">
-                    <div class="word-decimal">(${Number(cap.nsEntry.word2_limit)} bytes)</div>
-                </div>
-                
-                <div class="ns-word ns-word-seals" data-tooltip="Metadata[0:31] + Type[32:47] + MAC[48:63]">
-                    <div class="word-header">
-                        <span class="word-num">Word 3</span>
-                        <span class="word-name">Seals</span>
-                    </div>
-                    <div class="seals-breakdown">
-                        <div class="seal-field">
-                            <span class="seal-label">Meta[0:31]:</span>
-                            <input type="text" id="nsMeta" class="seal-input" value="0x${(Number(cap.nsEntry.word3_seals) & 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0')}" onchange="updateNSFromEditor()">
-                        </div>
-                        <div class="seal-field">
-                            <span class="seal-label">Type[32:47]:</span>
-                            <select id="nsType" class="seal-select" onchange="updateNSFromEditor()">${typeOptions}</select>
-                        </div>
-                        <div class="seal-field">
-                            <span class="seal-label">MAC[48:63]:</span>
-                            <span id="nsMACValue" class="seal-value">0x${getMACFromSeals(cap.nsEntry).toString(16).toUpperCase().padStart(4, '0')}</span>
-                        </div>
+                    <div class="field-group field-right">
+                        <span class="field-label">Offset [0:31]</span>
+                        <input type="text" id="gtOffset" class="field-input" value="0x${offset.toString(16).toUpperCase().padStart(8, '0')}" onchange="updateGTFromEditor()">
                     </div>
                 </div>
             </div>
             
-            <div class="mac-validation ${macValidation.valid ? 'mac-valid' : 'mac-invalid'}">
-                <div class="mac-status">
-                    <span class="mac-icon">${macValidation.valid ? '✓' : '⚠'}</span>
-                    <span class="mac-text">${macValidation.valid ? 'MAC Valid - Object Authenticated' : 'SECURITY TRAP - MAC Mismatch!'}</span>
-                </div>
-                <div class="mac-details">
-                    <div class="mac-formula">MAC = Hash(GT_Offset + W1 + W2 + W3_Meta)</div>
-                    <div class="mac-values">
-                        <span>Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')}</span>
-                        <span>Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}</span>
+            <div class="word-row nmd-row">
+                <div class="word-key">W1</div>
+                <code class="word-hex">${formatWord(cap.nsEntry.word1_location)}</code>
+                <div class="word-fields">
+                    <div class="field-group field-right-full">
+                        <span class="field-label">Location (Physical Address)</span>
+                        <input type="text" id="nsLocation" class="field-input field-wide" value="${formatWord(cap.nsEntry.word1_location)}" onchange="updateNSFromEditor()">
                     </div>
                 </div>
-                <button class="btn btn-recalc" onclick="recalculateMAC()">Recalculate MAC</button>
+            </div>
+            
+            <div class="word-row nmd-row">
+                <div class="word-key">W2</div>
+                <code class="word-hex">${formatWord(cap.nsEntry.word2_limit)}</code>
+                <div class="word-fields">
+                    <div class="field-group field-right-full">
+                        <span class="field-label">Limit (${Number(cap.nsEntry.word2_limit)} bytes)</span>
+                        <input type="text" id="nsLimit" class="field-input field-wide" value="${formatWord(cap.nsEntry.word2_limit)}" onchange="updateNSFromEditor()">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="word-row nmd-row">
+                <div class="word-key">W3</div>
+                <code class="word-hex">${formatWord(cap.nsEntry.word3_seals)}</code>
+                <div class="word-fields">
+                    <div class="field-group field-left">
+                        <span class="field-label">Meta [0:31]</span>
+                        <input type="text" id="nsMeta" class="field-input" value="0x${(Number(cap.nsEntry.word3_seals) & 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0')}" onchange="updateNSFromEditor()">
+                    </div>
+                    <div class="field-group field-center">
+                        <span class="field-label">Type [32:47]</span>
+                        <select id="nsType" class="field-select" onchange="updateNSFromEditor()">${typeOptions}</select>
+                    </div>
+                    <div class="field-group field-right mac-field ${macValidation.valid ? 'mac-valid' : 'mac-invalid'}" data-tooltip="${macPopupContent}">
+                        <span class="field-label">MAC [48:63]</span>
+                        <span id="nsMACValue" class="mac-value">${macValidation.valid ? '✓' : '⚠'} 0x${getMACFromSeals(cap.nsEntry).toString(16).toUpperCase().padStart(4, '0')}</span>
+                        <button class="btn-recalc-mini" onclick="recalculateMAC()" title="Recalculate MAC">↻</button>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -1280,8 +1264,6 @@ function updateNSFromEditor() {
                                              (BigInt(typeCode) << BigInt(32)) |
                                              (BigInt(storedMAC) << BigInt(48));
     
-    document.querySelector('.word-decimal').textContent = `(${Number(limit)} bytes)`;
-    
     updateMACValidationDisplay();
 }
 
@@ -1291,18 +1273,21 @@ function updateMACValidationDisplay() {
     const offset = currentEditingCap.location.offset || 0;
     const macValidation = validateMAC(offset, currentEditingCap.nsEntry);
     
-    const macDiv = document.querySelector('.mac-validation');
-    if (macDiv) {
-        macDiv.className = `mac-validation ${macValidation.valid ? 'mac-valid' : 'mac-invalid'}`;
-        macDiv.querySelector('.mac-icon').textContent = macValidation.valid ? '✓' : '⚠';
-        macDiv.querySelector('.mac-text').textContent = macValidation.valid ? 'MAC Valid - Object Authenticated' : 'SECURITY TRAP - MAC Mismatch!';
-        macDiv.querySelector('.mac-values').innerHTML = `
-            <span>Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')}</span>
-            <span>Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}</span>
-        `;
+    const macField = document.querySelector('.mac-field');
+    if (macField) {
+        macField.classList.remove('mac-valid', 'mac-invalid');
+        macField.classList.add(macValidation.valid ? 'mac-valid' : 'mac-invalid');
+        
+        const tooltipContent = macValidation.valid 
+            ? `MAC Valid | Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')} | Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}`
+            : `SECURITY TRAP! MAC Mismatch | Stored: 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')} | Calculated: 0x${macValidation.calculated.toString(16).toUpperCase().padStart(4, '0')}`;
+        macField.setAttribute('data-tooltip', tooltipContent);
     }
     
-    document.getElementById('nsMACValue').textContent = `0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')}`;
+    const macValueEl = document.getElementById('nsMACValue');
+    if (macValueEl) {
+        macValueEl.innerHTML = `${macValidation.valid ? '✓' : '⚠'} 0x${macValidation.stored.toString(16).toUpperCase().padStart(4, '0')}`;
+    }
 }
 
 function recalculateMAC() {
