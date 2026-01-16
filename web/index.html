@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260115h">
+    <link rel="stylesheet" href="styles.css?v=20260115i">
 </head>
 <body>
     <div class="fixed-toolbar">
@@ -205,8 +205,8 @@
                     <button class="btn btn-toolbar" onclick="toolbarAction('link')" data-tooltip="Link selected object to another C-List">Link</button>
                     <button class="btn btn-toolbar btn-danger" onclick="toolbarAction('delete')" data-tooltip="Delete selected object from namespace">Delete</button>
                     <span class="toolbar-separator"></span>
-                    <button class="btn btn-toolbar" onclick="exportNamespaceState()" data-tooltip="Export namespace state to JSON file">Export</button>
-                    <label class="btn btn-toolbar" data-tooltip="Import namespace state from JSON file">
+                    <button class="btn btn-toolbar tooltip-bottom" onclick="exportNamespaceState()" data-tooltip="Export namespace state to JSON file">Export</button>
+                    <label class="btn btn-toolbar tooltip-bottom" data-tooltip="Import namespace state from JSON file">
                         Import
                         <input type="file" accept=".json" onchange="importNamespaceState(this.files[0]); this.value='';" style="display:none;">
                     </label>

@@ -3054,7 +3054,10 @@ function exportNamespaceState() {
         }
     };
     
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const jsonString = JSON.stringify(state, (key, value) => 
+        typeof value === 'bigint' ? value.toString() + 'n' : value
+    , 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
