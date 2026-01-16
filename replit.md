@@ -57,6 +57,11 @@ The web interface is composed of five distinct views, accessible via a dropdown:
 
 ## Recent Changes
 
+- 2026-01-16: Reset button now saves thread state (CR, DR, flags, Lambda states) before hardware reset with 300ms pause
+- 2026-01-16: View selector changed from dropdown to horizontal row of buttons (Dashboard, Namespace, Assembly, Capabilities, Tutorial)
+- 2026-01-16: Boot sequence has 4 individual clickable step buttons (1-4) with "Run All" button replacing old status text
+- 2026-01-16: Removed Step button - boot steps are now clickable individually and enforced sequentially
+- 2026-01-16: Editor shows empty code when boot loads CR7 Nucleus (no code defined yet)
 - 2026-01-16: Simplified Dashboard - removed Command Input and Output Log, now pure Thread View
 - 2026-01-16: Bidirectional editor linkage - toolbar shows current loaded object path (e.g., Boot/SlideRule/GT_ADD.asm)
 - 2026-01-16: CR7 tooltip shows code preview (first 4 assembly lines)
