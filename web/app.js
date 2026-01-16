@@ -319,10 +319,8 @@ const bootSteps = [
             };
             updateSystemState();
             
-            // Update editor linkage to reflect CR7 Nucleus
-            editorState.currentLinkage = 'Boot/Nucleus';
-            editorState.currentPerms = '[RX]';
-            updateEditorToolbar();
+            // Update editor to empty state for Nucleus (no code defined yet)
+            setEditorCode('', 'Boot/Nucleus', '[RX]');
         }
     }
 ];
