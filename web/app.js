@@ -77,12 +77,12 @@ function generateGoldenKey() {
 
 // ==================== GOLDEN TOKEN (64-bit) STRUCTURE ====================
 // Bits 0-31:  Offset (index into Namespace Table)
-// Bits 32-47: Permissions (R/W/X/L/S/E/B on/off bits)
+// Bits 32-47: Permissions (R/W/X/L/S/E/B/M on/off bits - M=Meta-Machine for hardware-level)
 // Bits 48-63: Spare (future flags or Thread ID)
 
 const PERM_BITS = {
     R: 0x0001, W: 0x0002, X: 0x0004, L: 0x0008,
-    S: 0x0010, E: 0x0020, B: 0x0040
+    S: 0x0010, E: 0x0020, B: 0x0040, M: 0x0080
 };
 
 function encodeGoldenToken(offset, perms, spare = 0) {
@@ -793,7 +793,7 @@ function updateContextRegisters() {
         const tooltip = crTooltips[i];
         const permTooltip = reg.perms.length > 0 ? 
             `Permissions: ${reg.perms.map(p => {
-                const permNames = {R:'Read', W:'Write', X:'Execute', L:'Load', S:'Store', E:'Enter', B:'Bind'};
+                const permNames = {R:'Read', W:'Write', X:'Execute', L:'Load', S:'Store', E:'Enter', B:'Bind', M:'Meta-Machine'};
                 return permNames[p] || p;
             }).join(', ')}` : 'No capability loaded. Register is empty.';
         
@@ -1075,7 +1075,7 @@ function createTokenCard(cap, regLabel) {
     card.className = `token-card ${isNull ? 'null-cap' : ''}`;
     card.onclick = (evt) => showCapabilityDetail(evt, cap, regLabel);
     
-    const allPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B'];
+    const allPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'];
     const permBadges = allPerms.map(p => {
         const hasIt = cap.perms.includes(p);
         return `<span class="perm-badge perm-${p.toLowerCase()} ${hasIt ? '' : 'inactive'}">${p}</span>`;
@@ -1106,10 +1106,10 @@ function showCapabilityDetail(evt, cap, regLabel) {
     currentEditingRegLabel = regLabel;
     
     const panel = document.getElementById('capDetailPanel');
-    const allPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B'];
+    const allPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'];
     const permNames = {
         R: 'Read', W: 'Write', X: 'Execute',
-        L: 'Load', S: 'Store', E: 'Enter', B: 'Bind'
+        L: 'Load', S: 'Store', E: 'Enter', B: 'Bind', M: 'Meta-Machine'
     };
     
     const offset = cap.location.offset || 0;
@@ -1161,7 +1161,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
                     <input type="text" id="gtOffset" class="bit-input" value="0x${offset.toString(16).toUpperCase()}" onchange="updateGTFromEditor()">
                 </div>
                 
-                <div class="bit-field" data-tooltip="Permission bits: R/W/X/L/S/E/B (can downgrade without recalculating MAC)">
+                <div class="bit-field" data-tooltip="Permission bits: R/W/X/L/S/E/B/M (M=Meta-Machine for hardware-level access; can downgrade without recalculating MAC)">
                     <div class="bit-header">
                         <span class="bit-range">[32:47]</span>
                         <span class="bit-name">Permissions</span>
@@ -3069,7 +3069,7 @@ const lessons = [
                 <p>You've learned the fundamentals of capability-based security:</p>
                 <ul>
                     <li>Capabilities are unforgeable tokens granting specific access</li>
-                    <li>The 7 permissions (R, W, X, L, S, E, B) control what you can do</li>
+                    <li>The 8 permissions (R, W, X, L, S, E, B, M) control what you can do. M=Meta-Machine distinguishes hardware-level access.</li>
                     <li>The boot sequence establishes the secure foundation</li>
                     <li>Context and Data registers serve different purposes</li>
                     <li>Capability operations require proper permissions</li>
@@ -3459,8 +3459,9 @@ function openAddObjectModal() {
     document.getElementById('modalObjType').value = 'Data';
     document.getElementById('modalObjSize').value = '1024';
     
-    ['R', 'W', 'X', 'L', 'S', 'E', 'B'].forEach(p => {
-        document.getElementById(`modalPerm${p}`).checked = (p === 'R');
+    ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'].forEach(p => {
+        const el = document.getElementById(`modalPerm${p}`);
+        if (el) el.checked = (p === 'R');
     });
     
     updatePermissionsForType('Data');
@@ -3488,9 +3489,9 @@ function openEditObjectModal() {
     
     updatePermissionsForType(obj.type);
     
-    ['R', 'W', 'X', 'L', 'S', 'E', 'B'].forEach(p => {
+    ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'].forEach(p => {
         const checkbox = document.getElementById(`modalPerm${p}`);
-        if (!checkbox.disabled) {
+        if (checkbox && !checkbox.disabled) {
             checkbox.checked = obj.perms.includes(p);
         }
     });
@@ -3517,8 +3518,9 @@ function confirmObjectModal() {
     const parent = document.getElementById('modalParent').value;
     
     const perms = [];
-    ['R', 'W', 'X', 'L', 'S', 'E', 'B'].forEach(p => {
-        if (document.getElementById(`modalPerm${p}`).checked) {
+    ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'].forEach(p => {
+        const el = document.getElementById(`modalPerm${p}`);
+        if (el && el.checked) {
             perms.push(p);
         }
     });

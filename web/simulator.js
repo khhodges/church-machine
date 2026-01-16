@@ -347,7 +347,7 @@ class CTMMSimulator {
                            crIdx === 8 ? this.cr8 : 
                            this.cr15;
                 
-                const validPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B'];
+                const validPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'];
                 const requiredPerms = maskStr.toUpperCase().split('').filter(p => validPerms.includes(p));
                 const actualPerms = cr.perms || [];
                 
