@@ -12,14 +12,14 @@
             <h1>CTMM Simulator</h1>
             <nav class="controls">
                 <div class="header-left">
-                    <button onclick="goBack()" class="btn btn-back" id="backBtn" data-tooltip="Go back to previous view" disabled>&larr; Back</button>
+                    <button onclick="goBack()" class="btn btn-back tooltip-bottom" id="backBtn" data-tooltip="Navigate to previous view" disabled>Back</button>
                 </div>
                 <div class="view-buttons">
-                    <button onclick="switchView('dashboard')" class="btn btn-view active" id="viewBtn-dashboard" data-tooltip="View registers and system state">Dashboard</button>
-                    <button onclick="switchView('namespace')" class="btn btn-view" id="viewBtn-namespace" data-tooltip="Browse namespace objects">Namespace</button>
-                    <button onclick="switchView('editor')" class="btn btn-view" id="viewBtn-editor" data-tooltip="Edit assembly code">Assembly</button>
-                    <button onclick="switchView('capabilities')" class="btn btn-view" id="viewBtn-capabilities" data-tooltip="Explore Golden Tokens">Capabilities</button>
-                    <button onclick="switchView('tutorial')" class="btn btn-view" id="viewBtn-tutorial" data-tooltip="Learn CTMM concepts">Tutorial</button>
+                    <button onclick="switchView('dashboard')" class="btn btn-view tooltip-bottom active" id="viewBtn-dashboard" data-tooltip="View registers and system state">Dashboard</button>
+                    <button onclick="switchView('namespace')" class="btn btn-view tooltip-bottom" id="viewBtn-namespace" data-tooltip="Browse namespace objects">Namespace</button>
+                    <button onclick="switchView('editor')" class="btn btn-view tooltip-bottom" id="viewBtn-editor" data-tooltip="Edit assembly code">Assembly</button>
+                    <button onclick="switchView('capabilities')" class="btn btn-view tooltip-bottom" id="viewBtn-capabilities" data-tooltip="Explore Golden Tokens">Capabilities</button>
+                    <button onclick="switchView('tutorial')" class="btn btn-view tooltip-bottom" id="viewBtn-tutorial" data-tooltip="Learn CTMM concepts">Tutorial</button>
                 </div>
                 <div class="header-right"></div>
             </nav>

@@ -185,10 +185,10 @@ nav.controls {
 
 main {
     padding: 0.8rem;
-    margin-top: 50px;
+    margin-top: 60px;
     flex: 1;
     overflow-y: auto;
-    height: calc(100vh - 50px);
+    height: calc(100vh - 60px);
 }
 
 .view {
