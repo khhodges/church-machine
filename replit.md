@@ -58,7 +58,8 @@ The web interface is composed of five distinct views, accessible via a dropdown:
 ## Recent Changes
 
 - 2026-01-16: Redesigned Capabilities Explorer with vertically-stacked GT and NMD layout (GT, W1, W2, W3 rows aligned)
-- 2026-01-16: Each row shows: Key | Hex Value | Fields (Perms/Spare/Offset for GT; Location for W1; Limit for W2; Meta/Type/MAC for W3)
+- 2026-01-16: Hex values now shown via Hex button popup (hover tooltip) instead of inline display
+- 2026-01-16: Each row shows: Key | Hex button | Fields (Perms/Spare/Offset for GT; Location for W1; Limit for W2; Meta/Type/MAC for W3)
 - 2026-01-16: MAC validation now shows as hover popup tooltip instead of separate section
 - 2026-01-16: Added M (Meta-Machine) permission bit to distinguish hardware-level access (Namespace, Threads) from software-level permissions
 - 2026-01-16: M is now the ONLY permission on Namespace (offset 0) and all Thread entries (Kenneth, Matthew, Daniel) - no other permissions when M is set

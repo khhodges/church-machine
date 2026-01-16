@@ -873,13 +873,32 @@ main {
 
 .word-row {
     display: grid;
-    grid-template-columns: 40px 180px 1fr;
+    grid-template-columns: 40px 50px 1fr;
     gap: 0.8rem;
     align-items: start;
     background: var(--bg-dark);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.6rem 0.8rem;
+}
+
+.hex-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--warning);
+    font-family: 'Consolas', monospace;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.hex-btn:hover {
+    background: var(--warning);
+    color: var(--bg-dark);
+    border-color: var(--warning);
 }
 
 .word-row.gt-row {
@@ -895,15 +914,6 @@ main {
     padding: 0.3rem 0;
 }
 
-.word-hex {
-    font-family: 'Consolas', monospace;
-    font-size: 0.85rem;
-    color: var(--success);
-    background: var(--bg-input);
-    padding: 0.3rem 0.5rem;
-    border-radius: 4px;
-    display: block;
-}
 
 .word-fields {
     display: flex;

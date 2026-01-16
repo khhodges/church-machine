@@ -1152,7 +1152,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
         <div class="word-stack">
             <div class="word-row gt-row">
                 <div class="word-key">GT</div>
-                <code class="word-hex" id="gtHexValue">${formatGTHex(gt)}</code>
+                <button class="hex-btn" data-tooltip="${formatGTHex(gt)}" id="gtHexBtn">Hex</button>
                 <div class="word-fields">
                     <div class="field-group field-left">
                         <span class="field-label">Perms [32:47]</span>
@@ -1172,7 +1172,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
             
             <div class="word-row nmd-row">
                 <div class="word-key">W1</div>
-                <code class="word-hex">${formatWord(cap.nsEntry.word1_location)}</code>
+                <button class="hex-btn" data-tooltip="${formatWord(cap.nsEntry.word1_location)}" id="w1HexBtn">Hex</button>
                 <div class="word-fields">
                     <div class="field-group field-right-full">
                         <span class="field-label">Location (Physical Address)</span>
@@ -1183,7 +1183,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
             
             <div class="word-row nmd-row">
                 <div class="word-key">W2</div>
-                <code class="word-hex">${formatWord(cap.nsEntry.word2_limit)}</code>
+                <button class="hex-btn" data-tooltip="${formatWord(cap.nsEntry.word2_limit)}" id="w2HexBtn">Hex</button>
                 <div class="word-fields">
                     <div class="field-group field-right-full">
                         <span class="field-label">Limit (${Number(cap.nsEntry.word2_limit)} bytes)</span>
@@ -1194,7 +1194,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
             
             <div class="word-row nmd-row">
                 <div class="word-key">W3</div>
-                <code class="word-hex">${formatWord(cap.nsEntry.word3_seals)}</code>
+                <button class="hex-btn" data-tooltip="${formatWord(cap.nsEntry.word3_seals)}" id="w3HexBtn">Hex</button>
                 <div class="word-fields">
                     <div class="field-group field-left">
                         <span class="field-label">Meta [0:31]</span>
@@ -1233,7 +1233,8 @@ function updateGTFromEditor() {
     currentEditingCap.spare = spare;
     
     const gt = encodeGoldenToken(offset, perms, spare);
-    document.getElementById('gtHexValue').textContent = formatGTHex(gt);
+    const gtHexBtn = document.getElementById('gtHexBtn');
+    if (gtHexBtn) gtHexBtn.setAttribute('data-tooltip', formatGTHex(gt));
     
     const gtDecoded = decodeGoldenToken(gt);
     document.querySelector('.perm-hex').textContent = `= 0x${gtDecoded.permBits.toString(16).toUpperCase().padStart(4, '0')}`;
