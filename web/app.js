@@ -1501,6 +1501,33 @@ function recalculateMAC() {
     log(`MAC recalculated: 0x${newMAC.toString(16).toUpperCase().padStart(4, '0')}`, 'info');
 }
 
+function getCapabilityTypeLabel(cap) {
+    // Check for specific types based on name/type
+    const type = cap.type || '';
+    const name = cap.name || '';
+    
+    if (type === 'Thread' || ['Kenneth', 'Matthew', 'Daniel'].includes(name)) {
+        return 'Thread';
+    }
+    if (type === 'Code' || name === 'Access' || name.endsWith('.asm')) {
+        return 'Code';
+    }
+    if (type === 'Abstraction' || ['SlideRule', 'Abacus', 'Circle'].includes(name)) {
+        return 'Abstraction';
+    }
+    if (type === 'C-List' || name === 'Boot') {
+        return 'C-List';
+    }
+    if (type === 'Data') {
+        return 'Data';
+    }
+    if (type === 'Namespace' || name === 'Namespace') {
+        return 'Namespace';
+    }
+    
+    return type || 'Object';
+}
+
 function updateCapabilityExplorer() {
     const systemContainer = document.getElementById('systemTokens');
     const clistContainer = document.getElementById('clistTokens');
@@ -1515,7 +1542,8 @@ function updateCapabilityExplorer() {
     
     if (simulator.clist && simulator.clist.length > 0) {
         simulator.clist.forEach((cap, i) => {
-            clistContainer.appendChild(createTokenCard(cap, `C-List[${i}]`));
+            const typeLabel = getCapabilityTypeLabel(cap);
+            clistContainer.appendChild(createTokenCard(cap, `[${i}] ${typeLabel}`));
         });
     } else {
         clistContainer.innerHTML = '<p style="color: var(--text-secondary); font-style: italic; padding: 0.5rem;">No capabilities in C-List</p>';
