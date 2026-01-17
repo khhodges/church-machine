@@ -1067,6 +1067,17 @@ main {
     border: 1px solid var(--success);
 }
 
+.reg-badge-small {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    background: var(--accent-blue);
+    color: white;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    margin-left: 0.3rem;
+}
+
 .field-input {
     padding: 0.25rem 0.4rem;
     background: var(--bg-input);

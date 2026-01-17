@@ -1291,9 +1291,12 @@ function showCapabilityDetail(evt, cap, regLabel) {
     ).join('<span class="hier-arrow">→</span>');
     
     const isLocked = cap.locked === true;
+    const registerBadges = registers.length > 0 
+        ? registers.map(r => `<span class="reg-badge-small" data-tooltip="${r.desc}">${r.reg}</span>`).join(' ')
+        : '';
     const lockStatusHtml = isLocked 
         ? '<span class="lock-status locked" data-tooltip="Capability is locked - cannot be modified">🔒 Locked</span>'
-        : '<span class="lock-status unlocked" data-tooltip="Capability is unlocked - can be modified">🔓 Unlocked</span>';
+        : `<span class="lock-status unlocked" data-tooltip="Capability is unlocked - can be modified">🔓 Unlocked</span>${registerBadges ? ' ' + registerBadges : ''}`;
     
     panel.innerHTML = `
         <div class="cap-title-bar">
