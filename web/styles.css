@@ -780,6 +780,7 @@ main {
     padding: 1.5rem;
     border: 1px solid var(--border);
     width: 100%;
+    overflow: visible;
 }
 
 .cap-detail-panel h2 {
@@ -3581,11 +3582,14 @@ main {
     border-top-color: var(--accent);
 }
 
+/* CSS tooltips disabled - using JavaScript floating tooltips instead */
+/*
 [data-tooltip]:hover::before,
 [data-tooltip]:hover::after {
     visibility: visible;
     opacity: 1;
 }
+*/
 
 body.tooltip-hidden [data-tooltip]:hover::before,
 body.tooltip-hidden [data-tooltip]:hover::after {

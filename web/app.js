@@ -5136,6 +5136,94 @@ function attachContextMenuListeners() {
     });
 }
 
+// ==================== DYNAMIC TOOLTIP SYSTEM ====================
+// Creates floating tooltips positioned dynamically to avoid clipping
+
+let floatingTooltip = null;
+
+function createFloatingTooltip() {
+    if (!floatingTooltip) {
+        floatingTooltip = document.createElement('div');
+        floatingTooltip.className = 'floating-tooltip';
+        floatingTooltip.style.cssText = `
+            position: fixed;
+            padding: 0.6rem 0.8rem;
+            background: linear-gradient(135deg, #1e1e2e 0%, #2a2a3e 100%);
+            color: #eaeaea;
+            font-size: 0.8rem;
+            font-weight: normal;
+            border-radius: 6px;
+            border: 1px solid #e94560;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            max-width: 280px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.4;
+            z-index: 999999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        `;
+        document.body.appendChild(floatingTooltip);
+    }
+    return floatingTooltip;
+}
+
+function showFloatingTooltip(element) {
+    const tooltip = createFloatingTooltip();
+    const text = element.getAttribute('data-tooltip');
+    if (!text) return;
+    
+    tooltip.textContent = text;
+    tooltip.style.opacity = '1';
+    
+    const rect = element.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    // Position below the element by default
+    let top = rect.bottom + 8;
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    
+    // If tooltip would go below viewport, show above
+    if (top + tooltipRect.height > window.innerHeight) {
+        top = rect.top - tooltipRect.height - 8;
+    }
+    
+    // Keep tooltip within horizontal bounds
+    if (left < 10) left = 10;
+    if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+    }
+    
+    tooltip.style.top = top + 'px';
+    tooltip.style.left = left + 'px';
+}
+
+function hideFloatingTooltip() {
+    if (floatingTooltip) {
+        floatingTooltip.style.opacity = '0';
+    }
+}
+
+// Attach tooltip listeners to elements with data-tooltip
+function initDynamicTooltips() {
+    document.addEventListener('mouseenter', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (target) {
+            showFloatingTooltip(target);
+        }
+    }, true);
+    
+    document.addEventListener('mouseleave', (e) => {
+        const target = e.target.closest('[data-tooltip]');
+        if (target) {
+            hideFloatingTooltip();
+        }
+    }, true);
+}
+
+initDynamicTooltips();
+
 // ==================== TOOLTIP AUTO-FADE ====================
 // Hide tooltips after 5 seconds of mouse inactivity
 let tooltipFadeTimer = null;
@@ -5148,6 +5236,7 @@ function resetTooltipFadeTimer() {
     }
     tooltipFadeTimer = setTimeout(() => {
         document.body.classList.add('tooltip-hidden');
+        hideFloatingTooltip();
     }, TOOLTIP_FADE_DELAY);
 }
 
