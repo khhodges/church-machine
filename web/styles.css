@@ -993,7 +993,8 @@ main {
     color: var(--success);
     font-family: 'Consolas', monospace;
     font-size: 0.75rem;
-    width: 90px;
+    width: 12ch;
+    text-align: left;
 }
 
 .field-input.field-wide {
