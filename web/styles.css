@@ -775,6 +775,7 @@ main {
     padding: 1.5rem;
     border: 1px solid var(--border);
     min-height: 300px;
+    width: 100%;
 }
 
 .cap-detail-panel h2 {
@@ -972,14 +973,17 @@ main {
 
 .field-left {
     align-items: flex-start;
+    flex: 2;
 }
 
 .field-center {
     align-items: center;
+    flex: 1;
 }
 
 .field-right {
     align-items: flex-start;
+    flex: 3;
 }
 
 .field-right-full {
