@@ -1404,12 +1404,12 @@ function showCapabilityDetail(evt, cap, regLabel) {
                         <input type="text" id="gtOffset" class="field-input" value="0x${offset.toString(16).toUpperCase().padStart(8, '0')}" onchange="updateGTFromEditor()">
                     </div>
                     <div class="field-group field-center">
-                        <span class="field-label" data-tooltip="Bits 48-63: Reserved for future use">Spare [48:63]</span>
+                        <span class="field-label" data-tooltip="Bits 32-47: Reserved for future use">Spare [32:47]</span>
                         <input type="text" id="gtSpare" class="field-input" value="0x${spare.toString(16).toUpperCase().padStart(4, '0')}" onchange="updateGTFromEditor()">
                     </div>
                     <div class="field-group field-right">
                         <div class="field-label-row">
-                            <span class="field-label" data-tooltip="Bits 32-47: Permission flags (R=Read, W=Write, X=Execute, L=Load, S=Save, E=Enter, B=Bind, M=Meta-Machine, F=Far/Remote URL)">Perms [32:47]</span>
+                            <span class="field-label" data-tooltip="Bits 48-63: Permission flags (R=Read, W=Write, X=Execute, L=Load, S=Save, E=Enter, B=Bind, M=Meta-Machine, F=Far/Remote URL)">Perms [48:63]</span>
                             <span class="perm-hex">= 0x${gtDecoded.permBits.toString(16).toUpperCase().padStart(4, '0')}</span>
                         </div>
                         <div class="perm-checkboxes">${permCheckboxes}</div>
