@@ -1605,20 +1605,23 @@ function selectContextRegister(regIndex) {
     const reg = getContextRegister(regIndex);
     if (!reg || !reg.name || reg.name === 'NULL') return;
     
-    // Use existing capability data - don't regenerate goldenKey
+    // Build capability with required location.offset for showCapabilityDetail
     const cap = {
         name: reg.name,
         type: reg.type || getCapabilityTypeLabel(reg),
         perms: reg.perms || [],
         locked: reg.locked,
+        location: reg.location || { offset: reg.nsOffset || 0 },
+        size: reg.size || 1024,
         nsOffset: reg.nsOffset || 0,
-        nsEntry: reg.nsEntry || {
-            word1_location: reg.location?.offset || reg.word1_location || 0,
-            word2_limit: reg.size || reg.word2_limit || 0,
-            word3_seals: reg.word3_seals || 0
-        },
-        goldenKey: reg.goldenKey  // Use existing key, don't generate new one
+        nsEntry: reg.nsEntry,
+        goldenKey: reg.goldenKey
     };
+    
+    // Ensure location has offset
+    if (!cap.location.offset && cap.location.offset !== 0) {
+        cap.location.offset = cap.nsOffset || 0;
+    }
     
     // Use the existing showCapabilityDetail function with register label
     const regLabel = `CR${regIndex}`;
