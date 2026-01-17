@@ -1233,60 +1233,77 @@ function getCapabilityHierarchy(cap) {
 function getRegisterAssignment(cap) {
     const assignments = [];
     
-    // Check special registers with type indicators
+    // Check special registers - order: CRn first, then Type, then size/status
     if (simulator.cr15 && simulator.cr15.name === cap.name) {
-        // CR15 is Namespace - show type if M permission is set
+        assignments.push({ reg: 'CR15', desc: 'Namespace Root' });
         if (cap.perms && cap.perms.includes('M')) {
             assignments.push({ reg: 'Namespace', desc: 'Namespace root (M permission)' });
         }
-        assignments.push({ reg: 'CR15', desc: 'Namespace Root' });
     }
     if (simulator.cr8 && simulator.cr8.name === cap.name) {
-        // CR8 is Thread - show type if M permission is set
+        assignments.push({ reg: 'CR8', desc: 'Current Thread' });
         if (cap.perms && cap.perms.includes('M')) {
             assignments.push({ reg: 'Thread', desc: 'Thread identity (M permission)' });
         }
-        assignments.push({ reg: 'CR8', desc: 'Current Thread' });
     }
     if (simulator.contextRegs[7] && simulator.contextRegs[7].name === cap.name) {
         assignments.push({ reg: 'CR7', desc: 'Nucleus' });
+        // Show code status for CR7
+        if (cap.perms && cap.perms.includes('X')) {
+            const metadata = cap.nsEntry ? Number(cap.nsEntry.word3_seals & BigInt(0xFFFFFFFF)) : 0;
+            const statusLabel = getCodeStatusLabel(metadata);
+            assignments.push({ reg: 'Code', desc: 'Executable code' });
+            assignments.push({ reg: statusLabel, desc: 'Code status from metadata' });
+        }
     }
     if (simulator.contextRegs[6] && simulator.contextRegs[6].name === cap.name) {
-        // CR6 is C-List - show size
-        const clistSize = simulator.clist ? simulator.clist.length : 0;
-        assignments.push({ reg: `C-List [${clistSize}]`, desc: `Capability list with ${clistSize} entries` });
         assignments.push({ reg: 'CR6', desc: 'Current C-List' });
+        const clistSize = simulator.clist ? simulator.clist.length : 0;
+        assignments.push({ reg: 'C-List', desc: 'Capability list' });
+        assignments.push({ reg: `[${clistSize}]`, desc: `${clistSize} entries` });
     }
     
-    // Check other context registers
+    // Check other context registers (CR0-CR5) - order: CRn first, then Type, then status
     for (let i = 0; i < 6; i++) {
         if (simulator.contextRegs[i] && simulator.contextRegs[i].name === cap.name) {
             assignments.push({ reg: `CR${i}`, desc: 'Context Register' });
+            // Add type indicator based on capability type
+            const regCap = simulator.contextRegs[i];
+            if (regCap.perms && regCap.perms.includes('X')) {
+                const metadata = regCap.nsEntry ? Number(regCap.nsEntry.word3_seals & BigInt(0xFFFFFFFF)) : 0;
+                const statusLabel = getCodeStatusLabel(metadata);
+                assignments.push({ reg: 'Code', desc: 'Executable code' });
+                assignments.push({ reg: statusLabel, desc: 'Code status from metadata' });
+            } else if (regCap.type === 'Thread' || regCap.perms?.includes('M')) {
+                assignments.push({ reg: 'Thread', desc: 'Thread identity' });
+            } else if (regCap.type === 'Abstraction') {
+                assignments.push({ reg: 'Abstraction', desc: 'Protected abstraction' });
+            } else if (regCap.type === 'C-List') {
+                assignments.push({ reg: 'C-List', desc: 'Capability list' });
+            } else if (regCap.type) {
+                assignments.push({ reg: regCap.type, desc: `${regCap.type} capability` });
+            }
         }
     }
     
-    // Check if it's in the current C-List
-    if (simulator.clist) {
+    // Check if it's in the current C-List (only if not already in a register)
+    if (simulator.clist && assignments.length === 0) {
         const clistIndex = simulator.clist.findIndex(c => c.name === cap.name);
         if (clistIndex >= 0) {
             const clistEntry = simulator.clist[clistIndex];
-            // Show type-specific label based on entry type
+            // Show type-specific label based on entry type - order: Type, then status
             if (clistEntry.perms && clistEntry.perms.includes('X')) {
-                // Executable code - show code status from metadata
                 const metadata = clistEntry.nsEntry ? Number(clistEntry.nsEntry.word3_seals & BigInt(0xFFFFFFFF)) : 0;
                 const statusLabel = getCodeStatusLabel(metadata);
-                assignments.push({ reg: `Code: ${statusLabel}`, desc: `Executable code status from metadata` });
+                assignments.push({ reg: 'Code', desc: 'Executable code' });
+                assignments.push({ reg: statusLabel, desc: 'Code status from metadata' });
             } else if (clistEntry.type === 'Thread' || clistEntry.perms?.includes('M')) {
-                // Thread entry
                 assignments.push({ reg: 'Thread', desc: 'Thread identity capability' });
             } else if (clistEntry.type === 'Abstraction') {
-                // Abstraction entry
                 assignments.push({ reg: 'Abstraction', desc: 'Protected abstraction capability' });
             } else if (clistEntry.type === 'C-List') {
-                // C-List entry
                 assignments.push({ reg: 'C-List', desc: 'Capability list' });
             } else {
-                // Generic entry with type
                 const entryType = clistEntry.type || 'Entry';
                 assignments.push({ reg: entryType, desc: `${entryType} capability` });
             }
