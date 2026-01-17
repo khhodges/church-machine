@@ -1148,18 +1148,17 @@ let currentEditingRegLabel = null;
 function getCapabilityHierarchy(cap) {
     const hierarchy = [];
     
-    // Check if this capability is in the Boot C-List
-    const bootCListEntry = bootCList.entries.find(e => e.name === cap.name);
-    if (bootCListEntry) {
-        hierarchy.push({ name: 'Namespace', type: 'Root', offset: 0 });
-        hierarchy.push({ name: 'Boot', type: 'C-List', offset: 1 });
-        hierarchy.push({ name: cap.name, type: cap.type || bootCListEntry.type, offset: bootCListEntry.nsOffset });
-        return hierarchy;
-    }
-    
     // Check if it's the Namespace itself
     if (cap.name === 'Namespace' || cap.location?.offset === 0) {
         hierarchy.push({ name: 'Namespace', type: 'Root', offset: 0 });
+        return hierarchy;
+    }
+    
+    // Check if it's a Thread (default/system threads are directly under Namespace, not Boot)
+    const threadNames = ['Kenneth', 'Matthew', 'Daniel'];
+    if (cap.type === 'Thread' || threadNames.includes(cap.name)) {
+        hierarchy.push({ name: 'Namespace', type: 'Root', offset: 0 });
+        hierarchy.push({ name: cap.name, type: 'Thread', offset: cap.location?.offset || 0 });
         return hierarchy;
     }
     
@@ -1170,13 +1169,21 @@ function getCapabilityHierarchy(cap) {
         return hierarchy;
     }
     
+    // Check if this capability is in the Boot C-List (excluding threads)
+    const bootCListEntry = bootCList.entries.find(e => e.name === cap.name);
+    if (bootCListEntry && bootCListEntry.type !== 'Thread') {
+        hierarchy.push({ name: 'Namespace', type: 'Root', offset: 0 });
+        hierarchy.push({ name: 'Boot', type: 'C-List', offset: 1 });
+        hierarchy.push({ name: cap.name, type: cap.type || bootCListEntry.type, offset: bootCListEntry.nsOffset });
+        return hierarchy;
+    }
+    
     // Check thread C-Lists
     for (const [threadName, threadData] of Object.entries(threadCLists)) {
         const threadEntry = threadData.clist.find(e => e.name === cap.name);
         if (threadEntry) {
             hierarchy.push({ name: 'Namespace', type: 'Root', offset: 0 });
-            hierarchy.push({ name: 'Boot', type: 'C-List', offset: 1 });
-            hierarchy.push({ name: threadName, type: 'Thread', offset: threadData.clist === threadCLists.Kenneth?.clist ? 2 : 
+            hierarchy.push({ name: threadName, type: 'Thread', offset: threadName === 'Kenneth' ? 2 : 
                             threadName === 'Matthew' ? 4 : threadName === 'Daniel' ? 5 : 0 });
             hierarchy.push({ name: cap.name, type: threadEntry.type, offset: 0 });
             return hierarchy;
