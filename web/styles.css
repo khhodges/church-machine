@@ -998,6 +998,13 @@ main {
     text-transform: uppercase;
 }
 
+.field-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
 .field-input {
     padding: 0.25rem 0.4rem;
     background: var(--bg-input);
