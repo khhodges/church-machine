@@ -1620,26 +1620,9 @@ function selectContextRegister(regIndex) {
         goldenKey: reg.goldenKey  // Use existing key, don't generate new one
     };
     
-    // Find register assignments based on actual register index
-    const registers = [];
-    const regLabels = { 15: 'Namespace', 8: 'Thread', 7: 'Nucleus', 6: 'C-List' };
-    registers.push({ reg: `CR${regIndex}`, desc: regLabels[regIndex] || `Context Register ${regIndex}` });
-    
-    // Build hierarchy path
-    const hierarchy = [
-        { name: 'Namespace', type: 'Root', offset: 0 }
-    ];
-    
-    // Add intermediate path for certain register types
-    if (regIndex === 6 || regIndex === 7 || regIndex === 8) {
-        hierarchy.push({ name: 'Boot', type: 'C-List', offset: 1 });
-    }
-    
-    if (cap.name !== 'Namespace') {
-        hierarchy.push({ name: cap.name, type: cap.type, offset: cap.nsOffset });
-    }
-    
-    renderCapabilityDetail(cap, hierarchy, registers);
+    // Use the existing showCapabilityDetail function with register label
+    const regLabel = `CR${regIndex}`;
+    showCapabilityDetail(null, cap, regLabel);
 }
 
 function createSampleCapabilities() {
