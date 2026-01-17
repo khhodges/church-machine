@@ -1425,7 +1425,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
                 </div>
                 <div class="word-fields">
                     <div class="field-group field-right-full">
-                        <span class="field-label" data-tooltip="${cap.perms.includes('F') ? 'Remote URL location (F bit set)' : 'Physical memory address (local)'}">${cap.perms.includes('F') ? 'Location (URL)' : 'Location (Address)'}</span>
+                        <span class="field-label" data-tooltip="Bits 0-63: ${cap.perms.includes('F') ? 'Remote URL location (F bit set)' : 'Physical memory address (local)'}">${cap.perms.includes('F') ? 'Location (URL)' : 'Location (Address)'} [0:63]</span>
                         <input type="text" id="nsLocation" class="field-input field-wide ${cap.perms.includes('F') ? 'url-field' : ''}" value="${formatLocation(cap.nsEntry.word1_location, cap.perms.includes('F'))}" onchange="updateNSFromEditor()">
                     </div>
                 </div>
@@ -1439,7 +1439,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
                 </div>
                 <div class="word-fields">
                     <div class="field-group field-right-full">
-                        <span class="field-label" data-tooltip="${cap.perms.includes('F') ? 'Content length for remote resource' : 'Maximum size - hardware enforces bounds checking'}">${cap.perms.includes('F') ? 'Length' : 'Limit'} (${Number(cap.nsEntry.word2_limit)} bytes)</span>
+                        <span class="field-label" data-tooltip="Bits 0-63: ${cap.perms.includes('F') ? 'Content length for remote resource' : 'Maximum size - hardware enforces bounds checking'}">${cap.perms.includes('F') ? 'Length' : 'Limit'} [0:63]</span>
                         <input type="text" id="nsLimit" class="field-input field-wide" value="${formatWord(cap.nsEntry.word2_limit)}" onchange="updateNSFromEditor()">
                     </div>
                 </div>
