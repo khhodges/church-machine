@@ -4425,13 +4425,24 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     gap: 1rem;
 }
 
+.instr-header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: var(--bg-panel);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+}
+
+.instr-header h2 {
+    margin: 0;
+    color: var(--accent);
+    font-size: 1.2rem;
+}
+
 .instr-tabs {
     display: flex;
     gap: 0.5rem;
-    background: var(--bg-panel);
-    padding: 0.5rem;
-    border-radius: 8px;
-    width: fit-content;
 }
 
 .instr-tab {

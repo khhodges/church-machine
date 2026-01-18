@@ -312,20 +312,19 @@
 
         <section id="instructions" class="view">
             <div class="instructions-layout">
-                <div class="instr-tabs">
-                    <button class="instr-tab active" id="tabChurch" onclick="switchInstrTab('church')" data-tooltip="Church capability instructions for secure object access">Church</button>
-                    <button class="instr-tab" id="tabTuring" onclick="switchInstrTab('turing')" data-tooltip="Turing ARM-style instructions for computation">Turing</button>
+                <div class="instr-header">
+                    <h2>Instructions</h2>
+                    <div class="instr-tabs">
+                        <button class="instr-tab active" id="tabChurch" onclick="switchInstrTab('church')" data-tooltip="Church capability instructions for secure object access">Church</button>
+                        <button class="instr-tab" id="tabTuring" onclick="switchInstrTab('turing')" data-tooltip="Turing ARM-style instructions for computation">Turing</button>
+                    </div>
                 </div>
                 
                 <div class="instr-content" id="instrContent">
                     <div class="instr-panel" id="instrChurch">
-                        <h2>Church Instructions</h2>
-                        <p class="instr-intro">Capability-based operations for secure object access. E permission provides external interface; CALL temporarily elevates to M for internal L/S operations.</p>
                         <div class="instr-grid" id="churchInstrGrid"></div>
                     </div>
                     <div class="instr-panel hidden" id="instrTuring">
-                        <h2>Turing Instructions</h2>
-                        <p class="instr-intro">ARM-style operations for computation on Data Registers (DR0-DR15). All instructions support conditional execution.</p>
                         <div class="instr-grid" id="turingInstrGrid"></div>
                     </div>
                 </div>
