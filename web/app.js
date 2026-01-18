@@ -3918,7 +3918,16 @@ function loadLesson(lessonIndex) {
 
 function renderCurrentStep() {
     const lesson = lessons[tutorialState.currentLesson];
+    if (!lesson) {
+        console.error('Invalid lesson index:', tutorialState.currentLesson);
+        return;
+    }
+    
     const step = lesson.steps[tutorialState.currentStep];
+    if (!step) {
+        console.error('Invalid step index:', tutorialState.currentStep, 'for lesson', tutorialState.currentLesson);
+        return;
+    }
     
     document.getElementById('lessonTitle').textContent = lesson.title;
     document.getElementById('lessonText').innerHTML = step.text || '';
@@ -4017,7 +4026,6 @@ function nextStep() {
         tutorialState.currentStep++;
         renderCurrentStep();
     } else if (tutorialState.currentLesson < lessons.length - 1) {
-        // Advance to next lesson's first step
         tutorialState.currentLesson++;
         tutorialState.currentStep = 0;
         renderCurrentStep();
