@@ -122,6 +122,16 @@ nav.controls {
     display: flex;
     gap: 0.25rem;
     justify-content: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.view-buttons::-webkit-scrollbar {
+    display: none;
 }
 
 .btn-view {
@@ -130,6 +140,8 @@ nav.controls {
     color: var(--text-secondary);
     border: 1px solid var(--border);
     font-size: 0.8rem;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .btn-view:hover {
@@ -2758,6 +2770,48 @@ main {
     
     .cap-sidebar {
         max-height: none;
+    }
+}
+
+/* Mobile header - horizontal scroll for view buttons */
+@media (max-width: 600px) {
+    header {
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+        padding: 0.4rem 0.5rem;
+    }
+    
+    header h1 {
+        font-size: 0.9rem;
+    }
+    
+    .header-left {
+        flex: 0 0 auto;
+    }
+    
+    .header-right {
+        display: none;
+    }
+    
+    nav.controls {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+    }
+    
+    .view-buttons {
+        justify-content: flex-start;
+        padding: 0.25rem 0;
+    }
+    
+    .btn-view {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .btn-back {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.75rem;
     }
 }
 
