@@ -8,6 +8,9 @@ This project is a comprehensive simulator for the Church-Turing Meta-Machine (CT
 - Minimal UI with consolidated header controls
 - Auto-switching to Dashboard when Reset/Step/Run clicked
 - Code persistence in localStorage for session continuity
+- Assembly Editor defaults to Access.asm when empty
+- Example buttons append code instead of replacing
+- Ctrl+Z undoes last code change
 
 ## System Architecture
 

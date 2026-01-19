@@ -1,6 +1,55 @@
 let savedEditorContent = '';
 let currentView = 'dashboard';
 
+// Track if editor has been initialized with default content
+let editorInitialized = false;
+// Track if Access.asm was auto-loaded (to allow replacement)
+let autoLoadedAccessAsm = false;
+
+// Code history for undo (Ctrl+Z)
+const codeHistory = [];
+const MAX_HISTORY = 50;
+let lastSavedCode = '';
+
+function pushCodeHistory(code) {
+    // Don't push if same as last entry
+    if (codeHistory.length > 0 && codeHistory[codeHistory.length - 1] === code) {
+        return;
+    }
+    codeHistory.push(code);
+    lastSavedCode = code;
+    if (codeHistory.length > MAX_HISTORY) {
+        codeHistory.shift();
+    }
+}
+
+// Capture current state before any change (call this before modifying editor)
+function capturePreChangeState() {
+    const editor = document.getElementById('codeEditor');
+    if (editor && editor.value !== lastSavedCode) {
+        pushCodeHistory(editor.value);
+    }
+}
+
+function undoCodeChange() {
+    if (codeHistory.length < 2) {
+        editorLog('No more undo history', 'info');
+        return;
+    }
+    // Remove current state
+    codeHistory.pop();
+    // Get previous state
+    const previousCode = codeHistory[codeHistory.length - 1];
+    const editor = document.getElementById('codeEditor');
+    if (editor && previousCode !== undefined) {
+        editor.value = previousCode;
+        savedEditorContent = previousCode;
+        updateLineNumbers();
+        localStorage.setItem('ctmm_editor_content', previousCode);
+        editorLog('Undo: restored previous code', 'info');
+    }
+}
+
 // Code status values stored in metadata field (bits 0-7)
 const CODE_STATUS = {
     EMPTY: 0x00,      // No code loaded
@@ -43,6 +92,17 @@ function switchView(viewId) {
         if (editor && savedEditorContent === '') {
             savedEditorContent = editor.value;
         }
+        // Load Access.asm as default ONLY on first initialization when editor is truly empty
+        // and no saved content exists in localStorage
+        const hasSavedContent = localStorage.getItem('ctmm_editor_content');
+        if (!editorInitialized && editor && editor.value.trim() === '' && !hasSavedContent && typeof examplePrograms !== 'undefined' && examplePrograms.access) {
+            setEditorCode(examplePrograms.access, 'Boot/Examples/access', '[RX]');
+            savedEditorContent = examplePrograms.access;
+            pushCodeHistory(examplePrograms.access);
+            autoLoadedAccessAsm = true;
+            editorLog('Loaded Access.asm as default template', 'info');
+        }
+        editorInitialized = true;
         if (typeof updateEditorToolbar === 'function') {
             updateEditorToolbar();
         }
@@ -2790,16 +2850,45 @@ function setupCodeEditor() {
         updateEditorToolbar();
     }
     
+    // Track code changes for undo history
+    // Capture state immediately on first input, then debounce subsequent saves
+    let historyTimeout = null;
+    let firstInputSinceChange = true;
     editor.addEventListener('input', () => {
         updateLineNumbers();
         checkEditorModified();
+        
+        // Immediately capture state on first change (for instant undo)
+        if (firstInputSinceChange) {
+            capturePreChangeState();
+            firstInputSinceChange = false;
+        }
+        
+        // Debounce history saves for final state
+        clearTimeout(historyTimeout);
+        historyTimeout = setTimeout(() => {
+            pushCodeHistory(editor.value);
+            firstInputSinceChange = true; // Reset for next batch of changes
+        }, 1000);
     });
     editor.addEventListener('scroll', syncScroll);
     editor.addEventListener('keydown', handleTab);
     editor.addEventListener('click', updateLineInfo);
     editor.addEventListener('keyup', updateLineInfo);
     
+    // Ctrl+Z undo handler
+    editor.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undoCodeChange();
+        }
+    });
+    
     savedEditorContent = editor.value;
+    // Initialize history with current content
+    if (editor.value.trim()) {
+        pushCodeHistory(editor.value);
+    }
     updateLineNumbers();
 }
 
@@ -3174,10 +3263,38 @@ function loadExample(name) {
     const isLambda = codeTemplates.hasOwnProperty(name);
     const code = examplePrograms[name] || codeTemplates[name];
     if (code) {
-        setEditorCode(code, `Boot/Examples/${name}`, '[RX]');
-        savedEditorContent = code;
+        const editor = document.getElementById('codeEditor');
+        const currentCode = editor ? editor.value : '';
+        
+        // Save current state to history before change
+        capturePreChangeState();
+        
+        let newCode;
+        let shouldReplace = false;
+        
+        // Replace if empty, or if Access.asm was auto-loaded
+        if (currentCode.trim() === '' || autoLoadedAccessAsm) {
+            shouldReplace = true;
+            autoLoadedAccessAsm = false; // Clear flag after first replacement
+        }
+        
+        if (shouldReplace) {
+            newCode = code;
+        } else {
+            // Append with separator
+            newCode = currentCode + '\n\n; ============================================\n; APPENDED: ' + name + '\n; ============================================\n\n' + code;
+        }
+        
+        setEditorCode(newCode, `Boot/Examples/${name}`, '[RX]');
+        savedEditorContent = newCode;
+        pushCodeHistory(newCode);
         resetProgram();
-        editorLog(`Loaded example: ${name}`, 'success');
+        
+        if (!shouldReplace) {
+            editorLog(`Appended example: ${name}`, 'success');
+        } else {
+            editorLog(`Loaded example: ${name}`, 'success');
+        }
         
         // Update paradigm tab to match loaded example
         if (isTuring) {
