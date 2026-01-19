@@ -2923,27 +2923,26 @@ main {
 }
 
 .editor-examples-panel .paradigm-tabs {
-    flex-direction: column;
+    display: flex;
+    flex-direction: row;
     gap: 0;
     margin-bottom: 0.5rem;
 }
 
 .editor-examples-panel .paradigm-tab {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
-    padding: 0.6rem 0.4rem;
-    font-size: 0.75rem;
+    flex: 1;
+    padding: 0.4rem 0.3rem;
+    font-size: 0.7rem;
+    text-align: center;
 }
 
 .editor-examples-panel .paradigm-tab:first-child {
-    border-radius: 4px 4px 0 0;
+    border-radius: 4px 0 0 4px;
 }
 
 .editor-examples-panel .paradigm-tab:last-child {
-    border-radius: 0 0 4px 4px;
-    border-left: 1px solid var(--border);
-    border-top: none;
+    border-radius: 0 4px 4px 0;
+    border-left: none;
 }
 
 .example-btn {
