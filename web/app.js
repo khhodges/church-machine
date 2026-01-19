@@ -2346,6 +2346,126 @@ function updateEditorToolbar() {
 }
 
 const examplePrograms = {
+    access: `; =============================================
+; ACCESS.ASM - FAILSAFE INPUT VALIDATION
+; =============================================
+; Purpose: Generic input validation pattern that
+; checks capabilities and data WITHOUT leaking
+; information about which check failed.
+;
+; SECURITY PRINCIPLE: All failures branch to the
+; same FAULT handler - no error codes, no timing
+; differences, no information leakage.
+;
+; Inputs:
+;   CR0 = Capability to validate
+;   DR0 = Data value to validate
+;   DR1 = Maximum allowed value
+;
+; Output:
+;   On success: Proceeds to protected operation
+;   On failure: FAULT (uniform, no leakage)
+; =============================================
+
+; === CAPABILITY VALIDATION ===
+; Test that CR0 has required permissions
+TPERM 0 RW        ; Must have Read+Write
+B NE fault        ; Any failure -> FAULT
+
+TPERM 0 B         ; Must have Bind permission
+B NE fault        ; Any failure -> FAULT
+
+; === DATA BOUNDS VALIDATION ===
+; Ensure DR0 is within acceptable range
+CMP 0 0           ; DR0 >= 0? (non-negative)
+B MI fault        ; Negative -> FAULT
+
+CMP 0 1           ; DR0 <= DR1? (within max)
+B GT fault        ; Exceeds max -> FAULT
+
+; === ALL CHECKS PASSED ===
+; Safe to proceed with protected operation
+LOAD 1 0 0        ; Use validated capability
+; ... protected operations here ...
+RETURN            ; Success return
+
+; === SINGLE FAILURE MODE ===
+; All validation failures come here
+; No error codes - no information leakage
+fault:
+FAULT             ; Uniform failure - triggers FirstFault`,
+
+    firstfault: `; =============================================
+; FIRSTFAULT.ASM - UNIFORM FAULT HANDLER
+; =============================================
+; Purpose: Single entry point for ALL failures.
+; Provides failsafe recovery without leaking
+; any information about what caused the fault.
+;
+; SECURITY PRINCIPLE: Every fault looks identical
+; from outside - same timing, same behavior,
+; same observable state. Attackers learn nothing.
+;
+; Actions:
+;   1. Save thread state (for audit/recovery)
+;   2. Clear all sensitive registers
+;   3. Transfer to trusted fault handler
+;   4. No information returned to caller
+; =============================================
+
+; === FAULT ENTRY POINT ===
+; Hardware jumps here on any FAULT instruction
+; or unhandled exception
+
+; Step 1: Save thread identity for audit log
+; (CR8 contains thread GT - preserved for logging)
+; The Nucleus logs: WHO faulted, WHEN, WHERE (IP)
+; but NOT why - that would leak information
+
+; Step 2: Clear all Data Registers
+; Prevent any computed values from leaking
+ADDI 0 0          ; DR0 = 0
+ADDI 1 0          ; DR1 = 0
+ADDI 2 0          ; DR2 = 0
+ADDI 3 0          ; DR3 = 0
+ADDI 4 0          ; DR4 = 0
+ADDI 5 0          ; DR5 = 0
+ADDI 6 0          ; DR6 = 0
+ADDI 7 0          ; DR7 = 0
+
+; Step 3: Clear sensitive Context Registers
+; Keep only CR7 (Nucleus), CR8 (Thread), CR15 (Namespace)
+CHANGE 0 NULL     ; CR0 = NULL
+CHANGE 1 NULL     ; CR1 = NULL
+CHANGE 2 NULL     ; CR2 = NULL
+CHANGE 3 NULL     ; CR3 = NULL
+CHANGE 4 NULL     ; CR4 = NULL
+CHANGE 5 NULL     ; CR5 = NULL
+; CR6 (C-List) - cleared by Nucleus
+; CR7 (Nucleus) - preserved for recovery
+; CR8 (Thread) - preserved for audit
+; CR15 (Namespace) - preserved for recovery
+
+; Step 4: Transfer to Nucleus fault handler
+; The Nucleus will:
+;   - Log the fault (thread, time, IP only)
+;   - Optionally notify administrator
+;   - Terminate or restart the thread
+;   - Never reveal WHY it faulted
+
+; Jump to Nucleus handler (CR7) - never returns to caller
+CALL 7            ; Transfer control to Nucleus
+; Nucleus decides: terminate thread or restart
+; NO RETURN to original caller - no information leakage
+
+; === END FAULT HANDLER ===
+; Observable behavior is IDENTICAL for:
+;   - Permission failures
+;   - Bounds violations
+;   - Invalid capabilities
+;   - Any other security violation
+; Attackers cannot distinguish failure modes`,
+
     counter: `; =============================================
 ; COUNTER LOOP EXAMPLE
 ; =============================================
@@ -4335,30 +4455,30 @@ RETURN</pre>
                 </div>`
             },
             {
-                text: `<h3>Capability Validation</h3>
-                <p>Before using a gifted GT, <strong>validate it</strong>:</p>
+                text: `<h3>Capability Validation (Failsafe)</h3>
+                <p>Before using a gifted GT, <strong>validate it</strong> using the failsafe pattern:</p>
                 <ul>
                     <li><strong>TPERM</strong> - Test if GT has required permissions</li>
-                    <li><strong>Branch on failure</strong> - Reject invalid capabilities</li>
-                    <li><strong>Proceed if valid</strong> - Use the capability safely</li>
+                    <li><strong>Branch to FAULT</strong> - All failures go to same handler</li>
+                    <li><strong>No error codes</strong> - Prevents information leakage</li>
                 </ul>
-                <p>This is the defensive programming pattern for secure capability usage.</p>`,
-                demo: `<div class="demo-title">Capability Check Pattern</div>
+                <p>This is the <strong>failsafe pattern</strong> - attackers cannot learn which check failed.</p>`,
+                demo: `<div class="demo-title">Failsafe Validation Pattern</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.85rem;">
 ; Validate CR0 before use
 
 TPERM 0 RWX       ; Has R+W+X?
-B NE reject       ; No: reject
+B NE fault        ; No: FAULT (not error code!)
 
 ; Safe to use
 LOAD 1 0 0        ; Use capability
 ; ... operations ...
 RETURN
 
-reject:
-SUBI 0 1          ; DR0 = -1 (error)
-RETURN</pre>
+; Single failure mode - no leakage
+fault:
+FAULT             ; Uniform failure</pre>
                 </div>`,
                 interactive: {
                     type: "quiz",
@@ -4716,6 +4836,188 @@ Subsequent:
                     feedback: {
                         correct: "Correct! The F (Far) bit indicates the GT points to a remote resource accessed via URL rather than local memory.",
                         incorrect: "Not quite. The F bit distinguishes between local objects (F=0) and remote objects at URLs (F=1)."
+                    }
+                }
+            }
+        ]
+    },
+    {
+        title: "Failsafe Security",
+        steps: [
+            {
+                text: `<h3>The Information Leakage Problem</h3>
+                <p>Traditional error handling creates <strong>information leakage paths</strong>:</p>
+                <ul>
+                    <li><strong>Error codes</strong> - Reveal which validation failed</li>
+                    <li><strong>Timing differences</strong> - Different checks take different time</li>
+                    <li><strong>Exception types</strong> - Distinguish permission vs. bounds errors</li>
+                </ul>
+                <p>Attackers can <strong>probe the system</strong> with different inputs and learn from varying responses.</p>
+                <div class="key-concept" style="border-color: var(--error);">
+                    <strong>Security Risk:</strong> Returning -1 for "permission denied" and -2 for "bounds error" tells attackers exactly what to attack next.
+                </div>`,
+                demo: `<div class="demo-title">Leakage Example (BAD)</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
+; INSECURE - leaks information!
+TPERM 0 RW
+B NE perm_error   ; Return -1
+
+CMP 0 100
+B GT bounds_error ; Return -2
+
+; ... operations ...
+RETURN
+
+perm_error:
+SUBI 0 1          ; DR0 = -1 (LEAKS: permission issue)
+RETURN
+
+bounds_error:
+SUBI 0 2          ; DR0 = -2 (LEAKS: bounds issue)
+RETURN</pre>
+                    <p style="color: var(--error); margin-top: 0.5rem;">Attacker learns: "I have permissions but wrong bounds"</p>
+                </div>`
+            },
+            {
+                text: `<h3>The Failsafe Solution: Single Failure Mode</h3>
+                <p>CTMM's failsafe pattern ensures <strong>all failures look identical</strong>:</p>
+                <ul>
+                    <li><strong>One handler</strong> - All failures branch to FAULT</li>
+                    <li><strong>No codes</strong> - No information returned</li>
+                    <li><strong>Same timing</strong> - Constant-time failure path</li>
+                    <li><strong>Same behavior</strong> - Identical observable outcome</li>
+                </ul>
+                <p>The attacker learns only <strong>one bit of information</strong>: success or failure.</p>`,
+                demo: `<div class="demo-title">Failsafe Pattern (GOOD)</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
+; SECURE - no information leakage
+TPERM 0 RW
+B NE fault        ; All failures -> same place
+
+CMP 0 100
+B GT fault        ; All failures -> same place
+
+; ... operations ...
+RETURN
+
+; Single failure mode
+fault:
+FAULT             ; Uniform - attacker learns nothing</pre>
+                    <p style="color: var(--success); margin-top: 0.5rem;">Attacker learns: "Something failed" (nothing more)</p>
+                </div>`
+            },
+            {
+                text: `<h3>Access.asm: Generic Validation</h3>
+                <p><strong>Access.asm</strong> is the standard entry point for validating inputs:</p>
+                <ul>
+                    <li>Checks <strong>capability permissions</strong> with TPERM</li>
+                    <li>Checks <strong>data bounds</strong> with CMP</li>
+                    <li>All failures branch to <strong>fault:</strong></li>
+                    <li>Only proceeds if <strong>ALL</strong> checks pass</li>
+                </ul>
+                <p>Use Access.asm as a template for all protected entry points.</p>`,
+                demo: `<div class="demo-title">Access.asm Structure</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
+; === CAPABILITY VALIDATION ===
+TPERM 0 RW        ; Required permissions
+B NE fault
+
+TPERM 0 B         ; Additional permission
+B NE fault
+
+; === DATA VALIDATION ===
+CMP 0 0           ; Non-negative?
+B MI fault
+
+CMP 0 1           ; Within max?
+B GT fault
+
+; === ALL PASSED - PROCEED ===
+LOAD 1 0 0        ; Safe to use
+RETURN
+
+fault:
+FAULT             ; Single failure mode</pre>
+                </div>`
+            },
+            {
+                text: `<h3>FirstFault.asm: Uniform Recovery</h3>
+                <p><strong>FirstFault.asm</strong> handles all faults uniformly:</p>
+                <ul>
+                    <li><strong>Clears all Data Registers</strong> - No computed values leak</li>
+                    <li><strong>Clears sensitive Context Registers</strong> - No capabilities leak</li>
+                    <li><strong>Preserves audit info</strong> - CR8 (thread) for logging</li>
+                    <li><strong>Returns to Nucleus</strong> - Trusted handler decides next step</li>
+                </ul>
+                <p>The Nucleus logs WHO faulted and WHEN, but <strong>never WHY</strong>.</p>`,
+                demo: `<div class="demo-title">FirstFault.asm Flow</div>
+                <div class="demo-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
+                            <div style="color: var(--accent); font-weight: bold; margin-bottom: 0.5rem;">Cleared (Security)</div>
+                            <pre style="font-size: 0.75rem; margin: 0;">DR0-DR7 = 0
+CR0-CR5 = NULL</pre>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">Preserved (Audit)</div>
+                            <pre style="font-size: 0.75rem; margin: 0;">CR7 = Nucleus
+CR8 = Thread (WHO)
+CR15 = Namespace</pre>
+                        </div>
+                    </div>
+                </div>`
+            },
+            {
+                text: `<h3>The Failsafe Principle</h3>
+                <p>Kenneth Hamer-Hodges' design follows the <strong>"fail safe, fail secure"</strong> principle:</p>
+                <ul>
+                    <li><strong>Deny by default</strong> - If anything is wrong, deny everything</li>
+                    <li><strong>Reveal nothing</strong> - Failures give no diagnostic information</li>
+                    <li><strong>Audit internally</strong> - Log for administrators, not attackers</li>
+                    <li><strong>Recover cleanly</strong> - Clear state and restart from known-good</li>
+                </ul>
+                <div class="key-concept" style="border-color: var(--success);">
+                    <strong>Remember:</strong> Security is measured by what attackers CANNOT learn, not what the system CAN do.
+                </div>`,
+                demo: `<div class="demo-title">Failsafe Design Summary</div>
+                <div class="demo-content">
+                    <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px;">
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: var(--success);">✓</span>
+                                <span>TPERM → FAULT (no error codes)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: var(--success);">✓</span>
+                                <span>CMP → FAULT (same handler)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: var(--success);">✓</span>
+                                <span>FirstFault clears all state</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="color: var(--success);">✓</span>
+                                <span>Nucleus logs WHO, WHEN (not WHY)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`,
+                interactive: {
+                    type: "quiz",
+                    question: "Why should ALL validation failures go to the same FAULT handler?",
+                    options: [
+                        "It makes the code shorter and easier to read",
+                        "It prevents information leakage about which check failed",
+                        "It runs faster than multiple error handlers",
+                        "It saves memory by having only one handler"
+                    ],
+                    correct: 1,
+                    feedback: {
+                        correct: "Correct! A single failure mode prevents attackers from learning which validation check failed, closing an information leakage path.",
+                        incorrect: "Not quite. The primary security benefit is preventing attackers from learning which specific check failed."
                     }
                 }
             }
@@ -7290,7 +7592,7 @@ LOAD 0 6 0        ; CR0 = GT to self from nodal C-List
 ; Step 1: Create inner lambda (λx.f(x x))
 ; The GT in CR0 points to code that will call itself
 TPERM 0 X         ; Verify CR0 has Execute permission
-B NE error        ; Branch to error if not executable
+B NE fault        ; Any failure -> FAULT (failsafe)
 
 ; Step 2: Apply f to (x x) - self-application via CALL
 CALL 0            ; Execute the GT - this is (x x)
@@ -7302,9 +7604,9 @@ CALL 0            ; Execute the GT - this is (x x)
 ; On return, result is in DR0
 RETURN            ; Return from Y-combinator application
 
-error:
-; Security trap - invalid capability
-MOV 0 0           ; NOP - handle error`,
+; === FAILSAFE: No error codes ===
+fault:
+FAULT             ; Uniform failure - no information leakage`,
 
     'factorial': `; ================================================
 ; FACTORIAL using recursive GT calls
@@ -7342,22 +7644,22 @@ RETURN`,
 
 ; Step 1: Test required permissions (RWX)
 TPERM 0 RWX       ; Check CR0 has Read+Write+Execute
-B NE reject       ; If missing permissions, reject
+B NE fault        ; If missing -> FAULT (no error codes!)
 
 ; Step 2: Test bounds (optional size check)
-TPERM 0 R BOUNDS 1024  ; Verify size >= 1024 bytes
-B NE reject       ; If too small, reject
+TPERM 0 B         ; Verify has Bind permission
+B NE fault        ; If missing -> FAULT
 
 ; Step 3: Capability is valid - proceed
 LOAD 1 0 0        ; Use the validated capability
 ; ... safe operations here ...
 RETURN
 
-reject:
-; Capability failed validation - potential malware
-NEG 0 0           ; Set error flag (DR0 = 0)
-SUBI 0 1          ; DR0 = -1 (error code)
-RETURN            ; Return with error`,
+; === FAILSAFE: Single failure mode ===
+; No error codes - prevents information leakage
+; Attacker cannot learn WHICH check failed
+fault:
+FAULT             ; Uniform failure - no leakage`,
 
     'church_bool': `; ================================================
 ; CHURCH BOOLEANS using Golden Tokens

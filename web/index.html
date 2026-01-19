@@ -175,6 +175,7 @@
                             <option value="8">9. Example Programs</option>
                             <option value="9">10. Performance Benefits</option>
                             <option value="10">11. Remote Golden Tokens</option>
+                            <option value="11">12. Failsafe Security</option>
                         </select>
                         <div class="lesson-step-nav">
                             <button onclick="tutorialPrevStep()" class="btn btn-step" id="prevStepBtn">← Previous</button>
@@ -476,6 +477,8 @@
                         </div>
                         <div class="paradigm-content active" id="turingExamples">
                             <div class="example-list">
+                                <button class="example-btn" onclick="loadExample('access')">Access.asm</button>
+                                <button class="example-btn" onclick="loadExample('firstfault')">FirstFault.asm</button>
                                 <button class="example-btn" onclick="loadExample('counter')">Counter Loop</button>
                                 <button class="example-btn" onclick="loadExample('fibonacci')">Fibonacci</button>
                                 <button class="example-btn" onclick="loadExample('multiply')">Multiply</button>

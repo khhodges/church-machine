@@ -43,6 +43,7 @@ The web interface is composed of five distinct views:
 -   **Export/Import**: Functionality to export and import the complete simulator state as a JSON file.
 -   **Permission Management**: Permission validation rules are implemented, defining categories (Data, Capability, Protected, Meta) and ensuring normalization across all mutation paths.
 -   **MINT Operation**: Creates a new GT in the next free Namespace slot, allocates a 3-word entry, and returns the GT in CR0.
+-   **Failsafe Security**: All validation failures use single FAULT handler - no error codes, no information leakage. Access.asm validates inputs, FirstFault.asm handles all failures uniformly.
 
 ## External Dependencies
 
@@ -52,6 +53,9 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
+- 2026-01-19: Added Failsafe Security tutorial: information leakage, single failure mode, Access.asm, FirstFault.asm
+- 2026-01-19: Added Access.asm and FirstFault.asm examples demonstrating failsafe validation pattern
+- 2026-01-19: Fixed all code examples to use FAULT instead of error codes (capcheck, ycombinator, tutorials)
 - 2026-01-19: Added Remote Golden Tokens tutorial: F bit, URL paging, remote proxy abstractions, security/performance
 - 2026-01-19: Added Performance Benefits tutorial: GT validation overhead, Y-Combinator recursion, Church encodings, capability caching
 - 2026-01-19: Added Example Programs tutorial: Counter, Fibonacci, Multiply, Y-Combinator, Factorial, Capability Validation
