@@ -52,7 +52,7 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
-- 2026-01-19: LOAD/SAVE use programmable CRn field; CR6 has M-bit elevation, subtended C-Lists need L/S permission
+- 2026-01-19: LOAD/SAVE use programmable CRn field; only CALL elevates M-bit after secure entry, subtended C-Lists need L/S permission
 - 2026-01-19: CALL requires E permission ONLY for opaque entry hiding implementation from inspection
 - 2026-01-19: CR7 CODE block (C-List offset 0) documented as requiring X+R permissions
 - 2026-01-19: SWITCH/CHANGE have Mode bit for direct vs C-List lookup to navigate DNA hierarchy

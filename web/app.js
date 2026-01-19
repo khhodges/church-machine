@@ -6818,7 +6818,7 @@ const churchInstrFormats = [
         name: "LOAD",
         brief: "Load GT from C-List to CR",
         syntax: "LOAD CRd, [CRn+idx]",
-        desc: "Load Golden Token from C-List into Context Register. CR6 access has M bit temporarily elevated; subtended C-Lists require L permission on source GT.",
+        desc: "Load Golden Token from C-List into Context Register. CR6 is the current C-List; subtended C-Lists require L permission on the source GT.",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code (AL=always)" },
             { name: "Op", bits: 6, value: "000001", desc: "LOAD opcode" },
@@ -6829,7 +6829,7 @@ const churchInstrFormats = [
         variants: [
             { name: "Direct", fields: { Index: "Literal offset 0-16383" } },
             { name: "Register", fields: { Index: "DRn[13:0] indirect" } },
-            { name: "CR6 (current)", fields: { CRn: "6 - M bit auto-elevated" } },
+            { name: "CR6 (current)", fields: { CRn: "6 - current C-List" } },
             { name: "Subtended", fields: { CRn: "0-15 - requires L permission" } }
         ]
     },
@@ -6837,7 +6837,7 @@ const churchInstrFormats = [
         name: "SAVE",
         brief: "Save CR to C-List slot",
         syntax: "SAVE CRs, [CRn+idx]",
-        desc: "Save Context Register GT to C-List slot. CR6 access has M bit temporarily elevated; subtended C-Lists require S permission on target GT.",
+        desc: "Save Context Register GT to C-List slot. CR6 is the current C-List; subtended C-Lists require S permission on the target GT.",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "Op", bits: 6, value: "000010", desc: "SAVE opcode" },
@@ -6848,7 +6848,7 @@ const churchInstrFormats = [
         variants: [
             { name: "Direct", fields: { Index: "Literal offset 0-16383" } },
             { name: "Register", fields: { Index: "DRn[13:0] indirect" } },
-            { name: "CR6 (current)", fields: { CRn: "6 - M bit auto-elevated" } },
+            { name: "CR6 (current)", fields: { CRn: "6 - current C-List" } },
             { name: "Subtended", fields: { CRn: "0-15 - requires S permission" } }
         ]
     },
