@@ -462,6 +462,31 @@
                 <div class="cr7-error" id="cr7Error" style="display:none;"></div>
             </div>
             <div class="editor-content">
+                    <div class="editor-examples-panel">
+                        <div class="paradigm-tabs">
+                            <button class="paradigm-tab active" onclick="switchParadigm('turing')">Turing</button>
+                            <button class="paradigm-tab" onclick="switchParadigm('church')">Lambda</button>
+                        </div>
+                        <div class="paradigm-content active" id="turingExamples">
+                            <div class="example-list">
+                                <button class="example-btn" onclick="loadExample('counter')">Counter Loop</button>
+                                <button class="example-btn" onclick="loadExample('fibonacci')">Fibonacci</button>
+                                <button class="example-btn" onclick="loadExample('multiply')">Multiply</button>
+                                <button class="example-btn" onclick="loadExample('flags')">NZCV Flags</button>
+                                <button class="example-btn" onclick="loadExample('callerCode')">Caller Code</button>
+                            </div>
+                        </div>
+                        <div class="paradigm-content" id="churchExamples">
+                            <div class="example-list">
+                                <button class="example-btn" onclick="loadExample('y_combinator')">Y-Combinator</button>
+                                <button class="example-btn" onclick="loadExample('factorial')">Factorial</button>
+                                <button class="example-btn" onclick="loadExample('capcheck')">Cap Check</button>
+                                <button class="example-btn" onclick="loadExample('church_bool')">Church Booleans</button>
+                                <button class="example-btn" onclick="loadExample('church_num')">Church Numerals</button>
+                                <button class="example-btn" onclick="loadExample('pairs')">Pairs</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="code-editor-panel">
                         <div class="editor-header">
                             <span id="editorHeaderFilename">program.asm</span>

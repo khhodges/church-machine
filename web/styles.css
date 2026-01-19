@@ -2905,11 +2905,38 @@ main {
 
 .editor-content {
     display: grid;
-    grid-template-columns: 1fr 300px;
+    grid-template-columns: 160px 1fr 300px;
     gap: 1rem;
     flex: 1;
     min-height: 0;
     padding: 1rem;
+}
+
+.editor-examples-panel {
+    background: var(--bg-secondary);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    overflow-y: auto;
+}
+
+.example-btn {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.example-btn:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
 }
 
 .reg-list {
