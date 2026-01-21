@@ -338,7 +338,7 @@ class CTMMSimulator {
             }
             
             case "TPERM": {
-                const [crIdx, maskStr, boundsOffset] = args;
+                const [crIdx, maskStr, indexArg] = args;
                 
                 if (crIdx < 0 || (crIdx > 7 && crIdx !== 8 && crIdx !== 15)) {
                     return `FAULT: Invalid CR index ${crIdx} (valid: 0-7, 8, 15)`;
@@ -348,27 +348,56 @@ class CTMMSimulator {
                            crIdx === 8 ? this.cr8 : 
                            this.cr15;
                 
-                const validPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M'];
+                const validPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M', 'F'];
                 const requiredPerms = maskStr.toUpperCase().split('').filter(p => validPerms.includes(p));
                 const actualPerms = cr.perms || [];
                 
                 const permsOK = requiredPerms.every(p => actualPerms.includes(p));
                 
-                const capSize = cr.name === "NULL" ? 0 : 
-                               (cr.size || (cr.location.type === "Local" ? 4096 : 65536));
-                const boundsOK = boundsOffset === undefined || boundsOffset <= capSize;
+                let objectSize = 0;
+                let sizeOK = true;
+                let indexOK = true;
                 
-                const allOK = permsOK && boundsOK;
+                if (cr.name !== "NULL") {
+                    const nsOffset = cr.nsOffset !== undefined ? cr.nsOffset : 
+                                    (cr.location && cr.location.offset !== undefined ? cr.location.offset : null);
+                    
+                    if (nsOffset !== null && typeof window !== 'undefined' && window.namespaceObjects) {
+                        const nsEntry = window.namespaceObjects.find(obj => obj.offset === nsOffset);
+                        if (nsEntry) {
+                            objectSize = nsEntry.word2_limit || nsEntry.size || 4096;
+                        } else {
+                            objectSize = cr.size || 4096;
+                        }
+                    } else {
+                        objectSize = cr.size || (cr.location && cr.location.type === "Local" ? 4096 : 65536);
+                    }
+                    
+                    sizeOK = objectSize > 0;
+                    
+                    if (indexArg !== undefined) {
+                        const index = parseInt(indexArg);
+                        indexOK = !isNaN(index) && index >= 0 && index < objectSize;
+                    }
+                }
+                
+                const allOK = permsOK && sizeOK && indexOK;
                 const hasAnyPerm = actualPerms.length > 0;
                 
                 this.flags.N = !hasAnyPerm;
                 this.flags.Z = allOK;
                 this.flags.C = permsOK;
-                this.flags.V = boundsOK;
+                this.flags.V = indexOK && sizeOK;
                 
                 const result = allOK ? "PASS" : "FAIL";
-                const boundsStr = boundsOffset !== undefined ? ` BOUNDS ${boundsOffset}` : "";
-                return `TPERM CR${crIdx} ${maskStr}${boundsStr} -> ${result} (Z=${this.flags.Z ? 1 : 0})`;
+                let details = [];
+                if (!permsOK) details.push("perms");
+                if (!sizeOK) details.push("size=0");
+                if (indexArg !== undefined && !indexOK) details.push(`idx ${indexArg}>=${objectSize}`);
+                
+                const indexStr = indexArg !== undefined ? ` INDEX ${indexArg}` : "";
+                const failStr = details.length > 0 ? ` (${details.join(", ")})` : "";
+                return `TPERM CR${crIdx} ${maskStr}${indexStr} -> ${result}${failStr} (Z=${this.flags.Z ? 1 : 0}, size=${objectSize})`;
             }
             
             case "B": {

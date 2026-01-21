@@ -1275,7 +1275,7 @@ const instructionInfo = {
     CMN: { operands: ['reg1', 'reg2'], help: 'Compare negative DR[reg1] + DR[reg2]. Sets flags only.' },
     TST: { operands: ['reg1', 'reg2'], help: 'Test bits DR[reg1] AND DR[reg2]. Sets N, Z flags only.' },
     TEQ: { operands: ['reg1', 'reg2'], help: 'Test equal DR[reg1] XOR DR[reg2]. Sets N, Z flags only.' },
-    TPERM: { operands: ['cr', 'mask', 'bounds'], help: 'Test if CR has permissions in mask. Optional BOUNDS check. Sets Z=1 if pass.', isCap: true },
+    TPERM: { operands: ['cr', 'mask', 'index'], help: 'Test CR permissions against mask. Optional index validates against object W2 limit. Z=1 if all pass, C=perms OK, V=bounds OK.', isCap: true },
     B: { operands: ['condition', 'offset'], help: 'Branch to offset. Use condition code (EQ/NE/GT/LT/etc) or leave empty.', isBranch: true },
     BL: { operands: ['offset'], help: 'Branch with Link. Saves return address to DR7, then jumps to offset.', isBranch: true },
     LOAD: { operands: ['destCR', 'srcCR', 'index'], help: 'Load capability at index via CR[src] into CR[dest]. Requires Load permission.', isCap: true },
@@ -2807,8 +2807,9 @@ CMP 0 0       ; Is DR0 == 0? (success check)
 
 ; === STEP 1: Validate GT Selector ===
 ; Before dispatching, verify the capability
-; TPERM checks permissions (add BOUNDS n for size)
+; TPERM checks permissions and optional index bounds
 TPERM 1 R     ; Test: Does CR1 have Read permission?
+              ; Add index: TPERM 1 R 5 validates index 5 < object size
               ; Sets Z=1 if permission present
               ; Sets Z=0 if permission missing
               ; B EQ continue  ; proceed if valid
@@ -6883,7 +6884,7 @@ B NE perm_trap      ; TRAP: Missing Read permission
 
 ; Step 2: Validate parameter is Float type (Type=0x02)
 ; Hardware checks Namespace Entry Word3[32:47] = FLOAT
-TPERM 0 R BOUNDS 8  ; Verify 8-byte float size
+TPERM 0 R 0         ; Verify index 0 within object bounds
 B NE type_trap      ; TRAP: Not a valid Float GT
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -6954,7 +6955,7 @@ B NE perm_trap      ; TRAP: Missing Read permission
 
 ; Step 2: Validate parameter is Float type
 ; Hardware checks Namespace Entry Type field
-TPERM 0 R BOUNDS 8  ; Verify 8-byte float bounds
+TPERM 0 R 0         ; Verify index 0 within bounds
 B NE type_trap      ; TRAP: Not a valid Float GT
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7024,7 +7025,7 @@ TPERM 0 R           ; Test CR0 has Read permission
 B NE perm_trap      ; TRAP: Missing Read permission
 
 ; Step 2: Validate parameter is Float type
-TPERM 0 R BOUNDS 8  ; Verify 8-byte float bounds
+TPERM 0 R 0         ; Verify index 0 within bounds
 B NE type_trap      ; TRAP: Not a valid Float GT
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7070,12 +7071,12 @@ nan_propagate:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 has Read
 B NE perm_trap      ; TRAP on permission failure
-TPERM 0 R BOUNDS 8  ; Validate Float type (8 bytes)
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap      ; TRAP: operand a not Float
 
 TPERM 1 R           ; Validate CR1 has Read
 B NE perm_trap      ; TRAP on permission failure
-TPERM 1 R BOUNDS 8  ; Validate Float type (8 bytes)
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap      ; TRAP: operand b not Float
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7132,12 +7133,12 @@ invalid_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 has Read
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Float type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate CR1 has Read
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Validate Float type
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7184,12 +7185,12 @@ invalid_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Must be 8-byte Float
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate CR1 readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Must be 8-byte Float
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7240,12 +7241,12 @@ invalid_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate dividend readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Must be Float
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate divisor readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Must be Float
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7310,12 +7311,12 @@ divzero_inf:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer (8 bytes)
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate CR1 readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Validate Integer
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === DOMAIN VALIDATION ===
@@ -7346,7 +7347,7 @@ divzero_trap:`,
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7378,7 +7379,7 @@ overflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7406,7 +7407,7 @@ overflow_trap:`,
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7435,7 +7436,7 @@ overflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7466,7 +7467,7 @@ underflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Float type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7529,7 +7530,7 @@ log_negative:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Float type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7579,7 +7580,7 @@ nan_propagate:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Float type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7636,12 +7637,12 @@ sqrt_negative:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate base readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Float type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate exponent readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Validate Float type
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === IEEE 754 SPECIAL VALUE CHECK ===
@@ -7746,13 +7747,13 @@ divzero_inf:
 ; Step 1: Validate first operand is Integer
 TPERM 0 R           ; Validate CR0 has Read permission
 B NE perm_trap      ; TRAP on permission failure
-TPERM 0 R BOUNDS 8  ; Validate Integer type (8 bytes, 64-bit)
+TPERM 0 R 0         ; Validate index within bounds (8 bytes, 64-bit)
 B NE type_trap      ; TRAP: operand a not Integer
 
 ; Step 2: Validate second operand is Integer
 TPERM 1 R           ; Validate CR1 has Read permission
 B NE perm_trap      ; TRAP on permission failure
-TPERM 1 R BOUNDS 8  ; Validate Integer type
+TPERM 1 R 0         ; Validate index within bounds type
 B NE type_trap      ; TRAP: operand b not Integer
 
 ; === VALIDATED COMPUTATION ===
@@ -7789,12 +7790,12 @@ overflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Validate Integer type
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate CR1 readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Validate Integer type
+TPERM 1 R 0         ; Validate index within bounds type
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7825,12 +7826,12 @@ underflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate CR0 readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Must be 8-byte Integer
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate CR1 readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Must be 8-byte Integer
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === VALIDATED COMPUTATION ===
@@ -7863,12 +7864,12 @@ overflow_trap:
 ; === FORMAL TYPE VALIDATION ===
 TPERM 0 R           ; Validate dividend readable
 B NE perm_trap
-TPERM 0 R BOUNDS 8  ; Must be Integer
+TPERM 0 R 0         ; Validate index within bounds
 B NE type_trap
 
 TPERM 1 R           ; Validate divisor readable
 B NE perm_trap
-TPERM 1 R BOUNDS 8  ; Must be Integer
+TPERM 1 R 0         ; Validate index within bounds
 B NE type_trap
 
 ; === DOMAIN VALIDATION ===
@@ -8440,7 +8441,7 @@ const instructionComments = {
     'RETURN': 'Return from procedure call',
     'CHANGE': 'Context switch to thread at offset',
     'SWITCH': 'Set CR15 namespace to capability in CR',
-    'TPERM': 'Test permissions on capability'
+    'TPERM': 'Test permissions and bounds on capability'
 };
 
 function insertInstruction(instr, operands) {
@@ -8655,20 +8656,20 @@ const churchInstrFormats = [
     },
     {
         name: "TPERM",
-        brief: "Test GT permissions",
-        syntax: "TPERM CRs, permMask",
-        desc: "Compare CR permission bits against mask. Sets condition flags.",
+        brief: "Test GT permissions and bounds",
+        syntax: "TPERM CRs, permMask [, index]",
+        desc: "Compare CR permission bits against mask. Optional index validates against object size from namespace metadata (W2 limit). Sets Z=1 if all checks pass.",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "Op", bits: 6, value: "000111", desc: "TPERM opcode" },
             { name: "CRs", bits: 3, desc: "CR to test (0-7)" },
-            { name: "Reserved", bits: 1, value: "0", desc: "Reserved" },
-            { name: "Perms", bits: 9, desc: "Permission mask (9 bits)" },
-            { name: "Reserved2", bits: 9, value: "0", desc: "Must be zero" }
+            { name: "I", bits: 1, desc: "Index present (1=yes)" },
+            { name: "Perms", bits: 9, desc: "Permission mask (9 bits: R W X L S E B M F)" },
+            { name: "Index", bits: 9, desc: "Access index to validate against W2 limit (if I=1)" }
         ],
         variants: [
-            { name: "Full mask", fields: { Perms: "All 9 permission bits" } },
-            { name: "Partial mask", fields: { Perms: "Selected bits only" } }
+            { name: "Perms only", fields: { I: "0", Perms: "Permission bits to test" } },
+            { name: "Perms + Index", fields: { I: "1", Perms: "Permission bits", Index: "Offset to validate < W2 limit" } }
         ]
     }
 ];
