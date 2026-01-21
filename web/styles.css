@@ -3533,6 +3533,9 @@ main {
     resize: none;
     outline: none;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-wrap: normal;
 }
 
 #codeEditor.editor-modified {
@@ -3768,6 +3771,26 @@ main {
 @media (max-width: 900px) {
     .editor-layout {
         grid-template-columns: 1fr;
+    }
+    
+    .line-numbers,
+    #codeEditor {
+        font-size: 16px;
+        line-height: 1.4;
+    }
+    
+    .line-numbers span {
+        height: calc(16px * 1.4);
+        line-height: calc(16px * 1.4);
+    }
+    
+    .line-numbers {
+        padding: 0.75rem 0.4rem;
+        min-width: 35px;
+    }
+    
+    #codeEditor {
+        padding: 0.75rem;
     }
 }
 
