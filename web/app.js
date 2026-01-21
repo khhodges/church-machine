@@ -3667,7 +3667,11 @@ function highlightCurrentLine() {
     if (!parsed) return;
     
     parsed.querySelectorAll('.parsed-line').forEach((el, i) => {
-        el.classList.toggle('current-line', i === editorState.pc);
+        const isCurrent = i === editorState.pc;
+        el.classList.toggle('current-line', isCurrent);
+        if (isCurrent) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
     });
 }
 
