@@ -704,8 +704,16 @@ const bootSteps = [
             
             updateSystemState();
             
-            // Update editor to show Nucleus linkage
-            setEditorCode('', 'Boot/Access.asm', '[X]');
+            // Update editor linkage display only if editor is empty
+            // Don't overwrite user's code
+            const editor = document.getElementById('codeEditor');
+            if (editor && editor.value.trim() === '') {
+                editorState.currentLinkage = 'Boot/Access.asm';
+                editorState.currentPerms = '[X]';
+                if (typeof updateEditorToolbar === 'function') {
+                    updateEditorToolbar();
+                }
+            }
         }
     }
 ];
