@@ -457,24 +457,40 @@ class CTMMSimulator {
                     return `FAULT: CR${srcCR} ${permStr} "${src.name}" lacks Load (L) permission`;
                 }
                 
-                const newCap = {
-                    name: `LOADED_${idx}`,
-                    location: { type: 'Local', offset: idx * 256 },
-                    perms: ['R'],
-                    locked: false,
-                    goldenKey: this.generateKey()
-                };
+                // Get the capability from source's clist at given index
+                let loadedCap = null;
+                if (src.clist && idx < src.clist.length) {
+                    const entry = src.clist[idx];
+                    loadedCap = {
+                        name: entry.name || `Entry_${idx}`,
+                        location: entry.location || { type: 'Local', offset: idx * 256 },
+                        perms: entry.perms ? [...entry.perms] : ['R'],
+                        locked: entry.locked || false,
+                        goldenKey: entry.goldenKey || this.generateKey(),
+                        clist: entry.clist || null
+                    };
+                } else {
+                    // No clist or index out of bounds - create empty capability
+                    loadedCap = {
+                        name: `LOADED_${idx}`,
+                        location: { type: 'Local', offset: idx * 256 },
+                        perms: ['R'],
+                        locked: false,
+                        goldenKey: this.generateKey()
+                    };
+                }
                 
                 if (destCR < 8) {
-                    this.contextRegs[destCR] = newCap;
+                    this.contextRegs[destCR] = loadedCap;
                 } else if (destCR === 8) {
-                    this.cr8 = newCap;
+                    this.cr8 = loadedCap;
                 } else if (destCR === 15) {
-                    this.cr15 = newCap;
+                    this.cr15 = loadedCap;
                 }
                 
                 const destName = destCR === 8 ? 'CR8 (Thread)' : destCR === 15 ? 'CR15 (Namespace)' : `CR${destCR}`;
-                return `Loaded capability into ${destName} via CR${srcCR}[${idx}]`;
+                const permStr = loadedCap.perms.length > 0 ? `[${loadedCap.perms.join('')}]` : '';
+                return `Loaded ${loadedCap.name} ${permStr} into ${destName} via CR${srcCR}[${idx}]`;
             }
             
             case "SAVE": {
