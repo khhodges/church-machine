@@ -3028,24 +3028,64 @@ function parseProgram(code) {
     const lines = code.split('\n');
     const program = [];
     
+    const stringArgInstructions = {
+        'B': [0, 1],
+        'BL': [0],
+        'TPERM': [1],
+        'LOAD': [1],
+        'CALL': [0],
+        'SWITCH': [0],
+        'CHANGE': [1]
+    };
+    
     for (let i = 0; i < lines.length; i++) {
         let line = lines[i].trim();
+        let label = null;
+        
+        const labelMatch = line.match(/^(\w+):\s*/);
+        if (labelMatch) {
+            label = labelMatch[1];
+            line = line.substring(labelMatch[0].length).trim();
+        }
         
         const commentIdx = line.indexOf(';');
         if (commentIdx !== -1) {
             line = line.substring(0, commentIdx).trim();
         }
         
-        if (line === '') continue;
+        if (line === '') {
+            if (label) {
+                program.push({
+                    line: i + 1,
+                    instr: 'LABEL',
+                    args: [],
+                    label: label,
+                    raw: lines[i]
+                });
+            }
+            continue;
+        }
         
         const parts = line.split(/\s+/);
         const instr = parts[0].toUpperCase();
-        const args = parts.slice(1).map(a => parseInt(a));
+        const stringPositions = stringArgInstructions[instr] || [];
+        
+        const args = parts.slice(1).map((a, idx) => {
+            if (stringPositions.includes(idx)) {
+                return a;
+            }
+            const num = parseInt(a);
+            if (isNaN(num)) {
+                return a;
+            }
+            return num;
+        });
         
         program.push({
             line: i + 1,
             instr: instr,
             args: args,
+            label: label,
             raw: lines[i]
         });
     }
