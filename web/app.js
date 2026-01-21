@@ -3127,6 +3127,17 @@ function toggleFullCode() {
     }
     
     saveEditorPanelState();
+    
+    setTimeout(() => {
+        updateLineNumbers();
+        const editor = document.getElementById('codeEditor');
+        if (editor) {
+            const lineNumbers = document.getElementById('lineNumbers');
+            if (lineNumbers) {
+                lineNumbers.scrollTop = editor.scrollTop;
+            }
+        }
+    }, 50);
 }
 
 function saveEditorPanelState() {
