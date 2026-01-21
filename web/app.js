@@ -2877,9 +2877,13 @@ function setupCodeEditor() {
     const savedPerms = localStorage.getItem('ctmm_editor_perms');
     if (savedContent) {
         editor.value = savedContent;
+        savedEditorContent = savedContent;
+        lastSavedCode = savedContent;
         if (savedLinkage) editorState.currentLinkage = savedLinkage;
         if (savedPerms) editorState.currentPerms = savedPerms;
+        pushCodeHistory(savedContent);
         updateEditorToolbar();
+        updateLineNumbers();
     }
     
     // Track code changes for undo history
