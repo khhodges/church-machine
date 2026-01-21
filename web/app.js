@@ -126,6 +126,9 @@ function switchView(viewId) {
         if (typeof updateEditorToolbar === 'function') {
             updateEditorToolbar();
         }
+        if (typeof updateEditorRegisters === 'function') {
+            updateEditorRegisters();
+        }
     }
 }
 
@@ -3298,6 +3301,52 @@ function updateChurchRegisters() {
         div.innerHTML = `<span class="reg-name">${name}</span><span class="reg-value">${val}</span>`;
         container.appendChild(div);
     }
+}
+
+function updateEditorRegisters() {
+    const crContainer = document.getElementById('editorContextRegs');
+    const drContainer = document.getElementById('editorDataRegs');
+    
+    if (crContainer) {
+        crContainer.innerHTML = '';
+        const roles = { 6: 'C-List', 7: 'Nucleus' };
+        for (let i = 0; i < 8; i++) {
+            const reg = simulator.contextRegs[i];
+            const isNull = !reg || reg.name === 'NULL';
+            const role = roles[i] || '';
+            const row = document.createElement('div');
+            row.className = `register-row ${isNull ? 'null' : ''}`;
+            row.innerHTML = `
+                <span class="name">CR${i}${role ? ' ' + role : ''}</span>
+                <span class="value">${reg ? reg.name : 'NULL'}</span>
+                <span class="perms">${reg && reg.perms ? reg.perms.join('') : '---'}</span>
+            `;
+            crContainer.appendChild(row);
+        }
+    }
+    
+    if (drContainer) {
+        drContainer.innerHTML = '';
+        for (let i = 0; i < 16; i++) {
+            const value = simulator.dataRegs[i] || 0n;
+            const hexStr = value.toString(16).toUpperCase().padStart(16, '0');
+            const row = document.createElement('div');
+            row.className = 'register-row';
+            row.innerHTML = `
+                <span class="name">DR${i}</span>
+                <span class="value" title="0x${hexStr}">0x${hexStr.slice(-8)}</span>
+                <span class="perms"></span>
+            `;
+            drContainer.appendChild(row);
+        }
+    }
+    
+    ['N', 'Z', 'C', 'V'].forEach(flag => {
+        const el = document.getElementById(`editorFlag${flag}`);
+        if (el) {
+            el.classList.toggle('active', simulator.flags[flag]);
+        }
+    });
 }
 
 function loadExample(name) {

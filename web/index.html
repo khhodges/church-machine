@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260120a">
+    <link rel="stylesheet" href="styles.css?v=20260120b">
 </head>
 <body>
     <div class="fixed-toolbar">
@@ -519,21 +519,33 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                         </div>
                     </div>
                     
+                    <div class="editor-registers-panel">
+                        <div class="editor-reg-section">
+                            <h3>Church Registers</h3>
+                            <div class="register-list" id="editorContextRegs"></div>
+                        </div>
+                        <div class="editor-reg-section">
+                            <h3>Turing Registers</h3>
+                            <div class="register-list" id="editorDataRegs"></div>
+                        </div>
+                        <div class="editor-reg-section editor-flags-section">
+                            <h3>Flags</h3>
+                            <div class="flag-display-inline" id="editorFlags">
+                                <span class="flag-mini" id="editorFlagN">N</span>
+                                <span class="flag-mini" id="editorFlagZ">Z</span>
+                                <span class="flag-mini" id="editorFlagC">C</span>
+                                <span class="flag-mini" id="editorFlagV">V</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="editor-output-panel">
                         <div class="output-tabs">
                             <button class="output-tab active" onclick="switchOutputTab('console')" data-tooltip="Program output and status messages">Console</button>
-                            <button class="output-tab" onclick="switchOutputTab('turing')" data-tooltip="Data registers DR0-DR15 (64-bit values)">TURING</button>
-                            <button class="output-tab" onclick="switchOutputTab('church')" data-tooltip="Context registers CR0-CR15 (Golden Tokens)">CHURCH</button>
                         </div>
                         <div class="output-content" id="editorConsole">
                             <div class="console-line info">CTMM Assembly Editor Ready</div>
                             <div class="console-line info">Write code and click Run or Step to execute</div>
-                        </div>
-                        <div class="output-content hidden" id="editorTuring">
-                            <div class="reg-list" id="turingRegList"></div>
-                        </div>
-                        <div class="output-content hidden" id="editorChurch">
-                            <div class="reg-list" id="churchRegList"></div>
                         </div>
                     </div>
                 </div>
@@ -792,7 +804,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
         </div>
     </div>
 
-    <script src="simulator.js?v=20260120a"></script>
-    <script src="app.js?v=20260120a"></script>
+    <script src="simulator.js?v=20260120b"></script>
+    <script src="app.js?v=20260120b"></script>
 </body>
 </html>
