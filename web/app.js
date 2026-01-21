@@ -1431,6 +1431,7 @@ function getObjectTooltip(name, type) {
 
 let currentEditingCap = null;
 let currentEditingRegLabel = null;
+let currentEditingClistIndex = -1;
 
 function getCapabilityHierarchy(cap) {
     const hierarchy = [];
@@ -1592,6 +1593,18 @@ function showCapabilityDetail(evt, cap, regLabel) {
     
     currentEditingCap = cap;
     currentEditingRegLabel = regLabel;
+    
+    // Track C-List index if this is a C-List entry (not a context register)
+    currentEditingClistIndex = -1;
+    if (regLabel && regLabel.startsWith('CL[')) {
+        const match = regLabel.match(/CL\[(\d+)\]/);
+        if (match) {
+            currentEditingClistIndex = parseInt(match[1]);
+        }
+    } else if (cap.name && simulator.clist) {
+        // Find by name in clist
+        currentEditingClistIndex = simulator.clist.findIndex(c => c.name === cap.name);
+    }
     
     const panel = document.getElementById('capDetailPanel');
     const allPerms = ['R', 'W', 'X', 'L', 'S', 'E', 'B', 'M', 'F'];
@@ -1775,6 +1788,19 @@ function updateGTFromEditor() {
             } else if (regNum === 15 && simulator.cr15) {
                 simulator.cr15.perms = [...perms];
             }
+        }
+    }
+    
+    // CRITICAL: Also sync C-List entry permissions if editing a C-List entry
+    if (currentEditingClistIndex >= 0) {
+        // Update simulator.clist
+        if (simulator.clist && simulator.clist[currentEditingClistIndex]) {
+            simulator.clist[currentEditingClistIndex].perms = [...perms];
+        }
+        // Update CR6's clist (the authoritative source)
+        const cr6 = simulator.contextRegs[6];
+        if (cr6 && cr6.clist && cr6.clist[currentEditingClistIndex]) {
+            cr6.clist[currentEditingClistIndex].perms = [...perms];
         }
     }
     
