@@ -56,6 +56,10 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
+- 2026-01-21: Assembly Editor now displays hardware registers (CR0-CR7, DR0-DR15, NZCV flags) matching Dashboard layout
+- 2026-01-21: Register panel updates live during Step/Run execution
+- 2026-01-21: DR values show last 8 hex digits with full 16-digit tooltip on hover
+- 2026-01-21: CR6/CR7 show role labels (C-List/Nucleus) for quick identification
 - 2026-01-20: Updated Church instructions to 6 + TPERM format per user specification
 - 2026-01-20: LOAD requires L (Load) permission, SAVE requires S (Save) on dest + B (Bind) on source
 - 2026-01-20: CALL requires E (Enter), adds Mask field clearing, loads CR6 (nodal C-List) + CR7 (Access Code)
