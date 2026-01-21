@@ -3519,12 +3519,9 @@ main {
 }
 
 .line-numbers span.exec-line {
-    background: var(--accent);
-    color: var(--bg-dark);
+    color: #ffff00;
     font-weight: bold;
-    border-radius: 2px;
-    margin-right: -0.5rem;
-    padding-right: 0.5rem;
+    text-shadow: 0 0 4px #ffff00;
 }
 
 #codeEditor {
