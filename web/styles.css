@@ -3512,11 +3512,13 @@ main {
     user-select: none;
     border-right: 1px solid var(--border);
     min-width: 40px;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
-.line-numbers div {
-    height: 1.35em;
+.line-numbers span {
+    display: block;
+    height: calc(0.9rem * 1.5);
+    line-height: calc(0.9rem * 1.5);
 }
 
 #codeEditor {

@@ -2982,7 +2982,7 @@ function updateLineNumbers() {
     const lines = editor.value.split('\n').length;
     let nums = [];
     for (let i = 1; i <= lines; i++) {
-        nums.push(`<div>${i}</div>`);
+        nums.push(`<span>${i}</span>`);
     }
     lineNumbers.innerHTML = nums.join('');
 }
