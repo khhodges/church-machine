@@ -2884,13 +2884,14 @@ main {
     grid-template-columns: 0 1fr 0 280px;
 }
 
-/* Full code expansion - hide both panels */
+/* Full code expansion - hide all side panels */
 .editor-content.full-code {
-    grid-template-columns: 0 1fr 0 280px;
+    grid-template-columns: 0 1fr 0 0;
 }
 
 .editor-content.full-code .editor-examples-panel,
-.editor-content.full-code .editor-registers-panel {
+.editor-content.full-code .editor-registers-panel,
+.editor-content.full-code .editor-output-panel {
     display: none;
 }
 
