@@ -3030,7 +3030,7 @@ function parseProgram(code) {
     
     const stringArgInstructions = {
         'B': [0, 1],
-        'BL': [0],
+        'BL': [0, 1],
         'TPERM': [1],
         'LOAD': [1],
         'CALL': [0],
@@ -3366,9 +3366,26 @@ function executeEditorInstruction(instr) {
                 break;
             
             // Turing: Branch instructions
+            // Syntax: B label OR B condition label
             case 'B': {
-                const target = args[0];
-                const cond = args[1] || 'AL';
+                let target, cond;
+                const conditions = ['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 
+                                   'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL'];
+                
+                if (args.length === 1) {
+                    target = args[0];
+                    cond = 'AL';
+                } else if (args.length >= 2) {
+                    const firstArg = String(args[0]).toUpperCase();
+                    if (conditions.includes(firstArg)) {
+                        cond = firstArg;
+                        target = args[1];
+                    } else {
+                        target = args[0];
+                        cond = String(args[1]).toUpperCase();
+                    }
+                }
+                
                 if (simulator.checkCondition(cond)) {
                     const targetLine = findLabel(target);
                     if (targetLine >= 0) {
@@ -3380,7 +3397,6 @@ function executeEditorInstruction(instr) {
                     }
                 } else {
                     result = `Branch not taken (${cond} failed)`;
-                    editorState.pc++;
                 }
                 editorLog(`[${line}] ${op} ${args.join(' ')}: ${result}`, faultOccurred ? 'error' : 'exec');
                 updateEditorStatus();
@@ -3388,15 +3404,36 @@ function executeEditorInstruction(instr) {
             }
             
             case 'BL': {
-                const target = args[0];
-                const targetLine = findLabel(target);
-                if (targetLine >= 0) {
-                    simulator.setDataReg(14, BigInt(editorState.pc + 1));
-                    editorState.pc = targetLine;
-                    result = `Branch with link to ${target}, LR=${editorState.pc}`;
+                let target, cond;
+                const conditions = ['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 
+                                   'HI', 'LS', 'GE', 'LT', 'GT', 'LE', 'AL'];
+                
+                if (args.length === 1) {
+                    target = args[0];
+                    cond = 'AL';
+                } else if (args.length >= 2) {
+                    const firstArg = String(args[0]).toUpperCase();
+                    if (conditions.includes(firstArg)) {
+                        cond = firstArg;
+                        target = args[1];
+                    } else {
+                        target = args[0];
+                        cond = 'AL';
+                    }
+                }
+                
+                if (simulator.checkCondition(cond)) {
+                    const targetLine = findLabel(target);
+                    if (targetLine >= 0) {
+                        simulator.setDataReg(14, BigInt(editorState.pc + 1));
+                        editorState.pc = targetLine;
+                        result = `Branch with link to ${target}, LR=${editorState.pc}`;
+                    } else {
+                        result = `FAULT: Label '${target}' not found`;
+                        faultOccurred = true;
+                    }
                 } else {
-                    result = `FAULT: Label '${target}' not found`;
-                    faultOccurred = true;
+                    result = `Branch not taken (${cond} failed)`;
                 }
                 editorLog(`[${line}] ${op} ${args.join(' ')}: ${result}`, faultOccurred ? 'error' : 'exec');
                 updateEditorStatus();
