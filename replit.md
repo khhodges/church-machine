@@ -61,6 +61,9 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
+- 2026-01-22: Click function names (GT_CREATE, GT_AREA, etc.) in Namespace Browser to load code and switch to Assembly view
+- 2026-01-22: Added GT_CREATE implementation code for CapabilityManager with correct permission encoding (Data=0x47, C-List=0x78)
+- 2026-01-22: Added CapMgr example button to Assembly Editor demonstrating object creation with failsafe TPERM validation
 - 2026-01-22: Combined "Flags & Stack" panel merges condition flags and call stack into single tile
 - 2026-01-22: Condition Flags (NZCV + P/B) now update after each instruction step
 - 2026-01-22: Renamed IP/PC to NIA (Next Instruction Address) throughout simulator and UI
