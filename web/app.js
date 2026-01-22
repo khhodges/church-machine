@@ -6523,6 +6523,134 @@ first_fault:
                 </div>`
             }
         ]
+    },
+    {
+        title: "Capability Manager",
+        steps: [
+            {
+                text: `<h3>Creating New Golden Tokens</h3>
+                <p>The <strong>CapabilityManager</strong> abstraction creates new Golden Tokens for objects. Unlike other abstractions that perform computations, CapabilityManager allocates and initializes new capabilities.</p>
+                <div class="key-concept">
+                    <strong>Key Concept:</strong> To create objects in CTMM, you CALL the CapabilityManager with the object type and size. It returns a new GT in CR0 with full type-appropriate permissions plus Bind.
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
+                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: left;">Property</th><th style="padding: 0.5rem; text-align: left;">Value</th></tr>
+                    <tr><td style="padding: 0.5rem;"><strong>Namespace Offset</strong></td><td>9 (sibling to SlideRule, Abacus, Circle)</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>Boot C-List Index</strong></td><td>7</td></tr>
+                    <tr><td style="padding: 0.5rem;"><strong>Boot C-List Perms</strong></td><td>[E] - Enter only (minimal privilege)</td></tr>
+                </table>`,
+                demo: `<div class="demo-title">CapabilityManager in Namespace</div>
+                <div class="demo-content">
+                    <div class="demo-visual">
+                        <div class="hier-preview">
+                            <div style="padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; margin: 0.25rem 0;">
+                                <span class="math-type-badge math-capability" style="font-size: 0.7rem; padding: 0.15rem 0.4rem;">CAPABILITY</span>
+                                CapabilityManager [E]
+                            </div>
+                        </div>
+                    </div>
+                    <div class="demo-explanation">
+                        <p>CapabilityManager appears in the Namespace Browser alongside other abstractions. It has only <strong>[E]</strong> permission (Enter) - the minimum needed to CALL it.</p>
+                    </div>
+                </div>`
+            },
+            {
+                text: `<h3>API: Object Type and Size</h3>
+                <p>The CapabilityManager API uses data registers to specify what to create:</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
+                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: left;">Register</th><th style="padding: 0.5rem; text-align: left;">Input</th><th style="padding: 0.5rem; text-align: left;">Description</th></tr>
+                    <tr><td style="padding: 0.5rem;"><strong>DR0</strong></td><td>Object Type</td><td>0 = Data object, 1 = C-List object</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>DR1</strong></td><td>Size</td><td>Size in words (3-word Namespace entry limit)</td></tr>
+                </table>
+                <p>After the CALL returns, <strong>CR0</strong> contains the new Golden Token with appropriate permissions.</p>
+                <div class="highlight">
+                    <strong>Two Object Types:</strong><br>
+                    • <strong>Data (0)</strong>: For storing numeric values, arrays, buffers<br>
+                    • <strong>C-List (1)</strong>: For storing Golden Tokens (capability lists)
+                </div>`,
+                demo: `<div class="demo-title">API Call Pattern</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; font-size: 0.8rem;">
+; Set up API parameters
+MOV DR0, #0          ; Type 0 = Data object
+MOV DR1, #256        ; Size = 256 words
+
+; Load CapabilityManager GT from C-List
+LOAD 1 7 CR1         ; CR1 = CapabilityManager [E]
+
+; Create the object
+CALL 1 0             ; CALL CapabilityManager
+
+; CR0 now contains new GT with [R,W,X,B]</pre>
+                </div>`
+            },
+            {
+                text: `<h3>Returned Permissions by Type</h3>
+                <p>The CapabilityManager returns the new GT in <strong>CR0</strong> with permissions based on object type:</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
+                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: center;">Type</th><th style="padding: 0.5rem; text-align: center;">DR0</th><th style="padding: 0.5rem; text-align: center;">Returned Permissions</th><th style="padding: 0.5rem; text-align: left;">Meaning</th></tr>
+                    <tr><td style="padding: 0.5rem; text-align: center;"><strong>Data</strong></td><td style="text-align: center;">0</td><td style="text-align: center;"><span style="background: #4ade80; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">R</span> <span style="background: #f87171; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">W</span> <span style="background: #60a5fa; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">X</span> <span style="background: #2dd4bf; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">B</span></td><td>Read, Write, Execute, Bind</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem; text-align: center;"><strong>C-List</strong></td><td style="text-align: center;">1</td><td style="text-align: center;"><span style="background: #c084fc; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">L</span> <span style="background: #fb923c; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">S</span> <span style="background: #fbbf24; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">E</span> <span style="background: #2dd4bf; color: #1a1a2e; padding: 0.1rem 0.3rem; border-radius: 3px;">B</span></td><td>Load, Save, Enter, Bind</td></tr>
+                </table>
+                <div class="key-concept">
+                    <strong>Mutual Exclusivity:</strong> Data permissions (R,W,X) and Capability permissions (L,S,E) are mutually exclusive. A GT has either data access OR capability access, never both. The <strong>B</strong> (Bind) permission is included in both sets.
+                </div>`,
+                demo: `<div class="demo-title">Permission Sets</div>
+                <div class="demo-content">
+                    <div class="demo-visual" style="display: flex; gap: 2rem; justify-content: center;">
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; margin-bottom: 0.5rem;">Data Object</div>
+                            <div style="font-size: 1.5rem;">
+                                <span style="background: #4ade80; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">R</span>
+                                <span style="background: #f87171; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">W</span>
+                                <span style="background: #60a5fa; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">X</span>
+                                <span style="background: #2dd4bf; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">B</span>
+                            </div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-weight: bold; margin-bottom: 0.5rem;">C-List Object</div>
+                            <div style="font-size: 1.5rem;">
+                                <span style="background: #c084fc; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">L</span>
+                                <span style="background: #fb923c; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">S</span>
+                                <span style="background: #fbbf24; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">E</span>
+                                <span style="background: #2dd4bf; color: #1a1a2e; padding: 0.2rem 0.5rem; border-radius: 4px; margin: 0.1rem;">B</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`
+            },
+            {
+                text: `<h3>Complete Example: Creating Objects</h3>
+                <p>Here's a complete example showing how to create both a data buffer and a C-List:</p>`,
+                demo: `<div class="demo-title">CapMgr.asm - Creating Objects</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 4px; font-size: 0.8rem;">
+; CapMgr.asm - Demonstrate CapabilityManager usage
+; Creates a data buffer and a C-List
+
+; === Part 1: Create a Data Buffer ===
+    MOV DR0, #0          ; Type 0 = Data object
+    MOV DR1, #64         ; Size = 64 words
+    LOAD 1 7 CR1         ; Load CapabilityManager GT
+    CALL 1 0             ; Create object
+    ; CR0 = new Data GT [R,W,X,B]
+    
+    ; Store value in new buffer
+    MOV DR2, #42         ; Value to store
+    ; Use CR0 to access the new object...
+
+; === Part 2: Create a C-List ===
+    MOV DR0, #1          ; Type 1 = C-List object
+    MOV DR1, #16         ; Size = 16 entries
+    LOAD 1 7 CR1         ; Load CapabilityManager GT
+    CALL 1 0             ; Create object
+    ; CR0 = new C-List GT [L,S,E,B]
+    
+    ; Now can SAVE capabilities to new C-List
+    SAVE 0 0 CR2         ; Save CR2 to index 0 of new C-List</pre>
+                </div>`
+            }
+        ]
     }
 ];
 
@@ -9387,7 +9515,53 @@ RETURN
 ; To create Ω, call omega with itself:
 ; LOAD 0 6 n      ; Load omega GT from C-List (CR6)
 ; CALL 0          ; This triggers infinite recursion
-; This demonstrates non-termination in lambda calc`
+; This demonstrates non-termination in lambda calc`,
+
+    'capmgr': `; ================================================
+; CAPABILITY MANAGER DEMO
+; Creates Data and C-List objects using CapabilityManager
+; API: DR0=type (0=Data, 1=C-List), DR1=size in words
+; Returns: CR0=new GT with [RWXB] or [LSEB]
+; ================================================
+; Boot C-List Layout:
+;   [7] = CapabilityManager [E]
+
+; ------------------------------------------------
+; PART 1: Create a Data Buffer
+; ------------------------------------------------
+    MOV DR0, #0          ; Type 0 = Data object
+    MOV DR1, #64         ; Size = 64 words
+    LOAD 1 7 CR1         ; CR1 = CapabilityManager [E]
+    TPERM CR1, E         ; Verify Enter permission
+    BNE fault            ; No E -> FAULT
+    CALL 1 0             ; Create object
+    ; CR0 now holds new GT with [R,W,X,B]
+    
+    ; Store the new capability for later use
+    MOV CR2, CR0         ; CR2 = our new data buffer GT
+
+; ------------------------------------------------
+; PART 2: Create a C-List
+; ------------------------------------------------
+    MOV DR0, #1          ; Type 1 = C-List object
+    MOV DR1, #8          ; Size = 8 entries
+    LOAD 1 7 CR1         ; CR1 = CapabilityManager [E]
+    CALL 1 0             ; Create C-List
+    ; CR0 now holds new GT with [L,S,E,B]
+    
+    ; Save our data buffer GT to the new C-List
+    MOV CR3, CR0         ; CR3 = our new C-List GT
+    TPERM CR3, S         ; Verify Save permission
+    BNE fault            ; No S -> FAULT
+    SAVE 2 3 0           ; Save CR2 (data buffer) to index 0 of CR3 (C-List)
+    
+    ; Success! DR0 indicates how many objects created
+    MOV DR0, #2          ; Created 2 objects
+    RETURN
+
+; === FAILSAFE: No error codes ===
+fault:
+    FAULT                ; Uniform failure - no information leakage`
 };
 
 const instructionComments = {
