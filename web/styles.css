@@ -5129,12 +5129,8 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     line-height: 1.4;
 }
 
-/* Call Stack Panel */
-.panel.call-stack {
-    margin-top: 1rem;
-}
-
-.panel.call-stack h2 {
+/* Flags & Stack Combined Panel */
+.panel.flags-and-stack h2 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -5147,11 +5143,12 @@ body.tooltip-hidden [data-tooltip]:hover::after {
 }
 
 .stack-list {
-    max-height: 200px;
+    max-height: 150px;
     overflow-y: auto;
     padding: 0.5rem;
     background: var(--bg-dark);
     border-radius: 6px;
+    margin-top: 0.75rem;
 }
 
 .stack-empty {

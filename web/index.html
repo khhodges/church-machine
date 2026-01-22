@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260122a">
+    <link rel="stylesheet" href="styles.css?v=20260122b">
 </head>
 <body>
     <div class="fixed-toolbar">
@@ -85,8 +85,8 @@
                     <div class="register-list" id="dataRegs"></div>
                 </div>
 
-                <div class="panel flags">
-                    <h2>Condition Flags</h2>
+                <div class="panel flags-and-stack">
+                    <h2>Flags & Stack <span id="stackWordCount" class="stack-word-count">(0 words)</span></h2>
                     <div class="flag-display-container">
                         <div class="flag-row">
                             <span class="flag-row-label">Turing:</span>
@@ -119,10 +119,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="panel call-stack">
-                    <h2>Call Stack <span id="stackWordCount" class="stack-word-count">(0 words)</span></h2>
                     <div class="stack-list" id="stackList">
                         <div class="stack-empty">Stack is empty</div>
                     </div>
