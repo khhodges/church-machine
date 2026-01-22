@@ -63,6 +63,7 @@ The web interface is composed of seven distinct views:
 
 ## Recent Changes
 
+- 2026-01-22: Assembly Editor file dropdown: replaced static filename with dropdown of all namespace code files (Turing examples, Lambda examples, GT_* functions)
 - 2026-01-22: Added DateTime abstraction (NS offset 10, Boot C-List index 8): ISO 8601 date/time with modes for timestamp, date, time, epoch, and components
 - 2026-01-22: DateTime API: DR0=mode (0=ISO, 1=Date, 2=Time, 3=Unix epoch, 4=Components) returns DR1-DR6 for components
 - 2026-01-22: Added DateTime example button in Assembly Editor demonstrating epoch and component retrieval

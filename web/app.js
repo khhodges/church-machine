@@ -2592,6 +2592,7 @@ function resetVisualization() {
 document.addEventListener('DOMContentLoaded', () => {
     updateVizInstruction();
     setupCodeEditor();
+    populateCodeFileDropdown();
     
     const exBtn = document.getElementById('toggleExamples');
     const regBtn = document.getElementById('toggleRegisters');
@@ -2626,12 +2627,10 @@ let editorState = {
 };
 
 function updateEditorToolbar() {
-    const pathEl = document.getElementById('editorFilePath');
+    const selectEl = document.getElementById('editorFileSelect');
     const permsEl = document.getElementById('editorPerms');
     const headerEl = document.getElementById('editorHeaderFilename');
     
-    const linkageWithExt = editorState.currentLinkage.endsWith('.asm') ? editorState.currentLinkage : editorState.currentLinkage + '.asm';
-    if (pathEl) pathEl.textContent = linkageWithExt;
     if (permsEl) permsEl.textContent = editorState.currentPerms;
     
     // Extract filename from linkage path for editor header
@@ -2639,6 +2638,83 @@ function updateEditorToolbar() {
     let filename = parts[parts.length - 1];
     if (!filename.endsWith('.asm')) filename += '.asm';
     if (headerEl) headerEl.textContent = filename;
+    
+    // Update dropdown selection to match current file
+    if (selectEl && editorState.currentLinkage) {
+        const key = parts[parts.length - 1];
+        selectEl.value = key;
+    }
+}
+
+function populateCodeFileDropdown() {
+    const selectEl = document.getElementById('editorFileSelect');
+    if (!selectEl) return;
+    
+    selectEl.innerHTML = '<option value="">Select file...</option>';
+    
+    // Group 1: Example Programs (Turing)
+    const turingGroup = document.createElement('optgroup');
+    turingGroup.label = 'Turing Examples';
+    const turingExamples = ['access', 'firstfault', 'counter', 'fibonacci', 'multiply', 'flags', 'callerCode'];
+    turingExamples.forEach(name => {
+        if (examplePrograms[name]) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name + '.asm';
+            turingGroup.appendChild(opt);
+        }
+    });
+    selectEl.appendChild(turingGroup);
+    
+    // Group 2: Lambda/Church Examples
+    const lambdaGroup = document.createElement('optgroup');
+    lambdaGroup.label = 'Lambda Examples';
+    const lambdaExamples = ['ycombinator', 'factorial', 'capcheck', 'capmgr', 'datetime', 'church_bool', 'church_num', 'pair'];
+    lambdaExamples.forEach(name => {
+        if (codeTemplates[name]) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name + '.asm';
+            lambdaGroup.appendChild(opt);
+        }
+    });
+    selectEl.appendChild(lambdaGroup);
+    
+    // Group 3: Abstraction Functions (GT_*)
+    const funcGroup = document.createElement('optgroup');
+    funcGroup.label = 'Abstraction Functions';
+    Object.keys(functionBetaCode).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name + '.asm';
+        funcGroup.appendChild(opt);
+    });
+    selectEl.appendChild(funcGroup);
+}
+
+function selectCodeFile(name) {
+    if (!name) return;
+    
+    // Try to find code in examplePrograms, codeTemplates, or functionBetaCode
+    let code = examplePrograms[name] || codeTemplates[name] || functionBetaCode[name];
+    if (!code) return;
+    
+    // Determine linkage path based on source
+    let linkage;
+    if (examplePrograms[name]) {
+        linkage = `Boot/Examples/${name}`;
+    } else if (codeTemplates[name]) {
+        linkage = `Boot/Lambda/${name}`;
+    } else if (functionBetaCode[name]) {
+        linkage = `Boot/Functions/${name}`;
+    }
+    
+    capturePreChangeState();
+    setEditorCode(code, linkage, '[RX]');
+    savedEditorContent = code;
+    pushCodeHistory(code);
+    resetProgram();
+    editorLog(`Loaded: ${name}.asm`, 'success');
 }
 
 const examplePrograms = {

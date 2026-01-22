@@ -2828,6 +2828,42 @@ main {
     font-weight: 500;
 }
 
+.editor-file-select {
+    background: var(--surface-light);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    font-family: 'Fira Code', monospace;
+    cursor: pointer;
+    min-width: 180px;
+    max-width: 280px;
+}
+
+.editor-file-select:hover {
+    border-color: var(--accent);
+}
+
+.editor-file-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+.editor-file-select option {
+    background: var(--surface);
+    color: var(--text-primary);
+    padding: 0.3rem;
+}
+
+.editor-file-select optgroup {
+    background: var(--surface-dark);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-style: normal;
+}
+
 .perm-badge-green {
     display: inline-block;
     background: var(--success);

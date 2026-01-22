@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260122e">
+    <link rel="stylesheet" href="styles.css?v=20260122f">
 </head>
 <body>
     <div class="fixed-toolbar">
@@ -381,7 +381,9 @@
         <section id="editor" class="view">
             <div class="editor-toolbar">
                 <div class="toolbar-group">
-                    <span class="editor-file-path" id="editorFilePath">Boot/Nucleus/program.asm</span>
+                    <select class="editor-file-select" id="editorFileSelect" onchange="selectCodeFile(this.value)">
+                        <option value="">Select file...</option>
+                    </select>
                     <span class="perm-badge-green" id="editorPerms">[RX]</span>
                 </div>
                 <div class="toolbar-group">
@@ -779,6 +781,6 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
     </div>
 
     <script src="simulator.js?v=20260122a"></script>
-    <script src="app.js?v=20260122v"></script>
+    <script src="app.js?v=20260122w"></script>
 </body>
 </html>
