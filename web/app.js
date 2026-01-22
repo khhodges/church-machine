@@ -6138,22 +6138,6 @@ myFunction:
     ; ... function body ...
     MOV PC, DR7          ; Return to caller</pre>
                 </div>`
-            },
-            {
-                quiz: {
-                    question: "Which condition code should you use to branch when the result of a CMP is that the first operand is less than the second (signed comparison)?",
-                    options: [
-                        "BLO (Branch if Lower)",
-                        "BLT (Branch if Less Than)",
-                        "BMI (Branch if Minus)",
-                        "BNE (Branch if Not Equal)"
-                    ],
-                    correct: 1,
-                    feedback: {
-                        correct: "Correct! BLT (Branch if Less Than) is for signed comparisons and checks if N ≠ V. BLO is for unsigned comparisons.",
-                        incorrect: "Not quite. BLT is the correct choice for signed less-than comparison. BLO is for unsigned, BMI only checks if negative, and BNE checks inequality."
-                    }
-                }
             }
         ]
     }
