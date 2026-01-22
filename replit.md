@@ -55,6 +55,10 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
+- 2026-01-22: CALL/RETURN instructions now have 13-bit register mask fields (8 bits DR0-7 + 5 bits CR0-4) to prevent information leakage
+- 2026-01-22: DR8-15 always cleared on CALL/RETURN (never used for API), CR6-7 fixed by Lambda Calculus
+- 2026-01-22: Added "CALL/RETURN Register Masks" and "13-Bit API Boundary" tutorial steps to Failsafe Security lesson
+- 2026-01-22: Instructions view now displays security notes for CALL/RETURN with lock icon
 - 2026-01-22: Added warning to Tutorial Page 1 about testing unknown/untrusted data variables before sharing with abstractions
 - 2026-01-22: Added Church Indicators & TPERM tutorial: P/B flags, TPERM instruction, failsafe validation patterns
 - 2026-01-22: Added Branch Instructions tutorial: B/BL instructions, condition codes, loop patterns

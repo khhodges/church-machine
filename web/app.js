@@ -5583,6 +5583,74 @@ CR15 = Namespace</pre>
                             </div>
                         </div>
                     </div>
+                </div>`
+            },
+            {
+                text: `<h3>CALL/RETURN Register Masks: Preventing Malware</h3>
+                <p>The <strong>CALL</strong> and <strong>RETURN</strong> instructions include register mask fields to prevent information leakage between caller and callee:</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
+                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: left;">Register Group</th><th style="padding: 0.5rem; text-align: left;">Behavior</th><th style="padding: 0.5rem; text-align: left;">Purpose</th></tr>
+                    <tr><td style="padding: 0.5rem;"><strong>DR8-15</strong></td><td>Always cleared</td><td>Scratch space - never used for API</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>DR0-7</strong></td><td>Mask-controlled (8 bits)</td><td>API data variables</td></tr>
+                    <tr><td style="padding: 0.5rem;"><strong>CR0-4</strong></td><td>Mask-controlled (5 bits)</td><td>API capabilities</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td style="padding: 0.5rem;"><strong>CR6-7</strong></td><td>Fixed by Lambda Calculus</td><td>CR6=C-List, CR7=Nucleus (CR8=Thread identity)</td></tr>
+                </table>
+                <div class="key-concept" style="border-color: var(--error);">
+                    <strong>Malware Defense:</strong> Mask bits prevent untrusted code from reading the caller's private data (CALL) or leaking internal state back to malicious callers (RETURN).
+                </div>`,
+                demo: `<div class="demo-title">Register Mask Examples</div>
+                <div class="demo-content">
+                    <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
+; CALL with mask - pass only DR0, DR1 (arguments)
+CALL CR0, 0b11111100_00011111
+;          DR mask: 11111100 = clear DR2-7, keep DR0-1
+;          CR mask: 00011111 = clear CR0-4 (pass no caps)
+; DR8-15 always auto-cleared
+
+; RETURN with mask - return only DR0 (result)
+RETURN 0b11111110_00011111
+;        DR mask: 11111110 = clear DR1-7, keep DR0
+;        CR mask: 00011111 = clear CR0-4
+; Callee's private data cannot leak back</pre>
+                </div>`
+            },
+            {
+                text: `<h3>The 13-Bit API Boundary</h3>
+                <p>The register mask creates a <strong>hardware-enforced API boundary</strong> between caller and callee:</p>
+                <ul>
+                    <li><strong>8 bits for DR0-7</strong> - Which data registers pass through</li>
+                    <li><strong>5 bits for CR0-4</strong> - Which capability registers pass through</li>
+                    <li><strong>Total: 13 bits</strong> - Encoded in CALL and RETURN instruction formats</li>
+                </ul>
+                <p><strong>Why this prevents malware:</strong></p>
+                <ul>
+                    <li>Malicious callee cannot read caller's <strong>private variables</strong> (DR2-7 cleared)</li>
+                    <li>Malicious callee cannot access caller's <strong>restricted capabilities</strong> (CR0-4 cleared)</li>
+                    <li>Malicious callee cannot leak <strong>internal secrets</strong> on RETURN</li>
+                    <li>DR8-15 always cleared - <strong>no hidden channels</strong></li>
+                </ul>`,
+                demo: `<div class="demo-title">Malware Attack Prevention</div>
+                <div class="demo-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="background: rgba(231, 76, 60, 0.1); border-left: 3px solid var(--error); padding: 0.8rem; border-radius: 0 6px 6px 0;">
+                            <div style="color: var(--error); font-weight: bold; margin-bottom: 0.5rem;">Without Mask (Vulnerable)</div>
+                            <pre style="font-size: 0.7rem; margin: 0;">Caller has DR3 = secret key
+CALL malware
+; Malware reads DR3 = secret!
+; Malware copies to hidden channel
+RETURN
+; Secret leaked!</pre>
+                        </div>
+                        <div style="background: rgba(46, 204, 113, 0.1); border-left: 3px solid var(--success); padding: 0.8rem; border-radius: 0 6px 6px 0;">
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">With Mask (Protected)</div>
+                            <pre style="font-size: 0.7rem; margin: 0;">Caller has DR3 = secret key
+CALL malware, mask=0xFC1F
+; Hardware clears DR2-7
+; Malware sees DR3 = 0
+RETURN mask
+; Secret protected!</pre>
+                        </div>
+                    </div>
                 </div>`,
                 interactive: {
                     type: "quiz",
@@ -9354,32 +9422,40 @@ const churchInstrFormats = [
     {
         name: "CALL",
         brief: "Enter abstraction",
-        syntax: "CALL CRs",
-        desc: "Transfer control to abstraction entry point. Pushes return state, switches context.",
+        syntax: "CALL CRs [, mask]",
+        desc: "Transfer control to abstraction entry point. Pushes return state, switches context. Clears registers per mask to prevent information leakage. DR8-15 always cleared automatically.",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "Op", bits: 6, value: "000011", desc: "CALL opcode" },
             { name: "CRs", bits: 3, desc: "Abstraction capability (0-7)" },
-            { name: "Reserved", bits: 1, value: "0", desc: "Reserved" },
             { name: "L", bits: 1, desc: "Link bit (save return)" },
-            { name: "Reserved", bits: 17, value: "0", desc: "Must be zero" }
+            { name: "DR", bits: 8, desc: "DR0-7 clear mask (1=clear, prevents leakage to callee)" },
+            { name: "CR", bits: 5, desc: "CR0-4 clear mask (1=clear, prevents leakage to callee)" },
+            { name: "Reserved", bits: 5, value: "0", desc: "Reserved for future use" }
         ],
         variants: [
-            { name: "CALL", fields: { L: "0 = no link" } },
-            { name: "CALLL", fields: { L: "1 = save return address" } }
-        ]
+            { name: "No mask", fields: { DR: "0x00", CR: "0x00", desc: "All API registers passed" } },
+            { name: "Full clear", fields: { DR: "0xFF", CR: "0x1F", desc: "All cleared - no data passed" } }
+        ],
+        security: "DR8-15 always cleared (never used for API). CR6=C-List, CR7=Nucleus fixed by Lambda Calculus; CR8=Thread identity. Mask bits prevent malware from reading caller's private data."
     },
     {
         name: "RETURN",
         brief: "Return from call",
-        syntax: "RETURN",
-        desc: "Return from CALL. Pops return address, restores caller context.",
+        syntax: "RETURN [mask]",
+        desc: "Return from CALL. Pops return state, restores caller context. Clears registers per mask to prevent information leakage back to caller. DR8-15 always cleared automatically.",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "Op", bits: 6, value: "000100", desc: "RETURN opcode" },
-            { name: "Reserved", bits: 22, value: "0", desc: "Must be zero" }
+            { name: "DR", bits: 8, desc: "DR0-7 clear mask (1=clear, prevents leakage to caller)" },
+            { name: "CR", bits: 5, desc: "CR0-4 clear mask (1=clear, prevents leakage to caller)" },
+            { name: "Reserved", bits: 9, value: "0", desc: "Reserved for future use" }
         ],
-        variants: []
+        variants: [
+            { name: "No mask", fields: { DR: "0x00", CR: "0x00", desc: "All results returned" } },
+            { name: "Full clear", fields: { DR: "0xFF", CR: "0x1F", desc: "All cleared - no results returned" } }
+        ],
+        security: "DR8-15 always cleared (callee scratch space). CR6-7 restored from call stack (Lambda Calculus fixed). Mask bits prevent malware from leaking internal state back to caller."
     },
     {
         name: "CHANGE",
@@ -9678,6 +9754,16 @@ function renderInstrFormat(instr) {
         `;
     }
     
+    let securityHtml = '';
+    if (instr.security) {
+        securityHtml = `
+            <div class="instr-security">
+                <span class="security-icon">&#128274;</span>
+                <span class="security-text">${instr.security}</span>
+            </div>
+        `;
+    }
+    
     return `
         <div class="instr-format-card">
             <div class="instr-format-header">
@@ -9687,6 +9773,7 @@ function renderInstrFormat(instr) {
             <div class="instr-format-brief">${instr.brief}</div>
             <div class="instr-format-desc">${instr.desc}</div>
             ${notesHtml}
+            ${securityHtml}
             <div class="bit-diagram">
                 <div class="bit-fields">${fieldsHtml}</div>
                 <div class="field-descs">

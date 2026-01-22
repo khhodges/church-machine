@@ -5104,3 +5104,27 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     background: linear-gradient(135deg, #9b59b6, #8e44ad);
     color: white;
 }
+
+/* Instruction Security Notes */
+.instr-security {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(46, 204, 113, 0.1);
+    border-left: 3px solid var(--success);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 0.75rem;
+}
+
+.security-icon {
+    font-weight: 700;
+    color: var(--success);
+    font-size: 0.85rem;
+}
+
+.security-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
