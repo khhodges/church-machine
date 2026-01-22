@@ -591,7 +591,7 @@ let bootState = {
 // Step 1: CLEAR_ALL, set cold_restart flag
 // Step 2: LOAD_NS → CR15 (Namespace GT at offset 0)
 // Step 3a: CHANGE 3 → CR8 (Kenneth thread FIRST)
-// Step 3b: CALL HWGT → loads CR6 from NS[2], CR7 from NS[1], IP=0
+// Step 3b: CALL HWGT → loads CR6 from NS[2], CR7 from NS[1], NIA=0
 // Step 4: Clear cold_restart flag, execution begins
 
 const bootSteps = [
@@ -656,7 +656,7 @@ const bootSteps = [
     },
     {
         name: "Call Boot",
-        description: "CALL HWGT: Loading CR6←NS[2], CR7←NS[1], IP=0...",
+        description: "CALL HWGT: Loading CR6←NS[2], CR7←NS[1], NIA=0...",
         action: () => {
             // CALL HWGT triggers hardwired load sequence:
             // 1. LOAD CR6 from NS offset 2 (Boot C-List)
@@ -696,8 +696,8 @@ const bootSteps = [
                 size: accessNS.word2_limit
             };
             
-            // 3. IP = 0 (thread runs from first instruction)
-            simulator.ip = 0;
+            // 3. NIA = 0 (thread runs from first instruction)
+            simulator.nia = 0;
             
             // 4. Clear cold restart flag - boot complete
             coldRestart = false;
@@ -830,7 +830,7 @@ function saveThreadState() {
         // Indicators (condition flags)
         flags: { ...simulator.flags },
         // Lambda states
-        ip: simulator.ip,
+        nia: simulator.nia,
         stackDepth: simulator.stackDepth,
         cr6: simulator.contextRegs[6] ? JSON.parse(JSON.stringify(simulator.contextRegs[6])) : null,
         cr7: simulator.contextRegs[7] ? JSON.parse(JSON.stringify(simulator.contextRegs[7])) : null,
@@ -1202,8 +1202,8 @@ function updateSystemState() {
         document.getElementById('cr7NameDisplay').textContent = 'NULL';
     }
     
-    document.getElementById('ipValue').textContent = simulator.ip;
-    document.getElementById('stackDepth').textContent = simulator.stackDepth;
+    document.getElementById('niaValue').textContent = simulator.nia;
+    document.getElementById('stackDepth').textContent = `${simulator.stackDepth * 3} words`;
 }
 
 function updateFlags() {
@@ -1287,7 +1287,7 @@ const instructionInfo = {
     LOAD: { operands: ['destCR', 'srcCR', 'index'], help: 'Load capability at index via CR[src] into CR[dest]. Requires Load permission.', isCap: true },
     SAVE: { operands: ['destCR', 'srcDR'], help: 'Save DR[src] to location via CR[dest]. Requires Save permission.', isCap: true },
     CALL: { operands: ['cr'], help: 'Call procedure in CR[reg]. Requires Enter permission. Pushes return frame.', isCap: true },
-    RETURN: { operands: [], help: 'Return from procedure. Pops stack frame and restores CR6, CR7, IP.', isCap: true },
+    RETURN: { operands: [], help: 'Return from procedure. Pops stack frame and restores CR6, CR7, NIA.', isCap: true },
     CHANGE: { operands: ['offset'], help: 'Switch to thread at scope offset. Changes CR8 (Thread).', isCap: true },
     SWITCH: { operands: ['cr'], help: 'Set CR15 (Namespace) to capability in CR[reg]. Requires Load permission.', isCap: true }
 };
@@ -1369,7 +1369,117 @@ document.addEventListener('DOMContentLoaded', () => {
             log('Switched to Capabilities Explorer (CR6 C-List)', 'info');
         });
     }
+    
+    // Stack depth click handler - show stack popup
+    const stackDepthRow = document.getElementById('stackDepthRow');
+    if (stackDepthRow) {
+        stackDepthRow.addEventListener('click', (e) => showStackPopup(e.currentTarget));
+    }
+    
+    // Editor stack indicator click handler
+    const editorStackIndicator = document.getElementById('editorStackIndicator');
+    if (editorStackIndicator) {
+        editorStackIndicator.addEventListener('click', (e) => showStackPopup(e.currentTarget));
+    }
 });
+
+// Stack popup to show all call stack entries
+function showStackPopup(targetElement) {
+    // Remove any existing popup
+    const existingPopup = document.querySelector('.stack-popup');
+    if (existingPopup) {
+        existingPopup.remove();
+        return; // Toggle off if already showing
+    }
+    
+    const callStack = simulator.callStack;
+    
+    if (callStack.length === 0) {
+        // Show empty stack message
+        const popup = document.createElement('div');
+        popup.className = 'stack-popup';
+        popup.innerHTML = `
+            <div class="stack-popup-header">
+                <span>Call Stack (0 words)</span>
+                <button class="stack-popup-close" onclick="this.closest('.stack-popup').remove()">&times;</button>
+            </div>
+            <div class="stack-popup-content">
+                <div class="stack-empty">Stack is empty</div>
+            </div>
+        `;
+        document.body.appendChild(popup);
+        positionStackPopup(popup, targetElement);
+        return;
+    }
+    
+    // Build stack frame entries (3 words each: returnNIA, CR6, CR7)
+    let framesHtml = '';
+    callStack.forEach((frame, i) => {
+        const frameNum = callStack.length - i; // Reverse order (most recent first)
+        const cr6Name = frame.cr6 ? frame.cr6.name : 'NULL';
+        const cr6Perms = frame.cr6 && frame.cr6.perms ? `[${frame.cr6.perms.join('')}]` : '';
+        const cr7Name = frame.cr7 ? frame.cr7.name : 'NULL';
+        const cr7Perms = frame.cr7 && frame.cr7.perms ? `[${frame.cr7.perms.join('')}]` : '';
+        
+        framesHtml += `
+            <div class="stack-frame">
+                <div class="stack-frame-header">Frame ${frameNum}</div>
+                <div class="stack-word">
+                    <span class="stack-word-label">W0:</span>
+                    <span class="stack-word-name">returnNIA</span>
+                    <span class="stack-word-value">${frame.returnNIA}</span>
+                </div>
+                <div class="stack-word">
+                    <span class="stack-word-label">W1:</span>
+                    <span class="stack-word-name">CR6</span>
+                    <span class="stack-word-value">${cr6Name} ${cr6Perms}</span>
+                </div>
+                <div class="stack-word">
+                    <span class="stack-word-label">W2:</span>
+                    <span class="stack-word-name">CR7</span>
+                    <span class="stack-word-value">${cr7Name} ${cr7Perms}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    const popup = document.createElement('div');
+    popup.className = 'stack-popup';
+    popup.innerHTML = `
+        <div class="stack-popup-header">
+            <span>Call Stack (${callStack.length * 3} words)</span>
+            <button class="stack-popup-close" onclick="this.closest('.stack-popup').remove()">&times;</button>
+        </div>
+        <div class="stack-popup-content">
+            ${framesHtml}
+        </div>
+    `;
+    document.body.appendChild(popup);
+    positionStackPopup(popup, targetElement);
+    
+    // Close on click outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeStackPopup(e) {
+            if (!popup.contains(e.target) && !e.target.closest('#stackDepthRow') && !e.target.closest('#editorStackIndicator')) {
+                popup.remove();
+                document.removeEventListener('click', closeStackPopup);
+            }
+        });
+    }, 100);
+}
+
+function positionStackPopup(popup, targetElement) {
+    // Position near the clicked element
+    if (targetElement) {
+        const rect = targetElement.getBoundingClientRect();
+        popup.style.top = `${rect.bottom + 10}px`;
+        popup.style.left = `${Math.max(10, rect.left - 50)}px`;
+    } else {
+        popup.style.top = '100px';
+        popup.style.left = '50%';
+        popup.style.transform = 'translateX(-50%)';
+    }
+}
 
 // ==================== CAPABILITY EXPLORER ====================
 
@@ -2581,7 +2691,7 @@ FAULT             ; Uniform failure - triggers FirstFault`,
 
 ; Step 1: Save thread identity for audit log
 ; (CR8 contains thread GT - preserved for logging)
-; The Nucleus logs: WHO faulted, WHEN, WHERE (IP)
+; The Nucleus logs: WHO faulted, WHEN, WHERE (NIA)
 ; but NOT why - that would leak information
 
 ; Step 2: Clear all Data Registers
@@ -2610,7 +2720,7 @@ CHANGE 5 NULL     ; CR5 = NULL
 
 ; Step 4: Transfer to Nucleus fault handler
 ; The Nucleus will:
-;   - Log the fault (thread, time, IP only)
+;   - Log the fault (thread, time, NIA only)
 ;   - Optionally notify administrator
 ;   - Terminate or restart the thread
 ;   - Never reveal WHY it faulted
@@ -3347,7 +3457,7 @@ function restoreEditorPanelState() {
 function runProgram() {
     const code = document.getElementById('codeEditor').value;
     editorState.program = parseProgram(code);
-    editorState.pc = 0;
+    editorState.nia = 0;
     
     if (editorState.program.length === 0) {
         editorLog('No instructions to execute', 'error');
@@ -3359,10 +3469,10 @@ function runProgram() {
     editorLog('Running program...', 'info');
     simulator.softReset();
     
-    while (editorState.pc < editorState.program.length) {
-        const instr = editorState.program[editorState.pc];
+    while (editorState.nia < editorState.program.length) {
+        const instr = editorState.program[editorState.nia];
         const faultOccurred = executeEditorInstruction(instr);
-        editorState.pc++;
+        editorState.nia++;
         
         if (faultOccurred) {
             editorLog('*** HALTED: FAULT detected - investigate before continuing ***', 'error');
@@ -3387,7 +3497,7 @@ function stepProgram() {
     if (editorState.program.length === 0) {
         const code = document.getElementById('codeEditor').value;
         editorState.program = parseProgram(code);
-        editorState.pc = 0;
+        editorState.nia = 0;
         simulator.softReset();
         markEditorSaved();
         clearEditorConsole();
@@ -3395,14 +3505,14 @@ function stepProgram() {
         updateParsedView();
     }
     
-    if (editorState.pc >= editorState.program.length) {
+    if (editorState.nia >= editorState.program.length) {
         editorLog('Program completed', 'success');
         return;
     }
     
-    const instr = editorState.program[editorState.pc];
+    const instr = editorState.program[editorState.nia];
     const faultOccurred = executeEditorInstruction(instr);
-    editorState.pc++;
+    editorState.nia++;
     
     if (faultOccurred) {
         editorLog('*** FAULT detected - investigate before continuing ***', 'error');
@@ -3479,7 +3589,7 @@ function executeEditorInstruction(instr) {
                 if (simulator.checkCondition(cond)) {
                     const targetLine = findLabel(target);
                     if (targetLine >= 0) {
-                        editorState.pc = targetLine;
+                        editorState.nia = targetLine;
                         result = `Branch to ${target} (line ${targetLine})`;
                     } else {
                         result = `FAULT: Label '${target}' not found`;
@@ -3515,9 +3625,9 @@ function executeEditorInstruction(instr) {
                 if (simulator.checkCondition(cond)) {
                     const targetLine = findLabel(target);
                     if (targetLine >= 0) {
-                        simulator.setDataReg(14, BigInt(editorState.pc + 1));
-                        editorState.pc = targetLine;
-                        result = `Branch with link to ${target}, LR=${editorState.pc}`;
+                        simulator.setDataReg(14, BigInt(editorState.nia + 1));
+                        editorState.nia = targetLine;
+                        result = `Branch with link to ${target}, LR=${editorState.nia}`;
                     } else {
                         result = `FAULT: Label '${target}' not found`;
                         faultOccurred = true;
@@ -3588,7 +3698,7 @@ function findLabel(label) {
 
 function resetProgram(preserveLinkage = true) {
     editorState.program = [];
-    editorState.pc = 0;
+    editorState.nia = 0;
     currentExecutionLine = -1;
     simulator.softReset();
     
@@ -3628,9 +3738,10 @@ function setEditorCode(code, linkage, perms) {
 }
 
 function updateEditorStatus() {
-    document.getElementById('editorPC').textContent = editorState.pc;
+    document.getElementById('editorNIA').textContent = editorState.nia;
+    document.getElementById('editorStackDepth').textContent = `${simulator.stackDepth * 3}`;
     
-    const status = editorState.pc >= editorState.program.length ? 'Completed' : 'Running';
+    const status = editorState.nia >= editorState.program.length ? 'Completed' : 'Running';
     document.getElementById('editorStatus').textContent = status;
 }
 
@@ -3658,7 +3769,7 @@ function updateParsedView() {
     
     let html = '';
     editorState.program.forEach((p, i) => {
-        const current = i === editorState.pc ? 'current-line' : '';
+        const current = i === editorState.nia ? 'current-line' : '';
         html += `<div class="parsed-line ${current}">`;
         html += `<span class="parsed-addr">${i.toString().padStart(2, '0')}</span>`;
         html += `<span class="parsed-instr">${p.instr}</span> `;
@@ -3675,8 +3786,8 @@ function highlightCurrentLine() {
     
     // Find the source line number for the current instruction
     currentExecutionLine = -1;
-    if (editorState.program && editorState.program[editorState.pc]) {
-        currentExecutionLine = editorState.program[editorState.pc].line;
+    if (editorState.program && editorState.program[editorState.nia]) {
+        currentExecutionLine = editorState.program[editorState.nia].line;
     }
     
     // Highlight line number in the code editor gutter
@@ -3698,7 +3809,7 @@ function highlightCurrentLine() {
     
     // Highlight in parsed view
     parsed.querySelectorAll('.parsed-line').forEach((el, i) => {
-        const isCurrent = i === editorState.pc;
+        const isCurrent = i === editorState.nia;
         el.classList.toggle('current-line', isCurrent);
         if (isCurrent) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -6237,7 +6348,7 @@ countup:
 
 myFunction:
     ; ... function body ...
-    MOV PC, DR7          ; Return to caller</pre>
+    MOV DR15, DR7        ; Return to caller</pre>
                 </div>`
             }
         ]
@@ -6743,7 +6854,7 @@ function exportNamespaceState() {
             contextRegs: simulator.contextRegs,
             dataRegs: simulator.dataRegs,
             flags: simulator.flags,
-            ip: simulator.ip,
+            nia: simulator.nia,
             bootStep: simulator.bootStep
         }
     };
@@ -9608,7 +9719,7 @@ const turingInstrFormats = [
         name: "Branch",
         brief: "B, BL, BX",
         syntax: "B{cond} offset / BL{cond} offset",
-        desc: "PC-relative branch with optional link (subroutine call).",
+        desc: "NIA-relative branch with optional link (subroutine call).",
         format: [
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "101", bits: 3, value: "101", desc: "Branch ID" },

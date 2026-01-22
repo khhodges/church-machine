@@ -62,13 +62,13 @@
                             <span class="label">CR7 (Nucleus):</span>
                             <span id="cr7NameDisplay" class="value">NULL</span>
                         </div>
-                        <div class="state-row tooltip-bottom" data-tooltip="Instruction Pointer. Address of the next instruction to execute.">
-                            <span class="label">IP (Instruction Ptr):</span>
-                            <span id="ipValue" class="value">0</span>
+                        <div class="state-row tooltip-bottom" data-tooltip="Next Instruction Address. Offset of the next instruction to execute.">
+                            <span class="label">NIA:</span>
+                            <span id="niaValue" class="value">0</span>
                         </div>
-                        <div class="state-row tooltip-bottom" data-tooltip="Current call stack depth. Increases with CALL, decreases with RETURN.">
-                            <span class="label">Stack Depth:</span>
-                            <span id="stackDepth" class="value">0</span>
+                        <div class="state-row tooltip-bottom clickable" id="stackDepthRow" data-tooltip="Call stack depth (3 words per frame: returnNIA, CR6, CR7). Click to view stack contents.">
+                            <span class="label">Stack:</span>
+                            <span id="stackDepth" class="value">0 words</span>
                         </div>
                     </div>
                 </div>
@@ -379,7 +379,8 @@
                     <button onclick="toggleFullCode()" class="btn btn-sm btn-toggle btn-expand" id="toggleFullCode" data-tooltip="Expand code to full width">Expand</button>
                 </div>
                 <div class="toolbar-group toolbar-status">
-                    <span>PC: <strong id="editorPC">0</strong></span>
+                    <span>NIA: <strong id="editorNIA">0</strong></span>
+                    <span class="stack-indicator clickable" id="editorStackIndicator" data-tooltip="Click to view call stack">Stack: <strong id="editorStackDepth">0</strong></span>
                     <span id="editorStatus">Ready</span>
                 </div>
                 <div class="cr7-error" id="cr7Error" style="display:none;"></div>
@@ -670,7 +671,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
         </div>
     </div>
 
-    <script src="simulator.js?v=20260121q"></script>
-    <script src="app.js?v=20260122i"></script>
+    <script src="simulator.js?v=20260122a"></script>
+    <script src="app.js?v=20260122l"></script>
 </body>
 </html>

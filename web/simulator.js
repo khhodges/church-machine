@@ -16,7 +16,7 @@ class CTMMSimulator {
         
         this.cr15 = this.createNullCapability();
         this.cr8 = this.createNullCapability();
-        this.ip = 0;
+        this.nia = 0;
         this.stackDepth = 0;
         this.callStack = [];
         
@@ -30,7 +30,7 @@ class CTMMSimulator {
             this.dataRegs[i] = BigInt(0);
         }
         
-        this.ip = 0;
+        this.nia = 0;
         this.stackDepth = 0;
         this.callStack = [];
         
@@ -431,7 +431,7 @@ class CTMMSimulator {
             case "B": {
                 const [cond, offset] = args;
                 if (this.checkCondition(cond)) {
-                    this.ip = offset;
+                    this.nia = offset;
                     return `Branch${cond ? ' (' + cond + ')' : ''} taken to ${offset}`;
                 }
                 return `Branch${cond ? ' (' + cond + ')' : ''} not taken (condition false)`;
@@ -439,9 +439,9 @@ class CTMMSimulator {
             
             case "BL": {
                 const [offset] = args;
-                this.dataRegs[7] = BigInt(this.ip + 1);
-                this.ip = offset;
-                return `Branch with Link to ${offset}, return addr ${this.ip + 1} saved to DR7`;
+                this.dataRegs[7] = BigInt(this.nia + 1);
+                this.nia = offset;
+                return `Branch with Link to ${offset}, return addr ${this.nia + 1} saved to DR7`;
             }
             
             case "LOAD": {
@@ -531,7 +531,7 @@ class CTMMSimulator {
                 }
                 
                 this.callStack.push({
-                    returnPI: this.ip + 1,
+                    returnNIA: this.nia + 1,
                     cr6: this.contextRegs[6] ? { ...this.contextRegs[6] } : null,
                     cr7: this.contextRegs[7] ? { ...this.contextRegs[7] } : null,
                     boundGTs: []

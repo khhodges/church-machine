@@ -5128,3 +5128,126 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     color: var(--text-secondary);
     line-height: 1.4;
 }
+
+/* Stack Popup */
+.stack-popup {
+    position: fixed;
+    z-index: 2000;
+    background: var(--bg-panel);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    min-width: 280px;
+    max-width: 400px;
+    max-height: 60vh;
+    overflow: hidden;
+    animation: popupFadeIn 0.15s ease-out;
+}
+
+@keyframes popupFadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.stack-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-input);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.stack-popup-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0 0.25rem;
+    line-height: 1;
+}
+
+.stack-popup-close:hover {
+    color: var(--error);
+}
+
+.stack-popup-content {
+    padding: 0.5rem;
+    overflow-y: auto;
+    max-height: calc(60vh - 50px);
+}
+
+.stack-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.stack-frame {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    overflow: hidden;
+}
+
+.stack-frame:last-child {
+    margin-bottom: 0;
+}
+
+.stack-frame-header {
+    background: var(--bg-input);
+    padding: 0.4rem 0.75rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+}
+
+.stack-word {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+}
+
+.stack-word:last-child {
+    border-bottom: none;
+}
+
+.stack-word-label {
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+    min-width: 2rem;
+}
+
+.stack-word-name {
+    color: var(--warning);
+    font-weight: 500;
+    min-width: 5rem;
+}
+
+.stack-word-value {
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    flex: 1;
+}
+
+/* Stack indicator in Assembly Editor toolbar */
+.stack-indicator {
+    cursor: pointer;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.stack-indicator:hover {
+    background: var(--bg-input);
+    color: var(--accent);
+}
