@@ -6159,6 +6159,9 @@ myFunction:
                 </table>
                 <div class="key-concept">
                     <strong>Key Insight:</strong> Church indicators complement Turing flags - use <strong>NZCV</strong> for arithmetic/logic operations, <strong>P/B</strong> for capability validation before sensitive operations.
+                </div>
+                <div class="key-concept" style="border-color: var(--warning); margin-top: 0.5rem;">
+                    <strong>Important:</strong> When sharing unknown or untrusted data variables with an abstraction, always test them before use. Validate permissions with TPERM before passing capabilities to other code.
                 </div>`,
                 demo: `<div class="demo-title">Two Flag Sets in the CTMM</div>
                 <div class="demo-content">

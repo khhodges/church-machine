@@ -55,6 +55,7 @@ The web interface is composed of five distinct views:
 
 ## Recent Changes
 
+- 2026-01-22: Added warning to Tutorial Page 1 about testing unknown/untrusted data variables before sharing with abstractions
 - 2026-01-22: Added Church Indicators & TPERM tutorial: P/B flags, TPERM instruction, failsafe validation patterns
 - 2026-01-22: Added Branch Instructions tutorial: B/BL instructions, condition codes, loop patterns
 - 2026-01-22: M (Master) permission now grants authority for LOAD/SAVE operations (hardware-level access)
