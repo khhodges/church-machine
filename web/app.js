@@ -3178,8 +3178,20 @@ function setupCodeEditor() {
     
     // Load saved content and linkage from localStorage if available
     const savedContent = localStorage.getItem('ctmm_editor_content');
-    const savedLinkage = localStorage.getItem('ctmm_editor_linkage');
+    let savedLinkage = localStorage.getItem('ctmm_editor_linkage');
     const savedPerms = localStorage.getItem('ctmm_editor_perms');
+    
+    // Migrate old invalid linkages (e.g., Boot/Functions/GT_DATETIME -> Boot/DateTime/GT_DATETIME)
+    if (savedLinkage && savedLinkage.includes('/Functions/')) {
+        const funcMatch = savedLinkage.match(/\/Functions\/(GT_\w+|Abacus_GT_\w+)/);
+        if (funcMatch) {
+            const funcName = funcMatch[1];
+            const parentAbstraction = getParentAbstraction(funcName);
+            savedLinkage = `Boot/${parentAbstraction}/${funcName}`;
+            localStorage.setItem('ctmm_editor_linkage', savedLinkage);
+        }
+    }
+    
     if (savedContent) {
         editor.value = savedContent;
         savedEditorContent = savedContent;
