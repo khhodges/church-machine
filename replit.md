@@ -63,6 +63,9 @@ The web interface is composed of seven distinct views:
 
 ## Recent Changes
 
+- 2026-01-22: Added user authentication with Replit Auth - users can sign in, save/load their simulator state to server
+- 2026-01-22: Added PostgreSQL database for storing user accounts and simulator states
+- 2026-01-22: Flask backend replaces simple HTTP server - supports API endpoints for state persistence
 - 2026-01-22: Added Code Browser view with file tree, syntax highlighting, search, Go to Line, and Copy functionality
 - 2026-01-22: Click function names (GT_CREATE, GT_AREA, etc.) in Namespace Browser to load code and switch to Assembly view
 - 2026-01-22: Added GT_CREATE implementation code for CapabilityManager with correct permission encoding (Data=0x47, C-List=0x78)
