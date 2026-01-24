@@ -1,7 +1,7 @@
 import os
 import requests
-import resend
 import logging
+import resend
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +32,40 @@ def get_resend_credentials():
             },
             timeout=10
         )
-        data = response.json()
-        connection = data.get('items', [None])[0]
         
-        if connection and connection.get('settings'):
-            api_key = connection['settings'].get('api_key')
-            from_email = connection['settings'].get('from_email')
-            return api_key, from_email
+        if not response.ok:
+            logger.error(f"Resend connector request failed with status {response.status_code}")
+            return None, None
+        
+        try:
+            data = response.json()
+        except ValueError:
+            logger.error("Resend connector returned non-JSON response")
+            return None, None
+        
+        items = data.get('items', [])
+        if not items:
+            logger.warning("Resend connector returned no connections - check integration setup")
+            return None, None
+        
+        connection = items[0]
+        settings = connection.get('settings', {}) if connection else {}
+        
+        api_key = settings.get('api_key')
+        from_email = settings.get('from_email')
+        
+        if not api_key:
+            logger.warning("Resend API key not found in connector settings")
+            return None, None
+        if not from_email:
+            logger.warning("Resend from_email not found in connector settings")
+            return None, None
+            
+        return api_key, from_email
+    except requests.RequestException as e:
+        logger.error(f"Network error fetching Resend credentials: {e}")
     except Exception as e:
-        logger.error(f"Failed to get Resend credentials: {e}")
+        logger.error(f"Unexpected error fetching Resend credentials: {e}")
     
     return None, None
 

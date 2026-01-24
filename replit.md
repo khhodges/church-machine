@@ -63,6 +63,9 @@ The web interface is composed of seven distinct views:
 
 ## Recent Changes
 
+- 2026-01-24: Added welcome email for new user registration using Resend integration
+- 2026-01-24: email_service.py handles Resend API credentials via Replit connector with robust error handling
+- 2026-01-24: Welcome email includes Ken's custom message about CTMM, CLOOMC, and capability-based security
 - 2026-01-22: Added Lambda abstraction (NS offset 11, Boot C-List index 9): Church calculus primitives
 - 2026-01-22: Lambda C-List functions: Y_COMBINATOR, CHURCH_SUCC/PRED/ADD/MUL, PAIR/FST/SND, TRUE/FALSE/IF
 - 2026-01-22: Lambda enables recursion (Y-combinator), Church numerals, pairs for data structures, and booleans
