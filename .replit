@@ -37,3 +37,4 @@ run = ["gunicorn", "--bind=0.0.0.0:5000", "--reuse-port", "--chdir=web", "app:ap
 
 [nix]
 channel = "stable-25_05"
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
