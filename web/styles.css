@@ -5902,6 +5902,44 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     border: 1px solid var(--border);
 }
 
+.landing-books {
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg-panel);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    margin-bottom: 2rem;
+}
+
+.landing-books h2 {
+    color: var(--accent);
+    margin-bottom: 1rem;
+}
+
+.landing-books p {
+    color: var(--text-secondary);
+    margin-bottom: 1.5rem;
+}
+
+.books-link {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-input);
+    color: var(--accent);
+    text-decoration: none;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.books-link:hover {
+    background: var(--accent);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px var(--accent-glow);
+}
+
 .landing-cta {
     text-align: center;
     padding: 2rem;
