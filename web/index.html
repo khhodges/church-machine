@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260125m">
+    <link rel="stylesheet" href="styles.css?v=20260125n">
 </head>
 <body class="landing-mode">
     <div class="fixed-toolbar">
@@ -57,6 +57,8 @@
             <div class="landing-edit-controls" id="landingEditControls" style="display: none;">
                 <button class="btn btn-back-landing" onclick="exitLandingPageEditor()">Back to Simulator</button>
                 <div class="landing-edit-buttons" id="landingEditButtons">
+                    <button class="btn btn-link-landing" onclick="addLinkToSelection()" title="Add link to selected text">Add Link</button>
+                    <button class="btn btn-unlink-landing" onclick="removeLinkFromSelection()" title="Remove link from selected text">Remove Link</button>
                     <button class="btn btn-save-landing" onclick="saveLandingContent()">Save Changes</button>
                     <button class="btn btn-cancel-landing" onclick="cancelLandingEdit()">Discard Changes</button>
                 </div>
@@ -922,6 +924,6 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
     </div>
 
     <script src="simulator.js?v=20260122a"></script>
-    <script src="app.js?v=20260125f"></script>
+    <script src="app.js?v=20260125g"></script>
 </body>
 </html>

@@ -11243,6 +11243,52 @@ function removeEditable(container) {
     container.removeAttribute('contenteditable');
 }
 
+function addLinkToSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+        alert('Please select some text first');
+        return;
+    }
+    
+    const url = prompt('Enter the URL for this link:', 'https://');
+    if (!url || url === 'https://') {
+        return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    
+    try {
+        range.surroundContents(link);
+    } catch (e) {
+        alert('Cannot create link across multiple elements. Select text within a single paragraph.');
+    }
+}
+
+function removeLinkFromSelection() {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+        alert('Please select some text first');
+        return;
+    }
+    
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const link = container.nodeType === 3 ? container.parentElement.closest('a') : container.closest('a');
+    
+    if (link) {
+        const parent = link.parentNode;
+        while (link.firstChild) {
+            parent.insertBefore(link.firstChild, link);
+        }
+        parent.removeChild(link);
+    } else {
+        alert('No link found in selection');
+    }
+}
+
 function cancelLandingEdit() {
     const welcomeSection = document.getElementById('landingWelcome');
     const cloocmSection = document.getElementById('landingCloomc');

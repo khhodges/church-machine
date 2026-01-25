@@ -5993,6 +5993,35 @@ body.landing-mode .auth-section {
     border-color: var(--accent);
 }
 
+.btn-link-landing {
+    background: var(--accent);
+    color: var(--bg-main);
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-link-landing:hover {
+    background: var(--accent-hover);
+}
+
+.btn-unlink-landing {
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-unlink-landing:hover {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
 .landing-description.editing,
 .landing-examples.editing {
     outline: 2px dashed var(--accent);
