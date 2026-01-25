@@ -11236,19 +11236,11 @@ function toggleLandingEditMode() {
 }
 
 function makeEditable(container) {
-    const editableElements = container.querySelectorAll('h2, h3, p, strong, em, span, pre');
-    editableElements.forEach(el => {
-        if (!el.querySelector('h2, h3, p, strong, em, span, pre')) {
-            el.setAttribute('contenteditable', 'true');
-        }
-    });
+    container.setAttribute('contenteditable', 'true');
 }
 
 function removeEditable(container) {
-    const editableElements = container.querySelectorAll('[contenteditable]');
-    editableElements.forEach(el => {
-        el.removeAttribute('contenteditable');
-    });
+    container.removeAttribute('contenteditable');
 }
 
 function cancelLandingEdit() {
