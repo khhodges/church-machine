@@ -5746,15 +5746,9 @@ body.tooltip-hidden [data-tooltip]:hover::after {
 
 .landing-content {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
     gap: 2rem;
     margin-bottom: 3rem;
-}
-
-@media (max-width: 900px) {
-    .landing-content {
-        grid-template-columns: 1fr;
-    }
 }
 
 .landing-description {
