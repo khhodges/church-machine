@@ -2334,6 +2334,11 @@ main {
     margin-top: 1rem;
 }
 
+.tutorial-edit-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .btn-try {
     padding: 0.6rem 1.2rem;
     background: var(--bg-input);

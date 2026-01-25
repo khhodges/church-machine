@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
-    <link rel="stylesheet" href="styles.css?v=20260125y">
+    <link rel="stylesheet" href="styles.css?v=20260125z">
 </head>
 <body class="landing-mode">
     <div class="fixed-toolbar">
@@ -377,11 +377,13 @@ RETURN</pre>
                     </div>
                     
                     <div class="lesson-footer">
-                        <button onclick="saveTutorialEdits()" class="btn btn-save-tutorial" id="saveTutorialBtn" data-tooltip="Save your edits to this step">Save Edits</button>
-                        <button onclick="resetTutorialStep()" class="btn btn-reset-tutorial" id="resetTutorialBtn" data-tooltip="Reset this step to original content">Reset</button>
-                        <button onclick="exportAllTutorials()" class="btn btn-export-tutorial" id="exportTutorialBtn" data-tooltip="Export all tutorial edits to a file">Export All</button>
-                        <button onclick="document.getElementById('importTutorialFile').click()" class="btn btn-import-tutorial" id="importTutorialBtn" data-tooltip="Import tutorial edits from a file">Import</button>
-                        <input type="file" id="importTutorialFile" accept=".json" style="display:none" onchange="importAllTutorials(event)">
+                        <div id="tutorialEditButtons" class="tutorial-edit-buttons">
+                            <button onclick="saveTutorialEdits()" class="btn btn-save-tutorial" id="saveTutorialBtn" data-tooltip="Save your edits to this step">Save Edits</button>
+                            <button onclick="resetTutorialStep()" class="btn btn-reset-tutorial" id="resetTutorialBtn" data-tooltip="Reset this step to original content">Reset</button>
+                            <button onclick="exportAllTutorials()" class="btn btn-export-tutorial" id="exportTutorialBtn" data-tooltip="Export all tutorial edits to a file">Export All</button>
+                            <button onclick="document.getElementById('importTutorialFile').click()" class="btn btn-import-tutorial" id="importTutorialBtn" data-tooltip="Import tutorial edits from a file">Import</button>
+                            <input type="file" id="importTutorialFile" accept=".json" style="display:none" onchange="importAllTutorials(event)">
+                        </div>
                         <button onclick="tryInSimulator()" class="btn btn-try" id="tryBtn" data-tooltip="Open the simulator with this example">Try in Simulator</button>
                         <button onclick="completeLesson()" class="btn btn-complete" id="completeBtn" data-tooltip="Mark this lesson as completed">Mark Complete</button>
                     </div>

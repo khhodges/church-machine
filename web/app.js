@@ -11201,8 +11201,21 @@ async function checkEnvironment() {
                 editLandingBtn.style.display = 'block';
             }
         }
+        
+        updateTutorialEditButtonsVisibility();
     } catch (err) {
         console.error('Environment check failed:', err);
+    }
+}
+
+function updateTutorialEditButtonsVisibility() {
+    const tutorialEditButtons = document.getElementById('tutorialEditButtons');
+    if (tutorialEditButtons) {
+        if (!isDevelopmentMode || landingEditMode) {
+            tutorialEditButtons.style.display = 'none';
+        } else {
+            tutorialEditButtons.style.display = 'flex';
+        }
     }
 }
 
@@ -11221,6 +11234,7 @@ function showLandingPageEditor() {
     editControls.style.display = 'flex';
     
     toggleLandingEditMode();
+    updateTutorialEditButtonsVisibility();
 }
 
 function exitLandingPageEditor() {
@@ -11232,6 +11246,7 @@ function exitLandingPageEditor() {
     mainContent.style.display = 'block';
     editControls.style.display = 'none';
     document.body.classList.remove('landing-mode');
+    updateTutorialEditButtonsVisibility();
 }
 
 function showTutorialFromLanding() {
