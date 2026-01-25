@@ -5779,6 +5779,37 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     gap: 1.5rem;
 }
 
+.author-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg-panel);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+}
+
+.author-image {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+    box-shadow: 0 4px 15px rgba(0, 255, 136, 0.2);
+}
+
+.author-info h3 {
+    color: var(--accent);
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+}
+
+.author-info p {
+    color: var(--text-secondary);
+    margin: 0;
+    font-size: 0.9rem;
+}
+
 .landing-description {
     background: var(--bg-panel);
     padding: 2rem;
