@@ -1,6 +1,7 @@
 let savedEditorContent = '';
 let currentView = 'dashboard';
 let currentUser = null;
+let viewingTutorialFromLanding = false;
 
 // Track if editor has been initialized with default content
 let editorInitialized = false;
@@ -106,6 +107,18 @@ function switchView(viewId) {
     const activeBtn = document.getElementById(`viewBtn-${viewId}`);
     if (activeBtn) {
         activeBtn.classList.add('active');
+    }
+    
+    const backBtn = document.getElementById('tutorialBackToLanding');
+    if (backBtn) {
+        if (viewId === 'tutorial' && viewingTutorialFromLanding) {
+            backBtn.style.display = 'inline-block';
+        } else {
+            backBtn.style.display = 'none';
+            if (viewId !== 'tutorial') {
+                viewingTutorialFromLanding = false;
+            }
+        }
     }
     
     if (viewId === 'editor') {
@@ -11196,6 +11209,38 @@ function exitLandingPageEditor() {
     mainContent.style.display = 'block';
     editControls.style.display = 'none';
     document.body.classList.remove('landing-mode');
+}
+
+function showTutorialFromLanding() {
+    viewingTutorialFromLanding = true;
+    const landingPage = document.getElementById('landingPage');
+    const mainContent = document.getElementById('mainContent');
+    
+    landingPage.style.display = 'none';
+    mainContent.style.display = 'block';
+    document.body.classList.remove('landing-mode');
+    
+    switchView('tutorial');
+    
+    const backBtn = document.getElementById('tutorialBackToLanding');
+    if (backBtn) {
+        backBtn.style.display = 'inline-block';
+    }
+}
+
+function returnToLandingFromTutorial() {
+    viewingTutorialFromLanding = false;
+    const landingPage = document.getElementById('landingPage');
+    const mainContent = document.getElementById('mainContent');
+    
+    landingPage.style.display = 'block';
+    mainContent.style.display = 'none';
+    document.body.classList.add('landing-mode');
+    
+    const backBtn = document.getElementById('tutorialBackToLanding');
+    if (backBtn) {
+        backBtn.style.display = 'none';
+    }
 }
 
 async function loadLandingContent() {

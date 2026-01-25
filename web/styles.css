@@ -2053,6 +2053,22 @@ main {
     flex-wrap: wrap;
 }
 
+.btn-back-to-landing {
+    background: var(--bg-panel);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-back-to-landing:hover {
+    background: var(--accent);
+    color: white;
+}
+
 .lesson-title-select {
     font-size: 1.4rem;
     font-weight: bold;
@@ -5892,6 +5908,35 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     color: var(--text-secondary);
     margin-bottom: 1.5rem;
     font-size: 1.1rem;
+}
+
+.landing-cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-tutorial-landing {
+    display: inline-block;
+    padding: 1rem 2.5rem;
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 8px;
+    border: 2px solid var(--accent);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.btn-tutorial-landing:hover {
+    background: var(--accent);
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px var(--accent-glow);
 }
 
 .btn-register {

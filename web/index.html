@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260125n">
+    <link rel="stylesheet" href="styles.css?v=20260125o">
 </head>
 <body class="landing-mode">
     <div class="fixed-toolbar">
@@ -174,9 +174,14 @@ RETURN</pre>
             
             <div class="landing-cta">
                 <p>Sign in to access the full CTMM Simulator with interactive debugging, namespace exploration, and assembly programming.</p>
-                <a href="/auth/replit_auth" class="btn btn-register">
-                    Sign In to Get Started
-                </a>
+                <div class="landing-cta-buttons">
+                    <button onclick="showTutorialFromLanding()" class="btn btn-tutorial-landing">
+                        View Tutorial
+                    </button>
+                    <a href="/auth/replit_auth" class="btn btn-register">
+                        Sign In to Get Started
+                    </a>
+                </div>
                 <p class="landing-note">Join the CTMM Open Source community and explore capability-based security.</p>
             </div>
         </div>
@@ -323,6 +328,7 @@ RETURN</pre>
             <div class="tutorial-layout">
                 <div class="tutorial-main">
                     <div class="lesson-header">
+                        <button id="tutorialBackToLanding" class="btn btn-back-to-landing" onclick="returnToLandingFromTutorial()" style="display: none;">← Back to Landing</button>
                         <select id="lessonSelect" class="lesson-title-select" onchange="loadLesson(parseInt(this.value))">
                             <option value="0">1. Introduction to Capabilities</option>
                             <option value="1">2. Golden Token Structure</option>
@@ -924,6 +930,6 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
     </div>
 
     <script src="simulator.js?v=20260122a"></script>
-    <script src="app.js?v=20260125g"></script>
+    <script src="app.js?v=20260125i"></script>
 </body>
 </html>

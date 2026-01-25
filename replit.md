@@ -37,108 +37,23 @@ The web interface is composed of seven distinct views:
 4.  **Capabilities Explorer**: Detailed view of Golden Token structure, interactive editing of bit fields, and live MAC validation. Includes Context Register buttons for quick access to GT details.
 5.  **Instructions**: ARM binary format design reference with visual bit-field diagrams for Church and Turing instructions.
 6.  **Tutorial**: Interactive lessons explaining CTMM concepts, Golden Tokens, permissions, and guided examples.
-7.  **Code Browser**: Source code viewer with file tree panel, syntax highlighting for JS/CSS/HTML/Python, line numbers, search, and navigation tools.
+7.  **Code Browser**: Source code viewer with file tree panel, syntax highlighting, line numbers, search, and navigation tools.
 
 ### Key Features
 
 -   **Built-in Abstractions**: Includes `Boot` (root namespace), `Threads` (user identities), `SlideRule` (IEEE 754 float operations), `Abacus` (64-bit integer operations), `Circle` (geometric calculations), `CapabilityManager` (GT creation), `DateTime` (ISO 8601 date/time), and `Lambda` (Church calculus primitives).
--   **CapabilityManager Abstraction**: Creates new Golden Tokens for objects.
-    -   **Namespace Position**: Offset 9, child of Boot, sibling to other abstractions
-    -   **Boot C-List Entry**: [E] permission (Enter only)
-    -   **API**: DR0 = type (0=Data, 1=C-List), DR1 = size in words
-    -   **Output**: CR0 = new Golden Token with full type-appropriate permissions + Bind
-    -   **Returned Permissions**: Data type returns [R,W,X,B], C-List type returns [L,S,E,B]
+-   **CapabilityManager Abstraction**: Creates new Golden Tokens for objects with specific permissions.
 -   **Instruction Set**: Comprehensive set of Church-specific (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM) and Turing-specific (Arithmetic, Logic, Shifts, Compare, Branch) instructions.
 -   **Condition Codes**: ARM-style condition flags for conditional execution.
--   **State Persistence**: Automatic saving and restoring of simulator state using local storage.
--   **Export/Import**: Functionality to export and import the complete simulator state as a JSON file.
+-   **State Persistence**: Automatic saving and restoring of simulator state using local storage, with export/import functionality.
 -   **Permission Management**: Permission validation rules are implemented, defining categories (Data, Capability, Protected, Meta) and ensuring normalization across all mutation paths.
--   **Failsafe Security**: All validation failures use single FAULT handler - no error codes, no information leakage. Access.asm validates inputs, FirstFault.asm handles all failures uniformly.
+-   **Failsafe Security**: All validation failures use a single FAULT handler for secure error management without information leakage.
 
 ## External Dependencies
 
 -   **Python HTTP Server**: Serves the web interface files.
 -   **Haskell GHC**: For the console-based simulator backend.
 -   **`localStorage`**: Browser API used for client-side state persistence.
-
-## Recent Changes
-
-- 2026-01-25: Added landing page editing feature - authenticated users in development mode can edit and save landing page content
-- 2026-01-25: Landing page content stored in database (LandingPageContent table) with HTML sanitization for XSS protection
-- 2026-01-25: Edit Landing Page option in user menu (only visible in development mode, disabled in production)
-- 2026-01-25: Responsive landing page tiles using CSS Grid auto-fit for automatic screen width adjustment
-- 2026-01-25: Added landing/registration page for unauthenticated users with CTMM description and Lambda Calculus examples
-- 2026-01-25: Landing page requires sign-in to access simulator, hiding navigation buttons until authenticated
-- 2026-01-25: Added three-dot dropdown menu for logged-in users (Save State, Load State, Sign Out)
-- 2026-01-24: Added welcome email for new user registration using Resend integration
-- 2026-01-24: email_service.py handles Resend API credentials via Replit connector with robust error handling
-- 2026-01-24: Welcome email includes Ken's custom message about CTMM, CLOOMC, and capability-based security
-- 2026-01-22: Added Lambda abstraction (NS offset 11, Boot C-List index 9): Church calculus primitives
-- 2026-01-22: Lambda C-List functions: Y_COMBINATOR, CHURCH_SUCC/PRED/ADD/MUL, PAIR/FST/SND, TRUE/FALSE/IF
-- 2026-01-22: Lambda enables recursion (Y-combinator), Church numerals, pairs for data structures, and booleans
-- 2026-01-22: Assembly Editor file dropdown: replaced static filename with dropdown of all namespace code files (Turing examples, Lambda examples, GT_* functions)
-- 2026-01-22: Added DateTime abstraction (NS offset 10, Boot C-List index 8): ISO 8601 date/time with modes for timestamp, date, time, epoch, and components
-- 2026-01-22: DateTime API: DR0=mode (0=ISO, 1=Date, 2=Time, 3=Unix epoch, 4=Components) returns DR1-DR6 for components
-- 2026-01-22: Added DateTime example button in Assembly Editor demonstrating epoch and component retrieval
-- 2026-01-22: Added user authentication with Replit Auth - users can sign in, save/load their simulator state to server
-- 2026-01-22: Added PostgreSQL database for storing user accounts and simulator states
-- 2026-01-22: Flask backend replaces simple HTTP server - supports API endpoints for state persistence
-- 2026-01-22: Added Code Browser view with file tree, syntax highlighting, search, Go to Line, and Copy functionality
-- 2026-01-22: Click function names (GT_CREATE, GT_AREA, etc.) in Namespace Browser to load code and switch to Assembly view
-- 2026-01-22: Added GT_CREATE implementation code for CapabilityManager with correct permission encoding (Data=0x47, C-List=0x78)
-- 2026-01-22: Added CapMgr example button to Assembly Editor demonstrating object creation with failsafe TPERM validation
-- 2026-01-22: Combined "Flags & Stack" panel merges condition flags and call stack into single tile
-- 2026-01-22: Condition Flags (NZCV + P/B) now update after each instruction step
-- 2026-01-22: Renamed IP/PC to NIA (Next Instruction Address) throughout simulator and UI
-- 2026-01-22: Stack depth now shows word count (x3 per frame: returnNIA, CR6, CR7)
-- 2026-01-22: Added Common Mask Patterns table to "14-Bit API Boundary" tutorial step with 5 pattern examples
-- 2026-01-22: Added CALL/RETURN mask setup code examples to tutorial: MOV/LSL/ORR pattern, common mask patterns
-- 2026-01-22: CALL/RETURN instructions now have 14-bit register mask fields (8 bits DR0-7 + 6 bits CR0-5) to prevent information leakage
-- 2026-01-22: DR8-15 always cleared on CALL/RETURN (never used for API), CR6-7 fixed by Lambda Calculus
-- 2026-01-22: Added "CALL/RETURN Register Masks" and "14-Bit API Boundary" tutorial steps to Failsafe Security lesson
-- 2026-01-22: Instructions view now displays security notes for CALL/RETURN with lock icon
-- 2026-01-22: Added warning to Tutorial Page 1 about testing unknown/untrusted data variables before sharing with abstractions
-- 2026-01-22: Added Church Indicators & TPERM tutorial: P/B flags, TPERM instruction, failsafe validation patterns
-- 2026-01-22: Added Branch Instructions tutorial: B/BL instructions, condition codes, loop patterns
-- 2026-01-22: M (Master) permission now grants authority for LOAD/SAVE operations (hardware-level access)
-- 2026-01-22: FAULT messages now identify Source/Dest for permission errors
-- 2026-01-21: Enhanced TPERM instruction with index validation against object W2 limit (namespace metadata size)
-- 2026-01-21: TPERM syntax now: TPERM CRs, permMask [, index] - sets Z=1 if all pass, C=perms OK, V=bounds OK
-- 2026-01-21: Assembly Editor now displays hardware registers (CR0-CR7, DR0-DR15, NZCV flags) matching Dashboard layout
-- 2026-01-21: Register panel updates live during Step/Run execution
-- 2026-01-21: DR values show last 8 hex digits with full 16-digit tooltip on hover
-- 2026-01-21: CR6/CR7 show role labels (C-List/Nucleus) for quick identification
-- 2026-01-21: Removed all illegal RLE permission combinations from codebase
-- 2026-01-21: C-List entries for abstractions now start with [E] only, M appended after successful CALL
-- 2026-01-21: CALL instruction updated to append M permission to nodal C-List automatically
-- 2026-01-20: Updated Church instructions to 6 + TPERM format per user specification
-- 2026-01-20: LOAD requires L (Load) permission, SAVE requires S (Save) on dest + B (Bind) on source
-- 2026-01-20: CALL requires E (Enter), adds Mask field clearing, loads CR6 (nodal C-List) + CR7 (Access Code)
-- 2026-01-20: RETURN restores CR6/CR7, surrenders bound GTs automatically
-- 2026-01-20: All error messages changed to FAULT (failsafe pattern - no information leakage)
-- 2026-01-20: Added callStack for proper CALL/RETURN frame management
-- 2026-01-20: Added Export/Import buttons for tutorial edits in Tutorial footer
-- 2026-01-21: Removed all MINT instruction references from codebase (6 Church instructions + TPERM only)
-- 2026-01-19: Added Church Instructions Deep Dive tutorial: comprehensive explanations for Church instructions
-- 2026-01-19: Added Failsafe Security tutorial: information leakage, single failure mode, Access.asm, FirstFault.asm
-- 2026-01-19: Added Access.asm and FirstFault.asm examples demonstrating failsafe validation pattern
-- 2026-01-19: Fixed all code examples to use FAULT instead of error codes (capcheck, ycombinator, tutorials)
-- 2026-01-19: Added Remote Golden Tokens tutorial: F bit, URL paging, remote proxy abstractions, security/performance
-- 2026-01-19: Added Performance Benefits tutorial: GT validation overhead, Y-Combinator recursion, Church encodings, capability caching
-- 2026-01-19: Added Example Programs tutorial: Counter, Fibonacci, Multiply, Y-Combinator, Factorial, Capability Validation
-- 2026-01-19: Added Assembly Editor tutorial: Editor interface, syntax, Turing/Lambda examples, running programs
-- 2026-01-19: Added Lambda Combinators tutorial: Church Booleans, Church Numerals, Y-Combinator, Pairs
-- 2026-01-19: LOAD/SAVE add I bit for immediate (0-8191) vs register addressing, Index field now 13 bits
-- 2026-01-19: All Church instruction descriptions now purely mechanistic - no policy language
-- 2026-01-19: SWITCH/CHANGE have Mode bit for direct vs C-List lookup addressing
-- 2026-01-19: Bit fields have hover tooltips explaining each field's purpose and encoding
-- 2026-01-18: Instructions page redesigned as ARM binary format design reference with visual bit-field diagrams
-- 2026-01-18: Each instruction shows 32-bit encoding with field names, bit positions, widths, and variants
-- 2026-01-18: Church instructions: LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM with binary formats
-- 2026-01-18: Turing instructions: Data Processing, Multiply, Branch, Load/Store, Shift with ARM-style encoding
-- 2026-01-18: Added Instructions view with Church/Turing tabs and hover tooltips
-- 2026-01-18: Comprehensive permission validation: M clears software perms, Data/Capability mutually exclusive
-- 2026-01-18: Boot C-List corrected: Access=[X], Threads=[M], Abstractions=[E,B]
-- 2026-01-18: Added math type documentation with visual badges: Abacus [INTEGER], SlideRule [FLOAT], Circle [GEOMETRY]
-- 2026-01-18: Enhanced tooltips explain CALL usage for integer vs float operations
-- 2026-01-18: Added "Capability-Based Math" step to Tutorial explaining how CALL determines math type
+-   **PostgreSQL**: Database for storing user accounts and simulator states.
+-   **Replit Auth**: For user authentication.
+-   **Resend**: For sending welcome emails on user registration.
