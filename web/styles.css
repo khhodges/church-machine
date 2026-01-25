@@ -5666,11 +5666,11 @@ body.tooltip-hidden [data-tooltip]:hover::after {
     top: 100%;
     right: 0;
     margin-top: 0.5rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    background: #1e3a5f;
+    border: 1px solid #2a4a6f;
     border-radius: 6px;
     min-width: 140px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     z-index: 1000;
     overflow: hidden;
 }
@@ -5695,7 +5695,7 @@ body.tooltip-hidden [data-tooltip]:hover::after {
 
 .user-dropdown-menu button:hover,
 .user-dropdown-menu a:hover {
-    background: var(--bg-tertiary);
+    background: #2a5080;
 }
 
 .user-dropdown-menu hr {
