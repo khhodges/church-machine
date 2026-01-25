@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
-    <link rel="stylesheet" href="styles.css?v=20260125w">
+    <link rel="stylesheet" href="styles.css?v=20260125x">
 </head>
 <body class="landing-mode">
     <div class="fixed-toolbar">
@@ -22,6 +22,7 @@
                     <button onclick="switchView('code')" class="btn btn-view tooltip-bottom" id="viewBtn-code" data-tooltip="Browse simulator source code">Code</button>
                 </div>
                 <div class="header-right">
+                    <button id="tutorialBackToLanding" class="btn btn-back-to-landing" onclick="returnToLandingFromTutorial()" style="display: none;">← Back to Landing</button>
                     <div id="authSection" class="auth-section">
                         <div id="authLoading" class="auth-loading">Loading...</div>
                         <div id="authLoggedOut" class="auth-logged-out" style="display: none;">
@@ -343,7 +344,6 @@ RETURN</pre>
             <div class="tutorial-layout">
                 <div class="tutorial-main">
                     <div class="lesson-header">
-                        <button id="tutorialBackToLanding" class="btn btn-back-to-landing" onclick="returnToLandingFromTutorial()" style="display: none;">← Back to Landing</button>
                         <select id="lessonSelect" class="lesson-title-select" onchange="loadLesson(parseInt(this.value))">
                             <option value="0">1. Introduction to Capabilities</option>
                             <option value="1">2. Golden Token Structure</option>

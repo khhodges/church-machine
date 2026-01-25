@@ -11249,6 +11249,12 @@ function showTutorialFromLanding() {
     if (backBtn) {
         backBtn.style.display = 'inline-block';
     }
+    
+    const tutorialSection = document.getElementById('tutorial');
+    if (tutorialSection) {
+        tutorialSection.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
 }
 
 function returnToLandingFromTutorial() {
