@@ -129,7 +129,7 @@ The LOAD instruction (`LOAD CRd, [CRn + Index]`) fetches a capability from a C-L
 | 6    | FETCH_W2      | Fetch W2 (Limit) from Namespace                  |
 | 7    | FETCH_W3      | Fetch W3 (Seals/MAC) from Namespace              |
 | 8    | CHECK_MAC     | Validate MAC (calculated hash vs Seals)          |
-| 9    | RESET_G       | Reset G bit on GT                                |
+| 9    | RESET_G       | Reset G bit in CR15[GT.offset].Word3.Gbit        |
 | 10   | WRITE_DST     | Write all 4 words to destination CRd             |
 | 11   | COMPLETE      | Advance NIA, instruction complete                |
 

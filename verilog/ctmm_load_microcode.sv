@@ -13,7 +13,7 @@
 //   Step 6: Fetch Word 2 (Limit) from Namespace
 //   Step 7: Fetch Word 3 (Seals) from Namespace
 //   Step 8: Validate MAC (calculated hash vs Seals)
-//   Step 9: Reset G bit
+//   Step 9: Reset G bit in CR15[GT.offset].Word3.Gbit
 //   Step 10: Write all 4 words to destination CRd
 //   Step 11: Advance NIA, instruction complete
 // Each step takes 1 clock cycle (synchronous memory assumed)
@@ -53,9 +53,9 @@ module ctmm_load_microcode
     input  logic [63:0] ns_rd_data,           // Read data (one 64-bit word)
     input  logic        ns_rd_valid,          // Read data valid
     
-    // G bit reset interface
+    // G bit reset interface - resets G bit in CR15[GT.offset].Word3.Gbit
     output logic        g_bit_reset,          // Signal to reset G bit in namespace
-    output logic [31:0] g_bit_ns_offset       // Namespace offset for G bit reset
+    output logic [63:0] g_bit_ns_addr         // Address: CR15.Location + GT.offset*24 + 16 (Word3)
 );
 
     // ========================================================================
@@ -434,8 +434,8 @@ module ctmm_load_microcode
                       (state == LOAD_FETCH_W2) ||
                       (state == LOAD_FETCH_W3);
     
-    // G bit reset output
+    // G bit reset output - writes to CR15[GT.offset].Word3.Gbit
     assign g_bit_reset = (state == LOAD_RESET_G);
-    assign g_bit_ns_offset = dst_cap.word0_gt.offset;
+    assign g_bit_ns_addr = ns_entry_addr + 64'd16;  // Word3 address in namespace
 
 endmodule
