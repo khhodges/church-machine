@@ -5,18 +5,16 @@
 //   LOAD CRd, [CRn + Index]
 //
 // Microcode Sequence:
-//   Step 1: Fetch source CR (CRn) - read all 4 words
-//   Step 2: Check L permission on CRn.Word0 (Golden Token)
-//   Step 3: Calculate memory address: CRn.Location + (Index * 32 bytes)
-//   Step 4: Check bounds: Index < CRn.Limit
-//   Step 5: Fetch Word 0 (GT) from C-List memory
-//   Step 6: Fetch Word 1 (Location) from C-List memory
-//   Step 7: Fetch Word 2 (Limit) from C-List memory  
-//   Step 8: Fetch Word 3 (Seals) from C-List memory
-//   Step 9: Validate MAC (calculated hash vs Seals)
-//   Step 10: Reset G bit if namespace access (M or L permission set)
-//   Step 11: Write all 4 words to destination CRd
-//   Step 12: Advance NIA, instruction complete
+//   Step 1: Check CRn has M or L permission; if valid, CRd.Word1 = CRn.Location + Index
+//   Step 2: Check bounds: Index < CRn.Limit
+//   Step 3: Fetch Word 0 (GT) from C-List memory at CRd.Word1
+//   Step 4: Fetch Word 1 (Location) from C-List memory
+//   Step 5: Fetch Word 2 (Limit) from C-List memory  
+//   Step 6: Fetch Word 3 (Seals) from C-List memory
+//   Step 7: Validate MAC (calculated hash vs Seals)
+//   Step 8: Reset G bit if namespace access (M or L permission set)
+//   Step 9: Write all 4 words to destination CRd
+//   Step 10: Advance NIA, instruction complete
 //
 // Each step takes 1 clock cycle (synchronous memory assumed)
 // ============================================================================
@@ -74,10 +72,6 @@ module ctmm_load_microcode
     // Fetched destination capability (from C-List memory)
     capability_reg_t fetched_cap;
     
-    // Calculated address for C-List access
-    logic [63:0] clist_base_addr;
-    logic [63:0] entry_addr;
-    
     // ========================================================================
     // State Register
     // ========================================================================
@@ -119,29 +113,36 @@ module ctmm_load_microcode
     end
     
     // ========================================================================
-    // Address Calculation (Step 3)
+    // Step 1: CRd.Word1 = CRn.Location + Index
+    // This is the computed location stored in CRd after permission check
     // ========================================================================
     
-    // C-List base address from CRn.Word1 (Location)
-    assign clist_base_addr = src_cap.word1_location;
-    
-    // Entry address = Base + (Index * 32 bytes per capability)
-    // Each capability is 4 x 64-bit = 32 bytes
-    assign entry_addr = clist_base_addr + ({56'h0, index_reg} << 5);
+    // Memory fetch starts at computed_location (defined in next state logic)
+    // Each word is 8 bytes, so fetch addresses are:
+    //   Word 0: computed_location
+    //   Word 1: computed_location + 8
+    //   Word 2: computed_location + 16
+    //   Word 3: computed_location + 24
     
     // ========================================================================
     // Memory Fetch State Machine
     // ========================================================================
     
     logic [1:0] word_counter;  // Which word we're fetching (0-3)
+    logic [63:0] fetch_base_addr;  // Latched base address for fetching
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             word_counter <= 2'd0;
             fetched_cap <= CR_NULL;
+            fetch_base_addr <= 64'h0;
         end else begin
             case (state)
-                LOAD_CALC_ADDR: begin
+                LOAD_CHECK_L: begin
+                    // Latch the computed location when permission check passes
+                    if (has_load_permission && !src_is_null) begin
+                        fetch_base_addr <= computed_location;
+                    end
                     word_counter <= 2'd0;
                     fetched_cap <= CR_NULL;
                 end
@@ -228,6 +229,10 @@ module ctmm_load_microcode
     // Next State Logic
     // ========================================================================
     
+    // Computed address for CRd.Word1 = CRn.Location + Index
+    logic [63:0] computed_location;
+    assign computed_location = src_cap.word1_location + {56'h0, index_reg};
+    
     always_comb begin
         next_state = state;
         
@@ -237,8 +242,9 @@ module ctmm_load_microcode
                     next_state = LOAD_FETCH_SRC;
             end
             
+            // Step 1: Read CRn and check M or L permission
+            // If valid, CRd.Word1 = CRn.Location + Index
             LOAD_FETCH_SRC: begin
-                // Source register read takes 1 cycle (synchronous)
                 next_state = LOAD_CHECK_L;
             end
             
@@ -246,15 +252,12 @@ module ctmm_load_microcode
                 if (src_is_null)
                     next_state = LOAD_FAULT;  // Null capability fault
                 else if (!has_load_permission)
-                    next_state = LOAD_FAULT;  // L or M permission required
+                    next_state = LOAD_FAULT;  // M or L permission required
                 else
-                    next_state = LOAD_CALC_ADDR;
+                    next_state = LOAD_CHECK_BOUNDS;  // Permission OK, address computed
             end
             
-            LOAD_CALC_ADDR: begin
-                next_state = LOAD_CHECK_BOUNDS;
-            end
-            
+            // Step 2: Check bounds (Index < CRn.Limit)
             LOAD_CHECK_BOUNDS: begin
                 if (!bounds_ok)
                     next_state = LOAD_FAULT;  // Bounds check failed
@@ -379,8 +382,9 @@ module ctmm_load_microcode
     assign cr_wr_en = (state == LOAD_WRITE_DST);
     
     // Memory interface
-    // Address is entry_addr + (word_counter * 8 bytes)
-    assign mem_addr = entry_addr + ({62'h0, word_counter} << 3);
+    // Address is fetch_base_addr + (word_counter * 8 bytes)
+    // fetch_base_addr = CRn.Location + Index (computed in Step 1)
+    assign mem_addr = fetch_base_addr + ({62'h0, word_counter} << 3);
     
     assign mem_rd_en = (state == LOAD_FETCH_W0) ||
                        (state == LOAD_FETCH_W1) ||

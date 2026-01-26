@@ -121,18 +121,16 @@ The LOAD instruction (`LOAD CRd, [CRn + Index]`) fetches a capability from a C-L
 
 | Step | State         | Description                                      |
 |------|---------------|--------------------------------------------------|
-| 1    | FETCH_SRC     | Read source CR (CRn) - all 4 words               |
-| 2    | CHECK_L       | Verify L or M permission on CRn (required to store GT in CRd) |
-| 3    | CALC_ADDR     | Calculate address: CRn.Location + (Index * 32)   |
-| 4    | CHECK_BOUNDS  | Verify Index < CRn.Limit                         |
-| 5    | FETCH_W0      | Fetch Word 0 (GT) from C-List memory             |
-| 6    | FETCH_W1      | Fetch Word 1 (Location) from memory              |
-| 7    | FETCH_W2      | Fetch Word 2 (Limit) from memory                 |
-| 8    | FETCH_W3      | Fetch Word 3 (Seals/MAC) from memory             |
-| 9    | CHECK_MAC     | Validate MAC (calculated hash vs Seals)          |
-| 10   | RESET_G       | Reset G bit if namespace access (M or L set)     |
-| 11   | WRITE_DST     | Write all 4 words to destination CRd             |
-| 12   | COMPLETE      | Advance NIA, instruction complete                |
+| 1    | CHECK_L       | Check CRn has M or L permission; if valid, CRd.Word1 = CRn.Location + Index |
+| 2    | CHECK_BOUNDS  | Verify Index < CRn.Limit                         |
+| 3    | FETCH_W0      | Fetch Word 0 (GT) from memory at CRd.Word1       |
+| 4    | FETCH_W1      | Fetch Word 1 (Location) from memory              |
+| 5    | FETCH_W2      | Fetch Word 2 (Limit) from memory                 |
+| 6    | FETCH_W3      | Fetch Word 3 (Seals/MAC) from memory             |
+| 7    | CHECK_MAC     | Validate MAC (calculated hash vs Seals)          |
+| 8    | RESET_G       | Reset G bit if namespace access (M or L set)     |
+| 9    | WRITE_DST     | Write all 4 words to destination CRd             |
+| 10   | COMPLETE      | Advance NIA, instruction complete                |
 
 **Fault Conditions:**
 - NULL capability access → FAULT_NULL_CAP
