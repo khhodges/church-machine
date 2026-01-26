@@ -50,6 +50,20 @@ The web interface is composed of seven distinct views:
 -   **Failsafe Security**: All validation failures use a single FAULT handler for secure error management without information leakage.
 -   **Deterministic Garbage Collection**: The G (Garbage) permission bit enables deterministic GC by marking entries during collection cycles. When a valid key accesses a Namespace entry via LOAD, the G bit is reset to FALSE. The "GC Scan" button in the Namespace Browser runs a full Mark-Scan-Sweep cycle over the DNA hierarchy.
 
+## Verilog Hardware Implementation
+
+The `verilog/` directory contains a synthesizable SystemVerilog implementation of the CTMM architecture:
+
+-   **ctmm_pkg.sv**: Package with Golden Token structure, 10 permission bits (R,W,X,L,S,E,B,M,F,G), opcodes, condition codes, fault types, and boot states
+-   **ctmm_registers.sv**: Register file implementing CR0-CR15 (context/capability) and DR0-DR15 (data) with special registers for Namespace (CR15), Thread (CR8), C-List (CR6), and Nucleus (CR7)
+-   **ctmm_perm_check.sv**: Hardware permission validation with bounds checking, MAC validation, and G bit detection for namespace access
+-   **ctmm_gc_unit.sv**: Garbage collection unit implementing Mark-Scan-Sweep phases with G bit state machine
+-   **ctmm_decoder.sv**: Instruction decoder for Church (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM) and Turing (arithmetic, logic, branch) instructions with ARM-style condition code evaluation
+-   **ctmm_core.sv**: Top-level processor core integrating all components with boot sequence state machine
+-   **ctmm_tb.sv**: Testbench for verification
+
+The hardware captures the architectural concepts; a full execution pipeline would be expanded for production silicon.
+
 ## External Dependencies
 
 -   **Python HTTP Server**: Serves the web interface files.
