@@ -17,7 +17,8 @@ The CTMM hardware implements failsafe security through Golden Tokens (64-bit cap
 verilog/
 ├── ctmm_pkg.sv           # Package with types, constants, and definitions
 ├── ctmm_registers.sv     # Register file (18 x 256-bit CRs, 16 x 64-bit DRs)
-├── ctmm_load_microcode.sv # LOAD instruction microcode sequencer
+├── ctmm_mload.sv         # mLoad micro-routine (shared trusted code)
+├── ctmm_load.sv          # LOAD Church-Instruction (uses mLoad)
 ├── ctmm_perm_check.sv    # Permission checking unit
 ├── ctmm_gc_unit.sv       # Garbage collection unit with G bit
 ├── ctmm_decoder.sv       # Instruction decoder
@@ -115,28 +116,28 @@ Word 3: Seals/MAC (64 bits)
 3. **INIT_THRD**: Initialize thread identity in CR8
 4. **LOAD_NUC**: Load CR6 (Boot C-List) and CR7 (Nucleus)
 
-## LOAD Subroutine - Shared Trusted Microcode
+## mLoad Micro-Routine - Shared Trusted Code
 
-The LOAD subroutine (`ctmm_load_subroutine.sv`) is the **intended single trusted microcode** for all capability fetching. This minimizes the Trusted Computing Base (TCB) - Church instructions that need to fetch capabilities will share this verified code:
+The mLoad micro-routine (`ctmm_mload.sv`) is the **single trusted microcode** for all capability fetching. This minimizes the Trusted Computing Base (TCB) - all Church CLOOMC instructions that need to fetch capabilities share this verified code:
 
-| Instruction | Uses LOAD Subroutine For | Status |
-|-------------|--------------------------|--------|
+| Instruction | Uses mLoad For | Status |
+|-------------|----------------|--------|
 | **LOAD**    | Fetch capability into destination register | Implemented |
 | **CALL**    | Fetch procedure capability, then transfer control | Planned |
 | **RETURN**  | Fetch return capability from stack | Planned |
 | **CHANGE**  | Fetch new thread identity into CR8 | Planned |
 | **SWITCH**  | Fetch new namespace capability into CR15 | Planned |
 
-### Subroutine Interface
+### mLoad Interface
 
 ```systemverilog
 // Caller provides:
-input  sub_start,           // Start subroutine
+input  sub_start,           // Start mLoad
 input  sub_cr_src,          // Source register (CRn)
 input  sub_cr_dst,          // Destination register (CRd) - written directly
 input  sub_index,           // C-List index
 
-// Subroutine signals:
+// mLoad signals:
 output sub_done,            // Completed successfully
 output sub_fault,           // Caused a fault
 
@@ -146,16 +147,16 @@ output cr_wr_data,          // Fetched capability with G bit cleared
 output cr_wr_en,            // Write enable (on completion)
 ```
 
-**Key Optimization:** The subroutine writes directly to the destination register, avoiding a second bus transfer through the caller. Each Church instruction just specifies the destination:
+**Key Optimization:** mLoad writes directly to the destination register, avoiding a second bus transfer through the caller. Each Church instruction just specifies its destination:
 - **LOAD**: User-specified CRd
 - **CALL**: CR7 (Nucleus)
 - **RETURN**: Return register
 - **CHANGE**: CR8 (Thread)
 - **SWITCH**: CR15 (Namespace)
 
-### Microcode Sequence
+### mLoad Microcode Sequence
 
-The LOAD subroutine (`LOAD CRd, [CRn + Index]`) fetches a capability from a C-List. The microcode sequence is:
+The mLoad micro-routine fetches a capability from a C-List. The microcode sequence is:
 
 | Step | State         | Description                                      |
 |------|---------------|--------------------------------------------------|

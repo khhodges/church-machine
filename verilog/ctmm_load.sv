@@ -1,16 +1,16 @@
 // ============================================================================
-// CTMM LOAD Instruction - Wrapper for LOAD Subroutine
+// CTMM LOAD Church-Instruction (CLOOMC)
 // ============================================================================
 // This module implements the LOAD instruction by:
-//   1. Invoking the shared LOAD subroutine with source, destination, and index
-//   2. The subroutine writes directly to the destination register (single bus transfer)
+//   1. Invoking the shared mLoad micro-routine with source, destination, and index
+//   2. mLoad writes directly to the destination register (single bus transfer)
 //
-// The actual capability fetching is done by ctmm_load_subroutine.sv
-// This reduces the Trusted Computing Base - all Church instructions
-// share the same verified subroutine for capability fetching.
+// The actual capability fetching is done by ctmm_mload.sv
+// This reduces the Trusted Computing Base - all Church CLOOMC instructions
+// share the same verified mLoad micro-routine for capability fetching.
 // ============================================================================
 
-module ctmm_load_microcode
+module ctmm_load
     import ctmm_pkg::*;
 (
     input  logic        clk,
@@ -73,7 +73,7 @@ module ctmm_load_microcode
     logic        sub_fault;
     fault_type_t sub_fault_type;
     
-    ctmm_load_subroutine u_load_sub (
+    ctmm_mload u_mload (
         .clk            (clk),
         .rst_n          (rst_n),
         

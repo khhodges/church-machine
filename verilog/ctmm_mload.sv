@@ -1,7 +1,7 @@
 // ============================================================================
-// CTMM LOAD Subroutine - Shared Microcode for Capability Fetching
+// CTMM mLoad - Shared Micro-Routine for Capability Fetching
 // ============================================================================
-// This is the TRUSTED microcode subroutine used by all Church instructions
+// This is the TRUSTED micro-routine used by all Church CLOOMC instructions
 // that need to fetch a capability from a C-List:
 //   - LOAD: sub_cr_dst = user-specified destination
 //   - CALL: sub_cr_dst = CR7 (Nucleus)
@@ -10,10 +10,10 @@
 //   - SWITCH: sub_cr_dst = CR15 (Namespace)
 //
 // Minimizing this trusted code base is critical for security.
-// All capability fetching goes through this single verified subroutine.
+// All capability fetching goes through this single verified micro-routine.
 //
-// KEY OPTIMIZATION: The subroutine writes directly to the destination
-// register, avoiding a second bus transfer through the caller.
+// KEY OPTIMIZATION: mLoad writes directly to the destination register,
+// avoiding a second bus transfer through the caller.
 //
 // Microcode Sequence:
 //   Step 1: Check CRn has M or L permission
@@ -32,7 +32,7 @@
 //       will likely fail bounds check rather than accessing wrong entry.
 // ============================================================================
 
-module ctmm_load_subroutine
+module ctmm_mload
     import ctmm_pkg::*;
 (
     input  logic        clk,
