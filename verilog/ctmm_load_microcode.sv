@@ -184,9 +184,13 @@ module ctmm_load_microcode
     // Permission and Bounds Checking
     // ========================================================================
     
-    // Check L permission on source capability
+    // Check L or M permission on source capability (required to load GT into CRd)
     logic has_l_permission;
+    logic has_m_permission;
+    logic has_load_permission;
     assign has_l_permission = src_cap.word0_gt.perms[PERM_L];
+    assign has_m_permission = src_cap.word0_gt.perms[PERM_M];
+    assign has_load_permission = has_l_permission || has_m_permission;
     
     // Check bounds: Index must be less than Limit
     logic bounds_ok;
@@ -241,8 +245,8 @@ module ctmm_load_microcode
             LOAD_CHECK_L: begin
                 if (src_is_null)
                     next_state = LOAD_FAULT;  // Null capability fault
-                else if (!has_l_permission)
-                    next_state = LOAD_FAULT;  // L permission denied
+                else if (!has_load_permission)
+                    next_state = LOAD_FAULT;  // L or M permission required
                 else
                     next_state = LOAD_CALC_ADDR;
             end
@@ -321,8 +325,8 @@ module ctmm_load_microcode
                 LOAD_CHECK_L: begin
                     if (src_is_null)
                         fault_type_reg <= FAULT_NULL_CAP;
-                    else if (!has_l_permission)
-                        fault_type_reg <= FAULT_PERM_L;
+                    else if (!has_load_permission)
+                        fault_type_reg <= FAULT_PERM_L;  // L or M permission required
                 end
                 
                 LOAD_CHECK_BOUNDS: begin

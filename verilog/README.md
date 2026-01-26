@@ -122,7 +122,7 @@ The LOAD instruction (`LOAD CRd, [CRn + Index]`) fetches a capability from a C-L
 | Step | State         | Description                                      |
 |------|---------------|--------------------------------------------------|
 | 1    | FETCH_SRC     | Read source CR (CRn) - all 4 words               |
-| 2    | CHECK_L       | Verify L permission on CRn.Word0 (Golden Token)  |
+| 2    | CHECK_L       | Verify L or M permission on CRn (required to store GT in CRd) |
 | 3    | CALC_ADDR     | Calculate address: CRn.Location + (Index * 32)   |
 | 4    | CHECK_BOUNDS  | Verify Index < CRn.Limit                         |
 | 5    | FETCH_W0      | Fetch Word 0 (GT) from C-List memory             |
@@ -136,7 +136,7 @@ The LOAD instruction (`LOAD CRd, [CRn + Index]`) fetches a capability from a C-L
 
 **Fault Conditions:**
 - NULL capability access → FAULT_NULL_CAP
-- L permission missing → FAULT_PERM_L
+- L or M permission missing → FAULT_PERM_L
 - Index >= Limit → FAULT_BOUNDS
 - MAC mismatch → FAULT_MAC
 
