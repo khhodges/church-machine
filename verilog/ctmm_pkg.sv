@@ -85,15 +85,13 @@ package ctmm_pkg;
     };
     
     // Number of Capability Registers
-    localparam int NUM_CAP_REGS = 18;
+    localparam int NUM_CAP_REGS = 16;
     
     // Special Capability Register indices
-    localparam logic [4:0] CR_CLIST     = 5'd6;   // CR6: Current C-List
-    localparam logic [4:0] CR_NUCLEUS   = 5'd7;   // CR7: Nucleus (kernel)
-    localparam logic [4:0] CR_THREAD    = 5'd8;   // CR8: Thread identity
-    localparam logic [4:0] CR_NAMESPACE = 5'd15;  // CR15: Namespace root
-    localparam logic [4:0] CR_NIA       = 5'd16;  // CR16: Next Instruction Address
-    localparam logic [4:0] CR_FAULT     = 5'd17;  // CR17: Fault handler
+    localparam logic [3:0] CR_CLIST     = 4'd6;   // CR6: Current C-List
+    localparam logic [3:0] CR_NUCLEUS   = 4'd7;   // CR7: Nucleus (kernel)
+    localparam logic [3:0] CR_THREAD    = 4'd8;   // CR8: Thread identity
+    localparam logic [3:0] CR_NAMESPACE = 4'd15;  // CR15: Namespace root
     
     // ========================================================================
     // Namespace Entry - 3-word descriptor (192 bits) in memory

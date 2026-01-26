@@ -1,7 +1,7 @@
 // ============================================================================
-// CTMM Register File - 18 Capability Registers and 16 Data Registers
+// CTMM Register File - 16 Capability Registers and 16 Data Registers
 // ============================================================================
-// Capability Registers (CR0-CR17): Each is 4 x 64-bit words (256 bits)
+// Capability Registers (CR0-CR15): Each is 4 x 64-bit words (256 bits)
 //   Word 0: Golden Token (Permissions + Offset)
 //   Word 1: Location (Physical address/base pointer)
 //   Word 2: Limit (Size/bounds for access checking)
@@ -12,8 +12,6 @@
 //   CR7:  Nucleus (kernel capability)
 //   CR8:  Thread identity
 //   CR15: Namespace root
-//   CR16: NIA (Next Instruction Address)
-//   CR17: Fault handler
 //
 // Data Registers (DR0-DR15): 64-bit data values for Turing operations
 // ============================================================================
@@ -29,22 +27,22 @@ module ctmm_registers
     // ========================================================================
     
     // Read port - returns full 256-bit capability register
-    input  logic [4:0]  cr_rd_addr,           // Read address (0-17)
+    input  logic [3:0]  cr_rd_addr,           // Read address (0-15)
     output capability_reg_t cr_rd_data,       // Full 256-bit capability register
     
     // Write port - writes full 256-bit capability register
-    input  logic [4:0]  cr_wr_addr,           // Write address (0-17)
+    input  logic [3:0]  cr_wr_addr,           // Write address (0-15)
     input  capability_reg_t cr_wr_data,       // Full 256-bit capability register
     input  logic        cr_wr_en,             // Write enable
     
     // Word-level write interface (for microcode sequencing)
-    input  logic [4:0]  cr_word_wr_addr,      // Register address
+    input  logic [3:0]  cr_word_wr_addr,      // Register address
     input  logic [1:0]  cr_word_sel,          // Word select (0-3)
     input  logic [63:0] cr_word_wr_data,      // 64-bit word data
     input  logic        cr_word_wr_en,        // Word write enable
     
     // Word-level read interface
-    input  logic [4:0]  cr_word_rd_addr,      // Register address
+    input  logic [3:0]  cr_word_rd_addr,      // Register address
     input  logic [1:0]  cr_word_rd_sel,       // Word select (0-3)
     output logic [63:0] cr_word_rd_data,      // 64-bit word data
     
@@ -53,8 +51,6 @@ module ctmm_registers
     output capability_reg_t cr7_nucleus,      // CR7: Nucleus
     output capability_reg_t cr8_thread,       // CR8: Thread identity
     output capability_reg_t cr15_namespace,   // CR15: Namespace root
-    output capability_reg_t cr16_nia,         // CR16: NIA
-    output capability_reg_t cr17_fault,       // CR17: Fault handler
     
     // ========================================================================
     // Data Register Interface (Turing)

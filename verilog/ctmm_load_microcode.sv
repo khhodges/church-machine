@@ -29,8 +29,8 @@ module ctmm_load_microcode
     
     // Control interface
     input  logic        load_start,           // Start LOAD execution
-    input  logic [4:0]  cr_src,               // Source register (CRn)
-    input  logic [4:0]  cr_dst,               // Destination register (CRd)
+    input  logic [3:0]  cr_src,               // Source register (CRn)
+    input  logic [3:0]  cr_dst,               // Destination register (CRd)
     input  logic [7:0]  index,                // C-List index
     output logic        load_busy,            // LOAD in progress
     output logic        load_complete,        // LOAD finished successfully
@@ -38,11 +38,11 @@ module ctmm_load_microcode
     output fault_type_t fault_type,           // Type of fault
     
     // Capability register read interface
-    output logic [4:0]  cr_rd_addr,           // Register to read
+    output logic [3:0]  cr_rd_addr,           // Register to read
     input  capability_reg_t cr_rd_data,       // Full 256-bit register data
     
     // Capability register write interface
-    output logic [4:0]  cr_wr_addr,           // Register to write
+    output logic [3:0]  cr_wr_addr,           // Register to write
     output capability_reg_t cr_wr_data,       // Full 256-bit data to write
     output logic        cr_wr_en,             // Write enable
     
@@ -64,8 +64,8 @@ module ctmm_load_microcode
     load_state_t state, next_state;
     
     // Latched instruction operands
-    logic [4:0]  cr_src_reg;
-    logic [4:0]  cr_dst_reg;
+    logic [3:0]  cr_src_reg;
+    logic [3:0]  cr_dst_reg;
     logic [7:0]  index_reg;
     
     // Latched source capability register (CRn)
@@ -96,8 +96,8 @@ module ctmm_load_microcode
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            cr_src_reg <= 5'd0;
-            cr_dst_reg <= 5'd0;
+            cr_src_reg <= 4'd0;
+            cr_dst_reg <= 4'd0;
             index_reg <= 8'd0;
         end else if (state == LOAD_IDLE && load_start) begin
             cr_src_reg <= cr_src;
@@ -358,7 +358,7 @@ module ctmm_load_microcode
     assign load_fault = (state == LOAD_FAULT);
     
     // Register read address (for Step 1: fetch source CR)
-    assign cr_rd_addr = (state == LOAD_FETCH_SRC) ? cr_src_reg : 5'd0;
+    assign cr_rd_addr = (state == LOAD_FETCH_SRC) ? cr_src_reg : 4'd0;
     
     // Register write (Step 11: write to destination CR)
     assign cr_wr_addr = cr_dst_reg;
