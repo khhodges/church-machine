@@ -8,13 +8,16 @@
 //   CRs = Source C-List register (CR0-CR6)
 //   Index = Index into the C-List
 //
-// CALL Steps (Two-Phase Load):
+// CALL Steps (Two-Phase Load + Isolation):
 //   Phase 1: Load nodal C-List into CR6
 //     1. Verify source CRs is in range 0-5 (not CR6 itself)
 //     2. Verify source CRs has L permission
 //     3. Call mLoad: CRs[Index] → CR6 (nodal C-List)
 //   Phase 2: Load CLOOMC code into CR7
 //     4. Call mLoad: CR6[0] → CR7 (CLOOMC code at offset zero)
+//   Phase 3: Start isolated abstraction
+//     5. Set NIA = 0 (start execution at offset zero)
+//     6. Clear data registers DR0-DR15 (isolation)
 //
 // The actual capability fetching is done by ctmm_mload.sv
 // This reduces the Trusted Computing Base - all Church CLOOMC instructions
@@ -66,7 +69,13 @@ module ctmm_call
     
     // G bit reset interface
     output logic        g_bit_reset,
-    output logic [63:0] g_bit_addr
+    output logic [63:0] g_bit_addr,
+    
+    // Isolation interface - clear registers and set NIA
+    output logic        nia_set,              // Set NIA enable
+    output logic [63:0] nia_value,            // NIA = 0 for isolated abstraction
+    output logic        dr_clear,             // Clear all data registers DR0-DR15
+    output logic [15:0] cr_clear_mask         // CRs to clear: bit[i]=1 means clear CR[i]
 );
 
     // ========================================================================
@@ -353,5 +362,25 @@ module ctmm_call
     assign call_complete = (state == CALL_COMPLETE);
     assign call_fault = fault_latched;
     assign fault_type = fault_type_latched;
+    
+    // ========================================================================
+    // Isolation Signals - Active on successful completion
+    // ========================================================================
+    // On CALL_COMPLETE:
+    //   - Set NIA = 0 to start execution at offset zero
+    //   - Clear DR0-DR15 for isolation (no data leakage)
+    //   - Clear CR0-CR5 (CR6/CR7 contain new capabilities, CR8/CR15 preserved)
+    // ========================================================================
+    
+    // CR clear mask: bit[i]=1 means clear CR[i]
+    // Clear CR0-CR5 on completion: 16'b0000_0000_0011_1111
+    localparam logic [15:0] CR_CLEAR_0_5 = 16'b0000_0000_0011_1111;
+    
+    assign nia_set = (state == CALL_COMPLETE);
+    assign nia_value = 64'd0;  // Start at offset zero
+    assign dr_clear = (state == CALL_COMPLETE);
+    assign cr_clear_mask = (state == CALL_COMPLETE) ? CR_CLEAR_0_5 : 16'd0;
 
 endmodule
+
+
