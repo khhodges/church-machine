@@ -128,7 +128,7 @@ The mLoad micro-routine (`ctmm_mload.sv`) is the **single trusted microcode** fo
 | Instruction | Uses mLoad For | Status |
 |-------------|----------------|--------|
 | **LOAD**    | Fetch capability into destination register | Implemented |
-| **CALL**    | Two-phase load + isolation: CRs[Index]→CR6, CR6[0]→CR7, NIA=0, clear DRs | Implemented |
+| **CALL**    | Two-phase load + MASK isolation: CRs[Index]→CR6, CR6[0]→CR7, NIA=0, MASK-based clear | Implemented |
 | **RETURN**  | Fetch return capability from stack | Planned |
 | **CHANGE**  | Fetch new thread identity into CR8 | Planned |
 | **SWITCH**  | Fetch new namespace capability into CR15 | Implemented |

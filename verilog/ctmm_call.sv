@@ -15,9 +15,16 @@
 //     3. Call mLoad: CRs[Index] → CR6 (nodal C-List)
 //   Phase 2: Load CLOOMC code into CR7
 //     4. Call mLoad: CR6[0] → CR7 (CLOOMC code at offset zero)
-//   Phase 3: Start isolated abstraction
+//   Phase 3: Start isolated abstraction with MASK
 //     5. Set NIA = 0 (start execution at offset zero)
-//     6. Clear data registers DR0-DR15 (isolation)
+//     6. Clear DR8-DR15 always (upper DRs)
+//     7. Clear DR0-DR7 based on MASK (bit=0 means clear)
+//     8. Clear CR0-CR5 based on MASK (bit=0 means clear)
+//
+// MASK Field (14 bits):
+//   [7:0]  = DR preserve mask: bit[i]=1 preserves DR[i] (DR0-DR7)
+//   [13:8] = CR preserve mask: bit[i-8]=1 preserves CR[i-8] (CR0-CR5)
+//   Note: DR8-DR15 always cleared regardless of mask
 //
 // The actual capability fetching is done by ctmm_mload.sv
 // This reduces the Trusted Computing Base - all Church CLOOMC instructions
@@ -39,6 +46,7 @@ module ctmm_call
     input  logic        call_start,           // Start CALL execution
     input  logic [3:0]  cr_src,               // Source register (CRs) - must be CR0-CR5
     input  logic [7:0]  index,                // C-List index
+    input  logic [13:0] mask,                 // Preserve mask: [7:0]=DR0-7, [13:8]=CR0-5
     output logic        call_busy,            // CALL in progress
     output logic        call_complete,        // CALL finished successfully
     output logic        call_fault,           // CALL caused a fault
@@ -74,7 +82,7 @@ module ctmm_call
     // Isolation interface - clear registers and set NIA
     output logic        nia_set,              // Set NIA enable
     output logic [63:0] nia_value,            // NIA = 0 for isolated abstraction
-    output logic        dr_clear,             // Clear all data registers DR0-DR15
+    output logic [15:0] dr_clear_mask,        // DRs to clear: bit[i]=1 means clear DR[i]
     output logic [15:0] cr_clear_mask         // CRs to clear: bit[i]=1 means clear CR[i]
 );
 
@@ -368,18 +376,40 @@ module ctmm_call
     // ========================================================================
     // On CALL_COMPLETE:
     //   - Set NIA = 0 to start execution at offset zero
-    //   - Clear DR0-DR15 for isolation (no data leakage)
-    //   - Clear CR0-CR5 (CR6/CR7 contain new capabilities, CR8/CR15 preserved)
+    //   - Clear DR8-DR15 always (upper DRs cannot be preserved)
+    //   - Clear DR0-DR7 unless mask bit is set (preserve)
+    //   - Clear CR0-CR5 unless mask bit is set (preserve)
+    //
+    // MASK format (14 bits from instruction):
+    //   mask[7:0]  = DR preserve: bit[i]=1 means PRESERVE DR[i]
+    //   mask[13:8] = CR preserve: bit[i-8]=1 means PRESERVE CR[i-8]
+    //
+    // Output masks: bit[i]=1 means CLEAR register[i]
     // ========================================================================
     
-    // CR clear mask: bit[i]=1 means clear CR[i]
-    // Clear CR0-CR5 on completion: 16'b0000_0000_0011_1111
-    localparam logic [15:0] CR_CLEAR_0_5 = 16'b0000_0000_0011_1111;
+    // Latch mask on call_start for use at completion
+    logic [13:0] mask_latched;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            mask_latched <= 14'd0;
+        else if (call_start && state == CALL_IDLE)
+            mask_latched <= mask;
+    end
+    
+    // DR clear mask: invert preserve bits for DR0-7, always clear DR8-15
+    // bit[i]=1 means clear DR[i]
+    wire [7:0] dr_preserve = mask_latched[7:0];
+    wire [15:0] dr_clear_computed = {8'b1111_1111, ~dr_preserve};  // DR8-15 always cleared
+    
+    // CR clear mask: invert preserve bits for CR0-5, CR6-15 not cleared by CALL
+    // bit[i]=1 means clear CR[i]
+    wire [5:0] cr_preserve = mask_latched[13:8];
+    wire [15:0] cr_clear_computed = {10'd0, ~cr_preserve};  // Only CR0-5 can be cleared
     
     assign nia_set = (state == CALL_COMPLETE);
     assign nia_value = 64'd0;  // Start at offset zero
-    assign dr_clear = (state == CALL_COMPLETE);
-    assign cr_clear_mask = (state == CALL_COMPLETE) ? CR_CLEAR_0_5 : 16'd0;
+    assign dr_clear_mask = (state == CALL_COMPLETE) ? dr_clear_computed : 16'd0;
+    assign cr_clear_mask = (state == CALL_COMPLETE) ? cr_clear_computed : 16'd0;
 
 endmodule
 
