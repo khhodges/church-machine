@@ -25,7 +25,7 @@
 //   Step 7: Fetch Word 3 (Seals) from CR15.Location + GT.offset + 16
 //   Step 8: Validate MAC (calculated hash vs Seals)
 //   Step 9: If G=1, reset G bit in CR15[GT.offset].Word3.Gbit
-//   Step 10: If G=1, write GT with G=0 to CR8 (Thread) to keep state synchronized
+//   Step 10: Always write GT with G=0 to Thread[CRd] for suspension/rescheduling
 //   Step 11: Write capability to CRd, signal done
 //
 // Note: GT.offset is a direct memory offset (bytes), not an index.
@@ -78,10 +78,14 @@ module ctmm_mload
     input  logic        mem_rd_valid,         // Read data valid
     
     // ========================================================================
-    // CR8 (Thread) Update Interface - updates Thread.W0 with GT (G=0)
+    // Thread Update Interface - writes GT (G=0) to Thread[CRd]
     // ========================================================================
-    output logic        cr8_wr_en,            // Write enable for CR8.W0
-    output logic [63:0] cr8_wr_data,          // GT with G=0
+    // When a capability is loaded into CRd, the GT used is saved to Thread[CRd].
+    // This enables thread suspension/rescheduling - CRs can be reloaded from saved GTs.
+    // ========================================================================
+    output logic        thread_wr_en,         // Write enable for Thread[CRd]
+    output logic [3:0]  thread_wr_idx,        // Index into Thread (= CRd)
+    output logic [63:0] thread_wr_data,       // GT with G=0
     
     // ========================================================================
     // G Bit Reset Interface - writes to CR15[GT.offset].Word3.Gbit
@@ -106,7 +110,7 @@ module ctmm_mload
         SUB_FETCH_W3,
         SUB_CHECK_MAC,
         SUB_RESET_G,
-        SUB_UPDATE_CR8,      // Write GT with G=0 to CR8 (Thread)
+        SUB_UPDATE_THREAD,   // Always write GT with G=0 to Thread[CRd]
         SUB_COMPLETE,
         SUB_FAULT
     } sub_state_t;
@@ -340,15 +344,15 @@ module ctmm_mload
                 else if (gt_has_g_bit)
                     next_state = SUB_RESET_G;
                 else
-                    next_state = SUB_COMPLETE;
+                    next_state = SUB_UPDATE_THREAD;  // Skip RESET_G but always UPDATE_THREAD
             end
             
             SUB_RESET_G: begin
-                next_state = SUB_UPDATE_CR8;
+                next_state = SUB_UPDATE_THREAD;
             end
             
-            SUB_UPDATE_CR8: begin
-                // Write GT with G=0 to CR8 (Thread) to keep machine state synchronized
+            SUB_UPDATE_THREAD: begin
+                // Always write GT with G=0 to Thread[CRd] for suspension/rescheduling
                 next_state = SUB_COMPLETE;
             end
             
@@ -464,7 +468,10 @@ module ctmm_mload
                        (state == SUB_FETCH_W3);
     
     // ========================================================================
-    // CR8 (Thread) Update - write GT with G=0 to Thread.W0
+    // Thread Update - write GT with G=0 to Thread[CRd]
+    // ========================================================================
+    // Saves the GT used to load CRd, enabling thread suspension/rescheduling.
+    // This is UNCONDITIONAL - happens on every successful LOAD.
     // ========================================================================
     
     logic [63:0] gt_with_g_cleared;
@@ -473,8 +480,9 @@ module ctmm_mload
         gt_with_g_cleared[PERM_G + 48] = 1'b0;  // Clear G bit in permissions field
     end
     
-    assign cr8_wr_en = (state == SUB_UPDATE_CR8);
-    assign cr8_wr_data = gt_with_g_cleared;
+    assign thread_wr_en = (state == SUB_UPDATE_THREAD);
+    assign thread_wr_idx = cr_dst_reg;         // Write to Thread[CRd]
+    assign thread_wr_data = gt_with_g_cleared;
     
     // G bit reset output - writes to CR15[GT.offset].Word3.Gbit
     assign g_bit_reset = (state == SUB_RESET_G);

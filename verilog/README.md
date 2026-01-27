@@ -169,7 +169,7 @@ The mLoad micro-routine fetches a capability from a C-List. The microcode sequen
 | 7    | FETCH_W3      | Fetch W3 (Seals/MAC) from CR15.Location + GT.offset + 16 |
 | 8    | CHECK_MAC     | Validate MAC (calculated hash vs Seals)          |
 | 9    | RESET_G       | **If G=1**: Reset G bit in CR15[GT.offset].Word3.Gbit |
-| 10   | UPDATE_CR8    | **If G=1**: Write GT with G=0 to CR8 (Thread)    |
+| 10   | UPDATE_THREAD | **Always**: Write GT with G=0 to Thread[CRd]     |
 | 11   | COMPLETE      | Write all 4 words to CRd, assert sub_done        |
 
 **Key Points:**
