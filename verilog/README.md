@@ -16,7 +16,7 @@ The CTMM hardware implements failsafe security through Golden Tokens (64-bit cap
 ```
 verilog/
 ├── ctmm_pkg.sv           # Package with types, constants, and definitions
-├── ctmm_registers.sv     # Register file (18 x 256-bit CRs, 16 x 64-bit DRs)
+├── ctmm_registers.sv     # Register file (16 x 256-bit CRs, 16 x 64-bit DRs)
 ├── ctmm_mload.sv         # mLoad micro-routine (shared trusted code)
 ├── ctmm_load.sv          # LOAD Church-Instruction (uses mLoad)
 ├── ctmm_perm_check.sv    # Permission checking unit
