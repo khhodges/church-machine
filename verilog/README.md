@@ -22,6 +22,7 @@ verilog/
 ├── ctmm_switch.sv        # SWITCH Church-Instruction (uses mLoad)
 ├── ctmm_msave.sv         # mSave micro-routine (shared trusted code)
 ├── ctmm_save.sv          # SAVE Church-Instruction (uses mSave)
+├── ctmm_change.sv        # CHANGE Church-Instruction (uses mSave + mLoad)
 ├── ctmm_perm_check.sv    # Permission checking unit
 ├── ctmm_gc_unit.sv       # Garbage collection unit with G bit
 ├── ctmm_decoder.sv       # Instruction decoder
@@ -138,12 +139,38 @@ The mSave micro-routine (`ctmm_msave.sv`) is the **single trusted microcode** fo
 | Instruction | Uses mSave For | Status |
 |-------------|----------------|--------|
 | **SAVE**    | Write GT to C-List[Index] | Implemented |
-| **CHANGE**  | Save CR states to Thread before context switch | Planned |
+| **CHANGE**  | Full context switch (save CRs, load Thread, restore CRs) | Implemented |
 
 **mSave Permission Rule:**
 - Check dst.S (destination allows saving)
 - Check GT.M || GT.B (machine-level bypasses B check)
 - Check Index < Limit (bounds)
+
+### CHANGE Instruction - Full Context Switch
+
+The CHANGE instruction (`ctmm_change.sv`) performs a complete thread context switch:
+
+```
+CHANGE CRn[Index]   ; Switch to new thread at CRn[Index]
+```
+
+**Sequence (25 operations: Save 12 + Load 1 + Restore 12):**
+1. **Phase 1 - SAVE**: Save current CR states to Thread[CR8]
+   - For each CR in {0,1,2,3,4,5,6,9,10,11,12,13,14}: `mSave(dst=CR8, gt=CR[i].GT, idx=i)`
+2. **Phase 2 - LOAD**: Fetch new Thread identity
+   - `mLoad(src=CRn, dst=CR8, idx=Index)`
+3. **Phase 3 - RESTORE**: Load CR states from new Thread[CR8]
+   - For each CR in {0,1,2,3,4,5,6,9,10,11,12,13,14}: `mLoad(src=CR8, dst=i, idx=i)`
+
+**Reserved Registers (never saved/restored):**
+- CR7 = Nucleus (shared kernel)
+- CR8 = Thread (handled by CHANGE itself)
+- CR15 = Namespace (handled by SWITCH)
+
+**CHANGE_MASK Optimization:**
+- 16-bit mask allows skipping CRs during save/restore
+- Default skips CR7, CR8, CR15 (reserved)
+- Optional: Skip CR11-14 for faster context switch
 
 ### Non-mLoad/mSave Church Instructions
 
