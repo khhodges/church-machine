@@ -1,27 +1,29 @@
 // ============================================================================
 // CTMM CALL Church-Instruction (CLOOMC)
 // ============================================================================
-// This module implements the CALL instruction which loads a capability
-// from a C-List into CR7 (Nucleus) for invoking kernel services.
+// This module implements the CALL instruction which performs a two-step
+// capability load to invoke a procedure:
 //
 // Syntax: CALL CRs[Index]
 //   CRs = Source C-List register (CR0-CR6)
 //   Index = Index into the C-List
-//   Destination = CR7 (Nucleus) - hardwired
 //
-// CALL Steps:
-//   1. Verify source CRs is in range 0-6 (not reserved CR7/CR8/CR15)
-//   2. Verify source CRs has L (Load) permission
-//   3. Call mLoad with sub_cr_dst = CR7 (hardwired destination)
+// CALL Steps (Two-Phase Load):
+//   Phase 1: Load nodal C-List into CR6
+//     1. Verify source CRs is in range 0-5 (not CR6 itself)
+//     2. Verify source CRs has L permission
+//     3. Call mLoad: CRs[Index] → CR6 (nodal C-List)
+//   Phase 2: Load CLOOMC code into CR7
+//     4. Call mLoad: CR6[0] → CR7 (CLOOMC code at offset zero)
 //
 // The actual capability fetching is done by ctmm_mload.sv
 // This reduces the Trusted Computing Base - all Church CLOOMC instructions
 // share the same verified mLoad micro-routine for capability fetching.
 //
 // FAULT conditions:
-//   - Source CRs not in range 0-6
+//   - Source CRs not in range 0-5 (CR6 is destination)
 //   - Source CRs lacks L permission
-//   - mLoad faults (bounds, MAC, etc.)
+//   - Either mLoad faults (bounds, MAC, etc.)
 // ============================================================================
 
 module ctmm_call
@@ -32,19 +34,19 @@ module ctmm_call
     
     // Control interface
     input  logic        call_start,           // Start CALL execution
-    input  logic [3:0]  cr_src,               // Source register (CRs) - must be CR0-CR6
+    input  logic [3:0]  cr_src,               // Source register (CRs) - must be CR0-CR5
     input  logic [7:0]  index,                // C-List index
     output logic        call_busy,            // CALL in progress
     output logic        call_complete,        // CALL finished successfully
     output logic        call_fault,           // CALL caused a fault
     output fault_type_t fault_type,           // Type of fault
     
-    // Capability register read interface (directly from subroutine)
+    // Capability register read interface
     output logic [3:0]  cr_rd_addr,           // Register to read
     input  capability_reg_t cr_rd_data,       // Full 256-bit register data
     
-    // Capability register write interface (directly from subroutine)
-    output logic [3:0]  cr_wr_addr,           // Register to write (always CR7)
+    // Capability register write interface
+    output logic [3:0]  cr_wr_addr,           // Register to write
     output capability_reg_t cr_wr_data,       // Full 256-bit data to write
     output logic        cr_wr_en,             // Write enable
     
@@ -57,10 +59,10 @@ module ctmm_call
     input  logic [63:0] mem_rd_data,          // Read data
     input  logic        mem_rd_valid,         // Read data valid
     
-    // Thread update interface - writes GT (G=0) to Thread[CR7]
-    output logic        thread_wr_en,         // Write enable for Thread[CR7]
-    output logic [3:0]  thread_wr_idx,        // Index into Thread (= CR7 = 4'd7)
-    output logic [63:0] thread_wr_data,       // GT with G=0
+    // Thread update interface
+    output logic        thread_wr_en,
+    output logic [3:0]  thread_wr_idx,
+    output logic [63:0] thread_wr_data,
     
     // G bit reset interface
     output logic        g_bit_reset,
@@ -71,22 +73,43 @@ module ctmm_call
     // Constants
     // ========================================================================
     
-    localparam logic [3:0] CR7_NUCLEUS = 4'd7;     // Hardwired destination
-    localparam logic [3:0] MAX_CLIST_REG = 4'd6;   // Maximum allowed source register
+    localparam logic [3:0] CR6_CLIST = 4'd6;       // Phase 1 destination
+    localparam logic [3:0] CR7_NUCLEUS = 4'd7;    // Phase 2 destination
+    localparam logic [3:0] MAX_SRC_REG = 4'd5;    // Source must be CR0-CR5 (not CR6)
+    localparam logic [7:0] OFFSET_ZERO = 8'd0;    // CR6[0] for Phase 2
     
     // ========================================================================
-    // State Machine - CALL instruction wrapper
+    // State Machine - CALL instruction (two-phase)
     // ========================================================================
     
-    typedef enum logic [2:0] {
+    typedef enum logic [3:0] {
         CALL_IDLE,
-        CALL_CHECK_SRC,       // Verify source is CR0-CR6
+        CALL_CHECK_SRC,       // Verify source is CR0-CR5
         CALL_READ_SRC,        // Read source register for permission check
         CALL_CHECK_PERM,      // Verify L permission on source
-        CALL_CALL_SUB         // Call mLoad and wait for completion
+        CALL_PHASE1,          // mLoad: CRs[Index] → CR6
+        CALL_PHASE1_DONE,     // Phase 1 complete, prepare Phase 2
+        CALL_PHASE2,          // mLoad: CR6[0] → CR7
+        CALL_COMPLETE,
+        CALL_FAULT
     } call_state_t;
     
     call_state_t state, next_state;
+    
+    // ========================================================================
+    // Phase Tracking
+    // ========================================================================
+    
+    logic phase;  // 0 = Phase 1 (load CR6), 1 = Phase 2 (load CR7)
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            phase <= 1'b0;
+        else if (state == CALL_IDLE)
+            phase <= 1'b0;
+        else if (state == CALL_PHASE1_DONE)
+            phase <= 1'b1;
+    end
     
     // ========================================================================
     // Local Register Read Control
@@ -117,7 +140,7 @@ module ctmm_call
         end
     end
     
-    assign src_in_range = (cr_src <= MAX_CLIST_REG);
+    assign src_in_range = (cr_src <= MAX_SRC_REG);
     assign src_perms = src_reg_latched.word0_gt[57:48];
     assign src_has_l_perm = src_perms[PERM_L];
     
@@ -141,7 +164,7 @@ module ctmm_call
         end else if (state == CALL_CHECK_PERM && !src_has_l_perm) begin
             fault_latched <= 1'b1;
             fault_type_latched <= FAULT_PERM;
-        end else if (state == CALL_CALL_SUB && sub_fault_latched) begin
+        end else if ((state == CALL_PHASE1 || state == CALL_PHASE2) && sub_fault_latched) begin
             fault_latched <= 1'b1;
             fault_type_latched <= sub_fault_type;
         end
@@ -160,22 +183,36 @@ module ctmm_call
     logic        sub_fault_latched;
     fault_type_t sub_fault_type;
     
-    // Single-cycle pulse on entry to CALL_CALL_SUB
+    // mLoad parameters depend on phase
+    logic [3:0]  mload_src;
+    logic [3:0]  mload_dst;
+    logic [7:0]  mload_index;
+    
+    assign mload_src = phase ? CR6_CLIST : cr_src;        // Phase 1: CRs, Phase 2: CR6
+    assign mload_dst = phase ? CR7_NUCLEUS : CR6_CLIST;   // Phase 1: CR6, Phase 2: CR7
+    assign mload_index = phase ? OFFSET_ZERO : index;     // Phase 1: Index, Phase 2: 0
+    
+    // Single-cycle pulse on entry to PHASE1 or PHASE2
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             sub_start_reg <= 1'b0;
-        else if (state == CALL_CHECK_PERM && next_state == CALL_CALL_SUB)
+        else if ((state == CALL_CHECK_PERM && next_state == CALL_PHASE1) ||
+                 (state == CALL_PHASE1_DONE && next_state == CALL_PHASE2))
             sub_start_reg <= 1'b1;
         else
             sub_start_reg <= 1'b0;
     end
     
     // Sticky latches for completion/fault
+    // Clear on IDLE or when starting a new mLoad
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
         end else if (state == CALL_IDLE) begin
+            sub_done_latched <= 1'b0;
+            sub_fault_latched <= 1'b0;
+        end else if (sub_start_reg) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
         end else begin
@@ -192,9 +229,9 @@ module ctmm_call
         
         // Subroutine interface
         .sub_start      (sub_start),
-        .sub_cr_src     (cr_src),
-        .sub_cr_dst     (CR7_NUCLEUS),    // Hardwired to CR7
-        .sub_index      (index),
+        .sub_cr_src     (mload_src),
+        .sub_cr_dst     (mload_dst),
+        .sub_index      (mload_index),
         .sub_busy       (sub_busy),
         .sub_done       (sub_done),
         .sub_fault      (sub_fault),
@@ -253,27 +290,49 @@ module ctmm_call
             
             CALL_CHECK_SRC: begin
                 if (!src_in_range)
-                    next_state = CALL_IDLE;  // Fault
+                    next_state = CALL_FAULT;
                 else
                     next_state = CALL_READ_SRC;
             end
             
             CALL_READ_SRC: begin
-                // Wait for register data to be valid
                 next_state = CALL_CHECK_PERM;
             end
             
             CALL_CHECK_PERM: begin
                 if (!src_has_l_perm)
-                    next_state = CALL_IDLE;  // Fault
+                    next_state = CALL_FAULT;
                 else
-                    next_state = CALL_CALL_SUB;
+                    next_state = CALL_PHASE1;
             end
             
-            CALL_CALL_SUB: begin
-                // Wait for mLoad to complete
-                if (sub_done_latched || sub_fault_latched)
-                    next_state = CALL_IDLE;
+            CALL_PHASE1: begin
+                // Wait for mLoad: CRs[Index] → CR6
+                if (sub_fault_latched)
+                    next_state = CALL_FAULT;
+                else if (sub_done_latched)
+                    next_state = CALL_PHASE1_DONE;
+            end
+            
+            CALL_PHASE1_DONE: begin
+                // Transition to Phase 2
+                next_state = CALL_PHASE2;
+            end
+            
+            CALL_PHASE2: begin
+                // Wait for mLoad: CR6[0] → CR7
+                if (sub_fault_latched)
+                    next_state = CALL_FAULT;
+                else if (sub_done_latched)
+                    next_state = CALL_COMPLETE;
+            end
+            
+            CALL_COMPLETE: begin
+                next_state = CALL_IDLE;
+            end
+            
+            CALL_FAULT: begin
+                next_state = CALL_IDLE;
             end
             
             default: next_state = CALL_IDLE;
@@ -291,7 +350,7 @@ module ctmm_call
     // ========================================================================
     
     assign call_busy = (state != CALL_IDLE);
-    assign call_complete = (state == CALL_CALL_SUB) && sub_done_latched;
+    assign call_complete = (state == CALL_COMPLETE);
     assign call_fault = fault_latched;
     assign fault_type = fault_type_latched;
 
