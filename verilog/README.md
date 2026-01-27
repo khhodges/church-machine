@@ -19,6 +19,7 @@ verilog/
 ├── ctmm_registers.sv     # Register file (16 x 256-bit CRs, 16 x 64-bit DRs)
 ├── ctmm_mload.sv         # mLoad micro-routine (shared trusted code)
 ├── ctmm_load.sv          # LOAD Church-Instruction (uses mLoad)
+├── ctmm_switch.sv        # SWITCH Church-Instruction (uses mLoad)
 ├── ctmm_perm_check.sv    # Permission checking unit
 ├── ctmm_gc_unit.sv       # Garbage collection unit with G bit
 ├── ctmm_decoder.sv       # Instruction decoder
@@ -29,7 +30,7 @@ verilog/
 
 ## Capability Register (CR) Format - 4 x 64-bit Words (256 bits)
 
-Each of the 18 Capability Registers contains 4 words:
+Each of the 16 Capability Registers contains 4 words:
 
 ```
 Word 0: Golden Token (64 bits)
@@ -126,7 +127,7 @@ The mLoad micro-routine (`ctmm_mload.sv`) is the **single trusted microcode** fo
 | **CALL**    | Fetch procedure capability, then transfer control | Planned |
 | **RETURN**  | Fetch return capability from stack | Planned |
 | **CHANGE**  | Fetch new thread identity into CR8 | Planned |
-| **SWITCH**  | Fetch new namespace capability into CR15 | Planned |
+| **SWITCH**  | Fetch new namespace capability into CR15 | Implemented |
 
 ### mLoad Interface
 
