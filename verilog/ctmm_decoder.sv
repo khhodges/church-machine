@@ -32,6 +32,7 @@ module ctmm_decoder
     output logic [3:0]  cr_dst,           // Destination CR
     output logic [7:0]  clist_index,      // C-List index
     output logic [15:0] perm_mask,        // Permission mask for TPERM
+    output logic [2:0]  call_crs,         // CALL source CR (3 bits: CR0-CR5)
     output logic [13:0] call_mask,        // CALL preserve mask: [7:0]=DR0-7, [13:8]=CR0-5
     
     // Turing instruction decoded fields
@@ -108,10 +109,10 @@ module ctmm_decoder
     
     // LOAD/SAVE: CR_dst, CR_src, index
     // Bits [21:18] = dst CR
-    // Bits [17:14] = src CR
+    // Bits [17:14] = src CR (4 bits for LOAD/SAVE)
     // Bits [13:6]  = C-List index
     assign cr_dst = operand_field[21:18];
-    assign cr_src = operand_field[17:14];
+    assign cr_src = operand_field[17:14];  // 4 bits for LOAD/SAVE; CALL uses [17:15]
     assign clist_index = operand_field[13:6];
     
     // TPERM: CR_src, perm_mask
@@ -120,15 +121,18 @@ module ctmm_decoder
     assign perm_mask = operand_field[15:0];
     
     // CALL: CR_src, index, mask (uses spare bits for isolation mask)
-    // Bits [17:14] = src CR (C-List to call from)
+    // Bits [17:15] = src CR (3 bits: CR0-CR5 only)
     // Bits [13:6]  = C-List index (8 bits = 256 entries)
     // Bits [21:18] = CR preserve mask for CR0-CR3 (4 bits)
+    // Bits [14]    = CR preserve for CR4 (1 bit)
     // Bits [5:0]   = DR preserve mask for DR0-DR5 (6 bits)
-    // Spare bits encode 10 registers; DR6-7 default preserve, CR4-5 default clear
+    // Total: 11 spare bits encode 11 registers
+    assign call_crs = operand_field[17:15];
     //
     // call_mask format: [13:8]=CR0-5, [7:0]=DR0-7
-    // Encoding: CR[3:0]=[21:18], CR[5:4]=00, DR[5:0]=[5:0], DR[7:6]=11
-    assign call_mask = {2'b00, operand_field[21:18], 2'b11, operand_field[5:0]};
+    // Encoding: CR[4:0]={[14],[21:18]}, CR5=0, DR[5:0]=[5:0], DR[7:6]=11
+    assign call_mask = {1'b0, operand_field[14], operand_field[21:18], 
+                        2'b11, operand_field[5:0]};
     
     // ========================================================================
     // Turing Instruction Decode
