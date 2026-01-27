@@ -17,14 +17,16 @@
 //     4. Call mLoad: CR6[0] → CR7 (CLOOMC code at offset zero)
 //   Phase 3: Start isolated abstraction with MASK
 //     5. Set NIA = 0 (start execution at offset zero)
-//     6. Clear DR8-DR15 always (upper DRs)
-//     7. Clear DR0-DR7 based on MASK (bit=0 means clear)
-//     8. Clear CR0-CR5 based on MASK (bit=0 means clear)
+//     6. Apply isolation based on MASK
 //
-// MASK Field (14 bits):
-//   [7:0]  = DR preserve mask: bit[i]=1 preserves DR[i] (DR0-DR7)
-//   [13:8] = CR preserve mask: bit[i-8]=1 preserves CR[i-8] (CR0-CR5)
-//   Note: DR8-DR15 always cleared regardless of mask
+// Fixed Register Behaviors (NOT in MASK):
+//   DR0: always preserved (primary argument)
+//   DR6-DR7: always cleared
+//   DR8-DR15: always cleared
+//
+// MASK Field (11 bits): bit=1 means PRESERVE
+//   [10:5] = CR0-CR5 preserve mask
+//   [4:0]  = DR1-DR5 preserve mask
 //
 // The actual capability fetching is done by ctmm_mload.sv
 // This reduces the Trusted Computing Base - all Church CLOOMC instructions
@@ -46,7 +48,7 @@ module ctmm_call
     input  logic        call_start,           // Start CALL execution
     input  logic [3:0]  cr_src,               // Source register (CRs) - must be CR0-CR5
     input  logic [7:0]  index,                // C-List index
-    input  logic [13:0] mask,                 // Preserve mask: [7:0]=DR0-7, [13:8]=CR0-5
+    input  logic [10:0] mask,                 // Preserve mask: [10:5]=CR0-5, [4:0]=DR1-5
     output logic        call_busy,            // CALL in progress
     output logic        call_complete,        // CALL finished successfully
     output logic        call_fault,           // CALL caused a fault
@@ -388,23 +390,33 @@ module ctmm_call
     // ========================================================================
     
     // Latch mask on call_start for use at completion
-    logic [13:0] mask_latched;
+    // Mask format: [10:5]=CR0-5, [4:0]=DR1-5
+    logic [10:0] mask_latched;
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
-            mask_latched <= 14'd0;
+            mask_latched <= 11'd0;
         else if (call_start && state == CALL_IDLE)
             mask_latched <= mask;
     end
     
-    // DR clear mask: invert preserve bits for DR0-7, always clear DR8-15
-    // bit[i]=1 means clear DR[i]
-    wire [7:0] dr_preserve = mask_latched[7:0];
-    wire [15:0] dr_clear_computed = {8'b1111_1111, ~dr_preserve};  // DR8-15 always cleared
+    // Extract preserve bits from mask
+    wire [5:0] cr_preserve = mask_latched[10:5];  // CR0-CR5
+    wire [4:0] dr1_5_preserve = mask_latched[4:0]; // DR1-DR5
     
-    // CR clear mask: invert preserve bits for CR0-5, CR6-15 not cleared by CALL
-    // bit[i]=1 means clear CR[i]
-    wire [5:0] cr_preserve = mask_latched[13:8];
-    wire [15:0] cr_clear_computed = {10'd0, ~cr_preserve};  // Only CR0-5 can be cleared
+    // DR clear mask: bit[i]=1 means clear DR[i]
+    // DR0: always preserved (bit=0)
+    // DR1-DR5: from mask (inverted)
+    // DR6-DR7: always cleared (bit=1)
+    // DR8-DR15: always cleared (bit=1)
+    wire [15:0] dr_clear_computed = {8'b1111_1111,    // DR8-15 always cleared
+                                     2'b11,           // DR6-7 always cleared
+                                     ~dr1_5_preserve, // DR1-5 from mask
+                                     1'b0};           // DR0 always preserved
+    
+    // CR clear mask: bit[i]=1 means clear CR[i]
+    // CR0-CR5: from mask (inverted)
+    // CR6-CR15: never cleared by CALL (bit=0)
+    wire [15:0] cr_clear_computed = {10'd0, ~cr_preserve};
     
     assign nia_set = (state == CALL_COMPLETE);
     assign nia_value = 64'd0;  // Start at offset zero

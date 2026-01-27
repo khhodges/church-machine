@@ -128,7 +128,37 @@ The mLoad micro-routine (`ctmm_mload.sv`) is the **single trusted microcode** fo
 | Instruction | Uses mLoad For | Status |
 |-------------|----------------|--------|
 | **LOAD**    | Fetch capability into destination register | Implemented |
-| **CALL**    | Two-phase load + MASK isolation: CRs[Index]→CR6, CR6[0]→CR7, NIA=0, MASK-based clear | Implemented |
+| **CALL**    | Two-phase load + isolation: CRs[Index]→CR6, CR6[0]→CR7, NIA=0, MASK-based clear | Implemented |
+
+### CALL Instruction Encoding
+
+```
+| 31:28 | 27:22  | 21:19  | 18:16 | 15:8  | 7:6   | 5:1   | 0   |
+|-------|--------|--------|-------|-------|-------|-------|-----|
+| Cond  | Opcode | CR1-3  | CRs   | Index | CR4-5 | DR1-5 | CR0 |
+```
+
+**Instruction bits for MASK (11 bits, bit=1 → PRESERVE):**
+- `[0]` = CR0 preserve
+- `[21:19]` = CR1-CR3 preserve
+- `[7:6]` = CR4-CR5 preserve
+- `[5:1]` = DR1-DR5 preserve
+
+**Decoded call_mask[10:0]:**
+```
+[10]   = bit[0]       // CR0
+[9:7]  = bits[21:19]  // CR1-CR3
+[6:5]  = bits[7:6]    // CR4-CR5
+[4:0]  = bits[5:1]    // DR1-DR5
+```
+
+**Fixed Register Behaviors (NOT in MASK):**
+- DR0: always preserved (primary argument)
+- DR6-DR7: always cleared
+- DR8-DR15: always cleared
+
+| Instruction | Uses mLoad For | Status |
+|-------------|----------------|--------|
 | **RETURN**  | Fetch return capability from stack | Planned |
 | **CHANGE**  | Fetch new thread identity into CR8 | Planned |
 | **SWITCH**  | Fetch new namespace capability into CR15 | Implemented |

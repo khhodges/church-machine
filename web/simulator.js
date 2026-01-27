@@ -547,12 +547,34 @@ class CTMMSimulator {
                     boundGTs: []
                 });
                 
+                // CALL isolation mask (11 bits): [10:5]=CR0-5, [4:0]=DR1-5
+                // bit=1 means PRESERVE, bit=0 means CLEAR
+                // Fixed behaviors: DR0 always preserved, DR6-7 always cleared, DR8-15 always cleared
                 const mask = maskField || 0;
                 let clearedRegs = [];
-                for (let i = 0; i < 16; i++) {
-                    if ((mask >> i) & 1) {
+                
+                // DR0: always preserved (not in mask)
+                // DR1-DR5: based on mask bits [4:0]
+                for (let i = 1; i <= 5; i++) {
+                    const preserve = (mask >> (i - 1)) & 1;
+                    if (!preserve) {
                         this.dataRegs[i] = 0n;
                         clearedRegs.push(`DR${i}`);
+                    }
+                }
+                // DR6-DR15: always cleared
+                for (let i = 6; i < 16; i++) {
+                    this.dataRegs[i] = 0n;
+                    clearedRegs.push(`DR${i}`);
+                }
+                
+                // CR0-CR5: based on mask bits [10:5]
+                let clearedCRs = [];
+                for (let i = 0; i <= 5; i++) {
+                    const preserve = (mask >> (i + 5)) & 1;
+                    if (!preserve) {
+                        this.contextRegs[i] = { name: 'NULL', perms: [], location: null, locked: true };
+                        clearedCRs.push(`CR${i}`);
                     }
                 }
                 
@@ -578,8 +600,9 @@ class CTMMSimulator {
                 };
                 
                 this.stackDepth++;
-                const clearMsg = clearedRegs.length > 0 ? `, cleared: ${clearedRegs.join(',')}` : '';
-                return `CALL CR${crIdx} (${cr.name}): pushed frame, loaded CR6 (nodal C-List), CR7 (Access Code)${clearMsg}`;
+                const drClearMsg = clearedRegs.length > 0 ? `, DRs cleared: ${clearedRegs.join(',')}` : '';
+                const crClearMsg = clearedCRs.length > 0 ? `, CRs cleared: ${clearedCRs.join(',')}` : '';
+                return `CALL CR${crIdx} (${cr.name}): pushed frame, loaded CR6 (nodal C-List), CR7 (Access Code)${drClearMsg}${crClearMsg}`;
             }
             
             case "RETURN": {

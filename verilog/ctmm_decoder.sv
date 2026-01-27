@@ -32,7 +32,7 @@ module ctmm_decoder
     output logic [2:0]  cr_dst,           // Destination CR (3 bits: 0-5)
     output logic [7:0]  clist_index,      // C-List index
     output logic [15:0] perm_mask,        // Permission mask for TPERM
-    output logic [13:0] call_mask,        // CALL preserve mask: [7:0]=DR0-7, [13:8]=CR0-5
+    output logic [10:0] call_mask,        // CALL preserve mask: [10:5]=CR0-5, [4:0]=DR1-5
     
     // Turing instruction decoded fields
     output turing_opcode_t turing_op,
@@ -124,25 +124,23 @@ module ctmm_decoder
     // Standard Church layout: [21:19]=dst, [18:16]=src, [15:8]=index
     // CALL uses: src=cr_src, index=clist_index
     //
-    // Fixed register behaviors (no mask bits needed):
+    // Fixed register behaviors (NOT in mask):
     //   DR0: always preserved (primary argument)
     //   DR6-DR7: always cleared
     //   DR8-DR15: always cleared
     //
     // Spare bits for CALL mask (11 total):
+    //   Bit  [0]     = CR0 preserve (1 bit)
     //   Bits [21:19] = CR1-CR3 preserve (3 bits)
     //   Bits [7:6]   = CR4-CR5 preserve (2 bits)
     //   Bits [5:1]   = DR1-DR5 preserve (5 bits)
-    //   Bit  [0]     = CR0 preserve (1 bit, default=1 preserve)
     //
-    // call_mask format: [13:8]=CR0-5, [7:0]=DR0-7
+    // call_mask format: [10:5]=CR0-5 grouped, [4:0]=DR1-5
     // bit=1 means PRESERVE, bit=0 means CLEAR
-    assign call_mask = {operand_field[0],                    // CR0 (optional, default preserve)
-                        operand_field[21:19],                // CR1-CR3
-                        operand_field[7:6],                  // CR4-CR5
-                        1'b1,                                // DR0 always preserved
-                        operand_field[5:1],                  // DR1-DR5
-                        2'b00};                              // DR6-DR7 always cleared
+    assign call_mask = {operand_field[0],                    // [10] CR0
+                        operand_field[21:19],                // [9:7] CR1-CR3
+                        operand_field[7:6],                  // [6:5] CR4-CR5
+                        operand_field[5:1]};                 // [4:0] DR1-DR5
     
     // ========================================================================
     // Turing Instruction Decode
