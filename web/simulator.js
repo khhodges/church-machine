@@ -21,6 +21,36 @@ class CTMMSimulator {
         this.callStack = [];
         
         this.flags = { N: false, Z: false, C: false, V: false };
+        
+        // Per-thread exclusive monitors for LOADX/SAVEX (16 threads)
+        this.exclusiveMonitors = {};
+        for (let i = 0; i < 16; i++) {
+            this.exclusiveMonitors[i] = { valid: false, addr: 0 };
+        }
+        this.currentThread = 0;
+    }
+    
+    // TPERM preset codes (0-13 valid, 14-15 reserved cause FAULT)
+    getTpermMask(code) {
+        const presets = {
+            0:  [],                              // CLEAR: No permissions
+            1:  ['R'],                           // RO: Read-only
+            2:  ['R', 'W'],                      // RW: Read-Write
+            3:  ['R', 'X'],                      // RX: Read-Execute
+            4:  ['R', 'W', 'X'],                 // RWX: Full data access
+            5:  ['L'],                           // L: Load capability only
+            6:  ['L', 'S'],                      // LS: Load-Save capabilities
+            7:  ['L', 'S', 'E'],                 // LSE: Capability + Enter
+            8:  ['L', 'S', 'E', 'B'],            // LSEB: Full capability control
+            9:  ['R', 'W', 'L', 'S'],            // DATA+CAP: Data + capability
+            10: ['R', 'W', 'X', 'L', 'S', 'E'],  // FULL: All except B,M,F,G
+            11: ['M'],                           // META: Meta-machine only
+            12: ['E'],                           // ENTER: Enter only (for procedures)
+            13: ['L', 'M'],                      // LM: Load + Microcode (internal)
+            14: null,                            // RESERVED - causes FAULT
+            15: null                             // RESERVED - causes FAULT
+        };
+        return presets[code];
     }
     
     softReset() {
@@ -525,6 +555,188 @@ class CTMMSimulator {
                     return `FAULT: Source CR${srcCR} ${permStr} "${src.name}" lacks Bind (B) or Master (M) permission`;
                 }
                 return `Saved GT from CR${srcCR} to CR${destCR}[${idx || 0}] (B-bit validated)`;
+            }
+            
+            case "LOADX": {
+                // Load Exclusive - same as LOAD but sets exclusive monitor
+                const [destCR, srcCR, idx] = args;
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
+                           srcCR === 8 ? this.cr8 : this.cr15;
+                
+                if (!src || src.name === 'NULL') {
+                    return `FAULT: CR${srcCR} [NULL] - no capability loaded`;
+                }
+                if (!src.perms.includes('L') && !src.perms.includes('M')) {
+                    const permStr = src.perms.length > 0 ? `[${src.perms.join('')}]` : '[no perms]';
+                    return `FAULT: Source CR${srcCR} ${permStr} lacks Load (L) permission`;
+                }
+                
+                // Load the capability (reuse LOAD logic)
+                let loadedCap = null;
+                if (src.clist && idx < src.clist.length) {
+                    const entry = src.clist[idx];
+                    loadedCap = {
+                        name: entry.name || `Entry_${idx}`,
+                        location: entry.location || { type: 'Local', offset: idx * 256 },
+                        perms: entry.perms ? [...entry.perms] : ['R'],
+                        locked: entry.locked || false,
+                        goldenKey: entry.goldenKey || this.generateKey(),
+                        clist: entry.clist || null
+                    };
+                } else {
+                    loadedCap = {
+                        name: `LOADED_${idx}`,
+                        location: { type: 'Local', offset: idx * 256 },
+                        perms: ['R'],
+                        locked: false,
+                        goldenKey: this.generateKey()
+                    };
+                }
+                
+                if (destCR < 8) {
+                    this.contextRegs[destCR] = loadedCap;
+                }
+                
+                // Set exclusive monitor for current thread
+                const addr = (srcCR << 16) | idx;
+                this.exclusiveMonitors[this.currentThread] = { valid: true, addr: addr };
+                
+                return `LOADX: Loaded ${loadedCap.name} into CR${destCR}, exclusive monitor set for addr 0x${addr.toString(16)}`;
+            }
+            
+            case "SAVEX": {
+                // Store Exclusive - conditional store, returns result in DR
+                const [srcCR, destCR, idx, resultDR] = args;
+                const dest = destCR < 8 ? this.contextRegs[destCR] : 
+                            destCR === 8 ? this.cr8 : this.cr15;
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
+                           srcCR === 8 ? this.cr8 : this.cr15;
+                
+                if (!dest || dest.name === 'NULL') {
+                    return `FAULT: CR${destCR} [NULL] - no capability loaded (destination)`;
+                }
+                if (!dest.perms.includes('S') && !dest.perms.includes('M')) {
+                    const permStr = dest.perms.length > 0 ? `[${dest.perms.join('')}]` : '[no perms]';
+                    return `FAULT: Dest CR${destCR} ${permStr} lacks Save (S) permission`;
+                }
+                
+                // Check exclusive monitor
+                const addr = (destCR << 16) | idx;
+                const monitor = this.exclusiveMonitors[this.currentThread];
+                
+                if (monitor.valid && monitor.addr === addr) {
+                    // Success - monitor was valid
+                    this.setDataReg(resultDR || 0, BigInt(0));
+                    this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
+                    return `SAVEX: Success, saved CR${srcCR} to CR${destCR}[${idx}], DR${resultDR || 0}=0`;
+                } else {
+                    // Fail - monitor was cleared or different address
+                    this.setDataReg(resultDR || 0, BigInt(1));
+                    this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
+                    return `SAVEX: Failed (monitor invalid/mismatch), DR${resultDR || 0}=1`;
+                }
+            }
+            
+            case "LDM": {
+                // Load Multiple - load multiple CRs from consecutive C-List entries
+                const [baseCR, regList] = args;
+                const base = baseCR < 8 ? this.contextRegs[baseCR] : 
+                            baseCR === 8 ? this.cr8 : this.cr15;
+                
+                if (!base || base.name === 'NULL') {
+                    return `FAULT: CR${baseCR} [NULL] - no capability loaded`;
+                }
+                if (!base.perms.includes('L') && !base.perms.includes('M')) {
+                    const permStr = base.perms.length > 0 ? `[${base.perms.join('')}]` : '[no perms]';
+                    return `FAULT: Base CR${baseCR} ${permStr} lacks Load (L) permission`;
+                }
+                
+                let loaded = [];
+                let idx = 0;
+                for (let i = 0; i < 8; i++) {
+                    if ((regList >> i) & 1) {
+                        // Load CR[i] from base[idx]
+                        if (base.clist && idx < base.clist.length) {
+                            const entry = base.clist[idx];
+                            this.contextRegs[i] = {
+                                name: entry.name || `LDM_${idx}`,
+                                location: entry.location || { type: 'Local', offset: idx * 256 },
+                                perms: entry.perms ? [...entry.perms] : ['R'],
+                                locked: false,
+                                goldenKey: entry.goldenKey || this.generateKey()
+                            };
+                        }
+                        loaded.push(`CR${i}`);
+                        idx++;
+                    }
+                }
+                return `LDM: Loaded {${loaded.join(',')}} from CR${baseCR}`;
+            }
+            
+            case "STM": {
+                // Store Multiple - store multiple CRs to consecutive C-List entries
+                const [baseCR, regList] = args;
+                const base = baseCR < 8 ? this.contextRegs[baseCR] : 
+                            baseCR === 8 ? this.cr8 : this.cr15;
+                
+                if (!base || base.name === 'NULL') {
+                    return `FAULT: CR${baseCR} [NULL] - no capability loaded`;
+                }
+                if (!base.perms.includes('S') && !base.perms.includes('M')) {
+                    const permStr = base.perms.length > 0 ? `[${base.perms.join('')}]` : '[no perms]';
+                    return `FAULT: Base CR${baseCR} ${permStr} lacks Save (S) permission`;
+                }
+                
+                let stored = [];
+                for (let i = 0; i < 8; i++) {
+                    if ((regList >> i) & 1) {
+                        stored.push(`CR${i}`);
+                    }
+                }
+                return `STM: Stored {${stored.join(',')}} to CR${baseCR}`;
+            }
+            
+            case "LDI": {
+                // Load Immediate - load 22-bit constant into data register
+                const [dr, imm] = args;
+                const value = BigInt(imm) & BigInt(0x3FFFFF);  // 22-bit mask
+                this.setDataReg(dr, value);
+                return `LDI DR${dr}, #${imm} = 0x${value.toString(16).toUpperCase()}`;
+            }
+            
+            case "TPERM_PRESET": {
+                // TPERM with preset code instead of explicit permissions
+                const [destCR, srcCR, presetCode] = args;
+                
+                const mask = this.getTpermMask(presetCode);
+                if (mask === null) {
+                    return `FAULT: TPERM preset code ${presetCode} is reserved (use 0-13)`;
+                }
+                
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
+                           srcCR === 8 ? this.cr8 : this.cr15;
+                
+                if (!src || src.name === 'NULL') {
+                    return `FAULT: CR${srcCR} [NULL] - no capability loaded`;
+                }
+                
+                // Create new capability with restricted permissions
+                const srcPerms = src.perms || [];
+                const newPerms = mask.filter(p => srcPerms.includes(p));
+                
+                const newCap = {
+                    name: src.name,
+                    location: { ...src.location },
+                    perms: newPerms,
+                    locked: src.locked,
+                    goldenKey: src.goldenKey
+                };
+                
+                if (destCR < 8) {
+                    this.contextRegs[destCR] = newCap;
+                }
+                
+                return `TPERM_PRESET CR${destCR}, CR${srcCR}, #${presetCode}: [${srcPerms.join('')}] -> [${newPerms.join('')}]`;
             }
             
             case "CALL": {
