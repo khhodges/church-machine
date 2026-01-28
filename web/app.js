@@ -4278,8 +4278,8 @@ const lessons = [
                 </div>`
             },
             {
-                text: `<h3>The Nine Permissions</h3>
-                <p>Each capability grants specific permissions encoded in the GT. The CTMM uses nine permission types:</p>
+                text: `<h3>The Ten Permissions</h3>
+                <p>Each capability grants specific permissions encoded in the GT. The CTMM uses ten permission types organized into mutually exclusive domains:</p>
                 <ul>
                     <li><code>R</code> - <strong>Read</strong>: View data or code</li>
                     <li><code>W</code> - <strong>Write</strong>: Modify data</li>
@@ -4535,7 +4535,7 @@ const lessons = [
                 <ul>
                     <li><strong>Context Registers (CR0-CR7)</strong>: Hold capabilities (programmer-accessible)</li>
                     <li><strong>Meta-Machine Registers (CR8-CR15)</strong>: Reserved for hardware/OS</li>
-                    <li><strong>Data Registers (DR0-DR7)</strong>: Hold 64-bit numeric values</li>
+                    <li><strong>Data Registers (DR0-DR15)</strong>: Hold 64-bit numeric values</li>
                 </ul>
                 <div class="key-concept">
                     <strong>Key Insight:</strong> This separation enforces security at the hardware level. You cannot accidentally treat a number as a capability or vice versa.
@@ -4703,22 +4703,22 @@ const lessons = [
                 </div>`
             },
             {
-                text: `<h3>Namespace Switching</h3>
-                <p>The <code>SWITCH</code> instruction changes the current namespace (CR15):</p>
+                text: `<h3>System Register Updates</h3>
+                <p>The <code>SWITCH</code> instruction copies a capability to a system register (CR8-CR15):</p>
                 <ul>
-                    <li>Effectively changes "where you are" in the system</li>
-                    <li>Determines what resources you can see and access</li>
-                    <li>Requires <code>E</code> (Enter) permission on the target capability</li>
+                    <li>Uses a 3-bit target field to select destination: 0=CR8, 1=CR9, ... 7=CR15</li>
+                    <li>Supports I-bit variants: I=0 (register source) or I=1 (C-List lookup)</li>
+                    <li>Requires <code>L</code> (Load) permission on the source capability</li>
                 </ul>
-                <p>This enables secure isolation between different parts of the system.</p>`,
+                <p>This enables controlled updates to system registers like Thread (CR8) and Namespace (CR15).</p>`,
                 interactive: {
                     type: "quiz",
-                    question: "Which permission is required to use CALL or SWITCH on a capability?",
+                    question: "Which permission is required to use CALL on a capability?",
                     options: ["R (Read)", "W (Write)", "X (Execute)", "E (Enter)"],
                     correct: 3,
                     feedback: {
-                        correct: "Correct! The E (Enter) permission is required for CALL and SWITCH operations.",
-                        incorrect: "Not quite. The E (Enter) permission specifically controls entry into procedures and namespaces."
+                        correct: "Correct! The E (Enter) permission is required for CALL operations. SWITCH requires L (Load) permission.",
+                        incorrect: "Not quite. The E (Enter) permission specifically controls entry into abstractions via CALL."
                     }
                 }
             }
@@ -6021,8 +6021,8 @@ RETURN mask
                     <li><strong>SAVE</strong> - Write a Golden Token from a Context Register to memory</li>
                     <li><strong>CALL</strong> - Invoke code referenced by a Golden Token</li>
                     <li><strong>RETURN</strong> - Return from invoked code to the caller</li>
-                    <li><strong>CHANGE</strong> - Switch to a different C-List (capability context)</li>
-                    <li><strong>SWITCH</strong> - Switch to a different thread identity</li>
+                    <li><strong>CHANGE</strong> - Create new thread GT and write to CR8 (thread identity)</li>
+                    <li><strong>SWITCH</strong> - Copy capability to system register CR8-CR15</li>
                 </ul>
                 <div class="key-concept">
                     <strong>Key Insight:</strong> Church instructions operate on <em>capabilities</em> (GTs), not raw data. Every memory access, every function call, every context switch requires a valid GT.
@@ -6200,83 +6200,84 @@ done:
                 </div>`
             },
             {
-                text: `<h3>CHANGE: Switching C-Lists</h3>
-                <p>The <strong>CHANGE</strong> instruction switches the current C-List (CR6) to a different capability context.</p>
+                text: `<h3>CHANGE: Creating New Thread Identity</h3>
+                <p>The <strong>CHANGE</strong> instruction creates a new thread GT and writes it to CR8 (Thread identity register).</p>
                 <p><strong>What happens during CHANGE:</strong></p>
                 <ol>
-                    <li><strong>Permission Check</strong> - New C-List GT must have appropriate access</li>
-                    <li><strong>Validate C-List</strong> - Target must be a valid C-List structure</li>
-                    <li><strong>Update CR6</strong> - CR6 now points to the new C-List</li>
+                    <li><strong>Load Source Capability</strong> - From register (I=0) or C-List lookup (I=1)</li>
+                    <li><strong>Create Thread GT</strong> - New GT derived from source capability</li>
+                    <li><strong>Write to CR8</strong> - Thread identity updated (target always 0)</li>
+                    <li><strong>Clear Exclusive Monitor</strong> - Per ARM CLREX semantics</li>
                 </ol>
                 <p><strong>Use Cases:</strong></p>
                 <ul>
-                    <li>Entering a <strong>sandbox</strong> with restricted capabilities</li>
-                    <li>Switching to a <strong>library's</strong> private capability set</li>
-                    <li>Implementing <strong>least privilege</strong> by narrowing available GTs</li>
+                    <li>Creating a new <strong>thread context</strong> for isolated execution</li>
+                    <li>Switching to a <strong>different user identity</strong></li>
+                    <li>Implementing <strong>process isolation</strong> at hardware level</li>
                 </ul>`,
                 demo: `<div class="demo-title">CHANGE Instruction Examples</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
-; Syntax: CHANGE source
-; source = CR containing new C-List GT (0-15)
+; Syntax: CHANGE CRs (I=0) or CHANGE idx (I=1)
+; Creates new thread GT and writes to CR8
 
-; Switch to a restricted C-List:
-LOAD 0 6 10     ; CR0 = restricted C-List GT
-CHANGE 0        ; CR6 = CR0 (now using restricted set)
-; ... operate with fewer capabilities ...
+; Register addressing (I=0):
+LOAD 0 6 5      ; CR0 = thread template from C-List
+CHANGE 0        ; CR8 = new thread GT from CR0
 
-; Common pattern - sandbox execution:
-LOAD 0 6 8      ; CR0 = sandbox C-List
-SAVE 6 1 0      ; Save code GT in sandbox
-CHANGE 0        ; Enter sandbox
-LOAD 0 6 0      ; Load code from sandbox C-List
-CALL 0          ; Execute with limited rights
-; On RETURN, CR6 is restored to original
+; C-List lookup (I=1):
+CHANGE 3        ; CR8 = new thread GT from C-List[3]
 
-; Direct addressing (Mode=0):
-CHANGE 5        ; CR6 = CR5
+; Common pattern - create isolated context:
+LOAD 0 7 2      ; CR0 = thread template from Nucleus
+CHANGE 0        ; CR8 = new thread identity
+; ... execute with new identity ...
+; Note: CHANGE always targets CR8 (target=0)
 
-; C-List lookup (Mode=1):
-CHANGE 5        ; CR6 = memory[CR6 + 5]</pre>
+; Exclusive monitor is cleared on CHANGE
+; (per ARM CLREX semantics)</pre>
                 </div>`
             },
             {
-                text: `<h3>SWITCH: Changing Thread Identity</h3>
-                <p>The <strong>SWITCH</strong> instruction changes the current thread identity (CR8).</p>
+                text: `<h3>SWITCH: Copying to System Registers</h3>
+                <p>The <strong>SWITCH</strong> instruction copies a capability to a system register (CR8-CR15).</p>
                 <p><strong>What happens during SWITCH:</strong></p>
                 <ol>
-                    <li><strong>Permission Check</strong> - Caller must have M (Meta) permission on target</li>
-                    <li><strong>Validate Thread GT</strong> - Target must be a valid Thread capability</li>
-                    <li><strong>Update CR8</strong> - Current thread identity changes</li>
+                    <li><strong>Permission Check</strong> - Source must have L (Load) permission</li>
+                    <li><strong>Select Target</strong> - 3-bit target field selects CR8-CR15 (0=CR8, 7=CR15)</li>
+                    <li><strong>Copy Capability</strong> - GT copied to selected system register</li>
+                    <li><strong>Clear Monitor</strong> - If target=0 (CR8), exclusive monitor cleared</li>
                 </ol>
-                <p><strong>Why this matters:</strong> CR8 identifies WHO is executing code. Audit logs use CR8. Permission checks reference CR8. SWITCH enables:</p>
+                <p><strong>Target field mapping:</strong></p>
                 <ul>
-                    <li><strong>Impersonation</strong> - Acting on behalf of another user (with permission)</li>
-                    <li><strong>Service accounts</strong> - Background tasks with specific identity</li>
-                    <li><strong>Privilege escalation</strong> (controlled) - Temporarily gaining rights</li>
+                    <li><strong>0 = CR8</strong> - Thread identity</li>
+                    <li><strong>1 = CR9</strong> - Interrupt handler</li>
+                    <li><strong>2 = CR10</strong> - Double fault handler</li>
+                    <li><strong>7 = CR15</strong> - Namespace root</li>
                 </ul>`,
                 demo: `<div class="demo-title">SWITCH Instruction Examples</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem;">
-; Syntax: SWITCH source
-; source = CR containing new Thread GT (0-15)
+; Syntax: SWITCH CRs, target (I=0) or SWITCH idx, target (I=1)
+; Copies capability to system register CR8-CR15
+; target: 0=CR8, 1=CR9, 2=CR10, ... 7=CR15
 
-; Switch to service account:
-LOAD 0 7 3      ; CR0 = service thread GT from Nucleus
-TPERM 0 M       ; Verify we have Meta permission
-B NE fault      ; Fail if not authorized
-SWITCH 0        ; CR8 = service thread
-; ... now executing as service account ...
+; Copy to CR8 (Thread) - target=0:
+LOAD 0 7 3      ; CR0 = thread GT from Nucleus
+SWITCH 0, 0     ; CR8 = CR0 (thread identity)
 
-; Return to original identity (if saved):
-SWITCH 5        ; CR8 = saved original thread in CR5
+; Copy to CR15 (Namespace) - target=7:
+LOAD 0 6 2      ; CR0 = namespace GT from C-List
+SWITCH 0, 7     ; CR15 = CR0 (namespace root)
 
-; Common pattern - sudo-like:
-SAVE 6 8 0      ; Save current thread GT
-SWITCH 0        ; Become admin
-CALL 1          ; Do privileged operation
-LOAD 5 6 0      ; Restore original thread GT
-SWITCH 5        ; Become original user again</pre>
+; C-List lookup mode (I=1):
+SWITCH 5, 0     ; CR8 = C-List[5]
+
+; Common pattern - update interrupt handler:
+LOAD 0 7 4      ; CR0 = interrupt handler GT
+SWITCH 0, 1     ; CR9 = interrupt handler
+
+; Requires L (Load) permission on source</pre>
                 </div>`
             },
             {
@@ -6288,16 +6289,12 @@ SWITCH 5        ; Become original user again</pre>
                     <li><strong>Compare with Mask</strong> - Check if required bits are set</li>
                     <li><strong>Set Condition Flags</strong> - Z=1 if ALL required permissions present</li>
                 </ol>
-                <p><strong>Permission Bits:</strong></p>
+                <p><strong>Permission Bits (10 total in 4 mutually exclusive domains):</strong></p>
                 <ul>
-                    <li><strong>R</strong> (Read) - Can read data through this GT</li>
-                    <li><strong>W</strong> (Write) - Can write data through this GT</li>
-                    <li><strong>X</strong> (Execute) - Can CALL this GT</li>
-                    <li><strong>L</strong> (Lock) - Cannot be copied (SAVE fails)</li>
-                    <li><strong>S</strong> (Seal) - Object is sealed (immutable)</li>
-                    <li><strong>E</strong> (Extend) - Can create child capabilities</li>
-                    <li><strong>B</strong> (Bounds) - Has restricted bounds</li>
-                    <li><strong>M</strong> (Meta) - Hardware-level permissions</li>
+                    <li><strong>Turing (Data):</strong> R (Read), W (Write), X (Execute)</li>
+                    <li><strong>Church (Capability):</strong> L (Load from C-List), S (Save to C-List)</li>
+                    <li><strong>Lambda:</strong> E (Enter abstraction)</li>
+                    <li><strong>Meta:</strong> B (Bind), M (Machine), F (Foreign), G (Garbage)</li>
                 </ul>`,
                 demo: `<div class="demo-title">TPERM Instruction Examples</div>
                 <div class="demo-content">
@@ -6397,12 +6394,12 @@ FAULT             ; Uniform failure</pre>
                         "LOAD - loads capabilities from memory",
                         "SAVE - stores capabilities to memory",
                         "CALL - invokes abstraction with E permission",
-                        "CHANGE - switches thread identity"
+                        "CHANGE - creates new thread GT in CR8"
                     ],
                     correct: 2,
                     feedback: {
                         correct: "Correct! CALL is the instruction that transfers control to abstractions. It requires the E (Enter) permission on the target GT.",
-                        incorrect: "Not quite. CALL is the instruction for invoking abstractions. LOAD/SAVE move GTs, and CHANGE switches thread identity."
+                        incorrect: "Not quite. CALL is the instruction for invoking abstractions. LOAD/SAVE move GTs, CHANGE creates thread identity in CR8, and SWITCH copies to system registers CR8-CR15."
                     }
                 }
             }
