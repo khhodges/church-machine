@@ -51,7 +51,11 @@ The web interface is composed of seven distinct views:
     -   **TPERM Presets**: 14 preset codes (0=CLEAR, 1=R, 2=RW, 3=X, 4=RX, 5=RWX, 6=L, 7=S, 8=E, 9=B, 10=M, 11=F, 12=G, 13=LS); codes 6-12 follow Lambda permission order (L,S,E,B,M,F,G); codes 14-15 reserved (FAULT)
 -   **Condition Codes**: ARM-style condition flags for conditional execution.
 -   **State Persistence**: Automatic saving and restoring of simulator state using local storage, with export/import functionality.
--   **Permission Management**: Permission validation rules are implemented, defining categories (Data, Capability, Protected, Meta) and ensuring normalization across all mutation paths.
+-   **Permission Management**: Permission validation rules are implemented with mutually exclusive domains:
+    -   **Capability (Church)**: L (Load), S (Save) - Golden Token operations
+    -   **Data (Turing)**: R (Read), W (Write), X (Execute) - code/data operations
+    -   **Lambda**: E (Enter) - invoke protected abstraction
+    -   **Meta**: B (Bound), M (Machine), F (Foreign), G (Garbage) - system permissions
 -   **Failsafe Security**: All validation failures use a single FAULT handler for secure error management without information leakage.
 -   **Deterministic Garbage Collection**: The G (Garbage) permission bit enables deterministic GC by marking entries during collection cycles. When a valid key accesses a Namespace entry via LOAD, the G bit is reset to FALSE. The "GC Scan" button in the Namespace Browser runs a full Mark-Scan-Sweep cycle over the DNA hierarchy.
 
