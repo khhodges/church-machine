@@ -207,7 +207,7 @@ package ctmm_pkg;
         TPERM_E     = 4'd6,     // Enter abstraction
         TPERM_LS    = 4'd7,     // Load + Save capabilities
         TPERM_B     = 4'd8,     // Bound (can delegate)
-        TPERM_LB    = 4'd9,     // Load + Bind
+        TPERM_RSV0  = 4'd9,     // RESERVED - causes FAULT
         TPERM_G     = 4'd10,    // GC marking
         TPERM_F     = 4'd11,    // Foreign/remote
         TPERM_M     = 4'd12,    // Meta/internal
@@ -228,7 +228,7 @@ package ctmm_pkg;
             TPERM_E:     return PERM_MASK_E;                           // E
             TPERM_LS:    return PERM_MASK_L | PERM_MASK_S;             // L,S
             TPERM_B:     return PERM_MASK_B;                           // B
-            TPERM_LB:    return PERM_MASK_L | PERM_MASK_B;             // L,B
+            TPERM_RSV0:  return 16'hFFFF;                              // RESERVED - will fault
             TPERM_G:     return PERM_MASK_G;                           // G
             TPERM_F:     return PERM_MASK_F;                           // F
             TPERM_M:     return PERM_MASK_M;                           // M

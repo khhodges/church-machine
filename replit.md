@@ -47,7 +47,7 @@ The web interface is composed of seven distinct views:
     -   **LOADX/SAVEX**: Atomic load/store with per-thread exclusive monitors for lock-free synchronization
     -   **LDM/STM**: Load/Store Multiple CRs with mLoad/mSave security validation
     -   **LDI**: Load 22-bit immediate constant into data register
-    -   **TPERM Presets**: 14 preset codes (0-13) for common permission patterns (CLEAR, RO, RW, RX, RWX, L, LS, LSE, LSEB, DATA+CAP, FULL, META, ENTER, LM)
+    -   **TPERM Presets**: 13 preset codes for common permission patterns (0=CLEAR, 1=R, 2=RW, 3=X, 4=RX, 5=RWX, 6=E, 7=LS, 8=B, 10=G, 11=F, 12=M, 13=LM); codes 9,14,15 reserved (FAULT)
 -   **Condition Codes**: ARM-style condition flags for conditional execution.
 -   **State Persistence**: Automatic saving and restoring of simulator state using local storage, with export/import functionality.
 -   **Permission Management**: Permission validation rules are implemented, defining categories (Data, Capability, Protected, Meta) and ensuring normalization across all mutation paths.

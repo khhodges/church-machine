@@ -30,22 +30,22 @@ class CTMMSimulator {
         this.currentThread = 0;
     }
     
-    // TPERM preset codes (0-13 valid, 14-15 reserved cause FAULT)
+    // TPERM preset codes (0-8, 10-13 valid; 9 and 14-15 reserved cause FAULT)
     getTpermMask(code) {
         const presets = {
             0:  [],                              // CLEAR: No permissions
-            1:  ['R'],                           // RO: Read-only
+            1:  ['R'],                           // R: Read-only
             2:  ['R', 'W'],                      // RW: Read-Write
-            3:  ['R', 'X'],                      // RX: Read-Execute
-            4:  ['R', 'W', 'X'],                 // RWX: Full data access
-            5:  ['L'],                           // L: Load capability only
-            6:  ['L', 'S'],                      // LS: Load-Save capabilities
-            7:  ['L', 'S', 'E'],                 // LSE: Capability + Enter
-            8:  ['L', 'S', 'E', 'B'],            // LSEB: Full capability control
-            9:  ['R', 'W', 'L', 'S'],            // DATA+CAP: Data + capability
-            10: ['R', 'W', 'X', 'L', 'S', 'E'],  // FULL: All except B,M,F,G
-            11: ['M'],                           // META: Meta-machine only
-            12: ['E'],                           // ENTER: Enter only (for procedures)
+            3:  ['X'],                           // X: Execute only
+            4:  ['R', 'X'],                      // RX: Read-Execute
+            5:  ['R', 'W', 'X'],                 // RWX: Full data access
+            6:  ['E'],                           // E: Enter abstraction
+            7:  ['L', 'S'],                      // LS: Load-Save capabilities
+            8:  ['B'],                           // B: Bind (can delegate)
+            9:  null,                            // RESERVED - causes FAULT
+            10: ['G'],                           // G: GC marking
+            11: ['F'],                           // F: Foreign/remote
+            12: ['M'],                           // M: Meta/internal
             13: ['L', 'M'],                      // LM: Load + Microcode (internal)
             14: null,                            // RESERVED - causes FAULT
             15: null                             // RESERVED - causes FAULT
