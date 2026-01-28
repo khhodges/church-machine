@@ -842,39 +842,130 @@ class CTMMSimulator {
             }
             
             case "CHANGE": {
-                const [offset] = args;
+                // CHANGE CRs (I=0) or CHANGE CRn, idx (I=1)
+                // I=0: Create thread GT from capability in CRs
+                // I=1: Create thread GT from C-List lookup
+                const [arg1, arg2] = args;
+                
                 // Clear exclusive monitor on thread change (ARM CLREX semantics)
                 this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
+                
+                let sourceCap = null;
+                let sourceDesc = '';
+                
+                if (arg2 !== undefined) {
+                    // I=1: C-List lookup - arg1 is CRn, arg2 is index
+                    const crIdx = parseInt(arg1);
+                    const index = parseInt(arg2);
+                    const clist = crIdx < 8 ? this.contextRegs[crIdx] : null;
+                    if (!clist || clist.name === 'NULL') {
+                        return `FAULT: CR${crIdx} [NULL] - no C-List loaded`;
+                    }
+                    if (!clist.perms.includes('L')) {
+                        return `FAULT: CR${crIdx} lacks Load (L) permission for C-List access`;
+                    }
+                    // Actually look up the entry from the C-List
+                    if (!clist.clist || index >= clist.clist.length) {
+                        return `FAULT: Index ${index} out of bounds for C-List (size: ${clist.clist ? clist.clist.length : 0})`;
+                    }
+                    const entry = clist.clist[index];
+                    // Validate entry permissions (L or E required to read capability)
+                    if (entry.perms && !entry.perms.includes('L') && !entry.perms.includes('E') && !entry.perms.includes('R')) {
+                        return `FAULT: Entry ${index} lacks required permissions for access`;
+                    }
+                    sourceCap = {
+                        name: entry.name || `Entry_${index}`,
+                        location: entry.location || { type: 'Local', offset: index * 256 },
+                        perms: entry.perms ? [...entry.perms] : ['R'],
+                        locked: entry.locked || false,
+                        goldenKey: entry.goldenKey || this.generateKey(),
+                        clist: entry.clist || null
+                    };
+                    sourceDesc = `C-List CR${crIdx}[${index}]`;
+                } else {
+                    // I=0: Register source - arg1 is CRs
+                    const crIdx = parseInt(arg1);
+                    sourceCap = crIdx < 8 ? this.contextRegs[crIdx] : 
+                               crIdx === 8 ? this.cr8 : this.cr15;
+                    if (!sourceCap || sourceCap.name === 'NULL') {
+                        return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
+                    }
+                    sourceDesc = `CR${crIdx}`;
+                }
+                
+                // Create new thread GT from source capability
                 this.cr8 = {
-                    name: `THREAD_${offset}`,
-                    location: { type: 'Local', offset: offset },
+                    name: `THREAD_${sourceCap.name}`,
+                    location: sourceCap.location || { type: 'Local', offset: 0 },
                     perms: ['R', 'W'],
                     locked: false,
                     goldenKey: this.generateKey()
                 };
-                return `Changed to thread at offset ${offset}, exclusive monitor cleared`;
+                return `CHANGE: Created thread GT from ${sourceDesc}, exclusive monitor cleared`;
             }
             
             case "SWITCH": {
-                // SWITCH CRs, target - Load capability into system register CR8-CR15
+                // SWITCH CRs, target (I=0) or SWITCH CRn, idx, target (I=1)
+                // I=0: Copy capability from CRs to system register CR8-CR15
+                // I=1: Load from C-List[idx] to system register CR8-CR15
                 // Target: 0=CR8, 1=CR9, 2=CR10, 3-6=CR11-14 (future), 7=CR15
-                const [crIdx, target = 7] = args; // Default target=7 (CR15) for backward compatibility
-                const cr = crIdx < 8 ? this.contextRegs[crIdx] : 
-                          crIdx === 8 ? this.cr8 : this.cr15;
+                const [arg1, arg2, arg3] = args;
                 
-                if (!cr || cr.name === 'NULL') {
-                    return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
-                }
-                if (!cr.perms.includes('L') && !cr.perms.includes('E')) {
-                    const permStr = cr.perms.length > 0 ? `[${cr.perms.join('')}]` : '[no perms]';
-                    return `FAULT: CR${crIdx} ${permStr} "${cr.name}" lacks Load (L) or Enter (E) permission`;
+                let sourceCap = null;
+                let sourceDesc = '';
+                let target = 7; // Default to CR15 for backward compatibility
+                
+                if (arg3 !== undefined) {
+                    // I=1: C-List lookup - arg1 is CRn, arg2 is index, arg3 is target
+                    const crIdx = parseInt(arg1);
+                    const index = parseInt(arg2);
+                    target = parseInt(arg3);
+                    const clist = crIdx < 8 ? this.contextRegs[crIdx] : null;
+                    if (!clist || clist.name === 'NULL') {
+                        return `FAULT: CR${crIdx} [NULL] - no C-List loaded`;
+                    }
+                    if (!clist.perms.includes('L')) {
+                        return `FAULT: CR${crIdx} lacks Load (L) permission for C-List access`;
+                    }
+                    // Actually look up the entry from the C-List
+                    if (!clist.clist || index >= clist.clist.length) {
+                        return `FAULT: Index ${index} out of bounds for C-List (size: ${clist.clist ? clist.clist.length : 0})`;
+                    }
+                    const entry = clist.clist[index];
+                    // Validate entry permissions (L or E required to read capability)
+                    if (entry.perms && !entry.perms.includes('L') && !entry.perms.includes('E') && !entry.perms.includes('R')) {
+                        return `FAULT: Entry ${index} lacks required permissions for access`;
+                    }
+                    sourceCap = {
+                        name: entry.name || `Entry_${index}`,
+                        location: entry.location || { type: 'Local', offset: index * 256 },
+                        perms: entry.perms ? [...entry.perms] : ['R'],
+                        locked: entry.locked || false,
+                        goldenKey: entry.goldenKey || this.generateKey(),
+                        clist: entry.clist || null
+                    };
+                    sourceDesc = `C-List CR${crIdx}[${index}]`;
+                } else {
+                    // I=0: Register source - arg1 is CRs, arg2 is target
+                    const crIdx = parseInt(arg1);
+                    target = arg2 !== undefined ? parseInt(arg2) : 7;
+                    sourceCap = crIdx < 8 ? this.contextRegs[crIdx] : 
+                               crIdx === 8 ? this.cr8 : this.cr15;
+                    if (!sourceCap || sourceCap.name === 'NULL') {
+                        return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
+                    }
+                    if (!sourceCap.perms.includes('L') && !sourceCap.perms.includes('E')) {
+                        const permStr = sourceCap.perms.length > 0 ? `[${sourceCap.perms.join('')}]` : '[no perms]';
+                        return `FAULT: CR${crIdx} ${permStr} "${sourceCap.name}" lacks Load (L) or Enter (E) permission`;
+                    }
+                    sourceDesc = `CR${crIdx}`;
                 }
                 
                 // Map target to destination system register (CR8 + target)
                 const destCR = 8 + target;
                 const destName = ['CR8 (Thread)', 'CR9 (Interrupt)', 'CR10 (DFault)', 
                                   'CR11', 'CR12', 'CR13', 'CR14', 'CR15 (Namespace)'][target];
-                const newCap = { ...cr, goldenKey: cr.goldenKey || this.generateKey() };
+                const newCap = { ...sourceCap, goldenKey: sourceCap.goldenKey || this.generateKey() };
                 
                 // Store to appropriate system register
                 if (destCR === 8) {
@@ -892,7 +983,7 @@ class CTMMSimulator {
                     this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
                 }
                 
-                return `SWITCH: Loaded ${cr.name} into ${destName}`;
+                return `SWITCH: Loaded ${sourceDesc} into ${destName}`;
             }
             
             default:

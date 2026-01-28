@@ -1382,8 +1382,8 @@ const instructionInfo = {
     SAVE: { operands: ['destCR', 'srcDR'], help: 'Save DR[src] to location via CR[dest]. Requires Save permission.', isCap: true },
     CALL: { operands: ['cr'], help: 'Call procedure in CR[reg]. Requires Enter permission. Pushes return frame.', isCap: true },
     RETURN: { operands: [], help: 'Return from procedure. Pops stack frame and restores CR6, CR7, NIA.', isCap: true },
-    CHANGE: { operands: ['offset'], help: 'Create new thread GT at scope offset and load into CR8. Alternative: SWITCH CRs, 0 copies existing capability to CR8.', isCap: true },
-    SWITCH: { operands: ['cr', 'target'], help: 'Set system register CR8-15 to capability in CR[reg]. Target: 0=CR8, 7=CR15. Requires Load permission.', isCap: true }
+    CHANGE: { operands: ['cr_or_index'], help: 'Create new thread GT and load into CR8. I=0: from CRs, I=1: from C-List[idx]. Clears exclusive monitors.', isCap: true },
+    SWITCH: { operands: ['cr', 'target'], help: 'Copy capability to system register CR8-15. I=0: from CRs, I=1: from C-List[idx]. Target: 0=CR8...7=CR15.', isCap: true }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -3851,7 +3851,7 @@ function executeEditorInstruction(instr) {
                 break;
             
             case 'SWITCH':
-                result = simulator.execute(op, args[0]);
+                result = simulator.execute(op, args[0], args[1], args[2]);
                 break;
             
             case 'TPERM':
@@ -11018,20 +11018,22 @@ const churchInstrFormats = [
     {
         name: "CHANGE",
         brief: "Switch thread identity",
-        syntax: "CHANGE CRn, idx | CHANGE nsOffset",
-        desc: "Load new thread capability into CR8.",
+        syntax: "CHANGE CRs | CHANGE CRn, idx",
+        desc: "Create new thread Golden Token and load into CR8. I=0 uses capability in CRs as source; I=1 loads from C-List. Clears exclusive monitors (ARM CLREX semantics).",
         format: [
             { name: "Op", bits: 5, value: "00101", desc: "CHANGE opcode" },
             { name: "Cond", bits: 4, desc: "Condition code" },
-            { name: "I", bits: 1, desc: "0=NS offset, 1=C-List lookup" },
-            { name: "CRn", bits: 3, desc: "Source C-List (0-7, when I=1)" },
+            { name: "I", bits: 1, desc: "0=register source, 1=C-List lookup" },
+            { name: "CRs/CRn", bits: 3, desc: "Source CR (I=0) or C-List register (I=1)" },
             { name: "Reserved", bits: 3, value: "0", desc: "Reserved" },
-            { name: "Offset", bits: 16, desc: "C-List index or NS offset" }
+            { name: "Index", bits: 10, desc: "C-List slot index (when I=1, 0-1023)" },
+            { name: "Reserved", bits: 6, value: "0", desc: "Reserved" }
         ],
         variants: [
-            { name: "NS Offset", fields: { Mode: "0", Idx: "Namespace offset" } },
-            { name: "C-List", fields: { Mode: "1", CRn: "C-List register, Idx: slot" } }
-        ]
+            { name: "Register", fields: { I: "0", CRs: "Source capability register" } },
+            { name: "C-List", fields: { I: "1", CRn: "C-List register", Index: "slot" } }
+        ],
+        notes: "CHANGE creates a new thread GT from the source capability. Unlike SWITCH which copies existing capabilities, CHANGE establishes a new thread identity."
     },
     {
         name: "SWITCH",
@@ -11051,7 +11053,7 @@ const churchInstrFormats = [
             { name: "Direct", fields: { I: "0", CRs: "CR containing capability", Target: "Destination CR8-CR15" } },
             { name: "C-List lookup", fields: { I: "1", CRn: "C-List register", Index: "slot", Target: "Destination" } }
         ],
-        notes: "CHANGE is assembler alias for SWITCH with target=0 (CR8). Target maps: 0→CR8, 1→CR9, 2→CR10, 3→CR11, 4→CR12, 5→CR13, 6→CR14, 7→CR15."
+        notes: "Target maps: 0→CR8(Thread), 1→CR9(Interrupt), 2→CR10(DFault), 3-6→CR11-14(future), 7→CR15(Namespace). Both I=0 (register) and I=1 (C-List) variants supported."
     },
     {
         name: "TPERM",
