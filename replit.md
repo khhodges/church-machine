@@ -44,6 +44,7 @@ The web interface is composed of seven distinct views:
 -   **Built-in Abstractions**: Includes `Boot` (root namespace), `Threads` (user identities), `SlideRule` (IEEE 754 float operations), `Abacus` (64-bit integer operations), `Circle` (geometric calculations), `CapabilityManager` (GT creation), `DateTime` (ISO 8601 date/time), and `Lambda` (Church calculus primitives).
 -   **CapabilityManager Abstraction**: Creates new Golden Tokens for objects with specific permissions.
 -   **Instruction Set**: Comprehensive set of Church-specific (LOAD, SAVE, LOADX, SAVEX, LDM, STM, CALL, RETURN, CHANGE, SWITCH, TPERM) and Turing-specific (Arithmetic, Logic, Shifts, Compare, Branch, LDI) instructions.
+    -   **SWITCH Target Field**: 3-bit field selects destination system register: 0=CR8(Thread), 1=CR9(Interrupt), 2=CR10(DFault), 3-6=CR11-14(future), 7=CR15(Namespace)
     -   **LOADX/SAVEX**: Atomic load/store with per-thread exclusive monitors for lock-free synchronization
     -   **LDM/STM**: Load/Store Multiple CRs with mLoad/mSave security validation
     -   **LDI**: Load 22-bit immediate constant into data register

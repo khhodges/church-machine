@@ -856,7 +856,9 @@ class CTMMSimulator {
             }
             
             case "SWITCH": {
-                const [crIdx] = args;
+                // SWITCH CRs, target - Load capability into system register CR8-CR15
+                // Target: 0=CR8, 1=CR9, 2=CR10, 3-6=CR11-14 (future), 7=CR15
+                const [crIdx, target = 7] = args; // Default target=7 (CR15) for backward compatibility
                 const cr = crIdx < 8 ? this.contextRegs[crIdx] : 
                           crIdx === 8 ? this.cr8 : this.cr15;
                 
@@ -867,8 +869,30 @@ class CTMMSimulator {
                     const permStr = cr.perms.length > 0 ? `[${cr.perms.join('')}]` : '[no perms]';
                     return `FAULT: CR${crIdx} ${permStr} "${cr.name}" lacks Load (L) or Enter (E) permission`;
                 }
-                this.cr15 = { ...cr, goldenKey: cr.goldenKey || this.generateKey() };
-                return `Switched namespace to ${cr.name}`;
+                
+                // Map target to destination system register (CR8 + target)
+                const destCR = 8 + target;
+                const destName = ['CR8 (Thread)', 'CR9 (Interrupt)', 'CR10 (DFault)', 
+                                  'CR11', 'CR12', 'CR13', 'CR14', 'CR15 (Namespace)'][target];
+                const newCap = { ...cr, goldenKey: cr.goldenKey || this.generateKey() };
+                
+                // Store to appropriate system register
+                if (destCR === 8) {
+                    this.cr8 = newCap;
+                } else if (destCR === 15) {
+                    this.cr15 = newCap;
+                } else {
+                    // CR9-14: Store in system register array (future use)
+                    if (!this.systemRegs) this.systemRegs = {};
+                    this.systemRegs[destCR] = newCap;
+                }
+                
+                // Clear exclusive monitor on thread change (target=0 is CR8/Thread)
+                if (target === 0) {
+                    this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
+                }
+                
+                return `SWITCH: Loaded ${cr.name} into ${destName}`;
             }
             
             default:

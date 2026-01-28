@@ -160,6 +160,7 @@ After boot completes:
 | CR8/CR15 access | JS Simulator | LOAD allows writing to CR8/CR15 - OK for boot, but should be restricted after | DOCUMENTED |
 | Boot GT permissions | JS Simulator | Boot GTs for CR8/CR15 should have M permission only | VERIFY |
 | Boot offsets | JS Simulator | CR15=offset 0, CR8=offset 3 (hardwired) | VERIFY |
+| SWITCH target field | All | Added 3-bit target for CR8-CR15: 0=CR8, 1=CR9, 2=CR10, 7=CR15 | IMPLEMENTED |
 
 ---
 

@@ -1,20 +1,29 @@
 // ============================================================================
 // CTMM SWITCH Church-Instruction (CLOOMC)
 // ============================================================================
-// This module implements the SWITCH instruction which loads a new namespace
-// capability into CR15 from a C-List.
+// This module implements the SWITCH instruction which loads a capability
+// into system registers CR8-CR15 based on a 3-bit target field.
+//
+// Target field mapping (3 bits):
+//   000 = CR8  (Thread)         - CHANGE is alias for SWITCH target=0
+//   001 = CR9  (Interrupt Thread)
+//   010 = CR10 (Double Fault Recovery)
+//   011 = CR11 (future/virtual namespace)
+//   100 = CR12 (future/virtual namespace)
+//   101 = CR13 (future/virtual namespace)
+//   110 = CR14 (future/virtual namespace)
+//   111 = CR15 (Namespace root)
 //
 // SWITCH Steps:
-//   1. Verify source CRs is in range 0-6 (not reserved CR7/CR8/CR15)
+//   1. Verify source CRs is in range 0-7
 //   2. Verify source CRs has L (Load) permission
-//   3. Call mLoad with sub_cr_dst = CR15 (hardwired destination)
+//   3. Call mLoad with sub_cr_dst = CR8 + target
 //
 // The actual capability fetching is done by ctmm_mload.sv
 // This reduces the Trusted Computing Base - all Church CLOOMC instructions
 // share the same verified mLoad micro-routine for capability fetching.
 //
 // FAULT conditions:
-//   - Source CRs not in range 0-6
 //   - Source CRs lacks L permission
 //   - mLoad faults (bounds, MAC, etc.)
 // ============================================================================
@@ -27,7 +36,8 @@ module ctmm_switch
     
     // Control interface
     input  logic        switch_start,         // Start SWITCH execution
-    input  logic [3:0]  cr_src,               // Source register (CRs) - must be CR0-CR6
+    input  logic [3:0]  cr_src,               // Source register (CRs) - CR0-CR7
+    input  logic [2:0]  target,               // Target system register: 0=CR8, 7=CR15
     input  logic [7:0]  index,                // C-List index
     output logic        switch_busy,          // SWITCH in progress
     output logic        switch_complete,      // SWITCH finished successfully
@@ -66,8 +76,12 @@ module ctmm_switch
     // Constants
     // ========================================================================
     
-    localparam logic [3:0] CR15_NAMESPACE = 4'd15;  // Hardwired destination
-    localparam logic [3:0] MAX_CLIST_REG = 4'd6;    // Maximum allowed source register
+    localparam logic [3:0] CR8_BASE = 4'd8;          // Base for target calculation
+    localparam logic [3:0] MAX_CLIST_REG = 4'd7;    // Maximum allowed source register (CR0-CR7)
+    
+    // Calculate destination register from target field: CR8 + target
+    logic [3:0] dest_cr;
+    assign dest_cr = CR8_BASE + {1'b0, target};     // 4'd8 + target (0-7) = CR8-CR15
     
     // ========================================================================
     // State Machine - SWITCH instruction wrapper
@@ -168,10 +182,10 @@ module ctmm_switch
         .clk            (clk),
         .rst_n          (rst_n),
         
-        // Subroutine interface - destination hardwired to CR15
+        // Subroutine interface - destination from target field
         .sub_start      (sub_start),
         .sub_cr_src     (cr_src),
-        .sub_cr_dst     (CR15_NAMESPACE),    // Hardwired to CR15
+        .sub_cr_dst     (dest_cr),           // CR8 + target (0-7) = CR8-CR15
         .sub_index      (index),
         .sub_busy       (sub_busy),
         .sub_done       (sub_done),
@@ -182,7 +196,7 @@ module ctmm_switch
         .cr_rd_addr     (sub_cr_rd_addr),
         .cr_rd_data     (cr_rd_data),
         
-        // Register write interface - subroutine writes directly to CR15
+        // Register write interface - subroutine writes directly to dest_cr
         .cr_wr_addr     (cr_wr_addr),
         .cr_wr_data     (cr_wr_data),
         .cr_wr_en       (cr_wr_en),

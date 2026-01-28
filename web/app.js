@@ -1382,8 +1382,8 @@ const instructionInfo = {
     SAVE: { operands: ['destCR', 'srcDR'], help: 'Save DR[src] to location via CR[dest]. Requires Save permission.', isCap: true },
     CALL: { operands: ['cr'], help: 'Call procedure in CR[reg]. Requires Enter permission. Pushes return frame.', isCap: true },
     RETURN: { operands: [], help: 'Return from procedure. Pops stack frame and restores CR6, CR7, NIA.', isCap: true },
-    CHANGE: { operands: ['offset'], help: 'Switch to thread at scope offset. Changes CR8 (Thread).', isCap: true },
-    SWITCH: { operands: ['cr'], help: 'Set CR15 (Namespace) to capability in CR[reg]. Requires Load permission.', isCap: true }
+    CHANGE: { operands: ['offset'], help: 'Create new thread GT at scope offset and load into CR8. Alternative: SWITCH CRs, 0 copies existing capability to CR8.', isCap: true },
+    SWITCH: { operands: ['cr', 'target'], help: 'Set system register CR8-15 to capability in CR[reg]. Target: 0=CR8, 7=CR15. Requires Load permission.', isCap: true }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11035,22 +11035,24 @@ const churchInstrFormats = [
     },
     {
         name: "SWITCH",
-        brief: "Switch C-List context",
-        syntax: "SWITCH CRs | SWITCH CRn, idx",
-        desc: "Load new C-List capability into CR6.",
+        brief: "Switch system register context",
+        syntax: "SWITCH CRs, target | SWITCH CRn, idx, target",
+        desc: "Load capability into system register CR8-CR15 based on 3-bit target field. Target: 0=CR8(Thread), 1=CR9(Interrupt), 2=CR10(DFault), 3-6=CR11-14(future), 7=CR15(Namespace). CHANGE is alias for SWITCH with target=0.",
         format: [
             { name: "Op", bits: 5, value: "00110", desc: "SWITCH opcode" },
             { name: "Cond", bits: 4, desc: "Condition code" },
             { name: "I", bits: 1, desc: "0=direct CR, 1=C-List lookup" },
             { name: "CRs", bits: 3, desc: "Source CR (0-7, when I=0)" },
             { name: "CRn", bits: 3, desc: "Source C-List (0-7, when I=1)" },
-            { name: "Index", bits: 10, desc: "C-List slot index (when I=1)" },
+            { name: "Target", bits: 3, desc: "Destination: 0=CR8, 1=CR9, 2=CR10, 3-6=CR11-14, 7=CR15" },
+            { name: "Index", bits: 7, desc: "C-List slot index (when I=1, 0-127)" },
             { name: "Reserved", bits: 6, value: "0", desc: "Reserved" }
         ],
         variants: [
-            { name: "Direct", fields: { Mode: "0", CRs: "CR containing C-List GT" } },
-            { name: "C-List lookup", fields: { Mode: "1", CRn: "C-List register, Index: slot" } }
-        ]
+            { name: "Direct", fields: { I: "0", CRs: "CR containing capability", Target: "Destination CR8-CR15" } },
+            { name: "C-List lookup", fields: { I: "1", CRn: "C-List register", Index: "slot", Target: "Destination" } }
+        ],
+        notes: "CHANGE is assembler alias for SWITCH with target=0 (CR8). Target maps: 0→CR8, 1→CR9, 2→CR10, 3→CR11, 4→CR12, 5→CR13, 6→CR14, 7→CR15."
     },
     {
         name: "TPERM",
