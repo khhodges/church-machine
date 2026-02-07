@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISC-V Capability Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="fixed-toolbar">
+        <div class="toolbar-left">
+            <h1 class="toolbar-title">RV32-Cap</h1>
+        </div>
+        <nav class="toolbar-nav">
+            <button class="btn btn-view active" onclick="switchView('dashboard')">Dashboard</button>
+            <button class="btn btn-view" onclick="switchView('namespace')">Namespace</button>
+            <button class="btn btn-view" onclick="switchView('editor')">Assembly</button>
+            <button class="btn btn-view" onclick="switchView('capabilities')">Capabilities</button>
+            <button class="btn btn-view" onclick="switchView('instructions')">Instructions</button>
+        </nav>
+        <div class="toolbar-right">
+            <button class="btn btn-control" id="btn-reset">Reset</button>
+            <button class="btn btn-control" id="btn-step">Step</button>
+            <button class="btn btn-control btn-run" id="btn-run">Run</button>
+            <button class="btn btn-control btn-stop" id="btn-stop">Stop</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Dashboard View -->
+        <section id="view-dashboard" class="view active">
+            <div class="dashboard-grid">
+                <div class="panel data-registers">
+                    <div class="pc-display">
+                        <span class="pc-label">PC</span>
+                        <span class="pc-value" id="pc-value">0x00000000</span>
+                    </div>
+                    <h2>Data Registers</h2>
+                    <table class="register-table">
+                        <thead>
+                            <tr>
+                                <th>Register</th>
+                                <th>ABI Name</th>
+                                <th>Hex Value</th>
+                                <th>Decimal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reg-table-body">
+                            <tr><td>x0</td><td>zero</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x1</td><td>ra</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x2</td><td>sp</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x3</td><td>gp</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x4</td><td>tp</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x5</td><td>t0</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x6</td><td>t1</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x7</td><td>t2</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x8</td><td>s0</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x9</td><td>s1</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x10</td><td>a0</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x11</td><td>a1</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x12</td><td>a2</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x13</td><td>a3</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x14</td><td>a4</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x15</td><td>a5</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x16</td><td>a6</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x17</td><td>a7</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x18</td><td>s2</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x19</td><td>s3</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x20</td><td>s4</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x21</td><td>s5</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x22</td><td>s6</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x23</td><td>s7</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x24</td><td>s8</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x25</td><td>s9</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x26</td><td>s10</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x27</td><td>s11</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x28</td><td>t3</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x29</td><td>t4</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x30</td><td>t5</td><td>0x00000000</td><td>0</td></tr>
+                            <tr><td>x31</td><td>t6</td><td>0x00000000</td><td>0</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel capability-registers">
+                    <h2>Capability Registers</h2>
+                    <div class="cr-container" id="cr-container">
+                        <div class="cr-card" data-cr="0"><span class="cr-label">CR0</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="1"><span class="cr-label">CR1</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="2"><span class="cr-label">CR2</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="3"><span class="cr-label">CR3</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="4"><span class="cr-label">CR4</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="5"><span class="cr-label">CR5</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="6"><span class="cr-label">CR6 <em>C-List</em></span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="7"><span class="cr-label">CR7 <em>Nucleus</em></span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="8"><span class="cr-label">CR8 <em>Thread</em></span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="9"><span class="cr-label">CR9</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="10"><span class="cr-label">CR10</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="11"><span class="cr-label">CR11</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="12"><span class="cr-label">CR12</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="13"><span class="cr-label">CR13</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="14"><span class="cr-label">CR14</span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                        <div class="cr-card" data-cr="15"><span class="cr-label">CR15 <em>Namespace</em></span><span class="cr-gt">0x00000000</span><span class="cr-perms"></span><span class="cr-type"></span></div>
+                    </div>
+                    <div class="status-bar">
+                        <span class="boot-status" id="boot-status">Not booted</span>
+                        <span class="step-count">Steps: <span id="step-count">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel console-panel">
+                <h2>Console</h2>
+                <pre id="console-output"></pre>
+            </div>
+        </section>
+
+        <!-- Namespace Browser View -->
+        <section id="view-namespace" class="view">
+            <div class="panel">
+                <h2>Namespace Browser</h2>
+                <table class="namespace-table">
+                    <thead>
+                        <tr>
+                            <th>Slot #</th>
+                            <th>Location</th>
+                            <th>Limit</th>
+                            <th>Version</th>
+                            <th>Seals</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ns-table-body">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Assembly Editor View -->
+        <section id="view-editor" class="view">
+            <div class="editor-layout">
+                <div class="editor-left">
+                    <h2>Assembly Editor</h2>
+                    <div class="editor-wrapper">
+                        <div class="line-numbers" id="line-numbers">1</div>
+                        <textarea id="asm-editor" spellcheck="false" placeholder="Enter RISC-V assembly code here..."></textarea>
+                    </div>
+                </div>
+                <div class="editor-right">
+                    <div class="editor-buttons">
+                        <button class="btn btn-primary" id="btn-assemble">Assemble</button>
+                        <button class="btn btn-primary" id="btn-load">Load</button>
+                        <button class="btn btn-example" data-example="arithmetic">Basic Arithmetic</button>
+                        <button class="btn btn-example" data-example="capability">Capability Demo</button>
+                        <button class="btn btn-example" data-example="loop">Loop Example</button>
+                    </div>
+                    <div class="panel asm-output-panel">
+                        <h3>Assembled Output</h3>
+                        <pre id="asm-output"></pre>
+                    </div>
+                    <div class="panel program-listing-panel">
+                        <h3>Program Listing</h3>
+                        <table class="listing-table">
+                            <thead>
+                                <tr>
+                                    <th>Address</th>
+                                    <th>Hex</th>
+                                    <th>Disassembly</th>
+                                </tr>
+                            </thead>
+                            <tbody id="program-listing">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Capabilities Explorer View -->
+        <section id="view-capabilities" class="view">
+            <div class="capabilities-layout">
+                <div class="cap-sidebar">
+                    <h2>CR Quick Access</h2>
+                    <div class="cr-buttons">
+                        <button class="btn btn-cr" data-cr="0">CR0</button>
+                        <button class="btn btn-cr" data-cr="1">CR1</button>
+                        <button class="btn btn-cr" data-cr="2">CR2</button>
+                        <button class="btn btn-cr" data-cr="3">CR3</button>
+                        <button class="btn btn-cr" data-cr="4">CR4</button>
+                        <button class="btn btn-cr" data-cr="5">CR5</button>
+                        <button class="btn btn-cr" data-cr="6">CR6</button>
+                        <button class="btn btn-cr" data-cr="7">CR7</button>
+                        <button class="btn btn-cr" data-cr="8">CR8</button>
+                        <button class="btn btn-cr" data-cr="9">CR9</button>
+                        <button class="btn btn-cr" data-cr="10">CR10</button>
+                        <button class="btn btn-cr" data-cr="11">CR11</button>
+                        <button class="btn btn-cr" data-cr="12">CR12</button>
+                        <button class="btn btn-cr" data-cr="13">CR13</button>
+                        <button class="btn btn-cr" data-cr="14">CR14</button>
+                        <button class="btn btn-cr" data-cr="15">CR15</button>
+                    </div>
+                </div>
+
+                <div class="cap-main">
+                    <h2>Golden Token Bit-Field Breakdown</h2>
+                    <div class="gt-diagram" id="gt-diagram">
+                        <div class="bit-field-row">
+                            <span class="bit-field field-perms" data-bits="31:24">Permissions [31:24]</span>
+                            <span class="bit-field field-type" data-bits="23:20">Type [23:20]</span>
+                            <span class="bit-field field-version" data-bits="19:16">Version [19:16]</span>
+                            <span class="bit-field field-index" data-bits="15:0">Index [15:0]</span>
+                        </div>
+                    </div>
+
+                    <div class="gt-detail" id="gt-detail">
+                        <p class="hint-text">Select a capability register to view its decoded Golden Token.</p>
+                    </div>
+
+                    <div class="perm-display" id="perm-display">
+                        <h3>Permissions</h3>
+                        <div class="perm-grid">
+                            <label><input type="checkbox" disabled> Read</label>
+                            <label><input type="checkbox" disabled> Write</label>
+                            <label><input type="checkbox" disabled> Execute</label>
+                            <label><input type="checkbox" disabled> Enter</label>
+                            <label><input type="checkbox" disabled> Load</label>
+                            <label><input type="checkbox" disabled> Save</label>
+                            <label><input type="checkbox" disabled> Seal</label>
+                            <label><input type="checkbox" disabled> Unseal</label>
+                        </div>
+                    </div>
+
+                    <div class="type-display">
+                        <h3>Type</h3>
+                        <div class="type-indicators">
+                            <span class="type-badge" data-type="inform">Inform</span>
+                            <span class="type-badge" data-type="outform">Outform</span>
+                            <span class="type-badge" data-type="literal">Literal</span>
+                            <span class="type-badge" data-type="abstract">Abstract</span>
+                        </div>
+                    </div>
+
+                    <div class="field-values">
+                        <div class="field-item">
+                            <span class="field-label">Version:</span>
+                            <span class="field-value" id="field-version">-</span>
+                        </div>
+                        <div class="field-item">
+                            <span class="field-label">Index:</span>
+                            <span class="field-value" id="field-index">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions Reference View -->
+        <section id="view-instructions" class="view">
+            <div class="instructions-layout">
+                <div class="instr-section">
+                    <h2>RISC-V Base (RV32I)</h2>
+                    <h3>Instruction Formats</h3>
+                    <div class="format-diagrams">
+                        <div class="format-row">
+                            <span class="format-label">R-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-funct7" data-bits="31:25">funct7</span>
+                                <span class="bit-field field-rs2" data-bits="24:20">rs2</span>
+                                <span class="bit-field field-rs1" data-bits="19:15">rs1</span>
+                                <span class="bit-field field-funct3" data-bits="14:12">funct3</span>
+                                <span class="bit-field field-rd" data-bits="11:7">rd</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                        <div class="format-row">
+                            <span class="format-label">I-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-imm" data-bits="31:20">imm[11:0]</span>
+                                <span class="bit-field field-rs1" data-bits="19:15">rs1</span>
+                                <span class="bit-field field-funct3" data-bits="14:12">funct3</span>
+                                <span class="bit-field field-rd" data-bits="11:7">rd</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                        <div class="format-row">
+                            <span class="format-label">S-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-imm" data-bits="31:25">imm[11:5]</span>
+                                <span class="bit-field field-rs2" data-bits="24:20">rs2</span>
+                                <span class="bit-field field-rs1" data-bits="19:15">rs1</span>
+                                <span class="bit-field field-funct3" data-bits="14:12">funct3</span>
+                                <span class="bit-field field-imm" data-bits="11:7">imm[4:0]</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                        <div class="format-row">
+                            <span class="format-label">B-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-imm" data-bits="31:25">imm[12|10:5]</span>
+                                <span class="bit-field field-rs2" data-bits="24:20">rs2</span>
+                                <span class="bit-field field-rs1" data-bits="19:15">rs1</span>
+                                <span class="bit-field field-funct3" data-bits="14:12">funct3</span>
+                                <span class="bit-field field-imm" data-bits="11:7">imm[4:1|11]</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                        <div class="format-row">
+                            <span class="format-label">U-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-imm" data-bits="31:12">imm[31:12]</span>
+                                <span class="bit-field field-rd" data-bits="11:7">rd</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                        <div class="format-row">
+                            <span class="format-label">J-type:</span>
+                            <div class="bit-fields">
+                                <span class="bit-field field-imm" data-bits="31:12">imm[20|10:1|11|19:12]</span>
+                                <span class="bit-field field-rd" data-bits="11:7">rd</span>
+                                <span class="bit-field field-opcode" data-bits="6:0">opcode</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>RV32I Instructions</h3>
+                    <table class="instr-table">
+                        <thead>
+                            <tr>
+                                <th>Mnemonic</th>
+                                <th>Format</th>
+                                <th>Description</th>
+                                <th>Encoding</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>ADD</td><td>R</td><td>Add two registers</td><td>0000000 rs2 rs1 000 rd 0110011</td></tr>
+                            <tr><td>SUB</td><td>R</td><td>Subtract rs2 from rs1</td><td>0100000 rs2 rs1 000 rd 0110011</td></tr>
+                            <tr><td>AND</td><td>R</td><td>Bitwise AND</td><td>0000000 rs2 rs1 111 rd 0110011</td></tr>
+                            <tr><td>OR</td><td>R</td><td>Bitwise OR</td><td>0000000 rs2 rs1 110 rd 0110011</td></tr>
+                            <tr><td>XOR</td><td>R</td><td>Bitwise XOR</td><td>0000000 rs2 rs1 100 rd 0110011</td></tr>
+                            <tr><td>SLL</td><td>R</td><td>Shift left logical</td><td>0000000 rs2 rs1 001 rd 0110011</td></tr>
+                            <tr><td>SRL</td><td>R</td><td>Shift right logical</td><td>0000000 rs2 rs1 101 rd 0110011</td></tr>
+                            <tr><td>SRA</td><td>R</td><td>Shift right arithmetic</td><td>0100000 rs2 rs1 101 rd 0110011</td></tr>
+                            <tr><td>SLT</td><td>R</td><td>Set if less than (signed)</td><td>0000000 rs2 rs1 010 rd 0110011</td></tr>
+                            <tr><td>SLTU</td><td>R</td><td>Set if less than (unsigned)</td><td>0000000 rs2 rs1 011 rd 0110011</td></tr>
+                            <tr><td>ADDI</td><td>I</td><td>Add immediate</td><td>imm[11:0] rs1 000 rd 0010011</td></tr>
+                            <tr><td>ANDI</td><td>I</td><td>AND immediate</td><td>imm[11:0] rs1 111 rd 0010011</td></tr>
+                            <tr><td>ORI</td><td>I</td><td>OR immediate</td><td>imm[11:0] rs1 110 rd 0010011</td></tr>
+                            <tr><td>XORI</td><td>I</td><td>XOR immediate</td><td>imm[11:0] rs1 100 rd 0010011</td></tr>
+                            <tr><td>SLTI</td><td>I</td><td>Set if less than immediate (signed)</td><td>imm[11:0] rs1 010 rd 0010011</td></tr>
+                            <tr><td>SLTIU</td><td>I</td><td>Set if less than immediate (unsigned)</td><td>imm[11:0] rs1 011 rd 0010011</td></tr>
+                            <tr><td>LW</td><td>I</td><td>Load word</td><td>imm[11:0] rs1 010 rd 0000011</td></tr>
+                            <tr><td>LH</td><td>I</td><td>Load halfword (sign-extend)</td><td>imm[11:0] rs1 001 rd 0000011</td></tr>
+                            <tr><td>LB</td><td>I</td><td>Load byte (sign-extend)</td><td>imm[11:0] rs1 000 rd 0000011</td></tr>
+                            <tr><td>LHU</td><td>I</td><td>Load halfword (zero-extend)</td><td>imm[11:0] rs1 101 rd 0000011</td></tr>
+                            <tr><td>LBU</td><td>I</td><td>Load byte (zero-extend)</td><td>imm[11:0] rs1 100 rd 0000011</td></tr>
+                            <tr><td>JALR</td><td>I</td><td>Jump and link register</td><td>imm[11:0] rs1 000 rd 1100111</td></tr>
+                            <tr><td>SW</td><td>S</td><td>Store word</td><td>imm[11:5] rs2 rs1 010 imm[4:0] 0100011</td></tr>
+                            <tr><td>SH</td><td>S</td><td>Store halfword</td><td>imm[11:5] rs2 rs1 001 imm[4:0] 0100011</td></tr>
+                            <tr><td>SB</td><td>S</td><td>Store byte</td><td>imm[11:5] rs2 rs1 000 imm[4:0] 0100011</td></tr>
+                            <tr><td>BEQ</td><td>B</td><td>Branch if equal</td><td>imm rs2 rs1 000 imm 1100011</td></tr>
+                            <tr><td>BNE</td><td>B</td><td>Branch if not equal</td><td>imm rs2 rs1 001 imm 1100011</td></tr>
+                            <tr><td>BLT</td><td>B</td><td>Branch if less than (signed)</td><td>imm rs2 rs1 100 imm 1100011</td></tr>
+                            <tr><td>BGE</td><td>B</td><td>Branch if greater or equal (signed)</td><td>imm rs2 rs1 101 imm 1100011</td></tr>
+                            <tr><td>BLTU</td><td>B</td><td>Branch if less than (unsigned)</td><td>imm rs2 rs1 110 imm 1100011</td></tr>
+                            <tr><td>BGEU</td><td>B</td><td>Branch if greater or equal (unsigned)</td><td>imm rs2 rs1 111 imm 1100011</td></tr>
+                            <tr><td>LUI</td><td>U</td><td>Load upper immediate</td><td>imm[31:12] rd 0110111</td></tr>
+                            <tr><td>AUIPC</td><td>U</td><td>Add upper immediate to PC</td><td>imm[31:12] rd 0010111</td></tr>
+                            <tr><td>JAL</td><td>J</td><td>Jump and link</td><td>imm[20|10:1|11|19:12] rd 1101111</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="instr-section">
+                    <h2>Church Capability Extensions</h2>
+                    <table class="instr-table">
+                        <thead>
+                            <tr>
+                                <th>Mnemonic</th>
+                                <th>Format</th>
+                                <th>Description</th>
+                                <th>Required Permissions</th>
+                                <th>Encoding</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>CAP.LOAD</td>
+                                <td>custom-0</td>
+                                <td>Load capability from C-List into CR</td>
+                                <td>L (Load)</td>
+                                <td>funct7 --- rs1 000 cr_dst 0001011</td>
+                            </tr>
+                            <tr>
+                                <td>CAP.SAVE</td>
+                                <td>custom-0</td>
+                                <td>Save capability from CR to C-List</td>
+                                <td>S (Save)</td>
+                                <td>funct7 cr_src rs1 001 --- 0001011</td>
+                            </tr>
+                            <tr>
+                                <td>CAP.CALL</td>
+                                <td>custom-0</td>
+                                <td>Protected call through capability, save return state</td>
+                                <td>E (Enter)</td>
+                                <td>funct7 cr_src rs1 010 cr_dst 0001011</td>
+                            </tr>
+                            <tr>
+                                <td>CAP.RETURN</td>
+                                <td>custom-0</td>
+                                <td>Return from protected call, restore context</td>
+                                <td>(none)</td>
+                                <td>funct7 ----- --- 011 ----- 0001011</td>
+                            </tr>
+                            <tr>
+                                <td>CAP.CHANGE</td>
+                                <td>custom-0</td>
+                                <td>Change thread context, create new thread GT in CR8</td>
+                                <td>M (Machine)</td>
+                                <td>funct7 cr_src rs1 100 ----- 0001011</td>
+                            </tr>
+                            <tr>
+                                <td>CAP.SWITCH</td>
+                                <td>custom-0</td>
+                                <td>Copy capability to system register CR8-CR15 (target in bits [24:22])</td>
+                                <td>M (Machine)</td>
+                                <td>tgt cr_src rs1 101 ----- 0001011</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="simulator.js"></script>
+    <script src="assembler.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -140,6 +140,28 @@ The `ctmm_amaranth/` directory contains a Python-based HDL (Amaranth) implementa
 -   Signals can only be driven from one clock domain (d.comb OR d.sync, not both)
 -   All modules verified: `python -c "from ctmm_amaranth.core import CTMMCore; ..."` elaborates cleanly
 
+## RV32-Cap Simulator (New)
+
+The `riscv_cap/` directory contains a standalone web-based simulator for a RISC-V (RV32I) processor extended with 6 Church capability instructions and 32-bit Golden Tokens.
+
+### Architecture
+-   **RV32I Base**: Full integer instruction set (R, I, S, B, U, J types) with x0-x31 data registers
+-   **16 Capability Registers**: CR0-CR15, each 128-bit (4 × 32-bit words). CR6=C-List, CR7=Nucleus, CR8=Thread, CR15=Namespace
+-   **32-bit Golden Token Format**: [31:27] Version (5 bits), [26:12] Index (15 bits), [11:2] Permissions (G,F,M,B,S,E,L,X,W,R), [1:0] Type (Inform/Outform/Literal/Abstract)
+-   **6 Church Instructions**: CAP.LOAD, CAP.SAVE, CAP.CALL, CAP.RETURN, CAP.CHANGE, CAP.SWITCH (using RISC-V custom-0 opcode 0x0B)
+-   **Namespace Table**: Up to 32,768 entries, each 3 × 32-bit words (Location, Limit, VersionSeals). Slot address = Index × 3
+
+### File Structure
+-   **main.py**: Flask web server (port 5000)
+-   **index.html**: Single-page app with 5 views (Dashboard, Namespace, Assembly, Capabilities, Instructions)
+-   **styles.css**: Dark-themed IDE-like styling
+-   **simulator.js**: Core simulation engine (RV32I + Church instructions, GT helpers, boot sequence, event system)
+-   **assembler.js**: Two-pass assembler (RV32I + Church mnemonics, labels, pseudo-instructions)
+-   **app.js**: UI controller connecting simulator to web interface
+
+### Running
+Workflow "RV32-Cap Simulator" runs `cd riscv_cap && python main.py` on port 5000.
+
 ## External Dependencies
 
 -   **Python HTTP Server**: Serves the web interface files.

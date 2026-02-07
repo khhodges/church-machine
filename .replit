@@ -1,4 +1,4 @@
-modules = ["haskell-ghc9.8", "python-3.11", "postgresql-16"]
+modules = ["haskell-ghc9.8", "python-3.11", "postgresql-16", "nodejs-20"]
 [agent]
 expertMode = true
 integrations = ["resend:1.0.0"]
@@ -13,19 +13,19 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "CTMM Web Simulator"
+args = "RV32-Cap Simulator"
 
 [[workflows.workflow]]
-name = "CTMM Web Simulator"
+name = "RV32-Cap Simulator"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd web && python main.py"
+args = "cd riscv_cap && python main.py"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000
