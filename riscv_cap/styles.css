@@ -849,7 +849,6 @@ main {
     display: flex;
     flex: 1;
     border-radius: 3px;
-    overflow: hidden;
     border: 1px solid #0f3460;
 }
 
@@ -864,17 +863,14 @@ main {
 }
 
 .field-tooltip {
-    position: absolute;
-    left: 50%;
-    top: calc(100% + 8px);
-    transform: translateX(-50%);
+    position: fixed;
     background: #16213e;
     border: 1px solid #0f3460;
     border-radius: 6px;
     padding: 10px 14px;
     min-width: 220px;
     max-width: 340px;
-    z-index: 1000;
+    z-index: 10000;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
     pointer-events: none;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;

@@ -381,20 +381,25 @@ document.addEventListener('DOMContentLoaded', () => {
             '<div class="tip-bits">' + bits + '</div>' +
             '<div class="tip-desc">' + desc + '</div>';
 
-        el.style.position = 'relative';
-        el.appendChild(tip);
+        document.body.appendChild(tip);
         activeTooltip = { el: el, tip: tip };
 
-        const rect = tip.getBoundingClientRect();
-        if (rect.right > window.innerWidth) {
-            tip.style.left = 'auto';
-            tip.style.right = '0';
-            tip.style.transform = 'none';
+        const elRect = el.getBoundingClientRect();
+        let left = elRect.left + elRect.width / 2 - tip.offsetWidth / 2;
+        let top = elRect.bottom + 8;
+
+        if (left + tip.offsetWidth > window.innerWidth - 8) {
+            left = window.innerWidth - tip.offsetWidth - 8;
         }
-        if (rect.left < 0) {
-            tip.style.left = '0';
-            tip.style.transform = 'none';
+        if (left < 8) {
+            left = 8;
         }
+        if (top + tip.offsetHeight > window.innerHeight - 8) {
+            top = elRect.top - tip.offsetHeight - 8;
+        }
+
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
     }
 
     function hideFieldTooltip() {
