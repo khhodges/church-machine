@@ -19,6 +19,7 @@ class RiscVCapSimulator {
         this.output = '';
         this.breakpoints = new Set();
         this.callStack = [];
+        this.callStackMax = 256;
         this.threadTable = {};
         this.bootComplete = false;
 
@@ -619,6 +620,16 @@ class RiscVCapSimulator {
                 break;
             }
 
+            case 0x3: { // TPERM
+                const rd = (d.raw >>> 7) & 0x1F;
+                const depth = this.callStack.length;
+                const remaining = this.callStackMax - depth;
+                const result = ((remaining & 0xFFFF) << 16) | (depth & 0xFFFF);
+                if (rd !== 0) this.x[rd] = result >>> 0;
+                this.pc = (this.pc + 4) >>> 0;
+                break;
+            }
+
             default:
                 this.fault('ILLEGAL', `Unknown Church custom-0 funct3=${funct3}`);
                 return;
@@ -693,6 +704,7 @@ class RiscVCapSimulator {
                         const st = (d.raw >>> 22) & 0x7;
                         return `CAP.SWITCH CR${crSrc}, CR${8 + st}`;
                     }
+                    case 3: return `CAP.TPERM ${x(rd)}`;
                     default: return `C.??? funct3=${funct3}`;
                 }
             }

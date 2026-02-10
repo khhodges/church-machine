@@ -385,6 +385,7 @@ class RiscVAssembler {
             case 'cap.return': return [this._capReturn(lineNum)];
             case 'cap.change': return [this._capChange(args, lineNum)];
             case 'cap.switch': return [this._capSwitch(args, lineNum)];
+            case 'cap.tperm': return [this._capTperm(args, lineNum)];
 
             default:
                 return null;
@@ -603,6 +604,13 @@ class RiscVAssembler {
         const cr = this._parseCR(args[0]);
         if (cr < 0) throw new Error(`Invalid capability register: ${args[0]}`);
         return this.encodeRType(0, cr, 0, 0x1, 0, 0x0B);
+    }
+
+    _capTperm(args, lineNum) {
+        if (args.length !== 1) throw new Error(`CAP.TPERM requires 1 operand: rd`);
+        const rd = this._parseReg(args[0]);
+        if (rd < 0) throw new Error(`Invalid register: ${args[0]}`);
+        return this.encodeRType(0, 0, 0, 0x3, rd, 0x0B);
     }
 
     _capSwitch(args, lineNum) {
