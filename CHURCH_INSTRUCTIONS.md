@@ -36,15 +36,16 @@ These rules apply identically to both simulators:
 
 | Detail | Sim-64 (CTMM) | Sim-32 (RV32-Cap) |
 |--------|---------------|-------------------|
-| **Mnemonic** | `LOAD CRd, CRs, idx` | `CAP.LOAD CRd, rs1` |
-| **Source C-List** | Any CR (CRs) as C-List source, explicit index operand | CR6 (C-List) implied, index from x register (rs1) |
-| **Permission Check** | L or M on source CR | L on CR6 word0 |
-| **MAC Validation** | Yes — hardware hash checked on loaded GT | No |
-| **G-bit Reset** | Yes — G bit cleared on namespace access (GC signal) | No |
+| **Mnemonic** | `LOAD CRd, CRs, idx` | `CAP.LOAD CRd, CRs, index` |
+| **Source C-List** | Any CR (CRs) as C-List source, explicit index operand | Any CR (CRs) as source, 15-bit immediate index |
+| **Permission Check** | L or M on source CR | L on source CR |
+| **GT Validation** | Implicit (capability object integrity) | Version match + MAC seal validation on source GT |
+| **MAC Validation** | Yes — hardware hash checked on loaded GT | Yes — 27-bit FNV seal in VersionSeals checked on target namespace entry |
+| **G-bit Reset** | Yes — G bit cleared on namespace access (GC signal) | No (GC uses separate Mark-Scan-Sweep cycle) |
 | **Bounds Check** | Against source C-List entry count | Against namespaceTable length |
 | **GT Width** | 64-bit (Offset + Permissions + Spare) | 32-bit (Version + Index + Permissions + Type) |
 | **Result** | Loaded capability object stored in destination CR | 128-bit CR filled: word0=new GT, word1=location, word2=limit, word3=versionSeals from namespace entry |
-| **Encoding** | 5-bit opcode, condition[4], I-bit, CRd[3], CRs[3], idx | opcode=0x0B, funct3=000, cr_dst=rd[2:0], index from x[rs1] |
+| **Encoding** | 5-bit opcode, condition[4], I-bit, CRd[3], CRs[3], idx | opcode=0x2B, J-type: CRd[11:9], CRs[14:12], index[29:15] |
 
 ---
 
@@ -62,13 +63,14 @@ These rules apply identically to both simulators:
 
 | Detail | Sim-64 (CTMM) | Sim-32 (RV32-Cap) |
 |--------|---------------|-------------------|
-| **Mnemonic** | `SAVE CRd, CRs, idx` | `CAP.SAVE CRs, rs1` |
-| **Destination** | Any CR (CRd) as C-List destination, explicit index | CR6 (C-List) implied, index from x register (rs1) |
-| **Permission Check (C-List)** | S or M on destination CR | S on CR6 word0 |
+| **Mnemonic** | `SAVE CRd, CRs, idx` | `CAP.SAVE CRsrc, CRdst, index` |
+| **Destination** | Any CR (CRd) as C-List destination, explicit index | Any CR (CRdst) as destination, 15-bit immediate index |
+| **Permission Check (C-List)** | S or M on destination CR | S on destination CR |
 | **Permission Check (source)** | B or M on source CR (Bind permission required) | None |
 | **Bounds Check** | Against destination C-List size | Index must be < 32,768; namespace table auto-extends |
-| **Storage** | Writes capability object into C-List entry | Writes CR word1 (location), word2 (limit), word3 (versionSeals) into namespace table |
-| **Encoding** | 5-bit opcode, condition[4], I-bit, CRd[3], CRs[3], idx | opcode=0x0B, funct3=001, cr_src=rs2[2:0], index from x[rs1] |
+| **Seal Recompute** | N/A | Yes — MAC seal recomputed from Location+Limit, preserving existing version |
+| **Storage** | Writes capability object into C-List entry | Writes CR word1 (location), word2 (limit), word3 (recomputed versionSeals) into namespace table |
+| **Encoding** | 5-bit opcode, condition[4], I-bit, CRd[3], CRs[3], idx | opcode=0x7B, J-type: CRsrc[11:9], CRdst[14:12], index[29:15] |
 
 ---
 
@@ -86,12 +88,13 @@ These rules apply identically to both simulators:
 |--------|---------------|-------------------|
 | **Mnemonic** | `CALL CRs [, mask]` | `CAP.CALL CRs` |
 | **Required Permission** | L (Load) on source CR — used to access C-List for loading new context | E (Enter) on source CR — direct entry permission |
-| **GT Validation** | Implicit (capability object integrity) | Version field matched against namespace entry |
-| **Saved Context** | Return NIA, CR6, CR7, bound GT list | PC, CR6, CR7, full x register file |
-| **Register Clearing** | 11-bit mask field specifies which DRs (1-5) and CRs (0-5) to clear/preserve on entry; DR0 always preserved, DR6-15 always cleared | None |
-| **New Context** | CR6 loaded with target's nodal C-List, CR7 loaded with Access Code (X permission) | PC set to namespace entry location for target GT index |
-| **Stack** | Software-managed call stack with depth tracking | Array-based call history |
-| **Encoding** | 5-bit opcode, condition[4], CRs[3], mask bits | opcode=0x0B, funct3=010, cr_src=rs2[2:0] |
+| **GT Validation** | Implicit (capability object integrity) | Version match + MAC seal validation on both source GT and target namespace entry |
+| **Saved Context** | Return NIA, CR6, CR7, bound GT list | PC, CR5, CR6, CR7 pushed to call stack (max 256 frames) |
+| **Stack Overflow** | Software-managed depth tracking | FAULT if call stack full (256 frames). Updates stackSpace/stackFrames indicators. |
+| **Register Clearing** | 11-bit mask field specifies which DRs (1-5) and CRs (0-5) to clear/preserve on entry; DR0 always preserved, DR6-15 always cleared | CR5 cleared after push (software clears others) |
+| **New Context** | CR6 loaded with target's nodal C-List, CR7 loaded with Access Code (X permission) | CR6 set to callee C-List (M-bit set), CR7 set to callee code, PC set to namespace entry location |
+| **Stack** | Software-managed call stack with depth tracking | Hardware call stack with 256-frame limit, stackSpace/stackFrames indicators |
+| **Encoding** | 5-bit opcode, condition[4], CRs[3], mask bits | opcode=0x5B, J-type: CRs[14:12] |
 
 **Note on permission difference**: Sim-64 uses L because CALL's first action is loading the target's C-List entries (a Load operation). Sim-32 uses E because it treats CALL as entering an abstraction directly. Both achieve the same security goal — only authorized callers can invoke protected services.
 
@@ -113,10 +116,11 @@ These rules apply identically to both simulators:
 |--------|---------------|-------------------|
 | **Mnemonic** | `RETURN` | `CAP.RETURN` |
 | **Permission Check** | None | None |
-| **Restored Registers** | CR6, CR7, NIA (next instruction address) | CR6, CR7, PC (set to saved PC + 4) |
+| **Restored Registers** | CR6, CR7, NIA (next instruction address) | CR5, CR6 (M-bit set), CR7, PC (set to saved PC + 4) |
 | **Bound GT Surrender** | Yes — CRs marked as bound during CALL are cleared to NULL | No |
 | **Stack Underflow** | FAULT: "Stack underflow - no procedure to return from" | FAULT: "No saved context to restore" |
-| **Encoding** | 5-bit opcode, condition[4], no operands | opcode=0x0B, funct3=011, no operands |
+| **Stack Indicators** | N/A | Updates stackFrames (true if frames remain) and stackSpace (true, always room after pop) |
+| **Encoding** | 5-bit opcode, condition[4], no operands | opcode=0x0B, funct3=000, no operands |
 
 ---
 
@@ -132,12 +136,12 @@ These rules apply identically to both simulators:
 | Detail | Sim-64 (CTMM) | Sim-32 (RV32-Cap) |
 |--------|---------------|-------------------|
 | **Mnemonic** | `CHANGE CRs` (I=0) or `CHANGE CRn, idx` (I=1) | `CAP.CHANGE CRs` |
-| **Permission Check** | I=1: L on C-List CR for lookup; I=0: none on source (capability object checked) | M (Machine) on source CR |
+| **Permission Check** | I=1: L on C-List CR for lookup; I=0: none on source (capability object checked) | E (Enter) on source CR |
 | **I-bit Variant** | Yes — I=0 uses register, I=1 uses C-List lookup | No (register only) |
-| **Target** | Always CR8 (Thread) | Always CR8 (Thread) |
-| **What Gets Written** | New thread GT created with name `THREAD_<source>`, R/W permissions, new golden key | Full copy of source CR (all 4 words) |
+| **Target** | Always CR8 (Thread) | Full atomic thread swap via thread table |
+| **What Gets Written** | New thread GT created with name `THREAD_<source>`, R/W permissions, new golden key | Saves current x0-x31, CR0-CR8, PC to thread table; loads target thread context. CR9-CR15 unchanged. |
 | **Exclusive Monitor** | Cleared for current thread (ARM CLREX semantics) | Not implemented |
-| **Encoding** | 5-bit opcode, condition[4], I-bit, CRs[3] | opcode=0x0B, funct3=100, cr_src=rs2[2:0] |
+| **Encoding** | 5-bit opcode, condition[4], I-bit, CRs[3] | opcode=0x0B, funct3=001, cr_src=rs2[2:0] |
 
 ---
 
@@ -159,9 +163,29 @@ These rules apply identically to both simulators:
 | **Target Encoding** | Instruction operand (parsed from args) | Instruction bits [24:22] |
 | **Bounds Check** | Implicit (target 0-7 maps to CR8-CR15) | destIdx must be ≤ 15, FAULT otherwise |
 | **Exclusive Monitor** | Cleared if target is CR8 | Not implemented |
-| **Encoding** | 5-bit opcode, condition[4], I-bit, CRs[3], target[3] | opcode=0x0B, funct3=101, cr_src=rs2[2:0], tgt=[24:22] |
+| **Encoding** | 5-bit opcode, condition[4], I-bit, CRs[3], target[3] | opcode=0x0B, funct3=010, cr_src=rs2[2:0], tgt=[24:22] |
 
 **Note on permission difference**: Sim-64 requires L or E because SWITCH may load from a C-List (needing L) or enter a new context (needing E). Sim-32 requires M (Machine) because SWITCH is treated as a privileged machine-level operation.
+
+---
+
+## TPERM — Test Permission (Sim-32)
+
+**Purpose**: Test the permissions, validity, type, and stack indicators of a Golden Token and write the result to a data register.
+
+**Mnemonic**: `CAP.TPERM rd, CRs`
+
+**Encoding**: opcode=0x0B, funct3=011, CRs in rs2[22:20], result in rd[11:7]
+
+**Result Layout (rd)**:
+| Bits | Field | Description |
+|------|-------|-------------|
+| [9:0] | Permissions | R, W, X, L, S, E, B, M, F, G from CRs Golden Token |
+| [10] | stackFrames | 1 = at least one frame on call stack (RETURN safe) |
+| [11] | stackSpace | 1 = room for at least one more frame (CALL safe) |
+| [12] | Valid | 1 = GT passes version and MAC validation |
+| [14:13] | Type | GT type: 00=Inform, 01=Outform, 10=Literal, 11=Abstract |
+| [31:15] | (Reserved) | Zero |
 
 ---
 
@@ -177,7 +201,7 @@ The CTMM simulator includes five additional Church instructions not present in t
 | **STM** | Store Multiple — store multiple CRs to consecutive C-List entries in one instruction | S or M |
 | **TPERM** | Test Permission — check permission bits and bounds on a GT, setting condition flags (P, B, Z) | None |
 
-These instructions exist in Sim-64 because its custom ISA has room for dedicated opcodes. Sim-32 uses the standard RISC-V opcode space where Church instructions share a single custom-0 opcode (0x0B) with only 3 bits of funct3, limiting it to 8 possible operations (6 currently used, 2 reserved).
+These instructions exist in Sim-64 because its custom ISA has room for dedicated opcodes. Sim-32 uses the standard RISC-V opcode space with 4 dedicated custom opcodes (0x2B=LOAD, 0x5B=CALL, 0x7B=SAVE) plus custom-0 (0x0B) with funct3 selecting: 000=RETURN, 001=CHANGE, 010=SWITCH, 011=TPERM (100-111 reserved).
 
 ---
 
@@ -192,14 +216,28 @@ These instructions exist in Sim-64 because its custom ISA has room for dedicated
 ```
 Every instruction can be conditionally executed based on the condition flags. This is unique to Sim-64.
 
-### Sim-32 (RV32-Cap) — RISC-V Custom-0 Encoding
+### Sim-32 (RV32-Cap) — RISC-V Custom Opcode Encoding
+
+**Dedicated opcodes (J-type format)**:
 ```
-[31:25] funct7 (7 bits) — includes switch target in bits [24:22]
-[24:20] rs2 (5 bits) — source CR uses bits [22:20] (3-bit CR address)
-[19:15] rs1 (5 bits) — data register for index/address
-[14:12] funct3 (3 bits) — selects Church instruction (0=LOAD, 1=SAVE, 2=CALL, 3=RETURN, 4=CHANGE, 5=SWITCH)
-[11:7]  rd (5 bits) — destination CR uses bits [9:7] (3-bit CR address)
-[6:0]   opcode = 0x0B (7 bits) — RISC-V custom-0
+LOAD:  opcode=0x2B  — CAP.LOAD CRd, CRs, index
+       [31:17] index (15 bits), [14:12] CRs (3 bits), [11:9] CRd (3 bits), [6:0] 0101011
+
+CALL:  opcode=0x5B  — CAP.CALL CRs
+       [14:12] CRs (3 bits), [6:0] 1011011
+
+SAVE:  opcode=0x7B  — CAP.SAVE CRsrc, CRdst, index
+       [31:17] index (15 bits), [14:12] CRdst (3 bits), [11:9] CRsrc (3 bits), [6:0] 1111011
+```
+
+**Custom-0 opcode (R-type format)**:
+```
+opcode=0x0B (custom-0), funct3 selects instruction:
+  000 = RETURN    — CAP.RETURN (no operands)
+  001 = CHANGE    — CAP.CHANGE CRs (CRs in rs2[22:20])
+  010 = SWITCH    — CAP.SWITCH CRs, target (CRs in rs2[22:20], target in [24:22])
+  011 = TPERM     — CAP.TPERM rd, CRs (CRs in rs2[22:20], result in rd[11:7])
+  100-111 = (reserved for future Church instructions)
 ```
 No conditional execution — RISC-V uses explicit branch instructions instead.
 
@@ -211,12 +249,12 @@ No conditional execution — RISC-V uses explicit branch instructions instead.
 |--------|---------------|-------------------|
 | **CALL permission** | L (Load — accesses C-List) | E (Enter — enters abstraction) |
 | **SWITCH permission** | L or E | M (Machine) |
-| **CHANGE behavior** | Creates new thread GT with R/W permissions | Copies source CR directly to CR8 |
-| **CHANGE permission** | None (I=0) / L (I=1 for C-List lookup) | M (Machine) |
+| **CHANGE behavior** | Creates new thread GT with R/W permissions | Full atomic thread swap: saves x0-x31, CR0-CR8, PC to thread table; loads target context |
+| **CHANGE permission** | None (I=0) / L (I=1 for C-List lookup) | E (Enter) on source CR |
 | **I-bit variants** | Yes — CHANGE and SWITCH support register (I=0) and C-List lookup (I=1) | No — register mode only |
 | **Bind validation** | SAVE requires B or M on source | Not enforced |
-| **MAC validation** | LOAD validates hardware hash | Not implemented |
-| **G-bit management** | LOAD clears G bit on namespace access | Not implemented |
+| **MAC validation** | LOAD validates hardware hash | LOAD and CALL validate 27-bit FNV seal in VersionSeals; SAVE recomputes seal |
+| **G-bit management** | LOAD clears G bit on namespace access | Deterministic Mark-Scan-Sweep GC cycle with version bump on sweep |
 | **Exclusive monitors** | CHANGE clears thread's exclusive monitor | Not implemented |
 | **Bound GT surrender** | RETURN clears CRs bound during CALL | Not implemented |
 | **Register clearing** | CALL uses mask to selectively clear DRs/CRs | Not implemented |
