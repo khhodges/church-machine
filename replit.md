@@ -143,6 +143,8 @@ The `riscv_cap/` directory contains the standalone web-based Sim-32 simulator.
     -   **0x5B (CALL)**: J-type, `CAP.CALL CRs` — protected call. Pushes CR5+CR6+CR7+PC to call stack. Sets callee CR6 with M-bit, CR7 from abstraction. Clears CR5.
     -   **0x7B (SAVE)**: J-type, `CAP.SAVE CRsrc, CRdst, index` — saves capability to namespace. CRdst must have S permission.
     -   **0x0B (custom-0)**: R-type, funct3 selects: 000=RETURN, 001=CHANGE, 010=SWITCH, 011=TPERM
+-   **TPERM**: `CAP.TPERM rd, CRs` — Tests GT permissions, validity, type, and stack indicators. Result in rd: [9:0]=permission bits, [10]=stackFrames, [11]=stackSpace, [12]=valid, [14:13]=type.
+-   **Stack Indicators**: Two 1-bit flags set automatically by CALL/RETURN microcode. `stackSpace`=1 means room for another CALL. `stackFrames`=1 means at least one frame to RETURN from. CALL FAULTs on stack overflow. Visible on Dashboard.
 -   **CR5 Save Area**: Programmer-controlled register for call frame data. Hardware pushes/restores CR5 on CALL/RETURN.
 -   **Call Stack**: Internal stack stores {CR5, CR6, CR7, PC} frames. RETURN restores and sets M-bit on CR6.
 -   **CHANGE**: Full atomic thread swap — saves current x0-x31, CR0-CR8, PC to thread table, loads target thread context. CR9-CR15 unchanged. Requires E (Enter) permission.

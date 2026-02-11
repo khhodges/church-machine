@@ -20,6 +20,8 @@ class RiscVCapSimulator {
         this.breakpoints = new Set();
         this.callStack = [];
         this.callStackMax = 256;
+        this.stackSpace = true;
+        this.stackFrames = false;
         this.threadTable = {};
         this.bootComplete = false;
 
@@ -509,12 +511,18 @@ class RiscVCapSimulator {
             this.fault('VALIDATION', `CALL: GT version mismatch on CR${crSrc}`);
             return;
         }
+        if (this.callStack.length >= this.callStackMax) {
+            this.fault('STACK_OVERFLOW', `CALL: call stack full (max ${this.callStackMax} frames)`);
+            return;
+        }
         this.callStack.push({
             pc: this.pc,
             cr5: { ...this.cr[5] },
             cr6: { ...this.cr[6] },
             cr7: { ...this.cr[7] },
         });
+        this.stackSpace = this.callStack.length < this.callStackMax;
+        this.stackFrames = true;
         const parsed = this.parseGT(targetGT);
         if (parsed.index < this.namespaceTable.length) {
             const entry = this.namespaceTable[parsed.index];
@@ -558,6 +566,8 @@ class RiscVCapSimulator {
                     return;
                 }
                 const saved = this.callStack.pop();
+                this.stackFrames = this.callStack.length > 0;
+                this.stackSpace = true;
                 this.cr[5] = { ...saved.cr5 };
                 this.cr[6] = { ...saved.cr6 };
                 this.cr[7] = { ...saved.cr7 };
@@ -622,9 +632,17 @@ class RiscVCapSimulator {
 
             case 0x3: { // TPERM
                 const rd = (d.raw >>> 7) & 0x1F;
-                const depth = this.callStack.length;
-                const remaining = this.callStackMax - depth;
-                const result = ((remaining & 0xFFFF) << 16) | (depth & 0xFFFF);
+                const crIdx = crSrc;
+                const gt = this.cr[crIdx].word0;
+                const parsed = this.parseGT(gt);
+                const permBits = this.getPermBits(parsed.permissions) & 0x3FF;
+                const valid = this.validateGT(gt) ? 1 : 0;
+                const typeBits = parsed.type & 0x3;
+                const result = ((typeBits & 0x3) << 13) |
+                               ((valid & 0x1) << 12) |
+                               ((this.stackSpace ? 1 : 0) << 11) |
+                               ((this.stackFrames ? 1 : 0) << 10) |
+                               (permBits & 0x3FF);
                 if (rd !== 0) this.x[rd] = result >>> 0;
                 this.pc = (this.pc + 4) >>> 0;
                 break;
@@ -704,7 +722,7 @@ class RiscVCapSimulator {
                         const st = (d.raw >>> 22) & 0x7;
                         return `CAP.SWITCH CR${crSrc}, CR${8 + st}`;
                     }
-                    case 3: return `CAP.TPERM ${x(rd)}`;
+                    case 3: return `CAP.TPERM ${x(rd)}, CR${crSrc}`;
                     default: return `C.??? funct3=${funct3}`;
                 }
             }
@@ -821,6 +839,10 @@ class RiscVCapSimulator {
             output: this.output,
             namespaceTable: this.namespaceTable.map(e => ({ ...e })),
             bootComplete: this.bootComplete,
+            stackSpace: this.stackSpace,
+            stackFrames: this.stackFrames,
+            callStackDepth: this.callStack.length,
+            callStackMax: this.callStackMax,
         };
     }
 

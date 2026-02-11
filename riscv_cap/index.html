@@ -105,6 +105,11 @@
                     <div class="status-bar">
                         <span class="boot-status" id="boot-status">Not booted</span>
                         <span class="step-count">Steps: <span id="step-count">0</span></span>
+                        <span class="stack-indicators">
+                            <span class="stack-indicator" id="stack-space" data-tooltip="Stack Space|Set by CALL microcode|Indicates at least one more CALL frame can be pushed. Cleared when call stack is full (256 frames).">Space</span>
+                            <span class="stack-indicator" id="stack-frames" data-tooltip="Stack Frames|Set by RETURN microcode|Indicates at least one more RETURN frame can be popped. Cleared when call stack is empty.">Frames</span>
+                            <span class="stack-depth" id="stack-depth" data-tooltip="Call Stack Depth|Current / Maximum|Number of active call frames on the internal call stack.">0/256</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -444,11 +449,11 @@
                         <div class="format-row">
                             <span class="format-label">TPERM:</span>
                             <div class="bit-fields">
-                                <span class="bit-field field-funct7" data-bits="31:25" data-tooltip="funct7 (Unused)|Bits [31:25] — 7 bits|Not used. TPERM only reads call stack state.">0000000</span>
-                                <span class="bit-field field-reserved" data-bits="24:20" data-tooltip="rs2 (Unused)|Bits [24:20] — 5 bits|Not used.">-----</span>
+                                <span class="bit-field field-funct7" data-bits="31:25" data-tooltip="funct7 (Reserved)|Bits [31:25] — 7 bits|Reserved for future use.">0000000</span>
+                                <span class="bit-field field-church-cr" data-bits="24:20" data-tooltip="CRs (Source CR)|Bits [22:20] — 3 bits (within rs2[4:0])|Capability register CR0-CR7 whose Golden Token permissions are tested. The GT's permission bits, validity, and type are extracted and written to rd.">CRs</span>
                                 <span class="bit-field field-reserved" data-bits="19:15" data-tooltip="rs1 (Unused)|Bits [19:15] — 5 bits|Not used.">-----</span>
-                                <span class="bit-field field-funct3" data-bits="14:12" data-tooltip="funct3 = 011 (TPERM)|Bits [14:12] — 3 bits|Church instruction selector. 011 = CAP.TPERM. Tests call stack space. Writes result to rd: bits [15:0] = current depth, bits [31:16] = remaining capacity. Use before CALL (check remaining > 0) or RETURN (check depth > 0).">011</span>
-                                <span class="bit-field field-rs1" data-bits="11:7" data-tooltip="rd (Destination Register)|Bits [11:7] — 5 bits|Data register (x0-x31) to receive the stack test result. Low 16 bits = current call stack depth, high 16 bits = remaining capacity (max 256 - depth).">rd</span>
+                                <span class="bit-field field-funct3" data-bits="14:12" data-tooltip="funct3 = 011 (TPERM)|Bits [14:12] — 3 bits|Church instruction selector. 011 = CAP.TPERM. Tests permissions and stack state. Result in rd: [9:0]=permission bits (R,W,X,L,S,E,B,M,F,G), [10]=stackFrames (RETURN safe), [11]=stackSpace (CALL safe), [12]=GT valid, [14:13]=GT type.">011</span>
+                                <span class="bit-field field-rs1" data-bits="11:7" data-tooltip="rd (Destination Register)|Bits [11:7] — 5 bits|Data register (x0-x31) to receive the test result. Bit layout: [9:0] permission bits, [10] stackFrames indicator, [11] stackSpace indicator, [12] GT validity, [14:13] GT type.">rd</span>
                                 <span class="bit-field field-opcode" data-bits="6:0" data-tooltip="opcode = 0x0B (custom-0)|Bits [6:0] — 7 bits|RISC-V custom-0 opcode: 0001011.">0001011</span>
                             </div>
                         </div>
@@ -488,7 +493,7 @@
                             <tr><td>000</td><td>CAP.RETURN</td><td>Return from protected call (pops CR5+CR6+CR7+PC)</td><td>(none)</td><td>CAP.RETURN</td></tr>
                             <tr><td>001</td><td>CAP.CHANGE</td><td>Atomic thread swap (x0-x31, CR0-CR8, PC)</td><td>E (Enter) on cr_src</td><td>CAP.CHANGE CRs</td></tr>
                             <tr><td>010</td><td>CAP.SWITCH</td><td>Copy capability to system register CR8-CR15</td><td>M (Machine) on cr_src</td><td>CAP.SWITCH CRs, CR8-CR15</td></tr>
-                            <tr><td>011</td><td>CAP.TPERM</td><td>Test call stack space (depth + remaining)</td><td>(none)</td><td>CAP.TPERM rd</td></tr>
+                            <tr><td>011</td><td>CAP.TPERM</td><td>Test GT permissions, validity, type, and stack indicators</td><td>(none)</td><td>CAP.TPERM rd, CRs</td></tr>
                             <tr style="color:#666"><td>100-111</td><td>(reserved)</td><td>Available for future Church instructions</td><td>-</td><td>-</td></tr>
                         </tbody>
                     </table>
@@ -510,6 +515,27 @@
                             <tr><td>PC</td><td>Program Counter</td><td>Pushed; set to callee's entry point</td><td>Restored to caller PC + 4</td></tr>
                             <tr><td>x0-x31</td><td>Data Registers</td><td>Software clears before CALL</td><td>Software clears before RETURN</td></tr>
                             <tr><td>CR0-CR4</td><td>User CRs</td><td>Software clears (caller responsibility)</td><td>Software clears (callee responsibility)</td></tr>
+                            <tr><td>stackSpace</td><td>Indicator</td><td>Set if room for another CALL</td><td>Set (always room after pop)</td></tr>
+                            <tr><td>stackFrames</td><td>Indicator</td><td>Set (always a frame after push)</td><td>Set if frames remain to pop</td></tr>
+                        </tbody>
+                    </table>
+
+                    <h3>TPERM Result Layout (rd)</h3>
+                    <table class="instr-table">
+                        <thead>
+                            <tr>
+                                <th>Bits</th>
+                                <th>Field</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>[9:0]</td><td>Permissions</td><td>R, W, X, L, S, E, B, M, F, G from CRs Golden Token</td></tr>
+                            <tr><td>[10]</td><td>stackFrames</td><td>1 = at least one frame on call stack (RETURN safe)</td></tr>
+                            <tr><td>[11]</td><td>stackSpace</td><td>1 = room for at least one more frame (CALL safe)</td></tr>
+                            <tr><td>[12]</td><td>Valid</td><td>1 = GT passes version and bounds validation</td></tr>
+                            <tr><td>[14:13]</td><td>Type</td><td>GT type: 00=Inform, 01=Outform, 10=Literal, 11=Abstract</td></tr>
+                            <tr><td>[31:15]</td><td>(Reserved)</td><td>Zero, available for future use</td></tr>
                         </tbody>
                     </table>
 

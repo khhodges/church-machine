@@ -73,6 +73,7 @@ function updateUI() {
     updatePC();
     updateStepCount();
     updateBootStatus();
+    updateStackIndicators();
 }
 
 function updateRegisters() {
@@ -134,6 +135,22 @@ function updateBootStatus() {
     const el = document.getElementById('boot-status');
     el.textContent = sim.bootComplete ? 'Boot Complete' : 'Not Booted';
     el.className = 'boot-status ' + (sim.bootComplete ? 'booted' : 'not-booted');
+}
+
+function updateStackIndicators() {
+    const state = sim.getState();
+    const spaceEl = document.getElementById('stack-space');
+    const framesEl = document.getElementById('stack-frames');
+    const depthEl = document.getElementById('stack-depth');
+    if (spaceEl) {
+        spaceEl.className = 'stack-indicator ' + (state.stackSpace ? 'indicator-on' : 'indicator-off');
+    }
+    if (framesEl) {
+        framesEl.className = 'stack-indicator ' + (state.stackFrames ? 'indicator-on' : 'indicator-off');
+    }
+    if (depthEl) {
+        depthEl.textContent = `${state.callStackDepth}/${state.callStackMax}`;
+    }
 }
 
 function doAssemble() {

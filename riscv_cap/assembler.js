@@ -607,10 +607,12 @@ class RiscVAssembler {
     }
 
     _capTperm(args, lineNum) {
-        if (args.length !== 1) throw new Error(`CAP.TPERM requires 1 operand: rd`);
+        if (args.length !== 2) throw new Error(`CAP.TPERM requires 2 operands: rd, CRs`);
         const rd = this._parseReg(args[0]);
+        const cr = this._parseCR(args[1]);
         if (rd < 0) throw new Error(`Invalid register: ${args[0]}`);
-        return this.encodeRType(0, 0, 0, 0x3, rd, 0x0B);
+        if (cr < 0) throw new Error(`Invalid capability register: ${args[1]}`);
+        return this.encodeRType(0, cr, 0, 0x3, rd, 0x0B);
     }
 
     _capSwitch(args, lineNum) {
