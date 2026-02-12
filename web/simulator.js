@@ -628,17 +628,46 @@ class CTMMSimulator {
             
             case "SAVE": {
                 const [destCR, srcCR, idx] = args;
-                const dest = destCR < 8 ? this.contextRegs[destCR] : destCR === 8 ? this.cr8 : this.cr15;
-                const src = srcCR < 8 ? this.contextRegs[srcCR] : srcCR === 8 ? this.cr8 : this.cr15;
-                const destResult = this.mLoad(dest, 'S');
-                if (!destResult.ok) {
-                    return `FAULT: ${destResult.fault}: CR${destCR} - ${destResult.message} (destination)`;
+                const dest = this._getCR(destCR);
+                const src = this._getCR(srcCR);
+                if (!dest || dest.name === 'NULL') {
+                    return `FAULT: NULL: CR${destCR} - no capability loaded (destination C-List)`;
                 }
-                const srcResult = this.mLoad(src, 'B');
-                if (!srcResult.ok) {
-                    return `FAULT: ${srcResult.fault}: CR${srcCR} - ${srcResult.message} (source)`;
+                if (!src || src.name === 'NULL') {
+                    return `FAULT: NULL: CR${srcCR} - no capability loaded (source)`;
                 }
-                return `Saved GT from CR${srcCR} to CR${destCR}[${idx || 0}] (B-bit validated)`;
+                if (!dest.perms.includes('S') && !dest.perms.includes('M')) {
+                    return `FAULT: PERMISSION: CR${destCR} - lacks S permission (destination C-List)`;
+                }
+                if (!src.perms.includes('B') && !src.perms.includes('M')) {
+                    return `FAULT: PERMISSION: CR${srcCR} - lacks B permission (source, Bind required)`;
+                }
+                const saveIdx = idx || 0;
+                if (!dest.clist) {
+                    dest.clist = [];
+                }
+                if (saveIdx < 0) {
+                    return `FAULT: BOUNDS: index ${saveIdx} out of bounds`;
+                }
+                while (dest.clist.length <= saveIdx) {
+                    dest.clist.push(this.createNullCapability());
+                }
+                const savedPerms = src.perms ? src.perms.filter(p => p !== 'G') : [];
+                const savedCap = {
+                    name: src.name || `Saved_${srcCR}`,
+                    location: src.location,
+                    perms: [...savedPerms],
+                    locked: src.locked || false,
+                    goldenKey: src.goldenKey || this.generateKey(),
+                    clist: src.clist || null
+                };
+                this.registerCapability(savedCap);
+                dest.clist[saveIdx] = savedCap;
+                if (dest.perms && dest.perms.includes('G')) {
+                    dest.perms = dest.perms.filter(p => p !== 'G');
+                }
+                this._setCR(destCR, dest);
+                return `SAVE: Stored CR${srcCR} (${src.name}) into CR${destCR} C-List[${saveIdx}] (S+B validated, sealed)`;
             }
             
             case "LOADX": {
