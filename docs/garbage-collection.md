@@ -2,10 +2,37 @@
 
 ## The G Permission Bit
 
-The G (Garbage) permission bit is a flag on Golden Tokens that participates in the garbage collection process. Its role differs between the two simulators:
+The G (Garbage) permission bit is a flag on Golden Tokens that participates in the garbage collection process. Its behavior is unified across all implementations:
 
-- **Sim-64**: The G bit is cleared on namespace access during LOAD, signaling to the GC system that the entry has been recently accessed.
-- **Sim-32**: The G bit indicates that a capability is subject to garbage collection management. It is used during the Mark-Scan-Sweep cycle to track reachability.
+- **On every namespace access** (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH), the G bit is reset (cleared to 0) on the accessed namespace entry.
+- This means that actively used entries automatically signal their liveness through normal program execution.
+- **During the Mark phase**, the G bit is set (to 1) on all non-empty namespace entries, marking them as potentially reclaimable.
+- **After Scan**, entries still marked with G=1 have not been accessed since the last Mark and are candidates for reclamation.
+
+This G-bit reset is enforced through the **mLoad master validation path** — every namespace access routes through mLoad, which always resets G as a side effect. This is true in software (both simulators), SystemVerilog, and Amaranth HDL implementations.
+
+---
+
+## The mLoad Rule and G-bit Reset
+
+The G-bit reset is not a separate mechanism — it is an integral part of the mLoad validation pipeline. mLoad is the single trusted path for all namespace access:
+
+```
+mLoad Validation Pipeline:
+  1. Permission check (L/M on source)
+  2. Bounds check (index within C-List)
+  3. Fetch GT from C-List
+  4. Namespace bounds check (GT.offset within CR15 range)
+  5. Fetch namespace entry (Location, Limit, Seals)
+  6. MAC/seal validation
+  7. G-bit reset on accessed namespace entry  ← GC integration point
+  8. Thread update (save GT with G=0 for suspension)
+  9. Write result to destination register
+```
+
+Step 7 is unconditional — it happens on every successful namespace access regardless of the instruction type or permission domain. This ensures that **reachability determines liveness, not permissions**.
+
+For write-path instructions (SAVE, RETURN), the G-bit reset is applied to the namespace entries accessed during the operation, even though these instructions use different validation subroutines (mSave for SAVE, direct E-permission check for RETURN).
 
 ---
 
@@ -15,30 +42,38 @@ Both simulators implement deterministic garbage collection through a three-phase
 
 ### Phase 1: Mark
 
-The Mark phase flags all non-empty namespace entries as potentially reclaimable.
+The Mark phase flags all non-empty namespace entries as potentially reclaimable by setting G=1.
 
-- Every namespace entry that contains valid data is marked.
+- Every namespace entry that contains valid data has its G bit set.
 - This is a conservative starting point: all entries are assumed unreachable until proven otherwise.
 
-### Phase 2: Scan
+### Phase 2: Scan (DNA Tree Walk)
 
-The Scan phase walks all live references to identify entries that are still in use.
+The Scan phase walks the full reachability tree from all live roots, clearing G=0 on all reachable entries.
 
-- The scan examines all capability registers (CR0-CR15) and the call stack.
-- For each reference found, if the referenced entry's capability has L (Load) or M (Machine) permission, the mark on that namespace entry is cleared.
-- An entry with its mark cleared is considered reachable and will not be reclaimed.
+**Live roots include:**
+- All capability registers (CR0-CR15)
+- All call stack frames
+- Thread table entries (Sim-32)
+
+**Tree walk rules:**
+- Reachability in the tree determines liveness, not parent permissions
+- No permission filtering during scan — an entry is reachable if it can be reached through any path, regardless of whether the path has L, M, or any other permission
+- Nested C-Lists (Sim-64) or referenced entries (Sim-32) are followed recursively
+- A visited set prevents infinite loops in cyclic structures
 
 ### Phase 3: Sweep
 
-The Sweep phase reclaims entries that are still marked after scanning.
+The Sweep phase reclaims entries that are still marked with G=1 after scanning.
 
-- Any namespace entry that still has its mark set after the Scan phase is unreachable -- no live capability register or call stack frame references it.
+- Any namespace entry still marked after Scan is unreachable — no live capability register, call stack frame, or thread table entry references it.
 - The entry is cleared (reclaimed).
-- The entry's **version is bumped**, incrementing the version number in the namespace entry.
+- **Sim-32**: The entry's version is bumped (incremented within the 5-bit field), invalidating any stale Golden Tokens.
+- **Sim-64**: The entry is removed from the namespace tree.
 
 ---
 
-## Version Bumping and Token Invalidation
+## Version Bumping and Token Invalidation (Sim-32)
 
 Version bumping is the mechanism that prevents use-after-free vulnerabilities. When a namespace entry is reclaimed during Sweep:
 
@@ -53,52 +88,55 @@ This provides strong temporal safety: even if an old token is retained in a regi
 
 ## Sim-64: GC Integration
 
-In Sim-64, garbage collection is integrated directly into the LOAD instruction:
+In Sim-64, garbage collection is integrated directly into the mLoad path:
 
-- When a LOAD accesses a namespace entry, the G bit on that entry is cleared.
-- This means that actively used entries automatically signal their liveness through normal program execution.
+- When any Church instruction accesses a namespace entry through mLoad, the G bit on that entry is cleared.
 - The GC operates on the namespace hierarchy, traversing the tree of namespaces rooted at CR15.
-- The Mark-Scan-Sweep cycle can identify unreferenced entries by checking which entries still have their G bit set (indicating they have not been accessed since the last Mark phase).
-
-This approach is tightly coupled with normal execution: no separate GC pause or cycle is required for tracking liveness.
-
----
-
-## Sim-32: Separate GC Cycle
-
-In Sim-32, garbage collection is a separate, explicitly triggered cycle that operates on the flat namespace table:
-
-- The GC does not run automatically during normal instruction execution.
-- Instead, the three phases (Mark, Scan, Sweep) are triggered independently through the Dashboard UI.
-- The namespace table is a flat array of up to 32,768 entries, and the GC processes all entries in this table.
-
-### GC Operation Details (Sim-32)
-
-**Mark**: Iterates over all namespace entries. Any entry with non-zero content is flagged as potentially reclaimable.
-
-**Scan**: Examines all 16 capability registers (CR0-CR15) and all frames on the call stack. For each Golden Token found:
-- If the token has L (Load) or M (Machine) permission, the corresponding namespace entry's mark is cleared.
-- This identifies entries that are reachable through live capabilities.
-
-**Sweep**: Iterates over all namespace entries. Any entry still marked after scanning:
-- Has its content cleared (Location, Limit, Seal reset to zero).
-- Has its version incremented (bumped by 1, wrapping within the 5-bit field).
-- All Golden Tokens referencing this entry at the old version are now invalid.
+- The Scan phase walks the full DNA tree without permission filtering — any reachable node has its G bit cleared.
+- The Mark-Scan-Sweep cycle can be triggered to identify unreferenced entries by checking which entries still have their G bit set.
 
 ---
 
-## Dashboard UI (Sim-32)
+## Sim-32: GC Integration
+
+In Sim-32, garbage collection uses the same G-bit mechanism through mLoad:
+
+- **mLoad resets G**: When mLoad validates a namespace access, it resets G=0 on the accessed entry. This happens during every LOAD, SAVE, CALL, RETURN, CHANGE, and SWITCH.
+- **mLoadByIndex resets G**: Direct namespace index access also resets G=0.
+- The three phases (Mark, Scan, Sweep) can be triggered independently through the Dashboard UI.
+- The namespace table is a flat array of up to 32,768 entries.
+
+### Dashboard UI (Sim-32)
 
 The Sim-32 Dashboard provides four GC control buttons:
 
 | Button | Action |
 |--------|--------|
-| **Mark** | Executes the Mark phase only. Flags all non-empty namespace entries. |
-| **Scan** | Executes the Scan phase only. Clears marks on reachable entries. |
-| **Sweep** | Executes the Sweep phase only. Reclaims still-marked entries and bumps versions. |
+| **Mark** | Executes the Mark phase only. Sets G=1 on all non-empty namespace entries. |
+| **Scan** | Executes the Scan phase only. Walks DNA tree from all live roots, clearing G=0 on reachable entries. |
+| **Sweep** | Executes the Sweep phase only. Reclaims entries still marked with G=1 and bumps their versions. |
 | **GC Cycle** | Executes all three phases in sequence (Mark, then Scan, then Sweep). |
 
-The Dashboard also displays GC status information, showing the state of the namespace table and the results of each phase.
+The Namespace Browser displays a G column showing the current G-bit state for each entry.
+
+---
+
+## Hardware Implementation
+
+### SystemVerilog
+
+The mLoad micro-routine (`ctmm_mload.sv`) implements G-bit reset as a dedicated pipeline state:
+
+- **SUB_RESET_G**: After MAC validation, if the fetched GT has G=1, this state asserts `g_bit_reset` and provides the namespace address via `g_bit_addr` (CR15.Location + GT.offset + 16, pointing to Word 3/Seals).
+- The `g_bit_reset`/`g_bit_addr` interface is used by external logic to clear the G bit in the namespace memory.
+- Write-path instructions (SAVE via `ctmm_save.sv`, RETURN via `ctmm_return.sv`) also reset G-bits for their accessed namespace entries using the same interface.
+
+### Amaranth HDL
+
+The mLoad module (`ctmm_amaranth/mload.py`) mirrors the SystemVerilog implementation:
+
+- A `RESET_G` state asserts `g_bit_reset` and computes `g_bit_addr`.
+- SAVE (`save.py`) and RETURN (`ret.py`) include their own G-bit reset states using the same signal interface.
 
 ---
 
@@ -106,9 +144,14 @@ The Dashboard also displays GC status information, showing the state of the name
 
 | Aspect | Sim-64 (CTMM) | Sim-32 (RV32-Cap) |
 |--------|---------------|-------------------|
-| **GC Trigger** | Integrated into LOAD (G-bit cleared on access) | Explicit via Dashboard buttons |
+| **G-bit Reset Trigger** | Every mLoad call (all Church instructions) | Every mLoad/mLoadByIndex call (all Church instructions) |
 | **Namespace Structure** | Hierarchical (tree of namespaces) | Flat table (up to 32,768 entries) |
-| **Liveness Tracking** | G-bit: cleared on access, set entries are unreferenced | Mark flag: set during Mark, cleared during Scan |
-| **Version Bumping** | Not used (different invalidation mechanism) | 5-bit version incremented on Sweep |
-| **Token Invalidation** | Through G-bit and capability integrity | Through version mismatch detection |
-| **User Control** | Automatic during execution | Manual via Mark, Scan, Sweep, GC Cycle buttons |
+| **Scan Algorithm** | DNA tree walk from CR15 root, no permission filtering | DNA tree walk from registers + call stack + thread table, no permission filtering |
+| **Version Bumping** | Not used (tree removal) | 5-bit version incremented on Sweep |
+| **Token Invalidation** | Entry removal from tree | Version mismatch detection |
+| **User Control** | Dashboard buttons (Mark, Scan, Sweep, GC Cycle) | Dashboard buttons (Mark, Scan, Sweep, GC Cycle) |
+| **Hardware Support** | g_bit_reset/g_bit_addr signals in mLoad, SAVE, RETURN | g_bit_reset/g_bit_addr signals in mLoad, SAVE, RETURN |
+
+## Key Design Principle
+
+The G-bit reset happens on **every** namespace access because reachability determines liveness, not permissions. An entry accessed through a SAVE (S permission) is just as live as one accessed through a LOAD (L permission). The mLoad path enforces this uniformly.

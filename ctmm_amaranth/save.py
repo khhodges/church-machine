@@ -25,6 +25,10 @@ class CTMMSave(Elaboratable):
         self.mem_wr_en = Signal()
         self.mem_wr_done = Signal()
 
+        self.cr15_namespace = Signal(CAP_REG_LAYOUT)
+        self.g_bit_reset = Signal()
+        self.g_bit_addr = Signal(64)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -95,12 +99,24 @@ class CTMMSave(Elaboratable):
                 with m.If(u_msave.sub_fault):
                     m.d.sync += sub_fault_latched.eq(1)
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_msave.sub_fault_type)]
-                with m.If(sub_done_latched | sub_fault_latched):
+                with m.If(sub_done_latched):
+                    m.next = "RESET_G"
+                with m.Elif(sub_fault_latched):
                     m.next = "IDLE"
+
+            with m.State("RESET_G"):
+                dst_view = View(CAP_REG_LAYOUT, dst_reg_latched)
+                dst_gt_view = View(GT_LAYOUT, dst_view.word0_gt)
+                cr15_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
+                m.d.comb += [
+                    self.g_bit_reset.eq(1),
+                    self.g_bit_addr.eq(cr15_view.word1_location + Cat(dst_gt_view.offset, Const(0, 32)) + 16),
+                ]
+                m.next = "IDLE"
 
         m.d.comb += [
             self.save_busy.eq(~fsm.ongoing("IDLE")),
-            self.save_complete.eq(fsm.ongoing("CALL_SUB") & sub_done_latched),
+            self.save_complete.eq(fsm.ongoing("RESET_G")),
             self.save_fault.eq(fault_latched),
             self.fault_type.eq(fault_type_latched),
         ]

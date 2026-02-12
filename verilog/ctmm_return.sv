@@ -10,16 +10,24 @@
 // RETURN Steps:
 //   1. Read return capability from CRn
 //   2. Verify CRn has E (Enter) permission
-//   3. Restore CR6 (C-List) from return capability
-//   4. Restore CR7 (Nucleus) from return capability  
-//   5. Set NIA to saved return address
-//   6. Clear internal abstraction state
+//   3. Restore CR6 (C-List) from return capability Word 2 (saved GT)
+//   4. Restore CR7 (Nucleus) from return capability Word 3 (saved GT)
+//   5. Reset G-bit in namespace for restored CR6 GT entry
+//   6. Reset G-bit in namespace for restored CR7 GT entry
+//   7. Set NIA to saved return address
+//   8. Clear internal abstraction state
 //
 // The return capability structure (saved by CALL):
 //   Word 0: GT with saved permissions
 //   Word 1: Return NIA (instruction address)
 //   Word 2: Saved CR6 offset
 //   Word 3: Saved CR7 offset
+//
+// G-bit Reset:
+//   After restoring CR6/CR7 GTs, the namespace entries they point to have
+//   their G-bits reset. This signals the garbage collector that these
+//   namespace entries are actively referenced, preventing premature collection.
+//   Address calculation: CR15.Location + GT.offset + 16 (Word 3 of NS entry)
 //
 // FAULT conditions:
 //   - CRn lacks E permission
@@ -54,7 +62,14 @@ module ctmm_return
     output logic [63:0] nia_value,            // New NIA value
     
     // M bit clear interface (leaving internal abstraction)
-    output logic        clear_m_bit           // Clear M bit on current context
+    output logic        clear_m_bit,          // Clear M bit on current context
+    
+    // CR15 (Namespace) interface for G-bit reset
+    input  capability_reg_t cr15_namespace,   // CR15 Namespace register
+    
+    // G bit reset interface
+    output logic        g_bit_reset,          // Signal to reset G bit
+    output logic [63:0] g_bit_addr            // Address: CR15.Location + GT.offset + 16
 );
 
     // ========================================================================
@@ -68,12 +83,14 @@ module ctmm_return
     // State Machine
     // ========================================================================
     
-    typedef enum logic [2:0] {
+    typedef enum logic [3:0] {
         IDLE,
         READ_SRC,             // Read source register (return capability)
         CHECK_PERM,           // Check E permission
-        RESTORE_CR6,          // Restore CR6 (C-List)
-        RESTORE_CR7,          // Restore CR7 (Nucleus)
+        RESTORE_CR6,          // Restore CR6 (C-List) GT
+        RESTORE_CR7,          // Restore CR7 (Nucleus) GT
+        RESET_G_CR6,          // Reset G-bit for CR6 namespace entry
+        RESET_G_CR7,          // Reset G-bit for CR7 namespace entry
         SET_NIA,              // Set NIA to return address
         COMPLETE,
         FAULT
@@ -115,8 +132,9 @@ module ctmm_return
     //   Word 2: Saved CR6.GT (C-List Golden Token)
     //   Word 3: Saved CR7.GT (Nucleus Golden Token)
     //
-    // To fully restore CR6/CR7, we need to re-fetch from namespace
-    // using the saved GT offsets. This is done via mLoad interface.
+    // To fully restore CR6/CR7, we write the saved GTs directly and then
+    // reset the G-bit on the corresponding namespace entries to signal
+    // the garbage collector that these entries are actively referenced.
     // ========================================================================
     
     logic [63:0] saved_nia;
@@ -186,7 +204,9 @@ module ctmm_return
             end
             
             RESTORE_CR6: next_state = RESTORE_CR7;
-            RESTORE_CR7: next_state = SET_NIA;
+            RESTORE_CR7: next_state = RESET_G_CR6;
+            RESET_G_CR6: next_state = RESET_G_CR7;
+            RESET_G_CR7: next_state = SET_NIA;
             SET_NIA: next_state = COMPLETE;
             
             COMPLETE: next_state = IDLE;
@@ -209,9 +229,6 @@ module ctmm_return
     assign cr_rd_addr = {1'b0, cr_src};
     
     // CR write (restore CR6 or CR7 with full GT)
-    // Note: Full capability restoration requires namespace fetch via mLoad
-    // For now, we restore the GT directly - the caller should use LOAD
-    // to fully populate Word1-3 from namespace if needed.
     always_comb begin
         cr_wr_addr = 4'h0;
         cr_wr_data = '0;
@@ -221,15 +238,12 @@ module ctmm_return
             RESTORE_CR6: begin
                 cr_wr_addr = CR6_CLIST;
                 cr_wr_data.word0_gt = saved_cr6_gt;
-                // Word1-3 will be populated by subsequent namespace access
-                // when the capability is actually used
                 cr_wr_en = 1'b1;
             end
             
             RESTORE_CR7: begin
                 cr_wr_addr = CR7_NUCLEUS;
                 cr_wr_data.word0_gt = saved_cr7_gt;
-                // Word1-3 will be populated by subsequent namespace access
                 cr_wr_en = 1'b1;
             end
             
@@ -243,5 +257,23 @@ module ctmm_return
     
     // Clear M bit when leaving abstraction
     assign clear_m_bit = (state == SET_NIA);
+    
+    // ========================================================================
+    // G-bit Reset Interface
+    // ========================================================================
+    // After restoring CR6/CR7 GTs, reset the G-bit on the namespace entries
+    // they point to. This signals the garbage collector that these namespace
+    // entries are actively referenced.
+    //
+    // Address calculation: CR15.Location + GT.offset + 16
+    //   - CR15.Location = base of namespace table
+    //   - GT.offset = direct byte offset into namespace
+    //   - +16 = offset to Word 3 (Seals) where G-bit resides
+    // ========================================================================
+    
+    assign g_bit_reset = (state == RESET_G_CR6) || (state == RESET_G_CR7);
+    assign g_bit_addr = (state == RESET_G_CR6) ?
+        (cr15_namespace.word1_location + {32'h0, saved_cr6_gt.offset} + 64'd16) :
+        (cr15_namespace.word1_location + {32'h0, saved_cr7_gt.offset} + 64'd16);
 
 endmodule

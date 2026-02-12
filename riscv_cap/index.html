@@ -113,7 +113,7 @@
                         </span>
                         <span class="gc-controls">
                             <button class="gc-btn" id="gc-mark-btn" onclick="gcMark()" data-tooltip="GC Mark|Phase 1 of 3|Marks all namespace entries as potentially garbage by setting internal G-flag.">Mark</button>
-                            <button class="gc-btn" id="gc-scan-btn" onclick="gcScan()" data-tooltip="GC Scan|Phase 2 of 3|Scans capability registers and call stack. Clears G-flag on entries reachable via valid keys (L or M permission).">Scan</button>
+                            <button class="gc-btn" id="gc-scan-btn" onclick="gcScan()" data-tooltip="GC Scan|Phase 2 of 3|DNA tree walk from root. Clears G-bit on every reachable entry via registers, call stack, and thread table.">Scan</button>
                             <button class="gc-btn" id="gc-sweep-btn" onclick="gcSweep()" data-tooltip="GC Sweep|Phase 3 of 3|Sweeps entries still marked with G-flag. Reclaims unreachable entries and bumps their version to invalidate stale tokens.">Sweep</button>
                             <button class="gc-btn gc-cycle-btn" id="gc-cycle-btn" onclick="gcCycle()" data-tooltip="GC Full Cycle|Mark → Scan → Sweep|Runs all three GC phases in sequence. Reports marked, scanned, and collected entries.">GC Cycle</button>
                             <span class="gc-status" id="gc-status"></span>
@@ -141,6 +141,7 @@
                             <th>Version</th>
                             <th>Seals</th>
                             <th>MAC</th>
+                            <th>G</th>
                         </tr>
                     </thead>
                     <tbody id="ns-table-body">

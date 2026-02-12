@@ -12,9 +12,16 @@
 //   Step 1: Verify CRd in 0-6 AND initiate register reads (parallel)
 //   Step 2: Latch destination and source register data
 //   Step 3: Call mSave with destination cap, source GT, and index
+//   Step 4: On success, reset G-bit on the destination C-List namespace entry
 //
 // The actual permission checks and memory write are done by ctmm_msave.sv
 // This reduces the Trusted Computing Base - SAVE and CHANGE share mSave.
+//
+// G-bit Reset:
+//   After a successful mSave, the G-bit is reset on the namespace entry
+//   that the destination C-List GT points to. This signals the garbage
+//   collector that this namespace entry is actively referenced.
+//   Address calculation: CR15.Location + dst_GT.offset + 16
 //
 // FAULT conditions:
 //   - Destination CRd not in range 0-6 (checked here)
@@ -45,7 +52,14 @@ module ctmm_save
     output logic [63:0] mem_wr_addr,          // Memory address to write
     output logic [63:0] mem_wr_data,          // Data to write (GT)
     output logic        mem_wr_en,            // Write enable
-    input  logic        mem_wr_done           // Write complete acknowledgment
+    input  logic        mem_wr_done,          // Write complete acknowledgment
+    
+    // CR15 (Namespace) interface for G-bit reset
+    input  capability_reg_t cr15_namespace,   // CR15 Namespace register
+    
+    // G bit reset interface
+    output logic        g_bit_reset,          // Signal to reset G bit
+    output logic [63:0] g_bit_addr            // Address: CR15.Location + GT.offset + 16
 );
 
     // ========================================================================
@@ -63,7 +77,8 @@ module ctmm_save
         SAVE_CHECK_DST_READ,  // Verify CRd in 0-6 AND initiate destination read
         SAVE_LATCH_DST,       // Latch destination, initiate source read
         SAVE_LATCH_SRC,       // Latch source
-        SAVE_CALL_SUB         // Call mSave and wait for completion
+        SAVE_CALL_SUB,        // Call mSave and wait for completion
+        SAVE_RESET_G          // Reset G-bit on destination C-List namespace entry
     } save_state_t;
     
     save_state_t state, next_state;
@@ -205,7 +220,6 @@ module ctmm_save
             end
             
             SAVE_CHECK_DST_READ: begin
-                // Verify CRd in 0-6 AND initiate read
                 if (!dst_in_range)
                     next_state = SAVE_IDLE;  // Fault
                 else
@@ -213,20 +227,22 @@ module ctmm_save
             end
             
             SAVE_LATCH_DST: begin
-                // Destination data now valid, latch it
                 next_state = SAVE_LATCH_SRC;
             end
             
             SAVE_LATCH_SRC: begin
-                // Source data now valid, latch it
                 next_state = SAVE_CALL_SUB;
             end
             
             SAVE_CALL_SUB: begin
-                // sub_start_reg pulses once on entry (registered)
-                // Wait for subroutine to complete (using sticky latches)
-                if (sub_done_latched || sub_fault_latched)
-                    next_state = SAVE_IDLE;
+                if (sub_fault_latched)
+                    next_state = SAVE_IDLE;  // Fault from mSave
+                else if (sub_done_latched)
+                    next_state = SAVE_RESET_G;  // Success → reset G-bit
+            end
+            
+            SAVE_RESET_G: begin
+                next_state = SAVE_IDLE;
             end
             
             default: next_state = SAVE_IDLE;
@@ -259,6 +275,23 @@ module ctmm_save
     end
     
     // ========================================================================
+    // G-bit Reset Interface
+    // ========================================================================
+    // After a successful mSave, reset the G-bit on the namespace entry
+    // that the destination C-List GT points to. This signals the garbage
+    // collector that this namespace entry is actively referenced.
+    //
+    // Address calculation: CR15.Location + dst_GT.offset + 16
+    //   - CR15.Location = base of namespace table
+    //   - dst_GT.offset = direct byte offset into namespace
+    //   - +16 = offset to Word 3 (Seals) where G-bit resides
+    // ========================================================================
+    
+    assign g_bit_reset = (state == SAVE_RESET_G);
+    assign g_bit_addr = cr15_namespace.word1_location +
+                         {32'h0, dst_reg_latched.word0_gt.offset} + 64'd16;
+    
+    // ========================================================================
     // Output Signals
     // ========================================================================
     // Note: sub_done/sub_fault may be single-cycle pulses from mSave.
@@ -266,9 +299,8 @@ module ctmm_save
     // ensure completion/fault signals are not missed.
     
     assign save_busy = (state != SAVE_IDLE);
-    assign save_complete = (state == SAVE_CALL_SUB) && sub_done_latched;
+    assign save_complete = (state == SAVE_RESET_G);
     assign save_fault = fault_latched;
     assign fault_type = fault_type_latched;
 
 endmodule
-

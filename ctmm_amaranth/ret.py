@@ -24,6 +24,10 @@ class CTMMReturn(Elaboratable):
         self.nia_value = Signal(64)
         self.clear_m_bit = Signal()
 
+        self.cr15_namespace = Signal(CAP_REG_LAYOUT)
+        self.g_bit_reset = Signal()
+        self.g_bit_addr = Signal(64)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -86,6 +90,24 @@ class CTMMReturn(Elaboratable):
                     self.cr_wr_addr.eq(CR7_NUCLEUS),
                     self.cr_wr_data.eq(wr_data7),
                     self.cr_wr_en.eq(1),
+                ]
+                m.next = "RESET_G_CR6"
+
+            with m.State("RESET_G_CR6"):
+                cr15_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
+                cr6_gt_view = View(GT_LAYOUT, saved_cr6_gt)
+                m.d.comb += [
+                    self.g_bit_reset.eq(1),
+                    self.g_bit_addr.eq(cr15_view.word1_location + Cat(cr6_gt_view.offset, Const(0, 32)) + 16),
+                ]
+                m.next = "RESET_G_CR7"
+
+            with m.State("RESET_G_CR7"):
+                cr15_view7 = View(CAP_REG_LAYOUT, self.cr15_namespace)
+                cr7_gt_view = View(GT_LAYOUT, saved_cr7_gt)
+                m.d.comb += [
+                    self.g_bit_reset.eq(1),
+                    self.g_bit_addr.eq(cr15_view7.word1_location + Cat(cr7_gt_view.offset, Const(0, 32)) + 16),
                 ]
                 m.next = "SET_NIA"
 

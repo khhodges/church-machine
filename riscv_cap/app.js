@@ -300,7 +300,9 @@ function updateNamespaceView() {
         const macBadge = macValid
             ? '<span class="mac-badge mac-valid">MAC OK</span>'
             : '<span class="mac-badge mac-invalid">MAC FAIL</span>';
-        tr.innerHTML = `<td>${i}</td><td>${toHex32(entry.location)}</td><td>${toHex32(entry.limit)}</td><td>${version}</td><td>${toHex32(seals)}</td><td>${macBadge}</td>`;
+        const gBit = entry.gBit || 0;
+        const gBadge = gBit ? '<span class="mac-badge mac-invalid">G</span>' : '<span class="mac-badge mac-valid">-</span>';
+        tr.innerHTML = `<td>${i}</td><td>${toHex32(entry.location)}</td><td>${toHex32(entry.limit)}</td><td>${version}</td><td>${toHex32(seals)}</td><td>${macBadge}</td><td>${gBadge}</td>`;
         tbody.appendChild(tr);
     });
 }

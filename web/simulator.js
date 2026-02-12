@@ -94,6 +94,40 @@ class CTMMSimulator {
         return key.match(/.{1,8}/g).join('-');
     }
 
+    mLoad(src, requiredPerm, idx) {
+        if (!src || src.name === 'NULL') {
+            return { ok: false, fault: 'NULL', message: 'no capability loaded' };
+        }
+
+        if (!src.perms.includes(requiredPerm) && !src.perms.includes('M')) {
+            return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
+        }
+
+        if (idx !== undefined && idx !== null) {
+            if (!src.clist || idx >= src.clist.length) {
+                return { ok: false, fault: 'BOUNDS', message: `index ${idx} out of bounds for C-List (size: ${src.clist ? src.clist.length : 0})` };
+            }
+            const entry = src.clist[idx];
+
+            if (entry.perms && entry.perms.includes('G')) {
+                entry.perms = entry.perms.filter(p => p !== 'G');
+            }
+
+            const loadedCap = {
+                name: entry.name || `Entry_${idx}`,
+                location: entry.location || { type: 'Local', offset: idx * 256 },
+                perms: entry.perms ? [...entry.perms] : ['R'],
+                locked: entry.locked || false,
+                goldenKey: entry.goldenKey || this.generateKey(),
+                clist: entry.clist || null
+            };
+
+            return { ok: true, cap: loadedCap, entry };
+        }
+
+        return { ok: true, cap: src };
+    }
+
     checkCondition(cond) {
         if (!cond || cond === '') return true;
         
@@ -477,151 +511,56 @@ class CTMMSimulator {
             
             case "LOAD": {
                 const [destCR, srcCR, idx] = args;
-                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
-                           srcCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!src || src.name === 'NULL') {
-                    return `FAULT: CR${srcCR} [NULL] - no capability loaded`;
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : srcCR === 8 ? this.cr8 : this.cr15;
+                const result = this.mLoad(src, 'L', idx);
+                if (!result.ok) {
+                    return `FAULT: ${result.fault}: CR${srcCR} - ${result.message}`;
                 }
-                if (!src.perms.includes('L') && !src.perms.includes('M')) {
-                    const permStr = src.perms.length > 0 ? `[${src.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Source CR${srcCR} ${permStr} "${src.name}" lacks Load (L) or Master (M) permission`;
-                }
-                
-                // Get the capability from source's clist at given index
-                let loadedCap = null;
-                // Check if source is a Namespace entry (has M permission or is CR15)
-                // In CTMM, Namespace entries have M permission - only these participate in GC
-                const isNamespaceAccess = src.perms.includes('M') || srcCR === 15;
-                if (src.clist && idx < src.clist.length) {
-                    const entry = src.clist[idx];
-                    // Reset G bit if set (deterministic garbage collection)
-                    // Only incurs overhead when G=TRUE and accessing Namespace entry
-                    // The L/M permission check above validates the key before this point
-                    // This signals to software that a valid key exists for this entry
-                    if (isNamespaceAccess && entry.perms && entry.perms.includes('G')) {
-                        entry.perms = entry.perms.filter(p => p !== 'G');
-                    }
-                    loadedCap = {
-                        name: entry.name || `Entry_${idx}`,
-                        location: entry.location || { type: 'Local', offset: idx * 256 },
-                        perms: entry.perms ? [...entry.perms] : ['R'],
-                        locked: entry.locked || false,
-                        goldenKey: entry.goldenKey || this.generateKey(),
-                        clist: entry.clist || null
-                    };
-                } else {
-                    // No clist or index out of bounds - create empty capability
-                    loadedCap = {
-                        name: `LOADED_${idx}`,
-                        location: { type: 'Local', offset: idx * 256 },
-                        perms: ['R'],
-                        locked: false,
-                        goldenKey: this.generateKey()
-                    };
-                }
-                
-                if (destCR < 8) {
-                    this.contextRegs[destCR] = loadedCap;
-                } else if (destCR === 8) {
-                    this.cr8 = loadedCap;
-                } else if (destCR === 15) {
-                    this.cr15 = loadedCap;
-                }
-                
+                if (destCR < 8) this.contextRegs[destCR] = result.cap;
+                else if (destCR === 8) this.cr8 = result.cap;
+                else if (destCR === 15) this.cr15 = result.cap;
                 const destName = destCR === 8 ? 'CR8 (Thread)' : destCR === 15 ? 'CR15 (Namespace)' : `CR${destCR}`;
-                const permStr = loadedCap.perms.length > 0 ? `[${loadedCap.perms.join('')}]` : '';
-                return `Loaded ${loadedCap.name} ${permStr} into ${destName} via CR${srcCR}[${idx}]`;
+                const permStr = result.cap.perms.length > 0 ? `[${result.cap.perms.join('')}]` : '';
+                return `Loaded ${result.cap.name} ${permStr} into ${destName} via CR${srcCR}[${idx}]`;
             }
             
             case "SAVE": {
                 const [destCR, srcCR, idx] = args;
-                const dest = destCR < 8 ? this.contextRegs[destCR] : 
-                            destCR === 8 ? this.cr8 : this.cr15;
-                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
-                           srcCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!dest || dest.name === 'NULL') {
-                    return `FAULT: CR${destCR} [NULL] - no capability loaded (destination)`;
+                const dest = destCR < 8 ? this.contextRegs[destCR] : destCR === 8 ? this.cr8 : this.cr15;
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : srcCR === 8 ? this.cr8 : this.cr15;
+                const destResult = this.mLoad(dest, 'S');
+                if (!destResult.ok) {
+                    return `FAULT: ${destResult.fault}: CR${destCR} - ${destResult.message} (destination)`;
                 }
-                if (!src || src.name === 'NULL') {
-                    return `FAULT: CR${srcCR} [NULL] - no capability loaded (source)`;
-                }
-                if (!dest.perms.includes('S') && !dest.perms.includes('M')) {
-                    const permStr = dest.perms.length > 0 ? `[${dest.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Dest CR${destCR} ${permStr} "${dest.name}" lacks Save (S) or Master (M) permission`;
-                }
-                if (!src.perms.includes('B') && !src.perms.includes('M')) {
-                    const permStr = src.perms.length > 0 ? `[${src.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Source CR${srcCR} ${permStr} "${src.name}" lacks Bind (B) or Master (M) permission`;
+                const srcResult = this.mLoad(src, 'B');
+                if (!srcResult.ok) {
+                    return `FAULT: ${srcResult.fault}: CR${srcCR} - ${srcResult.message} (source)`;
                 }
                 return `Saved GT from CR${srcCR} to CR${destCR}[${idx || 0}] (B-bit validated)`;
             }
             
             case "LOADX": {
-                // Load Exclusive - same as LOAD but sets exclusive monitor
                 const [destCR, srcCR, idx] = args;
-                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
-                           srcCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!src || src.name === 'NULL') {
-                    return `FAULT: CR${srcCR} [NULL] - no capability loaded`;
+                const src = srcCR < 8 ? this.contextRegs[srcCR] : srcCR === 8 ? this.cr8 : this.cr15;
+                const result = this.mLoad(src, 'L', idx);
+                if (!result.ok) {
+                    return `FAULT: ${result.fault}: CR${srcCR} - ${result.message}`;
                 }
-                if (!src.perms.includes('L') && !src.perms.includes('M')) {
-                    const permStr = src.perms.length > 0 ? `[${src.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Source CR${srcCR} ${permStr} lacks Load (L) permission`;
-                }
-                
-                // Load the capability (reuse LOAD logic)
-                let loadedCap = null;
-                if (src.clist && idx < src.clist.length) {
-                    const entry = src.clist[idx];
-                    loadedCap = {
-                        name: entry.name || `Entry_${idx}`,
-                        location: entry.location || { type: 'Local', offset: idx * 256 },
-                        perms: entry.perms ? [...entry.perms] : ['R'],
-                        locked: entry.locked || false,
-                        goldenKey: entry.goldenKey || this.generateKey(),
-                        clist: entry.clist || null
-                    };
-                } else {
-                    loadedCap = {
-                        name: `LOADED_${idx}`,
-                        location: { type: 'Local', offset: idx * 256 },
-                        perms: ['R'],
-                        locked: false,
-                        goldenKey: this.generateKey()
-                    };
-                }
-                
                 if (destCR < 8) {
-                    this.contextRegs[destCR] = loadedCap;
+                    this.contextRegs[destCR] = result.cap;
                 }
-                
-                // Set exclusive monitor for current thread
                 const addr = (srcCR << 16) | idx;
                 this.exclusiveMonitors[this.currentThread] = { valid: true, addr: addr };
-                
-                return `LOADX: Loaded ${loadedCap.name} into CR${destCR}, exclusive monitor set for addr 0x${addr.toString(16)}`;
+                return `LOADX: Loaded ${result.cap.name} into CR${destCR}, exclusive monitor set for addr 0x${addr.toString(16)}`;
             }
             
             case "SAVEX": {
-                // Store Exclusive - conditional store, returns result in DR
                 const [srcCR, destCR, idx, resultDR] = args;
-                const dest = destCR < 8 ? this.contextRegs[destCR] : 
-                            destCR === 8 ? this.cr8 : this.cr15;
-                const src = srcCR < 8 ? this.contextRegs[srcCR] : 
-                           srcCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!dest || dest.name === 'NULL') {
-                    return `FAULT: CR${destCR} [NULL] - no capability loaded (destination)`;
+                const dest = destCR < 8 ? this.contextRegs[destCR] : destCR === 8 ? this.cr8 : this.cr15;
+                const destResult = this.mLoad(dest, 'S');
+                if (!destResult.ok) {
+                    return `FAULT: ${destResult.fault}: CR${destCR} - ${destResult.message}`;
                 }
-                if (!dest.perms.includes('S') && !dest.perms.includes('M')) {
-                    const permStr = dest.perms.length > 0 ? `[${dest.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Dest CR${destCR} ${permStr} lacks Save (S) permission`;
-                }
-                
-                // Check exclusive monitor
                 const addr = (destCR << 16) | idx;
                 const monitor = this.exclusiveMonitors[this.currentThread];
                 
@@ -639,33 +578,19 @@ class CTMMSimulator {
             }
             
             case "LDM": {
-                // Load Multiple - load multiple CRs from consecutive C-List entries
                 const [baseCR, regList] = args;
-                const base = baseCR < 8 ? this.contextRegs[baseCR] : 
-                            baseCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!base || base.name === 'NULL') {
-                    return `FAULT: CR${baseCR} [NULL] - no capability loaded`;
+                const base = baseCR < 8 ? this.contextRegs[baseCR] : baseCR === 8 ? this.cr8 : this.cr15;
+                const baseResult = this.mLoad(base, 'L');
+                if (!baseResult.ok) {
+                    return `FAULT: ${baseResult.fault}: CR${baseCR} - ${baseResult.message}`;
                 }
-                if (!base.perms.includes('L') && !base.perms.includes('M')) {
-                    const permStr = base.perms.length > 0 ? `[${base.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Base CR${baseCR} ${permStr} lacks Load (L) permission`;
-                }
-                
                 let loaded = [];
                 let idx = 0;
                 for (let i = 0; i < 8; i++) {
                     if ((regList >> i) & 1) {
-                        // Load CR[i] from base[idx]
-                        if (base.clist && idx < base.clist.length) {
-                            const entry = base.clist[idx];
-                            this.contextRegs[i] = {
-                                name: entry.name || `LDM_${idx}`,
-                                location: entry.location || { type: 'Local', offset: idx * 256 },
-                                perms: entry.perms ? [...entry.perms] : ['R'],
-                                locked: false,
-                                goldenKey: entry.goldenKey || this.generateKey()
-                            };
+                        const entryResult = this.mLoad(base, 'L', idx);
+                        if (entryResult.ok) {
+                            this.contextRegs[i] = entryResult.cap;
                         }
                         loaded.push(`CR${i}`);
                         idx++;
@@ -675,19 +600,12 @@ class CTMMSimulator {
             }
             
             case "STM": {
-                // Store Multiple - store multiple CRs to consecutive C-List entries
                 const [baseCR, regList] = args;
-                const base = baseCR < 8 ? this.contextRegs[baseCR] : 
-                            baseCR === 8 ? this.cr8 : this.cr15;
-                
-                if (!base || base.name === 'NULL') {
-                    return `FAULT: CR${baseCR} [NULL] - no capability loaded`;
+                const base = baseCR < 8 ? this.contextRegs[baseCR] : baseCR === 8 ? this.cr8 : this.cr15;
+                const baseResult = this.mLoad(base, 'S');
+                if (!baseResult.ok) {
+                    return `FAULT: ${baseResult.fault}: CR${baseCR} - ${baseResult.message}`;
                 }
-                if (!base.perms.includes('S') && !base.perms.includes('M')) {
-                    const permStr = base.perms.length > 0 ? `[${base.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Base CR${baseCR} ${permStr} lacks Save (S) permission`;
-                }
-                
                 let stored = [];
                 for (let i = 0; i < 8; i++) {
                     if ((regList >> i) & 1) {
@@ -742,15 +660,10 @@ class CTMMSimulator {
             
             case "CALL": {
                 const [crIdx, maskField] = args;
-                const cr = crIdx < 8 ? this.contextRegs[crIdx] : 
-                          crIdx === 8 ? this.cr8 : this.cr15;
-                
-                if (!cr || cr.name === 'NULL') {
-                    return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
-                }
-                if (!cr.perms.includes('L')) {
-                    const permStr = cr.perms.length > 0 ? `[${cr.perms.join('')}]` : '[no perms]';
-                    return `FAULT: Source CR${crIdx} ${permStr} "${cr.name}" lacks Limit (L) permission for CALL`;
+                const cr = crIdx < 8 ? this.contextRegs[crIdx] : crIdx === 8 ? this.cr8 : this.cr15;
+                const callResult = this.mLoad(cr, 'L');
+                if (!callResult.ok) {
+                    return `FAULT: ${callResult.fault}: CR${crIdx} - ${callResult.message}`;
                 }
                 
                 this.callStack.push({
@@ -842,54 +755,34 @@ class CTMMSimulator {
             }
             
             case "CHANGE": {
-                // CHANGE CRs (I=0) or CHANGE CRn, idx (I=1)
-                // I=0: Create thread GT from capability in CRs
-                // I=1: Create thread GT from C-List lookup
                 const [arg1, arg2] = args;
                 
-                // Clear exclusive monitor on thread change (ARM CLREX semantics)
                 this.exclusiveMonitors[this.currentThread] = { valid: false, addr: 0 };
                 
                 let sourceCap = null;
                 let sourceDesc = '';
                 
                 if (arg2 !== undefined) {
-                    // I=1: C-List lookup - arg1 is CRn, arg2 is index
                     const crIdx = parseInt(arg1);
                     const index = parseInt(arg2);
                     const clist = crIdx < 8 ? this.contextRegs[crIdx] : null;
-                    if (!clist || clist.name === 'NULL') {
-                        return `FAULT: CR${crIdx} [NULL] - no C-List loaded`;
+                    const result = this.mLoad(clist, 'L', index);
+                    if (!result.ok) {
+                        return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
-                    if (!clist.perms.includes('L')) {
-                        return `FAULT: CR${crIdx} lacks Load (L) permission for C-List access`;
-                    }
-                    // Actually look up the entry from the C-List
-                    if (!clist.clist || index >= clist.clist.length) {
-                        return `FAULT: Index ${index} out of bounds for C-List (size: ${clist.clist ? clist.clist.length : 0})`;
-                    }
-                    const entry = clist.clist[index];
-                    sourceCap = {
-                        name: entry.name || `Entry_${index}`,
-                        location: entry.location || { type: 'Local', offset: index * 256 },
-                        perms: entry.perms ? [...entry.perms] : [],
-                        locked: entry.locked || false,
-                        goldenKey: entry.goldenKey || this.generateKey(),
-                        clist: entry.clist || null
-                    };
+                    sourceCap = result.cap;
                     sourceDesc = `C-List CR${crIdx}[${index}]`;
                 } else {
-                    // I=0: Register source - arg1 is CRs
                     const crIdx = parseInt(arg1);
-                    sourceCap = crIdx < 8 ? this.contextRegs[crIdx] : 
-                               crIdx === 8 ? this.cr8 : this.cr15;
-                    if (!sourceCap || sourceCap.name === 'NULL') {
-                        return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
+                    const src = crIdx < 8 ? this.contextRegs[crIdx] : crIdx === 8 ? this.cr8 : this.cr15;
+                    const result = this.mLoad(src, 'L');
+                    if (!result.ok) {
+                        return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
+                    sourceCap = result.cap;
                     sourceDesc = `CR${crIdx}`;
                 }
                 
-                // Create new thread GT from source capability
                 this.cr8 = {
                     name: `THREAD_${sourceCap.name}`,
                     location: sourceCap.location || { type: 'Local', offset: 0 },
@@ -901,55 +794,33 @@ class CTMMSimulator {
             }
             
             case "SWITCH": {
-                // SWITCH CRs, target (I=0) or SWITCH CRn, idx, target (I=1)
-                // I=0: Copy capability from CRs to system register CR8-CR15
-                // I=1: Load from C-List[idx] to system register CR8-CR15
-                // Target: 0=CR8, 1=CR9, 2=CR10, 3-6=CR11-14 (future), 7=CR15
                 const [arg1, arg2, arg3] = args;
                 
                 let sourceCap = null;
                 let sourceDesc = '';
-                let target = 7; // Default to CR15 for backward compatibility
+                let target = 7;
                 
                 if (arg3 !== undefined) {
-                    // I=1: C-List lookup - arg1 is CRn, arg2 is index, arg3 is target
                     const crIdx = parseInt(arg1);
                     const index = parseInt(arg2);
                     target = parseInt(arg3);
                     const clist = crIdx < 8 ? this.contextRegs[crIdx] : null;
-                    if (!clist || clist.name === 'NULL') {
-                        return `FAULT: CR${crIdx} [NULL] - no C-List loaded`;
+                    const result = this.mLoad(clist, 'L', index);
+                    if (!result.ok) {
+                        return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
-                    if (!clist.perms.includes('L')) {
-                        return `FAULT: CR${crIdx} lacks Load (L) permission for C-List access`;
-                    }
-                    // Actually look up the entry from the C-List
-                    if (!clist.clist || index >= clist.clist.length) {
-                        return `FAULT: Index ${index} out of bounds for C-List (size: ${clist.clist ? clist.clist.length : 0})`;
-                    }
-                    const entry = clist.clist[index];
-                    sourceCap = {
-                        name: entry.name || `Entry_${index}`,
-                        location: entry.location || { type: 'Local', offset: index * 256 },
-                        perms: entry.perms ? [...entry.perms] : [],
-                        locked: entry.locked || false,
-                        goldenKey: entry.goldenKey || this.generateKey(),
-                        clist: entry.clist || null
-                    };
+                    sourceCap = result.cap;
                     sourceDesc = `C-List CR${crIdx}[${index}]`;
                 } else {
-                    // I=0: Register source - arg1 is CRs, arg2 is target
                     const crIdx = parseInt(arg1);
                     target = arg2 !== undefined ? parseInt(arg2) : 7;
-                    sourceCap = crIdx < 8 ? this.contextRegs[crIdx] : 
-                               crIdx === 8 ? this.cr8 : this.cr15;
-                    if (!sourceCap || sourceCap.name === 'NULL') {
-                        return `FAULT: CR${crIdx} [NULL] - no capability loaded`;
+                    const src = crIdx < 8 ? this.contextRegs[crIdx] : crIdx === 8 ? this.cr8 : this.cr15;
+                    const resultL = this.mLoad(src, 'L');
+                    const resultE = this.mLoad(src, 'E');
+                    if (!resultL.ok && !resultE.ok) {
+                        return `FAULT: ${resultL.fault}: CR${crIdx} - ${resultL.message}`;
                     }
-                    if (!sourceCap.perms.includes('L') && !sourceCap.perms.includes('E')) {
-                        const permStr = sourceCap.perms.length > 0 ? `[${sourceCap.perms.join('')}]` : '[no perms]';
-                        return `FAULT: CR${crIdx} ${permStr} "${sourceCap.name}" lacks Load (L) or Enter (E) permission`;
-                    }
+                    sourceCap = src;
                     sourceDesc = `CR${crIdx}`;
                 }
                 
@@ -994,11 +865,6 @@ class CTMMSimulator {
         return `${parentPath}:${index}:${obj.name || 'unnamed'}`;
     }
     
-    // Check if object has valid key access (L or M permission)
-    hasValidKeyAccess(parent) {
-        if (!parent || !parent.perms) return false;
-        return parent.perms.includes('L') || parent.perms.includes('M');
-    }
     
     // Mark phase: Set G=TRUE on all entries in the Namespace hierarchy
     gcMark(namespace, visited = new Set(), path = '') {
@@ -1027,9 +893,8 @@ class CTMMSimulator {
         return marked;
     }
     
-    // Scan phase: Walk hierarchy from root, simulating valid key access
-    // Each access resets G to FALSE (same as LOAD with valid key)
-    // Only clears G if parent has L or M permission (valid key check)
+    // Scan phase: Walk hierarchy from root, clearing G on all reachable entries
+    // Reachability in the tree determines liveness, not parent permissions
     gcScan(namespace, visited = new Set(), path = '') {
         if (!namespace || !namespace.clist) return 0;
         
@@ -1037,22 +902,15 @@ class CTMMSimulator {
         if (visited.has(objId)) return 0;
         visited.add(objId);
         
-        // Check if parent has valid key access (L or M permission)
-        const isNamespaceEntry = namespace.perms && 
-            (namespace.perms.includes('M') || namespace.perms.includes('L'));
-        
         let scanned = 0;
         
         for (let i = 0; i < namespace.clist.length; i++) {
             const entry = namespace.clist[i];
             if (entry && entry.perms) {
-                // Valid key access resets G bit only if parent has L or M permission
-                // This simulates the LOAD behavior where valid key access clears G
-                if (isNamespaceEntry && entry.perms.includes('G')) {
+                if (entry.perms.includes('G')) {
                     entry.perms = entry.perms.filter(p => p !== 'G');
                     scanned++;
                 }
-                // Recursively scan nested namespaces (DNA hierarchy)
                 if (entry.clist) {
                     scanned += this.gcScan(entry, visited, `${path}/${namespace.name || 'root'}`);
                 }

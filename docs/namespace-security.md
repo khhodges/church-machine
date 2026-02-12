@@ -30,21 +30,92 @@ The namespace table in Sim-32 supports up to 32,768 entries (limited by the 15-b
 
 ---
 
+## The mLoad Master Validation Path
+
+All namespace access in the CTMM architecture routes through a single trusted validation path called **mLoad**. This is the fundamental security principle: one master validation pipeline that every Church instruction must use to access the namespace.
+
+### Why One Path
+
+Having a single validation path:
+- **Minimizes the Trusted Computing Base (TCB)**: Only one piece of code needs to be correct for all namespace access.
+- **Eliminates validation gaps**: No instruction can bypass permission checks, bounds checks, MAC validation, or G-bit reset.
+- **Maps directly to hardware**: In ASIC/FPGA implementations, mLoad is a single pipeline — there is no way to access namespace memory without passing through it.
+
+### mLoad Validation Sequence
+
+Every namespace access follows this exact sequence. Any failure at any step triggers an immediate FAULT:
+
+```
+mLoad(source_capability, required_permission, index):
+
+  1. Permission Check
+     Does the source capability have L or M permission?
+     Failure → FAULT
+
+  2. Bounds Check
+     Is the index within the source C-List range?
+     - Sim-64: Index < source.Limit
+     - Sim-32: Index < namespaceTable.length
+     Failure → FAULT
+
+  3. Fetch Golden Token
+     Read the GT from the C-List at the given index.
+
+  4. Namespace Bounds Check
+     Is the GT's offset within the CR15 namespace range?
+     Does CR15 have M (Machine) permission?
+     Failure → FAULT
+
+  5. Fetch Namespace Entry
+     Read Location, Limit, and Seals from the namespace.
+
+  6. MAC/Seal Validation
+     - Sim-64: Hardware MAC hash verification
+     - Sim-32: Version match + 27-bit FNV seal recomputation
+     Failure → FAULT
+
+  7. G-bit Reset
+     Clear G=0 on the accessed namespace entry.
+     This is unconditional — happens on every successful access.
+     (GC integration: signals that this entry is reachable)
+
+  8. Thread Update
+     Write the GT (with G=0) to Thread[CRd] for suspension/rescheduling.
+
+  9. Result
+     Write the full capability (GT + namespace entry data) to the destination register.
+```
+
+### Instructions Using mLoad
+
+| Instruction | Source | Destination | Notes |
+|-------------|--------|-------------|-------|
+| **LOAD** | CRs (user-specified) | CRd (user-specified) | Standard capability fetch |
+| **CALL** | CRs (callee C-List) | CR7 (Nucleus) | Loads callee's code reference |
+| **RETURN** | Return capability | CR6/CR7 (restored) | G-bit reset on restored entries |
+| **CHANGE** | CRs/C-List | CR8 (Thread) | Thread context switch |
+| **SWITCH** | CRs/C-List | CR8-CR15 (system) | Privilege gate |
+| **SAVE** | CRd (C-List dest) | Namespace write | G-bit reset on accessed C-List entry |
+
+---
+
 ## MAC Seal Validation
 
 MAC seal validation is the mechanism that ensures Golden Tokens and namespace entries have not been corrupted or forged.
 
 ### When Validation Occurs
 
+Validation occurs on every mLoad call — which means every Church instruction that accesses namespace:
+
 | Operation | Sim-64 | Sim-32 |
 |-----------|--------|--------|
 | **LOAD** | MAC hash checked on loaded GT | Version match + FNV seal checked on source GT and target namespace entry |
 | **CALL** | Implicit capability integrity check | Version match + FNV seal checked on both source GT and target namespace entry |
-| **SAVE** | N/A | FNV seal recomputed from Location + Limit, preserving existing version |
+| **SAVE** | N/A (write path uses mSave) | FNV seal recomputed from Location + Limit, preserving existing version |
 
 ### How Validation Works (Sim-32)
 
-When a LOAD or CALL instruction accesses a namespace entry:
+When mLoad accesses a namespace entry:
 
 1. The **version** in the Golden Token (bits [31:27]) is compared against the version in the namespace entry's VersionSeals word (bits [31:27]). If they do not match, the token is stale and a FAULT is triggered.
 2. The **FNV seal** is recomputed from the entry's Location and Limit values and compared against the stored seal in VersionSeals (bits [26:0]). If they do not match, the entry has been corrupted and a FAULT is triggered.
@@ -54,40 +125,6 @@ When a SAVE instruction writes to a namespace entry:
 1. The Location and Limit values from the source capability register are written to the namespace entry.
 2. A new FNV seal is computed from the written Location and Limit values.
 3. The VersionSeals word is constructed by combining the existing version with the new seal.
-
----
-
-## Validation Flow
-
-Every Church instruction that accesses the namespace follows a strict validation sequence. Any failure at any step triggers an immediate FAULT:
-
-```
-1. Permission Check
-   Does the source/destination CR have the required permission bit?
-   (L for LOAD, S for SAVE, E for CALL, M for SWITCH)
-   Failure -> FAULT
-
-2. GT Validation
-   Is the Golden Token authentic?
-   - Sim-64: Capability object integrity check
-   - Sim-32: Version match + MAC seal validation
-   Failure -> FAULT
-
-3. Bounds Check
-   Is the index within the valid range of the namespace table?
-   - Sim-64: Against source C-List entry count
-   - Sim-32: Against namespace table length (max 32,768)
-   Failure -> FAULT
-
-4. Namespace Entry MAC Check
-   Is the target namespace entry intact?
-   - Sim-64: Hardware MAC hash verification
-   - Sim-32: FNV seal recomputation and comparison
-   Failure -> FAULT
-
-5. Operation
-   Execute the requested operation (load, save, call, etc.)
-```
 
 ---
 
@@ -121,9 +158,9 @@ The SWITCH instruction is the sole mechanism for writing to system registers CR8
 - Sim-64: L or E permission on the source capability
 - Sim-32: M (Machine) permission on the source capability
 
-### Capability-Mediated Access
+### Capability-Mediated Access Through mLoad
 
-All resource access goes through capability-mediated C-Lists. LOAD reads from a C-List entry. SAVE writes to a C-List entry. There is no instruction that can access raw memory without a valid Golden Token authorizing the operation.
+All resource access goes through capability-mediated C-Lists via the mLoad validation path. LOAD reads from a C-List entry. SAVE writes to a C-List entry. There is no instruction that can access raw memory without a valid Golden Token authorizing the operation. The mLoad path ensures that every access is validated, bounds-checked, MAC-verified, and G-bit-reset.
 
 ### Mutually Exclusive Permission Domains
 
@@ -135,3 +172,10 @@ The four permission domains (Church, Turing, Lambda, Meta) cannot be mixed withi
 | Turing | R, W, X | Read/Write data, Execute code |
 | Lambda | E | Enter abstractions (protected calls) |
 | Meta | B, M, F, G | Binding, machine privilege, foreign proxies, GC |
+
+### G-bit Reset as Security Invariant
+
+The G-bit reset on every namespace access is not optional — it is a security invariant enforced by the mLoad path. This ensures that the garbage collector can accurately determine which entries are reachable, preventing:
+- **Use-after-free**: Reclaimed entries have their version bumped (Sim-32) or are removed from the tree (Sim-64).
+- **Resource leaks**: Unreachable entries are identified and reclaimed.
+- **GC evasion**: No instruction can access namespace without triggering G-bit reset.
