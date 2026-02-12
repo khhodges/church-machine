@@ -35,6 +35,8 @@ class CTMMCall(Elaboratable):
         self.g_bit_reset = Signal()
         self.g_bit_addr = Signal(64)
 
+        self.saved_cr5_gt = Signal(64)
+
         self.nia_set = Signal()
         self.nia_value = Signal(64)
         self.dr_clear_mask = Signal(16)
@@ -144,8 +146,15 @@ class CTMMCall(Elaboratable):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
                     m.next = "FAULT"
                 with m.Else():
-                    m.d.sync += sub_start_reg.eq(1)
-                    m.next = "PHASE1"
+                    m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(5)]
+                    m.next = "READ_CR5"
+
+            with m.State("READ_CR5"):
+                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(5)]
+                cr5_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
+                m.d.sync += self.saved_cr5_gt.eq(cr5_view.word0_gt)
+                m.d.sync += sub_start_reg.eq(1)
+                m.next = "PHASE1"
 
             with m.State("PHASE1"):
                 m.d.sync += sub_start_reg.eq(0)

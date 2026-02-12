@@ -11,14 +11,17 @@
 //   1. Read return capability from CRn
 //   2. Verify CRn has E (Enter) permission
 //   3. Extract saved CR6 GT and CR7 GT from return capability
-//   4. Phase 1: Route saved CR6 GT through mLoad → CR6
+//   4. Phase 0: Route saved CR5 GT through mLoad → CR5 (tolerant: fault clears CR5)
+//      - Revalidates version/MAC against namespace (catches recycled entries)
+//      - If mLoad faults, CR5 is cleared and execution continues
+//   5. Phase 1: Route saved CR6 GT through mLoad → CR6
 //      - Revalidates version/MAC against namespace (catches recycled entries)
 //      - Resets G-bit on namespace entry
 //      - Updates thread table shadow at Thread[CR6]
-//   5. Phase 2: Route saved CR7 GT through mLoad → CR7
+//   6. Phase 2: Route saved CR7 GT through mLoad → CR7
 //      - Same validation pipeline as Phase 1
-//   6. Set NIA to saved return address
-//   7. Clear M bit (leaving internal abstraction)
+//   7. Set NIA to saved return address
+//   8. Clear M bit (leaving internal abstraction)
 //
 // Golden Rule: All CR writes go through mLoad. RETURN does NOT directly
 // write to CR6/CR7. Instead, mLoad revalidates the saved GTs against
@@ -76,13 +79,17 @@ module ctmm_return
     
     // G bit reset interface (driven by mLoad)
     output logic        g_bit_reset,
-    output logic [63:0] g_bit_addr
+    output logic [63:0] g_bit_addr,
+    
+    // Saved CR5 GT input - from call stack for restoration
+    input  golden_token_t saved_cr5_gt       // CR5 GT from call stack for restoration
 );
 
     // ========================================================================
     // Constants
     // ========================================================================
     
+    localparam logic [3:0] CR5_SAVED = 4'd5;
     localparam logic [3:0] CR6_CLIST = 4'd6;
     localparam logic [3:0] CR7_NUCLEUS = 4'd7;
     
@@ -94,6 +101,9 @@ module ctmm_return
         IDLE,
         READ_SRC,
         CHECK_PERM,
+        PHASE0_START,
+        PHASE0_WAIT,
+        PHASE0_DONE,
         PHASE1_START,
         PHASE1_WAIT,
         PHASE1_DONE,
@@ -147,15 +157,17 @@ module ctmm_return
     // Phase Tracking
     // ========================================================================
     
-    logic phase;  // 0 = Phase 1 (restore CR6), 1 = Phase 2 (restore CR7)
+    logic [1:0] phase;  // 0 = Phase 0 (restore CR5), 1 = Phase 1 (restore CR6), 2 = Phase 2 (restore CR7)
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
-            phase <= 1'b0;
+            phase <= 2'd0;
         else if (state == IDLE)
-            phase <= 1'b0;
+            phase <= 2'd0;
+        else if (state == PHASE0_DONE)
+            phase <= 2'd1;
         else if (state == PHASE1_DONE)
-            phase <= 1'b1;
+            phase <= 2'd2;
     end
     
     // ========================================================================
@@ -195,6 +207,7 @@ module ctmm_return
             fault_flag <= 1'b1;
             fault_latched <= sub_fault_type;
         end
+        // Phase 0 (CR5) fault is NOT fatal - handled separately
     end
     
     // ========================================================================
@@ -215,13 +228,27 @@ module ctmm_return
     logic [3:0]  mload_dst;
     logic [63:0] mload_direct_gt;
     
-    assign mload_dst = phase ? CR7_NUCLEUS : CR6_CLIST;
-    assign mload_direct_gt = phase ? saved_cr7_gt : saved_cr6_gt;
+    always_comb begin
+        case (phase)
+            2'd0: begin
+                mload_dst = CR5_SAVED;
+                mload_direct_gt = saved_cr5_gt;
+            end
+            2'd1: begin
+                mload_dst = CR6_CLIST;
+                mload_direct_gt = saved_cr6_gt;
+            end
+            default: begin
+                mload_dst = CR7_NUCLEUS;
+                mload_direct_gt = saved_cr7_gt;
+            end
+        endcase
+    end
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             sub_start_reg <= 1'b0;
-        else if ((state == PHASE1_START) || (state == PHASE2_START))
+        else if ((state == PHASE0_START) || (state == PHASE1_START) || (state == PHASE2_START))
             sub_start_reg <= 1'b1;
         else
             sub_start_reg <= 1'b0;
@@ -231,7 +258,7 @@ module ctmm_return
         if (!rst_n) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
-        end else if (state == IDLE || state == PHASE1_START || state == PHASE2_START) begin
+        end else if (state == IDLE || state == PHASE0_START || state == PHASE1_START || state == PHASE2_START) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
         end else begin
@@ -297,8 +324,19 @@ module ctmm_return
                 if (is_null_cap || !has_e_perm)
                     next_state = FAULT;
                 else
-                    next_state = PHASE1_START;
+                    next_state = PHASE0_START;
             end
+            
+            PHASE0_START: next_state = PHASE0_WAIT;
+            
+            PHASE0_WAIT: begin
+                if (sub_fault_latched)
+                    next_state = PHASE0_DONE;  // CR5 fault is tolerant - clear and continue
+                else if (sub_done_latched)
+                    next_state = PHASE0_DONE;
+            end
+            
+            PHASE0_DONE: next_state = PHASE1_START;
             
             PHASE1_START: next_state = PHASE1_WAIT;
             
@@ -339,6 +377,11 @@ module ctmm_return
     logic local_cr_rd_en;
     assign local_cr_rd_en = (state == IDLE && return_start) || (state == READ_SRC);
     assign cr_rd_addr = local_cr_rd_en ? {1'b0, cr_src} : sub_cr_rd_addr;
+    
+    // CR5 clear on phase 0 fault - tolerant restoration
+    // When phase 0 (CR5) mLoad faults, we clear CR5 and continue
+    logic cr5_fault_clear;
+    assign cr5_fault_clear = (state == PHASE0_DONE) && sub_fault_latched;
     
     // NIA update
     assign nia_set = (state == SET_NIA);

@@ -586,4 +586,135 @@ module ctmm_core
     assign ns_wr_data = '{default: '0};
     assign ns_wr_en = 1'b0;
 
+    // ========================================================================
+    // CALL and RETURN Module Instantiation
+    // ========================================================================
+    
+    // CR5 call stack for nested CALL/RETURN support (synchronized with architectural call stack)
+    localparam CR5_STACK_DEPTH = 256;
+    golden_token_t cr5_stack [0:CR5_STACK_DEPTH-1];
+    logic [7:0]    cr5_stack_ptr;
+    golden_token_t saved_cr5_gt_wire;
+    golden_token_t cr5_stack_top;
+    logic          cr5_stack_empty;
+    logic          cr5_stack_full;
+    
+    assign cr5_stack_empty = (cr5_stack_ptr == '0);
+    assign cr5_stack_full  = (cr5_stack_ptr == CR5_STACK_DEPTH[7:0]);
+    assign cr5_stack_top   = cr5_stack_empty ? '0 : cr5_stack[cr5_stack_ptr - 1];
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            cr5_stack_ptr <= '0;
+        end else if (call_complete_sig && !call_fault_sig && !cr5_stack_full) begin
+            cr5_stack[cr5_stack_ptr] <= saved_cr5_gt_wire;
+            cr5_stack_ptr <= cr5_stack_ptr + 1;
+        end else if (ret_complete_sig && !ret_fault_valid_sig && !cr5_stack_empty) begin
+            cr5_stack_ptr <= cr5_stack_ptr - 1;
+        end
+    end
+
+    logic        call_start_sig, call_busy_sig, call_complete_sig, call_fault_sig;
+    fault_type_t call_fault_type;
+    logic [3:0]  call_cr_rd_addr;
+    capability_reg_t call_cr_rd_data_in;
+    logic [3:0]  call_cr_wr_addr;
+    capability_reg_t call_cr_wr_data;
+    logic        call_cr_wr_en;
+    logic [63:0] call_mem_addr;
+    logic        call_mem_rd_en;
+    logic        call_thread_wr_en;
+    logic [3:0]  call_thread_wr_idx;
+    logic [63:0] call_thread_wr_data;
+    logic        call_g_bit_reset;
+    logic [63:0] call_g_bit_addr;
+    logic        call_nia_set;
+    logic [63:0] call_nia_value;
+    logic [15:0] call_dr_clear_mask;
+    logic [15:0] call_cr_clear_mask;
+
+    ctmm_call u_call (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .call_start     (call_start_sig),
+        .cr_src         (cr_src),
+        .index          (clist_index[7:0]),
+        .mask           (call_mask),
+        .call_busy      (call_busy_sig),
+        .call_complete  (call_complete_sig),
+        .call_fault     (call_fault_sig),
+        .fault_type     (call_fault_type),
+        .cr_rd_addr     (call_cr_rd_addr),
+        .cr_rd_data     (call_cr_rd_data_in),
+        .cr_wr_addr     (call_cr_wr_addr),
+        .cr_wr_data     (call_cr_wr_data),
+        .cr_wr_en       (call_cr_wr_en),
+        .cr15_namespace (cr15_namespace),
+        .mem_addr       (call_mem_addr),
+        .mem_rd_en      (call_mem_rd_en),
+        .mem_rd_data    (dmem_rd_data),
+        .mem_rd_valid   (1'b1),
+        .thread_wr_en   (call_thread_wr_en),
+        .thread_wr_idx  (call_thread_wr_idx),
+        .thread_wr_data (call_thread_wr_data),
+        .g_bit_reset    (call_g_bit_reset),
+        .g_bit_addr     (call_g_bit_addr),
+        .saved_cr5_gt   (saved_cr5_gt_wire),
+        .nia_set        (call_nia_set),
+        .nia_value      (call_nia_value),
+        .dr_clear_mask  (call_dr_clear_mask),
+        .cr_clear_mask  (call_cr_clear_mask)
+    );
+
+    assign call_start_sig = exec_enable && is_church_op && (church_op == OP_CALL) && all_checks_pass;
+
+    logic        ret_start_sig, ret_busy_sig, ret_complete_sig, ret_fault_valid_sig;
+    fault_type_t ret_fault_type;
+    logic [3:0]  ret_cr_rd_addr;
+    logic [3:0]  ret_cr_wr_addr;
+    capability_reg_t ret_cr_wr_data;
+    logic        ret_cr_wr_en;
+    logic        ret_nia_set;
+    logic [63:0] ret_nia_value;
+    logic        ret_clear_m_bit;
+    logic [63:0] ret_mem_addr;
+    logic        ret_mem_rd_en;
+    logic        ret_thread_wr_en;
+    logic [3:0]  ret_thread_wr_idx;
+    logic [63:0] ret_thread_wr_data;
+    logic        ret_g_bit_reset;
+    logic [63:0] ret_g_bit_addr;
+
+    ctmm_return u_return (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .return_start   (ret_start_sig),
+        .cr_src         (cr_src),
+        .busy           (ret_busy_sig),
+        .complete       (ret_complete_sig),
+        .fault_valid    (ret_fault_valid_sig),
+        .fault_type     (ret_fault_type),
+        .cr_rd_addr     (ret_cr_rd_addr),
+        .cr_rd_data     (call_cr_rd_data_in),
+        .cr_wr_addr     (ret_cr_wr_addr),
+        .cr_wr_data     (ret_cr_wr_data),
+        .cr_wr_en       (ret_cr_wr_en),
+        .nia_set        (ret_nia_set),
+        .nia_value      (ret_nia_value),
+        .clear_m_bit    (ret_clear_m_bit),
+        .cr15_namespace (cr15_namespace),
+        .mem_addr       (ret_mem_addr),
+        .mem_rd_en      (ret_mem_rd_en),
+        .mem_rd_data    (dmem_rd_data),
+        .mem_rd_valid   (1'b1),
+        .thread_wr_en   (ret_thread_wr_en),
+        .thread_wr_idx  (ret_thread_wr_idx),
+        .thread_wr_data (ret_thread_wr_data),
+        .g_bit_reset    (ret_g_bit_reset),
+        .g_bit_addr     (ret_g_bit_addr),
+        .saved_cr5_gt   (cr5_stack_top)
+    );
+
+    assign ret_start_sig = exec_enable && is_church_op && (church_op == OP_RETURN) && all_checks_pass;
+
 endmodule

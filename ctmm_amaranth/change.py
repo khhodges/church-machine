@@ -2,9 +2,8 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
 from .mload import CTMMMLoad
-from .msave import CTMMMSave
 
 
 class CTMMChange(Elaboratable):
@@ -42,27 +41,28 @@ class CTMMChange(Elaboratable):
         self.g_bit_reset = Signal()
         self.g_bit_addr = Signal(64)
 
+        self.dr_rd_addr = Signal(4)
+        self.dr_rd_data = Signal(64)
+        self.nia = Signal(32)
+        self.flags = Signal(COND_FLAGS_LAYOUT)
+
     def elaborate(self, platform):
         m = Module()
 
         RESERVED_MASK = 0b1000_0001_1000_0000
 
-        u_msave = CTMMMSave()
         u_mload = CTMMMLoad()
-        m.submodules.u_msave = u_msave
         m.submodules.u_mload = u_mload
 
         cr_index = Signal(4)
         crn_reg_latched = Signal(CAP_REG_LAYOUT)
-        current_cr_latched = Signal(CAP_REG_LAYOUT)
         index_latched = Signal(8)
         mask_latched = Signal(16)
         fault_latched = Signal()
         fault_type_latched = Signal(4)
 
-        msave_start_reg = Signal()
-        msave_done_latched = Signal()
-        msave_fault_latched = Signal()
+        save_index = Signal(5)
+
         mload_start_reg = Signal()
         mload_done_latched = Signal()
         mload_fault_latched = Signal()
@@ -77,15 +77,12 @@ class CTMMChange(Elaboratable):
         crn_gt = View(GT_LAYOUT, crn_view.word0_gt)
         crn_has_l_perm = crn_gt.perms[PERM_L]
 
-        cur_view = View(CAP_REG_LAYOUT, current_cr_latched)
+        thread_view = View(CAP_REG_LAYOUT, self.cr8_thread)
+        thread_base = thread_view.word1_location
 
-        m.d.comb += [
-            u_msave.sub_start.eq(msave_start_reg),
-            u_msave.sub_dst_cap.eq(self.cr8_thread),
-            u_msave.sub_src_gt.eq(cur_view.word0_gt),
-            u_msave.sub_index.eq(cr_index),
-            u_msave.mem_wr_done.eq(self.mem_wr_done),
-        ]
+        DR_OFFSET = 16
+        PC_OFFSET = 32
+        FLAGS_OFFSET = 33
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
@@ -96,7 +93,7 @@ class CTMMChange(Elaboratable):
             u_mload.sub_cr_src.eq(mload_src),
             u_mload.sub_cr_dst.eq(mload_dst),
             u_mload.sub_index.eq(mload_index),
-            u_mload.sub_direct.eq(0),             # CHANGE uses C-List fetch mode
+            u_mload.sub_direct.eq(0),
             u_mload.sub_direct_gt.eq(0),
             u_mload.cr_rd_data.eq(self.cr_rd_data),
             u_mload.cr15_namespace.eq(self.cr15_namespace),
@@ -104,10 +101,14 @@ class CTMMChange(Elaboratable):
             u_mload.mem_rd_valid.eq(self.mem_rd_valid),
         ]
 
+        mem_wr_addr_reg = Signal(64)
+        mem_wr_data_reg = Signal(64)
+        mem_wr_en_reg = Signal()
+
         m.d.comb += [
-            self.mem_wr_addr.eq(u_msave.mem_wr_addr),
-            self.mem_wr_data.eq(u_msave.mem_wr_data),
-            self.mem_wr_en.eq(u_msave.mem_wr_en),
+            self.mem_wr_addr.eq(mem_wr_addr_reg),
+            self.mem_wr_data.eq(mem_wr_data_reg),
+            self.mem_wr_en.eq(mem_wr_en_reg),
             self.mem_rd_addr.eq(u_mload.mem_addr),
             self.mem_rd_en.eq(u_mload.mem_rd_en),
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
@@ -123,13 +124,13 @@ class CTMMChange(Elaboratable):
         with m.FSM(name="change") as fsm:
             with m.State("IDLE"):
                 m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
-                m.d.sync += [msave_done_latched.eq(0), msave_fault_latched.eq(0)]
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                 with m.If(self.change_start):
                     m.d.sync += [
                         index_latched.eq(self.index),
                         mask_latched.eq(self.change_mask),
                         cr_index.eq(0),
+                        save_index.eq(0),
                     ]
                     m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                     m.next = "READ_CRN"
@@ -145,42 +146,37 @@ class CTMMChange(Elaboratable):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "SAVE_READ_CR"
+                    m.next = "SAVE_DR"
 
-            with m.State("SAVE_READ_CR"):
-                m.d.comb += self.cr_rd_addr.eq(cr_index)
-                with m.If(skip_current_cr):
-                    m.d.sync += cr_index.eq(cr_index + 1)
-                    with m.If(cr_index >= 14):
-                        m.next = "LOAD_THREAD"
-                with m.Else():
-                    m.next = "SAVE_LATCH_CR"
+            with m.State("SAVE_DR"):
+                m.d.comb += self.dr_rd_addr.eq(save_index[:4])
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(thread_base + ((DR_OFFSET + save_index) << 3)),
+                    mem_wr_data_reg.eq(self.dr_rd_data),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.d.sync += save_index.eq(save_index + 1)
+                    with m.If(save_index >= 15):
+                        m.next = "SAVE_PC"
 
-            with m.State("SAVE_LATCH_CR"):
-                m.d.sync += current_cr_latched.eq(self.cr_rd_data)
-                m.d.comb += self.cr_rd_addr.eq(cr_index)
-                m.d.sync += msave_start_reg.eq(1)
-                m.next = "SAVE_CALL"
+            with m.State("SAVE_PC"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(thread_base + (PC_OFFSET << 3)),
+                    mem_wr_data_reg.eq(Cat(self.nia, Const(0, 32))),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "SAVE_FLAGS"
 
-            with m.State("SAVE_CALL"):
-                m.d.sync += msave_start_reg.eq(0)
-                m.d.sync += [msave_done_latched.eq(0), msave_fault_latched.eq(0)]
-                with m.If(u_msave.sub_done):
-                    m.d.sync += msave_done_latched.eq(1)
-                with m.If(u_msave.sub_fault):
-                    m.d.sync += msave_fault_latched.eq(1)
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_msave.sub_fault_type)]
-                with m.If(msave_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(msave_done_latched):
-                    m.next = "SAVE_NEXT"
-
-            with m.State("SAVE_NEXT"):
-                m.d.sync += cr_index.eq(cr_index + 1)
-                with m.If(cr_index >= 14):
+            with m.State("SAVE_FLAGS"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(thread_base + (FLAGS_OFFSET << 3)),
+                    mem_wr_data_reg.eq(Cat(self.flags, Const(0, 60))),
+                ]
+                with m.If(self.mem_wr_done):
                     m.next = "LOAD_THREAD"
-                with m.Else():
-                    m.next = "SAVE_READ_CR"
 
             with m.State("LOAD_THREAD"):
                 m.d.comb += [

@@ -39,6 +39,8 @@ class CTMMReturn(Elaboratable):
         self.g_bit_reset = Signal()
         self.g_bit_addr = Signal(64)
 
+        self.saved_cr5_gt = Signal(64)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -63,7 +65,9 @@ class CTMMReturn(Elaboratable):
         saved_cr6_gt_view = View(GT_LAYOUT, saved_cr6_gt)
         saved_cr7_gt_view = View(GT_LAYOUT, saved_cr7_gt)
 
-        phase = Signal()
+        CR5_SCRATCH = 5
+
+        phase = Signal(2)
         fault_flag = Signal()
         fault_latched = Signal(4)
         sub_start_reg = Signal()
@@ -71,13 +75,28 @@ class CTMMReturn(Elaboratable):
         sub_fault_latched = Signal()
 
         local_cr_rd_en = Signal()
+        local_cr_wr_en = Signal()
+        local_cr_wr_addr = Signal(4)
+        local_cr_wr_data = Signal(CAP_REG_LAYOUT)
 
         mload_dst = Signal(4)
         mload_direct_gt = Signal(64)
-        m.d.comb += [
-            mload_dst.eq(Mux(phase, CR7_NUCLEUS, CR6_CLIST)),
-            mload_direct_gt.eq(Mux(phase, saved_cr7_gt, saved_cr6_gt)),
-        ]
+        with m.Switch(phase):
+            with m.Case(0):
+                m.d.comb += [
+                    mload_dst.eq(CR5_SCRATCH),
+                    mload_direct_gt.eq(self.saved_cr5_gt),
+                ]
+            with m.Case(1):
+                m.d.comb += [
+                    mload_dst.eq(CR6_CLIST),
+                    mload_direct_gt.eq(saved_cr6_gt),
+                ]
+            with m.Default():
+                m.d.comb += [
+                    mload_dst.eq(CR7_NUCLEUS),
+                    mload_direct_gt.eq(saved_cr7_gt),
+                ]
 
         m.d.comb += [
             u_mload.sub_start.eq(sub_start_reg),
@@ -93,9 +112,9 @@ class CTMMReturn(Elaboratable):
         ]
 
         m.d.comb += [
-            self.cr_wr_addr.eq(u_mload.cr_wr_addr),
-            self.cr_wr_data.eq(u_mload.cr_wr_data),
-            self.cr_wr_en.eq(u_mload.cr_wr_en),
+            self.cr_wr_addr.eq(Mux(local_cr_wr_en, local_cr_wr_addr, u_mload.cr_wr_addr)),
+            self.cr_wr_data.eq(Mux(local_cr_wr_en, local_cr_wr_data, u_mload.cr_wr_data)),
+            self.cr_wr_en.eq(u_mload.cr_wr_en | local_cr_wr_en),
             self.mem_addr.eq(u_mload.mem_addr),
             self.mem_rd_en.eq(u_mload.mem_rd_en),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
@@ -130,7 +149,33 @@ class CTMMReturn(Elaboratable):
                     m.next = "FAULT"
                 with m.Else():
                     m.d.sync += sub_start_reg.eq(1)
-                    m.next = "PHASE1"
+                    m.next = "PHASE0"
+
+            with m.State("PHASE0"):
+                m.d.sync += sub_start_reg.eq(0)
+                with m.If(u_mload.sub_done):
+                    m.d.sync += sub_done_latched.eq(1)
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += sub_fault_latched.eq(1)
+                with m.If(sub_fault_latched):
+                    m.next = "PHASE0_FAULT"
+                with m.Elif(sub_done_latched):
+                    m.next = "PHASE0_DONE"
+
+            with m.State("PHASE0_FAULT"):
+                m.d.comb += [
+                    local_cr_wr_en.eq(1),
+                    local_cr_wr_addr.eq(CR5_SCRATCH),
+                    local_cr_wr_data.eq(0),
+                ]
+                m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                m.d.sync += [phase.eq(1), sub_start_reg.eq(1)]
+                m.next = "PHASE1"
+
+            with m.State("PHASE0_DONE"):
+                m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                m.d.sync += sub_start_reg.eq(1)
+                m.next = "PHASE1"
 
             with m.State("PHASE1"):
                 m.d.sync += sub_start_reg.eq(0)
@@ -145,7 +190,7 @@ class CTMMReturn(Elaboratable):
                     m.next = "PHASE1_DONE"
 
             with m.State("PHASE1_DONE"):
-                m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                m.d.sync += [phase.eq(2), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 m.d.sync += sub_start_reg.eq(1)
                 m.next = "PHASE2"
 

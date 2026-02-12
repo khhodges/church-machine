@@ -1,34 +1,36 @@
 // ============================================================================
 // CTMM CHANGE Church-Instruction (CLOOMC) - Full Context Switch
 // ============================================================================
-// This module implements the CHANGE instruction which performs a complete
-// thread context switch using the trusted mSave and mLoad micro-routines.
+// CHANGE saves DR+PC+indicators only (CRs always current in thread table shadow)
 //
 // Syntax: CHANGE CRn[Index]
 //   CRn[Index] = Location in current C-List containing new Thread's GT
 //
-// CHANGE Sequence (25 operations: Save 12 + Load 1 + Restore 12):
-//   Phase 1 - SAVE: Save current CR states to Thread[CR8]
-//     For each CR in {0,1,2,3,4,5,6,9,10,11,12,13,14} (skipping 7,8,15):
-//       Call mSave(dst=CR8, src_gt=CR[i].GT, index=i)
+// CHANGE Sequence:
+//   Phase 1 - SAVE: Save DR[0:15] + PC + flags to Thread[CR8] memory
+//     Write 18 words to memory at CR8.Location:
+//       Offset  0..15: DR0-DR15 (64-bit data registers)
+//       Offset 16:     PC (program counter / NIA)
+//       Offset 17:     Condition flags {N, Z, C, V}
 //   Phase 2 - LOAD: Fetch new Thread identity
 //     Call mLoad(src=CRn, dst=CR8, index=Index)
 //   Phase 3 - RESTORE: Load CR states from new Thread[CR8]
 //     For each CR in {0,1,2,3,4,5,6,9,10,11,12,13,14} (skipping 7,8,15):
 //       Call mLoad(src=CR8, dst=i, index=i)
 //
-// CHANGE_MASK Optimization:
-//   The CHANGE_MASK[15:0] allows skipping CRs during save/restore.
-//   Default mask skips CR7 (Nucleus), CR8 (Thread), CR15 (Namespace).
-//   Optional: Skip CR11-14 for faster context switch.
+// CRs do NOT need saving because mLoad always writes GT (G=0) to
+// Thread[CRd] on every CR write, keeping the thread table shadow current.
 //
-// Reserved Registers (never saved/restored):
+// CHANGE_MASK Optimization (Phase 3 restore only):
+//   The CHANGE_MASK[15:0] allows skipping CRs during restore.
+//   Default mask skips CR7 (Nucleus), CR8 (Thread), CR15 (Namespace).
+//
+// Reserved Registers (never restored):
 //   CR7  - Nucleus (kernel capability) - shared across all threads
 //   CR8  - Thread (current thread identity) - changed by CHANGE itself
 //   CR15 - Namespace (current namespace) - changed by SWITCH
 //
 // FAULT conditions:
-//   - Any mSave fault during save phase
 //   - Any mLoad fault during load/restore phase
 //   - Source CRn lacks L permission
 //   - Index out of bounds
@@ -41,39 +43,49 @@ module ctmm_change
     input  logic        rst_n,
     
     // Control interface
-    input  logic        change_start,         // Start CHANGE execution
-    input  logic [3:0]  cr_src,               // Source C-List register (CRn)
-    input  logic [7:0]  index,                // Index in CRn for new Thread GT
-    input  logic [15:0] change_mask,          // Mask: 1=save/restore, 0=skip
-    output logic        change_busy,          // CHANGE in progress
-    output logic        change_complete,      // CHANGE finished successfully
-    output logic        change_fault,         // CHANGE caused a fault
-    output fault_type_t fault_type,           // Type of fault
+    input  logic        change_start,
+    input  logic [3:0]  cr_src,
+    input  logic [7:0]  index,
+    input  logic [15:0] change_mask,
+    output logic        change_busy,
+    output logic        change_complete,
+    output logic        change_fault,
+    output fault_type_t fault_type,
     
     // Capability register read interface
-    output logic [3:0]  cr_rd_addr,           // Register to read
-    input  capability_reg_t cr_rd_data,       // Full 256-bit register data
+    output logic [3:0]  cr_rd_addr,
+    input  capability_reg_t cr_rd_data,
     
     // Capability register write interface (for mLoad)
-    output logic [3:0]  cr_wr_addr,           // Destination register
-    output capability_reg_t cr_wr_data,       // Capability to write
-    output logic        cr_wr_en,             // Write enable
+    output logic [3:0]  cr_wr_addr,
+    output capability_reg_t cr_wr_data,
+    output logic        cr_wr_en,
     
     // CR8 (Thread) and CR15 (Namespace) for mLoad
-    input  capability_reg_t cr8_thread,       // Current Thread register
-    input  capability_reg_t cr15_namespace,   // Namespace register
+    input  capability_reg_t cr8_thread,
+    input  capability_reg_t cr15_namespace,
+    
+    // Data register read interface (for Phase 1 save)
+    output logic [3:0]  dr_rd_addr,
+    input  logic [63:0] dr_rd_data,
+    
+    // PC (NIA) read interface (for Phase 1 save)
+    input  logic [31:0] pc_value,
+    
+    // Condition flags read interface (for Phase 1 save)
+    input  condition_flags_t flags_value,
     
     // Memory read interface (for mLoad)
-    output logic [63:0] mem_rd_addr,          // Memory address to read
-    output logic        mem_rd_en,            // Read enable
-    input  logic [63:0] mem_rd_data,          // Read data
-    input  logic        mem_rd_valid,         // Read data valid
+    output logic [63:0] mem_rd_addr,
+    output logic        mem_rd_en,
+    input  logic [63:0] mem_rd_data,
+    input  logic        mem_rd_valid,
     
-    // Memory write interface (for mSave)
-    output logic [63:0] mem_wr_addr,          // Memory address to write
-    output logic [63:0] mem_wr_data,          // Data to write
-    output logic        mem_wr_en,            // Write enable
-    input  logic        mem_wr_done,          // Write complete acknowledgment
+    // Memory write interface (for Phase 1 DR+PC+flags save)
+    output logic [63:0] mem_wr_addr,
+    output logic [63:0] mem_wr_data,
+    output logic        mem_wr_en,
+    input  logic        mem_wr_done,
     
     // Thread update interface (for mLoad)
     output logic        thread_wr_en,
@@ -86,30 +98,34 @@ module ctmm_change
 );
 
     // ========================================================================
-    // Constants - CR indices to process
+    // Constants
     // ========================================================================
-    // Reserved registers that are never saved/restored:
-    //   CR7  = Nucleus (shared kernel)
-    //   CR8  = Thread (handled by CHANGE)
-    //   CR15 = Namespace (handled by SWITCH)
-    
+
     localparam logic [15:0] RESERVED_MASK = 16'b1000_0001_1000_0000;  // CR7, CR8, CR15
-    
+
+    localparam int DR_COUNT = 16;
+    localparam int SAVE_DR_LAST = DR_COUNT - 1;
+    localparam int SAVE_PC_IDX = DR_COUNT;
+    localparam int SAVE_FLAGS_IDX = DR_COUNT + 1;
+    localparam int SAVE_TOTAL = DR_COUNT + 2;
+
     // ========================================================================
     // State Machine
     // ========================================================================
     
     typedef enum logic [3:0] {
         CHANGE_IDLE,
-        CHANGE_READ_CRn,          // Read CRn to verify permissions
-        CHANGE_LATCH_CRn,         // Latch CRn data
-        CHANGE_SAVE_READ_CR,      // Read current CR for save phase
-        CHANGE_SAVE_LATCH_CR,     // Latch CR data
-        CHANGE_SAVE_CALL,         // Call mSave for current CR
-        CHANGE_SAVE_NEXT,         // Move to next CR or phase
-        CHANGE_LOAD_THREAD,       // Call mLoad for new Thread
-        CHANGE_RESTORE_CALL,      // Call mLoad for restore phase
-        CHANGE_RESTORE_NEXT,      // Move to next CR or complete
+        CHANGE_READ_CRn,
+        CHANGE_LATCH_CRn,
+        CHANGE_SAVE_DR,
+        CHANGE_SAVE_DR_WAIT,
+        CHANGE_SAVE_PC,
+        CHANGE_SAVE_PC_WAIT,
+        CHANGE_SAVE_FLAGS,
+        CHANGE_SAVE_FLAGS_WAIT,
+        CHANGE_LOAD_THREAD,
+        CHANGE_RESTORE_CALL,
+        CHANGE_RESTORE_NEXT,
         CHANGE_COMPLETE,
         CHANGE_FAULT
     } change_state_t;
@@ -117,20 +133,36 @@ module ctmm_change
     change_state_t state, next_state;
     
     // ========================================================================
-    // CR Index Counter
+    // DR Save Counter (0..15 for DR0-DR15)
     // ========================================================================
     
-    logic [3:0] cr_index;           // Current CR being processed (0-14)
-    logic [3:0] cr_index_next;      // Next CR to process
-    logic       cr_index_inc;       // Increment counter
-    logic       cr_index_reset;     // Reset counter to 0
-    logic [15:0] effective_mask;    // change_mask AND NOT RESERVED_MASK
-    logic       skip_current_cr;    // Skip this CR (mask bit = 0 or reserved)
+    logic [3:0] dr_save_idx;
+    logic       dr_save_inc;
+    logic       dr_save_reset;
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            dr_save_idx <= 4'd0;
+        else if (dr_save_reset)
+            dr_save_idx <= 4'd0;
+        else if (dr_save_inc)
+            dr_save_idx <= dr_save_idx + 4'd1;
+    end
+
+    // ========================================================================
+    // CR Index Counter (for Phase 3 restore)
+    // ========================================================================
+    
+    logic [3:0] cr_index;
+    logic [3:0] cr_index_next;
+    logic       cr_index_inc;
+    logic       cr_index_reset;
+    logic [15:0] effective_mask;
+    logic       skip_current_cr;
     
     assign effective_mask = mask_latched & ~RESERVED_MASK;
     assign skip_current_cr = (cr_index > 4'd14) || !effective_mask[cr_index];
     
-    // Find next valid CR to process
     always_comb begin
         cr_index_next = cr_index + 4'd1;
         while (cr_index_next <= 4'd14 && !effective_mask[cr_index_next]) begin
@@ -139,41 +171,37 @@ module ctmm_change
     end
     
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n)
             cr_index <= 4'd0;
-        end else if (cr_index_reset) begin
-            // Find first valid CR
+        else if (cr_index_reset)
             cr_index <= 4'd0;
-        end else if (cr_index_inc) begin
+        else if (cr_index_inc)
             cr_index <= cr_index_next;
-        end
     end
     
     // ========================================================================
     // Latched Registers
     // ========================================================================
     
-    capability_reg_t crn_reg_latched;    // Source C-List register
-    capability_reg_t current_cr_latched; // Current CR being saved
-    logic [7:0]      index_latched;      // Index latched on start
-    logic [15:0]     mask_latched;       // Mask latched on start
+    capability_reg_t crn_reg_latched;
+    logic [7:0]      index_latched;
+    logic [15:0]     mask_latched;
+    logic [63:0]     thread_base_addr;
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             crn_reg_latched <= '0;
-            current_cr_latched <= '0;
             index_latched <= '0;
             mask_latched <= '0;
+            thread_base_addr <= '0;
         end else begin
             if (state == CHANGE_IDLE && change_start) begin
                 index_latched <= index;
                 mask_latched <= change_mask;
+                thread_base_addr <= cr8_thread.word1_location;
             end
             if (state == CHANGE_LATCH_CRn) begin
                 crn_reg_latched <= cr_rd_data;
-            end
-            if (state == CHANGE_SAVE_LATCH_CR) begin
-                current_cr_latched <= cr_rd_data;
             end
         end
     end
@@ -189,66 +217,42 @@ module ctmm_change
     assign crn_has_l_perm = crn_perms[PERM_L];
     
     // ========================================================================
-    // mSave Subroutine Instance
+    // Phase 1: Save Address Calculation
+    // ========================================================================
+    // Thread memory layout at CR8.Location:
+    //   +0*8  .. +15*8 : DR0-DR15 (64-bit each)
+    //   +16*8          : PC (NIA, zero-extended to 64 bits)
+    //   +17*8          : Flags {N, Z, C, V} (zero-extended to 64 bits)
     // ========================================================================
     
-    logic               msave_start;
-    logic               msave_start_reg;
-    logic               msave_busy;
-    logic               msave_done;
-    logic               msave_fault;
-    logic               msave_done_latched;
-    logic               msave_fault_latched;
-    fault_type_t        msave_fault_type;
-    logic [63:0]        msave_wr_addr;
-    logic [63:0]        msave_wr_data;
-    logic               msave_wr_en;
+    logic [63:0] save_addr;
+    logic [63:0] save_data;
     
-    // Single-cycle pulse for mSave start
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            msave_start_reg <= 1'b0;
-        else if (state == CHANGE_SAVE_LATCH_CR && next_state == CHANGE_SAVE_CALL)
-            msave_start_reg <= 1'b1;
-        else
-            msave_start_reg <= 1'b0;
+    always_comb begin
+        save_addr = 64'h0;
+        save_data = 64'h0;
+        case (state)
+            CHANGE_SAVE_DR, CHANGE_SAVE_DR_WAIT: begin
+                save_addr = thread_base_addr + ({60'h0, dr_save_idx} << 3);
+                save_data = dr_rd_data;
+            end
+            CHANGE_SAVE_PC, CHANGE_SAVE_PC_WAIT: begin
+                save_addr = thread_base_addr + (64'd16 << 3);
+                save_data = {32'h0, pc_value};
+            end
+            CHANGE_SAVE_FLAGS, CHANGE_SAVE_FLAGS_WAIT: begin
+                save_addr = thread_base_addr + (64'd17 << 3);
+                save_data = {60'h0, flags_value.N, flags_value.Z, flags_value.C, flags_value.V};
+            end
+            default: begin
+                save_addr = 64'h0;
+                save_data = 64'h0;
+            end
+        endcase
     end
-    
-    // Sticky latches for mSave completion
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            msave_done_latched <= 1'b0;
-            msave_fault_latched <= 1'b0;
-        end else if (state == CHANGE_IDLE || state == CHANGE_SAVE_NEXT) begin
-            msave_done_latched <= 1'b0;
-            msave_fault_latched <= 1'b0;
-        end else begin
-            if (msave_done) msave_done_latched <= 1'b1;
-            if (msave_fault) msave_fault_latched <= 1'b1;
-        end
-    end
-    
-    assign msave_start = msave_start_reg;
-    
-    ctmm_msave u_msave (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        .sub_start      (msave_start),
-        .sub_dst_cap    (cr8_thread),               // Save to Thread (CR8)
-        .sub_src_gt     (current_cr_latched.word0_gt),
-        .sub_index      (cr_index),                 // Thread[cr_index] = CR[cr_index].GT
-        .sub_busy       (msave_busy),
-        .sub_done       (msave_done),
-        .sub_fault      (msave_fault),
-        .sub_fault_type (msave_fault_type),
-        .mem_wr_addr    (msave_wr_addr),
-        .mem_wr_data    (msave_wr_data),
-        .mem_wr_en      (msave_wr_en),
-        .mem_wr_done    (mem_wr_done)
-    );
     
     // ========================================================================
-    // mLoad Subroutine Instance
+    // mLoad Subroutine Instance (Phase 2 and Phase 3)
     // ========================================================================
     
     logic               mload_start;
@@ -271,36 +275,26 @@ module ctmm_change
     logic               mload_g_bit_reset;
     logic [63:0]        mload_g_bit_addr;
     
-    // mLoad source and destination depend on phase
     logic [3:0]         mload_src;
     logic [3:0]         mload_dst;
     logic [7:0]         mload_index;
     
-    // In LOAD_THREAD phase: src=CRn, dst=CR8, index=user_index
-    // In RESTORE phase: src=CR8, dst=cr_index, index=cr_index
-    assign mload_src = (state == CHANGE_LOAD_THREAD) ? cr_src : 4'd8;  // CRn or CR8
+    assign mload_src = (state == CHANGE_LOAD_THREAD) ? cr_src : 4'd8;
     assign mload_dst = (state == CHANGE_LOAD_THREAD) ? 4'd8 : cr_index;
     assign mload_index = (state == CHANGE_LOAD_THREAD) ? index_latched : cr_index;
     
-    // Single-cycle pulse for mLoad start
-    // Pulse on entry to LOAD_THREAD or RESTORE_CALL (for each restore)
-    // Use state transitions to detect entry:
-    //   - Entering LOAD_THREAD: from SAVE_NEXT or SAVE_READ_CR (all saves done)
-    //   - Entering RESTORE_CALL: from LOAD_THREAD (after thread load) or RESTORE_NEXT
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             mload_start_reg <= 1'b0;
-        else if ((state == CHANGE_SAVE_NEXT && next_state == CHANGE_LOAD_THREAD) ||      // Saves done → Thread load
-                 (state == CHANGE_SAVE_READ_CR && next_state == CHANGE_LOAD_THREAD) ||   // Skipped all saves
-                 (state == CHANGE_LOAD_THREAD && next_state == CHANGE_RESTORE_CALL) ||   // Thread done → first restore
-                 (state == CHANGE_RESTORE_NEXT && next_state == CHANGE_RESTORE_CALL))    // Next restore
+        else if ((state == CHANGE_SAVE_FLAGS_WAIT && next_state == CHANGE_LOAD_THREAD) ||
+                 (state == CHANGE_LATCH_CRn && next_state == CHANGE_LOAD_THREAD) ||
+                 (state == CHANGE_LOAD_THREAD && next_state == CHANGE_RESTORE_CALL) ||
+                 (state == CHANGE_RESTORE_NEXT && next_state == CHANGE_RESTORE_CALL))
             mload_start_reg <= 1'b1;
         else
             mload_start_reg <= 1'b0;
     end
     
-    // Sticky latches for mLoad completion
-    // Clear only on IDLE or when starting a new mLoad call
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             mload_done_latched <= 1'b0;
@@ -309,7 +303,6 @@ module ctmm_change
             mload_done_latched <= 1'b0;
             mload_fault_latched <= 1'b0;
         end else if (mload_start_reg) begin
-            // Clear on new mLoad start
             mload_done_latched <= 1'b0;
             mload_fault_latched <= 1'b0;
         end else begin
@@ -327,7 +320,7 @@ module ctmm_change
         .sub_cr_src     (mload_src),
         .sub_cr_dst     (mload_dst),
         .sub_index      (mload_index),
-        .sub_direct     (1'b0),           // CHANGE uses C-List fetch mode
+        .sub_direct     (1'b0),
         .sub_direct_gt  (64'd0),
         .sub_busy       (mload_busy),
         .sub_done       (mload_done),
@@ -367,9 +360,6 @@ module ctmm_change
         end else if (state == CHANGE_LATCH_CRn && !crn_has_l_perm) begin
             fault_latched <= 1'b1;
             fault_type_latched <= FAULT_PERM;
-        end else if (msave_fault_latched) begin
-            fault_latched <= 1'b1;
-            fault_type_latched <= msave_fault_type;
         end else if (mload_fault_latched) begin
             fault_latched <= 1'b1;
             fault_type_latched <= mload_fault_type;
@@ -381,79 +371,83 @@ module ctmm_change
     // ========================================================================
     
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n)
             state <= CHANGE_IDLE;
-        end else begin
+        else
             state <= next_state;
-        end
     end
     
     // ========================================================================
     // Next State Logic
     // ========================================================================
     
+    logic save_phase_active;
+    assign save_phase_active = (state == CHANGE_SAVE_DR) || (state == CHANGE_SAVE_DR_WAIT) ||
+                               (state == CHANGE_SAVE_PC) || (state == CHANGE_SAVE_PC_WAIT) ||
+                               (state == CHANGE_SAVE_FLAGS) || (state == CHANGE_SAVE_FLAGS_WAIT);
+    
     always_comb begin
         next_state = state;
         cr_index_inc = 1'b0;
         cr_index_reset = 1'b0;
+        dr_save_inc = 1'b0;
+        dr_save_reset = 1'b0;
         
         case (state)
             CHANGE_IDLE: begin
                 if (change_start) begin
+                    dr_save_reset = 1'b1;
                     cr_index_reset = 1'b1;
                     next_state = CHANGE_READ_CRn;
                 end
             end
             
             CHANGE_READ_CRn: begin
-                // Read CRn to verify L permission
                 next_state = CHANGE_LATCH_CRn;
             end
             
             CHANGE_LATCH_CRn: begin
-                // Check L permission
                 if (!crn_has_l_perm)
                     next_state = CHANGE_FAULT;
                 else
-                    next_state = CHANGE_SAVE_READ_CR;
+                    next_state = CHANGE_SAVE_DR;
             end
             
             // ================================================================
-            // Phase 1: Save current CRs to Thread
+            // Phase 1: Save DR[0:15] + PC + flags to Thread memory
             // ================================================================
             
-            CHANGE_SAVE_READ_CR: begin
-                // Skip if this CR is masked out
-                if (skip_current_cr) begin
-                    cr_index_inc = 1'b1;
-                    if (cr_index_next > 4'd14)
-                        next_state = CHANGE_LOAD_THREAD;  // All saves done
-                    // else stay in SAVE_READ_CR to check next
-                end else begin
-                    next_state = CHANGE_SAVE_LATCH_CR;
+            CHANGE_SAVE_DR: begin
+                next_state = CHANGE_SAVE_DR_WAIT;
+            end
+            
+            CHANGE_SAVE_DR_WAIT: begin
+                if (mem_wr_done) begin
+                    if (dr_save_idx == SAVE_DR_LAST[3:0]) begin
+                        next_state = CHANGE_SAVE_PC;
+                    end else begin
+                        dr_save_inc = 1'b1;
+                        next_state = CHANGE_SAVE_DR;
+                    end
                 end
             end
             
-            CHANGE_SAVE_LATCH_CR: begin
-                // CR data latched, start mSave
-                next_state = CHANGE_SAVE_CALL;
+            CHANGE_SAVE_PC: begin
+                next_state = CHANGE_SAVE_PC_WAIT;
             end
             
-            CHANGE_SAVE_CALL: begin
-                // Wait for mSave to complete
-                if (msave_fault_latched)
-                    next_state = CHANGE_FAULT;
-                else if (msave_done_latched)
-                    next_state = CHANGE_SAVE_NEXT;
+            CHANGE_SAVE_PC_WAIT: begin
+                if (mem_wr_done)
+                    next_state = CHANGE_SAVE_FLAGS;
             end
             
-            CHANGE_SAVE_NEXT: begin
-                // Move to next CR
-                cr_index_inc = 1'b1;
-                if (cr_index_next > 4'd14)
+            CHANGE_SAVE_FLAGS: begin
+                next_state = CHANGE_SAVE_FLAGS_WAIT;
+            end
+            
+            CHANGE_SAVE_FLAGS_WAIT: begin
+                if (mem_wr_done)
                     next_state = CHANGE_LOAD_THREAD;
-                else
-                    next_state = CHANGE_SAVE_READ_CR;
             end
             
             // ================================================================
@@ -461,8 +455,6 @@ module ctmm_change
             // ================================================================
             
             CHANGE_LOAD_THREAD: begin
-                // mLoad started by pulse generator
-                // Wait for completion
                 if (mload_fault_latched)
                     next_state = CHANGE_FAULT;
                 else if (mload_done_latched) begin
@@ -476,14 +468,11 @@ module ctmm_change
             // ================================================================
             
             CHANGE_RESTORE_CALL: begin
-                // Skip if this CR is masked out
                 if (skip_current_cr) begin
                     cr_index_inc = 1'b1;
                     if (cr_index_next > 4'd14)
                         next_state = CHANGE_COMPLETE;
-                    // else stay in RESTORE_CALL to check next
                 end else begin
-                    // Wait for mLoad to complete
                     if (mload_fault_latched)
                         next_state = CHANGE_FAULT;
                     else if (mload_done_latched)
@@ -492,7 +481,6 @@ module ctmm_change
             end
             
             CHANGE_RESTORE_NEXT: begin
-                // Move to next CR
                 cr_index_inc = 1'b1;
                 if (cr_index_next > 4'd14)
                     next_state = CHANGE_COMPLETE;
@@ -513,6 +501,12 @@ module ctmm_change
     end
     
     // ========================================================================
+    // DR Read Address (for Phase 1 save)
+    // ========================================================================
+    
+    assign dr_rd_addr = dr_save_idx;
+    
+    // ========================================================================
     // Register Read Control
     // ========================================================================
     
@@ -527,11 +521,7 @@ module ctmm_change
             CHANGE_READ_CRn, CHANGE_LATCH_CRn: begin
                 cr_rd_addr = cr_src;
             end
-            CHANGE_SAVE_READ_CR, CHANGE_SAVE_LATCH_CR: begin
-                cr_rd_addr = cr_index;  // Read current CR
-            end
             default: begin
-                // During mLoad phases, mLoad controls cr_rd_addr
                 cr_rd_addr = mload_cr_rd_addr;
             end
         endcase
@@ -541,10 +531,12 @@ module ctmm_change
     // Memory Interface Muxing
     // ========================================================================
     
-    // Write interface: mSave only
-    assign mem_wr_addr = msave_wr_addr;
-    assign mem_wr_data = msave_wr_data;
-    assign mem_wr_en = msave_wr_en;
+    // Write interface: Phase 1 DR+PC+flags save
+    assign mem_wr_addr = save_addr;
+    assign mem_wr_data = save_data;
+    assign mem_wr_en = (state == CHANGE_SAVE_DR) ||
+                       (state == CHANGE_SAVE_PC) ||
+                       (state == CHANGE_SAVE_FLAGS);
     
     // Read interface: mLoad only
     assign mem_rd_addr = mload_mem_addr;

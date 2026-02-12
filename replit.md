@@ -24,8 +24,8 @@ The CTMM simulator offers both a Haskell console interface and a web-based visua
     -   **Data Registers (DR0-DR15)**: Hold 64-bit numeric values.
 -   **Golden Token Structure**: 64-bit key with Offset, Permissions (R, W, X, L, S, E, B, M, F, G bits), and Spare bits.
 -   **Namespace Entry**: A 3-word descriptor (Location, Limit, Seals).
--   **MAC Validation**: Hardware-enforced security check during `LOAD`.
--   **mLoad Master Validation**: Single trusted path for all namespace access — every Church instruction routes through mLoad, which enforces permission check, bounds check, MAC validation, and G-bit reset.
+-   **MAC Validation**: Hardware-enforced security check during `LOAD`. Sim-64 uses namespace registry with FNV hash MAC computation.
+-   **mLoad Master Validation**: Single trusted path for all namespace access — every Church instruction routes through mLoad, which enforces permission check, bounds check, MAC validation, G-bit reset, and thread table shadow update. Golden Rule: mLoad is the sole path for all CR writes across all four implementations.
 -   **Boot Sequence**: A 4-step secure initialization process.
 -   **Permission Domains**: Mutually exclusive for Church (L, S), Turing (R, W, X), Lambda (E), and Meta (B, M, F, G) operations.
 -   **Failsafe Security**: All validation failures route to a single FAULT handler.

@@ -7,6 +7,8 @@ from .registers import CTMMRegisters
 from .decoder import CTMMDecoder
 from .perm_check import CTMMPermCheck
 from .gc_unit import CTMMGCUnit
+from .call import CTMMCall
+from .ret import CTMMReturn
 
 
 class CTMMCore(Elaboratable):
@@ -389,5 +391,69 @@ class CTMMCore(Elaboratable):
             self.ns_rd_en.eq(0),
             self.ns_wr_en.eq(0),
         ]
+
+        u_call = CTMMCall()
+        u_return = CTMMReturn()
+        m.submodules.u_call = u_call
+        m.submodules.u_return = u_return
+
+        call_start_sig = Signal()
+        m.d.comb += call_start_sig.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) & all_checks_pass
+        )
+
+        m.d.comb += [
+            u_call.call_start.eq(call_start_sig),
+            u_call.cr_src.eq(Cat(cr_src, Const(0, 1))),
+            u_call.index.eq(clist_index[:8]),
+            u_call.mask.eq(u_decoder.call_mask),
+            u_call.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_call.cr15_namespace.eq(u_regs.cr_rd_data),
+            u_call.mem_rd_data.eq(self.dmem_rd_data),
+            u_call.mem_rd_valid.eq(1),
+        ]
+
+        ret_start_sig = Signal()
+        m.d.comb += ret_start_sig.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.RETURN) & all_checks_pass
+        )
+
+        m.d.comb += [
+            u_return.return_start.eq(ret_start_sig),
+            u_return.cr_src.eq(cr_src),
+            u_return.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_return.cr15_namespace.eq(u_regs.cr_rd_data),
+            u_return.mem_rd_data.eq(self.dmem_rd_data),
+            u_return.mem_rd_valid.eq(1),
+        ]
+
+        CR5_STACK_DEPTH = 256
+        cr5_stack = Memory(shape=64, depth=CR5_STACK_DEPTH, init=[])
+        m.submodules.cr5_stack = cr5_stack
+        cr5_stack_ptr = Signal(8, init=0)
+        cr5_stack_empty = Signal()
+        cr5_stack_full = Signal()
+        cr5_stack_wr = cr5_stack.write_port()
+        cr5_stack_rd = cr5_stack.read_port(transparent_for=[cr5_stack_wr])
+
+        m.d.comb += [
+            cr5_stack_empty.eq(cr5_stack_ptr == 0),
+            cr5_stack_full.eq(cr5_stack_ptr == CR5_STACK_DEPTH),
+            cr5_stack_rd.addr.eq(Mux(cr5_stack_ptr > 0, cr5_stack_ptr - 1, 0)),
+            u_return.saved_cr5_gt.eq(Mux(cr5_stack_empty, 0, cr5_stack_rd.data)),
+            cr5_stack_wr.addr.eq(0),
+            cr5_stack_wr.data.eq(0),
+            cr5_stack_wr.en.eq(0),
+        ]
+
+        with m.If(u_call.complete & ~u_call.fault & ~cr5_stack_full):
+            m.d.comb += [
+                cr5_stack_wr.addr.eq(cr5_stack_ptr),
+                cr5_stack_wr.data.eq(u_call.saved_cr5_gt),
+                cr5_stack_wr.en.eq(1),
+            ]
+            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
+        with m.Elif(u_return.complete & ~u_return.fault_valid & ~cr5_stack_empty):
+            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr - 1)
 
         return m

@@ -715,7 +715,17 @@ class RiscVCapSimulator {
                 const target = this.threadTable[threadId];
                 if (target) {
                     for (let i = 0; i < 32; i++) this.x[i] = target.x[i];
-                    for (let i = 0; i <= 8; i++) this.cr[i] = { ...target.cr[i] };
+                    for (let i = 0; i <= 8; i++) {
+                        const savedGT = target.cr[i] ? target.cr[i].word0 : 0;
+                        if (savedGT !== 0) {
+                            const crResult = this.mLoad(savedGT, null, i);
+                            if (!crResult.ok) {
+                                this._clearCR(i);
+                            }
+                        } else {
+                            this._clearCR(i);
+                        }
+                    }
                     this.pc = target.pc;
                 } else {
                     for (let i = 0; i < 32; i++) this.x[i] = 0;

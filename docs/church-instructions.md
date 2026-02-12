@@ -122,21 +122,25 @@ These rules apply identically to both simulators:
 
 **Required Permission**: None (return is always permitted if a saved context exists), E checked on return capability (Sim-64)
 
-**Validation Path**: G-bit reset on restored CR6/CR7 namespace entries.
+**Validation Path**: Routes saved CR5/CR6/CR7 GTs through mLoad for namespace revalidation — version check, MAC check, G-bit reset. Catches recycled entries (use-after-free prevention).
 
 **Operation**:
 1. Check that a saved context exists on the call stack → FAULT if empty
 2. Pop the saved context
-3. Restore CR6 (caller's C-List) and CR7 (caller's code reference)
-4. Reset G=0 on the namespace entries for restored CR6 and CR7
-5. Resume execution at the saved return address
+3. Restore CR5 via mLoad (tolerant — clears CR5 on fault, continues)
+4. Restore CR6 via mLoad (fatal — FAULTs on validation failure)
+5. Restore CR7 via mLoad (fatal — FAULTs on validation failure)
+6. Reset G=0 on all restored namespace entries
+7. Resume execution at the saved return address
 
 | Detail | Sim-64 (CTMM) | Sim-32 (RV32-Cap) |
 |--------|---------------|-------------------|
 | **Mnemonic** | `RETURN` | `CAP.RETURN` |
-| **Permission Check** | E on return capability (Sim-64) | None |
-| **Restored Registers** | CR6, CR7, NIA (next instruction address) | CR5, CR6 (M-bit set), CR7, PC (set to saved PC + 4) |
-| **G-bit Reset** | Yes — on restored CR6 and CR7 namespace entries | Yes — on restored CR6 and CR7 namespace entries via mLoad |
+| **Permission Check** | None (null perm passed to mLoad — skips permission check) | None |
+| **Restored Registers** | CR5 (tolerant), CR6, CR7, NIA via mLoad revalidation | CR5 (tolerant), CR6 (M-bit set), CR7, PC (set to saved PC + 4) via mLoad |
+| **mLoad Revalidation** | Yes — saved GTs routed through mLoad for version/MAC/namespace validation | Yes — saved GTs routed through mLoad for version/MAC validation |
+| **CR5 Fault Tolerance** | CR5 fault clears CR5, continues to CR6/CR7 | CR5 fault clears CR5, continues to CR6/CR7 |
+| **G-bit Reset** | Yes — on all restored namespace entries via mLoad | Yes — on all restored namespace entries via mLoad |
 | **Bound GT Surrender** | Yes — CRs marked as bound during CALL are cleared to NULL | No |
 | **Stack Underflow** | FAULT: "Stack underflow - no procedure to return from" | FAULT: "No saved context to restore" |
 | **Stack Indicators** | N/A | Updates stackFrames (true if frames remain) and stackSpace (true, always room after pop) |
@@ -163,7 +167,8 @@ These rules apply identically to both simulators:
 | **I-bit Variant** | Yes — I=0 uses register, I=1 uses C-List lookup | No (register only) |
 | **Target** | Always CR8 (Thread) | Full atomic thread swap via thread table |
 | **G-bit Reset** | Yes — via mLoad on C-List access | Yes — on accessed namespace entries |
-| **What Gets Written** | New thread GT created with name `THREAD_<source>`, R/W permissions, new golden key | Saves current x0-x31, CR0-CR8, PC to thread table; loads target thread context. CR9-CR15 unchanged. |
+| **Save Side** | Saves DR+PC+indicators only (CRs always current in thread table shadow via mLoad) | Saves x0-x31 and PC to thread table (CRs always current via mLoad thread shadow) |
+| **Restore Side** | New thread GT created via mLoad; CRs restored from thread shadow via mLoad | CRs restored from thread table via mLoad revalidation; data registers restored directly |
 | **Exclusive Monitor** | Cleared for current thread (ARM CLREX semantics) | Not implemented |
 | **Encoding** | 5-bit opcode, condition[4], I-bit, CRs[3] | opcode=0x0B, funct3=001, cr_src=rs2[2:0] |
 

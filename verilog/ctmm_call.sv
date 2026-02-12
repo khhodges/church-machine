@@ -9,6 +9,8 @@
 //   Index = Index into the C-List
 //
 // CALL Steps (Two-Phase Load + Isolation):
+//   Pre: Save CR5 GT for later restoration by RETURN
+//     0. Read CR5 register and latch its GT to saved_cr5_gt output
 //   Phase 1: Load nodal C-List into CR6
 //     1. Verify source CRs is in range 0-5 (not CR6 itself)
 //     2. Verify source CRs has L permission
@@ -81,6 +83,9 @@ module ctmm_call
     output logic        g_bit_reset,
     output logic [63:0] g_bit_addr,
     
+    // Saved CR5 GT output - stored externally alongside return capability
+    output golden_token_t saved_cr5_gt,       // CR5 GT saved for RETURN restoration
+    
     // Isolation interface - clear registers and set NIA
     output logic        nia_set,              // Set NIA enable
     output logic [63:0] nia_value,            // NIA = 0 for isolated abstraction
@@ -106,6 +111,7 @@ module ctmm_call
         CALL_CHECK_SRC,       // Verify source is CR0-CR5
         CALL_READ_SRC,        // Read source register for permission check
         CALL_CHECK_PERM,      // Verify L permission on source
+        CALL_READ_CR5,        // Read CR5 and latch its GT for saving
         CALL_PHASE1,          // mLoad: CRs[Index] → CR6
         CALL_PHASE1_DONE,     // Phase 1 complete, prepare Phase 2
         CALL_PHASE2,          // mLoad: CR6[0] → CR7
@@ -138,8 +144,8 @@ module ctmm_call
     logic [3:0]  local_cr_rd_addr;
     logic [3:0]  sub_cr_rd_addr;
     
-    assign local_cr_rd_en = (state == CALL_CHECK_SRC) || (state == CALL_READ_SRC);
-    assign local_cr_rd_addr = cr_src;
+    assign local_cr_rd_en = (state == CALL_CHECK_SRC) || (state == CALL_READ_SRC) || (state == CALL_READ_CR5);
+    assign local_cr_rd_addr = (state == CALL_READ_CR5) ? 4'd5 : cr_src;
     
     // ========================================================================
     // Permission Check Logic
@@ -162,6 +168,21 @@ module ctmm_call
     assign src_in_range = (cr_src <= MAX_SRC_REG);
     assign src_perms = src_reg_latched.word0_gt[57:48];
     assign src_has_l_perm = src_perms[PERM_L];
+    
+    // ========================================================================
+    // CR5 GT Latching - Save CR5's GT before isolation
+    // ========================================================================
+    
+    golden_token_t saved_cr5_gt_reg;
+    
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            saved_cr5_gt_reg <= '0;
+        else if (state == CALL_READ_CR5)
+            saved_cr5_gt_reg <= cr_rd_data.word0_gt;
+    end
+    
+    assign saved_cr5_gt = saved_cr5_gt_reg;
     
     // ========================================================================
     // Fault Latching
@@ -215,7 +236,7 @@ module ctmm_call
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             sub_start_reg <= 1'b0;
-        else if ((state == CALL_CHECK_PERM && next_state == CALL_PHASE1) ||
+        else if ((state == CALL_READ_CR5 && next_state == CALL_PHASE1) ||
                  (state == CALL_PHASE1_DONE && next_state == CALL_PHASE2))
             sub_start_reg <= 1'b1;
         else
@@ -324,7 +345,11 @@ module ctmm_call
                 if (!src_has_l_perm)
                     next_state = CALL_FAULT;
                 else
-                    next_state = CALL_PHASE1;
+                    next_state = CALL_READ_CR5;
+            end
+            
+            CALL_READ_CR5: begin
+                next_state = CALL_PHASE1;
             end
             
             CALL_PHASE1: begin

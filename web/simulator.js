@@ -22,7 +22,9 @@ class CTMMSimulator {
         
         this.flags = { N: false, Z: false, C: false, V: false };
         
-        // Per-thread exclusive monitors for LOADX/SAVEX (16 threads)
+        this.namespaceRegistry = {};
+        this.nextVersion = 1;
+        
         this.exclusiveMonitors = {};
         for (let i = 0; i < 16; i++) {
             this.exclusiveMonitors[i] = { valid: false, addr: 0 };
@@ -78,12 +80,14 @@ class CTMMSimulator {
     }
 
     createCapability(name, perms = ["R", "W", "X"]) {
-        return {
+        const cap = {
             name: name,
             location: { type: "Local", offset: Math.floor(Math.random() * 1000) },
             perms: perms,
             locked: false
         };
+        this.registerCapability(cap);
+        return cap;
     }
 
     generateKey() {
@@ -94,13 +98,60 @@ class CTMMSimulator {
         return key.match(/.{1,8}/g).join('-');
     }
 
+    computeMAC(cap) {
+        const str = `${cap.name}:${cap.goldenKey || ''}:${cap.version || 0}:${JSON.stringify(cap.location)}`;
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < str.length; i++) {
+            hash ^= str.charCodeAt(i);
+            hash = (hash * 0x01000193) >>> 0;
+        }
+        return hash;
+    }
+
+    registerCapability(cap) {
+        if (!cap.goldenKey) cap.goldenKey = this.generateKey();
+        if (cap.version === undefined) {
+            cap.version = this.nextVersion++;
+        }
+        cap.seal = this.computeMAC(cap);
+        this.namespaceRegistry[cap.goldenKey] = cap.version;
+        return cap;
+    }
+
+    bumpVersion(cap) {
+        if (!cap.goldenKey) return;
+        cap.version = this.nextVersion++;
+        cap.seal = this.computeMAC(cap);
+        this.namespaceRegistry[cap.goldenKey] = cap.version;
+    }
+
     mLoad(src, requiredPerm, idx) {
         if (!src || src.name === 'NULL') {
             return { ok: false, fault: 'NULL', message: 'no capability loaded' };
         }
 
-        if (!src.perms.includes(requiredPerm) && !src.perms.includes('M')) {
-            return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
+        if (requiredPerm !== null && requiredPerm !== undefined) {
+            if (!src.perms.includes(requiredPerm) && !src.perms.includes('M')) {
+                return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
+            }
+        }
+
+        if (src.goldenKey && src.version !== undefined) {
+            const currentVersion = this.namespaceRegistry[src.goldenKey];
+            if (currentVersion !== undefined && src.version !== currentVersion) {
+                return { ok: false, fault: 'VERSION', message: `version mismatch: cap has ${src.version}, registry has ${currentVersion} (entry recycled)` };
+            }
+        }
+
+        if (src.seal !== undefined && src.goldenKey) {
+            const expectedMAC = this.computeMAC(src);
+            if (src.seal !== expectedMAC) {
+                return { ok: false, fault: 'MAC', message: 'MAC seal validation failed (capability tampered)' };
+            }
+        }
+
+        if (src.perms && src.perms.includes('G')) {
+            src.perms = src.perms.filter(p => p !== 'G');
         }
 
         if (idx !== undefined && idx !== null) {
@@ -108,6 +159,20 @@ class CTMMSimulator {
                 return { ok: false, fault: 'BOUNDS', message: `index ${idx} out of bounds for C-List (size: ${src.clist ? src.clist.length : 0})` };
             }
             const entry = src.clist[idx];
+
+            if (entry.goldenKey && entry.version !== undefined) {
+                const entryVersion = this.namespaceRegistry[entry.goldenKey];
+                if (entryVersion !== undefined && entry.version !== entryVersion) {
+                    return { ok: false, fault: 'VERSION', message: `entry ${idx}: version mismatch (entry recycled)` };
+                }
+            }
+
+            if (entry.seal !== undefined && entry.goldenKey) {
+                const expectedMAC = this.computeMAC(entry);
+                if (entry.seal !== expectedMAC) {
+                    return { ok: false, fault: 'MAC', message: `entry ${idx}: MAC seal validation failed` };
+                }
+            }
 
             if (entry.perms && entry.perms.includes('G')) {
                 entry.perms = entry.perms.filter(p => p !== 'G');
@@ -119,6 +184,8 @@ class CTMMSimulator {
                 perms: entry.perms ? [...entry.perms] : ['R'],
                 locked: entry.locked || false,
                 goldenKey: entry.goldenKey || this.generateKey(),
+                version: entry.version,
+                seal: entry.seal,
                 clist: entry.clist || null
             };
 
@@ -136,6 +203,9 @@ class CTMMSimulator {
     }
 
     _setCR(crIdx, cap) {
+        if (cap && cap.name !== 'NULL' && !cap.goldenKey) {
+            this.registerCapability(cap);
+        }
         if (crIdx < 8) this.contextRegs[crIdx] = cap;
         else if (crIdx === 8) this.cr8 = cap;
         else if (crIdx === 15) this.cr15 = cap;
@@ -698,6 +768,7 @@ class CTMMSimulator {
                 
                 this.callStack.push({
                     returnNIA: this.nia + 1,
+                    cr5: this.contextRegs[5] ? { ...this.contextRegs[5] } : null,
                     cr6: this.contextRegs[6] ? { ...this.contextRegs[6] } : null,
                     cr7: this.contextRegs[7] ? { ...this.contextRegs[7] } : null,
                     boundGTs: []
@@ -759,8 +830,36 @@ class CTMMSimulator {
                     const frame = this.callStack.pop();
                     this.stackDepth--;
                     
-                    if (frame.cr6) this._setCR(6, frame.cr6);
-                    if (frame.cr7) this._setCR(7, frame.cr7);
+                    if (frame.cr5) {
+                        const cr5Result = this.mLoad(frame.cr5, null);
+                        if (cr5Result.ok) {
+                            this._setCR(5, cr5Result.cap);
+                        } else {
+                            this._clearCR(5);
+                        }
+                    } else {
+                        this._clearCR(5);
+                    }
+                    
+                    if (frame.cr6) {
+                        const cr6Result = this.mLoad(frame.cr6, null);
+                        if (!cr6Result.ok) {
+                            return `FAULT: ${cr6Result.fault}: RETURN CR6 restore: ${cr6Result.message}`;
+                        }
+                        this._setCR(6, cr6Result.cap);
+                    } else {
+                        this._clearCR(6);
+                    }
+                    
+                    if (frame.cr7) {
+                        const cr7Result = this.mLoad(frame.cr7, null);
+                        if (!cr7Result.ok) {
+                            return `FAULT: ${cr7Result.fault}: RETURN CR7 restore: ${cr7Result.message}`;
+                        }
+                        this._setCR(7, cr7Result.cap);
+                    } else {
+                        this._clearCR(7);
+                    }
                     
                     let surrendered = [];
                     for (let i = 0; i < 8; i++) {
@@ -771,8 +870,9 @@ class CTMMSimulator {
                         }
                     }
                     
+                    this.nia = frame.returnNIA;
                     const surrenderMsg = surrendered.length > 0 ? `, surrendered bound GTs: ${surrendered.join(',')}` : '';
-                    return `RETURN: restored CR6/CR7, stack depth: ${this.stackDepth}${surrenderMsg}`;
+                    return `RETURN: restored CR5/CR6/CR7 via mLoad, stack depth: ${this.stackDepth}${surrenderMsg}`;
                 }
                 return `FAULT: Stack underflow - no procedure to return from`;
             }
