@@ -16,7 +16,7 @@ This project develops a comprehensive simulator for the Church-Turing Meta-Machi
 ## Recent Changes (2026-02-12)
 
 ### GT-Literals and Network Transparency (Design Document)
-- New doc: `docs/network-transparency.md` — retitled to "GT-Literals and Network Transparency"
+- New doc: `docs/network-transparency.md` — "Network Transparency" (cross-references gt-literals.md)
 - GT-Literal (Type=10) = capability-secured handle to a secret value in namespace entry Location/Limit fields
 - GT-Literal use cases: RPC tunnel keys, transparent login, session tokens, encryption keys at rest, API key wrapping
 - Common pattern: GT is the handle (Version/Index/Permissions/Type), namespace entry holds the secret, MAC protects integrity
@@ -31,6 +31,20 @@ This project develops a comprehensive simulator for the Church-Turing Meta-Machi
 - Tunnel revocation via GC sweep of GT-Literal (version bump kills tunnel)
 - Design validation tests: `riscv_cap/tests/test_network_transparency.py` (32 tests)
 - F (Foreign/Far) permission was for network transparency — now removed from GT but concept lives in Type field
+
+### GT-Literals, Lambda Calculus, and the CLOOMC Value Domain (Design Document)
+- New doc: `docs/gt-literals.md` — GT-Literals as Church's value domain in hardware
+- Two forms: Direct GT-Literal (30-bit value, no Version/Permissions) and Indirect GT-Literal (namespace-backed handle)
+- Direct GT-Literal format: [31:2] Value (30 bits) + [1:0] Type=10 — no mLoad, no MAC, pure value
+- Version/Permission bits reclaimed for direct form: 30 bits of value space (~1 billion integers)
+- Three new Church instructions: LDL (Load Literal, 1 cycle), STL (Store Literal, 1 cycle), LAMBDA (application, 2 cycles setup)
+- LAMBDA CRd, CRbody, CRarg: applies X-permission code body to GT-Literal argument, result in CRd
+- LAMBDA uses X permission (same domain, lightweight) vs CALL uses E permission (domain crossing, heavy)
+- Lambda calculus connection: GT-Literal = value, Inform = name, Abstract = callable, LAMBDA = application
+- Constructive examples: A=B+C (6 cycles vs 15+ via mLoad), square function (6 vs 16+ via CALL), factorial via Y combinator, map function
+- Performance: 2-3× speedup over namespace-backed CALL/RETURN for pure computation
+- Combinators (I, K, S, Y) as optimization targets: I = register move (1 cycle), K = register copy (2 cycles)
+- Security model: structural (LDL/STL/LAMBDA enforce type boundaries) not per-access (no mLoad validation needed)
 
 
 ### GT Permission Reduction: 10 → 6 bits

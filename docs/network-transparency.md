@@ -1,6 +1,8 @@
-# GT-Literals and Network Transparency
+# Network Transparency
 
-> **Status**: Architectural design document. The GT Type field (Inform, Outform, Literal, Abstract) exists in the simulator's 32-bit GT format. GT-Literal namespace entries can be constructed via boot_builder.py. Outform behavior, TRAP handling, and tunnel/credential operations are not yet implemented in the simulator. This document specifies the planned design.
+> **Status**: Architectural design document. The GT Type field (Inform, Outform, Literal, Abstract) exists in the simulator's 32-bit GT format. Outform behavior, TRAP handling, and tunnel operations are not yet implemented in the simulator. This document specifies the planned design.
+>
+> See also: [GT-Literals, Lambda Calculus, and the CLOOMC Value Domain](gt-literals.md) for the full GT-Literal specification, the LAMBDA instruction, and constructive examples.
 
 ## Overview
 
@@ -20,7 +22,7 @@ The 2-bit Type field in the 32-bit Golden Token classifies each resource:
 |-------|------|-------------|
 | 00 | **Inform** | Local resource — data or code in the local namespace |
 | 01 | **Outform** | Remote resource — data or service at a network URL, accessed transparently |
-| 10 | **Literal** | GT-Literal — capability-secured handle to a secret value in the namespace entry |
+| 10 | **Literal** | GT-Literal — a value (direct: 30-bit self-contained) or a handle to a secret (indirect: namespace-backed). See [GT-Literals](gt-literals.md). |
 | 11 | **Abstract** | Abstract service — a callable abstraction (function or service entry point) |
 
 The Type field combines with permissions to determine behavior:
@@ -141,33 +143,15 @@ All inbound requests carry a GT that is validated through the same mLoad path �
 
 ---
 
-## GT-Literals
+## GT-Literals and RPC Tunnel Keys
 
-The GT-Literal (Type = 10) is a **capability-secured handle to a secret value**. The GT itself uses the standard 32-bit format:
+GT-Literals (Type = 10) come in two forms: **direct** (30-bit self-contained value) and **indirect** (namespace-backed handle to a secret). For the full GT-Literal specification, the LAMBDA instruction, and lambda calculus examples, see [GT-Literals, Lambda Calculus, and the CLOOMC Value Domain](gt-literals.md).
 
-```
-GT-Literal [31:0]:
-  [31:27] Version    (7 bits)  — Revocable via GC version bump
-  [26:8]  Index      (17 bits) — Namespace index of the value entry
-  [7:2]   Permissions (6 bits) — Access control on the value itself
-  [1:0]   Type = 10  (2 bits)  — Literal
-```
+In the context of network transparency, **indirect GT-Literals** serve as handles to cryptographic keys and credentials:
 
-The **secret value** is not stored in the GT itself — it resides in the **namespace entry** that the GT references. The entry's Location and Limit fields hold the actual value (a crypto key, a credential, a token, etc.), and the entry's MAC seal provides integrity protection. This is consistent with the capability model: the GT is a validated handle, the namespace entry holds the actual resource.
+### RPC Tunnel Key
 
-### Core Properties
-
-Every GT-Literal, regardless of its specific use, shares these properties:
-
-1. **Capability-secured**: Access to the secret value requires a valid GT with correct permissions, MAC, and version — the same mLoad validation path as any other namespace access
-2. **Revocable**: Sweeping the GT-Literal during garbage collection bumps its version, instantly invalidating the handle. Anyone still holding the old GT gets FAULT: VERSION
-3. **Compartmentalized**: Each GT-Literal is independent. Compromise of one does not affect any other
-4. **GC-managed lifecycle**: The secret value follows the same lifecycle as every other namespace object — created, used, garbage-collected
-5. **MAC-protected**: The namespace entry's MAC seal ensures the value has not been tampered with
-
-### Use Case 1: RPC Tunnel Key
-
-A GT-Literal whose namespace entry holds a **symmetric encryption key** for point-to-point RPC tunnels between Meta Machines. Both communicating namespaces hold matching entries with the same key material (Location + Limit values).
+An indirect GT-Literal whose namespace entry holds a **symmetric encryption key** for point-to-point RPC tunnels between Meta Machines. Both communicating namespaces hold matching entries with the same key material (Location + Limit values).
 
 - The Literal GT is loaded into a CR before a `CAP.CALL` on an Outform Abstract GT
 - The CALL instruction uses the key material to encrypt the serialized register payload
@@ -175,57 +159,9 @@ A GT-Literal whose namespace entry holds a **symmetric encryption key** for poin
 - **Revocation**: GC sweep bumps the version, killing the tunnel instantly
 - **No PKI required**: The capability *is* the trust — no certificate authorities needed
 
-### Use Case 2: Transparent Login (Conceptual)
+### Other Credential Use Cases (Conceptual)
 
-A GT-Literal whose namespace entry holds **authentication credentials** (a password hash, a token, a certificate fingerprint). Presenting the GT-Literal to a remote service proves identity without exposing the underlying secret to the calling program. The exact handshake mechanism is a future design decision; the GT-Literal infrastructure is in place.
-
-- The program holds a GT-Literal for "my login to service X" — it never sees the raw credential
-- On CALL to the remote service, the system reads the credential from the namespace entry and presents it in the authentication handshake
-- The credential is protected by MAC and version — cannot be forged or replayed after revocation
-- **Revocation**: GC sweep invalidates the login credential. The program's GT becomes stale, login fails cleanly with FAULT: VERSION
-- **Rotation**: Create a new namespace entry with updated credentials, issue a new GT-Literal. Old GT dies on next GC cycle
-
-### Use Case 3: Session Tokens (Conceptual)
-
-A GT-Literal whose namespace entry holds a **session identifier** for an ongoing interaction with a remote service. The session token is managed entirely within the capability model. The exact session protocol is a future design decision.
-
-- Created when a session is established (e.g., after successful transparent login)
-- The program passes the GT-Literal on each subsequent request — the system extracts the session token from the namespace entry automatically
-- **Timeout/expiry**: The remote service can invalidate the session. Locally, GC sweep of the GT-Literal cleans up the stale session handle
-- **Compartmentalized**: Each session with each service has its own GT-Literal. Compromise of one session does not affect others
-
-### Use Case 4: Encryption Keys for Data at Rest (Conceptual)
-
-A GT-Literal whose namespace entry holds a **symmetric key for encrypting stored objects**. This extends the crypto key concept beyond network tunnels to local data protection. The encryption/decryption mechanism is a future design decision.
-
-- Objects written to persistent storage are encrypted using the key material from the GT-Literal's namespace entry
-- Reading the object requires the same GT-Literal (or one pointing to the same namespace entry)
-- **Key rotation**: Create a new entry with a new key, re-encrypt data, sweep the old GT-Literal
-- **Access control**: R permission on the GT-Literal controls who can decrypt; W controls who can re-encrypt
-
-### Use Case 5: API Key / Bearer Token Wrapping (Conceptual)
-
-A GT-Literal whose namespace entry holds a **third-party API key or bearer token**. This wraps external credentials in the capability model so they are governed by the same security rules as everything else. The injection mechanism is a future design decision.
-
-- The program holds a GT-Literal for "my API key to service X" — it never sees the raw key
-- On outbound HTTPS requests, the system reads the API key from the namespace entry and injects it into the request header
-- **Revocation**: GC sweep invalidates the GT-Literal. Even if the underlying API key is still valid, the program can no longer access it
-- **Rotation**: Update the namespace entry with a new API key, or issue a new GT-Literal pointing to a new entry. Old GT dies on GC
-
-### Common Pattern
-
-All GT-Literal use cases follow the same pattern:
-
-```
-GT-Literal (handle)  →  Namespace Entry (secret value)
-     │                        │
-     ├─ Version (revocable)   ├─ Location (value part 1)
-     ├─ Index (points to →)   ├─ Limit    (value part 2)
-     ├─ Permissions (access)  ├─ MAC seal (integrity)
-     └─ Type = 10 (Literal)   └─ gBit     (GC metadata)
-```
-
-The GT-Literal never exposes the secret. The program holds the handle, the system holds the value. Revocation is instant (GC version bump), compartmentalization is automatic (each use case gets its own GT-Literal), and integrity is guaranteed (MAC seal on the namespace entry).
+Indirect GT-Literals also serve as handles for transparent login credentials, session tokens, encryption keys for data at rest, and API key wrapping. These use cases share the same pattern: the GT is the handle, the namespace entry holds the secret, MAC protects integrity, and GC manages the lifecycle. See [GT-Literals](gt-literals.md) for details on each use case.
 
 ---
 
