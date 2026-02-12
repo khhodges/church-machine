@@ -25,10 +25,11 @@ The CTMM simulator offers both a Haskell console interface and a web-based visua
 -   **Golden Token Structure**: 64-bit key with Offset, Permissions (R, W, X, L, S, E, B, M, F, G bits), and Spare bits.
 -   **Namespace Entry**: A 3-word descriptor (Location, Limit, Seals).
 -   **MAC Validation**: Hardware-enforced security check during `LOAD`.
+-   **mLoad Master Validation**: Single trusted path for all namespace access — every Church instruction routes through mLoad, which enforces permission check, bounds check, MAC validation, and G-bit reset.
 -   **Boot Sequence**: A 4-step secure initialization process.
 -   **Permission Domains**: Mutually exclusive for Church (L, S), Turing (R, W, X), Lambda (E), and Meta (B, M, F, G) operations.
 -   **Failsafe Security**: All validation failures route to a single FAULT handler.
--   **Deterministic Garbage Collection**: Managed by the G (Garbage) permission bit.
+-   **Deterministic Garbage Collection**: G-bit reset on every namespace access via mLoad; three-phase Mark-Scan-Sweep cycle with DNA tree walk (no permission filtering during scan).
 
 ### Web Interface (UI/UX)
 
@@ -66,7 +67,8 @@ This simulator (`riscv_cap/`) uses a Flask web server, `index.html`, `styles.css
 -   **Church Instructions**: Seven instructions (`CAP.LOAD`, `CAP.CALL`, `CAP.SAVE`, `CAP.RETURN`, `CAP.CHANGE`, `CAP.SWITCH`, `CAP.TPERM`) across four RISC-V custom opcodes.
 -   **Web Views**: Dashboard, Namespace Browser, Assembly Editor, Capabilities Explorer, Instructions, Docs.
 -   **MAC Seal Validation**: 27-bit FNV hash seal in `VersionSeals` checked on `LOAD` and `CALL`.
--   **Deterministic Garbage Collection**: Three-phase Mark-Scan-Sweep cycle using a G-bit.
+-   **mLoad/mLoadByIndex**: Unified validation path for all Church instructions — validates version, MAC, permissions, and resets G-bit on every namespace access.
+-   **Deterministic Garbage Collection**: G-bit reset via mLoad on every access; three-phase Mark-Scan-Sweep cycle with DNA tree walk from registers, call stack, and thread table (no permission filtering during scan); version bump on sweep.
 
 ## External Dependencies
 
