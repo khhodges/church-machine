@@ -125,13 +125,14 @@ class CTMMSimulator {
         this.namespaceRegistry[cap.goldenKey] = cap.version;
     }
 
-    mLoad(src, requiredPerm, idx) {
+    mLoad(src, requiredPerm, idx, microcode = false) {
         if (!src || src.name === 'NULL') {
             return { ok: false, fault: 'NULL', message: 'no capability loaded' };
         }
 
         if (requiredPerm !== null && requiredPerm !== undefined) {
-            if (!src.perms.includes(requiredPerm)) {
+            const hasM = src.perms.includes('M') || microcode;
+            if (!hasM && !src.perms.includes(requiredPerm)) {
                 return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
             }
         }
@@ -609,14 +610,14 @@ class CTMMSimulator {
             case "LOAD": {
                 const [destCR, srcCR, idx] = args;
                 const src = this._getCR(srcCR);
-                const result = this.mLoad(src, 'L', idx);
+                const result = this.mLoad(src, 'L', idx, true);
                 if (!result.ok) {
                     return `FAULT: ${result.fault}: CR${srcCR} - ${result.message}`;
                 }
                 this._setCR(destCR, result.cap);
                 const destName = destCR === 8 ? 'CR8 (Thread)' : destCR === 15 ? 'CR15 (Namespace)' : `CR${destCR}`;
                 const permStr = result.cap.perms.length > 0 ? `[${result.cap.perms.join('')}]` : '';
-                return `Loaded ${result.cap.name} ${permStr} into ${destName} via CR${srcCR}[${idx}]`;
+                return `mLoad M↑: Loaded ${result.cap.name} ${permStr} into ${destName} via CR${srcCR}[${idx}]`;
             }
             
             case "SAVE": {
@@ -629,7 +630,8 @@ class CTMMSimulator {
                 if (!src || src.name === 'NULL') {
                     return `FAULT: NULL: CR${srcCR} - no capability loaded (source)`;
                 }
-                if (!dest.perms.includes('S')) {
+                const hasMDest = dest.perms.includes('M');
+                if (!hasMDest && !dest.perms.includes('S')) {
                     return `FAULT: PERMISSION: CR${destCR} - lacks S permission (destination C-List)`;
                 }
                 const saveIdx = idx || 0;
@@ -660,20 +662,20 @@ class CTMMSimulator {
             case "LOADX": {
                 const [destCR, srcCR, idx] = args;
                 const src = this._getCR(srcCR);
-                const result = this.mLoad(src, 'L', idx);
+                const result = this.mLoad(src, 'L', idx, true);
                 if (!result.ok) {
                     return `FAULT: ${result.fault}: CR${srcCR} - ${result.message}`;
                 }
                 this._setCR(destCR, result.cap);
                 const addr = (srcCR << 16) | idx;
                 this.exclusiveMonitors[this.currentThread] = { valid: true, addr: addr };
-                return `LOADX: Loaded ${result.cap.name} into CR${destCR}, exclusive monitor set for addr 0x${addr.toString(16)}`;
+                return `mLoad M↑: LOADX ${result.cap.name} into CR${destCR}, exclusive monitor set`;
             }
             
             case "SAVEX": {
                 const [srcCR, destCR, idx, resultDR] = args;
                 const dest = destCR < 8 ? this.contextRegs[destCR] : destCR === 8 ? this.cr8 : this.cr15;
-                const destResult = this.mLoad(dest, 'S');
+                const destResult = this.mLoad(dest, 'S', undefined, true);
                 if (!destResult.ok) {
                     return `FAULT: ${destResult.fault}: CR${destCR} - ${destResult.message}`;
                 }
@@ -696,7 +698,7 @@ class CTMMSimulator {
             case "LDM": {
                 const [baseCR, regList] = args;
                 const base = this._getCR(baseCR);
-                const baseResult = this.mLoad(base, 'L');
+                const baseResult = this.mLoad(base, 'L', undefined, true);
                 if (!baseResult.ok) {
                     return `FAULT: ${baseResult.fault}: CR${baseCR} - ${baseResult.message}`;
                 }
@@ -704,7 +706,7 @@ class CTMMSimulator {
                 let idx = 0;
                 for (let i = 0; i < 8; i++) {
                     if ((regList >> i) & 1) {
-                        const entryResult = this.mLoad(base, 'L', idx);
+                        const entryResult = this.mLoad(base, 'L', idx, true);
                         if (entryResult.ok) {
                             this._setCR(i, entryResult.cap);
                         }
@@ -718,7 +720,7 @@ class CTMMSimulator {
             case "STM": {
                 const [baseCR, regList] = args;
                 const base = baseCR < 8 ? this.contextRegs[baseCR] : baseCR === 8 ? this.cr8 : this.cr15;
-                const baseResult = this.mLoad(base, 'S');
+                const baseResult = this.mLoad(base, 'S', undefined, true);
                 if (!baseResult.ok) {
                     return `FAULT: ${baseResult.fault}: CR${baseCR} - ${baseResult.message}`;
                 }
@@ -777,7 +779,7 @@ class CTMMSimulator {
             case "CALL": {
                 const [crIdx, maskField] = args;
                 const cr = this._getCR(crIdx);
-                const callResult = this.mLoad(cr, 'L');
+                const callResult = this.mLoad(cr, 'E', undefined, true);
                 if (!callResult.ok) {
                     return `FAULT: ${callResult.fault}: CR${crIdx} - ${callResult.message}`;
                 }
@@ -844,7 +846,7 @@ class CTMMSimulator {
                     this.stackDepth--;
                     
                     if (frame.cr5) {
-                        const cr5Result = this.mLoad(frame.cr5, null);
+                        const cr5Result = this.mLoad(frame.cr5, null, undefined, true);
                         if (cr5Result.ok) {
                             this._setCR(5, cr5Result.cap);
                         } else {
@@ -858,7 +860,7 @@ class CTMMSimulator {
                         if (!frame.cr6.perms || !frame.cr6.perms.includes('E')) {
                             return `FAULT: PERMISSION: RETURN: saved CR6 lacks E permission`;
                         }
-                        const cr6Result = this.mLoad(frame.cr6, 'E');
+                        const cr6Result = this.mLoad(frame.cr6, 'E', undefined, true);
                         if (!cr6Result.ok) {
                             return `FAULT: ${cr6Result.fault}: RETURN CR6 restore: ${cr6Result.message}`;
                         }
@@ -869,7 +871,7 @@ class CTMMSimulator {
                     }
                     
                     if (frame.cr7) {
-                        const cr7Result = this.mLoad(frame.cr7, null);
+                        const cr7Result = this.mLoad(frame.cr7, null, undefined, true);
                         if (!cr7Result.ok) {
                             return `FAULT: ${cr7Result.fault}: RETURN CR7 restore: ${cr7Result.message}`;
                         }
@@ -906,7 +908,7 @@ class CTMMSimulator {
                     const crIdx = parseInt(arg1);
                     const index = parseInt(arg2);
                     const clist = this._getCR(crIdx);
-                    const result = this.mLoad(clist, 'L', index);
+                    const result = this.mLoad(clist, 'L', index, true);
                     if (!result.ok) {
                         return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
@@ -915,7 +917,7 @@ class CTMMSimulator {
                 } else {
                     const crIdx = parseInt(arg1);
                     const src = this._getCR(crIdx);
-                    const result = this.mLoad(src, 'L');
+                    const result = this.mLoad(src, 'L', undefined, true);
                     if (!result.ok) {
                         return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
@@ -959,7 +961,7 @@ class CTMMSimulator {
                         this.stackDepth = this.callStack.length;
 
                         if (resumeFrame.cr5) {
-                            const cr5Result = this.mLoad(resumeFrame.cr5, null);
+                            const cr5Result = this.mLoad(resumeFrame.cr5, null, undefined, true);
                             if (cr5Result.ok) {
                                 this._setCR(5, cr5Result.cap);
                             } else {
@@ -970,7 +972,7 @@ class CTMMSimulator {
                         }
 
                         if (resumeFrame.cr6) {
-                            const cr6Result = this.mLoad(resumeFrame.cr6, null);
+                            const cr6Result = this.mLoad(resumeFrame.cr6, null, undefined, true);
                             if (!cr6Result.ok) {
                                 return `FAULT: ${cr6Result.fault}: CHANGE restore CR6: ${cr6Result.message}`;
                             }
@@ -980,7 +982,7 @@ class CTMMSimulator {
                         }
 
                         if (resumeFrame.cr7) {
-                            const cr7Result = this.mLoad(resumeFrame.cr7, null);
+                            const cr7Result = this.mLoad(resumeFrame.cr7, null, undefined, true);
                             if (!cr7Result.ok) {
                                 return `FAULT: ${cr7Result.fault}: CHANGE restore CR7: ${cr7Result.message}`;
                             }
@@ -1027,7 +1029,7 @@ class CTMMSimulator {
                     const index = parseInt(arg2);
                     target = parseInt(arg3);
                     const clist = this._getCR(crIdx);
-                    const result = this.mLoad(clist, 'L', index);
+                    const result = this.mLoad(clist, 'L', index, true);
                     if (!result.ok) {
                         return `FAULT: ${result.fault}: CR${crIdx} - ${result.message}`;
                     }
@@ -1037,8 +1039,8 @@ class CTMMSimulator {
                     const crIdx = parseInt(arg1);
                     target = arg2 !== undefined ? parseInt(arg2) : 7;
                     const src = this._getCR(crIdx);
-                    const resultL = this.mLoad(src, 'L');
-                    const resultE = this.mLoad(src, 'E');
+                    const resultL = this.mLoad(src, 'L', undefined, true);
+                    const resultE = this.mLoad(src, 'E', undefined, true);
                     if (!resultL.ok && !resultE.ok) {
                         return `FAULT: ${resultL.fault}: CR${crIdx} - ${resultL.message}`;
                     }

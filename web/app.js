@@ -672,7 +672,7 @@ const bootSteps = [
                 nsOffset: 0,
                 type: "System",
                 location: { type: "Local", offset: nsEntry.word1_location },
-                perms: ["L", "S", "M"],  // Load + Save + Meta (M elevated by microcode during boot)
+                perms: ["M"],  // M only — Namespace is pure metadata, isolated from all RWXLSE
                 locked: true,
                 goldenKey: generateGoldenKey(),
                 word1: nsEntry.word1_location,
@@ -695,7 +695,7 @@ const bootSteps = [
                 nsOffset: kennethEntry.nsOffset,
                 type: "Thread",
                 location: { type: "Local", offset: kennethNS.word1_location },
-                perms: [...kennethEntry.perms, "M"],
+                perms: ["M"],  // M only — Thread is pure metadata, isolated from all RWXLSE
                 locked: false,
                 goldenKey: generateGoldenKey(),
                 word1: kennethNS.word1_location,
@@ -719,7 +719,7 @@ const bootSteps = [
                 nsOffset: 2,
                 type: "C-List",
                 location: { type: "Local", offset: bootNS.word1_location },
-                perms: ["L", "S", "E", "M"],  // Load + Save + Enter + Meta (M elevated by microcode during boot)
+                perms: ["E"],  // E only — owner can CALL; microcode elevates M on CR for LOAD operations
                 locked: false,
                 goldenKey: generateGoldenKey(),
                 word1: bootNS.word1_location,
@@ -737,7 +737,7 @@ const bootSteps = [
                 nsOffset: accessEntry.nsOffset,
                 type: "Code",
                 location: { type: "Local", offset: accessNS.word1_location },
-                perms: [...accessEntry.perms, "M"],
+                perms: accessEntry.perms,  // X (execute) — Nucleus holds CLOOMC code; R added if constants present
                 locked: true,
                 goldenKey: generateGoldenKey(),
                 word1: accessNS.word1_location,
@@ -4178,7 +4178,7 @@ function setupHelloMumNamespace() {
         ret_map: "x10→DR0"
     };
 
-    const meCList = simulator.createCapability("Me_CList", ["L", "S", "E"]);
+    const meCList = simulator.createCapability("Me_CList", ["E"]);
     meCList.type = "Inform";
     meCList.clist = [tunnelKey, mumService, abiDescriptor];
 
