@@ -3881,6 +3881,9 @@ function resetProgram(preserveLinkage = true) {
     for (let i = 0; i < 8; i++) {
         simulator.contextRegs[i] = simulator.createNullCapability();
     }
+    bootState.step = 0;
+    bootState.complete = false;
+    updateBootDisplay();
     
     clearEditorConsole();
     editorLog('Program reset — capability registers cleared to NULL', 'info');
