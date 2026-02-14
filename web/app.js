@@ -3264,7 +3264,8 @@ function setupCodeEditor() {
     
     if (savedContent) {
         const isOldAccess = (savedContent.includes('TPERM 0 RW') && savedContent.includes('TPERM 0 S') && savedContent.includes('ACCESS.ASM'))
-            || (savedContent.includes('LOAD 0 6 5') && savedContent.includes('TPERM 0 E') && savedContent.includes('RETURN'));
+            || (savedContent.includes('LOAD 0 6 5') && savedContent.includes('TPERM 0 E') && savedContent.includes('RETURN'))
+            || (savedContent.includes('ACCESS.ASM') && savedContent.includes('TPERM 0 E') && !savedContent.includes('B done'));
         if (isOldAccess && typeof examplePrograms !== 'undefined' && examplePrograms.access) {
             editor.value = examplePrograms.access;
             savedEditorContent = examplePrograms.access;
@@ -3689,6 +3690,7 @@ function ensureBooted() {
 }
 
 function runProgram() {
+  try {
     const code = document.getElementById('codeEditor').value;
     editorState.program = parseProgram(code);
     editorState.nia = 0;
@@ -3704,7 +3706,14 @@ function runProgram() {
     editorLog('Running program...', 'info');
     simulator.softReset();
     
+    const MAX_INSTRUCTIONS = 10000;
+    let count = 0;
+    
     while (editorState.nia < editorState.program.length) {
+        if (count++ > MAX_INSTRUCTIONS) {
+            editorLog('*** HALTED: Execution limit reached (possible infinite loop) ***', 'error');
+            break;
+        }
         const instr = editorState.program[editorState.nia];
         const faultOccurred = executeEditorInstruction(instr);
         editorState.nia++;
@@ -3720,12 +3729,16 @@ function runProgram() {
         }
     }
     
-    editorLog('Program completed', 'success');
+    editorLog('Program completed successfully', 'success');
     updateEditorStatus();
     updateEditorRegisters();
     updateParsedView();
     updateDisplay();
     updateCapabilityExplorer();
+  } catch (e) {
+    console.error('runProgram error:', e);
+    editorLog('*** Error: ' + e.message + ' ***', 'error');
+  }
 }
 
 function stepProgram() {
