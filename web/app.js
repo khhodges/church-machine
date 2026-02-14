@@ -3924,6 +3924,9 @@ function executeEditorInstruction(instr) {
                 result = simulator.execute(op, args[0], args[1], args[2]);
                 break;
             
+            case 'LABEL':
+                return false;
+            
             default:
                 result = `Unknown instruction: ${op}`;
                 faultOccurred = true;
