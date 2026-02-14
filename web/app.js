@@ -2859,7 +2859,8 @@ B done            ; Skip past fault handler
 fault:
 FAULT             ; Uniform failure - triggers FirstFault
 
-done:`,
+done:
+HALT              ; Execution complete`,
 
     firstfault: `; =============================================
 ; FIRSTFAULT.ASM - UNIFORM FAULT HANDLER
@@ -3265,7 +3266,8 @@ function setupCodeEditor() {
     if (savedContent) {
         const isOldAccess = (savedContent.includes('TPERM 0 RW') && savedContent.includes('TPERM 0 S') && savedContent.includes('ACCESS.ASM'))
             || (savedContent.includes('LOAD 0 6 5') && savedContent.includes('TPERM 0 E') && savedContent.includes('RETURN'))
-            || (savedContent.includes('ACCESS.ASM') && savedContent.includes('TPERM 0 E') && !savedContent.includes('B done'));
+            || (savedContent.includes('ACCESS.ASM') && savedContent.includes('TPERM 0 E') && !savedContent.includes('B done'))
+            || (savedContent.includes('ACCESS.ASM') && savedContent.includes('TPERM 0 E') && !savedContent.includes('HALT'));
         if (isOldAccess && typeof examplePrograms !== 'undefined' && examplePrograms.access) {
             editor.value = examplePrograms.access;
             savedEditorContent = examplePrograms.access;
@@ -3691,11 +3693,8 @@ function ensureBooted() {
 
 function runProgram() {
   try {
-    console.log('[DEBUG] runProgram: start');
     const code = document.getElementById('codeEditor').value;
-    console.log('[DEBUG] runProgram: code length=', code.length);
     editorState.program = parseProgram(code);
-    console.log('[DEBUG] runProgram: parsed', editorState.program.length, 'instructions');
     editorState.nia = 0;
     
     if (editorState.program.length === 0) {
@@ -3703,14 +3702,11 @@ function runProgram() {
         return;
     }
     
-    console.log('[DEBUG] runProgram: calling ensureBooted');
     ensureBooted();
-    console.log('[DEBUG] runProgram: ensureBooted done');
     markEditorSaved();
     clearEditorConsole();
     editorLog('Running program...', 'info');
     simulator.softReset();
-    console.log('[DEBUG] runProgram: entering loop');
     
     const MAX_INSTRUCTIONS = 10000;
     let count = 0;
@@ -3721,7 +3717,6 @@ function runProgram() {
             break;
         }
         const instr = editorState.program[editorState.nia];
-        console.log('[DEBUG] exec[' + count + '] nia=' + editorState.nia + ' op=' + instr.instr);
         const faultOccurred = executeEditorInstruction(instr);
         editorState.nia++;
         
@@ -3736,14 +3731,12 @@ function runProgram() {
         }
     }
     
-    console.log('[DEBUG] runProgram: loop done, count=' + count);
     editorLog('Program completed successfully', 'success');
     updateEditorStatus();
     updateEditorRegisters();
     updateParsedView();
     updateDisplay();
     updateCapabilityExplorer();
-    console.log('[DEBUG] runProgram: finished');
   } catch (e) {
     console.error('runProgram error:', e);
     editorLog('*** Error: ' + e.message + ' ***', 'error');
@@ -3946,6 +3939,11 @@ function executeEditorInstruction(instr) {
                 break;
             
             case 'LABEL':
+                return false;
+            
+            case 'HALT':
+                editorLog(`[${line}] HALT: Program stopped`, 'success');
+                editorState.nia = editorState.program.length;
                 return false;
             
             default:
