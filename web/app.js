@@ -1916,6 +1916,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
 
     let clistTabHtml = '';
     if (hasCList) {
+        const parentName = cap.name;
         const clistEntries = cap.clist.map((entry, i) => {
             const allP = ['R', 'W', 'X', 'L', 'S', 'E'];
             const badges = allP.map(p => {
@@ -1923,7 +1924,11 @@ function showCapabilityDetail(evt, cap, regLabel) {
                 return `<span class="perm-badge perm-${p.toLowerCase()} ${has ? '' : 'inactive'}">${p}</span>`;
             }).join('');
             const nsOff = entry.nsOffset !== undefined ? `0x${entry.nsOffset.toString(16).toUpperCase()}` : '--';
-            return `<div class="clist-tab-entry" data-tooltip="${entry.type || 'Object'}: ${entry.name} at NS offset ${nsOff}">
+            const isExec = entry.perms && entry.perms.includes('X');
+            const execClass = isExec ? ' clist-tab-executable' : '';
+            const execAttr = isExec ? ` data-func-name="${entry.name}" data-parent="${parentName}"` : '';
+            const execHint = isExec ? ' — Click to view code' : '';
+            return `<div class="clist-tab-entry${execClass}"${execAttr} data-tooltip="${entry.type || 'Object'}: ${entry.name} at NS offset ${nsOff}${execHint}">
                 <span class="clist-tab-idx">[${i}]</span>
                 <span class="clist-tab-name">${entry.name}</span>
                 <span class="clist-tab-perms">${badges}</span>
@@ -1958,6 +1963,14 @@ function showCapabilityDetail(evt, cap, regLabel) {
         <div id="gtTabContent">${wordStackHtml}</div>
         ${clistTabHtml}
     `;
+
+    panel.querySelectorAll('.clist-tab-executable').forEach(el => {
+        el.addEventListener('click', () => {
+            const funcName = el.dataset.funcName;
+            const parent = el.dataset.parent;
+            if (funcName) openFunctionInEditor(funcName, parent);
+        });
+    });
 }
 
 function switchCapDetailTab(tab, btn) {

@@ -1104,6 +1104,22 @@ main {
     border-color: var(--accent);
 }
 
+.clist-tab-entry.clist-tab-executable {
+    cursor: pointer;
+    border-left: 2px solid var(--accent);
+}
+
+.clist-tab-entry.clist-tab-executable:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--accent);
+}
+
+.clist-tab-entry.clist-tab-executable .clist-tab-name::after {
+    content: ' ▶';
+    color: var(--accent);
+    font-size: 0.7rem;
+}
+
 .clist-tab-idx {
     color: var(--text-secondary);
     min-width: 2rem;
