@@ -653,7 +653,7 @@ const bootSteps = [
         action: () => {
             // Save thread state before reset (skip on cold restart)
             if (!coldRestart) {
-                saveThreadState();
+                try { saveThreadState(); } catch(e) { /* BigInt or other serialization error - safe to skip */ }
             }
             simulator.reset();
             coldRestart = true;  // Set cold restart flag
