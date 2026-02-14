@@ -922,6 +922,8 @@ function resetCPU() {
     // Perform hardware reset after brief pause
     setTimeout(() => {
         simulator.reset();
+        simulator.clist = [];
+        dynamicObjects = [];
         bootState.step = 0;
         bootState.complete = false;
         updateBootDisplay();
