@@ -2852,7 +2852,7 @@ B GT fault        ; Exceeds max -> FAULT
 ; === ALL CHECKS PASSED ===
 ; Safe to proceed with protected operation
 ; (In real code: CALL CR0 enters the abstraction)
-RETURN            ; Success - all validation passed
+; Program ends here - validation complete
 
 ; === SINGLE FAILURE MODE ===
 ; All validation failures come here
@@ -3262,7 +3262,8 @@ function setupCodeEditor() {
     }
     
     if (savedContent) {
-        const isOldAccess = savedContent.includes('TPERM 0 RW') && savedContent.includes('TPERM 0 S') && savedContent.includes('ACCESS.ASM');
+        const isOldAccess = (savedContent.includes('TPERM 0 RW') && savedContent.includes('TPERM 0 S') && savedContent.includes('ACCESS.ASM'))
+            || (savedContent.includes('LOAD 0 6 5') && savedContent.includes('TPERM 0 E') && savedContent.includes('RETURN'));
         if (isOldAccess && typeof examplePrograms !== 'undefined' && examplePrograms.access) {
             editor.value = examplePrograms.access;
             savedEditorContent = examplePrograms.access;
