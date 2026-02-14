@@ -3613,6 +3613,20 @@ function restoreEditorPanelState() {
     }
 }
 
+function ensureBooted() {
+    if (!bootState.complete) {
+        while (bootState.step < 4) {
+            executeBootStep(bootState.step);
+            bootState.step++;
+        }
+        bootState.complete = true;
+        updateBootDisplay();
+        updateDisplay();
+        updateCapabilityExplorer();
+        log('Auto-boot: system initialized', 'info');
+    }
+}
+
 function runProgram() {
     const code = document.getElementById('codeEditor').value;
     editorState.program = parseProgram(code);
@@ -3623,6 +3637,7 @@ function runProgram() {
         return;
     }
     
+    ensureBooted();
     markEditorSaved();
     clearEditorConsole();
     editorLog('Running program...', 'info');
@@ -3657,6 +3672,7 @@ function stepProgram() {
         const code = document.getElementById('codeEditor').value;
         editorState.program = parseProgram(code);
         editorState.nia = 0;
+        ensureBooted();
         simulator.softReset();
         markEditorSaved();
         clearEditorConsole();
