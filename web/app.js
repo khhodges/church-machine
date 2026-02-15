@@ -1936,7 +1936,8 @@ function getContentTabInfo(cap) {
     }
 
     if (objType === 'System' && capName === 'Namespace') {
-        const nsEntries = namespaceObjects.map(o => ({
+        const allNsObjects = [...namespaceObjects, ...dynamicObjects];
+        const nsEntries = allNsObjects.map(o => ({
             name: o.name,
             type: o.type,
             perms: o.perms || [],
