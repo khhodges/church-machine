@@ -1750,6 +1750,206 @@ function getRegisterAssignment(cap) {
     return assignments;
 }
 
+function getContentTabInfo(cap) {
+    const objType = cap.type || getTypeFromSeals(cap.nsEntry);
+    const capName = cap.name || 'Unknown';
+    const allP = ['R', 'W', 'X', 'L', 'S', 'E'];
+
+    const renderCListEntries = (entries, parentName) => {
+        if (!entries || entries.length === 0) return '<div style="color:#94a3b8;padding:0.5rem;">No entries</div>';
+        return entries.map((entry, i) => {
+            const badges = allP.map(p => {
+                const has = entry.perms && entry.perms.includes(p);
+                return `<span class="perm-badge perm-${p.toLowerCase()} ${has ? '' : 'inactive'}">${p}</span>`;
+            }).join('');
+            const nsOff = entry.nsOffset !== undefined ? `0x${entry.nsOffset.toString(16).toUpperCase()}` :
+                          entry.base !== undefined ? `0x${entry.base.toString(16).toUpperCase()}` : '--';
+            const isExec = entry.perms && entry.perms.includes('X');
+            const execClass = isExec ? ' clist-tab-executable' : '';
+            const execAttr = isExec ? ` data-func-name="${entry.name}" data-parent="${parentName}"` : '';
+            const execHint = isExec ? ' — Click to view code' : '';
+            return `<div class="clist-tab-entry${execClass}"${execAttr} data-tooltip="${entry.type || 'Object'}: ${entry.name}${entry.desc ? ' — ' + entry.desc : ''}${execHint}">
+                <span class="clist-tab-idx">[${i}]</span>
+                <span class="clist-tab-name">${entry.name}</span>
+                <span class="clist-tab-perms">${badges}</span>
+                <span class="clist-tab-offset">${nsOff}</span>
+            </div>`;
+        }).join('');
+    };
+
+    if (objType === 'C-List' || objType === 'CList') {
+        const entries = cap.clist || [];
+        const count = entries.length;
+        return {
+            label: `C-List (${count})`,
+            tooltip: 'Capability List entries',
+            html: `<div class="content-tab-section">
+                <div class="clist-tab-header"><span class="clist-tab-count">${count} entries</span></div>
+                <div class="clist-tab-entries">${renderCListEntries(entries, capName)}</div>
+            </div>`
+        };
+    }
+
+    if (objType === 'Thread') {
+        const threadInfo = threadCLists[capName];
+        const threadNS = namespaceObjects.find(o => o.name === capName);
+        const base = threadNS ? `0x${threadNS.word1_location.toString(16).toUpperCase()}` : '--';
+        const size = threadNS ? `0x${threadNS.word2_limit.toString(16).toUpperCase()}` : '--';
+        const threadEntries = threadInfo ? threadInfo.clist : [];
+        return {
+            label: 'Thread',
+            tooltip: 'Thread object layout and C-List snippet',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Thread Identity: ${capName}</div>
+                <div class="content-tab-grid">
+                    <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">CR8</span><span class="content-tab-val">${capName} [M on CR]</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">CR6</span><span class="content-tab-val">${capName} C-List [E]</span></div>
+                </div>
+                <div class="content-tab-heading" style="margin-top:0.5rem;">Thread C-List Shadow (CR0–CR7)</div>
+                <div class="clist-tab-entries">${renderCListEntries(threadEntries.map((e, i) => ({...e, nsOffset: e.nsOffset})), capName)}</div>
+                ${threadInfo ? `<div class="content-tab-desc">${threadInfo.description}</div>` : ''}
+            </div>`
+        };
+    }
+
+    if (objType === 'Code') {
+        const linkage = cap.linkage || 'Boot/Access.asm';
+        const codeNS = namespaceObjects.find(o => o.name === capName);
+        const base = codeNS ? `0x${codeNS.word1_location.toString(16).toUpperCase()}` : '--';
+        const size = codeNS ? `0x${codeNS.word2_limit.toString(16).toUpperCase()}` : '--';
+        return {
+            label: 'Code',
+            tooltip: 'Code object — executable instructions',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Code Object: ${capName}</div>
+                <div class="content-tab-grid">
+                    <div class="content-tab-field"><span class="content-tab-key">Linkage</span><span class="content-tab-val">${linkage}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Perms</span><span class="content-tab-val">[${(cap.perms || []).join(', ')}]</span></div>
+                </div>
+                <div class="content-tab-desc">Loaded into CR7 (Nucleus register) during boot. Contains the secure entry points for system calls. X permission required for execution.</div>
+            </div>`
+        };
+    }
+
+    if (objType === 'Data') {
+        const dataNS = namespaceObjects.find(o => o.name === capName);
+        const base = dataNS ? `0x${dataNS.word1_location.toString(16).toUpperCase()}` : 
+                     cap.base !== undefined ? `0x${cap.base.toString(16).toUpperCase()}` : '--';
+        const size = dataNS ? `0x${dataNS.word2_limit.toString(16).toUpperCase()}` :
+                     cap.size !== undefined ? `0x${cap.size.toString(16).toUpperCase()}` : '--';
+        return {
+            label: 'Data',
+            tooltip: 'Data object — memory region',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Data Object: ${capName}</div>
+                <div class="content-tab-grid">
+                    <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Perms</span><span class="content-tab-val">[${(cap.perms || []).join(', ')}]</span></div>
+                </div>
+                <div class="content-tab-desc">Turing domain data region. R permission for reading, W for writing. Hardware enforces bounds checking via W2 (Limit).</div>
+            </div>`
+        };
+    }
+
+    if (objType === 'Function') {
+        const desc = cap.desc || '';
+        const mathType = cap.mathType || '';
+        const base = cap.base !== undefined ? `0x${cap.base.toString(16).toUpperCase()}` : '--';
+        const size = cap.size !== undefined ? `${cap.size} bytes` : '--';
+        return {
+            label: 'Lambda',
+            tooltip: 'Function — executable lambda',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Function: ${capName}</div>
+                <div class="content-tab-grid">
+                    <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
+                    ${mathType ? `<div class="content-tab-field"><span class="content-tab-key">Domain</span><span class="content-tab-val">${mathType}</span></div>` : ''}
+                    <div class="content-tab-field"><span class="content-tab-key">Perms</span><span class="content-tab-val">[${(cap.perms || []).join(', ')}]</span></div>
+                </div>
+                ${desc ? `<div class="content-tab-desc">${desc}</div>` : ''}
+                <div class="content-tab-desc">Invoked via LAMBDA CRn,x — uses X permission (not E). Arguments/results in data registers. Machine-status fast path.</div>
+            </div>`
+        };
+    }
+
+    if (objType === 'Abstraction') {
+        const absCList = abstractionCLists[capName];
+        if (absCList) {
+            const entries = absCList.clist || [];
+            const count = entries.length;
+            return {
+                label: `Contents (${count})`,
+                tooltip: `${capName} abstraction internal C-List`,
+                html: `<div class="content-tab-section">
+                    <div class="content-tab-heading">${capName} [${absCList.mathType || ''}]</div>
+                    ${absCList.description ? `<div class="content-tab-desc">${absCList.description}</div>` : ''}
+                    <div class="clist-tab-header" style="margin-top:0.4rem;"><span class="clist-tab-count">${count} entries</span></div>
+                    <div class="clist-tab-entries">${renderCListEntries(entries, capName)}</div>
+                </div>`
+            };
+        }
+        const base = cap.nsEntry ? `0x${Number(cap.nsEntry.word1_location).toString(16).toUpperCase()}` : '--';
+        const size = cap.nsEntry ? `0x${Number(cap.nsEntry.word2_limit).toString(16).toUpperCase()}` : '--';
+        return {
+            label: 'Abstraction',
+            tooltip: 'Abstraction object details',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Abstraction: ${capName}</div>
+                <div class="content-tab-grid">
+                    <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
+                    <div class="content-tab-field"><span class="content-tab-key">Perms</span><span class="content-tab-val">[${(cap.perms || []).join(', ')}]</span></div>
+                </div>
+                <div class="content-tab-desc">Callable via CALL instruction with E permission. Domain separation enforced — capabilities never leak into data registers.</div>
+            </div>`
+        };
+    }
+
+    if (objType === 'Null') {
+        return {
+            label: 'Null',
+            tooltip: 'NULL Golden Token — empty/invalid/revoked',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">NULL Token</div>
+                <div class="content-tab-desc">GT Type 10 (NULL) — unambiguous initialization, clean revocation, and GC clarity. No namespace entry is referenced.</div>
+            </div>`
+        };
+    }
+
+    const hasFallbackCList = cap.clist && cap.clist.length > 0;
+    if (hasFallbackCList) {
+        const entries = cap.clist;
+        const count = entries.length;
+        return {
+            label: `Contents (${count})`,
+            tooltip: `${objType} entries`,
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">${capName} [${objType}]</div>
+                <div class="clist-tab-header"><span class="clist-tab-count">${count} entries</span></div>
+                <div class="clist-tab-entries">${renderCListEntries(entries, capName)}</div>
+            </div>`
+        };
+    }
+
+    return {
+        label: 'Info',
+        tooltip: 'Object information',
+        html: `<div class="content-tab-section">
+            <div class="content-tab-heading">${capName}</div>
+            <div class="content-tab-grid">
+                <div class="content-tab-field"><span class="content-tab-key">Type</span><span class="content-tab-val">${objType}</span></div>
+                <div class="content-tab-field"><span class="content-tab-key">Perms</span><span class="content-tab-val">[${(cap.perms || []).join(', ')}]</span></div>
+            </div>
+        </div>`
+    };
+}
+
 function showCapabilityDetail(evt, cap, regLabel) {
     document.querySelectorAll('.token-card').forEach(c => c.classList.remove('selected'));
     if (evt && evt.currentTarget) {
@@ -1914,41 +2114,13 @@ function showCapabilityDetail(evt, cap, regLabel) {
             </div>
         </div>`;
 
-    let clistTabHtml = '';
-    if (hasCList) {
-        const parentName = cap.name;
-        const clistEntries = cap.clist.map((entry, i) => {
-            const allP = ['R', 'W', 'X', 'L', 'S', 'E'];
-            const badges = allP.map(p => {
-                const has = entry.perms && entry.perms.includes(p);
-                return `<span class="perm-badge perm-${p.toLowerCase()} ${has ? '' : 'inactive'}">${p}</span>`;
-            }).join('');
-            const nsOff = entry.nsOffset !== undefined ? `0x${entry.nsOffset.toString(16).toUpperCase()}` : '--';
-            const isExec = entry.perms && entry.perms.includes('X');
-            const execClass = isExec ? ' clist-tab-executable' : '';
-            const execAttr = isExec ? ` data-func-name="${entry.name}" data-parent="${parentName}"` : '';
-            const execHint = isExec ? ' — Click to view code' : '';
-            return `<div class="clist-tab-entry${execClass}"${execAttr} data-tooltip="${entry.type || 'Object'}: ${entry.name} at NS offset ${nsOff}${execHint}">
-                <span class="clist-tab-idx">[${i}]</span>
-                <span class="clist-tab-name">${entry.name}</span>
-                <span class="clist-tab-perms">${badges}</span>
-                <span class="clist-tab-offset">${nsOff}</span>
-            </div>`;
-        }).join('');
+    const contentTabInfo = getContentTabInfo(cap);
 
-        clistTabHtml = `<div class="clist-tab-content" id="clistTabContent" style="display:none;">
-            <div class="clist-tab-header">
-                <span class="clist-tab-count">${clistCount} entries</span>
-            </div>
-            <div class="clist-tab-entries">${clistEntries}</div>
-        </div>`;
-    }
-
-    const tabBarHtml = hasCList ? `
+    const tabBarHtml = `
         <div class="cap-detail-tabs">
             <button class="cap-detail-tab active" onclick="switchCapDetailTab('gt', this)" data-tooltip="Golden Token and Namespace Descriptor">GT</button>
-            <button class="cap-detail-tab" onclick="switchCapDetailTab('clist', this)" data-tooltip="C-List entries owned by this capability">GT-List (${clistCount})</button>
-        </div>` : '';
+            <button class="cap-detail-tab" onclick="switchCapDetailTab('content', this)" data-tooltip="${contentTabInfo.tooltip}">${contentTabInfo.label}</button>
+        </div>`;
 
     panel.innerHTML = `
         <div class="cap-title-bar">
@@ -1961,7 +2133,7 @@ function showCapabilityDetail(evt, cap, regLabel) {
         </div>
         ${tabBarHtml}
         <div id="gtTabContent">${wordStackHtml}</div>
-        ${clistTabHtml}
+        <div id="contentTabContent" style="display:none;">${contentTabInfo.html}</div>
     `;
 
     panel.querySelectorAll('.clist-tab-executable').forEach(el => {
@@ -1977,13 +2149,13 @@ function switchCapDetailTab(tab, btn) {
     document.querySelectorAll('.cap-detail-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     const gtContent = document.getElementById('gtTabContent');
-    const clistContent = document.getElementById('clistTabContent');
+    const contentTab = document.getElementById('contentTabContent');
     if (tab === 'gt') {
         if (gtContent) gtContent.style.display = '';
-        if (clistContent) clistContent.style.display = 'none';
+        if (contentTab) contentTab.style.display = 'none';
     } else {
         if (gtContent) gtContent.style.display = 'none';
-        if (clistContent) clistContent.style.display = '';
+        if (contentTab) contentTab.style.display = '';
     }
 }
 
