@@ -2118,8 +2118,8 @@ function showCapabilityDetail(evt, cap, regLabel) {
 
     const tabBarHtml = `
         <div class="cap-detail-tabs">
-            <button class="cap-detail-tab active" onclick="switchCapDetailTab('gt', this)" data-tooltip="Golden Token and Namespace Descriptor">GT</button>
-            <button class="cap-detail-tab" onclick="switchCapDetailTab('content', this)" data-tooltip="${contentTabInfo.tooltip}">${contentTabInfo.label}</button>
+            <button class="cap-detail-tab" onclick="switchCapDetailTab('gt', this)" data-tooltip="Golden Token and Namespace Descriptor">GT</button>
+            <button class="cap-detail-tab active" onclick="switchCapDetailTab('content', this)" data-tooltip="${contentTabInfo.tooltip}">${contentTabInfo.label}</button>
         </div>`;
 
     panel.innerHTML = `
@@ -2132,8 +2132,8 @@ function showCapabilityDetail(evt, cap, regLabel) {
             </div>
         </div>
         ${tabBarHtml}
-        <div id="gtTabContent">${wordStackHtml}</div>
-        <div id="contentTabContent" style="display:none;">${contentTabInfo.html}</div>
+        <div id="gtTabContent" style="display:none;">${wordStackHtml}</div>
+        <div id="contentTabContent">${contentTabInfo.html}</div>
     `;
 
     panel.querySelectorAll('.clist-tab-executable').forEach(el => {
