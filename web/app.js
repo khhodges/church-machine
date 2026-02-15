@@ -7942,7 +7942,7 @@ ADDI 8 109    ; DR8 = 'm' (ASCII 109)</pre>
                 <ol style="font-size: 0.85rem;">
                     <li><strong>Decrypts</strong> the payload using the matching tunnel key</li>
                     <li><strong>Validates</strong> the payload MAC (HMAC-SHA256)</li>
-                    <li><strong>ABI maps</strong> the incoming data: x10='H', x11='e', x12='l', etc.</li>
+                    <li><strong>ABI maps</strong> the incoming data: x10='H', x11='e', x12='l', x13='l', x14='o', x15=' ', x16='M', x17='u', x18='m'</li>
                     <li><strong>Stores</strong> the message in the Inbox via CAP.STORE (W permission on CR2)</li>
                     <li><strong>Returns</strong> acknowledgment in x10 (ack code: MESSAGE_RECEIVED)</li>
                 </ol>
@@ -7954,16 +7954,14 @@ ADDI 8 109    ; DR8 = 'm' (ASCII 109)</pre>
                 <div class="demo-content">
                     <pre style="background: #1e1e2e; padding: 0.6rem; border-radius: 6px; font-size: 0.7rem; color: #e2e8f0;">; mymother's RV32-Cap messaging service
 ; Arguments arrive per ABI descriptor:
-;   x10 = 'H'  x11 = 'e'  x12 = 'l'
-;   x13 = 'l'  x14 = 'o'  x15 = 'M'
-
-; Validate message type
-BEQ   x13, x0, fault      ; type 0 invalid
+;   x10='H' x11='e' x12='l' x13='l' x14='o'
+;   x15=' ' x16='M' x17='u' x18='m'
 
 ; Store in Inbox (capability-protected)
 CAP.LOAD  CR2, CR6, 7     ; CR2 = Inbox [R,W]
 CAP.STORE CR2, x10, 0     ; Write 'H'
 CAP.STORE CR2, x11, 4     ; Write 'e'
+; ... store remaining chars ...
 
 ; Return acknowledgment
 ADDI  x10, x0, 1          ; ack = MESSAGE_RECEIVED
@@ -7975,10 +7973,10 @@ RETURN                     ; Back through tunnel</pre>
                 <p>Every single step in the Hello Mum flow passes through mLoad. Every check that fails triggers a uniform <strong>FAULT</strong> &mdash; unrecoverable, no information leakage:</p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.7rem; margin: 0.5rem 0;">
                     <tr style="background: var(--bg-tertiary);"><th style="padding: 0.3rem;">Step</th><th>Check</th><th>Failure</th></tr>
-                    <tr><td>LOAD CR0</td><td>L perm on CR6</td><td style="color: #f87171;">FAULT: PERMISSION</td></tr>
+                    <tr><td>LOAD CR0</td><td>M on CR6 (elevated by CALL)</td><td style="color: #f87171;">FAULT: PERMISSION</td></tr>
                     <tr style="background: var(--bg-tertiary);"><td>LOAD CR0</td><td>MAC on entry 0</td><td style="color: #f87171;">FAULT: MAC</td></tr>
                     <tr><td>LOAD CR0</td><td>Version on entry 0</td><td style="color: #f87171;">FAULT: VERSION</td></tr>
-                    <tr style="background: var(--bg-tertiary);"><td>LOAD CR1</td><td>L perm, MAC, version</td><td style="color: #f87171;">FAULT (same chain)</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><td>LOAD CR1</td><td>M on CR6, MAC, version</td><td style="color: #f87171;">FAULT (same chain)</td></tr>
                     <tr><td>CALL CR1</td><td>E perm on CR1</td><td style="color: #f87171;">FAULT: PERMISSION</td></tr>
                     <tr style="background: var(--bg-tertiary);"><td>CALL CR1</td><td>R perm on tunnel key</td><td style="color: #f87171;">FAULT: PERMISSION</td></tr>
                     <tr><td>CALL CR1</td><td>Encryption with key</td><td style="color: #f87171;">FAULT: CRYPTO</td></tr>
