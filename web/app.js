@@ -4318,6 +4318,8 @@ function loadExample(name) {
 }
 
 function setupHelloMumNamespace() {
+    ensureBooted();
+
     const tunnelKey = simulator.createCapability("Tunnel_Key_Mum", ["R"]);
     tunnelKey.type = "Inform";
     tunnelKey.tunnelEndpoint = "mymother.namespace.local";
@@ -4337,7 +4339,7 @@ function setupHelloMumNamespace() {
         ret_map: "x10→DR0"
     };
 
-    const meCList = simulator.createCapability("Me_CList", ["E"]);
+    const meCList = simulator.createCapability("Me_CList", ["L", "S", "E"]);
     meCList.type = "Inform";
     meCList.clist = [tunnelKey, mumService, abiDescriptor];
 
