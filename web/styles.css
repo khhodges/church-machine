@@ -1148,6 +1148,67 @@ main {
     text-align: right;
 }
 
+.clist-tab-entry-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.clist-tab-expand {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    transition: transform 0.15s;
+    margin-left: auto;
+    min-width: 1rem;
+    text-align: center;
+}
+
+.clist-tab-entry-wrap.expanded .clist-tab-expand {
+    transform: rotate(90deg);
+}
+
+.clist-tab-words {
+    display: none;
+    padding: 0.25rem 0.4rem 0.35rem 2.2rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    gap: 0.2rem;
+    flex-direction: column;
+}
+
+.clist-tab-entry-wrap.expanded .clist-tab-words {
+    display: flex;
+}
+
+.clist-tab-entry-wrap.expanded .clist-tab-entry {
+    border-radius: 4px 4px 0 0;
+}
+
+.clist-word {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+}
+
+.clist-word-label {
+    color: var(--accent);
+    font-weight: 600;
+    min-width: 1.5rem;
+}
+
+.clist-word-desc {
+    color: var(--text-secondary);
+    min-width: 4rem;
+}
+
+.clist-word-val {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
 .content-tab-section {
     padding: 0.5rem;
 }

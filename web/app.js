@@ -1762,17 +1762,41 @@ function getContentTabInfo(cap) {
                 const has = entry.perms && entry.perms.includes(p);
                 return `<span class="perm-badge perm-${p.toLowerCase()} ${has ? '' : 'inactive'}">${p}</span>`;
             }).join('');
-            const nsOff = entry.nsOffset !== undefined ? `0x${entry.nsOffset.toString(16).toUpperCase()}` :
-                          entry.base !== undefined ? `0x${entry.base.toString(16).toUpperCase()}` : '--';
+
+            let w1 = '--', w2 = '--', w3 = '--';
+            const nsObj = entry.nsOffset !== undefined ? namespaceObjects.find(o => o.offset === entry.nsOffset) : null;
+            if (nsObj) {
+                w1 = `0x${nsObj.word1_location.toString(16).toUpperCase().padStart(4, '0')}`;
+                w2 = `0x${nsObj.word2_limit.toString(16).toUpperCase().padStart(4, '0')}`;
+                w3 = `0x${Number(nsObj.word3_seals || 0).toString(16).toUpperCase().padStart(8, '0')}`;
+            } else if (entry.base !== undefined) {
+                w1 = `0x${entry.base.toString(16).toUpperCase().padStart(4, '0')}`;
+                w2 = entry.size !== undefined ? `0x${entry.size.toString(16).toUpperCase().padStart(4, '0')}` : '--';
+                const entryType = entry.type || 'Abstraction';
+                const typeCode = Object.entries(OBJECT_TYPES).find(([k, v]) => v === entryType)?.[0] || 0x0004;
+                w3 = `0x${(Number(typeCode) << 16).toString(16).toUpperCase().padStart(8, '0')}`;
+            } else if (entry.word1_location !== undefined) {
+                w1 = `0x${entry.word1_location.toString(16).toUpperCase().padStart(4, '0')}`;
+                w2 = entry.word2_limit !== undefined ? `0x${entry.word2_limit.toString(16).toUpperCase().padStart(4, '0')}` : '--';
+                w3 = '--';
+            }
+
             const isExec = entry.perms && entry.perms.includes('X');
             const execClass = isExec ? ' clist-tab-executable' : '';
             const execAttr = isExec ? ` data-func-name="${entry.name}" data-parent="${parentName}"` : '';
             const execHint = isExec ? ' — Click to view code' : '';
-            return `<div class="clist-tab-entry${execClass}"${execAttr} data-tooltip="${entry.type || 'Object'}: ${entry.name}${entry.desc ? ' — ' + entry.desc : ''}${execHint}">
-                <span class="clist-tab-idx">[${i}]</span>
-                <span class="clist-tab-name">${entry.name}</span>
-                <span class="clist-tab-perms">${badges}</span>
-                <span class="clist-tab-offset">${nsOff}</span>
+            return `<div class="clist-tab-entry-wrap">
+                <div class="clist-tab-entry${execClass}"${execAttr} data-tooltip="${entry.type || 'Object'}: ${entry.name}${entry.desc ? ' — ' + entry.desc : ''}${execHint}" onclick="this.parentElement.classList.toggle('expanded')">
+                    <span class="clist-tab-idx">[${i}]</span>
+                    <span class="clist-tab-name">${entry.name}</span>
+                    <span class="clist-tab-perms">${badges}</span>
+                    <span class="clist-tab-expand">▸</span>
+                </div>
+                <div class="clist-tab-words">
+                    <div class="clist-word"><span class="clist-word-label">W1</span><span class="clist-word-desc">Location</span><span class="clist-word-val">${w1}</span></div>
+                    <div class="clist-word"><span class="clist-word-label">W2</span><span class="clist-word-desc">Limit</span><span class="clist-word-val">${w2}</span></div>
+                    <div class="clist-word"><span class="clist-word-label">W3</span><span class="clist-word-desc">Seals</span><span class="clist-word-val">${w3}</span></div>
+                </div>
             </div>`;
         }).join('');
     };
@@ -2137,7 +2161,8 @@ function showCapabilityDetail(evt, cap, regLabel) {
     `;
 
     panel.querySelectorAll('.clist-tab-executable').forEach(el => {
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
             const funcName = el.dataset.funcName;
             const parent = el.dataset.parent;
             if (funcName) openFunctionInEditor(funcName, parent);
