@@ -375,13 +375,13 @@ const bootCList = {
         { index: 0, name: "Access", nsOffset: 1, perms: ["X"], type: "Code", 
           desc: "Nucleus entry code", size: 0x1000 },
         // Index 1: Kenneth thread - GT pointing to NS offset 3
-        { index: 1, name: "Kenneth", nsOffset: 3, perms: ["L", "S"], type: "Thread", 
+        { index: 1, name: "Kenneth", nsOffset: 3, perms: [], type: "Thread", 
           desc: "Primary user identity", size: 0x0800 },
         // Index 2: Matthew thread - GT pointing to NS offset 4
-        { index: 2, name: "Matthew", nsOffset: 4, perms: ["L", "S"], type: "Thread", 
+        { index: 2, name: "Matthew", nsOffset: 4, perms: [], type: "Thread", 
           desc: "Secondary user identity", size: 0x0800 },
         // Index 3: Daniel thread - GT pointing to NS offset 5
-        { index: 3, name: "Daniel", nsOffset: 5, perms: ["L", "S"], type: "Thread", 
+        { index: 3, name: "Daniel", nsOffset: 5, perms: [], type: "Thread", 
           desc: "Tertiary user identity", size: 0x0800 },
         // Index 4: SlideRule abstraction - GT pointing to NS offset 6
         // E = Enter (external interface)
@@ -662,17 +662,17 @@ const bootSteps = [
     },
     {
         name: "Load Namespace",
-        description: "LOAD_NS CR15: Loading Namespace capability (offset 0, perms L+S)...",
+        description: "LOAD_NS CR15: Loading Namespace capability (offset 0, no GT perms — M elevated on CR by microcode)...",
         action: () => {
             // CR15 = GT pointing to Namespace offset 0 (self-reference)
-            // Namespace GT has L (Load) and S (Save) permissions for boot
+            // GT has NO permissions — M is elevated on CR15 by microcode only
             const nsEntry = getNSEntry(0);
             simulator.cr15 = {
                 name: "Namespace",
                 nsOffset: 0,
                 type: "System",
                 location: { type: "Local", offset: nsEntry.word1_location },
-                perms: ["M"],  // M only — Namespace is pure metadata, isolated from all RWXLSE
+                perms: [],  // No GT perms — M elevated on CR by microcode only
                 locked: true,
                 goldenKey: generateGoldenKey(),
                 word1: nsEntry.word1_location,
@@ -695,7 +695,7 @@ const bootSteps = [
                 nsOffset: kennethEntry.nsOffset,
                 type: "Thread",
                 location: { type: "Local", offset: kennethNS.word1_location },
-                perms: ["M"],  // M only — Thread is pure metadata, isolated from all RWXLSE
+                perms: [],  // No GT perms — M elevated on CR by microcode only
                 locked: false,
                 goldenKey: generateGoldenKey(),
                 word1: kennethNS.word1_location,
