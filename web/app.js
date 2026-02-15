@@ -922,7 +922,7 @@ function resetCPU() {
     setTimeout(() => {
         simulator.reset();
         simulator.clist = [];
-        dynamicObjects = [];
+        namespaceObjects = namespaceObjects.filter(o => !o.dynamic);
         bootState.step = 0;
         bootState.complete = false;
         updateBootDisplay();
@@ -955,7 +955,7 @@ function updateNamespaceDisplay() {
         'Abstraction': 'Protected abstraction containing function Golden Tokens.'
     };
     
-    const allObjects = [...namespaceObjects, ...dynamicObjects];
+    const allObjects = namespaceObjects;
     allObjects.forEach(obj => {
         // Look up permissions from Boot C-List (authoritative source for GTs)
         const gtEntry = getBootGT(obj.name);
@@ -990,7 +990,7 @@ function updateNamespaceDisplay() {
 
 function renderDynamicChildren(parentName) {
     let html = '';
-    const children = dynamicObjects.filter(o => o.parent === parentName);
+    const children = namespaceObjects.filter(o => o.dynamic && o.parent === parentName);
     const clistChildren = dynamicCLists[parentName] || [];
     
     if (children.length === 0 && clistChildren.length === 0) return '';
@@ -1102,7 +1102,7 @@ function buildHierarchyTree() {
     });
     
     html += '<div class="hier-group-label" data-tooltip="User-created objects in the Boot namespace.">Custom Objects</div>';
-    dynamicObjects.filter(obj => obj.parent === 'Boot').forEach(obj => {
+    namespaceObjects.filter(obj => obj.dynamic && obj.parent === 'Boot').forEach(obj => {
         const permsStr = obj.perms ? `[${obj.perms.join('')}]` : '';
         const baseStr = obj.location !== undefined ? `Base: 0x${obj.location.toString(16).toUpperCase()}` : '';
         const sizeStr = obj.size ? `Size: ${obj.size}` : '';
@@ -1936,8 +1936,7 @@ function getContentTabInfo(cap) {
     }
 
     if (objType === 'System' && capName === 'Namespace') {
-        const allNsObjects = [...namespaceObjects, ...dynamicObjects];
-        const nsEntries = allNsObjects.map(o => ({
+        const nsEntries = namespaceObjects.map(o => ({
             name: o.name,
             type: o.type,
             perms: o.perms || [],
@@ -4578,12 +4577,12 @@ function setupHelloMumNamespace() {
           tooltip: "Hello Mum C-List for \"me\" — holds Tunnel Key, Messaging, ABI." }
     ];
 
-    const baseOffset = namespaceObjects.length + dynamicObjects.filter(o => !o._helloMum).length;
+    const baseOffset = namespaceObjects.length;
 
-    dynamicObjects = dynamicObjects.filter(o => !o._helloMum);
+    namespaceObjects = namespaceObjects.filter(o => !o._helloMum);
 
     helloMumNsEntries.forEach((entry, i) => {
-        dynamicObjects.push({
+        namespaceObjects.push({
             offset: baseOffset + i,
             name: entry.name,
             type: entry.type,
@@ -8542,7 +8541,6 @@ let contextMenuState = {
     editMode: false
 };
 
-let dynamicObjects = [];
 let nextAddress = 0x8000;
 let dynamicCLists = {};
 
@@ -8553,10 +8551,10 @@ let selectedObject = {
 
 function saveToStorage() {
     const state = {
-        dynamicObjects,
+        dynamicEntries: namespaceObjects.filter(o => o.dynamic),
         dynamicCLists,
         nextAddress,
-        namespaceModifications: namespaceObjects.map(o => ({
+        namespaceModifications: namespaceObjects.filter(o => !o.dynamic).map(o => ({
             name: o.name,
             type: o.type,
             size: o.size,
@@ -8571,18 +8569,20 @@ function loadFromStorage() {
         const saved = localStorage.getItem('ctmm_namespace_state');
         if (saved) {
             const state = JSON.parse(saved);
-            dynamicObjects = state.dynamicObjects || [];
-            dynamicCLists = state.dynamicCLists || {};
-            nextAddress = state.nextAddress || 0x8000;
             
-            // Normalize permissions on dynamic objects (enforces all validation rules)
-            dynamicObjects.forEach(obj => {
+            const dynamicEntries = state.dynamicEntries || state.dynamicObjects || [];
+            dynamicEntries.forEach(obj => {
                 if (obj.perms) {
                     obj.perms = normalizePermissions(obj.perms);
                 }
+                obj.dynamic = true;
             });
+            namespaceObjects = namespaceObjects.filter(o => !o.dynamic);
+            namespaceObjects.push(...dynamicEntries);
             
-            // Normalize C-List permissions
+            dynamicCLists = state.dynamicCLists || {};
+            nextAddress = state.nextAddress || 0x8000;
+            
             Object.keys(dynamicCLists).forEach(key => {
                 if (dynamicCLists[key] && dynamicCLists[key].forEach) {
                     dynamicCLists[key].forEach(entry => {
@@ -8595,7 +8595,7 @@ function loadFromStorage() {
             
             if (state.namespaceModifications) {
                 state.namespaceModifications.forEach(mod => {
-                    const obj = namespaceObjects.find(o => o.name === mod.name);
+                    const obj = namespaceObjects.find(o => o.name === mod.name && !o.dynamic);
                     if (obj) {
                         obj.type = mod.type;
                         obj.size = mod.size;
@@ -8613,7 +8613,7 @@ function loadFromStorage() {
 
 function clearStoredState() {
     localStorage.removeItem('ctmm_namespace_state');
-    dynamicObjects = [];
+    namespaceObjects = namespaceObjects.filter(o => !o.dynamic);
     dynamicCLists = {};
     nextAddress = 0x8000;
     log('Cleared stored namespace state', 'info');
@@ -8623,7 +8623,7 @@ function exportNamespaceState() {
     const state = {
         version: '1.0',
         exportDate: new Date().toISOString(),
-        dynamicObjects,
+        dynamicEntries: namespaceObjects.filter(o => o.dynamic),
         dynamicCLists,
         nextAddress,
         namespaceObjects: namespaceObjects.map(o => ({
@@ -8730,11 +8730,14 @@ function importNamespaceState(file) {
             const state = JSON.parse(e.target.result);
             
             // Normalize permissions on imported dynamic objects
-            if (state.dynamicObjects) {
-                state.dynamicObjects.forEach(obj => {
+            if (state.dynamicObjects || state.dynamicEntries) {
+                const entries = state.dynamicEntries || state.dynamicObjects;
+                entries.forEach(obj => {
                     if (obj.perms) obj.perms = normalizePermissions(obj.perms);
+                    obj.dynamic = true;
                 });
-                dynamicObjects = state.dynamicObjects;
+                namespaceObjects = namespaceObjects.filter(o => !o.dynamic);
+                namespaceObjects.push(...entries);
             }
             
             // Normalize permissions on imported C-Lists
@@ -9129,9 +9132,9 @@ function confirmDeleteCapability() {
     simulator.clist.splice(pendingDeleteIndex, 1);
     
     // Remove from dynamic objects if applicable
-    const dynIndex = dynamicObjects.findIndex(o => o.name === cap.name);
+    const dynIndex = namespaceObjects.findIndex(o => o.name === cap.name && o.dynamic);
     if (dynIndex >= 0) {
-        dynamicObjects.splice(dynIndex, 1);
+        namespaceObjects.splice(dynIndex, 1);
     }
     
     log(`Deleted capability "${pendingDeleteName}" from C-List`, 'info');
@@ -9145,11 +9148,11 @@ function confirmDeleteCapability() {
 
 function confirmObjectDelete() {
     const name = pendingDeleteName;
-    const dynObj = dynamicObjects.find(o => o.name === name);
+    const dynObj = namespaceObjects.find(o => o.name === name && o.dynamic);
     
     // Check if it's a built-in object - prevent deletion
     if (!dynObj) {
-        const builtIn = namespaceObjects.find(o => o.name === name);
+        const builtIn = namespaceObjects.find(o => o.name === name && !o.dynamic);
         if (builtIn) {
             log('Cannot delete built-in system objects', 'error');
             closeDeleteModal();
@@ -9234,15 +9237,11 @@ function confirmObjectModal() {
 }
 
 function findObject(name) {
-    let obj = namespaceObjects.find(o => o.name === name);
-    if (!obj) {
-        obj = dynamicObjects.find(o => o.name === name);
-    }
-    return obj;
+    return namespaceObjects.find(o => o.name === name);
 }
 
 function getAllObjects() {
-    return [...namespaceObjects, ...dynamicObjects];
+    return namespaceObjects;
 }
 
 function allocateAddress(size) {
@@ -9274,7 +9273,7 @@ function createObject(name, type, size, perms, parentName, description = '') {
         dynamic: true
     };
     
-    dynamicObjects.push(newObj);
+    namespaceObjects.push(newObj);
     
     addToCList(parentName, name, type, perms, description);
     
@@ -9311,7 +9310,7 @@ function findAllCListReferences(name) {
 }
 
 function updateObject(oldName, updates) {
-    let obj = dynamicObjects.find(o => o.name === oldName);
+    let obj = namespaceObjects.find(o => o.name === oldName && o.dynamic);
     let isBuiltIn = false;
     
     if (!obj) {
@@ -9369,7 +9368,7 @@ function updateObject(oldName, updates) {
         addToCList(updates.parent, updates.name, updates.type, updates.perms);
     }
     
-    dynamicObjects.forEach(child => {
+    namespaceObjects.filter(o => o.dynamic).forEach(child => {
         if (child.parent === oldName) {
             child.parent = updates.name;
         }
@@ -9404,14 +9403,14 @@ function syncSimulatorCapabilities(oldName, updates) {
 }
 
 function deleteObjectRecursive(name) {
-    const children = dynamicObjects.filter(o => o.parent === name);
+    const children = namespaceObjects.filter(o => o.dynamic && o.parent === name);
     children.forEach(child => {
         deleteObjectRecursive(child.name);
     });
     
-    const idx = dynamicObjects.findIndex(o => o.name === name);
+    const idx = namespaceObjects.findIndex(o => o.name === name && o.dynamic);
     if (idx >= 0) {
-        dynamicObjects.splice(idx, 1);
+        namespaceObjects.splice(idx, 1);
     }
     
     removeFromCLists(name);
@@ -9461,11 +9460,11 @@ function showDeleteObjectModal(objName, objType) {
 function analyzeObjectDeleteImpact(objName, objType) {
     const impacts = [];
     const obj = findObject(objName);
-    const dynObj = dynamicObjects.find(o => o.name === objName);
+    const dynObj = namespaceObjects.find(o => o.name === objName && o.dynamic);
     
     // Check if it's a built-in object
     if (!dynObj) {
-        const builtIn = namespaceObjects.find(o => o.name === objName);
+        const builtIn = namespaceObjects.find(o => o.name === objName && !o.dynamic);
         if (builtIn) {
             impacts.push({
                 message: '<strong>⛔ BUILT-IN OBJECT</strong> - This is a system object and cannot be deleted',
@@ -9509,7 +9508,7 @@ function analyzeObjectDeleteImpact(objName, objType) {
     }
     
     // Check for child objects
-    const children = dynamicObjects.filter(o => o.parent === objName);
+    const children = namespaceObjects.filter(o => o.dynamic && o.parent === objName);
     if (children.length > 0) {
         impacts.push({
             message: `<strong>${children.length} child object(s)</strong> will also be deleted: ${children.map(c => c.name).join(', ')}`,
@@ -9644,7 +9643,7 @@ function populateParentSelect() {
         select.innerHTML += `<option value="${name}">${name} (Abstraction)</option>`;
     });
     
-    dynamicObjects.filter(o => o.type === 'C-List' || o.type === 'Abstraction').forEach(obj => {
+    namespaceObjects.filter(o => o.dynamic && (o.type === 'C-List' || o.type === 'Abstraction')).forEach(obj => {
         select.innerHTML += `<option value="${obj.name}">${obj.name} (${obj.type})</option>`;
     });
 }
