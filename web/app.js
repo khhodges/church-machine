@@ -8069,17 +8069,24 @@ function renderCurrentStep() {
         interactiveContainer.innerHTML = '';
     }
     
-    // Update step indicator
+    // Update step indicators (top and bottom)
+    const stepText = `Step ${tutorialState.currentStep + 1} of ${lesson.steps.length}`;
     const stepIndicator = document.getElementById('stepIndicator');
-    if (stepIndicator) {
-        stepIndicator.textContent = `Step ${tutorialState.currentStep + 1} of ${lesson.steps.length}`;
-    }
+    const stepIndicatorBottom = document.getElementById('stepIndicatorBottom');
+    if (stepIndicator) stepIndicator.textContent = stepText;
+    if (stepIndicatorBottom) stepIndicatorBottom.textContent = stepText;
     
-    // Update button states
+    // Update button states (top and bottom)
     const prevBtn = document.getElementById('prevStepBtn');
     const nextBtn = document.getElementById('nextStepBtn');
-    if (prevBtn) prevBtn.disabled = tutorialState.currentStep === 0;
-    if (nextBtn) nextBtn.disabled = tutorialState.currentStep >= lesson.steps.length - 1;
+    const prevBtnBottom = document.getElementById('prevStepBtnBottom');
+    const nextBtnBottom = document.getElementById('nextStepBtnBottom');
+    const atFirst = tutorialState.currentStep === 0;
+    const atLast = tutorialState.currentStep >= lesson.steps.length - 1;
+    if (prevBtn) prevBtn.disabled = atFirst;
+    if (nextBtn) nextBtn.disabled = atLast;
+    if (prevBtnBottom) prevBtnBottom.disabled = atFirst;
+    if (nextBtnBottom) nextBtnBottom.disabled = atLast;
     
     tutorialState.hasUnsavedChanges = false;
     updateTutorialSaveButton();
