@@ -1935,6 +1935,28 @@ function getContentTabInfo(cap) {
         };
     }
 
+    if (objType === 'System' && capName === 'Namespace') {
+        const nsEntries = namespaceObjects.map(o => ({
+            name: o.name,
+            type: o.type,
+            perms: o.perms || [],
+            nsOffset: o.offset,
+            base: o.word1_location,
+            size: o.word2_limit,
+            desc: o.tooltip || ''
+        }));
+        const count = nsEntries.length;
+        return {
+            label: `Namespace (${count})`,
+            tooltip: 'Namespace Table — all entries in the DNA tree',
+            html: `<div class="content-tab-section">
+                <div class="content-tab-heading">Namespace Table (${count} entries)</div>
+                <div class="content-tab-desc">Root of all capability addressing. Each entry is a 3-word descriptor (Location, Limit, Seals). M elevated on CR15 by microcode — never stored in GT.</div>
+                <div class="clist-tab-entries" style="margin-top:0.4rem;">${renderCListEntries(nsEntries, 'Namespace')}</div>
+            </div>`
+        };
+    }
+
     if (objType === 'Null') {
         return {
             label: 'Null',
