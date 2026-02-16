@@ -4470,7 +4470,9 @@ function executeEditorInstruction(instr) {
                     }
                 }
                 const logLevel = faultOccurred ? 'error' : (String(target || '').toLowerCase() === 'fault' && !simulator.checkCondition(cond)) ? 'success' : 'exec';
+                traceRecord(line, op, args, result, editorState.currentLinkage);
                 editorLog(`[${line}] ${op} ${args.join(' ')}: ${result}`, logLevel);
+                updateTraceView();
                 updateEditorStatus();
                 return faultOccurred;
             }
@@ -4507,7 +4509,9 @@ function executeEditorInstruction(instr) {
                 } else {
                     result = `Branch not taken (${cond} failed)`;
                 }
+                traceRecord(line, op, args, result, editorState.currentLinkage);
                 editorLog(`[${line}] ${op} ${args.join(' ')}: ${result}`, faultOccurred ? 'error' : 'exec');
+                updateTraceView();
                 updateEditorStatus();
                 return faultOccurred;
             }
