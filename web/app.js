@@ -572,17 +572,6 @@ const abstractionCLists = {
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xAA40, size: 512 }
         ]
     },
-    CapabilityManager: {
-        name: "CapabilityManager",
-        mathType: "SYSTEM",
-        description: "Simplified capability forge — creates Data [RWX] or C-List [LSE] objects. API: DR0=type (0=Data, 1=C-List), DR1=size in words. Returns new GT in CR0.",
-        clist: [
-            { name: "GT_CREATE", type: "Function", perms: ["R", "X"], desc: "Create new object: DR0=type (0=Data, 1=C-List), DR1=size → CR0=new GT", base: 0xD100, size: 384 },
-            { name: "GT_DESTROY", type: "Function", perms: ["R", "X"], desc: "Destroy object: CR0=target GT → revokes and reclaims", base: 0xD280, size: 256 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0xD000, size: 256 },
-            { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xD380, size: 256 }
-        ]
-    },
     Mint: {
         name: "Mint",
         mathType: "FORGE",
