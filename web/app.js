@@ -4110,7 +4110,7 @@ function runOrContinue() {
 function runProgram(continueFromCurrent = false) {
   try {
     if (!continueFromCurrent) {
-        if (!ensureBooted()) return;
+        if (!autoBootIfNeeded()) return;
 
         const code = document.getElementById('codeEditor').value;
         editorState.program = parseProgram(code);
@@ -4185,8 +4185,23 @@ function runProgram(continueFromCurrent = false) {
   }
 }
 
+function autoBootIfNeeded() {
+    if (!bootState.complete) {
+        for (let i = bootState.step; i < 4; i++) {
+            executeBootStep(i);
+            bootState.step = i + 1;
+        }
+        bootState.complete = true;
+        updateBootDisplay();
+        updateDisplay();
+        updateCapabilityExplorer();
+        log('Auto-boot complete — system ready', 'success');
+    }
+    return true;
+}
+
 function stepProgram() {
-    if (!ensureBooted()) return;
+    if (!autoBootIfNeeded()) return;
 
     if (editorState.program.length === 0) {
         const code = document.getElementById('codeEditor').value;
@@ -4978,17 +4993,7 @@ function loadExample(name) {
         resetProgram();
         
         if (name === 'hello_mum') {
-            if (!bootState.complete) {
-                for (let i = bootState.step; i < 4; i++) {
-                    executeBootStep(i);
-                    bootState.step = i + 1;
-                }
-                bootState.complete = true;
-                updateBootDisplay();
-                updateDisplay();
-                updateCapabilityExplorer();
-                log('Auto-boot complete — system ready for Hello Mum', 'success');
-            }
+            autoBootIfNeeded();
             setupHelloMumNamespace();
         }
         
