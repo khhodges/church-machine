@@ -4484,9 +4484,20 @@ function executeEditorInstruction(instr) {
                 result = simulator.execute(op, args[0], args[1], args[2]);
                 break;
             
-            case 'LAMBDA':
+            case 'LAMBDA': {
+                const lambdaCR = simulator.contextRegs[args[0]];
                 result = simulator.execute(op, args[0], args[1]);
+                if (!result || !result.startsWith('FAULT')) {
+                    if (lambdaCR && lambdaCR.name !== 'NULL') {
+                        const lambdaLinkage = lambdaCR.linkage || `${lambdaCR.name}/Lambda.asm`;
+                        const lambdaPerms = lambdaCR.perms ? `[${lambdaCR.perms.join('')}]` : '[X]';
+                        editorState.currentLinkage = lambdaLinkage;
+                        editorState.currentPerms = lambdaPerms;
+                        updateEditorToolbar();
+                    }
+                }
                 break;
+            }
             
             case 'LABEL':
                 return false;
