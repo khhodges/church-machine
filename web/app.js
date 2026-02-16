@@ -4430,7 +4430,10 @@ function sendCtmmReply(replyText) {
             ]
         }
     };
-    localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(notification));
+    const existing = JSON.parse(localStorage.getItem('ctmm-tunnel-notification') || '[]');
+    const queue = Array.isArray(existing) ? existing : [];
+    queue.push(notification);
+    localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(queue));
     const overlay = document.getElementById('tunnelMsgOverlay');
     if (overlay) overlay.remove();
 }
@@ -4461,7 +4464,7 @@ function showTunnelMessage(direction, message, details, timestamp) {
             </div>
             <div class="tunnel-msg-body">
                 <div class="tunnel-msg-timestamp" style="color: ${color}">${timeStr}</div>
-                <div class="tunnel-msg-payload" style="border-color: ${color}; color: ${color}">
+                <div class="tunnel-msg-payload${message.length > 30 ? ' tunnel-long-msg' : ''}" style="border-color: ${color}; color: ${color}">
                     "${safeMessage}"
                 </div>
                 <div class="tunnel-reply-section">
@@ -4735,7 +4738,10 @@ function executeEditorInstruction(instr) {
                                 ]
                             }
                         };
-                        localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(tunnelNotification));
+                        const existingQ = JSON.parse(localStorage.getItem('ctmm-tunnel-notification') || '[]');
+                        const sendQ = Array.isArray(existingQ) ? existingQ : [];
+                        sendQ.push(tunnelNotification);
+                        localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(sendQ));
                         result += '\n  [NOTIFICATION] Sent to Priscilla (RV32-Cap) \u2014 check her Sim-32 page';
                     } else {
                         resolveCallTarget(callTargetName);
@@ -14218,11 +14224,19 @@ function checkRv32TunnelNotifications() {
     const raw = localStorage.getItem('rv32cap-tunnel-notification');
     if (!raw) return;
     try {
-        const notif = JSON.parse(raw);
-        if (notif && notif.target === 'ctmm' && !notif.seen) {
-            pendingTunnelMessages.push(notif);
-            notif.seen = true;
-            localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(notif));
+        const queue = JSON.parse(raw);
+        if (!Array.isArray(queue)) return;
+        let changed = false;
+        for (const notif of queue) {
+            if (notif && notif.target === 'ctmm' && !notif.seen) {
+                pendingTunnelMessages.push(notif);
+                notif.seen = true;
+                changed = true;
+            }
+        }
+        if (changed) {
+            const pruned = queue.filter(n => !n.seen || (Date.now() - (n.timestamp || 0)) < 300000);
+            localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(pruned));
             updateCtmmNotifyBadge();
         }
     } catch(e) {}

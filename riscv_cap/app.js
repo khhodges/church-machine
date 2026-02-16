@@ -942,13 +942,21 @@ function checkTunnelNotifications() {
     const raw = localStorage.getItem('ctmm-tunnel-notification');
     if (!raw) return;
     try {
-        const notif = JSON.parse(raw);
-        if (notif && notif.target === 'rv32cap' && !notif.seen) {
-            pendingTunnelMessages.push(notif);
-            notif.seen = true;
-            localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(notif));
+        const queue = JSON.parse(raw);
+        if (!Array.isArray(queue)) return;
+        let changed = false;
+        for (const notif of queue) {
+            if (notif && notif.target === 'rv32cap' && !notif.seen) {
+                pendingTunnelMessages.push(notif);
+                notif.seen = true;
+                changed = true;
+                appendConsole('[TUNNEL] Incoming message from Kenneth (CTMM) — click notification to view');
+            }
+        }
+        if (changed) {
+            const pruned = queue.filter(n => !n.seen || (Date.now() - (n.timestamp || 0)) < 300000);
+            localStorage.setItem('ctmm-tunnel-notification', JSON.stringify(pruned));
             updateNotifyBadge();
-            appendConsole('[TUNNEL] Incoming message from Kenneth (CTMM) — click notification to view');
         }
     } catch(e) {}
 }
@@ -983,7 +991,10 @@ function sendHelloSon() {
             ]
         }
     };
-    localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(notification));
+    const existingQ = JSON.parse(localStorage.getItem('rv32cap-tunnel-notification') || '[]');
+    const sendQ = Array.isArray(existingQ) ? existingQ : [];
+    sendQ.push(notification);
+    localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(sendQ));
     appendConsole('[TUNNEL] "Hello Son" sent to Kenneth (CTMM) via encrypted tunnel');
     appendConsole('[TUNNEL] Notification posted — Kenneth\'s CTMM page will show badge');
 }
@@ -1008,7 +1019,10 @@ function sendRv32Reply(replyText) {
             ]
         }
     };
-    localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(notification));
+    const existingRQ = JSON.parse(localStorage.getItem('rv32cap-tunnel-notification') || '[]');
+    const replyQ = Array.isArray(existingRQ) ? existingRQ : [];
+    replyQ.push(notification);
+    localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(replyQ));
     const overlay = document.getElementById('tunnelMsgOverlay');
     if (overlay) overlay.remove();
     appendConsole('[NOTIFICATION] "' + replyText.trim() + '" sent to Kenneth (CTMM)');
@@ -1047,7 +1061,7 @@ function showTunnelNotification() {
             </div>
             <div class="tunnel-msg-body">
                 <div class="tunnel-msg-timestamp">${timeStr}</div>
-                <div class="tunnel-msg-payload">"${safeMessage}"</div>
+                <div class="tunnel-msg-payload${message.length > 30 ? ' tunnel-long-msg' : ''}">"${safeMessage}"</div>
                 <div class="tunnel-reply-section">
                     <input type="text" class="tunnel-reply-input" id="tunnelReplyInput" placeholder="Type a reply to Kenneth..." maxlength="200">
                     <button class="tunnel-reply-btn" onclick="sendRv32Reply(document.getElementById('tunnelReplyInput').value)">Send Reply</button>

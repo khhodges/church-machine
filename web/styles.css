@@ -7117,6 +7117,20 @@ body.landing-mode .auth-section {
     background: rgba(0, 230, 118, 0.06);
     letter-spacing: 0.05em;
     font-family: 'Georgia', serif;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.tunnel-msg-payload.tunnel-long-msg {
+    font-size: 1.1rem;
+    letter-spacing: 0;
+    line-height: 1.5;
+    text-align: left;
+    padding: 0.75rem 1rem;
 }
 
 .tunnel-msg-flow {
