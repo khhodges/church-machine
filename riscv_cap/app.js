@@ -613,7 +613,23 @@ document.addEventListener('DOMContentLoaded', () => {
     updateUI();
 
     const savedAsm = localStorage.getItem('rv32cap-asm');
-    if (savedAsm) document.getElementById('asm-editor').value = savedAsm;
+    if (savedAsm) {
+        document.getElementById('asm-editor').value = savedAsm;
+    } else {
+        loadExample('access');
+    }
+
+    const editorSource = document.getElementById('asm-editor').value;
+    if (editorSource && editorSource.trim()) {
+        const result = asm.assemble(editorSource);
+        if (result.success) {
+            sim.reset();
+            sim.loadProgram(result.bytes);
+            codeLoaded = true;
+            appendConsole(`Auto-loaded ${result.bytes.length} bytes — Ready to Step or Run`);
+            updateUI();
+        }
+    }
 
     const editor = document.getElementById('asm-editor');
     const lineNums = document.getElementById('line-numbers');
