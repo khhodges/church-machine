@@ -51,11 +51,11 @@ class RiscVCapSimulator {
             { location: 0x00011800, limit: 0x000118FF, funcId: 'GT_SND', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00011900, limit: 0x000119FF, funcId: 'GT_IF', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00020000, limit: 0x000200FF, funcId: 'TunnelKey_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
-            { location: 0x00020100, limit: 0x000201FF, funcId: 'Son_Messaging', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1} },
+            { location: 0x00020100, limit: 0x000201FF, funcId: 'Son_Messaging', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1 },
             { location: 0x00020200, limit: 0x000202FF, funcId: 'ABI_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
             { location: 0x00020300, limit: 0x000206FF, funcId: 'Inbox', entryPerms: {R:1,W:1,X:0,L:0,S:0,E:0} },
             { location: 0x00020700, limit: 0x00020AFF, funcId: 'Outbox', entryPerms: {R:1,W:1,X:0,L:0,S:0,E:0} },
-            { location: 0x00020B00, limit: 0x00020BFF, funcId: 'Reply_Tunnel', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1} },
+            { location: 0x00020B00, limit: 0x00020BFF, funcId: 'Reply_Tunnel', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1 },
         ];
         for (let i = 0; i < defaults.length; i++) {
             const d = defaults[i];
@@ -66,6 +66,7 @@ class RiscVCapSimulator {
                 gBit: 0,
                 funcId: d.funcId || null,
                 entryPerms: d.entryPerms || null,
+                gtType: d.gtType || 0,
             };
         }
     }
@@ -572,12 +573,13 @@ class RiscVCapSimulator {
         }
         const entry = targetResult.entry;
         const perms = entry.entryPerms || clistResult.parsed.permissions;
+        const gtType = entry.gtType || 0;
         const loadedGT = this.createGT(
             (entry.versionSeals >>> 25) & 0x7F,
             index,
             { R: perms.R, W: perms.W, X: perms.X,
               L: perms.L, S: perms.S, E: perms.E },
-            0
+            gtType
         );
         this._writeCR(crDst, loadedGT, entry);
         this.pc = (this.pc + 4) >>> 0;
@@ -626,6 +628,26 @@ class RiscVCapSimulator {
             this.fault(targetResult.fault, `CALL: CR${crSrc}: ${targetResult.message}`);
             return;
         }
+
+        const parsed = targetResult.parsed;
+
+        if (parsed.type === 1) {
+            const entry = targetResult.entry;
+            const funcName = entry.funcId || `ns[${parsed.index}]`;
+            this.output += `[TUNNEL] Outform CALL via ${funcName} — encrypted tunnel to remote endpoint\n`;
+            this.output += `[TUNNEL] ABI mapping: x10-x15 (32-bit) ↔ DR0-DR5 (64-bit)\n`;
+            this.output += `[TUNNEL] Payload: x10=${this.x[10]}, x11=${this.x[11]}, x12=${this.x[12]}, x13=${this.x[13]}, x14=${this.x[14]}, x15=${this.x[15]}\n`;
+            const payload = [this.x[10], this.x[11], this.x[12], this.x[13], this.x[14], this.x[15]];
+            const msg = payload.map(c => String.fromCharCode(c & 0x7F)).join('');
+            this.output += `[TUNNEL] Message: "${msg}" → sent via encrypted tunnel\n`;
+            this.output += `[TUNNEL] Remote acknowledged — tunnel return\n`;
+            this.emit('output', this.output);
+            this.x[10] = 1;
+            this.pc = (this.pc + 4) >>> 0;
+            this.x[0] = 0;
+            return;
+        }
+
         if (this.callStack.length >= this.callStackMax) {
             this.fault('STACK_OVERFLOW', `CALL: call stack full (max ${this.callStackMax} frames)`);
             return;
@@ -638,7 +660,6 @@ class RiscVCapSimulator {
         });
         this.stackSpace = this.callStack.length < this.callStackMax;
         this.stackFrames = true;
-        const parsed = targetResult.parsed;
         const nsResult = this.mLoadByIndex(parsed.index);
         if (!nsResult.ok) {
             this.fault(nsResult.fault, `CALL: namespace entry ${parsed.index}: ${nsResult.message}`);

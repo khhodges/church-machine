@@ -864,7 +864,18 @@ class CTMMSimulator {
                 if (!callResult.ok) {
                     return `FAULT: ${callResult.fault}: CR${crIdx} - ${callResult.message}`;
                 }
-                
+
+                if (cr && cr.type === "Outform") {
+                    const drVals = [];
+                    for (let i = 0; i <= 5; i++) drVals.push(Number(this.dataRegs[i]));
+                    const msg = drVals.map(c => String.fromCharCode(c & 0x7F)).join('');
+                    this.dataRegs[0] = 1n;
+                    return `CALL CR${crIdx} (${cr.name}): [TUNNEL] Outform → encrypted tunnel to ${cr.remoteEndpoint || 'remote'}\n` +
+                        `  Payload: DR0-DR5 = ${drVals.join(', ')} ("${msg}")\n` +
+                        `  ABI mapping: DR0-DR15 (64-bit) → x0-x31 (32-bit)\n` +
+                        `  Remote acknowledged — tunnel return. DR0 = 1 (ACK)`;
+                }
+
                 this.callStack.push({
                     returnNIA: this.nia,
                     cr6: this.contextRegs[6] ? { ...this.contextRegs[6] } : null,
