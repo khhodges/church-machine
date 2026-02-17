@@ -67,6 +67,20 @@ def test_static(path):
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+DOCS_DIR = os.path.join(BASE_DIR, 'docs', 'figures')
+
+@app.route('/figures/')
+def figures_index():
+    resp = make_response(send_from_directory(DOCS_DIR, 'lambda-flow-diagram.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
+@app.route('/figures/<path:path>')
+def figures_static(path):
+    resp = make_response(send_from_directory(DOCS_DIR, path))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/')
 def landing_page():
     return send_from_directory(BASE_DIR, 'landing.html')
