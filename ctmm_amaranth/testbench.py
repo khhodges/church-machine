@@ -137,17 +137,17 @@ def run_testbench():
         cr8_perms = 0
         cr6_perms = PERM_MASK_E
         cr7_perms = PERM_MASK_X
-        cr5_perms = PERM_MASK_E
+        cr5_perms = PERM_MASK_L | PERM_MASK_S
         print(f"  CR15 (Namespace): perms=0x{cr15_perms:02x} (M only, transient)")
         print(f"  CR8  (Thread):    perms=0x{cr8_perms:02x} (M only, transient)")
         print(f"  CR6  (C-List):    perms=0x{cr6_perms:02x} (E only)")
         print(f"  CR7  (Nucleus):   perms=0x{cr7_perms:02x} (X)")
-        print(f"  CR5  (Services):  perms=0x{cr5_perms:02x} (E only)")
+        print(f"  CR5  (Services):  perms=0x{cr5_perms:02x} (L+S, C-List)")
         assert cr15_perms == 0, "CR15 GT should have no stored perms"
         assert cr8_perms == 0, "CR8 GT should have no stored perms"
         assert cr6_perms == PERM_MASK_E, "CR6 GT should have E only"
         assert cr7_perms == PERM_MASK_X, "CR7 GT should have X"
-        assert cr5_perms == PERM_MASK_E, "CR5 GT should have E only"
+        assert cr5_perms == (PERM_MASK_L | PERM_MASK_S), "CR5 GT should have L+S (C-List)"
         print("  PASS: All boot CR permissions match design spec")
 
         print("\n[TEST 6] LAMBDA Opcode & Encoding")

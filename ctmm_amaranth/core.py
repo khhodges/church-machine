@@ -385,7 +385,7 @@ class CTMMCore(Elaboratable):
                     cr5_gt_view.spare.eq(0),
                     cr5_gt_view.gt_type.eq(GT_TYPE_INFORM),
                     cr5_gt_view.g_bit.eq(0),
-                    cr5_gt_view.perms.eq(PERM_MASK_E),
+                    cr5_gt_view.perms.eq(PERM_MASK_L | PERM_MASK_S),
                 ]
                 m.d.comb += [boot_wr_en[5].eq(1), boot_wr_gt[5].eq(cr5_gt)]
 

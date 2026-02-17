@@ -30,7 +30,7 @@ The CTMM simulator offers both a Haskell console interface and a web-based visua
 -   **Golden Token Permissions**: 6 bits — R (Read), W (Write), X (Execute), L (Load), S (Save), E (Enter). M is transient (elevated by microcode on CR, never on GT). G is per-namespace-entry metadata.
 -   **Permission Domains**: Turing (R, W, X), Church (L, S), Lambda (E).
 -   **M Elevation Rule**: M is never stored in the GT — only on the CR during microcode execution. Microcode elevates M to perform privileged actions (LOAD, SAVE, CHANGE, etc.) then clears it. No user instruction can set, test, or observe M. See `docs/boot-permission-rules.md`.
--   **Boot CR Permissions**: CR15 (Namespace) = M only; CR8 (Thread) = M only; CR6 (Active C-List) = E only on GT, M elevated on CR by microcode; CR7 (Active Nucleus) = X (+R if constants); CR5 (Services) = E only.
+-   **Boot CR Permissions**: CR15 (Namespace) = M only; CR8 (Thread) = M only; CR6 (Active C-List) = E only on GT, M elevated on CR by microcode; CR7 (Active Nucleus) = X (+R if constants); CR5 (Services C-List) = L+S (C-List access).
 -   **Namespace Entry**: A 3-word descriptor (Location, Limit, Seals) with per-entry gBit for GC.
 -   **MAC Validation**: Hardware-enforced security check during `LOAD`. FNV hash MAC computation.
 -   **mLoad Master Validation**: Single trusted path for all namespace access – every Church instruction routes through mLoad, which enforces permission check, bounds check, MAC validation, G-bit reset, and thread table shadow update.
