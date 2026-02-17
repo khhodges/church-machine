@@ -93,6 +93,12 @@ def figures_lambda_calculus_mapping():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/lambda-clamp-example')
+def figures_lambda_clamp():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'lambda-clamp-example.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/<path:path>')
 def figures_static(path):
     resp = make_response(send_from_directory(FIGURES_DIR, path))
