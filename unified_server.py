@@ -99,6 +99,12 @@ def figures_lambda_clamp():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/tunnel-architecture')
+def figures_tunnel_architecture():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'tunnel-architecture.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/<path:path>')
 def figures_static(path):
     resp = make_response(send_from_directory(FIGURES_DIR, path))
