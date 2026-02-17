@@ -87,6 +87,12 @@ def figures_lambda_nesting():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/lambda-calculus-mapping')
+def figures_lambda_calculus_mapping():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'lambda-calculus-mapping.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/<path:path>')
 def figures_static(path):
     resp = make_response(send_from_directory(FIGURES_DIR, path))

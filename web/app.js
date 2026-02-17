@@ -13760,9 +13760,13 @@ function executeCodeSearch() {
 
 function loadFigure(url) {
     document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-    const dataFile = url === '/figures/' ? 'figures/lambda-flow' :
-                     url === '/figures/stack-frames' ? 'figures/stack-frames' :
-                     'figures/lambda-nesting';
+    const figMap = {
+        '/figures/': 'figures/lambda-flow',
+        '/figures/stack-frames': 'figures/stack-frames',
+        '/figures/lambda-nesting-sequence': 'figures/lambda-nesting',
+        '/figures/lambda-calculus-mapping': 'figures/lambda-calculus'
+    };
+    const dataFile = figMap[url] || url.replace(/^\//, '');
     const fileItem = document.querySelector(`.file-item[data-file="${dataFile}"]`);
     if (fileItem) fileItem.classList.add('active');
 
