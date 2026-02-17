@@ -34,7 +34,7 @@ The CTMM simulator offers both a Haskell console interface and a web-based visua
 -   **Namespace Entry**: A 3-word descriptor (Location, Limit, Seals) with per-entry gBit for GC.
 -   **MAC Validation**: Hardware-enforced security check during `LOAD`. FNV hash MAC computation.
 -   **mLoad Master Validation**: Single trusted path for all namespace access – every Church instruction routes through mLoad, which enforces permission check, bounds check, MAC validation, G-bit reset, and thread table shadow update.
--   **Boot Sequence**: A 4-step secure initialization process.
+-   **Boot Sequence**: A 5-phase hardware initialization (IDLE→FAULT_RST→LOAD_NS→INIT_THRD→LOAD_NUC→COMPLETE).
 -   **Failsafe Security**: All validation failures route to a single FAULT handler.
 -   **Deterministic Garbage Collection (PP250)**: Three-phase Mark-Scan-Sweep. Mark sets G=1 on all namespace entries. Scan walks DNA tree via mLoad (resets G=0 on reachable entries). Sweep identifies entries still G=1 as garbage, bumps version.
 -   **GT Type Field**: 2-bit field classifying GTs as Inform (00, local reference), Outform (01, remote reference), NULL (10, empty/invalid/revoked), or Spare (11, reserved). NULL provides unambiguous initialization, clean revocation, and GC clarity.

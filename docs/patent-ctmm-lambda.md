@@ -1,6 +1,6 @@
 # INITIAL PATENT SUBMISSION
 
-## Church-Turing Meta-Machine: Hardware-Enforced Lambda Calculus with the LAMBDA Instruction and NULL Capability Type
+## Church-Turing Meta-Machine: Hardware-Enforced Lambda Calculus with the LAMBDA Instruction, NULL Capability Type, and Atomic Abstraction Architecture
 
 ---
 
@@ -8,13 +8,13 @@
 
 **Filing Date**: February 12, 2026
 
-**Classification**: Computer Architecture; Hardware Security; Capability-Based Computing; Lambda Calculus Implementation
+**Classification**: Computer Architecture; Hardware Security; Capability-Based Computing; Lambda Calculus Implementation; Atomic Abstraction Architecture
 
 ---
 
 ## TITLE OF THE INVENTION
 
-Church-Turing Meta-Machine: Hardware-Enforced Lambda Calculus with the LAMBDA Instruction and NULL Capability Type
+Church-Turing Meta-Machine: Hardware-Enforced Lambda Calculus with the LAMBDA Instruction, NULL Capability Type, and Atomic Abstraction Architecture
 
 ---
 
@@ -26,7 +26,7 @@ This application relates to capability-based computer architecture, hardware-enf
 
 ## FIELD OF THE INVENTION
 
-The present invention relates generally to computer processor architecture and, more specifically, to a hardware architecture that unifies Church's lambda calculus with Turing's computational model through a dedicated lightweight LAMBDA instruction for in-scope code application, a NULL capability type for safe initialization and revocation, and self-describing stack frames with a 1-bit tag distinguishing LAMBDA frames from CALL frames, achieving both provable security guarantees and significant performance improvements for code reuse within a capability-based protection system.
+The present invention relates generally to computer processor architecture and, more specifically, to a hardware architecture that unifies Church's lambda calculus with Turing's computational model through: a dedicated lightweight LAMBDA instruction for in-scope code application; a NULL capability type for safe initialization and revocation; self-describing stack frames with a 1-bit tag distinguishing LAMBDA frames from CALL frames; three dispatch styles for abstraction method resolution; a transient M (Meta/Microcode) permission that provides privileged microcode access without a privileged hardware mode; a five-check mLoad validation sequence; a five-phase hardware boot sequence; and an atomic abstraction architecture that eliminates the operating system, virtual memory, privilege rings, and superuser — achieving both provable security guarantees (7 Zeroes) and significant performance improvements for code reuse within a capability-based protection system.
 
 ---
 
@@ -163,7 +163,7 @@ The synthesis is expressed as the **Church-Lambda-Object-Oriented-Meta-Calculus 
 | Church | L (Load), S (Save) | Capability transfer between C-Lists |
 | Lambda | E (Enter) | Protection domain crossing |
 
-A seventh permission, M (Meta), is transient — elevated by microcode during RETURN and CHANGE instructions, never stored in the GT itself.
+A seventh permission, M (Meta/Microcode), is transient — elevated on CRs by microcode to perform privileged actions (LOAD, SAVE, CHANGE, namespace walk during GC, etc.), then cleared when the microcode operation completes. M is never stored in the GT itself. No user instruction can set, test, or observe M — it is invisible to the instruction set architecture.
 
 ### 2. The Golden Token Format
 
@@ -384,6 +384,16 @@ The LAMBDA instruction maintains capability security through several mechanisms:
 
 The mLoad function is the single trusted path for all namespace access in the CTMM architecture. Every Church instruction (CAP.LOAD, CAP.SAVE, CAP.CALL, CAP.RETURN, CAP.CHANGE, CAP.SWITCH) routes through mLoad. This is the **Golden Rule**: mLoad is the sole path for all capability register writes that involve namespace dereferencing.
 
+The mLoad master validation sequence performs five checks in order:
+
+1. **Permission check**: Verify the GT carries the required permission for the operation
+2. **Bounds check**: Verify the target address falls within the namespace entry's Location..Limit range
+3. **MAC validation**: Compute FNV hash over the namespace entry and verify it matches the stored seal
+4. **G-bit reset**: Clear the garbage collection mark bit (G=0) on the accessed namespace entry, marking it as reachable
+5. **Thread table shadow update**: Update the thread's shadow C-List snippet (CR0-CR7 only) to reflect the new CR contents
+
+Any validation failure at any step routes to a single hardware FAULT handler. There are no partial states, no silent failures, and no fallback paths.
+
 The LAMBDA instruction is significant precisely because it provides a validated code execution path that **does not go through mLoad**. This is safe because:
 
 - LAMBDA does not write to capability registers — it branches to code and returns through data registers
@@ -573,9 +583,147 @@ The NULL type integrates cleanly with garbage collection:
 
 - **LAMBDA body GTs**: The GT used by LAMBDA (CRn with X permission) is a standard Inform GT that participates fully in garbage collection. If the code object's namespace entry is swept while a LAMBDA body is executing, the entry's version is bumped, but the executing code continues because the instruction stream is already loaded. The GT in CRn becomes stale and cannot be used for a subsequent LAMBDA — the next LAMBDA attempt would go through mLoad verification and FAULT on the version mismatch.
 
-### 10. Performance Analysis
+### 10. Three Dispatch Styles
 
-#### 10.1 Cycle Count Comparison
+The architecture provides three distinct styles for how an abstraction's nucleus (CR7) resolves method calls from its C-List (CR6). The abstraction's creator chooses the style based on security and performance requirements. Different abstractions in the same system can use different styles. Critically, the caller cannot distinguish which style is used — they always invoke via `CALL(Abstraction.Method(args))`.
+
+#### 10.1 Symbolic Resolver (High-Security)
+
+CR7 contains a dispatcher that reads symbolic method names from CR6's C-List and resolves them to code blocks at runtime. The method names in CR6 are capability entries with symbolic names (e.g., "Mint", "GC", "Lookup"), not code addresses. The caller never sees code addresses or internal structure — maximum isolation.
+
+This style is used by the Hello Mum canonical example for `CALL(Thread.Mint(type, size, access))`, where the caller has no visibility into whether Mint is local code, a delegation to the Namespace, or a chain of three abstraction calls.
+
+#### 10.2 LAMBDA Fast-Path
+
+CR7 contains code that uses the LAMBDA instruction to jump directly to method bodies. LAMBDA uses X permission (not E), operates in the same protection domain, and uses machine-status registers instead of the stack. Near-zero overhead (~2-3 cycles per invocation). This style is used by the SlideRule, Abacus, and Circle compute abstractions.
+
+#### 10.3 Traditional Compiled Binary
+
+CR7 contains a conventional compiled code object — a single binary with standard method offsets. Methods are reached via computed offsets from the code base address. This is the familiar programming model. The capability framework wraps it, but the internal dispatch is traditional. This style is used by the Access.asm example.
+
+#### 10.4 Significance for the LAMBDA Invention
+
+The three dispatch styles demonstrate that LAMBDA is not merely an optimization of CALL — it is a fundamentally different dispatch mechanism that enables an entirely new style of abstraction design. Style 2 (LAMBDA fast-path) is impossible without the LAMBDA instruction. It provides the fastest method dispatch while maintaining the full capability security model. The choice between Style 1 (symbolic resolver for maximum security), Style 2 (LAMBDA for maximum performance), and Style 3 (traditional binary for compatibility) is an architectural degree of freedom that enriches the capability model.
+
+### 11. Atomic Abstraction Architecture
+
+The CTMM eliminates four architectural pillars that every major cyberattack exploits:
+
+1. **No central operating system**: All system services are atomic abstractions accessed through Golden Tokens. There is no monolithic kernel with unrestricted hardware access.
+
+2. **No virtual memory**: Namespace entries *are* the memory model. The Location, Limit, and Seals fields of each 3-word namespace descriptor define the accessible region. mLoad enforces bounds on every access. Page tables, TLBs, and address space identifiers are unnecessary.
+
+3. **No privileged hardware mode**: There is no ring 0, no supervisor mode, no trap-to-kernel mechanism. mLoad is the single trusted gate that validates every namespace access — nobody bypasses it, not even the Nucleus.
+
+4. **No superuser / root**: No identity has universal access. Every access requires a valid GT with the correct permissions. Even system abstractions (Thread, Namespace) are accessed through GTs with restricted permissions, and their internal state is protected by M elevation that exists only transiently during microcode execution.
+
+These four eliminations produce the architecture's **7 Zeroes** security property:
+
+| Zero | Property | Why |
+|------|----------|-----|
+| 1 | Zero OS required | All services are atomic abstractions via GTs |
+| 2 | Zero virtual memory | Namespace entries are the memory model |
+| 3 | Zero privilege escalation | No privilege rings to escalate through |
+| 4 | Zero superuser / root | No identity bypasses mLoad |
+| 5 | Zero unauthorized code execution | Cannot execute without X permission on a valid GT |
+| 6 | Zero unauthorized data access | Cannot read/write without R/W permission on a valid GT |
+| 7 | Zero containment escape | Capability boundary is hardware — intelligence cannot forge GTs |
+
+### 12. Hello Mum — The Canonical Secure Communication Example
+
+The architecture's security properties are demonstrated by the "Hello Mum" example, which replaces "Hello World" as the canonical first program. Where Hello World (Unix, 1978) proves only that a process can output text — requiring a monolithic kernel, virtual memory, privilege rings, and root access — Hello Mum proves that two people can communicate securely across different machine architectures.
+
+```
+CALL(CONNECT(me, mymother))
+```
+
+This single Church instruction uses 3 Golden Tokens and achieves all 7 Zeroes: zero OS, zero VM, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, zero containment escape. The escalation paths exploited by malware, ransomware, and AI breakout are structurally eliminated — not mitigated by software, but absent from the hardware.
+
+The Hello Mum example is implemented as a bidirectional messaging system ("Hello Mum / Hello Son") between two simulated CTMM machines — Kenneth (CTMM, Sim-64) and Priscilla (RV32-Cap, Sim-32) — demonstrating secure cross-architecture communication through an encrypted capability tunnel with interactive notifications, timestamps, and reply capabilities.
+
+### 13. Abstraction Nesting and Resource Management
+
+#### 13.1 Mint as a Namespace Method
+
+Mint — the operation that creates new Golden Tokens — is a method of the Namespace abstraction, not a standalone abstraction. The Namespace owns all memory and is responsible for allocation, deallocation, and garbage collection. The API is:
+
+```
+GT_MINT(access, type, size) → new GT in CR0
+```
+
+Where DR0 = access rights (domain-pure: Turing [RWX] or Church [LSE], never both), DR1 = object type, DR2 = size. The returned GT respects domain separation — a Mint call cannot create a GT that mixes Turing and Church permissions.
+
+#### 13.2 Abstraction Nesting
+
+The caller accesses Mint through a chain of abstraction nesting:
+
+```
+Services C-List (CR5) → self [E] (Thread abstraction) → Namespace [E] → Mint(type, size, access)
+```
+
+The caller sees only `CALL(Thread.Mint(type, size, access))`. The internal delegation (self → Namespace → Mint) is hidden behind the abstraction boundary. This is the power of capability-based encapsulation: the caller cannot observe or bypass the internal nesting.
+
+#### 13.3 Thread as Resource Manager
+
+The Thread abstraction manages all per-thread scarce resources — memory budget, namespace slots, etc. It delegates to the Namespace for actual allocation but enforces budgets. The Thread reads CR8 internally for memory accounting. This ensures that resource limits are enforced by the Thread's own logic, not by a central OS scheduler or memory manager.
+
+### 14. Boot Sequence and Initial CR Permissions
+
+#### 14.1 Five-Phase Hardware Boot
+
+The architecture boots through a five-phase hardware sequence:
+
+| Phase | State | Action |
+|-------|-------|--------|
+| 0 | IDLE | Waiting for boot_start signal |
+| 1 | FAULT_RST | Clear all CRs, DRs, flags, exclusive monitors |
+| 2 | LOAD_NS | Load namespace GT into CR15 (the one wired GT — hardwired into the boot ROM) |
+| 3 | INIT_THRD | Initialize thread GT into CR8, services C-List into CR5 |
+| 4 | LOAD_NUC | Load nucleus code reference into CR7, active C-List into CR6 |
+| 5 | COMPLETE | Begin instruction fetch at NIA |
+
+Phase 1 (FAULT_RST) sets all capability registers to NULL type, providing the clean initialization guaranteed by Claim 2(a). Only phases 2-4 load valid GTs into specific CRs, and these loads go through mLoad validation (except CR15, which is the one hardwired bootstrap GT).
+
+#### 14.2 Boot CR Permissions
+
+Each context register receives specific permissions at boot, enforcing the principle of least privilege from the very first instruction:
+
+| Register | GT Permission | CR Elevation | Purpose |
+|----------|--------------|-------------|---------|
+| CR15 (Namespace) | None (zero RWXLSE) | M only | Pure metadata — microcode-only access |
+| CR8 (Thread) | None (zero RWXLSE) | M only | Pure metadata — identity, shadow, scheduling |
+| CR5 (Services) | E only | M added by microcode | Thread's gateway to available services |
+| CR6 (Active C-List) | E only | M added by microcode | Current abstraction's method names |
+| CR7 (Active Nucleus) | X (+R if constants) | — | Currently executing code |
+| CR0-CR4 | NULL | — | Available for user code |
+
+The key insight is that the Namespace (CR15) and Thread (CR8) carry **zero user-visible permissions** — they are pure metadata objects accessible only through M elevation during microcode execution. This means no user instruction can read, write, load, save, or enter the Namespace or Thread directly. All access is mediated by the microcode's trusted path.
+
+### 15. CHANGE and RETURN Semantics
+
+CHANGE (thread context switch) uses CALL microcode to push a call stack frame, preserving the current context before switching to a new thread. CALL and CHANGE both store the instruction address in the frame. RETURN adds the step size to the saved instruction address and checks E permission on the saved CR6 GT before performing revalidation through mLoad.
+
+This unified CALL/CHANGE/RETURN microcode ensures that thread switching has the same security guarantees as domain crossing — the saved context is protected by the capability stack, and the restored context is fully revalidated through mLoad.
+
+### 16. Hardware Implementation Evidence
+
+The architecture has been implemented in two hardware description languages, providing evidence of practical realizability:
+
+#### 16.1 Amaranth HDL Implementation
+
+16 synthesizable modules (~3,000 lines of Python) covering: top-level integration with 5-phase boot sequencer, 32-bit instruction decoder with Church/Turing split, CR0-CR15 (256-bit capability) and DR0-DR15 (64-bit data) register files, 6-bit permission validation, the mLoad trusted gate with full validation sequence, namespace write path, all 11 Church instructions (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LOADX, SAVEX, LDM, STM), deterministic garbage collection unit, and exclusive access monitor. The remaining modules (Turing ALU, branch unit, LAMBDA hardware, FNV MAC, bus adapter) are standard processor logic estimated at ~1,450 additional lines.
+
+#### 16.2 SystemVerilog Implementation
+
+A parallel implementation in SystemVerilog provides the same architectural coverage and serves as a reference for traditional FPGA/ASIC design flows.
+
+#### 16.3 FPGA Target
+
+Resource estimates for Intel Cyclone V 5CSEBA6 (41,910 ALMs, 553 M10K blocks) indicate the CTMM core uses approximately 10% of chip resources, leaving substantial headroom for peripherals and memory controllers. The architecture is designed for integration with a RISC-V SoC base design, with two integration paths: (a) CTMM as a co-processor alongside an RV32I core, or (b) CTMM as a replacement for the RV32I pipeline using the existing peripheral infrastructure.
+
+### 17. Performance Analysis
+
+#### 17.1 Cycle Count Comparison
 
 | Operation | LAMBDA Path | CALL Path | Speedup |
 |-----------|-------------|-----------|---------|
@@ -586,7 +734,7 @@ The NULL type integrates cleanly with garbage collection:
 
 The speedup is largest for the common case: lightweight code reuse within a single protection domain. When CALL intervenes (cross-domain service invocation), the overhead of saving and restoring LAMBDA state reduces but does not eliminate the benefit.
 
-#### 10.2 The Machine-Status Fast Path Advantage
+#### 17.2 The Machine-Status Fast Path Advantage
 
 The key performance insight is that in the common case (LAMBDA → body → RETURN), zero stack access occurs:
 
@@ -661,11 +809,43 @@ The architecture of Claim 1, wherein a cryptographic key for a point-to-point RP
 
 The architecture of Claim 3, wherein the LAMBDA instruction enables a code body stored once in memory to be invoked from multiple call sites with near-zero overhead per invocation and without code duplication; wherein each invocation uses the machine-status fast path (zero stack access) when no CALL or CHANGE intervenes during the code body; and wherein the code body receives arguments and returns results through data registers, operating as a reusable function that achieves the performance characteristics of an inline macro without replicating the code base.
 
+### Claim 11 — Three Dispatch Styles for Abstraction Method Resolution
+
+The architecture of Claims 3 and 4, wherein an abstraction's nucleus code (held in CR7) may resolve method calls from the abstraction's C-List (held in CR6) using any of three dispatch styles, selected by the abstraction's creator and invisible to the caller:
+
+(a) a symbolic resolver style, wherein CR7 contains a dispatcher that reads symbolic method names from CR6 and resolves them to code blocks at runtime, providing maximum isolation because the caller never sees code addresses;
+
+(b) a LAMBDA fast-path style, wherein CR7 uses the LAMBDA instruction to jump directly to method bodies with X permission, zero stack access, and near-zero overhead;
+
+(c) a traditional compiled binary style, wherein CR7 contains a conventional code object with method offsets;
+
+wherein all three styles present the same interface to the caller (`CALL(Abstraction.Method(args))`), and the caller cannot determine which dispatch style is used; and wherein Style (b) is made possible exclusively by the LAMBDA instruction of Claim 3.
+
+### Claim 12 — Atomic Abstraction Architecture with Zero-OS Security
+
+The architecture of Claims 1 and 3, wherein the processor operates without a central operating system, without virtual memory, without privileged hardware modes, and without a superuser identity; wherein all system services are atomic abstractions accessed exclusively through Golden Tokens; wherein the mLoad validation path is the sole trusted gate for all namespace access and cannot be bypassed by any identity or instruction; and wherein the architecture provides seven security zeros: zero OS required, zero virtual memory, zero privilege escalation possible, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape.
+
+### Claim 13 — M Permission as Transient Microcode Elevation
+
+The architecture of Claim 1, further comprising a seventh permission bit M (Meta/Microcode) that exists only transiently on capability registers during microcode execution and is never stored in Golden Tokens; wherein the microcode elevates M on a CR to perform privileged actions including namespace reads (LOAD), namespace writes (SAVE), thread state updates (CHANGE), and garbage collection scanning; wherein M is cleared from the CR when the microcode operation completes; and wherein no user instruction can set, test, or observe M, making it invisible to the instruction set architecture; thereby providing privileged microcode access to metadata objects (Namespace, Thread) without requiring a privileged hardware mode, supervisor state, or kernel trap mechanism.
+
+### Claim 14 — mLoad Master Validation with Five-Check Sequence
+
+The architecture of Claims 1 and 12, wherein the mLoad validation path performs five sequential checks for every namespace access: (a) permission verification against the GT's permission field, (b) bounds verification against the namespace entry's Location and Limit fields, (c) MAC validation by computing an FNV hash over the namespace entry and comparing it to the stored seal, (d) G-bit reset to mark the accessed namespace entry as reachable for garbage collection, and (e) thread table shadow update to reflect the new CR contents in the thread's shadow C-List snippet (CR0-CR7 only); wherein failure at any check routes to a single hardware FAULT handler with no partial state, no silent failure, and no fallback path.
+
+### Claim 15 — Five-Phase Hardware Boot with NULL Initialization
+
+The architecture of Claims 1 and 2, wherein the processor boots through a five-phase hardware sequence: (0) IDLE, awaiting boot signal; (1) FAULT_RST, clearing all CRs to NULL type, all DRs to zero, all flags and exclusive monitors to initial state; (2) LOAD_NS, loading the namespace GT into CR15 from a hardwired bootstrap source; (3) INIT_THRD, initializing the thread GT into CR8 and the services C-List into CR5; (4) LOAD_NUC, loading the nucleus code reference into CR7 and the active C-List into CR6; (5) COMPLETE, beginning instruction fetch; wherein Phase 1 sets all capability registers to NULL type as guaranteed by Claim 2(a), and Phases 2-4 load valid GTs through the mLoad validation path (except CR15, the one hardwired bootstrap GT).
+
+### Claim 16 — Mint as Domain-Pure Namespace Method with Abstraction Nesting
+
+The architecture of Claim 1, wherein the operation to create new Golden Tokens (Mint) is a method of the Namespace abstraction accessed through a chain of abstraction nesting: Services C-List (CR5) → Thread abstraction (self, with E permission) → Namespace (with E permission) → Mint; wherein the caller invokes `CALL(Thread.Mint(type, size, access))` and the internal delegation is hidden behind capability boundaries; wherein the Mint operation enforces domain purity by requiring that access rights be either Turing-domain (any combination of R, W, X) or Church-domain (any combination of L, S, E), never a mixture of both domains; and wherein the Thread abstraction manages per-thread resource budgets (memory, namespace slots) before delegating to the Namespace for actual allocation.
+
 ---
 
 ## ABSTRACT
 
-A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Spare (reserved). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The LAMBDA instruction is non-nestable on its own (FAULT on double-LAMBDA) but supports controlled nesting through CALL mediation, where CALL saves and restores LAMBDA machine status as part of its frame. The architecture unifies capability-based security, lambda calculus code application, and practical code reuse in a single mechanism governed by a 2-bit type field, with the Church-Turing marriage expressed as: LAMBDA bridges Church (GT as λ) and Turing (DRs as computation) with X permission within a domain, while CALL bridges them with E permission across domains.
+A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Spare (reserved). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The architecture eliminates the four pillars of conventional insecurity — operating system, virtual memory, privilege rings, and superuser — replacing them with atomic abstractions accessed exclusively through Golden Tokens and a single trusted gate (mLoad) that performs five-check validation (permission, bounds, MAC, G-bit reset, thread shadow update) on every namespace access. A transient M (Meta/Microcode) permission, never stored in GTs, provides privileged microcode access to metadata objects without requiring a privileged hardware mode. Three dispatch styles — symbolic resolver (maximum security), LAMBDA fast-path (maximum performance), and traditional compiled binary (compatibility) — give abstraction creators control over the security/performance tradeoff while presenting a uniform interface to callers. The Mint operation enforces domain purity (Turing or Church permissions, never mixed) and is accessed through a chain of abstraction nesting hidden behind capability boundaries. A five-phase hardware boot sequence initializes all capability registers to NULL before loading valid GTs through mLoad. The architecture achieves seven security zeros: zero OS, zero virtual memory, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape. The architecture is implemented in synthesizable Amaranth HDL (16 modules, ~3,000 lines) and SystemVerilog, targeting FPGA implementation on Intel Cyclone V.
 
 ---
 
@@ -702,3 +882,27 @@ Annotated instruction sequence showing the clamp function invoked via LAMBDA wit
 ### Figure 8: Network-Transparent RPC via Namespace Tunnel Key
 
 Diagram showing two Meta Machines with matching namespace entries (same key material in Location/Limit fields), connected by an encrypted tunnel. Shows the namespace entry accessed via standard CAP.LOAD with R permission, the CALL instruction encrypting the payload, and the GC sweep revocation path (version bump invalidates the GT, killing the tunnel).
+
+### Figure 9: Three Dispatch Styles
+
+Three-column comparison showing the same caller instruction `CALL(Abstraction.Method(args))` resolved three different ways: (a) Symbolic Resolver — CR7 dispatcher reads symbolic name from CR6, resolves to code block, maximum isolation; (b) LAMBDA Fast-Path — CR7 code uses `LAMBDA CRn, x` to jump directly to method body, zero stack access, 2-3 cycles; (c) Traditional Compiled Binary — CR7 code object with method offsets, standard dispatch. Annotated with security level, performance, and example use cases.
+
+### Figure 10: Atomic Abstraction Architecture — 7 Zeroes
+
+Diagram contrasting conventional architecture (OS kernel, virtual memory, privilege rings, superuser — four attack surfaces) with CTMM architecture (atomic abstractions, namespace entries, mLoad trusted gate, Golden Tokens — zero attack surfaces). Shows the 7 Zeroes security properties and how each conventional attack vector is structurally eliminated.
+
+### Figure 11: Five-Phase Boot Sequence
+
+State machine diagram showing IDLE → FAULT_RST (clear all CRs to NULL) → LOAD_NS (hardwired GT into CR15) → INIT_THRD (thread GT into CR8, services into CR5) → LOAD_NUC (nucleus into CR7, C-List into CR6) → COMPLETE (begin fetch). Annotated with which CRs are written at each phase and their boot permissions.
+
+### Figure 12: mLoad Five-Check Validation Sequence
+
+Pipeline diagram showing the five sequential checks: Permission Check → Bounds Check → MAC Validation (FNV hash) → G-bit Reset → Thread Shadow Update. Shows the single FAULT handler that catches any validation failure at any stage, with no partial state or silent fallback.
+
+### Figure 13: Abstraction Nesting — Mint via Thread via Namespace
+
+Nested box diagram showing the caller's view (`CALL(Thread.Mint(type, size, access))`) and the hidden internal delegation: CR5 (Services) → self [E] (Thread abstraction) → Namespace [E] → Mint method. Shows how domain purity is enforced (Turing permissions OR Church permissions, never both) and how the Thread manages resource budgets before delegating.
+
+### Figure 14: Hello Mum — Secure Cross-Architecture Communication
+
+Diagram showing Kenneth's CTMM machine (Sim-64) and Priscilla's RV32-Cap machine (Sim-32) connected by an encrypted capability tunnel. Shows the single Church instruction `CALL(CONNECT(me, mymother))`, the 3 Golden Tokens involved, and the 7 Zeroes achieved. Annotated with the absence of OS, VM, privilege hardware, and superuser at every layer.
