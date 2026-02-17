@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 11: Boot Sequence State Machine — 5-Phase Hardware Initialization</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e17;
+    color: #c8d6e5;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 780px; }
+</style>
+</head>
+<body>
+
+<h1>Figure 11 &mdash; Boot Sequence State Machine</h1>
+<p class="subtitle">Five-phase hardware initialization. Each phase writes specific CRs with defined boot permissions. All loads go through mLoad validation except CR15 (the one hardwired bootstrap GT).</p>
+
+<svg viewBox="0 0 1100 1550" width="1100" height="1550" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#5dade2"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2ecc71"/>
+    </marker>
+    <marker id="ah-y" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f5c842"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
+    </marker>
+    <marker id="ah-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ecf0f1"/>
+    </marker>
+  </defs>
+
+  <style>
+    .mono { font-family:'Consolas','Courier New',monospace; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
+    .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .state-label { font-family:'Consolas',monospace; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .phase-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; font-weight:700; fill:#0a0e17; text-anchor:middle; dominant-baseline:central; }
+    .cr-tag { font-family:'Consolas',monospace; font-size:11px; font-weight:700; text-anchor:start; dominant-baseline:central; }
+    .perm { font-family:'Consolas',monospace; font-size:10px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+  </style>
+
+  <!-- ========== STATE MACHINE FLOW ========== -->
+
+  <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">STATE MACHINE: 5-PHASE HARDWARE BOOT SEQUENCE</text>
+
+  <!-- ===== Phase 0: IDLE ===== -->
+  <circle cx="110" cy="100" r="45" fill="#141a28" stroke="#8899aa" stroke-width="2"/>
+  <text class="state-label" x="110" y="93" fill="#8899aa">IDLE</text>
+  <text class="ls" x="110" y="110" fill="#555" font-size="10">Phase 0</text>
+
+  <!-- Annotation -->
+  <rect x="35" y="155" width="150" height="35" rx="4" fill="#0f1520" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="ls" x="110" y="167" fill="#8899aa">Awaiting boot signal</text>
+  <text class="ls" x="110" y="181" fill="#555">All hardware quiescent</text>
+
+  <!-- Arrow IDLE -> FAULT_RST -->
+  <line x1="155" y1="100" x2="225" y2="100" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+  <text class="ls" x="190" y="88" fill="#ecf0f1" font-size="10">boot signal</text>
+
+  <!-- ===== Phase 1: FAULT_RST ===== -->
+  <rect x="235" y="60" width="170" height="80" rx="12" fill="#2a0f0f" stroke="#e74c3c" stroke-width="2.5"/>
+  <circle cx="255" cy="80" r="12" fill="#e74c3c"/>
+  <text class="phase-num" x="255" y="80">1</text>
+  <text class="state-label" x="320" y="88" fill="#e74c3c">FAULT_RST</text>
+  <text class="ls" x="320" y="108" fill="#c8d6e5" font-size="10">Clear all registers</text>
+  <text class="ls" x="320" y="122" fill="#c8d6e5" font-size="10">Cold restart</text>
+
+  <!-- FAULT_RST detail box -->
+  <rect x="210" y="155" width="220" height="135" rx="6" fill="#1a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <text class="col-hdr" x="320" y="172" fill="#e74c3c">Actions</text>
+
+  <text class="cr-tag" x="225" y="195" fill="#e74c3c">CR0-CR15</text>
+  <text class="lt" x="300" y="195" fill="#c8d6e5">&#8594; NULL type (10)</text>
+
+  <text class="cr-tag" x="225" y="215" fill="#e74c3c">DR0-DR15</text>
+  <text class="lt" x="300" y="215" fill="#c8d6e5">&#8594; 0x0000000000000000</text>
+
+  <text class="cr-tag" x="225" y="235" fill="#e74c3c">Flags</text>
+  <text class="lt" x="300" y="235" fill="#c8d6e5">&#8594; cleared (N=Z=C=V=0)</text>
+
+  <text class="cr-tag" x="225" y="255" fill="#e74c3c">LAMBDA flag</text>
+  <text class="lt" x="320" y="255" fill="#c8d6e5">&#8594; 0</text>
+
+  <text class="cr-tag" x="225" y="275" fill="#e74c3c">Excl. monitors</text>
+  <text class="lt" x="330" y="275" fill="#c8d6e5">&#8594; released</text>
+
+  <!-- Arrow FAULT_RST -> LOAD_NS -->
+  <line x1="405" y1="100" x2="475" y2="100" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+
+  <!-- ===== Phase 2: LOAD_NS ===== -->
+  <rect x="485" y="60" width="170" height="80" rx="12" fill="#0f1a2a" stroke="#f5c842" stroke-width="2.5"/>
+  <circle cx="505" cy="80" r="12" fill="#f5c842"/>
+  <text class="phase-num" x="505" y="80">2</text>
+  <text class="state-label" x="570" y="88" fill="#f5c842">LOAD_NS</text>
+  <text class="ls" x="570" y="108" fill="#c8d6e5" font-size="10">Load namespace root</text>
+  <text class="ls" x="570" y="122" fill="#c8d6e5" font-size="10">Hardwired GT</text>
+
+  <!-- LOAD_NS detail box -->
+  <rect x="460" y="155" width="220" height="120" rx="6" fill="#0f1520" stroke="#f5c842" stroke-width="1"/>
+  <text class="col-hdr" x="570" y="172" fill="#f5c842">Actions</text>
+
+  <rect x="475" y="185" width="190" height="40" rx="4" fill="#1a1a0f" stroke="#f5c842" stroke-width="1.5"/>
+  <text class="cr-tag" x="485" y="200" fill="#f5c842">CR15</text>
+  <text class="lt" x="525" y="200" fill="#c8d6e5">&#8594; Namespace GT</text>
+  <text class="perm" x="570" y="218" fill="#f39c12">GT: &#8212; | CR: M</text>
+
+  <rect x="475" y="235" width="190" height="28" rx="4" fill="#2a1a0f" stroke="#f39c12" stroke-width="1" stroke-dasharray="4,2"/>
+  <text class="ls" x="570" y="249" fill="#f39c12">&#9888; HARDWIRED (no mLoad)</text>
+
+  <!-- Arrow LOAD_NS -> INIT_THRD -->
+  <line x1="655" y1="100" x2="725" y2="100" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+
+  <!-- ===== Phase 3: INIT_THRD ===== -->
+  <rect x="735" y="60" width="170" height="80" rx="12" fill="#0f1a15" stroke="#2ecc71" stroke-width="2.5"/>
+  <circle cx="755" cy="80" r="12" fill="#2ecc71"/>
+  <text class="phase-num" x="755" y="80">3</text>
+  <text class="state-label" x="820" y="88" fill="#2ecc71">INIT_THRD</text>
+  <text class="ls" x="820" y="108" fill="#c8d6e5" font-size="10">Initialize thread</text>
+  <text class="ls" x="820" y="122" fill="#c8d6e5" font-size="10">+ services C-List</text>
+
+  <!-- INIT_THRD detail box -->
+  <rect x="710" y="155" width="220" height="140" rx="6" fill="#0d1a15" stroke="#2ecc71" stroke-width="1"/>
+  <text class="col-hdr" x="820" y="172" fill="#2ecc71">Actions</text>
+
+  <rect x="725" y="185" width="190" height="40" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cr-tag" x="735" y="200" fill="#2ecc71">CR8</text>
+  <text class="lt" x="770" y="200" fill="#c8d6e5">&#8594; Thread GT</text>
+  <text class="perm" x="820" y="218" fill="#2ecc71">GT: &#8212; | CR: M</text>
+
+  <rect x="725" y="235" width="190" height="40" rx="4" fill="#0f2620" stroke="#c39bd3" stroke-width="1.5"/>
+  <text class="cr-tag" x="735" y="250" fill="#c39bd3">CR5</text>
+  <text class="lt" x="770" y="250" fill="#c8d6e5">&#8594; Services C-List GT</text>
+  <text class="perm" x="820" y="268" fill="#c39bd3">GT: E | CR: M (transient)</text>
+
+  <!-- Arrow INIT_THRD -> LOAD_NUC -->
+  <line x1="905" y1="100" x2="937" y2="100" stroke="#ecf0f1" stroke-width="2"/>
+  <line x1="937" y1="100" x2="937" y2="360" stroke="#ecf0f1" stroke-width="2"/>
+  <line x1="937" y1="360" x2="880" y2="360" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+
+  <!-- ===== Phase 4: LOAD_NUC ===== -->
+  <rect x="700" y="325" width="170" height="80" rx="12" fill="#0f1520" stroke="#5dade2" stroke-width="2.5"/>
+  <circle cx="720" cy="345" r="12" fill="#5dade2"/>
+  <text class="phase-num" x="720" y="345">4</text>
+  <text class="state-label" x="785" y="353" fill="#5dade2">LOAD_NUC</text>
+  <text class="ls" x="785" y="373" fill="#c8d6e5" font-size="10">Load nucleus code</text>
+  <text class="ls" x="785" y="387" fill="#c8d6e5" font-size="10">+ active C-List</text>
+
+  <!-- LOAD_NUC detail box -->
+  <rect x="660" y="420" width="240" height="155" rx="6" fill="#0f1520" stroke="#5dade2" stroke-width="1"/>
+  <text class="col-hdr" x="780" y="437" fill="#5dade2">Actions</text>
+
+  <rect x="675" y="450" width="210" height="40" rx="4" fill="#0f1a2a" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cr-tag" x="685" y="465" fill="#5dade2">CR7</text>
+  <text class="lt" x="720" y="465" fill="#c8d6e5">&#8594; Nucleus code GT</text>
+  <text class="perm" x="780" y="483" fill="#5dade2">GT: X (+R) | CR: &#8212;</text>
+
+  <rect x="675" y="500" width="210" height="40" rx="4" fill="#0f1a2a" stroke="#f39c12" stroke-width="1.5"/>
+  <text class="cr-tag" x="685" y="515" fill="#f39c12">CR6</text>
+  <text class="lt" x="720" y="515" fill="#c8d6e5">&#8594; Active C-List GT</text>
+  <text class="perm" x="780" y="533" fill="#f39c12">GT: E | CR: M (transient)</text>
+
+  <rect x="675" y="548" width="210" height="22" rx="4" fill="#0f1520" stroke="#2ecc71" stroke-width="1"/>
+  <text class="ls" x="780" y="559" fill="#2ecc71">NIA (PC) &#8594; 0x00000000</text>
+
+  <!-- Arrow LOAD_NUC -> COMPLETE -->
+  <line x1="700" y1="365" x2="580" y2="365" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+
+  <!-- ===== Phase 5: COMPLETE ===== -->
+  <rect x="400" y="325" width="170" height="80" rx="12" fill="#0f2620" stroke="#2ecc71" stroke-width="3"/>
+  <circle cx="420" cy="345" r="12" fill="#2ecc71"/>
+  <text class="phase-num" x="420" y="345">5</text>
+  <text class="state-label" x="485" y="353" fill="#2ecc71">COMPLETE</text>
+  <text class="ls" x="485" y="373" fill="#c8d6e5" font-size="10">Begin instruction fetch</text>
+  <text class="ls" x="485" y="387" fill="#2ecc71" font-size="10" font-weight="bold">Machine running</text>
+
+  <!-- COMPLETE detail box -->
+  <rect x="360" y="420" width="250" height="65" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <text class="col-hdr" x="485" y="437" fill="#2ecc71">Machine State</text>
+  <text class="lt" x="375" y="457" fill="#c8d6e5">Fetch from CR7 at NIA = 0</text>
+  <text class="lt" x="375" y="475" fill="#2ecc71" font-weight="bold">Boot code begins execution</text>
+
+  <!-- Fault arrow back -->
+  <line x1="400" y1="390" x2="320" y2="390" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <line x1="320" y1="390" x2="320" y2="145" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ah-r)"/>
+  <text class="ls" x="295" y="300" fill="#e74c3c" font-size="10" transform="rotate(-90 295 300)">any FAULT &#8594; restart</text>
+
+  <!-- ========== CR STATE SUMMARY TABLE ========== -->
+
+  <text class="ph" x="550" y="620" text-anchor="middle" fill="#f5c842">CONTEXT REGISTER STATE AT EACH PHASE</text>
+
+  <!-- Table headers -->
+  <rect x="30" y="640" width="90" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="col-hdr" x="75" y="656" fill="#f5c842">Register</text>
+
+  <rect x="120" y="640" width="140" height="32" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <text class="col-hdr" x="190" y="656" fill="#e74c3c">1: FAULT_RST</text>
+
+  <rect x="260" y="640" width="140" height="32" rx="4" fill="#0f1520" stroke="#f5c842" stroke-width="1"/>
+  <text class="col-hdr" x="330" y="656" fill="#f5c842">2: LOAD_NS</text>
+
+  <rect x="400" y="640" width="140" height="32" rx="4" fill="#0d1a15" stroke="#2ecc71" stroke-width="1"/>
+  <text class="col-hdr" x="470" y="656" fill="#2ecc71">3: INIT_THRD</text>
+
+  <rect x="540" y="640" width="140" height="32" rx="4" fill="#0f1520" stroke="#5dade2" stroke-width="1"/>
+  <text class="col-hdr" x="610" y="656" fill="#5dade2">4: LOAD_NUC</text>
+
+  <rect x="680" y="640" width="120" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="col-hdr" x="740" y="656" fill="#8899aa">GT Perms</text>
+
+  <rect x="800" y="640" width="130" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="col-hdr" x="865" y="656" fill="#8899aa">CR Elevation</text>
+
+  <rect x="930" y="640" width="140" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="col-hdr" x="1000" y="656" fill="#8899aa">Stability</text>
+
+  <!-- CR15 row -->
+  <rect x="30" y="676" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="693" fill="#f5c842">CR15</text>
+
+  <rect x="120" y="676" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="693" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="676" width="140" height="34" rx="0" fill="#1a1a0f" stroke="#f5c842" stroke-width="1.5"/>
+  <text class="cell mono" x="330" y="693" fill="#f5c842">&#9733; NS GT</text>
+
+  <rect x="400" y="676" width="140" height="34" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="470" y="693" fill="#555">&#8212;</text>
+
+  <rect x="540" y="676" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="610" y="693" fill="#555">&#8212;</text>
+
+  <rect x="680" y="676" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="740" y="693" fill="#8899aa">&#8212; (none)</text>
+
+  <rect x="800" y="676" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="865" y="693" fill="#f39c12">M only</text>
+
+  <rect x="930" y="676" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="693" fill="#2ecc71">Stable</text>
+
+  <!-- CR8 row -->
+  <rect x="30" y="710" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="727" fill="#2ecc71">CR8</text>
+
+  <rect x="120" y="710" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="727" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="710" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="330" y="727" fill="#555">&#8212;</text>
+
+  <rect x="400" y="710" width="140" height="34" rx="0" fill="#0d1a15" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cell mono" x="470" y="727" fill="#2ecc71">&#9733; Thread GT</text>
+
+  <rect x="540" y="710" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="610" y="727" fill="#555">&#8212;</text>
+
+  <rect x="680" y="710" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="740" y="727" fill="#8899aa">&#8212; (none)</text>
+
+  <rect x="800" y="710" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="865" y="727" fill="#f39c12">M only</text>
+
+  <rect x="930" y="710" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="727" fill="#2ecc71">Stable</text>
+
+  <!-- CR5 row -->
+  <rect x="30" y="744" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="761" fill="#c39bd3">CR5</text>
+
+  <rect x="120" y="744" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="761" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="744" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="330" y="761" fill="#555">&#8212;</text>
+
+  <rect x="400" y="744" width="140" height="34" rx="0" fill="#0d1a15" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cell mono" x="470" y="761" fill="#c39bd3">&#9733; Svc C-List</text>
+
+  <rect x="540" y="744" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="610" y="761" fill="#555">&#8212;</text>
+
+  <rect x="680" y="744" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="740" y="761" fill="#c39bd3">E only</text>
+
+  <rect x="800" y="744" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="865" y="761" fill="#f39c12">M (transient)</text>
+
+  <rect x="930" y="744" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="761" fill="#2ecc71">Stable</text>
+
+  <!-- CR6 row -->
+  <rect x="30" y="778" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="795" fill="#f39c12">CR6</text>
+
+  <rect x="120" y="778" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="795" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="778" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="330" y="795" fill="#555">&#8212;</text>
+
+  <rect x="400" y="778" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="470" y="795" fill="#555">&#8212;</text>
+
+  <rect x="540" y="778" width="140" height="34" rx="0" fill="#0f1520" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cell mono" x="610" y="795" fill="#f39c12">&#9733; Act C-List</text>
+
+  <rect x="680" y="778" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="740" y="795" fill="#f39c12">E only</text>
+
+  <rect x="800" y="778" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="865" y="795" fill="#f39c12">M (transient)</text>
+
+  <rect x="930" y="778" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="795" fill="#e8b86d">Dynamic</text>
+
+  <!-- CR7 row -->
+  <rect x="30" y="812" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="829" fill="#5dade2">CR7</text>
+
+  <rect x="120" y="812" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="829" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="812" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="330" y="829" fill="#555">&#8212;</text>
+
+  <rect x="400" y="812" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="470" y="829" fill="#555">&#8212;</text>
+
+  <rect x="540" y="812" width="140" height="34" rx="0" fill="#0f1520" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cell mono" x="610" y="829" fill="#5dade2">&#9733; Nucleus GT</text>
+
+  <rect x="680" y="812" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="740" y="829" fill="#5dade2">X (+R)</text>
+
+  <rect x="800" y="812" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="865" y="829" fill="#8899aa">&#8212;</text>
+
+  <rect x="930" y="812" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="829" fill="#e8b86d">Dynamic</text>
+
+  <!-- CR0-CR4 row -->
+  <rect x="30" y="846" width="90" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell-b" x="75" y="863" fill="#8899aa">CR0-CR4</text>
+
+  <rect x="120" y="846" width="140" height="34" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell mono" x="190" y="863" fill="#e74c3c">NULL</text>
+
+  <rect x="260" y="846" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="330" y="863" fill="#555">NULL</text>
+
+  <rect x="400" y="846" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="470" y="863" fill="#555">NULL</text>
+
+  <rect x="540" y="846" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="610" y="863" fill="#555">NULL</text>
+
+  <rect x="680" y="846" width="120" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="740" y="863" fill="#555">&#8212;</text>
+
+  <rect x="800" y="846" width="130" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="865" y="863" fill="#555">&#8212;</text>
+
+  <rect x="930" y="846" width="140" height="34" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <text class="cell" x="1000" y="863" fill="#8899aa">User-managed</text>
+
+  <!-- ========== VALIDATION PATH ========== -->
+
+  <text class="ph" x="550" y="920" text-anchor="middle" fill="#f5c842">VALIDATION PATH: mLoad vs HARDWIRED</text>
+
+  <rect x="30" y="940" width="1040" height="130" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+
+  <!-- CR15: hardwired -->
+  <rect x="55" y="960" width="470" height="48" rx="6" fill="#2a1a0f" stroke="#f39c12" stroke-width="1.5"/>
+  <text class="col-hdr" x="290" y="978" fill="#f39c12">CR15 (Namespace): HARDWIRED Bootstrap</text>
+  <text class="lt" x="70" y="998" fill="#a0b0c0">Loaded from fixed hardware address — the one exception to mLoad. This is the</text>
+
+  <!-- mLoad for everything else -->
+  <rect x="55" y="1018" width="990" height="42" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="col-hdr" x="550" y="1035" fill="#2ecc71">CR8, CR5, CR6, CR7: All loaded through mLoad validation</text>
+  <text class="ls" x="550" y="1052" fill="#2ecc71">Permission &#8594; Bounds &#8594; MAC &#8594; G-bit reset &#8594; Thread table shadow update</text>
+
+  <text class="lr" x="1020" y="978" fill="#f39c12">chicken-and-egg bootstrap.</text>
+
+  <!-- ========== KEY INSIGHTS ========== -->
+
+  <rect x="30" y="1090" width="1040" height="190" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <text class="ph" x="550" y="1115" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
+
+  <text class="lt" x="60" y="1145" fill="#e74c3c" font-size="13" font-weight="bold">Phase 1 guarantees clean slate (Claim 2a):</text>
+  <text class="lt" x="60" y="1165" fill="#a0b0c0" font-size="12">Every CR set to NULL type (10). Every DR zeroed. Every flag cleared. No residual state from previous</text>
+  <text class="lt" x="60" y="1183" fill="#a0b0c0" font-size="12">execution. A FAULT at any point during execution returns the machine to Phase 1 — total restart.</text>
+
+  <text class="lt" x="60" y="1208" fill="#f5c842" font-size="13" font-weight="bold">One hardwired GT — the bootstrap chicken-and-egg:</text>
+  <text class="lt" x="60" y="1228" fill="#a0b0c0" font-size="12">CR15 (Namespace root) cannot be loaded via mLoad because mLoad needs the Namespace to validate MACs.</text>
+  <text class="lt" x="60" y="1246" fill="#a0b0c0" font-size="12">This single hardwired GT is the only exception. Every subsequent load goes through mLoad validation.</text>
+
+  <text class="lt" x="60" y="1271" fill="#2ecc71" font-size="13" font-weight="bold">Strict ordering guarantees safety:</text>
+  <text class="lt" x="60" y="1291" fill="#a0b0c0" font-size="12">Phase 2 must complete before Phase 3 (Thread needs Namespace). Phase 3 before Phase 4 (Nucleus needs</text>
+  <text class="lt" x="60" y="1309" fill="#a0b0c0" font-size="12">Thread context). Each phase builds on the previous, and any failure at any point faults back to Phase 1.</text>
+
+  <!-- ========== BOOT PERMISSION LEGEND ========== -->
+
+  <rect x="30" y="1300" width="1040" height="230" rx="10" fill="#0a1015" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="ph" x="550" y="1325" text-anchor="middle" fill="#f5c842">BOOT PERMISSION DOMAIN MAP</text>
+
+  <!-- Metadata domain -->
+  <rect x="55" y="1345" width="320" height="80" rx="8" fill="#1a1a0f" stroke="#f39c12" stroke-width="1.5"/>
+  <text class="col-hdr" x="215" y="1365" fill="#f39c12">Metadata Domain (M only)</text>
+  <text class="lt" x="70" y="1388" fill="#c8d6e5" font-size="11">CR15 (Namespace): pure metadata</text>
+  <text class="lt" x="70" y="1408" fill="#c8d6e5" font-size="11">CR8 (Thread): pure metadata</text>
+
+  <!-- Capability domain -->
+  <rect x="395" y="1345" width="320" height="80" rx="8" fill="#1a0f1a" stroke="#c39bd3" stroke-width="1.5"/>
+  <text class="col-hdr" x="555" y="1365" fill="#c39bd3">Capability Domain (E + M transient)</text>
+  <text class="lt" x="410" y="1388" fill="#c8d6e5" font-size="11">CR5 (Services C-List): stable</text>
+  <text class="lt" x="410" y="1408" fill="#c8d6e5" font-size="11">CR6 (Active C-List): dynamic</text>
+
+  <!-- Execution domain -->
+  <rect x="735" y="1345" width="320" height="80" rx="8" fill="#0f1a2a" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="col-hdr" x="895" y="1365" fill="#5dade2">Execution Domain (X)</text>
+  <text class="lt" x="750" y="1388" fill="#c8d6e5" font-size="11">CR7 (Active Nucleus): dynamic</text>
+  <text class="lt" x="750" y="1408" fill="#c8d6e5" font-size="11">X = execute, optional R for constants</text>
+
+  <!-- Domain separation note -->
+  <rect x="55" y="1440" width="1000" height="35" rx="6" fill="#0f1520" stroke="#f5c842" stroke-width="1"/>
+  <text class="ls" x="555" y="1452" fill="#f5c842">CRs hold capabilities exclusively. DRs hold values exclusively. No mixing &#8212; "oil and water."</text>
+  <text class="ls" x="555" y="1468" fill="#f5c842">mLoad is the single gate between domains.</text>
+
+  <!-- User registers note -->
+  <rect x="55" y="1485" width="1000" height="28" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <text class="ls" x="555" y="1499" fill="#8899aa">CR0-CR4: remain NULL at boot. Populated by user code via mLoad (CAP.LOAD) during execution.</text>
+
+</svg>
+
+</body>
+</html>

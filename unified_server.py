@@ -117,6 +117,12 @@ def figures_conventional_vs_ctmm():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/boot-sequence-state-machine')
+def figures_boot_sequence():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'boot-sequence-state-machine.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/<path:path>')
 def figures_static(path):
     resp = make_response(send_from_directory(FIGURES_DIR, path))

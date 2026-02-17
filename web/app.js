@@ -13768,7 +13768,8 @@ function loadFigure(url) {
         '/figures/lambda-clamp-example': 'figures/lambda-clamp',
         '/figures/tunnel-architecture': 'figures/tunnel-arch',
         '/figures/dispatch-styles-comparison': 'figures/dispatch-styles',
-        '/figures/conventional-vs-ctmm': 'figures/conv-vs-ctmm'
+        '/figures/conventional-vs-ctmm': 'figures/conv-vs-ctmm',
+        '/figures/boot-sequence-state-machine': 'figures/boot-seq'
     };
     const dataFile = figMap[url] || url.replace(/^\//, '');
     const fileItem = document.querySelector(`.file-item[data-file="${dataFile}"]`);
