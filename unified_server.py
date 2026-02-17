@@ -67,31 +67,42 @@ def test_static(path):
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
-DOCS_DIR = os.path.join(BASE_DIR, 'docs', 'figures')
+FIGURES_DIR = os.path.join(BASE_DIR, 'docs', 'figures')
 
 @app.route('/figures/')
 def figures_index():
-    resp = make_response(send_from_directory(DOCS_DIR, 'lambda-flow-diagram.html'))
+    resp = make_response(send_from_directory(FIGURES_DIR, 'lambda-flow-diagram.html'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
 @app.route('/figures/stack-frames')
 def figures_stack_frames():
-    resp = make_response(send_from_directory(DOCS_DIR, 'stack-frames-diagram.html'))
+    resp = make_response(send_from_directory(FIGURES_DIR, 'stack-frames-diagram.html'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
 @app.route('/figures/lambda-nesting-sequence')
 def figures_lambda_nesting():
-    resp = make_response(send_from_directory(DOCS_DIR, 'lambda-nesting-sequence.html'))
+    resp = make_response(send_from_directory(FIGURES_DIR, 'lambda-nesting-sequence.html'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
 @app.route('/figures/<path:path>')
 def figures_static(path):
-    resp = make_response(send_from_directory(DOCS_DIR, path))
+    resp = make_response(send_from_directory(FIGURES_DIR, path))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
+
+@app.route('/docs/<path:filename>')
+def serve_doc(filename):
+    safe_name = os.path.basename(filename)
+    filepath = os.path.join(DOCS_DIR, safe_name)
+    if os.path.isfile(filepath):
+        resp = make_response(open(filepath, 'r').read())
+        resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
+    return Response('Not found', status=404)
 
 @app.route('/')
 def landing_page():

@@ -13633,6 +13633,8 @@ async function loadSourceFile(filename) {
 
 function displaySourceCode(code, filename) {
     const viewer = document.getElementById('codeViewerContent');
+    viewer.style.padding = '';
+    viewer.style.overflow = '';
     const lines = code.split('\n');
     const extension = filename.split('.').pop();
     
@@ -13752,6 +13754,26 @@ function executeCodeSearch() {
         header.insertBefore(resultsEl, header.firstChild.nextSibling);
     }
     resultsEl.textContent = matchCount > 0 ? `${matchCount} matches` : 'No matches';
+}
+
+// ==================== FIGURE VIEWER ====================
+
+function loadFigure(url) {
+    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+    const dataFile = url === '/figures/' ? 'figures/lambda-flow' :
+                     url === '/figures/stack-frames' ? 'figures/stack-frames' :
+                     'figures/lambda-nesting';
+    const fileItem = document.querySelector(`.file-item[data-file="${dataFile}"]`);
+    if (fileItem) fileItem.classList.add('active');
+
+    const label = fileItem ? fileItem.textContent.trim() : url;
+    document.getElementById('currentFileName').textContent = label;
+    currentSourceFile = dataFile;
+
+    const viewer = document.getElementById('codeViewerContent');
+    viewer.innerHTML = `<iframe src="${url}?t=${Date.now()}" style="width:100%;height:100%;border:none;background:#0a0e17;"></iframe>`;
+    viewer.style.padding = '0';
+    viewer.style.overflow = 'hidden';
 }
 
 // ==================== DOC FILE VIEWER ====================
