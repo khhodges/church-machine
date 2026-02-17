@@ -129,6 +129,12 @@ def figures_mload_pipeline():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/mint-abstraction-nesting')
+def figures_mint_nesting():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'mint-abstraction-nesting.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/<path:path>')
 def figures_static(path):
     resp = make_response(send_from_directory(FIGURES_DIR, path))

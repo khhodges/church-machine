@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 13: Mint Abstraction Nesting &amp; Domain Purity</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e17;
+    color: #c8d6e5;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 750px; }
+</style>
+</head>
+<body>
+
+<h1>Figure 13 &mdash; Mint Abstraction Nesting &amp; Domain Purity</h1>
+<p class="subtitle">The caller sees only CALL(Thread.Mint(type, size, access)). The internal delegation chain &mdash; CR5 &rarr; self [E] &rarr; Namespace [E] &rarr; Mint method &mdash; is completely hidden. Domain purity: Turing permissions (RWX) OR Church permissions (LSE), never both.</p>
+
+<svg viewBox="0 0 1000 1500" width="1000" height="1500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#5dade2"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2ecc71"/>
+    </marker>
+    <marker id="ah-y" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f5c842"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c39bd3"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#f39c12"/>
+    </marker>
+    <marker id="ah-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e8e8e8"/>
+    </marker>
+  </defs>
+
+  <style>
+    .mono { font-family:'Consolas','Courier New',monospace; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
+    .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:12px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .code { font-family:'Consolas',monospace; font-size:13px; fill:#2ecc71; text-anchor:middle; dominant-baseline:central; }
+    .code-sm { font-family:'Consolas',monospace; font-size:11px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <!-- ========== SECTION 1: CALLER'S VIEW ========== -->
+
+  <text class="ph" x="500" y="25" text-anchor="middle" fill="#f5c842">WHAT THE CALLER SEES</text>
+  <text class="ls" x="500" y="45">One instruction. No knowledge of internal structure.</text>
+
+  <rect x="200" y="60" width="600" height="90" rx="10" fill="#0f1a2a" stroke="#2ecc71" stroke-width="2.5" stroke-dasharray="0"/>
+  <text class="code" x="500" y="90" font-size="18" fill="#2ecc71" font-weight="700">CALL(Thread.Mint(type, size, access))</text>
+  <text class="ls" x="500" y="118">DR0 = access rights &bull; DR1 = object type &bull; DR2 = size &bull; Returns new GT in CR0</text>
+
+  <!-- Arrow down -->
+  <line x1="500" y1="150" x2="500" y2="195" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
+  <text class="ls" x="520" y="172" text-anchor="start" fill="#5dade2">But internally...</text>
+
+  <!-- ========== SECTION 2: NESTED BOXES — HIDDEN DELEGATION ========== -->
+
+  <text class="ph" x="500" y="215" text-anchor="middle" fill="#f5c842">HIDDEN INTERNAL DELEGATION CHAIN</text>
+  <text class="ls" x="500" y="235">Four nested layers. The caller never sees inside. Each layer enforces its own permissions.</text>
+
+  <!-- Outermost box: CR5 Services C-List -->
+  <rect x="50" y="255" width="900" height="520" rx="14" fill="#0c1220" stroke="#f39c12" stroke-width="2.5"/>
+  <text class="ph" x="80" y="280" text-anchor="start" fill="#f39c12">CR5 &mdash; Services C-List [E]</text>
+  <text class="lt" x="80" y="298" fill="#f39c12">Set at boot. Stable &mdash; does not change on CALL/RETURN.</text>
+  <text class="lt" x="80" y="314" fill="#a0b0c0">Contains the Thread's available services. Entry point for all resource requests.</text>
+
+  <!-- Permission badge for CR5 -->
+  <rect x="810" y="265" width="120" height="28" rx="4" fill="#1a1a1a" stroke="#f39c12" stroke-width="1"/>
+  <text class="cell-b" x="870" y="279" fill="#f39c12">E only</text>
+
+  <!-- Second box: self — Thread Abstraction -->
+  <rect x="90" y="335" width="820" height="420" rx="12" fill="#0e1628" stroke="#5dade2" stroke-width="2"/>
+  <text class="ph" x="120" y="360" text-anchor="start" fill="#5dade2">self [E] &mdash; Thread Abstraction</text>
+  <text class="lt" x="120" y="378" fill="#5dade2">The Thread's own abstraction, accessed via CR5.</text>
+  <text class="lt" x="120" y="394" fill="#a0b0c0">Manages per-thread scarce resources: memory budget, namespace slots.</text>
+  <text class="lt" x="120" y="410" fill="#a0b0c0">Enforces budgets before delegating to Namespace for actual allocation.</text>
+
+  <!-- Permission badge for self -->
+  <rect x="770" y="345" width="120" height="28" rx="4" fill="#1a1a1a" stroke="#5dade2" stroke-width="1"/>
+  <text class="cell-b" x="830" y="359" fill="#5dade2">E permission</text>
+
+  <!-- Budget check box -->
+  <rect x="130" y="425" width="340" height="100" rx="8" fill="#141e30" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text class="col-hdr" x="300" y="445" fill="#e74c3c">BUDGET ENFORCEMENT</text>
+  <text class="code-sm" x="145" y="468" fill="#e74c3c">if (request.size > thread.budget)</text>
+  <text class="code-sm" x="160" y="486" fill="#e74c3c">  &rarr; FAULT (resource exhausted)</text>
+  <text class="code-sm" x="145" y="506" fill="#a0b0c0">thread.budget -= request.size</text>
+
+  <!-- Domain purity check box -->
+  <rect x="500" y="425" width="380" height="100" rx="8" fill="#141e30" stroke="#c39bd3" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <text class="col-hdr" x="690" y="445" fill="#c39bd3">DOMAIN PURITY CHECK</text>
+  <text class="code-sm" x="515" y="468" fill="#c39bd3">if (has_turing(DR0) AND has_church(DR0))</text>
+  <text class="code-sm" x="530" y="486" fill="#c39bd3">  &rarr; FAULT (domain violation)</text>
+  <text class="code-sm" x="515" y="506" fill="#a0b0c0">Turing [RWX] xor Church [LSE]</text>
+
+  <!-- Arrow from budget/domain checks down -->
+  <line x1="300" y1="525" x2="300" y2="545" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <line x1="690" y1="525" x2="690" y2="545" stroke="#5dade2" stroke-width="1.5" marker-end="url(#ah)"/>
+  <text class="ls" x="500" y="540" fill="#2ecc71">both pass</text>
+
+  <!-- Third box: Namespace -->
+  <rect x="130" y="555" width="740" height="180" rx="10" fill="#101a28" stroke="#2ecc71" stroke-width="2"/>
+  <text class="ph" x="160" y="580" text-anchor="start" fill="#2ecc71">Namespace [E] &mdash; Memory Owner</text>
+  <text class="lt" x="160" y="598" fill="#2ecc71">Owns all memory. Responsible for allocation and garbage collection.</text>
+  <text class="lt" x="160" y="614" fill="#a0b0c0">Accessed via self. The Namespace contains all methods including Mint, GC, Lookup.</text>
+
+  <!-- Permission badge for Namespace -->
+  <rect x="730" y="565" width="120" height="28" rx="4" fill="#1a1a1a" stroke="#2ecc71" stroke-width="1"/>
+  <text class="cell-b" x="790" y="579" fill="#2ecc71">E permission</text>
+
+  <!-- Innermost box: Mint method -->
+  <rect x="170" y="630" width="660" height="88" rx="8" fill="#121e2e" stroke="#f5c842" stroke-width="2"/>
+  <text class="ph" x="200" y="655" text-anchor="start" fill="#f5c842">Mint(type, size, access) &mdash; Allocation Method</text>
+  <text class="lt" x="200" y="675" fill="#f5c842">Creates namespace entry (Location, Limit, Seals). Computes MAC. Sets gBit = 0.</text>
+  <text class="lt" x="200" y="695" fill="#a0b0c0">Returns new Golden Token in CR0 with requested permissions.</text>
+
+  <!-- Permission badge for Mint -->
+  <rect x="700" y="640" width="110" height="28" rx="4" fill="#1a1a1a" stroke="#f5c842" stroke-width="1"/>
+  <text class="cell-b" x="755" y="654" fill="#f5c842">via mLoad</text>
+
+  <!-- ========== SECTION 3: DELEGATION FLOW ARROWS (left side) ========== -->
+
+  <!-- Step labels on left margin -->
+  <rect x="10" y="275" width="28" height="28" rx="14" fill="#f39c12"/>
+  <text class="cell-b" x="24" y="289" fill="#0a0e17">1</text>
+
+  <rect x="10" y="355" width="28" height="28" rx="14" fill="#5dade2"/>
+  <text class="cell-b" x="24" y="369" fill="#0a0e17">2</text>
+
+  <rect x="10" y="445" width="28" height="28" rx="14" fill="#e74c3c"/>
+  <text class="cell-b" x="24" y="459" fill="#0a0e17">3</text>
+
+  <rect x="10" y="575" width="28" height="28" rx="14" fill="#2ecc71"/>
+  <text class="cell-b" x="24" y="589" fill="#0a0e17">4</text>
+
+  <rect x="10" y="650" width="28" height="28" rx="14" fill="#f5c842"/>
+  <text class="cell-b" x="24" y="664" fill="#0a0e17">5</text>
+
+  <!-- ========== SECTION 4: DOMAIN PURITY — DETAILED ========== -->
+
+  <text class="ph" x="500" y="820" text-anchor="middle" fill="#f5c842">DOMAIN PURITY: OIL AND WATER</text>
+  <text class="ls" x="500" y="842">DR0 access rights must be domain-pure. Turing permissions OR Church permissions. Never both.</text>
+
+  <!-- Turing domain -->
+  <rect x="80" y="860" width="380" height="200" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <text class="ph" x="270" y="890" text-anchor="middle" fill="#5dade2">TURING DOMAIN</text>
+  <text class="ls" x="270" y="910" fill="#5dade2">Data objects &bull; Computation</text>
+
+  <rect x="110" y="925" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cell-b" x="160" y="943" fill="#5dade2">R</text>
+  <text class="lt" x="220" y="943" fill="#a0b0c0">Read</text>
+
+  <rect x="110" y="967" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cell-b" x="160" y="985" fill="#5dade2">W</text>
+  <text class="lt" x="220" y="985" fill="#a0b0c0">Write</text>
+
+  <rect x="110" y="1009" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#5dade2" stroke-width="1.5"/>
+  <text class="cell-b" x="160" y="1027" fill="#5dade2">X</text>
+  <text class="lt" x="220" y="1027" fill="#a0b0c0">Execute</text>
+
+  <!-- Church domain -->
+  <rect x="540" y="860" width="380" height="200" rx="10" fill="#0f1a2a" stroke="#2ecc71" stroke-width="2"/>
+  <text class="ph" x="730" y="890" text-anchor="middle" fill="#2ecc71">CHURCH DOMAIN</text>
+  <text class="ls" x="730" y="910" fill="#2ecc71">Capabilities &bull; Abstraction access</text>
+
+  <rect x="570" y="925" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cell-b" x="620" y="943" fill="#2ecc71">L</text>
+  <text class="lt" x="680" y="943" fill="#a0b0c0">Load (capability)</text>
+
+  <rect x="570" y="967" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cell-b" x="620" y="985" fill="#2ecc71">S</text>
+  <text class="lt" x="680" y="985" fill="#a0b0c0">Save (capability)</text>
+
+  <rect x="570" y="1009" width="100" height="35" rx="5" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="cell-b" x="620" y="1027" fill="#2ecc71">E</text>
+  <text class="lt" x="680" y="1027" fill="#a0b0c0">Enter (abstraction)</text>
+
+  <!-- Forbidden crossing -->
+  <line x1="470" y1="880" x2="530" y2="880" stroke="#e74c3c" stroke-width="3"/>
+  <line x1="470" y1="870" x2="470" y2="890" stroke="#e74c3c" stroke-width="3"/>
+  <line x1="530" y1="870" x2="530" y2="890" stroke="#e74c3c" stroke-width="3"/>
+  <text class="cell-b" x="500" y="903" fill="#e74c3c">NEVER</text>
+  <text class="cell-b" x="500" y="920" fill="#e74c3c">BOTH</text>
+
+  <!-- Crossed-out examples -->
+  <rect x="200" y="1075" width="280" height="55" rx="6" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text class="code-sm" x="215" y="1095" fill="#e74c3c">DR0 = RWX | LSE &rarr; FAULT</text>
+  <text class="code-sm" x="215" y="1115" fill="#e74c3c">DR0 = RW | E   &rarr; FAULT</text>
+
+  <!-- X over invalid -->
+  <line x1="200" y1="1075" x2="480" y2="1130" stroke="#e74c3c" stroke-width="2" opacity="0.4"/>
+  <line x1="480" y1="1075" x2="200" y2="1130" stroke="#e74c3c" stroke-width="2" opacity="0.4"/>
+
+  <rect x="530" y="1075" width="280" height="55" rx="6" fill="#0a1a0a" stroke="#2ecc71" stroke-width="1.5"/>
+  <text class="code-sm" x="545" y="1095" fill="#2ecc71">DR0 = RWX       &rarr; Turing GT</text>
+  <text class="code-sm" x="545" y="1115" fill="#2ecc71">DR0 = LSE       &rarr; Church GT</text>
+
+  <!-- ========== SECTION 5: GT_MINT API ========== -->
+
+  <text class="ph" x="500" y="1170" text-anchor="middle" fill="#f5c842">GT_MINT API &mdash; DATA REGISTER ARGUMENTS</text>
+  <text class="ls" x="500" y="1190">Arguments passed in data registers. Thread reads CR8 internally for memory accounting.</text>
+
+  <!-- Register table -->
+  <rect x="150" y="1205" width="700" height="140" rx="8" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1.5"/>
+
+  <!-- Header row -->
+  <rect x="160" y="1215" width="120" height="30" rx="4" fill="#1a2a3a"/>
+  <text class="cell-b" x="220" y="1230" fill="#f5c842">Register</text>
+  <rect x="290" y="1215" width="200" height="30" rx="4" fill="#1a2a3a"/>
+  <text class="cell-b" x="390" y="1230" fill="#f5c842">Content</text>
+  <rect x="500" y="1215" width="340" height="30" rx="4" fill="#1a2a3a"/>
+  <text class="cell-b" x="670" y="1230" fill="#f5c842">Constraint</text>
+
+  <!-- DR0 -->
+  <rect x="160" y="1252" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
+  <text class="cell" x="220" y="1265" fill="#5dade2">DR0</text>
+  <text class="lt" x="295" y="1265" fill="#c8d6e5">Access rights</text>
+  <text class="lt" x="505" y="1265" fill="#c39bd3">Domain-pure: [RWX] xor [LSE]</text>
+
+  <!-- DR1 -->
+  <rect x="160" y="1285" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
+  <text class="cell" x="220" y="1298" fill="#5dade2">DR1</text>
+  <text class="lt" x="295" y="1298" fill="#c8d6e5">Object type</text>
+  <text class="lt" x="505" y="1298" fill="#a0b0c0">Inform, Outform, or user-defined</text>
+
+  <!-- DR2 -->
+  <rect x="160" y="1318" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
+  <text class="cell" x="220" y="1331" fill="#5dade2">DR2</text>
+  <text class="lt" x="295" y="1331" fill="#c8d6e5">Size (words)</text>
+  <text class="lt" x="505" y="1331" fill="#a0b0c0">Must fit within thread budget</text>
+
+  <!-- Return value -->
+  <rect x="250" y="1355" width="500" height="35" rx="6" fill="#121e2e" stroke="#f5c842" stroke-width="1.5"/>
+  <text class="cell-b" x="500" y="1370" fill="#f5c842">Returns: New Golden Token in CR0 with requested permissions</text>
+
+  <!-- CR8 internal note -->
+  <rect x="250" y="1400" width="500" height="35" rx="6" fill="#121e2e" stroke="#3a4a5a" stroke-width="1" stroke-dasharray="5,3"/>
+  <text class="cell" x="500" y="1418" fill="#a0b0c0">CR8 (Thread identity) read internally by microcode &mdash; not passed by caller</text>
+
+  <!-- ========== KEY INSIGHT AT BOTTOM ========== -->
+
+  <rect x="100" y="1450" width="800" height="40" rx="8" fill="#1a1400" stroke="#f5c842" stroke-width="1.5"/>
+  <text class="cell-b" x="500" y="1470" fill="#f5c842">Every layer uses mLoad. No bypass. The caller sees one instruction &mdash; the machine enforces five.</text>
+
+</svg>
+
+</body>
+</html>
