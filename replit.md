@@ -28,7 +28,7 @@ The CTMM simulator provides a web-based visualization using a Python HTTP server
 -   **Failsafe Security**: All validation failures are routed to a single FAULT handler.
 -   **Deterministic Garbage Collection (PP250)**: A three-phase Mark-Scan-Sweep process.
 -   **LAMBDA Instruction**: Enables lightweight, in-scope code application with machine-status fast path.
--   **Network Transparency**: Outform GTs support remote resources via HTTPS, with RPC tunnels using cryptographic keys.
+-   **Network Transparency**: Outform GTs support remote resources via HTTPS, with RPC tunnels using cryptographic keys. F (Far) flag distinguishes virtual memory caching (F=0, HTTP GET/PUT) from remote execution (F=1, encrypted tunnel). Remote addresses placed in namespace entry location field at bind time by FamilyRegistry abstraction.
 -   **Atomic Abstraction Architecture**: No central OS, VM, privileged mode, or superuser. All system services are atomic abstractions accessed via Golden Tokens, with `mLoad` as the single trusted gate.
 -   **Three Dispatch Styles**: Abstractions can resolve method calls via Symbolic resolver (high-security), LAMBDA fast-path (performance), or Traditional compiled binary (fastest).
 -   **Hardware Implementations**:
@@ -40,7 +40,7 @@ The CTMM simulator provides a web-based visualization using a Python HTTP server
 The web interface features a dark-themed, IDE-like design with seven views: Dashboard, Namespace Browser, Assembly Editor, Capabilities Explorer, Instructions, Tutorial, and Code Browser.
 
 ### Key Features
--   **Built-in Abstractions**: Includes `Boot`, `Threads`, `SlideRule`, `Abacus`, `Circle`, `CapabilityManager`, `DateTime`, and `Lambda`.
+-   **Built-in Abstractions**: Includes `Boot`, `Threads`, `SlideRule`, `Abacus`, `Circle`, `CapabilityManager`, `DateTime`, `Lambda`, and `FamilyRegistry`.
 -   **Instruction Set**: Custom 32-bit CTMM instruction set with Church-specific and Turing-specific operations, including ARM-style condition flags.
 -   **State Persistence**: Automatic saving and restoring of state using browser local storage.
 

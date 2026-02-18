@@ -51,11 +51,11 @@ class RiscVCapSimulator {
             { location: 0x00011800, limit: 0x000118FF, funcId: 'GT_SND', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00011900, limit: 0x000119FF, funcId: 'GT_IF', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00020000, limit: 0x000200FF, funcId: 'TunnelKey_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
-            { location: 0x00020100, limit: 0x400201FF, funcId: 'Son_Messaging', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1 },
+            { location: 0xC7440001, limit: 0xC00201FF, funcId: 'Son_Messaging', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1, remoteId: 'ctmm-sim64-kenneth' },
             { location: 0x00020200, limit: 0x000202FF, funcId: 'ABI_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
             { location: 0x00020300, limit: 0x000206FF, funcId: 'Inbox', entryPerms: {R:1,W:1,X:0,L:0,S:0,E:0} },
             { location: 0x00020700, limit: 0x00020AFF, funcId: 'Outbox', entryPerms: {R:1,W:1,X:0,L:0,S:0,E:0} },
-            { location: 0x00020B00, limit: 0x40020BFF, funcId: 'Reply_Tunnel', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1 },
+            { location: 0xC7440001, limit: 0xC0020BFF, funcId: 'Reply_Tunnel', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1, remoteId: 'ctmm-sim64-kenneth' },
         ];
         for (let i = 0; i < defaults.length; i++) {
             const d = defaults[i];
@@ -67,6 +67,7 @@ class RiscVCapSimulator {
                 funcId: d.funcId || null,
                 entryPerms: d.entryPerms || null,
                 gtType: d.gtType || 0,
+                remoteId: d.remoteId || null,
             };
         }
     }
@@ -638,8 +639,11 @@ class RiscVCapSimulator {
             if (fFlag) {
                 const entry = targetResult.entry;
                 const funcName = entry.funcId || `ns[${parsed.index}]`;
+                const remoteAddr = this.cr[crSrc].word1 >>> 0;
+                const remoteId = entry.remoteId || `endpoint@${remoteAddr.toString(16)}`;
                 this.output += `[TUNNEL] Outform+Far CALL via ${funcName} — remote execution via encrypted tunnel\n`;
-                this.output += `[TUNNEL] F=1: remote address required — tunnel to remote Meta Machine\n`;
+                this.output += `[TUNNEL] F=1: remote address 0x${remoteAddr.toString(16).toUpperCase()} → ${remoteId}\n`;
+                this.output += `[TUNNEL] Address source: namespace entry location field (bound by FamilyRegistry)\n`;
                 this.output += `[TUNNEL] ABI mapping: x10-x15 (32-bit) ↔ DR0-DR5 (64-bit)\n`;
                 this.output += `[TUNNEL] Payload: x10=${this.x[10]}, x11=${this.x[11]}, x12=${this.x[12]}, x13=${this.x[13]}, x14=${this.x[14]}, x15=${this.x[15]}\n`;
                 const payload = [this.x[10], this.x[11], this.x[12], this.x[13], this.x[14], this.x[15]];

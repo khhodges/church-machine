@@ -110,62 +110,89 @@ The architectures are different. The ISAs are different. The register widths are
 
 ---
 
-## 4. Namespace Setup via CALL(Thread.Mint)
+## 4. Namespace Setup via FamilyRegistry
 
-All namespace entries below are created through `CALL(Thread.Mint(type, size, access))`. The caller never calls the Namespace directly — the Thread abstraction manages the budget and delegates internally:
+> See also: [FamilyRegistry Abstraction](family-registry.md) for the full binding mechanism.
 
-```
-CR5 (Services C-List) → self (Thread abstraction) → Namespace → Mint(type, size, access)
-```
+### Where Does the Remote Address Come From?
 
-Boot microcode creates the first entries (Root, C-List, Code, Thread) before any Thread exists. Once Kenneth's Thread is running, it creates the Hello Mum entries (TunnelKey_Mum, Mum_Messaging, MessageBuffer, ABI_Mum) via `CALL(Thread.Mint(...))`, which uses **symbolic dispatch** (high-security style — see `docs/dispatch-styles.md`).
-
-### Minting the Hello Mum GTs
+The remote endpoint address is **not** looked up at call time. It is placed in the namespace entry at **bind time** by the **FamilyRegistry abstraction**. The FamilyRegistry is an atomic abstraction (like Thread, Namespace, or CapManager) that creates matching namespace entries on both machines when a relationship is established.
 
 ```
-; Create the tunnel key — Turing domain [R], Abstraction type, 256 bytes
-MOV DR0, 0x01          ; access rights: R (Turing domain)
-MOV DR1, 4             ; type: Abstraction
-MOV DR2, 256           ; size: 256 bytes (crypto key)
-CALL(Thread.Mint)      ; → CR0 = Tunnel_Key_Mum GT [R]
-SAVE CR0, CR6, 4       ; store in C-List at index 4
+Kenneth calls: CALL(FamilyRegistry.Register(me, priscilla_intro, CHILD))
 
-; Create the messaging service — Church domain [E], Abstraction type, 512 bytes
-MOV DR0, 0x20          ; access rights: E (Church domain)
-MOV DR1, 4             ; type: Abstraction
-MOV DR2, 512           ; size: 512 bytes
-CALL(Thread.Mint)      ; → CR0 = Mum_Messaging GT [E]
-SAVE CR0, CR6, 5       ; store in C-List at index 5
-
-; Create the message buffer — Turing domain [R,W], Data type, 1024 bytes
-MOV DR0, 0x03          ; access rights: R+W (Turing domain)
-MOV DR1, 0             ; type: Data
-MOV DR2, 1024          ; size: 1024 bytes
-CALL(Thread.Mint)      ; → CR0 = MessageBuffer GT [R,W]
-SAVE CR0, CR6, 6       ; store in C-List at index 6
-
-; Create the ABI descriptor — Turing domain [R], Abstraction type, 256 bytes
-MOV DR0, 0x01          ; access rights: R (Turing domain)
-MOV DR1, 4             ; type: Abstraction
-MOV DR2, 256           ; size: 256 bytes
-CALL(Thread.Mint)      ; → CR0 = ABI_Mum GT [R]
-SAVE CR0, CR6, 7       ; store in C-List at index 7
+FamilyRegistry:
+  1. Reads priscilla_intro entry → gets Priscilla's remote endpoint address
+  2. Generates shared tunnel key material (256-bit symmetric key)
+  3. Creates local entries: TunnelKey_Mum, Mum_Messaging (Outform+Far), ABI_Mum
+     → Mum_Messaging.location = Priscilla's endpoint address (from introduction)
+     → Mum_Messaging.limit = B=1, F=1 (Bound + Far)
+  4. Provisions matching entries on Priscilla's machine via system tunnel:
+     TunnelKey_Child, Son_Messaging (Outform+Far), ABI_Child
+     → Son_Messaging.location = Kenneth's endpoint address
+     → Son_Messaging.limit = B=1, F=1 (Bound + Far)
+  5. Returns GT for Mum_Messaging in CR0
 ```
 
-Each `CALL(Thread.Mint)` internally: validates domain purity (RWX or LSE, never both), checks the thread's memory budget, delegates to Namespace.Mint which allocates the 3-word descriptor (Location, Limit, Seals), computes the MAC, and returns the GT in CR0.
+After binding, both machines have namespace entries pointing at each other. The address is sealed by MAC. No DNS, no routing tables, no certificate authorities. The capability *is* the address book.
+
+### The Introduction
+
+Before Kenneth can register Priscilla, someone must provide an **introduction** — a namespace entry containing the remote machine's endpoint address and identity attestation. Introductions can come from manual provisioning, QR/NFC proximity exchange, a mutual acquaintance who delegates introduction entries, or boot-time system configuration.
+
+### Local Entries via Thread.Mint
+
+The FamilyRegistry internally delegates to `CALL(Thread.Mint(type, size, access))` to create the actual namespace entries. The caller never calls the Namespace directly — the Thread abstraction manages the budget:
+
+```
+CR5 (Services C-List) → FamilyRegistry → Thread.Mint → Namespace → Mint(type, size, access)
+```
+
+Boot microcode creates the first entries (Root, C-List, Code, Thread) before any Thread exists. The FamilyRegistry creates the Hello Mum entries (TunnelKey_Mum, Mum_Messaging, ABI_Mum) via Thread.Mint:
+
+```
+; FamilyRegistry internally creates:
+
+; Tunnel key — Turing domain [R], 256 bytes
+CALL(Thread.Mint(R, Abstraction, 256))
+  → CR0 = TunnelKey_Mum GT [R]
+  → Location: <local address of 256-bit symmetric key>
+  → Limit: 32 bytes
+SAVE CR0, CR6, 4
+
+; Remote service — Church domain [E], Outform type, Far+Bound
+CALL(Thread.Mint(E, Outform, 512))
+  → CR0 = Mum_Messaging GT [E]
+  → Location: 0xC7440001  ← PRISCILLA'S REMOTE ENDPOINT (from introduction)
+  → Limit: B=1, F=1, session bound
+SAVE CR0, CR6, 5
+
+; Message buffer — Turing domain [R,W], 1024 bytes
+CALL(Thread.Mint(RW, Data, 1024))
+  → CR0 = MessageBuffer GT [R,W]
+SAVE CR0, CR6, 6
+
+; ABI descriptor — Turing domain [R], 256 bytes
+CALL(Thread.Mint(R, Abstraction, 256))
+  → CR0 = ABI_Mum GT [R]
+  → Location: <local address of ABI descriptor>
+SAVE CR0, CR6, 7
+```
+
+Each Thread.Mint internally validates domain purity (RWX or LSE, never both), checks the thread's memory budget, and delegates to Namespace.Mint which allocates the 3-word descriptor (Location, Limit, Seals), computes the MAC, and returns the GT in CR0.
 
 ### "me" Namespace (CTMM Sim-64)
 
-| Index | Name | Type | Permissions | Minted By | Description |
-|-------|------|------|-------------|-----------|-------------|
-| 0 | Root | Inform | R,L | Boot | Namespace root |
-| 1 | C-List | Inform | L,S | Boot | Thread's capability list |
-| 2 | Code | Inform | R,X | Boot | Code segment — the "Hello Mum" program |
-| 3 | Thread | Inform | R,W | Boot | Current thread object |
-| 4 | TunnelKey_Mum | Inform | R | Thread.Mint | Symmetric encryption key for tunnel to "mymother" |
-| 5 | Mum_Messaging | Outform | E | Thread.Mint | Remote: mymother's messaging service |
-| 6 | MessageBuffer | Inform | R,W | Thread.Mint | Local buffer for outgoing message payload |
-| 7 | ABI_Mum | Inform | R | Thread.Mint | ABI descriptor for mymother's architecture |
+| Index | Name | Type | Permissions | Flags | Created By | Description |
+|-------|------|------|-------------|-------|------------|-------------|
+| 0 | Root | Inform | R,L | — | Boot | Namespace root |
+| 1 | C-List | Inform | L,S | — | Boot | Thread's capability list |
+| 2 | Code | Inform | R,X | — | Boot | Code segment — the "Hello Mum" program |
+| 3 | Thread | Inform | R,W | — | Boot | Current thread object |
+| 4 | TunnelKey_Mum | Inform | R | B | FamilyRegistry | Symmetric encryption key for tunnel to "mymother" |
+| 5 | Mum_Messaging | Outform | E | B,F | FamilyRegistry | Remote: mymother's messaging service (location = remote endpoint) |
+| 6 | MessageBuffer | Inform | R,W | — | Thread.Mint | Local buffer for outgoing message payload |
+| 7 | ABI_Mum | Inform | R | B | FamilyRegistry | ABI descriptor for mymother's architecture |
 
 **Namespace entry format** (3 words per entry):
 
@@ -175,9 +202,9 @@ Entry[4] (TunnelKey_Mum):
   Limit:    32 bytes (key length)
   Seals:    MAC = FNV(Location ⊕ Limit ⊕ Version ⊕ Index), gBit = 0
 
-Entry[5] (Mum_Messaging):
-  Location: <URL/endpoint identifier for mymother's invoke service>
-  Limit:    <service-specific parameter>
+Entry[5] (Mum_Messaging — Outform+Far, created by FamilyRegistry):
+  Location: 0xC7440001   ← REMOTE ENDPOINT (Priscilla's address, from introduction)
+  Limit:    B=1, F=1, session_bound  (bit 31=B, bit 30=F, bits 16:0=limit)
   Seals:    MAC = FNV(Location ⊕ Limit ⊕ Version ⊕ Index), gBit = 0
 
 Entry[7] (ABI_Mum):
@@ -188,18 +215,18 @@ Entry[7] (ABI_Mum):
 
 ### "mymother" Namespace (RV32-Cap Sim-32)
 
-| Index | Name | Type | Permissions | Description |
-|-------|------|------|-------------|-------------|
-| 0 | Root | Inform | R,L | Namespace root |
-| 1 | C-List | Inform | L,S | Thread's capability list |
-| 2 | Code | Inform | R,X | Code segment — the messaging service |
-| 3 | Thread | Inform | R,W | Current thread object |
-| 4 | TunnelKey_Child | Inform | R | Same symmetric key as "me" entry 4 (matching key material) |
-| 5 | Published_CList | Inform | L,S | Services available to authorized remote callers |
-| 6 | Messaging_Impl | Inform | R,X,E | The messaging service implementation |
-| 7 | Inbox | Inform | R,W | Storage for received messages |
-| 8 | ABI_Self | Inform | R | ABI descriptor for this machine's architecture |
-| 9 | Reply_Tunnel | Outform | E | Return path to "me" for acknowledgments |
+| Index | Name | Type | Permissions | Flags | Created By | Description |
+|-------|------|------|-------------|-------|------------|-------------|
+| 0 | Root | Inform | R,L | — | Boot | Namespace root |
+| 1 | C-List | Inform | L,S | — | Boot | Thread's capability list |
+| 2 | Code | Inform | R,X | — | Boot | Code segment — the messaging service |
+| 3 | Thread | Inform | R,W | — | Boot | Current thread object |
+| 4 | TunnelKey_Child | Inform | R | B | FamilyRegistry | Same symmetric key as "me" entry 4 (matching key material) |
+| 5 | Published_CList | Inform | L,S | — | Boot | Services available to authorized remote callers |
+| 6 | Messaging_Impl | Inform | R,X,E | — | Boot | The messaging service implementation |
+| 7 | Inbox | Inform | R,W | — | Thread.Mint | Storage for received messages |
+| 8 | ABI_Self | Inform | R | B | FamilyRegistry | ABI descriptor for this machine's architecture |
+| 9 | Reply_Tunnel | Outform | E | B,F | FamilyRegistry | Return path to "me" (location = remote endpoint) |
 
 ---
 
