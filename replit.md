@@ -29,6 +29,7 @@ The CTMM simulator provides a web-based visualization using a Python HTTP server
 -   **Deterministic Garbage Collection (PP250)**: A three-phase Mark-Scan-Sweep process.
 -   **LAMBDA Instruction**: Enables lightweight, in-scope code application with machine-status fast path.
 -   **Network Transparency**: Outform GTs support remote resources via HTTPS, with RPC tunnels using cryptographic keys. F (Far) flag distinguishes virtual memory caching (F=0, HTTP GET/PUT) from remote execution (F=1, encrypted tunnel). Remote addresses placed in namespace entry location field at bind time by FamilyRegistry abstraction.
+-   **Abstraction C-List Layout**: Hardware-enforced initial condition — every abstraction C-List: slot [0] = self-reference [E], slot [1] = Access Code [R,X] (CLOOMC code block, CALL entry point). LAMBDA can move execution to macros in any programmable CR0-CR7.
 -   **Atomic Abstraction Architecture**: No central OS, VM, privileged mode, or superuser. All system services are atomic abstractions accessed via Golden Tokens, with `mLoad` as the single trusted gate.
 -   **Three Dispatch Styles**: Abstractions can resolve method calls via Symbolic resolver (high-security), LAMBDA fast-path (performance), or Traditional compiled binary (fastest).
 -   **Hardware Implementations**:

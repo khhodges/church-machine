@@ -500,8 +500,10 @@ const abstractionCLists = {
     SlideRule: {
         name: "SlideRule",
         mathType: "FLOAT",
-        description: "IEEE 754 floating-point operations. CALL this abstraction for float math.",
+        description: "IEEE 754 floating-point operations. CALL this abstraction for float math. Slot [1] Access code is hardware-enforced entry point.",
         clist: [
+            { name: "SlideRule", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0x5000, size: 0x1000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0x5000, size: 256 },
             { name: "GT_ADD", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: a + b", base: 0x5100, size: 256 },
             { name: "GT_SUB", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: a - b", base: 0x5200, size: 256 },
             { name: "GT_MUL", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: a * b", base: 0x5300, size: 256 },
@@ -510,15 +512,16 @@ const abstractionCLists = {
             { name: "GT_EXP", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: e^x", base: 0x5680, size: 256 },
             { name: "GT_SQRT", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: sqrt(x)", base: 0x5780, size: 256 },
             { name: "GT_POW", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: x^y", base: 0x5880, size: 320 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0x5000, size: 256 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0x5A00, size: 512 }
         ]
     },
     Abacus: {
         name: "Abacus",
         mathType: "INTEGER",
-        description: "64-bit integer arithmetic operations. CALL this abstraction for integer math.",
+        description: "64-bit integer arithmetic operations. CALL this abstraction for integer math. Slot [1] Access code is hardware-enforced entry point.",
         clist: [
+            { name: "Abacus", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0x6000, size: 0x1000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0x6000, size: 256 },
             { name: "GT_ADD", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: a + b", base: 0x6100, size: 192 },
             { name: "GT_SUB", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: a - b", base: 0x6200, size: 192 },
             { name: "GT_MUL", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: a * b", base: 0x6300, size: 192 },
@@ -528,43 +531,46 @@ const abstractionCLists = {
             { name: "GT_NEG", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: -a", base: 0x6700, size: 128 },
             { name: "GT_INC", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: a + 1", base: 0x6780, size: 64 },
             { name: "GT_DEC", type: "Function", mathType: "int64", perms: ["R", "X"], desc: "Int64: a - 1", base: 0x67C0, size: 64 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0x6000, size: 256 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0x6800, size: 512 }
         ]
     },
     Circle: {
         name: "Circle",
         mathType: "GEOMETRY",
-        description: "Circle geometry using float math. Provides PI constants and circle functions.",
+        description: "Circle geometry using float math. Provides PI constants and circle functions. Slot [1] Access code is hardware-enforced entry point.",
         clist: [
+            { name: "Circle", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0x7000, size: 0x1000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0x7080, size: 128 },
             { name: "GT_PI", type: "Constant", mathType: "float", perms: ["R"], desc: "Float: PI = 3.14159...", value: 3.14159265358979, base: 0x7000, size: 8 },
             { name: "GT_TWO_PI", type: "Constant", mathType: "float", perms: ["R"], desc: "Float: 2*PI = 6.28318...", value: 6.28318530717958, base: 0x7008, size: 8 },
             { name: "GT_CIRCUMFERENCE", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: C = 2*PI*r", base: 0x7100, size: 192 },
             { name: "GT_AREA", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: A = PI*r^2", base: 0x7200, size: 192 },
             { name: "GT_DIAMETER", type: "Function", mathType: "float", perms: ["R", "X"], desc: "Float: D = 2*r", base: 0x7300, size: 128 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0x7080, size: 128 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0x7400, size: 512 }
         ]
     },
     DateTime: {
         name: "DateTime",
         mathType: "TIME",
-        description: "ISO 8601 date/time. API: DR0=mode (0=ISO timestamp, 1=Date, 2=Time, 3=Unix epoch, 4=Components). Components return in DR1-DR6.",
+        description: "ISO 8601 date/time. API: DR0=mode (0=ISO timestamp, 1=Date, 2=Time, 3=Unix epoch, 4=Components). Components return in DR1-DR6. Slot [1] Access code is hardware-enforced entry point.",
         clist: [
+            { name: "DateTime", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0x9000, size: 0x1000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0x9000, size: 256 },
             { name: "GT_DATETIME", type: "Function", perms: ["R", "X"], desc: "Get date/time: DR0=mode → DR1-DR6 or string GT", base: 0x9100, size: 512 },
             { name: "GT_TIMESTAMP", type: "Function", perms: ["R", "X"], desc: "ISO 8601 full timestamp string", base: 0x9200, size: 256 },
             { name: "GT_DATE", type: "Function", perms: ["R", "X"], desc: "ISO 8601 date only (YYYY-MM-DD)", base: 0x9300, size: 256 },
             { name: "GT_TIME", type: "Function", perms: ["R", "X"], desc: "ISO 8601 time only (HH:MM:SS)", base: 0x9400, size: 256 },
             { name: "GT_EPOCH", type: "Function", perms: ["R", "X"], desc: "Unix epoch seconds in DR1", base: 0x9500, size: 128 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0x9000, size: 256 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0x9600, size: 512 }
         ]
     },
     Lambda: {
         name: "Lambda",
         mathType: "FUNCTIONAL",
-        description: "Church's lambda calculus primitives. Y-Combinator for recursion, Church numerals for arithmetic, Pairs for data structures, Booleans for logic.",
+        description: "Church's lambda calculus primitives. Y-Combinator for recursion, Church numerals for arithmetic, Pairs for data structures, Booleans for logic. Slot [1] Access code is hardware-enforced entry point.",
         clist: [
+            { name: "Lambda", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0xA000, size: 0x2000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0xA000, size: 256 },
             { name: "GT_Y_COMBINATOR", type: "Function", perms: ["R", "X"], desc: "Y f = f (Y f) - fixed-point combinator for recursion", base: 0xA100, size: 512 },
             { name: "GT_CHURCH_SUCC", type: "Function", perms: ["R", "X"], desc: "λn.λf.λx. f (n f x) - successor", base: 0xA300, size: 256 },
             { name: "GT_CHURCH_PRED", type: "Function", perms: ["R", "X"], desc: "λn.λf.λx. n (λg.λh. h (g f)) (λu.x) (λu.u) - predecessor", base: 0xA400, size: 384 },
@@ -576,21 +582,21 @@ const abstractionCLists = {
             { name: "GT_TRUE", type: "Function", perms: ["R", "X"], desc: "λx.λy. x - Church TRUE", base: 0xA940, size: 64 },
             { name: "GT_FALSE", type: "Function", perms: ["R", "X"], desc: "λx.λy. y - Church FALSE", base: 0xA980, size: 64 },
             { name: "GT_IF", type: "Function", perms: ["R", "X"], desc: "λc.λt.λf. c t f - conditional", base: 0xA9C0, size: 128 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0xA000, size: 256 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xAA40, size: 512 }
         ]
     },
     Mint: {
         name: "Mint",
         mathType: "FORGE",
-        description: "Namespace method (not standalone abstraction) — accessed via CALL(Thread.Mint(type, size, access)). Mints domain-pure Golden Tokens (Turing [RWX] or Church [LSE], never both).",
+        description: "Namespace method (not standalone abstraction) — accessed via CALL(Thread.Mint(type, size, access)). Mints domain-pure Golden Tokens (Turing [RWX] or Church [LSE], never both). Slot [1] Access code is hardware-enforced entry point.",
         isNamespaceMethod: true,
         clist: [
+            { name: "Mint", type: "Abstraction", perms: ["E"], desc: "Self-reference — abstraction identity", base: 0xC000, size: 0x1000 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "CLOOMC code block — hardware-enforced CALL entry point (slot 1)", base: 0xC000, size: 256 },
             { name: "GT_MINT", type: "Function", perms: ["R", "X"], desc: "Mint new GT: DR0=domain-pure perm mask (Turing [RWX] or Church [LSE], never both), DR1=type (0=Data,1=Code,2=C-List,3=Thread,4=Abstraction), DR2=size → CR0", base: 0xC100, size: 512 },
             { name: "GT_RESTRICT", type: "Function", perms: ["R", "X"], desc: "Derive restricted GT: CR0=source GT, DR0=new perm mask (must be subset) → CR0=restricted GT", base: 0xC300, size: 512 },
             { name: "GT_REVOKE", type: "Function", perms: ["R", "X"], desc: "Revoke GT: CR0=target GT → bumps namespace version, all copies FAULT on next mLoad", base: 0xC500, size: 256 },
             { name: "GT_INSPECT", type: "Function", perms: ["R", "X"], desc: "Inspect GT metadata: CR0=target GT → DR0=perms, DR1=type, DR2=version, DR3=nsOffset", base: 0xC600, size: 256 },
-            { name: "LocalCode", type: "Code", perms: ["R", "X"], base: 0xC000, size: 256 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xC800, size: 512 }
         ]
     }
