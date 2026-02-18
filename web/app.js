@@ -9,7 +9,9 @@ const mathTypeBadges = {
     'CapabilityManager': 'SYSTEM',
     'DateTime': 'TIME',
     'Lambda': 'FUNCTIONAL',
-    'Constants': 'CONSTANT'
+    'Constants': 'CONSTANT',
+    'Stack': 'RPN',
+    'HP35': 'CALCULATOR'
 };
 let currentUser = null;
 let viewingTutorialFromLanding = false;
@@ -143,6 +145,10 @@ function switchView(viewId) {
     
     if (viewId === 'abstractionZoom') {
         renderAbstractionZoom();
+    }
+    
+    if (viewId === 'hp35calc') {
+        renderHP35Calculator();
     }
     
     if (viewId === 'dashboard') {
@@ -374,7 +380,13 @@ let namespaceObjects = [
       tooltip: "Lambda [FUNCTIONAL] — Church calculus primitives: Y-Combinator, Church numerals, Pairs, Booleans." },
     { offset: 12, name: "Constants", type: "Abstraction",
       word1_location: 0xE000, word2_limit: 0x1000, word3_seals: 0n,
-      tooltip: "Constants [CONSTANT] — Physical and mathematical constants as Abstract GTs. Unforgeable, incorruptible identity tokens for PI, E, PHI, c, h, k_B, N_A, G." }
+      tooltip: "Constants [CONSTANT] — Physical and mathematical constants as Abstract GTs. Unforgeable, incorruptible identity tokens for PI, E, PHI, c, h, k_B, N_A, G." },
+    { offset: 13, name: "Stack", type: "Abstraction",
+      word1_location: 0xF000, word2_limit: 0x1000, word3_seals: 0n,
+      tooltip: "Stack [RPN] — Church-encoded RPN stack using nested pairs. PUSH, POP, SWAP, DUP, PEEK, CLEAR. stack = PAIR(top, rest), empty = FALSE." },
+    { offset: 14, name: "HP35", type: "Abstraction",
+      word1_location: 0x10000, word2_limit: 0x2000, word3_seals: 0n,
+      tooltip: "HP35 [CALCULATOR] — HP-35 scientific calculator. Pure lambda calculus RPN engine. Digit entry, arithmetic (+,−,×,÷), scientific (√,sin,cos,log,exp), stack ops (ENTER,swap,CLR)." }
 ];
 
 // Services C-List at Namespace offset 2
@@ -419,7 +431,11 @@ const bootCList = {
         { index: 8, name: "Lambda", nsOffset: 11, perms: ["E"], type: "Abstraction",
           desc: "Church lambda calculus primitives — Y-Combinator, Church numerals, Pairs, Booleans", size: 0x2000 },
         { index: 9, name: "Constants", nsOffset: 12, perms: ["E"], type: "Abstraction",
-          desc: "Physical/mathematical constants as Abstract GTs — PI, E, PHI, c, h, k_B, N_A, G", size: 0x1000 }
+          desc: "Physical/mathematical constants as Abstract GTs — PI, E, PHI, c, h, k_B, N_A, G", size: 0x1000 },
+        { index: 10, name: "Stack", nsOffset: 13, perms: ["E"], type: "Abstraction",
+          desc: "Church-encoded RPN stack — PUSH, POP, SWAP, DUP, PEEK, CLEAR via nested pairs", size: 0x1000 },
+        { index: 11, name: "HP35", nsOffset: 14, perms: ["E"], type: "Abstraction",
+          desc: "HP-35 scientific calculator — pure lambda calculus RPN engine", size: 0x2000 }
     ]
 };
 
@@ -577,7 +593,12 @@ const abstractionCLists = {
             { name: "GT_TRUE", type: "Function", perms: ["R", "X"], desc: "λx.λy. x - Church TRUE", base: 0xA940, size: 64 },
             { name: "GT_FALSE", type: "Function", perms: ["R", "X"], desc: "λx.λy. y - Church FALSE", base: 0xA980, size: 64 },
             { name: "GT_IF", type: "Function", perms: ["R", "X"], desc: "λc.λt.λf. c t f - conditional", base: 0xA9C0, size: 128 },
-            { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xAA40, size: 512 }
+            { name: "GT_CHURCH_SUB", type: "Function", perms: ["R", "X"], desc: "λm.λn. n PRED m - subtraction (Church: repeated predecessor)", base: 0xAA40, size: 256 },
+            { name: "GT_CHURCH_DIV", type: "Function", perms: ["R", "X"], desc: "λm.λn. Y (λf.λq. IF (LEQ n m) (f (SUB m n) (SUCC q)) q) m 0 - integer division", base: 0xAB40, size: 384 },
+            { name: "GT_CHURCH_POW", type: "Function", perms: ["R", "X"], desc: "λb.λe. e (MUL b) 1 - exponentiation (Church: repeated multiplication)", base: 0xAC40, size: 256 },
+            { name: "GT_CHURCH_ISZERO", type: "Function", perms: ["R", "X"], desc: "λn. n (λx. FALSE) TRUE - zero test", base: 0xAD40, size: 128 },
+            { name: "GT_CHURCH_LEQ", type: "Function", perms: ["R", "X"], desc: "λm.λn. ISZERO (SUB m n) - less-than-or-equal", base: 0xAE40, size: 192 },
+            { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xAF40, size: 512 }
         ]
     },
     Mint: {
@@ -590,6 +611,56 @@ const abstractionCLists = {
             { name: "NULL", type: "NULL", perms: [], desc: "NULL Golden Token — clears any CR when loaded", size: 0 },
             { name: "Access", type: "Code", perms: ["R", "X"], desc: "Method dispatcher — DR0 selects operation (0=MINT, 1=RESTRICT, 2=REVOKE, 3=INSPECT)", base: 0xC000, size: 0x1000 },
             { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xC800, size: 512 }
+        ]
+    },
+    Stack: {
+        name: "Stack",
+        mathType: "RPN",
+        description: "Church-encoded RPN stack using nested pairs. stack = PAIR(top, rest), empty = FALSE. All operations are pure lambda calculus — PUSH creates a new pair, POP extracts via FST/SND, SWAP reorders top two. DR0=method selector: 0=PUSH, 1=POP, 2=SWAP, 3=DUP, 4=PEEK, 5=CLEAR, 6=DEPTH.",
+        methodSelector: { 0: 'PUSH', 1: 'POP', 2: 'SWAP', 3: 'DUP', 4: 'PEEK', 5: 'CLEAR', 6: 'DEPTH' },
+        clist: [
+            { name: "NULL", type: "NULL", perms: [], desc: "NULL Golden Token — clears any CR when loaded", size: 0 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "Stack method dispatcher — DR0 selects operation. Church-encoded: stack = PAIR(top, rest)", base: 0xF000, size: 0x400 },
+            { name: "GT_PUSH", type: "Function", perms: ["R", "X"], desc: "λval.λstack. PAIR val stack — push value onto stack", base: 0xF400, size: 128 },
+            { name: "GT_POP", type: "Function", perms: ["R", "X"], desc: "λstack. FST stack — remove and return top element", base: 0xF480, size: 128 },
+            { name: "GT_SWAP", type: "Function", perms: ["R", "X"], desc: "λstack. PAIR (FST (SND stack)) (PAIR (FST stack) (SND (SND stack))) — swap top two", base: 0xF500, size: 192 },
+            { name: "GT_DUP", type: "Function", perms: ["R", "X"], desc: "λstack. PAIR (FST stack) stack — duplicate top element", base: 0xF5C0, size: 128 },
+            { name: "GT_PEEK", type: "Function", perms: ["R", "X"], desc: "λstack. FST stack — read top without removing", base: 0xF640, size: 64 },
+            { name: "GT_CLEAR", type: "Function", perms: ["R", "X"], desc: "λstack. FALSE — return empty stack", base: 0xF680, size: 64 },
+            { name: "GT_DEPTH", type: "Function", perms: ["R", "X"], desc: "λstack. Y (λf.λs.λn. IF (ISZERO s) n (f (SND s) (SUCC n))) stack 0 — count elements", base: 0xF6C0, size: 256 },
+            { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0xF800, size: 512 }
+        ]
+    },
+    HP35: {
+        name: "HP35",
+        mathType: "CALCULATOR",
+        description: "HP-35 scientific calculator — the world's first handheld scientific calculator (Hewlett-Packard, 1972). Pure lambda calculus RPN engine. All arithmetic via Church numerals, stack via nested pairs, constants via Abstract GTs. DR0=method selector for operations.",
+        methodSelector: { 0: 'DIGIT', 1: 'ENTER', 2: 'ADD', 3: 'SUB', 4: 'MUL', 5: 'DIV', 6: 'SQRT', 7: 'SIN', 8: 'COS', 9: 'LOG', 10: 'EXP', 11: 'POW', 12: 'CHS', 13: 'CLR', 14: 'CLX', 15: 'SWAP', 16: 'PI', 17: 'EEX', 18: 'ARC' },
+        clist: [
+            { name: "NULL", type: "NULL", perms: [], desc: "NULL Golden Token — clears any CR when loaded", size: 0 },
+            { name: "Access", type: "Code", perms: ["R", "X"], desc: "HP-35 calculator dispatcher — RPN engine using Church lambda calculus", base: 0x10000, size: 0x800 },
+            { name: "GT_DIGIT", type: "Function", perms: ["R", "X"], desc: "λd. append digit d to X register display — Church SUCC chain builds number", base: 0x10800, size: 256 },
+            { name: "GT_ENTER", type: "Function", perms: ["R", "X"], desc: "λstack. PUSH X onto stack, lift — PAIR(X, stack)", base: 0x10900, size: 192 },
+            { name: "GT_ADD", type: "Function", perms: ["R", "X"], desc: "λx.λy. CHURCH_ADD x y — pop Y, add to X, result in X", base: 0x10A00, size: 256 },
+            { name: "GT_SUB", type: "Function", perms: ["R", "X"], desc: "λx.λy. CHURCH_SUB y x — pop Y, subtract X from Y, result in X", base: 0x10B00, size: 256 },
+            { name: "GT_MUL", type: "Function", perms: ["R", "X"], desc: "λx.λy. CHURCH_MUL x y — pop Y, multiply by X, result in X", base: 0x10C00, size: 256 },
+            { name: "GT_DIV", type: "Function", perms: ["R", "X"], desc: "λx.λy. CHURCH_DIV y x — pop Y, divide Y by X, result in X", base: 0x10D00, size: 384 },
+            { name: "GT_SQRT", type: "Function", perms: ["R", "X"], desc: "λx. Y (λf.λg. IF (LEQ (MUL g g) x) (f (SUCC g)) (PRED g)) 0 — Newton's method via Church", base: 0x10E00, size: 512 },
+            { name: "GT_SIN", type: "Function", perms: ["R", "X"], desc: "λx. Taylor series: x - x³/3! + x⁵/5! - ... via Church combinators", base: 0x10F00, size: 512 },
+            { name: "GT_COS", type: "Function", perms: ["R", "X"], desc: "λx. Taylor series: 1 - x²/2! + x⁴/4! - ... via Church combinators", base: 0x11000, size: 512 },
+            { name: "GT_LOG", type: "Function", perms: ["R", "X"], desc: "λx. natural log via Y-Combinator iterative refinement", base: 0x11100, size: 512 },
+            { name: "GT_EXP", type: "Function", perms: ["R", "X"], desc: "λx. eˣ via Taylor series: 1 + x + x²/2! + x³/3! + ... Church POW chain", base: 0x11200, size: 512 },
+            { name: "GT_POW", type: "Function", perms: ["R", "X"], desc: "λx.λy. CHURCH_POW x y — Y raised to X power", base: 0x11300, size: 256 },
+            { name: "GT_CHS", type: "Function", perms: ["R", "X"], desc: "λx. negate sign — Church PAIR(sign, magnitude) toggle", base: 0x11400, size: 128 },
+            { name: "GT_CLR", type: "Function", perms: ["R", "X"], desc: "λstack. FALSE — clear entire stack and display", base: 0x11480, size: 64 },
+            { name: "GT_CLX", type: "Function", perms: ["R", "X"], desc: "λstack. PAIR 0 (SND stack) — clear X register only", base: 0x114C0, size: 128 },
+            { name: "GT_SWAP_XY", type: "Function", perms: ["R", "X"], desc: "λstack. SWAP top two — exchange X and Y registers", base: 0x11540, size: 192 },
+            { name: "GT_PI_CONST", type: "Function", perms: ["R", "X"], desc: "λ. push PI (Abstract GT from Constants) onto stack", base: 0x11600, size: 128 },
+            { name: "GT_EEX", type: "Function", perms: ["R", "X"], desc: "λx.λe. x × 10ᵉ — enter exponent via Church POW(10, e) then MUL", base: 0x11680, size: 256 },
+            { name: "GT_ARC", type: "Function", perms: ["R", "X"], desc: "λ. toggle arc mode — next trig function uses inverse (asin, acos, atan)", base: 0x11780, size: 128 },
+            { name: "DisplayBuffer", type: "Data", perms: ["R", "W"], desc: "15-digit LED display buffer — HP-35 red LED format", base: 0x11800, size: 64 },
+            { name: "StackData", type: "Data", perms: ["R", "W"], desc: "4-register RPN stack storage (X, Y, Z, T) — Church-encoded pairs", base: 0x11840, size: 256 },
+            { name: "LocalData", type: "Data", perms: ["R", "W"], base: 0x11A00, size: 512 }
         ]
     },
     Constants: {
@@ -1608,7 +1679,9 @@ function getObjectTooltip(name, type) {
         'Circle': 'Geometric calculations — mintable at runtime via CALL(Thread.Mint)',
         'Access': 'Boot nucleus code — loaded into CR7. Resolves symbolic names from CR6 to executable code',
         'NULL': 'Null capability - no access rights, typically indicates uninitialized register',
-        'Constants': 'Physical/mathematical constants as Abstract GTs — unforgeable identity tokens for PI, E, PHI, c, h, k_B, N_A, G. Present Abstract GT in CR1 to retrieve value.'
+        'Constants': 'Physical/mathematical constants as Abstract GTs — unforgeable identity tokens for PI, E, PHI, c, h, k_B, N_A, G. Present Abstract GT in CR1 to retrieve value.',
+        'Stack': 'Church-encoded RPN stack — PUSH, POP, SWAP, DUP, PEEK, CLEAR via nested pairs. stack = PAIR(top, rest), empty = FALSE.',
+        'HP35': 'HP-35 scientific calculator — pure lambda calculus RPN engine. All arithmetic via Church numerals, stack via nested pairs, constants via Abstract GTs.'
     };
     return tooltips[name] || `${type || 'Object'}: ${name}`;
 }
@@ -9260,6 +9333,115 @@ RETURN                     ; Back through tunnel</pre>
                 }
             }
         ]
+    },
+    {
+        title: "HP-35: Calculator from Lambda Calculus",
+        steps: [
+            {
+                text: `<h3>Building a Calculator from Nothing</h3>
+                <p>The HP-35 was the world's first handheld scientific calculator (Hewlett-Packard, 1972). We rebuild it as a CTMM abstraction using <strong>pure lambda calculus</strong> &mdash; no hardware ALU, no floating-point unit.</p>
+                <p>Every operation &mdash; addition, square root, sine &mdash; is composed from three foundations:</p>
+                <div class="key-concept">
+                    <strong>The Three Foundations:</strong><br>
+                    1. <strong>Church Numerals</strong> &mdash; numbers as lambda functions: 3 = &lambda;f.&lambda;x. f(f(f(x)))<br>
+                    2. <strong>Nested Pairs</strong> &mdash; the RPN stack: stack = PAIR(top, PAIR(next, rest))<br>
+                    3. <strong>Abstract GTs</strong> &mdash; constants like &pi; as unforgeable identity tokens
+                </div>`,
+                demo: `<div class="demo-title">HP-35 RPN Stack Model</div>
+                <div class="demo-content">
+                    <div style="font-size: 0.75rem;">
+                        <div style="color: #88ccff; font-family: monospace; line-height: 1.6; font-size: 0.7rem;">
+                            ; RPN: Enter 3, Enter 4, press +<br>
+                            <br>
+                            ; Step 1: Key "3"<br>
+                            DIGIT(SUCC&sup3;(ZERO)) &rarr; X=3<br>
+                            stack = PAIR(3, FALSE)<br>
+                            <br>
+                            ; Step 2: ENTER<br>
+                            PUSH X &rarr; PAIR(3, PAIR(3, FALSE))<br>
+                            <br>
+                            ; Step 3: Key "4"<br>
+                            DIGIT(SUCC&sup4;(ZERO)) &rarr; X=4<br>
+                            stack = PAIR(4, PAIR(3, FALSE))<br>
+                            <br>
+                            ; Step 4: Press +<br>
+                            CHURCH_ADD(3, 4) = 7<br>
+                            POP &rarr; stack = PAIR(7, FALSE)
+                        </div>
+                    </div>
+                </div>`
+            },
+            {
+                text: `<h3>Abstraction Dependencies</h3>
+                <p>A programmer builds the HP-35 step by step, starting from foundations already in the system:</p>
+                <p><strong>Step 1:</strong> The <span style="color:#88ccff">Lambda</span> abstraction provides Church numerals (SUCC, PRED, ADD, SUB, MUL, DIV, POW), booleans (TRUE, FALSE, IF), pairs (PAIR, FST, SND), and the Y-Combinator for recursion.</p>
+                <p><strong>Step 2:</strong> The <span style="color:#88ccff">Stack</span> abstraction uses Lambda's pairs to build an RPN stack: PUSH = PAIR(val, stack), POP = FST(stack), SWAP reorders the top two.</p>
+                <p><strong>Step 3:</strong> The <span style="color:#88ccff">HP35</span> abstraction wires Lambda's arithmetic, Stack's RPN, and Constants' Abstract GTs into a complete calculator.</p>
+                <div class="key-concept">
+                    <strong>Key Insight:</strong> No operation is primitive. Addition is repeated succession. Multiplication is repeated addition. Exponentiation is repeated multiplication. The entire calculator is built from &lambda;f.&lambda;x. f(x).
+                </div>`,
+                demo: `<div class="demo-title">Dependency Chain</div>
+                <div class="demo-content">
+                    <div style="font-size: 0.75rem;">
+                        <div style="font-family: monospace; line-height: 1.8; font-size: 0.7rem;">
+                            <span style="color:#f472b6">HP35</span> depends on:<br>
+                            &nbsp;&nbsp;<span style="color:#88ccff">Stack</span> &larr; PUSH, POP, SWAP, CLEAR<br>
+                            &nbsp;&nbsp;<span style="color:#88ccff">Lambda</span> &larr; ADD, SUB, MUL, DIV, POW<br>
+                            &nbsp;&nbsp;<span style="color:#f472b6">Constants</span> &larr; PI (Abstract GT)<br>
+                            <br>
+                            <span style="color:#88ccff">Stack</span> depends on:<br>
+                            &nbsp;&nbsp;<span style="color:#88ccff">Lambda</span> &larr; PAIR, FST, SND, FALSE<br>
+                            <br>
+                            <span style="color:#88ccff">Lambda</span> depends on:<br>
+                            &nbsp;&nbsp;Nothing &mdash; pure lambda calculus
+                        </div>
+                    </div>
+                </div>`
+            },
+            {
+                text: `<h3>Try It</h3>
+                <p>Click the <strong>HP-35</strong> tab in the navigation bar to open the calculator. Try this RPN calculation:</p>
+                <p>1. Press <strong>3</strong> then <strong>ENTER</strong><br>
+                2. Press <strong>4</strong><br>
+                3. Press <strong>+</strong><br>
+                4. The display shows <strong>7</strong></p>
+                <p>Watch the <strong>Lambda Calculus Trace</strong> panel on the right &mdash; it shows every operation decomposed into its Church lambda expression.</p>
+                <div class="key-concept">
+                    <strong>RPN Advantage:</strong> No parentheses, no equals key, no operator precedence. The stack <em>is</em> the memory. This maps perfectly to lambda calculus where function application is the only operation.
+                </div>`,
+                demo: `<div class="demo-title">Scientific Functions</div>
+                <div class="demo-content">
+                    <div style="font-size: 0.75rem;">
+                        <div style="font-family: monospace; line-height: 1.6; font-size: 0.7rem;">
+                            <span style="color:#fbbf24;">; sin(0.5) via Taylor series</span><br>
+                            SIN_TAYLOR(x) =<br>
+                            &nbsp;&nbsp;x - x&sup3;/3! + x&sup5;/5! - ...<br>
+                            <br>
+                            Each term is Church arithmetic:<br>
+                            &nbsp;&nbsp;x&sup3; = MUL(x, MUL(x, x))<br>
+                            &nbsp;&nbsp;3! = MUL(3, MUL(2, 1))<br>
+                            &nbsp;&nbsp;DIV = Y(&lambda;f.&lambda;q. IF(LEQ n m)<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(f(SUB m n)(SUCC q)) q)
+                        </div>
+                    </div>
+                </div>`,
+                interaction: {
+                    type: "quiz",
+                    question: "In the HP-35's RPN model, what does pressing '+' actually do at the lambda calculus level?",
+                    options: [
+                        "Calls a hardware ADD instruction",
+                        "Pops two values, applies CHURCH_ADD (repeated SUCC), pushes result",
+                        "Sends a signal to the SlideRule abstraction",
+                        "Stores the sum in a Data Register"
+                    ],
+                    correct: 1,
+                    feedback: {
+                        correct: "Correct! The HP-35 pops X and Y from the stack (FST/SND of pairs), applies CHURCH_ADD which is repeated SUCC (successor), and pushes the result back. No hardware ALU involved — it's pure lambda calculus.",
+                        incorrect: "The HP-35 abstraction uses Church lambda calculus, not hardware. CHURCH_ADD is defined as λm.λn.λf.λx. m f (n f x) — it applies the successor function m times starting from n. The result is pushed back onto the RPN stack."
+                    }
+                }
+            }
+        ]
     }
 ];
 
@@ -15195,6 +15377,364 @@ window.addEventListener('storage', (e) => {
         checkRv32TunnelNotifications();
     }
 });
+
+const hp35State = {
+    stack: [0, 0, 0, 0],
+    display: '0',
+    inputMode: false,
+    hasDecimal: false,
+    lastEntry: false,
+    arcMode: false,
+    trace: [],
+    maxTrace: 50
+};
+
+function hp35TraceLog(lambdaExpr, desc) {
+    hp35State.trace.unshift({ lambda: lambdaExpr, desc: desc, time: Date.now() });
+    if (hp35State.trace.length > hp35State.maxTrace) hp35State.trace.pop();
+}
+
+function hp35StackLift() {
+    hp35State.stack[3] = hp35State.stack[2];
+    hp35State.stack[2] = hp35State.stack[1];
+    hp35State.stack[1] = hp35State.stack[0];
+}
+
+function hp35StackDrop() {
+    hp35State.stack[0] = hp35State.stack[1];
+    hp35State.stack[1] = hp35State.stack[2];
+    hp35State.stack[2] = hp35State.stack[3];
+}
+
+function hp35UpdateDisplay() {
+    const val = hp35State.stack[0];
+    if (hp35State.inputMode) {
+        hp35State.display = hp35State.display;
+    } else {
+        if (val === 0) {
+            hp35State.display = '0.';
+        } else if (Math.abs(val) >= 1e10 || (Math.abs(val) < 0.001 && val !== 0)) {
+            hp35State.display = val.toExponential(9).replace('e+', ' ').replace('e-', ' -').replace('e', ' ');
+        } else {
+            let s = val.toPrecision(10);
+            if (s.indexOf('.') === -1) s += '.';
+            hp35State.display = s;
+        }
+    }
+    renderHP35Display();
+}
+
+function hp35PressDigit(d) {
+    if (!hp35State.inputMode) {
+        if (hp35State.lastEntry) {
+            hp35State.lastEntry = false;
+        } else {
+            hp35StackLift();
+        }
+        hp35State.display = '';
+        hp35State.inputMode = true;
+        hp35State.hasDecimal = false;
+    }
+    if (d === '.' && hp35State.hasDecimal) return;
+    if (d === '.') hp35State.hasDecimal = true;
+    hp35State.display += d;
+    hp35State.stack[0] = parseFloat(hp35State.display) || 0;
+
+    const churchDigit = d === '.' ? 'DECIMAL' : `SUCC^${d}(ZERO)`;
+    hp35TraceLog(`DIGIT(${churchDigit})`, `Key: ${d} → display "${hp35State.display}"`);
+    hp35UpdateDisplay();
+}
+
+function hp35PressEnter() {
+    hp35State.inputMode = false;
+    hp35StackLift();
+    hp35State.lastEntry = true;
+    hp35TraceLog('PUSH X → PAIR(X, PAIR(Y, PAIR(Z, T)))', `ENTER: X=${hp35State.stack[0]} pushed, stack lifted`);
+    hp35UpdateDisplay();
+}
+
+function hp35BinaryOp(name, fn, lambdaExpr) {
+    hp35State.inputMode = false;
+    const x = hp35State.stack[0];
+    const y = hp35State.stack[1];
+    const result = fn(y, x);
+    if (!isFinite(result)) {
+        hp35TraceLog(`${lambdaExpr}(${y}, ${x})`, `FAULT: ${name} → not finite`);
+        return;
+    }
+    hp35StackDrop();
+    hp35State.stack[0] = result;
+    hp35TraceLog(`${lambdaExpr}(${y}, ${x}) = ${result}`, `${name}: ${y} ${name} ${x} = ${result}`);
+    hp35UpdateDisplay();
+}
+
+function hp35UnaryOp(name, fn, lambdaExpr) {
+    hp35State.inputMode = false;
+    const x = hp35State.stack[0];
+    const result = fn(x);
+    if (!isFinite(result)) {
+        hp35TraceLog(`${lambdaExpr}(${x})`, `FAULT: ${name} → not finite`);
+        return;
+    }
+    hp35State.stack[0] = result;
+    hp35TraceLog(`${lambdaExpr}(${x}) = ${result}`, `${name}: f(${x}) = ${result}`);
+    hp35UpdateDisplay();
+}
+
+function hp35PressOp(op) {
+    switch(op) {
+        case '+': hp35BinaryOp('+', (a,b) => a+b, 'CHURCH_ADD'); break;
+        case '-': hp35BinaryOp('-', (a,b) => a-b, 'CHURCH_SUB'); break;
+        case '×': hp35BinaryOp('×', (a,b) => a*b, 'CHURCH_MUL'); break;
+        case '÷': hp35BinaryOp('÷', (a,b) => b===0 ? Infinity : a/b, 'CHURCH_DIV'); break;
+        case 'yˣ': hp35BinaryOp('yˣ', (a,b) => Math.pow(a,b), 'CHURCH_POW'); break;
+        case '√x': hp35UnaryOp('√x', Math.sqrt, 'Y(λf.λg. IF(LEQ(MUL g g) x)(f(SUCC g))(PRED g)) 0'); break;
+        case 'sin':
+            if (hp35State.arcMode) {
+                hp35UnaryOp('arcsin', Math.asin, 'ARC(SIN_TAYLOR)');
+                hp35State.arcMode = false;
+            } else {
+                hp35UnaryOp('sin', Math.sin, 'SIN_TAYLOR(x - x³/3! + x⁵/5! - ...)');
+            }
+            break;
+        case 'cos':
+            if (hp35State.arcMode) {
+                hp35UnaryOp('arccos', Math.acos, 'ARC(COS_TAYLOR)');
+                hp35State.arcMode = false;
+            } else {
+                hp35UnaryOp('cos', Math.cos, 'COS_TAYLOR(1 - x²/2! + x⁴/4! - ...)');
+            }
+            break;
+        case 'tan':
+            if (hp35State.arcMode) {
+                hp35UnaryOp('arctan', Math.atan, 'ARC(DIV(SIN,COS))');
+                hp35State.arcMode = false;
+            } else {
+                hp35UnaryOp('tan', Math.tan, 'DIV(SIN_TAYLOR, COS_TAYLOR)');
+            }
+            break;
+        case 'log': hp35UnaryOp('log₁₀', Math.log10, 'DIV(LN_SERIES(x), LN_SERIES(10))'); break;
+        case 'ln': hp35UnaryOp('ln', Math.log, 'Y(λf.λx. LN_SERIES(x))'); break;
+        case 'eˣ': hp35UnaryOp('eˣ', Math.exp, 'EXP_TAYLOR(1 + x + x²/2! + x³/3! + ...)'); break;
+        case '1/x': hp35UnaryOp('1/x', x => x===0 ? Infinity : 1/x, 'CHURCH_DIV(SUCC ZERO, x)'); break;
+        case 'x²': hp35UnaryOp('x²', x => x*x, 'CHURCH_MUL(x, x)'); break;
+        case 'π':
+            hp35State.inputMode = false;
+            hp35StackLift();
+            hp35State.stack[0] = Math.PI;
+            hp35TraceLog('CALL Constants(GT_PI) → DR0', `π = ${Math.PI}`);
+            hp35UpdateDisplay();
+            break;
+        case 'CHS':
+            hp35State.stack[0] = -hp35State.stack[0];
+            if (hp35State.inputMode && hp35State.display.startsWith('-')) {
+                hp35State.display = hp35State.display.slice(1);
+            } else if (hp35State.inputMode) {
+                hp35State.display = '-' + hp35State.display;
+            }
+            hp35TraceLog('PAIR(NOT(FST sign), SND magnitude)', `CHS: ${-hp35State.stack[0]} → ${hp35State.stack[0]}`);
+            hp35UpdateDisplay();
+            break;
+        case 'CLX':
+            hp35State.stack[0] = 0;
+            hp35State.display = '0.';
+            hp35State.inputMode = false;
+            hp35TraceLog('PAIR(ZERO, SND stack)', 'CLX: clear X register');
+            hp35UpdateDisplay();
+            break;
+        case 'CLR':
+            hp35State.stack = [0, 0, 0, 0];
+            hp35State.display = '0.';
+            hp35State.inputMode = false;
+            hp35State.hasDecimal = false;
+            hp35TraceLog('FALSE — empty stack', 'CLR: clear all registers');
+            hp35UpdateDisplay();
+            break;
+        case 'x⇄y':
+            const tmp = hp35State.stack[0];
+            hp35State.stack[0] = hp35State.stack[1];
+            hp35State.stack[1] = tmp;
+            hp35State.inputMode = false;
+            hp35TraceLog('PAIR(FST(SND s))(PAIR(FST s)(SND(SND s)))', `SWAP: X=${hp35State.stack[0]}, Y=${hp35State.stack[1]}`);
+            hp35UpdateDisplay();
+            break;
+        case 'R↓':
+            const t0 = hp35State.stack[0];
+            hp35State.stack[0] = hp35State.stack[1];
+            hp35State.stack[1] = hp35State.stack[2];
+            hp35State.stack[2] = hp35State.stack[3];
+            hp35State.stack[3] = t0;
+            hp35State.inputMode = false;
+            hp35TraceLog('ROTATE_DOWN(stack)', `R↓: X=${hp35State.stack[0]} Y=${hp35State.stack[1]} Z=${hp35State.stack[2]} T=${hp35State.stack[3]}`);
+            hp35UpdateDisplay();
+            break;
+        case 'STO':
+            hp35TraceLog('SAVE(X, LocalData)', `STO: stored ${hp35State.stack[0]}`);
+            break;
+        case 'RCL':
+            hp35TraceLog('LOAD(LocalData) → X', `RCL: recalled value`);
+            break;
+        case 'EEX':
+            hp35State.inputMode = false;
+            hp35TraceLog('MUL(x, POW(10, e))', 'EEX: enter exponent mode');
+            break;
+        case 'ARC':
+            hp35State.arcMode = !hp35State.arcMode;
+            hp35TraceLog('TOGGLE(arc_mode)', `ARC: ${hp35State.arcMode ? 'ON' : 'OFF'} — next trig uses inverse`);
+            renderHP35Display();
+            break;
+    }
+}
+
+function renderHP35Display() {
+    const displayEl = document.querySelector('.hp35-screen-value');
+    if (displayEl) displayEl.textContent = hp35State.display;
+
+    const arcIndicator = document.querySelector('.hp35-arc-indicator');
+    if (arcIndicator) arcIndicator.style.visibility = hp35State.arcMode ? 'visible' : 'hidden';
+
+    for (let i = 0; i < 4; i++) {
+        const el = document.querySelector(`.hp35-stack-reg[data-reg="${i}"]`);
+        if (el) {
+            const labels = ['X','Y','Z','T'];
+            const val = hp35State.stack[i];
+            let valStr;
+            if (i === 0 && hp35State.inputMode) {
+                valStr = hp35State.display;
+            } else if (Math.abs(val) >= 1e10 || (Math.abs(val) < 0.001 && val !== 0)) {
+                valStr = val.toExponential(6);
+            } else {
+                valStr = val.toPrecision(10);
+            }
+            el.innerHTML = `<span class="hp35-reg-label">${labels[i]}:</span> <span class="hp35-reg-value">${valStr}</span>`;
+        }
+    }
+
+    const traceEl = document.getElementById('hp35TracePanel');
+    if (traceEl) {
+        let traceHtml = '<div class="hp35-trace-header">Lambda Calculus Trace</div>';
+        traceHtml += '<div class="hp35-trace-list">';
+        hp35State.trace.forEach((t, idx) => {
+            traceHtml += `<div class="hp35-trace-entry ${idx === 0 ? 'hp35-trace-latest' : ''}">`;
+            traceHtml += `<div class="hp35-trace-lambda">${t.lambda}</div>`;
+            traceHtml += `<div class="hp35-trace-desc">${t.desc}</div>`;
+            traceHtml += '</div>';
+        });
+        traceHtml += '</div>';
+        traceEl.innerHTML = traceHtml;
+    }
+}
+
+function renderHP35Calculator() {
+    const infoPanel = document.getElementById('hp35InfoPanel');
+    const calcPanel = document.getElementById('hp35CalcPanel');
+    const tracePanel = document.getElementById('hp35TracePanel');
+
+    infoPanel.innerHTML = `
+        <div class="hp35-info-card">
+            <div class="hp35-info-title">HP-35 Scientific Calculator</div>
+            <div class="hp35-info-subtitle">Hewlett-Packard, 1972</div>
+            <div class="hp35-info-desc">The world's first handheld scientific calculator, reimplemented as a CTMM abstraction using pure lambda calculus.</div>
+            <div class="hp35-info-section">
+                <div class="hp35-info-label">Architecture</div>
+                <div class="hp35-info-detail">RPN (Reverse Polish Notation) — no equals key, no parentheses. Enter operands first, then apply the operator.</div>
+            </div>
+            <div class="hp35-info-section">
+                <div class="hp35-info-label">Lambda Foundation</div>
+                <div class="hp35-info-detail">All arithmetic uses Church numerals (λf.λx. f(f(...x))). Stack is nested pairs: PAIR(top, rest). Constants are Abstract GTs from the Constants abstraction.</div>
+            </div>
+            <div class="hp35-info-section">
+                <div class="hp35-info-label">4-Register Stack</div>
+                <div class="hp35-stack-display">
+                    <div class="hp35-stack-reg" data-reg="3"></div>
+                    <div class="hp35-stack-reg" data-reg="2"></div>
+                    <div class="hp35-stack-reg" data-reg="1"></div>
+                    <div class="hp35-stack-reg" data-reg="0"></div>
+                </div>
+            </div>
+            <div class="hp35-info-section">
+                <div class="hp35-info-label">Abstraction Dependencies</div>
+                <div class="hp35-deps">
+                    <span class="hp35-dep-badge" onclick="zoomToAbstraction('Lambda')">Lambda</span>
+                    <span class="hp35-dep-badge" onclick="zoomToAbstraction('Stack')">Stack</span>
+                    <span class="hp35-dep-badge" onclick="zoomToAbstraction('Constants')">Constants</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    calcPanel.innerHTML = `
+        <div class="hp35-body">
+            <div class="hp35-brand">
+                <span class="hp35-hp-logo">HEWLETT · PACKARD</span>
+                <span class="hp35-model">35</span>
+            </div>
+            <div class="hp35-screen">
+                <div class="hp35-arc-indicator" style="visibility:hidden">ARC</div>
+                <div class="hp35-screen-value">${hp35State.display}</div>
+            </div>
+            <div class="hp35-keys">
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('x²')">x²</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('√x')">√x</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('eˣ')">eˣ</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('log')">LOG</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('ln')">LN</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('ARC')">ARC</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('sin')">SIN</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('cos')">COS</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('tan')">TAN</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('1/x')">1/x</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('x⇄y')">x⇄y</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('R↓')">R↓</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('STO')">STO</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('RCL')">RCL</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('yˣ')">yˣ</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-enter" onclick="hp35PressEnter()">ENTER ↑</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('CHS')">CHS</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('EEX')">EEX</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('CLX')">CLX</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('7')">7</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('8')">8</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('9')">9</button>
+                    <button class="hp35-key hp35-key-op" onclick="hp35PressOp('+')">+</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('π')">π</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('4')">4</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('5')">5</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('6')">6</button>
+                    <button class="hp35-key hp35-key-op" onclick="hp35PressOp('-')">−</button>
+                    <button class="hp35-key hp35-key-fn" onclick="hp35PressOp('CLR')">CLR</button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('1')">1</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('2')">2</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('3')">3</button>
+                    <button class="hp35-key hp35-key-op" onclick="hp35PressOp('×')">×</button>
+                    <button class="hp35-key" style="visibility:hidden"></button>
+                </div>
+                <div class="hp35-key-row">
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('0')">0</button>
+                    <button class="hp35-key hp35-key-digit" onclick="hp35PressDigit('.')">.</button>
+                    <button class="hp35-key" style="visibility:hidden"></button>
+                    <button class="hp35-key hp35-key-op" onclick="hp35PressOp('÷')">÷</button>
+                    <button class="hp35-key" style="visibility:hidden"></button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    hp35UpdateDisplay();
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();

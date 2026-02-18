@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
-    <link rel="stylesheet" href="styles.css?v=20260216e">
+    <link rel="stylesheet" href="styles.css?v=20260218a">
 </head>
 <body class="landing-mode">
     <div id="toast-container" class="toast-container"></div>
@@ -20,6 +20,7 @@
                     <button onclick="switchView('editor')" class="btn btn-view tooltip-bottom" id="viewBtn-editor" data-tooltip="Edit assembly code">Assembly</button>
                     <button onclick="switchView('capabilities')" class="btn btn-view tooltip-bottom" id="viewBtn-capabilities" data-tooltip="Explore Golden Tokens">Capabilities</button>
                     <button onclick="switchView('abstractionZoom')" class="btn btn-view tooltip-bottom" id="viewBtn-abstractionZoom" data-tooltip="Zoom into an abstraction — view its C-List and active CR6 entries">Zoom</button>
+                    <button onclick="switchView('hp35calc')" class="btn btn-view tooltip-bottom" id="viewBtn-hp35calc" data-tooltip="HP-35 Scientific Calculator — pure lambda calculus RPN engine">HP-35</button>
                     <button onclick="switchView('instructions')" class="btn btn-view tooltip-bottom" id="viewBtn-instructions" data-tooltip="View Church and Turing instruction sets">Instructions</button>
                     <button onclick="switchView('tutorial')" class="btn btn-view tooltip-bottom" id="viewBtn-tutorial" data-tooltip="Learn CTMM concepts">Tutorial</button>
                     <button onclick="switchView('code')" class="btn btn-view tooltip-bottom" id="viewBtn-code" data-tooltip="Browse simulator source code">Code</button>
@@ -566,6 +567,17 @@ RETURN</pre>
                     <div class="zoom-clist-panel" id="zoomClistPanel">
                         <div class="zoom-empty">Select an abstraction to view its C-List entries</div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="hp35calc" class="view">
+            <div class="hp35-layout">
+                <div class="hp35-info-panel" id="hp35InfoPanel">
+                </div>
+                <div class="hp35-calculator-panel" id="hp35CalcPanel">
+                </div>
+                <div class="hp35-trace-panel" id="hp35TracePanel">
                 </div>
             </div>
         </section>
@@ -1119,7 +1131,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
         </div>
     </div>
 
-    <script src="simulator.js?v=20260216e"></script>
-    <script src="app.js?v=20260216e"></script>
+    <script src="simulator.js?v=20260218a"></script>
+    <script src="app.js?v=20260218a"></script>
 </body>
 </html>

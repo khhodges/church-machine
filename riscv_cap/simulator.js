@@ -50,6 +50,11 @@ class RiscVCapSimulator {
             { location: 0x00011700, limit: 0x000117FF, funcId: 'GT_FST', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00011800, limit: 0x000118FF, funcId: 'GT_SND', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00011900, limit: 0x000119FF, funcId: 'GT_IF', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
+            { location: 0x00011A00, limit: 0x00011AFF, funcId: 'GT_CHURCH_SUB', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
+            { location: 0x00011B00, limit: 0x00011BFF, funcId: 'GT_CHURCH_DIV', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
+            { location: 0x00011C00, limit: 0x00011CFF, funcId: 'GT_CHURCH_POW', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
+            { location: 0x00011D00, limit: 0x00011DFF, funcId: 'GT_CHURCH_ISZERO', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
+            { location: 0x00011E00, limit: 0x00011EFF, funcId: 'GT_CHURCH_LEQ', entryPerms: {R:1,W:0,X:1,L:0,S:0,E:0} },
             { location: 0x00020000, limit: 0x000200FF, funcId: 'TunnelKey_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
             { location: 0xC7440001, limit: 0xC00201FF, funcId: 'Son_Messaging', entryPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, gtType: 1, remoteId: 'ctmm-sim64-kenneth' },
             { location: 0x00020200, limit: 0x000202FF, funcId: 'ABI_Child', entryPerms: {R:1,W:0,X:0,L:0,S:0,E:0} },
@@ -924,6 +929,30 @@ class RiscVCapSimulator {
                     const elseVal = this.x[(rd + 2) & 0x1F] | 0;
                     resultVal = argVal !== 0 ? thenVal : elseVal;
                     desc = `IF(${argVal}, ${thenVal}, ${elseVal}) = ${resultVal}`;
+                } else if (funcId === 'SUB' || funcId === 'GT_CHURCH_SUB') {
+                    const b = this.x[(rd + 1) & 0x1F] | 0;
+                    resultVal = argVal >= b ? (argVal - b) | 0 : 0;
+                    desc = `SUB(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcId === 'DIV' || funcId === 'GT_CHURCH_DIV') {
+                    const b = this.x[(rd + 1) & 0x1F] | 0;
+                    if (b === 0) {
+                        this.fault('ARITHMETIC', `DIV: division by zero`);
+                        this.lambdaActive = false;
+                        return;
+                    }
+                    resultVal = (argVal / b) | 0;
+                    desc = `DIV(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcId === 'POW' || funcId === 'GT_CHURCH_POW') {
+                    const b = this.x[(rd + 1) & 0x1F] | 0;
+                    resultVal = Math.pow(argVal, b) | 0;
+                    desc = `POW(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcId === 'ISZERO' || funcId === 'GT_CHURCH_ISZERO') {
+                    resultVal = argVal === 0 ? 1 : 0;
+                    desc = `ISZERO(${argVal}) = ${resultVal}`;
+                } else if (funcId === 'LEQ' || funcId === 'GT_CHURCH_LEQ') {
+                    const b = this.x[(rd + 1) & 0x1F] | 0;
+                    resultVal = argVal <= b ? 1 : 0;
+                    desc = `LEQ(${argVal}, ${b}) = ${resultVal}`;
                 } else {
                     desc = `λ func[${parsed.index}](${argVal})`;
                 }

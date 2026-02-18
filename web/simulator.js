@@ -851,6 +851,28 @@ class CTMMSimulator {
                     const elseVal = this.getDataReg(2);
                     resultVal = cond ? thenVal : elseVal;
                     computeDesc = `IF(${argVal}, ${thenVal}, ${elseVal}) = ${resultVal}`;
+                } else if (funcName === 'GT_CHURCH_SUB' || funcName === 'SUB') {
+                    const b = this.getDataReg(1);
+                    resultVal = argVal >= b ? argVal - b : 0n;
+                    computeDesc = `SUB(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcName === 'GT_CHURCH_DIV' || funcName === 'DIV') {
+                    const b = this.getDataReg(1);
+                    if (b === 0n) {
+                        return `LAMBDA FAULT: DIV by zero`;
+                    }
+                    resultVal = argVal / b;
+                    computeDesc = `DIV(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcName === 'GT_CHURCH_POW' || funcName === 'POW') {
+                    const b = this.getDataReg(1);
+                    resultVal = argVal ** b;
+                    computeDesc = `POW(${argVal}, ${b}) = ${resultVal}`;
+                } else if (funcName === 'GT_CHURCH_ISZERO' || funcName === 'ISZERO') {
+                    resultVal = argVal === 0n ? 1n : 0n;
+                    computeDesc = `ISZERO(${argVal}) = ${resultVal}`;
+                } else if (funcName === 'GT_CHURCH_LEQ' || funcName === 'LEQ') {
+                    const b = this.getDataReg(1);
+                    resultVal = argVal <= b ? 1n : 0n;
+                    computeDesc = `LEQ(${argVal}, ${b}) = ${resultVal}`;
                 } else {
                     computeDesc = `λ ${funcName}(${argVal}) → applied`;
                 }

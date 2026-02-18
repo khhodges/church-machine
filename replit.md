@@ -38,11 +38,13 @@ The CTMM simulator provides a web-based visualization using a Python HTTP server
     -   **SystemVerilog (`verilog/`)**: A parallel hardware implementation of the CTMM architecture.
 
 ### Web Interface (UI/UX)
-The web interface features a dark-themed, IDE-like design with eight views: Dashboard, Namespace Browser, Assembly Editor, Capabilities Explorer, Zoom (Abstraction detail), Instructions, Tutorial, and Code Browser.
+The web interface features a dark-themed, IDE-like design with ten views: Dashboard, Namespace Browser, Assembly Editor, Capabilities Explorer, Zoom (Abstraction detail), HP-35 Calculator, Instructions, Tutorial, and Code Browser.
 -   **Instructions View Tabs**: Church (capability opcodes), Turing (ARM-style opcodes), Timing (cycle counts), GT Types (Golden Token type system, Abstract GT reference, programmable method-selector security levels, namespace metadata flags, and Abstract GT vs software tokens comparison).
 
 ### Key Features
--   **Built-in Abstractions**: Includes `Boot`, `Threads`, `SlideRule`, `Abacus`, `Circle`, `CapabilityManager`, `DateTime`, `Lambda`, `Constants`, and `FamilyRegistry`.
+-   **Built-in Abstractions**: Includes `Boot`, `Threads`, `SlideRule`, `Abacus`, `Circle`, `CapabilityManager`, `DateTime`, `Lambda`, `Constants`, `FamilyRegistry`, `Stack`, and `HP35`.
+-   **Stack Abstraction**: Church-encoded RPN stack using nested pairs. stack = PAIR(top, rest), empty = FALSE. Operations: PUSH, POP, SWAP, DUP, PEEK, CLEAR, DEPTH — all pure lambda calculus.
+-   **HP35 Calculator Abstraction**: HP-35 scientific calculator (Hewlett-Packard, 1972) rebuilt as CTMM abstraction. Pure lambda calculus RPN engine. Dependencies: Lambda (Church numerals), Stack (RPN pairs), Constants (Abstract GTs for PI). Visual UI with red LED display, authentic key layout, and real-time lambda calculus trace panel.
 -   **Constants Abstraction**: Physical and mathematical constants (PI, E, PHI, SQRT2, LN2, LN10, c, h, k_B, N_A, G) as Abstract GTs — unforgeable identity tokens. Present Abstract GT in CR1, CALL Constants, value returned in DR0. Constants never exist as bare data.
 -   **Instruction Set**: Custom 32-bit CTMM instruction set with Church-specific and Turing-specific operations, including ARM-style condition flags.
 -   **State Persistence**: Automatic saving and restoring of state using browser local storage.
