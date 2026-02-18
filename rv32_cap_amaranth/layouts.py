@@ -21,6 +21,13 @@ NS_ENTRY_LAYOUT = StructLayout({
     "word2_seals":    unsigned(32),
 })
 
+NS_LIMIT_LAYOUT = StructLayout({
+    "limit":    unsigned(17),
+    "reserved": unsigned(13),
+    "f_flag":   unsigned(1),
+    "b_flag":   unsigned(1),
+})
+
 SEALS_LAYOUT = StructLayout({
     "seal":    unsigned(25),
     "version": unsigned(7),

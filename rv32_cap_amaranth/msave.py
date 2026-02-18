@@ -11,6 +11,7 @@ class RV32CapMSave(Elaboratable):
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)
         self.sub_src_gt = Signal(32)
         self.sub_index = Signal(17)
+        self.sub_bind_flag = Signal()
         self.sub_busy = Signal()
         self.sub_done = Signal()
         self.sub_fault = Signal()
@@ -27,6 +28,7 @@ class RV32CapMSave(Elaboratable):
         dst_cap_reg = Signal(CAP_REG_LAYOUT)
         src_gt_reg = Signal(32)
         index_reg = Signal(17)
+        bind_flag_reg = Signal()
         fault_type_reg = Signal(4)
 
         dst_view = View(CAP_REG_LAYOUT, dst_cap_reg)
@@ -47,8 +49,16 @@ class RV32CapMSave(Elaboratable):
                         dst_cap_reg.eq(self.sub_dst_cap),
                         src_gt_reg.eq(self.sub_src_gt),
                         index_reg.eq(self.sub_index),
+                        bind_flag_reg.eq(self.sub_bind_flag),
                         fault_type_reg.eq(FaultType.NONE),
                     ]
+                    m.next = "CHECK_BIND"
+
+            with m.State("CHECK_BIND"):
+                with m.If(~bind_flag_reg):
+                    m.d.sync += fault_type_reg.eq(FaultType.BIND)
+                    m.next = "FAULT"
+                with m.Else():
                     m.next = "CHECK_S"
 
             with m.State("CHECK_S"):

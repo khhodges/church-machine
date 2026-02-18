@@ -11,6 +11,7 @@ from .lambda_unit import RV32CapLambda
 from .call import RV32CapCall
 from .ret import RV32CapReturn
 from .tperm import RV32CapTperm
+from .save import RV32CapSave
 
 
 class RV32CapCore(Elaboratable):
@@ -62,6 +63,7 @@ class RV32CapCore(Elaboratable):
         u_call = RV32CapCall()
         u_return = RV32CapReturn()
         u_tperm = RV32CapTperm()
+        u_save = RV32CapSave()
         m.submodules.u_registers = u_regs
         m.submodules.u_decoder = u_decoder
         m.submodules.u_perm_check = u_perm
@@ -70,6 +72,7 @@ class RV32CapCore(Elaboratable):
         m.submodules.u_call = u_call
         m.submodules.u_return = u_return
         m.submodules.u_tperm = u_tperm
+        m.submodules.u_save = u_save
 
         nia_reg = Signal(32)
         nia_next = Signal(32)
@@ -129,7 +132,8 @@ class RV32CapCore(Elaboratable):
                 Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                     Mux(u_call.call_busy, u_call.cr_rd_addr,
                         Mux(u_return.busy, u_return.cr_rd_addr,
-                            cr_src))))
+                            Mux(u_save.save_busy, u_save.cr_rd_addr,
+                                cr_src)))))
         )
 
         perm_gt_sig = Signal(GT_LAYOUT)
@@ -570,6 +574,20 @@ class RV32CapCore(Elaboratable):
             u_tperm.cr_rd_data.eq(u_regs.cr_rd_data),
         ]
 
+        save_start_sig = Signal()
+        m.d.comb += save_start_sig.eq(
+            exec_enable & is_church_op & (church_op == ChurchOpcode.SAVE) & all_checks_pass
+        )
+        m.d.comb += [
+            u_save.save_start.eq(save_start_sig),
+            u_save.cr_src.eq(cr_src),
+            u_save.cr_dst.eq(cr_dst),
+            u_save.index.eq(cap_index),
+            u_save.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_save.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_save.mem_wr_done.eq(1),
+        ]
+
         CR5_STACK_DEPTH = 256
         cr5_stack = Memory(width=32, depth=CR5_STACK_DEPTH, init=[])
         m.submodules.cr5_stack = cr5_stack
@@ -611,13 +629,20 @@ class RV32CapCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_call.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_return.fault_valid):
             m.d.comb += [self.fault.eq(u_return.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_save.save_fault):
+            m.d.comb += [self.fault.eq(u_save.fault_type), self.fault_valid.eq(1)]
         with m.Else():
             m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]
 
         m.d.comb += [
-            self.ns_addr.eq(0),
-            self.ns_rd_en.eq(0),
+            self.ns_addr.eq(Mux(u_save.ns_rd_en, u_save.ns_rd_addr, 0)),
+            self.ns_rd_en.eq(u_save.ns_rd_en),
             self.ns_wr_en.eq(0),
+        ]
+
+        m.d.comb += [
+            u_save.ns_rd_data.eq(self.ns_rd_data[:32]),
+            u_save.ns_rd_valid.eq(self.ns_rd_en),
         ]
 
         return m

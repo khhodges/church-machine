@@ -48,6 +48,12 @@ SEAL_BITS       = 25
 MAX_NS_ENTRIES  = 1 << GT_INDEX_BITS
 MAX_GT_VERSION  = (1 << GT_VERSION_BITS) - 1
 
+NS_FLAG_B_BIT = 31
+NS_FLAG_F_BIT = 30
+NS_FLAG_B_MASK = 1 << NS_FLAG_B_BIT
+NS_FLAG_F_MASK = 1 << NS_FLAG_F_BIT
+NS_LIMIT_MASK  = (1 << GT_INDEX_BITS) - 1
+
 FNV_OFFSET_32 = 0x811c9dc5
 FNV_PRIME_32  = 0x01000193
 FNV_SEAL_MASK = (1 << SEAL_BITS) - 1
@@ -180,6 +186,7 @@ class FaultType(IntEnum):
     INVALID_OP    = 0xB
     TPERM_RSV     = 0xC
     DOMAIN_PURITY = 0xD
+    BIND          = 0xE
 
 
 class BootState(IntEnum):

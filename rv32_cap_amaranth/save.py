@@ -2,7 +2,7 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_LIMIT_LAYOUT
 from .msave import RV32CapMSave
 
 
@@ -25,6 +25,11 @@ class RV32CapSave(Elaboratable):
         self.mem_wr_en = Signal()
         self.mem_wr_done = Signal()
 
+        self.ns_rd_addr = Signal(32)
+        self.ns_rd_en = Signal()
+        self.ns_rd_data = Signal(32)
+        self.ns_rd_valid = Signal()
+
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
 
     def elaborate(self, platform):
@@ -37,6 +42,7 @@ class RV32CapSave(Elaboratable):
 
         dst_reg_latched = Signal(CAP_REG_LAYOUT)
         src_reg_latched = Signal(CAP_REG_LAYOUT)
+        bind_flag_latched = Signal()
         fault_latched = Signal()
         fault_type_latched = Signal(4)
         sub_start = Signal()
@@ -48,12 +54,21 @@ class RV32CapSave(Elaboratable):
         m.d.comb += dst_in_range.eq(self.cr_dst <= MAX_CLIST_REG)
 
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
+        dst_view = View(CAP_REG_LAYOUT, dst_reg_latched)
+        dst_gt = View(GT_LAYOUT, dst_view.word0_gt)
+
+        ns15_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
+        ns_base = ns15_view.word1_location
+
+        ns_entry_addr = Signal(32)
+        m.d.comb += ns_entry_addr.eq(ns_base + (dst_gt.index * 12) + 4)
 
         m.d.comb += [
             u_msave.sub_start.eq(sub_start),
             u_msave.sub_dst_cap.eq(dst_reg_latched),
             u_msave.sub_src_gt.eq(src_view.word0_gt),
             u_msave.sub_index.eq(self.index),
+            u_msave.sub_bind_flag.eq(bind_flag_latched),
             u_msave.mem_wr_done.eq(self.mem_wr_done),
         ]
         m.d.comb += [
@@ -67,6 +82,7 @@ class RV32CapSave(Elaboratable):
             with m.State("IDLE"):
                 m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
                 m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                m.d.sync += bind_flag_latched.eq(0)
                 with m.If(self.save_start):
                     m.d.comb += self.cr_rd_addr.eq(self.cr_dst)
                     m.next = "CHECK_DST_READ"
@@ -86,9 +102,18 @@ class RV32CapSave(Elaboratable):
 
             with m.State("LATCH_SRC"):
                 m.d.sync += src_reg_latched.eq(self.cr_rd_data)
-                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
-                m.d.sync += sub_start_reg.eq(1)
-                m.next = "CALL_SUB"
+                m.next = "READ_NS_LIMIT"
+
+            with m.State("READ_NS_LIMIT"):
+                m.d.comb += [
+                    self.ns_rd_addr.eq(ns_entry_addr),
+                    self.ns_rd_en.eq(1),
+                ]
+                with m.If(self.ns_rd_valid):
+                    ns_limit_view = View(NS_LIMIT_LAYOUT, self.ns_rd_data)
+                    m.d.sync += bind_flag_latched.eq(ns_limit_view.b_flag)
+                    m.d.sync += sub_start_reg.eq(1)
+                    m.next = "CALL_SUB"
 
             with m.State("CALL_SUB"):
                 m.d.sync += sub_start_reg.eq(0)
