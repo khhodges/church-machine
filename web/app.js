@@ -1841,23 +1841,43 @@ function getContentTabInfo(cap) {
         const base = threadNS ? `0x${threadNS.word1_location.toString(16).toUpperCase()}` : '--';
         const size = threadNS ? `0x${threadNS.word2_limit.toString(16).toUpperCase()}` : '--';
         const threadEntries = threadInfo ? threadInfo.clist : [];
+
+        const formatCR = (idx) => {
+            const reg = (idx === 8) ? simulator.cr8 : simulator.contextRegs[idx];
+            if (!reg || reg.name === 'NULL') return '<span style="color:var(--text-muted)">— empty —</span>';
+            const permsStr = reg.perms && reg.perms.length > 0 ? ` [${reg.perms.join('')}]` : '';
+            const typeStr = reg.type ? ` (${reg.type})` : '';
+            return `${reg.name}${permsStr}${typeStr}`;
+        };
+
+        let crRows = '';
+        for (let i = 0; i <= 7; i++) {
+            const reg = simulator.contextRegs[i];
+            if (reg && reg.name && reg.name !== 'NULL') {
+                crRows += `<div class="content-tab-field"><span class="content-tab-key">CR${i}</span><span class="content-tab-val">${formatCR(i)}</span></div>`;
+            }
+        }
+        crRows += `<div class="content-tab-field"><span class="content-tab-key">CR8</span><span class="content-tab-val">${formatCR(8)}</span></div>`;
+
+        const cr6 = simulator.contextRegs[6];
+        let clistShadow = '';
+        if (cr6 && cr6.clist && cr6.clist.length > 0) {
+            clistShadow = `<div class="content-tab-heading" style="margin-top:0.5rem;">C-List Shadow (${cr6.name} in CR6)</div>
+                <div class="clist-tab-entries">${renderCListEntries(cr6.clist.map((e, i) => ({...e, nsOffset: e.nsOffset})), cr6.name)}</div>`;
+        }
+
         return {
             label: 'Thread',
-            tooltip: 'Thread object layout and C-List snippet',
+            tooltip: 'Thread object layout — live context register state',
             html: `<div class="content-tab-section">
                 <div class="content-tab-heading">Thread Identity: ${capName}</div>
                 <div class="content-tab-grid">
                     <div class="content-tab-field"><span class="content-tab-key">Base</span><span class="content-tab-val">${base}</span></div>
                     <div class="content-tab-field"><span class="content-tab-key">Size</span><span class="content-tab-val">${size}</span></div>
-                    <div class="content-tab-field"><span class="content-tab-key">CR8</span><span class="content-tab-val">${capName} [M on CR]</span></div>
-                    <div class="content-tab-field"><span class="content-tab-key">CR6</span><span class="content-tab-val">${capName} C-List [E]</span></div>
                 </div>
-                <div class="content-tab-heading" style="margin-top:0.5rem;">Context Registers</div>
-                <div class="content-tab-grid">
-                    <div class="content-tab-field"><span class="content-tab-key">CR5</span><span class="content-tab-val">Services C-List [E] (stable)</span></div>
-                    <div class="content-tab-field"><span class="content-tab-key">CR6</span><span class="content-tab-val">Boot C-List [E] (dynamic — switches on CALL/RETURN)</span></div>
-                    <div class="content-tab-field"><span class="content-tab-key">CR7</span><span class="content-tab-val">Access [X] (dynamic — switches on CALL/RETURN)</span></div>
-                </div>
+                <div class="content-tab-heading" style="margin-top:0.5rem;">Context Registers (live)</div>
+                <div class="content-tab-grid">${crRows}</div>
+                ${clistShadow}
                 ${threadEntries.length > 0 ? `<div class="content-tab-heading" style="margin-top:0.5rem;">Thread-Local Entries</div>
                 <div class="clist-tab-entries">${renderCListEntries(threadEntries.map((e, i) => ({...e, nsOffset: e.nsOffset})), capName)}</div>` : ''}
                 ${threadInfo ? `<div class="content-tab-desc">${threadInfo.description}</div>` : ''}
