@@ -3,8 +3,8 @@
 Network Transparency Design Validation Tests for RV32-Cap (Sim-32)
 
 Validates the architectural design for CALL(CONNECT(me, mymother)):
-  - GT Type field encoding (Inform, Outform, Literal, Abstract)
-  - Literal GT as crypto tunnel key handle (key material in namespace entry)
+  - GT Type field encoding (Inform, Outform, NULL, Abstract)
+  - Inform GT as crypto tunnel key handle (key material in namespace entry)
   - Namespace construction and MAC validation for Outform scenarios
   - Permission checks (R=fetch, W=flush, E=RPC, L/S/X=TRAP)
   - GC-tied cache invalidation and tunnel revocation
@@ -30,7 +30,7 @@ from boot_builder import BootImageBuilder
 
 GT_TYPE_INFORM = 0
 GT_TYPE_OUTFORM = 1
-GT_TYPE_LITERAL = 2
+GT_TYPE_NULL = 2
 GT_TYPE_ABSTRACT = 3
 
 
@@ -47,7 +47,7 @@ class TestNetworkTransparencySetup(unittest.TestCase):
         self.me.add_namespace_entry(0x00000000, 0x00003FFF)  # 1: C-List
         self.me.add_namespace_entry(0x00004000, 0x00007FFF)  # 2: Code
         self.me.add_namespace_entry(0x00008000, 0x000000FF)  # 3: Thread
-        self.me.add_namespace_entry(0x0000A000, 0x0000A01F)  # 4: TunnelKey_Mother (Literal)
+        self.me.add_namespace_entry(0x0000A000, 0x0000A01F)  # 4: TunnelKey_Mother (Inform)
         self.me.add_namespace_entry(0x0000B000, 0x0000B0FF)  # 5: Mother_CList (Outform)
         self.me.add_namespace_entry(0x0000C000, 0x0000C0FF)  # 6: Mother_Service (Outform/Abstract)
         return self.me.namespace_table
@@ -65,7 +65,7 @@ class TestNetworkTransparencySetup(unittest.TestCase):
 
 
 class TestGTTypeField(TestNetworkTransparencySetup):
-    """Verify GT type field correctly encodes Inform, Outform, Literal, Abstract."""
+    """Verify GT type field correctly encodes Inform, Outform, NULL, Abstract."""
 
     def test_inform_gt(self):
         gt = self.me.create_gt(0, 1, {'L': 1, 'S': 1}, GT_TYPE_INFORM)
@@ -84,12 +84,11 @@ class TestGTTypeField(TestNetworkTransparencySetup):
         self.assertEqual(parsed['index'], 5)
         self.assertEqual(parsed['permissions']['R'], 1)
 
-    def test_literal_gt(self):
-        gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+    def test_null_gt(self):
+        gt = self.me.create_gt(0, 0, {}, GT_TYPE_NULL)
         parsed = self.me.parse_gt(gt)
-        self.assertEqual(parsed['type'], GT_TYPE_LITERAL)
-        self.assertEqual(parsed['typeName'], 'Literal')
-        self.assertEqual(parsed['index'], 4)
+        self.assertEqual(parsed['type'], GT_TYPE_NULL)
+        self.assertEqual(parsed['typeName'], 'NULL')
 
     def test_abstract_gt(self):
         gt = self.me.create_gt(0, 6, {'E': 1, 'L': 1, 'S': 1}, GT_TYPE_ABSTRACT)
@@ -108,21 +107,22 @@ class TestGTTypeField(TestNetworkTransparencySetup):
         self.assertEqual(parsed['permissions']['W'], 0)
 
 
-class TestLiteralGTTunnelKey(TestNetworkTransparencySetup):
-    """Verify Literal GT as crypto tunnel key for namespace-to-namespace tunnels."""
+class TestInformGTTunnelKey(TestNetworkTransparencySetup):
+    """Verify Inform GT as crypto tunnel key for namespace-to-namespace tunnels."""
 
     def test_tunnel_key_construction(self):
-        """Literal GT is a handle; key material lives in the namespace entry.
+        """Inform GT is a handle; key material lives in the namespace entry.
 
         The GT's index field points to the namespace entry. The entry's
         Location and Limit fields hold the actual cryptographic key data.
-        The MAC seal protects key integrity.
+        The MAC seal protects key integrity. Accessed via CAP.LOAD with
+        R permission per GT-Literals removal (Feb 14 2026).
         """
         self._build_me_namespace()
-        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_INFORM)
         parsed = self.me.parse_gt(tunnel_key_gt)
 
-        self.assertEqual(parsed['type'], GT_TYPE_LITERAL)
+        self.assertEqual(parsed['type'], GT_TYPE_INFORM)
         self.assertEqual(parsed['index'], 4)
 
         entry = self.me.namespace_table[parsed['index']]
@@ -149,13 +149,13 @@ class TestLiteralGTTunnelKey(TestNetworkTransparencySetup):
         self.assertEqual(me_seal, mother_seal)
 
     def test_tunnel_key_revocation(self):
-        """GC sweep bumps version on Literal GT entry, invalidating tunnel key."""
+        """GC sweep bumps version on tunnel key entry, invalidating tunnel."""
         self._build_me_namespace()
         entry = self.me.namespace_table[4]
         original_version = (entry['versionSeals'] >> 25) & 0x7F
         self.assertEqual(original_version, 0)
 
-        tunnel_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+        tunnel_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_INFORM)
         parsed_before = self.me.parse_gt(tunnel_gt)
         self.assertEqual(parsed_before['version'], 0)
 
@@ -317,13 +317,13 @@ class TestOutformRPC(TestNetworkTransparencySetup):
         """E permission on Outform Abstract GT enables RPC through tunnel.
 
         Simulates the CALL(CONNECT(me, mymother)) flow:
-        1. Load tunnel key (Literal GT) from C-List
+        1. Load tunnel key (Inform GT) from C-List
         2. Load remote service GT (Outform) from C-List
         3. CALL on Outform Abstract → RPC via encrypted tunnel
         """
-        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_INFORM)
         tunnel_parsed = self.me.parse_gt(tunnel_key_gt)
-        self.assertEqual(tunnel_parsed['type'], GT_TYPE_LITERAL)
+        self.assertEqual(tunnel_parsed['type'], GT_TYPE_INFORM)
 
         service_gt = self.me.create_gt(0, 6, {'E': 1, 'L': 1, 'S': 1}, GT_TYPE_OUTFORM)
         service_parsed = self.me.parse_gt(service_gt)
@@ -527,15 +527,15 @@ class TestCacheInvalidationGC(TestNetworkTransparencySetup):
             self.assertEqual(ver, 1)
             self.assertTrue(self.me.validate_mac(self.me.namespace_table[idx]))
 
-    def test_literal_gt_sweep_kills_tunnel(self):
-        """GC sweep of Literal GT (tunnel key) invalidates the tunnel.
+    def test_tunnel_key_sweep_kills_tunnel(self):
+        """GC sweep of tunnel key (Inform GT) invalidates the tunnel.
 
         After sweep:
         - Tunnel key version bumped
         - Any GT referencing old version → FAULT:VERSION
         - Tunnel is dead — no new communication possible
         """
-        tunnel_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+        tunnel_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_INFORM)
         parsed_before = self.me.parse_gt(tunnel_gt)
         self.assertEqual(parsed_before['version'], 0)
 
@@ -551,7 +551,7 @@ class TestCacheInvalidationGC(TestNetworkTransparencySetup):
         ns_version = (entry['versionSeals'] >> 25) & 0x7F
         self.assertNotEqual(parsed_before['version'], ns_version)
 
-        new_tunnel_gt = self.me.create_gt(new_ver, 4, {'R': 1}, GT_TYPE_LITERAL)
+        new_tunnel_gt = self.me.create_gt(new_ver, 4, {'R': 1}, GT_TYPE_INFORM)
         parsed_new = self.me.parse_gt(new_tunnel_gt)
         self.assertEqual(parsed_new['version'], ns_version)
 
@@ -560,13 +560,13 @@ class TestConnectMeMymother(TestNetworkTransparencySetup):
     """End-to-end test of the CALL(CONNECT(me, mymother)) instruction sequence.
 
     Simulates the complete flow:
-      CAP.LOAD  CR0, CR6, 4    ; CR0 = TunnelKey_Mother (Literal GT)
+      CAP.LOAD  CR0, CR6, 4    ; CR0 = TunnelKey_Mother (Inform GT)
       CAP.LOAD  CR1, CR6, 6    ; CR1 = Mother_Service (Outform GT)
       CAP.CALL  CR1            ; RPC call through encrypted tunnel
 
     Validates:
       - C-List access with L permission
-      - GT construction for Literal and Outform types
+      - GT construction for Inform and Outform types
       - MAC validation on all namespace entries
       - Version consistency
       - E permission check for RPC
@@ -595,11 +595,11 @@ class TestConnectMeMymother(TestNetworkTransparencySetup):
             (tunnel_key_entry['versionSeals'] >> 25) & 0x7F,
             4,
             {'R': 1},
-            GT_TYPE_LITERAL,
+            GT_TYPE_INFORM,
         )
         tunnel_parsed = self.me.parse_gt(tunnel_key_gt)
-        self.assertEqual(tunnel_parsed['type'], GT_TYPE_LITERAL)
-        self.assertEqual(tunnel_parsed['typeName'], 'Literal')
+        self.assertEqual(tunnel_parsed['type'], GT_TYPE_INFORM)
+        self.assertEqual(tunnel_parsed['typeName'], 'Inform')
 
         service_entry = self.me.namespace_table[6]
         self.assertTrue(self.me.validate_mac(service_entry))
@@ -646,7 +646,7 @@ class TestConnectMeMymother(TestNetworkTransparencySetup):
 
     def test_connect_fails_with_revoked_tunnel(self):
         """CALL(CONNECT(me, mymother)) fails if tunnel key has been GC-swept."""
-        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_LITERAL)
+        tunnel_key_gt = self.me.create_gt(0, 4, {'R': 1}, GT_TYPE_INFORM)
 
         entry = self.me.namespace_table[4]
         old_ver = (entry['versionSeals'] >> 25) & 0x7F
@@ -672,12 +672,12 @@ class TestAssemblyExample(unittest.TestCase):
         """Verify the assembly program structure for the CONNECT example."""
         assembly = """; CALL(CONNECT(me, mymother))
 ; Network-transparent RPC to mymother's service
-; Demonstrates: Literal GT tunnel key + Outform RPC
+; Demonstrates: Inform GT tunnel key + Outform RPC
 
 ; Boot: CR6 = C-List (L,S), CR7 = Code (E), CR15 = Namespace root
 
 ; Step 1: Load tunnel key from C-List slot 4
-; CR0 = TunnelKey_Mother (Literal GT)
+; CR0 = TunnelKey_Mother (Inform GT, R permission)
 CAP.LOAD CR0, CR6, 4
 
 ; Step 2: Load remote service handle from C-List slot 6
@@ -706,7 +706,7 @@ EBREAK
         self.assertIn('CAP.LOAD CR0, CR6, 4', assembly)
         self.assertIn('CAP.LOAD CR1, CR6, 6', assembly)
         self.assertIn('CAP.CALL CR1', assembly)
-        self.assertIn('Literal GT', assembly)
+        self.assertIn('Inform GT', assembly)
         self.assertIn('Outform', assembly)
         self.assertIn('tunnel key', assembly)
         self.assertIn('network-transparent', assembly)
