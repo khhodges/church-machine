@@ -661,9 +661,575 @@ header h1 {
     font-style: italic;
 }
 
+.pipeline-wrapper {
+    padding: 1rem;
+}
+
+.pipeline-mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.btn-mode {
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-mode.active {
+    background: var(--church-gold);
+    color: var(--bg-dark);
+    font-weight: 600;
+    border-color: var(--church-gold);
+}
+
+.pipeline-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--church-gold);
+    margin-bottom: 0.25rem;
+}
+
+.pipeline-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.pipeline-stages {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+}
+
+.pipeline-stage {
+    background: var(--bg-panel);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    min-width: 100px;
+    text-align: center;
+    transition: all 0.3s;
+    flex-shrink: 0;
+}
+
+.pipeline-stage.stage-done {
+    border-color: var(--church-green);
+    background: rgba(74, 222, 128, 0.08);
+}
+
+.pipeline-stage.stage-active {
+    border-color: var(--church-gold);
+    background: rgba(251, 191, 36, 0.12);
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.3);
+}
+
+.pipeline-stage.stage-fused {
+    border-style: dashed;
+    min-width: 130px;
+}
+
+.pipeline-stage.stage-fused.stage-done {
+    border-style: solid;
+}
+
+.stage-number {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.15rem;
+}
+
+.stage-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stage-desc {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-top: 0.15rem;
+    line-height: 1.3;
+}
+
+.stage-substeps {
+    margin-top: 0.3rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.3rem;
+}
+
+.substep {
+    font-size: 0.6rem;
+    color: var(--church-blue);
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+}
+
+.stage-gt {
+    font-size: 0.6rem;
+    color: var(--church-gold);
+    font-family: 'Courier New', monospace;
+    margin-top: 0.2rem;
+}
+
+.stage-perm {
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-top: 0.15rem;
+}
+
+.stage-perm.pass { color: var(--church-green); }
+.stage-perm.fail { color: var(--error); }
+
+.pipeline-arrow {
+    font-size: 1.2rem;
+    color: var(--border);
+    flex-shrink: 0;
+}
+
+.pipeline-arrow.arrow-done {
+    color: var(--church-green);
+}
+
+.pipeline-info {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: var(--bg-input);
+    border-radius: 6px;
+}
+
+.pipeline-current {
+    font-weight: 600;
+    color: var(--church-gold);
+    font-size: 0.85rem;
+}
+
+.pipeline-current.pipeline-complete {
+    color: var(--church-green);
+}
+
+.pipeline-detail {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.pipeline-cycle-comparison {
+    margin-top: 1rem;
+}
+
+.cycle-bar-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.4rem;
+}
+
+.cycle-bar {
+    height: 28px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    margin-bottom: 0.3rem;
+    overflow: hidden;
+}
+
+.cycle-bar-old {
+    height: 100%;
+    background: rgba(248, 113, 113, 0.3);
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--error);
+}
+
+.cycle-bar-new {
+    height: 100%;
+    background: rgba(74, 222, 128, 0.3);
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--church-green);
+    min-width: 80px;
+}
+
+.tutorial-wrapper {
+    padding: 1rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.tutorial-header {
+    margin-bottom: 1rem;
+}
+
+.tutorial-header h2 {
+    font-size: 1.1rem;
+    color: var(--church-gold);
+    margin-bottom: 0.25rem;
+}
+
+.tutorial-tagline {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.tutorial-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.btn-tutorial {
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-tutorial:hover:not(:disabled) {
+    background: var(--church-gold);
+    color: var(--bg-dark);
+}
+
+.btn-tutorial:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.btn-run-all {
+    margin-left: auto;
+    background: var(--church-green);
+    color: var(--bg-dark);
+    font-weight: 600;
+}
+
+.tutorial-progress {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-family: 'Courier New', monospace;
+}
+
+.tutorial-phase-indicators {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.phase-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    min-width: 60px;
+}
+
+.phase-indicator.phase-done {
+    border-color: var(--church-green);
+    background: rgba(74, 222, 128, 0.06);
+}
+
+.phase-indicator.phase-active {
+    border-color: var(--church-gold);
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.phase-num {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--church-gold);
+}
+
+.phase-label {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+}
+
+.phase-connector {
+    width: 20px;
+    height: 2px;
+    background: var(--border);
+}
+
+.tutorial-body {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    gap: 1rem;
+    flex: 1;
+    overflow: hidden;
+}
+
+.tutorial-step-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.tutorial-step-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.tutorial-step-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+}
+
+.tutorial-code {
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.tutorial-code code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--church-blue);
+}
+
+.tutorial-result {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--church-green);
+    padding: 0.4rem 0;
+    font-weight: 600;
+}
+
+.tutorial-cycles {
+    font-size: 0.75rem;
+    color: var(--church-gold);
+    font-family: 'Courier New', monospace;
+    margin-top: 0.25rem;
+}
+
+.tutorial-error {
+    color: var(--error);
+    font-size: 0.85rem;
+}
+
+.phase-summary {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-dark);
+    border-radius: 6px;
+    border: 1px solid var(--church-gold);
+}
+
+.summary-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--church-gold);
+    font-family: 'Courier New', monospace;
+}
+
+.chain-demo {
+    background: var(--bg-dark);
+    border: 1px solid var(--church-gold);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.chain-label {
+    font-size: 0.8rem;
+    color: var(--church-gold);
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+}
+
+.chain-sequence {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: var(--church-blue);
+    background: var(--bg-input);
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    margin-bottom: 0.6rem;
+}
+
+.chain-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.chain-step {
+    font-family: 'Courier New', monospace;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+}
+
+.chain-entry {
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--church-gold);
+}
+
+.chain-method {
+    background: rgba(96, 165, 250, 0.08);
+    color: var(--church-blue);
+    padding-left: 1.5rem;
+}
+
+.chain-exit {
+    background: rgba(74, 222, 128, 0.08);
+    color: var(--church-green);
+}
+
+.chain-cycles {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--church-green);
+    font-weight: 600;
+}
+
+.comparison-table {
+    margin: 1rem 0;
+}
+
+.comparison-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 80px 80px;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+}
+
+.comparison-header {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.comp-col {
+    font-size: 0.85rem;
+}
+
+.comp-phase {
+    font-weight: 700;
+    color: var(--church-gold);
+    font-size: 1rem;
+}
+
+.comp-cycles {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+}
+
+.comp-reduction {
+    color: var(--church-green);
+    font-weight: 700;
+}
+
+.phase-1-row .comp-cycles { color: var(--error); }
+.phase-2-row .comp-cycles { color: var(--warning); }
+.phase-3-row .comp-cycles { color: var(--church-green); }
+
+.comparison-insight {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: rgba(251, 191, 36, 0.06);
+    border: 1px solid var(--church-gold);
+    border-radius: 8px;
+}
+
+.insight-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--church-gold);
+    margin-bottom: 0.4rem;
+}
+
+.insight-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.comparison-bars {
+    margin-top: 1rem;
+}
+
+.bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+}
+
+.bar-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    width: 55px;
+    flex-shrink: 0;
+}
+
+.bar-track {
+    flex: 1;
+    height: 24px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 4px;
+}
+
+.bar-phase1 { background: rgba(248, 113, 113, 0.3); color: var(--error); }
+.bar-phase2 { background: rgba(251, 191, 36, 0.3); color: var(--warning); }
+.bar-phase3 { background: rgba(74, 222, 128, 0.3); color: var(--church-green); min-width: 80px; }
+
 @media (max-width: 800px) {
     .editor-layout { grid-template-columns: 1fr; }
     .repl-layout { grid-template-columns: 1fr; }
     .tutorial-body { grid-template-columns: 1fr; }
     .pipeline-stages { flex-wrap: wrap; }
+    .comparison-row { grid-template-columns: 30px 1fr 60px 60px; }
 }

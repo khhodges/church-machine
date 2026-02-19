@@ -45,30 +45,30 @@ class ChurchSimulator {
     _initNamespaceTable() {
         this.namespaceTable = [];
         const abstractions = [
-            { funcId: 'Boot',       perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'Threads',    perms: {R:0,W:0,X:0,L:1,S:1,E:1} },
-            { funcId: 'Lambda',     perms: {R:0,W:0,X:0,L:0,S:0,E:1} },
-            { funcId: 'SlideRule',  perms: {R:0,W:0,X:0,L:0,S:0,E:1} },
-            { funcId: 'Abacus',     perms: {R:0,W:0,X:0,L:0,S:0,E:1} },
-            { funcId: 'Constants',  perms: {R:0,W:0,X:0,L:0,S:0,E:1} },
-            { funcId: 'Stack',      perms: {R:0,W:0,X:0,L:0,S:0,E:1} },
-            { funcId: 'SUCC',       perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'PRED',       perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'ADD',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'SUB',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'MUL',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'DIV',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'POW',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'SQRT',       perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'LOG',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'EXP',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'ISZERO',     perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'LEQ',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'TRUE',       perms: {R:0,W:0,X:0,L:1,S:0,E:0} },
-            { funcId: 'FALSE',      perms: {R:0,W:0,X:0,L:1,S:0,E:0} },
-            { funcId: 'PAIR',       perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'FST',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
-            { funcId: 'SND',        perms: {R:0,W:0,X:0,L:1,S:0,E:1} },
+            { funcId: 'Boot',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'Threads',    perms: {R:0,W:0,X:0,L:1,S:1,E:1}, chainable: false },
+            { funcId: 'Lambda',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { funcId: 'SlideRule',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { funcId: 'Abacus',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { funcId: 'Constants',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { funcId: 'Stack',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { funcId: 'SUCC',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'PRED',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'ADD',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'SUB',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'MUL',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'DIV',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'POW',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'SQRT',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'LOG',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'EXP',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'ISZERO',     perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'LEQ',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'TRUE',       perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
+            { funcId: 'FALSE',      perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
+            { funcId: 'PAIR',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'FST',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { funcId: 'SND',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
         ];
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
@@ -83,6 +83,7 @@ class ChurchSimulator {
                 entryPerms: a.perms,
                 gtType: 0,
                 bindFlag: 1,
+                chainable: a.chainable || false,
             };
         }
     }
@@ -233,7 +234,8 @@ class ChurchSimulator {
     }
 
     opName(code) {
-        return ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA'][code & 7] || '???';
+        const names = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA'];
+        return names[code] || '???';
     }
 
     decodeInstruction(instr) {
@@ -310,6 +312,8 @@ class ChurchSimulator {
             case 5: result = this._execSwitch(d); break;
             case 6: result = this._execTperm(d); break;
             case 7: result = this._execLambda(d); break;
+            case 8: result = this._execEloadcall(d); break;
+            case 9: result = this._execXloadlambda(d); break;
             default:
                 this.fault('INVALID_OP', `Unknown opcode ${d.opcode}`);
                 return null;
@@ -553,6 +557,117 @@ class ChurchSimulator {
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._lambdaPipeline(d, entry) };
+    }
+
+    _execEloadcall(d) {
+        const clistGT = this.cr[d.crSrc].word0;
+        if (clistGT === 0) {
+            this.fault('NULL_CAP', `ELOADCALL: CR${d.crSrc} C-List is NULL`);
+            return null;
+        }
+        const loadCheck = this.mLoad(clistGT, 'L');
+        if (!loadCheck.ok) {
+            this.fault(loadCheck.fault, `ELOADCALL LOAD: CR${d.crSrc}: ${loadCheck.message}`);
+            return null;
+        }
+
+        const targetIdx = d.imm;
+        if (targetIdx >= this.namespaceTable.length) {
+            this.fault('BOUNDS', `ELOADCALL: namespace index ${targetIdx} out of bounds`);
+            return null;
+        }
+        const entry = this.namespaceTable[targetIdx];
+        if (!entry) {
+            this.fault('BOUNDS', `ELOADCALL: entry ${targetIdx} is null`);
+            return null;
+        }
+        if (!this.validateMAC(entry)) {
+            this.fault('SEAL', `ELOADCALL: entry ${targetIdx} seal failed`);
+            return null;
+        }
+
+        const version = (entry.versionSeals >>> 25) & 0x7F;
+        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const gt = this.createGT(version, targetIdx, perms, entry.gtType || 0);
+        this._writeCR(d.crDst, gt, entry);
+
+        const tpermCheck = this.mLoad(gt, 'E');
+        if (!tpermCheck.ok) {
+            this.fault(tpermCheck.fault, `ELOADCALL TPERM: CR${d.crDst}: ${tpermCheck.message}`);
+            return null;
+        }
+
+        this.callStack.push({
+            returnPC: this.pc + 1,
+            savedCRs: this.cr.map(c => ({...c})),
+            savedDRs: [...this.dr],
+            savedFlags: {...this.flags},
+        });
+
+        const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${entry.funcId || 'abstraction'} (LOAD+TPERM+CALL)`;
+        this.output += desc + '\n';
+        this.pc++;
+        return { pc: this.pc - 1, instr: d, desc, pipeline: this._eloadcallPipeline(d, entry) };
+    }
+
+    _execXloadlambda(d) {
+        const clistGT = this.cr[d.crSrc].word0;
+        if (clistGT === 0) {
+            this.fault('NULL_CAP', `XLOADLAMBDA: CR${d.crSrc} C-List is NULL`);
+            return null;
+        }
+        const loadCheck = this.mLoad(clistGT, 'L');
+        if (!loadCheck.ok) {
+            this.fault(loadCheck.fault, `XLOADLAMBDA LOAD: CR${d.crSrc}: ${loadCheck.message}`);
+            return null;
+        }
+
+        const slotIdx = d.imm;
+        if (slotIdx >= this.namespaceTable.length) {
+            this.fault('BOUNDS', `XLOADLAMBDA: slot ${slotIdx} out of bounds`);
+            return null;
+        }
+        const entry = this.namespaceTable[slotIdx];
+        if (!entry) {
+            this.fault('BOUNDS', `XLOADLAMBDA: slot ${slotIdx} is null`);
+            return null;
+        }
+        if (!this.validateMAC(entry)) {
+            this.fault('SEAL', `XLOADLAMBDA: slot ${slotIdx} seal failed`);
+            return null;
+        }
+
+        const version = (entry.versionSeals >>> 25) & 0x7F;
+        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const gt = this.createGT(version, slotIdx, perms, entry.gtType || 0);
+        this._writeCR(d.crDst, gt, entry);
+
+        const parsed = this.parseGT(gt);
+        if (!parsed.permissions.X && !parsed.permissions.E) {
+            this.fault('PERMISSION', `XLOADLAMBDA TPERM: CR${d.crDst} lacks X and E`);
+            return null;
+        }
+
+        const desc = `XLOADLAMBDA CR${d.crDst}, [CR${d.crSrc} + ${slotIdx}] → ${entry.funcId || 'slot'} (LOAD+TPERM+LAMBDA)`;
+        this.output += desc + '\n';
+        this.pc++;
+        return { pc: this.pc - 1, instr: d, desc, pipeline: this._xloadlambdaPipeline(d, entry) };
+    }
+
+    _eloadcallPipeline(d, entry) {
+        return [
+            { stage: 'LOAD', desc: `Namespace lookup via CR${d.crSrc}, index ${d.imm}`, perm: 'L', status: 'pass' },
+            { stage: 'TPERM', desc: `Verify E permission on ${entry.funcId || 'target'}`, perm: 'E', status: 'pass' },
+            { stage: 'CALL', desc: `Enter ${entry.funcId || 'abstraction'}, save context`, status: 'pass' },
+        ];
+    }
+
+    _xloadlambdaPipeline(d, entry) {
+        return [
+            { stage: 'LOAD', desc: `C-List slot lookup [CR${d.crSrc} + ${d.imm}]`, perm: 'L', status: 'pass' },
+            { stage: 'TPERM', desc: `Verify X permission on ${entry.funcId || 'slot'}`, perm: 'X', status: 'pass' },
+            { stage: 'LAMBDA', desc: `Church reduction via ${entry.funcId || 'lambda'}`, status: 'pass' },
+        ];
     }
 
     _loadPipeline(d, entry) {

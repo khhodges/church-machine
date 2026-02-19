@@ -3,6 +3,7 @@ class ChurchAssembler {
         this.opcodes = {
             'LOAD': 0, 'SAVE': 1, 'CALL': 2, 'RETURN': 3,
             'CHANGE': 4, 'SWITCH': 5, 'TPERM': 6, 'LAMBDA': 7,
+            'ELOADCALL': 8, 'XLOADLAMBDA': 9,
         };
         this.conditions = {
             'EQ': 0, 'NE': 1, 'CS': 2, 'CC': 3,
@@ -131,6 +132,18 @@ class ChurchAssembler {
                 crDst = this._parseCR(parts[1], lineNum);
                 break;
             }
+            case 8: {
+                crDst = this._parseCR(parts[1], lineNum);
+                crSrc = this._parseCR(parts[2], lineNum);
+                imm = this._parseImm(parts[3], lineNum);
+                break;
+            }
+            case 9: {
+                crDst = this._parseCR(parts[1], lineNum);
+                crSrc = this._parseCR(parts[2], lineNum);
+                imm = this._parseImm(parts[3], lineNum);
+                break;
+            }
         }
 
         return (
@@ -192,10 +205,10 @@ class ChurchAssembler {
         const crSrc = (word >>> 16) & 0xF;
         const imm = word & 0xFFFF;
 
-        const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA'];
+        const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA'];
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
-        if (opcode > 7) return `??? 0x${word.toString(16).padStart(8, '0')}`;
+        if (opcode > 9) return `??? 0x${word.toString(16).padStart(8, '0')}`;
 
         const op = opNames[opcode];
         const condStr = cond === 14 ? '' : condNames[cond];
@@ -213,6 +226,8 @@ class ChurchAssembler {
                 return `${mnemonic} CR${crDst}, ${presetNames[imm & 0xF]}`;
             }
             case 7: return `${mnemonic} CR${crDst}`;
+            case 8: return `${mnemonic} CR${crDst}, [CR${crSrc} + ${imm}]`;
+            case 9: return `${mnemonic} CR${crDst}, [CR${crSrc} + ${imm}]`;
             default: return `??? 0x${word.toString(16)}`;
         }
     }

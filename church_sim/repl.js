@@ -6,6 +6,7 @@ class ChurchREPL {
         this.ans = 0;
         this.history = [];
         this.outputLines = [];
+        this.pipelineMode = 'full';
 
         this.operations = {
             'succ': (a) => a + 1,
@@ -14,6 +15,10 @@ class ChurchREPL {
             'log':  (a) => Math.log(a),
             'exp':  (a) => Math.exp(a),
         };
+    }
+
+    setPipelineMode(mode) {
+        this.pipelineMode = mode;
     }
 
     execute(input) {
@@ -70,6 +75,7 @@ class ChurchREPL {
             pipeline: pipelineTrace,
             churchSteps: result.churchSteps || [],
             variable: name,
+            cycles: result.cycles || 7,
         };
     }
 
@@ -86,6 +92,7 @@ class ChurchREPL {
             value: result.value,
             pipeline: result.pipeline || [],
             churchSteps: result.churchSteps || [],
+            cycles: result.cycles || 7,
         };
     }
 
@@ -105,25 +112,33 @@ class ChurchREPL {
                 const result = this.operations[func](argResult.value);
                 const opMap = { succ: 'SUCC', pred: 'PRED', sqrt: 'SQRT', log: 'LOG', exp: 'EXP' };
                 const abstraction = opMap[func] || func.toUpperCase();
+                const displayResult = Number.isInteger(result) ? result : result.toFixed(6);
 
-                churchSteps.push(
-                    `1. LOAD  CR7, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction}`,
-                    `2. TPERM CR7, E                               ; Verify entry`,
-                    `3. CALL  CR7                                  ; Enter ${abstraction}`,
-                    `4. LOAD  CR0, [CR6 + 1]                       ; Access Code`,
-                    `5. TPERM CR0, X                               ; Verify execute`,
-                    `6. LAMBDA CR0                                 ; ${func}(${argResult.value}) → ${Number.isInteger(result) ? result : result.toFixed(6)}`,
-                    `7. RETURN CR7                                 ; Result in DR0`,
-                );
-
-                if (this.pipeline) {
-                    pipeline = this.pipeline.buildSecurityTrace('CALL', {
-                        target: abstraction,
-                        result: Number.isInteger(result) ? result.toString() : result.toFixed(6),
-                    });
+                if (this.pipelineMode === 'full') {
+                    churchSteps.push(
+                        `1. LOAD  CR7, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction}`,
+                        `2. TPERM CR7, E                               ; Verify entry`,
+                        `3. CALL  CR7                                  ; Enter ${abstraction}`,
+                        `4. LOAD  CR0, [CR6 + 1]                       ; Access Code`,
+                        `5. TPERM CR0, X                               ; Verify execute`,
+                        `6. LAMBDA CR0                                 ; ${func}(${argResult.value}) \u2192 ${displayResult}`,
+                        `7. RETURN CR7                                 ; Result in DR0`,
+                    );
+                    if (this.pipeline) {
+                        pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
+                    }
+                    return { value: result, churchSteps, pipeline, cycles: 7 };
+                } else {
+                    churchSteps.push(
+                        `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
+                        `2. XLOADLAMBDA CR0, CR6, 1                     ; LOAD+TPERM(X)+LAMBDA \u2192 ${displayResult}`,
+                        `3. RETURN      CR7                             ; Result in DR0`,
+                    );
+                    if (this.pipeline) {
+                        pipeline = this.pipeline.buildSecurityTrace('ELOADCALL', { target: abstraction, result: displayResult });
+                    }
+                    return { value: result, churchSteps, pipeline, cycles: 3 };
                 }
-
-                return { value: result, churchSteps, pipeline };
             }
 
             if (func === 'pow' && argExpr.includes(',')) {
@@ -133,19 +148,33 @@ class ChurchREPL {
                 if (base.error) return base;
                 if (exp.error) return exp;
                 const result = Math.pow(base.value, exp.value);
-                churchSteps.push(
-                    `1. LOAD  CR7, [CR6 + ${this._nsIndex('POW')}]  ; Load POW`,
-                    `2. TPERM CR7, E`,
-                    `3. CALL  CR7`,
-                    `4. LOAD  CR0, [CR6 + 1]`,
-                    `5. TPERM CR0, X`,
-                    `6. LAMBDA CR0  ; pow(${base.value}, ${exp.value}) → ${result}`,
-                    `7. RETURN CR7`,
-                );
-                if (this.pipeline) {
-                    pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: result.toString() });
+                const displayResult = Number.isInteger(result) ? result : result.toFixed(6);
+
+                if (this.pipelineMode === 'full') {
+                    churchSteps.push(
+                        `1. LOAD  CR7, [CR6 + ${this._nsIndex('POW')}]  ; Load POW`,
+                        `2. TPERM CR7, E`,
+                        `3. CALL  CR7`,
+                        `4. LOAD  CR0, [CR6 + 1]`,
+                        `5. TPERM CR0, X`,
+                        `6. LAMBDA CR0  ; pow(${base.value}, ${exp.value}) \u2192 ${displayResult}`,
+                        `7. RETURN CR7`,
+                    );
+                    if (this.pipeline) {
+                        pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: displayResult });
+                    }
+                    return { value: result, churchSteps, pipeline, cycles: 7 };
+                } else {
+                    churchSteps.push(
+                        `1. ELOADCALL   CR7, CR6, ${this._nsIndex('POW')}  ; LOAD+TPERM(E)+CALL \u2192 POW`,
+                        `2. XLOADLAMBDA CR0, CR6, 1                     ; LOAD+TPERM(X)+LAMBDA \u2192 ${displayResult}`,
+                        `3. RETURN      CR7                             ; Result in DR0`,
+                    );
+                    if (this.pipeline) {
+                        pipeline = this.pipeline.buildSecurityTrace('ELOADCALL', { target: 'POW', result: displayResult });
+                    }
+                    return { value: result, churchSteps, pipeline, cycles: 3 };
                 }
-                return { value: result, churchSteps, pipeline };
             }
 
             return { error: `Unknown function: ${func}` };
@@ -178,43 +207,92 @@ class ChurchREPL {
             }
 
             const displayResult = Number.isInteger(result) ? result : result.toFixed(6);
-            churchSteps.push(
-                `1. LOAD  CR7, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction}`,
-                `2. TPERM CR7, E                               ; Verify entry`,
-                `3. CALL  CR7                                  ; Enter ${abstraction}`,
-                `4. LOAD  CR0, [CR6 + 1]                       ; Access Code`,
-                `5. TPERM CR0, X                               ; Verify execute`,
-                `6. LAMBDA CR0                                 ; ${left.value} ${op} ${right.value} → ${displayResult}`,
-                `7. RETURN CR7                                 ; Result in DR0`,
-            );
 
-            if (this.pipeline) {
-                pipeline = this.pipeline.buildSecurityTrace('CALL', {
-                    target: abstraction,
-                    result: displayResult,
-                });
+            if (this.pipelineMode === 'full') {
+                churchSteps.push(
+                    `1. LOAD  CR7, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction}`,
+                    `2. TPERM CR7, E                               ; Verify entry`,
+                    `3. CALL  CR7                                  ; Enter ${abstraction}`,
+                    `4. LOAD  CR0, [CR6 + 1]                       ; Access Code`,
+                    `5. TPERM CR0, X                               ; Verify execute`,
+                    `6. LAMBDA CR0                                 ; ${left.value} ${op} ${right.value} \u2192 ${displayResult}`,
+                    `7. RETURN CR7                                 ; Result in DR0`,
+                );
+                if (this.pipeline) {
+                    pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
+                }
+                return { value: result, churchSteps, pipeline, cycles: 7 };
+            } else {
+                churchSteps.push(
+                    `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
+                    `2. XLOADLAMBDA CR0, CR6, 1                     ; LOAD+TPERM(X)+LAMBDA \u2192 ${displayResult}`,
+                    `3. RETURN      CR7                             ; Result in DR0`,
+                );
+                if (this.pipeline) {
+                    pipeline = this.pipeline.buildSecurityTrace('ELOADCALL', { target: abstraction, result: displayResult });
+                }
+                return { value: result, churchSteps, pipeline, cycles: 3 };
             }
-
-            if (Number.isInteger(result)) {
-                return { value: result, churchSteps, pipeline };
-            }
-            return { value: result, churchSteps, pipeline };
         }
 
         if (expr.toUpperCase() === 'ANS') {
-            return { value: this.ans };
+            return { value: this.ans, cycles: 0 };
         }
 
         if (this.variables[expr] !== undefined) {
-            return { value: this.variables[expr] };
+            return { value: this.variables[expr], cycles: 0 };
         }
 
         const num = parseFloat(expr);
         if (!isNaN(num)) {
-            return { value: num };
+            return { value: num, cycles: 0 };
         }
 
         return { error: `Undefined: ${expr}` };
+    }
+
+    executeChain(abstraction, methods, args) {
+        const churchSteps = [];
+        let pipeline = [];
+        const intermediates = [];
+
+        churchSteps.push(`1. ELOADCALL CR7, CR6, ${this._nsIndex(abstraction)}  ; Enter ${abstraction} (LOAD+TPERM+CALL)`);
+
+        let accumulator = args[0] || 0;
+        for (let i = 0; i < methods.length; i++) {
+            const method = methods[i];
+            const operand = args[i + 1] !== undefined ? args[i + 1] : accumulator;
+            let result;
+            switch (method.toUpperCase()) {
+                case 'ADD': result = accumulator + operand; break;
+                case 'SUB': result = accumulator - operand; break;
+                case 'MUL': result = accumulator * operand; break;
+                case 'DIV': result = operand !== 0 ? accumulator / operand : 0; break;
+                case 'POW': result = Math.pow(accumulator, operand); break;
+                case 'SUCC': result = accumulator + 1; break;
+                case 'PRED': result = Math.max(0, accumulator - 1); break;
+                default: result = accumulator;
+            }
+            const displayResult = Number.isInteger(result) ? result : result.toFixed(6);
+            intermediates.push(displayResult);
+            churchSteps.push(`${i + 2}. XLOADLAMBDA CR0, CR6, ${this._nsIndex(method.toUpperCase())}  ; ${method}(${accumulator}${operand !== accumulator ? ', ' + operand : ''}) \u2192 ${displayResult}`);
+            accumulator = result;
+        }
+
+        const stepNum = methods.length + 2;
+        churchSteps.push(`${stepNum}. RETURN CR7                                ; Result = ${Number.isInteger(accumulator) ? accumulator : accumulator.toFixed(6)}`);
+
+        if (this.pipeline) {
+            pipeline = this.pipeline.buildSecurityTrace('CHAIN', {
+                target: abstraction,
+                methods: methods,
+                intermediates: intermediates,
+                result: Number.isInteger(accumulator) ? accumulator.toString() : accumulator.toFixed(6),
+            });
+        }
+
+        const cycles = 1 + methods.length + 1;
+        return { value: accumulator, churchSteps, pipeline, cycles, intermediates };
     }
 
     _nsIndex(name) {
@@ -259,7 +337,7 @@ class ChurchREPL {
         return {
             type: 'info',
             text: [
-                'Church Computer REPL — Pure Lambda Calculus',
+                'Church Computer REPL \u2014 Pure Lambda Calculus',
                 '',
                 'Arithmetic:  3 + 5, 10 * 2, 8 / 4, 2 ^ 3',
                 'Functions:   succ(n), pred(n), sqrt(x), log(x), exp(x)',
@@ -267,8 +345,10 @@ class ChurchREPL {
                 '             let result = n * succ(n)',
                 'Special:     ANS (last result), VARS (show all), CLEAR (reset)',
                 '',
-                'Every operation → 7-step security pipeline:',
-                '  LOAD → TPERM → CALL → LOAD → TPERM → LAMBDA → RETURN',
+                'Pipeline modes:',
+                '  Full (7-step):  LOAD \u2192 TPERM \u2192 CALL \u2192 LOAD \u2192 TPERM \u2192 LAMBDA \u2192 RETURN',
+                '  Fused (3-step): ELOADCALL \u2192 XLOADLAMBDA \u2192 RETURN',
+                '  Chained (1 call): ELOADCALL \u2192 N\u00d7XLOADLAMBDA \u2192 RETURN',
             ].join('\n'),
         };
     }

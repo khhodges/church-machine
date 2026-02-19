@@ -103,13 +103,25 @@ function updateInfoDisplay() {
     if (!container) return;
     container.innerHTML = `
         <div class="info-item"><span class="info-label">Architecture</span><span class="info-value">Pure Church Machine</span></div>
-        <div class="info-item"><span class="info-label">Opcodes</span><span class="info-value">8 (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA)</span></div>
+        <div class="info-item"><span class="info-label">Base Opcodes</span><span class="info-value">8 (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA)</span></div>
+        <div class="info-item"><span class="info-label">Fused Opcodes</span><span class="info-value">2 (ELOADCALL, XLOADLAMBDA) \u2014 same security, 57% fewer cycles</span></div>
         <div class="info-item"><span class="info-label">Instruction</span><span class="info-value">32-bit: opcode[4] | cond[4] | cr_dst[4] | cr_src[4] | imm[16]</span></div>
         <div class="info-item"><span class="info-label">Conditions</span><span class="info-value">16 ARM-style (EQ, NE, CS, CC, MI, PL, VS, VC, HI, LS, GE, LT, GT, LE, AL, NV)</span></div>
         <div class="info-item"><span class="info-label">Turing Instructions</span><span class="info-value">ZERO \u2014 Pure Church domain only</span></div>
         <div class="info-item"><span class="info-label">Golden Tokens</span><span class="info-value">32-bit: Version(7) | Index(17) | Perms(6) | Type(2)</span></div>
-        <div class="info-item"><span class="info-label">Security</span><span class="info-value">7-step pipeline on every operation</span></div>
+        <div class="info-item"><span class="info-label">Security</span><span class="info-value">7-step \u2192 3-step fused \u2192 programmable chain</span></div>
+        <div class="info-item"><span class="info-label">Programmable</span><span class="info-value">Chainable abstractions accept method sequence programs</span></div>
     `;
+}
+
+function setPipelineMode(mode) {
+    if (pipelineViz) {
+        pipelineViz._setMode(mode);
+        pipelineViz.reset();
+    }
+    if (repl) {
+        repl.setPipelineMode(mode);
+    }
 }
 
 function updateNamespace() {

@@ -77,12 +77,15 @@ Interactive Haskell interpreter demonstrating the Pure Church Lambda Machine. GH
 
 ### Church Machine Web Simulator (`church_sim/`)
 Interactive web-based Pure Church Lambda Machine simulator at `/church/`. Faithfully mirrors the `church_machine/` Amaranth HDL hardware implementation in JavaScript, proving computational completeness with zero Turing-domain instructions.
--   **Files**: `simulator.js` (~664 lines, core machine model), `assembler.js` (Church assembly parser), `pipeline.js` (7-step security pipeline visualizer), `repl.js` (symbolic math REPL), `tutorial.js` (Bernoulli tutorial), `app.js` (view management), `styles.css`, `index.html`.
+-   **Files**: `simulator.js` (core machine model with fused instructions), `assembler.js` (Church assembly parser, 10 opcodes), `pipeline.js` (3-mode security pipeline visualizer), `repl.js` (symbolic math REPL with pipeline mode switching), `tutorial.js` (4-phase Bernoulli tutorial), `app.js` (view management), `styles.css`, `index.html`.
 -   **6 Views**: Dashboard (registers/GT display), Assembly Editor, Namespace Browser, Pipeline Visualizer, Tutorial, REPL.
--   **Machine Model**: 16 CRs (128-bit), 16 DRs (32-bit, DR0=zero), 32-bit GT format, 8 opcodes (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA), ARM-style condition codes.
--   **7-Step Security Pipeline**: LOAD → TPERM(E) → CALL → LOAD → TPERM(X) → LAMBDA → RETURN — animated gate-by-gate execution trace.
--   **Symbolic Math REPL**: `let x = 3 + 5`, `let y = sqrt(x)` — translated to Church-domain CALL sequences. Let bindings, ANS, VARS, CLEAR.
--   **Bernoulli Tutorial**: 18-step interactive walkthrough proving 1²+2²+3²+4²=30 via Ada Lovelace's method (formula vs direct computation).
+-   **Machine Model**: 16 CRs (128-bit), 16 DRs (32-bit, DR0=zero), 32-bit GT format, 10 opcodes (8 base + 2 fused), ARM-style condition codes.
+-   **10 Opcodes**: LOAD(0), SAVE(1), CALL(2), RETURN(3), CHANGE(4), SWITCH(5), TPERM(6), LAMBDA(7), ELOADCALL(8), XLOADLAMBDA(9).
+-   **Fused Instructions**: ELOADCALL = LOAD+TPERM(E)+CALL in one cycle. XLOADLAMBDA = LOAD+TPERM(X)+LAMBDA in one cycle. Same security checks, 57% fewer cycles (3 vs 7).
+-   **Programmable Abstractions**: Chainable abstractions accept method sequence programs (e.g., "MUL,ADD,DIV"). Single ELOADCALL enters scope, N×XLOADLAMBDA executes methods, one RETURN. Up to 84% cycle reduction for multi-method sequences.
+-   **3 Pipeline Modes**: Full 7-step (educational foundation), Fused 3-step (ELOADCALL+XLOADLAMBDA+RETURN), Chained (programmable abstraction with method sequence).
+-   **Symbolic Math REPL**: `let x = 3 + 5`, `let y = sqrt(x)` — translated to Church-domain CALL sequences. Pipeline mode switching (full/fused/chained). Let bindings, ANS, VARS, CLEAR.
+-   **4-Phase Bernoulli Tutorial**: Progressive discovery of optimization — Phase 1: Full 7-step pipeline (63 cycles), Phase 2: Fused instructions (27 cycles, 57% reduction), Phase 3: Programmable abstraction chain (10 cycles, 84% reduction), Phase 4: Side-by-side comparison with cycle bars. All phases compute 1²+2²+3²+4²=30 via Ada Lovelace's Note G formula n(n+1)(2n+1)/6.
 
 ### Unified Server Architecture
 All three simulators are served from a single Flask application (`unified_server.py`), providing dedicated routes (`/ctmm/`, `/rv32/`, `/church/`), a test harness (`/test/`), and API endpoints for user authentication and state persistence.
