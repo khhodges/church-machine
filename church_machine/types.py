@@ -60,17 +60,19 @@ FNV_SEAL_MASK = (1 << SEAL_BITS) - 1
 
 
 class ChurchOpcode(IntEnum):
-    LOAD    = 0b0000
-    SAVE    = 0b0001
-    CALL    = 0b0010
-    RETURN  = 0b0011
-    CHANGE  = 0b0100
-    SWITCH  = 0b0101
-    TPERM   = 0b0110
-    LAMBDA  = 0b0111
+    LOAD        = 0b0000
+    SAVE        = 0b0001
+    CALL        = 0b0010
+    RETURN      = 0b0011
+    CHANGE      = 0b0100
+    SWITCH      = 0b0101
+    TPERM       = 0b0110
+    LAMBDA      = 0b0111
+    ELOADCALL   = 0b1000
+    XLOADLAMBDA = 0b1001
 
 
-NUM_CHURCH_OPCODES = 8
+NUM_CHURCH_OPCODES = 10
 
 
 class CondCode(IntEnum):
