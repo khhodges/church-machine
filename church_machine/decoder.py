@@ -102,7 +102,7 @@ class ChurchDecoder(Elaboratable):
         m.d.comb += self.exec_enable.eq(self.instr_valid & cond_pass)
 
         valid_opcode = Signal()
-        m.d.comb += valid_opcode.eq(opcode_field <= ChurchOpcode.LAMBDA)
+        m.d.comb += valid_opcode.eq(opcode_field <= ChurchOpcode.XLOADLAMBDA)
         m.d.comb += self.is_church_op.eq(valid_opcode & self.instr_valid)
 
         m.d.comb += [
