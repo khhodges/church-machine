@@ -197,8 +197,7 @@ function updateCRDetail() {
 
     if (showCode) {
         html += '<div class="cr-detail-section">';
-        const zeroPermsNote = !hasX ? ' <span style="color:var(--church-gold);font-size:0.75rem;">(inspector view — GT has no X permission)</span>' : '';
-        html += `<div class="cr-detail-heading">Code View — Executable Memory${zeroPermsNote}</div>`;
+        html += '<div class="cr-detail-heading">Code View — Executable Memory</div>';
         const baseLoc = cr.word1_location >>> 0;
         const limitVal = cr.limit17;
         const wordCount = Math.min(limitVal + 1, 256);
@@ -235,8 +234,7 @@ function updateCRDetail() {
 
     if (showCList) {
         html += '<div class="cr-detail-section">';
-        const zeroPermsNote = !hasL ? ' <span style="color:var(--church-gold);font-size:0.75rem;">(inspector view — GT has no L permission)</span>' : '';
-        html += `<div class="cr-detail-heading">C-List View — Accessible Entries${zeroPermsNote}</div>`;
+        html += '<div class="cr-detail-heading">C-List View — Accessible Entries</div>';
         const baseLoc = cr.word1_location >>> 0;
         const limitVal = cr.limit17;
         const clistEntries = [];
