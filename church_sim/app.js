@@ -497,7 +497,7 @@ function assembleAndLoad() {
     if (console) console.textContent = listing;
 
     const saveBtn = document.getElementById('btnSaveNS');
-    if (saveBtn) saveBtn.style.display = '';
+    if (saveBtn) saveBtn.disabled = false;
 
     updateDashboard();
 }
