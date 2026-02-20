@@ -136,9 +136,9 @@ class ChurchSimulator {
                 break;
             }
             case 3: {
-                const gt6 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
-                this._writeCR(6, gt6, threadEntry);
-                this.output += '[M] CR6 ← Boot C-List (gift from heaven, no permissions)\n';
+                const gt6 = this.createGT(0, 0, {R:0,W:0,X:0,L:1,S:1,E:0}, 0);
+                this._writeCR(6, gt6, bootEntry);
+                this.output += '[M] CR6 ← Boot C-List (gift from heaven, L+S to manage boot entries)\n';
                 this.bootStep++;
                 break;
             }
