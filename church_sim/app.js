@@ -40,6 +40,18 @@ function switchView(viewId) {
     if (viewId === 'tutorial') churchTutorial.render('tutorialView');
 }
 
+function switchDashTab(tabId) {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
+
+    const tab = document.getElementById('dashTab-' + tabId);
+    const panel = document.getElementById('dashPanel-' + tabId);
+    if (tab) tab.classList.add('active');
+    if (panel) panel.classList.add('active');
+
+    updateDashboard();
+}
+
 function updateDashboard() {
     updateCRDisplay();
     updateDRDisplay();

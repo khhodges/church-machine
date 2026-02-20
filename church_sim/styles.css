@@ -172,18 +172,43 @@ header h1 {
     color: var(--text-secondary);
 }
 
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
+.dash-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.35rem;
 }
 
-.dashboard-full {
-    grid-column: 1 / -1;
+.dash-tab {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.72rem;
+    background: var(--bg-panel);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
 }
 
-@media (max-width: 900px) {
-    .dashboard-grid { grid-template-columns: 1fr; }
+.dash-tab:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.dash-tab.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.dash-panel {
+    display: none;
+}
+
+.dash-panel.active {
+    display: block;
 }
 
 .info-item {

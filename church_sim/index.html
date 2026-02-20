@@ -26,20 +26,29 @@
     </div>
 
     <div id="dashboard" class="view active">
-        <div class="dashboard-grid">
+        <div class="dash-tabs">
+            <button onclick="switchDashTab('cr')" class="dash-tab active" id="dashTab-cr">Context Registers</button>
+            <button onclick="switchDashTab('dr')" class="dash-tab" id="dashTab-dr">Data Registers</button>
+            <button onclick="switchDashTab('state')" class="dash-tab" id="dashTab-state">Machine State</button>
+        </div>
+        <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
-                <div class="panel-title">Context Registers (CR0–CR15) — 128-bit Golden Token Holders</div>
+                <div class="panel-title">CR0–CR15 — 128-bit Golden Token Holders</div>
                 <div id="crRegs"></div>
             </div>
+        </div>
+        <div id="dashPanel-dr" class="dash-panel">
             <div class="panel">
-                <div class="panel-title">Data Registers (DR0–DR15) — 32-bit Values (DR0 = zero)</div>
+                <div class="panel-title">DR0–DR15 — 32-bit Values (DR0 = zero)</div>
                 <div id="drRegs"></div>
             </div>
-            <div class="panel dashboard-full">
+        </div>
+        <div id="dashPanel-state" class="dash-panel">
+            <div class="panel">
                 <div class="panel-title">Flags &amp; Status</div>
                 <div id="flagsDisplay"></div>
             </div>
-            <div class="panel dashboard-full">
+            <div class="panel">
                 <div class="panel-title">Machine Architecture</div>
                 <div id="machineInfo"></div>
             </div>
