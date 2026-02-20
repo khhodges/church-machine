@@ -14,36 +14,34 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 40px 20px;
+            padding: 20px 16px;
         }
         h1 {
-            font-size: 2.4rem;
+            font-size: 1.6rem;
             color: #e2e8f0;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
             text-align: center;
         }
         .subtitle {
-            font-size: 1.1rem;
+            font-size: 0.85rem;
             color: #8892a4;
-            margin-bottom: 48px;
+            margin-bottom: 16px;
             text-align: center;
             max-width: 620px;
-            line-height: 1.6;
+            line-height: 1.5;
         }
         .cards {
-            display: flex;
-            gap: 32px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 900px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            width: 100%;
+            max-width: 1200px;
         }
         .card {
             background: #141a28;
             border: 1px solid #1e2a3a;
-            border-radius: 12px;
-            padding: 36px 32px;
-            width: 380px;
+            border-radius: 10px;
+            padding: 18px 16px;
             text-decoration: none;
             color: inherit;
             transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
@@ -56,32 +54,32 @@
             box-shadow: 0 8px 30px rgba(59, 130, 246, 0.12);
         }
         .card h2 {
-            font-size: 1.5rem;
+            font-size: 1.05rem;
             color: #e2e8f0;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         .card .tag {
-            font-size: 0.78rem;
+            font-size: 0.68rem;
             color: #64748b;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             font-family: 'SF Mono', 'Fira Code', monospace;
         }
         .card p {
-            font-size: 0.95rem;
-            line-height: 1.6;
+            font-size: 0.78rem;
+            line-height: 1.5;
             color: #8892a4;
             flex: 1;
         }
         .card .features {
-            margin-top: 20px;
+            margin-top: 12px;
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
+            gap: 5px;
         }
         .card .feature {
-            font-size: 0.75rem;
-            padding: 3px 10px;
-            border-radius: 4px;
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 3px;
             background: rgba(59, 130, 246, 0.1);
             color: #60a5fa;
             border: 1px solid rgba(59, 130, 246, 0.2);
@@ -92,16 +90,16 @@
             border-color: rgba(139, 92, 246, 0.2);
         }
         .card .arrow {
-            margin-top: 20px;
-            font-size: 0.9rem;
+            margin-top: 12px;
+            font-size: 0.78rem;
             color: #3b82f6;
             font-weight: 500;
         }
         .card-ctmm .arrow { color: #8b5cf6; }
         .card-ctmm:hover { border-color: #8b5cf6; box-shadow: 0 8px 30px rgba(139, 92, 246, 0.12); }
         footer {
-            margin-top: 60px;
-            font-size: 0.82rem;
+            margin-top: 20px;
+            font-size: 0.75rem;
             color: #4a5568;
             text-align: center;
         }
