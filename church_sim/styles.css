@@ -378,6 +378,8 @@ header h1 {
     tab-size: 4;
     line-height: 1.5;
     overflow-y: auto;
+    overflow-x: auto;
+    white-space: pre;
     min-height: 0;
 }
 
