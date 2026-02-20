@@ -772,34 +772,35 @@ RETURN CR0
 ; Run AFTER boot completes (6 steps)
 ; ============================================
 ;
-; Load 5 abstractions into CR0-CR4 (survivors).
-; Everything else becomes garbage.
-; After HALT, press "Run GC" to sweep.
+; Bidirectional G-bit: mLoad toggles G toward
+; "live" polarity on every access. Entries never
+; accessed retain garbage polarity. No mark pass.
 ;
 ; Expected: 17 entries freed, 7 survive.
 ; ============================================
 
-; --- Phase 1: Load subset into CRs (survivors) ---
+; --- Load subset into CRs (survivors) ---
+; Each LOAD calls mLoad, toggling G to "live"
 LOAD CR0, CR6, 2       ; CR0 = Lambda    (E)
 LOAD CR1, CR6, 7       ; CR1 = SUCC      (LE)
 LOAD CR2, CR6, 6       ; CR2 = Stack     (E)
 LOAD CR3, CR6, 9       ; CR3 = ADD       (LE)
 LOAD CR4, CR6, 5       ; CR4 = Constants (E)
 
-; --- Phase 2: Verify permissions ---
+; --- Verify permissions ---
 TPERM CR0, E           ; Lambda has E? PASS
 TPERM CR1, LE          ; SUCC has L+E? PASS
 TPERM CR2, E           ; Stack has E? PASS
 TPERM CR3, LE          ; ADD has L+E? PASS
 TPERM CR4, E           ; Constants has E? PASS
 
-; --- Phase 3: Exercise live capabilities ---
+; --- Exercise live capabilities ---
 LAMBDA CR1             ; Church SUCC reduction
 LAMBDA CR3             ; Church ADD reduction
 
-; --- Phase 4: HALT — ready for GC ---
-; Press "Run GC" to trigger PP250 Mark-Scan-Sweep.
-; Namespace Browser will show 17 entries vanish.
+; --- HALT — ready for GC ---
+; Press "Run GC" to trigger PP250 Scan-Sweep.
+; Polarity flips after each cycle.
 HALT
 `,
     };
