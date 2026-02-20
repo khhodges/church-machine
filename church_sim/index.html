@@ -63,6 +63,7 @@
             <div class="editor-panel">
                 <div class="editor-toolbar">
                     <button class="btn btn-primary" onclick="assembleAndLoad()">Assemble</button>
+                    <button class="btn btn-primary" onclick="showSaveToNamespace()" id="btnSaveNS" style="display:none;">Save to Namespace</button>
                     <button class="btn btn-success" onclick="stepSim()">Step</button>
                     <button class="btn btn-success" onclick="runSim()">Run</button>
                     <button class="btn btn-warning" onclick="resetSim()">Reset</button>
@@ -92,6 +93,11 @@
     <div id="namespace" class="view">
         <div class="panel">
             <div class="panel-title">Namespace Table — Golden Token Entries</div>
+            <div class="ns-toolbar">
+                <button class="btn btn-primary btn-sm" onclick="exportAllNamespace()">Export All</button>
+                <button class="btn btn-primary btn-sm" onclick="importNamespaceFile()">Import</button>
+                <input type="file" id="nsImportFile" style="display:none;" accept=".json,.bin" onchange="handleNSImport(event)">
+            </div>
             <div id="namespaceTable"></div>
         </div>
     </div>
@@ -140,6 +146,35 @@
                         Version(7) | Index(17) | Perms(6) | Type(2)
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="saveNSDialog" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog">
+            <div class="modal-title">Save to Namespace</div>
+            <label class="modal-label">Label:
+                <input type="text" id="saveNSLabel" class="modal-input" placeholder="MyCode">
+            </label>
+            <label class="modal-label">Permissions:
+                <div class="perm-checks">
+                    <label><input type="checkbox" id="permR"> R</label>
+                    <label><input type="checkbox" id="permW"> W</label>
+                    <label><input type="checkbox" id="permX" checked> X</label>
+                    <label><input type="checkbox" id="permL"> L</label>
+                    <label><input type="checkbox" id="permS"> S</label>
+                    <label><input type="checkbox" id="permE"> E</label>
+                </div>
+            </label>
+            <label class="modal-label">GT Type:
+                <select id="saveNSType" class="modal-input">
+                    <option value="0">Abstract</option>
+                    <option value="1">Outform</option>
+                </select>
+            </label>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="confirmSaveToNamespace()">Save</button>
+                <button class="btn btn-warning" onclick="closeSaveDialog()">Cancel</button>
             </div>
         </div>
     </div>

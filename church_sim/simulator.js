@@ -853,6 +853,59 @@ class ChurchSimulator {
             sealFNV: sealFNV,
         };
     }
+
+    saveToNamespace(label, words, perms, gtType) {
+        perms = perms || {R:0,W:0,X:1,L:0,S:0,E:0};
+        gtType = gtType || 0;
+        let idx = this.namespaceTable.findIndex(e => e && e.label === label);
+        if (idx === -1) {
+            idx = this.namespaceTable.length;
+        }
+        const loc = idx * 0x100;
+        const lim17 = Math.min(words.length, 0xFF);
+        const gtWord = this.createGT(0, idx, perms, gtType);
+        this.namespaceTable[idx] = {
+            word0_location: loc,
+            word1_limit: this.packLimitWord(lim17, 0, 0),
+            word2_seals: this.makeVersionSeals(0, loc, lim17),
+            gBit: 0,
+            label: label,
+            gtType: gtType,
+            chainable: false,
+        };
+        this.memory[loc] = gtWord;
+        for (let i = 0; i < words.length; i++) {
+            this.memory[loc + 1 + i] = words[i] >>> 0;
+        }
+        this.emit('stateChange', this.getState());
+        return idx;
+    }
+
+    getEntryMemory(idx) {
+        const entry = this.namespaceTable[idx];
+        if (!entry) return null;
+        const loc = entry.word0_location;
+        const lim = this.parseLimitWord(entry.word1_limit);
+        const words = [];
+        for (let i = 0; i <= lim.limit; i++) {
+            words.push(this.memory[loc + i] || 0);
+        }
+        return { label: entry.label, location: loc, limit: lim.limit, words };
+    }
+
+    setEntryMemory(idx, dataWords) {
+        const entry = this.namespaceTable[idx];
+        if (!entry) return false;
+        const loc = entry.word0_location;
+        const lim17 = Math.min(dataWords.length - 1, 0x1FFFF);
+        entry.word1_limit = this.packLimitWord(lim17, 0, 0);
+        entry.word2_seals = this.makeVersionSeals(0, loc, lim17);
+        for (let i = 0; i < dataWords.length; i++) {
+            this.memory[loc + i] = dataWords[i] >>> 0;
+        }
+        this.emit('stateChange', this.getState());
+        return true;
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

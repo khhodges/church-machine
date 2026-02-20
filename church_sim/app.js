@@ -4,6 +4,7 @@ let pipelineViz = null;
 let repl = null;
 let churchTutorial = null;
 let currentView = 'dashboard';
+let lastAssembledWords = null;
 
 function init() {
     sim = new ChurchSimulator();
@@ -34,6 +35,7 @@ function init() {
         });
     }
     updateLineNumbers();
+    loadNamespaceState();
     switchView('dashboard');
     updateDashboard();
     pipelineViz.render();
@@ -443,7 +445,7 @@ function updateNamespace() {
     html += '<th>word0: Location</th>';
     html += '<th>word1: B</th><th>word1: F</th><th>word1: Limit[16:0]</th>';
     html += '<th>word2: Ver[31:25]</th><th>word2: FNV Seal[24:0]</th>';
-    html += '<th>G</th>';
+    html += '<th>G</th><th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     for (let i = 0; i < sim.namespaceTable.length; i++) {
@@ -462,6 +464,7 @@ function updateNamespace() {
         html += `<td>${ver}</td>`;
         html += `<td>0x${seal.toString(16).toUpperCase().padStart(7, '0')}</td>`;
         html += `<td class="ns-flag">${e.gBit}</td>`;
+        html += `<td class="ns-entry-actions"><button class="btn btn-primary btn-xs" onclick="exportEntryMemory(${i})">Export</button></td>`;
         html += '</tr>';
     }
     html += '</tbody></table>';
@@ -485,12 +488,17 @@ function assembleAndLoad() {
 
     sim.reset();
     sim.loadProgram(result.words, 0);
+    lastAssembledWords = result.words.slice();
 
     let listing = `Assembled ${result.words.length} instructions:\n`;
     for (let i = 0; i < result.words.length; i++) {
         listing += `  ${i.toString().padStart(4)}: 0x${result.words[i].toString(16).padStart(8, '0')}  ${assembler.disassemble(result.words[i])}\n`;
     }
     if (console) console.textContent = listing;
+
+    const saveBtn = document.getElementById('btnSaveNS');
+    if (saveBtn) saveBtn.style.display = '';
+
     updateDashboard();
 }
 
@@ -832,6 +840,163 @@ RETURN CR0             ; Return result
 `;
         }
     }
+}
+
+function showSaveToNamespace() {
+    if (!lastAssembledWords || lastAssembledWords.length === 0) {
+        alert('Assemble code first before saving to namespace.');
+        return;
+    }
+    document.getElementById('saveNSDialog').style.display = '';
+    document.getElementById('saveNSLabel').value = '';
+    document.getElementById('saveNSLabel').focus();
+}
+
+function closeSaveDialog() {
+    document.getElementById('saveNSDialog').style.display = 'none';
+}
+
+function confirmSaveToNamespace() {
+    const label = document.getElementById('saveNSLabel').value.trim();
+    if (!label) {
+        alert('Please enter a label for this code block.');
+        return;
+    }
+    const perms = {
+        R: document.getElementById('permR').checked ? 1 : 0,
+        W: document.getElementById('permW').checked ? 1 : 0,
+        X: document.getElementById('permX').checked ? 1 : 0,
+        L: document.getElementById('permL').checked ? 1 : 0,
+        S: document.getElementById('permS').checked ? 1 : 0,
+        E: document.getElementById('permE').checked ? 1 : 0,
+    };
+    const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
+    const idx = sim.saveToNamespace(label, lastAssembledWords, perms, gtType);
+    closeSaveDialog();
+    saveNamespaceState();
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.textContent += `\nSaved ${lastAssembledWords.length} words to namespace[${idx}] "${label}"`;
+        con.scrollTop = con.scrollHeight;
+    }
+    updateDashboard();
+}
+
+function exportEntryMemory(idx) {
+    const data = sim.getEntryMemory(idx);
+    if (!data) return;
+    const exportObj = {
+        label: data.label,
+        location: data.location,
+        limit: data.limit,
+        words: data.words,
+        entry: sim.namespaceTable[idx],
+    };
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${data.label || 'entry_' + idx}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportAllNamespace() {
+    const entries = [];
+    for (let i = 0; i < sim.namespaceTable.length; i++) {
+        const e = sim.namespaceTable[i];
+        if (!e) continue;
+        const mem = sim.getEntryMemory(i);
+        entries.push({
+            index: i,
+            label: e.label,
+            entry: e,
+            words: mem ? mem.words : [],
+        });
+    }
+    const blob = new Blob([JSON.stringify({ namespace: entries }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'church_namespace.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importNamespaceFile() {
+    document.getElementById('nsImportFile').click();
+}
+
+function handleNSImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (data.namespace && Array.isArray(data.namespace)) {
+                for (const item of data.namespace) {
+                    if (item.entry && item.words) {
+                        const idx = item.index !== undefined ? item.index : sim.namespaceTable.length;
+                        while (sim.namespaceTable.length <= idx) sim.namespaceTable.push(null);
+                        sim.namespaceTable[idx] = item.entry;
+                        sim.setEntryMemory(idx, item.words);
+                    }
+                }
+            } else if (data.label && data.words) {
+                const idx = sim.namespaceTable.length;
+                if (data.entry) {
+                    sim.namespaceTable[idx] = data.entry;
+                    sim.namespaceTable[idx].word0_location = idx * 0x100;
+                }
+                sim.setEntryMemory(idx, data.words);
+            }
+            saveNamespaceState();
+            updateDashboard();
+            updateNamespace();
+        } catch (err) {
+            alert('Failed to import: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+function saveNamespaceState() {
+    const entries = [];
+    for (let i = 0; i < sim.namespaceTable.length; i++) {
+        const e = sim.namespaceTable[i];
+        if (!e) { entries.push(null); continue; }
+        const mem = sim.getEntryMemory(i);
+        entries.push({
+            entry: e,
+            words: mem ? mem.words : [],
+        });
+    }
+    localStorage.setItem('church_namespace', JSON.stringify(entries));
+}
+
+function loadNamespaceState() {
+    const saved = localStorage.getItem('church_namespace');
+    if (!saved) return;
+    try {
+        const entries = JSON.parse(saved);
+        for (let i = 0; i < entries.length; i++) {
+            const item = entries[i];
+            if (!item) continue;
+            if (i < sim.namespaceTable.length && sim.namespaceTable[i]) {
+                continue;
+            }
+            while (sim.namespaceTable.length <= i) sim.namespaceTable.push(null);
+            sim.namespaceTable[i] = item.entry;
+            if (item.words && item.words.length > 0) {
+                const loc = item.entry.word0_location;
+                for (let j = 0; j < item.words.length; j++) {
+                    sim.memory[loc + j] = item.words[j] >>> 0;
+                }
+            }
+        }
+    } catch (e) {}
 }
 
 document.addEventListener('DOMContentLoaded', init);
