@@ -16,7 +16,7 @@ class ChurchSimulator {
     reset() {
         this.cr = [];
         for (let i = 0; i < 16; i++) {
-            this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0 };
+            this.cr[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
         }
 
         this.dr = new Array(16).fill(0);
@@ -111,7 +111,7 @@ class ChurchSimulator {
         switch (this.bootStep) {
             case 0:
                 for (let i = 0; i < 16; i++) {
-                    if (this.cr[i].word0 !== 0 || this.cr[i].word1 !== 0) {
+                    if (this.cr[i].word0 !== 0 || this.cr[i].word1 !== 0 || this.cr[i].m !== 0) {
                         this.fault('BOOT', 'Boot invariant: CRs must be zero at boot entry');
                         return false;
                     }
@@ -121,30 +121,30 @@ class ChurchSimulator {
                 this.bootStep++;
                 break;
             case 1: {
-                const gt15 = this.createGT(0, 0, {R:0,W:0,X:0,L:1,S:0,E:1}, 0);
+                const gt15 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
                 this._writeCR(15, gt15, bootEntry);
-                this.output += '[M] CR15 ← Boot namespace root [L,E]\n';
+                this.output += '[M] CR15 ← Namespace root (gift from heaven, no permissions)\n';
                 this.bootStep++;
                 break;
             }
             case 2: {
-                const gt8 = this.createGT(0, 1, {R:0,W:0,X:0,L:1,S:1,E:0}, 0);
+                const gt8 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
                 this._writeCR(8, gt8, threadEntry);
-                this.output += '[M] CR8 ← Thread identity [L,S]\n';
+                this.output += '[M] CR8 ← Boot thread (gift from heaven, no permissions)\n';
                 this.bootStep++;
                 break;
             }
             case 3: {
-                const gt7 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:1}, 0);
+                const gt7 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
                 this._writeCR(7, gt7, bootEntry);
-                this.output += '[M] CR7 ← Boot CLOOMC [E]\n';
+                this.output += '[M] CR7 ← Boot CLOOMC (gift from heaven, no permissions)\n';
                 this.bootStep++;
                 break;
             }
             case 4: {
-                const gt6 = this.createGT(0, 1, {R:0,W:0,X:0,L:1,S:1,E:0}, 0);
+                const gt6 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
                 this._writeCR(6, gt6, threadEntry);
-                this.output += '[M] CR6 ← Thread C-List [L,S]\n';
+                this.output += '[M] CR6 ← Boot C-List (gift from heaven, no permissions)\n';
                 this.bootStep++;
                 break;
             }
@@ -251,11 +251,12 @@ class ChurchSimulator {
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
         this.cr[crIdx].word2 = entry.word1_limit >>> 0;
         this.cr[crIdx].word3 = entry.word2_seals >>> 0;
+        this.cr[crIdx].m = this.mElevation ? 1 : 0;
         return true;
     }
 
     _clearCR(crIdx) {
-        this.cr[crIdx] = { word0: 0, word1: 0, word2: 0, word3: 0 };
+        this.cr[crIdx] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
     }
 
     checkCondition(condCode) {
@@ -814,7 +815,7 @@ class ChurchSimulator {
         const cr = this.cr[idx];
         if (!cr || cr.word0 === 0) {
             return {
-                index: idx, isNull: true,
+                index: idx, isNull: true, mBit: 0,
                 word0_gt: '00000000', perms: '------', gtVersion: 0, gtIndex: 0, gtType: 'NULL', gtTypeName: 'NULL',
                 word1_location: 0,
                 word2_limit_raw: 0, limitB: 0, limitF: 0, limit17: 0,
@@ -832,7 +833,7 @@ class ChurchSimulator {
                         (parsed.permissions.S ? 'S' : '-') +
                         (parsed.permissions.E ? 'E' : '-');
         return {
-            index: idx, isNull: false,
+            index: idx, isNull: false, mBit: cr.m || 0,
             word0_gt: cr.word0.toString(16).toUpperCase().padStart(8, '0'),
             perms: permStr,
             gtVersion: parsed.version,

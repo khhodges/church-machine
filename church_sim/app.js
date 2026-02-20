@@ -66,7 +66,7 @@ function updateCRDisplay() {
         6: 'C-List', 7: 'CLOOMC', 8: 'Thread', 9: 'IRQ', 10: 'Fault', 15: 'Namespace'
     };
     let html = '<table class="cr-table"><thead><tr>';
-    html += '<th>CR</th><th>Local Name</th>';
+    html += '<th>CR</th><th>M</th><th>Local Name</th>';
     html += '<th>word0: GT</th><th>Perms</th><th>Ver</th><th>Idx</th><th>Type</th>';
     html += '<th>word1: Location</th>';
     html += '<th>word2: B</th><th>F</th><th>Limit[16:0]</th>';
@@ -78,6 +78,7 @@ function updateCRDisplay() {
         const cls = cr.isNull ? 'cr-null' : 'cr-active';
         html += `<tr class="${cls}">`;
         html += `<td class="cr-idx">${i}</td>`;
+        html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
         html += `<td class="cr-name">${name}</td>`;
         html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
         html += `<td class="cr-perms">[${cr.perms}]</td>`;
@@ -116,11 +117,13 @@ function updateFlagsDisplay() {
     const container = document.getElementById('flagsDisplay');
     if (!container) return;
     const f = sim.flags;
-    const mClass = sim.mElevation ? 'flag-m-active' : '';
     const bootLabel = !sim.bootComplete ? `BOOT ${sim.bootStep}/6` : '';
     const statusLabel = sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET');
     container.innerHTML = `
-        <span class="flag ${mClass}" title="M: transient microcode elevation (never stored in GT)">M${sim.mElevation ? '=1' : ''}</span>
+        <button class="btn btn-success btn-sm" onclick="stepSim()">Step</button>
+        <button class="btn btn-success btn-sm" onclick="runSim()">Run</button>
+        <button class="btn btn-warning btn-sm" onclick="resetSim()">Reset</button>
+        <span class="flags-sep"></span>
         <span class="flag ${f.N ? 'flag-set' : ''}">N</span>
         <span class="flag ${f.Z ? 'flag-set' : ''}">Z</span>
         <span class="flag ${f.C ? 'flag-set' : ''}">C</span>

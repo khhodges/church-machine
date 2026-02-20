@@ -156,6 +156,8 @@ header h1 {
 .cr-perms { font-size: 0.68rem; }
 .cr-type { color: var(--text-secondary); font-size: 0.68rem; }
 .cr-flag { text-align: center; color: var(--church-gold); font-weight: 600; }
+.cr-m { text-align: center; color: var(--text-secondary); }
+.cr-m.cr-m-set { color: #e53e3e; font-weight: 700; }
 
 .reg-row {
     display: flex;
@@ -194,19 +196,6 @@ header h1 {
     color: white;
 }
 
-.flag.flag-m-active {
-    background: #e53e3e;
-    border-color: #e53e3e;
-    color: white;
-    font-weight: 700;
-    animation: m-pulse 1s infinite;
-}
-
-@keyframes m-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
-
 .flag-info {
     margin-left: 0.35rem;
     font-size: 0.68rem;
@@ -227,6 +216,18 @@ header h1 {
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 0.5rem;
+}
+
+.flags-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 0.3rem;
+}
+
+.btn-sm {
+    padding: 0.2rem 0.6rem;
+    font-size: 0.7rem;
 }
 
 .dash-tabs {
