@@ -32,7 +32,7 @@ class ChurchSimulator {
         this.lambdaReturnPC = 0;
         this.faultLog = [];
 
-        this.memory = new Uint32Array(4096);
+        this.memory = new Uint32Array(65536);
         this.namespaceTable = [];
         this.bootComplete = false;
         this.mElevation = false;
