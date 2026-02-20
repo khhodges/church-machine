@@ -130,23 +130,24 @@ header h1 {
 .reg-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 1rem;
     padding: 0.1rem 0.35rem;
     font-family: 'Courier New', monospace;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     border-bottom: 1px solid rgba(45,55,72,0.3);
-    line-height: 1.35;
+    line-height: 1.4;
+    white-space: nowrap;
 }
 
 .reg-row.reg-null { color: var(--text-secondary); opacity: 0.6; }
 .reg-row.reg-active { color: var(--text-primary); }
 
-.reg-label { width: 120px; color: var(--church-blue); }
-.reg-gt { width: 85px; color: var(--church-gold); }
-.reg-perms { width: 65px; font-size: 0.65rem; }
-.reg-name { color: var(--text-primary); }
-.reg-value { width: 85px; color: var(--church-gold); }
-.reg-decimal { color: var(--text-secondary); font-size: 0.62rem; }
+.reg-label { min-width: 140px; color: var(--church-blue); flex-shrink: 0; }
+.reg-gt { min-width: 90px; color: var(--church-gold); flex-shrink: 0; }
+.reg-perms { min-width: 70px; font-size: 0.72rem; flex-shrink: 0; }
+.reg-name { color: var(--text-primary); flex-shrink: 0; }
+.reg-value { min-width: 90px; color: var(--church-gold); flex-shrink: 0; }
+.reg-decimal { color: var(--text-secondary); font-size: 0.68rem; flex-shrink: 0; }
 
 .flag {
     display: inline-block;
