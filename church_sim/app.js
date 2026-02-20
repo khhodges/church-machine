@@ -117,7 +117,7 @@ function updateFlagsDisplay() {
     const container = document.getElementById('flagsDisplay');
     if (!container) return;
     const f = sim.flags;
-    const bootLabel = !sim.bootComplete ? `BOOT ${sim.bootStep}/5` : '';
+    const bootLabel = !sim.bootComplete ? `BOOT ${sim.bootStep}/6` : '';
     const statusLabel = sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET');
     container.innerHTML = `
         <button class="btn btn-success btn-sm" onclick="stepSim()">Step</button>

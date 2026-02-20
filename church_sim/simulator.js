@@ -138,11 +138,26 @@ class ChurchSimulator {
                 const gt6 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 0);
                 this._writeCR(6, gt6, threadEntry);
                 this.output += '[M] CR6 ← Boot C-List (gift from heaven, no permissions)\n';
-                this.output += '[M] Note: CR7 (CLOOMC) = CR6+0 via normal GT rules\n';
                 this.bootStep++;
                 break;
             }
-            case 4:
+            case 4: {
+                const clistGT = this.cr[6].word0;
+                const check = this.mLoad(clistGT, 'L');
+                if (!check.ok) {
+                    this.fault('BOOT', `CR7 load via CR6+0 failed: ${check.message}`);
+                    return false;
+                }
+                const entry = this.namespaceTable[0];
+                const version = (entry.word2_seals >>> 25) & 0x7F;
+                const perms = entry.gtPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+                const gt7 = this.createGT(version, 0, perms, entry.gtType || 0);
+                this._writeCR(7, gt7, entry);
+                this.output += '[M] CR7 ← CR6+0 (Boot, first c-list entry, normal GT rules)\n';
+                this.bootStep++;
+                break;
+            }
+            case 5:
                 this.mElevation = false;
                 this.bootComplete = true;
                 this.output += '[M] Boot microcode: M elevation OFF — boot complete\n';
@@ -228,7 +243,7 @@ class ChurchSimulator {
         if (!this.validateMAC(entry)) {
             return { ok: false, fault: 'SEAL', message: `FNV seal validation failed for entry ${parsed.index}` };
         }
-        if (requiredPerm !== null && !parsed.permissions[requiredPerm]) {
+        if (requiredPerm !== null && !this.mElevation && !parsed.permissions[requiredPerm]) {
             return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
         }
         entry.gBit = 0;
