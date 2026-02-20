@@ -349,8 +349,17 @@ header h1 {
     border-bottom: 1px solid rgba(45,55,72,0.3);
 }
 
-.ns-funcid { color: var(--church-blue); font-weight: 600; }
-.ns-perms { color: var(--text-primary); }
+.ns-layout-header {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.25rem 0.6rem 0.4rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Courier New', monospace;
+}
+.ns-label { color: var(--church-blue); font-style: italic; font-weight: 400; }
+.ns-label-col { font-style: italic; }
+.ns-flag { text-align: center; color: var(--church-gold); font-weight: 600; }
 
 .pipeline-wrapper { padding: 1rem 0; }
 

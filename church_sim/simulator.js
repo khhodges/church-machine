@@ -42,47 +42,58 @@ class ChurchSimulator {
         this.emit('stateChange', this.getState());
     }
 
+    packLimitWord(limit17, bFlag, fFlag) {
+        return (((bFlag & 1) << 31) | ((fFlag & 1) << 30) | (limit17 & 0x1FFFF)) >>> 0;
+    }
+
+    parseLimitWord(word1) {
+        return {
+            b: (word1 >>> 31) & 1,
+            f: (word1 >>> 30) & 1,
+            limit: word1 & 0x1FFFF,
+        };
+    }
+
     _initNamespaceTable() {
         this.namespaceTable = [];
         const abstractions = [
-            { funcId: 'Boot',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'Threads',    perms: {R:0,W:0,X:0,L:1,S:1,E:1}, chainable: false },
-            { funcId: 'Lambda',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { funcId: 'SlideRule',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { funcId: 'Abacus',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { funcId: 'Constants',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { funcId: 'Stack',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { funcId: 'SUCC',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'PRED',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'ADD',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'SUB',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'MUL',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'DIV',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'POW',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'SQRT',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'LOG',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'EXP',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'ISZERO',     perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'LEQ',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'TRUE',       perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
-            { funcId: 'FALSE',      perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
-            { funcId: 'PAIR',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'FST',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { funcId: 'SND',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'Boot',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'Threads',    gtPerms: {R:0,W:0,X:0,L:1,S:1,E:1}, chainable: false },
+            { label: 'Lambda',     gtPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { label: 'SlideRule',  gtPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { label: 'Abacus',     gtPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { label: 'Constants',  gtPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { label: 'Stack',      gtPerms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
+            { label: 'SUCC',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'PRED',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'ADD',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'SUB',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'MUL',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'DIV',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'POW',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'SQRT',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'LOG',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'EXP',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'ISZERO',     gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'LEQ',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'TRUE',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
+            { label: 'FALSE',      gtPerms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
+            { label: 'PAIR',       gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'FST',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'SND',        gtPerms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
         ];
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
             const loc = i * 0x100;
-            const lim = loc + 0xFF;
+            const lim17 = 0xFF;
             this.namespaceTable[i] = {
-                location: loc,
-                limit: lim,
-                versionSeals: this.makeVersionSeals(0, loc, lim),
+                word0_location: loc,
+                word1_limit: this.packLimitWord(lim17, 1, 0),
+                word2_seals: this.makeVersionSeals(0, loc, lim17),
                 gBit: 0,
-                funcId: a.funcId,
-                entryPerms: a.perms,
+                label: a.label,
+                gtPerms: a.gtPerms,
                 gtType: 0,
-                bindFlag: 1,
                 chainable: a.chainable || false,
             };
         }
@@ -153,23 +164,24 @@ class ChurchSimulator {
         return bits & 0x3F;
     }
 
-    computeSeal(location, limit) {
+    computeSeal(location, limit17) {
         let h = 0x5A5A5A5A;
         h = ((h ^ location) * 0x01000193) >>> 0;
-        h = ((h ^ limit) * 0x01000193) >>> 0;
+        h = ((h ^ limit17) * 0x01000193) >>> 0;
         h = (h ^ (h >>> 16)) >>> 0;
         return h & 0x01FFFFFF;
     }
 
-    makeVersionSeals(version, location, limit) {
-        const seal = this.computeSeal(location, limit);
+    makeVersionSeals(version, location, limit17) {
+        const seal = this.computeSeal(location, limit17);
         return (((version & 0x7F) << 25) | (seal & 0x01FFFFFF)) >>> 0;
     }
 
     validateMAC(entry) {
         if (!entry) return false;
-        const storedSeal = entry.versionSeals & 0x01FFFFFF;
-        return storedSeal === this.computeSeal(entry.location, entry.limit);
+        const storedSeal = entry.word2_seals & 0x01FFFFFF;
+        const lim = this.parseLimitWord(entry.word1_limit);
+        return storedSeal === this.computeSeal(entry.word0_location, lim.limit);
     }
 
     mLoad(gt32, requiredPerm) {
@@ -181,7 +193,7 @@ class ChurchSimulator {
         if (!entry) {
             return { ok: false, fault: 'BOUNDS', message: `namespace entry ${parsed.index} is null` };
         }
-        const nsVersion = (entry.versionSeals >>> 25) & 0x7F;
+        const nsVersion = (entry.word2_seals >>> 25) & 0x7F;
         if (parsed.version !== nsVersion) {
             return { ok: false, fault: 'VERSION', message: `version mismatch: GT v${parsed.version}, entry v${nsVersion}` };
         }
@@ -197,9 +209,9 @@ class ChurchSimulator {
 
     _writeCR(crIdx, gt32, entry) {
         this.cr[crIdx].word0 = gt32;
-        this.cr[crIdx].word1 = entry.location >>> 0;
-        this.cr[crIdx].word2 = entry.limit >>> 0;
-        this.cr[crIdx].word3 = entry.versionSeals >>> 0;
+        this.cr[crIdx].word1 = entry.word0_location >>> 0;
+        this.cr[crIdx].word2 = entry.word1_limit >>> 0;
+        this.cr[crIdx].word3 = entry.word2_seals >>> 0;
     }
 
     _clearCR(crIdx) {
@@ -352,11 +364,11 @@ class ChurchSimulator {
             this.fault('SEAL', `LOAD: entry ${targetIdx} seal failed`);
             return null;
         }
-        const version = (entry.versionSeals >>> 25) & 0x7F;
-        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const version = (entry.word2_seals >>> 25) & 0x7F;
+        const perms = entry.gtPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
         const gt = this.createGT(version, targetIdx, perms, entry.gtType || 0);
         this._writeCR(d.crDst, gt, entry);
-        const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${entry.funcId || 'entry_'+targetIdx}`;
+        const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${entry.label || 'entry_'+targetIdx}`;
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._loadPipeline(d, entry) };
@@ -381,15 +393,17 @@ class ChurchSimulator {
         const targetIdx = d.imm;
         if (targetIdx >= this.namespaceTable.length) {
             const parsed = this.parseGT(srcGT);
+            const loc = targetIdx * 0x100;
+            const lim17 = 0xFF;
             const entry = {
-                location: targetIdx * 0x100,
-                limit: targetIdx * 0x100 + 0xFF,
-                versionSeals: this.makeVersionSeals(0, targetIdx * 0x100, targetIdx * 0x100 + 0xFF),
+                word0_location: loc,
+                word1_limit: this.packLimitWord(lim17, 1, 0),
+                word2_seals: this.makeVersionSeals(0, loc, lim17),
                 gBit: 0,
-                funcId: `saved_${targetIdx}`,
-                entryPerms: parsed.permissions,
+                label: `dyn_${targetIdx}`,
+                gtPerms: parsed.permissions,
                 gtType: parsed.type,
-                bindFlag: 1,
+                chainable: false,
             };
             while (this.namespaceTable.length <= targetIdx) {
                 this.namespaceTable.push(null);
@@ -422,7 +436,7 @@ class ChurchSimulator {
         });
 
         const entry = check.entry;
-        const desc = `CALL CR${d.crDst} → ${entry.funcId || 'abstraction'}`;
+        const desc = `CALL CR${d.crDst} → ${entry.label || 'abstraction'}`;
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._callPipeline(d, entry) };
@@ -459,8 +473,8 @@ class ChurchSimulator {
             this.fault('BOUNDS', `CHANGE: entry ${targetIdx} is null`);
             return null;
         }
-        const version = (entry.versionSeals >>> 25) & 0x7F;
-        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const version = (entry.word2_seals >>> 25) & 0x7F;
+        const perms = entry.gtPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
         const gt = this.createGT(version, targetIdx, perms, entry.gtType || 0);
         this._writeCR(d.crDst, gt, entry);
         const desc = `CHANGE CR${d.crDst}, [CR${d.crSrc}] idx=${targetIdx}`;
@@ -553,7 +567,7 @@ class ChurchSimulator {
         }
 
         const entry = check.entry;
-        const desc = `LAMBDA CR${crIdx} → ${entry.funcId || 'reduction'}`;
+        const desc = `LAMBDA CR${crIdx} → ${entry.label || 'reduction'}`;
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._lambdaPipeline(d, entry) };
@@ -586,8 +600,8 @@ class ChurchSimulator {
             return null;
         }
 
-        const version = (entry.versionSeals >>> 25) & 0x7F;
-        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const version = (entry.word2_seals >>> 25) & 0x7F;
+        const perms = entry.gtPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
         const gt = this.createGT(version, targetIdx, perms, entry.gtType || 0);
         this._writeCR(d.crDst, gt, entry);
 
@@ -604,7 +618,7 @@ class ChurchSimulator {
             savedFlags: {...this.flags},
         });
 
-        const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${entry.funcId || 'abstraction'} (LOAD+TPERM+CALL)`;
+        const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${entry.label || 'abstraction'} (LOAD+TPERM+CALL)`;
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._eloadcallPipeline(d, entry) };
@@ -637,8 +651,8 @@ class ChurchSimulator {
             return null;
         }
 
-        const version = (entry.versionSeals >>> 25) & 0x7F;
-        const perms = entry.entryPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
+        const version = (entry.word2_seals >>> 25) & 0x7F;
+        const perms = entry.gtPerms || {R:0,W:0,X:0,L:0,S:0,E:0};
         const gt = this.createGT(version, slotIdx, perms, entry.gtType || 0);
         this._writeCR(d.crDst, gt, entry);
 
@@ -648,7 +662,7 @@ class ChurchSimulator {
             return null;
         }
 
-        const desc = `XLOADLAMBDA CR${d.crDst}, [CR${d.crSrc} + ${slotIdx}] → ${entry.funcId || 'slot'} (LOAD+TPERM+LAMBDA)`;
+        const desc = `XLOADLAMBDA CR${d.crDst}, [CR${d.crSrc} + ${slotIdx}] → ${entry.label || 'slot'} (LOAD+TPERM+LAMBDA)`;
         this.output += desc + '\n';
         this.pc++;
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._xloadlambdaPipeline(d, entry) };
@@ -657,16 +671,16 @@ class ChurchSimulator {
     _eloadcallPipeline(d, entry) {
         return [
             { stage: 'LOAD', desc: `Namespace lookup via CR${d.crSrc}, index ${d.imm}`, perm: 'L', status: 'pass' },
-            { stage: 'TPERM', desc: `Verify E permission on ${entry.funcId || 'target'}`, perm: 'E', status: 'pass' },
-            { stage: 'CALL', desc: `Enter ${entry.funcId || 'abstraction'}, save context`, status: 'pass' },
+            { stage: 'TPERM', desc: `Verify E permission on ${entry.label || 'target'}`, perm: 'E', status: 'pass' },
+            { stage: 'CALL', desc: `Enter ${entry.label || 'abstraction'}, save context`, status: 'pass' },
         ];
     }
 
     _xloadlambdaPipeline(d, entry) {
         return [
             { stage: 'LOAD', desc: `C-List slot lookup [CR${d.crSrc} + ${d.imm}]`, perm: 'L', status: 'pass' },
-            { stage: 'TPERM', desc: `Verify X permission on ${entry.funcId || 'slot'}`, perm: 'X', status: 'pass' },
-            { stage: 'LAMBDA', desc: `Church reduction via ${entry.funcId || 'lambda'}`, status: 'pass' },
+            { stage: 'TPERM', desc: `Verify X permission on ${entry.label || 'slot'}`, perm: 'X', status: 'pass' },
+            { stage: 'LAMBDA', desc: `Church reduction via ${entry.label || 'lambda'}`, status: 'pass' },
         ];
     }
 
@@ -675,7 +689,7 @@ class ChurchSimulator {
             { stage: 'LOAD', desc: `Namespace lookup via CR${d.crSrc}`, perm: 'L', status: 'pass' },
             { stage: 'TPERM', desc: `Verify L permission on CR${d.crSrc}`, perm: 'L', status: 'pass' },
             { stage: 'VALIDATE', desc: `FNV seal check on entry ${d.imm}`, status: 'pass' },
-            { stage: 'WRITE', desc: `Write ${entry.funcId || 'entry'} to CR${d.crDst}`, status: 'pass' },
+            { stage: 'WRITE', desc: `Write ${entry.label || 'entry'} to CR${d.crDst}`, status: 'pass' },
         ];
     }
 
@@ -683,7 +697,7 @@ class ChurchSimulator {
         return [
             { stage: 'LOAD', desc: `Read target GT from CR${d.crDst}`, perm: 'L', status: 'pass' },
             { stage: 'TPERM', desc: `Verify E permission on target`, perm: 'E', status: 'pass' },
-            { stage: 'CALL', desc: `Enter ${entry.funcId || 'abstraction'}, save context`, status: 'pass' },
+            { stage: 'CALL', desc: `Enter ${entry.label || 'abstraction'}, save context`, status: 'pass' },
         ];
     }
 
@@ -707,7 +721,7 @@ class ChurchSimulator {
         return [
             { stage: 'LOAD', desc: `Read CR${d.crDst} GT`, perm: 'L', status: 'pass' },
             { stage: 'TPERM', desc: `Verify E permission`, perm: 'E', status: 'pass' },
-            { stage: 'LAMBDA', desc: `Church reduction via ${entry.funcId || 'lambda'}`, status: 'pass' },
+            { stage: 'LAMBDA', desc: `Church reduction via ${entry.label || 'lambda'}`, status: 'pass' },
         ];
     }
 
@@ -771,7 +785,7 @@ class ChurchSimulator {
                         (parsed.permissions.E ? 'E' : '-');
         return {
             index: idx,
-            name: entry ? entry.funcId : `ns[${parsed.index}]`,
+            name: entry ? entry.label : `ns[${parsed.index}]`,
             gt: cr.word0.toString(16).toUpperCase().padStart(8, '0'),
             perms: permStr,
             nsIndex: parsed.index,

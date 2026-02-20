@@ -139,25 +139,31 @@ function setPipelineMode(mode) {
 function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
-    let html = '<table class="ns-table"><thead><tr>';
-    html += '<th>Idx</th><th>FuncID</th><th>Location</th><th>Limit</th><th>Perms</th><th>Ver</th><th>B</th>';
+    let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 3 words per entry (96 bits)</div>';
+    html += '<table class="ns-table"><thead><tr>';
+    html += '<th>Idx</th><th class="ns-label-col">Label</th>';
+    html += '<th>word0: Location</th>';
+    html += '<th>word1: B</th><th>word1: F</th><th>word1: Limit[16:0]</th>';
+    html += '<th>word2: Ver[31:25]</th><th>word2: FNV Seal[24:0]</th>';
+    html += '<th>G</th>';
     html += '</tr></thead><tbody>';
 
     for (let i = 0; i < sim.namespaceTable.length; i++) {
         const e = sim.namespaceTable[i];
         if (!e) continue;
-        const perms = e.entryPerms || {};
-        const permStr = (perms.R ? 'R' : '-') + (perms.W ? 'W' : '-') + (perms.X ? 'X' : '-') +
-                        (perms.L ? 'L' : '-') + (perms.S ? 'S' : '-') + (perms.E ? 'E' : '-');
-        const ver = (e.versionSeals >>> 25) & 0x7F;
+        const lim = sim.parseLimitWord(e.word1_limit);
+        const ver = (e.word2_seals >>> 25) & 0x7F;
+        const seal = e.word2_seals & 0x01FFFFFF;
         html += '<tr>';
         html += `<td>${i}</td>`;
-        html += `<td class="ns-funcid">${e.funcId || '-'}</td>`;
-        html += `<td>0x${e.location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
-        html += `<td>0x${e.limit.toString(16).toUpperCase().padStart(8, '0')}</td>`;
-        html += `<td class="ns-perms">[${permStr}]</td>`;
+        html += `<td class="ns-label">${e.label || '-'}</td>`;
+        html += `<td>0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        html += `<td class="ns-flag">${lim.b}</td>`;
+        html += `<td class="ns-flag">${lim.f}</td>`;
+        html += `<td>0x${lim.limit.toString(16).toUpperCase().padStart(5, '0')}</td>`;
         html += `<td>${ver}</td>`;
-        html += `<td>${e.bindFlag ? 'Y' : 'N'}</td>`;
+        html += `<td>0x${seal.toString(16).toUpperCase().padStart(7, '0')}</td>`;
+        html += `<td class="ns-flag">${e.gBit}</td>`;
         html += '</tr>';
     }
     html += '</tbody></table>';
