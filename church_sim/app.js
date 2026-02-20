@@ -62,19 +62,37 @@ function updateDashboard() {
 function updateCRDisplay() {
     const container = document.getElementById('crRegs');
     if (!container) return;
-    let html = '';
+    const localNames = {
+        6: 'C-List', 7: 'CLOOMC', 8: 'Thread', 9: 'IRQ', 10: 'Fault', 15: 'Namespace'
+    };
+    let html = '<table class="cr-table"><thead><tr>';
+    html += '<th>CR</th><th>Local Name</th>';
+    html += '<th>word0: GT</th><th>Perms</th><th>Ver</th><th>Idx</th><th>Type</th>';
+    html += '<th>word1: Location</th>';
+    html += '<th>word2: B</th><th>F</th><th>Limit[16:0]</th>';
+    html += '<th>word3: Ver</th><th>FNV Seal</th>';
+    html += '</tr></thead><tbody>';
     for (let i = 0; i < 16; i++) {
         const cr = sim.getFormattedCR(i);
-        const special = i === 6 ? ' (C-List)' : i === 7 ? ' (CLOOMC)' : i === 8 ? ' (Thread)' :
-                        i === 15 ? ' (Namespace)' : i === 9 ? ' (IRQ)' : i === 10 ? ' (Fault)' : '';
-        const isNull = cr.name === 'NULL';
-        html += `<div class="reg-row ${isNull ? 'reg-null' : 'reg-active'}">`;
-        html += `<span class="reg-label">CR${i.toString().padStart(2, ' ')}${special}</span>`;
-        html += `<span class="reg-gt">0x${cr.gt}</span>`;
-        html += `<span class="reg-perms">[${cr.perms}]</span>`;
-        html += `<span class="reg-name">${cr.name}</span>`;
-        html += '</div>';
+        const name = localNames[i] || '';
+        const cls = cr.isNull ? 'cr-null' : 'cr-active';
+        html += `<tr class="${cls}">`;
+        html += `<td class="cr-idx">${i}</td>`;
+        html += `<td class="cr-name">${name}</td>`;
+        html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
+        html += `<td class="cr-perms">[${cr.perms}]</td>`;
+        html += `<td>${cr.gtVersion}</td>`;
+        html += `<td>${cr.gtIndex}</td>`;
+        html += `<td class="cr-type">${cr.gtTypeName}</td>`;
+        html += `<td>0x${cr.word1_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        html += `<td class="cr-flag">${cr.limitB}</td>`;
+        html += `<td class="cr-flag">${cr.limitF}</td>`;
+        html += `<td>0x${cr.limit17.toString(16).toUpperCase().padStart(5, '0')}</td>`;
+        html += `<td>${cr.sealVersion}</td>`;
+        html += `<td>0x${cr.sealFNV.toString(16).toUpperCase().padStart(7, '0')}</td>`;
+        html += '</tr>';
     }
+    html += '</tbody></table>';
     container.innerHTML = html;
 }
 

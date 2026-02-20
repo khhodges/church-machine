@@ -787,10 +787,18 @@ class ChurchSimulator {
     getFormattedCR(idx) {
         const cr = this.cr[idx];
         if (!cr || cr.word0 === 0) {
-            return { index: idx, name: 'NULL', gt: '00000000', perms: '------', nsIndex: 0, version: 0, type: 'NULL' };
+            return {
+                index: idx, isNull: true,
+                word0_gt: '00000000', perms: '------', gtVersion: 0, gtIndex: 0, gtType: 'NULL', gtTypeName: 'NULL',
+                word1_location: 0,
+                word2_limit_raw: 0, limitB: 0, limitF: 0, limit17: 0,
+                word3_seals_raw: 0, sealVersion: 0, sealFNV: 0,
+            };
         }
         const parsed = this.parseGT(cr.word0);
-        const entry = this.namespaceTable[parsed.index];
+        const lim = this.parseLimitWord(cr.word2);
+        const sealVer = (cr.word3 >>> 25) & 0x7F;
+        const sealFNV = cr.word3 & 0x01FFFFFF;
         const permStr = (parsed.permissions.R ? 'R' : '-') +
                         (parsed.permissions.W ? 'W' : '-') +
                         (parsed.permissions.X ? 'X' : '-') +
@@ -798,15 +806,21 @@ class ChurchSimulator {
                         (parsed.permissions.S ? 'S' : '-') +
                         (parsed.permissions.E ? 'E' : '-');
         return {
-            index: idx,
-            name: entry ? entry.label : `ns[${parsed.index}]`,
-            gt: cr.word0.toString(16).toUpperCase().padStart(8, '0'),
+            index: idx, isNull: false,
+            word0_gt: cr.word0.toString(16).toUpperCase().padStart(8, '0'),
             perms: permStr,
-            nsIndex: parsed.index,
-            version: parsed.version,
-            type: parsed.typeName,
-            location: cr.word1,
-            limit: cr.word2,
+            gtVersion: parsed.version,
+            gtIndex: parsed.index,
+            gtType: parsed.type,
+            gtTypeName: parsed.typeName,
+            word1_location: cr.word1,
+            word2_limit_raw: cr.word2,
+            limitB: lim.b,
+            limitF: lim.f,
+            limit17: lim.limit,
+            word3_seals_raw: cr.word3,
+            sealVersion: sealVer,
+            sealFNV: sealFNV,
         };
     }
 }

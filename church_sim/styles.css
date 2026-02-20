@@ -127,6 +127,36 @@ header h1 {
     letter-spacing: 0.5px;
 }
 
+.cr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+}
+.cr-table th {
+    background: var(--bg-input);
+    padding: 0.3rem 0.4rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--church-gold);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+    font-size: 0.68rem;
+}
+.cr-table td {
+    padding: 0.2rem 0.4rem;
+    border-bottom: 1px solid rgba(45,55,72,0.3);
+    white-space: nowrap;
+}
+.cr-null { color: var(--text-secondary); opacity: 0.5; }
+.cr-active { color: var(--text-primary); }
+.cr-idx { color: var(--church-blue); font-weight: 600; min-width: 24px; }
+.cr-name { color: var(--church-blue); font-style: italic; min-width: 70px; }
+.cr-gt { color: var(--church-gold); }
+.cr-perms { font-size: 0.68rem; }
+.cr-type { color: var(--text-secondary); font-size: 0.68rem; }
+.cr-flag { text-align: center; color: var(--church-gold); font-weight: 600; }
+
 .reg-row {
     display: flex;
     align-items: center;
@@ -143,9 +173,6 @@ header h1 {
 .reg-row.reg-active { color: var(--text-primary); }
 
 .reg-label { min-width: 140px; color: var(--church-blue); flex-shrink: 0; }
-.reg-gt { min-width: 90px; color: var(--church-gold); flex-shrink: 0; }
-.reg-perms { min-width: 70px; font-size: 0.72rem; flex-shrink: 0; }
-.reg-name { color: var(--text-primary); flex-shrink: 0; }
 .reg-value { min-width: 90px; color: var(--church-gold); flex-shrink: 0; }
 .reg-decimal { color: var(--text-secondary); font-size: 0.68rem; flex-shrink: 0; }
 
