@@ -549,9 +549,9 @@ LOADEQ CR0, CR6, 12    ; SKIP (Z=0, not equal)
 LOADNE CR0, CR6, 2     ; EXEC (Z=0, is not-equal)
 
 ; --- TEST 5: SWITCH - swap registers ---
-SWITCH CR0, CR1        ; CR0 <-> CR1
+SWITCH CR0, 1          ; CR0 <-> CR1
 ; Now CR0=SUCC, CR1=Lambda
-SWITCH CR0, CR1        ; Swap back
+SWITCH CR0, 1          ; Swap back
 ; CR0=Lambda, CR1=SUCC again
 
 ; --- TEST 6: LAMBDA - in-scope reduction ---
@@ -561,7 +561,7 @@ LAMBDA CR3             ; Church SUB reduction
 LAMBDA CR4             ; Church MUL reduction
 
 ; --- TEST 7: CHANGE - re-aim register ---
-CHANGE CR0, CR6, 3     ; CR0 now -> SlideRule
+CHANGE CR0, 3          ; CR0 now -> SlideRule
 TPERM CR0, E           ; SlideRule has E? PASS
 
 ; --- TEST 8: SAVE - write to namespace ---
