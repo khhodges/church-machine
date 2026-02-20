@@ -516,6 +516,80 @@ function loadExample(name) {
     if (!editor) return;
 
     const examples = {
+        'selftest': `; ============================================
+; Church Machine Self-Test
+; Tests every opcode and CR0-CR5 registers
+; Boot must complete before assembling
+; ============================================
+
+; --- TEST 1: LOAD into CR0-CR5 ---
+; Load 6 different abstractions via C-List
+LOAD CR0, CR6, 2       ; CR0 = Lambda  (E)
+LOAD CR1, CR6, 7       ; CR1 = SUCC    (LE)
+LOAD CR2, CR6, 9       ; CR2 = ADD     (LE)
+LOAD CR3, CR6, 10      ; CR3 = SUB     (LE)
+LOAD CR4, CR6, 11      ; CR4 = MUL     (LE)
+LOAD CR5, CR6, 5       ; CR5 = Constants (E)
+
+; --- TEST 2: TPERM - permission checks ---
+; Each should set Z=1 (pass)
+TPERM CR0, E           ; Lambda has E? PASS
+TPERM CR1, LE          ; SUCC has L+E? PASS
+TPERM CR2, LE          ; ADD has L+E? PASS
+TPERM CR3, LE          ; SUB has L+E? PASS
+TPERM CR4, LE          ; MUL has L+E? PASS
+TPERM CR5, E           ; Constants has E? PASS
+
+; --- TEST 3: TPERM failure ---
+TPERM CR0, L           ; Lambda has L? FAIL (Z=0)
+
+; --- TEST 4: Conditional execution ---
+; Z=0 from failed TPERM above
+LOADEQ CR0, CR6, 12    ; SKIP (Z=0, not equal)
+LOADNE CR0, CR6, 2     ; EXEC (Z=0, is not-equal)
+
+; --- TEST 5: SWITCH - swap registers ---
+SWITCH CR0, CR1        ; CR0 <-> CR1
+; Now CR0=SUCC, CR1=Lambda
+SWITCH CR0, CR1        ; Swap back
+; CR0=Lambda, CR1=SUCC again
+
+; --- TEST 6: LAMBDA - in-scope reduction ---
+LAMBDA CR1             ; Church SUCC reduction
+LAMBDA CR2             ; Church ADD reduction
+LAMBDA CR3             ; Church SUB reduction
+LAMBDA CR4             ; Church MUL reduction
+
+; --- TEST 7: CHANGE - re-aim register ---
+CHANGE CR0, CR6, 3     ; CR0 now -> SlideRule
+TPERM CR0, E           ; SlideRule has E? PASS
+
+; --- TEST 8: SAVE - write to namespace ---
+LOAD CR0, CR6, 2       ; Reload Lambda
+SAVE CR0, CR6, 24      ; Save Lambda copy to slot 24
+
+; --- TEST 9: CALL/RETURN ---
+LOAD CR0, CR6, 2       ; CR0 = Lambda
+CALL CR0               ; Push frame, enter Lambda
+RETURN CR0             ; Pop frame, return to next
+
+; --- TEST 10: ELOADCALL - fused Load+TPERM+Call ---
+ELOADCALL CR0, CR6, 2  ; Load Lambda + check E + call
+RETURN CR0             ; Return from fused call
+
+; --- TEST 11: XLOADLAMBDA - fused Load+TPERM+Lambda ---
+XLOADLAMBDA CR1, CR6, 7 ; Load SUCC + check + lambda
+
+; --- TEST 12: Conditional LAMBDA ---
+TPERM CR1, LE          ; Z=1 (SUCC has LE)
+LAMBDAEQ CR2           ; Lambda ADD only if Z=1
+TPERM CR0, L           ; Z=0 (Lambda lacks L)
+LAMBDANE CR3           ; Lambda SUB only if Z=0 (NE)
+LAMBDAEQ CR4           ; SKIP MUL (Z=0, not EQ)
+
+; --- All tests complete ---
+HALT
+`,
         'load_save': `; Load and Save example
 ; Load Lambda abstraction into CR0 from C-List[CR6]
 LOAD CR0, CR6, 2       ; CR0 = Lambda (ns index 2)
