@@ -136,23 +136,23 @@ class ChurchSimulator {
             { label: 'Abacus',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
             { label: 'Constants',  perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Stack',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: true },
-            { label: 'SUCC',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'PRED',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'ADD',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'SUB',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'MUL',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'DIV',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'POW',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'SQRT',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'LOG',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'EXP',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'ISZERO',     perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'LEQ',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'SUCC',       perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'PRED',       perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'ADD',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'SUB',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'MUL',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'DIV',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'POW',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'SQRT',       perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'LOG',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'EXP',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'ISZERO',     perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'LEQ',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
             { label: 'TRUE',       perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
             { label: 'FALSE',      perms: {R:0,W:0,X:0,L:1,S:0,E:0}, chainable: false },
-            { label: 'PAIR',       perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'FST',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
-            { label: 'SND',        perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
+            { label: 'PAIR',       perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'FST',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
+            { label: 'SND',        perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
             { label: 'GC',         perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, handler: 'gc' },
         ];
         for (let i = 0; i < abstractions.length; i++) {
@@ -250,7 +250,7 @@ class ChurchSimulator {
                 E: (permBits >>> 5) & 1,
             },
             type,
-            typeName: ['Inform','Outform','DATA','Abstract'][type & 3],
+            typeName: ['Inform','Outform','NULL','Abstract'][type & 3],
         };
     }
 
@@ -602,6 +602,15 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `SAVE: CR${d.crDst} is NULL`);
             return null;
         }
+        const srcParsed = this.parseGT(srcGT);
+        const srcEntry = this.readNSEntry(srcParsed.index);
+        if (srcEntry) {
+            const srcWord1 = this.parseNSWord1(srcEntry.word1_limit);
+            if (srcWord1.b !== 1 && !this.mElevation) {
+                this.fault('BIND', `SAVE: CR${d.crDst} GT has B=0 — not bindable to c-list`);
+                return null;
+            }
+        }
         const clistGT = this.cr[d.crSrc].word0;
         if (clistGT === 0) {
             this.fault('NULL_CAP', `SAVE: CR${d.crSrc} C-List is NULL`);
@@ -791,19 +800,9 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `LAMBDA: CR${crIdx} is NULL`);
             return null;
         }
-        const check = this.mLoad(targetGT, 'E');
+        const check = this.mLoad(targetGT, 'X');
         if (!check.ok) {
             this.fault(check.fault, `LAMBDA: CR${crIdx}: ${check.message}`);
-            return null;
-        }
-
-        const parsed = this.parseGT(targetGT);
-        const hasL = parsed.permissions.L === 1;
-        const hasS = parsed.permissions.S === 1;
-        const hasE = parsed.permissions.E === 1;
-
-        if (hasL && !hasS && !hasE) {
-            this.fault('DOMAIN_PURITY', `LAMBDA: CR${crIdx} has Turing permissions (L without E)`);
             return null;
         }
 
@@ -895,8 +894,8 @@ class ChurchSimulator {
         if (!this._writeCR(d.crDst, gt, entry)) return null;
 
         const parsed = this.parseGT(gt);
-        if (!parsed.permissions.X && !parsed.permissions.E) {
-            this.fault('PERMISSION', `XLOADLAMBDA TPERM: CR${d.crDst} lacks X and E`);
+        if (!parsed.permissions.X) {
+            this.fault('PERMISSION', `XLOADLAMBDA TPERM: CR${d.crDst} lacks X permission`);
             return null;
         }
 
@@ -917,11 +916,6 @@ class ChurchSimulator {
         const check = this.mLoad(dataGT, 'R');
         if (!check.ok) {
             this.fault(check.fault, `DREAD: CR${d.crSrc}: ${check.message}`);
-            return null;
-        }
-        const parsed = this.parseGT(dataGT);
-        if (parsed.type !== 2) {
-            this.fault('TYPE', `DREAD: CR${d.crSrc} is not a DATA object (type=${parsed.typeName})`);
             return null;
         }
         const entry = check.entry;
@@ -953,11 +947,6 @@ class ChurchSimulator {
         const check = this.mLoad(dataGT, 'W');
         if (!check.ok) {
             this.fault(check.fault, `DWRITE: CR${d.crSrc}: ${check.message}`);
-            return null;
-        }
-        const parsed = this.parseGT(dataGT);
-        if (parsed.type !== 2) {
-            this.fault('TYPE', `DWRITE: CR${d.crSrc} is not a DATA object (type=${parsed.typeName})`);
             return null;
         }
         const entry = check.entry;
@@ -1031,7 +1020,7 @@ class ChurchSimulator {
     _lambdaPipeline(d, label) {
         return [
             { stage: 'LOAD', desc: `Read CR${d.crDst} GT`, perm: 'L', status: 'pass' },
-            { stage: 'TPERM', desc: `Verify E permission`, perm: 'E', status: 'pass' },
+            { stage: 'TPERM', desc: `Verify X permission`, perm: 'X', status: 'pass' },
             { stage: 'LAMBDA', desc: `Church reduction via ${label}`, status: 'pass' },
         ];
     }

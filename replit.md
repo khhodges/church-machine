@@ -26,9 +26,12 @@ The CTMM simulator provides web-based visualization using a Python HTTP server, 
 -   **Failsafe Security**: All validation failures are routed to a single FAULT handler.
 -   **Deterministic Garbage Collection (PP250)**: A four-phase Scan-Identify-Clear-Flip process with bidirectional G-bit. GC is a safe Turing abstraction — atomic Turing machine hidden behind a Church-callable namespace entry, entered via CALL, exited via RETURN.
 -   **Safe Turing Abstractions**: Hidden Turing implementations inside Church-callable entries. Church is the armor (interface, security), Turing is the sword inside (implementation, hidden and atomic). Entered only via CALL/LAMBDA with valid GTs, exited only via RETURN.
--   **DATA Objects**: Namespace entries with GT type 2 (DATA), accessed via DREAD/DWRITE Turing instructions with R/W permission checks and bounds validation. DATA objects bridge Church and Turing domains.
+-   **DATA Objects**: Namespace entries accessed via DREAD/DWRITE Turing instructions with R/W permission checks and bounds validation. DATA objects bridge Church and Turing domains.
 -   **Minimal Turing ISA** (inside safe abstractions): DREAD, DWRITE, BFEXT, BFINS, MCMP, ADD, BRANCH, RETURN — 8 integer-only instructions, no FP (FP is Church-domain via abstractions).
 -   **LAMBDA Instruction**: Enables lightweight, in-scope code application with machine-status fast path.
+-   **mLoad — Single Guard at the Gate**: Every instruction goes through mLoad for GT validation (version, seal, bounds) and permission checking. Permission gate table: R→DREAD, W→DWRITE, X→LAMBDA, L→LOAD, S→SAVE(+B=1), E→CALL. M-elevation bypasses permission checks.
+-   **B (Bind) Bit**: NS entry word1 bit 31. SAVE requires B=1 on the source GT before committing to c-list. Defaults to 0 — set only by explicit API choice.
+-   **GT Type Field** (2-bit): Specific cases of NULL Golden Tokens (Inform=0, Outform=1, NULL=2, Abstract=3). NOT used for object classification — R/W/X permission bits determine data vs. code access.
 -   **Network Transparency**: Outform GTs support remote resources via HTTPS and RPC tunnels.
 -   **Atomic Abstraction Architecture**: No central OS, VM, privileged mode, or superuser. All system services are atomic abstractions accessed via Golden Tokens, with `mLoad` as the single trusted gate.
 -   **Three Dispatch Styles**: Abstractions can resolve method calls via Symbolic resolver (high-security), LAMBDA fast-path (performance), or Traditional compiled binary (fastest).
