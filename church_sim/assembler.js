@@ -7,7 +7,7 @@ class ChurchAssembler {
             'DREAD': 10, 'DWRITE': 11,
             'BFEXT': 12, 'BFINS': 13,
             'MCMP': 14, 'IADD': 15, 'ISUB': 16,
-            'BRANCH': 17,
+            'BRANCH': 17, 'SHL': 18, 'SHR': 19,
         };
         this.conditions = {
             'EQ': 0, 'NE': 1, 'CS': 2, 'CC': 3,
@@ -197,6 +197,23 @@ class ChurchAssembler {
                 imm = this._parseImm(parts[1], lineNum, addr);
                 break;
             }
+            case 18: {
+                crDst = this._parseDR(parts[1], lineNum);
+                crSrc = this._parseDR(parts[2], lineNum);
+                imm = this._parseImm(parts[3], lineNum) & 0x1F;
+                break;
+            }
+            case 19: {
+                crDst = this._parseDR(parts[1], lineNum);
+                crSrc = this._parseDR(parts[2], lineNum);
+                let shamt = this._parseImm(parts[3], lineNum) & 0x1F;
+                let arith = 0;
+                if (parts.length > 4 && parts[4].toUpperCase() === 'ASR') {
+                    arith = 1;
+                }
+                imm = (arith << 5) | shamt;
+                break;
+            }
         }
 
         return (
@@ -272,10 +289,10 @@ class ChurchAssembler {
         const crSrc = (word >>> 15) & 0xF;
         const imm = word & 0x7FFF;
 
-        const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH'];
+        const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
-        if (opcode > 17) return `??? 0x${word.toString(16).padStart(8, '0')}`;
+        if (opcode > 19) return `??? 0x${word.toString(16).padStart(8, '0')}`;
 
         const op = opNames[opcode];
         const condStr = cond === 14 ? '' : condNames[cond];
@@ -313,6 +330,12 @@ class ChurchAssembler {
             case 17: {
                 const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
                 return `${mnemonic} ${soff >= 0 ? '+' : ''}${soff}`;
+            }
+            case 18: return `${mnemonic} DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
+            case 19: {
+                const arith = (imm >>> 5) & 1;
+                const shamt = imm & 0x1F;
+                return `${mnemonic} DR${crDst}, DR${crSrc}, ${shamt}${arith ? ' ASR' : ''}`;
             }
             default: return `??? 0x${word.toString(16)}`;
         }

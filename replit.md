@@ -27,9 +27,9 @@ The CTMM simulator provides web-based visualization using a Python HTTP server, 
 -   **Deterministic Garbage Collection (PP250)**: A four-phase Scan-Identify-Clear-Flip process with bidirectional G-bit. GC is a safe Turing abstraction — atomic Turing machine hidden behind a Church-callable namespace entry, entered via CALL, exited via RETURN.
 -   **Safe Turing Abstractions**: Hidden Turing implementations inside Church-callable entries. Church is the armor (interface, security), Turing is the sword inside (implementation, hidden and atomic). Entered only via CALL/LAMBDA with valid GTs, exited only via RETURN.
 -   **DATA Objects**: Namespace entries accessed via DREAD/DWRITE Turing instructions with R/W permission checks and bounds validation. DATA objects bridge Church and Turing domains.
--   **Minimal Turing ISA** (inside safe abstractions): DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH + shared RETURN — 9 integer-only instructions, no FP (FP is Church-domain via abstractions).
+-   **Minimal Turing ISA** (inside safe abstractions): DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR + shared RETURN — 11 integer-only instructions, no FP (FP is Church-domain via abstractions).
 -   **Unified Address Space**: Memory (MSB 0x00-0xFD), attached devices (MSB 0xFE), and machine register bank (MSB 0xFF) are all segments of one flat address space, all protected by the same GT gate via mLoad. Without the right GT, any address range is unreachable.
--   **Instruction Encoding**: 32-bit: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]. 5-bit opcode supports 18 instructions (10 Church + 8 Turing).
+-   **Instruction Encoding**: 32-bit: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]. 5-bit opcode supports 20 instructions (10 Church + 10 Turing).
 -   **LAMBDA Instruction**: Enables lightweight, in-scope code application with machine-status fast path.
 -   **mLoad — Single Guard at the Gate**: Every instruction goes through mLoad for GT validation (version, seal, bounds) and permission checking. Permission gate table: R→DREAD, W→DWRITE, X→LAMBDA, L→LOAD, S→SAVE(+B=1), E→CALL. M-elevation bypasses permission checks.
 -   **B (Bind) Bit**: NS entry word1 bit 31. SAVE requires B=1 on the source GT before committing to c-list. Defaults to 0 — set only by explicit API choice.

@@ -555,6 +555,8 @@ class ChurchSimulator {
             case 15: result = this._execIadd(d); break;
             case 16: result = this._execIsub(d); break;
             case 17: result = this._execBranch(d); break;
+            case 18: result = this._execShl(d); break;
+            case 19: result = this._execShr(d); break;
             default:
                 this.fault('INVALID_OP', `Unknown opcode ${d.opcode}`);
                 return null;
@@ -1125,6 +1127,52 @@ class ChurchSimulator {
         this.pc = target;
         return { pc: this.pc - soff, instr: d, desc, pipeline: [
             { stage: 'BRANCH', desc: `Branch to PC=${target} (offset ${soff})`, status: 'pass' },
+        ]};
+    }
+
+    _execShl(d) {
+        const drSrc = d.crSrc;
+        const shamt = d.imm & 0x1F;
+        const value = this.dr[drSrc] >>> 0;
+        const lastBitOut = shamt > 0 ? ((value >>> (32 - shamt)) & 1) : 0;
+        const result = (value << shamt) >>> 0;
+        this.flags.Z = (result === 0);
+        this.flags.N = ((result >>> 31) & 1) === 1;
+        this.flags.C = lastBitOut === 1;
+        this.flags.V = false;
+        this.dr[d.crDst] = result;
+        const desc = `SHL DR${d.crDst}, DR${drSrc}, ${shamt} → 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
+        this.output += desc + '\n';
+        this.pc++;
+        return { pc: this.pc - 1, instr: d, desc, pipeline: [
+            { stage: 'SHL', desc: `DR${d.crDst} = DR${drSrc} << ${shamt}`, status: 'pass' },
+        ]};
+    }
+
+    _execShr(d) {
+        const drSrc = d.crSrc;
+        const shamt = d.imm & 0x1F;
+        const arith = (d.imm >>> 5) & 1;
+        const value = this.dr[drSrc] >>> 0;
+        const lastBitOut = shamt > 0 ? ((value >>> (shamt - 1)) & 1) : 0;
+        let result;
+        if (arith) {
+            result = (value | 0) >> shamt;
+            result = result >>> 0;
+        } else {
+            result = value >>> shamt;
+        }
+        this.flags.Z = (result === 0);
+        this.flags.N = ((result >>> 31) & 1) === 1;
+        this.flags.C = lastBitOut === 1;
+        this.flags.V = false;
+        this.dr[d.crDst] = result;
+        const shType = arith ? 'ASR' : 'LSR';
+        const desc = `SHR DR${d.crDst}, DR${drSrc}, ${shamt} ${shType} → 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
+        this.output += desc + '\n';
+        this.pc++;
+        return { pc: this.pc - 1, instr: d, desc, pipeline: [
+            { stage: 'SHR', desc: `DR${d.crDst} = DR${drSrc} ${shType} ${shamt}`, status: 'pass' },
         ]};
     }
 

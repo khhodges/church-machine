@@ -202,6 +202,8 @@ Turing instructions exist only inside safe abstractions. They operate on DRs and
 | 15 | IADD | DRd, DRa, DRb | Integer add: DRd = DRa + DRb. Sets flags |
 | 16 | ISUB | DRd, DRa, DRb | Integer subtract: DRd = DRa - DRb. Sets flags |
 | 17 | BRANCH | offset | Conditional branch within abstraction. Bounded by abstraction limits |
+| 18 | SHL | DRd, DRs, shamt | Logical shift left: DRd = DRs << shamt. Sets Z, N, C (last bit out) |
+| 19 | SHR | DRd, DRs, shamt [ASR] | Shift right: logical (default) or arithmetic (ASR). Sets Z, N, C |
 
 RETURN (opcode 3) is shared between domains — it is the only exit from a Turing abstraction.
 
@@ -246,7 +248,7 @@ A safe Turing abstraction is a hidden Turing implementation inside a Church-call
 
 1. **Church program** holds a GT with E permission pointing to the abstraction
 2. **CALL** enters the abstraction — mLoad validates the GT, context is saved
-3. **Inside**: Turing instructions (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH) execute atomically. The caller cannot see or interfere with the implementation
+3. **Inside**: Turing instructions (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR) execute atomically. The caller cannot see or interfere with the implementation
 4. **RETURN** exits — caller's context is restored, results are visible through the namespace
 
 The caller sees only the Church interface. The Turing implementation is invisible, atomic, and confined. There is no way to branch into an abstraction at an arbitrary point — CALL is the only entry, RETURN is the only exit.
@@ -294,7 +296,7 @@ Abstractions support three dispatch methods:
 [14:0]   Immediate (15 bits) — offset, slot index, bitfield position/width
 ```
 
-For BFEXT/BFINS, the immediate field encodes position and width. For BRANCH, it encodes a signed offset bounded within the abstraction. For IADD/ISUB, it encodes a third register in the lower bits.
+For BFEXT/BFINS, the immediate field encodes position and width. For BRANCH, it encodes a signed offset bounded within the abstraction. For IADD/ISUB, it encodes a third register in the lower bits. For SHL, the immediate encodes shift amount (bits 0-4). For SHR, bits 0-4 encode shift amount and bit 5 selects arithmetic (1) vs logical (0) mode.
 
 ---
 
@@ -305,6 +307,6 @@ For BFEXT/BFINS, the immediate field encodes position and width. For BRANCH, it 
 3. **Uniform address space** — memory, devices, and machine registers are all address ranges behind the same GT gate
 4. **No special cases** — no privilege rings, no MMU, no separate I/O instructions, no superuser
 5. **Domain purity** — Church (security interface) and Turing (hidden implementation) are separated by the abstraction boundary
-6. **Minimal Turing ISA** — 9 instructions, integer only, no floating point (FP is Church-domain via abstractions)
+6. **Minimal Turing ISA** — 11 instructions, integer only, no floating point (FP is Church-domain via abstractions)
 7. **Capabilities cannot be forged** — only attenuated (CHANGE), loaded (LOAD), or saved (SAVE with B=1)
 8. **Failsafe default** — all validation failures route to a single FAULT handler

@@ -485,7 +485,7 @@ function updateInfoDisplay() {
     container.innerHTML = `
         <div class="info-item"><span class="info-label">Architecture</span><span class="info-value">Church Machine (Church + Turing domains)</span></div>
         <div class="info-item"><span class="info-label">Church Opcodes</span><span class="info-value">10 (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA)</span></div>
-        <div class="info-item"><span class="info-label">Turing Opcodes</span><span class="info-value">8 (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH) + shared RETURN</span></div>
+        <div class="info-item"><span class="info-label">Turing Opcodes</span><span class="info-value">10 (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR) + shared RETURN</span></div>
         <div class="info-item"><span class="info-label">Instruction</span><span class="info-value">32-bit: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]</span></div>
         <div class="info-item"><span class="info-label">Conditions</span><span class="info-value">16 ARM-style (EQ, NE, CS, CC, MI, PL, VS, VC, HI, LS, GE, LT, GT, LE, AL, NV)</span></div>
         <div class="info-item"><span class="info-label">Address Space</span><span class="info-value">Unified: Memory (0x00-FD) | Devices (0xFE) | Registers (0xFF) \u2014 all GT-protected</span></div>
@@ -810,12 +810,14 @@ HALT
 `,
         'turing_test': `; ============================================
 ; Turing ISA Test
-; Exercises IADD, ISUB, MCMP, BRANCH
+; Exercises IADD, ISUB, MCMP, BRANCH, SHL, SHR
 ; ============================================
 ;
-; Turing ISA (9 instructions):
+; Turing ISA (11 instructions):
 ;   DREAD, DWRITE, BFEXT, BFINS  (R/W via GT)
-;   MCMP, IADD, ISUB, BRANCH, RETURN
+;   MCMP, IADD, ISUB, BRANCH
+;   SHL, SHR (logical/arithmetic)
+;   RETURN (shared with Church)
 ; ============================================
 
 ; --- Boot: Load GTs ---
@@ -847,9 +849,21 @@ ISUB DR7, DR3, DR3     ; DR7 = 0 (Z=1)
 BRANCHEQ +2            ; Branch taken
 IADD DR8, DR1, DR1     ; Skipped
 
-; --- Overflow test ---
-IADD DR9, DR3, DR4     ; Sum
-ISUB DR10, DR0, DR1    ; 0 - DR1 (wraps, N=1)
+; --- SHL: Shift left ---
+IADD DR9, DR3, DR0     ; DR9 = DR3 (copy)
+SHL DR10, DR9, 4       ; DR10 = DR9 << 4
+
+; --- SHR: Logical shift right ---
+SHR DR11, DR10, 2      ; DR11 = DR10 >> 2
+
+; --- SHR: Arithmetic shift right ---
+ISUB DR12, DR0, DR3    ; DR12 = negative
+SHR DR13, DR12, 1, ASR ; DR13 sign-extending
+
+; --- Verify: SHL then SHR restores ---
+SHL DR14, DR3, 8       ; DR14 = DR3 << 8
+SHR DR15, DR14, 8      ; DR15 = DR14 >> 8
+MCMP DR15, DR3         ; Should be equal (Z=1)
 
 HALT
 `,
