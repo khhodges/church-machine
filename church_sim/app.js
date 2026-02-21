@@ -1345,17 +1345,17 @@ const INSTRUCTION_DATA = [
     {
         opcode: 1, mnemonic: 'SAVE', domain: 'church',
         syntax: 'SAVE CRd, CRs, imm',
-        brief: 'Save a Golden Token from a context register into the namespace',
+        brief: 'Save a Golden Token into a C-List (capability list)',
         encoding: 'opcode[5]=00001 | cond[4] | CRd[4] | CRs[4] | slot[15]',
         fields: [
             { name: 'CRd', desc: 'Source context register containing GT to save' },
-            { name: 'CRs', desc: 'Target C-List GT (must have S permission)' },
-            { name: 'imm', desc: 'Namespace slot index (0-32767)' },
+            { name: 'CRs', desc: 'C-List GT — the capability list to save into (must have S permission)' },
+            { name: 'imm', desc: 'Slot index within the C-List (0-32767)' },
         ],
         permission: 'S (Save) on CRs; B=1 required on source GT',
         flags: 'None',
-        details: 'Writes the GT from CRd into the namespace at the given slot. The target C-List must have S permission, and the source GT must have its B (Bind) bit set. This prevents unauthorized capability propagation.',
-        example: 'SAVE CR1, CR6, 20   ; Save CR1 to slot 20 via C-List CR6',
+        details: 'Saves the GT from CRd into the C-List pointed to by CRs, at the specified slot index. A C-List (capability list) is a namespace entry that holds other GTs — it is the fundamental mechanism for storing and sharing capabilities. The target C-List GT must have S (Save) permission, and the source GT must have its B (Bind) bit set to 1. This prevents unauthorized capability propagation — you cannot save a GT you have not explicitly been allowed to share.',
+        example: 'SAVE CR1, CR6, 20   ; Save CR1 into slot 20 of C-List CR6',
     },
     {
         opcode: 2, mnemonic: 'CALL', domain: 'church',
