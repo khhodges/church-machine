@@ -169,13 +169,11 @@ class RV32CapCore(Elaboratable):
 
         m.d.comb += [
             u_gc.gc_start.eq(self.gc_start),
+            u_gc.gc_mark_en.eq(1),
             u_gc.gc_sweep_en.eq(1),
-            u_gc.clist_start_index.eq(0),
-            u_gc.clist_end_index.eq(0x1000),
-            u_gc.clist_base_addr.eq(0),
-            u_gc.ns_base_addr.eq(0),
-            u_gc.mem_rd_data.eq(self.dmem_rd_data),
-            u_gc.mem_rd_valid.eq(1),
+            u_gc.ns_start_index.eq(0),
+            u_gc.ns_end_index.eq(0x1000),
+            u_gc.ns_rd_data.eq(self.ns_rd_data),
         ]
 
         m.d.comb += [
@@ -634,10 +632,19 @@ class RV32CapCore(Elaboratable):
         with m.Else():
             m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]
 
-        m.d.comb += [
-            self.ns_addr.eq(0),
-            self.ns_rd_en.eq(0),
-            self.ns_wr_en.eq(0),
-        ]
+        with m.If(u_gc.gc_busy):
+            m.d.comb += [
+                self.ns_addr.eq(u_gc.ns_addr),
+                self.ns_rd_en.eq(u_gc.ns_rd_en),
+                self.ns_wr_data.eq(u_gc.ns_wr_data),
+                self.ns_wr_en.eq(u_gc.ns_wr_en),
+            ]
+        with m.Else():
+            m.d.comb += [
+                self.ns_addr.eq(0),
+                self.ns_rd_en.eq(0),
+                self.ns_wr_data.eq(0),
+                self.ns_wr_en.eq(0),
+            ]
 
         return m
