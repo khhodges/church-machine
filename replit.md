@@ -32,7 +32,7 @@ The CTMM simulator provides web-based visualization using a Python HTTP server, 
 -   **Instruction Encoding**: 32-bit: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]. 5-bit opcode supports 20 instructions (10 Church + 10 Turing).
 -   **LAMBDA Instruction**: Enables lightweight, in-scope code application with machine-status fast path.
 -   **mLoad — Read Gate**: Every read-side instruction goes through mLoad for GT validation (version, seal, bounds) and permission checking. Permission gate table: R→DREAD, W→DWRITE, X→LAMBDA, L→LOAD, S→SAVE(c-list access), E→CALL. M-elevation bypasses permission checks.
--   **mSave — Write Gate**: Every write to a c-list goes through mSave for source GT validation: version match, seal valid, B=1 (bindable), and F=0 on target slot (not frozen). Symmetric counterpart to mLoad in the TSB.
+-   **mSave — Write Gate**: Every write to a c-list goes through mSave for source GT validation: version match, seal valid, B=1 (bindable), and F-bit detection on target slot (F=1 means FAR/foreign object requiring HTTP/tunnel access). Symmetric counterpart to mLoad in the TSB.
 -   **B (Bind) Bit**: NS entry word1 bit 31. mSave requires B=1 on the source GT before committing to c-list. Defaults to 0 — set only by explicit TPERM with B modifier (e.g., `TPERM CR0, EB`).
 -   **GT Type Field** (2-bit): Specific cases of NULL Golden Tokens (Inform=0, Outform=1, NULL=2, Abstract=3). NOT used for object classification — R/W/X permission bits determine data vs. code access.
 -   **Network Transparency**: Outform GTs support remote resources via HTTPS and RPC tunnels.

@@ -154,7 +154,7 @@
             <div class="step"><span class="step-num">4</span><span class="step-text">Version match: source GT.ver == NS.ver <span class="step-fault">→ VERSION fault</span></span></div>
             <div class="step"><span class="step-num">5</span><span class="step-text">FNV seal validation on source <span class="step-fault">→ SEAL fault</span></span></div>
             <div class="step"><span class="step-num">6</span><span class="step-text">B-bit check: B=1 required (unless M-elevated) <span class="step-fault">→ BIND fault</span></span></div>
-            <div class="step"><span class="step-num">7</span><span class="step-text">F-bit check: target F=0 required (unless M-elevated) <span class="step-fault">→ FROZEN fault</span></span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text">F-bit check: target F=1 → FAR object (requires HTTP/tunnel) <span class="step-fault">→ FAR fault if local-only</span></span></div>
             <div class="sep"></div>
             <div class="step"><span class="step-text"><span class="step-detail">Called by: SAVE instruction (validates source GT before c-list write)</span></span></div>
             <div class="step"><span class="step-text"><span class="step-detail">Symmetric counterpart to mLoad — together they form the complete TSB</span></span></div>
@@ -177,7 +177,7 @@
         <div class="flow-card">
             <h3>1 — SAVE CRd, CRs, imm</h3>
             <div class="step"><span class="step-num">1</span><span class="step-text">CR[dst] = source GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
-            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mSave(srcGT, targetIdx)</span> — validate source: ver, seal, B=1, target F=0</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mSave(srcGT, targetIdx)</span> — validate source: ver, seal, B=1, detect FAR</span></div>
             <div class="step"><span class="step-num">3</span><span class="step-text">CR[src] = c-list GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
             <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-gate">mLoad(clistGT, 'S')</span> — validate c-list, require S perm</span></div>
             <div class="step"><span class="step-num">5</span><span class="step-text">If target slot invalid → create dynamic entry</span></div>
@@ -383,7 +383,7 @@
             <div class="step"><span class="step-text"><span class="step-fault">SEAL</span> — FNV seal validation failure</span></div>
             <div class="step"><span class="step-text"><span class="step-fault">PERMISSION</span> — GT lacks required permission bit</span></div>
             <div class="step"><span class="step-text"><span class="step-fault">BIND</span> — B=0 on source GT (mSave rejects)</span></div>
-            <div class="step"><span class="step-text"><span class="step-fault">FROZEN</span> — F=1 on target slot (mSave rejects)</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">FAR</span> — F=1 on target (foreign/remote object, needs HTTP/tunnel)</span></div>
             <div class="step"><span class="step-text"><span class="step-fault">CR_OCCUPIED</span> — writing to non-empty CR</span></div>
             <div class="step"><span class="step-text"><span class="step-fault">TPERM_RSV</span> — reserved TPERM preset code</span></div>
             <div class="step"><span class="step-text"><span class="step-fault">INVALID_OP</span> — unknown opcode</span></div>
@@ -407,7 +407,7 @@
         <div style="margin-bottom:0.3rem;"><b>Word 0:</b> <span class="enc-field enc-imm">Location[32]</span> <span style="color:#8b949e;">— memory base address</span></div>
         <div style="margin-bottom:0.3rem;"><b>Word 1:</b>
             <span class="enc-field" style="background:#6e5a2a33;border-color:#d4a843;color:#d4a843;">B[1]</span>
-            <span class="enc-field" style="background:#5a2a6e33;border-color:#bc8cff;color:#bc8cff;">F[1]</span>
+            <span class="enc-field" style="background:#5a2a6e33;border-color:#bc8cff;color:#bc8cff;">F(ar)[1]</span>
             <span class="enc-field" style="background:#1c2a1c;border-color:#3fb950;color:#3fb950;">G[1]</span>
             <span class="enc-field" style="background:#161b22;border-color:#6e7681;color:#6e7681;">Chain[1]</span>
             <span class="enc-field" style="background:#2a1a2a;border-color:#bc8cff;color:#bc8cff;">GTType[2]</span>

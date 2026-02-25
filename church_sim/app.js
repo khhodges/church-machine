@@ -353,7 +353,7 @@ function updateCRDetail() {
     html += '</tr></thead><tbody>';
     html += `<tr><td>word0: GT</td><td class="cr-gt">0x${cr.word0_gt}</td><td>[${cr.perms}] Ver=${cr.gtVersion} Idx=${cr.gtIndex} Type=${cr.gtTypeName}</td></tr>`;
     html += `<tr><td>word1: Location</td><td>0x${cr.word1_location.toString(16).toUpperCase().padStart(8,'0')}</td><td>Base address in memory</td></tr>`;
-    html += `<tr><td>word2: Limit</td><td>B=${cr.limitB} F=${cr.limitF} Limit=0x${cr.limit17.toString(16).toUpperCase().padStart(5,'0')}</td><td>Bound=${cr.limitB} Frozen=${cr.limitF} Size=${cr.limit17 + 1} words</td></tr>`;
+    html += `<tr><td>word2: Limit</td><td>B=${cr.limitB} F=${cr.limitF} Limit=0x${cr.limit17.toString(16).toUpperCase().padStart(5,'0')}</td><td>Bound=${cr.limitB} Far=${cr.limitF} Size=${cr.limit17 + 1} words</td></tr>`;
     html += `<tr><td>word3: Seals</td><td>Ver=${cr.sealVersion} FNV=0x${cr.sealFNV.toString(16).toUpperCase().padStart(7,'0')}</td><td>Integrity seal</td></tr>`;
     html += `<tr><td>M bit</td><td class="${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td><td>${cr.mBit ? 'Written under M elevation (boot gift)' : 'Normal write'}</td></tr>`;
     html += '</tbody></table>';
@@ -384,7 +384,7 @@ function updateCRDetail() {
         html += `<tr><td>Stored GT Perms</td><td>[${storedPermStr}]</td></tr>`;
         html += `<tr><td>GT Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
         html += `<tr><td>B (Bind)</td><td>${lim.b}</td></tr>`;
-        html += `<tr><td>F (Frozen)</td><td>${lim.f}</td></tr>`;
+        html += `<tr><td>F (Far)</td><td>${lim.f}</td></tr>`;
         html += `<tr><td>Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
         html += `<tr><td>Version</td><td>${sealVer}</td></tr>`;
         html += `<tr><td>FNV Seal</td><td>0x${sealFNV.toString(16).toUpperCase().padStart(7,'0')}</td></tr>`;

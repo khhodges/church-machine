@@ -360,7 +360,7 @@ class ChurchSimulator {
             if (tgtEntry) {
                 const tgtWord1 = this.parseNSWord1(tgtEntry.word1_limit);
                 if (tgtWord1.f === 1 && !this.mElevation) {
-                    return { ok: false, fault: 'FROZEN', message: `target slot ${targetIdx} is frozen (F=1)` };
+                    return { ok: false, fault: 'FAR', message: `target slot ${targetIdx} is FAR (F=1) — requires HTTP/tunnel access` };
                 }
             }
         }
