@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Church Machine — Microcode Flowchart</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; padding: 1.5rem; }
+        h1 { color: #d4a843; margin-bottom: 0.3rem; font-size: 1.4rem; }
+        .subtitle { color: #8b949e; margin-bottom: 1.5rem; font-size: 0.85rem; }
+        .back-link { color: #58a6ff; text-decoration: none; font-size: 0.8rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .chart { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; margin-bottom: 2rem; }
+        .section-title { color: #d4a843; font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 0.5rem; text-align: center; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; width: 100%; max-width: 900px; }
+
+        .node { border-radius: 6px; padding: 0.5rem 1rem; text-align: center; font-size: 0.78rem; min-width: 200px; position: relative; }
+        .node-boot    { background: #1a1e2e; border: 2px solid #6e7681; }
+        .node-gate    { background: #1c2333; border: 2px solid #d4a843; color: #d4a843; font-weight: 700; }
+        .node-check   { background: #161b22; border: 2px solid #58a6ff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); min-width: 220px; padding: 1.2rem 1rem; }
+        .node-action  { background: #1a2332; border: 2px solid #3fb950; }
+        .node-fault   { background: #2d1214; border: 2px solid #f85149; color: #f85149; }
+        .node-church  { background: #1a2332; border: 2px solid #79c0ff; }
+        .node-turing  { background: #1a2332; border: 2px solid #bc8cff; }
+        .node-fused   { background: #1a2332; border: 2px solid #f0883e; }
+        .node-gc      { background: #1c2a1c; border: 2px solid #3fb950; }
+        .node-start   { background: #1a2332; border: 2px solid #d4a843; border-radius: 20px; }
+        .node-end     { background: #161b22; border: 2px double #6e7681; border-radius: 20px; }
+
+        .arrow { color: #6e7681; font-size: 1rem; line-height: 1; }
+        .arrow-label { color: #8b949e; font-size: 0.65rem; font-style: italic; }
+        .pass { color: #3fb950; font-size: 0.65rem; font-weight: 600; }
+        .fail { color: #f85149; font-size: 0.65rem; font-weight: 600; }
+
+        .flow-row { display: flex; align-items: center; gap: 1rem; justify-content: center; }
+        .flow-branch { display: flex; gap: 2rem; align-items: flex-start; }
+
+        .legend { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0 2rem; justify-content: center; }
+        .legend-item { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; }
+        .legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 2px solid; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        .flow-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; }
+        .flow-card h3 { color: #79c0ff; font-size: 0.9rem; margin-bottom: 0.6rem; border-bottom: 1px solid #21262d; padding-bottom: 0.3rem; }
+        .flow-card.turing h3 { color: #bc8cff; }
+        .flow-card.fused h3 { color: #f0883e; }
+        .flow-card.gate h3 { color: #d4a843; }
+        .flow-card.boot h3 { color: #6e7681; }
+        .flow-card.gc h3 { color: #3fb950; }
+
+        .step { display: flex; align-items: flex-start; gap: 0.5rem; margin: 0.3rem 0; font-size: 0.75rem; }
+        .step-num { color: #6e7681; min-width: 1.2rem; text-align: right; }
+        .step-text { flex: 1; }
+        .step-gate { color: #d4a843; font-weight: 600; }
+        .step-fault { color: #f85149; }
+        .step-ok { color: #3fb950; }
+        .step-detail { color: #8b949e; font-size: 0.7rem; }
+        .sep { border-top: 1px dashed #21262d; margin: 0.4rem 0; }
+
+        .gate-table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.75rem; }
+        .gate-table th { background: #21262d; color: #d4a843; padding: 0.3rem 0.5rem; text-align: left; border: 1px solid #30363d; }
+        .gate-table td { padding: 0.3rem 0.5rem; border: 1px solid #30363d; }
+        .gate-table tr:nth-child(even) { background: #161b22; }
+
+        .instr-encoding { background: #0d1117; border: 1px solid #30363d; border-radius: 4px; padding: 0.5rem; margin: 0.5rem 0; font-family: 'Courier New', monospace; font-size: 0.75rem; text-align: center; }
+        .enc-field { display: inline-block; padding: 0.2rem 0.4rem; margin: 0.1rem; border-radius: 3px; }
+        .enc-op { background: #2a1a1a; border: 1px solid #f85149; color: #f85149; }
+        .enc-cond { background: #1a2a1a; border: 1px solid #3fb950; color: #3fb950; }
+        .enc-dst { background: #1a1a2a; border: 1px solid #58a6ff; color: #58a6ff; }
+        .enc-src { background: #2a1a2a; border: 1px solid #bc8cff; color: #bc8cff; }
+        .enc-imm { background: #2a2a1a; border: 1px solid #d4a843; color: #d4a843; }
+    </style>
+</head>
+<body>
+    <a href="/church" class="back-link">&larr; Back to Simulator</a>
+    <h1>Church Machine — Complete Microcode Flowchart</h1>
+    <p class="subtitle">20-instruction ISA: 10 Church + 10 Turing &bull; Dual security gates: mLoad (read) + mSave (write) &bull; PP250 GC</p>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#6e7681;background:#1a1e2e;"></div> Boot Microcode</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#d4a843;background:#1c2333;"></div> Security Gate (TSB)</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#79c0ff;background:#1a2332;"></div> Church Instruction</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#bc8cff;background:#1a2332;"></div> Turing Instruction</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#f0883e;background:#1a2332;"></div> Fused Instruction</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#3fb950;background:#1c2a1c;"></div> GC / Action</div>
+        <div class="legend-item"><div class="legend-swatch" style="border-color:#f85149;background:#2d1214;"></div> FAULT</div>
+    </div>
+
+    <div class="section-title">Instruction Encoding (32-bit)</div>
+    <div class="instr-encoding">
+        <span class="enc-field enc-op">opcode[5]</span>
+        <span class="enc-field enc-cond">cond[4]</span>
+        <span class="enc-field enc-dst">dst[4]</span>
+        <span class="enc-field enc-src">src[4]</span>
+        <span class="enc-field enc-imm">imm[15]</span>
+        <div style="margin-top:0.3rem;color:#8b949e;font-size:0.7rem;">31 ················ 27 │ 26 ····· 23 │ 22 ····· 19 │ 18 ····· 15 │ 14 ················ 0</div>
+    </div>
+
+    <div class="section-title">Boot Microcode Sequence</div>
+    <div class="flow-card boot" style="max-width:500px;margin:0 auto 1.5rem;">
+        <h3>Boot Microcode (6 Steps, M-Elevation Active)</h3>
+        <div class="step"><span class="step-num">0</span><span class="step-text">Verify all CRs are zero (boot invariant) <span class="step-fault">→ FAULT if violated</span></span></div>
+        <div class="step"><span class="step-num">1</span><span class="step-text">M-Elevation ON — enable trusted setup</span></div>
+        <div class="step"><span class="step-num">2</span><span class="step-text">CR15 ← Namespace root (NS[0], no permissions)</span></div>
+        <div class="step"><span class="step-num">3</span><span class="step-text">CR8 ← Boot Thread identity (NS[2])</span></div>
+        <div class="step"><span class="step-num">4</span><span class="step-text">CR6 ← Boot C-List (NS[0], L+S via M gate)</span></div>
+        <div class="step"><span class="step-num">5</span><span class="step-text">CR7 ← Boot CLOOMC (NS[1], executable code)</span></div>
+        <div class="step"><span class="step-num">6</span><span class="step-text">M-Elevation OFF — boot complete → <span class="step-ok">READY</span></span></div>
+    </div>
+
+    <div class="section-title">Instruction Fetch &amp; Condition Check</div>
+    <div class="flow-card" style="max-width:500px;margin:0 auto 1.5rem;">
+        <h3>Common Prefix (Every Instruction)</h3>
+        <div class="step"><span class="step-num">1</span><span class="step-text">Fetch instruction word at PC</span></div>
+        <div class="step"><span class="step-num">2</span><span class="step-text">If word = 0 → <span class="step-fault">HALT (zero instruction)</span></span></div>
+        <div class="step"><span class="step-num">3</span><span class="step-text">Decode: opcode[5] | cond[4] | dst[4] | src[4] | imm[15]</span></div>
+        <div class="step"><span class="step-num">4</span><span class="step-text">Evaluate ARM condition (16 codes: EQ/NE/CS/CC/MI/PL/VS/VC/HI/LS/GE/LT/GT/LE/AL/NV)</span></div>
+        <div class="step"><span class="step-num">5</span><span class="step-text">If condition false → skip, PC++ <span class="step-detail">(conditional execution)</span></span></div>
+        <div class="step"><span class="step-num">6</span><span class="step-text">Dispatch to instruction handler by opcode</span></div>
+        <div class="sep"></div>
+        <div class="step"><span class="step-num">7</span><span class="step-text"><span class="step-detail">Post-execute: DR0 ← 0 (always cleared), emit state change</span></span></div>
+    </div>
+
+    <div class="section-title">Security Gates — Trusted Security Base (TSB)</div>
+    <div class="grid">
+        <div class="flow-card gate">
+            <h3>mLoad — Read Gate</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Parse GT: Version(7) | Index(17) | Perms(6) | Type(2)</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Bounds check: index &lt; nsCount <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Read namespace entry (word0: location, word1: B|F|G|limit, word2: version|seal)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-gate">Update capability indicators</span> (perms, B, F, version, seal)</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">Version match: GT.ver == NS.ver <span class="step-fault">→ VERSION fault</span></span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">FNV seal validation <span class="step-fault">→ SEAL fault</span></span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text">Permission check: GT has required perm (unless M-elevated) <span class="step-fault">→ PERMISSION fault</span></span></div>
+            <div class="step"><span class="step-num">8</span><span class="step-text"><span class="step-ok">Mark entry LIVE (set G-bit for GC)</span></span></div>
+            <div class="sep"></div>
+            <table class="gate-table">
+                <tr><th>Required</th><th>Instruction</th><th>Domain</th></tr>
+                <tr><td>R</td><td>DREAD, BFEXT</td><td>Turing</td></tr>
+                <tr><td>W</td><td>DWRITE, BFINS</td><td>Turing</td></tr>
+                <tr><td>X</td><td>LAMBDA</td><td>Church</td></tr>
+                <tr><td>L</td><td>LOAD, ELOADCALL, XLOADLAMBDA</td><td>Church</td></tr>
+                <tr><td>S</td><td>SAVE (c-list access)</td><td>Church</td></tr>
+                <tr><td>E</td><td>CALL, ELOADCALL</td><td>Church</td></tr>
+            </table>
+        </div>
+
+        <div class="flow-card gate">
+            <h3>mSave — Write Gate</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Parse source GT: Version(7) | Index(17) | Perms(6) | Type(2)</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Read source namespace entry <span class="step-fault">→ BOUNDS fault if null</span></span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text"><span class="step-gate">Update capability indicators</span> (source GT perms, B, F, version, seal)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Version match: source GT.ver == NS.ver <span class="step-fault">→ VERSION fault</span></span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">FNV seal validation on source <span class="step-fault">→ SEAL fault</span></span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">B-bit check: B=1 required (unless M-elevated) <span class="step-fault">→ BIND fault</span></span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text">F-bit check: target F=0 required (unless M-elevated) <span class="step-fault">→ FROZEN fault</span></span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-text"><span class="step-detail">Called by: SAVE instruction (validates source GT before c-list write)</span></span></div>
+            <div class="step"><span class="step-text"><span class="step-detail">Symmetric counterpart to mLoad — together they form the complete TSB</span></span></div>
+        </div>
+    </div>
+
+    <div class="section-title">Church Domain — 10 Instructions</div>
+    <div class="grid">
+        <div class="flow-card">
+            <h3>0 — LOAD CRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = c-list GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(clistGT, 'L')</span> — validate c-list, require L perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Bounds check: imm &lt; nsCount, entry valid <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">FNV seal on target entry <span class="step-fault">→ SEAL fault</span></span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">Read GT word from entry's memory location</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">Write to CR[dst] (occupied check) <span class="step-fault">→ CR_OCCUPIED fault</span></span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>1 — SAVE CRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[dst] = source GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mSave(srcGT, targetIdx)</span> — validate source: ver, seal, B=1, target F=0</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">CR[src] = c-list GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-gate">mLoad(clistGT, 'S')</span> — validate c-list, require S perm</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">If target slot invalid → create dynamic entry</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">Register target in nsClistMap (GC reachability)</span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text">Write source GT to target slot's memory location</span></div>
+            <div class="step"><span class="step-num">8</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>2 — CALL CRd</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[dst] = target GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(targetGT, 'E')</span> — require E (entry) perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">If handler registered (e.g., GC) → dispatch to safe Turing abstraction</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Push call frame: returnPC, all CRs, all DRs, flags</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>3 — RETURN CRd</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Call stack empty? → <span class="step-fault">HALT (stack empty)</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Pop frame: restore returnPC</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text"><span class="step-ok">PC ← returnPC</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>4 — CHANGE CRd, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = source GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Bounds check: imm &lt; nsCount <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Read entry at index imm <span class="step-fault">→ BOUNDS fault if null</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Read GT from entry, write to CR[dst] <span class="step-fault">→ CR_OCCUPIED fault</span></span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(re-aims register without mLoad — index-based)</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>5 — SWITCH CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] must be non-null <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Swap CR[src] ↔ CR[imm&7] (atomic register swap)</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>6 — TPERM CRd, preset[+B]</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Decode: presetCode = imm & 0xF, bSet = imm bit 4</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Reserved preset? <span class="step-fault">→ TPERM_RSV fault</span></span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">GT null? → Z=0, N=1 (fail flags), <span class="step-ok">PC++</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Test: GT has all required permission bits?</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">If B modifier + test passed → set B=1 on namespace entry word1</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">Set flags: Z=pass, N=!pass, C=0, V=0</span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-text"><span class="step-detail">Presets: CLEAR(0) R(1) RW(2) X(3) RX(4) RWX(5) L(6) S(7) E(8) LS(9) LE(10) SE(11) LSE(12) RWXLSE(13) + B flag(bit4)</span></span></div>
+        </div>
+
+        <div class="flow-card">
+            <h3>7 — LAMBDA CRd</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[dst] = target GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(targetGT, 'X')</span> — require X (execute) perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">In-scope code application (no context save, lightweight)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card fused">
+            <h3>8 — ELOADCALL CRd, CRs, imm (Fused)</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = c-list GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(clistGT, 'L')</span> — LOAD phase: validate c-list</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Bounds + seal on target entry</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Load GT → CR[dst]</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text"><span class="step-gate">mLoad(loadedGT, 'E')</span> — TPERM+CALL phase: check E perm</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">Push call frame (CRs, DRs, flags, returnPC)</span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(3 ops in 1 cycle: LOAD + TPERM(E) + CALL)</span></span></div>
+        </div>
+
+        <div class="flow-card fused">
+            <h3>9 — XLOADLAMBDA CRd, CRs, imm (Fused)</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = c-list GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(clistGT, 'L')</span> — LOAD phase: validate c-list</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Bounds + seal on target entry</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Load GT → CR[dst]</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">Check X permission on loaded GT <span class="step-fault">→ PERMISSION fault</span></span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text">In-scope application (no context save)</span></div>
+            <div class="step"><span class="step-num">7</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(3 ops in 1 cycle: LOAD + TPERM(X) + LAMBDA)</span></span></div>
+        </div>
+    </div>
+
+    <div class="section-title">Turing Domain — 10 Instructions (inside safe abstractions)</div>
+    <div class="grid">
+        <div class="flow-card turing">
+            <h3>10 — DREAD DRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = data GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(dataGT, 'R')</span> — require R perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Bounds check: imm ≤ entry limit <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">DR[dst] ← memory[location + imm]</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>11 — DWRITE DRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = data GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(dataGT, 'W')</span> — require W perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Bounds check: imm ≤ entry limit <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">memory[location + imm] ← DR[dst]</span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>12 — BFEXT DRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = data GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(dataGT, 'R')</span> — require R perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Decode: pos = imm[9:5], width = imm[4:0]</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Validate pos+width ≤ 32 <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">DR[dst] ← (word >> pos) & mask(width)</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>13 — BFINS DRd, CRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">CR[src] = data GT. Null? <span class="step-fault">→ NULL_CAP fault</span></span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text"><span class="step-gate">mLoad(dataGT, 'W')</span> — require W perm</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Decode: pos = imm[9:5], width = imm[4:0]</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text">Validate pos+width ≤ 32 <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">5</span><span class="step-text">word = (old & ~mask) | (DR[dst] << pos) & mask</span></div>
+            <div class="step"><span class="step-num">6</span><span class="step-text"><span class="step-ok">PC++</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>14 — MCMP DRd, DRs</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">a = DR[dst], b = DR[src]</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">Compute a − b (unsigned), set flags NZCV</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(no gate — pure arithmetic)</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>15 — IADD DRd, DRs, DRimm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">a = DR[src], b = DR[imm&0xF]</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">DR[dst] = (a + b) mod 2³²</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Set flags: Z, N, C (carry), V (overflow)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(no gate — pure arithmetic)</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>16 — ISUB DRd, DRs, DRimm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">a = DR[src], b = DR[imm&0xF]</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">DR[dst] = (a − b) mod 2³²</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Set flags: Z, N, C (borrow), V (overflow)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(no gate — pure arithmetic)</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>17 — BRANCH imm (signed offset)</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Sign-extend imm[15] to signed offset</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">target = PC + offset. Range check <span class="step-fault">→ BOUNDS fault</span></span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text"><span class="step-ok">PC ← target</span> <span class="step-detail">(combine with cond for conditional branch)</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>18 — SHL DRd, DRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">shamt = imm & 0x1F (shift amount 0–31)</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">DR[dst] = DR[src] << shamt</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Set Z, N, C (last bit shifted out)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(no gate — pure arithmetic)</span></span></div>
+        </div>
+
+        <div class="flow-card turing">
+            <h3>19 — SHR DRd, DRs, imm</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">shamt = imm & 0x1F (shift amount 0–31)</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">DR[dst] = DR[src] >>> shamt (logical shift)</span></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">Set Z, N, C (last bit shifted out)</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">PC++</span> <span class="step-detail">(no gate — pure arithmetic)</span></span></div>
+        </div>
+    </div>
+
+    <div class="section-title">PP250 Deterministic Garbage Collection</div>
+    <div class="grid">
+        <div class="flow-card gc">
+            <h3>GC — Safe Turing Abstraction (via CALL)</h3>
+            <div class="step"><span class="step-num">1</span><span class="step-text">Entered via CALL to GC namespace entry (requires E perm)</span></div>
+            <div class="step"><span class="step-num">2</span><span class="step-text">M-Elevation ON (atomic Turing abstraction)</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-num" style="color:#d4a843;">S</span><span class="step-text"><b>SCAN</b> — Mark all CR-referenced entries as LIVE via G-bit</span></div>
+            <div class="step"><span class="step-text step-detail" style="margin-left:1.7rem;">Walk CR0–CR15, for each non-null GT: markLive(GT.index)</span></div>
+            <div class="step"><span class="step-text step-detail" style="margin-left:1.7rem;">Walk nsClistMap: for each c-list child, markLive(childIdx)</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-num" style="color:#d4a843;">I</span><span class="step-text"><b>IDENTIFY</b> — Entries with G-bit matching garbage polarity are garbage</span></div>
+            <div class="step"><span class="step-text step-detail" style="margin-left:1.7rem;">G-bit == gcPolarity → LIVE; G-bit != gcPolarity → GARBAGE</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-num" style="color:#d4a843;">C</span><span class="step-text"><b>CLEAR</b> — Zero out garbage entries, bump their version (stale GT invalidation)</span></div>
+            <div class="step"><span class="step-text step-detail" style="margin-left:1.7rem;">Zeroed entries become available for reuse; version bump kills stale GTs</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-num" style="color:#d4a843;">F</span><span class="step-text"><b>FLIP</b> — Toggle gcPolarity (bidirectional G-bit)</span></div>
+            <div class="step"><span class="step-text step-detail" style="margin-left:1.7rem;">Next cycle: LIVE = opposite polarity, no re-mark needed</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-num">3</span><span class="step-text">M-Elevation OFF</span></div>
+            <div class="step"><span class="step-num">4</span><span class="step-text"><span class="step-ok">RETURN</span> — exit atomic abstraction</span></div>
+        </div>
+
+        <div class="flow-card gc">
+            <h3>FAULT Handler</h3>
+            <div class="step"><span class="step-text">All validation failures across both gates route to a single FAULT handler:</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-text"><span class="step-fault">NULL_CAP</span> — null GT where non-null required</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">BOUNDS</span> — index out of range or null entry</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">VERSION</span> — GT version ≠ namespace entry version</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">SEAL</span> — FNV seal validation failure</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">PERMISSION</span> — GT lacks required permission bit</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">BIND</span> — B=0 on source GT (mSave rejects)</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">FROZEN</span> — F=1 on target slot (mSave rejects)</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">CR_OCCUPIED</span> — writing to non-empty CR</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">TPERM_RSV</span> — reserved TPERM preset code</span></div>
+            <div class="step"><span class="step-text"><span class="step-fault">INVALID_OP</span> — unknown opcode</span></div>
+            <div class="sep"></div>
+            <div class="step"><span class="step-text"><span class="step-detail">Effect: HALT machine, log fault (type, message, PC, step count), emit fault event</span></span></div>
+        </div>
+    </div>
+
+    <div class="section-title">Golden Token Format (32-bit)</div>
+    <div class="instr-encoding" style="max-width:600px;margin:0 auto 1rem;">
+        <span class="enc-field" style="background:#2a1a1a;border-color:#f85149;color:#f85149;">Version[7]</span>
+        <span class="enc-field" style="background:#1a1a2a;border-color:#58a6ff;color:#58a6ff;">Index[17]</span>
+        <span class="enc-field" style="background:#1a2a1a;border-color:#3fb950;color:#3fb950;">Perms[6]</span>
+        <span class="enc-field" style="background:#2a1a2a;border-color:#bc8cff;color:#bc8cff;">Type[2]</span>
+        <div style="margin-top:0.3rem;color:#8b949e;font-size:0.7rem;">31 ········· 25 │ 24 ·················· 8 │ 7 ···· 2 │ 1 · 0</div>
+        <div style="margin-top:0.3rem;color:#8b949e;font-size:0.7rem;">Perms: R(0) W(1) X(2) L(3) S(4) E(5) &nbsp;│&nbsp; Type: Inform(0) Outform(1) NULL(2) Abstract(3)</div>
+    </div>
+
+    <div class="section-title">Namespace Entry Layout (96-bit = 3 × 32-bit words)</div>
+    <div class="instr-encoding" style="max-width:700px;margin:0 auto 2rem;">
+        <div style="margin-bottom:0.3rem;"><b>Word 0:</b> <span class="enc-field enc-imm">Location[32]</span> <span style="color:#8b949e;">— memory base address</span></div>
+        <div style="margin-bottom:0.3rem;"><b>Word 1:</b>
+            <span class="enc-field" style="background:#6e5a2a33;border-color:#d4a843;color:#d4a843;">B[1]</span>
+            <span class="enc-field" style="background:#5a2a6e33;border-color:#bc8cff;color:#bc8cff;">F[1]</span>
+            <span class="enc-field" style="background:#1c2a1c;border-color:#3fb950;color:#3fb950;">G[1]</span>
+            <span class="enc-field" style="background:#161b22;border-color:#6e7681;color:#6e7681;">Chain[1]</span>
+            <span class="enc-field" style="background:#2a1a2a;border-color:#bc8cff;color:#bc8cff;">GTType[2]</span>
+            <span class="enc-field" style="background:#161b22;border-color:#6e7681;color:#6e7681;">rsv[9]</span>
+            <span class="enc-field enc-imm">Limit[17]</span>
+        </div>
+        <div><b>Word 2:</b>
+            <span class="enc-field" style="background:#2a1a1a;border-color:#f85149;color:#f85149;">Version[7]</span>
+            <span class="enc-field" style="background:#1a2332;border-color:#58a6ff;color:#58a6ff;">FNV Seal[25]</span>
+        </div>
+    </div>
+
+    <div style="text-align:center;color:#6e7681;font-size:0.7rem;padding:1rem 0;">
+        Church Machine Microcode Flowchart &bull; 20-instruction ISA &bull; mLoad + mSave dual gates &bull; PP250 GC
+    </div>
+</body>
+</html>
