@@ -301,11 +301,23 @@ class ChurchSimulator {
         if (!entry) {
             return { ok: false, fault: 'BOUNDS', message: `namespace entry ${parsed.index} is null` };
         }
+        const nsWord1 = this.parseNSWord1(entry.word1_limit);
         const nsVersion = (entry.word2_seals >>> 25) & 0x7F;
-        if (parsed.version !== nsVersion) {
+        const versionMatch = parsed.version === nsVersion;
+        const sealValid = this.validateMAC(entry);
+        this.lastCapability = {
+            op: requiredPerm,
+            label: this.nsLabels[parsed.index] || 'entry_'+parsed.index,
+            perms: parsed.permissions,
+            b: nsWord1.b,
+            f: nsWord1.f,
+            versionMatch,
+            sealValid,
+        };
+        if (!versionMatch) {
             return { ok: false, fault: 'VERSION', message: `version mismatch: GT v${parsed.version}, entry v${nsVersion}` };
         }
-        if (!this.validateMAC(entry)) {
+        if (!sealValid) {
             return { ok: false, fault: 'SEAL', message: `FNV seal validation failed for entry ${parsed.index}` };
         }
         if (requiredPerm !== null && !this.mElevation && !parsed.permissions[requiredPerm]) {
@@ -657,17 +669,6 @@ class ChurchSimulator {
         const gt = this.memory[entry.word0_location] || 0;
         if (!this._writeCR(d.crDst, gt, entry)) return null;
         const label = this.nsLabels[targetIdx] || 'entry_'+targetIdx;
-        const loadedParsed = this.parseGT(gt);
-        const nsWord1 = this.parseNSWord1(entry.word1_limit);
-        const nsVersion = (entry.word2_seals >>> 25) & 0x7F;
-        this.lastCapability = {
-            op: 'LOAD',
-            label,
-            perms: loadedParsed.permissions,
-            b: nsWord1.b,
-            f: nsWord1.f,
-            versionMatch: loadedParsed.version === nsVersion,
-        };
         const desc = `LOAD CR${d.crDst}, [CR${d.crSrc} + ${targetIdx}] → ${label}`;
         this.output += desc + '\n';
         this.pc++;
@@ -718,17 +719,6 @@ class ChurchSimulator {
         const entry = this.readNSEntry(targetIdx);
         const saveLoc = entry.word0_location;
         this.memory[saveLoc] = srcGT;
-        const saveParsed = this.parseGT(srcGT);
-        const saveWord1 = this.parseNSWord1(entry.word1_limit);
-        const saveNsVersion = (entry.word2_seals >>> 25) & 0x7F;
-        this.lastCapability = {
-            op: 'SAVE',
-            label: this.nsLabels[targetIdx] || 'slot_'+targetIdx,
-            perms: saveParsed.permissions,
-            b: saveWord1.b,
-            f: saveWord1.f,
-            versionMatch: saveParsed.version === saveNsVersion,
-        };
         const desc = `SAVE CR${d.crDst} → [CR${d.crSrc} + ${targetIdx}]`;
         this.output += desc + '\n';
         this.pc++;

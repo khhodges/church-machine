@@ -309,6 +309,11 @@ header h1 {
     color: #a0d0ff;
 }
 
+.cap-bit.cap-req {
+    border-color: var(--church-gold);
+    box-shadow: 0 0 3px var(--church-gold);
+}
+
 .cap-bit.cap-fail {
     background: #6e2a2a;
     border-color: #9a3a3a;

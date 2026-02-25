@@ -467,20 +467,23 @@ function updateFlagsDisplay() {
     let capHtml = '';
     if (cap) {
         const p = cap.perms;
+        const gateNames = {L:'LOAD',S:'SAVE',E:'CALL',R:'DREAD',W:'DWRITE',X:'LAMBDA'};
+        const gateName = gateNames[cap.op] || cap.op || 'mLoad';
+        const req = cap.op;
         capHtml = `
         <span class="flags-sep"></span>
-        <span class="cap-group-label">${cap.op}</span>
-        <span class="cap-bit ${p.R ? 'cap-on' : ''}">R</span>
-        <span class="cap-bit ${p.W ? 'cap-on' : ''}">W</span>
-        <span class="cap-bit ${p.X ? 'cap-on' : ''}">X</span>
+        <span class="cap-group-label">${gateName}</span>
+        <span class="cap-bit ${p.R ? 'cap-on' : ''} ${req==='R' ? 'cap-req' : ''}">R</span>
+        <span class="cap-bit ${p.W ? 'cap-on' : ''} ${req==='W' ? 'cap-req' : ''}">W</span>
+        <span class="cap-bit ${p.X ? 'cap-on' : ''} ${req==='X' ? 'cap-req' : ''}">X</span>
         <span class="cap-sep">|</span>
-        <span class="cap-bit ${p.L ? 'cap-on' : ''}">L</span>
-        <span class="cap-bit ${p.S ? 'cap-on' : ''}">S</span>
-        <span class="cap-bit ${p.E ? 'cap-on' : ''}">E</span>
+        <span class="cap-bit ${p.L ? 'cap-on' : ''} ${req==='L' ? 'cap-req' : ''}">L</span>
+        <span class="cap-bit ${p.S ? 'cap-on' : ''} ${req==='S' ? 'cap-req' : ''}">S</span>
+        <span class="cap-bit ${p.E ? 'cap-on' : ''} ${req==='E' ? 'cap-req' : ''}">E</span>
         <span class="cap-sep">|</span>
         <span class="cap-bit ${cap.b ? 'cap-on cap-b' : ''}">B</span>
         <span class="cap-bit ${cap.f ? 'cap-on cap-f' : ''}">F</span>
-        <span class="cap-bit ${cap.versionMatch ? 'cap-on cap-v' : 'cap-fail'}">V✓</span>
+        <span class="cap-bit ${cap.versionMatch ? 'cap-on cap-v' : 'cap-fail'}">V${cap.versionMatch ? '\u2713' : '\u2717'}</span>
         <span class="cap-label">${cap.label}</span>`;
     }
     container.innerHTML = `
