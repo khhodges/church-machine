@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 4: LAMBDA vs. CALL Execution Paths</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 920px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 4 &mdash; LAMBDA vs. CALL Execution Paths</h1>
+<p class="subtitle">Side-by-side comparison of the two abstraction-entry mechanisms. LAMBDA is a lightweight, in-scope fast path (~3 cycles) that saves only the PC to machine status. CALL is the full domain-crossing mechanism (10+ cycles) with stack frame push, c-list switch, mLoad revalidation, and automatic B-bit clearing.</p>
+
+<svg viewBox="0 0 1100 1080" width="1100" height="1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c05020"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:17px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555; text-anchor:middle; dominant-baseline:central; }
+    .step-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+    .cycle { font-family:'Consolas',monospace; font-size:9px; fill:#999; text-anchor:end; dominant-baseline:central; }
+  </style>
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- LAMBDA COLUMN (LEFT) — Fast Path                        -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <rect x="40" y="10" width="490" height="44" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="285" y="32" class="title-lg" fill="#27864a">LAMBDA &mdash; Fast Path (~3 cycles)</text>
+
+  <rect x="40" y="60" width="490" height="30" rx="4" fill="#f0fff0" stroke="#27864a" stroke-width="1"/>
+  <text x="285" y="75" class="mono" fill="#27864a">LAMBDA CRd &nbsp;&nbsp;(X permission required on CRd)</text>
+
+  <!-- Connecting arrow -->
+  <line x1="285" y1="90" x2="285" y2="120" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 1: X Permission -->
+  <rect x="60" y="120" width="450" height="50" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="85" cy="145" r="14" fill="#27864a"/>
+  <text x="85" y="145" class="step-num">1</text>
+  <text x="300" y="138" class="label" fill="#27864a">X Permission Verify via mLoad</text>
+  <text x="300" y="156" class="label-s" fill="#555">Single permission check — no c-list traversal</text>
+  <text x="505" y="145" class="cycle">~1 cyc</text>
+
+  <line x1="285" y1="170" x2="285" y2="200" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 2: Save PC -->
+  <rect x="60" y="200" width="450" height="50" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="85" cy="225" r="14" fill="#27864a"/>
+  <text x="85" y="225" class="step-num">2</text>
+  <text x="300" y="218" class="label" fill="#27864a">Save PC+NIA to Machine Status</text>
+  <text x="300" y="236" class="label-s" fill="#555">lambdaActive=true, lambdaReturnNIA=PC+4</text>
+  <text x="505" y="225" class="cycle">~1 cyc</text>
+
+  <line x1="285" y1="250" x2="285" y2="280" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 3: Branch -->
+  <rect x="60" y="280" width="450" height="50" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="85" cy="305" r="14" fill="#27864a"/>
+  <text x="85" y="305" class="step-num">3</text>
+  <text x="300" y="298" class="label" fill="#27864a">Branch to Target Entry Point</text>
+  <text x="300" y="316" class="label-s" fill="#555">PC &#x2190; entry.location (same scope, same CRs, same DRs)</text>
+  <text x="505" y="305" class="cycle">~1 cyc</text>
+
+  <line x1="285" y1="330" x2="285" y2="360" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Execution -->
+  <rect x="100" y="360" width="370" height="40" rx="6" fill="#f9f9f5" stroke="#999" stroke-width="1"/>
+  <text x="285" y="380" class="mono" fill="#333">... execute target code in same scope ...</text>
+
+  <line x1="285" y1="400" x2="285" y2="430" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- RETURN fast path -->
+  <rect x="60" y="430" width="450" height="60" rx="8" fill="#dff0d8" stroke="#27864a" stroke-width="2"/>
+  <text x="285" y="448" class="title-sm" fill="#27864a">RETURN (LAMBDA fast path)</text>
+  <text x="285" y="468" class="label-s" fill="#555">lambdaActive? &#x2192; PC = lambdaReturnNIA, clear flag</text>
+  <text x="285" y="482" class="label-s" fill="#27864a">No stack pop. No revalidation. ~1 cycle.</text>
+
+  <!-- What's NOT done -->
+  <rect x="60" y="520" width="450" height="110" rx="8" fill="#fff8f0" stroke="#b8860b" stroke-width="1"/>
+  <text x="285" y="540" class="title-xs" fill="#b8860b">What LAMBDA does NOT do:</text>
+  <text x="285" y="560" class="mono-s" fill="#555">&#x2717; No call stack push/pop</text>
+  <text x="285" y="576" class="mono-s" fill="#555">&#x2717; No c-list switch</text>
+  <text x="285" y="592" class="mono-s" fill="#555">&#x2717; No B-bit clearing</text>
+  <text x="285" y="608" class="mono-s" fill="#555">&#x2717; No domain crossing</text>
+  <text x="285" y="624" class="mono-s" fill="#555">&#x2717; No CR/DR save/restore</text>
+
+  <!-- Total -->
+  <rect x="100" y="650" width="370" height="36" rx="6" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="285" y="668" class="mono-b" fill="#27864a">Total: ~3 cycles (entry + return)</text>
+
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- CALL COLUMN (RIGHT) — Full Path                         -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <rect x="570" y="10" width="490" height="44" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2"/>
+  <text x="815" y="32" class="title-lg" fill="#2a6db5">CALL &mdash; Full Path (10+ cycles)</text>
+
+  <rect x="570" y="60" width="490" height="30" rx="4" fill="#f0f7ff" stroke="#2a6db5" stroke-width="1"/>
+  <text x="815" y="75" class="mono" fill="#2a6db5">CALL CRd &nbsp;&nbsp;(E permission required on CRd)</text>
+
+  <line x1="815" y1="90" x2="815" y2="110" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 1: E Permission -->
+  <rect x="590" y="110" width="450" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="615" cy="131" r="14" fill="#2a6db5"/>
+  <text x="615" y="131" class="step-num">1</text>
+  <text x="830" y="125" class="label" fill="#2a6db5">E Permission Verify via mLoad</text>
+  <text x="830" y="141" class="label-s" fill="#555">Full 7-stage mLoad pipeline on target GT</text>
+  <text x="1035" y="131" class="cycle">~2 cyc</text>
+
+  <line x1="815" y1="152" x2="815" y2="168" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 2: Push Stack -->
+  <rect x="590" y="168" width="450" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="615" cy="189" r="14" fill="#2a6db5"/>
+  <text x="615" y="189" class="step-num">2</text>
+  <text x="830" y="183" class="label" fill="#2a6db5">Push Call Stack Frame</text>
+  <text x="830" y="199" class="label-s" fill="#555">Save PC, CRs, DRs, flags, LAMBDA state</text>
+  <text x="1035" y="189" class="cycle">~2 cyc</text>
+
+  <line x1="815" y1="210" x2="815" y2="226" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 3: C-List Switch -->
+  <rect x="590" y="226" width="450" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="615" cy="247" r="14" fill="#2a6db5"/>
+  <text x="615" y="247" class="step-num">3</text>
+  <text x="830" y="241" class="label" fill="#2a6db5">C-List Switch (Namespace Crossing)</text>
+  <text x="830" y="257" class="label-s" fill="#555">CR15 &#x2190; target's c-list root GT</text>
+  <text x="1035" y="247" class="cycle">~1 cyc</text>
+
+  <line x1="815" y1="268" x2="815" y2="284" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 4: B-bit Auto-Clear -->
+  <rect x="590" y="284" width="450" height="42" rx="8" fill="#fde8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <circle cx="615" cy="305" r="14" fill="#cc3333"/>
+  <text x="615" y="305" class="step-num">4</text>
+  <text x="830" y="299" class="label" fill="#cc3333">B-bit Auto-Clear on All Preserved CRs</text>
+  <text x="830" y="315" class="label-s" fill="#555">CR0-CR7: B &#x2190; 0 ("use it, don't keep it")</text>
+  <text x="1035" y="305" class="cycle">~1 cyc</text>
+
+  <line x1="815" y1="326" x2="815" y2="342" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 5: LAMBDA state save -->
+  <rect x="590" y="342" width="450" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="615" cy="363" r="14" fill="#2a6db5"/>
+  <text x="615" y="363" class="step-num">5</text>
+  <text x="830" y="357" class="label" fill="#2a6db5">Clear LAMBDA State</text>
+  <text x="830" y="373" class="label-s" fill="#555">lambdaActive &#x2190; false (saved in stack frame)</text>
+  <text x="1035" y="363" class="cycle">~0 cyc</text>
+
+  <line x1="815" y1="384" x2="815" y2="400" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Step 6: Domain crossing -->
+  <rect x="590" y="400" width="450" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="615" cy="421" r="14" fill="#2a6db5"/>
+  <text x="615" y="421" class="step-num">6</text>
+  <text x="830" y="415" class="label" fill="#2a6db5">Domain Crossing &amp; PC Branch</text>
+  <text x="830" y="431" class="label-s" fill="#555">PC &#x2190; entry.location, enter new abstraction scope</text>
+  <text x="1035" y="421" class="cycle">~1 cyc</text>
+
+  <line x1="815" y1="442" x2="815" y2="458" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Execution -->
+  <rect x="630" y="458" width="370" height="34" rx="6" fill="#f9f9f5" stroke="#999" stroke-width="1"/>
+  <text x="815" y="475" class="mono" fill="#333">... execute in callee's scope ...</text>
+
+  <line x1="815" y1="492" x2="815" y2="510" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- RETURN full path -->
+  <rect x="590" y="510" width="450" height="180" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2"/>
+  <text x="815" y="530" class="title-sm" fill="#2a6db5">RETURN (Full Stack Path)</text>
+
+  <rect x="610" y="545" width="410" height="36" rx="6" fill="#fff" stroke="#2a6db5" stroke-width="1"/>
+  <circle cx="630" cy="563" r="12" fill="#2a6db5"/>
+  <text x="630" y="563" class="step-num" style="font-size:11px">7</text>
+  <text x="825" y="557" class="label" fill="#2a6db5">Pop Call Stack Frame</text>
+  <text x="825" y="572" class="label-s">Restore PC, CRs, DRs, flags, LAMBDA state</text>
+
+  <rect x="610" y="590" width="410" height="36" rx="6" fill="#fff" stroke="#2a6db5" stroke-width="1"/>
+  <circle cx="630" cy="608" r="12" fill="#2a6db5"/>
+  <text x="630" y="608" class="step-num" style="font-size:11px">8</text>
+  <text x="825" y="602" class="label" fill="#2a6db5">mLoad Revalidation on Restored CRs</text>
+  <text x="825" y="617" class="label-s">Version, seal, bounds re-checked on CR6, CR7</text>
+
+  <rect x="610" y="635" width="410" height="36" rx="6" fill="#fff" stroke="#2a6db5" stroke-width="1"/>
+  <circle cx="630" cy="653" r="12" fill="#2a6db5"/>
+  <text x="630" y="653" class="step-num" style="font-size:11px">9</text>
+  <text x="825" y="647" class="label" fill="#2a6db5">C-List Restore &amp; PC Resume</text>
+  <text x="825" y="662" class="label-s">CR15 &#x2190; caller's c-list, PC &#x2190; return address</text>
+
+  <text x="1035" y="600" class="cycle">~3+ cyc</text>
+
+  <!-- Total -->
+  <rect x="630" y="710" width="370" height="36" rx="6" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2"/>
+  <text x="815" y="728" class="mono-b" fill="#2a6db5">Total: 10+ cycles (entry + return)</text>
+
+
+  <!-- ════════════════════════════════════════════════════════ -->
+  <!-- COMPARISON TABLE                                        -->
+  <!-- ════════════════════════════════════════════════════════ -->
+  <text x="550" y="790" class="title-lg" fill="#1a1a1a">Comparison Summary</text>
+
+  <!-- Table header -->
+  <rect x="80" y="810" width="940" height="30" rx="4" fill="#e8e8e8" stroke="#999" stroke-width="1"/>
+  <text x="250" y="825" class="mono-b" fill="#333">Property</text>
+  <text x="550" y="825" class="mono-b" fill="#27864a">LAMBDA</text>
+  <text x="830" y="825" class="mono-b" fill="#2a6db5">CALL</text>
+
+  <!-- Rows -->
+  <rect x="80" y="840" width="940" height="26" rx="0" fill="#fafff5" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="853" class="label" fill="#333">Permission Required</text>
+  <text x="550" y="853" class="mono" fill="#27864a">X (Execute)</text>
+  <text x="830" y="853" class="mono" fill="#2a6db5">E (Enter)</text>
+
+  <rect x="80" y="866" width="940" height="26" rx="0" fill="#f5f9ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="879" class="label" fill="#333">Cycles (entry + return)</text>
+  <text x="550" y="879" class="mono-b" fill="#27864a">~3</text>
+  <text x="830" y="879" class="mono-b" fill="#2a6db5">10+</text>
+
+  <rect x="80" y="892" width="940" height="26" rx="0" fill="#fafff5" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="905" class="label" fill="#333">Call Stack</text>
+  <text x="550" y="905" class="mono" fill="#27864a">Not used</text>
+  <text x="830" y="905" class="mono" fill="#2a6db5">Push / Pop</text>
+
+  <rect x="80" y="918" width="940" height="26" rx="0" fill="#f5f9ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="931" class="label" fill="#333">C-List / Namespace</text>
+  <text x="550" y="931" class="mono" fill="#27864a">Same scope</text>
+  <text x="830" y="931" class="mono" fill="#2a6db5">Switch to callee's</text>
+
+  <rect x="80" y="944" width="940" height="26" rx="0" fill="#fafff5" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="957" class="label" fill="#333">B-bit Behavior</text>
+  <text x="550" y="957" class="mono" fill="#27864a">Unchanged</text>
+  <text x="830" y="957" class="mono" fill="#cc3333">Auto-cleared to 0</text>
+
+  <rect x="80" y="970" width="940" height="26" rx="0" fill="#f5f9ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="983" class="label" fill="#333">Domain Crossing</text>
+  <text x="550" y="983" class="mono" fill="#27864a">No</text>
+  <text x="830" y="983" class="mono" fill="#2a6db5">Yes</text>
+
+  <rect x="80" y="996" width="940" height="26" rx="0" fill="#fafff5" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="1009" class="label" fill="#333">RETURN Revalidation</text>
+  <text x="550" y="1009" class="mono" fill="#27864a">None (PC restore)</text>
+  <text x="830" y="1009" class="mono" fill="#2a6db5">Full mLoad on CRs</text>
+
+  <rect x="80" y="1022" width="940" height="26" rx="0" fill="#f5f9ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="250" y="1035" class="label" fill="#333">Nestable</text>
+  <text x="550" y="1035" class="mono" fill="#27864a">No (1 level only)</text>
+  <text x="830" y="1035" class="mono" fill="#2a6db5">Yes (stack depth)</text>
+
+  <rect x="80" y="840" width="940" height="208" rx="0" fill="none" stroke="#999" stroke-width="1"/>
+
+  <!-- Use case annotation -->
+  <rect x="80" y="1058" width="940" height="20" rx="4" fill="#f9f9f5" stroke="none"/>
+  <text x="550" y="1070" class="label-s" fill="#b8860b">LAMBDA is ideal for macro-like code reuse and hot-path abstraction. CALL is required for domain isolation and capability delegation.</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> LAMBDA fast path (~3 cycles)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> CALL full path (10+ cycles)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#cc3333;"></div> B-bit auto-clear (security)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div> Design rationale</div>
+</div>
+
+</body>
+</html>

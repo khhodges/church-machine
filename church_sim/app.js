@@ -113,7 +113,7 @@ function renderPagesDirectory() {
         card('/figures/dual-gate-tsb', 'Fig 1: Dual-Gate TSB', 'figure', td, 'mLoad + mSave as the complete Trusted Security Base.'),
         card('/figures/gt-format-type-field', 'Fig 2: GT Format &amp; Type', 'figure', td, 'Bit layout of all four GT types: Inform, Outform, NULL, Abstract (Sim-32 + Sim-64).'),
         card('/figures/b-bit-propagation', 'Fig 3: B-bit Propagation', 'figure', td, 'B-bit flow: default B=0, CALL clears B, TPERM sets B=1, mSave enforces B=1.'),
-        card('/figures/', 'Fig 4: LAMBDA Fast Path', 'figure', td, 'LAMBDA machine-status fast path.'),
+        card('/figures/lambda-vs-call', 'Fig 4: LAMBDA vs CALL', 'figure', td, 'Side-by-side: LAMBDA ~3 cycles vs CALL 10+ cycles, with comparison table.'),
         card('/figures/stack-frames', 'Fig 5: Stack Frames', 'figure', td, 'Self-describing stack frames.'),
         card('/figures/lambda-nesting-sequence', 'Fig 6: LAMBDA Nesting', 'figure', td, 'Non-nestable LAMBDA with CALL-mediated nesting.'),
         card('/figures/lambda-calculus-mapping', 'Fig 7: Lambda Mapping', 'figure', td, 'Lambda calculus to CTMM hardware mapping.'),

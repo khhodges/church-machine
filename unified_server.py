@@ -175,6 +175,12 @@ def figures_b_bit_propagation():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/lambda-vs-call')
+def figures_lambda_vs_call():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'lambda-vs-call.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/hello-mum-tunnel')
 def figures_hello_mum_tunnel():
     resp = make_response(send_from_directory(FIGURES_DIR, 'hello-mum-tunnel.html'))
