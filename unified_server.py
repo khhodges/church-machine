@@ -217,6 +217,12 @@ def figures_safe_turing_abstractions():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/unified-address-space')
+def figures_unified_address_space():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'unified-address-space.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/hello-mum-tunnel')
 def figures_hello_mum_tunnel():
     resp = make_response(send_from_directory(FIGURES_DIR, 'hello-mum-tunnel.html'))

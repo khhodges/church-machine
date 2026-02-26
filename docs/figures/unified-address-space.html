@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 12: Unified Address Space</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 24px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 12 &mdash; Unified Address Space</h1>
+<p class="subtitle">Memory, attached devices, and machine registers are all segments of one flat address space, all protected by the same Golden Token gate via mLoad. Without the right GT, any address range is unreachable. There is no separate I/O bus, no memory-mapped device backdoor, and no unprotected register file access.</p>
+
+<svg viewBox="0 0 1100 1260" width="1100" height="1260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c07020"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7b2d8e"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:17px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555; text-anchor:middle; dominant-baseline:central; }
+    .mono-xs { font-family:'Consolas','Courier New',monospace; font-size:9px; fill:#777; text-anchor:middle; dominant-baseline:central; }
+    .hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+    .addr { font-family:'Consolas','Courier New',monospace; font-size:11px; font-weight:700; dominant-baseline:central; }
+  </style>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- ADDRESS SPACE MAP (center)                                  -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="25" class="title-lg" fill="#333">32-bit Unified Address Space</text>
+  <text x="550" y="45" class="label-s" fill="#555">MSB selects segment; remaining bits select offset within segment</text>
+
+  <!-- Address bar (vertical, left side) -->
+  <rect x="120" y="70" width="60" height="500" rx="0" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+  <text x="150" y="85" class="addr" fill="#333" text-anchor="middle">MSB</text>
+
+  <!-- Memory segment: 0x00 - 0xFD -->
+  <rect x="180" y="70" width="500" height="370" rx="10" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2.5"/>
+  <rect x="182" y="72" width="496" height="36" rx="8" fill="#2a6db5"/>
+  <text x="430" y="90" class="hdr" style="font-size:15px">Memory (MSB 0x00 &#x2013; 0xFD)</text>
+
+  <!-- Address labels -->
+  <text x="150" y="110" class="addr" fill="#2a6db5" text-anchor="middle">0x00</text>
+  <line x1="178" y1="110" x2="180" y2="110" stroke="#2a6db5" stroke-width="1"/>
+
+  <!-- Memory sub-regions -->
+  <rect x="210" y="118" width="440" height="44" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="430" y="134" class="mono-b" fill="#2a6db5">Namespace C-Lists (capability storage)</text>
+  <text x="430" y="152" class="label-s" fill="#555">Golden Tokens, entry metadata, seals, version counters</text>
+
+  <rect x="210" y="170" width="440" height="44" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="430" y="186" class="mono-b" fill="#2a6db5">DATA Objects (structured data)</text>
+  <text x="430" y="204" class="label-s" fill="#555">Accessed via DREAD (R perm) / DWRITE (W perm) with bounds</text>
+
+  <rect x="210" y="222" width="440" height="44" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="430" y="238" class="mono-b" fill="#2a6db5">Code Segments (abstraction bodies)</text>
+  <text x="430" y="256" class="label-s" fill="#555">Entered via CALL (E perm) or LAMBDA (X perm) only</text>
+
+  <rect x="210" y="274" width="440" height="44" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="430" y="290" class="mono-b" fill="#2a6db5">Call Stack Frames</text>
+  <text x="430" y="308" class="label-s" fill="#555">Self-describing tag=0 (CALL) / tag=1 (LAMBDA) frames</text>
+
+  <rect x="210" y="326" width="440" height="44" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="430" y="342" class="mono-b" fill="#2a6db5">Thread Control Blocks</text>
+  <text x="430" y="360" class="label-s" fill="#555">CR8 thread identity GT required for access</text>
+
+  <rect x="210" y="378" width="440" height="44" rx="6" fill="#c8ddf0" stroke="#2a6db5" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="430" y="394" class="mono" fill="#2a6db5">General-purpose memory (heap, constants, ...)</text>
+  <text x="430" y="412" class="label-s" fill="#555">All require valid GT with appropriate R/W permissions</text>
+
+  <text x="150" y="430" class="addr" fill="#2a6db5" text-anchor="middle">0xFD</text>
+  <line x1="178" y1="430" x2="180" y2="430" stroke="#2a6db5" stroke-width="1"/>
+
+  <!-- Attached Devices segment: 0xFE -->
+  <rect x="180" y="450" width="500" height="60" rx="10" fill="#fff3e0" stroke="#c07020" stroke-width="2.5"/>
+  <rect x="182" y="452" width="496" height="28" rx="8" fill="#c07020"/>
+  <text x="430" y="466" class="hdr" style="font-size:14px">Attached Devices (MSB 0xFE)</text>
+
+  <text x="150" y="480" class="addr" fill="#c07020" text-anchor="middle">0xFE</text>
+  <line x1="178" y1="480" x2="180" y2="480" stroke="#c07020" stroke-width="1"/>
+
+  <text x="430" y="498" class="label" fill="#c07020">UART, GPIO, timers, network &mdash; all gated by mLoad/mSave</text>
+
+  <!-- Machine Register Bank: 0xFF -->
+  <rect x="180" y="520" width="500" height="60" rx="10" fill="#f3ecff" stroke="#7b2d8e" stroke-width="2.5"/>
+  <rect x="182" y="522" width="496" height="28" rx="8" fill="#7b2d8e"/>
+  <text x="430" y="536" class="hdr" style="font-size:14px">Machine Register Bank (MSB 0xFF)</text>
+
+  <text x="150" y="550" class="addr" fill="#7b2d8e" text-anchor="middle">0xFF</text>
+  <line x1="178" y1="550" x2="180" y2="550" stroke="#7b2d8e" stroke-width="1"/>
+
+  <text x="430" y="568" class="label" fill="#7b2d8e">CRs, DRs, flags, machine status &mdash; M-elevation for internal access</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- mLoad GATE (right side)                                     -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="730" y="70" width="320" height="510" rx="14" fill="#e8fde8" stroke="#27864a" stroke-width="2.5"/>
+  <rect x="732" y="72" width="316" height="36" rx="12" fill="#27864a"/>
+  <text x="890" y="90" class="hdr" style="font-size:15px">mLoad (Read Gate)</text>
+
+  <text x="890" y="120" class="label" fill="#27864a">Every read-side instruction</text>
+  <text x="890" y="136" class="label" fill="#27864a">passes through mLoad</text>
+
+  <!-- Pipeline stages -->
+  <rect x="760" y="155" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="170" r="11" fill="#27864a"/>
+  <text x="783" y="170" class="hdr" style="font-size:9px">1</text>
+  <text x="900" y="170" class="mono" fill="#27864a">Permission Gate (R/W/X/L/S/E)</text>
+
+  <line x1="890" y1="185" x2="890" y2="195" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="195" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="210" r="11" fill="#27864a"/>
+  <text x="783" y="210" class="hdr" style="font-size:9px">2</text>
+  <text x="900" y="210" class="mono" fill="#27864a">Bounds Check</text>
+
+  <line x1="890" y1="225" x2="890" y2="235" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="235" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="250" r="11" fill="#27864a"/>
+  <text x="783" y="250" class="hdr" style="font-size:9px">3</text>
+  <text x="900" y="250" class="mono" fill="#27864a">Version Match</text>
+
+  <line x1="890" y1="265" x2="890" y2="275" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="275" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="290" r="11" fill="#27864a"/>
+  <text x="783" y="290" class="hdr" style="font-size:9px">4</text>
+  <text x="900" y="290" class="mono" fill="#27864a">MAC / Seal Verify</text>
+
+  <line x1="890" y1="305" x2="890" y2="315" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="315" width="260" height="30" rx="5" fill="#d0f0d0" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="783" cy="330" r="11" fill="#27864a"/>
+  <text x="783" y="330" class="hdr" style="font-size:9px">G</text>
+  <text x="900" y="330" class="mono" fill="#27864a">G-bit Reset (G&#x2190;0)</text>
+
+  <line x1="890" y1="345" x2="890" y2="355" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="355" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="370" r="11" fill="#27864a"/>
+  <text x="783" y="370" class="hdr" style="font-size:9px">6</text>
+  <text x="900" y="370" class="mono" fill="#27864a">CR Write</text>
+
+  <line x1="890" y1="385" x2="890" y2="395" stroke="#27864a" stroke-width="1" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="395" width="260" height="30" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <circle cx="783" cy="410" r="11" fill="#27864a"/>
+  <text x="783" y="410" class="hdr" style="font-size:9px">7</text>
+  <text x="900" y="410" class="mono" fill="#27864a">Thread Shadow</text>
+
+  <!-- FAULT -->
+  <rect x="780" y="445" width="220" height="30" rx="6" fill="#fde8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text x="890" y="460" class="mono-b" fill="#cc3333">Any failure &#x2192; FAULT</text>
+
+  <!-- Permission gate table -->
+  <text x="890" y="495" class="title-xs" fill="#27864a">Permission Gate Table</text>
+  <rect x="760" y="505" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="822" y="515" class="mono-xs" fill="#27864a">R &#x2192; DREAD</text>
+  <rect x="895" y="505" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="957" y="515" class="mono-xs" fill="#27864a">W &#x2192; DWRITE</text>
+  <rect x="760" y="530" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="822" y="540" class="mono-xs" fill="#27864a">X &#x2192; LAMBDA</text>
+  <rect x="895" y="530" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="957" y="540" class="mono-xs" fill="#27864a">L &#x2192; LOAD</text>
+  <rect x="760" y="555" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="822" y="565" class="mono-xs" fill="#27864a">S &#x2192; SAVE</text>
+  <rect x="895" y="555" width="125" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="957" y="565" class="mono-xs" fill="#27864a">E &#x2192; CALL</text>
+
+  <!-- Arrows from address space to mLoad -->
+  <line x1="680" y1="250" x2="728" y2="250" stroke="#2a6db5" stroke-width="2" marker-end="url(#ah-g)"/>
+  <line x1="680" y1="480" x2="728" y2="390" stroke="#c07020" stroke-width="2" marker-end="url(#ah-g)"/>
+  <line x1="680" y1="550" x2="728" y2="410" stroke="#7b2d8e" stroke-width="2" marker-end="url(#ah-g)"/>
+
+  <text x="705" y="238" class="mono-xs" fill="#2a6db5">memory</text>
+  <text x="700" y="470" class="mono-xs" fill="#c07020">devices</text>
+  <text x="700" y="540" class="mono-xs" fill="#7b2d8e">regs</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- KEY PRINCIPLE                                               -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="80" y="600" width="940" height="70" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text x="550" y="625" class="title-sm" fill="#b8860b">One Address Space, One Gate, One Rule</text>
+  <text x="550" y="648" class="label" fill="#333">Every address &mdash; whether memory, device, or register &mdash; is unreachable without the right Golden Token.</text>
+  <text x="550" y="662" class="label" fill="#333">There is no "other bus," no backdoor, no bypass. mLoad is the single read gate for all three segments.</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- CONVENTIONAL vs. UNIFIED COMPARISON                         -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="710" class="title-lg" fill="#333">Conventional vs. Unified</text>
+
+  <!-- Conventional -->
+  <rect x="80" y="730" width="460" height="220" rx="10" fill="#fef5f5" stroke="#cc3333" stroke-width="1.5"/>
+  <text x="310" y="755" class="title-sm" fill="#cc3333">Conventional: Fragmented</text>
+
+  <rect x="110" y="770" width="400" height="28" rx="5" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
+  <text x="310" y="784" class="mono-s" fill="#cc3333">Virtual memory (MMU/TLB, page tables)</text>
+  <rect x="110" y="804" width="400" height="28" rx="5" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
+  <text x="310" y="818" class="mono-s" fill="#cc3333">Separate I/O bus (PCI, DMA, MMIO)</text>
+  <rect x="110" y="838" width="400" height="28" rx="5" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
+  <text x="310" y="852" class="mono-s" fill="#cc3333">Privileged register access (ring-0 only)</text>
+  <rect x="110" y="872" width="400" height="28" rx="5" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
+  <text x="310" y="886" class="mono-s" fill="#cc3333">3+ separate protection mechanisms</text>
+  <rect x="110" y="906" width="400" height="28" rx="5" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
+  <text x="310" y="920" class="mono-s" fill="#cc3333">Each with its own bypass vulnerabilities</text>
+
+  <!-- Unified -->
+  <rect x="560" y="730" width="460" height="220" rx="10" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="790" y="755" class="title-sm" fill="#27864a">CTMM: Unified</text>
+
+  <rect x="590" y="770" width="400" height="28" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="790" y="784" class="mono-s" fill="#27864a">One flat address space (MSB selects segment)</text>
+  <rect x="590" y="804" width="400" height="28" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="790" y="818" class="mono-s" fill="#27864a">Devices at 0xFE (same GT gate as memory)</text>
+  <rect x="590" y="838" width="400" height="28" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="790" y="852" class="mono-s" fill="#27864a">Registers at 0xFF (M-elevation, no ring change)</text>
+  <rect x="590" y="872" width="400" height="28" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="790" y="886" class="mono-s" fill="#27864a">1 protection mechanism: mLoad + GT</text>
+  <rect x="590" y="906" width="400" height="28" rx="5" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="790" y="920" class="mono-s" fill="#27864a">Zero bypass paths (nothing else exists)</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- MSB DECODE TABLE                                            -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="990" class="title-lg" fill="#333">MSB Segment Decode</text>
+
+  <rect x="200" y="1010" width="700" height="30" rx="4" fill="#444" stroke="#333" stroke-width="1"/>
+  <text x="310" y="1025" class="hdr">MSB Range</text>
+  <text x="500" y="1025" class="hdr">Segment</text>
+  <text x="700" y="1025" class="hdr">Gate / Access</text>
+
+  <rect x="200" y="1040" width="700" height="30" rx="0" fill="#f0f7ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="310" y="1055" class="mono-b" fill="#2a6db5">0x00 &#x2013; 0xFD</text>
+  <text x="500" y="1055" class="label" fill="#2a6db5">Memory</text>
+  <text x="700" y="1055" class="mono-s" fill="#555">mLoad: R/W/X/L/S/E permission on GT</text>
+
+  <rect x="200" y="1070" width="700" height="30" rx="0" fill="#fff8f0" stroke="#eee" stroke-width="0.5"/>
+  <text x="310" y="1085" class="mono-b" fill="#c07020">0xFE</text>
+  <text x="500" y="1085" class="label" fill="#c07020">Attached Devices</text>
+  <text x="700" y="1085" class="mono-s" fill="#555">mLoad: same GT gate, device-specific perms</text>
+
+  <rect x="200" y="1100" width="700" height="30" rx="0" fill="#f5f0ff" stroke="#eee" stroke-width="0.5"/>
+  <text x="310" y="1115" class="mono-b" fill="#7b2d8e">0xFF</text>
+  <text x="500" y="1115" class="label" fill="#7b2d8e">Machine Register Bank</text>
+  <text x="700" y="1115" class="mono-s" fill="#555">M-elevation bypasses perm (internal HW access)</text>
+
+  <rect x="200" y="1010" width="700" height="120" rx="4" fill="none" stroke="#ccc" stroke-width="1"/>
+  <line x1="400" y1="1040" x2="400" y2="1130" stroke="#eee" stroke-width="0.5"/>
+  <line x1="600" y1="1040" x2="600" y2="1130" stroke="#eee" stroke-width="0.5"/>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- BOTTOM INSIGHT                                              -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="140" y="1160" width="820" height="80" rx="10" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="550" y="1185" class="title-sm" fill="#27864a">Why Unified Matters</text>
+  <text x="550" y="1208" class="label" fill="#333">A single protection mechanism is auditable, verifiable, and has no seams to exploit.</text>
+  <text x="550" y="1226" class="label" fill="#333">Three separate mechanisms (VM, I/O bus, privileged regs) create three attack surfaces. One gate creates zero.</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Memory (MSB 0x00-0xFD)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#c07020;"></div> Attached Devices (MSB 0xFE)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#7b2d8e;"></div> Machine Registers (MSB 0xFF)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> mLoad gate (single trust point)</div>
+</div>
+
+</body>
+</html>
