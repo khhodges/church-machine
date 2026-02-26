@@ -192,4 +192,6 @@ def landing_page():
     return send_from_directory(BASE_DIR, 'landing.html')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True, use_reloader=False)
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    app.run(host='0.0.0.0', port=5000, debug=False)
