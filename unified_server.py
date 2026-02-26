@@ -99,7 +99,7 @@ def figures_index():
 
 @app.route('/figures/stack-frames')
 def figures_stack_frames():
-    resp = make_response(send_from_directory(FIGURES_DIR, 'stack-frames-diagram.html'))
+    resp = make_response(send_from_directory(FIGURES_DIR, 'stack-frames.html'))
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
