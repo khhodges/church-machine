@@ -163,6 +163,12 @@ def figures_dual_gate_tsb():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/gt-format-type-field')
+def figures_gt_format_type_field():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'gt-format-type-field.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/hello-mum-tunnel')
 def figures_hello_mum_tunnel():
     resp = make_response(send_from_directory(FIGURES_DIR, 'hello-mum-tunnel.html'))

@@ -111,6 +111,7 @@ function renderPagesDirectory() {
     ].join('');
     el('pagesFigures').innerHTML = [
         card('/figures/dual-gate-tsb', 'Fig 1: Dual-Gate TSB', 'figure', td, 'mLoad + mSave as the complete Trusted Security Base.'),
+        card('/figures/gt-format-type-field', 'Fig 2: GT Format &amp; Type', 'figure', td, 'Bit layout of all four GT types: Inform, Outform, NULL, Abstract (Sim-32 + Sim-64).'),
         card('/figures/', 'Fig 3: LAMBDA Fast Path', 'figure', td, 'LAMBDA machine-status fast path.'),
         card('/figures/stack-frames', 'Fig 4: Stack Frames', 'figure', td, 'Self-describing stack frames.'),
         card('/figures/lambda-nesting-sequence', 'Fig 5: LAMBDA Nesting', 'figure', td, 'Non-nestable LAMBDA with CALL-mediated nesting.'),

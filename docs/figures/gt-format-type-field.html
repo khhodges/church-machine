@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 2: GT Format and Type Field</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 880px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 2 &mdash; GT Format and Type Field</h1>
+<p class="subtitle">Bit layout of all four Golden Token types side by side, showing both the Sim-32 (32-bit, RV32-Cap) and Sim-64 (64-bit, CTMM) formats. The 2-bit Type field determines hardware behavior: local dereference, remote fetch, fault, or unforgeable constant.</p>
+
+<svg viewBox="0 0 1100 1320" width="1100" height="1320" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:18px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .label-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:start; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .bit-label { font-family:'Consolas','Courier New',monospace; font-size:9px; fill:#777; text-anchor:middle; dominant-baseline:central; }
+  </style>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- SECTION 1: Sim-32 Format (32-bit)              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <text x="550" y="30" class="title-lg" fill="#2a6db5">Sim-32 Format (32-bit Golden Token &mdash; RV32-Cap)</text>
+  <rect x="40" y="48" width="1020" height="490" rx="10" fill="none" stroke="#2a6db5" stroke-width="1.5" stroke-dasharray="6,3"/>
+
+  <!-- Bit ruler for 32 bits -->
+  <text x="550" y="70" class="label-s" fill="#777">Bit positions (MSB left)</text>
+  <g transform="translate(100,80)">
+    <line x1="0" y1="0" x2="900" y2="0" stroke="#ccc" stroke-width="1"/>
+    <text x="0" y="-6" class="bit-label">31</text>
+    <text x="197" y="-6" class="bit-label">25 24</text>
+    <text x="675" y="-6" class="bit-label">8  7</text>
+    <text x="844" y="-6" class="bit-label">2  1  0</text>
+  </g>
+
+  <!-- ── Inform (00) ── -->
+  <text x="70" y="115" class="title-xs" fill="#2a6db5">Inform</text>
+  <text x="70" y="132" class="mono-s" fill="#2a6db5">Type=00</text>
+
+  <rect x="100" y="100" width="197" height="40" rx="4" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="198" y="120" class="mono-b" fill="#2a6db5">Version (7)</text>
+
+  <rect x="297" y="100" width="478" height="40" rx="4" fill="#dff0d8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="536" y="120" class="mono-b" fill="#27864a">Index (17)</text>
+
+  <rect x="775" y="100" width="169" height="40" rx="4" fill="#fdf5eb" stroke="#b8860b" stroke-width="1.5"/>
+  <text x="859" y="120" class="mono-b" fill="#b8860b">Perms (6)</text>
+
+  <rect x="944" y="100" width="56" height="40" rx="4" fill="#f0f0f0" stroke="#555" stroke-width="1.5"/>
+  <text x="972" y="120" class="mono-b" fill="#555">00</text>
+
+  <text x="198" y="155" class="mono-s">[31:25]</text>
+  <text x="536" y="155" class="mono-s">[24:8]</text>
+  <text x="859" y="155" class="mono-s">[7:2]</text>
+  <text x="972" y="155" class="mono-s">[1:0]</text>
+
+  <!-- ── Outform (01) ── -->
+  <text x="70" y="195" class="title-xs" fill="#c05020">Outform</text>
+  <text x="70" y="212" class="mono-s" fill="#c05020">Type=01</text>
+
+  <rect x="100" y="180" width="197" height="40" rx="4" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="198" y="200" class="mono-b" fill="#2a6db5">Version (7)</text>
+
+  <rect x="297" y="180" width="478" height="40" rx="4" fill="#dff0d8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="536" y="200" class="mono-b" fill="#27864a">Index (17)</text>
+
+  <rect x="775" y="180" width="169" height="40" rx="4" fill="#fdf5eb" stroke="#b8860b" stroke-width="1.5"/>
+  <text x="859" y="200" class="mono-b" fill="#b8860b">Perms (6)</text>
+
+  <rect x="944" y="180" width="56" height="40" rx="4" fill="#fde8d0" stroke="#c05020" stroke-width="1.5"/>
+  <text x="972" y="200" class="mono-b" fill="#c05020">01</text>
+
+  <!-- ── NULL (10) ── -->
+  <text x="70" y="275" class="title-xs" fill="#999">NULL</text>
+  <text x="70" y="292" class="mono-s" fill="#999">Type=10</text>
+
+  <rect x="100" y="260" width="844" height="40" rx="4" fill="#f5f5f5" stroke="#bbb" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="522" y="280" class="mono" fill="#999">All zeroes (invalid / empty slot)</text>
+
+  <rect x="944" y="260" width="56" height="40" rx="4" fill="#e8e8e8" stroke="#999" stroke-width="1.5"/>
+  <text x="972" y="280" class="mono-b" fill="#999">10</text>
+
+  <!-- ── Abstract (11) ── -->
+  <text x="70" y="355" class="title-xs" fill="#7b2d8e">Abstract</text>
+  <text x="70" y="372" class="mono-s" fill="#7b2d8e">Type=11</text>
+
+  <rect x="100" y="340" width="844" height="40" rx="4" fill="#f3ecff" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="522" y="360" class="mono-b" fill="#7b2d8e">Encoded Value (30 bits)</text>
+
+  <rect x="944" y="340" width="56" height="40" rx="4" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="972" y="360" class="mono-b" fill="#7b2d8e">11</text>
+
+  <text x="522" y="395" class="label-s" fill="#7b2d8e">Unforgeable constant (e.g., pi, e, c). No namespace dereference. Immutable.</text>
+
+  <!-- Permission bits detail -->
+  <rect x="100" y="420" width="900" height="50" rx="6" fill="#f9f9f5" stroke="#999" stroke-width="1"/>
+  <text x="550" y="438" class="title-xs" fill="#b8860b">Permission Bits [7:2] &mdash; R W X L S E</text>
+  <text x="200" y="458" class="mono-s" fill="#1a1a1a">R=Read(DREAD)</text>
+  <text x="340" y="458" class="mono-s" fill="#1a1a1a">W=Write(DWRITE)</text>
+  <text x="490" y="458" class="mono-s" fill="#1a1a1a">X=Execute(LAMBDA)</text>
+  <text x="640" y="458" class="mono-s" fill="#1a1a1a">L=Load(LOAD)</text>
+  <text x="770" y="458" class="mono-s" fill="#1a1a1a">S=Save(SAVE)</text>
+  <text x="900" y="458" class="mono-s" fill="#1a1a1a">E=Enter(CALL)</text>
+
+  <!-- Sim-32 CR 128-bit format (4 words) -->
+  <text x="550" y="510" class="label-s" fill="#555">Capability Register: 128 bits (4 x 32-bit words) &mdash; word0: GT | word1: Location + B-bit(31) | word2: Limit | word3: Version(7) + FNV Seal(25)</text>
+
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- SECTION 2: Sim-64 Format (64-bit)              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <text x="550" y="580" class="title-lg" fill="#c05020">Sim-64 Format (64-bit Golden Token &mdash; CTMM)</text>
+  <rect x="40" y="598" width="1020" height="490" rx="10" fill="none" stroke="#c05020" stroke-width="1.5" stroke-dasharray="6,3"/>
+
+  <!-- Bit ruler for 64 bits -->
+  <text x="550" y="620" class="label-s" fill="#777">Bit positions (MSB left)</text>
+  <g transform="translate(100,630)">
+    <line x1="0" y1="0" x2="900" y2="0" stroke="#ccc" stroke-width="1"/>
+    <text x="0" y="-6" class="bit-label">63</text>
+    <text x="84" y="-6" class="bit-label">58 57</text>
+    <text x="98" y="12" class="bit-label">G</text>
+    <text x="450" y="-6" class="bit-label">32 31</text>
+    <text x="900" y="-6" class="bit-label">0</text>
+  </g>
+
+  <!-- ── Inform (00) ── -->
+  <text x="70" y="670" class="title-xs" fill="#2a6db5">Inform</text>
+  <text x="70" y="687" class="mono-s" fill="#2a6db5">Type=00</text>
+
+  <rect x="100" y="655" width="84" height="40" rx="4" fill="#fdf5eb" stroke="#b8860b" stroke-width="1.5"/>
+  <text x="142" y="675" class="mono-b" fill="#b8860b">Perms(6)</text>
+
+  <rect x="184" y="655" width="14" height="40" rx="2" fill="#dff0d8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="191" y="675" class="mono-s" fill="#27864a">G</text>
+
+  <rect x="198" y="655" width="352" height="40" rx="4" fill="#e8e8e8" stroke="#999" stroke-width="1"/>
+  <text x="374" y="675" class="mono" fill="#555">Spare / Version (25)</text>
+
+  <rect x="550" y="655" width="450" height="40" rx="4" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="775" y="675" class="mono-b" fill="#2a6db5">Offset (32)</text>
+
+  <text x="142" y="710" class="mono-s">[63:58]</text>
+  <text x="191" y="710" class="mono-s">[57]</text>
+  <text x="374" y="710" class="mono-s">[56:32]</text>
+  <text x="775" y="710" class="mono-s">[31:0]</text>
+
+  <!-- ── Outform (01) ── -->
+  <text x="70" y="750" class="title-xs" fill="#c05020">Outform</text>
+  <text x="70" y="767" class="mono-s" fill="#c05020">Type=01</text>
+
+  <rect x="100" y="735" width="84" height="40" rx="4" fill="#fdf5eb" stroke="#b8860b" stroke-width="1.5"/>
+  <text x="142" y="755" class="mono-b" fill="#b8860b">Perms(6)</text>
+
+  <rect x="184" y="735" width="14" height="40" rx="2" fill="#dff0d8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="191" y="755" class="mono-s" fill="#27864a">G</text>
+
+  <rect x="198" y="735" width="352" height="40" rx="4" fill="#fde8d0" stroke="#c05020" stroke-width="1"/>
+  <text x="374" y="755" class="mono" fill="#c05020">Tunnel ID / Remote Version (25)</text>
+
+  <rect x="550" y="735" width="450" height="40" rx="4" fill="#fde8d0" stroke="#c05020" stroke-width="1.5"/>
+  <text x="775" y="755" class="mono-b" fill="#c05020">Remote Offset (32)</text>
+
+  <!-- ── NULL (10) ── -->
+  <text x="70" y="830" class="title-xs" fill="#999">NULL</text>
+  <text x="70" y="847" class="mono-s" fill="#999">Type=10</text>
+
+  <rect x="100" y="815" width="900" height="40" rx="4" fill="#f5f5f5" stroke="#bbb" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="550" y="835" class="mono" fill="#999">All zeroes (invalid / empty slot) &mdash; FAULT on any operation</text>
+
+  <!-- ── Abstract (11) ── -->
+  <text x="70" y="910" class="title-xs" fill="#7b2d8e">Abstract</text>
+  <text x="70" y="927" class="mono-s" fill="#7b2d8e">Type=11</text>
+
+  <rect x="100" y="895" width="900" height="40" rx="4" fill="#f3ecff" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="550" y="915" class="mono-b" fill="#7b2d8e">Encoded Constant Value (64 bits)</text>
+
+  <text x="550" y="952" class="label-s" fill="#7b2d8e">Unforgeable constant. Returns encoded value directly. No namespace dereference. Immutable.</text>
+
+  <!-- Permission bits detail for 64-bit -->
+  <rect x="100" y="975" width="900" height="50" rx="6" fill="#f9f9f5" stroke="#999" stroke-width="1"/>
+  <text x="550" y="993" class="title-xs" fill="#b8860b">Permission Bits [63:58] &mdash; R W X L S E</text>
+  <text x="200" y="1013" class="mono-s" fill="#1a1a1a">R=Read(DREAD)</text>
+  <text x="340" y="1013" class="mono-s" fill="#1a1a1a">W=Write(DWRITE)</text>
+  <text x="490" y="1013" class="mono-s" fill="#1a1a1a">X=Execute(LAMBDA)</text>
+  <text x="640" y="1013" class="mono-s" fill="#1a1a1a">L=Load(LOAD)</text>
+  <text x="770" y="1013" class="mono-s" fill="#1a1a1a">S=Save(SAVE)</text>
+  <text x="900" y="1013" class="mono-s" fill="#1a1a1a">E=Enter(CALL)</text>
+
+  <text x="550" y="1060" class="label-s" fill="#555">Sim-64 uses inline permissions at the MSB end. G-bit (57) is integrated for PP250 garbage collection liveness tracking.</text>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- SECTION 3: Type Field Summary Table            -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <text x="550" y="1120" class="title-lg" fill="#1a1a1a">GT Type Field &mdash; Hardware Behavior</text>
+
+  <!-- Table header -->
+  <rect x="100" y="1140" width="900" height="32" rx="4" fill="#e8e8e8" stroke="#999" stroke-width="1"/>
+  <text x="150" y="1156" class="mono-b" fill="#333">Type</text>
+  <text x="250" y="1156" class="mono-b" fill="#333">Name</text>
+  <text x="430" y="1156" class="mono-b" fill="#333">Semantic Category</text>
+  <text x="740" y="1156" class="mono-b" fill="#333">Hardware Behavior</text>
+
+  <!-- Row 1: Inform -->
+  <rect x="100" y="1172" width="900" height="32" rx="0" fill="#f8fcff" stroke="#ddd" stroke-width="0.5"/>
+  <text x="150" y="1188" class="mono" fill="#2a6db5">00</text>
+  <text x="250" y="1188" class="mono" fill="#2a6db5">Inform</text>
+  <text x="430" y="1188" class="label" fill="#333">Name (local resource)</text>
+  <text x="740" y="1188" class="label-s" fill="#333">mLoad: MAC, version, permissions, namespace lookup</text>
+
+  <!-- Row 2: Outform -->
+  <rect x="100" y="1204" width="900" height="32" rx="0" fill="#fffaf5" stroke="#ddd" stroke-width="0.5"/>
+  <text x="150" y="1220" class="mono" fill="#c05020">01</text>
+  <text x="250" y="1220" class="mono" fill="#c05020">Outform</text>
+  <text x="430" y="1220" class="label" fill="#333">Name (remote resource)</text>
+  <text x="740" y="1220" class="label-s" fill="#333">HTTPS fetch/flush or RPC tunnel dereference</text>
+
+  <!-- Row 3: NULL -->
+  <rect x="100" y="1236" width="900" height="32" rx="0" fill="#f8f8f8" stroke="#ddd" stroke-width="0.5"/>
+  <text x="150" y="1252" class="mono" fill="#999">10</text>
+  <text x="250" y="1252" class="mono" fill="#999">NULL</text>
+  <text x="430" y="1252" class="label" fill="#333">Empty / invalid</text>
+  <text x="740" y="1252" class="label-s" fill="#e74c3c">FAULT on any operation</text>
+
+  <!-- Row 4: Abstract -->
+  <rect x="100" y="1268" width="900" height="32" rx="0" fill="#faf5ff" stroke="#ddd" stroke-width="0.5"/>
+  <text x="150" y="1284" class="mono" fill="#7b2d8e">11</text>
+  <text x="250" y="1284" class="mono" fill="#7b2d8e">Abstract</text>
+  <text x="430" y="1284" class="label" fill="#333">Unforgeable constant</text>
+  <text x="740" y="1284" class="label-s" fill="#333">Returns encoded value; immutable; no dereference</text>
+
+  <rect x="100" y="1172" width="900" height="128" rx="0" fill="none" stroke="#999" stroke-width="1"/>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Version / Offset fields</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> Index / G-bit (GC)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div> Permission bits (R,W,X,L,S,E)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#c05020;"></div> Outform / remote fields</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#7b2d8e;"></div> Abstract (unforgeable constant)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#999;"></div> NULL / spare</div>
+</div>
+
+</body>
+</html>
