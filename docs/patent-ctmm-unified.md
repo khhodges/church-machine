@@ -125,7 +125,7 @@ The present invention provides a processor architecture, the Church-Turing Meta-
 
 ### 1. Golden Token (GT) Architecture
 
-A 2-bit Type field in every capability token classifies four categories: Inform (local reference, Type = 00), Outform (remote reference, Type = 01), NULL (empty/invalid, Type = 10), and Spare (reserved, Type = 11). Six permission bits enforce domain purity: Turing domain (R, W, X) and Church domain (L, S, E), never mixed. Capability registers hold capabilities exclusively; data registers hold values exclusively.
+A 2-bit Type field in every capability token classifies four categories: Inform (local reference, Type = 00), Outform (remote reference, Type = 01), NULL (empty/invalid, Type = 10), and Abstract (unforgeable constant value, e.g., pi, Type = 11). Six permission bits enforce domain purity: Turing domain (R, W, X) and Church domain (L, S, E), never mixed. Capability registers hold capabilities exclusively; data registers hold values exclusively.
 
 ### 2. Dual-Gate Trusted Security Base
 
@@ -228,7 +228,7 @@ GT [63:0]:
 | 00 | Inform | Name (local) | Dereference through mLoad: validate MAC, version, permissions, namespace lookup |
 | 01 | Outform | Name (remote) | Dereference through HTTPS fetch/flush or RPC tunnel |
 | 10 | NULL | Empty/invalid | FAULT on any operation |
-| 11 | Spare | Reserved | FAULT on any operation |
+| 11 | Abstract | Unforgeable constant (e.g., pi) | Returns encoded value; immutable; no namespace dereference |
 
 ### 3. The Dual-Gate Trusted Security Base
 
@@ -364,7 +364,7 @@ LAMBDA CRn, x
 #### 5.2 Execution Sequence
 
 ```
-Step 1: Verify CRn.Type = Inform (00) → FAULT if NULL, Outform, or Spare
+Step 1: Verify CRn.Type = Inform (00) → FAULT if NULL, Outform, or Abstract
 Step 2: Check X permission on CRn → FAULT if X bit not set
 Step 3: Check LAMBDA-active flag → FAULT if already set (non-nestable)
 Step 4: Save return address (PC+4) to LAMBDA_PC machine status register
@@ -554,9 +554,9 @@ Three web-based simulators (CTMM Sim-64, RV32-Cap Sim-32, Pure Church Machine) d
 
 ## CLAIMS
 
-### Claim 1 — GT Type Field with NULL Type
+### Claim 1 — GT Type Field with NULL and Abstract Types
 
-A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or a reserved future type (Spare, Type = 11); wherein the Type field is checked by hardware at each instruction to determine the execution path; and wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers.
+A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
 
 ### Claim 2 — NULL Type for Initialization, Revocation, and Garbage Collection
 
@@ -820,7 +820,7 @@ The architecture of Claim 3, wherein the LAMBDA instruction enables a code body 
 
 ## ABSTRACT
 
-A processor architecture, the Church-Turing Meta-Machine (CTMM), enforcing capability-based security through a dual-gate Trusted Security Base (TSB) comprising an mLoad read gate and an mSave write gate. Every Golden Token (GT) contains a 2-bit Type field (Inform, Outform, NULL, Spare) and 6 permission bits organized into mutually exclusive Turing (R, W, X) and Church (L, S, E) domains. mLoad validates every read-side capability operation through permission, bounds, version, MAC, and G-bit checks; mSave validates every write of a capability to a C-List through version, seal, B-bit (bind), and F-bit (far/foreign) checks. The B (Bind) bit, defaulting to 0, provides hardware-enforced control over capability propagation — CALL auto-clears B on preserved capabilities, and explicit TPERM is required to allow bind. A LAMBDA instruction provides lightweight in-scope code application with machine-status fast path and zero stack access. Self-describing stack frames with a 1-bit tag distinguish CALL from LAMBDA frames. The architecture eliminates the OS, virtual memory, privilege rings, and superuser, replacing them with atomic abstractions and 7 security zeros. Deterministic PP250 garbage collection uses bidirectional G-bit integrated into both mLoad and mSave. In its Pure Church variant, the processor operates with only 6 Church-domain instructions, architecturally excluding all Turing-domain instructions to eliminate buffer overflows, ROP attacks, code injection, and privilege escalation by construction. Three software proofs (HP-35 calculator, SlideRule engine, interactive REPL) and synthesizable FPGA implementations (Amaranth HDL, SystemVerilog) demonstrate computational completeness and practical realizability. The total TSB is fewer than 400 lines of synthesizable HDL — five orders of magnitude smaller than Linux, two orders of magnitude smaller than seL4.
+A processor architecture, the Church-Turing Meta-Machine (CTMM), enforcing capability-based security through a dual-gate Trusted Security Base (TSB) comprising an mLoad read gate and an mSave write gate. Every Golden Token (GT) contains a 2-bit Type field (Inform, Outform, NULL, Abstract) and 6 permission bits organized into mutually exclusive Turing (R, W, X) and Church (L, S, E) domains. mLoad validates every read-side capability operation through permission, bounds, version, MAC, and G-bit checks; mSave validates every write of a capability to a C-List through version, seal, B-bit (bind), and F-bit (far/foreign) checks. The B (Bind) bit, defaulting to 0, provides hardware-enforced control over capability propagation — CALL auto-clears B on preserved capabilities, and explicit TPERM is required to allow bind. A LAMBDA instruction provides lightweight in-scope code application with machine-status fast path and zero stack access. Self-describing stack frames with a 1-bit tag distinguish CALL from LAMBDA frames. The architecture eliminates the OS, virtual memory, privilege rings, and superuser, replacing them with atomic abstractions and 7 security zeros. Deterministic PP250 garbage collection uses bidirectional G-bit integrated into both mLoad and mSave. In its Pure Church variant, the processor operates with only 6 Church-domain instructions, architecturally excluding all Turing-domain instructions to eliminate buffer overflows, ROP attacks, code injection, and privilege escalation by construction. Three software proofs (HP-35 calculator, SlideRule engine, interactive REPL) and synthesizable FPGA implementations (Amaranth HDL, SystemVerilog) demonstrate computational completeness and practical realizability. The total TSB is fewer than 400 lines of synthesizable HDL — five orders of magnitude smaller than Linux, two orders of magnitude smaller than seL4.
 
 ---
 
@@ -832,7 +832,7 @@ Block diagram showing the two gates (mLoad and mSave) as the complete TSB. mLoad
 
 ### Figure 2: GT Format and Type Field
 
-Bit layout of all four GT types side by side: Inform (Version|Index|Permissions|00), Outform (Version|Index|Permissions|01), NULL (Type=10), Spare (Type=11). Shows both Sim-32 (32-bit) and Sim-64 (64-bit) formats.
+Bit layout of all four GT types side by side: Inform (Version|Index|Permissions|00), Outform (Version|Index|Permissions|01), NULL (Type=10), Abstract (Type=11). Shows both Sim-32 (32-bit) and Sim-64 (64-bit) formats.
 
 ### Figure 3: B-bit Capability Propagation Control
 
