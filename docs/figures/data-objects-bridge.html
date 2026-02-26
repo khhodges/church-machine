@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 17: DATA Objects — Church/Turing Bridge</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 24px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 17 &mdash; DATA Objects: Church/Turing Bridge</h1>
+<p class="subtitle">DATA objects are namespace entries that bridge the Church and Turing domains. Church-domain Golden Tokens provide access control (R/W permissions via mLoad). Turing-domain DREAD/DWRITE instructions perform the actual data operations. mLoad validates permissions and enforces bounds checking on every access within the Location..Limit range. No raw pointers, no unchecked access.</p>
+
+<svg viewBox="0 0 1100 1320" width="1100" height="1320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c07020"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7b2d8e"/>
+    </marker>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="ah-t" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1a7a7a"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:17px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555; text-anchor:middle; dominant-baseline:central; }
+    .mono-xs { font-family:'Consolas','Courier New',monospace; font-size:9px; fill:#777; text-anchor:middle; dominant-baseline:central; }
+    .hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+  </style>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- DOMAIN BRIDGE OVERVIEW                                      -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="25" class="title-lg" fill="#333">DATA Object: Bridging Church and Turing Domains</text>
+
+  <!-- ─── CHURCH DOMAIN (left) ─── -->
+  <rect x="50" y="55" width="380" height="400" rx="14" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2.5"/>
+  <rect x="52" y="57" width="376" height="34" rx="12" fill="#2a6db5"/>
+  <text x="240" y="74" class="hdr" style="font-size:15px">Church Domain (Access Control)</text>
+
+  <!-- GT held by caller -->
+  <rect x="80" y="105" width="320" height="70" rx="8" fill="#dce9f5" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="240" y="123" class="title-xs" fill="#2a6db5">Golden Token (in CR)</text>
+
+  <!-- GT bit fields -->
+  <rect x="95" y="140" width="60" height="22" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="125" y="151" class="mono-xs" fill="#2a6db5">Ver(7)</text>
+  <rect x="160" y="140" width="80" height="22" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="200" y="151" class="mono-xs" fill="#2a6db5">Index(17)</text>
+  <rect x="245" y="140" width="60" height="22" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="1"/>
+  <text x="275" y="151" class="mono-b" fill="#2a6db5" style="font-size:9px">R W</text>
+  <rect x="310" y="140" width="60" height="22" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="340" y="151" class="mono-xs" fill="#2a6db5">Type(2)</text>
+
+  <!-- LOAD instruction -->
+  <rect x="80" y="190" width="320" height="40" rx="8" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
+  <text x="240" y="204" class="mono-b" fill="#2a6db5">LOAD CR0, [CR15, #DataObj]</text>
+  <text x="240" y="220" class="label-s" fill="#2a6db5">Church instruction loads GT into context register</text>
+
+  <!-- mLoad gate -->
+  <rect x="80" y="250" width="320" height="120" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="240" y="270" class="title-xs" fill="#27864a">mLoad Validation</text>
+
+  <rect x="100" y="285" width="135" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="167" y="295" class="mono-xs" fill="#27864a">Version match</text>
+  <rect x="245" y="285" width="135" height="20" rx="3" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
+  <text x="312" y="295" class="mono-xs" fill="#27864a">Seal verify</text>
+
+  <rect x="100" y="310" width="135" height="20" rx="3" fill="#d0f0d0" stroke="#27864a" stroke-width="1.5"/>
+  <text x="167" y="320" class="mono-b" fill="#27864a" style="font-size:9px">R perm &#x2192; DREAD</text>
+  <rect x="245" y="310" width="135" height="20" rx="3" fill="#d0f0d0" stroke="#27864a" stroke-width="1.5"/>
+  <text x="312" y="320" class="mono-b" fill="#27864a" style="font-size:9px">W perm &#x2192; DWRITE</text>
+
+  <rect x="100" y="335" width="280" height="20" rx="3" fill="#fde8e8" stroke="#cc3333" stroke-width="1"/>
+  <text x="240" y="345" class="mono-b" fill="#cc3333" style="font-size:9px">Bounds: Location &#x2264; offset &#x2264; Limit</text>
+
+  <!-- Domain purity label -->
+  <rect x="100" y="390" width="280" height="40" rx="6" fill="#fff" stroke="#2a6db5" stroke-width="1"/>
+  <text x="240" y="405" class="label-s" fill="#2a6db5">Church domain controls WHO can access</text>
+  <text x="240" y="420" class="label-s" fill="#2a6db5">and WHAT permissions they hold (R, W)</text>
+
+  <!-- ─── BRIDGE ARROW ─── -->
+  <rect x="440" y="180" width="120" height="100" rx="10" fill="#fff8f0" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="500" y="210" class="title-xs" fill="#b8860b">DATA</text>
+  <text x="500" y="228" class="title-xs" fill="#b8860b">Object</text>
+  <text x="500" y="250" class="mono-xs" fill="#b8860b">Bridge</text>
+  <text x="500" y="264" class="mono-xs" fill="#b8860b">&#x2190; &#x2192;</text>
+
+  <line x1="430" y1="230" x2="440" y2="230" stroke="#b8860b" stroke-width="2"/>
+  <line x1="560" y1="230" x2="570" y2="230" stroke="#b8860b" stroke-width="2"/>
+
+  <!-- ─── TURING DOMAIN (right) ─── -->
+  <rect x="570" y="55" width="480" height="400" rx="14" fill="#f3ecff" stroke="#7b2d8e" stroke-width="2.5"/>
+  <rect x="572" y="57" width="476" height="34" rx="12" fill="#7b2d8e"/>
+  <text x="810" y="74" class="hdr" style="font-size:15px">Turing Domain (Data Operations)</text>
+
+  <!-- DREAD -->
+  <rect x="600" y="105" width="420" height="100" rx="8" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="810" y="125" class="title-xs" fill="#7b2d8e">DREAD DR_dst, CR_src, offset</text>
+  <text x="810" y="148" class="mono-s" fill="#555">Read data word from DATA object into data register</text>
+
+  <rect x="620" y="162" width="180" height="18" rx="3" fill="#e0ccf5" stroke="#7b2d8e" stroke-width="0.5"/>
+  <text x="710" y="171" class="mono-xs" fill="#7b2d8e">Requires R permission on GT</text>
+  <rect x="820" y="162" width="180" height="18" rx="3" fill="#e0ccf5" stroke="#7b2d8e" stroke-width="0.5"/>
+  <text x="910" y="171" class="mono-xs" fill="#7b2d8e">Bounds-checked access</text>
+
+  <!-- DWRITE -->
+  <rect x="600" y="220" width="420" height="100" rx="8" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="810" y="240" class="title-xs" fill="#7b2d8e">DWRITE CR_dst, DR_src, offset</text>
+  <text x="810" y="263" class="mono-s" fill="#555">Write data word from data register into DATA object</text>
+
+  <rect x="620" y="277" width="180" height="18" rx="3" fill="#e0ccf5" stroke="#7b2d8e" stroke-width="0.5"/>
+  <text x="710" y="286" class="mono-xs" fill="#7b2d8e">Requires W permission on GT</text>
+  <rect x="820" y="277" width="180" height="18" rx="3" fill="#e0ccf5" stroke="#7b2d8e" stroke-width="0.5"/>
+  <text x="910" y="286" class="mono-xs" fill="#7b2d8e">Bounds-checked access</text>
+
+  <!-- Domain purity label -->
+  <rect x="600" y="340" width="420" height="80" rx="6" fill="#fff" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="810" y="360" class="label-s" fill="#7b2d8e">Turing domain controls HOW data is manipulated</text>
+  <text x="810" y="376" class="label-s" fill="#7b2d8e">(integer arithmetic, bit fields, comparisons)</text>
+  <text x="810" y="396" class="label-s" fill="#7b2d8e">DREAD/DWRITE are the ONLY Turing data access path</text>
+  <text x="810" y="412" class="label-s" fill="#7b2d8e">No raw pointers, no unmediated memory access</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- DATA OBJECT MEMORY LAYOUT                                   -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="490" class="title-lg" fill="#333">DATA Object Memory Layout &amp; Bounds Checking</text>
+
+  <rect x="80" y="510" width="940" height="280" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+
+  <!-- Namespace entry -->
+  <rect x="110" y="530" width="400" height="110" rx="8" fill="#dce9f5" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="310" y="550" class="title-xs" fill="#2a6db5">Namespace Entry (Metadata)</text>
+
+  <rect x="130" y="562" width="90" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="175" y="574" class="mono-xs" fill="#2a6db5">Location</text>
+  <rect x="225" y="562" width="70" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="260" y="574" class="mono-xs" fill="#2a6db5">Limit</text>
+  <rect x="300" y="562" width="60" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="330" y="574" class="mono-xs" fill="#2a6db5">Seal</text>
+  <rect x="365" y="562" width="60" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="395" y="574" class="mono-xs" fill="#2a6db5">Ver</text>
+  <rect x="430" y="562" width="50" height="24" rx="4" fill="#d0f0d0" stroke="#27864a" stroke-width="1"/>
+  <text x="455" y="574" class="mono-xs" fill="#27864a">G</text>
+
+  <text x="310" y="610" class="mono-xs" fill="#555">Location = start address of DATA region</text>
+  <text x="310" y="625" class="mono-xs" fill="#555">Limit = end address (inclusive) of DATA region</text>
+
+  <!-- Memory region -->
+  <rect x="550" y="530" width="440" height="240" rx="8" fill="#fff" stroke="#555" stroke-width="1.5"/>
+  <text x="770" y="550" class="title-xs" fill="#333">Memory (Unified Address Space)</text>
+
+  <!-- Before Location -->
+  <rect x="570" y="565" width="400" height="30" rx="4" fill="#fde8e8" stroke="#cc3333" stroke-width="1"/>
+  <text x="770" y="580" class="mono-s" fill="#cc3333">&#x2718; Before Location &mdash; ACCESS DENIED (FAULT)</text>
+
+  <!-- Location marker -->
+  <line x1="570" y1="600" x2="970" y2="600" stroke="#27864a" stroke-width="2"/>
+  <text x="580" y="612" class="mono-b" fill="#27864a" style="text-anchor:start;font-size:10px">Location (0x1000)</text>
+
+  <!-- Valid region -->
+  <rect x="570" y="618" width="400" height="80" rx="4" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="770" y="640" class="title-xs" fill="#27864a">Valid DATA Region</text>
+  <text x="770" y="660" class="mono-s" fill="#27864a">DREAD/DWRITE operate here</text>
+  <text x="770" y="678" class="label-s" fill="#27864a">Each access: Location + offset &#x2264; Limit</text>
+  <text x="770" y="692" class="label-s" fill="#27864a">offset from DREAD/DWRITE instruction immediate</text>
+
+  <!-- Limit marker -->
+  <line x1="570" y1="702" x2="970" y2="702" stroke="#c07020" stroke-width="2"/>
+  <text x="580" y="714" class="mono-b" fill="#c07020" style="text-anchor:start;font-size:10px">Limit (0x10FF)</text>
+
+  <!-- After Limit -->
+  <rect x="570" y="722" width="400" height="30" rx="4" fill="#fde8e8" stroke="#cc3333" stroke-width="1"/>
+  <text x="770" y="737" class="mono-s" fill="#cc3333">&#x2718; Beyond Limit &mdash; ACCESS DENIED (FAULT)</text>
+
+  <!-- Arrow from namespace to memory -->
+  <line x1="510" y1="575" x2="548" y2="650" stroke="#555" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ah-k)"/>
+  <text x="520" y="610" class="mono-xs" fill="#555" style="text-anchor:start">points to</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- ACCESS FLOW                                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="825" class="title-lg" fill="#333">DREAD Access Flow (Step by Step)</text>
+
+  <rect x="80" y="845" width="940" height="170" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+
+  <!-- Step 1 -->
+  <rect x="100" y="865" width="160" height="50" rx="8" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1.5"/>
+  <circle cx="123" cy="890" r="12" fill="#7b2d8e"/>
+  <text x="123" y="890" class="hdr" style="font-size:9px">1</text>
+  <text x="190" y="883" class="title-xs" fill="#7b2d8e">DREAD</text>
+  <text x="190" y="900" class="mono-xs" fill="#555">DR0, CR0, #8</text>
+
+  <line x1="260" y1="890" x2="280" y2="890" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <!-- Step 2 -->
+  <rect x="280" y="865" width="170" height="50" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="303" cy="890" r="12" fill="#27864a"/>
+  <text x="303" y="890" class="hdr" style="font-size:9px">2</text>
+  <text x="378" y="883" class="title-xs" fill="#27864a">mLoad gate</text>
+  <text x="378" y="900" class="mono-xs" fill="#27864a">R perm on CR0?</text>
+
+  <line x1="450" y1="890" x2="470" y2="890" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <!-- Step 3 -->
+  <rect x="470" y="865" width="170" height="50" rx="8" fill="#fff3e0" stroke="#c07020" stroke-width="1.5"/>
+  <circle cx="493" cy="890" r="12" fill="#c07020"/>
+  <text x="493" y="890" class="hdr" style="font-size:9px">3</text>
+  <text x="568" y="883" class="title-xs" fill="#c07020">Bounds check</text>
+  <text x="568" y="900" class="mono-xs" fill="#c07020">Loc+8 &#x2264; Limit?</text>
+
+  <line x1="640" y1="890" x2="660" y2="890" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <!-- Step 4 -->
+  <rect x="660" y="865" width="160" height="50" rx="8" fill="#dce9f5" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="683" cy="890" r="12" fill="#2a6db5"/>
+  <text x="683" y="890" class="hdr" style="font-size:9px">4</text>
+  <text x="748" y="883" class="title-xs" fill="#2a6db5">Memory read</text>
+  <text x="748" y="900" class="mono-xs" fill="#2a6db5">addr = Loc + 8</text>
+
+  <line x1="820" y1="890" x2="840" y2="890" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <!-- Step 5 -->
+  <rect x="840" y="865" width="160" height="50" rx="8" fill="#e0f7f7" stroke="#1a7a7a" stroke-width="1.5"/>
+  <circle cx="863" cy="890" r="12" fill="#1a7a7a"/>
+  <text x="863" y="890" class="hdr" style="font-size:9px">5</text>
+  <text x="928" y="883" class="title-xs" fill="#1a7a7a">DR0 loaded</text>
+  <text x="928" y="900" class="mono-xs" fill="#1a7a7a">data in register</text>
+
+  <!-- Fault path -->
+  <line x1="365" y1="915" x2="365" y2="940" stroke="#cc3333" stroke-width="1.5" marker-end="url(#ah-r)"/>
+  <text x="385" y="930" class="mono-xs" fill="#cc3333" style="text-anchor:start">no R</text>
+  <line x1="555" y1="915" x2="555" y2="940" stroke="#cc3333" stroke-width="1.5" marker-end="url(#ah-r)"/>
+  <text x="575" y="930" class="mono-xs" fill="#cc3333" style="text-anchor:start">out of bounds</text>
+
+  <rect x="300" y="945" width="320" height="30" rx="6" fill="#fde8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text x="460" y="960" class="mono-b" fill="#cc3333">Any failure &#x2192; FAULT (single handler)</text>
+
+  <text x="550" y="1000" class="label-s" fill="#555">DWRITE follows the same flow but checks W permission at step 2 and writes DR_src to memory at step 4</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- PERMISSION MATRIX                                           -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="550" y="1040" class="title-lg" fill="#333">DATA Object Permission Matrix</text>
+
+  <!-- Header -->
+  <rect x="180" y="1060" width="740" height="28" rx="4" fill="#444"/>
+  <text x="310" y="1074" class="hdr">GT Permissions</text>
+  <text x="480" y="1074" class="hdr">DREAD</text>
+  <text x="620" y="1074" class="hdr">DWRITE</text>
+  <text x="790" y="1074" class="hdr">Result</text>
+
+  <line x1="400" y1="1088" x2="400" y2="1208" stroke="#eee" stroke-width="0.5"/>
+  <line x1="550" y1="1088" x2="550" y2="1208" stroke="#eee" stroke-width="0.5"/>
+  <line x1="690" y1="1088" x2="690" y2="1208" stroke="#eee" stroke-width="0.5"/>
+
+  <rect x="180" y="1088" width="740" height="28" rx="0" fill="#e8fde8"/>
+  <text x="310" y="1102" class="mono-b" fill="#27864a">R W</text>
+  <text x="480" y="1102" class="mono" fill="#27864a">&#x2714; allowed</text>
+  <text x="620" y="1102" class="mono" fill="#27864a">&#x2714; allowed</text>
+  <text x="790" y="1102" class="label-s" fill="#27864a">Full read/write access within bounds</text>
+
+  <rect x="180" y="1116" width="740" height="28" rx="0" fill="#fff"/>
+  <text x="310" y="1130" class="mono-b" fill="#2a6db5">R only</text>
+  <text x="480" y="1130" class="mono" fill="#27864a">&#x2714; allowed</text>
+  <text x="620" y="1130" class="mono" fill="#cc3333">&#x2718; FAULT</text>
+  <text x="790" y="1130" class="label-s" fill="#2a6db5">Read-only DATA (constants, config)</text>
+
+  <rect x="180" y="1144" width="740" height="28" rx="0" fill="#f8f8f8"/>
+  <text x="310" y="1158" class="mono-b" fill="#c07020">W only</text>
+  <text x="480" y="1158" class="mono" fill="#cc3333">&#x2718; FAULT</text>
+  <text x="620" y="1158" class="mono" fill="#27864a">&#x2714; allowed</text>
+  <text x="790" y="1158" class="label-s" fill="#c07020">Write-only (audit log, output buffer)</text>
+
+  <rect x="180" y="1172" width="740" height="28" rx="0" fill="#fff"/>
+  <text x="310" y="1186" class="mono-b" fill="#cc3333">no R, no W</text>
+  <text x="480" y="1186" class="mono" fill="#cc3333">&#x2718; FAULT</text>
+  <text x="620" y="1186" class="mono" fill="#cc3333">&#x2718; FAULT</text>
+  <text x="790" y="1186" class="label-s" fill="#cc3333">Opaque handle (metadata only)</text>
+
+  <rect x="180" y="1060" width="740" height="140" rx="4" fill="none" stroke="#ccc" stroke-width="1"/>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- KEY INSIGHT                                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="80" y="1225" width="940" height="80" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text x="550" y="1250" class="title-sm" fill="#b8860b">Why DATA Objects Matter</text>
+  <text x="550" y="1273" class="label" fill="#333">DATA objects let Turing abstractions work with structured data without breaking Church security.</text>
+  <text x="550" y="1291" class="label" fill="#333">Church controls access (who, what permissions). Turing controls operations (how). Neither domain can bypass the other.</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Church domain (GT access control)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#7b2d8e;"></div> Turing domain (DREAD/DWRITE)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> mLoad gate (validation)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#c07020;"></div> Bounds checking</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div> DATA object (bridge)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#cc3333;"></div> FAULT (access denied)</div>
+</div>
+
+</body>
+</html>
