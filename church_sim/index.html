@@ -182,9 +182,9 @@
     </div>
 
     <div id="pages" class="view">
-        <div style="max-width:1100px;margin:0 auto;padding:1rem;">
+        <div id="pagesListing" style="max-width:1100px;margin:0 auto;padding:1rem;">
             <h2 style="color:#d4a843;margin-bottom:0.3rem;font-size:1.3rem;">CTMM Page Directory</h2>
-            <p style="color:#8b949e;margin-bottom:1.5rem;font-size:0.8rem;">All interactive pages across the project. Click any card to open it.</p>
+            <p style="color:#8b949e;margin-bottom:1.5rem;font-size:0.8rem;">All interactive pages across the project. Click any card to view it inline.</p>
             <div style="margin-bottom:1.5rem;">
                 <h3 style="color:#79c0ff;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Simulators</h3>
                 <div id="pagesSimulators" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
@@ -201,6 +201,13 @@
                 <h3 style="color:#f0883e;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Business Documents</h3>
                 <div id="pagesBusiness" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
             </div>
+        </div>
+        <div id="pagesViewer" style="display:none;flex-direction:column;height:calc(100vh - 60px);width:100%;">
+            <div style="display:flex;align-items:center;gap:0.8rem;padding:0.5rem 1rem;background:#161b22;border-bottom:1px solid #30363d;">
+                <button onclick="closePageViewer()" class="btn" style="padding:0.3rem 0.8rem;font-size:0.8rem;">Back to Directory</button>
+                <span id="pagesViewerTitle" style="color:#d4a843;font-weight:600;font-size:0.9rem;"></span>
+            </div>
+            <iframe id="pagesIframe" style="flex:1;border:none;width:100%;background:#0d1117;" src="about:blank"></iframe>
         </div>
     </div>
 

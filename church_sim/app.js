@@ -63,9 +63,31 @@ function switchView(viewId) {
     if (viewId === 'pages') renderPagesDirectory();
 }
 
+function openPageInFrame(href, name) {
+    const viewer = document.getElementById('pagesViewer');
+    const listing = document.getElementById('pagesListing');
+    const frame = document.getElementById('pagesIframe');
+    const title = document.getElementById('pagesViewerTitle');
+    listing.style.display = 'none';
+    viewer.style.display = 'flex';
+    title.textContent = name;
+    frame.src = href;
+}
+
+function closePageViewer() {
+    const viewer = document.getElementById('pagesViewer');
+    const listing = document.getElementById('pagesListing');
+    const frame = document.getElementById('pagesIframe');
+    viewer.style.display = 'none';
+    listing.style.display = 'block';
+    frame.src = 'about:blank';
+}
+
 function renderPagesDirectory() {
     function card(href, name, tag, tagClass, desc) {
-        return `<a href="${href}" style="display:block;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;text-decoration:none;color:#c9d1d9;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#58a6ff'" onmouseout="this.style.borderColor='#30363d'"><div style="font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;">${name} <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;${tagClass}">${tag}</span></div><div style="font-size:0.7rem;color:#8b949e;line-height:1.3;">${desc}</div></a>`;
+        const escaped = href.replace(/'/g, "\\'");
+        const eName = name.replace(/'/g, "\\'");
+        return `<div onclick="openPageInFrame('${escaped}','${eName}')" style="cursor:pointer;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;color:#c9d1d9;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#58a6ff'" onmouseout="this.style.borderColor='#30363d'"><div style="font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;">${name} <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;${tagClass}">${tag}</span></div><div style="font-size:0.7rem;color:#8b949e;line-height:1.3;">${desc}</div></div>`;
     }
     const tc = 'background:#1a2a1a;border:1px solid #3fb950;color:#3fb950;';
     const ts = 'background:#1a1a2a;border:1px solid #58a6ff;color:#58a6ff;';
