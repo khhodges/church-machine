@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 8: Pure Church Processor Block Diagram</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 8 &mdash; Pure Church Processor Block Diagram</h1>
+<p class="subtitle">Three-block architecture proving computational completeness with zero Turing-domain hardware. The Lambda Reducer executes 6 Church instructions with no ALU. The Capability Validator enforces dual-gate TSB security. The I/O Mediator is the sole physical interface. Everything absent from conventional processors is absent by design.</p>
+
+<svg viewBox="0 0 1100 1200" width="1100" height="1200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c07020"/>
+    </marker>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7b2d8e"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:17px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555; text-anchor:middle; dominant-baseline:central; }
+    .absent { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#cc3333; text-anchor:start; dominant-baseline:central; }
+    .step-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+  </style>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- BLOCK 1: LAMBDA REDUCER (top center)                        -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="250" y="20" width="600" height="340" rx="14" fill="#e8fde8" stroke="#27864a" stroke-width="2.5"/>
+  <rect x="252" y="22" width="596" height="36" rx="12" fill="#27864a"/>
+  <text x="550" y="40" class="title-sm" fill="#fff">Block 1: Lambda Reducer</text>
+
+  <text x="550" y="72" class="label" fill="#27864a">Pure lambda calculus execution engine &mdash; no arithmetic hardware</text>
+
+  <!-- Instruction decode -->
+  <rect x="290" y="90" width="520" height="30" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="550" y="105" class="mono-b" fill="#27864a">Instruction Decode (5-bit opcode + ARM-style 4-bit condition)</text>
+
+  <!-- 6 Instructions in 2x3 grid -->
+  <text x="550" y="140" class="title-xs" fill="#27864a">6 Church Instructions</text>
+
+  <rect x="290" y="155" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="370" y="167" class="mono-b" fill="#27864a">LOAD</text>
+  <text x="370" y="183" class="label-s" fill="#555">c-list &#x2192; CR (L perm)</text>
+
+  <rect x="470" y="155" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="550" y="167" class="mono-b" fill="#27864a">SAVE</text>
+  <text x="550" y="183" class="label-s" fill="#555">CR &#x2192; c-list (S perm)</text>
+
+  <rect x="650" y="155" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="730" y="167" class="mono-b" fill="#27864a">CALL</text>
+  <text x="730" y="183" class="label-s" fill="#555">domain crossing (E perm)</text>
+
+  <rect x="290" y="200" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="370" y="212" class="mono-b" fill="#27864a">LAMBDA</text>
+  <text x="370" y="228" class="label-s" fill="#555">fast path (X perm)</text>
+
+  <rect x="470" y="200" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="550" y="212" class="mono-b" fill="#27864a">RETURN</text>
+  <text x="550" y="228" class="label-s" fill="#555">exit abstraction</text>
+
+  <rect x="650" y="200" width="160" height="36" rx="6" fill="#d5f0d5" stroke="#27864a" stroke-width="1"/>
+  <text x="730" y="212" class="mono-b" fill="#27864a">TPERM</text>
+  <text x="730" y="228" class="label-s" fill="#555">attenuate permissions</text>
+
+  <!-- Fused instructions -->
+  <text x="550" y="258" class="title-xs" fill="#27864a">Fused Instructions (cycle reduction)</text>
+
+  <rect x="330" y="272" width="200" height="30" rx="6" fill="#c8e8c8" stroke="#27864a" stroke-width="1"/>
+  <text x="430" y="287" class="mono" fill="#27864a">ELOADCALL (LOAD+CALL)</text>
+
+  <rect x="570" y="272" width="220" height="30" rx="6" fill="#c8e8c8" stroke="#27864a" stroke-width="1"/>
+  <text x="680" y="287" class="mono" fill="#27864a">XLOADLAMBDA (LOAD+LAMBDA)</text>
+
+  <!-- Register file -->
+  <rect x="290" y="315" width="250" height="30" rx="6" fill="#f0fff0" stroke="#27864a" stroke-width="1"/>
+  <text x="415" y="330" class="mono" fill="#27864a">CR0-CR7 (Context Registers)</text>
+
+  <rect x="560" y="315" width="250" height="30" rx="6" fill="#f0fff0" stroke="#27864a" stroke-width="1"/>
+  <text x="685" y="330" class="mono" fill="#27864a">Machine Status (&#x03BB; regs)</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- BLOCK 2: CAPABILITY VALIDATOR (middle)                      -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="250" y="400" width="600" height="260" rx="14" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2.5"/>
+  <rect x="252" y="402" width="596" height="36" rx="12" fill="#2a6db5"/>
+  <text x="550" y="420" class="title-sm" fill="#fff">Block 2: Capability Validator (Dual-Gate TSB)</text>
+
+  <text x="550" y="454" class="label" fill="#2a6db5">Trusted Security Base &mdash; the only hardware that touches Golden Tokens</text>
+
+  <!-- mLoad -->
+  <rect x="280" y="470" width="250" height="160" rx="8" fill="#dce9f5" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="405" y="492" class="title-xs" fill="#2a6db5">mLoad (Read Gate)</text>
+
+  <rect x="295" y="505" width="220" height="18" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="405" y="514" class="mono-s" fill="#2a6db5">Permission (R/W/X/L/S/E)</text>
+  <rect x="295" y="527" width="220" height="18" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="405" y="536" class="mono-s" fill="#2a6db5">Bounds Check</text>
+  <rect x="295" y="549" width="220" height="18" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="405" y="558" class="mono-s" fill="#2a6db5">Version Match</text>
+  <rect x="295" y="571" width="220" height="18" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="405" y="580" class="mono-s" fill="#2a6db5">MAC/Seal Verify</text>
+  <rect x="295" y="593" width="220" height="18" rx="3" fill="#d0f0d0" stroke="#27864a" stroke-width="0.5"/>
+  <text x="405" y="602" class="mono-s" fill="#27864a">G-bit Reset (G&#x2190;0)</text>
+  <rect x="295" y="615" width="220" height="18" rx="3" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
+  <text x="405" y="624" class="mono-s" fill="#2a6db5">CR Write + Thread Shadow</text>
+
+  <!-- mSave -->
+  <rect x="570" y="470" width="250" height="160" rx="8" fill="#fff3e0" stroke="#c07020" stroke-width="1.5"/>
+  <text x="695" y="492" class="title-xs" fill="#c07020">mSave (Write Gate)</text>
+
+  <rect x="585" y="505" width="220" height="18" rx="3" fill="#fde8d0" stroke="#c07020" stroke-width="0.5"/>
+  <text x="695" y="514" class="mono-s" fill="#c07020">Version Match</text>
+  <rect x="585" y="527" width="220" height="18" rx="3" fill="#fde8d0" stroke="#c07020" stroke-width="0.5"/>
+  <text x="695" y="536" class="mono-s" fill="#c07020">Seal Validation</text>
+  <rect x="585" y="549" width="220" height="18" rx="3" fill="#fde8d0" stroke="#c07020" stroke-width="0.5"/>
+  <text x="695" y="558" class="mono-s" fill="#c07020">Target Bounds + B-bit</text>
+  <rect x="585" y="571" width="220" height="18" rx="3" fill="#fde8d0" stroke="#c07020" stroke-width="0.5"/>
+  <text x="695" y="580" class="mono-s" fill="#c07020">F-bit Detection</text>
+  <rect x="585" y="593" width="220" height="18" rx="3" fill="#d0f0d0" stroke="#27864a" stroke-width="0.5"/>
+  <text x="695" y="602" class="mono-s" fill="#27864a">G-bit Reset (G&#x2190;0)</text>
+  <rect x="585" y="615" width="220" height="18" rx="3" fill="#fde8d0" stroke="#c07020" stroke-width="0.5"/>
+  <text x="695" y="624" class="mono-s" fill="#c07020">Seal Recompute + Commit</text>
+
+  <!-- FAULT output -->
+  <rect x="460" y="640" width="180" height="24" rx="4" fill="#fde8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text x="550" y="652" class="mono-b" fill="#cc3333">&#x2192; FAULT on any failure</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- BLOCK 3: I/O MEDIATOR (bottom center)                       -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="250" y="700" width="600" height="160" rx="14" fill="#f3ecff" stroke="#7b2d8e" stroke-width="2.5"/>
+  <rect x="252" y="702" width="596" height="36" rx="12" fill="#7b2d8e"/>
+  <text x="550" y="720" class="title-sm" fill="#fff">Block 3: I/O Mediator (Sole Physical Interface)</text>
+
+  <text x="550" y="754" class="label" fill="#7b2d8e">Only path between the processor and the outside world</text>
+
+  <rect x="290" y="770" width="160" height="36" rx="6" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="370" y="782" class="mono-b" fill="#7b2d8e">Namespace</text>
+  <text x="370" y="798" class="label-s" fill="#555">c-list storage</text>
+
+  <rect x="470" y="770" width="160" height="36" rx="6" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="550" y="782" class="mono-b" fill="#7b2d8e">Memory Bus</text>
+  <text x="550" y="798" class="label-s" fill="#555">unified addr space</text>
+
+  <rect x="650" y="770" width="160" height="36" rx="6" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="730" y="782" class="mono-b" fill="#7b2d8e">Device I/O</text>
+  <text x="730" y="798" class="label-s" fill="#555">MSB 0xFE segment</text>
+
+  <text x="550" y="840" class="label-s" fill="#7b2d8e">All access gated by mLoad/mSave &mdash; no ungated bus transactions</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- INTER-BLOCK CONNECTIONS                                     -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+
+  <!-- Lambda Reducer → Capability Validator -->
+  <line x1="420" y1="360" x2="420" y2="398" stroke="#27864a" stroke-width="2" marker-end="url(#ah-b)"/>
+  <text x="440" y="380" class="mono-s" fill="#27864a" text-anchor="start">LOAD/SAVE/CALL request</text>
+
+  <line x1="680" y1="398" x2="680" y2="360" stroke="#2a6db5" stroke-width="2" marker-end="url(#ah-g)"/>
+  <text x="700" y="380" class="mono-s" fill="#2a6db5" text-anchor="start">validated GT / FAULT</text>
+
+  <!-- Capability Validator → I/O Mediator -->
+  <line x1="420" y1="660" x2="420" y2="698" stroke="#2a6db5" stroke-width="2" marker-end="url(#ah-p)"/>
+  <text x="440" y="680" class="mono-s" fill="#2a6db5" text-anchor="start">gated access request</text>
+
+  <line x1="680" y1="698" x2="680" y2="660" stroke="#7b2d8e" stroke-width="2" marker-end="url(#ah-b)"/>
+  <text x="700" y="680" class="mono-s" fill="#7b2d8e" text-anchor="start">namespace / memory data</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- WHAT IS ABSENT (right side)                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="880" y="20" width="200" height="340" rx="10" fill="#fde8e8" stroke="#cc3333" stroke-width="2"/>
+  <text x="980" y="42" class="title-sm" fill="#cc3333">Absent by Design</text>
+
+  <line x1="900" y1="60" x2="1060" y2="60" stroke="#cc3333" stroke-width="0.5"/>
+
+  <text x="905" y="82" class="absent">&#x2717; No ALU</text>
+  <text x="905" y="100" class="absent">&#x2717; No barrel shifter</text>
+  <text x="905" y="118" class="absent">&#x2717; No condition flags</text>
+  <text x="905" y="136" class="absent">&#x2717; No branch unit</text>
+  <text x="905" y="154" class="absent">&#x2717; No integer multiply</text>
+  <text x="905" y="172" class="absent">&#x2717; No FPU</text>
+  <text x="905" y="190" class="absent">&#x2717; No data registers</text>
+  <text x="905" y="208" class="absent">&#x2717; No privilege modes</text>
+  <text x="905" y="226" class="absent">&#x2717; No MMU/TLB</text>
+  <text x="905" y="244" class="absent">&#x2717; No interrupts</text>
+  <text x="905" y="262" class="absent">&#x2717; No cache hierarchy</text>
+  <text x="905" y="280" class="absent">&#x2717; No speculative exec</text>
+  <text x="905" y="298" class="absent">&#x2717; No microcode</text>
+  <text x="905" y="316" class="absent">&#x2717; No pipeline hazards</text>
+  <text x="905" y="340" class="absent">&#x2717; No Turing ISA</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- WHAT IS PRESENT (left side)                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="20" y="20" width="200" height="340" rx="10" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="120" y="42" class="title-sm" fill="#27864a">Present</text>
+
+  <line x1="40" y1="60" x2="200" y2="60" stroke="#27864a" stroke-width="0.5"/>
+
+  <text x="40" y="82" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Lambda reducer</text>
+  <text x="40" y="100" class="mono-s" fill="#27864a" text-anchor="start">&#10003; 6 instructions</text>
+  <text x="40" y="118" class="mono-s" fill="#27864a" text-anchor="start">&#10003; 2 fused instrs</text>
+  <text x="40" y="136" class="mono-s" fill="#27864a" text-anchor="start">&#10003; 8 context regs</text>
+  <text x="40" y="154" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Machine status</text>
+  <text x="40" y="172" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Dual-gate TSB</text>
+  <text x="40" y="190" class="mono-s" fill="#27864a" text-anchor="start">&#10003; G-bit (GC)</text>
+  <text x="40" y="208" class="mono-s" fill="#27864a" text-anchor="start">&#10003; B-bit (bind)</text>
+  <text x="40" y="226" class="mono-s" fill="#27864a" text-anchor="start">&#10003; GT type field</text>
+  <text x="40" y="244" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Call stack</text>
+  <text x="40" y="262" class="mono-s" fill="#27864a" text-anchor="start">&#10003; FAULT handler</text>
+  <text x="40" y="280" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Cond execution</text>
+  <text x="40" y="298" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Unified addr space</text>
+  <text x="40" y="316" class="mono-s" fill="#27864a" text-anchor="start">&#10003; Version counter</text>
+  <text x="40" y="340" class="mono-s" fill="#27864a" text-anchor="start">&#10003; I/O mediator</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- COMPLETENESS PROOF (bottom)                                 -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="80" y="900" width="940" height="110" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text x="550" y="925" class="title-sm" fill="#b8860b">Computational Completeness Without Turing Hardware</text>
+
+  <text x="550" y="950" class="label" fill="#333">Lambda calculus is computationally complete (Church-Turing thesis). Every computable function</text>
+  <text x="550" y="968" class="label" fill="#333">can be expressed as lambda terms. The Pure Church Machine proves this in hardware:</text>
+  <text x="550" y="990" class="mono-s" fill="#27864a">6 instructions + dual-gate security + capability GTs = complete, secure computation</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- DATA FLOW SUMMARY                                           -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="80" y="1030" width="940" height="150" rx="10" fill="#fafafa" stroke="#ddd" stroke-width="1"/>
+  <text x="550" y="1055" class="title-sm" fill="#333">Data Flow</text>
+
+  <!-- Flow boxes -->
+  <rect x="120" y="1075" width="180" height="44" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="210" y="1091" class="mono-b" fill="#27864a">Lambda Reducer</text>
+  <text x="210" y="1109" class="label-s" fill="#555">decode + dispatch</text>
+
+  <line x1="300" y1="1097" x2="350" y2="1097" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <rect x="350" y="1075" width="200" height="44" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="450" y="1091" class="mono-b" fill="#2a6db5">Capability Validator</text>
+  <text x="450" y="1109" class="label-s" fill="#555">mLoad / mSave gate</text>
+
+  <line x1="550" y1="1097" x2="600" y2="1097" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <rect x="600" y="1075" width="180" height="44" rx="8" fill="#f3ecff" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="690" y="1091" class="mono-b" fill="#7b2d8e">I/O Mediator</text>
+  <text x="690" y="1109" class="label-s" fill="#555">namespace + bus</text>
+
+  <line x1="780" y1="1097" x2="830" y2="1097" stroke="#555" stroke-width="1.5" marker-end="url(#ah-k)"/>
+
+  <rect x="830" y="1075" width="150" height="44" rx="8" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+  <text x="905" y="1091" class="mono-b" fill="#555">External</text>
+  <text x="905" y="1109" class="label-s" fill="#555">memory / devices</text>
+
+  <text x="550" y="1160" class="label-s" fill="#b8860b">Every external access passes through both the Capability Validator and the I/O Mediator &mdash; no bypass path exists</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> Lambda Reducer (6 instructions)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Capability Validator (dual-gate TSB)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#7b2d8e;"></div> I/O Mediator (sole physical interface)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#cc3333;"></div> Absent by design</div>
+</div>
+
+</body>
+</html>
