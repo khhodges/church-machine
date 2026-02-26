@@ -306,6 +306,9 @@ class BernoulliTutorial {
         } else if (this.currentStep < 0) {
             html += '<div class="tutorial-step-title">Welcome</div>';
             html += '<div class="tutorial-step-desc">Click "Next" to begin the Discovery Path \u2014 from the full 7-gate security pipeline to programmable abstractions, following the exact reasoning that led to each optimization.</div>';
+            html += '<div style="margin-top:1rem;padding:0.8rem 1rem;background:#1a1a2a;border:1px solid #d4a843;border-radius:6px;font-size:0.8rem;color:#c9d1d9;line-height:1.5;">';
+            html += '<span style="color:#d4a843;font-weight:600;">Pages button</span> &mdash; The gold <em>Pages</em> button in the navigation bar opens the Page Directory: a single page listing every simulator, reference document, architecture figure, and business document in the project. Use it to jump directly to any page.';
+            html += '</div>';
         }
         html += '</div>';
 

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CTMM — Page Directory</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; padding: 2rem; }
+        h1 { color: #d4a843; margin-bottom: 0.3rem; font-size: 1.4rem; }
+        .subtitle { color: #8b949e; margin-bottom: 2rem; font-size: 0.85rem; }
+        .back-link { color: #58a6ff; text-decoration: none; font-size: 0.8rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .section { margin-bottom: 2rem; }
+        .section h2 { color: #79c0ff; font-size: 1rem; margin-bottom: 0.8rem; border-bottom: 1px solid #30363d; padding-bottom: 0.3rem; }
+        .section.turing h2 { color: #bc8cff; }
+        .section.docs h2 { color: #3fb950; }
+        .section.business h2 { color: #f0883e; }
+
+        .page-list { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0.8rem; }
+        .page-item { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; transition: border-color 0.2s; }
+        .page-item:hover { border-color: #58a6ff; }
+        .page-item a { display: block; padding: 0.8rem 1rem; text-decoration: none; color: #c9d1d9; }
+        .page-name { font-size: 0.9rem; font-weight: 600; color: #58a6ff; margin-bottom: 0.3rem; }
+        .page-desc { font-size: 0.72rem; color: #8b949e; line-height: 1.4; }
+        .page-path { font-size: 0.65rem; color: #484f58; font-family: 'Courier New', monospace; margin-top: 0.3rem; }
+
+        .tag { display: inline-block; font-size: 0.6rem; padding: 0.1rem 0.4rem; border-radius: 3px; margin-left: 0.4rem; vertical-align: middle; }
+        .tag-church { background: #1a2a1a; border: 1px solid #3fb950; color: #3fb950; }
+        .tag-turing { background: #2a1a2a; border: 1px solid #bc8cff; color: #bc8cff; }
+        .tag-sim { background: #1a1a2a; border: 1px solid #58a6ff; color: #58a6ff; }
+        .tag-doc { background: #2a2a1a; border: 1px solid #d4a843; color: #d4a843; }
+        .tag-test { background: #2a1a1a; border: 1px solid #f0883e; color: #f0883e; }
+    </style>
+</head>
+<body>
+    <a href="/church" class="back-link">&larr; Back to Church Machine</a>
+    <h1>CTMM Page Directory</h1>
+    <p class="subtitle">All interactive pages across the project, organized by category.</p>
+
+    <div class="section">
+        <h2>Simulators</h2>
+        <ul class="page-list">
+            <li class="page-item"><a href="/">
+                <div class="page-name">Home <span class="tag tag-sim">landing</span></div>
+                <div class="page-desc">Landing page with links to all simulators and the test harness.</div>
+                <div class="page-path">/</div>
+            </a></li>
+            <li class="page-item"><a href="/church">
+                <div class="page-name">Church Machine <span class="tag tag-church">Pure Church</span></div>
+                <div class="page-desc">Pure Church Lambda Machine simulator. 8 opcodes, zero Turing instructions, REPL, pipeline visualization, Bernoulli tutorial.</div>
+                <div class="page-path">/church</div>
+            </a></li>
+            <li class="page-item"><a href="/ctmm/">
+                <div class="page-name">CTMM Simulator <span class="tag tag-sim">Sim-64</span></div>
+                <div class="page-desc">Church-Turing Meta-Machine with custom ISA, 64-bit Golden Tokens, namespace browser, assembly editor, capability explorer.</div>
+                <div class="page-path">/ctmm/</div>
+            </a></li>
+            <li class="page-item"><a href="/rv32/">
+                <div class="page-name">RV32-Cap Simulator <span class="tag tag-turing">RISC-V</span></div>
+                <div class="page-desc">RISC-V RV32I base with capability security extensions. 32-bit Golden Tokens, boot builder, cap instructions.</div>
+                <div class="page-path">/rv32/</div>
+            </a></li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Reference</h2>
+        <ul class="page-list">
+            <li class="page-item"><a href="/church/flowchart.html">
+                <div class="page-name">Microcode Flowchart <span class="tag tag-church">Church</span></div>
+                <div class="page-desc">Complete microcode for all 20 instructions with memory bus annotations (REG/MEM RD/MEM WR), TSB gates, GC cycle, and fault catalog.</div>
+                <div class="page-path">/church/flowchart.html</div>
+            </a></li>
+            <li class="page-item"><a href="/test">
+                <div class="page-name">Tunnel Test Harness <span class="tag tag-test">testing</span></div>
+                <div class="page-desc">Side-by-side simulator testing with automated messaging. Kenneth-to-Priscilla and ping-pong exchanges with real-time test logging.</div>
+                <div class="page-path">/test</div>
+            </a></li>
+        </ul>
+    </div>
+
+    <div class="section docs">
+        <h2>Architecture Figures</h2>
+        <ul class="page-list">
+            <li class="page-item"><a href="/docs/figures/lambda-flow-diagram.html">
+                <div class="page-name">Fig 3: LAMBDA Fast Path <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">LAMBDA machine-status fast path diagram.</div>
+                <div class="page-path">/docs/figures/lambda-flow-diagram.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/stack-frames-diagram.html">
+                <div class="page-name">Fig 4: Stack Frames <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Self-describing stack frames layout.</div>
+                <div class="page-path">/docs/figures/stack-frames-diagram.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/lambda-nesting-sequence.html">
+                <div class="page-name">Fig 5: LAMBDA Nesting <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Non-nestable LAMBDA with CALL-mediated nesting sequence.</div>
+                <div class="page-path">/docs/figures/lambda-nesting-sequence.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/lambda-calculus-mapping.html">
+                <div class="page-name">Fig 6: Lambda Calculus Mapping <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Lambda calculus to CTMM hardware mapping.</div>
+                <div class="page-path">/docs/figures/lambda-calculus-mapping.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/lambda-clamp-example.html">
+                <div class="page-name">Fig 7: LAMBDA Clamp <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">LAMBDA clamp example — macro-like code reuse.</div>
+                <div class="page-path">/docs/figures/lambda-clamp-example.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/tunnel-architecture.html">
+                <div class="page-name">Fig 8: Tunnel Architecture <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Encrypted capability tunnel between Meta Machines.</div>
+                <div class="page-path">/docs/figures/tunnel-architecture.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/dispatch-styles-comparison.html">
+                <div class="page-name">Fig 9: Dispatch Styles <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Three dispatch styles — same CALL, three resolutions.</div>
+                <div class="page-path">/docs/figures/dispatch-styles-comparison.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/conventional-vs-ctmm.html">
+                <div class="page-name">Fig 10: Conventional vs CTMM <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Attack surface elimination compared to conventional architecture.</div>
+                <div class="page-path">/docs/figures/conventional-vs-ctmm.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/boot-sequence-state-machine.html">
+                <div class="page-name">Fig 11: Boot Sequence <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">5-phase hardware initialization state machine.</div>
+                <div class="page-path">/docs/figures/boot-sequence-state-machine.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/mload-validation-pipeline.html">
+                <div class="page-name">Fig 12: mLoad Pipeline <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">mLoad validation pipeline — five sequential checks.</div>
+                <div class="page-path">/docs/figures/mload-validation-pipeline.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/mint-abstraction-nesting.html">
+                <div class="page-name">Fig 13: Mint Abstraction <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Mint abstraction nesting and domain purity.</div>
+                <div class="page-path">/docs/figures/mint-abstraction-nesting.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/figures/hello-mum-tunnel.html">
+                <div class="page-name">Fig 14: Hello Mum Tunnel <span class="tag tag-doc">figure</span></div>
+                <div class="page-desc">Hello Mum — encrypted capability tunnel example.</div>
+                <div class="page-path">/docs/figures/hello-mum-tunnel.html</div>
+            </a></li>
+        </ul>
+    </div>
+
+    <div class="section business">
+        <h2>Business Documents</h2>
+        <ul class="page-list">
+            <li class="page-item"><a href="/docs/business/plan.html">
+                <div class="page-name">Business Plan <span class="tag tag-test">business</span></div>
+                <div class="page-desc">Church Machine business plan.</div>
+                <div class="page-path">/docs/business/plan.html</div>
+            </a></li>
+            <li class="page-item"><a href="/docs/business/deck.html">
+                <div class="page-name">Investor Deck <span class="tag tag-test">business</span></div>
+                <div class="page-desc">Church Machine investor presentation deck.</div>
+                <div class="page-path">/docs/business/deck.html</div>
+            </a></li>
+        </ul>
+    </div>
+
+</body>
+</html>
