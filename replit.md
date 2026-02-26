@@ -62,6 +62,12 @@ The web interface features a dark-themed, IDE-like design with ten views: Dashbo
 ### Unified Server Architecture
 All three simulators (CTMM, RV32, Church) are served from a single Flask application, providing dedicated routes, a test harness, and API endpoints for user authentication and state persistence.
 
+### Patent Documentation
+-   **`docs/patent-ctmm-unified.md`**: Consolidated unified patent submission covering all claims from both the original CTMM filing and the Pure Church continuation-in-part, with updated claims for dual-gate TSB (mLoad + mSave), B-bit propagation control, DATA objects, safe Turing abstractions, unified address space, and PP250 deterministic GC. 28 claims total.
+-   **`docs/patent-ctmm-lambda.md`**: Original initial patent submission (Claims 1-16).
+-   **`docs/patent-church-machine-claims.md`**: Original Pure Church continuation-in-part (Claims 17-23).
+-   **`docs/patent-church-machine-email.md`**: CIP filing cover letter to patent attorney.
+
 ## External Dependencies
 
 -   **Python/Flask**: Unified web server.
