@@ -60,6 +60,48 @@ function switchView(viewId) {
     if (viewId === 'pipeline') pipelineViz.render();
     if (viewId === 'tutorial') churchTutorial.render('tutorialView');
     if (viewId === 'instructions') renderInstructionsList();
+    if (viewId === 'pages') renderPagesDirectory();
+}
+
+function renderPagesDirectory() {
+    function card(href, name, tag, tagClass, desc) {
+        return `<a href="${href}" style="display:block;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;text-decoration:none;color:#c9d1d9;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#58a6ff'" onmouseout="this.style.borderColor='#30363d'"><div style="font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;">${name} <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;${tagClass}">${tag}</span></div><div style="font-size:0.7rem;color:#8b949e;line-height:1.3;">${desc}</div></a>`;
+    }
+    const tc = 'background:#1a2a1a;border:1px solid #3fb950;color:#3fb950;';
+    const ts = 'background:#1a1a2a;border:1px solid #58a6ff;color:#58a6ff;';
+    const tr = 'background:#2a1a2a;border:1px solid #bc8cff;color:#bc8cff;';
+    const td = 'background:#2a2a1a;border:1px solid #d4a843;color:#d4a843;';
+    const tt = 'background:#2a1a1a;border:1px solid #f0883e;color:#f0883e;';
+
+    const el = id => document.getElementById(id);
+    el('pagesSimulators').innerHTML = [
+        card('/', 'Home', 'landing', ts, 'Landing page with links to all simulators.'),
+        card('/church/', 'Church Machine', 'Pure Church', tc, '8 opcodes, zero Turing instructions, REPL, pipeline, Bernoulli tutorial.'),
+        card('/ctmm/', 'CTMM Simulator', 'Sim-64', ts, 'Custom ISA, 64-bit Golden Tokens, namespace browser, assembly editor.'),
+        card('/rv32/', 'RV32-Cap Simulator', 'RISC-V', tr, 'RISC-V RV32I with capability security extensions, 32-bit GTs.'),
+    ].join('');
+    el('pagesReference').innerHTML = [
+        card('/church/flowchart.html', 'Microcode Flowchart', 'Church', tc, 'All 20 instructions with memory bus annotations, TSB gates, GC cycle, fault catalog.'),
+        card('/test', 'Tunnel Test Harness', 'testing', tt, 'Side-by-side testing with automated messaging and real-time test logging.'),
+    ].join('');
+    el('pagesFigures').innerHTML = [
+        card('/docs/figures/lambda-flow-diagram.html', 'Fig 3: LAMBDA Fast Path', 'figure', td, 'LAMBDA machine-status fast path.'),
+        card('/docs/figures/stack-frames-diagram.html', 'Fig 4: Stack Frames', 'figure', td, 'Self-describing stack frames.'),
+        card('/docs/figures/lambda-nesting-sequence.html', 'Fig 5: LAMBDA Nesting', 'figure', td, 'Non-nestable LAMBDA with CALL-mediated nesting.'),
+        card('/docs/figures/lambda-calculus-mapping.html', 'Fig 6: Lambda Mapping', 'figure', td, 'Lambda calculus to CTMM hardware mapping.'),
+        card('/docs/figures/lambda-clamp-example.html', 'Fig 7: LAMBDA Clamp', 'figure', td, 'Macro-like code reuse.'),
+        card('/docs/figures/tunnel-architecture.html', 'Fig 8: Tunnel Architecture', 'figure', td, 'Encrypted capability tunnel between Meta Machines.'),
+        card('/docs/figures/dispatch-styles-comparison.html', 'Fig 9: Dispatch Styles', 'figure', td, 'Same CALL, three resolutions.'),
+        card('/docs/figures/conventional-vs-ctmm.html', 'Fig 10: Conventional vs CTMM', 'figure', td, 'Attack surface elimination.'),
+        card('/docs/figures/boot-sequence-state-machine.html', 'Fig 11: Boot Sequence', 'figure', td, '5-phase hardware initialization.'),
+        card('/docs/figures/mload-validation-pipeline.html', 'Fig 12: mLoad Pipeline', 'figure', td, 'Five sequential validation checks.'),
+        card('/docs/figures/mint-abstraction-nesting.html', 'Fig 13: Mint Abstraction', 'figure', td, 'Abstraction nesting and domain purity.'),
+        card('/docs/figures/hello-mum-tunnel.html', 'Fig 14: Hello Mum Tunnel', 'figure', td, 'Encrypted capability tunnel example.'),
+    ].join('');
+    el('pagesBusiness').innerHTML = [
+        card('/docs/business/plan.html', 'Business Plan', 'business', tt, 'Church Machine business plan.'),
+        card('/docs/business/deck.html', 'Investor Deck', 'business', tt, 'Church Machine investor presentation.'),
+    ].join('');
 }
 
 function switchDashTab(tabId) {

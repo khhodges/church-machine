@@ -20,7 +20,7 @@
                     <button onclick="switchView('tutorial')" class="btn btn-view" id="viewBtn-tutorial">Tutorial</button>
                     <button onclick="switchView('repl')" class="btn btn-view" id="viewBtn-repl">REPL</button>
                     <button onclick="switchView('instructions')" class="btn btn-view" id="viewBtn-instructions">Instructions</button>
-                    <a href="/church/pages.html" class="btn btn-view" style="text-decoration:none;background:#2a2a1a;border-color:#d4a843;color:#d4a843;">Pages</a>
+                    <button onclick="switchView('pages')" class="btn btn-view" id="viewBtn-pages" style="background:#2a2a1a;border-color:#d4a843;color:#d4a843;">Pages</button>
                 </div>
             </nav>
         </header>
@@ -177,6 +177,29 @@
                         <div class="instr-placeholder">Click any instruction on the left to see its format, encoding, permissions, flags, and usage examples.</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="pages" class="view">
+        <div style="max-width:1100px;margin:0 auto;padding:1rem;">
+            <h2 style="color:#d4a843;margin-bottom:0.3rem;font-size:1.3rem;">CTMM Page Directory</h2>
+            <p style="color:#8b949e;margin-bottom:1.5rem;font-size:0.8rem;">All interactive pages across the project. Click any card to open it.</p>
+            <div style="margin-bottom:1.5rem;">
+                <h3 style="color:#79c0ff;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Simulators</h3>
+                <div id="pagesSimulators" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <h3 style="color:#79c0ff;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Reference</h3>
+                <div id="pagesReference" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <h3 style="color:#3fb950;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Architecture Figures</h3>
+                <div id="pagesFigures" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
+            </div>
+            <div style="margin-bottom:1.5rem;">
+                <h3 style="color:#f0883e;font-size:0.95rem;margin-bottom:0.6rem;border-bottom:1px solid #30363d;padding-bottom:0.3rem;">Business Documents</h3>
+                <div id="pagesBusiness" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:0.7rem;"></div>
             </div>
         </div>
     </div>
