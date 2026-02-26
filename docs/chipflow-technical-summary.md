@@ -50,7 +50,7 @@ GT Type Field (2 bits, within spare):
   00 — Inform  (local reference)
   01 — Outform (remote reference)
   10 — NULL    (empty/invalid/revoked)
-  11 — Spare   (reserved)
+  11 — Abstract (unforgeable constant, e.g., pi)
 ```
 
 **Capability Register (CR) Layout — 4 words, 256 bits:**

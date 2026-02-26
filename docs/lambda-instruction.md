@@ -22,7 +22,7 @@ LAMBDA CRn, x
 ## Execution: Machine-Status Fast Path
 
 ### LAMBDA Entry:
-1. Check CRn.Type = Inform (00) → FAULT if NULL, Outform, or Spare
+1. Check CRn.Type = Inform (00) → FAULT if NULL, Outform, or Abstract
 2. Check X permission on CRn → FAULT if X bit not set
 3. Check LAMBDA-active flag in machine status → FAULT if already set (non-nestable)
 4. Save PC+4 to LAMBDA_PC machine status register

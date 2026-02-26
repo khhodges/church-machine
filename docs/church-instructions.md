@@ -218,7 +218,7 @@ These rules apply identically to both simulators:
 | [11] | stackFrames | 1 = at least one frame on call stack (RETURN safe) |
 | [12] | stackSpace | 1 = room for at least one more frame (CALL safe) |
 | [13] | Valid | 1 = GT passes version and MAC validation |
-| [15:14] | Type | GT type: 00=Inform, 01=Outform, 10=NULL, 11=Spare |
+| [15:14] | Type | GT type: 00=Inform, 01=Outform, 10=NULL, 11=Abstract |
 | [31:16] | (Reserved) | Zero |
 
 ---

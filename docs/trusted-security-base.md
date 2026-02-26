@@ -18,7 +18,7 @@ This document describes the TSB for both implementations, focused on the Sim-32 
 [31:25] Version     (7 bits)   -- GC invalidation (128 generations)
 [24:8]  Index       (17 bits)  -- Namespace entry index (0-131,071)
 [7:2]   Permissions (6 bits)   -- E, S, L, X, W, R
-[1:0]   Type        (2 bits)   -- Inform/Outform/NULL/Spare
+[1:0]   Type        (2 bits)   -- Inform/Outform/NULL/Abstract
 ```
 
 Each capability register is 128 bits wide (4 x 32-bit words):

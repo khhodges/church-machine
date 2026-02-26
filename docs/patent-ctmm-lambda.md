@@ -127,7 +127,7 @@ Beyond the PP250 patent family, academic capability architectures including Camb
 
 The present invention provides a processor architecture, the Church-Turing Meta-Machine (CTMM), that implements Church's lambda calculus in hardware through a clean separation of concerns and a lightweight code application mechanism:
 
-1. **Golden Token (GT) Type Field**: A 2-bit field in every capability token that architecturally classifies four categories: Inform (local reference), Outform (remote reference), NULL (empty/invalid), and Spare (reserved for future use). The Type field determines the hardware execution path at every instruction. The clean architectural rule is: capability registers (CRs) hold capabilities only, data registers (DRs) hold values only. No mixing.
+1. **Golden Token (GT) Type Field**: A 2-bit field in every capability token that architecturally classifies four categories: Inform (local reference), Outform (remote reference), NULL (empty/invalid), and Abstract (unforgeable constant value, e.g., pi). The Type field determines the hardware execution path at every instruction. The clean architectural rule is: capability registers (CRs) hold capabilities only, data registers (DRs) hold values only. No mixing.
 
 2. **NULL Type (Type = 10)**: A capability register encoding that represents an empty, invalid, or revoked capability. Any operation on a NULL-typed GT causes an immediate FAULT. NULL enables clean initialization (freshly created threads have all CRs set to NULL), safe revocation (revoking a capability sets the register to NULL), and unambiguous garbage collection (the scanner can distinguish empty registers from valid capabilities with index zero).
 
@@ -186,16 +186,16 @@ The 2-bit Type field classifies every Golden Token:
 | 00 | Inform | Name (local) | Dereference through mLoad: validate MAC, version, permissions, namespace lookup |
 | 01 | Outform | Name (remote) | Dereference through HTTPS fetch/flush or RPC tunnel |
 | 10 | NULL | Empty/invalid | FAULT on any operation — register is empty, revoked, or uninitialized |
-| 11 | Spare | Reserved | Reserved for future architectural extension; FAULT on any operation |
+| 11 | Abstract | Unforgeable constant (e.g., pi) | Returns encoded immutable value; no namespace dereference |
 
 This classification reflects the clean architectural separation:
 
 - **Inform** is a *local name* — it refers to a resource in the local namespace and requires evaluation (dereferencing through the mLoad validation path)
 - **Outform** is a *remote name* — it refers to a resource at a network location and requires evaluation (HTTPS fetch or RPC tunnel)
 - **NULL** is *nothing* — the register is empty. Any attempt to use it FAULTs immediately. This is the safe, unambiguous "no capability" state
-- **Spare** is *reserved* — available for future architectural extension without changing the existing type encodings
+- **Abstract** is an *unforgeable constant* — a hardware-protected immutable value (e.g., pi, e, c) that requires no namespace dereference
 
-The Type field is checked by hardware at every instruction. A NULL or Spare GT cannot be dereferenced, loaded, saved, called, or used in any capability operation — the hardware rejects it before any validation path is entered.
+The Type field is checked by hardware at every instruction. A NULL GT cannot be dereferenced, loaded, saved, called, or used in any capability operation — the hardware rejects it before any validation path is entered. An Abstract GT returns its encoded immutable value without namespace dereference.
 
 #### 2.3 The NULL Type
 
@@ -224,7 +224,7 @@ LAMBDA CRn, x
 #### 3.2 Execution Sequence
 
 ```
-Step 1: Verify CRn.Type = Inform (00) → FAULT if NULL (10), Outform (01), or Spare (11)
+Step 1: Verify CRn.Type = Inform (00) → FAULT if NULL (10), Outform (01), or Abstract (11)
 Step 2: Check X permission on CRn → FAULT if X bit not set
 Step 3: Check LAMBDA-active flag in machine status → FAULT if already set (non-nestable)
 Step 4: Save return address (PC+4) to machine status register (LAMBDA_PC)
@@ -344,7 +344,7 @@ This makes LAMBDA safe by construction: it cannot forge, modify, or create capab
 
 The CTMM architecture enforces a clean separation between the capability domain and the value domain:
 
-- **Capability registers (CRs)** hold Golden Tokens exclusively. Every GT in a CR has a Type field (Inform, Outform, NULL, or Spare) and is subject to hardware type checking at every instruction. CRs never hold raw numeric values.
+- **Capability registers (CRs)** hold Golden Tokens exclusively. Every GT in a CR has a Type field (Inform, Outform, NULL, or Abstract) and is subject to hardware type checking at every instruction. CRs never hold raw numeric values.
 
 - **Data registers (DRs)** hold numeric values exclusively. DRs are the computational substrate for arithmetic, logic, comparison, and branching. DRs never hold capabilities.
 
@@ -364,7 +364,7 @@ The NULL type provides fail-safe behavior for uninitialized, revoked, or empty c
 
 2. **NULL is unforgeable**: The Type field (bits [1:0]) is set by hardware during initialization and revocation. Software cannot construct a NULL GT by writing arbitrary bits to a capability register — only mLoad and the hardware initialization/revocation path can set the Type field.
 
-3. **NULL is unambiguous**: The NULL type (10) is distinct from all valid capability types. A NULL GT cannot be confused with an Inform GT, an Outform GT, or a Spare GT. The 2-bit Type field makes the distinction at every instruction cycle.
+3. **NULL is unambiguous**: The NULL type (10) is distinct from all valid capability types. A NULL GT cannot be confused with an Inform GT, an Outform GT, or an Abstract GT. The 2-bit Type field makes the distinction at every instruction cycle.
 
 #### 4.3 LAMBDA Security
 
@@ -753,7 +753,7 @@ The machine-status fast path eliminates stack access entirely for the lightweigh
 
 ### Claim 1 — GT Type Field with NULL Type
 
-A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or a reserved future type (Spare, Type = 11); wherein the Type field is checked by hardware at each instruction to determine the execution path; and wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers.
+A processor architecture comprising a capability register file wherein each register holds a Golden Token (GT) having a Type field of at least two bits that architecturally classifies the token content as one of: a local reference (Inform, Type = 00), a remote reference (Outform, Type = 01), a null/empty/invalid capability (NULL, Type = 10), or an unforgeable constant value (Abstract, Type = 11, e.g., mathematical or physical constants such as pi); wherein the Type field is checked by hardware at each instruction to determine the execution path; wherein a NULL-typed token causes an immediate hardware fault on any operation, providing an unambiguous representation for empty, uninitialized, or revoked capability registers; and wherein an Abstract-typed token encodes an immutable value that requires no namespace dereference, enabling hardware-protected constants that cannot be forged, modified, or confused with capabilities.
 
 ### Claim 2 — NULL Type for Initialization, Revocation, and Garbage Collection
 
@@ -845,7 +845,7 @@ The architecture of Claim 1, wherein the operation to create new Golden Tokens (
 
 ## ABSTRACT
 
-A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Spare (reserved). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The architecture eliminates the four pillars of conventional insecurity — operating system, virtual memory, privilege rings, and superuser — replacing them with atomic abstractions accessed exclusively through Golden Tokens and a single trusted gate (mLoad) that performs five-check validation (permission, bounds, MAC, G-bit reset, thread shadow update) on every namespace access. A transient M (Meta/Microcode) permission, never stored in GTs, provides privileged microcode access to metadata objects without requiring a privileged hardware mode. Three dispatch styles — symbolic resolver (maximum security), LAMBDA fast-path (maximum performance), and traditional compiled binary (compatibility) — give abstraction creators control over the security/performance tradeoff while presenting a uniform interface to callers. The Mint operation enforces domain purity (Turing or Church permissions, never mixed) and is accessed through a chain of abstraction nesting hidden behind capability boundaries. A five-phase hardware boot sequence initializes all capability registers to NULL before loading valid GTs through mLoad. The architecture achieves seven security zeros: zero OS, zero virtual memory, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape. The architecture is implemented in synthesizable Amaranth HDL (16 modules, ~3,000 lines) and SystemVerilog, targeting FPGA implementation on Intel Cyclone V.
+A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Abstract (unforgeable constant). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The architecture eliminates the four pillars of conventional insecurity — operating system, virtual memory, privilege rings, and superuser — replacing them with atomic abstractions accessed exclusively through Golden Tokens and a single trusted gate (mLoad) that performs five-check validation (permission, bounds, MAC, G-bit reset, thread shadow update) on every namespace access. A transient M (Meta/Microcode) permission, never stored in GTs, provides privileged microcode access to metadata objects without requiring a privileged hardware mode. Three dispatch styles — symbolic resolver (maximum security), LAMBDA fast-path (maximum performance), and traditional compiled binary (compatibility) — give abstraction creators control over the security/performance tradeoff while presenting a uniform interface to callers. The Mint operation enforces domain purity (Turing or Church permissions, never mixed) and is accessed through a chain of abstraction nesting hidden behind capability boundaries. A five-phase hardware boot sequence initializes all capability registers to NULL before loading valid GTs through mLoad. The architecture achieves seven security zeros: zero OS, zero virtual memory, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape. The architecture is implemented in synthesizable Amaranth HDL (16 modules, ~3,000 lines) and SystemVerilog, targeting FPGA implementation on Intel Cyclone V.
 
 ---
 
@@ -853,7 +853,7 @@ A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates
 
 ### Figure 1: GT Format and Type Field
 
-Diagram showing the bit layout of all four GT types side by side: Inform (Version|Index|Permissions|Type=00), Outform (Version|Index|Permissions|Type=01), NULL (all fields meaningless|Type=10), Spare (reserved|Type=11). Highlights the NULL type as architecturally distinct from all valid reference types.
+Diagram showing the bit layout of all four GT types side by side: Inform (Version|Index|Permissions|Type=00), Outform (Version|Index|Permissions|Type=01), NULL (all fields meaningless|Type=10), Abstract (unforgeable constant|Type=11). Highlights the NULL type as architecturally distinct from all valid reference types.
 
 ### Figure 2: LAMBDA vs. CALL Execution Paths
 

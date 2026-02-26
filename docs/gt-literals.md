@@ -19,7 +19,7 @@ The 2-bit Type field in every Golden Token classifies four categories:
 | 00 | **Inform** | Local reference — data or code in the local namespace. Requires dereferencing through mLoad: MAC validation, version check, permissions check, namespace lookup. |
 | 01 | **Outform** | Remote reference — data or service at a network URL. Requires evaluation through HTTPS fetch/flush or RPC tunnel. |
 | 10 | **NULL** | Empty/invalid/revoked capability — any operation FAULTs. The register holds no capability. |
-| 11 | **Spare** | Reserved for future use — any operation FAULTs. |
+| 11 | **Abstract** | Unforgeable constant value (e.g., pi) — immutable, no namespace dereference. |
 
 ### Inform (Type = 00)
 A *local name* — a reference to a resource in the local namespace. The GT format holds:
@@ -52,8 +52,8 @@ When a capability must be revoked (access withdrawn, resource deallocated, sessi
 #### Garbage Collection
 The NULL type allows the GC scanner to unambiguously distinguish empty registers from valid capabilities. A register holding all zeros could be confused with an Inform GT pointing to namespace index 0 with version 0 and no permissions — but Type = 10 (NULL) is unambiguous. The scanner knows immediately the register does not reference any namespace entry.
 
-### Spare (Type = 11)
-Reserved for future architectural extension. Like NULL, any operation on a Spare-typed GT causes an FAULT, preventing accidental use of undefined type encodings.
+### Abstract (Type = 11)
+An unforgeable constant value — a hardware-protected token encoding an immutable value such as a mathematical or physical constant (e.g., pi, e, c). Abstract GTs require no namespace dereference; the value is encoded directly in the token. They cannot be forged, modified, or confused with capabilities. The Constants abstraction provides Abstract GTs as its output.
 
 ---
 
@@ -229,7 +229,7 @@ A 30-bit value embedded in a capability register by reclaiming the Version and P
 A GT pointing to a namespace entry containing a secret value. Removed because:
 - The same result is achieved with a standard Inform GT and CAP.LOAD with R permission
 - No special type needed; the namespace already handles secrets securely
-- The Type field is now available for other purposes (NULL, Spare)
+- The Type field is now available for other purposes (NULL, Abstract)
 
 ### LDL Instruction (Load Literal)
 Created a direct GT-Literal from a 30-bit immediate or data register value. Removed with the GT-Literal concept.
@@ -264,6 +264,6 @@ The removal of GT-Literals and the clarification of the Type field reflect a mat
 
 4. **Single Validation Gate**: mLoad is the single, trusted validation function for all capability access — no shortcuts, no special cases, no silent failures.
 
-5. **Secure Defaults**: All operations on NULL or Spare typed GTs result in FAULT. Uninitialized CRs are NULL, not unspecified. Revocation is deterministic.
+5. **Secure Defaults**: All operations on NULL typed GTs result in FAULT. Abstract typed GTs return their encoded immutable value. Uninitialized CRs are NULL, not unspecified. Revocation is deterministic.
 
 This architecture achieves the Church-Turing marriage: the capability model (Church) provides protection and naming; the computational model (Turing) provides data and algorithms; LAMBDA bridges them for efficient, secure in-scope computation; CALL bridges them for secure cross-domain service invocation.

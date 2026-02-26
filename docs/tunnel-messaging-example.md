@@ -324,7 +324,7 @@ The ABI descriptor costs nothing compared to the network. It is fetched once, ca
 
     ; Step 3: Call — one Church instruction executes the entire communication
     CAP.CALL  CR1                  ; CALL(CONNECT(me, mymother))
-                                   ;   → Type checked on CR1: NULL/Spare → FAULT; Inform/Outform → proceed
+                                   ;   → Type checked on CR1: NULL/Abstract → FAULT; Inform/Outform → proceed
                                    ;   → E permission checked on CR1 → FAULT if denied
                                    ;   → Detects Outform type on CR1
                                    ;   → Reads ABI descriptor from entry 7 (via mLoad, R perm)
@@ -457,22 +457,22 @@ Every check is classified as either **FAULT** (security violation, unrecoverable
 
 | Step | Check | Failure Condition | Type | Code |
 |------|-------|-------------------|------|------|
-| CAP.LOAD CR0 | Type check on CR6 | CR6 is NULL (10) or Spare (11) → immediate FAULT | FAULT | TYPE |
+| CAP.LOAD CR0 | Type check on CR6 | CR6 is NULL (10) or Abstract (11) → immediate FAULT | FAULT | TYPE |
 | CAP.LOAD CR0 | L permission on CR6 | C-List GT missing L bit | FAULT | PERMISSION |
 | CAP.LOAD CR0 | MAC on entry 4 | Namespace entry tampered | FAULT | MAC |
 | CAP.LOAD CR0 | Version on entry 4 | Entry recycled by GC | FAULT | VERSION |
 | CAP.LOAD CR0 | Bounds on entry 4 | Index out of namespace range | FAULT | BOUNDS |
-| CAP.LOAD CR0 | Type check on loaded GT | Loaded GT is NULL (10) or Spare (11) → FAULT before CR write | FAULT | TYPE |
-| CAP.LOAD CR1 | Type check on CR6 | CR6 is NULL (10) or Spare (11) → immediate FAULT | FAULT | TYPE |
+| CAP.LOAD CR0 | Type check on loaded GT | Loaded GT is NULL (10) or Abstract (11) → FAULT before CR write | FAULT | TYPE |
+| CAP.LOAD CR1 | Type check on CR6 | CR6 is NULL (10) or Abstract (11) → immediate FAULT | FAULT | TYPE |
 | CAP.LOAD CR1 | L permission on CR6 | C-List GT missing L bit | FAULT | PERMISSION |
 | CAP.LOAD CR1 | MAC on entry 5 | Namespace entry tampered | FAULT | MAC |
 | CAP.LOAD CR1 | Version on entry 5 | Entry recycled by GC | FAULT | VERSION |
 | CAP.LOAD CR1 | Bounds on entry 5 | Index out of namespace range | FAULT | BOUNDS |
-| CAP.LOAD CR1 | Type check on loaded GT | Loaded GT is NULL (10) or Spare (11) → FAULT before CR write | FAULT | TYPE |
-| CAP.CALL CR1 | Type check on CR1 | CR1 is NULL (10) or Spare (11) → immediate FAULT | FAULT | TYPE |
+| CAP.LOAD CR1 | Type check on loaded GT | Loaded GT is NULL (10) or Abstract (11) → FAULT before CR write | FAULT | TYPE |
+| CAP.CALL CR1 | Type check on CR1 | CR1 is NULL (10) or Abstract (11) → immediate FAULT | FAULT | TYPE |
 | CAP.CALL CR1 | E permission on CR1 | Service GT missing E bit | FAULT | PERMISSION |
 | CAP.CALL CR1 | Outform detection | CR1 is Inform (local path, no tunnel) | — | N/A (local call) |
-| CAP.CALL CR1 | Type check on CR0 | Tunnel key GT is NULL (10) or Spare (11) → FAULT | FAULT | TYPE |
+| CAP.CALL CR1 | Type check on CR0 | Tunnel key GT is NULL (10) or Abstract (11) → FAULT | FAULT | TYPE |
 | CAP.CALL CR1 | Tunnel key read (R on CR0) | Tunnel key GT missing R bit | FAULT | PERMISSION |
 | CAP.CALL CR1 | Tunnel key MAC | Key namespace entry tampered | FAULT | MAC |
 | CAP.CALL CR1 | Tunnel key version | Key entry recycled by GC | FAULT | VERSION |
@@ -484,7 +484,7 @@ Every check is classified as either **FAULT** (security violation, unrecoverable
 | CAP.CALL CR1 | Response payload MAC | Payload integrity failure | FAULT | MAC |
 
 **FAULT vs TRAP distinction** (per [Network Transparency](network-transparency.md) specification):
-- **FAULT**: Security violation — unrecoverable. Execution stops. Forged MAC, permission denied, version mismatch, NULL/Spare type, bounds error, crypto failure.
+- **FAULT**: Security violation — unrecoverable. Execution stops. Forged MAC, permission denied, version mismatch, NULL/Abstract type, bounds error, crypto failure.
 - **TRAP**: Architectural event requiring software handling — recoverable. Network unreachability, timeouts, cache misses. Handler retries or reports to caller.
 
 ### "mymother" Side — Receiving
@@ -494,13 +494,13 @@ Every check is classified as either **FAULT** (security violation, unrecoverable
 | Tunnel receive | Decryption | Wrong tunnel key | FAULT | CRYPTO |
 | Tunnel receive | Payload MAC | Payload integrity failure | FAULT | MAC |
 | Tunnel receive | GT validation | Incoming GT forged or expired | FAULT | MAC/VERSION |
-| CAP.LOAD CR2 | Type check on CR6 | CR6 is NULL (10) or Spare (11) → immediate FAULT | FAULT | TYPE |
+| CAP.LOAD CR2 | Type check on CR6 | CR6 is NULL (10) or Abstract (11) → immediate FAULT | FAULT | TYPE |
 | CAP.LOAD CR2 | L permission on CR6 | C-List missing L bit | FAULT | PERMISSION |
 | CAP.LOAD CR2 | MAC on entry 7 | Inbox entry tampered | FAULT | MAC |
 | CAP.LOAD CR2 | Version on entry 7 | Inbox entry recycled | FAULT | VERSION |
 | CAP.LOAD CR2 | Bounds on entry 7 | Index out of namespace range | FAULT | BOUNDS |
-| CAP.LOAD CR2 | Type check on loaded GT | Loaded GT is NULL (10) or Spare (11) → FAULT before CR write | FAULT | TYPE |
-| CAP.STORE CR2 | Type check on CR2 | CR2 is NULL (10) or Spare (11) → immediate FAULT | FAULT | TYPE |
+| CAP.LOAD CR2 | Type check on loaded GT | Loaded GT is NULL (10) or Abstract (11) → FAULT before CR write | FAULT | TYPE |
+| CAP.STORE CR2 | Type check on CR2 | CR2 is NULL (10) or Abstract (11) → immediate FAULT | FAULT | TYPE |
 | CAP.STORE CR2 | W permission on CR2 | Inbox GT missing W bit | FAULT | PERMISSION |
 | CAP.STORE CR2 | Bounds on CR2 | Write exceeds Inbox Limit | FAULT | BOUNDS |
 | CAP.STORE CR2 | MAC on CR2 | Inbox namespace entry tampered | FAULT | MAC |
@@ -633,7 +633,7 @@ In a conventional system, malware exploits the gap between what the OS *should* 
 
 In CTMM:
 - Every code execution requires a GT with X permission (LAMBDA) or E permission (CALL)
-- The GT must be Inform type (local) or Outform type (remote) — NULL and Spare FAULT immediately
+- The GT must be Inform type (local) or Outform type (remote) — NULL and Abstract FAULT immediately
 - The GT's MAC must match the namespace entry — forged GTs FAULT
 - The GT's version must match — stale GTs FAULT
 - The code segment must be within the Limit boundary — out-of-bounds FAULTs

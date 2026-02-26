@@ -21,7 +21,7 @@ Sim-64 uses a 64-bit Golden Token with the following structure:
 |-------|-------------|
 | **Offset** (32 bits) | Index into the namespace identifying the target resource |
 | **Spare** (23 bits) | Version counter (bumped by GC sweep) |
-| **Type** (2 bits) | Inform (00), Outform (01), NULL (10), Spare (11) |
+| **Type** (2 bits) | Inform (00), Outform (01), NULL (10), Abstract (11) |
 | **G** (1 bit) | Garbage collection mark bit |
 | **Permissions** (6 bits) | R, W, X, L, S, E |
 
@@ -102,7 +102,7 @@ Both Sim-32 and Sim-64 include a 2-bit type field classifying the nature of the 
 | 00 | Inform | Local resource -- data or code residing in the local namespace |
 | 01 | Outform | Remote resource -- data or service accessible through a network proxy |
 | 10 | NULL | Empty / invalid / revoked -- always faults on use |
-| 11 | Spare | Reserved for future use |
+| 11 | Abstract | Unforgeable constant value (e.g., pi) |
 
 In Sim-32, the type field occupies bits [1:0] of the GT. In Sim-64, it occupies the gt_type field in the 64-bit layout.
 

@@ -54,7 +54,7 @@ Both simulators enforce the same core security model:
 | **Church Instructions** | 7 (CAP.LOAD, CAP.SAVE, CAP.CALL, CAP.RETURN, CAP.CHANGE, CAP.SWITCH, CAP.TPERM) | 11 (LOAD, SAVE, LOADX, SAVEX, LDM, STM, CALL, RETURN, CHANGE, SWITCH, TPERM) |
 | **Max Namespace Entries** | 131,072 (17-bit index) | Offset-dependent |
 | **GT Version Field** | 7-bit (128 generations) | None (G-bit mechanism) |
-| **GT Type Field** | 2-bit: Inform, Outform, NULL, Spare | 2-bit: Inform, Outform, NULL, Spare |
+| **GT Type Field** | 2-bit: Inform, Outform, NULL, Abstract | 2-bit: Inform, Outform, NULL, Abstract |
 | **MAC Validation** | 25-bit FNV seal in VersionSeals | Hardware-enforced hash |
 | **Garbage Collection** | Version bump on sweep; G-bit reset on access | G-bit cleared on LOAD access |
 | **Hardware Implementations** | Software simulation only | SystemVerilog + Amaranth HDL |
