@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 5: Machine-Status Fast Path</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 920px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 5 &mdash; Machine-Status Fast Path</h1>
+<p class="subtitle">LAMBDA uses two machine-status registers instead of the call stack, enabling zero-stack abstraction entry and return. The common case completes in ~3 cycles with no memory access for stack push or pop. CALL/CHANGE save and restore LAMBDA state when nesting is required.</p>
+
+<svg viewBox="0 0 1100 1100" width="1100" height="1100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#7b2d8e"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title-lg { font-family:'Segoe UI',system-ui,sans-serif; font-size:17px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-sm { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .title-xs { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:600; text-anchor:middle; dominant-baseline:central; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .label-s { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .label-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .mono { font-family:'Consolas','Courier New',monospace; font-size:11px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .mono-b { font-family:'Consolas','Courier New',monospace; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .mono-s { font-family:'Consolas','Courier New',monospace; font-size:10px; fill:#555; text-anchor:middle; dominant-baseline:central; }
+    .step-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; fill:#fff; text-anchor:middle; dominant-baseline:central; }
+  </style>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- MACHINE STATUS REGISTERS (center top)                       -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="300" y="10" width="500" height="80" rx="10" fill="#f3ecff" stroke="#7b2d8e" stroke-width="2"/>
+  <text x="550" y="30" class="title-sm" fill="#7b2d8e">Machine-Status Registers (hardware, not memory)</text>
+  <rect x="330" y="48" width="200" height="30" rx="5" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="430" y="63" class="mono-b" fill="#7b2d8e">lambdaActive</text>
+  <rect x="570" y="48" width="200" height="30" rx="5" fill="#e8d6f5" stroke="#7b2d8e" stroke-width="1"/>
+  <text x="670" y="63" class="mono-b" fill="#7b2d8e">lambdaReturnNIA</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- LAMBDA ENTRY (left flow)                                    -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="280" y="120" class="title-lg" fill="#27864a">LAMBDA Entry</text>
+
+  <!-- Instruction -->
+  <rect x="130" y="140" width="300" height="32" rx="6" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="280" y="156" class="mono-b" fill="#27864a">LAMBDA CRd</text>
+
+  <line x1="280" y1="172" x2="280" y2="198" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 1 -->
+  <rect x="100" y="198" width="360" height="48" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="125" cy="222" r="14" fill="#27864a"/>
+  <text x="125" y="222" class="step-num">1</text>
+  <text x="295" y="214" class="label" fill="#27864a">mLoad: X Permission Check on CRd</text>
+  <text x="295" y="234" class="label-s">Single gate check &mdash; no c-list traversal needed</text>
+
+  <line x1="280" y1="246" x2="280" y2="272" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 2: Write machine status -->
+  <rect x="100" y="272" width="360" height="64" rx="8" fill="#f3ecff" stroke="#7b2d8e" stroke-width="2"/>
+  <circle cx="125" cy="296" r="14" fill="#7b2d8e"/>
+  <text x="125" y="296" class="step-num">2</text>
+  <text x="295" y="288" class="label" fill="#7b2d8e">Write Machine-Status Registers</text>
+  <text x="295" y="306" class="mono-s" fill="#7b2d8e">lambdaActive &#x2190; true</text>
+  <text x="295" y="322" class="mono-s" fill="#7b2d8e">lambdaReturnNIA &#x2190; PC + 4</text>
+
+  <!-- Arrow up to registers -->
+  <line x1="430" y1="55" x2="460" y2="55" stroke="#7b2d8e" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="460" y1="55" x2="460" y2="304" stroke="#7b2d8e" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <line x1="280" y1="336" x2="280" y2="362" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Step 3: Branch -->
+  <rect x="100" y="362" width="360" height="48" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
+  <circle cx="125" cy="386" r="14" fill="#27864a"/>
+  <text x="125" y="386" class="step-num">3</text>
+  <text x="295" y="378" class="label" fill="#27864a">PC &#x2190; entry.location (branch)</text>
+  <text x="295" y="398" class="label-s">Same scope: all CRs, DRs, flags unchanged</text>
+
+  <line x1="280" y1="410" x2="280" y2="436" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Execute -->
+  <rect x="140" y="436" width="280" height="34" rx="6" fill="#f9f9f5" stroke="#999" stroke-width="1"/>
+  <text x="280" y="453" class="mono" fill="#555">... target code executes ...</text>
+
+  <line x1="280" y1="470" x2="280" y2="496" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Zero stack annotation -->
+  <rect x="60" y="490" width="100" height="70" rx="6" fill="#fff8f0" stroke="#b8860b" stroke-width="1"/>
+  <text x="110" y="510" class="title-xs" fill="#b8860b">Stack</text>
+  <text x="110" y="528" class="mono-b" fill="#b8860b">NOT</text>
+  <text x="110" y="544" class="title-xs" fill="#b8860b">touched</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- RETURN FAST PATH (left flow, bottom)                        -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <text x="280" y="510" class="title-lg" fill="#27864a">RETURN (fast path)</text>
+
+  <rect x="130" y="526" width="300" height="32" rx="6" fill="#dff0d8" stroke="#27864a" stroke-width="1.5"/>
+  <text x="280" y="542" class="mono-b" fill="#27864a">RETURN</text>
+
+  <line x1="280" y1="558" x2="280" y2="584" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <!-- Decision diamond -->
+  <polygon points="280,584 370,620 280,656 190,620" fill="#f3ecff" stroke="#7b2d8e" stroke-width="1.5"/>
+  <text x="280" y="614" class="mono-s" fill="#7b2d8e">lambdaActive</text>
+  <text x="280" y="628" class="mono-s" fill="#7b2d8e">== true?</text>
+
+  <!-- Yes path (left / down) -->
+  <line x1="280" y1="656" x2="280" y2="690" stroke="#27864a" stroke-width="2" marker-end="url(#ah-g)"/>
+  <text x="266" y="672" class="mono-b" fill="#27864a" text-anchor="end">YES</text>
+
+  <rect x="120" y="690" width="320" height="58" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="280" y="710" class="label" fill="#27864a">PC &#x2190; lambdaReturnNIA</text>
+  <text x="280" y="728" class="mono-s" fill="#27864a">lambdaActive &#x2190; false &nbsp; (clear flag, done)</text>
+
+  <!-- Arrow from registers -->
+  <line x1="670" y1="55" x2="700" y2="55" stroke="#7b2d8e" stroke-width="1" stroke-dasharray="4,3"/>
+  <line x1="700" y1="55" x2="700" y2="710" stroke="#7b2d8e" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="700" y1="710" x2="440" y2="710" stroke="#7b2d8e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#ah-p)"/>
+
+  <line x1="280" y1="748" x2="280" y2="774" stroke="#27864a" stroke-width="1.5" marker-end="url(#ah-g)"/>
+
+  <rect x="150" y="774" width="260" height="34" rx="6" fill="#dff0d8" stroke="#27864a" stroke-width="2"/>
+  <text x="280" y="791" class="mono-b" fill="#27864a">&#10003; Complete (~1 cycle)</text>
+
+  <!-- Total annotation -->
+  <rect x="100" y="830" width="360" height="40" rx="8" fill="#e8fde8" stroke="#27864a" stroke-width="2"/>
+  <text x="280" y="843" class="title-sm" fill="#27864a">Total: ~3 cycles round-trip</text>
+  <text x="280" y="861" class="label-s" fill="#27864a">Zero stack access. Zero memory bus contention.</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- NO path — CALL was used, fall through to stack             -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <line x1="370" y1="620" x2="530" y2="620" stroke="#2a6db5" stroke-width="2" marker-end="url(#ah-b)"/>
+  <text x="450" y="608" class="mono-b" fill="#2a6db5">NO</text>
+
+  <text x="770" y="590" class="title-lg" fill="#2a6db5">RETURN (stack path)</text>
+
+  <rect x="530" y="604" width="480" height="48" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <text x="770" y="620" class="label" fill="#2a6db5">lambdaActive == false &#x2192; use call stack</text>
+  <text x="770" y="638" class="label-s">Pop frame, restore CRs/DRs/flags, revalidate via mLoad</text>
+
+  <line x1="770" y1="652" x2="770" y2="678" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <!-- Stack pop steps -->
+  <rect x="570" y="678" width="400" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="595" cy="699" r="13" fill="#2a6db5"/>
+  <text x="595" y="699" class="step-num">1</text>
+  <text x="785" y="693" class="label" fill="#2a6db5">Pop Call Stack Frame</text>
+  <text x="785" y="709" class="label-s">Restore PC, CRs, DRs, flags + LAMBDA state</text>
+
+  <line x1="770" y1="720" x2="770" y2="736" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <rect x="570" y="736" width="400" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="595" cy="757" r="13" fill="#2a6db5"/>
+  <text x="595" y="757" class="step-num">2</text>
+  <text x="785" y="751" class="label" fill="#2a6db5">mLoad Revalidation (CR6, CR7)</text>
+  <text x="785" y="767" class="label-s">Version, seal, bounds re-checked on restored CRs</text>
+
+  <line x1="770" y1="778" x2="770" y2="794" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <rect x="570" y="794" width="400" height="42" rx="8" fill="#e8f4fd" stroke="#2a6db5" stroke-width="1.5"/>
+  <circle cx="595" cy="815" r="13" fill="#2a6db5"/>
+  <text x="595" y="815" class="step-num">3</text>
+  <text x="785" y="809" class="label" fill="#2a6db5">C-List Restore &amp; PC Resume</text>
+  <text x="785" y="825" class="label-s">CR15 &#x2190; caller's c-list, PC &#x2190; return address</text>
+
+  <line x1="770" y1="836" x2="770" y2="856" stroke="#2a6db5" stroke-width="1.5" marker-end="url(#ah-b)"/>
+
+  <rect x="640" y="856" width="260" height="34" rx="6" fill="#e8f4fd" stroke="#2a6db5" stroke-width="2"/>
+  <text x="770" y="873" class="mono-b" fill="#2a6db5">&#10003; Complete (3+ cycles)</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- CALL/CHANGE save LAMBDA state                               -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="530" y="910" width="480" height="80" rx="10" fill="#fff8f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text x="770" y="930" class="title-xs" fill="#b8860b">CALL and CHANGE Preserve LAMBDA State</text>
+  <text x="770" y="950" class="label-s" fill="#555">If LAMBDA is active when CALL executes, the stack frame saves</text>
+  <text x="770" y="965" class="label-s" fill="#555">lambdaActive + lambdaReturnNIA, then clears the flag.</text>
+  <text x="770" y="980" class="label-s" fill="#555">RETURN from CALL restores LAMBDA state &#x2192; nested LAMBDA resumes.</text>
+
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <!-- KEY INSIGHT (bottom)                                        -->
+  <!-- ════════════════════════════════════════════════════════════ -->
+  <rect x="80" y="1020" width="940" height="70" rx="10" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text x="550" y="1042" class="title-sm" fill="#b8860b">Key Insight: Register-Only Fast Path</text>
+  <text x="550" y="1062" class="label-s" fill="#555">LAMBDA replaces the call stack with two machine-status registers. In the common case (no nested CALL), abstraction</text>
+  <text x="550" y="1078" class="label-s" fill="#555">entry and return complete in ~3 cycles with zero stack access, zero memory bus contention, and zero revalidation overhead.</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> LAMBDA fast path (register-only)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#7b2d8e;"></div> Machine-status registers</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Stack path (CALL fallback)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div> Design rationale</div>
+</div>
+
+</body>
+</html>

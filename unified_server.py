@@ -181,6 +181,12 @@ def figures_lambda_vs_call():
     resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return resp
 
+@app.route('/figures/machine-status-fast-path')
+def figures_machine_status_fast_path():
+    resp = make_response(send_from_directory(FIGURES_DIR, 'machine-status-fast-path.html'))
+    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return resp
+
 @app.route('/figures/hello-mum-tunnel')
 def figures_hello_mum_tunnel():
     resp = make_response(send_from_directory(FIGURES_DIR, 'hello-mum-tunnel.html'))
