@@ -194,7 +194,7 @@ class ChurchSimulator {
             }
             clistChildren.push(i);
         }
-        this.nsClistMap[0] = clistChildren;
+        this.nsClistMap[2] = clistChildren;
 
         const bootAbstrCListLoc = 3 * this.SLOT_SIZE;
         const cr7GT = this.createGT(0, 4, {R:0,W:0,X:1,L:0,S:0,E:0}, 0);

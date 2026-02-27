@@ -324,6 +324,15 @@ class ChurchCore(Elaboratable):
                 ]
                 m.d.comb += [boot_wr_en[6].eq(1), boot_wr_gt[6].eq(cr6_gt)]
             with m.Case(BootState.LOAD_NUC):
+                slot3_gt = Signal(GT_LAYOUT)
+                slot3_gt_view = View(GT_LAYOUT, slot3_gt)
+                m.d.comb += [
+                    slot3_gt_view.index.eq(3),
+                    slot3_gt_view.version.eq(0),
+                    slot3_gt_view.gt_type.eq(GT_TYPE_INFORM),
+                    slot3_gt_view.perms.eq(PERM_MASK_E),
+                ]
+
                 cr7_gt = Signal(GT_LAYOUT)
                 cr7_gt_view = View(GT_LAYOUT, cr7_gt)
                 m.d.comb += [

@@ -323,17 +323,13 @@ function updateCRDetail() {
     if (showCList) {
         html += '<div class="cr-detail-section">';
         html += '<div class="cr-detail-heading">C-List View — Accessible Entries</div>';
-        const baseLoc = cr.word1_location >>> 0;
-        const limitVal = cr.limit17;
         const clistEntries = [];
         for (let i = 0; i < sim.nsCount; i++) {
             const e = sim.readNSEntry(i);
             if (!e) continue;
             const eLoc = e.word0_location >>> 0;
             const eLim = sim.parseNSWord1(e.word1_limit);
-            if (eLoc >= baseLoc && eLoc <= baseLoc + limitVal * sim.SLOT_SIZE) {
-                clistEntries.push({ idx: i, entry: e, loc: eLoc, lim: eLim });
-            }
+            clistEntries.push({ idx: i, entry: e, loc: eLoc, lim: eLim });
         }
         if (clistEntries.length === 0) {
             html += '<div style="color:var(--text-secondary);padding:0.5rem;">No namespace entries within this capability\'s range.</div>';
