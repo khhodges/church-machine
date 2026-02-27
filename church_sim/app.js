@@ -124,7 +124,7 @@ function renderPagesDirectory() {
         card('/figures/unified-address-space', 'Fig 12: Unified Address Space', 'figure', td, 'Memory (0x00-0xFD), devices (0xFE), registers (0xFF) &mdash; all gated by mLoad.'),
         card('/figures/network-transparency-fbit', 'Fig 13: Network Transparency', 'figure', td, 'F-bit routes to encrypted tunnel; GC version bump revokes atomically.'),
         card('/figures/three-dispatch-styles', 'Fig 14: Three Dispatch Styles', 'figure', td, 'Same CALL, three resolutions: symbolic resolver, LAMBDA fast-path, compiled binary.'),
-        card('/figures/five-phase-boot', 'Fig 15: Five-Phase Boot', 'figure', td, 'IDLE &#x2192; FAULT_RST &#x2192; LOAD_NS &#x2192; INIT_THRD &#x2192; LOAD_NUC &#x2192; COMPLETE.'),
+        card('/figures/five-phase-boot', 'Fig 15: Six-Phase Boot', 'figure', td, 'IDLE &#x2192; FAULT_RST &#x2192; LOAD_NS &#x2192; INIT_THRD &#x2192; INIT_CLIST &#x2192; LOAD_NUC &#x2192; COMPLETE.'),
         card('/figures/church-numeral-dispatch', 'Fig 16: Church Numeral Dispatch', 'figure', td, 'DR0 &#x2192; SUCC/ZERO &#x2192; c-list index &#x2192; TPERM &#x2192; LAMBDA. Zero branches.'),
         card('/figures/data-objects-bridge', 'Fig 17: DATA Objects Bridge', 'figure', td, 'Church GT provides access, Turing DREAD/DWRITE operates, mLoad validates R/W + bounds.'),
         card('/figures/lambda-nesting-sequence', 'Fig 18: LAMBDA Nesting', 'figure', td, 'Non-nestable LAMBDA with CALL-mediated nesting.'),
@@ -543,7 +543,7 @@ function updateFlagsDisplay() {
     const container = document.getElementById('flagsDisplay');
     if (!container) return;
     const f = sim.flags;
-    const bootLabel = !sim.bootComplete ? `BOOT ${sim.bootStep}/5` : '';
+    const bootLabel = !sim.bootComplete ? `BOOT ${sim.bootStep}/6` : '';
     const statusLabel = sim.halted ? 'HALTED' : (sim.bootComplete ? 'READY' : 'RESET');
     const cap = sim.lastCapability;
     let capHtml = '';
@@ -694,7 +694,7 @@ function stepSim() {
         sim._bootStep();
         const con = document.getElementById('editorConsole');
         if (con) {
-            con.textContent += `\n[boot ${sim.bootStep}/5] ${sim.output.split('\n').filter(l => l).pop()}`;
+            con.textContent += `\n[boot ${sim.bootStep}/6] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
         }
         updateDashboard();
@@ -801,7 +801,7 @@ function slowBoot() {
         sim._bootStep();
         const con = document.getElementById('editorConsole');
         if (con) {
-            con.textContent += `\n[boot ${sim.bootStep}/5] ${sim.output.split('\n').filter(l => l).pop()}`;
+            con.textContent += `\n[boot ${sim.bootStep}/6] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
         }
         updateDashboard();

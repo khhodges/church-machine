@@ -237,7 +237,10 @@ class ChurchSimulator {
                 }
                 this._writeCR(8, gt8, check8.entry);
                 this.output += '[BOOT] INIT_THRD — CR8 ← mLoad(Slot 1) Thread identity\n';
-
+                this.bootStep++;
+                break;
+            }
+            case 3: {
                 const gt6 = this.createGT(0, 2, {R:0,W:0,X:0,L:1,S:1,E:0}, 0);
                 const check6 = this.mLoad(gt6, null, undefined);
                 if (!check6.ok) {
@@ -249,7 +252,7 @@ class ChurchSimulator {
                 this.bootStep++;
                 break;
             }
-            case 3: {
+            case 4: {
                 const gt3 = this.createGT(0, 3, {R:0,W:0,X:0,L:1,S:0,E:1}, 0);
                 const check3 = this.mLoad(gt3, 'E', undefined);
                 if (!check3.ok) {
@@ -278,7 +281,7 @@ class ChurchSimulator {
                 this.bootStep++;
                 break;
             }
-            case 4:
+            case 5:
                 this.mElevation = false;
                 this.bootComplete = true;
                 this.output += '[BOOT] COMPLETE — M-Elevation OFF. CR5 is NULL (unavailable). Boot complete.\n';

@@ -128,15 +128,16 @@
 
     <div class="section-title">Boot Microcode Sequence (Patent Section 15)</div>
     <div class="flow-card boot" style="max-width:550px;margin:0 auto 1.5rem;">
-        <h3>Five-Phase Hardware Boot (M-Elevation Active)</h3>
+        <h3>Six-Phase Hardware Boot (M-Elevation Active)</h3>
         <div class="step"><span class="step-num">0</span><span class="step-text"><span class="bus bus-none">---</span> <b>IDLE</b> — waiting for boot_start signal</span></div>
         <div class="step"><span class="step-num">1</span><span class="step-text"><span class="bus bus-reg">REG</span> <b>FAULT_RST</b> — Clear all CRs to NULL, all DRs to zero. M-Elevation ON.</span></div>
         <div class="step"><span class="step-num">2</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>LOAD_NS</b> — CR15 ← mLoad(Slot 0). Hardwired GT, zero perms, Inform type.</span></div>
-        <div class="step"><span class="step-num">3</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>INIT_THRD</b> — CR8 ← mLoad(Slot 1) Thread, CR6 ← mLoad(Slot 2) C-List. CR5 stays NULL.</span></div>
-        <div class="step"><span class="step-num">4</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>LOAD_NUC</b> — CALL via mLoad(Slot 3, E) into Boot abstraction. CR7 discovered at offset 0.</span></div>
-        <div class="step"><span class="step-num">5</span><span class="step-text"><span class="bus bus-none">---</span> <b>COMPLETE</b> — M-Elevation OFF → begin instruction fetch → <span class="step-ok">READY</span></span></div>
+        <div class="step"><span class="step-num">3</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>INIT_THRD</b> — CR8 ← mLoad(Slot 1) Thread identity.</span></div>
+        <div class="step"><span class="step-num">4</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>INIT_CLIST</b> — CR6 ← mLoad(Slot 2) C-List. CR5 stays NULL.</span></div>
+        <div class="step"><span class="step-num">5</span><span class="step-text"><span class="bus bus-rd">MEM RD</span> <b>LOAD_NUC</b> — CALL via mLoad(Slot 3, E) into Boot abstraction. CR7 discovered at offset 0.</span></div>
+        <div class="step"><span class="step-num">6</span><span class="step-text"><span class="bus bus-none">---</span> <b>COMPLETE</b> — M-Elevation OFF → begin instruction fetch → <span class="step-ok">READY</span></span></div>
         <div class="sep"></div>
-        <div class="step"><span class="step-text"><span class="step-detail">Phase 1 clears all CRs to NULL. Phases 2–4 load valid GTs through mLoad (M-elevation bypasses permission but not bounds/version/seal). CALL loads CR6 first. CR5 remains NULL — the secure default.</span></span></div>
+        <div class="step"><span class="step-text"><span class="step-detail">Phase 1 clears all CRs to NULL. Phases 2–5 load valid GTs through mLoad (M-elevation bypasses permission but not bounds/version/seal). Thread loads before C-List. CALL loads CR6 first. CR5 remains NULL — the secure default.</span></span></div>
     </div>
 
     <div class="section-title">Instruction Fetch &amp; Condition Check</div>
