@@ -320,7 +320,7 @@ class ChurchCore(Elaboratable):
                     cr6_gt_view.index.eq(2),
                     cr6_gt_view.version.eq(0),
                     cr6_gt_view.gt_type.eq(GT_TYPE_INFORM),
-                    cr6_gt_view.perms.eq(PERM_MASK_L | PERM_MASK_S),
+                    cr6_gt_view.perms.eq(PERM_MASK_E),
                 ]
                 m.d.comb += [boot_wr_en[6].eq(1), boot_wr_gt[6].eq(cr6_gt)]
             with m.Case(BootState.LOAD_NUC):

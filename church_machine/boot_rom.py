@@ -50,7 +50,7 @@ DEMO_CLIST = [
     make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, 4, 0),
     make_gt(GT_TYPE_INFORM, PERM_MASK_X | PERM_MASK_E, 5, 0),
     make_gt(GT_TYPE_NULL, 0, 0, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_L | PERM_MASK_S, 3, 0),
+    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 3, 0),
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 6, 0),
     make_gt(GT_TYPE_INFORM, PERM_MASK_L, 7, 0),
     make_gt(GT_TYPE_NULL, 0, 0, 0),
