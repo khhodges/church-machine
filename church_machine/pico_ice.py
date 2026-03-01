@@ -398,6 +398,18 @@ class ChurchPicoIce(Elaboratable):
             with m.State("WAIT_BOOT"):
                 with m.If(boot_just_done):
                     m.d.sync += [banner_idx.eq(0), halted.eq(1)]
+                    m.next = "POWER_ON"
+
+            with m.State("POWER_ON"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        debug.byte_data.eq(ord('!')),
+                        debug.send_byte.eq(1),
+                    ]
+                    m.next = "PO_WAIT"
+
+            with m.State("PO_WAIT"):
+                with m.If(~debug.busy):
                     m.next = "SEND_BANNER"
 
             with m.State("SEND_BANNER"):
