@@ -438,13 +438,9 @@ class ChurchPicoIce(Elaboratable):
                         m.next = "HALTED"
 
             with m.State("HALTED"):
-                m.d.sync += startup_ctr.eq(startup_ctr + 1)
                 with m.If(btn_press):
                     m.d.sync += stepping.eq(1)
                     m.next = "STEP_WAIT"
-                with m.Elif(startup_ctr == (self.clk_freq * 2) - 1):
-                    m.d.sync += [startup_ctr.eq(0), banner_idx.eq(0)]
-                    m.next = "SEND_BANNER"
 
             with m.State("STEP_WAIT"):
                 with m.If(step_complete):
