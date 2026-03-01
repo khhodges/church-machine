@@ -183,7 +183,14 @@ class UartTestTop(Elaboratable):
         step_fault = Signal(4)
         step_had_fault = Signal()
 
+        startup_ctr = Signal(26)
+
         with m.FSM(name="debug_fsm"):
+            with m.State("STARTUP_DELAY"):
+                m.d.sync += startup_ctr.eq(startup_ctr + 1)
+                with m.If(startup_ctr == (self.clk_freq * 3) - 1):
+                    m.next = "WAIT_BOOT"
+
             with m.State("WAIT_BOOT"):
                 with m.If(core.boot_complete):
                     m.d.sync += [banner_idx.eq(0), halted.eq(1)]
