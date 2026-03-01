@@ -1,5 +1,5 @@
-"""Diagnostic: Full ChurchCore with SPRAM init + boot, but NO instruction execution.
-Tests whether the boot process itself crashes the RP2040.
+"""Diagnostic: Full ChurchCore with SPRAM init + boot + instruction execution.
+Tests whether instruction execution crashes the RP2040.
 """
 
 from amaranth import *
@@ -118,21 +118,23 @@ class UartTestTop(Elaboratable):
                 m.d.comb += core.boot_start.eq(1)
                 m.d.sync += boot_triggered.eq(1)
 
-        m.d.comb += core.imem_valid.eq(0)
+        m.d.comb += core.imem_valid.eq(core.boot_complete)
         m.d.comb += core.gc_start.eq(0)
 
         counter = Signal(32, init=0)
         delay_ctr = Signal(24)
         heartbeat = Signal()
 
+        report_phase = Signal()
+
         with m.FSM(name="diag_fsm"):
             with m.State("DELAY"):
                 m.d.sync += delay_ctr.eq(delay_ctr + 1)
                 with m.If(delay_ctr == (self.clk_freq // 4) - 1):
                     m.d.sync += [delay_ctr.eq(0), heartbeat.eq(~heartbeat)]
-                    m.next = "SEND_HEX"
+                    m.next = "SEND_STATUS"
 
-            with m.State("SEND_HEX"):
+            with m.State("SEND_STATUS"):
                 with m.If(~debug.busy):
                     m.d.comb += [
                         debug.data.eq(Cat(core.boot_state, core.fault_valid,
@@ -140,10 +142,22 @@ class UartTestTop(Elaboratable):
                                           counter[:24])),
                         debug.send.eq(1),
                     ]
-                    m.d.sync += counter.eq(counter + 1)
-                    m.next = "WAIT_DONE"
+                    m.next = "WAIT_STATUS"
 
-            with m.State("WAIT_DONE"):
+            with m.State("WAIT_STATUS"):
+                with m.If(~debug.busy):
+                    m.next = "SEND_NIA"
+
+            with m.State("SEND_NIA"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        debug.data.eq(core.nia),
+                        debug.send.eq(1),
+                    ]
+                    m.d.sync += counter.eq(counter + 1)
+                    m.next = "WAIT_NIA"
+
+            with m.State("WAIT_NIA"):
                 with m.If(~debug.busy):
                     m.next = "DELAY"
 
