@@ -385,101 +385,14 @@ class ChurchPicoIce(Elaboratable):
         fault_byte = Signal(8)
         m.d.comb += fault_byte.eq(FAULT_MSG[fault_msg_idx])
 
-        prev_boot_complete = Signal()
-        m.d.sync += prev_boot_complete.eq(core.boot_complete)
-        boot_just_done = Signal()
-        m.d.comb += boot_just_done.eq(core.boot_complete & ~prev_boot_complete)
-
         step_nia = Signal(32)
         step_fault = Signal(4)
         step_had_fault = Signal()
 
-        diag_timer = Signal(24)
-        diag_timeout = Signal()
-
-        with m.If(~diag_timeout & ~core.boot_complete):
-            m.d.sync += diag_timer.eq(diag_timer + 1)
-            with m.If(diag_timer == (self.clk_freq - 1)):
-                m.d.sync += diag_timeout.eq(1)
-
         with m.FSM(name="debug_fsm"):
-            with m.State("SEND_I"):
-                with m.If(~debug.busy):
-                    m.d.comb += [
-                        debug.byte_data.eq(ord('I')),
-                        debug.send_byte.eq(1),
-                    ]
-                    m.next = "SEND_I_WAIT"
-
-            with m.State("SEND_I_WAIT"):
-                with m.If(~debug.busy):
-                    m.next = "DUMP_INIT"
-
-            with m.State("DUMP_INIT"):
-                with m.If(~debug.busy):
-                    if not self.sim_mode:
-                        m.d.comb += [
-                            debug.data.eq(Cat(init_done, boot_triggered, core.boot_complete,
-                                             core.boot_state, core.fault_valid, core.fault,
-                                             C(0, 18))),
-                            debug.send.eq(1),
-                        ]
-                    else:
-                        m.d.comb += [
-                            debug.data.eq(Cat(Const(1), boot_triggered, core.boot_complete,
-                                             core.boot_state, core.fault_valid, core.fault,
-                                             C(0, 18))),
-                            debug.send.eq(1),
-                        ]
-                    m.next = "WAIT_BOOT"
-
             with m.State("WAIT_BOOT"):
                 with m.If(core.boot_complete):
                     m.d.sync += [banner_idx.eq(0), halted.eq(1)]
-                    m.next = "SEND_D"
-                with m.Elif(diag_timeout):
-                    m.next = "SEND_T"
-
-            with m.State("SEND_T"):
-                with m.If(~debug.busy):
-                    m.d.comb += [
-                        debug.byte_data.eq(ord('T')),
-                        debug.send_byte.eq(1),
-                    ]
-                    m.next = "SEND_T_WAIT"
-
-            with m.State("SEND_T_WAIT"):
-                with m.If(~debug.busy):
-                    m.next = "DUMP_STATUS"
-
-            with m.State("DUMP_STATUS"):
-                with m.If(~debug.busy):
-                    if not self.sim_mode:
-                        m.d.comb += [
-                            debug.data.eq(Cat(init_done, boot_triggered, core.boot_complete,
-                                             core.boot_state, core.fault_valid, core.fault,
-                                             C(0, 18))),
-                            debug.send.eq(1),
-                        ]
-                    else:
-                        m.d.comb += [
-                            debug.data.eq(Cat(Const(1), boot_triggered, core.boot_complete,
-                                             core.boot_state, core.fault_valid, core.fault,
-                                             C(0, 18))),
-                            debug.send.eq(1),
-                        ]
-                    m.next = "DONE"
-
-            with m.State("SEND_D"):
-                with m.If(~debug.busy):
-                    m.d.comb += [
-                        debug.byte_data.eq(ord('D')),
-                        debug.send_byte.eq(1),
-                    ]
-                    m.next = "SEND_D_WAIT"
-
-            with m.State("SEND_D_WAIT"):
-                with m.If(~debug.busy):
                     m.next = "SEND_BANNER"
 
             with m.State("SEND_BANNER"):
@@ -499,9 +412,82 @@ class ChurchPicoIce(Elaboratable):
                         debug.data.eq(core.nia),
                         debug.send.eq(1),
                     ]
-                    m.next = "DONE"
+                    m.next = "SEND_HALT"
 
-            with m.State("DONE"):
-                pass
+            with m.State("SEND_HALT"):
+                with m.If(~debug.busy):
+                    with m.If(halt_idx < len(HALT_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(halt_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += halt_idx.eq(halt_idx + 1)
+                    with m.Else():
+                        m.d.sync += halt_idx.eq(0)
+                        m.next = "HALTED"
+
+            with m.State("HALTED"):
+                with m.If(btn_press):
+                    m.d.sync += stepping.eq(1)
+                    m.next = "STEP_WAIT"
+
+            with m.State("STEP_WAIT"):
+                with m.If(step_complete):
+                    m.d.sync += [
+                        stepping.eq(0),
+                        step_nia.eq(core.nia),
+                        step_fault.eq(core.fault),
+                        step_had_fault.eq(core.fault_valid),
+                        step_idx.eq(0),
+                    ]
+                    m.next = "STEP_LABEL"
+
+            with m.State("STEP_LABEL"):
+                with m.If(~debug.busy):
+                    with m.If(step_idx < len(STEP_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(step_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += step_idx.eq(step_idx + 1)
+                    with m.Else():
+                        m.d.sync += step_idx.eq(0)
+                        m.next = "STEP_DUMP_NIA"
+
+            with m.State("STEP_DUMP_NIA"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        debug.data.eq(step_nia),
+                        debug.send.eq(1),
+                    ]
+                    with m.If(step_had_fault):
+                        m.d.sync += fault_msg_idx.eq(0)
+                        m.next = "STEP_FAULT_LABEL"
+                    with m.Else():
+                        m.d.sync += halt_idx.eq(0)
+                        m.next = "SEND_HALT"
+
+            with m.State("STEP_FAULT_LABEL"):
+                with m.If(~debug.busy):
+                    with m.If(fault_msg_idx < len(FAULT_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(fault_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += fault_msg_idx.eq(fault_msg_idx + 1)
+                    with m.Else():
+                        m.d.sync += fault_msg_idx.eq(0)
+                        m.next = "STEP_DUMP_FAULT"
+
+            with m.State("STEP_DUMP_FAULT"):
+                with m.If(~debug.busy):
+                    fault_word = Signal(32)
+                    m.d.comb += [
+                        fault_word.eq(Cat(step_fault, C(0, 28))),
+                        debug.data.eq(fault_word),
+                        debug.send.eq(1),
+                    ]
+                    m.d.sync += halt_idx.eq(0)
+                    m.next = "SEND_HALT"
 
         return m
