@@ -260,7 +260,6 @@ module top(push_button, clk, uart_tx, led_r, led_g, led_b, uart_rx);
   wire [31:0] rd_data;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   wire rst = 1'b0;
-  wire rst;
   (* src = "/home/runner/workspace/church_machine/uart_tx.py:90" *)
   reg send;
   (* src = "/home/runner/workspace/church_machine/uart_tx.py:91" *)
