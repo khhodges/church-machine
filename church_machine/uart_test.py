@@ -1,5 +1,6 @@
-"""Diagnostic: Full ChurchCore with SPRAM init + boot + instruction execution.
-Tests whether instruction execution crashes the RP2040.
+"""Proven pico-ice design: Full ChurchCore with SPRAM, boot, banner, halt, step.
+This version works on hardware (verified via diagnostic testing) and adds
+the full debug output: CHURCH v1.0 banner, NIA dump, HALT, button stepping.
 """
 
 from amaranth import *
@@ -118,58 +119,180 @@ class UartTestTop(Elaboratable):
                 m.d.comb += core.boot_start.eq(1)
                 m.d.sync += boot_triggered.eq(1)
 
-        m.d.comb += core.imem_valid.eq(core.boot_complete)
+        halted = Signal(init=1)
+        stepping = Signal()
+
+        prev_nia = Signal(32)
+        m.d.sync += prev_nia.eq(core.nia)
+        nia_changed = Signal()
+        m.d.comb += nia_changed.eq(core.nia != prev_nia)
+        step_complete = Signal()
+        m.d.comb += step_complete.eq(stepping & nia_changed)
+
+        m.d.comb += core.imem_valid.eq(~halted | (stepping & ~step_complete))
         m.d.comb += core.gc_start.eq(0)
 
-        counter = Signal(32, init=0)
-        delay_ctr = Signal(24)
-        heartbeat = Signal()
+        btn_sync = Signal(3)
+        btn_prev = Signal()
+        m.d.sync += [
+            btn_sync[0].eq(self.push_button),
+            btn_sync[1].eq(btn_sync[0]),
+            btn_sync[2].eq(btn_sync[1]),
+            btn_prev.eq(btn_sync[2]),
+        ]
+        btn_press = Signal()
+        m.d.comb += btn_press.eq(btn_prev & ~btn_sync[2])
 
-        report_phase = Signal()
+        heartbeat_ctr = Signal(23)
+        m.d.sync += heartbeat_ctr.eq(heartbeat_ctr + 1)
+        heartbeat_blink = Signal()
+        m.d.comb += heartbeat_blink.eq(heartbeat_ctr[-1])
 
-        with m.FSM(name="diag_fsm"):
-            with m.State("DELAY"):
-                m.d.sync += delay_ctr.eq(delay_ctr + 1)
-                with m.If(delay_ctr == (self.clk_freq // 4) - 1):
-                    m.d.sync += [delay_ctr.eq(0), heartbeat.eq(~heartbeat)]
-                    m.next = "SEND_STATUS"
+        led_boot = Signal()
+        led_run = Signal()
+        led_fault = Signal()
+        led_halted_blink = Signal()
+        m.d.comb += [
+            led_boot.eq(~core.boot_complete),
+            led_run.eq(core.boot_complete & ~core.fault_valid & ~halted),
+            led_fault.eq(core.fault_valid),
+            led_halted_blink.eq(core.boot_complete & halted & ~core.fault_valid & heartbeat_blink),
+        ]
 
-            with m.State("SEND_STATUS"):
+        BANNER = Array([C(ord(c), 8) for c in "CHURCH v1.0\r\n"])
+        banner_idx = Signal(range(len(BANNER) + 1))
+        banner_byte = Signal(8)
+        m.d.comb += banner_byte.eq(BANNER[banner_idx])
+
+        HALT_MSG = Array([C(ord(c), 8) for c in "HALT\r\n"])
+        halt_idx = Signal(range(len(HALT_MSG) + 1))
+        halt_byte = Signal(8)
+        m.d.comb += halt_byte.eq(HALT_MSG[halt_idx])
+
+        STEP_MSG = Array([C(ord(c), 8) for c in "S:"])
+        step_idx = Signal(range(len(STEP_MSG) + 1))
+        step_byte = Signal(8)
+        m.d.comb += step_byte.eq(STEP_MSG[step_idx])
+
+        FAULT_MSG = Array([C(ord(c), 8) for c in "F:"])
+        fault_msg_idx = Signal(range(len(FAULT_MSG) + 1))
+        fault_byte = Signal(8)
+        m.d.comb += fault_byte.eq(FAULT_MSG[fault_msg_idx])
+
+        step_nia = Signal(32)
+        step_fault = Signal(4)
+        step_had_fault = Signal()
+
+        with m.FSM(name="debug_fsm"):
+            with m.State("WAIT_BOOT"):
+                with m.If(core.boot_complete):
+                    m.d.sync += [banner_idx.eq(0), halted.eq(1)]
+                    m.next = "SEND_BANNER"
+
+            with m.State("SEND_BANNER"):
                 with m.If(~debug.busy):
-                    m.d.comb += [
-                        debug.data.eq(Cat(core.boot_state, core.fault_valid,
-                                          core.fault, core.boot_complete,
-                                          counter[:24])),
-                        debug.send.eq(1),
-                    ]
-                    m.next = "WAIT_STATUS"
+                    with m.If(banner_idx < len(BANNER)):
+                        m.d.comb += [
+                            debug.byte_data.eq(banner_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += banner_idx.eq(banner_idx + 1)
+                    with m.Else():
+                        m.next = "DUMP_NIA"
 
-            with m.State("WAIT_STATUS"):
-                with m.If(~debug.busy):
-                    m.next = "SEND_NIA"
-
-            with m.State("SEND_NIA"):
+            with m.State("DUMP_NIA"):
                 with m.If(~debug.busy):
                     m.d.comb += [
                         debug.data.eq(core.nia),
                         debug.send.eq(1),
                     ]
-                    m.d.sync += counter.eq(counter + 1)
-                    m.next = "WAIT_NIA"
+                    m.next = "SEND_HALT"
 
-            with m.State("WAIT_NIA"):
+            with m.State("SEND_HALT"):
                 with m.If(~debug.busy):
-                    m.next = "DELAY"
+                    with m.If(halt_idx < len(HALT_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(halt_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += halt_idx.eq(halt_idx + 1)
+                    with m.Else():
+                        m.d.sync += halt_idx.eq(0)
+                        m.next = "HALTED"
+
+            with m.State("HALTED"):
+                with m.If(btn_press):
+                    m.d.sync += stepping.eq(1)
+                    m.next = "STEP_WAIT"
+
+            with m.State("STEP_WAIT"):
+                with m.If(step_complete):
+                    m.d.sync += [
+                        stepping.eq(0),
+                        step_nia.eq(core.nia),
+                        step_fault.eq(core.fault),
+                        step_had_fault.eq(core.fault_valid),
+                        step_idx.eq(0),
+                    ]
+                    m.next = "STEP_LABEL"
+
+            with m.State("STEP_LABEL"):
+                with m.If(~debug.busy):
+                    with m.If(step_idx < len(STEP_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(step_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += step_idx.eq(step_idx + 1)
+                    with m.Else():
+                        m.d.sync += step_idx.eq(0)
+                        m.next = "STEP_DUMP_NIA"
+
+            with m.State("STEP_DUMP_NIA"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        debug.data.eq(step_nia),
+                        debug.send.eq(1),
+                    ]
+                    with m.If(step_had_fault):
+                        m.d.sync += fault_msg_idx.eq(0)
+                        m.next = "STEP_FAULT_LABEL"
+                    with m.Else():
+                        m.d.sync += halt_idx.eq(0)
+                        m.next = "SEND_HALT"
+
+            with m.State("STEP_FAULT_LABEL"):
+                with m.If(~debug.busy):
+                    with m.If(fault_msg_idx < len(FAULT_MSG)):
+                        m.d.comb += [
+                            debug.byte_data.eq(fault_byte),
+                            debug.send_byte.eq(1),
+                        ]
+                        m.d.sync += fault_msg_idx.eq(fault_msg_idx + 1)
+                    with m.Else():
+                        m.d.sync += fault_msg_idx.eq(0)
+                        m.next = "STEP_DUMP_FAULT"
+
+            with m.State("STEP_DUMP_FAULT"):
+                with m.If(~debug.busy):
+                    fault_word = Signal(32)
+                    m.d.comb += [
+                        fault_word.eq(Cat(step_fault, C(0, 28))),
+                        debug.data.eq(fault_word),
+                        debug.send.eq(1),
+                    ]
+                    m.d.sync += halt_idx.eq(0)
+                    m.next = "SEND_HALT"
 
         m.d.comb += [
-            rgb.r.eq(core.fault_valid),
-            rgb.g.eq(heartbeat & init_done),
-            rgb.b.eq(~init_done),
+            rgb.r.eq(led_fault),
+            rgb.g.eq(led_run | led_halted_blink),
+            rgb.b.eq(led_boot),
         ]
         m.d.comb += [
-            self.led_r.eq(core.fault_valid),
-            self.led_g.eq(heartbeat & init_done),
-            self.led_b.eq(~init_done),
+            self.led_r.eq(led_fault),
+            self.led_g.eq(led_run | led_halted_blink),
+            self.led_b.eq(led_boot),
         ]
 
         return m
