@@ -850,12 +850,25 @@ async function uploadToPicoIce() {
     }
 
     try {
-        con.textContent = 'Connecting to pico-ice...\n' +
-            '(Select the FPGA UART port — usually the second one, not the RP2040 REPL)\n\n';
+        if (!PicoSerial.isConnected()) {
+            con.textContent = 'Select the FPGA UART port (usually the second pico-ice port).\n\n';
+        } else {
+            con.textContent = '';
+        }
 
         const image = sim.exportHardwareImage();
-        con.textContent += `Namespace: ${image.namespace.length} words\n`;
-        con.textContent += `C-list: ${image.clist.length} words\n`;
+
+        await PicoSerial.connect();
+        con.textContent += 'Connected. Ready to upload.\n';
+        con.textContent += `Namespace: ${image.namespace.length} words, C-list: ${image.clist.length} words\n\n`;
+        con.textContent += '>>> Press the RESET button on the pico-ice now, then click OK <<<\n';
+
+        await new Promise(resolve => {
+            const ok = confirm('Press the RESET button on the pico-ice board, then click OK to send data.\n\nThe upload must start within ~1 second of reset.');
+            resolve();
+        });
+
+        con.textContent += 'Sending...\n';
 
         const result = await PicoSerial.uploadToFPGA(
             image.namespace,
@@ -868,8 +881,8 @@ async function uploadToPicoIce() {
         if (result.success) {
             con.textContent += '\nUpload successful! pico-ice booted with simulator data.\n';
         } else {
-            con.textContent += '\nUpload sent, but did not receive expected banner.\n';
-            con.textContent += 'The pico-ice may need a reset, or check serial port selection.\n';
+            con.textContent += '\nData sent but no banner received.\n';
+            con.textContent += 'Try again: reset pico-ice, click OK quickly.\n';
         }
     } catch(e) {
         if (e.name === 'NotFoundError') {

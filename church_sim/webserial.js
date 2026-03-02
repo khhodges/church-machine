@@ -53,22 +53,6 @@ const PicoSerial = (function() {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async function resetFPGA(onStatus) {
-        const status = onStatus || function() {};
-
-        if (!port) return;
-
-        status('Resetting pico-ice...');
-        try {
-            await port.setSignals({ dataTerminalReady: true });
-            await sleep(100);
-            await port.setSignals({ dataTerminalReady: false });
-            await sleep(500);
-        } catch(e) {
-            status('DTR toggle not available, sending data directly...');
-        }
-    }
-
     async function drainInput() {
         if (!port || !port.readable) return;
         const r = port.readable.getReader();
@@ -89,7 +73,6 @@ const PicoSerial = (function() {
 
         await connect();
 
-        await resetFPGA(status);
         await drainInput();
 
         const totalWords = NS_WORDS + CLIST_WORDS;
