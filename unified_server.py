@@ -75,6 +75,14 @@ def church_static(path):
         resp.headers['Expires'] = '0'
     return resp
 
+@church_bp.route('/pico_upload.py')
+def church_pico_upload():
+    upload_dir = os.path.join(BASE_DIR, 'church_machine')
+    resp = make_response(send_from_directory(upload_dir, 'pico_upload.py'))
+    resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    resp.headers['Content-Disposition'] = 'attachment; filename="pico_upload.py"'
+    return resp
+
 app.register_blueprint(church_bp)
 
 @app.route('/test/')
