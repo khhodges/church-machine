@@ -7,7 +7,7 @@ The Church Machine is a pure lambda calculus processor — a standalone, Church-
 **Hardware specifications:**
 - FPGA: Lattice iCE40UP5K-SG48
 - Clock: 12 MHz (internal HFOSC)
-- Logic utilization: ~2573 LUT4 (49% synthesis), ~4515 LCs (85% after packing)
+- Logic utilization: ~2573 LUT4 (49% synthesis), ~4522 LCs (85% after packing)
 - Memory: 2 SPRAM blocks (64KB data memory)
 - Boot ROM: Constant instruction memory (synthesized into LUTs)
 - I/O: UART (115200 baud), RGB LED, push button
@@ -54,13 +54,13 @@ When Yosys (the synthesis tool) sees constant instruction data, it can determine
 
 | Configuration | LUT4 Usage | Fits? |
 |---|---|---|
-| Boot ROM (constant instructions, no CHANGE/SWITCH) | 2573 LUT4 (49%), 4515 LCs (85%) | Yes — tight, seed-sensitive |
-| Boot ROM (constant instructions, with CHANGE/SWITCH) | 4179 / 5280 (79%) | Yes (synthesis), but nextpnr expands to 7159 LCs — No |
+| Boot ROM (constant instructions, no CHANGE/SWITCH) | 2573 LUT4 (49%), 4522 LCs (85%) | Yes — tight, seed-sensitive |
+| Boot ROM (constant instructions, with CHANGE/SWITCH) | 4149 LUT4 (79%), 7130 LCs (135%) | No — exceeds 5280 LC budget |
 | SPRAM instructions (runtime variable) | 6324 / 5280 (119%) | No |
 
 Without constant propagation, the full instruction decoder must be preserved because any instruction could appear at runtime. The iCE40UP5K simply does not have enough logic cells for that.
 
-**CHANGE/SWITCH status:** Enabling `ENABLE_CHANGE_SWITCH` in hardware adds significant decode logic. While Yosys synthesis shows 4179 LUT4 (79%), nextpnr expands this to 7159 logic cells during placement — exceeding the 5280 LC budget. CHANGE/SWITCH remains a simulator-only feature until a larger FPGA or further LUT optimization is available. The boot program conditionally includes CHANGE based on the `ENABLE_CHANGE_SWITCH` flag.
+**CHANGE/SWITCH status:** Enabling `ENABLE_CHANGE_SWITCH` in hardware adds significant decode logic. Yosys synthesis shows 4149 LUT4 (79%), but nextpnr packs this to 7130 logic cells — exceeding the 5280 LC budget at 135%. CHANGE/SWITCH remains a simulator-only feature until a larger FPGA or further LUT optimization is available. The boot program conditionally includes CHANGE based on the `ENABLE_CHANGE_SWITCH` flag. Note: the `switch_change_active` runtime CR-write logic in `core.py` is now properly guarded by the flag — previously it was always included, inflating non-CHANGE builds.
 
 **Consequence:** Changing the boot program requires rebuilding the FPGA bitstream. The namespace and c-list are reprogrammable via UART without rebuilding.
 

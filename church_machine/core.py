@@ -394,22 +394,23 @@ class ChurchCore(Elaboratable):
         runtime_wr_en = [Signal(name=f"rt_cr{i}_wr_en") for i in range(16)]
         runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cr{i}_wr_gt") for i in range(16)]
 
-        switch_change_active = Signal()
-        m.d.comb += switch_change_active.eq(
-            self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
-            ((church_op == ChurchOpcode.SWITCH) | (church_op == ChurchOpcode.CHANGE))
-        )
+        if ENABLE_CHANGE_SWITCH:
+            switch_change_active = Signal()
+            m.d.comb += switch_change_active.eq(
+                self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
+                ((church_op == ChurchOpcode.SWITCH) | (church_op == ChurchOpcode.CHANGE))
+            )
 
-        switch_src_gt = Signal(GT_LAYOUT)
-        m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
+            switch_src_gt = Signal(GT_LAYOUT)
+            m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
 
-        effective_target = Signal(3)
-        m.d.comb += effective_target.eq(Mux(church_op == ChurchOpcode.CHANGE, 0, switch_target[:3]))
+            effective_target = Signal(3)
+            m.d.comb += effective_target.eq(Mux(church_op == ChurchOpcode.CHANGE, 0, switch_target[:3]))
 
-        with m.If(switch_change_active):
-            for i in range(8):
-                with m.If(effective_target == i):
-                    m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
+            with m.If(switch_change_active):
+                for i in range(8):
+                    with m.If(effective_target == i):
+                        m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
 
         for i in range(16):
             m.d.comb += [

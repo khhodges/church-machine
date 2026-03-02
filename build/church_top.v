@@ -1343,7 +1343,7 @@ module top(rst, uart_tx, led_boot, led_run, led_fault, dbg_nia, dbg_fault, dbg_f
     .dmem_wr_data(dmem_wr_data),
     .dmem_wr_en(dmem_wr_en),
     .fault(dbg_fault),
-    .\fault_valid$241 (led_fault),
+    .\fault_valid$237 (led_fault),
     .imem_addr(dbg_nia),
     .imem_valid(imem_valid),
     .instruction(imem_data),
@@ -1732,7 +1732,7 @@ endmodule
 
 (* src = "/home/runner/workspace/church_machine/core.py:74" *)
 (* generator = "Amaranth" *)
-module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot_start, fault, \fault_valid$241 , dmem_addr, dmem_wr_data, dmem_wr_en, boot_state, imem_addr, instruction, clk);
+module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot_start, fault, \fault_valid$237 , dmem_addr, dmem_wr_data, dmem_wr_en, boot_state, imem_addr, instruction, clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$3  = 0;
   wire \$1 ;
   wire [3:0] \$10 ;
@@ -1763,7 +1763,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire \$33 ;
   wire \$34 ;
   wire \$35 ;
-  wire \$36 ;
+  wire [32:0] \$36 ;
   wire \$37 ;
   wire \$38 ;
   wire \$39 ;
@@ -1779,9 +1779,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire \$48 ;
   wire \$49 ;
   wire \$5 ;
-  wire \$50 ;
-  wire \$51 ;
-  wire [32:0] \$52 ;
+  wire [8:0] \$50 ;
+  wire [8:0] \$51 ;
+  wire \$52 ;
   wire \$53 ;
   wire \$54 ;
   wire \$55 ;
@@ -1793,11 +1793,11 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire \$60 ;
   wire \$61 ;
   wire \$62 ;
-  wire \$63 ;
+  wire [32:0] \$63 ;
   wire \$64 ;
   wire \$65 ;
-  wire [8:0] \$66 ;
-  wire [8:0] \$67 ;
+  wire \$66 ;
+  wire \$67 ;
   wire \$68 ;
   wire \$69 ;
   wire \$7 ;
@@ -1805,32 +1805,16 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire \$71 ;
   wire \$72 ;
   wire \$73 ;
-  wire \$74 ;
-  wire \$75 ;
-  wire \$76 ;
-  wire \$77 ;
-  wire \$78 ;
-  wire [32:0] \$79 ;
+  wire [8:0] \$74 ;
+  wire [8:0] \$75 ;
+  reg [2:0] \$76 ;
+  reg [31:0] \$77 ;
+  reg \$78 ;
+  reg [31:0] \$79 ;
   wire \$8 ;
-  wire \$80 ;
-  wire \$81 ;
-  wire \$82 ;
-  wire \$83 ;
-  wire \$84 ;
-  wire \$85 ;
-  wire \$86 ;
-  wire \$87 ;
-  wire \$88 ;
-  wire \$89 ;
+  reg [7:0] \$80 ;
+  wire [2:0] \$81 ;
   wire \$9 ;
-  wire [8:0] \$90 ;
-  wire [8:0] \$91 ;
-  reg [2:0] \$92 ;
-  reg [31:0] \$93 ;
-  reg \$94 ;
-  reg [31:0] \$95 ;
-  reg [7:0] \$96 ;
-  wire [2:0] \$97 ;
   (* src = "/home/runner/workspace/church_machine/core.py:161" *)
   wire any_unit_busy;
   (* src = "/home/runner/workspace/church_machine/core.py:61" *)
@@ -2173,41 +2157,41 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/save.py:33" *)
   wire [127:0] cr15_namespace;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [127:0] \cr15_namespace$209 ;
+  wire [127:0] \cr15_namespace$205 ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [31:0] \cr15_namespace$209.word0_gt ;
+  wire [31:0] \cr15_namespace$205.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [1:0] \cr15_namespace$209.word0_gt.gt_type ;
+  wire [1:0] \cr15_namespace$205.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [16:0] \cr15_namespace$209.word0_gt.index ;
+  wire [16:0] \cr15_namespace$205.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [5:0] \cr15_namespace$209.word0_gt.perms ;
+  wire [5:0] \cr15_namespace$205.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [6:0] \cr15_namespace$209.word0_gt.version ;
+  wire [6:0] \cr15_namespace$205.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [31:0] \cr15_namespace$209.word1_location ;
+  wire [31:0] \cr15_namespace$205.word1_location ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [31:0] \cr15_namespace$209.word2_limit ;
+  wire [31:0] \cr15_namespace$205.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/registers.py:39" *)
-  wire [31:0] \cr15_namespace$209.word3_seals ;
+  wire [31:0] \cr15_namespace$205.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [127:0] \cr15_namespace$250 ;
+  wire [127:0] \cr15_namespace$246 ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [31:0] \cr15_namespace$250.word0_gt ;
+  wire [31:0] \cr15_namespace$246.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [1:0] \cr15_namespace$250.word0_gt.gt_type ;
+  wire [1:0] \cr15_namespace$246.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [16:0] \cr15_namespace$250.word0_gt.index ;
+  wire [16:0] \cr15_namespace$246.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [5:0] \cr15_namespace$250.word0_gt.perms ;
+  wire [5:0] \cr15_namespace$246.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [6:0] \cr15_namespace$250.word0_gt.version ;
+  wire [6:0] \cr15_namespace$246.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [31:0] \cr15_namespace$250.word1_location ;
+  wire [31:0] \cr15_namespace$246.word1_location ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [31:0] \cr15_namespace$250.word2_limit ;
+  wire [31:0] \cr15_namespace$246.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/mload.py:31" *)
-  wire [31:0] \cr15_namespace$250.word3_seals ;
+  wire [31:0] \cr15_namespace$246.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/save.py:33" *)
   wire [31:0] \cr15_namespace.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/save.py:33" *)
@@ -2284,21 +2268,21 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire [6:0] \cr5_gt_wr_data.version ;
   (* src = "/home/runner/workspace/church_machine/registers.py:42" *)
   wire cr5_gt_wr_en;
-  (* src = "/home/runner/workspace/church_machine/core.py:566" *)
-  wire cr5_stack_empty;
   (* src = "/home/runner/workspace/church_machine/core.py:567" *)
+  wire cr5_stack_empty;
+  (* src = "/home/runner/workspace/church_machine/core.py:568" *)
   wire cr5_stack_full;
-  (* src = "/home/runner/workspace/church_machine/core.py:565" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:566" *)
   reg [7:0] cr5_stack_ptr = 8'h00;
-  (* src = "/home/runner/workspace/church_machine/core.py:569" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:570" *)
   wire [7:0] cr5_stack_r_addr;
-  (* src = "/home/runner/workspace/church_machine/core.py:569" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:570" *)
   wire [31:0] cr5_stack_r_data;
-  (* src = "/home/runner/workspace/church_machine/core.py:568" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:569" *)
   reg [7:0] cr5_stack_w_addr;
-  (* src = "/home/runner/workspace/church_machine/core.py:568" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:569" *)
   reg [31:0] cr5_stack_w_data;
-  (* src = "/home/runner/workspace/church_machine/core.py:568" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:569" *)
   reg cr5_stack_w_en;
   (* src = "/home/runner/workspace/church_machine/core.py:365" *)
   reg [31:0] cr6_gt;
@@ -2371,9 +2355,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/decoder.py:30" *)
   wire [3:0] cr_dst;
   (* src = "/home/runner/workspace/church_machine/save.py:13" *)
-  wire [3:0] \cr_dst$205 ;
+  wire [3:0] \cr_dst$201 ;
   (* src = "/home/runner/workspace/church_machine/load.py:10" *)
-  wire [3:0] \cr_dst$217 ;
+  wire [3:0] \cr_dst$213 ;
   (* src = "/home/runner/workspace/church_machine/registers.py:20" *)
   wire [3:0] cr_rd_addr;
   (* src = "/home/runner/workspace/church_machine/save.py:20" *)
@@ -2391,113 +2375,113 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/registers.py:21" *)
   wire [127:0] cr_rd_data;
   (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [127:0] \cr_rd_data$178 ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [31:0] \cr_rd_data$178.word0_gt ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [1:0] \cr_rd_data$178.word0_gt.gt_type ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [16:0] \cr_rd_data$178.word0_gt.index ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [5:0] \cr_rd_data$178.word0_gt.perms ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [6:0] \cr_rd_data$178.word0_gt.version ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [31:0] \cr_rd_data$178.word1_location ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [31:0] \cr_rd_data$178.word2_limit ;
+  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  wire [31:0] \cr_rd_data$178.word3_seals ;
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [127:0] \cr_rd_data$182 ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [31:0] \cr_rd_data$182.word0_gt ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [1:0] \cr_rd_data$182.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [16:0] \cr_rd_data$182.word0_gt.index ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [5:0] \cr_rd_data$182.word0_gt.perms ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [6:0] \cr_rd_data$182.word0_gt.version ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [31:0] \cr_rd_data$182.word1_location ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [31:0] \cr_rd_data$182.word2_limit ;
-  (* src = "/home/runner/workspace/church_machine/call.py:20" *)
+  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
   wire [31:0] \cr_rd_data$182.word3_seals ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [127:0] \cr_rd_data$186 ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [31:0] \cr_rd_data$186.word0_gt ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [1:0] \cr_rd_data$186.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [16:0] \cr_rd_data$186.word0_gt.index ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [5:0] \cr_rd_data$186.word0_gt.perms ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [6:0] \cr_rd_data$186.word0_gt.version ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [31:0] \cr_rd_data$186.word1_location ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [31:0] \cr_rd_data$186.word2_limit ;
-  (* src = "/home/runner/workspace/church_machine/ret.py:19" *)
-  wire [31:0] \cr_rd_data$186.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [127:0] \cr_rd_data$194 ;
+  wire [127:0] \cr_rd_data$190 ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [31:0] \cr_rd_data$194.word0_gt ;
+  wire [31:0] \cr_rd_data$190.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [1:0] \cr_rd_data$194.word0_gt.gt_type ;
+  wire [1:0] \cr_rd_data$190.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [16:0] \cr_rd_data$194.word0_gt.index ;
+  wire [16:0] \cr_rd_data$190.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [5:0] \cr_rd_data$194.word0_gt.perms ;
+  wire [5:0] \cr_rd_data$190.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [6:0] \cr_rd_data$194.word0_gt.version ;
+  wire [6:0] \cr_rd_data$190.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [31:0] \cr_rd_data$194.word1_location ;
+  wire [31:0] \cr_rd_data$190.word1_location ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [31:0] \cr_rd_data$194.word2_limit ;
+  wire [31:0] \cr_rd_data$190.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:18" *)
-  wire [31:0] \cr_rd_data$194.word3_seals ;
+  wire [31:0] \cr_rd_data$190.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [127:0] \cr_rd_data$201 ;
+  wire [127:0] \cr_rd_data$197 ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [31:0] \cr_rd_data$201.word0_gt ;
+  wire [31:0] \cr_rd_data$197.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [1:0] \cr_rd_data$201.word0_gt.gt_type ;
+  wire [1:0] \cr_rd_data$197.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [16:0] \cr_rd_data$201.word0_gt.index ;
+  wire [16:0] \cr_rd_data$197.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [5:0] \cr_rd_data$201.word0_gt.perms ;
+  wire [5:0] \cr_rd_data$197.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [6:0] \cr_rd_data$201.word0_gt.version ;
+  wire [6:0] \cr_rd_data$197.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [31:0] \cr_rd_data$201.word1_location ;
+  wire [31:0] \cr_rd_data$197.word1_location ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [31:0] \cr_rd_data$201.word2_limit ;
+  wire [31:0] \cr_rd_data$197.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:20" *)
-  wire [31:0] \cr_rd_data$201.word3_seals ;
+  wire [31:0] \cr_rd_data$197.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [127:0] \cr_rd_data$207 ;
+  wire [127:0] \cr_rd_data$203 ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [31:0] \cr_rd_data$207.word0_gt ;
+  wire [31:0] \cr_rd_data$203.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [1:0] \cr_rd_data$207.word0_gt.gt_type ;
+  wire [1:0] \cr_rd_data$203.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [16:0] \cr_rd_data$207.word0_gt.index ;
+  wire [16:0] \cr_rd_data$203.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [5:0] \cr_rd_data$207.word0_gt.perms ;
+  wire [5:0] \cr_rd_data$203.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [6:0] \cr_rd_data$207.word0_gt.version ;
+  wire [6:0] \cr_rd_data$203.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [31:0] \cr_rd_data$207.word1_location ;
+  wire [31:0] \cr_rd_data$203.word1_location ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [31:0] \cr_rd_data$207.word2_limit ;
+  wire [31:0] \cr_rd_data$203.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/save.py:21" *)
-  wire [31:0] \cr_rd_data$207.word3_seals ;
+  wire [31:0] \cr_rd_data$203.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [127:0] \cr_rd_data$249 ;
+  wire [127:0] \cr_rd_data$245 ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [31:0] \cr_rd_data$249.word0_gt ;
+  wire [31:0] \cr_rd_data$245.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [1:0] \cr_rd_data$249.word0_gt.gt_type ;
+  wire [1:0] \cr_rd_data$245.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [16:0] \cr_rd_data$249.word0_gt.index ;
+  wire [16:0] \cr_rd_data$245.word0_gt.index ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [5:0] \cr_rd_data$249.word0_gt.perms ;
+  wire [5:0] \cr_rd_data$245.word0_gt.perms ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [6:0] \cr_rd_data$249.word0_gt.version ;
+  wire [6:0] \cr_rd_data$245.word0_gt.version ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [31:0] \cr_rd_data$249.word1_location ;
+  wire [31:0] \cr_rd_data$245.word1_location ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [31:0] \cr_rd_data$249.word2_limit ;
+  wire [31:0] \cr_rd_data$245.word2_limit ;
   (* src = "/home/runner/workspace/church_machine/mload.py:25" *)
-  wire [31:0] \cr_rd_data$249.word3_seals ;
+  wire [31:0] \cr_rd_data$245.word3_seals ;
   (* src = "/home/runner/workspace/church_machine/registers.py:21" *)
   wire [31:0] \cr_rd_data.word0_gt ;
   (* src = "/home/runner/workspace/church_machine/registers.py:21" *)
@@ -2527,17 +2511,17 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/decoder.py:31" *)
   wire [3:0] cr_src;
   (* src = "/home/runner/workspace/church_machine/call.py:11" *)
-  wire [3:0] \cr_src$177 ;
+  wire [3:0] \cr_src$173 ;
   (* src = "/home/runner/workspace/church_machine/ret.py:11" *)
-  wire [2:0] \cr_src$185 ;
+  wire [2:0] \cr_src$181 ;
   (* src = "/home/runner/workspace/church_machine/save.py:12" *)
-  wire [3:0] \cr_src$204 ;
+  wire [3:0] \cr_src$200 ;
   (* src = "/home/runner/workspace/church_machine/load.py:9" *)
-  wire [3:0] \cr_src$216 ;
+  wire [3:0] \cr_src$212 ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:11" *)
   wire [3:0] cr_target;
   (* src = "/home/runner/workspace/church_machine/tperm.py:11" *)
-  wire [3:0] \cr_target$198 ;
+  wire [3:0] \cr_target$194 ;
   (* src = "/home/runner/workspace/church_machine/registers.py:23" *)
   wire [3:0] cr_wr_addr;
   (* src = "/home/runner/workspace/church_machine/ret.py:20" *)
@@ -2667,38 +2651,36 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire [31:0] dr_wr_data;
   (* src = "/home/runner/workspace/church_machine/registers.py:50" *)
   wire dr_wr_en;
-  (* src = "/home/runner/workspace/church_machine/core.py:406" *)
-  wire [2:0] effective_target;
   (* src = "/home/runner/workspace/church_machine/decoder.py:26" *)
   wire exec_enable;
   (* src = "/home/runner/workspace/church_machine/core.py:67" *)
   output [3:0] fault;
   reg [3:0] fault;
   (* src = "/home/runner/workspace/church_machine/decoder.py:39" *)
-  wire [3:0] \fault$240 ;
+  wire [3:0] \fault$236 ;
   (* src = "/home/runner/workspace/church_machine/perm_check.py:31" *)
   wire [3:0] fault_type;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:15" *)
-  wire [3:0] \fault_type$243 ;
+  wire [3:0] \fault_type$239 ;
   (* src = "/home/runner/workspace/church_machine/tperm.py:17" *)
-  wire [3:0] \fault_type$244 ;
+  wire [3:0] \fault_type$240 ;
   (* src = "/home/runner/workspace/church_machine/call.py:17" *)
-  wire [3:0] \fault_type$245 ;
+  wire [3:0] \fault_type$241 ;
   (* src = "/home/runner/workspace/church_machine/ret.py:15" *)
-  wire [3:0] \fault_type$246 ;
+  wire [3:0] \fault_type$242 ;
   (* src = "/home/runner/workspace/church_machine/save.py:18" *)
-  wire [3:0] \fault_type$247 ;
+  wire [3:0] \fault_type$243 ;
   (* src = "/home/runner/workspace/church_machine/load.py:15" *)
-  wire [3:0] \fault_type$248 ;
+  wire [3:0] \fault_type$244 ;
   (* src = "/home/runner/workspace/church_machine/ret.py:14" *)
   wire fault_valid;
   (* src = "/home/runner/workspace/church_machine/decoder.py:40" *)
-  wire \fault_valid$233 ;
+  wire \fault_valid$229 ;
   (* src = "/home/runner/workspace/church_machine/perm_check.py:32" *)
-  wire \fault_valid$234 ;
+  wire \fault_valid$230 ;
   (* src = "/home/runner/workspace/church_machine/core.py:68" *)
-  output \fault_valid$241 ;
-  reg \fault_valid$241 ;
+  output \fault_valid$237 ;
+  reg \fault_valid$237 ;
   (* src = "/home/runner/workspace/church_machine/decoder.py:24" *)
   wire [3:0] flags;
   (* src = "/home/runner/workspace/church_machine/core.py:71" *)
@@ -2766,9 +2748,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/call.py:12" *)
   wire [16:0] index;
   (* src = "/home/runner/workspace/church_machine/save.py:14" *)
-  wire [16:0] \index$206 ;
+  wire [16:0] \index$202 ;
   (* src = "/home/runner/workspace/church_machine/load.py:11" *)
-  wire [16:0] \index$218 ;
+  wire [16:0] \index$214 ;
   (* src = "/home/runner/workspace/church_machine/decoder.py:23" *)
   wire instr_valid;
   (* src = "/home/runner/workspace/church_machine/core.py:38" *)
@@ -2804,7 +2786,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire load_fault;
   (* src = "/home/runner/workspace/church_machine/load.py:8" *)
   wire load_start;
-  (* src = "/home/runner/workspace/church_machine/core.py:482" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:483" *)
   wire load_start_sig;
   (* src = "/home/runner/workspace/church_machine/call.py:13" *)
   wire [15:0] mask;
@@ -2816,89 +2798,89 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   input [31:0] mem_rd_data;
   wire [31:0] mem_rd_data;
   (* src = "/home/runner/workspace/church_machine/mload.py:35" *)
-  wire [31:0] \mem_rd_data$251 ;
+  wire [31:0] \mem_rd_data$247 ;
   (* src = "/home/runner/workspace/church_machine/mload.py:34" *)
   wire mem_rd_en;
   (* src = "/home/runner/workspace/church_machine/save.py:29" *)
-  wire \mem_rd_en$301 ;
+  wire \mem_rd_en$297 ;
   (* src = "/home/runner/workspace/church_machine/save.py:31" *)
   wire mem_rd_valid;
   (* src = "/home/runner/workspace/church_machine/mload.py:36" *)
-  wire \mem_rd_valid$252 ;
+  wire \mem_rd_valid$248 ;
   (* src = "/home/runner/workspace/church_machine/save.py:23" *)
   wire [31:0] mem_wr_addr;
   (* src = "/home/runner/workspace/church_machine/mload.py:38" *)
   wire [31:0] mem_wr_data;
   (* src = "/home/runner/workspace/church_machine/save.py:24" *)
-  wire [31:0] \mem_wr_data$305 ;
+  wire [31:0] \mem_wr_data$301 ;
   (* src = "/home/runner/workspace/church_machine/save.py:26" *)
   wire mem_wr_done;
   (* src = "/home/runner/workspace/church_machine/mload.py:37" *)
   wire mem_wr_en;
   (* src = "/home/runner/workspace/church_machine/save.py:25" *)
-  wire \mem_wr_en$300 ;
+  wire \mem_wr_en$296 ;
   (* src = "/home/runner/workspace/church_machine/load.py:25" *)
   wire mload_busy;
   (* src = "/home/runner/workspace/church_machine/call.py:27" *)
   wire [3:0] mload_cr_dst;
   (* src = "/home/runner/workspace/church_machine/ret.py:29" *)
-  wire [3:0] \mload_cr_dst$269 ;
+  wire [3:0] \mload_cr_dst$265 ;
   (* src = "/home/runner/workspace/church_machine/load.py:19" *)
-  wire [3:0] \mload_cr_dst$276 ;
+  wire [3:0] \mload_cr_dst$272 ;
   (* src = "/home/runner/workspace/church_machine/call.py:26" *)
   wire [3:0] mload_cr_src;
   (* src = "/home/runner/workspace/church_machine/ret.py:28" *)
-  wire [3:0] \mload_cr_src$268 ;
+  wire [3:0] \mload_cr_src$264 ;
   (* src = "/home/runner/workspace/church_machine/load.py:18" *)
-  wire [3:0] \mload_cr_src$275 ;
+  wire [3:0] \mload_cr_src$271 ;
   (* src = "/home/runner/workspace/church_machine/call.py:29" *)
   wire mload_direct;
   (* src = "/home/runner/workspace/church_machine/ret.py:31" *)
-  wire \mload_direct$271 ;
+  wire \mload_direct$267 ;
   (* src = "/home/runner/workspace/church_machine/load.py:21" *)
-  wire \mload_direct$278 ;
+  wire \mload_direct$274 ;
   (* src = "/home/runner/workspace/church_machine/call.py:30" *)
   wire [31:0] mload_direct_gt;
   (* src = "/home/runner/workspace/church_machine/ret.py:32" *)
-  wire [31:0] \mload_direct_gt$272 ;
+  wire [31:0] \mload_direct_gt$268 ;
   (* src = "/home/runner/workspace/church_machine/load.py:22" *)
-  wire [31:0] \mload_direct_gt$279 ;
+  wire [31:0] \mload_direct_gt$275 ;
   (* src = "/home/runner/workspace/church_machine/call.py:33" *)
   wire mload_done;
   (* src = "/home/runner/workspace/church_machine/ret.py:35" *)
-  wire \mload_done$287 ;
+  wire \mload_done$283 ;
   (* src = "/home/runner/workspace/church_machine/load.py:26" *)
-  wire \mload_done$291 ;
+  wire \mload_done$287 ;
   (* src = "/home/runner/workspace/church_machine/call.py:34" *)
   wire mload_fault;
   (* src = "/home/runner/workspace/church_machine/ret.py:36" *)
-  wire \mload_fault$288 ;
+  wire \mload_fault$284 ;
   (* src = "/home/runner/workspace/church_machine/load.py:27" *)
-  wire \mload_fault$292 ;
+  wire \mload_fault$288 ;
   (* src = "/home/runner/workspace/church_machine/call.py:35" *)
   wire [3:0] mload_fault_type;
   (* src = "/home/runner/workspace/church_machine/ret.py:37" *)
-  wire [3:0] \mload_fault_type$289 ;
+  wire [3:0] \mload_fault_type$285 ;
   (* src = "/home/runner/workspace/church_machine/load.py:28" *)
-  wire [3:0] \mload_fault_type$293 ;
+  wire [3:0] \mload_fault_type$289 ;
   (* src = "/home/runner/workspace/church_machine/call.py:28" *)
   wire [16:0] mload_index;
   (* src = "/home/runner/workspace/church_machine/ret.py:30" *)
-  wire [16:0] \mload_index$270 ;
+  wire [16:0] \mload_index$266 ;
   (* src = "/home/runner/workspace/church_machine/load.py:20" *)
-  wire [16:0] \mload_index$277 ;
+  wire [16:0] \mload_index$273 ;
   (* src = "/home/runner/workspace/church_machine/call.py:31" *)
   wire mload_m_elevated;
   (* src = "/home/runner/workspace/church_machine/ret.py:33" *)
-  wire \mload_m_elevated$273 ;
+  wire \mload_m_elevated$269 ;
   (* src = "/home/runner/workspace/church_machine/load.py:23" *)
-  wire \mload_m_elevated$280 ;
+  wire \mload_m_elevated$276 ;
   (* src = "/home/runner/workspace/church_machine/call.py:25" *)
   wire mload_start;
   (* src = "/home/runner/workspace/church_machine/ret.py:27" *)
-  wire \mload_start$267 ;
+  wire \mload_start$263 ;
   (* src = "/home/runner/workspace/church_machine/load.py:17" *)
-  wire \mload_start$274 ;
+  wire \mload_start$270 ;
   (* init = 32'd0 *)
   (* src = "/home/runner/workspace/church_machine/core.py:70" *)
   wire [31:0] nia;
@@ -2908,15 +2890,15 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:20" *)
   wire nia_set;
   (* src = "/home/runner/workspace/church_machine/ret.py:24" *)
-  wire \nia_set$316 ;
+  wire \nia_set$312 ;
   (* src = "/home/runner/workspace/church_machine/call.py:39" *)
-  wire \nia_set$317 ;
+  wire \nia_set$313 ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:21" *)
   wire [31:0] nia_value;
   (* src = "/home/runner/workspace/church_machine/ret.py:25" *)
-  wire [31:0] \nia_value$319 ;
+  wire [31:0] \nia_value$315 ;
   (* src = "/home/runner/workspace/church_machine/call.py:40" *)
-  wire [31:0] \nia_value$320 ;
+  wire [31:0] \nia_value$316 ;
   (* src = "/home/runner/workspace/church_machine/core.py:47" *)
   wire [31:0] ns_addr;
   (* src = "/home/runner/workspace/church_machine/core.py:345" *)
@@ -2935,7 +2917,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire [95:0] ns_wr_data;
   (* src = "/home/runner/workspace/church_machine/core.py:51" *)
   wire ns_wr_en;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:56" *)
   output [31:0] perm_gt_sig;
   wire [31:0] perm_gt_sig;
   (* src = "/home/runner/workspace/church_machine/core.py:202" *)
@@ -2974,9 +2956,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr0_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr10_wr_en;
+  wire rt_cr10_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr10_wr_gt;
+  wire [31:0] rt_cr10_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr10_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -2986,9 +2968,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr10_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr11_wr_en;
+  wire rt_cr11_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr11_wr_gt;
+  wire [31:0] rt_cr11_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr11_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -2998,9 +2980,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr11_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr12_wr_en;
+  wire rt_cr12_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr12_wr_gt;
+  wire [31:0] rt_cr12_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr12_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3010,9 +2992,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr12_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr13_wr_en;
+  wire rt_cr13_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr13_wr_gt;
+  wire [31:0] rt_cr13_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr13_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3022,9 +3004,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr13_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr14_wr_en;
+  wire rt_cr14_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr14_wr_gt;
+  wire [31:0] rt_cr14_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr14_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3034,9 +3016,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr14_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr15_wr_en;
+  wire rt_cr15_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr15_wr_gt;
+  wire [31:0] rt_cr15_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr15_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3130,9 +3112,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr7_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr8_wr_en;
+  wire rt_cr8_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr8_wr_gt;
+  wire [31:0] rt_cr8_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr8_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3142,9 +3124,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [6:0] \rt_cr8_wr_gt.version ;
   (* src = "/home/runner/workspace/church_machine/core.py:394" *)
-  reg rt_cr9_wr_en;
+  wire rt_cr9_wr_en;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
-  reg [31:0] rt_cr9_wr_gt;
+  wire [31:0] rt_cr9_wr_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
   wire [1:0] \rt_cr9_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/church_machine/core.py:395" *)
@@ -3159,12 +3141,12 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire save_fault;
   (* src = "/home/runner/workspace/church_machine/save.py:11" *)
   wire save_start;
-  (* src = "/home/runner/workspace/church_machine/core.py:466" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:467" *)
   wire save_start_sig;
   (* src = "/home/runner/workspace/church_machine/ret.py:39" *)
   wire [31:0] saved_cr5_gt;
   (* src = "/home/runner/workspace/church_machine/call.py:37" *)
-  wire [31:0] \saved_cr5_gt$232 ;
+  wire [31:0] \saved_cr5_gt$228 ;
   (* src = "/home/runner/workspace/church_machine/lambda_unit.py:22" *)
   wire [31:0] saved_nia;
   (* src = "/home/runner/workspace/church_machine/core.py:375" *)
@@ -3199,20 +3181,6 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   reg sub_m_elevated;
   (* src = "/home/runner/workspace/church_machine/mload.py:12" *)
   reg sub_start;
-  (* src = "/home/runner/workspace/church_machine/core.py:397" *)
-  wire switch_change_active;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
-  wire [31:0] switch_src_gt;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
-  wire [1:0] \switch_src_gt.gt_type ;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
-  wire [16:0] \switch_src_gt.index ;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
-  wire [5:0] \switch_src_gt.perms ;
-  (* src = "/home/runner/workspace/church_machine/core.py:403" *)
-  wire [6:0] \switch_src_gt.version ;
-  (* src = "/home/runner/workspace/church_machine/decoder.py:37" *)
-  wire [3:0] switch_target;
   (* src = "/home/runner/workspace/church_machine/core.py:355" *)
   reg [31:0] thrd_gt;
   (* src = "/home/runner/workspace/church_machine/core.py:355" *)
@@ -3233,7 +3201,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   wire tperm_start;
   (* src = "/home/runner/workspace/church_machine/core.py:179" *)
   wire tperm_start_sig;
-  (* src = "/home/runner/workspace/church_machine/core.py:563" *)
+  (* src = "/home/runner/workspace/church_machine/core.py:564" *)
   reg [31:0] cr5_stack [255:0];
   initial begin
     cr5_stack[0] = 32'd0;
@@ -3499,25 +3467,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   end
   reg [7:0] _0_;
   always @(posedge clk) begin
-    _0_ <= \$67 [7:0];
+    _0_ <= \$51 [7:0];
   end
   assign cr5_stack_r_data = cr5_stack[_0_];
-  assign instr_valid = imem_valid & (* src = "/home/runner/workspace/church_machine/core.py:146" *) boot_complete;
-  assign cond_exec_enable = boot_complete & (* src = "/home/runner/workspace/church_machine/core.py:159" *) exec_enable;
-  assign \$1  = lambda_busy | (* src = "/home/runner/workspace/church_machine/core.py:163" *) tperm_busy;
-  assign \$2  = \$1  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) call_busy;
-  assign \$3  = \$2  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) busy;
-  assign \$4  = \$3  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) save_busy;
-  assign any_unit_busy = \$4  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) load_busy;
-  assign \$5  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:176" *) is_church_op;
-  assign \$6  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:176" *) 3'h7;
-  assign \$7  = \$5  & (* src = "/home/runner/workspace/church_machine/core.py:176" *) \$6 ;
-  assign \$8  = ~ (* src = "/home/runner/workspace/church_machine/core.py:176" *) any_unit_busy;
-  assign lambda_start_sig = \$7  & (* src = "/home/runner/workspace/church_machine/core.py:176" *) \$8 ;
-  assign \$9  = lambda_start_sig | (* src = "/home/runner/workspace/church_machine/core.py:194" *) lambda_busy;
-  assign \$10  = save_busy ? (* src = "/home/runner/workspace/church_machine/core.py:198" *) \cr_rd_addr$25  : instruction[18:15];
-  assign \$11  = busy ? (* src = "/home/runner/workspace/church_machine/core.py:197" *) \cr_rd_addr$26  : \$10 ;
-  assign \$12  = call_busy ? (* src = "/home/runner/workspace/church_machine/core.py:196" *) \cr_rd_addr$27  : \$11 ;
   assign \$13  = tperm_busy ? (* src = "/home/runner/workspace/church_machine/core.py:195" *) \cr_rd_addr$28  : \$12 ;
   assign \$14  = \$9  ? (* src = "/home/runner/workspace/church_machine/core.py:194" *) \cr_rd_addr$29  : \$13 ;
   assign cr_rd_addr = sub_busy ? (* src = "/home/runner/workspace/church_machine/core.py:193" *) \cr_rd_addr$30  : \$14 ;
@@ -3538,97 +3490,93 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \$25  = cr_wr_en | (* src = "/home/runner/workspace/church_machine/core.py:310" *) \cr_wr_en$53 ;
   assign \$26  = \$25  | (* src = "/home/runner/workspace/church_machine/core.py:310" *) \cr_wr_en$54 ;
   assign \$27  = \$26  | (* src = "/home/runner/workspace/church_machine/core.py:310" *) \cr_wr_en$55 ;
-  assign \$28  = boot_complete & (* src = "/home/runner/workspace/church_machine/core.py:399" *) cond_exec_enable;
-  assign \$29  = \$28  & (* src = "/home/runner/workspace/church_machine/core.py:399" *) is_church_op;
-  assign \$30  = ~ (* src = "/home/runner/workspace/church_machine/core.py:399" *) any_unit_busy;
-  assign \$31  = \$29  & (* src = "/home/runner/workspace/church_machine/core.py:399" *) \$30 ;
-  assign \$32  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:400" *) 3'h5;
-  assign \$33  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:400" *) 3'h4;
-  assign \$34  = \$32  | (* src = "/home/runner/workspace/church_machine/core.py:400" *) \$33 ;
-  assign switch_change_active = \$31  & (* src = "/home/runner/workspace/church_machine/core.py:399" *) \$34 ;
-  assign \$35  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:407" *) 3'h4;
-  assign effective_target = \$35  ? (* src = "/home/runner/workspace/church_machine/core.py:407" *) 3'h0 : instruction[2:0];
-  assign \$36  = ! (* src = "/home/runner/workspace/church_machine/core.py:411" *) effective_target;
-  assign \$37  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 1'h1;
-  assign \$38  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 2'h2;
-  assign \$39  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 2'h3;
-  assign \$40  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 3'h4;
-  assign \$41  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 3'h5;
-  assign \$42  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 3'h6;
-  assign \$43  = effective_target == (* src = "/home/runner/workspace/church_machine/core.py:411" *) 3'h7;
-  assign cr6_gt_wr_data = boot_cr6_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:417" *) boot_cr6_wr_gt : 32'd0;
-  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:417" *) boot_cr7_wr_gt : 32'd0;
-  assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/church_machine/core.py:416" *) rt_cr8_wr_en;
-  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:417" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
-  assign cr15_gt_wr_en = boot_cr15_wr_en | (* src = "/home/runner/workspace/church_machine/core.py:416" *) rt_cr15_wr_en;
-  assign cr15_gt_wr_data = boot_cr15_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:417" *) boot_cr15_wr_gt : rt_cr15_wr_gt;
-  assign \$44  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:421" *) is_church_op;
-  assign \$45  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:421" *) 2'h2;
-  assign \$46  = \$44  & (* src = "/home/runner/workspace/church_machine/core.py:421" *) \$45 ;
-  assign \$47  = ~ (* src = "/home/runner/workspace/church_machine/core.py:421" *) any_unit_busy;
-  assign call_start_sig = \$46  & (* src = "/home/runner/workspace/church_machine/core.py:421" *) \$47 ;
-  assign \$48  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:432" *) is_church_op;
-  assign \$49  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:432" *) 2'h3;
-  assign \$50  = \$48  & (* src = "/home/runner/workspace/church_machine/core.py:432" *) \$49 ;
-  assign \$51  = ~ (* src = "/home/runner/workspace/church_machine/core.py:432" *) any_unit_busy;
-  assign ret_start_sig = \$50  & (* src = "/home/runner/workspace/church_machine/core.py:432" *) \$51 ;
-  assign \$52  = imem_addr + (* src = "/home/runner/workspace/church_machine/core.py:453" *) 3'h4;
-  assign \$53  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:457" *) is_church_op;
-  assign \$54  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:457" *) 3'h6;
-  assign \$55  = \$53  & (* src = "/home/runner/workspace/church_machine/core.py:457" *) \$54 ;
-  assign \$56  = ~ (* src = "/home/runner/workspace/church_machine/core.py:457" *) any_unit_busy;
-  assign tperm_start_sig = \$55  & (* src = "/home/runner/workspace/church_machine/core.py:457" *) \$56 ;
-  assign \$57  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:468" *) is_church_op;
-  assign \$58  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:468" *) 1'h1;
-  assign \$59  = \$57  & (* src = "/home/runner/workspace/church_machine/core.py:468" *) \$58 ;
-  assign \$60  = ~ (* src = "/home/runner/workspace/church_machine/core.py:468" *) any_unit_busy;
-  assign save_start_sig = \$59  & (* src = "/home/runner/workspace/church_machine/core.py:468" *) \$60 ;
-  assign \$61  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:484" *) is_church_op;
-  assign \$62  = ! (* src = "/home/runner/workspace/church_machine/core.py:484" *) instruction[31:27];
-  assign \$63  = \$61  & (* src = "/home/runner/workspace/church_machine/core.py:484" *) \$62 ;
-  assign \$64  = ~ (* src = "/home/runner/workspace/church_machine/core.py:484" *) any_unit_busy;
-  assign load_start_sig = \$63  & (* src = "/home/runner/workspace/church_machine/core.py:484" *) \$64 ;
-  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/church_machine/core.py:572" *) cr5_stack_ptr;
-  assign \$65  = cr5_stack_ptr > (* src = "/home/runner/workspace/church_machine/core.py:574" *) 1'h0;
-  assign \$66  = cr5_stack_ptr - (* src = "/home/runner/workspace/church_machine/core.py:574" *) 1'h1;
-  assign \$67  = \$65  ? (* src = "/home/runner/workspace/church_machine/core.py:574" *) \$66  : 9'h000;
-  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/church_machine/core.py:575" *) 32'd0 : cr5_stack_r_data;
-  assign \$68  = ~ (* src = "/home/runner/workspace/church_machine/core.py:581" *) call_fault;
-  assign \$69  = call_complete & (* src = "/home/runner/workspace/church_machine/core.py:581" *) \$68 ;
-  assign \$72  = ~ (* src = "/home/runner/workspace/church_machine/core.py:596" *) fault_valid;
-  assign \$73  = complete & (* src = "/home/runner/workspace/church_machine/core.py:596" *) \$72 ;
-  assign \$74  = ~ (* src = "/home/runner/workspace/church_machine/core.py:596" *) cr5_stack_empty;
-  assign \$75  = \$73  & (* src = "/home/runner/workspace/church_machine/core.py:596" *) \$74 ;
-  assign \$77  = ~ (* src = "/home/runner/workspace/church_machine/core.py:331" *) any_unit_busy;
-  assign \$78  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:331" *) \$77 ;
-  assign \$79  = imem_addr + (* src = "/home/runner/workspace/church_machine/core.py:332" *) 3'h4;
-  assign \$80  = ~ (* src = "/home/runner/workspace/church_machine/core.py:446" *) lambda_fault;
-  assign \$81  = lambda_complete & (* src = "/home/runner/workspace/church_machine/core.py:446" *) \$80 ;
-  assign \$82  = ~ (* src = "/home/runner/workspace/church_machine/core.py:581" *) call_fault;
-  assign \$83  = call_complete & (* src = "/home/runner/workspace/church_machine/core.py:581" *) \$82 ;
-  assign \$86  = ~ (* src = "/home/runner/workspace/church_machine/core.py:596" *) fault_valid;
-  assign \$87  = complete & (* src = "/home/runner/workspace/church_machine/core.py:596" *) \$86 ;
-  assign \$88  = ~ (* src = "/home/runner/workspace/church_machine/core.py:596" *) cr5_stack_empty;
-  assign \$89  = \$87  & (* src = "/home/runner/workspace/church_machine/core.py:596" *) \$88 ;
-  assign \$90  = cr5_stack_ptr + (* src = "/home/runner/workspace/church_machine/core.py:587" *) 1'h1;
-  assign \$91  = cr5_stack_ptr - (* src = "/home/runner/workspace/church_machine/core.py:597" *) 1'h1;
+  assign cr6_gt_wr_data = boot_cr6_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:418" *) boot_cr6_wr_gt : 32'd0;
+  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:418" *) boot_cr7_wr_gt : 32'd0;
+  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:418" *) boot_cr8_wr_gt : 32'd0;
+  assign cr15_gt_wr_data = boot_cr15_wr_en ? (* src = "/home/runner/workspace/church_machine/core.py:418" *) boot_cr15_wr_gt : 32'd0;
+  assign \$28  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:422" *) is_church_op;
+  assign \$29  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:422" *) 2'h2;
+  assign \$30  = \$28  & (* src = "/home/runner/workspace/church_machine/core.py:422" *) \$29 ;
+  assign \$31  = ~ (* src = "/home/runner/workspace/church_machine/core.py:422" *) any_unit_busy;
+  assign call_start_sig = \$30  & (* src = "/home/runner/workspace/church_machine/core.py:422" *) \$31 ;
+  assign \$32  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:433" *) is_church_op;
+  assign \$33  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:433" *) 2'h3;
+  assign \$34  = \$32  & (* src = "/home/runner/workspace/church_machine/core.py:433" *) \$33 ;
+  assign \$35  = ~ (* src = "/home/runner/workspace/church_machine/core.py:433" *) any_unit_busy;
+  assign ret_start_sig = \$34  & (* src = "/home/runner/workspace/church_machine/core.py:433" *) \$35 ;
+  assign \$36  = imem_addr + (* src = "/home/runner/workspace/church_machine/core.py:454" *) 3'h4;
+  assign \$37  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:458" *) is_church_op;
+  assign \$38  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:458" *) 3'h6;
+  assign \$39  = \$37  & (* src = "/home/runner/workspace/church_machine/core.py:458" *) \$38 ;
+  assign \$40  = ~ (* src = "/home/runner/workspace/church_machine/core.py:458" *) any_unit_busy;
+  assign tperm_start_sig = \$39  & (* src = "/home/runner/workspace/church_machine/core.py:458" *) \$40 ;
+  assign \$41  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:469" *) is_church_op;
+  assign \$42  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:469" *) 1'h1;
+  assign \$43  = \$41  & (* src = "/home/runner/workspace/church_machine/core.py:469" *) \$42 ;
+  assign \$44  = ~ (* src = "/home/runner/workspace/church_machine/core.py:469" *) any_unit_busy;
+  assign save_start_sig = \$43  & (* src = "/home/runner/workspace/church_machine/core.py:469" *) \$44 ;
+  assign \$45  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:485" *) is_church_op;
+  assign \$46  = ! (* src = "/home/runner/workspace/church_machine/core.py:485" *) instruction[31:27];
+  assign \$47  = \$45  & (* src = "/home/runner/workspace/church_machine/core.py:485" *) \$46 ;
+  assign \$48  = ~ (* src = "/home/runner/workspace/church_machine/core.py:485" *) any_unit_busy;
+  assign load_start_sig = \$47  & (* src = "/home/runner/workspace/church_machine/core.py:485" *) \$48 ;
+  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/church_machine/core.py:573" *) cr5_stack_ptr;
+  assign \$49  = cr5_stack_ptr > (* src = "/home/runner/workspace/church_machine/core.py:575" *) 1'h0;
+  assign \$50  = cr5_stack_ptr - (* src = "/home/runner/workspace/church_machine/core.py:575" *) 1'h1;
+  assign \$51  = \$49  ? (* src = "/home/runner/workspace/church_machine/core.py:575" *) \$50  : 9'h000;
+  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/church_machine/core.py:576" *) 32'd0 : cr5_stack_r_data;
+  assign \$52  = ~ (* src = "/home/runner/workspace/church_machine/core.py:582" *) call_fault;
+  assign \$53  = call_complete & (* src = "/home/runner/workspace/church_machine/core.py:582" *) \$52 ;
+  assign \$56  = ~ (* src = "/home/runner/workspace/church_machine/core.py:597" *) fault_valid;
+  assign \$57  = complete & (* src = "/home/runner/workspace/church_machine/core.py:597" *) \$56 ;
+  assign \$58  = ~ (* src = "/home/runner/workspace/church_machine/core.py:597" *) cr5_stack_empty;
+  assign \$59  = \$57  & (* src = "/home/runner/workspace/church_machine/core.py:597" *) \$58 ;
+  assign \$61  = ~ (* src = "/home/runner/workspace/church_machine/core.py:331" *) any_unit_busy;
+  assign \$62  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:331" *) \$61 ;
+  assign \$63  = imem_addr + (* src = "/home/runner/workspace/church_machine/core.py:332" *) 3'h4;
+  assign \$64  = ~ (* src = "/home/runner/workspace/church_machine/core.py:447" *) lambda_fault;
+  assign \$65  = lambda_complete & (* src = "/home/runner/workspace/church_machine/core.py:447" *) \$64 ;
+  assign \$66  = ~ (* src = "/home/runner/workspace/church_machine/core.py:582" *) call_fault;
+  assign \$67  = call_complete & (* src = "/home/runner/workspace/church_machine/core.py:582" *) \$66 ;
+  assign \$70  = ~ (* src = "/home/runner/workspace/church_machine/core.py:597" *) fault_valid;
+  assign \$71  = complete & (* src = "/home/runner/workspace/church_machine/core.py:597" *) \$70 ;
+  assign \$72  = ~ (* src = "/home/runner/workspace/church_machine/core.py:597" *) cr5_stack_empty;
+  assign \$73  = \$71  & (* src = "/home/runner/workspace/church_machine/core.py:597" *) \$72 ;
+  assign \$74  = cr5_stack_ptr + (* src = "/home/runner/workspace/church_machine/core.py:588" *) 1'h1;
+  assign \$75  = cr5_stack_ptr - (* src = "/home/runner/workspace/church_machine/core.py:598" *) 1'h1;
   (* src = "/home/runner/workspace/church_machine/core.py:118" *)
   always @(posedge clk)
-    boot_state <= \$92 ;
+    boot_state <= \$76 ;
   (* src = "/home/runner/workspace/church_machine/core.py:113" *)
   always @(posedge clk)
-    imem_addr <= \$93 ;
+    imem_addr <= \$77 ;
   (* src = "/home/runner/workspace/church_machine/core.py:115" *)
   always @(posedge clk)
-    lambda_active <= \$94 ;
+    lambda_active <= \$78 ;
   (* src = "/home/runner/workspace/church_machine/core.py:116" *)
   always @(posedge clk)
-    lambda_pc <= \$95 ;
-  (* src = "/home/runner/workspace/church_machine/core.py:565" *)
+    lambda_pc <= \$79 ;
+  (* src = "/home/runner/workspace/church_machine/core.py:566" *)
   always @(posedge clk)
-    cr5_stack_ptr <= \$96 ;
+    cr5_stack_ptr <= \$80 ;
   assign boot_complete = boot_state == (* src = "/home/runner/workspace/church_machine/core.py:123" *) 3'h6;
   assign clear_all = boot_state == (* src = "/home/runner/workspace/church_machine/core.py:124" *) 1'h1;
+  assign instr_valid = imem_valid & (* src = "/home/runner/workspace/church_machine/core.py:146" *) boot_complete;
+  assign cond_exec_enable = boot_complete & (* src = "/home/runner/workspace/church_machine/core.py:159" *) exec_enable;
+  assign \$1  = lambda_busy | (* src = "/home/runner/workspace/church_machine/core.py:163" *) tperm_busy;
+  assign \$2  = \$1  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) call_busy;
+  assign \$3  = \$2  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) busy;
+  assign \$4  = \$3  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) save_busy;
+  assign any_unit_busy = \$4  | (* src = "/home/runner/workspace/church_machine/core.py:163" *) load_busy;
+  assign \$5  = cond_exec_enable & (* src = "/home/runner/workspace/church_machine/core.py:176" *) is_church_op;
+  assign \$6  = instruction[31:27] == (* src = "/home/runner/workspace/church_machine/core.py:176" *) 3'h7;
+  assign \$7  = \$5  & (* src = "/home/runner/workspace/church_machine/core.py:176" *) \$6 ;
+  assign \$8  = ~ (* src = "/home/runner/workspace/church_machine/core.py:176" *) any_unit_busy;
+  assign lambda_start_sig = \$7  & (* src = "/home/runner/workspace/church_machine/core.py:176" *) \$8 ;
+  assign \$9  = lambda_start_sig | (* src = "/home/runner/workspace/church_machine/core.py:194" *) lambda_busy;
+  assign \$10  = save_busy ? (* src = "/home/runner/workspace/church_machine/core.py:198" *) \cr_rd_addr$25  : instruction[18:15];
+  assign \$11  = busy ? (* src = "/home/runner/workspace/church_machine/core.py:197" *) \cr_rd_addr$26  : \$10 ;
+  assign \$12  = call_busy ? (* src = "/home/runner/workspace/church_machine/core.py:196" *) \cr_rd_addr$27  : \$11 ;
   (* src = "/home/runner/workspace/church_machine/core.py:99" *)
   \top.core.u_call  u_call (
     .call_busy(call_busy),
@@ -3641,23 +3589,23 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr_wr_addr(\cr_wr_addr$57 ),
     .cr_wr_data(\cr_wr_data$62 ),
     .cr_wr_en(\cr_wr_en$54 ),
-    .fault_type(\fault_type$245 ),
+    .fault_type(\fault_type$241 ),
     .mload_done(mload_done),
     .mload_fault(mload_fault),
-    .mload_fault_type(\fault_type$248 ),
+    .mload_fault_type(\fault_type$244 ),
     .mload_index(mload_index),
     .mload_src(mload_cr_src),
     .mload_start(mload_start),
-    .\port$1399$0 (instruction[18:0]),
-    .\port$652$0 (\$97 ),
+    .\port$1347$0 (instruction[18:0]),
+    .\port$616$0 (\$81 ),
     .rst(rst),
-    .saved_cr5_gt(\saved_cr5_gt$232 )
+    .saved_cr5_gt(\saved_cr5_gt$228 )
   );
   (* src = "/home/runner/workspace/church_machine/core.py:94" *)
   \top.core.u_decoder  u_decoder (
     .exec_enable(exec_enable),
-    .fault(\fault$240 ),
-    .fault_valid(\fault_valid$233 ),
+    .fault(\fault$236 ),
+    .fault_valid(\fault_valid$229 ),
     .flags(flags),
     .instr_valid(instr_valid),
     .instruction(instruction),
@@ -3669,7 +3617,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr_rd_addr(\cr_rd_addr$29 ),
     .cr_rd_data(cr_rd_data),
     .cr_target(instruction[22:19]),
-    .fault_type(\fault_type$243 ),
+    .fault_type(\fault_type$239 ),
     .lambda_busy(lambda_busy),
     .lambda_complete(lambda_complete),
     .lambda_fault(lambda_fault),
@@ -3681,16 +3629,16 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   (* src = "/home/runner/workspace/church_machine/core.py:103" *)
   \top.core.u_load  u_load (
     .clk(clk),
-    .fault_type(\fault_type$248 ),
+    .fault_type(\fault_type$244 ),
     .load_busy(load_busy),
     .load_fault(load_fault),
     .load_start(load_start_sig),
     .mload_busy(sub_busy),
     .mload_done(mload_done),
     .mload_fault(mload_fault),
-    .mload_m_elevated(\mload_m_elevated$280 ),
-    .mload_start(\mload_start$274 ),
-    .\port$1399$0 (instruction[22:0]),
+    .mload_m_elevated(\mload_m_elevated$276 ),
+    .mload_start(\mload_start$270 ),
+    .\port$1347$0 (instruction[22:0]),
     .rst(rst)
   );
   (* src = "/home/runner/workspace/church_machine/core.py:95" *)
@@ -3698,7 +3646,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .check_domain_purity(check_domain_purity),
     .check_valid(check_valid),
     .fault_type(fault_type),
-    .fault_valid(\fault_valid$234 ),
+    .fault_valid(\fault_valid$230 ),
     .gt_in(cr_rd_data[31:0]),
     .required_perms(required_perms)
   );
@@ -3708,16 +3656,16 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .clk(clk),
     .cr0_gt_wr_data(32'd0),
     .cr0_gt_wr_en(1'h0),
-    .cr10_gt_wr_data(cr10_gt_wr_data),
-    .cr10_gt_wr_en(cr10_gt_wr_en),
-    .cr11_gt_wr_data(cr11_gt_wr_data),
-    .cr11_gt_wr_en(cr11_gt_wr_en),
-    .cr12_gt_wr_data(cr12_gt_wr_data),
-    .cr12_gt_wr_en(cr12_gt_wr_en),
-    .cr13_gt_wr_data(cr13_gt_wr_data),
-    .cr13_gt_wr_en(cr13_gt_wr_en),
-    .cr14_gt_wr_data(cr14_gt_wr_data),
-    .cr14_gt_wr_en(cr14_gt_wr_en),
+    .cr10_gt_wr_data(32'd0),
+    .cr10_gt_wr_en(1'h0),
+    .cr11_gt_wr_data(32'd0),
+    .cr11_gt_wr_en(1'h0),
+    .cr12_gt_wr_data(32'd0),
+    .cr12_gt_wr_en(1'h0),
+    .cr13_gt_wr_data(32'd0),
+    .cr13_gt_wr_en(1'h0),
+    .cr14_gt_wr_data(32'd0),
+    .cr14_gt_wr_en(1'h0),
     .cr15(cr15_namespace),
     .cr15_gt_wr_data(cr15_gt_wr_data),
     .cr15_gt_wr_en(cr15_gt_wr_en),
@@ -3737,8 +3685,8 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr7_gt_wr_en(cr7_gt_wr_en),
     .cr8_gt_wr_data(cr8_gt_wr_data),
     .cr8_gt_wr_en(cr8_gt_wr_en),
-    .cr9_gt_wr_data(cr9_gt_wr_data),
-    .cr9_gt_wr_en(cr9_gt_wr_en),
+    .cr9_gt_wr_data(32'd0),
+    .cr9_gt_wr_en(1'h0),
     .cr_rd_addr(cr_rd_addr),
     .cr_rd_data(cr_rd_data),
     .cr_wr_addr(cr_wr_addr),
@@ -3758,19 +3706,19 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr_wr_addr(\cr_wr_addr$56 ),
     .cr_wr_data(\cr_wr_data$61 ),
     .cr_wr_en(\cr_wr_en$55 ),
-    .fault_type(\fault_type$246 ),
+    .fault_type(\fault_type$242 ),
     .fault_valid(fault_valid),
     .lambda_active(lambda_active),
     .lambda_clear(lambda_clear),
     .lambda_pc(lambda_pc),
-    .mload_direct_gt(\mload_direct_gt$272 ),
+    .mload_direct_gt(\mload_direct_gt$268 ),
     .mload_done(mload_done),
-    .mload_dst(\mload_cr_dst$269 ),
+    .mload_dst(\mload_cr_dst$265 ),
     .mload_fault(mload_fault),
-    .mload_fault_type(\fault_type$248 ),
-    .mload_start(\mload_start$267 ),
-    .nia_set(\nia_set$316 ),
-    .nia_value(\nia_value$319 ),
+    .mload_fault_type(\fault_type$244 ),
+    .mload_start(\mload_start$263 ),
+    .nia_set(\nia_set$312 ),
+    .nia_value(\nia_value$315 ),
     .reboot_request(reboot_request),
     .return_start(ret_start_sig),
     .rst(rst),
@@ -3782,14 +3730,14 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr15_namespace(cr15_namespace),
     .cr_rd_addr(\cr_rd_addr$25 ),
     .cr_rd_data(cr_rd_data),
-    .fault_type(\fault_type$247 ),
+    .fault_type(\fault_type$243 ),
     .mem_rd_addr(mem_rd_addr),
     .mem_rd_data(mem_rd_data),
-    .mem_rd_en(\mem_rd_en$301 ),
+    .mem_rd_en(\mem_rd_en$297 ),
     .mem_wr_addr(mem_wr_addr),
-    .mem_wr_data(\mem_wr_data$305 ),
-    .mem_wr_en(\mem_wr_en$300 ),
-    .\port$1399$0 (instruction[22:0]),
+    .mem_wr_data(\mem_wr_data$301 ),
+    .mem_wr_en(\mem_wr_en$296 ),
+    .\port$1347$0 (instruction[22:0]),
     .rst(rst),
     .save_busy(save_busy),
     .save_fault(save_fault),
@@ -3815,7 +3763,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .sub_direct_gt(sub_direct_gt),
     .sub_done(mload_done),
     .sub_fault(mload_fault),
-    .sub_fault_type(\fault_type$248 ),
+    .sub_fault_type(\fault_type$244 ),
     .sub_index(sub_index),
     .sub_m_elevated(sub_m_elevated),
     .sub_start(sub_start)
@@ -3829,7 +3777,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     .cr_wr_addr(\cr_wr_addr$58 ),
     .cr_wr_data(\cr_wr_data$63 ),
     .cr_wr_en(\cr_wr_en$53 ),
-    .fault_type(\fault_type$244 ),
+    .fault_type(\fault_type$240 ),
     .preset(instruction[3:0]),
     .rst(rst),
     .tperm_busy(tperm_busy),
@@ -4033,188 +3981,44 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr8_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$36 ) begin
-        rt_cr8_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr8_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$36 ) begin
-        rt_cr8_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr9_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$37 ) begin
-        rt_cr9_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr9_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$37 ) begin
-        rt_cr9_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr10_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$38 ) begin
-        rt_cr10_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr10_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$38 ) begin
-        rt_cr10_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr11_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$39 ) begin
-        rt_cr11_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr11_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$39 ) begin
-        rt_cr11_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr12_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$40 ) begin
-        rt_cr12_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr12_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$40 ) begin
-        rt_cr12_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr13_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$41 ) begin
-        rt_cr13_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr13_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$41 ) begin
-        rt_cr13_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr14_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$42 ) begin
-        rt_cr14_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr14_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$42 ) begin
-        rt_cr14_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr15_wr_en = 1'h0;
-    if (switch_change_active) begin
-      if (\$43 ) begin
-        rt_cr15_wr_en = 1'h1;
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    rt_cr15_wr_gt = 32'd0;
-    if (switch_change_active) begin
-      if (\$43 ) begin
-        rt_cr15_wr_gt = cr_rd_data[31:0];
-      end
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     cr5_stack_w_addr = 8'h00;
-    if (\$71 ) begin
+    if (\$55 ) begin
       cr5_stack_w_addr = cr5_stack_ptr;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     cr5_stack_w_data = 32'd0;
-    if (\$71 ) begin
-      cr5_stack_w_data = \saved_cr5_gt$232 ;
+    if (\$55 ) begin
+      cr5_stack_w_data = \saved_cr5_gt$228 ;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     cr5_stack_w_en = 1'h0;
-    if (\$71 ) begin
+    if (\$55 ) begin
       cr5_stack_w_en = 1'h1;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     (* full_case = 32'd1 *)
-    if (\fault_valid$233 ) begin
-      fault = \fault$240 ;
-    end else if (\fault_valid$234 ) begin
+    if (\fault_valid$229 ) begin
+      fault = \fault$236 ;
+    end else if (\fault_valid$230 ) begin
       fault = fault_type;
     end else if (lambda_fault) begin
-      fault = \fault_type$243 ;
+      fault = \fault_type$239 ;
     end else if (tperm_fault) begin
-      fault = \fault_type$244 ;
+      fault = \fault_type$240 ;
     end else if (call_fault) begin
-      fault = \fault_type$245 ;
+      fault = \fault_type$241 ;
     end else if (fault_valid) begin
-      fault = \fault_type$246 ;
+      fault = \fault_type$242 ;
     end else if (save_fault) begin
-      fault = \fault_type$247 ;
+      fault = \fault_type$243 ;
     end else if (load_fault) begin
-      fault = \fault_type$248 ;
+      fault = \fault_type$244 ;
     end else begin
       fault = 4'h0;
     end
@@ -4222,24 +4026,24 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     (* full_case = 32'd1 *)
-    if (\fault_valid$233 ) begin
-      \fault_valid$241  = 1'h1;
-    end else if (\fault_valid$234 ) begin
-      \fault_valid$241  = 1'h1;
+    if (\fault_valid$229 ) begin
+      \fault_valid$237  = 1'h1;
+    end else if (\fault_valid$230 ) begin
+      \fault_valid$237  = 1'h1;
     end else if (lambda_fault) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else if (tperm_fault) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else if (call_fault) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else if (fault_valid) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else if (save_fault) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else if (load_fault) begin
-      \fault_valid$241  = 1'h1;
+      \fault_valid$237  = 1'h1;
     end else begin
-      \fault_valid$241  = 1'h0;
+      \fault_valid$237  = 1'h0;
     end
   end
   always @* begin
@@ -4248,9 +4052,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     if (call_busy) begin
       sub_start = mload_start;
     end else if (busy) begin
-      sub_start = \mload_start$267 ;
+      sub_start = \mload_start$263 ;
     end else if (load_busy) begin
-      sub_start = \mload_start$274 ;
+      sub_start = \mload_start$270 ;
     end
   end
   always @* begin
@@ -4268,9 +4072,9 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     sub_cr_dst = 4'h0;
     if (call_busy) begin
-      sub_cr_dst = { 1'h0, \$97  };
+      sub_cr_dst = { 1'h0, \$81  };
     end else if (busy) begin
-      sub_cr_dst = \mload_cr_dst$269 ;
+      sub_cr_dst = \mload_cr_dst$265 ;
     end else if (load_busy) begin
       sub_cr_dst = instruction[22:19];
     end
@@ -4303,7 +4107,7 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     if (call_busy) begin
       sub_direct_gt = 32'd0;
     end else if (busy) begin
-      sub_direct_gt = \mload_direct_gt$272 ;
+      sub_direct_gt = \mload_direct_gt$268 ;
     end else if (load_busy) begin
       sub_direct_gt = 32'd0;
     end
@@ -4316,133 +4120,133 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
     end else if (busy) begin
       sub_m_elevated = 1'h1;
     end else if (load_busy) begin
-      sub_m_elevated = \mload_m_elevated$280 ;
+      sub_m_elevated = \mload_m_elevated$276 ;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     dmem_addr = 32'd0;
-    if (\$76 ) begin
+    if (\$60 ) begin
       dmem_addr = mem_addr;
-    end else if (\mem_wr_en$300 ) begin
+    end else if (\mem_wr_en$296 ) begin
       dmem_addr = mem_wr_addr;
-    end else if (\mem_rd_en$301 ) begin
+    end else if (\mem_rd_en$297 ) begin
       dmem_addr = mem_rd_addr;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     dmem_rd_en = 1'h0;
-    if (\$76 ) begin
+    if (\$60 ) begin
       dmem_rd_en = mem_rd_en;
-    end else if (\mem_wr_en$300 ) begin
-    end else if (\mem_rd_en$301 ) begin
+    end else if (\mem_wr_en$296 ) begin
+    end else if (\mem_rd_en$297 ) begin
       dmem_rd_en = 1'h1;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     dmem_wr_data = 32'd0;
-    if (\$76 ) begin
+    if (\$60 ) begin
       dmem_wr_data = 32'd0;
-    end else if (\mem_wr_en$300 ) begin
-      dmem_wr_data = \mem_wr_data$305 ;
+    end else if (\mem_wr_en$296 ) begin
+      dmem_wr_data = \mem_wr_data$301 ;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
     dmem_wr_en = 1'h0;
-    if (\$76 ) begin
+    if (\$60 ) begin
       dmem_wr_en = 1'h0;
-    end else if (\mem_wr_en$300 ) begin
+    end else if (\mem_wr_en$296 ) begin
       dmem_wr_en = 1'h1;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    \$92  = boot_state;
+    \$76  = boot_state;
     casez (boot_state)
       3'h0:
           if (boot_start) begin
-            \$92  = 3'h1;
+            \$76  = 3'h1;
           end
       3'h1:
-          \$92  = 3'h2;
+          \$76  = 3'h2;
       3'h2:
-          \$92  = 3'h3;
+          \$76  = 3'h3;
       3'h3:
-          \$92  = 3'h4;
+          \$76  = 3'h4;
       3'h4:
-          \$92  = 3'h5;
+          \$76  = 3'h5;
       3'h5:
-          \$92  = 3'h6;
+          \$76  = 3'h6;
       3'h6:
-          \$92  = 3'h6;
+          \$76  = 3'h6;
     endcase
     if (reboot_request) begin
-      \$92  = 3'h1;
+      \$76  = 3'h1;
     end
     if (rst) begin
-      \$92  = 3'h0;
+      \$76  = 3'h0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    \$93  = imem_addr;
+    \$77  = imem_addr;
     if (reboot_request) begin
-      \$93  = 32'd0;
+      \$77  = 32'd0;
     end else if (clear_all) begin
-      \$93  = 32'd0;
+      \$77  = 32'd0;
     end else if (nia_set) begin
-      \$93  = nia_value;
-    end else if (\nia_set$316 ) begin
-      \$93  = \nia_value$319 ;
+      \$77  = nia_value;
+    end else if (\nia_set$312 ) begin
+      \$77  = \nia_value$315 ;
     end else if (call_complete) begin
-      \$93  = 32'd0;
-    end else if (\$78 ) begin
-      \$93  = \$79 [31:0];
+      \$77  = 32'd0;
+    end else if (\$62 ) begin
+      \$77  = \$63 [31:0];
     end
     if (rst) begin
-      \$93  = 32'd0;
+      \$77  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    \$94  = lambda_active;
+    \$78  = lambda_active;
     if (clear_all) begin
-      \$94  = 1'h0;
+      \$78  = 1'h0;
     end else if (lambda_clear) begin
-      \$94  = 1'h0;
-    end else if (\$81 ) begin
-      \$94  = 1'h1;
+      \$78  = 1'h0;
+    end else if (\$65 ) begin
+      \$78  = 1'h1;
     end
     if (rst) begin
-      \$94  = 1'h0;
+      \$78  = 1'h0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    \$95  = lambda_pc;
+    \$79  = lambda_pc;
     if (clear_all) begin
-      \$95  = 32'd0;
+      \$79  = 32'd0;
     end else if (lambda_clear) begin
-    end else if (\$81 ) begin
-      \$95  = \$52 [31:0];
+    end else if (\$65 ) begin
+      \$79  = \$36 [31:0];
     end
     if (rst) begin
-      \$95  = 32'd0;
+      \$79  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$3 ) begin end
-    \$96  = cr5_stack_ptr;
-    if (\$85 ) begin
-      \$96  = \$90 [7:0];
-    end else if (\$89 ) begin
-      \$96  = \$91 [7:0];
+    \$80  = cr5_stack_ptr;
+    if (\$69 ) begin
+      \$80  = \$74 [7:0];
+    end else if (\$73 ) begin
+      \$80  = \$75 [7:0];
     end
     if (rst) begin
-      \$96  = 8'h00;
+      \$80  = 8'h00;
     end
   end
   assign boot_state_reg = boot_state;
@@ -4468,8 +4272,6 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign nia_reg = imem_addr;
   assign nia = imem_addr;
   assign \flags$69  = flags;
-  assign switch_src_gt = cr_rd_data[31:0];
-  assign switch_target = instruction[3:0];
   assign boot_cr0_wr_en = 1'h0;
   assign rt_cr0_wr_en = 1'h0;
   assign rt_cr0_wr_gt = 32'd0;
@@ -4498,90 +4300,106 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign rt_cr6_wr_gt = 32'd0;
   assign rt_cr7_wr_en = 1'h0;
   assign rt_cr7_wr_gt = 32'd0;
+  assign rt_cr8_wr_en = 1'h0;
+  assign rt_cr8_wr_gt = 32'd0;
   assign boot_cr9_wr_en = 1'h0;
+  assign rt_cr9_wr_en = 1'h0;
+  assign rt_cr9_wr_gt = 32'd0;
   assign boot_cr9_wr_gt = 32'd0;
   assign boot_cr10_wr_en = 1'h0;
+  assign rt_cr10_wr_en = 1'h0;
+  assign rt_cr10_wr_gt = 32'd0;
   assign boot_cr10_wr_gt = 32'd0;
   assign boot_cr11_wr_en = 1'h0;
+  assign rt_cr11_wr_en = 1'h0;
+  assign rt_cr11_wr_gt = 32'd0;
   assign boot_cr11_wr_gt = 32'd0;
   assign boot_cr12_wr_en = 1'h0;
+  assign rt_cr12_wr_en = 1'h0;
+  assign rt_cr12_wr_gt = 32'd0;
   assign boot_cr12_wr_gt = 32'd0;
   assign boot_cr13_wr_en = 1'h0;
+  assign rt_cr13_wr_en = 1'h0;
+  assign rt_cr13_wr_gt = 32'd0;
   assign boot_cr13_wr_gt = 32'd0;
   assign boot_cr14_wr_en = 1'h0;
+  assign rt_cr14_wr_en = 1'h0;
+  assign rt_cr14_wr_gt = 32'd0;
   assign boot_cr14_wr_gt = 32'd0;
+  assign rt_cr15_wr_en = 1'h0;
+  assign rt_cr15_wr_gt = 32'd0;
   assign call_start = call_start_sig;
-  assign \cr_src$177  = instruction[18:15];
+  assign \cr_src$173  = instruction[18:15];
   assign index = { 2'h0, instruction[14:0] };
   assign cap_index = instruction[14:0];
   assign mask = { 1'h0, instruction[14:0] };
   assign call_mask = instruction[14:0];
-  assign \cr_rd_data$182  = cr_rd_data;
+  assign \cr_rd_data$178  = cr_rd_data;
   assign return_start = ret_start_sig;
-  assign \cr_src$185  = instruction[17:15];
-  assign \cr_rd_data$186  = cr_rd_data;
+  assign \cr_src$181  = instruction[17:15];
+  assign \cr_rd_data$182  = cr_rd_data;
   assign lambda_active_reg = lambda_active;
   assign lambda_pc_reg = lambda_pc;
   assign lambda_start = lambda_start_sig;
   assign cr_target = instruction[22:19];
   assign cr_dst = instruction[22:19];
-  assign \cr_rd_data$194  = cr_rd_data;
-  assign saved_nia = \$52 [31:0];
+  assign \cr_rd_data$190  = cr_rd_data;
+  assign saved_nia = \$36 [31:0];
   assign tperm_start = tperm_start_sig;
-  assign \cr_target$198  = instruction[22:19];
+  assign \cr_target$194  = instruction[22:19];
   assign preset = instruction[3:0];
   assign tperm_preset = instruction[3:0];
-  assign \cr_rd_data$201  = cr_rd_data;
+  assign \cr_rd_data$197  = cr_rd_data;
   assign save_start = save_start_sig;
-  assign \cr_src$204  = instruction[18:15];
-  assign \cr_dst$205  = instruction[22:19];
-  assign \index$206  = { 2'h0, instruction[14:0] };
-  assign \cr_rd_data$207  = cr_rd_data;
-  assign \cr15_namespace$209  = cr15_namespace;
+  assign \cr_src$200  = instruction[18:15];
+  assign \cr_dst$201  = instruction[22:19];
+  assign \index$202  = { 2'h0, instruction[14:0] };
+  assign \cr_rd_data$203  = cr_rd_data;
+  assign \cr15_namespace$205  = cr15_namespace;
   assign mem_wr_done = 1'h1;
   assign dmem_rd_data = mem_rd_data;
   assign mem_rd_valid = 1'h1;
   assign load_start = load_start_sig;
-  assign \cr_src$216  = instruction[18:15];
-  assign \cr_dst$217  = instruction[22:19];
-  assign \index$218  = { 2'h0, instruction[14:0] };
-  assign cr5_stack_r_addr = \$67 [7:0];
-  assign \cr_rd_data$249  = cr_rd_data;
-  assign \cr15_namespace$250  = cr15_namespace;
-  assign \mem_rd_data$251  = mem_rd_data;
-  assign \mem_rd_valid$252  = 1'h1;
-  assign mload_cr_dst = { 1'h0, \$97  };
+  assign \cr_src$212  = instruction[18:15];
+  assign \cr_dst$213  = instruction[22:19];
+  assign \index$214  = { 2'h0, instruction[14:0] };
+  assign cr5_stack_r_addr = \$51 [7:0];
+  assign \cr_rd_data$245  = cr_rd_data;
+  assign \cr15_namespace$246  = cr15_namespace;
+  assign \mem_rd_data$247  = mem_rd_data;
+  assign \mem_rd_valid$248  = 1'h1;
+  assign mload_cr_dst = { 1'h0, \$81  };
   assign mload_direct = 1'h0;
   assign mload_direct_gt = 32'd0;
   assign mload_m_elevated = 1'h1;
-  assign \mload_cr_src$268  = 4'h0;
-  assign \mload_index$270  = 17'h00000;
-  assign \mload_direct$271  = 1'h1;
-  assign \mload_m_elevated$273  = 1'h1;
-  assign \mload_cr_src$275  = instruction[18:15];
-  assign \mload_cr_dst$276  = instruction[22:19];
-  assign \mload_index$277  = { 2'h0, instruction[14:0] };
-  assign \mload_direct$278  = 1'h0;
-  assign \mload_direct_gt$279  = 32'd0;
+  assign \mload_cr_src$264  = 4'h0;
+  assign \mload_index$266  = 17'h00000;
+  assign \mload_direct$267  = 1'h1;
+  assign \mload_m_elevated$269  = 1'h1;
+  assign \mload_cr_src$271  = instruction[18:15];
+  assign \mload_cr_dst$272  = instruction[22:19];
+  assign \mload_index$273  = { 2'h0, instruction[14:0] };
+  assign \mload_direct$274  = 1'h0;
+  assign \mload_direct_gt$275  = 32'd0;
   assign sub_done = mload_done;
   assign sub_fault = mload_fault;
-  assign mload_fault_type = \fault_type$248 ;
-  assign sub_fault_type = \fault_type$248 ;
+  assign mload_fault_type = \fault_type$244 ;
+  assign sub_fault_type = \fault_type$244 ;
+  assign \mload_done$283  = mload_done;
+  assign \mload_fault$284  = mload_fault;
+  assign \mload_fault_type$285  = \fault_type$244 ;
+  assign mload_busy = sub_busy;
   assign \mload_done$287  = mload_done;
   assign \mload_fault$288  = mload_fault;
-  assign \mload_fault_type$289  = \fault_type$248 ;
-  assign mload_busy = sub_busy;
-  assign \mload_done$291  = mload_done;
-  assign \mload_fault$292  = mload_fault;
-  assign \mload_fault_type$293  = \fault_type$248 ;
+  assign \mload_fault_type$289  = \fault_type$244 ;
   assign mem_wr_en = 1'h0;
   assign mem_wr_data = 32'd0;
   assign ns_addr = 32'd0;
   assign ns_rd_en = 1'h0;
   assign ns_wr_data = 96'h000000000000000000000000;
   assign ns_wr_en = 1'h0;
-  assign \nia_set$317  = call_complete;
-  assign \nia_value$320  = 32'd0;
+  assign \nia_set$313  = call_complete;
+  assign \nia_value$316  = 32'd0;
   assign perm_gt_sig = cr_rd_data[31:0];
   assign \flags.N  = flags[0];
   assign \flags.Z  = flags[1];
@@ -4699,42 +4517,6 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \boot_cr7_wr_gt.perms  = boot_cr7_wr_gt[7:2];
   assign \boot_cr7_wr_gt.index  = boot_cr7_wr_gt[24:8];
   assign \boot_cr7_wr_gt.version  = boot_cr7_wr_gt[31:25];
-  assign \switch_src_gt.gt_type  = cr_rd_data[1:0];
-  assign \switch_src_gt.perms  = cr_rd_data[7:2];
-  assign \switch_src_gt.index  = cr_rd_data[24:8];
-  assign \switch_src_gt.version  = cr_rd_data[31:25];
-  assign \rt_cr8_wr_gt.gt_type  = rt_cr8_wr_gt[1:0];
-  assign \rt_cr8_wr_gt.perms  = rt_cr8_wr_gt[7:2];
-  assign \rt_cr8_wr_gt.index  = rt_cr8_wr_gt[24:8];
-  assign \rt_cr8_wr_gt.version  = rt_cr8_wr_gt[31:25];
-  assign \rt_cr9_wr_gt.gt_type  = rt_cr9_wr_gt[1:0];
-  assign \rt_cr9_wr_gt.perms  = rt_cr9_wr_gt[7:2];
-  assign \rt_cr9_wr_gt.index  = rt_cr9_wr_gt[24:8];
-  assign \rt_cr9_wr_gt.version  = rt_cr9_wr_gt[31:25];
-  assign \rt_cr10_wr_gt.gt_type  = rt_cr10_wr_gt[1:0];
-  assign \rt_cr10_wr_gt.perms  = rt_cr10_wr_gt[7:2];
-  assign \rt_cr10_wr_gt.index  = rt_cr10_wr_gt[24:8];
-  assign \rt_cr10_wr_gt.version  = rt_cr10_wr_gt[31:25];
-  assign \rt_cr11_wr_gt.gt_type  = rt_cr11_wr_gt[1:0];
-  assign \rt_cr11_wr_gt.perms  = rt_cr11_wr_gt[7:2];
-  assign \rt_cr11_wr_gt.index  = rt_cr11_wr_gt[24:8];
-  assign \rt_cr11_wr_gt.version  = rt_cr11_wr_gt[31:25];
-  assign \rt_cr12_wr_gt.gt_type  = rt_cr12_wr_gt[1:0];
-  assign \rt_cr12_wr_gt.perms  = rt_cr12_wr_gt[7:2];
-  assign \rt_cr12_wr_gt.index  = rt_cr12_wr_gt[24:8];
-  assign \rt_cr12_wr_gt.version  = rt_cr12_wr_gt[31:25];
-  assign \rt_cr13_wr_gt.gt_type  = rt_cr13_wr_gt[1:0];
-  assign \rt_cr13_wr_gt.perms  = rt_cr13_wr_gt[7:2];
-  assign \rt_cr13_wr_gt.index  = rt_cr13_wr_gt[24:8];
-  assign \rt_cr13_wr_gt.version  = rt_cr13_wr_gt[31:25];
-  assign \rt_cr14_wr_gt.gt_type  = rt_cr14_wr_gt[1:0];
-  assign \rt_cr14_wr_gt.perms  = rt_cr14_wr_gt[7:2];
-  assign \rt_cr14_wr_gt.index  = rt_cr14_wr_gt[24:8];
-  assign \rt_cr14_wr_gt.version  = rt_cr14_wr_gt[31:25];
-  assign \rt_cr15_wr_gt.gt_type  = rt_cr15_wr_gt[1:0];
-  assign \rt_cr15_wr_gt.perms  = rt_cr15_wr_gt[7:2];
-  assign \rt_cr15_wr_gt.index  = rt_cr15_wr_gt[24:8];
-  assign \rt_cr15_wr_gt.version  = rt_cr15_wr_gt[31:25];
   assign \cr0_gt_wr_data.gt_type  = cr0_gt_wr_data[1:0];
   assign \cr0_gt_wr_data.perms  = cr0_gt_wr_data[7:2];
   assign \cr0_gt_wr_data.index  = cr0_gt_wr_data[24:8];
@@ -4827,10 +4609,18 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr8_gt_wr_data.perms  = cr8_gt_wr_data[7:2];
   assign \cr8_gt_wr_data.index  = cr8_gt_wr_data[24:8];
   assign \cr8_gt_wr_data.version  = cr8_gt_wr_data[31:25];
+  assign \rt_cr8_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr8_wr_gt.perms  = 6'h00;
+  assign \rt_cr8_wr_gt.index  = 17'h00000;
+  assign \rt_cr8_wr_gt.version  = 7'h00;
   assign \cr9_gt_wr_data.gt_type  = cr9_gt_wr_data[1:0];
   assign \cr9_gt_wr_data.perms  = cr9_gt_wr_data[7:2];
   assign \cr9_gt_wr_data.index  = cr9_gt_wr_data[24:8];
   assign \cr9_gt_wr_data.version  = cr9_gt_wr_data[31:25];
+  assign \rt_cr9_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr9_wr_gt.perms  = 6'h00;
+  assign \rt_cr9_wr_gt.index  = 17'h00000;
+  assign \rt_cr9_wr_gt.version  = 7'h00;
   assign \boot_cr9_wr_gt.gt_type  = 2'h0;
   assign \boot_cr9_wr_gt.perms  = 6'h00;
   assign \boot_cr9_wr_gt.index  = 17'h00000;
@@ -4839,6 +4629,10 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr10_gt_wr_data.perms  = cr10_gt_wr_data[7:2];
   assign \cr10_gt_wr_data.index  = cr10_gt_wr_data[24:8];
   assign \cr10_gt_wr_data.version  = cr10_gt_wr_data[31:25];
+  assign \rt_cr10_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr10_wr_gt.perms  = 6'h00;
+  assign \rt_cr10_wr_gt.index  = 17'h00000;
+  assign \rt_cr10_wr_gt.version  = 7'h00;
   assign \boot_cr10_wr_gt.gt_type  = 2'h0;
   assign \boot_cr10_wr_gt.perms  = 6'h00;
   assign \boot_cr10_wr_gt.index  = 17'h00000;
@@ -4847,6 +4641,10 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr11_gt_wr_data.perms  = cr11_gt_wr_data[7:2];
   assign \cr11_gt_wr_data.index  = cr11_gt_wr_data[24:8];
   assign \cr11_gt_wr_data.version  = cr11_gt_wr_data[31:25];
+  assign \rt_cr11_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr11_wr_gt.perms  = 6'h00;
+  assign \rt_cr11_wr_gt.index  = 17'h00000;
+  assign \rt_cr11_wr_gt.version  = 7'h00;
   assign \boot_cr11_wr_gt.gt_type  = 2'h0;
   assign \boot_cr11_wr_gt.perms  = 6'h00;
   assign \boot_cr11_wr_gt.index  = 17'h00000;
@@ -4855,6 +4653,10 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr12_gt_wr_data.perms  = cr12_gt_wr_data[7:2];
   assign \cr12_gt_wr_data.index  = cr12_gt_wr_data[24:8];
   assign \cr12_gt_wr_data.version  = cr12_gt_wr_data[31:25];
+  assign \rt_cr12_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr12_wr_gt.perms  = 6'h00;
+  assign \rt_cr12_wr_gt.index  = 17'h00000;
+  assign \rt_cr12_wr_gt.version  = 7'h00;
   assign \boot_cr12_wr_gt.gt_type  = 2'h0;
   assign \boot_cr12_wr_gt.perms  = 6'h00;
   assign \boot_cr12_wr_gt.index  = 17'h00000;
@@ -4863,6 +4665,10 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr13_gt_wr_data.perms  = cr13_gt_wr_data[7:2];
   assign \cr13_gt_wr_data.index  = cr13_gt_wr_data[24:8];
   assign \cr13_gt_wr_data.version  = cr13_gt_wr_data[31:25];
+  assign \rt_cr13_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr13_wr_gt.perms  = 6'h00;
+  assign \rt_cr13_wr_gt.index  = 17'h00000;
+  assign \rt_cr13_wr_gt.version  = 7'h00;
   assign \boot_cr13_wr_gt.gt_type  = 2'h0;
   assign \boot_cr13_wr_gt.perms  = 6'h00;
   assign \boot_cr13_wr_gt.index  = 17'h00000;
@@ -4871,6 +4677,10 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr14_gt_wr_data.perms  = cr14_gt_wr_data[7:2];
   assign \cr14_gt_wr_data.index  = cr14_gt_wr_data[24:8];
   assign \cr14_gt_wr_data.version  = cr14_gt_wr_data[31:25];
+  assign \rt_cr14_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr14_wr_gt.perms  = 6'h00;
+  assign \rt_cr14_wr_gt.index  = 17'h00000;
+  assign \rt_cr14_wr_gt.version  = 7'h00;
   assign \boot_cr14_wr_gt.gt_type  = 2'h0;
   assign \boot_cr14_wr_gt.perms  = 6'h00;
   assign \boot_cr14_wr_gt.index  = 17'h00000;
@@ -4879,6 +4689,18 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr15_gt_wr_data.perms  = cr15_gt_wr_data[7:2];
   assign \cr15_gt_wr_data.index  = cr15_gt_wr_data[24:8];
   assign \cr15_gt_wr_data.version  = cr15_gt_wr_data[31:25];
+  assign \rt_cr15_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr15_wr_gt.perms  = 6'h00;
+  assign \rt_cr15_wr_gt.index  = 17'h00000;
+  assign \rt_cr15_wr_gt.version  = 7'h00;
+  assign \cr_rd_data$178.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$178.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$178.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$178.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$178.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$178.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$178.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$178.word3_seals  = cr_rd_data[127:96];
   assign \cr_rd_data$182.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data$182.word0_gt.gt_type  = cr_rd_data[1:0];
   assign \cr_rd_data$182.word0_gt.perms  = cr_rd_data[7:2];
@@ -4887,38 +4709,30 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr_rd_data$182.word1_location  = cr_rd_data[63:32];
   assign \cr_rd_data$182.word2_limit  = cr_rd_data[95:64];
   assign \cr_rd_data$182.word3_seals  = cr_rd_data[127:96];
-  assign \cr_rd_data$186.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$186.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$186.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$186.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$186.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$186.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$186.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$186.word3_seals  = cr_rd_data[127:96];
-  assign \cr_rd_data$194.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$194.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$194.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$194.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$194.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$194.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$194.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$194.word3_seals  = cr_rd_data[127:96];
-  assign \cr_rd_data$201.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$201.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$201.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$201.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$201.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$201.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$201.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$201.word3_seals  = cr_rd_data[127:96];
-  assign \cr_rd_data$207.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$207.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$207.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$207.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$207.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$207.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$207.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$207.word3_seals  = cr_rd_data[127:96];
+  assign \cr_rd_data$190.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$190.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$190.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$190.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$190.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$190.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$190.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$190.word3_seals  = cr_rd_data[127:96];
+  assign \cr_rd_data$197.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$197.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$197.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$197.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$197.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$197.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$197.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$197.word3_seals  = cr_rd_data[127:96];
+  assign \cr_rd_data$203.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$203.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$203.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$203.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$203.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$203.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$203.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$203.word3_seals  = cr_rd_data[127:96];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[1:0];
   assign \cr15_namespace.word0_gt.perms  = cr15_namespace[7:2];
@@ -4927,30 +4741,30 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign \cr15_namespace.word1_location  = cr15_namespace[63:32];
   assign \cr15_namespace.word2_limit  = cr15_namespace[95:64];
   assign \cr15_namespace.word3_seals  = cr15_namespace[127:96];
-  assign \cr15_namespace$209.word0_gt  = cr15_namespace[31:0];
-  assign \cr15_namespace$209.word0_gt.gt_type  = cr15_namespace[1:0];
-  assign \cr15_namespace$209.word0_gt.perms  = cr15_namespace[7:2];
-  assign \cr15_namespace$209.word0_gt.index  = cr15_namespace[24:8];
-  assign \cr15_namespace$209.word0_gt.version  = cr15_namespace[31:25];
-  assign \cr15_namespace$209.word1_location  = cr15_namespace[63:32];
-  assign \cr15_namespace$209.word2_limit  = cr15_namespace[95:64];
-  assign \cr15_namespace$209.word3_seals  = cr15_namespace[127:96];
-  assign \cr_rd_data$249.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$249.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$249.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$249.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$249.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$249.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$249.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$249.word3_seals  = cr_rd_data[127:96];
-  assign \cr15_namespace$250.word0_gt  = cr15_namespace[31:0];
-  assign \cr15_namespace$250.word0_gt.gt_type  = cr15_namespace[1:0];
-  assign \cr15_namespace$250.word0_gt.perms  = cr15_namespace[7:2];
-  assign \cr15_namespace$250.word0_gt.index  = cr15_namespace[24:8];
-  assign \cr15_namespace$250.word0_gt.version  = cr15_namespace[31:25];
-  assign \cr15_namespace$250.word1_location  = cr15_namespace[63:32];
-  assign \cr15_namespace$250.word2_limit  = cr15_namespace[95:64];
-  assign \cr15_namespace$250.word3_seals  = cr15_namespace[127:96];
+  assign \cr15_namespace$205.word0_gt  = cr15_namespace[31:0];
+  assign \cr15_namespace$205.word0_gt.gt_type  = cr15_namespace[1:0];
+  assign \cr15_namespace$205.word0_gt.perms  = cr15_namespace[7:2];
+  assign \cr15_namespace$205.word0_gt.index  = cr15_namespace[24:8];
+  assign \cr15_namespace$205.word0_gt.version  = cr15_namespace[31:25];
+  assign \cr15_namespace$205.word1_location  = cr15_namespace[63:32];
+  assign \cr15_namespace$205.word2_limit  = cr15_namespace[95:64];
+  assign \cr15_namespace$205.word3_seals  = cr15_namespace[127:96];
+  assign \cr_rd_data$245.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$245.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$245.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$245.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$245.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$245.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$245.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$245.word3_seals  = cr_rd_data[127:96];
+  assign \cr15_namespace$246.word0_gt  = cr15_namespace[31:0];
+  assign \cr15_namespace$246.word0_gt.gt_type  = cr15_namespace[1:0];
+  assign \cr15_namespace$246.word0_gt.perms  = cr15_namespace[7:2];
+  assign \cr15_namespace$246.word0_gt.index  = cr15_namespace[24:8];
+  assign \cr15_namespace$246.word0_gt.version  = cr15_namespace[31:25];
+  assign \cr15_namespace$246.word1_location  = cr15_namespace[63:32];
+  assign \cr15_namespace$246.word2_limit  = cr15_namespace[95:64];
+  assign \cr15_namespace$246.word3_seals  = cr15_namespace[127:96];
   assign \cr_wr_en$65  = \$27 ;
   assign cr0_gt_wr_en = 1'h0;
   assign cr0_gt_wr_data = 32'd0;
@@ -4966,29 +4780,31 @@ module \top.core (rst, imem_valid, boot_complete, perm_gt_sig, mem_rd_data, boot
   assign cr5_gt_wr_data = 32'd0;
   assign cr6_gt_wr_en = boot_cr6_wr_en;
   assign cr7_gt_wr_en = boot_cr7_wr_en;
-  assign cr9_gt_wr_en = rt_cr9_wr_en;
-  assign cr9_gt_wr_data = rt_cr9_wr_gt;
-  assign cr10_gt_wr_en = rt_cr10_wr_en;
-  assign cr10_gt_wr_data = rt_cr10_wr_gt;
-  assign cr11_gt_wr_en = rt_cr11_wr_en;
-  assign cr11_gt_wr_data = rt_cr11_wr_gt;
-  assign cr12_gt_wr_en = rt_cr12_wr_en;
-  assign cr12_gt_wr_data = rt_cr12_wr_gt;
-  assign cr13_gt_wr_en = rt_cr13_wr_en;
-  assign cr13_gt_wr_data = rt_cr13_wr_gt;
-  assign cr14_gt_wr_en = rt_cr14_wr_en;
-  assign cr14_gt_wr_data = rt_cr14_wr_gt;
+  assign cr8_gt_wr_en = boot_cr8_wr_en;
+  assign cr9_gt_wr_en = 1'h0;
+  assign cr9_gt_wr_data = 32'd0;
+  assign cr10_gt_wr_en = 1'h0;
+  assign cr10_gt_wr_data = 32'd0;
+  assign cr11_gt_wr_en = 1'h0;
+  assign cr11_gt_wr_data = 32'd0;
+  assign cr12_gt_wr_en = 1'h0;
+  assign cr12_gt_wr_data = 32'd0;
+  assign cr13_gt_wr_en = 1'h0;
+  assign cr13_gt_wr_data = 32'd0;
+  assign cr14_gt_wr_en = 1'h0;
+  assign cr14_gt_wr_data = 32'd0;
+  assign cr15_gt_wr_en = boot_cr15_wr_en;
   assign cr5_stack_full = 1'h0;
-  assign \$70  = 1'h1;
-  assign \$71  = \$69 ;
-  assign \$76  = mem_rd_en;
-  assign \$84  = 1'h1;
-  assign \$85  = \$83 ;
+  assign \$54  = 1'h1;
+  assign \$55  = \$53 ;
+  assign \$60  = mem_rd_en;
+  assign \$68  = 1'h1;
+  assign \$69  = \$67 ;
 endmodule
 
 (* src = "/home/runner/workspace/church_machine/call.py:45" *)
 (* generator = "Amaranth" *)
-module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , mload_index, call_busy, call_complete, mload_fault, mload_done, cr_rd_addr, cr_wr_data, cr_wr_en, cr_wr_addr, call_fault, fault_type, saved_cr5_gt, mload_start, mload_fault_type, \port$1399$0 , clk
+module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$616$0 , mload_index, call_busy, call_complete, mload_fault, mload_done, cr_rd_addr, cr_wr_data, cr_wr_en, cr_wr_addr, call_fault, fault_type, saved_cr5_gt, mload_start, mload_fault_type, \port$1347$0 , clk
 );
   reg \$auto$verilog_backend.cc:2355:dump_module$4  = 0;
   wire [2:0] \$1 ;
@@ -5202,10 +5018,10 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
   wire [31:0] nia_value;
   (* src = "/home/runner/workspace/church_machine/call.py:53" *)
   reg phase = 1'h0;
-  input [18:0] \port$1399$0 ;
-  wire [18:0] \port$1399$0 ;
-  output [2:0] \port$652$0 ;
-  wire [2:0] \port$652$0 ;
+  input [18:0] \port$1347$0 ;
+  wire [18:0] \port$1347$0 ;
+  output [2:0] \port$616$0 ;
+  wire [2:0] \port$616$0 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -5242,10 +5058,10 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
   (* src = "/home/runner/workspace/church_machine/call.py:65" *)
   always @(posedge clk)
     b_cr_data <= \$38 ;
-  assign src_in_range = \port$1399$0 [18:15] <= (* src = "/home/runner/workspace/church_machine/call.py:71" *) 3'h5;
-  assign mload_src = phase ? (* src = "/home/runner/workspace/church_machine/call.py:81" *) 4'h6 : \port$1399$0 [18:15];
+  assign src_in_range = \port$1347$0 [18:15] <= (* src = "/home/runner/workspace/church_machine/call.py:71" *) 3'h5;
+  assign mload_src = phase ? (* src = "/home/runner/workspace/church_machine/call.py:81" *) 4'h6 : \port$1347$0 [18:15];
   assign \$1  = phase ? (* src = "/home/runner/workspace/church_machine/call.py:82" *) 3'h7 : 3'h6;
-  assign mload_index = phase ? (* src = "/home/runner/workspace/church_machine/call.py:83" *) 17'h00000 : { 2'h0, \port$1399$0 [14:0] };
+  assign mload_index = phase ? (* src = "/home/runner/workspace/church_machine/call.py:83" *) 17'h00000 : { 2'h0, \port$1347$0 [14:0] };
   assign \$2  = ~ (* src = "/home/runner/workspace/church_machine/call.py:110" *) mask_latched[4:0];
   assign \$3  = ~ (* src = "/home/runner/workspace/church_machine/call.py:111" *) mask_latched[10:5];
   assign \$4  = ~ (* src = "/home/runner/workspace/church_machine/call.py:136" *) src_reg_latched[5];
@@ -5314,9 +5130,9 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
       4'h0:
           /* empty */;
       4'h1:
-          cr_rd_addr = \port$1399$0 [18:15];
+          cr_rd_addr = \port$1347$0 [18:15];
       4'h3:
-          cr_rd_addr = \port$1399$0 [18:15];
+          cr_rd_addr = \port$1347$0 [18:15];
       4'h4:
           (* full_case = 32'd1 *)
           if (\$4 ) begin
@@ -5620,7 +5436,7 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
     casez (call_state)
       4'h0:
           if (call_start) begin
-            \$32  = { 1'h0, \port$1399$0 [14:0] };
+            \$32  = { 1'h0, \port$1347$0 [14:0] };
           end
     endcase
     if (rst) begin
@@ -5816,9 +5632,9 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
       \$38  = 128'h00000000000000000000000000000000;
     end
   end
-  assign cr_src = \port$1399$0 [18:15];
+  assign cr_src = \port$1347$0 [18:15];
   assign mload_dst = { 1'h0, \$1  };
-  assign index = { 2'h0, \port$1399$0 [14:0] };
+  assign index = { 2'h0, \port$1347$0 [14:0] };
   assign sub_start_reg = mload_start;
   assign mload_cr_src = mload_src;
   assign mload_cr_dst = { 1'h0, \$1  };
@@ -5836,8 +5652,8 @@ module \top.core.u_call (rst, call_start, cr_rd_data, mload_src, \port$652$0 , m
   assign fault_type_latched = fault_type;
   assign nia_set = call_complete;
   assign nia_value = 32'd0;
-  assign mask = { 1'h0, \port$1399$0 [14:0] };
-  assign \port$652$0  = \$1 ;
+  assign mask = { 1'h0, \port$1347$0 [14:0] };
+  assign \port$616$0  = \$1 ;
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[1:0];
   assign \cr_wr_data.word0_gt.perms  = cr_wr_data[7:2];
@@ -6312,7 +6128,7 @@ endmodule
 
 (* src = "/home/runner/workspace/church_machine/load.py:31" *)
 (* generator = "Amaranth" *)
-module \top.core.u_load (rst, load_start, mload_m_elevated, load_busy, load_fault, mload_busy, mload_fault, mload_done, mload_start, fault_type, \port$1399$0 , clk);
+module \top.core.u_load (rst, load_start, mload_m_elevated, load_busy, load_fault, mload_busy, mload_fault, mload_done, mload_start, fault_type, \port$1347$0 , clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$7  = 0;
   wire \$1 ;
   wire \$2 ;
@@ -6372,8 +6188,8 @@ module \top.core.u_load (rst, load_start, mload_m_elevated, load_busy, load_faul
   (* src = "/home/runner/workspace/church_machine/load.py:17" *)
   output mload_start;
   reg mload_start;
-  input [22:0] \port$1399$0 ;
-  wire [22:0] \port$1399$0 ;
+  input [22:0] \port$1347$0 ;
+  wire [22:0] \port$1347$0 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -6386,7 +6202,7 @@ module \top.core.u_load (rst, load_start, mload_m_elevated, load_busy, load_faul
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
     load_wrapper_state <= \$6 ;
-  assign mload_m_elevated = \port$1399$0 [18:15] == (* src = "/home/runner/workspace/church_machine/load.py:39" *) 3'h6;
+  assign mload_m_elevated = \port$1347$0 [18:15] == (* src = "/home/runner/workspace/church_machine/load.py:39" *) 3'h6;
   assign load_busy = ~ (* src = "/home/runner/workspace/church_machine/load.py:58" *) \$1 ;
   assign load_complete = \$4  & (* src = "/home/runner/workspace/church_machine/load.py:59" *) mload_done;
   always @* begin
@@ -6425,12 +6241,12 @@ module \top.core.u_load (rst, load_start, mload_m_elevated, load_busy, load_faul
       \$6  = 2'h0;
     end
   end
-  assign mload_cr_src = \port$1399$0 [18:15];
-  assign cr_src = \port$1399$0 [18:15];
-  assign mload_cr_dst = \port$1399$0 [22:19];
-  assign cr_dst = \port$1399$0 [22:19];
-  assign mload_index = { 2'h0, \port$1399$0 [14:0] };
-  assign index = { 2'h0, \port$1399$0 [14:0] };
+  assign mload_cr_src = \port$1347$0 [18:15];
+  assign cr_src = \port$1347$0 [18:15];
+  assign mload_cr_dst = \port$1347$0 [22:19];
+  assign cr_dst = \port$1347$0 [22:19];
+  assign mload_index = { 2'h0, \port$1347$0 [14:0] };
+  assign index = { 2'h0, \port$1347$0 [14:0] };
   assign mload_direct = 1'h0;
   assign mload_direct_gt = 32'd0;
   assign mload_fault_type = fault_type;
@@ -9253,7 +9069,7 @@ endmodule
 
 (* src = "/home/runner/workspace/church_machine/save.py:36" *)
 (* generator = "Amaranth" *)
-module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr15_namespace, cr_rd_addr, save_fault, fault_type, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, \port$1399$0 , clk);
+module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr15_namespace, cr_rd_addr, save_fault, fault_type, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, \port$1347$0 , clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$11  = 0;
   wire \$1 ;
   reg \$10 ;
@@ -9405,8 +9221,8 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
   wire mem_wr_en;
   (* src = "/home/runner/workspace/church_machine/msave.py:23" *)
   wire \mem_wr_en$23 ;
-  input [22:0] \port$1399$0 ;
-  wire [22:0] \port$1399$0 ;
+  input [22:0] \port$1347$0 ;
+  wire [22:0] \port$1347$0 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -9481,7 +9297,7 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
   (* init = 1'h0 *)
   (* src = "/home/runner/workspace/church_machine/save.py:48" *)
   wire sub_start_reg;
-  assign dst_in_range = \port$1399$0 [22:19] <= (* src = "/home/runner/workspace/church_machine/save.py:53" *) 3'h6;
+  assign dst_in_range = \port$1347$0 [22:19] <= (* src = "/home/runner/workspace/church_machine/save.py:53" *) 3'h6;
   assign save_busy = ~ (* src = "/home/runner/workspace/church_machine/save.py:115" *) \$1 ;
   assign save_complete = \$5  & (* src = "/home/runner/workspace/church_machine/save.py:116" *) sub_done_latched;
   assign \$1  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) save_wrapper_state;
@@ -9524,7 +9340,7 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
     .mem_wr_addr(mem_wr_addr),
     .mem_wr_data(mem_wr_data),
     .mem_wr_en(mem_wr_en),
-    .\port$1399$0 (\port$1399$0 [14:0]),
+    .\port$1347$0 (\port$1347$0 [14:0]),
     .rst(rst),
     .sub_done(sub_done),
     .sub_dst_cap(sub_dst_cap),
@@ -9540,11 +9356,11 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
       3'h0:
           /* empty */;
       3'h1:
-          cr_rd_addr = \port$1399$0 [22:19];
+          cr_rd_addr = \port$1347$0 [22:19];
       3'h2:
-          cr_rd_addr = \port$1399$0 [18:15];
+          cr_rd_addr = \port$1347$0 [18:15];
       3'h3:
-          cr_rd_addr = \port$1399$0 [18:15];
+          cr_rd_addr = \port$1347$0 [18:15];
     endcase
   end
   always @* begin
@@ -9716,12 +9532,12 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
       \$14  = 1'h0;
     end
   end
-  assign cr_dst = \port$1399$0 [22:19];
+  assign cr_dst = \port$1347$0 [22:19];
   assign \sub_start$3  = sub_start;
   assign dst_reg_latched = sub_dst_cap;
   assign sub_src_gt = src_reg_latched[31:0];
-  assign sub_index = { 2'h0, \port$1399$0 [14:0] };
-  assign index = { 2'h0, \port$1399$0 [14:0] };
+  assign sub_index = { 2'h0, \port$1347$0 [14:0] };
+  assign index = { 2'h0, \port$1347$0 [14:0] };
   assign mem_wr_done = 1'h1;
   assign \mem_wr_done$11  = 1'h1;
   assign \cr15_namespace$13  = cr15_namespace;
@@ -9734,7 +9550,7 @@ module \top.core.u_save (rst, save_start, cr_rd_data, save_busy, mem_rd_data, cr
   assign \mem_rd_addr$25  = mem_rd_addr;
   assign \mem_rd_en$27  = mem_rd_en;
   assign sub_start_reg = sub_start;
-  assign cr_src = \port$1399$0 [18:15];
+  assign cr_src = \port$1347$0 [18:15];
   assign fault_latched = save_fault;
   assign fault_type_latched = fault_type;
   assign \sub_dst_cap.word0_gt  = sub_dst_cap[31:0];
@@ -9789,7 +9605,7 @@ endmodule
 
 (* src = "/home/runner/workspace/church_machine/msave.py:34" *)
 (* generator = "Amaranth" *)
-module \top.core.u_save.u_msave (rst, sub_fault, sub_done, mem_rd_data, cr15_namespace, sub_dst_cap, sub_src_gt, sub_start, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, \port$1399$0 , clk);
+module \top.core.u_save.u_msave (rst, sub_fault, sub_done, mem_rd_data, cr15_namespace, sub_dst_cap, sub_src_gt, sub_start, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, \port$1347$0 , clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$12  = 0;
   wire [19:0] \$1 ;
   wire \$10 ;
@@ -9893,8 +9709,8 @@ module \top.core.u_save.u_msave (rst, sub_fault, sub_done, mem_rd_data, cr15_nam
   reg [31:0] ns_limit_reg = 32'd0;
   (* src = "/home/runner/workspace/church_machine/msave.py:59" *)
   reg [31:0] ns_location_reg = 32'd0;
-  input [14:0] \port$1399$0 ;
-  wire [14:0] \port$1399$0 ;
+  input [14:0] \port$1347$0 ;
+  wire [14:0] \port$1347$0 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -10114,7 +9930,7 @@ module \top.core.u_save.u_msave (rst, sub_fault, sub_done, mem_rd_data, cr15_nam
     casez (msave_state)
       4'h0:
           if (sub_start) begin
-            \$21  = { 2'h0, \port$1399$0  };
+            \$21  = { 2'h0, \port$1347$0  };
           end
     endcase
     if (rst) begin
@@ -10248,7 +10064,7 @@ module \top.core.u_save.u_msave (rst, sub_fault, sub_done, mem_rd_data, cr15_nam
   assign write_addr = \$2 [31:0];
   assign ns_entry_addr = \$6 [31:0];
   assign fault_type_reg = sub_fault_type;
-  assign sub_index = { 2'h0, \port$1399$0  };
+  assign sub_index = { 2'h0, \port$1347$0  };
   assign mem_rd_valid = 1'h1;
   assign mem_wr_done = 1'h1;
   assign \dst_cap_reg.word0_gt  = dst_cap_reg[31:0];
