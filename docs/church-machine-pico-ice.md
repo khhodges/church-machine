@@ -222,6 +222,21 @@ HALT
 | Green | Blinking | Halted (waiting for button step) |
 | Red | Solid | Fault detected |
 
+## Web Simulator to Hardware Workflow
+
+The web simulator can build a namespace + c-list image and export it for upload to the physical pico-ice:
+
+1. **Configure in the simulator** — set up namespace entries and c-list as desired
+2. **Click "Download Image"** — downloads `church_image.bin` (1028 bytes: 4-byte header + 256 words)
+3. **Copy the file to your Linux terminal** (on ChromeOS, it downloads to `~/Downloads`)
+4. **Upload to pico-ice:**
+   ```bash
+   python3 pico_upload.py --port /dev/ttyACM1 --image ~/Downloads/church_image.bin
+   ```
+5. Press the pico-ice reset button, then press Enter
+
+The binary file format is the same UART protocol: 4-byte LE word count header followed by 256 x 4-byte LE data words (192 namespace + 64 c-list).
+
 ## Build and Flash Workflow
 
 ### Prerequisites
