@@ -835,6 +835,47 @@ function loadHardwareBinary() {
     updateDashboard();
 }
 
+function downloadHardwareImage() {
+    const image = sim.exportHardwareImage();
+    const NS_WORDS = 192;
+    const CLIST_WORDS = 64;
+    const totalWords = NS_WORDS + CLIST_WORDS;
+
+    const buffer = new ArrayBuffer(4 + totalWords * 4);
+    const view = new DataView(buffer);
+
+    view.setUint32(0, totalWords, true);
+
+    for (let i = 0; i < NS_WORDS; i++) {
+        const w = i < image.namespace.length ? image.namespace[i] : 0;
+        view.setUint32(4 + i * 4, w >>> 0, true);
+    }
+
+    for (let i = 0; i < CLIST_WORDS; i++) {
+        const w = i < image.clist.length ? image.clist[i] : 0;
+        view.setUint32(4 + (NS_WORDS + i) * 4, w >>> 0, true);
+    }
+
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'church_image.bin';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.textContent = `Downloaded church_image.bin (${4 + totalWords * 4} bytes)\n`;
+        con.textContent += `  Namespace: ${image.namespace.length} words\n`;
+        con.textContent += `  C-list: ${image.clist.length} words\n\n`;
+        con.textContent += `To upload to pico-ice:\n`;
+        con.textContent += `  python3 pico_upload.py --port /dev/ttyACM1 --image church_image.bin\n`;
+    }
+}
+
 async function uploadToPicoIce() {
     const con = document.getElementById('editorConsole');
     if (!con) return;
