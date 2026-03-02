@@ -11,25 +11,26 @@ const PicoSerial = (function() {
     }
 
     function isConnected() {
-        return port !== null && port.readable !== null;
+        return port !== null && port.readable !== null && port.writable !== null;
     }
 
     async function connect() {
         if (!isSupported()) {
             throw new Error('WebSerial not supported. Use Chrome or Edge.');
         }
-        if (isConnected()) return;
+
+        if (port) {
+            try { await port.close(); } catch(e) {}
+            port = null;
+        }
 
         port = await navigator.serial.requestPort();
-        try {
-            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
-        } catch(e) {
-            if (e.message && e.message.includes('already open')) {
-                // port already open from previous session, that's fine
-            } else {
-                throw e;
-            }
+
+        if (port.readable) {
+            return;
         }
+
+        await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
     }
 
     async function disconnect() {
@@ -64,7 +65,7 @@ const PicoSerial = (function() {
             await port.setSignals({ dataTerminalReady: false });
             await sleep(500);
         } catch(e) {
-            status('DTR toggle not supported, sending data directly...');
+            status('DTR toggle not available, sending data directly...');
         }
     }
 
@@ -84,11 +85,9 @@ const PicoSerial = (function() {
     }
 
     async function uploadToFPGA(nsWords, clistWords, onStatus) {
-        if (!isConnected()) {
-            await connect();
-        }
-
         const status = onStatus || function() {};
+
+        await connect();
 
         await resetFPGA(status);
         await drainInput();
@@ -145,7 +144,7 @@ const PicoSerial = (function() {
                         status(line.trim());
                     }
                     if (line.includes('HALT')) {
-                        r.releaseLock();
+                        try { r.releaseLock(); } catch(e) {}
                         const success = bannerLines.some(l => l.includes('CHURCH'));
                         return { success, lines: bannerLines };
                     }
