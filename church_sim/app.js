@@ -850,7 +850,8 @@ async function uploadToPicoIce() {
     }
 
     try {
-        con.textContent = 'Connecting to pico-ice...\n';
+        con.textContent = 'Connecting to pico-ice...\n' +
+            '(Select the FPGA UART port — usually the second one, not the RP2040 REPL)\n\n';
 
         const image = sim.exportHardwareImage();
         con.textContent += `Namespace: ${image.namespace.length} words\n`;

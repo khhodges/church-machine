@@ -21,7 +21,15 @@ const PicoSerial = (function() {
         if (isConnected()) return;
 
         port = await navigator.serial.requestPort();
-        await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
+        try {
+            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
+        } catch(e) {
+            if (e.message && e.message.includes('already open')) {
+                // port already open from previous session, that's fine
+            } else {
+                throw e;
+            }
+        }
     }
 
     async function disconnect() {
