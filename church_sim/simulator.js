@@ -1608,7 +1608,7 @@ class ChurchSimulator {
         this.emit('stateChange', this.getState());
     }
 
-    loadImageFromBinary(nsWords, clistWords) {
+    loadImageFromBinary(nsWords, clistWords, bootProgram) {
         this.reset();
 
         this.memory = new Uint32Array(65536);
@@ -1638,6 +1638,13 @@ class ChurchSimulator {
             this.memory[clistBase + i] = clistWords[i] >>> 0;
         }
 
+        const hwBoot = bootProgram || (typeof HW_BOOT_PROGRAM !== 'undefined' ? HW_BOOT_PROGRAM : null);
+        if (hwBoot) {
+            for (let i = 0; i < hwBoot.length; i++) {
+                this.memory[i] = hwBoot[i] >>> 0;
+            }
+        }
+
         const clistChildren = [];
         for (let i = 0; i < nsEntryCount; i++) clistChildren.push(i);
         this.nsClistMap[2] = clistChildren;
@@ -1646,6 +1653,9 @@ class ChurchSimulator {
         this.output += '=== BINARY IMAGE LOADED ===\n';
         this.output += `Namespace: ${nsEntryCount} entries at NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
         this.output += `C-List: ${clistCount} GTs at 0x${clistBase.toString(16).padStart(4,'0').toUpperCase()}\n`;
+        if (hwBoot) {
+            this.output += `Boot ROM: ${hwBoot.length} instructions at 0x0000 (read-only in hardware)\n`;
+        }
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
             const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
@@ -1665,6 +1675,15 @@ class ChurchSimulator {
                            (p.permissions.S ? 'S':'') + (p.permissions.E ? 'E':'');
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'------').padEnd(6)} → idx ${p.index}\n`;
         }
+        if (hwBoot) {
+            this.output += '\n--- Boot ROM (CR7 code, read-only) ---\n';
+            for (let i = 0; i < hwBoot.length; i++) {
+                const w = hwBoot[i] >>> 0;
+                if (w === 0) continue;
+                const disasm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler().disassemble(w) : '';
+                this.output += `  0x${(i*4).toString(16).padStart(4,'0')}: 0x${w.toString(16).padStart(8,'0')}  ${disasm}\n`;
+            }
+        }
         this.output += '\nStep or Run to begin boot sequence with loaded data.\n';
 
         this.pc = 0;
@@ -1677,7 +1696,7 @@ class ChurchSimulator {
         this.stepCount = 0;
         this.callStack = [];
 
-        this.emit('programLoaded', { addr: 0, length: 0 });
+        this.emit('programLoaded', { addr: 0, length: hwBoot ? hwBoot.length : 0 });
         this.emit('stateChange', this.getState());
     }
 
