@@ -12,9 +12,12 @@ def make_gt(gt_type=GT_TYPE_NULL, perms=0, index=0, version=0):
     return (version << 25) | (index << 8) | (perms << 2) | gt_type
 
 
-BOOT_PROGRAM = [
-    encode_church(ChurchOpcode.CHANGE, CondCode.AL, cr_dst=8, cr_src=8, imm=1),
+BOOT_PROGRAM = []
+if ENABLE_CHANGE_SWITCH:
+    BOOT_PROGRAM.append(
+        encode_church(ChurchOpcode.CHANGE, CondCode.AL, cr_dst=8, cr_src=8, imm=1))
 
+BOOT_PROGRAM += [
     encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=1, cr_src=6, imm=0),
 
     encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=2, cr_src=6, imm=1),

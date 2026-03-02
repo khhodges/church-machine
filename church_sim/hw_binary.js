@@ -1,5 +1,5 @@
 const HW_BOOT_PROGRAM = [
-    0x27440001, // PC=0  CHANGE CR8, CR8, 1  (establish thread context)
+    0x27440001, // PC=0  CHANGE CR8, CR8, 1  (simulator-only; hardware omits when ENABLE_CHANGE_SWITCH=False)
     0x070B0000, // PC=1  LOAD CR1, [CR6 + 0]
     0x07130001, // PC=2  LOAD CR2, [CR6 + 1]
     0x37100003, // PC=3  TPERM CR2, X

@@ -41,7 +41,7 @@ module top(rst, uart_tx, led_boot, led_run, led_fault, dbg_nia, dbg_fault, dbg_f
   wire \$7 ;
   wire \$8 ;
   wire \$9 ;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:79" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:84" *)
   wire [8:0] addr;
   (* src = "/home/runner/workspace/church_machine/top.py:91" *)
   wire any_clist_access;
@@ -98,7 +98,7 @@ module top(rst, uart_tx, led_boot, led_run, led_fault, dbg_nia, dbg_fault, dbg_f
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
   wire clk;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:80" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:85" *)
   wire [31:0] data;
   (* src = "/home/runner/workspace/church_machine/uart_tx.py:89" *)
   reg [31:0] \data$63 ;
@@ -492,12 +492,12 @@ module top(rst, uart_tx, led_boot, led_run, led_fault, dbg_nia, dbg_fault, dbg_f
     dmem[254] = 32'd0;
     dmem[255] = 32'd0;
     dmem[256] = 32'd788;
-    dmem[257] = 32'd1168;
+    dmem[257] = 32'd1040;
     dmem[258] = 32'd2;
     dmem[259] = 32'd640;
     dmem[260] = 32'd1408;
     dmem[261] = 32'd1568;
-    dmem[262] = 32'd2;
+    dmem[262] = 32'd1152;
     dmem[263] = 32'd2;
     dmem[264] = 32'd0;
     dmem[265] = 32'd0;
@@ -1667,26 +1667,26 @@ module top(rst, uart_tx, led_boot, led_run, led_fault, dbg_nia, dbg_fault, dbg_f
   assign any_clist_access = 1'h0;
 endmodule
 
-(* src = "/home/runner/workspace/church_machine/boot_rom.py:83" *)
+(* src = "/home/runner/workspace/church_machine/boot_rom.py:88" *)
 (* generator = "Amaranth" *)
 module \top.boot_rom (rst, addr, data, clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$2  = 0;
   reg [31:0] \$1 ;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:79" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:84" *)
   input [8:0] addr;
   wire [8:0] addr;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
   wire clk;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:80" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:85" *)
   output [31:0] data;
   reg [31:0] data = 32'd0;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:85" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:90" *)
   reg [31:0] rom_comb;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/church_machine/boot_rom.py:80" *)
+  (* src = "/home/runner/workspace/church_machine/boot_rom.py:85" *)
   always @(posedge clk)
     data <= \$1 ;
   always @* begin
@@ -1702,7 +1702,7 @@ module \top.boot_rom (rst, addr, data, clk);
       9'h003:
           rom_comb = 32'd1058013184;
       9'h004:
-          rom_comb = 32'd117637121;
+          rom_comb = 32'd117637126;
       9'h005:
           rom_comb = 32'd922746888;
       9'h006:

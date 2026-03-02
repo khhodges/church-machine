@@ -50,20 +50,25 @@ The Church Machine on pico-ice uses a split memory architecture:
 
 Instruction memory is stored as constant data in the Boot ROM (synthesized into FPGA lookup tables). This is not a limitation — it is a deliberate architectural decision.
 
-When Yosys (the synthesis tool) sees constant instruction data, it can determine which decode paths are never taken and optimizes them away. This **constant propagation saves approximately 1800 LUTs**:
+When Yosys (the synthesis tool) sees constant instruction data, it can determine which decode paths are never taken and optimizes them away. This **constant propagation** dramatically reduces LUT usage:
 
 | Configuration | LUT4 Usage | Fits? |
 |---|---|---|
-| Boot ROM (constant instructions) | 4520 / 5280 (85%) | Yes |
+| Boot ROM (constant instructions, no CHANGE/SWITCH) | 2591 / 5280 (49%) | Yes |
+| Boot ROM (constant instructions, with CHANGE/SWITCH) | 4179 / 5280 (79%) | Yes (synthesis), but nextpnr expands to 7159 LCs — No |
 | SPRAM instructions (runtime variable) | 6324 / 5280 (119%) | No |
 
 Without constant propagation, the full instruction decoder must be preserved because any instruction could appear at runtime. The iCE40UP5K simply does not have enough logic cells for that.
+
+**CHANGE/SWITCH status:** Enabling `ENABLE_CHANGE_SWITCH` in hardware adds significant decode logic. While Yosys synthesis shows 4179 LUT4 (79%), nextpnr expands this to 7159 logic cells during placement — exceeding the 5280 LC budget. CHANGE/SWITCH remains a simulator-only feature until a larger FPGA or further LUT optimization is available. The boot program conditionally includes CHANGE based on the `ENABLE_CHANGE_SWITCH` flag.
 
 **Consequence:** Changing the boot program requires rebuilding the FPGA bitstream. The namespace and c-list are reprogrammable via UART without rebuilding.
 
 ## Default Boot Program
 
-The boot program is 13 instructions (padded to 256 words with zeros). It demonstrates four key Church Machine operations: CHANGE (thread context establishment), LAMBDA (fast-path execution), CALL (full security pipeline), and SAVE (writing capabilities back to a c-list).
+The boot program is 12 instructions without CHANGE/SWITCH (13 with it enabled), padded to 256 words with zeros. It demonstrates three or four key Church Machine operations: optionally CHANGE (thread context establishment, simulator only), LAMBDA (fast-path execution), CALL (full security pipeline), and SAVE (writing capabilities back to a c-list).
+
+**Note:** The CHANGE instruction at PC=0 is conditionally included based on `ENABLE_CHANGE_SWITCH` in `types.py`. When disabled (default for iCE40 hardware builds), the program starts directly with LOAD. The web simulator's `hw_binary.js` always includes CHANGE because the simulator handles it regardless of the hardware flag.
 
 ### Instruction-by-instruction
 
