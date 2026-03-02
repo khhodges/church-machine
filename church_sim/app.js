@@ -871,8 +871,9 @@ function downloadHardwareImage() {
         con.textContent = `Downloaded church_image.bin (${4 + totalWords * 4} bytes)\n`;
         con.textContent += `  Namespace: ${image.namespace.length} words\n`;
         con.textContent += `  C-list: ${image.clist.length} words\n\n`;
-        con.textContent += `To upload to pico-ice:\n`;
-        con.textContent += `  python3 pico_upload.py --port /dev/ttyACM1 --image church_image.bin\n`;
+        con.textContent += `To upload to pico-ice, run:\n\n`;
+        con.textContent += `  python3 ~/pico_upload.py --port /dev/ttyACM1 --image ~/Downloads/church_image.bin\n\n`;
+        con.textContent += `Then press the pico-ice reset button and press Enter.\n`;
     }
 }
 
