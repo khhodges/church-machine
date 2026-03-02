@@ -113,13 +113,11 @@ class UartTestTop(Elaboratable):
         default_idx = Signal(range(default_total + 1))
         default_word = Signal(32)
 
-        with m.Switch(default_idx):
-            for i, word in enumerate(default_data):
-                if word != 0:
-                    with m.Case(i):
-                        m.d.comb += default_word.eq(word)
-            with m.Default():
-                m.d.comb += default_word.eq(0)
+        init_mem = Memory(width=32, depth=default_total, init=default_data)
+        init_rd = init_mem.read_port(domain="sync")
+        m.submodules.init_mem_rd = init_rd
+        m.d.comb += init_rd.addr.eq(default_idx)
+        m.d.comb += default_word.eq(init_rd.data)
 
         load_word = Signal(32)
         load_byte_idx = Signal(2)
@@ -156,16 +154,23 @@ class UartTestTop(Elaboratable):
                     m.next = "DEFAULT_INIT"
 
             with m.State("DEFAULT_INIT"):
-                with m.If(default_idx < default_total):
-                    m.d.comb += [
-                        spram.addr.eq(default_idx),
-                        spram.wr_data.eq(default_word),
-                        spram.wr_en.eq(1),
-                    ]
-                    m.d.sync += default_idx.eq(default_idx + 1)
-                with m.Else():
+                m.d.comb += init_rd.en.eq(1)
+                m.d.sync += default_idx.eq(default_idx + 1)
+                m.next = "DEFAULT_WRITE"
+
+            with m.State("DEFAULT_WRITE"):
+                m.d.comb += [
+                    spram.addr.eq(default_idx - 1),
+                    spram.wr_data.eq(default_word),
+                    spram.wr_en.eq(1),
+                ]
+                with m.If(default_idx >= default_total):
                     m.d.sync += load_done.eq(1)
                     m.next = "IDLE"
+                with m.Else():
+                    m.d.comb += init_rd.en.eq(1)
+                    m.d.sync += default_idx.eq(default_idx + 1)
+                    m.next = "DEFAULT_WRITE"
 
             with m.State("HEADER_LATCH"):
                 with m.If(load_word[:9] <= DMEM_WORDS):

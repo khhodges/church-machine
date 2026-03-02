@@ -7,7 +7,7 @@ The Church Machine is a pure lambda calculus processor — a standalone, Church-
 **Hardware specifications:**
 - FPGA: Lattice iCE40UP5K-SG48
 - Clock: 12 MHz (internal HFOSC)
-- Logic utilization: ~4520 LUT4 out of 5280 (85%)
+- Logic utilization: ~2573 LUT4 (49% synthesis), ~4515 LCs (85% after packing)
 - Memory: 2 SPRAM blocks (64KB data memory)
 - Boot ROM: Constant instruction memory (synthesized into LUTs)
 - I/O: UART (115200 baud), RGB LED, push button
@@ -54,7 +54,7 @@ When Yosys (the synthesis tool) sees constant instruction data, it can determine
 
 | Configuration | LUT4 Usage | Fits? |
 |---|---|---|
-| Boot ROM (constant instructions, no CHANGE/SWITCH) | 2591 / 5280 (49%) | Yes |
+| Boot ROM (constant instructions, no CHANGE/SWITCH) | 2573 LUT4 (49%), 4515 LCs (85%) | Yes — tight, seed-sensitive |
 | Boot ROM (constant instructions, with CHANGE/SWITCH) | 4179 / 5280 (79%) | Yes (synthesis), but nextpnr expands to 7159 LCs — No |
 | SPRAM instructions (runtime variable) | 6324 / 5280 (119%) | No |
 
