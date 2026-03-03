@@ -763,12 +763,23 @@ function showAbstractionDetail(index) {
     if (abs.methods && abs.methods.length > 0) {
         html += '<div class="abs-detail-section">';
         html += '<div class="abs-detail-label">Methods</div>';
-        html += '<table class="abs-methods-table"><thead><tr><th>Method</th><th>Purpose</th></tr></thead><tbody>';
         const methodPurposes = getMethodPurposes(abs);
+        const methodExamples = getMethodExamples(abs);
+        html += '<div class="abs-method-cards">';
         for (const m of abs.methods) {
-            html += `<tr><td class="abs-method-name">${m}</td><td>${methodPurposes[m] || 'Dispatched via CALL'}</td></tr>`;
+            const purpose = methodPurposes[m] || 'Dispatched via CALL';
+            const example = methodExamples[m] || null;
+            html += '<div class="abs-method-card">';
+            html += `<div class="abs-method-card-header">`;
+            html += `<span class="abs-method-card-name">${abs.name}.${m}</span>`;
+            html += `</div>`;
+            html += `<div class="abs-method-card-desc">${purpose}</div>`;
+            if (example) {
+                html += `<pre class="abs-method-card-code">${example}</pre>`;
+            }
+            html += '</div>';
         }
-        html += '</tbody></table>';
+        html += '</div>';
         html += '</div>';
     }
 
@@ -859,6 +870,732 @@ function getMethodPurposes(abs) {
         purposes[m] = 'Dispatched via CALL';
     }
     return purposes;
+}
+
+function getMethodExamples(abs) {
+    const examples = {
+        'Salvation': {
+            'LOAD': `; Salvation.LOAD — prove NS lookup works
+LOAD   CR1, NS[4]       ; Load Salvation GT into CR1
+TPERM  CR1, #E          ; Verify E permission on GT
+; Success: CR1 holds a valid Salvation GT`,
+            'TPERM': `; Salvation.TPERM — prove permission check
+LOAD   CR1, NS[4]       ; Load Salvation GT
+TPERM  CR1, #E          ; Test E (Enter) permission
+BRANCH.NE  @fault       ; Branch if permission denied`,
+            'LAMBDA': `; Salvation.LAMBDA — prove Church reduction
+LOAD   CR1, NS[20]      ; Load SUCC GT
+LAMBDA CR1, DR0         ; Apply SUCC to DR0
+; DR0 now holds SUCC(DR0)`,
+            'TransitionToNavana': `; Salvation.TransitionToNavana — hand off to Navana
+LOAD   CR2, NS[5]       ; Load Navana GT into CR2
+CALL   CR2              ; Enter Navana (never returns)
+; Navana takes over system control`,
+        },
+        'Navana': {
+            'Init': `; Navana.Init — bootstrap all abstractions
+LOAD   CR1, NS[5]       ; Load Navana GT
+DWRITE DR0, #0          ; Method selector = Init
+CALL   CR1              ; Navana initializes Layer 1-8`,
+            'Manage': `; Navana.Manage — abstraction lifecycle
+LOAD   CR1, NS[5]       ; Load Navana GT
+DWRITE DR0, #1          ; Method = Manage
+DWRITE DR1, #33         ; Target = Editor abstraction
+CALL   CR1              ; Create/check Editor`,
+            'Monitor': `; Navana.Monitor — system health check
+LOAD   CR1, NS[5]       ; Load Navana GT
+DWRITE DR0, #2          ; Method = Monitor
+CALL   CR1              ; Returns fault counts, MTBF`,
+            'IDS': `; Navana.IDS — intrusion detection
+LOAD   CR1, NS[5]       ; Load Navana GT
+DWRITE DR0, #3          ; Method = IDS
+CALL   CR1              ; Scans for GT anomalies`,
+        },
+        'Mint': {
+            'Create': `; Mint.Create — forge a new Golden Token
+LOAD   CR1, NS[6]       ; Load Mint GT
+DWRITE DR0, #45         ; Target NS slot 45
+DWRITE DR1, #0x09       ; Perms: L+E (bits 3,0)
+CALL   CR1              ; CR1 <- new GT for slot 45`,
+            'Revoke': `; Mint.Revoke — kill all copies of a GT
+LOAD   CR1, NS[6]       ; Load Mint GT
+DWRITE DR0, #45         ; Target NS slot to revoke
+CALL   CR1              ; Version incremented, old GTs dead`,
+            'Transfer': `; Mint.Transfer — move GT to another c-list
+LOAD   CR1, NS[6]       ; Load Mint GT
+DWRITE DR0, #45         ; Source slot
+DWRITE DR1, #60         ; Destination c-list slot
+CALL   CR1              ; GT moved to new c-list`,
+        },
+        'Memory': {
+            'Allocate': `; Memory.Allocate — claim a namespace slot
+LOAD   CR1, NS[7]       ; Load Memory GT
+DWRITE DR0, #256        ; Requested size (words)
+CALL   CR1              ; DR0 <- allocated slot index`,
+            'Free': `; Memory.Free — release a namespace slot
+LOAD   CR1, NS[7]       ; Load Memory GT
+DWRITE DR0, #50         ; Slot to free
+CALL   CR1              ; Slot 50 returned to pool`,
+            'Resize': `; Memory.Resize — grow/shrink allocation
+LOAD   CR1, NS[7]       ; Load Memory GT
+DWRITE DR0, #50         ; Slot to resize
+DWRITE DR1, #512        ; New size
+CALL   CR1              ; Slot 50 resized`,
+        },
+        'Scheduler': {
+            'Yield': `; Scheduler.Yield — give up time slice
+LOAD   CR1, NS[8]       ; Load Scheduler GT
+DWRITE DR0, #0          ; Method = Yield
+CALL   CR1              ; Thread yields, next runs`,
+            'Spawn': `; Scheduler.Spawn — create new thread
+LOAD   CR1, NS[8]       ; Load Scheduler GT
+DWRITE DR0, #1          ; Method = Spawn
+DWRITE DR1, #0x100      ; Entry point address
+CALL   CR1              ; DR0 <- new thread ID`,
+            'Wait': `; Scheduler.Wait — block until event
+LOAD   CR1, NS[8]       ; Load Scheduler GT
+DWRITE DR0, #2          ; Method = Wait
+DWRITE DR1, #10         ; Event: DijkstraFlag slot
+CALL   CR1              ; Thread blocked until signaled`,
+            'Stop': `; Scheduler.Stop — terminate thread
+LOAD   CR1, NS[8]       ; Load Scheduler GT
+DWRITE DR0, #3          ; Method = Stop
+DWRITE DR1, #2          ; Thread ID to stop
+CALL   CR1              ; Thread terminated`,
+        },
+        'Stack': {
+            'Push': `; Stack.Push — push value onto stack
+LOAD   CR1, NS[9]       ; Load Stack GT
+DWRITE DR0, #42         ; Value to push
+CALL   CR1              ; 42 pushed onto stack`,
+            'Pop': `; Stack.Pop — pop value from stack
+LOAD   CR1, NS[9]       ; Load Stack GT
+DWRITE DR0, #1          ; Method = Pop
+CALL   CR1              ; DR0 <- popped value`,
+            'Peek': `; Stack.Peek — read top without removing
+LOAD   CR1, NS[9]       ; Load Stack GT
+DWRITE DR0, #2          ; Method = Peek
+CALL   CR1              ; DR0 <- top value (kept)`,
+            'Depth': `; Stack.Depth — query stack depth
+LOAD   CR1, NS[9]       ; Load Stack GT
+DWRITE DR0, #3          ; Method = Depth
+CALL   CR1              ; DR0 <- current depth`,
+        },
+        'DijkstraFlag': {
+            'Wait': `; DijkstraFlag.Wait — block until signaled
+LOAD   CR1, NS[10]      ; Load DijkstraFlag GT
+DWRITE DR0, #0          ; Method = Wait
+CALL   CR1              ; Thread blocks here
+; Resumes when another thread Signals`,
+            'Signal': `; DijkstraFlag.Signal — wake a waiting thread
+LOAD   CR1, NS[10]      ; Load DijkstraFlag GT
+DWRITE DR0, #1          ; Method = Signal
+CALL   CR1              ; One waiter wakes up`,
+            'Reset': `; DijkstraFlag.Reset — clear flag state
+LOAD   CR1, NS[10]      ; Load DijkstraFlag GT
+DWRITE DR0, #2          ; Method = Reset
+CALL   CR1              ; Flag cleared`,
+            'Test': `; DijkstraFlag.Test — non-blocking check
+LOAD   CR1, NS[10]      ; Load DijkstraFlag GT
+DWRITE DR0, #3          ; Method = Test
+CALL   CR1              ; DR0 <- 1 if signaled, 0 if not`,
+        },
+        'UART': {
+            'Send': `; UART.Send — transmit byte (needs S perm)
+LOAD   CR1, NS[11]      ; Load UART GT [L,S,E]
+DWRITE DR0, #0x41       ; Byte to send ('A')
+SAVE   CR1, DR0         ; S perm: save data to device`,
+            'Receive': `; UART.Receive — read byte (needs L perm)
+LOAD   CR1, NS[11]      ; Load UART GT [L,S,E]
+LOAD   DR0, CR1         ; L perm: load data from device
+; DR0 <- received byte`,
+            'SetBaud': `; UART.SetBaud — configure baud rate
+LOAD   CR1, NS[11]      ; Load UART GT
+DWRITE DR0, #115200     ; Baud rate
+CALL   CR1              ; Baud rate configured`,
+        },
+        'LED': {
+            'Set': `; LED.Set — turn LED on (needs S perm)
+LOAD   CR1, NS[12]      ; Load LED GT [L,S,E]
+DWRITE DR0, #3          ; LED number (0-5)
+SAVE   CR1, DR0         ; S perm: save state to LED`,
+            'Clear': `; LED.Clear — turn LED off
+LOAD   CR1, NS[12]      ; Load LED GT
+DWRITE DR0, #3          ; LED number
+DWRITE DR1, #0          ; Off
+SAVE   CR1, DR0         ; S perm: save to device`,
+            'Toggle': `; LED.Toggle — flip LED state
+LOAD   CR1, NS[12]      ; Load LED GT
+DWRITE DR0, #3          ; LED number
+CALL   CR1              ; Toggle via S perm`,
+            'Pattern': `; LED.Pattern — set all 6 LEDs at once
+LOAD   CR1, NS[12]      ; Load LED GT
+DWRITE DR0, #0b101010   ; Pattern: alternating
+SAVE   CR1, DR0         ; S perm: all LEDs updated`,
+        },
+        'Button': {
+            'Read': `; Button.Read — read button state (L perm)
+LOAD   CR1, NS[13]      ; Load Button GT [L,E]
+LOAD   DR0, CR1         ; L perm: load from device
+; DR0 <- 1 if pressed, 0 if not`,
+            'WaitPress': `; Button.WaitPress — block until press
+LOAD   CR1, NS[13]      ; Load Button GT
+DWRITE DR0, #1          ; Method = WaitPress
+CALL   CR1              ; Blocks until button pressed`,
+            'OnEvent': `; Button.OnEvent — dequeue event
+LOAD   CR1, NS[13]      ; Load Button GT
+DWRITE DR0, #2          ; Method = OnEvent
+CALL   CR1              ; DR0 <- event or 0`,
+        },
+        'Timer': {
+            'Start': `; Timer.Start — begin counting (S perm)
+LOAD   CR1, NS[14]      ; Load Timer GT [L,S,E]
+DWRITE DR0, #0          ; Method = Start
+SAVE   CR1, DR0         ; S perm: start timer`,
+            'Stop': `; Timer.Stop — halt timer
+LOAD   CR1, NS[14]      ; Load Timer GT
+DWRITE DR0, #1          ; Method = Stop
+SAVE   CR1, DR0         ; S perm: stop timer`,
+            'Read': `; Timer.Read — get elapsed time (L perm)
+LOAD   CR1, NS[14]      ; Load Timer GT
+LOAD   DR0, CR1         ; L perm: load elapsed
+; DR0 <- elapsed ticks`,
+            'SetAlarm': `; Timer.SetAlarm — set threshold (S perm)
+LOAD   CR1, NS[14]      ; Load Timer GT
+DWRITE DR0, #1000       ; Alarm at 1000 ticks
+SAVE   CR1, DR0         ; S perm: save alarm`,
+        },
+        'Display': {
+            'Write': `; Display.Write — write text (S perm)
+LOAD   CR1, NS[15]      ; Load Display GT [L,S,E]
+DWRITE DR0, #0x48       ; 'H'
+SAVE   CR1, DR0         ; S perm: save to display`,
+            'Clear': `; Display.Clear — clear screen
+LOAD   CR1, NS[15]      ; Load Display GT
+DWRITE DR0, #1          ; Method = Clear
+CALL   CR1              ; Display cleared`,
+            'Scroll': `; Display.Scroll — scroll display
+LOAD   CR1, NS[15]      ; Load Display GT
+DWRITE DR0, #2          ; Method = Scroll
+DWRITE DR1, #1          ; Scroll 1 line
+CALL   CR1              ; Display scrolled`,
+        },
+        'SlideRule': {
+            'Add': `; SlideRule.Add — float addition
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3F800000 ; 1.0 (IEEE 754)
+DWRITE DR1, #0x40000000 ; 2.0
+CALL   CR1              ; DR0 <- 3.0`,
+            'Sub': `; SlideRule.Sub — float subtract
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x40400000 ; 3.0
+DWRITE DR1, #0x3F800000 ; 1.0
+CALL   CR1              ; DR0 <- 2.0`,
+            'Mul': `; SlideRule.Mul — float multiply
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x40000000 ; 2.0
+DWRITE DR1, #0x40400000 ; 3.0
+CALL   CR1              ; DR0 <- 6.0`,
+            'Div': `; SlideRule.Div — float divide
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x41200000 ; 10.0
+DWRITE DR1, #0x40000000 ; 2.0
+CALL   CR1              ; DR0 <- 5.0`,
+            'Sqrt': `; SlideRule.Sqrt — square root
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x41100000 ; 9.0
+CALL   CR1              ; DR0 <- 3.0`,
+            'Log': `; SlideRule.Log — natural logarithm
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x402DF854 ; e (2.71828...)
+CALL   CR1              ; DR0 <- 1.0`,
+            'Pow': `; SlideRule.Pow — power function
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x40000000 ; Base: 2.0
+DWRITE DR1, #0x41200000 ; Exp: 10.0
+CALL   CR1              ; DR0 <- 1024.0`,
+            'Sin': `; SlideRule.Sin — sine (radians)
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3FC90FDB ; pi/2 (1.5708)
+CALL   CR1              ; DR0 <- 1.0`,
+            'Cos': `; SlideRule.Cos — cosine (radians)
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x00000000 ; 0.0
+CALL   CR1              ; DR0 <- 1.0`,
+            'Tan': `; SlideRule.Tan — tangent (radians)
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3F490FDB ; pi/4 (0.7854)
+CALL   CR1              ; DR0 <- 1.0`,
+            'Asin': `; SlideRule.Asin — inverse sine
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3F800000 ; 1.0
+CALL   CR1              ; DR0 <- pi/2`,
+            'Acos': `; SlideRule.Acos — inverse cosine
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3F800000 ; 1.0
+CALL   CR1              ; DR0 <- 0.0`,
+            'Atan': `; SlideRule.Atan — inverse tangent
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x3F800000 ; 1.0
+CALL   CR1              ; DR0 <- pi/4`,
+            'ToDegrees': `; SlideRule.ToDegrees — radians to degrees
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x40490FDB ; pi (3.14159)
+CALL   CR1              ; DR0 <- 180.0`,
+            'ToRadians': `; SlideRule.ToRadians — degrees to radians
+LOAD   CR1, NS[16]      ; Load SlideRule GT
+DWRITE DR0, #0x43340000 ; 180.0
+CALL   CR1              ; DR0 <- pi`,
+        },
+        'Abacus': {
+            'Add': `; Abacus.Add — integer addition
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #7          ; Operand A
+DWRITE DR1, #5          ; Operand B
+CALL   CR1              ; DR0 <- 12`,
+            'Sub': `; Abacus.Sub — integer subtract
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #10
+DWRITE DR1, #3
+CALL   CR1              ; DR0 <- 7`,
+            'Mul': `; Abacus.Mul — integer multiply
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #6
+DWRITE DR1, #7
+CALL   CR1              ; DR0 <- 42`,
+            'Div': `; Abacus.Div — integer divide
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #42
+DWRITE DR1, #6
+CALL   CR1              ; DR0 <- 7`,
+            'Mod': `; Abacus.Mod — modulo
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #17
+DWRITE DR1, #5
+CALL   CR1              ; DR0 <- 2`,
+            'Abs': `; Abacus.Abs — absolute value
+LOAD   CR1, NS[17]      ; Load Abacus GT
+DWRITE DR0, #-42        ; Negative input
+CALL   CR1              ; DR0 <- 42`,
+        },
+        'Constants': {
+            'Pi': `; Constants.Pi — load pi
+LOAD   CR1, NS[18]      ; Load Constants GT
+DWRITE DR0, #0          ; Selector = Pi
+CALL   CR1              ; DR0 <- 0x40490FDB (3.14159)`,
+            'E': `; Constants.E — load Euler's number
+LOAD   CR1, NS[18]      ; Load Constants GT
+DWRITE DR0, #1          ; Selector = E
+CALL   CR1              ; DR0 <- 0x402DF854 (2.71828)`,
+            'Phi': `; Constants.Phi — load golden ratio
+LOAD   CR1, NS[18]      ; Load Constants GT
+DWRITE DR0, #2          ; Selector = Phi
+CALL   CR1              ; DR0 <- 0x3FCFBE77 (1.61803)`,
+            'Zero': `; Constants.Zero — load zero
+LOAD   CR1, NS[18]      ; Load Constants GT
+DWRITE DR0, #3
+CALL   CR1              ; DR0 <- 0`,
+            'One': `; Constants.One — load one
+LOAD   CR1, NS[18]      ; Load Constants GT
+DWRITE DR0, #4
+CALL   CR1              ; DR0 <- 1`,
+        },
+        'Circle': {
+            'Area': `; Circle.Area — pi * r^2 via SlideRule
+LOAD   CR1, NS[19]      ; Load Circle GT
+DWRITE DR0, #0x40A00000 ; Radius: 5.0
+CALL   CR1              ; DR0 <- 78.54 (area)
+; Internally: SlideRule.Mul(r, r), then Mul(pi, r^2)`,
+            'Circumference': `; Circle.Circumference — 2 * pi * r
+LOAD   CR1, NS[19]      ; Load Circle GT
+DWRITE DR0, #0x40A00000 ; Radius: 5.0
+DWRITE DR1, #1          ; Method = Circumference
+CALL   CR1              ; DR0 <- 31.416`,
+        },
+        'SUCC': {
+            'Apply': `; SUCC.Apply — Church successor
+LOAD   CR1, NS[20]      ; Load SUCC GT [X,L,E]
+DWRITE DR0, #3          ; Church numeral 3
+LAMBDA CR1, DR0         ; Apply SUCC to 3
+; DR0 <- 4`,
+        },
+        'PRED': {
+            'Apply': `; PRED.Apply — Church predecessor
+LOAD   CR1, NS[21]      ; Load PRED GT
+DWRITE DR0, #5          ; Church numeral 5
+LAMBDA CR1, DR0         ; Apply PRED to 5
+; DR0 <- 4`,
+        },
+        'ADD': {
+            'Apply': `; ADD.Apply — Church addition
+LOAD   CR1, NS[22]      ; Load ADD GT
+DWRITE DR0, #3          ; First operand
+DWRITE DR1, #4          ; Second operand
+LAMBDA CR1, DR0         ; Apply ADD
+; DR0 <- 7`,
+        },
+        'SUB': {
+            'Apply': `; SUB.Apply — Church subtraction
+LOAD   CR1, NS[23]      ; Load SUB GT
+DWRITE DR0, #7          ; First operand
+DWRITE DR1, #3          ; Second operand
+LAMBDA CR1, DR0         ; Apply SUB
+; DR0 <- 4`,
+        },
+        'MUL': {
+            'Apply': `; MUL.Apply — Church multiplication
+LOAD   CR1, NS[24]      ; Load MUL GT
+DWRITE DR0, #3
+DWRITE DR1, #4
+LAMBDA CR1, DR0         ; Apply MUL
+; DR0 <- 12`,
+        },
+        'ISZERO': {
+            'Apply': `; ISZERO.Apply — Church zero test
+LOAD   CR1, NS[25]      ; Load ISZERO GT
+DWRITE DR0, #0          ; Test value
+LAMBDA CR1, DR0         ; Apply ISZERO
+; DR0 <- TRUE (Church boolean)`,
+        },
+        'PAIR': {
+            'Apply': `; PAIR.Apply — Church pair constructor
+LOAD   CR1, NS[43]      ; Load PAIR GT
+DWRITE DR0, #10         ; First element
+DWRITE DR1, #20         ; Second element
+LAMBDA CR1, DR0         ; Apply PAIR
+; DR0 <- PAIR(10, 20)`,
+        },
+        'Family': {
+            'Register': `; Family.Register — bind parent-child
+LOAD   CR1, NS[28]      ; Load Family GT
+DWRITE DR0, #0          ; Method = Register
+LOAD   CR2, NS[50]      ; Parent GT
+LOAD   CR3, NS[51]      ; Child GT
+CALL   CR1              ; Bond registered in c-list`,
+            'Hello': `; Family.Hello — greet any family member
+LOAD   CR1, NS[28]      ; Load Family GT
+DWRITE DR0, #1          ; Method = Hello
+LOAD   CR2, NS[50]      ; target_GT (Mum, Dad, Sibling...)
+CALL   CR1              ; Hello(target_GT) sent
+; Mum is a GT, not a method name`,
+            'Oversight': `; Family.Oversight — parent queries child
+LOAD   CR1, NS[28]      ; Load Family GT
+DWRITE DR0, #2          ; Method = Oversight
+LOAD   CR2, NS[51]      ; Child GT
+CALL   CR1              ; DR0 <- activity report`,
+        },
+        'Schoolroom': {
+            'Join': `; Schoolroom.Join — student enters class
+LOAD   CR1, NS[29]      ; Load Schoolroom GT
+DWRITE DR0, #0          ; Method = Join
+LOAD   CR2, NS[60]      ; Class GT
+CALL   CR1              ; Student joined`,
+            'Lesson': `; Schoolroom.Lesson — teacher posts lesson
+LOAD   CR1, NS[29]      ; Load Schoolroom GT
+DWRITE DR0, #1          ; Method = Lesson
+LOAD   CR2, NS[70]      ; Lesson content GT
+CALL   CR1              ; Lesson posted to class`,
+            'Submit': `; Schoolroom.Submit — student submits work
+LOAD   CR1, NS[29]      ; Load Schoolroom GT
+DWRITE DR0, #2          ; Method = Submit
+LOAD   CR2, NS[71]      ; Work GT (DATA object)
+CALL   CR1              ; Work submitted`,
+            'Grade': `; Schoolroom.Grade — teacher grades work
+LOAD   CR1, NS[29]      ; Load Schoolroom GT
+DWRITE DR0, #3          ; Method = Grade
+LOAD   CR2, NS[71]      ; Work GT
+DWRITE DR1, #85         ; Grade: 85%
+CALL   CR1              ; Grade recorded`,
+        },
+        'Friends': {
+            'Request': `; Friends.Request — send friend request
+LOAD   CR1, NS[30]      ; Load Friends GT
+DWRITE DR0, #0          ; Method = Request
+LOAD   CR2, NS[52]      ; Target peer GT
+CALL   CR1              ; Request sent (needs parent OK)`,
+            'Accept': `; Friends.Accept — accept friend request
+LOAD   CR1, NS[30]      ; Load Friends GT
+DWRITE DR0, #1          ; Method = Accept
+LOAD   CR2, NS[52]      ; Requester GT
+CALL   CR1              ; Friendship accepted`,
+            'Share': `; Friends.Share — share a capability
+LOAD   CR1, NS[30]      ; Load Friends GT
+DWRITE DR0, #2          ; Method = Share
+LOAD   CR2, NS[52]      ; Friend GT
+LOAD   CR3, NS[80]      ; GT to share
+CALL   CR1              ; Capability shared`,
+            'Revoke': `; Friends.Revoke — revoke shared cap
+LOAD   CR1, NS[30]      ; Load Friends GT
+DWRITE DR0, #3          ; Method = Revoke
+LOAD   CR2, NS[80]      ; GT to revoke
+CALL   CR1              ; Shared capability revoked`,
+        },
+        'Tunnel': {
+            'Connect': `; Tunnel.Connect — open encrypted tunnel
+LOAD   CR1, NS[31]      ; Load Tunnel GT
+DWRITE DR0, #0          ; Method = Connect
+LOAD   CR2, NS[55]      ; Remote endpoint GT (F-bit)
+CALL   CR1              ; Tunnel established`,
+            'Send': `; Tunnel.Send — send via tunnel
+LOAD   CR1, NS[31]      ; Load Tunnel GT
+DWRITE DR0, #1          ; Method = Send
+DWRITE DR1, #0x48656C6C ; "Hell" (payload)
+CALL   CR1              ; Data sent encrypted`,
+            'Receive': `; Tunnel.Receive — receive via tunnel
+LOAD   CR1, NS[31]      ; Load Tunnel GT
+DWRITE DR0, #2          ; Method = Receive
+CALL   CR1              ; DR0 <- received data`,
+            'Close': `; Tunnel.Close — close tunnel
+LOAD   CR1, NS[31]      ; Load Tunnel GT
+DWRITE DR0, #3          ; Method = Close
+CALL   CR1              ; Tunnel closed`,
+        },
+        'Negotiate': {
+            'Propose': `; Negotiate.Propose — request special grant
+LOAD   CR1, NS[32]      ; Load Negotiate GT
+DWRITE DR0, #0          ; Method = Propose
+LOAD   CR2, NS[80]      ; Requested capability GT
+CALL   CR1              ; Proposal submitted`,
+            'Approve': `; Negotiate.Approve — parent/teacher approves
+LOAD   CR1, NS[32]      ; Load Negotiate GT
+DWRITE DR0, #1          ; Method = Approve
+DWRITE DR1, #1          ; Proposal ID
+CALL   CR1              ; Approved (dual-approval)`,
+            'Reject': `; Negotiate.Reject — reject proposal
+LOAD   CR1, NS[32]      ; Load Negotiate GT
+DWRITE DR0, #2          ; Method = Reject
+DWRITE DR1, #1          ; Proposal ID
+CALL   CR1              ; Proposal rejected`,
+            'Status': `; Negotiate.Status — check proposal state
+LOAD   CR1, NS[32]      ; Load Negotiate GT
+DWRITE DR0, #3          ; Method = Status
+DWRITE DR1, #1          ; Proposal ID
+CALL   CR1              ; DR0 <- status code`,
+        },
+        'Editor': {
+            'Open': `; Editor.Open — open source file
+LOAD   CR1, NS[33]      ; Load Editor GT
+DWRITE DR0, #0          ; Method = Open
+LOAD   CR2, NS[80]      ; File GT (DATA object)
+CALL   CR1              ; File opened in editor`,
+            'Save': `; Editor.Save — save source file
+LOAD   CR1, NS[33]      ; Load Editor GT
+DWRITE DR0, #1          ; Method = Save
+CALL   CR1              ; File saved to namespace`,
+            'Load': `; Editor.Load — load from namespace
+LOAD   CR1, NS[33]      ; Load Editor GT
+DWRITE DR0, #2          ; Method = Load
+DWRITE DR1, #80         ; Source NS slot
+CALL   CR1              ; Source loaded into editor`,
+            'Undo': `; Editor.Undo — undo last edit
+LOAD   CR1, NS[33]      ; Load Editor GT
+DWRITE DR0, #3          ; Method = Undo
+CALL   CR1              ; Last edit undone`,
+        },
+        'Assembler': {
+            'Assemble': `; Assembler.Assemble — source to machine code
+LOAD   CR1, NS[34]      ; Load Assembler GT
+DWRITE DR0, #0          ; Method = Assemble
+LOAD   CR2, NS[80]      ; Source GT (DATA object)
+CALL   CR1              ; CR2 <- binary GT (DATA object)`,
+            'Disassemble': `; Assembler.Disassemble — binary to source
+LOAD   CR1, NS[34]      ; Load Assembler GT
+DWRITE DR0, #1          ; Method = Disassemble
+LOAD   CR2, NS[81]      ; Binary GT
+CALL   CR1              ; CR2 <- source text GT`,
+            'Validate': `; Assembler.Validate — check code validity
+LOAD   CR1, NS[34]      ; Load Assembler GT
+DWRITE DR0, #2          ; Method = Validate
+LOAD   CR2, NS[80]      ; Source GT
+CALL   CR1              ; DR0 <- 1 valid, 0 invalid`,
+        },
+        'Debugger': {
+            'Step': `; Debugger.Step — single-step execution
+LOAD   CR1, NS[35]      ; Load Debugger GT
+DWRITE DR0, #0          ; Method = Step
+CALL   CR1              ; One instruction executed`,
+            'Run': `; Debugger.Run — run until halt/breakpoint
+LOAD   CR1, NS[35]      ; Load Debugger GT
+DWRITE DR0, #1          ; Method = Run
+CALL   CR1              ; Running until stop`,
+            'Breakpoint': `; Debugger.Breakpoint — set/clear breakpoint
+LOAD   CR1, NS[35]      ; Load Debugger GT
+DWRITE DR0, #2          ; Method = Breakpoint
+DWRITE DR1, #0x0040     ; Address to break at
+CALL   CR1              ; Breakpoint set at 0x40`,
+            'Inspect': `; Debugger.Inspect — inspect register/memory
+LOAD   CR1, NS[35]      ; Load Debugger GT
+DWRITE DR0, #3          ; Method = Inspect
+DWRITE DR1, #0x0100     ; Memory address
+CALL   CR1              ; DR0 <- value at 0x100`,
+        },
+        'Deployer': {
+            'Build': `; Deployer.Build — compile for Tang Nano
+LOAD   CR1, NS[36]      ; Load Deployer GT
+DWRITE DR0, #0          ; Method = Build
+LOAD   CR2, NS[81]      ; Binary GT
+CALL   CR1              ; FPGA bitstream built`,
+            'Upload': `; Deployer.Upload — send via UART to Tang
+LOAD   CR1, NS[36]      ; Load Deployer GT
+DWRITE DR0, #1          ; Method = Upload
+CALL   CR1              ; Bitstream uploaded via UART`,
+            'Verify': `; Deployer.Verify — verify upload integrity
+LOAD   CR1, NS[36]      ; Load Deployer GT
+DWRITE DR0, #2          ; Method = Verify
+CALL   CR1              ; DR0 <- 1 if verified`,
+            'Boot': `; Deployer.Boot — boot the FPGA
+LOAD   CR1, NS[36]      ; Load Deployer GT
+DWRITE DR0, #3          ; Method = Boot
+CALL   CR1              ; Tang Nano booted`,
+        },
+        'Browser': {
+            'Navigate': `; Browser.Navigate — go to GT-addressed site
+LOAD   CR1, NS[37]      ; Load Browser GT
+DWRITE DR0, #0          ; Method = Navigate
+LOAD   CR2, NS[90]      ; Site GT from c-list
+CALL   CR1              ; Page loaded (no URLs, only GTs)`,
+            'Back': `; Browser.Back — go back
+LOAD   CR1, NS[37]      ; Load Browser GT
+DWRITE DR0, #1          ; Method = Back
+CALL   CR1              ; Previous page`,
+            'Bookmark': `; Browser.Bookmark — save GT bookmark
+LOAD   CR1, NS[37]      ; Load Browser GT
+DWRITE DR0, #2          ; Method = Bookmark
+LOAD   CR2, NS[90]      ; Site GT to bookmark
+CALL   CR1              ; Bookmark saved to c-list`,
+            'Search': `; Browser.Search — search within GT scope
+LOAD   CR1, NS[37]      ; Load Browser GT
+DWRITE DR0, #3          ; Method = Search
+LOAD   CR2, NS[91]      ; Search scope GT
+CALL   CR1              ; Results in c-list`,
+        },
+        'Messenger': {
+            'Send': `; Messenger.Send — send message
+LOAD   CR1, NS[38]      ; Load Messenger GT
+DWRITE DR0, #0          ; Method = Send
+LOAD   CR2, NS[50]      ; Recipient GT (parent-approved)
+LOAD   CR3, NS[85]      ; Message GT (DATA object)
+CALL   CR1              ; Message sent`,
+            'Receive': `; Messenger.Receive — read incoming message
+LOAD   CR1, NS[38]      ; Load Messenger GT
+DWRITE DR0, #1          ; Method = Receive
+CALL   CR1              ; CR2 <- message GT`,
+            'Contacts': `; Messenger.Contacts — list approved contacts
+LOAD   CR1, NS[38]      ; Load Messenger GT
+DWRITE DR0, #2          ; Method = Contacts
+CALL   CR1              ; DR0 <- contact count`,
+            'Block': `; Messenger.Block — block a contact
+LOAD   CR1, NS[38]      ; Load Messenger GT
+DWRITE DR0, #3          ; Method = Block
+LOAD   CR2, NS[52]      ; Contact GT to block
+CALL   CR1              ; Contact blocked`,
+        },
+        'Photos': {
+            'View': `; Photos.View — view a photo
+LOAD   CR1, NS[39]      ; Load Photos GT
+DWRITE DR0, #0          ; Method = View
+LOAD   CR2, NS[85]      ; Photo GT
+CALL   CR1              ; Photo displayed`,
+            'Share': `; Photos.Share — share with GT
+LOAD   CR1, NS[39]      ; Load Photos GT
+DWRITE DR0, #1          ; Method = Share
+LOAD   CR2, NS[85]      ; Photo GT
+LOAD   CR3, NS[50]      ; Recipient GT
+CALL   CR1              ; Photo shared`,
+            'Upload': `; Photos.Upload — upload new photo
+LOAD   CR1, NS[39]      ; Load Photos GT
+DWRITE DR0, #2          ; Method = Upload
+LOAD   CR2, NS[86]      ; Photo data GT (DATA object)
+CALL   CR1              ; Photo stored`,
+            'Album': `; Photos.Album — manage album
+LOAD   CR1, NS[39]      ; Load Photos GT
+DWRITE DR0, #3          ; Method = Album
+CALL   CR1              ; DR0 <- album entry count`,
+        },
+        'Social': {
+            'Post': `; Social.Post — post to feed
+LOAD   CR1, NS[40]      ; Load Social GT
+DWRITE DR0, #0          ; Method = Post
+LOAD   CR2, NS[85]      ; Content GT (DATA object)
+CALL   CR1              ; Post published`,
+            'Read': `; Social.Read — read feed
+LOAD   CR1, NS[40]      ; Load Social GT
+DWRITE DR0, #1          ; Method = Read
+CALL   CR1              ; CR2 <- feed entry GT`,
+            'Follow': `; Social.Follow — follow an account
+LOAD   CR1, NS[40]      ; Load Social GT
+DWRITE DR0, #2          ; Method = Follow
+LOAD   CR2, NS[55]      ; Account GT
+CALL   CR1              ; Now following`,
+            'Feed': `; Social.Feed — get feed items
+LOAD   CR1, NS[40]      ; Load Social GT
+DWRITE DR0, #3          ; Method = Feed
+CALL   CR1              ; DR0 <- feed item count`,
+        },
+        'Video': {
+            'Watch': `; Video.Watch — play a video
+LOAD   CR1, NS[41]      ; Load Video GT
+DWRITE DR0, #0          ; Method = Watch
+LOAD   CR2, NS[85]      ; Video GT
+CALL   CR1              ; Video playing`,
+            'Search': `; Video.Search — search videos
+LOAD   CR1, NS[41]      ; Load Video GT
+DWRITE DR0, #1          ; Method = Search
+LOAD   CR2, NS[91]      ; Search scope GT
+CALL   CR1              ; Results in c-list`,
+            'Playlist': `; Video.Playlist — manage playlist
+LOAD   CR1, NS[41]      ; Load Video GT
+DWRITE DR0, #2          ; Method = Playlist
+CALL   CR1              ; DR0 <- playlist length`,
+            'Share': `; Video.Share — share video GT
+LOAD   CR1, NS[41]      ; Load Video GT
+DWRITE DR0, #3          ; Method = Share
+LOAD   CR2, NS[85]      ; Video GT
+LOAD   CR3, NS[50]      ; Recipient GT
+CALL   CR1              ; Video shared`,
+        },
+        'Email': {
+            'Compose': `; Email.Compose — compose email
+LOAD   CR1, NS[42]      ; Load Email GT
+DWRITE DR0, #0          ; Method = Compose
+LOAD   CR2, NS[50]      ; Recipient GT
+LOAD   CR3, NS[85]      ; Body GT (DATA object)
+CALL   CR1              ; Email queued`,
+            'Read': `; Email.Read — read email
+LOAD   CR1, NS[42]      ; Load Email GT
+DWRITE DR0, #1          ; Method = Read
+CALL   CR1              ; CR2 <- email content GT`,
+            'Reply': `; Email.Reply — reply to email
+LOAD   CR1, NS[42]      ; Load Email GT
+DWRITE DR0, #2          ; Method = Reply
+LOAD   CR2, NS[86]      ; Original email GT
+LOAD   CR3, NS[85]      ; Reply body GT
+CALL   CR1              ; Reply sent`,
+            'Contacts': `; Email.Contacts — list contacts
+LOAD   CR1, NS[42]      ; Load Email GT
+DWRITE DR0, #3          ; Method = Contacts
+CALL   CR1              ; DR0 <- contact count`,
+        },
+        'GC': {
+            'Scan': `; GC.Scan — mark live entries
+LOAD   CR1, NS[44]      ; Load GC GT
+DWRITE DR0, #0          ; Method = Scan
+CALL   CR1              ; Walk CRs, set G-bits on live`,
+            'Identify': `; GC.Identify — find garbage
+LOAD   CR1, NS[44]      ; Load GC GT
+DWRITE DR0, #1          ; Method = Identify
+CALL   CR1              ; DR0 <- garbage entry count`,
+            'Clear': `; GC.Clear — zero garbage memory
+LOAD   CR1, NS[44]      ; Load GC GT
+DWRITE DR0, #2          ; Method = Clear
+CALL   CR1              ; Dead entries zeroed`,
+            'Flip': `; GC.Flip — invert GC polarity
+LOAD   CR1, NS[44]      ; Load GC GT
+DWRITE DR0, #3          ; Method = Flip
+CALL   CR1              ; G-bit polarity flipped`,
+        },
+    };
+    return examples[abs.name] || {};
 }
 
 function assembleAndLoad() {

@@ -1895,6 +1895,55 @@ header h1 {
     color: var(--text-primary);
 }
 
+.abs-method-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.abs-method-card {
+    background: rgba(15, 52, 96, 0.2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--church-blue);
+    border-radius: 4px;
+    padding: 0.5rem 0.6rem;
+}
+
+.abs-method-card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.abs-method-card-name {
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--church-gold);
+}
+
+.abs-method-card-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.35rem;
+    line-height: 1.4;
+}
+
+.abs-method-card-code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    line-height: 1.5;
+    color: #c8e6c9;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.4rem 0.5rem;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    margin: 0;
+    overflow-x: auto;
+    white-space: pre;
+    tab-size: 4;
+}
+
 .abs-perm-badge {
     display: inline-block;
     font-size: 0.6rem;
