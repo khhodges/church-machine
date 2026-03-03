@@ -147,19 +147,49 @@ class SystemAbstractions {
                 }
             }
 
-            const nsIndex = args.nsIndex;
-            if (nsIndex === undefined || nsIndex === null) {
-                return { ok: false, fault: 'ARGS', message: 'Mint.Create: nsIndex required' };
+            const hasTuring = targetPerms.R || targetPerms.W;
+            const hasChurch = targetPerms.L || targetPerms.S || targetPerms.E;
+            if (hasTuring && hasChurch) {
+                return {
+                    ok: false,
+                    fault: 'DOMAIN_PURITY',
+                    message: `Mint.Create: cannot mix Turing (R,W) and Church (L,S,E) perms in one GT`
+                };
             }
 
+            const gtType = args.gtType || args.type || 0;
+            const size = args.size || 16;
+
+            let nsIndex = args.nsIndex;
+            if (nsIndex === undefined || nsIndex === null) {
+                let freeIdx = -1;
+                for (let i = sim.nsCount; i < sim.MAX_NS_ENTRIES; i++) {
+                    if (!sim.isNSEntryValid(i)) { freeIdx = i; break; }
+                }
+                if (freeIdx === -1) {
+                    for (let i = 45; i < sim.nsCount; i++) {
+                        if (!sim.isNSEntryValid(i)) { freeIdx = i; break; }
+                    }
+                }
+                if (freeIdx === -1) {
+                    return { ok: false, fault: 'OOM', message: 'Mint.Create: no free NS entries' };
+                }
+                nsIndex = freeIdx;
+            }
+
+            const location = nsIndex * sim.SLOT_SIZE;
+            const limit17 = (size - 1) & 0x1FFFF;
+            const fFlag = (gtType === 1) ? 1 : 0;
+            sim.writeNSEntry(nsIndex, location, limit17, 0, fFlag, 0, 0, 0, 0);
+            sim.nsLabels[nsIndex] = hasTuring ? `DATA[${nsIndex}]` : `CAP[${nsIndex}]`;
+
             const version = args.version || 0;
-            const gtType = args.gtType || 0;
             const gt = sim.createGT(version, nsIndex, targetPerms, gtType);
 
             return {
                 ok: true,
-                result: gt,
-                message: `Mint.Create: GT created for NS[${nsIndex}] v${version}`
+                result: { gt: gt, nsIndex: nsIndex, location: location, size: size },
+                message: `Mint.Create: GT(type=${gtType},size=${size},perms=${sim.getPermBits(targetPerms).toString(2).padStart(6,'0')}) -> NS[${nsIndex}]`
             };
         });
 

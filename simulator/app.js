@@ -741,6 +741,18 @@ function showAbstractionDetail(index) {
     html += `<div class="abs-detail-desc">${abs.description}</div>`;
     html += '</div>';
 
+    html += '<div class="abs-detail-section abs-polymorphic-section">';
+    html += '<div class="abs-detail-label">Polymorphic Interface</div>';
+    html += '<div class="abs-polymorphic-bar">';
+    html += '<span class="abs-poly-method">create</span>';
+    html += '<span class="abs-poly-method">destroy</span>';
+    html += '<span class="abs-poly-method">call</span>';
+    html += '<span class="abs-poly-method">inspect</span>';
+    html += '</div>';
+    html += '<div class="abs-poly-note">Every abstraction responds to these four operations. ';
+    html += 'This uniformity is intentional \u2014 the same pattern applies whether the abstraction is a boot service, a hardware driver, a math library, or a social networking tool.</div>';
+    html += '</div>';
+
     html += '<div class="abs-detail-section">';
     html += '<div class="abs-detail-label">Properties</div>';
     html += '<table class="abs-props-table"><tbody>';
@@ -819,7 +831,7 @@ function showAbstractionDetail(index) {
         html += '<div class="abs-note-text">Layer 5 social abstractions operate within isolated namespaces. ';
         html += 'Each child\'s social interactions are mediated through CALL/RETURN \u2014 the abstraction ';
         html += 'receives only the capabilities explicitly passed by the caller. Parent oversight is ';
-        html += 'enforced via the Family abstraction (NS[29]) which must approve all social connections. ';
+        html += 'enforced via the Family abstraction (NS[28]) which must approve all social connections. ';
         html += 'SWITCH instruction can move between namespace domains atomically.</div>';
         html += '</div>';
     }
@@ -832,36 +844,36 @@ function getMethodPurposes(abs) {
     const knownPurposes = {
         'Salvation': { 'LOAD': 'Proves namespace lookup', 'TPERM': 'Proves permission check', 'LAMBDA': 'Proves Church reduction', 'TransitionToNavana': 'Transitions to Navana (does not RETURN)' },
         'Navana': { 'Init': 'Initialize all abstractions', 'Manage': 'Abstraction lifecycle management', 'Monitor': 'System health monitoring', 'IDS': 'Intrusion Detection via GT anomalies' },
-        'Mint': { 'Create': 'Create new GT with bounded permissions', 'Revoke': 'Increment version to invalidate all outstanding GTs', 'Transfer': 'Transfer GT to another c-list' },
-        'Memory': { 'Allocate': 'Allocate NS entry for DATA object', 'Free': 'Deallocate NS entry', 'Resize': 'Resize allocated region' },
-        'Scheduler': { 'Yield': 'Voluntarily yield time slice', 'Spawn': 'Create new thread', 'Wait': 'Block until event', 'Stop': 'Terminate thread' },
-        'Stack': { 'Push': 'Push value onto managed stack', 'Pop': 'Pop value from stack', 'Peek': 'Read top without removing', 'Depth': 'Query current depth' },
-        'DijkstraFlag': { 'Wait': 'Block thread until flag signaled', 'Signal': 'Signal flag, wake one waiter', 'Reset': 'Clear flag state', 'Test': 'Non-blocking check if signaled' },
-        'UART': { 'Send': 'Queue bytes for transmission (S perm)', 'Receive': 'Read received byte (L perm)', 'SetBaud': 'Configure baud rate' },
-        'LED': { 'Set': 'Turn LED on (S perm)', 'Clear': 'Turn LED off (S perm)', 'Toggle': 'Toggle LED state (S perm)', 'Pattern': 'Set all LEDs at once (S perm)' },
-        'Button': { 'Read': 'Read current button state (L perm)', 'WaitPress': 'Wait for button press (L perm)', 'OnEvent': 'Dequeue button event (L perm)' },
-        'Timer': { 'Start': 'Start timer counting (S perm)', 'Stop': 'Stop timer (S perm)', 'Read': 'Read elapsed time (L perm)', 'SetAlarm': 'Set alarm threshold (S perm)' },
-        'Display': { 'Write': 'Write text to display (S perm)', 'Clear': 'Clear display (S perm)', 'Scroll': 'Scroll display (S perm)' },
-        'SlideRule': { 'Add': 'Float add', 'Sub': 'Float subtract', 'Mul': 'Float multiply', 'Div': 'Float divide', 'Sqrt': 'Square root', 'Log': 'Natural logarithm', 'Pow': 'Power', 'Sin': 'Sine (radians)', 'Cos': 'Cosine (radians)', 'Tan': 'Tangent (radians)', 'Asin': 'Inverse sine', 'Acos': 'Inverse cosine', 'Atan': 'Inverse tangent', 'ToDegrees': 'Radians to degrees', 'ToRadians': 'Degrees to radians' },
-        'Abacus': { 'Add': 'Integer add', 'Sub': 'Integer subtract', 'Mul': 'Integer multiply', 'Div': 'Integer divide', 'Mod': 'Modulo', 'Abs': 'Absolute value' },
-        'Constants': { 'Pi': 'Return \u03c0', 'E': 'Return e', 'Phi': 'Return \u03c6', 'Zero': 'Return 0', 'One': 'Return 1' },
-        'Circle': { 'Area': 'Circle area (delegates trig to SlideRule)', 'Circumference': 'Circle circumference' },
-        'Family': { 'Register': 'Register parent-child bond', 'Hello': 'Hello(target_GT) \u2014 send greeting/request to any family member via their GT', 'Oversight': 'Query child activity' },
-        'Schoolroom': { 'Join': 'Student joins class', 'Lesson': 'Teacher posts lesson', 'Submit': 'Student submits work', 'Grade': 'Teacher grades work' },
-        'Friends': { 'Request': 'Send friend request', 'Accept': 'Accept friend request', 'Share': 'Share capability with friend', 'Revoke': 'Revoke shared capability' },
-        'Tunnel': { 'Connect': 'Establish encrypted tunnel', 'Send': 'Send via tunnel', 'Receive': 'Receive via tunnel', 'Close': 'Close tunnel' },
-        'Negotiate': { 'Propose': 'Propose special grant', 'Approve': 'Parent/teacher approves', 'Reject': 'Reject proposal', 'Status': 'Query negotiation status' },
-        'Editor': { 'Open': 'Open source file', 'Save': 'Save source file', 'Load': 'Load from namespace', 'Undo': 'Undo last edit' },
-        'Assembler': { 'Assemble': 'Translate assembly to machine code', 'Disassemble': 'Translate machine code to assembly', 'Validate': 'Check code validity' },
-        'Debugger': { 'Step': 'Single-step execution', 'Run': 'Run until halt/breakpoint', 'Breakpoint': 'Set/clear breakpoint', 'Inspect': 'Inspect register/memory' },
-        'Deployer': { 'Build': 'Compile for FPGA', 'Upload': 'Upload via UART', 'Verify': 'Verify upload', 'Boot': 'Boot FPGA' },
-        'Browser': { 'Navigate': 'Navigate to GT-addressed site', 'Back': 'Go back', 'Bookmark': 'Save GT bookmark', 'Search': 'Search within GT scope' },
-        'Messenger': { 'Send': 'Send message', 'Receive': 'Receive message', 'Contacts': 'List approved contacts', 'Block': 'Block contact' },
-        'Photos': { 'View': 'View photo', 'Share': 'Share with GT', 'Upload': 'Upload new photo', 'Album': 'Manage album' },
-        'Social': { 'Post': 'Post to feed', 'Read': 'Read feed', 'Follow': 'Follow account GT', 'Feed': 'Get feed items' },
-        'Video': { 'Watch': 'Watch video', 'Search': 'Search videos', 'Playlist': 'Manage playlist', 'Share': 'Share video GT' },
-        'Email': { 'Compose': 'Compose email', 'Read': 'Read email', 'Reply': 'Reply to email', 'Contacts': 'List contacts' },
-        'GC': { 'Scan': 'Walk CRs, mark live entries', 'Identify': 'Find garbage entries', 'Clear': 'Zero garbage memory', 'Flip': 'Invert GC polarity' },
+        'Mint': { 'Create': 'Mint.Create(type, size, perms) — allocate slot, reserve memory, pack NS entry, forge GT', 'Revoke': 'Mint.Revoke(nsIndex) — increment version, kill all GT copies instantly', 'Transfer': 'Mint.Transfer(gt, target_clist, slot) — move GT between c-lists' },
+        'Memory': { 'Allocate': 'Memory.Allocate(size) — find free NS slot, reserve memory, pack 3-word entry', 'Free': 'Memory.Free(nsIndex) — zero word0+word1, release slot for reuse', 'Resize': 'Memory.Resize(nsIndex, newSize) — repack word1 limit, recompute FNV seal' },
+        'Scheduler': { 'Yield': 'Scheduler.Yield() — save thread state, switch to next ready thread', 'Spawn': 'Scheduler.Spawn(code_GT, entry) — create thread with isolated CR set', 'Wait': 'Scheduler.Wait(flag_GT) — block thread on DijkstraFlag', 'Stop': 'Scheduler.Stop(threadID) — terminate thread, release CRs' },
+        'Stack': { 'Push': 'Stack.Push(value) — DWRITE to stack location, increment depth', 'Pop': 'Stack.Pop() — decrement depth, DREAD from stack location', 'Peek': 'Stack.Peek() — DREAD top without decrementing', 'Depth': 'Stack.Depth() — return current entry count' },
+        'DijkstraFlag': { 'Wait': 'DijkstraFlag.Wait() — P() operation: block if unsignaled', 'Signal': 'DijkstraFlag.Signal() — V() operation: wake one waiter or set flag', 'Reset': 'DijkstraFlag.Reset() — clear flag to unsignaled state', 'Test': 'DijkstraFlag.Test() — non-blocking read of flag state' },
+        'UART': { 'Send': 'UART.Send(byte) — SAVE byte to device (S perm)', 'Receive': 'UART.Receive() — LOAD byte from device (L perm)', 'SetBaud': 'UART.SetBaud(rate) — configure via CALL (E perm)' },
+        'LED': { 'Set': 'LED.Set(num, state) — SAVE on-state to device (S perm)', 'Clear': 'LED.Clear(num) — SAVE off-state to device (S perm)', 'Toggle': 'LED.Toggle(num) — LOAD state, invert, SAVE (L+S perm)', 'Pattern': 'LED.Pattern(bits) — SAVE 6-bit pattern to all LEDs (S perm)' },
+        'Button': { 'Read': 'Button.Read() — LOAD state from device (L perm)', 'WaitPress': 'Button.WaitPress() — block via Scheduler until press (E perm)', 'OnEvent': 'Button.OnEvent() — dequeue press/release event (E perm)' },
+        'Timer': { 'Start': 'Timer.Start(channel) — SAVE start command to device (S perm)', 'Stop': 'Timer.Stop(channel) — SAVE stop command (S perm)', 'Read': 'Timer.Read() — LOAD elapsed ticks from device (L perm)', 'SetAlarm': 'Timer.SetAlarm(ticks) — SAVE threshold to device (S perm)' },
+        'Display': { 'Write': 'Display.Write(char) — SAVE character to device (S perm)', 'Clear': 'Display.Clear() — SAVE clear command (S perm)', 'Scroll': 'Display.Scroll(lines) — SAVE scroll command (S perm)' },
+        'SlideRule': { 'Add': 'SlideRule.Add(a, b) — IEEE 754 float add', 'Sub': 'SlideRule.Sub(a, b) — float subtract', 'Mul': 'SlideRule.Mul(a, b) — float multiply', 'Div': 'SlideRule.Div(a, b) — float divide', 'Sqrt': 'SlideRule.Sqrt(x) — square root', 'Log': 'SlideRule.Log(x) — natural logarithm', 'Pow': 'SlideRule.Pow(base, exp) — power function', 'Sin': 'SlideRule.Sin(rad) — sine', 'Cos': 'SlideRule.Cos(rad) — cosine', 'Tan': 'SlideRule.Tan(rad) — tangent', 'Asin': 'SlideRule.Asin(x) — inverse sine', 'Acos': 'SlideRule.Acos(x) — inverse cosine', 'Atan': 'SlideRule.Atan(x) — inverse tangent', 'ToDegrees': 'SlideRule.ToDegrees(rad) — radians to degrees', 'ToRadians': 'SlideRule.ToRadians(deg) — degrees to radians' },
+        'Abacus': { 'Add': 'Abacus.Add(a, b) — integer add', 'Sub': 'Abacus.Sub(a, b) — integer subtract', 'Mul': 'Abacus.Mul(a, b) — integer multiply', 'Div': 'Abacus.Div(a, b) — integer divide', 'Mod': 'Abacus.Mod(a, b) — remainder', 'Abs': 'Abacus.Abs(x) — absolute value' },
+        'Constants': { 'Pi': 'Constants.Pi() — return \u03c0 as IEEE 754', 'E': 'Constants.E() — return e', 'Phi': 'Constants.Phi() — return \u03c6', 'Zero': 'Constants.Zero() — return 0.0', 'One': 'Constants.One() — return 1.0' },
+        'Circle': { 'Area': 'Circle.Area(radius) — \u03c0r\u00b2 via SlideRule.Mul + Constants.Pi', 'Circumference': 'Circle.Circumference(radius) — 2\u03c0r via SlideRule' },
+        'Family': { 'Register': 'Family.Register(parent_GT, child_GT) — bind parent-child in c-list', 'Hello': 'Family.Hello(target_GT) — send greeting to any family member via their GT', 'Oversight': 'Family.Oversight(child_GT) — parent queries child activity' },
+        'Schoolroom': { 'Join': 'Schoolroom.Join(class_GT) — student enters class', 'Lesson': 'Schoolroom.Lesson(class_GT, content_GT) — teacher posts lesson', 'Submit': 'Schoolroom.Submit(work_GT) — student submits work', 'Grade': 'Schoolroom.Grade(work_GT, score) — teacher grades work' },
+        'Friends': { 'Request': 'Friends.Request(peer_GT) — send friend request (needs parent approval)', 'Accept': 'Friends.Accept(requester_GT) — accept request', 'Share': 'Friends.Share(friend_GT, cap_GT) — share capability', 'Revoke': 'Friends.Revoke(cap_GT) — revoke shared capability' },
+        'Tunnel': { 'Connect': 'Tunnel.Connect(remote_GT) — establish encrypted tunnel (F-bit)', 'Send': 'Tunnel.Send(remote_GT, data) — send via tunnel', 'Receive': 'Tunnel.Receive() — receive from tunnel', 'Close': 'Tunnel.Close(remote_GT) — close tunnel, clear F-bit' },
+        'Negotiate': { 'Propose': 'Negotiate.Propose(cap_GT) — request special grant (dual-approval)', 'Approve': 'Negotiate.Approve(proposal_id) — parent or teacher approves', 'Reject': 'Negotiate.Reject(proposal_id) — reject proposal', 'Status': 'Negotiate.Status(proposal_id) — query proposal state' },
+        'Editor': { 'Open': 'Editor.Open(file_GT) — load DATA object into editor buffer', 'Save': 'Editor.Save() — DWRITE buffer to NS slot, recompute seal', 'Load': 'Editor.Load(nsIndex) — DREAD source from slot into buffer', 'Undo': 'Editor.Undo() — pop previous state from undo stack' },
+        'Assembler': { 'Assemble': 'Assembler.Assemble(source_GT) — parse + encode to 32-bit instructions', 'Disassemble': 'Assembler.Disassemble(binary_GT) — decode instructions to text', 'Validate': 'Assembler.Validate(source_GT) — check syntax + register refs' },
+        'Debugger': { 'Step': 'Debugger.Step() — fetch-decode-execute one instruction', 'Run': 'Debugger.Run() — execute until halt/breakpoint/fault', 'Breakpoint': 'Debugger.Breakpoint(address) — set/clear breakpoint', 'Inspect': 'Debugger.Inspect(address) — read and decode memory/NS entry' },
+        'Deployer': { 'Build': 'Deployer.Build(binary_GT) — package for Gowin GW2AR-18', 'Upload': 'Deployer.Upload() — send via UART to Tang Nano (S perm)', 'Verify': 'Deployer.Verify() — readback + checksum via UART (L perm)', 'Boot': 'Deployer.Boot() — send boot command, FPGA begins execution' },
+        'Browser': { 'Navigate': 'Browser.Navigate(site_GT) — LOAD content via L perm (no URLs)', 'Back': 'Browser.Back() — pop previous site GT from history', 'Bookmark': 'Browser.Bookmark(site_GT) — SAVE GT to bookmark c-list', 'Search': 'Browser.Search(scope_GT) — search within GT scope only' },
+        'Messenger': { 'Send': 'Messenger.Send(recipient_GT, msg_GT) — send to approved contact', 'Receive': 'Messenger.Receive() — dequeue from inbox c-list', 'Contacts': 'Messenger.Contacts() — list parent-approved contact GTs', 'Block': 'Messenger.Block(contact_GT) — Mint.Revoke contact GT' },
+        'Photos': { 'View': 'Photos.View(photo_GT) — LOAD photo data via L perm', 'Share': 'Photos.Share(photo_GT, recipient_GT) — TPERM to L-only, transfer', 'Upload': 'Photos.Upload(data_GT) — Memory.Allocate + store photo', 'Album': 'Photos.Album() — walk album c-list, return count' },
+        'Social': { 'Post': 'Social.Post(content_GT) — publish to followers\' feed c-lists', 'Read': 'Social.Read() — LOAD next feed entry via L perm', 'Follow': 'Social.Follow(account_GT) — request follow (parent-gated)', 'Feed': 'Social.Feed() — count feed items available' },
+        'Video': { 'Watch': 'Video.Watch(video_GT) — LOAD + stream via L perm', 'Search': 'Video.Search(scope_GT) — search within approved scope', 'Playlist': 'Video.Playlist() — walk playlist c-list', 'Share': 'Video.Share(video_GT, recipient_GT) — TPERM to L-only, transfer' },
+        'Email': { 'Compose': 'Email.Compose(recipient_GT, body_GT) — allocate + send to inbox', 'Read': 'Email.Read() — dequeue from inbox c-list', 'Reply': 'Email.Reply(original_GT, body_GT) — reply in thread chain', 'Contacts': 'Email.Contacts() — list parent-approved email contacts' },
+        'GC': { 'Scan': 'GC.Scan() — walk CRs + c-lists, set G-bit on live NS entries', 'Identify': 'GC.Identify() — find entries where G-bit != polarity', 'Clear': 'GC.Clear() — zero word0+word1 on garbage entries', 'Flip': 'GC.Flip() — toggle polarity for bidirectional cycle' },
     };
     if (knownPurposes[abs.name]) {
         return knownPurposes[abs.name];
@@ -975,58 +987,120 @@ CALL   CR1              ; Navana.IDS scans:
 ;   Report anomalies to Navana.Monitor`,
         },
         'Mint': {
-            'Create': `; Mint.Create — forge a new Golden Token
-; Full process: find slot, reserve memory, pack 3-word NS
-; entry, compute FNV seal, pack 32-bit GT, enforce types
+            'Create': `; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+; Mint.Create(type, size, perms)
+; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+;   type:  00=Inform (local)  01=Outform (remote)
+;   size:  words to allocate for the object
+;   perms: EXACTLY one domain — never mixed:
+;     Turing domain:  R, W     (data objects)
+;     Turing domain:  R, X     (code objects / CLOOMC)
+;     Church domain:  L, S, E  (c-lists, devices)
+;     Church domain:  E        (abstractions)
 ;
-; Step 1: Caller must hold a source GT with >= target perms
-; (monotonic restriction — cannot grant what you don't hold)
-LOAD   CR1, NS[6]       ; Load Mint E-GT via mLoad pipeline
-TPERM  CR1, #E          ; Verify caller holds E perm on Mint
+; Returns: GT packed as Version(7)|Index(17)|Perms(6)|Type(2)
+; Faults:  PERMISSION_ESCALATION, OOM, DOMAIN_PURITY
+; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-; Step 2: Allocate a namespace slot via Memory
-LOAD   CR2, NS[7]       ; Load Memory E-GT
-DWRITE DR0, #64         ; Request 64 words of storage
-CALL   CR2              ; Memory.Allocate:
-                         ;   scans NS for free entry (word0=0, word1=0)
-                         ;   skips reserved slots 0..44
-                         ;   DR0 <- free slot index (e.g. 50)
-                         ;   DR1 <- base location (slot * SLOT_SIZE)
+; ── EXAMPLE A: Inform + Turing R,W (data buffer) ──────────
+LOAD   CR1, NS[6]       ; Load Mint E-GT (mLoad validates)
+DWRITE DR0, #0          ; type = 00 (Inform, local)
+DWRITE DR1, #128        ; size = 128 words
+DWRITE DR2, #0b000110   ; perms = R+W (Turing DATA domain)
+                         ;   bit0=R, bit1=W -> 0x06
+CALL   CR1              ; Mint.Create internally:
+;   1. Domain purity check:
+;      R+W = Turing only — OK (no Church bits mixed)
+;   2. Monotonic check:
+;      caller.perms >= target.perms (can't escalate)
+;   3. Memory.Allocate(128):
+;      scan NS for free slot (word0=0 AND word1=0)
+;      skip reserved 0..44, find slot e.g. 50
+;      location = 50 * SLOT_SIZE
+;   4. Pack 3-word NS entry at NS_TABLE_BASE + 50*3:
+;      word0 = location (base address)
+;      word1 = B(0)|F(0)|G(0)|...|limit(127)
+;             limit = (size-1) & 0x1FFFF
+;      word2 = (ver<<25) | FNV_seal(word0, limit)
+;             seal = FNV-1a: h=0x5A5A5A5A
+;               h=(h^loc)*0x01000193
+;               h=(h^lim)*0x01000193
+;               h=h^(h>>16); seal=h&0x1FFFFFF
+;   5. Pack GT:
+;      GT = (0<<25)|(50<<8)|(0b000110<<2)|(0b00)
+;         = 0x00003218 (ver=0, idx=50, R+W, Inform)
+; Result: CR1 <- GT for NS[50], R+W, Inform
+; Use: DREAD/DWRITE to this object via Turing instructions
 
-; Step 3: Pack the 3-word namespace entry
-; word0 = location (base address of allocated memory)
-; word1 = B(31)|F(30)|G(29)|...|limit(16:0)
-;   B=0 (not yet bound), F=0 (local), G=0 (live)
-;   limit = (size-1) & 0x1FFFF = 63
-; word2 = version(31:25) | FNV_seal(24:0)
-;   seal = FNV-1a(word0, word1)
-;   FNV: h=0x5A5A5A5A; h=(h^loc)*0x01000193;
-;         h=(h^lim)*0x01000193; h=h^(h>>16); seal=h&0x1FFFFFF
-DWRITE DR2, DR1         ; DR2 = location (word0)
-DWRITE DR3, #63         ; DR3 = limit (word1 low 17 bits)
-DWRITE DR4, #0          ; DR4 = version 0 (new entry)
+; ── EXAMPLE B: Inform + Turing R,X (code / CLOOMC) ───────
+LOAD   CR1, NS[6]       ; Load Mint E-GT
+DWRITE DR0, #0          ; type = 00 (Inform)
+DWRITE DR1, #64         ; size = 64 words for code
+DWRITE DR2, #0b000101   ; perms = R+X (Turing CODE domain)
+                         ;   bit0=R, bit2=X -> 0x05
+                         ;   Code is a DATA-domain object,
+                         ;   never Church domain
+CALL   CR1              ; Mint.Create:
+;   Domain purity: R+X = Turing only — OK
+;   Pack GT = (0<<25)|(51<<8)|(0b000101<<2)|(0b00)
+;           = 0x00003314 (ver=0, idx=51, R+X, Inform)
+; Result: CR1 <- GT for code object (CLOOMC)
+;   CR7 loads this via X perm at c-list[0]
+;   LAMBDA uses X perm to execute the code
+;   The code itself is DATA, never Church domain
 
-; Step 4: Write NS entry to namespace table
-; NS_TABLE_BASE + slotIndex * 3 words
-; mem[base+0] = word0 (location)
-; mem[base+1] = packWord1(limit, B=0, F=0, G=0)
-; mem[base+2] = (version<<25) | computeSeal(loc, lim)
+; ── EXAMPLE C: Inform + Church L,S,E (c-list) ────────────
+LOAD   CR1, NS[6]       ; Load Mint E-GT
+DWRITE DR0, #0          ; type = 00 (Inform)
+DWRITE DR1, #16         ; size = 16 slots in c-list
+DWRITE DR2, #0b101001   ; perms = L+S+E (Church domain)
+                         ;   bit3=L, bit4=S, bit5=E -> 0x29
+CALL   CR1              ; Mint.Create:
+;   Domain purity: L+S+E = Church only — OK
+;     FAULT if any Turing bit (R,W) also set
+;   Pack GT = (0<<25)|(52<<8)|(0b101001<<2)|(0b00)
+;           = 0x000034A4 (ver=0, idx=52, L+S+E, Inform)
+; Result: CR1 <- GT for c-list
+;   L perm: LOAD GTs from this c-list
+;   S perm: SAVE GTs into this c-list
+;   E perm: CALL/enter through this c-list
+;   CR6 receives this on CALL (c-list ref)
 
-; Step 5: Pack the 32-bit Golden Token
-; GT = Version(7)|Index(17)|Perms(6)|Type(2)
-;    = (0<<25)|(50<<8)|(permBits<<2)|(0)
-; permBits: R=bit0, W=bit1, X=bit2, L=bit3, S=bit4, E=bit5
-; Type: 00=Inform (local capability)
-; Domain purity enforced: Church(X,L,S,E) or Turing(R,W)
-;   — cannot mix Church and Turing perms in one GT
-DWRITE DR5, #0b001001   ; Perms: L+E (Church domain only)
+; ── EXAMPLE D: Inform + Church E only (abstraction) ──────
+LOAD   CR1, NS[6]       ; Load Mint E-GT
+DWRITE DR0, #0          ; type = 00 (Inform)
+DWRITE DR1, #8          ; size = 8 words (minimal)
+DWRITE DR2, #0b100000   ; perms = E only (Church domain)
+                         ;   bit5=E -> 0x20
+CALL   CR1              ; Mint.Create:
+;   Domain purity: E = Church only — OK
+;   Pack GT = (0<<25)|(53<<8)|(0b100000<<2)|(0b00)
+;           = 0x00003580 (ver=0, idx=53, E, Inform)
+; Result: CR1 <- GT for an abstraction entry point
+;   E perm only: can CALL but not LOAD/SAVE
+;   This is the typical abstraction permission
+
+; ── EXAMPLE E: Outform + Church L,E (remote resource) ────
+LOAD   CR1, NS[6]       ; Load Mint E-GT
+DWRITE DR0, #1          ; type = 01 (Outform, remote)
+DWRITE DR1, #32         ; size = 32 words (proxy)
+DWRITE DR2, #0b001001   ; perms = L+E (Church domain)
                          ;   bit3=L, bit0=E -> 0x09
 CALL   CR1              ; Mint.Create:
-                         ;   check source >= target perms
-                         ;   GT = (ver<<25)|(idx<<8)|(perms<<2)|type
-                         ;   CR1 <- new GT for NS[50]
-; Result: CR1 holds GT = 0x00003224
-;   ver=0, idx=50, perms=L+E, type=Inform`,
+;   Domain purity: L+E = Church only — OK
+;   Outform type: NS entry gets F-bit=1 (Far)
+;     word1[30] = 1 (remote resource)
+;   Pack GT = (0<<25)|(54<<8)|(0b001001<<2)|(0b01)
+;           = 0x00003625 (ver=0, idx=54, L+E, Outform)
+; Result: CR1 <- GT for remote capability
+;   F-bit routes all access through Tunnel
+;   mLoad step 6 detects F-bit, redirects
+
+; ── ILLEGAL: Mixed domain (FAULT) ─────────────────────────
+; DWRITE DR2, #0b001011 ; R+W+L — ILLEGAL!
+;   Turing(R,W) mixed with Church(L)
+;   -> FAULT: DOMAIN_PURITY
+;   A GT must be pure Turing OR pure Church, never both`,
             'Revoke': `; Mint.Revoke — instant revocation via version increment
 ; Incrementing the version in the NS entry kills ALL
 ; outstanding copies of the GT — they will fail mLoad

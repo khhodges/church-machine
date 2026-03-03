@@ -1895,6 +1895,38 @@ header h1 {
     color: var(--text-primary);
 }
 
+.abs-polymorphic-section {
+    background: rgba(218, 165, 32, 0.06);
+    border: 1px solid rgba(218, 165, 32, 0.2);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.abs-polymorphic-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.abs-poly-method {
+    display: inline-block;
+    background: rgba(218, 165, 32, 0.15);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.6rem;
+    border-radius: 4px;
+    border: 1px solid rgba(218, 165, 32, 0.3);
+}
+
+.abs-poly-note {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
 .abs-method-cards {
     display: flex;
     flex-direction: column;
