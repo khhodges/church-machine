@@ -1,3 +1,14 @@
+function nextPow2(n) {
+    if (n <= 0) return 1;
+    n = n - 1;
+    n |= n >> 1;
+    n |= n >> 2;
+    n |= n >> 4;
+    n |= n >> 8;
+    n |= n >> 16;
+    return n + 1;
+}
+
 class SystemAbstractions {
     constructor(registry) {
         this.registry = registry;
@@ -130,6 +141,184 @@ class SystemAbstractions {
                 message: `Navana.IDS: ${alerts.length} new alerts, ${navanaState.idsLog.length} total`
             };
         });
+
+        this.registry.bindMethod(5, 'ADD', function(sim, args) {
+            const location = args.location;
+            const limit = args.limit || 0xFF;
+            const clistCount = args.clistCount || 0;
+            const gtType = args.gtType || 1;
+            const label = args.label || 'unnamed';
+
+            let freeSlot = -1;
+            for (let i = 45; i < sim.MAX_NS_ENTRIES; i++) {
+                if (!sim.isNSEntryValid(i)) { freeSlot = i; break; }
+            }
+            if (freeSlot === -1) {
+                for (let i = 11; i < 45; i++) {
+                    if (!sim.isNSEntryValid(i)) { freeSlot = i; break; }
+                }
+            }
+            if (freeSlot === -1) {
+                return { ok: false, fault: 'NS_FULL', message: 'Navana.Add: no free NS slots' };
+            }
+
+            const base = sim.NS_TABLE_BASE + freeSlot * sim.NS_ENTRY_WORDS;
+            const existingW2 = sim.memory[base + 2] || 0;
+            const oldVersion = (existingW2 >>> 25) & 0x7F;
+            const newVersion = (oldVersion + 1) & 0x7F;
+
+            sim.writeNSEntry(freeSlot, location, limit, 0, 0, 0, 0, gtType, newVersion, clistCount);
+            sim.nsLabels[freeSlot] = label;
+
+            navanaState.managedAbstractions.push({ index: freeSlot, name: label, layer: -1 });
+
+            return {
+                ok: true,
+                result: { nsIndex: freeSlot, version: newVersion, location: location, limit: limit, clistCount: clistCount },
+                message: `Navana.Add: NS[${freeSlot}] = "${label}" @ 0x${location.toString(16)}, lim=${limit}, clist=${clistCount}, v${newVersion}`
+            };
+        });
+
+        this.registry.bindMethod(5, 'REMOVE', function(sim, args) {
+            const index = args.index;
+            if (index === undefined || index < 4) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.Remove: invalid index (boot abstractions protected)' };
+            }
+            const base = sim.NS_TABLE_BASE + index * sim.NS_ENTRY_WORDS;
+            const w2 = sim.memory[base + 2] || 0;
+            const oldVersion = (w2 >>> 25) & 0x7F;
+            const newVersion = (oldVersion + 1) & 0x7F;
+            sim.memory[base + 0] = 0;
+            sim.memory[base + 1] = 0;
+            sim.memory[base + 2] = (newVersion << 25) >>> 0;
+            const label = sim.nsLabels[index] || 'unnamed';
+            delete sim.nsLabels[index];
+            navanaState.managedAbstractions = navanaState.managedAbstractions.filter(a => a.index !== index);
+            return {
+                ok: true,
+                result: { index: index, revoked: true },
+                message: `Navana.Remove: NS[${index}] "${label}" revoked (v${oldVersion}->v${newVersion})`
+            };
+        });
+
+        const self = this;
+        this.registry.bindMethod(5, 'ABSTRACTION.ADD', function(sim, args) {
+            const upload = args.upload || args;
+            if (!upload || !upload.abstraction) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.Abstraction.Add: upload required with abstraction name' };
+            }
+
+            const name = upload.abstraction;
+            const capabilities = upload.capabilities || [];
+            const methods = upload.methods || [];
+            const clistCount = capabilities.length;
+
+            if (clistCount > 511) {
+                return { ok: false, fault: 'BOUNDS', message: `Navana.Abstraction.Add: clistCount ${clistCount} exceeds max 511` };
+            }
+
+            let totalCodeWords = 0;
+            for (const m of methods) {
+                totalCodeWords += (m.code || []).length;
+            }
+            const methodTableSize = methods.length;
+            const codeSize = methodTableSize + totalCodeWords;
+
+            const neededSize = codeSize + clistCount;
+            const allocSize = Math.max(256, nextPow2(neededSize));
+
+            if (codeSize + clistCount > allocSize) {
+                return { ok: false, fault: 'OVERFLOW', message: `Navana.Abstraction.Add: code(${codeSize}) + clist(${clistCount}) > allocSize(${allocSize})` };
+            }
+
+            const memResult = sim.abstractionRegistry.dispatchMethod(7, 'Allocate', sim, { size: allocSize });
+            if (!memResult || !memResult.ok) {
+                return { ok: false, fault: 'OOM', message: `Navana.Abstraction.Add: Memory.Allocate failed: ${memResult ? memResult.message : 'no result'}` };
+            }
+
+            const location = memResult.result.location;
+            const limit = allocSize - 1;
+
+            let offset = 0;
+            for (let mi = 0; mi < methods.length; mi++) {
+                sim.memory[location + mi] = totalCodeWords > 0 ? (methods.length + offset) : 0;
+                offset += (methods[mi].code || []).length;
+            }
+
+            offset = methods.length;
+            for (const m of methods) {
+                for (const word of (m.code || [])) {
+                    sim.memory[location + offset] = word >>> 0;
+                    offset++;
+                }
+            }
+
+            const clistStart = allocSize - clistCount;
+            for (let ci = 0; ci < capabilities.length; ci++) {
+                const cap = capabilities[ci];
+                const targetIdx = cap.target;
+                const capPerms = {};
+                for (const p of (cap.grants || ['E'])) {
+                    capPerms[p] = 1;
+                }
+                const entry = sim.readNSEntry(targetIdx);
+                if (entry) {
+                    const version = (entry.word2_seals >>> 25) & 0x7F;
+                    const gt = sim.createGT(version, targetIdx, capPerms, 1);
+                    sim.memory[location + clistStart + ci] = gt;
+                }
+            }
+
+            const addResult = sim.abstractionRegistry.dispatchMethod(5, 'Add', sim, {
+                location: location,
+                limit: limit,
+                clistCount: clistCount,
+                gtType: 1,
+                label: name
+            });
+
+            if (!addResult || !addResult.ok) {
+                return { ok: false, fault: 'NS_FULL', message: `Navana.Abstraction.Add: ${addResult ? addResult.message : 'Add failed'}` };
+            }
+
+            const nsIndex = addResult.result.nsIndex;
+            const version = addResult.result.version;
+            const eGT = sim.createGT(version, nsIndex, { E: 1 }, 1);
+
+            return {
+                ok: true,
+                result: {
+                    nsIndex: nsIndex,
+                    version: version,
+                    eGT: eGT,
+                    location: location,
+                    allocSize: allocSize,
+                    codeSize: codeSize,
+                    clistCount: clistCount,
+                    clistStart: clistStart,
+                    methods: methods.map(m => m.name)
+                },
+                message: `Navana.Abstraction.Add: "${name}" @ NS[${nsIndex}] v${version}, code=${codeSize}, clist=${clistCount}, alloc=${allocSize}`
+            };
+        });
+
+        this.registry.bindMethod(5, 'ABSTRACTION.REMOVE', function(sim, args) {
+            const index = args.index;
+            return sim.abstractionRegistry.dispatchMethod(5, 'Remove', sim, { index: index });
+        });
+
+        this.registry.bindMethod(5, 'ABSTRACTION.UPDATE', function(sim, args) {
+            const upload = args.upload || args;
+            const index = args.index;
+            if (!index && !upload.index) {
+                return { ok: false, fault: 'ARGS', message: 'Navana.Abstraction.Update: index required' };
+            }
+            return {
+                ok: true,
+                result: { index: index || upload.index, updated: true },
+                message: `Navana.Abstraction.Update: NS[${index || upload.index}] updated`
+            };
+        });
     }
 
     _bindMint() {
@@ -164,41 +353,34 @@ class SystemAbstractions {
                 return { ok: false, fault: 'OOM', message: `Mint.Create: Memory.Allocate(${size}) failed — ${memResult ? memResult.message : 'no response'}` };
             }
             const location = memResult.result.location;
-
-            let nsIndex = args.nsIndex;
-            if (nsIndex === undefined || nsIndex === null) {
-                let freeIdx = -1;
-                for (let i = sim.nsCount; i < sim.MAX_NS_ENTRIES; i++) {
-                    if (!sim.isNSEntryValid(i)) { freeIdx = i; break; }
-                }
-                if (freeIdx === -1) {
-                    for (let i = 45; i < sim.nsCount; i++) {
-                        if (!sim.isNSEntryValid(i)) { freeIdx = i; break; }
-                    }
-                }
-                if (freeIdx === -1) {
-                    return { ok: false, fault: 'NS_FULL', message: 'Mint.Create: no free NS entries' };
-                }
-                nsIndex = freeIdx;
-            }
-
-            const entry = sim.readNSEntry(nsIndex);
-            const currentVersion = entry ? ((entry.word2_seals >>> 25) & 0x7F) : 0;
-            const newVersion = (currentVersion + 1) & 0x7F;
-
-            const limit17 = (size - 1) & 0x1FFFF;
-            sim.writeNSEntry(nsIndex, location, limit17, bFlag, fFlag, 0, 0, gtType, newVersion);
+            const allocatedSize = memResult.result.size;
+            const limit17 = (allocatedSize - 1) & 0x1FFFF;
 
             const labelPrefix = gtType === 3 ? 'ABS' : (gtType === 2 ? 'OUT' : (hasTuring ? 'DATA' : 'CAP'));
-            sim.nsLabels[nsIndex] = `${labelPrefix}[${nsIndex}]`;
+            const label = `${labelPrefix}[mint]`;
+
+            const addResult = sim.abstractionRegistry.dispatchMethod(5, 'Add', sim, {
+                location: location,
+                limit: limit17,
+                clistCount: 0,
+                gtType: gtType,
+                label: label
+            });
+
+            if (!addResult || !addResult.ok) {
+                return { ok: false, fault: 'NS_FULL', message: `Mint.Create: Navana.Add failed — ${addResult ? addResult.message : 'no response'}` };
+            }
+
+            const nsIndex = addResult.result.nsIndex;
+            const newVersion = addResult.result.version;
 
             const gt = sim.createGT(newVersion, nsIndex, targetPerms, gtType);
 
             const permBits = sim.getPermBits(targetPerms);
             return {
                 ok: true,
-                result: { gt: gt, nsIndex: nsIndex, location: location, size: size, version: newVersion, type: gtType, typeName: typeNames[gtType] },
-                message: `Mint.Create: ${typeNames[gtType]} GT v${newVersion} -> NS[${nsIndex}] perms=${permBits.toString(2).padStart(6,'0')} B=${bFlag} F=${fFlag}`
+                result: { gt: gt, nsIndex: nsIndex, location: location, size: allocatedSize, version: newVersion, type: gtType, typeName: typeNames[gtType] },
+                message: `Mint.Create: ${typeNames[gtType]} GT v${newVersion} -> NS[${nsIndex}] perms=${permBits.toString(2).padStart(6,'0')} B=${bFlag} F=${fFlag} (via Navana.Add)`
             };
         });
 
@@ -253,11 +435,12 @@ class SystemAbstractions {
         const memState = this._memoryState;
 
         this.registry.bindMethod(7, 'Allocate', function(sim, args) {
-            const size = args.size || 16;
+            const requested = args.size || 16;
+            const size = Math.max(256, nextPow2(requested));
 
             const location = memState.nextFreeAddr;
             if (location + size > sim.NS_TABLE_BASE) {
-                return { ok: false, fault: 'OOM', message: `Memory.Allocate(${size}): out of memory — next=0x${location.toString(16)}, limit=0x${sim.NS_TABLE_BASE.toString(16)}` };
+                return { ok: false, fault: 'OOM', message: `Memory.Allocate(${requested}→${size}): out of memory — next=0x${location.toString(16)}, limit=0x${sim.NS_TABLE_BASE.toString(16)}` };
             }
 
             memState.allocations[location] = { location: location, size: size };
@@ -266,7 +449,7 @@ class SystemAbstractions {
             return {
                 ok: true,
                 result: { location: location, size: size },
-                message: `Memory.Allocate: ${size} words at 0x${location.toString(16)}`
+                message: `Memory.Allocate: ${size} words (pow2, requested ${requested}) at 0x${location.toString(16)}`
             };
         });
 

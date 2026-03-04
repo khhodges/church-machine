@@ -1,0 +1,15 @@
+abstraction Mint {
+    capabilities {
+        Memory
+    }
+    method Create(size, perms) {
+        result = call(Memory.Allocate(size))
+        return(result)
+    }
+    method Revoke(index) {
+        return(0)
+    }
+    method Transfer(gt) {
+        return(gt)
+    }
+}

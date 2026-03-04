@@ -9,8 +9,10 @@ The Church Machine is a capability-secured processor architecture with an educat
 ```
 hardware/          — Amaranth HDL for Tang Nano 20K (all features enabled)
 simulator/         — Web IDE (HTML/JS/CSS) — the educational product
+  cloomc/          — CLOOMC++ source files for system abstractions
 server/            — Flask backend (SQLite, port 5000)
 docs/              — Architecture and reference documentation
+  risks.md         — Security risk register (R001-R009)
 church_machine/    — Original pico-ice hardware (reference, not active)
 church_sim/        — Original simulator (reference, ported to simulator/)
 ```
@@ -23,15 +25,18 @@ church_sim/        — Original simulator (reference, ported to simulator/)
 - [docs/instruction-set.md](../docs/instruction-set.md) — All 20 instructions with encoding, syntax, and examples
 - [docs/tang-nano-20k.md](../docs/tang-nano-20k.md) — FPGA target, pin assignments, build toolchain
 - [docs/getting-started.md](../docs/getting-started.md) — Tutorial for educators, students, parents, and developers
+- [docs/risks.md](../docs/risks.md) — Security risk register: R001-R009 with severity, fixes, status
 
 ## Architecture
 
 ### Abstraction Model (Scale-Free)
 
 Every abstraction is a security block with MTBF measured by fault reports over time in a namespace:
-- CR6 → c-list (capability list)
-- CR7 → code at c-list[0] (CLOOMC) — code is DATA domain, never Church domain
-- Entered via CALL (E-GT); LAMBDA is a method/instruction within abstractions, not a separate security block
+- Single NS entry model: one lump, one Inform E-GT, clistCount in word1
+- CR7 → code region (Turing X, hardcoded by CALL) — R001 fix
+- CR6 → c-list region (Church L, hardcoded by CALL) — R001 fix
+- Entered via CALL (E-GT); CALL checks clistCount to split lump
+- LAMBDA is a method/instruction within abstractions, not a separate security block
 
 45 abstractions across 9 layers:
 - Layer 0: Boot (NS, Thread, CList, CLOOMC)
@@ -55,12 +60,51 @@ MTBF tracking: Every fault against a security block is counted; MTBF = uptime / 
 - mLoad 7-step pipeline: type check → version match → seal verify → bounds → perms → F-bit → deliver
 - Domain purity: Church domain = capabilities (GTs, c-lists); DATA domain = code objects + data; code is NEVER Church domain
 - L/S Church domain controls capability grants — the c-list IS the parental approval
-- GT types: 00=NULL (zero value), 01=Inform (local), 10=Outform (remote, F-bit auto), 11=Abstract
-- Mint.Create(type, size, perms, [bind], [far]): CALLs Memory.Allocate for backing storage, finds free NS entry, increments version, writes NS entry, returns ready-to-use GT
+- GT types: 00=NULL (zero value), 01=Inform (NS entry, memory), 10=Outform (remote, F-bit auto), 11=Abstract (GT IS value)
+- Inform GTs for all abstractions — clistCount in word1 tells CALL how to split the lump
+- Mint.Create delegates NS entry to Navana.Add — Navana is sole NS writer
 - Perms: any valid RWX combo (Turing) or any valid LSE combo (Church) — FAULT on mixed domains
 - Version never reset — Mint.Create increments; Mint.Revoke increments to kill all GT copies instantly
 - Negotiate abstraction: dual-approval (parent+teacher) for special grants
-- Each sibling has their own isolated namespace
+- Each sibling has their own isolated namespace — private digital shadow
+
+### NS Entry word1 Layout
+
+```
+word1: B(31)|F(30)|G(29)|chain(28)|type(27:26)|clistCount(25:17)|limit(16:0)
+
+clistCount > 0: abstraction lump — CALL splits into CR7 (code, X) + CR6 (c-list, L)
+clistCount = 0: plain data object
+type = 01 (Inform) for all abstractions
+```
+
+### CLOOMC++ Compiler
+
+Multi-language compiler targeting Church Machine 20-instruction set:
+- JavaScript front-end (Phase 1, implemented): JS subset → 32-bit code words
+- Haskell front-end (Phase 1b, planned): Lambda calculus → Church Machine instructions
+- Resident Object Model: c-list = compiler symbol table, maps abstraction names to offsets
+- Calling convention: DR0-3 args/return, DR4-11 locals, DR12-15 temporaries (R008)
+- Output: upload.json format for Navana.Abstraction.Add
+
+### Navana as Master Controller
+
+- Sole NS entry writer (except one boot mElevation for Navana's own entry)
+- Navana.Add: find free NS slot, write 3-word entry with clistCount
+- Navana.Abstraction.Add: process upload.json, allocate lump, write code+c-list, forge E-GT
+- Upload validation: R007 fixes (bounds, capability delegation, integer overflow checks)
+
+### Upload Format
+
+```json
+{
+  "abstraction": "Name",
+  "type": "abstraction",
+  "grants": ["E"],
+  "capabilities": [{ "target": 7, "name": "Memory", "grants": ["E"] }],
+  "methods": [{ "name": "Method", "code": [0x12345678] }]
+}
+```
 
 ### Hardware Target
 
@@ -75,6 +119,7 @@ MTBF tracking: Every fault against a security block is counted; MTBF = uptime / 
 
 - Flask server on port 5000, serves simulator/ as static files
 - 8 views: Dashboard, Code, Namespace, Abstractions, Pipeline, Tutorial, REPL, Reference
+- CLOOMC++ compiler integrated: write source → compile → create abstraction
 - State persistence via localStorage
 - WebSerial for Tang Nano 20K deployment
 
@@ -102,3 +147,4 @@ MTBF tracking: Every fault against a security block is counted; MTBF = uptime / 
 - No separate dynamicObjects — all entries in namespaceObjects
 - B (Bind) bit defaults to 0, auto-cleared by CALL
 - C-Lists only have E permission, CLOOMC only X or RX
+- Phase 1: JS compiler only; Haskell deferred to Phase 1b

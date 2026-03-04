@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" font-family="monospace" font-size="12">
+  <rect width="900" height="700" fill="#141414"/>
+  <rect x="20" y="10" width="860" height="680" rx="8" fill="none" stroke="#C89B3C" stroke-width="2"/>
+  <text x="40" y="35" fill="#C89B3C" font-size="16" font-weight="bold">Namespace (Navana)</text>
+
+  <rect x="40" y="50" width="530" height="80" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+  <text x="50" y="70" fill="#C89B3C" font-size="11" font-weight="bold">NS Table (0xFD00) — 3 words per entry</text>
+  <text x="50" y="88" fill="#888" font-size="10">word0: location</text>
+  <text x="170" y="88" fill="#888" font-size="10">word1: B|F|G|C|type(2)|clistCount(9)|limit(17)</text>
+  <text x="50" y="106" fill="#888" font-size="10">word2: version(7)|seal(25)</text>
+  <text x="260" y="106" fill="#C89B3C" font-size="10">type=01 (Inform) for all abstractions</text>
+
+  <line x1="150" y1="130" x2="150" y2="170" stroke="#C89B3C" stroke-width="1" stroke-dasharray="4"/>
+  <text x="160" y="150" fill="#888" font-size="10">E-GT points here</text>
+  <polygon points="150,170 145,160 155,160" fill="#C89B3C"/>
+
+  <rect x="40" y="175" width="340" height="240" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+  <text x="50" y="195" fill="#C89B3C" font-size="11" font-weight="bold">Lump (power-of-2 allocation)</text>
+
+  <rect x="55" y="205" width="310" height="60" rx="2" fill="#1e2a18" stroke="#4a7a2e" stroke-width="1"/>
+  <text x="65" y="225" fill="#4a7a2e" font-size="11">Code — Turing domain (X only)</text>
+  <text x="65" y="245" fill="#666" font-size="10">method_table + code words</text>
+  <text x="65" y="260" fill="#555" font-size="9">CR7: loc=base, lim=clistStart-1</text>
+
+  <rect x="55" y="270" width="310" height="40" rx="2" fill="#1a1a1a" stroke="#333" stroke-width="1" stroke-dasharray="3"/>
+  <text x="65" y="295" fill="#555" font-size="10">FREESPACE — inaccessible (no CR covers it)</text>
+
+  <rect x="55" y="315" width="310" height="60" rx="2" fill="#2a1e18" stroke="#7a4a2e" stroke-width="1"/>
+  <text x="65" y="335" fill="#7a4a2e" font-size="11">C-list — Church domain (L only)</text>
+  <text x="65" y="355" fill="#666" font-size="10">GT slots (clistCount entries)</text>
+  <text x="65" y="370" fill="#555" font-size="9">CR6: loc=base+clistStart, lim=clistCount-1</text>
+
+  <text x="50" y="405" fill="#888" font-size="9">offset 0 ─────────────────── allocSize (pow2)</text>
+
+  <g transform="translate(420, 200)">
+    <rect x="0" y="0" width="200" height="180" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+    <text x="10" y="20" fill="#C89B3C" font-size="11" font-weight="bold">CALL splits lump</text>
+
+    <text x="10" y="45" fill="#4a7a2e" font-size="10">CR7 (code)</text>
+    <text x="10" y="60" fill="#666" font-size="9">loc = base</text>
+    <text x="10" y="73" fill="#666" font-size="9">lim = clistStart - 1</text>
+    <text x="10" y="86" fill="#4a7a2e" font-size="9">perms = X (hardcoded)</text>
+
+    <line x1="0" y1="95" x2="200" y2="95" stroke="#333" stroke-width="1"/>
+
+    <text x="10" y="115" fill="#7a4a2e" font-size="10">CR6 (c-list)</text>
+    <text x="10" y="130" fill="#666" font-size="9">loc = base + clistStart</text>
+    <text x="10" y="143" fill="#666" font-size="9">lim = clistCount - 1</text>
+    <text x="10" y="156" fill="#7a4a2e" font-size="9">perms = L (hardcoded)</text>
+    <text x="10" y="172" fill="#C89B3C" font-size="9">R001: domain purity enforced</text>
+  </g>
+
+  <line x1="365" y1="235" x2="420" y2="240" stroke="#4a7a2e" stroke-width="1"/>
+  <line x1="365" y1="345" x2="420" y2="310" stroke="#7a4a2e" stroke-width="1"/>
+
+  <rect x="40" y="430" width="580" height="150" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+  <text x="50" y="450" fill="#C89B3C" font-size="11" font-weight="bold">CLOOMC++ Compiler</text>
+
+  <rect x="55" y="460" width="120" height="30" rx="2" fill="#1e1e2a" stroke="#4a4a7a" stroke-width="1"/>
+  <text x="75" y="480" fill="#4a4a7a" font-size="11">JavaScript</text>
+
+  <rect x="55" y="500" width="120" height="30" rx="2" fill="#1e1e2a" stroke="#555" stroke-width="1" stroke-dasharray="3"/>
+  <text x="63" y="520" fill="#555" font-size="11">Haskell (P1b)</text>
+
+  <line x1="175" y1="475" x2="220" y2="495" stroke="#4a4a7a" stroke-width="1"/>
+  <line x1="175" y1="515" x2="220" y2="500" stroke="#555" stroke-width="1" stroke-dasharray="3"/>
+
+  <rect x="220" y="470" width="170" height="50" rx="2" fill="#2a2a18" stroke="#7a7a4a" stroke-width="1"/>
+  <text x="230" y="490" fill="#7a7a4a" font-size="10">Resident Object Model</text>
+  <text x="230" y="505" fill="#666" font-size="9">c-list = symbol table</text>
+
+  <line x1="390" y1="495" x2="420" y2="495" stroke="#7a7a4a" stroke-width="1"/>
+  <polygon points="420,495 412,490 412,500" fill="#7a7a4a"/>
+
+  <rect x="420" y="470" width="130" height="50" rx="2" fill="#2a1e1e" stroke="#7a4a4a" stroke-width="1"/>
+  <text x="430" y="490" fill="#7a4a4a" font-size="10">32-bit code words</text>
+  <text x="430" y="505" fill="#666" font-size="9">20 instructions</text>
+
+  <text x="55" y="565" fill="#888" font-size="10">Output: upload.json → Navana.Abstraction.Add → lump</text>
+
+  <g transform="translate(650, 50)">
+    <rect x="0" y="0" width="210" height="180" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+    <text x="10" y="20" fill="#C89B3C" font-size="11" font-weight="bold">GT Type Legend</text>
+    <text x="10" y="40" fill="#555" font-size="10">00 NULL — zero value</text>
+    <text x="10" y="60" fill="#4a7a2e" font-size="10">01 Inform — NS entry</text>
+    <text x="10" y="80" fill="#4a4a7a" font-size="10">10 Outform — remote (F-bit)</text>
+    <text x="10" y="100" fill="#7a4a2e" font-size="10">11 Abstract — GT IS value</text>
+
+    <line x1="0" y1="115" x2="210" y2="115" stroke="#333" stroke-width="1"/>
+    <text x="10" y="135" fill="#C89B3C" font-size="11" font-weight="bold">E-GT Format</text>
+    <text x="10" y="155" fill="#888" font-size="9">ver(7)|idx(17)|perms=E(6)|01</text>
+    <text x="10" y="170" fill="#666" font-size="9">32 bits, unforgeable</text>
+  </g>
+
+  <g transform="translate(650, 250)">
+    <rect x="0" y="0" width="210" height="140" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+    <text x="10" y="20" fill="#C89B3C" font-size="11" font-weight="bold">word1 Layout</text>
+    <text x="10" y="40" fill="#888" font-size="9">31: B (bind)</text>
+    <text x="10" y="55" fill="#888" font-size="9">30: F (far)</text>
+    <text x="10" y="70" fill="#888" font-size="9">29: G (GC)</text>
+    <text x="10" y="85" fill="#888" font-size="9">28: chain</text>
+    <text x="10" y="100" fill="#C89B3C" font-size="9">27-26: type (01=Inform)</text>
+    <text x="10" y="115" fill="#C89B3C" font-size="9">25-17: clistCount (0-511)</text>
+    <text x="10" y="130" fill="#888" font-size="9">16-0: limit (17 bits)</text>
+  </g>
+
+  <rect x="40" y="600" width="820" height="60" rx="4" fill="#1a1a1a" stroke="#C89B3C" stroke-width="1"/>
+  <text x="50" y="620" fill="#C89B3C" font-size="11" font-weight="bold">Private Digital Shadow — Namespace Isolation (R009)</text>
+  <text x="50" y="640" fill="#888" font-size="10">Each namespace protects itself. No external actor can reach inside without a valid, unrevoked Inform GT.</text>
+  <text x="50" y="655" fill="#666" font-size="9">Revoking a GT (incrementing version) instantly cuts ALL access — every copy becomes invalid.</text>
+</svg>

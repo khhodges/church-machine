@@ -3,6 +3,7 @@ let assembler = null;
 let pipelineViz = null;
 let repl = null;
 let churchTutorial = null;
+let cloomcCompiler = null;
 let currentView = 'dashboard';
 let lastAssembledWords = null;
 let abstractionRegistry = null;
@@ -20,6 +21,10 @@ function init() {
     systemAbstractions = new SystemAbstractions(abstractionRegistry);
     deviceAbstractions = new DeviceAbstractions(abstractionRegistry);
     sim.initAbstractions(abstractionRegistry, systemAbstractions, deviceAbstractions);
+
+    if (typeof CLOOMCCompiler !== 'undefined') {
+        cloomcCompiler = new CLOOMCCompiler();
+    }
 
     window.churchTutorial = churchTutorial;
 
@@ -3785,6 +3790,123 @@ function showInstructionDetail(opcode) {
             <pre class="instr-detail-example">${instr.example}</pre>
         </div>
     `;
+}
+
+function compileCLOOMC() {
+    const editor = document.getElementById('asmEditor');
+    if (!editor || !cloomcCompiler) return;
+    const source = editor.value;
+    const con = document.getElementById('editorConsole');
+
+    const capabilities = [];
+    const result = cloomcCompiler.compile(source, capabilities);
+
+    if (result.errors.length > 0) {
+        const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
+        if (con) con.textContent = `CLOOMC++ compilation errors:\n${errText}`;
+        return;
+    }
+
+    let listing = `CLOOMC++ compiled "${result.abstractionName}" — ${result.methods.length} method(s):\n\n`;
+    for (const m of result.methods) {
+        listing += `  method ${m.name}: ${m.code.length} instruction(s)\n`;
+        for (let i = 0; i < m.code.length; i++) {
+            const word = m.code[i];
+            listing += `    ${i.toString().padStart(4)}: 0x${word.toString(16).padStart(8, '0')}  ${assembler.disassemble(word)}\n`;
+        }
+        listing += '\n';
+    }
+
+    if (result.manifest && result.manifest.length > 0) {
+        listing += 'Compilation manifest:\n';
+        for (const entry of result.manifest) {
+            for (const m of entry.mapping || []) {
+                listing += `  src:${m.src} -> addr:${m.addr} ${m.desc}\n`;
+            }
+        }
+    }
+
+    if (con) con.textContent = listing;
+    appendOutput(`CLOOMC++ compiled "${result.abstractionName}" — ${result.methods.length} methods`, 'info');
+}
+
+function compileAndCreateAbstraction() {
+    const editor = document.getElementById('asmEditor');
+    if (!editor || !cloomcCompiler) return;
+    const source = editor.value;
+    const con = document.getElementById('editorConsole');
+
+    const result = cloomcCompiler.compile(source, []);
+
+    if (result.errors.length > 0) {
+        const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
+        if (con) con.textContent = `CLOOMC++ compilation errors:\n${errText}`;
+        return;
+    }
+
+    if (!sim.bootComplete) {
+        if (con) con.textContent = 'Boot not complete — run boot sequence first.';
+        return;
+    }
+
+    const uploadCaps = (result.capabilities || []).map((capName, idx) => {
+        let target = -1;
+        if (sim.abstractionRegistry) {
+            const allAbs = sim.abstractionRegistry.abstractions || [];
+            for (let i = 0; i < allAbs.length; i++) {
+                if (allAbs[i] && allAbs[i].name && allAbs[i].name.toUpperCase() === capName.toUpperCase()) {
+                    target = i;
+                    break;
+                }
+            }
+        }
+        return { target: target, name: capName, grants: ['E'] };
+    }).filter(c => c.target >= 0);
+
+    const upload = {
+        abstraction: result.abstractionName || 'UserAbstraction',
+        type: 'abstraction',
+        grants: ['E'],
+        capabilities: uploadCaps,
+        methods: result.methods
+    };
+
+    const addResult = abstractionRegistry.dispatchMethod(5, 'Abstraction.Add', sim, { upload: upload });
+
+    if (!addResult || !addResult.ok) {
+        if (con) con.textContent = `Abstraction creation failed: ${addResult ? addResult.message : 'unknown error'}`;
+        return;
+    }
+
+    let listing = `Abstraction "${upload.abstraction}" created via Navana.Abstraction.Add:\n`;
+    listing += `  NS Index: ${addResult.result.nsIndex}\n`;
+    listing += `  Version: ${addResult.result.version}\n`;
+    listing += `  Location: 0x${addResult.result.location.toString(16)}\n`;
+    listing += `  Alloc Size: ${addResult.result.allocSize}\n`;
+    listing += `  Code Size: ${addResult.result.codeSize}\n`;
+    listing += `  C-List Count: ${addResult.result.clistCount}\n`;
+    listing += `  Methods: ${addResult.result.methods.join(', ')}\n`;
+    listing += `  E-GT: 0x${addResult.result.eGT.toString(16).padStart(8, '0')}\n`;
+
+    if (con) con.textContent = listing;
+    appendOutput(`Created "${upload.abstraction}" @ NS[${addResult.result.nsIndex}]`, 'info');
+    updateDashboard();
+}
+
+function loadCLOOMCExample(name) {
+    const editor = document.getElementById('asmEditor');
+    if (!editor) return;
+
+    const examples = {
+        'memory': `abstraction Memory {\n    capabilities {\n    }\n    method Allocate(size) {\n        location = read(CR7, 0)\n        needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        write(CR7, 0, location + needed)\n        return(location, needed)\n    }\n    method Free(location) {\n        return(0)\n    }\n}`,
+        'mint': `abstraction Mint {\n    capabilities {\n        Memory\n    }\n    method Create(size, perms) {\n        result = call(Memory.Allocate(size))\n        return(result)\n    }\n    method Revoke(index) {\n        return(0)\n    }\n}`,
+        'hello': `abstraction Hello {\n    capabilities {\n    }\n    method Greet(who) {\n        result = who + 1\n        return(result)\n    }\n}`,
+        'counter': `abstraction Counter {\n    capabilities {\n    }\n    method Increment(value) {\n        result = value + 1\n        return(result)\n    }\n    method Add(a, b) {\n        result = a + b\n        return(result)\n    }\n}`,
+    };
+
+    editor.value = examples[name] || examples['hello'];
+    updateLineNumbers();
+    saveEditorState();
 }
 
 document.addEventListener('DOMContentLoaded', init);

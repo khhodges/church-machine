@@ -1,0 +1,15 @@
+abstraction Navana {
+    capabilities {
+        Memory
+        Mint
+    }
+    method Init() {
+        return(1)
+    }
+    method Add(location, limit) {
+        return(location)
+    }
+    method Remove(index) {
+        return(0)
+    }
+}

@@ -1,0 +1,18 @@
+abstraction Memory {
+    capabilities {
+    }
+    method Allocate(size) {
+        location = read(CR7, 0)
+        needed = size + 255
+        needed = needed >> 8
+        needed = needed << 8
+        write(CR7, 0, location + needed)
+        return(location, needed)
+    }
+    method Free(location) {
+        return(0)
+    }
+    method Resize(location, newSize) {
+        return(location, newSize)
+    }
+}

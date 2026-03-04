@@ -55,18 +55,25 @@ The first callable abstraction. Its purpose is to prove that the CALL mechanism 
 
 **Rationale**: Named for the theological concept of proving grace through works. This abstraction is the "smoke test" for the entire capability system. Once verified, it hands control to Navana forever.
 
-### 5 — Navana
+### 5 — Navana (Master Controller)
 
-**Methods**: Init, Manage, Monitor, IDS
+**Methods**: Init, Add, Remove, Abstraction.Add, Abstraction.Update, Abstraction.Remove, Manage, Monitor, IDS
 
-The Namespace controller. Navana runs indefinitely — it does not RETURN. After Salvation proves the security pipeline, Navana takes over and manages:
+The Namespace controller and sole NS entry writer. Navana runs indefinitely — it does not RETURN. After Salvation proves the security pipeline, Navana takes over and manages:
 
 - **Init**: Initialize all higher-layer abstractions and register them in the namespace
+- **Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
+- **Remove**: Revoke GT (increment version), free NS slot
+- **Abstraction.Add**: Process upload.json, allocate lump (power-of-2), write code + c-list, create NS entry, forge Inform E-GT
+- **Abstraction.Update**: Re-carve lump or migrate to larger allocation
+- **Abstraction.Remove**: Revoke GT, free lump, clear NS slot
 - **Manage**: Abstraction lifecycle — creation, destruction, and reconfiguration
 - **Monitor**: System health — step counts, namespace utilization, fault rates
 - **IDS (Intrusion Detection)**: Monitors GT version anomalies, seal mismatches, and permission escalation attempts
 
-Navana is the permanent "main loop" of the Church Machine. The boot flow is: Boot → CALL Salvation → Salvation transitions to Navana → Navana runs forever.
+Navana is the permanent "main loop" of the Church Machine and the sole authority for NS table writes. The boot flow is: Boot → CALL Salvation → Salvation transitions to Navana → Navana runs forever. One boot-time exception: Navana's own NS entry is written via mElevation before Navana exists. After boot, mElevation is dropped.
+
+Mint.Create delegates NS entry creation to Navana.Add. Upload-driven creation via Navana.Abstraction.Add validates: codeSize + clistCount <= allocSize, capability delegation rights, clistCount <= 511, power-of-2 allocation.
 
 **Rationale**: Every system needs a permanent controller. Navana is that controller — it never returns, never halts, and manages everything including intrusion detection. Named for the concept of a permanent, peaceful state.
 
@@ -74,17 +81,17 @@ Navana is the permanent "main loop" of the Church Machine. The boot flow is: Boo
 
 **Methods**: Create, Revoke, Transfer
 
-GT lifecycle management. Mint creates new Golden Tokens with permissions that are a subset of the caller's permissions (you cannot grant what you don't have). Revoke increments the namespace version, instantly killing all outstanding copies. Transfer moves a GT from one c-list to another.
+GT lifecycle management. Mint creates new Golden Tokens with permissions that are a subset of the caller's permissions (you cannot grant what you don't have). Mint.Create delegates NS entry writing to Navana.Add — Navana is the sole NS writer. Revoke increments the namespace version, instantly killing all outstanding copies. Transfer moves a GT from one c-list to another.
 
-**Rationale**: Centralized GT creation ensures the permission subsetting invariant is never violated. No code can create a GT with more permissions than it holds.
+**Rationale**: Centralized GT creation ensures the permission subsetting invariant is never violated. No code can create a GT with more permissions than it holds. Mint handles the capability logic; Navana handles the namespace entry.
 
 ### 7 — Memory
 
 **Methods**: Allocate, Free, Resize
 
-Memory allocation for DATA objects. Allocate reserves a memory region of the requested size and returns its location. Free releases the region. Resize adjusts the allocation size. Memory does not manage the namespace table — that is Navana's responsibility. Mint.Create calls Memory.Allocate for the backing storage, then writes the NS entry itself.
+Memory allocation for DATA objects. Allocate rounds up to the next power-of-2 (minimum 256 words) and returns the location and actual allocated size. Free releases the region. Resize adjusts the allocation size. Memory does not manage the namespace table — that is Navana's responsibility.
 
-**Rationale**: Memory management is a system service, not an implicit runtime feature. Programs must hold a GT to the Memory abstraction to allocate storage. The separation between Memory (storage) and the NS table (namespace) keeps responsibilities clean — Memory knows about address space, Navana knows about namespace structure.
+**Rationale**: Memory management is a system service, not an implicit runtime feature. Programs must hold a GT to the Memory abstraction to allocate storage. Power-of-2 allocation simplifies bounds checking and lump management. The separation between Memory (storage) and the NS table (namespace) keeps responsibilities clean — Memory knows about address space, Navana knows about namespace structure.
 
 ### 8 — Scheduler
 

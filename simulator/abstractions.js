@@ -92,6 +92,26 @@ class AbstractionRegistry {
         return true;
     }
 
+    addMethod(index, name, fn) {
+        const a = this.abstractions[index];
+        if (!a) return false;
+        const upper = name.toUpperCase();
+        if (!a.methods.includes(name) && !a.methods.map(m => m.toUpperCase()).includes(upper)) {
+            a.methods.push(name);
+        }
+        a.dispatch[upper] = fn || null;
+        return true;
+    }
+
+    removeMethod(index, name) {
+        const a = this.abstractions[index];
+        if (!a) return false;
+        const upper = name.toUpperCase();
+        a.methods = a.methods.filter(m => m.toUpperCase() !== upper);
+        delete a.dispatch[upper];
+        return true;
+    }
+
     getAbstraction(index) {
         return this.abstractions[index] || null;
     }
@@ -169,8 +189,8 @@ class AbstractionRegistry {
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(5, 'Navana', 1,
-            ['Init', 'Manage', 'Monitor', 'IDS'],
-            'Namespace controller — runs indefinitely, manages all abstractions, IDS, system lifecycle (does not RETURN)',
+            ['Init', 'Add', 'Remove', 'Abstraction.Add', 'Abstraction.Remove', 'Abstraction.Update', 'Manage', 'Monitor', 'IDS'],
+            'Namespace controller — master NS writer, runs indefinitely, manages all abstractions via uploads (does not RETURN)',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(6, 'Mint', 1,

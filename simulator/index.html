@@ -69,6 +69,8 @@
             <div class="editor-panel">
                 <div class="editor-toolbar">
                     <button class="btn btn-primary" onclick="assembleAndLoad()" title="Assemble code and load into simulator">Assemble</button>
+                    <button class="btn" onclick="compileCLOOMC()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" title="Compile CLOOMC++ source to Church Machine code">CLOOMC++</button>
+                    <button class="btn" onclick="compileAndCreateAbstraction()" style="background:#4a7a2e;color:#fff;border:none;" title="Compile and create abstraction via Navana.Abstraction.Add">Create Abstraction</button>
                     <button class="btn btn-primary" onclick="showSaveToNamespace()" id="btnSaveNS" disabled title="Save assembled program to namespace">Save to NS</button>
                     <button class="btn" onclick="runGC()" style="background:#9b59b6;color:#fff;border:none;" title="Run PP250 garbage collection">Run GC</button>
                     <button class="btn btn-deploy" onclick="downloadHardwareImage()" title="Download binary for Tang Nano 20K">Download .bin</button>
@@ -86,6 +88,9 @@
                         <button class="example-tab" onclick="loadExample('salvation')" data-example="salvation" style="color:#4ade80;">Salvation</button>
                         <button class="example-tab" onclick="loadExample('perm_attack')" data-example="perm_attack" style="color:#f87171;">Perm Attack</button>
                         <button class="example-tab" onclick="loadExample('bind_attack')" data-example="bind_attack" style="color:#f87171;">Bind Attack</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('hello')" data-example="cloomc_hello" style="color:#C89B3C;">CLOOMC++ Hello</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('memory')" data-example="cloomc_memory" style="color:#C89B3C;">CLOOMC++ Memory</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('counter')" data-example="cloomc_counter" style="color:#C89B3C;">CLOOMC++ Counter</button>
                     </div>
                     <button class="example-arrow" onclick="scrollExamples(1)">&rsaquo;</button>
                 </div>
@@ -238,6 +243,8 @@
     <script src="abstractions.js"></script>
     <script src="system_abstractions.js"></script>
     <script src="device_abstractions.js"></script>
+    <script src="cloomc_compiler.js"></script>
+    <script src="boot_uploads.js"></script>
     <script src="webserial.js"></script>
     <script src="hw_binary.js"></script>
     <script src="simulator.js"></script>

@@ -77,10 +77,12 @@ R, W are data permissions (Turing domain access). X, L, S, E are capability perm
 
 | Value | Type | Meaning |
 |-------|------|---------|
-| 00 | NULL | Empty/absent — a zeroed GT is naturally NULL. Cannot be created. |
-| 01 | Inform | Local capability reference |
-| 10 | Outform | Remote capability (F-bit auto-set, tunneled access) |
-| 11 | Abstract | Abstraction entry point (responds to create/destroy/call/inspect) |
+| 00 | NULL | Zero value — no capability. A zeroed GT is naturally NULL. |
+| 01 | Inform | GT points to memory via an NS entry — abstractions, data objects, lumps |
+| 10 | Outform | GT points to remote memory (F-bit auto-set, tunneled access) |
+| 11 | Abstract | GT IS the value — constants (pi), immutable credentials, escale variables |
+
+All abstractions use **Inform (01)** GTs. The Inform GT points to a namespace entry, which points to a memory lump. CALL uses the clistCount field in the NS entry's word1 to split the lump into code (CR7) and c-list (CR6) regions.
 
 ## Register Architecture
 
@@ -127,8 +129,28 @@ All segments are accessed through the same GT gate via mLoad.
 Each namespace entry is 3 words (96 bits):
 
 - **Word 0**: Location (32-bit base address of the object)
-- **Word 1**: B(31) | F(30) | G(29) | ... | Limit(16:0) — flags and bounds
+- **Word 1**: B(31) | F(30) | G(29) | chain(28) | type(27:26) | clistCount(25:17) | Limit(16:0)
 - **Word 2**: Version(31:25) | Seal(24:0) — 7-bit version + 25-bit FNV-1a integrity hash
+
+### word1 Layout
+
+```
+Bit 31:    B (Bind) — defaults 0, auto-cleared by CALL
+Bit 30:    F (Far) — set for Outform GTs
+Bit 29:    G (GC mark) — used by PP250 garbage collector
+Bit 28:    chain — reserved for linked entries
+Bits 27:26: type — 00=NULL, 01=Inform, 10=Outform, 11=Abstract
+Bits 25:17: clistCount — number of c-list slots (0-511)
+Bits 16:0:  limit — object size limit (0-131071)
+```
+
+When `clistCount > 0`, the NS entry describes an abstraction lump. CALL splits the lump:
+- `clistStart = (limit + 1) - clistCount`
+- **CR7** (code): location = base, limit = clistStart - 1, permissions = X-only (hardcoded)
+- **CR6** (c-list): location = base + clistStart, limit = clistCount - 1, permissions = L-only (hardcoded)
+- PC = 0
+
+When `clistCount = 0`, the entry is a plain data object (no lump split).
 
 Seal = FNV-1a(word0, word1[16:0]). Recomputed and verified on every mLoad access (step 3). If word0 or word1 are tampered, the seal check fails.
 
@@ -179,13 +201,19 @@ Instruction fetch uses CR7 (CLOOMC):
 
 ## CALL / RETURN
 
-CALL performs:
-1. Validate E permission on target GT
-2. Load target's c-list into CR6
-3. Load target's code (c-list[0]) into CR7
-4. Save caller's CR6, CR7, PC to call stack
-5. Clear B-bit on preserved CRs
-6. Set PC = 0
+CALL performs (single NS entry with clistCount):
+1. Validate E permission on target Inform GT
+2. mLoad resolves GT → validates version, seal, E-perm
+3. Parse word1 → extract clistCount and limit
+4. If clistCount > 0 (abstraction lump):
+   - clistStart = (limit + 1) - clistCount
+   - CR7 (code): location = base, limit = clistStart - 1, perms = **X-only** (hardcoded)
+   - CR6 (c-list): location = base + clistStart, limit = clistCount - 1, perms = **L-only** (hardcoded)
+5. Save caller's CR6, CR7, PC to call stack
+6. Clear B-bit on preserved CRs
+7. Set PC = 0
+
+CR7 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. This resolves R001.
 
 RETURN restores:
 1. Pop saved CR6, CR7, PC from call stack
@@ -227,3 +255,60 @@ Outform GTs (type=10) with F-bit=1 represent remote resources:
 - Same GT format, same permission model
 - mLoad detects F-bit and routes to Tunnel abstraction
 - Transparent to application code
+
+## Navana as Master Controller
+
+Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go through Navana:
+
+- **Navana.Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
+- **Navana.Remove**: Revoke GT (increment version), free NS slot
+- **Navana.Abstraction.Add**: Process upload.json, allocate lump (power-of-2), write code + c-list, create NS entry, forge E-GT
+- **Navana.Abstraction.Update**: Re-carve lump or migrate to larger allocation
+- **Navana.Abstraction.Remove**: Revoke GT, free lump, clear NS slot
+
+The one exception: boot writes Navana's own NS entry via mElevation (raw write). After boot, mElevation is dropped and Navana controls all subsequent writes. Mint.Create delegates NS entry creation to Navana.Add.
+
+### Upload Format
+
+```json
+{
+  "abstraction": "Name",
+  "type": "abstraction",
+  "grants": ["E"],
+  "capabilities": [{ "target": 7, "name": "Memory", "grants": ["E"] }],
+  "methods": [{ "name": "Method", "code": [0x12345678] }]
+}
+```
+
+Navana.Abstraction.Add validates: codeSize + clistCount <= allocSize, each capability target exists and creator holds sufficient permissions, clistCount <= 511, allocSize is power-of-2.
+
+## CLOOMC++ Compiler
+
+Multi-language compiler targeting Church Machine 20-instruction set:
+
+- **JavaScript front-end** (Phase 1): JS subset → 32-bit code words
+- **Haskell front-end** (Phase 1b, planned): Lambda calculus → Church Machine instructions
+
+### Resident Object Model
+
+The c-list is the compiler's symbol table for external references. The Resident Object Model maps abstraction names to c-list offsets so that `call(Memory.Allocate(size))` compiles to the correct LOAD offset + CALL sequence. Offsets are generated directly from the upload's capabilities array — the compiler never guesses.
+
+### Calling Convention
+
+| Registers | Purpose | Saved by |
+|-----------|---------|----------|
+| DR0-DR3 | Arguments / return values | Caller |
+| DR4-DR11 | Local variables | Callee |
+| DR12-DR15 | Temporaries (compiler scratch) | Caller |
+
+### Language Mapping
+
+JavaScript constructs map to Church Machine instructions:
+- `var x = read(addr)` → DREAD
+- `write(addr, val)` → DWRITE
+- `x + y` → IADD, `x - y` → ISUB
+- `if (x == y)` → MCMP + BRANCH.EQ
+- `call(Abstraction.Method(args))` → LOAD from c-list + CALL
+- `return(val)` → RETURN
+- `x << n` → SHL, `x >> n` → SHR
+- `bitfield(x, pos, width)` → BFEXT / BFINS

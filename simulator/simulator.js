@@ -86,13 +86,14 @@ class ChurchSimulator {
         this.emit('stateChange', this.getState());
     }
 
-    packNSWord1(limit17, bFlag, fFlag, gBit, chainable, gtType) {
+    packNSWord1(limit17, bFlag, fFlag, gBit, chainable, gtType, clistCount) {
         return (
             ((bFlag & 1) << 31) |
             ((fFlag & 1) << 30) |
             ((gBit & 1) << 29) |
             ((chainable & 1) << 28) |
             ((gtType & 3) << 26) |
+            (((clistCount || 0) & 0x1FF) << 17) |
             (limit17 & 0x1FFFF)
         ) >>> 0;
     }
@@ -104,22 +105,23 @@ class ChurchSimulator {
             g: (word1 >>> 29) & 1,
             chainable: (word1 >>> 28) & 1,
             gtType: (word1 >>> 26) & 3,
+            clistCount: (word1 >>> 17) & 0x1FF,
             limit: word1 & 0x1FFFF,
         };
     }
 
     packLimitWord(limit17, bFlag, fFlag) {
-        return this.packNSWord1(limit17, bFlag, fFlag, 0, 0, 0);
+        return this.packNSWord1(limit17, bFlag, fFlag, 0, 0, 0, 0);
     }
 
     parseLimitWord(word1) {
         return this.parseNSWord1(word1);
     }
 
-    writeNSEntry(idx, location, limit17, bFlag, fFlag, gBit, chainable, gtType, version) {
+    writeNSEntry(idx, location, limit17, bFlag, fFlag, gBit, chainable, gtType, version, clistCount) {
         const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
         this.memory[base + 0] = location >>> 0;
-        this.memory[base + 1] = this.packNSWord1(limit17, bFlag, fFlag, gBit, chainable, gtType);
+        this.memory[base + 1] = this.packNSWord1(limit17, bFlag, fFlag, gBit, chainable, gtType, clistCount || 0);
         this.memory[base + 2] = this.makeVersionSeals(version || 0, location, limit17);
         if (idx >= this.nsCount) this.nsCount = idx + 1;
     }
@@ -138,6 +140,7 @@ class ChurchSimulator {
             word2_seals: w2,
             gBit: parsed.g,
             gtType: parsed.gtType,
+            clistCount: parsed.clistCount,
             chainable: parsed.chainable ? true : false,
             label: this.nsLabels[idx] || '',
         };
@@ -993,16 +996,16 @@ class ChurchSimulator {
             this.fault(check.fault, `CALL: CR${d.crDst}: ${check.message}`);
             return null;
         }
-        const clistEntry = check.entry;
-        const clistWord1 = this.parseNSWord1(clistEntry.word1_limit);
-        if (clistWord1.f === 1) {
-            this.fault('FAR', `CALL: CR${d.crDst} C-List has F-bit set (Far)`);
+        const nsEntry = check.entry;
+        const word1 = this.parseNSWord1(nsEntry.word1_limit);
+        if (word1.f === 1) {
+            this.fault('FAR', `CALL: CR${d.crDst} has F-bit set (Far)`);
             return null;
         }
 
         const handler = this.nsHandlers[check.index];
         if (handler) {
-            this._writeCR(6, sourceGT, clistEntry);
+            this._writeCR(6, sourceGT, nsEntry);
             return this._dispatchHandler(d, check, handler);
         }
 
@@ -1010,7 +1013,7 @@ class ChurchSimulator {
             const abstraction = this.abstractionRegistry.getAbstraction(check.index);
             if (abstraction && abstraction.methods.length > 0) {
                 this.abstractionRegistry.activate(check.index);
-                this._writeCR(6, sourceGT, clistEntry);
+                this._writeCR(6, sourceGT, nsEntry);
                 return this._dispatchAbstraction(d, check, abstraction);
             }
         }
@@ -1022,22 +1025,52 @@ class ChurchSimulator {
             savedFlags: {...this.flags},
         });
 
-        this._writeCR(6, sourceGT, clistEntry);
-
-        const clistLoc = clistEntry.word0_location;
-        const cr7GT = this.memory[clistLoc];
+        const clistCount = word1.clistCount;
+        const limit = word1.limit;
+        const base = nsEntry.word0_location;
+        const label = this.nsLabels[check.index] || 'abstraction';
         let cr7Desc = '';
-        if (cr7GT !== 0) {
-            const cr7Parsed = this.parseGT(cr7GT);
-            if (cr7Parsed.type === 1 && cr7Parsed.permissions.X) {
-                const cr7Entry = this.readNSEntry(cr7Parsed.index);
-                if (cr7Entry) {
-                    const cr7Word1 = this.parseNSWord1(cr7Entry.word1_limit);
-                    if (cr7Word1.f !== 1) {
-                        const cr7Check = this.mLoad(cr7GT, 'X', undefined);
-                        if (cr7Check.ok) {
-                            this._writeCR(7, cr7GT, cr7Check.entry);
-                            cr7Desc = `, CR7 <- X-GT(Slot ${cr7Parsed.index})`;
+
+        if (clistCount > 0) {
+            const allocSize = limit + 1;
+            const clistStart = allocSize - clistCount;
+
+            const cr7Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
+            this.cr[7] = {
+                word0: sourceGT,
+                word1: base,
+                word2: cr7Word1,
+                word3: nsEntry.word2_seals,
+                m: this.mElevation ? 1 : 0
+            };
+
+            const cr6Word1 = this.packNSWord1(clistCount - 1, 0, 0, 0, 0, 1, 0);
+            this.cr[6] = {
+                word0: sourceGT,
+                word1: (base + clistStart) >>> 0,
+                word2: cr6Word1,
+                word3: nsEntry.word2_seals,
+                m: this.mElevation ? 1 : 0
+            };
+
+            cr7Desc = `, CR7(code,X,lim=${clistStart-1}), CR6(clist,L,lim=${clistCount-1})`;
+        } else {
+            this._writeCR(6, sourceGT, nsEntry);
+
+            const clistLoc = nsEntry.word0_location;
+            const cr7GT = this.memory[clistLoc];
+            if (cr7GT !== 0) {
+                const cr7Parsed = this.parseGT(cr7GT);
+                if (cr7Parsed.type === 1 && cr7Parsed.permissions.X) {
+                    const cr7Entry = this.readNSEntry(cr7Parsed.index);
+                    if (cr7Entry) {
+                        const cr7Word1p = this.parseNSWord1(cr7Entry.word1_limit);
+                        if (cr7Word1p.f !== 1) {
+                            const cr7Check = this.mLoad(cr7GT, 'X', undefined);
+                            if (cr7Check.ok) {
+                                this._writeCR(7, cr7GT, cr7Check.entry);
+                                cr7Desc = `, CR7 <- X-GT(Slot ${cr7Parsed.index})`;
+                            }
                         }
                     }
                 }
@@ -1048,8 +1081,7 @@ class ChurchSimulator {
             this.cr[i].word2 = (this.cr[i].word2 & ~(1 << 31)) >>> 0;
         }
 
-        const label = this.nsLabels[check.index] || 'abstraction';
-        const desc = `CALL CR${d.crDst} -> ${label}: CR6 <- E-GT(Slot ${check.index})${cr7Desc}`;
+        const desc = `CALL CR${d.crDst} -> ${label}: clistCount=${clistCount}${cr7Desc}`;
         this.output += desc + '\n';
         const prevPC = this.pc;
         this.pc = 0;
