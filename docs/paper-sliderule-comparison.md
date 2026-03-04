@@ -706,7 +706,7 @@ The Church Machine's answer to "who can access my data?" is not a policy, not a 
 
 10. Hamer-Hodges, K.J. (2023). *The Fate of AI Society: Civilizing Superhuman Cyberspace*. Studio of Books LLC. ISBN 978-1964148540.
 
-11. Hamer-Hodges, K.J. (2025). *World War III: The End Game in Cyberspace*. Studio of Books LLC. ISBN 978-1964864983.
+11. Hamer-Hodges, K.J. (2025). *Winning World War III: Industrial Strength Computer Science*. Studio of Books LLC. ISBN 978-1964864983.
 
 ---
 
