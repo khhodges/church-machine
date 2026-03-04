@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 27: Upload-Driven Lifecycle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  .legend { margin-top: 24px; display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555555; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 27 &mdash; Upload-Driven Lifecycle</h1>
+<p class="subtitle">The complete lifecycle from source code to running abstraction: the CLOOMC++ compiler produces an upload.json, which Navana validates, allocates a power-of-2 lump, writes code and c-list, creates a sealed NS entry, forges an Inform E-GT, and returns it to the creator.</p>
+
+<svg viewBox="0 0 1100 1020" width="1100" height="1020" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#b8860b"/>
+    </marker>
+    <marker id="ah-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2c5f8a"/>
+    </marker>
+    <marker id="ah-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c62828"/>
+    </marker>
+    <marker id="ah-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2e7d32"/>
+    </marker>
+    <marker id="ah-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#6b4c9a"/>
+    </marker>
+    <marker id="ah-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#e65100"/>
+    </marker>
+  </defs>
+
+  <!-- ===== Step numbers along the left ===== -->
+  <!-- Step circles will be placed next to each stage -->
+
+  <!-- ============================================================ -->
+  <!-- STAGE 1: Source Code                                         -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="60" r="18" fill="#b8860b" stroke="none"/>
+  <text x="50" y="66" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">1</text>
+
+  <rect x="80" y="30" width="460" height="65" rx="10" fill="#fff8e1" stroke="#b8860b" stroke-width="2"/>
+  <text x="310" y="55" text-anchor="middle" font-size="15" font-weight="bold" fill="#b8860b">Source Code</text>
+  <text x="310" y="75" text-anchor="middle" font-size="11" fill="#555">JavaScript or Haskell &#x2014; problem-oriented language</text>
+
+  <rect x="570" y="30" width="490" height="65" rx="8" fill="#f9f9f9" stroke="#999" stroke-width="1"/>
+  <text x="580" y="52" font-size="10" font-family="'Courier New', monospace" fill="#333">abstraction MyRobot {</text>
+  <text x="580" y="66" font-size="10" font-family="'Courier New', monospace" fill="#333">  capabilities { Memory, Scheduler }</text>
+  <text x="580" y="80" font-size="10" font-family="'Courier New', monospace" fill="#333">  method Forward(steps) { ... }</text>
+  <text x="580" y="92" font-size="10" font-family="'Courier New', monospace" fill="#555">}</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="310" y1="95" x2="310" y2="130" stroke="#b8860b" stroke-width="2.5" marker-end="url(#ah)"/>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 2: CLOOMC++ Compiler                                   -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="170" r="18" fill="#b8860b" stroke="none"/>
+  <text x="50" y="176" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">2</text>
+
+  <rect x="80" y="135" width="460" height="75" rx="10" fill="#fff8e1" stroke="#b8860b" stroke-width="2"/>
+  <text x="310" y="162" text-anchor="middle" font-size="15" font-weight="bold" fill="#b8860b">CLOOMC++ Compiler</text>
+  <text x="100" y="182" font-size="11" fill="#333">Parse &#x2192; Resident Object Model &#x2192; Code Generator</text>
+  <text x="100" y="198" font-size="11" fill="#555">Maps capabilities to c-list offsets, emits 32-bit instruction words</text>
+
+  <rect x="570" y="135" width="490" height="75" rx="8" fill="#f5f5f5" stroke="#555" stroke-width="1"/>
+  <text x="815" y="158" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Correctness Domain (outside TCB)</text>
+  <text x="580" y="178" font-size="10" fill="#333">&#x2022; Compiler bugs &#x2192; wrong answers, never security breaches</text>
+  <text x="580" y="194" font-size="10" fill="#333">&#x2022; Cannot forge GTs, escape bounds, or access other c-lists</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="310" y1="210" x2="310" y2="245" stroke="#b8860b" stroke-width="2.5" marker-end="url(#ah)"/>
+  <text x="320" y="232" font-size="10" fill="#b8860b">produces</text>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 3: upload.json                                         -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="300" r="18" fill="#e65100" stroke="none"/>
+  <text x="50" y="306" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">3</text>
+
+  <rect x="80" y="250" width="460" height="105" rx="10" fill="#fff3e0" stroke="#e65100" stroke-width="2"/>
+  <text x="310" y="275" text-anchor="middle" font-size="15" font-weight="bold" fill="#e65100">upload.json</text>
+  <line x1="100" y1="283" x2="520" y2="283" stroke="#e65100" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="303" font-size="10" font-family="'Courier New', monospace" fill="#333">{ "abstraction": "MyRobot",</text>
+  <text x="100" y="317" font-size="10" font-family="'Courier New', monospace" fill="#333">  "type": "abstraction",  "grants": ["E"],</text>
+  <text x="100" y="331" font-size="10" font-family="'Courier New', monospace" fill="#333">  "capabilities": [{ "target":7, "grants":["E"] }, ...],</text>
+  <text x="100" y="345" font-size="10" font-family="'Courier New', monospace" fill="#333">  "methods": [{ "name":"Forward", "code":[0x1E8...] }] }</text>
+
+  <rect x="570" y="250" width="490" height="105" rx="8" fill="#fff" stroke="#e65100" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="815" y="275" text-anchor="middle" font-size="12" font-weight="bold" fill="#e65100">Upload Format Fields</text>
+  <line x1="590" y1="283" x2="1040" y2="283" stroke="#e65100" stroke-width="0.5" opacity="0.3"/>
+  <text x="590" y="303" font-size="11" fill="#333"><tspan font-weight="bold">abstraction</tspan>: problem-oriented name</text>
+  <text x="590" y="321" font-size="11" fill="#333"><tspan font-weight="bold">capabilities</tspan>: c-list wiring (target index + grants)</text>
+  <text x="590" y="339" font-size="11" fill="#333"><tspan font-weight="bold">methods</tspan>: name + compiled code word arrays</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="310" y1="355" x2="310" y2="390" stroke="#e65100" stroke-width="2.5" marker-end="url(#ah-orange)"/>
+  <text x="320" y="377" font-size="10" fill="#e65100">submitted to</text>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 4: Navana.Abstraction.Add — Validation                 -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="445" r="18" fill="#c62828" stroke="none"/>
+  <text x="50" y="451" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">4</text>
+
+  <rect x="80" y="395" width="460" height="105" rx="10" fill="#ffebee" stroke="#c62828" stroke-width="2.5"/>
+  <text x="310" y="420" text-anchor="middle" font-size="15" font-weight="bold" fill="#c62828">Navana.Abstraction.Add (Validation)</text>
+  <line x1="100" y1="430" x2="520" y2="430" stroke="#c62828" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="450" font-size="11" fill="#333">&#x2713; codeSize + clistCount &#x2264; allocSize (no overlap)</text>
+  <text x="100" y="466" font-size="11" fill="#333">&#x2713; Each capability: creator holds GT with sufficient perms</text>
+  <text x="100" y="482" font-size="11" fill="#333">&#x2713; clistCount &#x2264; 511 (fits 9-bit field)</text>
+  <text x="100" y="498" font-size="11" fill="#333">&#x2713; allocSize is valid power-of-2 &#x2265; 256</text>
+
+  <rect x="570" y="395" width="490" height="105" rx="8" fill="#ffebee" stroke="#c62828" stroke-width="1.5" stroke-dasharray="5,3"/>
+  <text x="815" y="420" text-anchor="middle" font-size="12" font-weight="bold" fill="#c62828">Security Checks (R007)</text>
+  <line x1="590" y1="430" x2="1040" y2="430" stroke="#c62828" stroke-width="0.5" opacity="0.3"/>
+  <text x="590" y="450" font-size="11" fill="#333">&#x2717; Integer underflow in clistStart &#x2192; REJECT</text>
+  <text x="590" y="466" font-size="11" fill="#333">&#x2717; Capability escalation (no delegation) &#x2192; REJECT</text>
+  <text x="590" y="482" font-size="11" fill="#333">&#x2717; Code overlaps c-list region &#x2192; REJECT</text>
+  <text x="590" y="498" font-size="11" fill="#c62828" font-weight="bold">Navana is sole NS writer &#x2014; all creation goes through here</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="310" y1="500" x2="310" y2="535" stroke="#c62828" stroke-width="2.5" marker-end="url(#ah-red)"/>
+  <text x="320" y="522" font-size="10" fill="#c62828">validated &#x2192; proceed</text>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 5: Memory.Allocate                                     -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="575" r="18" fill="#2e7d32" stroke="none"/>
+  <text x="50" y="581" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">5</text>
+
+  <rect x="80" y="540" width="460" height="75" rx="10" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+  <text x="310" y="565" text-anchor="middle" font-size="15" font-weight="bold" fill="#2e7d32">Memory.Allocate (Power-of-2 Lump)</text>
+  <line x1="100" y1="575" x2="520" y2="575" stroke="#2e7d32" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="595" font-size="11" fill="#333">Round up: codeSize + clistCount &#x2192; next power-of-2 (min 256)</text>
+  <text x="100" y="611" font-size="11" fill="#555">Returns: base address + allocated size</text>
+
+  <rect x="570" y="540" width="490" height="75" rx="8" fill="#e8f5e9" stroke="#2e7d32" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="815" y="565" text-anchor="middle" font-size="12" font-weight="bold" fill="#2e7d32">Power-of-2 Sizing</text>
+  <text x="590" y="585" font-size="11" fill="#333">10 code + 3 c-list = 13 words &#x2192; alloc 256 (next power-of-2)</text>
+  <text x="590" y="603" font-size="11" fill="#555">Freespace = 256 - 13 = 243 words (growth room)</text>
+
+  <!-- Arrow 5→6 -->
+  <line x1="310" y1="615" x2="310" y2="650" stroke="#2e7d32" stroke-width="2.5" marker-end="url(#ah-green)"/>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 6: Code Write + C-List Populate                        -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="710" r="18" fill="#2c5f8a" stroke="none"/>
+  <text x="50" y="716" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">6</text>
+
+  <rect x="80" y="655" width="460" height="115" rx="10" fill="#e3f2fd" stroke="#2c5f8a" stroke-width="2"/>
+  <text x="310" y="680" text-anchor="middle" font-size="15" font-weight="bold" fill="#2c5f8a">Write Code + Populate C-List</text>
+  <line x1="100" y1="690" x2="520" y2="690" stroke="#2c5f8a" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="710" font-size="11" fill="#2c5f8a" font-weight="bold">Code region (offset 0):</text>
+  <text x="100" y="726" font-size="11" fill="#333">method_table[N] + compiled code words &#x2192; DWRITE to lump</text>
+  <text x="100" y="746" font-size="11" fill="#6b4c9a" font-weight="bold">C-list region (offset clistStart):</text>
+  <text x="100" y="762" font-size="11" fill="#333">Forge E-GTs for each capability &#x2192; SAVE to c-list slots</text>
+
+  <rect x="570" y="655" width="490" height="115" rx="8" fill="#fff" stroke="#2c5f8a" stroke-width="1.5"/>
+  <text x="815" y="680" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Lump Layout After Write</text>
+  <line x1="590" y1="690" x2="1040" y2="690" stroke="#2c5f8a" stroke-width="0.5" opacity="0.3"/>
+  <!-- Mini lump diagram -->
+  <rect x="620" y="698" width="400" height="18" rx="2" fill="#e3f2fd" stroke="#2c5f8a" stroke-width="1"/>
+  <text x="820" y="712" text-anchor="middle" font-size="9" font-weight="bold" fill="#2c5f8a">Code (method_table + instructions) &#x2014; Turing X</text>
+  <rect x="620" y="716" width="400" height="14" rx="0" fill="#f5f5f5" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <text x="820" y="727" text-anchor="middle" font-size="8" fill="#aaa">FREESPACE (inaccessible)</text>
+  <rect x="620" y="730" width="400" height="18" rx="2" fill="#f5f0ff" stroke="#6b4c9a" stroke-width="1"/>
+  <text x="820" y="744" text-anchor="middle" font-size="9" font-weight="bold" fill="#6b4c9a">C-List (GT slots) &#x2014; Church L</text>
+  <text x="820" y="764" text-anchor="middle" font-size="10" fill="#555">clistStart = allocSize - clistCount</text>
+
+  <!-- Arrow 6→7 -->
+  <line x1="310" y1="770" x2="310" y2="805" stroke="#2c5f8a" stroke-width="2.5" marker-end="url(#ah-blue)"/>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 7: NS Entry Creation                                   -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="845" r="18" fill="#6b4c9a" stroke="none"/>
+  <text x="50" y="851" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">7</text>
+
+  <rect x="80" y="810" width="460" height="80" rx="10" fill="#f5f0ff" stroke="#6b4c9a" stroke-width="2"/>
+  <text x="310" y="835" text-anchor="middle" font-size="15" font-weight="bold" fill="#6b4c9a">NS Entry Creation (Navana.Add)</text>
+  <line x1="100" y1="845" x2="520" y2="845" stroke="#6b4c9a" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="862" font-size="10" font-family="'Courier New', monospace" fill="#333">word0: location = base address</text>
+  <text x="100" y="876" font-size="10" font-family="'Courier New', monospace" fill="#333">word1: B|F|G|C|type=01|clistCount|limit</text>
+  <text x="100" y="890" font-size="10" font-family="'Courier New', monospace" fill="#333">word2: seal = FNV-1a(location, limit)</text>
+
+  <rect x="570" y="810" width="490" height="80" rx="8" fill="#f5f0ff" stroke="#6b4c9a" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="815" y="835" text-anchor="middle" font-size="12" font-weight="bold" fill="#6b4c9a">Navana is Sole NS Writer</text>
+  <text x="590" y="858" font-size="11" fill="#333">Finds free NS slot, writes sealed 3-word entry</text>
+  <text x="590" y="876" font-size="11" fill="#333">clistCount encoded in word1 bits[25:17]</text>
+  <text x="590" y="892" font-size="11" fill="#555">Seal protects against tampering (R002)</text>
+
+  <!-- Arrow 7→8 -->
+  <line x1="310" y1="890" x2="310" y2="925" stroke="#6b4c9a" stroke-width="2.5" marker-end="url(#ah-purple)"/>
+
+  <!-- ============================================================ -->
+  <!-- STAGE 8: E-GT Forge + Return                                 -->
+  <!-- ============================================================ -->
+  <circle cx="50" cy="960" r="18" fill="#b8860b" stroke="none"/>
+  <text x="50" y="966" text-anchor="middle" font-size="14" font-weight="bold" fill="#fff">8</text>
+
+  <rect x="80" y="930" width="460" height="70" rx="10" fill="#fffbef" stroke="#b8860b" stroke-width="2.5"/>
+  <text x="310" y="955" text-anchor="middle" font-size="15" font-weight="bold" fill="#b8860b">Forge Inform E-GT &#x2192; Return to Creator</text>
+  <line x1="100" y1="965" x2="520" y2="965" stroke="#b8860b" stroke-width="0.5" opacity="0.3"/>
+  <text x="100" y="985" font-size="10" font-family="'Courier New', monospace" fill="#333">E-GT: Version(7) | Index(17) | Perms=E(6) | Type=01(2)</text>
+  <text x="100" y="997" font-size="10" fill="#555">Creator receives sole E-GT &#x2014; can CALL the new abstraction</text>
+
+  <rect x="570" y="930" width="490" height="70" rx="8" fill="#fffbef" stroke="#b8860b" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="815" y="955" text-anchor="middle" font-size="12" font-weight="bold" fill="#b8860b">Lifecycle Complete</text>
+  <text x="590" y="978" font-size="11" fill="#333">Creator can now CALL the abstraction via the E-GT</text>
+  <text x="590" y="994" font-size="11" fill="#333">CALL reads clistCount, splits lump &#x2192; CR7 (X) + CR6 (L)</text>
+
+  <!-- ===== Return arrow curving back up ===== -->
+  <path d="M 540 965 Q 555 965, 555 940 Q 555 200, 540 150 L 540 100" fill="none" stroke="#b8860b" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#ah)"/>
+  <text x="560" y="530" font-size="10" fill="#b8860b" transform="rotate(-90, 560, 530)">E-GT returned to creator &#x2014; lifecycle restarts on next CALL</text>
+
+</svg>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div>Source / Compiler / GT</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#e65100;"></div>upload.json</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#c62828;"></div>Navana Validation</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2e7d32;"></div>Memory Allocation</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2c5f8a;"></div>Code + C-List Write</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#6b4c9a;"></div>NS Entry Creation</div>
+</div>
+
+</body>
+</html>
