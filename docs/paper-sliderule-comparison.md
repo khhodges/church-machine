@@ -704,7 +704,7 @@ The Church Machine's answer to "who can access my data?" is not a policy, not a 
 
 9. Hamer-Hodges, K.J. (2025). *Civilizing Cyberspace: The Fight for Digital Democracy*. Studio of Books LLC. ISBN 978-1964864983.
 
-10. Hamer-Hodges, K.J. (2023). *The Fate of AI Society: Civilizing Superhuman Cyberspace*. Studio of Books LLC. ISBN 978-1964148540.
+10. Hamer-Hodges, K.J. (2024). *The Fate of AI Society: Civilizing Superhuman Cyberspace*. Studio of Books LLC. ISBN 978-1964148663.
 
 11. Hamer-Hodges, K.J. (2025). *Winning World War III: Industrial Strength Computer Science*. Studio of Books LLC. ISBN 978-1964864983.
 
