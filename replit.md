@@ -119,8 +119,9 @@ Multi-language compiler targeting Church Machine 20-instruction set:
 ### Web IDE
 
 - Flask server on port 5000, serves simulator/ as static files
-- 8 views: Dashboard, Code, Namespace, Abstractions, Pipeline, Tutorial, REPL, Reference
+- 9 views: Dashboard, Code, Namespace, Abstractions, Pipeline, Tutorial, REPL, Reference, Docs
 - CLOOMC++ compiler integrated: write source → compile → create abstraction
+- Docs tab: browse docs/*.md and docs/figures/*.html from the IDE; markdown rendered in-app, figures embedded via iframe
 - State persistence via localStorage
 - WebSerial for Tang Nano 20K deployment
 

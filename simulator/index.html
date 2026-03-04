@@ -20,6 +20,7 @@
                     <button onclick="switchView('tutorial')" class="btn btn-view" id="viewBtn-tutorial">Tutorial</button>
                     <button onclick="switchView('repl')" class="btn btn-view" id="viewBtn-repl">REPL</button>
                     <button onclick="switchView('reference')" class="btn btn-view" id="viewBtn-reference">Reference</button>
+                    <button onclick="switchView('docs')" class="btn btn-view" id="viewBtn-docs">Docs</button>
                 </div>
                 <div class="sim-controls">
                     <button class="btn btn-success" onclick="stepSim()" title="Execute one instruction">Step</button>
@@ -204,6 +205,27 @@
                     <div class="panel-title" id="instrDetailTitle">Select an instruction</div>
                     <div id="instrDetailContent" class="instr-detail-content">
                         <div class="instr-placeholder">Click any instruction on the left to see its format, encoding, permissions, flags, and usage examples.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="docs" class="view">
+        <div class="docs-layout">
+            <div class="docs-sidebar">
+                <div class="panel">
+                    <div class="panel-title">Documents</div>
+                    <div id="docsFileList" class="docs-file-list"></div>
+                    <div class="panel-title" style="margin-top:12px;">Figures</div>
+                    <div id="docsFigureList" class="docs-file-list"></div>
+                </div>
+            </div>
+            <div class="docs-content-panel">
+                <div class="panel">
+                    <div class="panel-title" id="docsContentTitle">Select a document or figure</div>
+                    <div id="docsContentBody" class="docs-content-body">
+                        <div class="docs-placeholder">Click any document on the left to view it, or click a figure to see the diagram.</div>
                     </div>
                 </div>
             </div>

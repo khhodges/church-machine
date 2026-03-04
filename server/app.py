@@ -61,6 +61,39 @@ def simulator_static(path):
 def docs_figures(path):
     return send_from_directory(os.path.join(DOCS_DIR, "figures"), path)
 
+@app.route("/api/docs/list")
+def docs_list():
+    docs = []
+    for f in sorted(os.listdir(DOCS_DIR)):
+        if f.endswith('.md'):
+            filepath = os.path.join(DOCS_DIR, f)
+            size = os.path.getsize(filepath)
+            docs.append({"name": f, "type": "doc", "size": size})
+    figures = []
+    figures_dir = os.path.join(DOCS_DIR, "figures")
+    if os.path.isdir(figures_dir):
+        for f in sorted(os.listdir(figures_dir)):
+            if f.endswith('.html'):
+                filepath = os.path.join(figures_dir, f)
+                size = os.path.getsize(filepath)
+                figures.append({"name": f, "type": "figure", "size": size})
+    return jsonify({"docs": docs, "figures": figures})
+
+@app.route("/api/docs/read/<path:filename>")
+def docs_read(filename):
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({"error": "Invalid path"}), 400
+    if not filename.endswith('.md'):
+        return jsonify({"error": "Only markdown files allowed"}), 400
+    filepath = os.path.realpath(os.path.join(DOCS_DIR, filename))
+    if not filepath.startswith(os.path.realpath(DOCS_DIR)):
+        return jsonify({"error": "Invalid path"}), 400
+    if not os.path.isfile(filepath):
+        return jsonify({"error": "Not found"}), 404
+    with open(filepath, 'r') as f:
+        content = f.read()
+    return jsonify({"name": filename, "content": content})
+
 with app.app_context():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

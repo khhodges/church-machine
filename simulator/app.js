@@ -74,6 +74,7 @@ function switchView(viewId) {
     if (viewId === 'pipeline') pipelineViz.render();
     if (viewId === 'tutorial') churchTutorial.render('tutorialView');
     if (viewId === 'reference') renderReference();
+    if (viewId === 'docs') loadDocsView();
 }
 
 function switchDashTab(tabId) {
@@ -3912,6 +3913,116 @@ function loadCLOOMCExample(name) {
     editor.value = examples[name] || examples['hello'];
     updateLineNumbers();
     saveEditorState();
+}
+
+let docsLoaded = false;
+let docsData = null;
+
+async function loadDocsView() {
+    if (docsLoaded) return;
+    try {
+        const resp = await fetch('/api/docs/list');
+        docsData = await resp.json();
+        renderDocsFileList();
+        docsLoaded = true;
+    } catch (e) {
+        const body = document.getElementById('docsContentBody');
+        if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document list.</div>';
+    }
+}
+
+function renderDocsFileList() {
+    const docsList = document.getElementById('docsFileList');
+    const figsList = document.getElementById('docsFigureList');
+    if (!docsList || !figsList || !docsData) return;
+
+    docsList.innerHTML = docsData.docs.map(d => {
+        const sizeKB = (d.size / 1024).toFixed(1);
+        const label = d.name.replace('.md', '');
+        return `<div class="docs-file-item" onclick="loadDoc('${d.name}')" data-doc="${d.name}"><span>${label}</span><span class="file-size">${sizeKB} KB</span></div>`;
+    }).join('');
+
+    figsList.innerHTML = docsData.figures.map(f => {
+        const label = f.name.replace('.html', '');
+        const sizeKB = (f.size / 1024).toFixed(1);
+        return `<div class="docs-file-item" onclick="loadFigure('${f.name}')" data-fig="${f.name}"><span>${label}</span><span class="file-size">${sizeKB} KB</span></div>`;
+    }).join('');
+}
+
+async function loadDoc(filename) {
+    document.querySelectorAll('.docs-file-item').forEach(el => el.classList.remove('active'));
+    const active = document.querySelector(`.docs-file-item[data-doc="${filename}"]`);
+    if (active) active.classList.add('active');
+
+    const title = document.getElementById('docsContentTitle');
+    const body = document.getElementById('docsContentBody');
+    if (title) title.textContent = filename;
+    if (body) body.innerHTML = '<div class="docs-placeholder">Loading...</div>';
+
+    try {
+        const resp = await fetch('/api/docs/read/' + filename);
+        const data = await resp.json();
+        if (body) body.innerHTML = renderMarkdown(data.content);
+    } catch (e) {
+        if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document.</div>';
+    }
+}
+
+function loadFigure(filename) {
+    document.querySelectorAll('.docs-file-item').forEach(el => el.classList.remove('active'));
+    const active = document.querySelector(`.docs-file-item[data-fig="${filename}"]`);
+    if (active) active.classList.add('active');
+
+    const title = document.getElementById('docsContentTitle');
+    const body = document.getElementById('docsContentBody');
+    const label = filename.replace('.html', '');
+    if (title) title.textContent = 'Figure: ' + label;
+    if (body) body.innerHTML = `<iframe class="docs-figure-frame" src="/docs/figures/${filename}"></iframe>`;
+}
+
+function renderMarkdown(md) {
+    let html = escapeHtml(md);
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
+        return '<pre><code>' + code.trim() + '</code></pre>';
+    });
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/^---$/gm, '<hr>');
+    html = html.replace(/^\> (.+)$/gm, '<blockquote>$1</blockquote>');
+    html = html.replace(/^\| (.+) \|$/gm, (match, row) => {
+        const cells = row.split('|').map(c => c.trim());
+        return '<tr>' + cells.map(c => {
+            if (c.match(/^[-:]+$/)) return '';
+            return '<td>' + c + '</td>';
+        }).join('') + '</tr>';
+    });
+    html = html.replace(/((<tr>.*<\/tr>\n?)+)/g, '<table>$1</table>');
+    html = html.replace(/<table>(\s*<tr>\s*<td>[-:|\s]+<\/td>\s*<\/tr>)/g, '<table>');
+    html = html.replace(/<tr><\/tr>/g, '');
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/((<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+    html = html.replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>');
+    const lines = html.split('\n');
+    const result = [];
+    let inPre = false;
+    for (const line of lines) {
+        if (line.includes('<pre>')) inPre = true;
+        if (line.includes('</pre>')) inPre = false;
+        if (!inPre && line.trim() && !line.startsWith('<')) {
+            result.push('<p>' + line + '</p>');
+        } else {
+            result.push(line);
+        }
+    }
+    return result.join('\n');
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 document.addEventListener('DOMContentLoaded', init);
