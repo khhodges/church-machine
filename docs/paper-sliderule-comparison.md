@@ -16,7 +16,7 @@
 
 Modern computer security relies on a fundamentally flawed model: ambient authority. Programs run with broad permissions granted by the operating system, and security is enforced by checking identity rather than capability. A web browser, a text editor, and a cryptocurrency wallet all execute under the same user account, with the same file system access. The only barrier between them is trust in the software — trust that is routinely violated.
 
-The Church Machine takes a different approach. Every memory access — every read, every write, every function call — requires an unforgeable capability token. There is no operating system. There is no privileged mode. There is no superuser. The hardware itself enforces the security model at every instruction cycle.
+The Church Machine takes a different approach, building on the capability-based addressing model first proposed by Dennis and Van Horn [1] and first implemented in hardware by the Plessey System 250 (PP250) [8]. Every memory access — every read, every write, every function call — requires an unforgeable capability token. There is no operating system. There is no privileged mode. There is no superuser. The hardware itself enforces the security model at every instruction cycle. The broader case for why this architectural revolution is necessary — and why conventional binary computers are fundamentally unsuited to civilised cyberspace — is developed at length in Hamer-Hodges [9][10][11].
 
 ### 1.2 Contribution
 
@@ -699,6 +699,14 @@ The Church Machine's answer to "who can access my data?" is not a policy, not a 
 6. Watson, R.N.M. et al. (2015). "CHERI: A Hybrid Capability-System Architecture for Scalable Software Compartmentalization." *IEEE Symposium on Security and Privacy*.
 
 7. Woodruff, J. et al. (2014). "The CHERI Capability Model: Revisiting RISC in an Age of Risk." *ISCA '14*.
+
+8. Halton, D. (1972). "Hardware of the System 250 for Communication Control." *International Switching Symposium*, MIT, Cambridge, Massachusetts, June 1972.
+
+9. Hamer-Hodges, K.J. (2020). *Civilizing Cyberspace: The Fight for Digital Democracy*. Studio of Books LLC. ISBN 978-1951630447.
+
+10. Hamer-Hodges, K.J. (2023). *The Fate of AI Society: Civilizing Superhuman Cyberspace*. Studio of Books LLC. ISBN 978-1964148540.
+
+11. Hamer-Hodges, K.J. (2024). *World War III: The End Game in Cyberspace*. Studio of Books LLC. ISBN 978-1964148663.
 
 ---
 
