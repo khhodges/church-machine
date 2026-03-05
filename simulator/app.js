@@ -562,7 +562,7 @@ function updateFlagsDisplay() {
         <button class="btn btn-info btn-sm" onclick="slowBoot()" ${sim.bootComplete ? 'disabled style="opacity:0.5"' : ''}>Boot</button>
         <button class="btn btn-success btn-sm" onclick="runSim()">Run</button>
         <button class="btn btn-walk btn-sm" onclick="walkToggle()">${walkRunning ? 'Stop' : 'Walk'}</button>
-        <button class="btn btn-warning btn-sm" onclick="resetSim()">Reset</button>
+        <button class="btn btn-warning btn-sm" onclick="faultClear()">Fault</button>
         <span class="flags-sep"></span>
         <span class="flag ${f.N ? 'flag-set' : ''}">N</span>
         <span class="flag ${f.Z ? 'flag-set' : ''}">Z</span>
@@ -2524,6 +2524,14 @@ function runSim() {
         con.textContent += `\nBoot complete. Ran ${steps} steps. ${status}`;
         con.scrollTop = con.scrollHeight;
     }
+    updateDashboard();
+}
+
+function faultClear() {
+    sim.reset();
+    pipelineViz.reset();
+    const con = document.getElementById('editorConsole');
+    if (con) con.textContent = 'FAULT: Machine cleared.';
     updateDashboard();
 }
 
