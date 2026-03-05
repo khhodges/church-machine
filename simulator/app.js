@@ -3494,70 +3494,59 @@ function challengeOpSlot(opType) {
 function buildTuringLines(c) {
     const lines = [];
     if (c.opType === 'add') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the number ' + c.a + ' into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the number ' + c.b + ' into data register 2'});
-        lines.push({asm: 'IADD DR3, DR1, DR2', desc: 'Add DR1 + DR2, store result (' + c.answer + ') in DR3'});
-        lines.push({note: 'IADD is "integer add". Everything here is a number: the values ' + c.a + ' and ' + c.b + ', the addresses DR1 and DR2. The body works in numbers.'});
+        lines.push({asm: 'IADD DR0, DR0, DR1', desc: 'Add DR0 + DR1, store result (' + c.answer + ') in DR0'});
+        lines.push({note: 'DR0 = ' + c.a + ', DR1 = ' + c.b + '. IADD is "integer add". Everything is a number. The body works in numbers.'});
     } else if (c.opType === 'sub') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b + ' into data register 2'});
-        lines.push({asm: 'ISUB DR3, DR1, DR2', desc: 'Subtract DR2 from DR1, store result (' + c.answer + ') in DR3'});
-        lines.push({note: 'ISUB is "integer subtract". DR1, DR2, DR3 are physical addresses. The values ' + c.a + ' and ' + c.b + ' are numbers. The body only speaks in numbers.'});
+        lines.push({asm: 'ISUB DR0, DR0, DR1', desc: 'Subtract DR1 from DR0, store result (' + c.answer + ') in DR0'});
+        lines.push({note: 'DR0 = ' + c.a + ', DR1 = ' + c.b + '. ISUB is "integer subtract". DR0, DR1 are physical addresses holding numbers.'});
     } else if (c.opType === 'mul') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b + ' into data register 2'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Set DR3 to 0 (running total)'});
-        lines.push({asm: 'IADD DR3, DR3, DR1', desc: 'Add DR1 to DR3 (repeat ' + c.b + ' times)'});
-        lines.push({asm: 'ISUB DR2, DR2, #1', desc: 'Count down: subtract 1 from DR2'});
-        lines.push({asm: 'BRANCH NE, -2', desc: 'If DR2 is not zero, jump back and add again'});
+        lines.push({asm: 'DREAD DR2, #0', desc: 'Set DR2 to 0 (running total)'});
+        lines.push({asm: 'IADD DR2, DR2, DR0', desc: 'Add DR0 to DR2 (repeat DR1 times)'});
+        lines.push({asm: 'ISUB DR1, DR1, #1', desc: 'Count down: subtract 1 from DR1'});
+        lines.push({asm: 'BRANCH NE, -2', desc: 'If DR1 is not zero, jump back and add again'});
+        lines.push({asm: 'DREAD DR0, DR2', desc: 'Copy result to DR0'});
         lines.push({note: 'No multiply instruction! The body loops: add ' + c.a + ' to itself ' + c.b + ' times. ' + c.a + ' \u00d7 ' + c.b + ' = ' + c.answer + '. Loops can run forever \u2014 the body can fail.'});
     } else if (c.opType === 'div') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the dividend (' + c.a + ') into DR1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the divisor (' + c.b + ') into DR2'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Set DR3 to 0 (counts subtractions)'});
-        lines.push({asm: 'ISUB DR1, DR1, DR2', desc: 'Subtract DR2 from DR1'});
-        lines.push({asm: 'IADD DR3, DR3, #1', desc: 'Add 1 to the counter'});
-        lines.push({asm: 'BRANCH PL, -2', desc: 'If DR1 is still positive, keep subtracting'});
+        lines.push({asm: 'DREAD DR2, #0', desc: 'Set DR2 to 0 (counts subtractions)'});
+        lines.push({asm: 'ISUB DR0, DR0, DR1', desc: 'Subtract DR1 from DR0'});
+        lines.push({asm: 'IADD DR2, DR2, #1', desc: 'Add 1 to the counter'});
+        lines.push({asm: 'BRANCH PL, -2', desc: 'If DR0 is still positive, keep subtracting'});
+        lines.push({asm: 'DREAD DR0, DR2', desc: 'Copy result to DR0'});
         lines.push({note: 'Division is repeated subtraction. Subtract ' + c.b + ' from ' + c.a + ' and count: ' + c.answer + ' times. All numbers, all physical.'});
     } else if (c.opType === 'factorial') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into DR1 (the counter)'});
-        lines.push({asm: 'DREAD DR3, #1', desc: 'Set DR3 to 1 (the running product)'});
-        lines.push({asm: '-- outer loop:', desc: 'For each counter value, multiply DR3 by DR1'});
-        lines.push({asm: 'DREAD DR4, DR3', desc: 'Copy the current product into DR4'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Reset DR3 for the add loop'});
-        lines.push({asm: 'DREAD DR5, DR1', desc: 'Copy counter into DR5 (inner loop count)'});
-        lines.push({asm: 'IADD DR3, DR3, DR4', desc: 'Add DR4 to DR3 (repeated DR1 times = multiply)'});
-        lines.push({asm: 'ISUB DR5, DR5, #1', desc: 'Decrease inner loop counter'});
-        lines.push({asm: 'BRANCH NE, -2', desc: 'Inner loop: keep adding until DR5 = 0'});
+        lines.push({asm: 'DREAD DR1, DR0', desc: 'Copy ' + c.a + ' into DR1 (counter)'});
+        lines.push({asm: 'DREAD DR0, #1', desc: 'Set DR0 to 1 (running product)'});
+        lines.push({asm: '-- outer loop:', desc: 'For each counter value, multiply DR0 by DR1'});
+        lines.push({asm: 'DREAD DR2, DR0', desc: 'Copy the current product into DR2'});
+        lines.push({asm: 'DREAD DR0, #0', desc: 'Reset DR0 for the add loop'});
+        lines.push({asm: 'DREAD DR3, DR1', desc: 'Copy counter into DR3 (inner loop count)'});
+        lines.push({asm: 'IADD DR0, DR0, DR2', desc: 'Add DR2 to DR0 (repeated DR1 times = multiply)'});
+        lines.push({asm: 'ISUB DR3, DR3, #1', desc: 'Decrease inner loop counter'});
+        lines.push({asm: 'BRANCH NE, -2', desc: 'Inner loop: keep adding until DR3 = 0'});
         lines.push({asm: 'ISUB DR1, DR1, #1', desc: 'Decrease the outer counter by 1'});
         lines.push({asm: 'BRANCH NE, -8', desc: 'Outer loop: repeat for next factor'});
-        lines.push({note: c.a + '! = ' + c.answer + '. Two nested loops of addition \u2014 the body builds complexity from simple parts. DR1 through DR5 are all physical addresses holding numbers.'});
+        lines.push({note: c.a + '! = ' + c.answer + '. Two nested loops of addition \u2014 the body builds complexity from simple parts. Result ends up in DR0.'});
     } else if (c.opType === 'exp') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the base (' + c.a + ') into DR1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the exponent (' + c.b + ') into DR2'});
-        lines.push({asm: 'DREAD DR3, #1', desc: 'Set DR3 to 1 (result starts at 1)'});
-        lines.push({asm: '-- outer loop:', desc: 'Multiply DR3 by DR1, using an add loop'});
-        lines.push({asm: 'DREAD DR4, DR3', desc: 'Copy current result into DR4'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Reset DR3 for the add loop'});
-        lines.push({asm: 'DREAD DR5, DR1', desc: 'Copy base into DR5 (inner loop count)'});
-        lines.push({asm: 'IADD DR3, DR3, DR4', desc: 'Add DR4 to DR3 (repeated DR1 times = multiply)'});
-        lines.push({asm: 'ISUB DR5, DR5, #1', desc: 'Decrease inner counter'});
+        lines.push({asm: 'DREAD DR2, #1', desc: 'Set DR2 to 1 (result starts at 1)'});
+        lines.push({asm: '-- outer loop:', desc: 'Multiply DR2 by DR0, using an add loop'});
+        lines.push({asm: 'DREAD DR3, DR2', desc: 'Copy current result into DR3'});
+        lines.push({asm: 'DREAD DR2, #0', desc: 'Reset DR2 for the add loop'});
+        lines.push({asm: 'DREAD DR4, DR0', desc: 'Copy base into DR4 (inner loop count)'});
+        lines.push({asm: 'IADD DR2, DR2, DR3', desc: 'Add DR3 to DR2 (repeated DR0 times = multiply)'});
+        lines.push({asm: 'ISUB DR4, DR4, #1', desc: 'Decrease inner counter'});
         lines.push({asm: 'BRANCH NE, -2', desc: 'Inner loop: keep adding'});
-        lines.push({asm: 'ISUB DR2, DR2, #1', desc: 'Decrease exponent counter'});
+        lines.push({asm: 'ISUB DR1, DR1, #1', desc: 'Decrease exponent counter'});
         lines.push({asm: 'BRANCH NE, -8', desc: 'Outer loop until exponent reaches 0'});
-        lines.push({note: c.a + '^' + c.b + ' = ' + c.answer + '. Repeated multiplication, each multiplication repeated addition. Two nested loops, all numbers.'});
+        lines.push({asm: 'DREAD DR0, DR2', desc: 'Copy result to DR0'});
+        lines.push({note: c.a + '^' + c.b + ' = ' + c.answer + '. Repeated multiplication, each multiplication repeated addition. Two nested loops, all numbers. Result in DR0.'});
     } else if (c.opType === 'mod') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into DR1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b + ' into DR2'});
-        lines.push({asm: 'ISUB DR1, DR1, DR2', desc: 'Subtract DR2 from DR1'});
+        lines.push({asm: 'ISUB DR0, DR0, DR1', desc: 'Subtract DR1 from DR0'});
         lines.push({asm: 'BRANCH PL, -1', desc: 'If still positive, keep subtracting'});
-        lines.push({asm: 'IADD DR1, DR1, DR2', desc: 'Add back once (remainder = ' + c.answer + ')'});
-        lines.push({note: 'Modulo: subtract ' + c.b + ' from ' + c.a + ' until it goes negative, then add back once. Remainder is ' + c.answer + '.'});
+        lines.push({asm: 'IADD DR0, DR0, DR1', desc: 'Add back once (remainder = ' + c.answer + ')'});
+        lines.push({note: 'Modulo: subtract ' + c.b + ' from ' + c.a + ' until it goes negative, then add back once. Result ' + c.answer + ' is in DR0.'});
     } else {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b});
-        lines.push({asm: 'Operation', desc: 'Compute the result: ' + c.answer});
-        lines.push({note: 'The body uses its 20 instructions to solve this step by step. All numbers, all physical addresses.'});
+        lines.push({asm: 'Operation', desc: 'Compute ' + c.a + ' op ' + c.b + ' = ' + c.answer});
+        lines.push({note: 'The body computes the result in DR0. All numbers, all physical addresses.'});
     }
     return lines;
 }
@@ -3574,6 +3563,11 @@ function showChallengeExplanation(el, c) {
 
     html += `<div class="explain-turing">`;
     html += `<div class="explain-header">The body \u2014 Turing (numbers)</div>`;
+    if (c.opType === 'factorial') {
+        html += `<div style="font-size:0.78rem;color:rgba(130,200,255,0.7);margin-bottom:0.3rem;">Inside the envelope: DR0 = ${c.a}</div>`;
+    } else {
+        html += `<div style="font-size:0.78rem;color:rgba(130,200,255,0.7);margin-bottom:0.3rem;">Inside the envelope: DR0 = ${c.a}, DR1 = ${c.b}</div>`;
+    }
     const turingLines = buildTuringLines(c);
     for (const line of turingLines) {
         if (line.note) {
@@ -3606,11 +3600,11 @@ function showChallengeExplanation(el, c) {
         html += `<span class="code-desc">${escapeHtml(churchLines[i].desc)}</span>`;
         html += `</div>`;
     }
-    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">"${opName}" is a symbol in the capability list \u2014 a name, not a number. CALL finds it, checks the Golden Token, enters the abstraction, runs the body inside, and returns. The hardware does everything. Arguments (${argNote}) cross into the envelope via data registers. LOAD is only needed to store a capability for later.</div>`;
+    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">"${opName}" is a symbol in the capability list \u2014 a name, not a number. CALL finds it, checks the Golden Token, enters the abstraction, runs the body inside, and returns. The hardware does everything. Arguments (${argNote}) cross into the envelope via data registers.</div>`;
     html += `</div>`;
 
     html += `<div class="explain-bridge">`;
-    html += `<p><strong>Body and mind.</strong> The Turing instructions above use numbers: DR1 = ${c.a}, DR2 = ${c.b}, physical addresses, values that can overflow. That is the body \u2014 the physical work that runs <em>inside</em> the CALL.</p>`;
+    html += `<p><strong>Body and mind.</strong> The Turing instructions above use numbers: DR0 = ${c.a}${c.opType !== 'factorial' ? ', DR1 = ' + c.b : ''}, physical addresses, values that can overflow. That is the body \u2014 the physical work that runs <em>inside</em> the CALL.</p>`;
     html += `<p>The Church instruction is one word: CALL ${opName}. No numbers. That is the mind \u2014 the security envelope that wraps the body\u2019s work.</p>`;
     html += `<p>Ada wrote the first program in 1843 using symbols \u2014 no compiler, no OS, no superuser. The Church Machine returns to what she had. Turing was Church\u2019s student. He built the body. His teacher gave it a mind.</p>`;
     html += `</div>`;
