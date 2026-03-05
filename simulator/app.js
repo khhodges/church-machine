@@ -3584,22 +3584,25 @@ function showChallengeExplanation(el, c) {
     html += `<div class="explain-church">`;
     html += `<div class="explain-header">The mind \u2014 Church (symbols)</div>`;
 
-    const setArgs = c.opType === 'factorial'
-        ? 'SET(' + c.a + ')'
-        : 'SET(' + c.a + ',' + c.b + ')';
+    const churchLines = [];
+    if (c.opType === 'factorial') {
+        churchLines.push({label: 'A', expr: '= ' + c.a});
+        churchLines.push({label: '!', expr: ''});
+        churchLines.push({label: 'C', expr: '= A! = ' + c.answer});
+    } else {
+        churchLines.push({label: 'A', expr: '= ' + c.a});
+        churchLines.push({label: 'B', expr: '= ' + c.b});
+        churchLines.push({label: sym, expr: ''});
+        churchLines.push({label: 'C', expr: '= A ' + sym + ' B = ' + c.answer});
+    }
 
-    const churchLines = [
-        {asm: 'CALL ' + setArgs + ' ' + opName, desc: exprStr + ' \u2192 ' + c.answer + ' in DR0'},
-    ];
-
-    for (let i = 0; i < churchLines.length; i++) {
+    for (const line of churchLines) {
         html += `<div class="code-line">`;
-        html += `<span class="code-hex" style="min-width:20px;">${i + 1}.</span>`;
-        html += `<span class="code-asm">${escapeHtml(churchLines[i].asm)}</span>`;
-        html += `<span class="code-desc">${escapeHtml(churchLines[i].desc)}</span>`;
+        html += `<span class="code-hex" style="min-width:28px;color:var(--church-gold);font-weight:700;">${escapeHtml(line.label)}</span>`;
+        html += `<span class="code-asm">${escapeHtml(line.expr)}</span>`;
         html += `</div>`;
     }
-    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">One instruction. "${opName}" is a symbol \u2014 a name, not a number. The hardware checks the Golden Token, opens the security envelope, runs the body inside, and returns the result.</div>`;
+    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">Pure symbols. A, B, and ${sym} are names. No addresses, no registers. The mind works in mathematics.</div>`;
     html += `</div>`;
 
     el.innerHTML = html;
@@ -3623,8 +3626,8 @@ function showMathGuidePopup() {
         `<div style="flex:1;background:rgba(218,165,32,0.08);border:1px solid rgba(218,165,32,0.25);border-radius:8px;padding:0.6rem 0.8rem;">` +
         `<div style="font-weight:700;color:var(--church-gold);margin-bottom:0.3rem;">Left &mdash; The Mind</div>` +
         `<p style="font-size:0.82rem;line-height:1.5;margin:0;">` +
-        `Church domain. Symbols and permissions. When you type a calculation, you see ` +
-        `<strong>CALL SET(3,1) ADD</strong> &mdash; one instruction, no numbers. ` +
+        `Church domain. Symbols and permissions. The calculation becomes: ` +
+        `<strong>A = 3, B = 1, C = A + B = 4</strong> &mdash; pure mathematics, no registers. ` +
         `The security envelope opens, the body does its work inside, and the envelope closes.</p>` +
         `</div>` +
 

@@ -120,14 +120,14 @@ class ChurchREPL {
 
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
-                        `  DREAD  DR0, #${argResult.value}                     ; Pass argument: ${argResult.value}`,
-                        `\u2192 CALL   ${abstraction}                              ; Envelope opens \u2014 body runs ${func}(${argResult.value}) = ${displayResult}`,
-                        `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
+                        `A = ${argResult.value}`,
+                        `${func}`,
+                        `C = ${func}(A) = ${displayResult}`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
                     }
-                    return { value: result, churchSteps, pipeline, cycles: 3 };
+                    return { value: result, churchSteps, pipeline, cycles: 2 };
                 } else {
                     churchSteps.push(
                         `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
@@ -152,10 +152,10 @@ class ChurchREPL {
 
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
-                        `  DREAD  DR0, #${base.value}                          ; Pass base: ${base.value}`,
-                        `  DREAD  DR1, #${exp.value}                           ; Pass exponent: ${exp.value}`,
-                        `\u2192 CALL   POW                                  ; Envelope opens \u2014 body runs pow(${base.value}, ${exp.value}) = ${displayResult}`,
-                        `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
+                        `A = ${base.value}`,
+                        `B = ${exp.value}`,
+                        `^`,
+                        `C = A ^ B = ${displayResult}`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: displayResult });
@@ -198,7 +198,7 @@ class ChurchREPL {
                     result = left.value / right.value; abstraction = 'DIV'; break;
                 case '%':
                     if (right.value === 0) return { error: 'Modulo by zero' };
-                    result = left.value % right.value; abstraction = 'DIV'; break;
+                    result = left.value % right.value; abstraction = 'MOD'; break;
                 case '^': result = Math.pow(left.value, right.value); abstraction = 'POW'; break;
                 default: return { error: `Unknown operator: ${op}` };
             }
@@ -207,10 +207,10 @@ class ChurchREPL {
 
             if (this.pipelineMode === 'full') {
                 churchSteps.push(
-                    `  DREAD  DR0, #${left.value}                          ; Pass first argument: ${left.value}`,
-                    `  DREAD  DR1, #${right.value}                         ; Pass second argument: ${right.value}`,
-                    `\u2192 CALL   ${abstraction}                              ; Envelope opens \u2014 body runs ${left.value} ${op} ${right.value} = ${displayResult}`,
-                    `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
+                    `A = ${left.value}`,
+                    `B = ${right.value}`,
+                    `${op}`,
+                    `C = A ${op} B = ${displayResult}`,
                 );
                 if (this.pipeline) {
                     pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
