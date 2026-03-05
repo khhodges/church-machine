@@ -4,17 +4,19 @@ The goal: each namespace protects itself. A private digital shadow is achieved w
 external actor can reach inside a namespace without holding a valid, unrevoked Inform GT
 with sufficient permissions. Every risk below is tracked to resolution.
 
-## R001: CALL Must Hardcode CR7=X, CR6=L When Splitting Lump
+## R001: CALL Must Hardcode CR7 and CR6 Permissions When Splitting Lump
 - **Severity**: CRITICAL
 - **New**: Yes — introduced by single-NS-entry CALL split
 - **Layer**: CALL instruction (simulator.js _execCall)
 - **Risk**: CALL derives CR7 (code) and CR6 (c-list) from one NS entry. If CALL copies
   permissions from the NS entry into both CRs, domain purity breaks — code could read GTs,
   or c-list could be executed as code.
-- **Fix**: CALL must explicitly set CR7 permissions to X-only (execute) and CR6 permissions
-  to L-only (load). These are architectural invariants, not derived from the GT or NS entry.
-  The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal
-  domain split.
+- **Fix**: CALL hardcodes CR7 permissions to RWX (Turing domain) and CR6 permissions to
+  L-only (Church domain). These are architectural invariants, not derived from the GT or NS
+  entry. CR7 gets R and W in addition to X because Boot.CLOOMC uses DREAD to load constants
+  from data tables appended after HALT in the code region (e.g., Ada Note G's .org/.word
+  constants). Domain purity is maintained: CR7 has no Church permissions (L/S/E) and CR6 has
+  no Turing permissions (R/W/X).
 - **Task**: T002
 - **Status**: RESOLVED
 

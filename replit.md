@@ -28,6 +28,7 @@ church_sim/        — Original simulator (reference, ported to simulator/)
 - [docs/risks.md](../docs/risks.md) — Security risk register: R001-R009 with severity, fixes, status
 - [docs/patent-cloomc-universal-target.md](../docs/patent-cloomc-universal-target.md) — CIP patent: universal target ISA, multi-language compiler, Claims 24-31
 - [docs/paper-sliderule-comparison.md](../docs/paper-sliderule-comparison.md) — Student tutorial and paper: JS vs Haskell SlideRule comparison, architecture overview, pros/cons
+- [docs/longevity.md](../docs/longevity.md) — Session record (T_RISK, T000-T014) and essay: how to build code that lasts centuries, Ada's Note G bug as proof point
 
 ## Architecture
 
