@@ -1541,9 +1541,27 @@ header h1 {
 
 .intro-footer {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     margin-top: 0.5rem;
+    gap: 0.75rem;
+}
+
+.settings-gear-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+}
+
+.settings-gear-btn:hover {
+    color: var(--church-gold);
+    border-color: var(--church-gold);
 }
 
 .intro-dismiss-label {
@@ -1553,6 +1571,113 @@ header h1 {
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    flex: 1;
+}
+
+.settings-dialog {
+    max-width: 580px;
+    min-width: 340px;
+    width: 90vw;
+}
+
+.settings-body {
+    margin: 0.75rem 0 1rem;
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
+.settings-section {
+    margin-bottom: 1.25rem;
+}
+
+.settings-section-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--church-gold);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.settings-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.settings-label .modal-input {
+    margin-top: 0.3rem;
+}
+
+.progress-report {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    line-height: 1.7;
+}
+
+.progress-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.progress-stat-label {
+    color: var(--text-secondary);
+}
+
+.progress-stat-value {
+    color: var(--church-gold);
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+.progress-langs {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-top: 0.3rem;
+}
+
+.progress-lang-badge {
+    background: rgba(200, 155, 60, 0.15);
+    border: 1px solid rgba(200, 155, 60, 0.3);
+    color: var(--church-gold);
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.progress-history {
+    margin-top: 0.5rem;
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 0.75rem;
+    font-family: 'Courier New', monospace;
+    color: var(--text-secondary);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+}
+
+.progress-history-entry {
+    padding: 0.15rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.grade-indicator {
+    display: inline-block;
+    background: rgba(200, 155, 60, 0.2);
+    border: 1px solid var(--church-gold);
+    color: var(--church-gold);
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
 }
 
 .ns-entry-actions {

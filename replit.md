@@ -142,7 +142,10 @@ Multi-language compiler targeting Church Machine 20-instruction set:
 - CLOOMC++ compiler integrated: write source → compile → create abstraction (JS, Haskell, Symbolic Math)
 - REPL: interactive calculator + "Compile Session" button compiles let-bindings to Church Machine code
 - Docs tab: browse docs/*.md and docs/figures/*.html from the IDE; markdown rendered in-app, figures embedded via iframe
-- State persistence via localStorage
+- Settings: gear icon in intro popup opens settings modal with student name, school, K-12 + IB grade dropdown
+- Grade-adapted intros: intro popup content dynamically adapts to student grade level (early/elementary/middle/high/advanced/IB tiers)
+- Progress tracking: compilations, abstractions created, drafts, REPL sessions, languages used, recent activity history
+- State persistence via localStorage (editor state, settings, progress, intro dismissals)
 - WebSerial for Tang Nano 20K deployment
 
 ### Instruction Set

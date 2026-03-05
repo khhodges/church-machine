@@ -3408,6 +3408,7 @@ function replCompileSession() {
     if (result.type === 'info') {
         output.innerHTML += `<div class="repl-info">${escapeHtml(result.text)}</div>`;
     } else if (result.type === 'result') {
+        trackAction('repl', { name: 'Compile Session', lang: 'symbolic' });
         output.innerHTML += `<div class="repl-result" style="white-space:pre;font-family:monospace;">${escapeHtml(result.text)}</div>`;
     }
     output.scrollTop = output.scrollHeight;
@@ -3630,8 +3631,9 @@ function showIntro(lang) {
     const intro = langIntros[lang];
     if (!intro) return;
 
-    document.getElementById('introTitle').innerHTML = intro.title;
-    document.getElementById('introBody').innerHTML = intro.body;
+    const adapted = getGradeAdaptedIntro(lang) || intro;
+    document.getElementById('introTitle').innerHTML = adapted.title;
+    document.getElementById('introBody').innerHTML = adapted.body;
     document.getElementById('introDismiss').checked = false;
     document.getElementById('introModal').style.display = 'flex';
     document.getElementById('introModal').setAttribute('data-lang', lang);
@@ -3665,6 +3667,295 @@ function closeIntro() {
     }
     const arrow = document.getElementById('introScrollArrow');
     if (arrow) arrow.classList.add('hidden');
+}
+
+function getStudentSettings() {
+    try {
+        const raw = localStorage.getItem('church_student_settings');
+        if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { name: '', school: '', grade: '' };
+}
+
+function getStudentProgress() {
+    try {
+        const raw = localStorage.getItem('church_student_progress');
+        if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return { compilations: 0, abstractions: 0, drafts: 0, replSessions: 0, langsUsed: [], history: [] };
+}
+
+function saveStudentProgress(progress) {
+    localStorage.setItem('church_student_progress', JSON.stringify(progress));
+}
+
+function trackAction(action, detail) {
+    const progress = getStudentProgress();
+    if (action === 'compile') progress.compilations++;
+    if (action === 'abstract') progress.abstractions++;
+    if (action === 'draft') progress.drafts++;
+    if (action === 'repl') progress.replSessions++;
+    if (detail && detail.lang && !progress.langsUsed.includes(detail.lang)) {
+        progress.langsUsed.push(detail.lang);
+    }
+    const ts = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const entry = `${ts} ${action}${detail && detail.name ? ': ' + detail.name : ''}`;
+    progress.history.unshift(entry);
+    if (progress.history.length > 50) progress.history.length = 50;
+    saveStudentProgress(progress);
+}
+
+function openSettings() {
+    const settings = getStudentSettings();
+    document.getElementById('settingName').value = settings.name || '';
+    document.getElementById('settingSchool').value = settings.school || '';
+    document.getElementById('settingGrade').value = settings.grade || '';
+    renderProgressReport();
+    document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeSettings() {
+    document.getElementById('settingsModal').style.display = 'none';
+}
+
+function saveSettings() {
+    const settings = {
+        name: document.getElementById('settingName').value.trim(),
+        school: document.getElementById('settingSchool').value.trim(),
+        grade: document.getElementById('settingGrade').value
+    };
+    localStorage.setItem('church_student_settings', JSON.stringify(settings));
+    closeSettings();
+}
+
+function onGradeChange() {
+    renderProgressReport();
+}
+
+function renderProgressReport() {
+    const el = document.getElementById('progressReport');
+    if (!el) return;
+    const progress = getStudentProgress();
+    const settings = getStudentSettings();
+    const grade = document.getElementById('settingGrade').value || settings.grade;
+    const name = document.getElementById('settingName').value.trim() || settings.name || 'Student';
+
+    const gradeLabel = getGradeLabel(grade);
+    let html = '';
+    html += `<div class="progress-stat"><span class="progress-stat-label">Student</span><span class="progress-stat-value">${escapeHtml(name)}</span></div>`;
+    if (gradeLabel) {
+        html += `<div class="progress-stat"><span class="progress-stat-label">Level</span><span class="progress-stat-value">${gradeLabel}</span></div>`;
+    }
+    html += `<div class="progress-stat"><span class="progress-stat-label">Programs Compiled</span><span class="progress-stat-value">${progress.compilations}</span></div>`;
+    html += `<div class="progress-stat"><span class="progress-stat-label">Abstractions Created</span><span class="progress-stat-value">${progress.abstractions}</span></div>`;
+    html += `<div class="progress-stat"><span class="progress-stat-label">Drafts Viewed</span><span class="progress-stat-value">${progress.drafts}</span></div>`;
+    html += `<div class="progress-stat"><span class="progress-stat-label">REPL Sessions</span><span class="progress-stat-value">${progress.replSessions}</span></div>`;
+
+    if (progress.langsUsed.length > 0) {
+        const langNames = { symbolic: 'Symbolic Math', javascript: 'JavaScript', haskell: 'Haskell', assembly: 'Assembly' };
+        html += `<div style="margin-top:0.5rem;"><span class="progress-stat-label">Languages Used</span></div>`;
+        html += `<div class="progress-langs">`;
+        for (const l of progress.langsUsed) {
+            html += `<span class="progress-lang-badge">${langNames[l] || l}</span>`;
+        }
+        html += `</div>`;
+    }
+
+    if (progress.history.length > 0) {
+        html += `<div style="margin-top:0.75rem;"><span class="progress-stat-label">Recent Activity</span></div>`;
+        html += `<div class="progress-history">`;
+        for (const h of progress.history.slice(0, 20)) {
+            html += `<div class="progress-history-entry">${escapeHtml(h)}</div>`;
+        }
+        html += `</div>`;
+    }
+
+    el.innerHTML = html;
+}
+
+
+
+function getGradeLabel(grade) {
+    if (!grade) return '';
+    const validGrades = { 'K': 'Kindergarten', '1': 'Grade 1', '2': 'Grade 2', '3': 'Grade 3', '4': 'Grade 4', '5': 'Grade 5', '6': 'Grade 6', '7': 'Grade 7', '8': 'Grade 8', '9': 'Grade 9', '10': 'Grade 10', '11': 'Grade 11', '12': 'Grade 12', 'IB': 'IB Programme' };
+    return validGrades[grade] || escapeHtml(grade);
+}
+
+function getGradeTier(grade) {
+    if (!grade) return 'default';
+    if (grade === 'K' || grade === '1' || grade === '2') return 'early';
+    if (grade === '3' || grade === '4' || grade === '5') return 'elementary';
+    if (grade === '6' || grade === '7' || grade === '8') return 'middle';
+    if (grade === '9' || grade === '10') return 'high';
+    if (grade === '11' || grade === '12') return 'advanced';
+    if (grade === 'IB') return 'ib';
+    return 'default';
+}
+
+function getGradeAdaptedIntro(lang) {
+    const settings = getStudentSettings();
+    const tier = getGradeTier(settings.grade);
+    const name = settings.name || '';
+    const greeting = name ? `Hi ${escapeHtml(name)}! ` : '';
+
+    const base = langIntros[lang];
+    if (!base || tier === 'default') return base;
+
+    const gradeTag = settings.grade ? `<span class="grade-indicator">${getGradeLabel(settings.grade)}</span>` : '';
+
+    const adapted = { title: base.title + gradeTag };
+
+    if (lang === 'symbolic') {
+        if (tier === 'early') {
+            adapted.body = `
+                <p>${greeting}You are about to see <span class="intro-highlight">the first computer program ever written!</span></p>
+                <p>A very clever woman named <span class="intro-highlight">Ada Lovelace</span> wrote it a long, long time ago -- in 1843!
+                That is over 180 years ago! She wrote instructions for a special machine that could do math.</p>
+                <p>Her instructions look like this:</p>
+                <div class="intro-example">let V1 = 1
+let V2 = 2
+let V4 = V2 * V3    -- multiply!</div>
+                <p>Each <span class="intro-highlight">V</span> is like a box that holds a number.
+                V1 holds the number 1, V2 holds 2, and so on. You tell the machine what to do with the numbers!</p>
+                <div class="intro-tip">Press <strong>Compile</strong> to see Ada's program turn into machine language!</div>
+            `;
+        } else if (tier === 'elementary') {
+            adapted.body = `
+                <p>${greeting}<span class="intro-highlight">The first computer program ever written</span> is right here.</p>
+                <p>In 1843, <span class="intro-highlight">Ada Lovelace</span> wrote a program for a machine called
+                the Analytical Engine. The machine was never built, but her program was real. It calculated
+                a special number called B7 -- the seventh Bernoulli number.</p>
+                <p>Ada used variables like storage boxes:</p>
+                <div class="intro-example">let V1 = 1
+let V2 = 2
+let V4 = V2 * V3    -- multiply V2 by V3
+let V11 = V4 / V5   -- divide V4 by V5</div>
+                <p>Each <span class="intro-highlight">V-variable</span> holds a number.
+                You write one math operation per line. The Church Machine can actually run Ada's program today!</p>
+                <div class="intro-tip">Click <strong>Compile</strong> to translate Ada's math into machine code,
+                then <strong>Draft</strong> to see the memory layout.</div>
+            `;
+        } else if (tier === 'middle') {
+            adapted.body = `
+                <p>${greeting}This is <span class="intro-highlight">the first computer program in history</span> --
+                written by Ada Lovelace in 1843 for Charles Babbage's Analytical Engine.</p>
+                <p>Her program computes B7, the seventh Bernoulli number, using a sequence of 25 operations.
+                The notation maps directly to hardware: each V-variable is a register, each line is an instruction.</p>
+                <div class="intro-example">let V1 = 1
+let V2 = 2
+let V4 = V2 * V3    -- Operation 1: 2n
+let V11 = V4 / V5   -- Operation 4: ratio</div>
+                <p>Multiply and divide compile to loops of addition and subtraction --
+                the same way early computers actually worked.</p>
+                <div class="intro-tip">Try <strong>Compile</strong> to see the machine code, then <strong>Draft</strong>
+                to understand how the code maps to a memory lump with method tables and capability lists.</div>
+            `;
+        } else if (tier === 'high') {
+            adapted.body = `
+                <p>${greeting}${base.body}`;
+        } else if (tier === 'advanced' || tier === 'ib') {
+            adapted.body = `
+                <p>${greeting}You are examining <span class="intro-highlight">Note G</span> from Ada Lovelace's 1843 translation
+                of Menabrea's paper on the Analytical Engine. This is the first published algorithm --
+                a computation of the seventh Bernoulli number B7 = -1/30.</p>
+                <p>The notation mirrors Ada's original: V-variables map to store columns (here, data registers DR1-DR15).
+                Operation 4 uses the correction identified by Bromley (1990) -- Ada's original had V5/V4 instead of V4/V5.</p>
+                <div class="intro-example">let V4 = V2 * V3    -- IADD loop: DR4 += DR2, counter DR3
+let V11 = V4 / V5   -- ISUB loop: quotient++, remainder -= divisor</div>
+                <p>Multiplication compiles to shift-and-add loops; division to repeated subtraction.
+                The compiler allocates temporary registers dynamically to avoid clobbering.
+                ${tier === 'ib' ? 'This connects to the IB Computer Science core -- abstraction, algorithms, and machine architecture as a unified system.' : ''}</p>
+                <div class="intro-tip">Examine the <strong>Draft</strong> output to see lump layout, CR7/CR6 split,
+                and the capability-secured memory model. Compare JS and Haskell versions via the language selector.</div>
+            `;
+        }
+    } else if (lang === 'assembly') {
+        if (tier === 'early') {
+            adapted.body = `
+                <p>${greeting}This is <span class="intro-highlight">assembly language</span> -- the simplest instructions
+                a computer understands!</p>
+                <p>Each line tells the Church Machine to do one tiny thing -- like adding two numbers
+                or checking if something is allowed.</p>
+                <div class="intro-example">IADD DR0, DR1, DR2   ; add two numbers
+MCMP DR0, DR1        ; compare them</div>
+                <p>There are <span class="intro-highlight">20 instructions</span> the machine knows.
+                Some do math, and some check security permissions -- like asking a parent for permission!</p>
+                <div class="intro-tip">Try the <strong>Self-Test</strong> example to see the machine run!</div>
+            `;
+        } else if (tier === 'elementary' || tier === 'middle') {
+            adapted.body = `
+                <p>${greeting}${base.body}`;
+        } else if (tier === 'advanced' || tier === 'ib') {
+            adapted.body = `
+                <p>${greeting}Assembly provides direct access to the Church Machine's 20-instruction dual-domain ISA.
+                The <span class="intro-highlight">Church domain</span> (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA)
+                enforces capability-based security through Golden Tokens.
+                The <span class="intro-highlight">Turing domain</span> (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR)
+                handles computation.</p>
+                <div class="intro-example">LOAD CR0, CR6, 4    ; capability load from c-list
+TPERM CR0, XL       ; permission check (execute + load)
+CALL CR0            ; domain crossing via E-GT</div>
+                <p>ARM-style condition codes on every instruction. The F-bit auto-set on Outform GTs prevents
+                the confused deputy problem.${tier === 'ib' ? ' This maps directly to IB CS topics: machine architecture, instruction sets, and security models.' : ''}</p>
+                <div class="intro-tip">Study the <strong>mLoad pipeline</strong> (7 steps) in the Pipeline tab
+                to understand how capability checks enforce memory safety at the hardware level.</div>
+            `;
+        }
+    } else if (lang === 'javascript') {
+        if (tier === 'early' || tier === 'elementary') {
+            adapted.body = `
+                <p>${greeting}This is <span class="intro-highlight">CLOOMC++</span> -- a language that looks a lot
+                like regular programming! You write code with curly braces and the Church Machine runs it.</p>
+                <div class="intro-example">abstraction Hello {
+    capabilities { }
+    method Greet(who) {
+        result = who + 1
+        return(result)
+    }
+}</div>
+                <p>An <span class="intro-highlight">abstraction</span> is like a little program with its own rules.
+                Methods are the things it can do -- like greeting someone!</p>
+                <div class="intro-tip">Try <strong>JS: Hello</strong>, then click <strong>Compile</strong> to see the machine code!</div>
+            `;
+        } else if (tier === 'advanced' || tier === 'ib') {
+            adapted.body = `
+                <p>${greeting}${base.body}
+                <p>The CLOOMC++ compiler proves the Church Machine is a universal target -- the same 20-instruction ISA
+                accepts programs from JavaScript, Haskell, and Symbolic Math front-ends. Variables map to DR0-DR15,
+                multiply/divide compile to IADD/ISUB loops.${tier === 'ib' ? ' Relevant to IB CS: compilers, abstraction layers, and universal computation.' : ''}</p>
+            `;
+        } else {
+            adapted.body = `<p>${greeting}${base.body}`;
+        }
+    } else if (lang === 'haskell') {
+        if (tier === 'early' || tier === 'elementary') {
+            adapted.body = `
+                <p>${greeting}This is <span class="intro-highlight">Haskell</span> -- a language based on math!
+                Instead of telling the computer what to do step by step, you describe what things are.</p>
+                <div class="intro-example">method add(a, b) = a + b
+method isZero(n) = if n == 0 then 1 else 0</div>
+                <p>It looks like math equations! The Church Machine turns these into the same instructions
+                as the other languages.</p>
+                <div class="intro-tip">Try <strong>HS: Math</strong> to see basic arithmetic in Haskell!</div>
+            `;
+        } else if (tier === 'advanced' || tier === 'ib') {
+            adapted.body = `
+                <p>${greeting}The Haskell front-end demonstrates that lambda calculus compiles to the Church Machine's
+                20-instruction set -- pattern matching becomes MCMP+BRANCH chains, pairs use BFINS/BFEXT packing,
+                and let-bindings map to register allocation.</p>
+                <div class="intro-example">method factorial(n) = case n of 0 -> 1, _ -> n * (n - 1)
+method swap(p) = (snd p, fst p)</div>
+                <p>Named after Alonzo Church, this front-end connects his lambda calculus to silicon.${tier === 'ib' ? ' This relates to IB CS abstract data structures, recursion, and computational thinking.' : ''}</p>
+                <div class="intro-tip">Compare the compiled output of <strong>HS: Math</strong> with <strong>JS: Counter</strong> --
+                both produce the same machine instructions from different paradigms.</div>
+            `;
+        } else {
+            adapted.body = `<p>${greeting}${base.body}`;
+        }
+    }
+
+    if (!adapted.body) adapted.body = `<p>${greeting}${base.body}`;
+    return adapted;
 }
 
 function confirmSaveToNamespace() {
@@ -4542,6 +4833,7 @@ function compileDraft() {
     }
 
     if (con) con.textContent = draft;
+    trackAction('draft', { name: result.abstractionName, lang: result.language });
     appendOutput(`Draft: "${result.abstractionName}" — ${result.methods.length} methods, ${clistCount} caps, ${allocSize} alloc`, 'info');
 }
 
@@ -4596,6 +4888,7 @@ function compileCLOOMC() {
     }
 
     if (con) con.textContent = listing;
+    trackAction('compile', { name: result.abstractionName, lang: result.language });
     appendOutput(`CLOOMC++ compiled "${result.abstractionName}" — ${result.methods.length} methods`, 'info');
 }
 
@@ -4668,6 +4961,7 @@ function compileAndCreateAbstraction() {
     }
 
     if (con) con.textContent = listing;
+    trackAction('abstract', { name: upload.abstraction, lang: result.language });
     appendOutput(`Created "${upload.abstraction}" @ NS[${addResult.result.nsIndex}]`, 'info');
     updateDashboard();
 }
@@ -4875,10 +5169,6 @@ function renderMarkdown(md) {
         }
     }
     return result.join('\n');
-}
-
-function escapeHtml(str) {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 document.addEventListener('DOMContentLoaded', init);

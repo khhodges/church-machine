@@ -259,10 +259,58 @@
                 <div class="intro-scroll-arrow hidden" id="introScrollArrow"><span>&#x25BC;</span></div>
             </div>
             <div class="intro-footer">
+                <button class="settings-gear-btn" onclick="openSettings()" title="Settings">&#x2699;</button>
                 <label class="intro-dismiss-label">
                     <input type="checkbox" id="introDismiss"> Don't show this again
                 </label>
                 <button class="btn btn-primary" onclick="closeIntro()">Let's Go!</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog settings-dialog">
+            <div class="intro-header">
+                <div class="modal-title">Settings</div>
+                <button class="intro-close" onclick="closeSettings()">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <div class="settings-section-title">Student Profile</div>
+                    <label class="settings-label">Name
+                        <input type="text" id="settingName" class="modal-input" placeholder="Your name">
+                    </label>
+                    <label class="settings-label">School
+                        <input type="text" id="settingSchool" class="modal-input" placeholder="School name">
+                    </label>
+                    <label class="settings-label">Grade Level
+                        <select id="settingGrade" class="modal-input" onchange="onGradeChange()">
+                            <option value="">-- Select --</option>
+                            <option value="K">Kindergarten</option>
+                            <option value="1">Grade 1</option>
+                            <option value="2">Grade 2</option>
+                            <option value="3">Grade 3</option>
+                            <option value="4">Grade 4</option>
+                            <option value="5">Grade 5</option>
+                            <option value="6">Grade 6</option>
+                            <option value="7">Grade 7</option>
+                            <option value="8">Grade 8</option>
+                            <option value="9">Grade 9</option>
+                            <option value="10">Grade 10</option>
+                            <option value="11">Grade 11</option>
+                            <option value="12">Grade 12</option>
+                            <option value="IB">IB (International Baccalaureate)</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">Progress Report</div>
+                    <div id="progressReport" class="progress-report"></div>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+                <button class="btn btn-warning" onclick="closeSettings()">Cancel</button>
             </div>
         </div>
     </div>
