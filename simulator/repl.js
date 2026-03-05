@@ -121,8 +121,7 @@ class ChurchREPL {
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
                         `A = ${argResult.value}`,
-                        `${func}`,
-                        `C = ${func}(A) = ${displayResult}`,
+                        `C = CALL.${abstraction} (${func}(A))`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
@@ -154,8 +153,7 @@ class ChurchREPL {
                     churchSteps.push(
                         `A = ${base.value}`,
                         `B = ${exp.value}`,
-                        `^`,
-                        `C = A ^ B = ${displayResult}`,
+                        `C = CALL.POW (A ^ B)`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: displayResult });
@@ -209,8 +207,7 @@ class ChurchREPL {
                 churchSteps.push(
                     `A = ${left.value}`,
                     `B = ${right.value}`,
-                    `${op}`,
-                    `C = A ${op} B = ${displayResult}`,
+                    `C = CALL.${abstraction} (A ${op} B)`,
                 );
                 if (this.pipeline) {
                     pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });

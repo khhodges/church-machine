@@ -3587,13 +3587,11 @@ function showChallengeExplanation(el, c) {
     const churchLines = [];
     if (c.opType === 'factorial') {
         churchLines.push({label: 'A', expr: '= ' + c.a});
-        churchLines.push({label: '!', expr: ''});
-        churchLines.push({label: 'C', expr: '= A! = ' + c.answer});
+        churchLines.push({label: 'C', expr: '= CALL.FACTORIAL (A!)'});
     } else {
         churchLines.push({label: 'A', expr: '= ' + c.a});
         churchLines.push({label: 'B', expr: '= ' + c.b});
-        churchLines.push({label: sym, expr: ''});
-        churchLines.push({label: 'C', expr: '= A ' + sym + ' B = ' + c.answer});
+        churchLines.push({label: 'C', expr: '= CALL.' + opName + ' (A ' + sym + ' B)'});
     }
 
     for (const line of churchLines) {
@@ -3602,7 +3600,7 @@ function showChallengeExplanation(el, c) {
         html += `<span class="code-asm">${escapeHtml(line.expr)}</span>`;
         html += `</div>`;
     }
-    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">Pure symbols. A, B, and ${sym} are names. No addresses, no registers. The mind works in mathematics.</div>`;
+    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">CALL names the abstraction. A and B are symbols, not addresses. The mind works in mathematics.</div>`;
     html += `</div>`;
 
     el.innerHTML = html;
@@ -3627,8 +3625,8 @@ function showMathGuidePopup() {
         `<div style="font-weight:700;color:var(--church-gold);margin-bottom:0.3rem;">Left &mdash; The Mind</div>` +
         `<p style="font-size:0.82rem;line-height:1.5;margin:0;">` +
         `Church domain. Symbols and permissions. The calculation becomes: ` +
-        `<strong>A = 3, B = 1, C = A + B = 4</strong> &mdash; pure mathematics, no registers. ` +
-        `The security envelope opens, the body does its work inside, and the envelope closes.</p>` +
+        `<strong>A = 3, B = 1, C = CALL.ADD (A + B)</strong> &mdash; pure mathematics, no registers. ` +
+        `CALL names the abstraction, the envelope opens, the body runs inside, and the envelope closes.</p>` +
         `</div>` +
 
         `<div style="flex:1;background:rgba(100,180,255,0.08);border:1px solid rgba(100,180,255,0.25);border-radius:8px;padding:0.6rem 0.8rem;">` +
