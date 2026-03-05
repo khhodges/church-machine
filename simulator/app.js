@@ -3589,13 +3589,12 @@ function showChallengeExplanation(el, c) {
     html += `<div class="explain-church">`;
     html += `<div class="explain-header">The mind \u2014 Church (symbols)</div>`;
     const churchLines = [
-        {asm: 'LOAD CR7, [CR6 + ' + opName + ']', desc: 'Load the symbol "' + opName + '" from the capability list (slot ' + slot + ')'},
-        {asm: 'TPERM CR7, E', desc: 'Check permission "E" (Entry) \u2014 a symbol, not a number'},
-        {asm: 'CALL CR7', desc: 'Enter the ' + opName + ' abstraction through its security gate'},
-        {asm: 'LOAD CR0, [CR6 + Code]', desc: 'Load the code region\'s token \u2014 a symbol, not an address'},
-        {asm: 'TPERM CR0, X', desc: 'Check permission "X" (Execute) \u2014 proof the code is untampered'},
-        {asm: 'LAMBDA CR0', desc: opName + ' runs: ' + exprStr + ' \u2192 ' + c.answer},
-        {asm: 'RETURN CR7', desc: 'Exit. The answer (' + c.answer + ') is in DR0'},
+        {asm: 'LOAD CR1, [CR6 + ' + opName + ']', desc: 'Load the E-GT for "' + opName + '" from the capability list'},
+        {asm: 'TPERM CR1, E', desc: 'Check permission "E" (Entry) \u2014 a symbol, not a number'},
+        {asm: 'CALL CR1', desc: 'Enter ' + opName + '. CALL sets CR7=code, CR6=c-list'},
+        {asm: 'TPERM CR7, X', desc: 'CR7 was set by CALL \u2014 verify "X" (Execute)'},
+        {asm: 'LAMBDA CR7', desc: opName + ' runs: ' + exprStr + ' \u2192 ' + c.answer},
+        {asm: 'RETURN', desc: 'Exit. The answer (' + c.answer + ') is in DR0'},
     ];
     for (let i = 0; i < churchLines.length; i++) {
         html += `<div class="code-line">`;
