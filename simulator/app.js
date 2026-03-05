@@ -3475,77 +3475,72 @@ function showChallengeHint() {
     resultEl.textContent = 'Hint: ' + hint;
 }
 
+function challengeOpName(opType) {
+    const names = { add: 'ADD', sub: 'SUB', mul: 'MUL', div: 'DIV', factorial: 'FACTORIAL', exp: 'POW', mod: 'MOD' };
+    return names[opType] || 'COMPUTE';
+}
+
+function challengeOpSymbol(opType) {
+    const syms = { add: '+', sub: '-', mul: '\u00d7', div: '\u00f7', exp: '^', mod: '%' };
+    return syms[opType] || '?';
+}
+
+function challengeOpSlot(opType) {
+    const slots = { add: 22, sub: 23, mul: 24, div: 25, factorial: 26, exp: 24, mod: 25 };
+    return slots[opType] || 22;
+}
+
 function showChallengeExplanation(el, c) {
     if (!el) return;
 
     let lines = [];
-    const aHex = '0x' + (c.a >>> 0).toString(16).padStart(8, '0');
-    const bHex = '0x' + (c.b >>> 0).toString(16).padStart(8, '0');
-    const rHex = '0x' + (c.answer >>> 0).toString(16).padStart(8, '0');
+    const opName = challengeOpName(c.opType);
+    const slot = challengeOpSlot(c.opType);
+    const sym = challengeOpSymbol(c.opType);
 
-    lines.push({title: 'How the Church Machine solves this:'});
+    if (c.opType === 'factorial') {
+        lines.push({title: 'How the Church Machine solves ' + c.a + '!:'});
+    } else {
+        lines.push({title: 'How the Church Machine solves ' + c.a + ' ' + sym + ' ' + c.b + ':'});
+    }
+
+    lines.push({step: '1', asm: 'LOAD CR7, [CR6 + ' + slot + ']', desc: 'Load the ' + opName + ' abstraction\'s Golden Token from the capability list (slot ' + slot + ')'});
+    lines.push({step: '2', asm: 'TPERM CR7, E', desc: 'Check the token has Entry permission \u2014 are we allowed to call ' + opName + '?'});
+    lines.push({step: '3', asm: 'CALL CR7', desc: 'Enter the ' + opName + ' abstraction through its security gate'});
+
+    lines.push({step: '4', asm: 'LOAD CR0, [CR6 + 1]', desc: 'Inside ' + opName + ': load the code region\'s Golden Token'});
+    lines.push({step: '5', asm: 'TPERM CR0, X', desc: 'Verify the code has Execute permission \u2014 no one tampered with it'});
 
     if (c.opType === 'add') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the first number (' + c.a + ') into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the second number (' + c.b + ') into data register 2'});
-        lines.push({asm: 'IADD DR3, DR1, DR2', desc: 'Add DR1 + DR2, store the result (' + c.answer + ') in DR3'});
-        lines.push({hex: aHex, asm: '.word ' + c.a, desc: 'Data: the number ' + c.a + ' stored in memory'});
-        lines.push({hex: bHex, asm: '.word ' + c.b, desc: 'Data: the number ' + c.b + ' stored in memory'});
-        lines.push({note: 'IADD is the "integer add" instruction. It takes two registers and puts the sum in a third.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + ' + ' + c.b + ' \u2192 ' + c.answer + '. Result stored in DR0'});
+        lines.push({note: 'LAMBDA executes the addition. Even simple "2 + 3" passes through the security pipeline \u2014 the Golden Token on the ADD abstraction was checked before any code ran.'});
     } else if (c.opType === 'sub') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b + ' into data register 2'});
-        lines.push({asm: 'ISUB DR3, DR1, DR2', desc: 'Subtract DR2 from DR1, store the result (' + c.answer + ') in DR3'});
-        lines.push({note: 'ISUB is "integer subtract". The machine subtracts the second register from the first.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + ' - ' + c.b + ' \u2192 ' + c.answer + '. Result stored in DR0'});
+        lines.push({note: 'LAMBDA executes the subtraction. The security check happened at step 2 \u2014 if the token was wrong, the machine would FAULT and never reach this step.'});
     } else if (c.opType === 'mul') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into data register 1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b + ' into data register 2'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Set DR3 to 0 (this will hold our running total)'});
-        lines.push({asm: 'IADD DR3, DR3, DR1', desc: 'Add DR1 to DR3 (repeat ' + c.b + ' times in a loop)'});
-        lines.push({asm: 'ISUB DR2, DR2, #1', desc: 'Count down: subtract 1 from DR2'});
-        lines.push({asm: 'BRANCH NE, -2', desc: 'If DR2 is not zero, jump back and add again'});
-        lines.push({note: 'The Church Machine has no multiply instruction! It uses a loop: add ' + c.a + ' to itself ' + c.b + ' times. ' + c.a + ' \u00d7 ' + c.b + ' = ' + c.answer + '.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + ' \u00d7 ' + c.b + ' \u2192 ' + c.answer + '. Inside, it loops ' + c.b + ' additions'});
+        lines.push({note: 'The Church Machine has no multiply instruction. ' + opName + ' uses a loop of IADD: add ' + c.a + ' to itself ' + c.b + ' times. But the security check at step 2 happened before any of that looping began.'});
     } else if (c.opType === 'div') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the dividend (' + c.a + ') into DR1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the divisor (' + c.b + ') into DR2'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Set DR3 to 0 (this counts how many times we subtract)'});
-        lines.push({asm: 'ISUB DR1, DR1, DR2', desc: 'Subtract DR2 from DR1'});
-        lines.push({asm: 'IADD DR3, DR3, #1', desc: 'Add 1 to the counter'});
-        lines.push({asm: 'BRANCH PL, -2', desc: 'If DR1 is still positive, keep subtracting'});
-        lines.push({note: 'Division is repeated subtraction! Subtract ' + c.b + ' from ' + c.a + ' and count how many times: ' + c.answer + ' times.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + ' \u00f7 ' + c.b + ' \u2192 ' + c.answer + '. Inside, it loops subtractions'});
+        lines.push({note: 'Division is repeated subtraction \u2014 subtract ' + c.b + ' from ' + c.a + ' and count: ' + c.answer + ' times. The Golden Token was verified before the loop started.'});
     } else if (c.opType === 'factorial') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a + ' into DR1 (the counter)'});
-        lines.push({asm: 'DREAD DR3, #1', desc: 'Set DR3 to 1 (the running product)'});
-        lines.push({asm: '-- outer loop:', desc: 'For each counter value, multiply DR3 by DR1'});
-        lines.push({asm: 'DREAD DR4, DR3', desc: 'Copy the current product into DR4'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Reset DR3 to 0 for the add loop'});
-        lines.push({asm: 'DREAD DR5, DR1', desc: 'Copy counter into DR5 (inner loop count)'});
-        lines.push({asm: 'IADD DR3, DR3, DR4', desc: 'Add DR4 to DR3 (repeated DR1 times = multiply)'});
-        lines.push({asm: 'ISUB DR5, DR5, #1', desc: 'Decrease inner loop counter'});
-        lines.push({asm: 'BRANCH NE, -2', desc: 'Inner loop: keep adding until DR5 = 0'});
-        lines.push({asm: 'ISUB DR1, DR1, #1', desc: 'Decrease the outer counter by 1'});
-        lines.push({asm: 'BRANCH NE, -8', desc: 'Outer loop: repeat for next factor'});
-        lines.push({note: c.a + '! = ' + c.answer + '. The machine has no multiply instruction, so it uses nested add loops: each multiplication is repeated addition.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + '! \u2192 ' + c.answer + '. Nested loops of additions'});
+        lines.push({note: c.a + '! means ' + c.a + ' \u00d7 ' + (c.a-1) + ' \u00d7 ... \u00d7 1 = ' + c.answer + '. Each multiply is itself a loop of additions. Two nested loops, but the security gate only opened once.'});
     } else if (c.opType === 'exp') {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load the base (' + c.a + ') into DR1'});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load the exponent (' + c.b + ') into DR2'});
-        lines.push({asm: 'DREAD DR3, #1', desc: 'Set DR3 to 1 (the result starts at 1)'});
-        lines.push({asm: '-- outer loop:', desc: 'Multiply DR3 by DR1, using an add loop'});
-        lines.push({asm: 'DREAD DR4, DR3', desc: 'Copy current result into DR4'});
-        lines.push({asm: 'DREAD DR3, #0', desc: 'Reset DR3 for the add loop'});
-        lines.push({asm: 'DREAD DR5, DR1', desc: 'Copy base into DR5 (inner loop count)'});
-        lines.push({asm: 'IADD DR3, DR3, DR4', desc: 'Add DR4 to DR3 (repeated DR1 times = multiply)'});
-        lines.push({asm: 'ISUB DR5, DR5, #1', desc: 'Decrease inner counter'});
-        lines.push({asm: 'BRANCH NE, -2', desc: 'Inner loop: keep adding'});
-        lines.push({asm: 'ISUB DR2, DR2, #1', desc: 'Decrease exponent counter'});
-        lines.push({asm: 'BRANCH NE, -8', desc: 'Outer loop until exponent reaches 0'});
-        lines.push({note: c.a + '^' + c.b + ' = ' + c.answer + '. Exponentiation is repeated multiplication, and each multiplication is repeated addition. Two nested loops!'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + '^' + c.b + ' \u2192 ' + c.answer + '. Repeated multiplication via additions'});
+        lines.push({note: c.a + '^' + c.b + ' = ' + c.answer + '. Exponentiation is repeated multiplication, each multiplication is repeated addition. Two nested loops, one security check.'});
+    } else if (c.opType === 'mod') {
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: opName + ' runs: ' + c.a + ' % ' + c.b + ' \u2192 ' + c.answer + '. Remainder after division'});
+        lines.push({note: 'Modulo is the remainder after division. Subtract ' + c.b + ' repeatedly from ' + c.a + ' until what is left is less than ' + c.b + '. The remainder is ' + c.answer + '.'});
     } else {
-        lines.push({asm: 'DREAD DR1, #' + c.a, desc: 'Load ' + c.a});
-        lines.push({asm: 'DREAD DR2, #' + c.b, desc: 'Load ' + c.b});
-        lines.push({asm: 'Operation', desc: 'Compute the result: ' + c.answer});
-        lines.push({note: 'The Church Machine uses its 20-instruction set to solve this step by step.'});
+        lines.push({step: '6', asm: 'LAMBDA CR0', desc: 'Compute: ' + c.answer + '. Result stored in DR0'});
+        lines.push({note: 'The operation runs inside the abstraction. The Golden Token was checked before any code executed.'});
     }
+
+    lines.push({step: '7', asm: 'RETURN CR7', desc: 'Exit the ' + opName + ' abstraction. The answer (' + c.answer + ') is in DR0'});
+
+    const exprStr = c.opType === 'factorial' ? c.a + '!' : c.a + ' ' + sym + ' ' + c.b;
+    lines.push({note: 'Every calculation \u2014 even ' + exprStr + ' \u2014 goes through 7 steps: load the token, check permission, enter the abstraction, verify code, run, and return. This is what makes the Church Machine secure: no shortcut is possible.'});
 
     let html = '';
     for (const line of lines) {
@@ -3555,7 +3550,7 @@ function showChallengeExplanation(el, c) {
             html += `<div style="margin-top:0.4rem;padding:0.4rem 0.5rem;background:rgba(218,165,32,0.06);border-left:3px solid var(--church-gold);font-style:italic;color:var(--text-primary);font-family:inherit;">${escapeHtml(line.note)}</div>`;
         } else {
             html += `<div class="code-line">`;
-            if (line.hex) html += `<span class="code-hex">${escapeHtml(line.hex)}</span>`;
+            if (line.step) html += `<span class="code-hex" style="min-width:20px;">${escapeHtml(line.step)}.</span>`;
             html += `<span class="code-asm">${escapeHtml(line.asm)}</span>`;
             html += `<span class="code-desc">${escapeHtml(line.desc)}</span>`;
             html += `</div>`;
