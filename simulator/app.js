@@ -3595,9 +3595,8 @@ function showChallengeExplanation(el, c) {
         : 'DR0 = ' + c.a + ', DR1 = ' + c.b;
 
     const churchLines = [
-        {asm: 'LOAD CR1, [CR6 + ' + opName + ']', desc: '"' + opName + '" is a symbol in the capability list \u2014 a name, not a number'},
-        {asm: 'CALL CR1', desc: 'Security envelope opens. The body runs inside: ' + exprStr + ' \u2192 ' + c.answer},
-        {asm: 'RETURN', desc: 'Security envelope closes. Result ' + c.answer + ' is in DR0'},
+        {asm: 'CALL ' + opName, desc: 'Security envelope opens \u2014 the body runs ' + exprStr + ' inside \u2014 envelope closes'},
+        {asm: 'RETURN', desc: 'Result ' + c.answer + ' is in DR0'},
     ];
 
     for (let i = 0; i < churchLines.length; i++) {
@@ -3607,12 +3606,12 @@ function showChallengeExplanation(el, c) {
         html += `<span class="code-desc">${escapeHtml(churchLines[i].desc)}</span>`;
         html += `</div>`;
     }
-    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">Three instructions, no numbers. CR1 is a capability register, "${opName}" is a symbol, "E" is a permission checked by the hardware. CALL/RETURN is the security envelope \u2014 everything inside is protected. The body\u2019s arguments (${argNote}) cross into the envelope via data registers.</div>`;
+    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">"${opName}" is a symbol in the capability list \u2014 a name, not a number. CALL finds it, checks the Golden Token, enters the abstraction, runs the body inside, and returns. The hardware does everything. Arguments (${argNote}) cross into the envelope via data registers. LOAD is only needed to store a capability for later.</div>`;
     html += `</div>`;
 
     html += `<div class="explain-bridge">`;
-    html += `<p><strong>Body and mind.</strong> The Turing instructions above use numbers: DR1 = ${c.a}, DR2 = ${c.b}, physical addresses, values that can overflow. That is the body \u2014 the physical work that runs <em>inside</em> the CALL envelope.</p>`;
-    html += `<p>The Church instructions use symbols: CR1, "${opName}", CALL/RETURN. No numbers anywhere. That is the mind \u2014 the security envelope that wraps the body\u2019s work.</p>`;
+    html += `<p><strong>Body and mind.</strong> The Turing instructions above use numbers: DR1 = ${c.a}, DR2 = ${c.b}, physical addresses, values that can overflow. That is the body \u2014 the physical work that runs <em>inside</em> the CALL.</p>`;
+    html += `<p>The Church instruction is one word: CALL ${opName}. No numbers. That is the mind \u2014 the security envelope that wraps the body\u2019s work.</p>`;
     html += `<p>Ada wrote the first program in 1843 using symbols \u2014 no compiler, no OS, no superuser. The Church Machine returns to what she had. Turing was Church\u2019s student. He built the body. His teacher gave it a mind.</p>`;
     html += `</div>`;
 

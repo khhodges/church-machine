@@ -121,14 +121,13 @@ class ChurchREPL {
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
                         `  DREAD  DR0, #${argResult.value}                     ; Pass argument: ${argResult.value}`,
-                        `  LOAD   CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load "${abstraction}" (symbol)`,
-                        `\u2192 CALL   CR1                                  ; Envelope opens \u2014 body runs ${func}(${argResult.value}) = ${displayResult}`,
+                        `\u2192 CALL   ${abstraction}                              ; Envelope opens \u2014 body runs ${func}(${argResult.value}) = ${displayResult}`,
                         `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
                     }
-                    return { value: result, churchSteps, pipeline, cycles: 4 };
+                    return { value: result, churchSteps, pipeline, cycles: 3 };
                 } else {
                     churchSteps.push(
                         `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
@@ -155,14 +154,13 @@ class ChurchREPL {
                     churchSteps.push(
                         `  DREAD  DR0, #${base.value}                          ; Pass base: ${base.value}`,
                         `  DREAD  DR1, #${exp.value}                           ; Pass exponent: ${exp.value}`,
-                        `  LOAD   CR1, [CR6 + ${this._nsIndex('POW')}]         ; Load "POW" (symbol)`,
-                        `\u2192 CALL   CR1                                  ; Envelope opens \u2014 body runs pow(${base.value}, ${exp.value}) = ${displayResult}`,
+                        `\u2192 CALL   POW                                  ; Envelope opens \u2014 body runs pow(${base.value}, ${exp.value}) = ${displayResult}`,
                         `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: displayResult });
                     }
-                    return { value: result, churchSteps, pipeline, cycles: 5 };
+                    return { value: result, churchSteps, pipeline, cycles: 4 };
                 } else {
                     churchSteps.push(
                         `1. ELOADCALL   CR7, CR6, ${this._nsIndex('POW')}  ; LOAD+TPERM(E)+CALL \u2192 POW`,
@@ -211,14 +209,13 @@ class ChurchREPL {
                 churchSteps.push(
                     `  DREAD  DR0, #${left.value}                          ; Pass first argument: ${left.value}`,
                     `  DREAD  DR1, #${right.value}                         ; Pass second argument: ${right.value}`,
-                    `  LOAD   CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load "${abstraction}" (symbol)`,
-                    `\u2192 CALL   CR1                                  ; Envelope opens \u2014 body runs ${left.value} ${op} ${right.value} = ${displayResult}`,
+                    `\u2192 CALL   ${abstraction}                              ; Envelope opens \u2014 body runs ${left.value} ${op} ${right.value} = ${displayResult}`,
                     `\u2190 RETURN                                      ; Envelope closes \u2014 result in DR0`,
                 );
                 if (this.pipeline) {
                     pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
                 }
-                return { value: result, churchSteps, pipeline, cycles: 5 };
+                return { value: result, churchSteps, pipeline, cycles: 4 };
             } else {
                 churchSteps.push(
                     `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
@@ -351,7 +348,7 @@ class ChurchREPL {
                 'Special:     ANS (last result), VARS (show all), CLEAR (reset)',
                 '',
                 'Pipeline modes:',
-                '  Full:  DREAD args \u2192 LOAD symbol \u2192 CALL (envelope opens) \u2192 RETURN (envelope closes)',
+                '  Full:  DREAD args \u2192 CALL abstraction (envelope opens/closes) \u2192 RETURN',
                 '  Fused (3-step): ELOADCALL \u2192 XLOADLAMBDA \u2192 RETURN',
                 '  Chained (1 call): ELOADCALL \u2192 N\u00d7XLOADLAMBDA \u2192 RETURN',
             ].join('\n'),
