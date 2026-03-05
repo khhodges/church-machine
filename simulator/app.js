@@ -3589,10 +3589,8 @@ function showChallengeExplanation(el, c) {
     html += `<div class="explain-church">`;
     html += `<div class="explain-header">The mind \u2014 Church (symbols)</div>`;
     const churchLines = [
-        {asm: 'LOAD CR1, [CR6 + ' + opName + ']', desc: 'Load the E-GT for "' + opName + '" from the capability list'},
-        {asm: 'TPERM CR1, E', desc: 'Check permission "E" (Entry) \u2014 a symbol, not a number'},
+        {asm: 'LOAD CR1, [CR6 + ' + opName + ']', desc: 'Load the E-GT for "' + opName + '" \u2014 the hardware checks permissions automatically'},
         {asm: 'CALL CR1', desc: 'Enter ' + opName + '. CALL sets CR7=code, CR6=c-list'},
-        {asm: 'TPERM CR7, X', desc: 'CR7 was set by CALL \u2014 verify "X" (Execute)'},
         {asm: 'LAMBDA CR7', desc: opName + ' runs: ' + exprStr + ' \u2192 ' + c.answer},
         {asm: 'RETURN', desc: 'Exit. The answer (' + c.answer + ') is in DR0'},
     ];
@@ -3603,7 +3601,7 @@ function showChallengeExplanation(el, c) {
         html += `<span class="code-desc">${escapeHtml(churchLines[i].desc)}</span>`;
         html += `</div>`;
     }
-    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">No numbers anywhere. CR7, CR6, "E", "X" \u2014 all symbols. The mind works in names and permissions, not addresses and values.</div>`;
+    html += `<div style="margin-top:0.3rem;font-size:0.78rem;font-style:italic;color:var(--church-gold);opacity:0.8;">TPERM is not needed here \u2014 the capability hardware checks permissions on every LOAD and CALL automatically. TPERM is only used when you receive a capability from an untrusted source.</div>`;
     html += `</div>`;
 
     html += `<div class="explain-bridge">`;

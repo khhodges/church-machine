@@ -120,17 +120,15 @@ class ChurchREPL {
 
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
-                        `1. LOAD  CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction} E-GT`,
-                        `2. TPERM CR1, E                               ; Verify entry`,
-                        `3. CALL  CR1                                  ; Enter ${abstraction} (sets CR7=code, CR6=c-list)`,
-                        `4. TPERM CR7, X                               ; Verify execute (CR7 set by CALL)`,
-                        `5. LAMBDA CR7                                 ; ${func}(${argResult.value}) \u2192 ${displayResult}`,
-                        `6. RETURN                                     ; Result in DR0`,
+                        `1. LOAD   CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction} E-GT (hardware checks perms)`,
+                        `2. CALL   CR1                                  ; Enter ${abstraction} (sets CR7=code, CR6=c-list)`,
+                        `3. LAMBDA CR7                                  ; ${func}(${argResult.value}) \u2192 ${displayResult}`,
+                        `4. RETURN                                      ; Result in DR0`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
                     }
-                    return { value: result, churchSteps, pipeline, cycles: 6 };
+                    return { value: result, churchSteps, pipeline, cycles: 4 };
                 } else {
                     churchSteps.push(
                         `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
@@ -155,17 +153,15 @@ class ChurchREPL {
 
                 if (this.pipelineMode === 'full') {
                     churchSteps.push(
-                        `1. LOAD  CR1, [CR6 + ${this._nsIndex('POW')}]  ; Load POW E-GT`,
-                        `2. TPERM CR1, E                               ; Verify entry`,
-                        `3. CALL  CR1                                  ; Enter POW (sets CR7=code, CR6=c-list)`,
-                        `4. TPERM CR7, X                               ; Verify execute (CR7 set by CALL)`,
-                        `5. LAMBDA CR7                                 ; pow(${base.value}, ${exp.value}) \u2192 ${displayResult}`,
-                        `6. RETURN                                     ; Result in DR0`,
+                        `1. LOAD   CR1, [CR6 + ${this._nsIndex('POW')}]  ; Load POW E-GT (hardware checks perms)`,
+                        `2. CALL   CR1                                  ; Enter POW (sets CR7=code, CR6=c-list)`,
+                        `3. LAMBDA CR7                                  ; pow(${base.value}, ${exp.value}) \u2192 ${displayResult}`,
+                        `4. RETURN                                      ; Result in DR0`,
                     );
                     if (this.pipeline) {
                         pipeline = this.pipeline.buildSecurityTrace('CALL', { target: 'POW', result: displayResult });
                     }
-                    return { value: result, churchSteps, pipeline, cycles: 6 };
+                    return { value: result, churchSteps, pipeline, cycles: 4 };
                 } else {
                     churchSteps.push(
                         `1. ELOADCALL   CR7, CR6, ${this._nsIndex('POW')}  ; LOAD+TPERM(E)+CALL \u2192 POW`,
@@ -212,17 +208,15 @@ class ChurchREPL {
 
             if (this.pipelineMode === 'full') {
                 churchSteps.push(
-                    `1. LOAD  CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction} E-GT`,
-                    `2. TPERM CR1, E                               ; Verify entry`,
-                    `3. CALL  CR1                                  ; Enter ${abstraction} (sets CR7=code, CR6=c-list)`,
-                    `4. TPERM CR7, X                               ; Verify execute (CR7 set by CALL)`,
-                    `5. LAMBDA CR7                                 ; ${left.value} ${op} ${right.value} \u2192 ${displayResult}`,
-                    `6. RETURN                                     ; Result in DR0`,
+                    `1. LOAD   CR1, [CR6 + ${this._nsIndex(abstraction)}]  ; Load ${abstraction} E-GT (hardware checks perms)`,
+                    `2. CALL   CR1                                  ; Enter ${abstraction} (sets CR7=code, CR6=c-list)`,
+                    `3. LAMBDA CR7                                  ; ${left.value} ${op} ${right.value} \u2192 ${displayResult}`,
+                    `4. RETURN                                      ; Result in DR0`,
                 );
                 if (this.pipeline) {
                     pipeline = this.pipeline.buildSecurityTrace('CALL', { target: abstraction, result: displayResult });
                 }
-                return { value: result, churchSteps, pipeline, cycles: 6 };
+                return { value: result, churchSteps, pipeline, cycles: 4 };
             } else {
                 churchSteps.push(
                     `1. ELOADCALL   CR7, CR6, ${this._nsIndex(abstraction)}  ; LOAD+TPERM(E)+CALL \u2192 ${abstraction}`,
@@ -355,7 +349,7 @@ class ChurchREPL {
                 'Special:     ANS (last result), VARS (show all), CLEAR (reset)',
                 '',
                 'Pipeline modes:',
-                '  Full (6-step):  LOAD \u2192 TPERM \u2192 CALL (sets CR7=code, CR6=c-list) \u2192 TPERM \u2192 LAMBDA \u2192 RETURN',
+                '  Full (4-step):  LOAD (hardware checks perms) \u2192 CALL (sets CR7=code, CR6=c-list) \u2192 LAMBDA \u2192 RETURN',
                 '  Fused (3-step): ELOADCALL \u2192 XLOADLAMBDA \u2192 RETURN',
                 '  Chained (1 call): ELOADCALL \u2192 N\u00d7XLOADLAMBDA \u2192 RETURN',
             ].join('\n'),
