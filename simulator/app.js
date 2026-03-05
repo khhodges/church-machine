@@ -4238,6 +4238,10 @@ function showWelcomePopup() {
     if (!body) return;
 
     body.innerHTML =
+        `<div style="background:rgba(218,165,32,0.06);border:1px solid rgba(218,165,32,0.2);border-radius:8px;padding:0.6rem 1rem;margin-bottom:0.75rem;font-size:0.88rem;line-height:1.55;">` +
+        `<strong style="color:var(--church-gold);">Did you know?</strong> Cybercrime is now the world's third biggest economy &mdash; ` +
+        `behind only the USA and China. If it were a country, it would be richer than Japan, Germany, and the UK combined.</div>` +
+
         `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.5rem;">Why does security matter?</div>` +
 
         `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
