@@ -125,6 +125,24 @@ header h1 {
 
 .view.active { display: block; }
 
+#editor.view.active {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#editor .editor-layout {
+    flex: 1;
+    min-height: 0;
+}
+
+#editor .console-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .panel {
     background: var(--bg-panel);
     border: 1px solid var(--border);
@@ -427,12 +445,16 @@ header h1 {
 
 .editor-layout {
     display: flex;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .editor-layout > .editor-panel {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .editor-divider {
@@ -676,7 +698,6 @@ header h1 {
 }
 
 #editorConsole {
-    flex: 1;
     background: #0a0a1a;
     color: var(--church-green);
     border: 1px solid var(--border);
@@ -688,15 +709,21 @@ header h1 {
     overflow: auto;
     white-space: pre;
     line-height: 1.4;
-    min-height: 0;
+    max-height: calc(100vh - 160px);
 }
 
-#codeConsoleContent {
+#codeConsoleContent,
+#codeHistoryPanel {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+}
+
+#codeHistoryContent {
+    overflow-y: auto;
+    max-height: calc(100vh - 160px);
 }
 
 .ns-table {
@@ -1086,6 +1113,7 @@ header h1 {
     gap: 0;
     border-bottom: 2px solid var(--border);
     margin-bottom: 0.5rem;
+    flex-shrink: 0;
 }
 
 .sidebar-tab {
