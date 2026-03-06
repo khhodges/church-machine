@@ -192,31 +192,46 @@
             </div>
             <div class="repl-divider" id="replDivider"></div>
             <div class="repl-sidebar">
-                <div class="panel challenge-panel">
-                    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
-                        <span>Challenge</span>
-                        <button class="btn btn-primary" onclick="generateChallenge()" style="padding:0.2rem 0.6rem;font-size:0.75rem;">New Problem</button>
-                    </div>
-                    <div id="challengeArea">
-                        <div id="challengePrompt" class="challenge-prompt">Click "New Problem" to get a math challenge!</div>
-                        <div id="challengeInput" class="challenge-input-area" style="display:none;">
-                            <input type="text" id="challengeAnswer" class="modal-input" placeholder="Your answer..." onkeydown="if(event.key==='Enter')checkChallenge()">
-                            <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
-                                <button class="btn btn-primary" onclick="checkChallenge()" style="flex:1;font-size:0.8rem;">Check</button>
-                                <button class="btn" onclick="showChallengeHint()" style="flex:1;font-size:0.8rem;">Hint</button>
-                            </div>
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" id="sidebarTabChallenge" onclick="switchSidebarTab('challenge')">Challenge</button>
+                    <button class="sidebar-tab" id="sidebarTabHistory" onclick="switchSidebarTab('history')">History</button>
+                </div>
+                <div id="sidebarChallengeContent">
+                    <div class="panel challenge-panel">
+                        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>Challenge</span>
+                            <button class="btn btn-primary" onclick="generateChallenge()" style="padding:0.2rem 0.6rem;font-size:0.75rem;">New Problem</button>
                         </div>
-                        <div id="challengeResult" class="challenge-result"></div>
-                        <div id="challengeExplain" class="challenge-explain"></div>
+                        <div id="challengeArea">
+                            <div id="challengePrompt" class="challenge-prompt">Click "New Problem" to get a math challenge!</div>
+                            <div id="challengeInput" class="challenge-input-area" style="display:none;">
+                                <input type="text" id="challengeAnswer" class="modal-input" placeholder="Your answer..." onkeydown="if(event.key==='Enter')checkChallenge()">
+                                <div style="display:flex;gap:0.4rem;margin-top:0.4rem;">
+                                    <button class="btn btn-primary" onclick="checkChallenge()" style="flex:1;font-size:0.8rem;">Check</button>
+                                    <button class="btn" onclick="showChallengeHint()" style="flex:1;font-size:0.8rem;">Hint</button>
+                                </div>
+                            </div>
+                            <div id="challengeResult" class="challenge-result"></div>
+                            <div id="challengeExplain" class="challenge-explain"></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-title">Tools</div>
+                        <button class="btn" onclick="loadBernoulliInREPL()" style="width:100%;margin-bottom:0.5rem;">Run Bernoulli</button>
+                        <button class="btn" onclick="replCompileSession()" style="width:100%;margin-bottom:0.5rem;background:#C89B3C;color:#141414;font-weight:bold;">Compile Session</button>
+                        <button class="btn" onclick="replExecute('HELP')" style="width:100%;margin-bottom:0.5rem;">Help</button>
+                        <button class="btn" onclick="replExecute('VARS')" style="width:100%;margin-bottom:0.5rem;">Show Variables</button>
+                        <button class="btn btn-warning" onclick="replExecute('CLEAR')" style="width:100%;">Clear All</button>
                     </div>
                 </div>
-                <div class="panel">
-                    <div class="panel-title">Tools</div>
-                    <button class="btn" onclick="loadBernoulliInREPL()" style="width:100%;margin-bottom:0.5rem;">Run Bernoulli</button>
-                    <button class="btn" onclick="replCompileSession()" style="width:100%;margin-bottom:0.5rem;background:#C89B3C;color:#141414;font-weight:bold;">Compile Session</button>
-                    <button class="btn" onclick="replExecute('HELP')" style="width:100%;margin-bottom:0.5rem;">Help</button>
-                    <button class="btn" onclick="replExecute('VARS')" style="width:100%;margin-bottom:0.5rem;">Show Variables</button>
-                    <button class="btn btn-warning" onclick="replExecute('CLEAR')" style="width:100%;">Clear All</button>
+                <div id="sidebarHistoryContent" style="display:none;">
+                    <div class="panel history-panel">
+                        <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>History</span>
+                            <button class="btn btn-primary" onclick="historyNewStory()" style="padding:0.2rem 0.6rem;font-size:0.75rem;">Another Story</button>
+                        </div>
+                        <div id="historyContent"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -416,6 +431,7 @@
     <script src="hp35.js"></script>
     <script src="abacus.js"></script>
     <script src="sliderule.js"></script>
+    <script src="history.js"></script>
     <script src="tutorial.js"></script>
     <script src="sliderule_tutorial.js"></script>
     <script src="app.js"></script>
