@@ -184,7 +184,7 @@ const MATH_HISTORY = {
         },
         {
             title: "Capability Security: Dennis and Van Horn (1966)",
-            body: "In 1966, Jack Dennis and Earl Van Horn published a paper at MIT describing a radical idea: instead of a central authority deciding who can access what (like a superuser), give each program unforgeable tokens called capabilities. If you hold the token, you can use the resource. If not, you can't even name it.<br><br>Every Golden Token in the Church Machine \u2014 the 32-bit values with Version, Index, Perms, and Type fields \u2014 is exactly what Dennis and Van Horn described. LOAD checks your token. CALL checks your token. No superuser, no bypass, no tricks.",
+            body: "In 1966, Jack Dennis and Earl Van Horn published a paper at MIT describing a radical idea: instead of a central authority deciding who can access what (like a superuser), give each program unforgeable tokens called capabilities. If you hold the token, you can use the resource. If not, you can't even name it.<br><br>Every Golden Token in the Church Machine \u2014 the 32-bit values with Version, Index, Perms, and Type fields \u2014 is exactly what Dennis and Van Horn described. LOAD checks your token. CALL checks your token. No superuser, no branded operating systems, no surveillance, no bypass, no tricks, no hacking, no malware, no bullying, no cyber crime, and no ransomware.",
             question: "Most computers today use access control lists (who is allowed) instead of capabilities (what token do you hold). Which feels safer to you? Why?",
             era: "MIT, 1966"
         },
