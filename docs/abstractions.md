@@ -8,7 +8,7 @@ Every abstraction in the Church Machine is a **security block** — a protected 
 - **Entry** — Via CALL (Inform E-GT). LAMBDA (X-GT) is a method/instruction within abstractions, not a separate security block.
 - **MTBF** — Mean Time Between Failures, measured by fault reports over time in the namespace. Every fault against a security block is counted. The MTBF ratio provides continuous reliability measurement.
 - **Method dispatch** — Symbolic dispatch (high-security), LAMBDA fast-path (performance), or compiled binary (fastest)
-- **Lump layout** — Code (method table + instructions) at offset 0, freespace in the middle, c-list (GT slots) at the end. Allocated as power-of-2 blocks (minimum 256 words).
+- **Lump layout** — Code (method table + instructions) at offset 0, freespace in the middle, c-list (GT slots) at the end. Allocated as power-of-2 blocks (minimum 32 words).
 
 There is no operating system. Every system service, hardware driver, and user-facing tool is a security block accessed through Golden Tokens. The same security model applies at every level — from boot firmware to social networking. A code object belongs to the DATA domain — it is data stored in memory, accessed via X permission. Code is never a Church-domain capability.
 
@@ -76,7 +76,7 @@ The Namespace controller and sole NS entry writer. Navana runs indefinitely — 
 - **Init**: Initialize all higher-layer abstractions and register them in the namespace
 - **Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
 - **Remove**: Revoke GT (increment version), free NS slot
-- **Abstraction.Add**: Process upload.json, allocate lump (power-of-2, minimum 256 words), write method table + code at offset 0, write c-list GTs at allocSize-clistCount, create NS entry with clistCount, forge Inform E-GT. Validates: codeSize + clistCount <= allocSize, clistCount <= 511, power-of-2 allocation, capability delegation rights.
+- **Abstraction.Add**: Process upload.json, allocate lump (power-of-2, minimum 32 words), write method table + code at offset 0, write c-list GTs at allocSize-clistCount, create NS entry with clistCount, forge Inform E-GT. Validates: codeSize + clistCount <= allocSize, clistCount <= 511, power-of-2 allocation, capability delegation rights.
 - **Abstraction.Update**: Re-carve lump or migrate to larger allocation
 - **Abstraction.Remove**: Revoke GT, free lump, clear NS slot
 - **Manage**: Abstraction lifecycle — creation, destruction, and reconfiguration
@@ -101,7 +101,7 @@ GT lifecycle management. Mint creates new Golden Tokens with permissions that ar
 
 **Methods**: Allocate, Free, Resize
 
-Memory allocation for DATA objects. Allocate rounds up to the next power-of-2 (minimum 256 words) and returns the location and actual allocated size. Free releases the region. Resize adjusts the allocation size. Memory does not manage the namespace table — that is Navana's responsibility.
+Memory allocation for DATA objects. Allocate rounds up to the next power-of-2 (minimum 32 words) and returns the location and actual allocated size. Free releases the region. Resize adjusts the allocation size. Memory does not manage the namespace table — that is Navana's responsibility.
 
 **Rationale**: Memory management is a system service, not an implicit runtime feature. Programs must hold a GT to the Memory abstraction to allocate storage. Power-of-2 allocation simplifies bounds checking and lump management. The separation between Memory (storage) and the NS table (namespace) keeps responsibilities clean — Memory knows about address space, Navana knows about namespace structure.
 

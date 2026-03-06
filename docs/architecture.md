@@ -213,7 +213,7 @@ CALL performs (single NS entry with clistCount):
 6. Clear B-bit on preserved CRs
 7. Set PC = 0
 
-CR7 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. This resolves R001. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at allocSize-clistCount. All lumps are allocated as power-of-2 blocks (minimum 256 words).
+CR7 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. This resolves R001. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at allocSize-clistCount. All lumps are allocated as power-of-2 blocks (minimum 32 words).
 
 RETURN restores:
 1. Pop saved CR6, CR7, PC from call stack
@@ -280,7 +280,7 @@ The one exception: boot writes Navana's own NS entry via mElevation (raw write).
 }
 ```
 
-Navana.Abstraction.Add validates: codeSize + clistCount <= allocSize, each capability target exists and creator holds sufficient permissions, clistCount <= 511, allocSize is power-of-2 (minimum 256 words). The method table is written at offset 0, code words follow, and c-list GTs are placed at allocSize-clistCount.
+Navana.Abstraction.Add validates: codeSize + clistCount <= allocSize, each capability target exists and creator holds sufficient permissions, clistCount <= 511, allocSize is power-of-2 (minimum 32 words). The method table is written at offset 0, code words follow, and c-list GTs are placed at allocSize-clistCount.
 
 ## CLOOMC++ Compiler
 

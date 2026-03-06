@@ -34,7 +34,7 @@ The web IDE features nine views (Math, Code, Tutorial, Dashboard, Namespace, Abs
 **Technical Implementations:**
 - **Abstraction Model:** A scale-free model where each of 45 abstractions across 9 layers functions as a security block with MTBF tracking.
 - **Security Model:** Based on 32-bit unforgeable Golden Tokens with specific permission bits (R, W, X, L, S, E) and a 7-step mLoad pipeline for robust capability handling. Domain purity ensures strict separation between capabilities (Church domain) and code/data (DATA domain).
-- **NS Entry and Lump Layout:** Defines the structure of Namespace entries and memory lumps for abstractions, detailing how code and c-lists are organized and accessed securely.
+- **NS Entry and Lump Layout:** Defines the structure of Namespace entries and memory lumps for abstractions. Lumps are power-of-2 allocated (minimum 32 words). Code at offset 0, c-list at allocSize-clistCount, freespace between.
 - **CLOOMC++ Compiler:** A multi-language compiler targeting the 20-instruction Church Machine instruction set. It supports English, JavaScript, Haskell, and Symbolic Math (Ada Lovelace's notation) front-ends. The compiler auto-detects language from source syntax and outputs in a JSON format for abstraction deployment.
 - **Navana Master Controller:** Acts as the sole writer for Namespace entries, managing abstraction creation, allocation, and secure deployment by validating uploads and enforcing security constraints.
 - **Instruction Set:** Comprises 20 instructions, evenly split between Church (capability-focused) and Turing (data manipulation) sets, all supporting ARM-style conditional execution.

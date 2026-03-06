@@ -449,7 +449,7 @@ class ChurchREPL {
         const methodTableSize = result.methods.length;
         const codeSize = methodTableSize + totalCodeWords;
         const neededSize = codeSize + clistCount;
-        const allocSize = Math.max(256, Math.pow(2, Math.ceil(Math.log2(Math.max(neededSize, 1)))));
+        const allocSize = Math.max(32, Math.pow(2, Math.ceil(Math.log2(Math.max(neededSize, 1)))));
 
         output += `\n  Lump: ${codeSize} code + ${clistCount} c-list = ${neededSize} words`;
         output += ` (alloc ${allocSize})\n`;

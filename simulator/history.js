@@ -242,7 +242,7 @@ const CODE_EXAMPLE_STORIES = {
     },
     'memory': {
         title: "Memory Management \u2014 No Malloc, No Free, No Bugs",
-        body: "On a von Neumann machine, memory allocation is the source of countless security holes: buffer overflows, use-after-free, double-free. The Church Machine's Memory abstraction (NS[8]) handles allocation through capability-controlled methods.<br><br>Allocate asks for a size, rounds up to a power of 2 (minimum 256 bytes), and returns a bounded region. The Golden Token for that region encodes exact bounds \u2014 you physically cannot read or write outside them.",
+        body: "On a von Neumann machine, memory allocation is the source of countless security holes: buffer overflows, use-after-free, double-free. The Church Machine's Memory abstraction (NS[8]) handles allocation through capability-controlled methods.<br><br>Allocate asks for a size, rounds up to a power of 2 (minimum 32 words), and returns a bounded region. The Golden Token for that region encodes exact bounds \u2014 you physically cannot read or write outside them.",
         question: "Why does the Church Machine round allocations up to powers of 2? What advantage does that give the hardware?",
         era: "System Design"
     },

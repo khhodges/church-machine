@@ -90,7 +90,7 @@ The permissions are not copied from the source GT. They are not read from the NS
 
 ### T003: Power-of-2 Memory Allocation
 
-**Problem:** Lump sizes must be powers of 2 (minimum 256 words) so that memory allocation is simple, fragmentation is bounded, and address arithmetic uses shifts instead of division.
+**Problem:** Lump sizes must be powers of 2 (minimum 32 words) so that memory allocation is simple, fragmentation is bounded, and address arithmetic uses shifts instead of division.
 
 **Solution:** Already implemented in `simulator/system_abstractions.js`. The `nextPow2` function at line 1 computes the next power of 2 greater than or equal to the input. Memory.Allocate and Navana.Abstraction.Add both use it.
 
@@ -233,7 +233,7 @@ Each entry includes compiled code words, capability lists, and grant specificati
 
 - **Bounds check:** codeSize + clistCount must not exceed allocSize
 - **clistCount limit:** maximum 511 (9-bit field)
-- **Power-of-2 allocation:** allocSize must be a power of 2, minimum 256
+- **Power-of-2 allocation:** allocSize must be a power of 2, minimum 32
 - **Capability delegation:** every capability in the upload's c-list must be a valid delegation from the caller's own capabilities — you cannot grant what you do not hold
 - **Integer overflow:** all size calculations use unsigned 32-bit arithmetic with overflow checks
 

@@ -4130,7 +4130,7 @@ function showCreateNamespace() {
     }
     document.getElementById('createNSName').value = '';
     document.getElementById('createNSGTType').value = '1';
-    document.getElementById('createNSAllocSize').value = '256';
+    document.getElementById('createNSAllocSize').value = '32';
     document.getElementById('createNSClistCount').value = '0';
     document.getElementById('createNSDialog').style.display = '';
     document.getElementById('createNSName').focus();
@@ -4143,7 +4143,7 @@ function confirmCreateNamespace() {
         return;
     }
     const gtType = parseInt(document.getElementById('createNSGTType').value) || 1;
-    const allocSize = parseInt(document.getElementById('createNSAllocSize').value) || 256;
+    const allocSize = parseInt(document.getElementById('createNSAllocSize').value) || 32;
     const clistCount = Math.min(511, Math.max(0, parseInt(document.getElementById('createNSClistCount').value) || 0));
 
     if (clistCount >= allocSize) {
@@ -5732,7 +5732,7 @@ function compileDraft() {
     const methodTableSize = result.methods.length;
     const codeSize = methodTableSize + totalCodeWords;
     const neededSize = codeSize + clistCount;
-    const allocSize = Math.max(256, nextPow2(neededSize));
+    const allocSize = Math.max(32, nextPow2(neededSize));
     const clistStart = allocSize - clistCount;
     const freespace = allocSize - codeSize - clistCount;
 

@@ -225,7 +225,7 @@ class SystemAbstractions {
             const codeSize = methodTableSize + totalCodeWords;
 
             const neededSize = codeSize + clistCount;
-            const allocSize = Math.max(256, nextPow2(neededSize));
+            const allocSize = Math.max(32, nextPow2(neededSize));
 
             if (codeSize + clistCount > allocSize) {
                 return { ok: false, fault: 'OVERFLOW', message: `Navana.Abstraction.Add: code(${codeSize}) + clist(${clistCount}) > allocSize(${allocSize})` };
@@ -436,7 +436,7 @@ class SystemAbstractions {
 
         this.registry.bindMethod(7, 'Allocate', function(sim, args) {
             const requested = args.size || 16;
-            const size = Math.max(256, nextPow2(requested));
+            const size = Math.max(32, nextPow2(requested));
 
             const location = memState.nextFreeAddr;
             if (location + size > sim.NS_TABLE_BASE) {
