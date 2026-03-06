@@ -4282,7 +4282,7 @@ function showWelcomePopup() {
         `a message that travels through the Family security block, verified by Golden Tokens at every step.</p>` +
         `<p style="font-size:0.85rem;line-height:1.55;margin:0;">` +
         `No one else can send that message. No one else can intercept it. It works because Mum is not just a name &mdash; ` +
-        `she is a <strong>Golden Token</strong>, unforgeable and unique. That is what Church's mathematics gives us: ` +
+        `she is a <strong>Golden Token</strong>, alive, in charge, unforgeable and unique. That is what Church's mathematics gives us: ` +
         `a computer where "Hello Mum" (unlike Hello World from 1972) actually means something safe.</p>` +
         `</div>` +
 
