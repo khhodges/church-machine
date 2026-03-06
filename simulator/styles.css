@@ -426,10 +426,27 @@ header h1 {
 .info-value { color: var(--text-primary); font-family: 'Courier New', monospace; }
 
 .editor-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    display: flex;
     height: 100%;
+}
+
+.editor-layout > .editor-panel {
+    flex: 1;
+    min-width: 0;
+}
+
+.editor-divider {
+    width: 6px;
+    cursor: col-resize;
+    background: var(--border);
+    border-radius: 3px;
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+.editor-divider:hover,
+.editor-divider.dragging {
+    background: var(--church-gold);
 }
 
 .editor-panel {
@@ -2702,8 +2719,12 @@ header h1 {
     }
 
     .editor-layout {
-        grid-template-columns: 1fr;
+        flex-direction: column;
         height: auto;
+    }
+
+    .editor-divider {
+        display: none;
     }
 
     .repl-layout {

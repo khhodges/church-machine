@@ -38,6 +38,7 @@ function init() {
 
     loadEditorState();
     initReplDivider();
+    initEditorDivider();
     const asmEd = document.getElementById('asmEditor');
     if (asmEd) {
         asmEd.addEventListener('input', updateLineNumbers);
@@ -6038,6 +6039,68 @@ function renderMarkdown(md) {
         }
     }
     return result.join('\n');
+}
+
+function initEditorDivider() {
+    const divider = document.getElementById('editorDivider');
+    if (!divider) return;
+    const layout = divider.parentElement;
+    const panels = layout.querySelectorAll('.editor-panel');
+    if (panels.length < 2) return;
+    const leftPanel = panels[0];
+    const rightPanel = panels[1];
+    let dragging = false;
+
+    divider.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        dragging = true;
+        divider.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        const rect = layout.getBoundingClientRect();
+        const leftPct = Math.max(15, Math.min(85, ((e.clientX - rect.left) / rect.width) * 100));
+        const rightPct = 100 - leftPct;
+        leftPanel.style.flex = 'none';
+        leftPanel.style.width = leftPct + '%';
+        rightPanel.style.flex = 'none';
+        rightPanel.style.width = rightPct + '%';
+    });
+
+    document.addEventListener('mouseup', function() {
+        if (!dragging) return;
+        dragging = false;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    });
+
+    divider.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        dragging = true;
+        divider.classList.add('dragging');
+    }, { passive: false });
+
+    document.addEventListener('touchmove', function(e) {
+        if (!dragging) return;
+        const touch = e.touches[0];
+        const rect = layout.getBoundingClientRect();
+        const leftPct = Math.max(15, Math.min(85, ((touch.clientX - rect.left) / rect.width) * 100));
+        const rightPct = 100 - leftPct;
+        leftPanel.style.flex = 'none';
+        leftPanel.style.width = leftPct + '%';
+        rightPanel.style.flex = 'none';
+        rightPanel.style.width = rightPct + '%';
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+        if (!dragging) return;
+        dragging = false;
+        divider.classList.remove('dragging');
+    });
 }
 
 function initReplDivider() {
