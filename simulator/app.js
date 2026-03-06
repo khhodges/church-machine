@@ -6323,6 +6323,25 @@ function buildDocBlock(result, source) {
     };
 }
 
+async function exportSimulatorToGitHub() {
+    const btn = document.getElementById('dashTab-export');
+    if (btn) btn.textContent = 'Pushing...';
+    try {
+        const r = await fetch('/api/github/export-simulator', { method: 'POST' });
+        const data = await r.json();
+        if (data.ok) {
+            alert(`Exported ${data.total} files to GitHub.\n\nPushed:\n${data.pushed.join('\n')}`);
+        } else {
+            const msg = data.errors ? data.errors.join('\n') : (data.error || 'Unknown error');
+            alert(`Export had issues:\n\nPushed: ${data.pushed ? data.pushed.length : 0}\nErrors:\n${msg}`);
+        }
+    } catch (e) {
+        alert('Export failed: ' + e.message);
+    } finally {
+        if (btn) btn.textContent = 'Push to GitHub';
+    }
+}
+
 let libraryCache = null;
 let libraryAllItems = [];
 

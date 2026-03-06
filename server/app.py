@@ -265,6 +265,66 @@ def library_publish():
 
     return jsonify({"ok": True, "path": json_path, "message": f"Published {name} to {GITHUB_LIBRARY_REPO}"})
 
+@app.route("/api/github/export-simulator", methods=["POST"])
+def export_simulator():
+    if not GITHUB_TOKEN or not GITHUB_LIBRARY_REPO:
+        return jsonify({"error": "GitHub not configured"}), 400
+    sim_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "simulator")
+    if not os.path.isdir(sim_dir):
+        return jsonify({"error": "simulator/ directory not found"}), 500
+    export_extensions = {'.js', '.html', '.css', '.svg', '.json', '.cloomc'}
+    results = []
+    errors = []
+    sim_readme = """# CLOOMC Simulator — Web-Based IDE
+
+The Church Machine educational IDE. Open `index.html` in any modern browser to run.
+
+## Quick Start
+
+```bash
+git clone https://github.com/khhodges/cloomc-project.git
+cd cloomc-project/simulator
+# Open index.html in your browser — no build step required
+```
+
+## What's Included
+
+- **IDE** with nine views: Math, Code, Tutorial, Dashboard, Namespace, Abstractions, Pipeline, Reference, Docs
+- **CLOOMC++ Compiler** — English, JavaScript, Haskell, Symbolic Math (Ada), Assembly
+- **Interactive Math Tools** — HP-35 calculator, soroban abacus, logarithmic slide rule
+- **Math Challenge** — Grade-adaptive problems with dual Turing/Church explanations
+- **WebSerial** — Deploy to Tang Nano 20K FPGA directly from the browser
+
+## License
+
+Free and open source under GPL-3.0 for all educational and personal use.
+See [LICENSE](../LICENSE) for details.
+"""
+    result, err = github_push_file(GITHUB_LIBRARY_REPO, "simulator/README.md", sim_readme, "Update simulator README")
+    if err:
+        errors.append(f"simulator/README.md: {err}")
+    else:
+        results.append("simulator/README.md")
+    for dirpath, dirnames, filenames in os.walk(sim_dir):
+        for fname in sorted(filenames):
+            ext = os.path.splitext(fname)[1].lower()
+            if ext not in export_extensions:
+                continue
+            fpath = os.path.join(dirpath, fname)
+            rel = os.path.relpath(fpath, sim_dir)
+            gh_path = f"simulator/{rel}"
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                res, err = github_push_file(GITHUB_LIBRARY_REPO, gh_path, content, f"Export {rel}")
+                if err:
+                    errors.append(f"{gh_path}: {err}")
+                else:
+                    results.append(gh_path)
+            except Exception as e:
+                errors.append(f"{gh_path}: {str(e)}")
+    return jsonify({"ok": len(errors) == 0, "pushed": results, "errors": errors, "total": len(results)})
+
 with app.app_context():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
