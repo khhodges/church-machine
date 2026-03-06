@@ -170,15 +170,21 @@
     <div id="repl" class="view">
         <div class="repl-layout">
             <div class="repl-panel">
-                <div class="panel-title">Church Machine Math</div>
-                <div id="replOutput">
-                    <div class="repl-info" id="replWelcomeMsg"></div>
+                <div class="math-mode-tabs">
+                    <button class="math-mode-tab active" id="mathTabInteractive" onclick="switchMathMode('interactive')">Interactive Math</button>
+                    <button class="math-mode-tab" id="mathTabHP35" onclick="switchMathMode('hp35')">HP-35</button>
                 </div>
-                <div class="repl-input-bar">
-                    <span class="repl-prompt">&#955;&gt;</span>
-                    <input type="text" id="replInput" placeholder="let x = 2 + 3" onkeydown="replKeydown(event)">
-                    <button class="btn btn-primary" onclick="replExecute()">Enter</button>
+                <div id="interactiveMathContent">
+                    <div id="replOutput">
+                        <div class="repl-info" id="replWelcomeMsg"></div>
+                    </div>
+                    <div class="repl-input-bar">
+                        <span class="repl-prompt">&#955;&gt;</span>
+                        <input type="text" id="replInput" placeholder="let x = 2 + 3" onkeydown="replKeydown(event)">
+                        <button class="btn btn-primary" onclick="replExecute()">Enter</button>
+                    </div>
                 </div>
+                <div id="hp35Container" style="display:none;"></div>
             </div>
             <div class="repl-divider" id="replDivider"></div>
             <div class="repl-sidebar">
@@ -403,6 +409,7 @@
     <script src="assembler.js"></script>
     <script src="pipeline.js"></script>
     <script src="repl.js"></script>
+    <script src="hp35.js"></script>
     <script src="tutorial.js"></script>
     <script src="sliderule_tutorial.js"></script>
     <script src="app.js"></script>

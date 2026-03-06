@@ -3743,6 +3743,28 @@ function replExecute(cmdOverride) {
     output.scrollTop = output.scrollHeight;
 }
 
+function switchMathMode(mode) {
+    const interactiveContent = document.getElementById('interactiveMathContent');
+    const hp35Container = document.getElementById('hp35Container');
+    const tabInteractive = document.getElementById('mathTabInteractive');
+    const tabHP35 = document.getElementById('mathTabHP35');
+
+    if (mode === 'hp35') {
+        if (interactiveContent) interactiveContent.style.display = 'none';
+        if (hp35Container) {
+            hp35Container.style.display = 'block';
+            if (!hp35State.rendered) renderHP35Calculator();
+        }
+        if (tabInteractive) tabInteractive.classList.remove('active');
+        if (tabHP35) tabHP35.classList.add('active');
+    } else {
+        if (interactiveContent) interactiveContent.style.display = 'flex';
+        if (hp35Container) hp35Container.style.display = 'none';
+        if (tabInteractive) tabInteractive.classList.add('active');
+        if (tabHP35) tabHP35.classList.remove('active');
+    }
+}
+
 function replKeydown(event) {
     if (event.key === 'Enter') {
         event.preventDefault();
