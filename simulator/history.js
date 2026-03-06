@@ -1,6 +1,12 @@
 const MATH_HISTORY = {
     interactive: [
         {
+            title: "Computing B\u2087: Ada's Proof That Machines Can Think (1843)",
+            body: "B\u2087 is the 7th Bernoulli number, and it equals \u22121/30. Bernoulli numbers appear whenever you sum powers of integers \u2014 they are the coefficients in the formula for 1\u00b2 + 2\u00b2 + 3\u00b2 + \u2026 + n\u00b2 and higher powers. Ada Lovelace chose B\u2087 as the target for her program because it was complex enough to need loops, memory, and conditional logic, but simple enough to verify by hand.<br><br>Her algorithm used variables V1 through V15, each holding one intermediate result \u2014 exactly like typing <code>let V4 = V2 * V3</code> in Interactive Math. The program multiplied, divided, added and subtracted step by step, looping to accumulate the answer. If the final variable held \u22121/30, the program worked. If not, there was a bug.<br><br>Ada's original actually did have a small error \u2014 making the first computer program also the first program with a bug. The Church Machine's Symbolic Math compiler uses her exact notation so you can run Note G yourself and watch B\u2087 = \u22121/30 appear, just as she intended 180 years ago.",
+            question: "Ada proved a machine could compute B\u2087 automatically. But she also wrote: 'The Engine has no pretensions to originate anything.' Do you agree \u2014 can a machine only do what it is told, or can it surprise us?",
+            era: "Victorian England, 1843"
+        },
+        {
             title: "Ada Lovelace and the First Program (1843)",
             body: "In 1843, Ada Lovelace wrote what is considered the first computer program \u2014 an algorithm to compute Bernoulli numbers on Charles Babbage's Analytical Engine. She used a notation strikingly similar to what you just typed: variables V1, V2, V3... with one operation per line. She saw that the Engine could manipulate symbols, not just numbers \u2014 making her the first person to imagine general-purpose computing. The Church Machine's Interactive Math directly descends from her notation.",
             question: "Ada called the Engine 'weaving algebraic patterns just as the Jacquard loom weaves flowers and leaves.' What did she mean by that?",
