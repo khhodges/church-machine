@@ -2396,6 +2396,7 @@ CALL   CR1              ; GC.Flip:
 }
 
 function assembleAndLoad() {
+    switchCodeTab('console');
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
     const source = editor.value;
@@ -5581,6 +5582,7 @@ function onLangChange(restoring) {
 }
 
 function smartCompile() {
+    switchCodeTab('console');
     const sel = document.getElementById('langSelector');
     const lang = sel ? sel.value : 'assembly';
     if (lang === 'assembly') {
