@@ -3282,6 +3282,7 @@ HALT
         });
         const sel = document.getElementById('langSelector');
         if (sel) sel.value = 'assembly';
+        if (typeof historySetCodeExample === 'function') historySetCodeExample(name);
     }
 }
 
@@ -5826,6 +5827,8 @@ function loadCLOOMCExample(name) {
         const isSymbolic = ['ada_note_g'].includes(name);
         sel.value = isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
     }
+
+    if (typeof historySetCodeExample === 'function') historySetCodeExample(name);
 }
 
 function saveUploadJSON() {

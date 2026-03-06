@@ -221,7 +221,113 @@ const MATH_HISTORY = {
     ]
 };
 
+const CODE_EXAMPLE_STORIES = {
+    'ada_note_g': {
+        title: "Ada's Note G \u2014 The First Program (1843)",
+        body: "You're looking at the first computer program ever written. Ada Lovelace designed this algorithm to compute B\u2087, the 7th Bernoulli number (\u22121/30), for Babbage's Analytical Engine \u2014 a machine that was never built.<br><br>Her variables V1\u2013V15 map directly to the Church Machine's data registers DR1\u2013DR15. Each line is one operation: <code>let V4 = V2 * V3</code> means multiply V2 by V3, store in V4. The program loops, accumulating terms until the answer appears.<br><br>Click <strong>Assemble</strong> to compile it, then use <strong>Step</strong> to watch each instruction execute. The Console Output tab shows the compiled code words. The result should be \u22121/30.",
+        question: "Ada's original had a small bug. Can you spot anything that looks wrong in the code? What would happen if a loop counter started at the wrong value?",
+        era: "Victorian England, 1843"
+    },
+    'hello': {
+        title: "Hello World \u2014 The Simplest Abstraction",
+        body: "Every programmer's first program says hello. This one creates an abstraction called Hello with a single method: Greet. It takes a value, adds 1, and returns the result.<br><br>In Church Machine terms, this is a complete security block: it gets its own namespace entry, its own Golden Token, and its own sealed code region (CR7). Even this tiny program is protected by capability security.<br><br>Click <strong>Assemble</strong> to compile, then switch to the Console Output tab to see the generated code words.",
+        question: "This abstraction only has one method. What would happen if you tried to call a method that doesn't exist?",
+        era: "The Beginning"
+    },
+    'memory': {
+        title: "Memory Management \u2014 No Malloc, No Free, No Bugs",
+        body: "On a von Neumann machine, memory allocation is the source of countless security holes: buffer overflows, use-after-free, double-free. The Church Machine's Memory abstraction (NS[8]) handles allocation through capability-controlled methods.<br><br>Allocate asks for a size, rounds up to a power of 2 (minimum 256 bytes), and returns a bounded region. The Golden Token for that region encodes exact bounds \u2014 you physically cannot read or write outside them.",
+        question: "Why does the Church Machine round allocations up to powers of 2? What advantage does that give the hardware?",
+        era: "System Design"
+    },
+    'counter': {
+        title: "Counter \u2014 Two Methods, One Abstraction",
+        body: "This Counter abstraction has two methods: Increment (add 1) and Add (add two values). In JavaScript syntax, it looks like a simple object \u2014 but the compiler turns it into a Church Machine abstraction with a method table, code region, and c-list.<br><br>Each method compiles to a sequence of IADD instructions. The calling convention puts arguments in DR0\u2013DR3 and the return value in DR0.",
+        question: "The Counter has no internal state \u2014 it just computes and returns. How would you add persistent state that survives between calls?",
+        era: "Programming Fundamentals"
+    },
+    'church_math': {
+        title: "Church Numerals \u2014 Numbers as Functions (1936)",
+        body: "Alonzo Church showed that numbers don't need to be primitive \u2014 they can be built from pure functions. The number 3 is 'apply f three times': \u03bbf.\u03bbx.f(f(f(x))). Addition is composing applications. Multiplication is composing compositions.<br><br>This Haskell example compiles successor, add, multiply, predecessor, and isZero to Church Machine instructions. The <code>--</code> comments are Haskell-style. Click <strong>Assemble</strong> to see how abstract mathematics becomes concrete machine code.",
+        question: "If zero is \u03bbf.\u03bbx.x (apply f zero times), what is the predecessor of zero? Can you have negative Church numerals?",
+        era: "Princeton, 1936"
+    },
+    'church_pair': {
+        title: "Church Pairs \u2014 Data Structures from Nothing",
+        body: "A pair packs two values into one. Church showed this can be done with pure functions: PAIR = \u03bba.\u03bbb.\u03bbf.f(a)(b). To get the first element, pass a selector that picks the first argument.<br><br>The Church Machine implements pairs by packing two 16-bit values into one 32-bit word using BFINS and BFEXT (bit field insert/extract). The Haskell front-end compiles <code>fst</code> and <code>snd</code> into these bit operations.",
+        question: "If you can make pairs, you can make lists (a pair of value and rest-of-list). How would you build a list of three numbers using only pairs?",
+        era: "Lambda Calculus"
+    },
+    'church_case': {
+        title: "Pattern Matching \u2014 Case Expressions",
+        body: "Haskell's case expressions let you match a value against patterns: case n of 0 \u2192 1, _ \u2192 n * (n-1). The compiler turns each pattern into an MCMP (compare) followed by a conditional BRANCH.<br><br>This example implements factorial, classification, and absolute value. Each case arm becomes a compare-and-jump chain in the generated code \u2014 exactly how a hardware switch statement works.",
+        question: "The factorial case says 0 \u2192 1 and _ \u2192 n * (n-1). But n * (n-1) isn't recursive here. What would real recursion look like?",
+        era: "Functional Programming"
+    },
+    'church_lambda': {
+        title: "Lambda Expressions \u2014 Functions as Values",
+        body: "Lambda expressions are the core of Church's invention: anonymous functions that can be passed around, returned, and composed. The identity function \u03bbx.x just returns its argument. The constant function \u03bbx.\u03bby.x ignores the second argument.<br><br>The <code>let a = x + 1 in a + a</code> example shows let-binding: compute a value, name it, use it twice. The compiler allocates a register for 'a' and emits two references to it.",
+        question: "The constant function ignores its second argument. When would that be useful? Can you think of a real-world situation where you'd want to ignore information?",
+        era: "Lambda Calculus"
+    },
+    'perm_attack': {
+        title: "Permission Attack \u2014 Testing Security",
+        body: "This example deliberately tries to break the rules: it attempts operations that the Golden Token doesn't permit. On a von Neumann machine, these attacks often succeed because there's no hardware enforcement.<br><br>On the Church Machine, every LOAD checks permissions at pipeline step 5. If your token says X-only (execute), you cannot read or write. The attack triggers a FAULT, not a compromise. Try stepping through to see exactly where each attack fails.",
+        question: "If you were designing a security system, would you rather have attacks fail silently or trigger a visible alarm? Why?",
+        era: "Security Testing"
+    },
+    'bind_attack': {
+        title: "Bind Attack \u2014 The B-bit Defence",
+        body: "The bind attack tries to re-bind a Golden Token to point at a different memory region \u2014 essentially stealing someone else's data by redirecting your own token. The B (Bind) bit in the NS entry prevents this: once cleared by CALL, the binding is locked.<br><br>Step through this code and watch the FAULT trigger when the attacker tries to change the token's target. This is R001 in the security risk register.",
+        question: "Physical keys can be copied. Digital keys (Golden Tokens) cannot because of the version counter. Which is actually more secure?",
+        era: "Security Testing"
+    },
+    'salvation': {
+        title: "Salvation \u2014 The Boot Abstraction",
+        body: "Salvation (NS[4]) is the first abstraction that runs when the Church Machine starts. It sets up the initial namespace entries, creates the Navana controller, and then transfers control permanently \u2014 Navana runs forever, never returning.<br><br>This is like a rocket booster: it gets the system to altitude, then detaches. After Salvation hands off to Navana, it can never be called again. The boot sequence is: Boot \u2192 CALL Salvation \u2192 Salvation transitions to Navana \u2192 Navana runs forever.",
+        question: "Why would you design a boot process that destroys itself after running? What security advantage does that give?",
+        era: "System Architecture"
+    },
+    'gc_test': {
+        title: "Garbage Collection \u2014 Automated Memory Safety",
+        body: "The GC abstraction (NS[44]) reclaims memory that is no longer reachable. Unlike C's manual free() or Java's stop-the-world collector, the Church Machine's GC works within the capability system \u2014 it can only reclaim regions whose tokens have been revoked.<br><br>This test creates allocations, revokes their tokens, and verifies the GC reclaims them correctly. Step through to see the lifecycle.",
+        question: "Some languages (Rust) use compile-time ownership instead of garbage collection. What are the trade-offs between checking at compile time versus at runtime?",
+        era: "Memory Management"
+    },
+    'turing_test': {
+        title: "Turing ISA \u2014 The Body's Instructions",
+        body: "The Turing domain has 10 instructions for computation: DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR. These are 'the body' \u2014 they work with numbers, addresses, and registers. They can overflow, underflow, and loop forever.<br><br>This test exercises each Turing instruction. Step through and watch DR registers change in the state panel. Compare with Church domain instructions (LOAD, SAVE, CALL) that work with tokens and permissions instead.",
+        question: "Turing instructions can fail (overflow, divide by zero, infinite loops). Church instructions can FAULT (bad token, wrong permissions). What's the difference between a failure and a fault?",
+        era: "Instruction Architecture"
+    },
+    'sliderule': {
+        title: "SlideRule in JavaScript \u2014 Math Without Multiply",
+        body: "The Church Machine has no multiply or divide instruction. This SlideRule abstraction implements multiplication using shift-and-add (the same algorithm a child uses for long multiplication in binary), and division using repeated subtraction.<br><br>The Sqrt method uses Newton's method: guess, divide, average, repeat. All built from IADD, ISUB, SHL, and SHR. Click <strong>Assemble</strong>, then step through Mul to watch binary multiplication happen one bit at a time.",
+        question: "Early computers also lacked multiply instructions. The ENIAC (1945) multiplied by repeated addition. Why would a chip designer leave out multiply? What's the trade-off?",
+        era: "Algorithm Design"
+    },
+    'sliderule_hs': {
+        title: "SlideRule in Haskell \u2014 Same Machine, Different Mind",
+        body: "This is the same SlideRule abstraction, but written in Haskell instead of JavaScript. Both compile to exactly the same 20-instruction Church Machine code. That's the point of a universal target \u2014 the language you think in doesn't change what the hardware runs.<br><br>Compare this with the JS version (click 'JS: SlideRule'). The Haskell version is more concise: <code>method Add(a, b) = a + b</code> versus a block with explicit return. Different syntax, identical output.",
+        question: "If two languages compile to identical machine code, does the choice of language matter? What does each language make easier or harder to think about?",
+        era: "Universal Target"
+    }
+};
+
+const CODE_STEP_GUIDE = {
+    title: "How to Step Through Your Code",
+    body: "<strong>1. Write or load code</strong> \u2014 Type in the editor or click an example tab above (Hello, Memory, Ada: Note G, etc.).<br><br>" +
+        "<strong>2. Click Assemble</strong> \u2014 The compiler turns your source into 32-bit Church Machine code words. Switch to <strong>Console Output</strong> to see the compiled instructions and any errors.<br><br>" +
+        "<strong>3. Click Step</strong> (top right) \u2014 Executes one instruction at a time. Each step updates the registers, namespace, and pipeline state. Watch the Pipeline tab to see the 7-stage mLoad process.<br><br>" +
+        "<strong>4. Click Run</strong> \u2014 Executes all instructions until the program halts or faults. Results appear in Console Output.<br><br>" +
+        "<strong>5. Click Reset</strong> \u2014 Clears the machine state back to zero so you can run again.<br><br>" +
+        "<strong>Try it now:</strong> Load an example, click Assemble, switch to Console Output, then click Step repeatedly to watch each instruction execute. The gold text shows Church domain operations (capabilities, tokens), the blue text shows Turing domain operations (numbers, registers).",
+    question: "When you step through code, you see exactly what the machine does at each moment. Real processors execute billions of steps per second. What gets lost when things go that fast?",
+    era: "Learning Guide"
+};
+
 let historyCurrentTool = 'interactive';
+let historyCurrentCodeExample = null;
 let historyShownIndices = { interactive: [], hp35: [], abacus: [], sliderule: [], code: [] };
 
 function historyGetRandom(tool) {
@@ -274,7 +380,48 @@ function historyRefresh() {
 
 function historyRefreshCode() {
     const area = document.getElementById('codeHistoryContent');
-    if (area) historyRenderStory(area, 'code');
+    if (!area) return;
+
+    if (historyCurrentCodeExample && CODE_EXAMPLE_STORIES[historyCurrentCodeExample]) {
+        const story = CODE_EXAMPLE_STORIES[historyCurrentCodeExample];
+        area.innerHTML = `
+            <div class="history-story">
+                <div class="history-era">${story.era}</div>
+                <div class="history-title">${story.title}</div>
+                <div class="history-body">${story.body}</div>
+                <div class="history-question">
+                    <div class="history-question-label">Think about it</div>
+                    ${story.question}
+                </div>
+            </div>
+        `;
+    } else {
+        historyRenderStory(area, 'code');
+    }
+}
+
+function historySetCodeExample(name) {
+    historyCurrentCodeExample = name;
+    const panel = document.getElementById('codeHistoryPanel');
+    if (panel && panel.style.display !== 'none') {
+        historyRefreshCode();
+    }
+}
+
+function historyShowStepGuide() {
+    const area = document.getElementById('codeHistoryContent');
+    if (!area) return;
+    area.innerHTML = `
+        <div class="history-story">
+            <div class="history-era">${CODE_STEP_GUIDE.era}</div>
+            <div class="history-title">${CODE_STEP_GUIDE.title}</div>
+            <div class="history-body">${CODE_STEP_GUIDE.body}</div>
+            <div class="history-question">
+                <div class="history-question-label">Think about it</div>
+                ${CODE_STEP_GUIDE.question}
+            </div>
+        </div>
+    `;
 }
 
 function historyNewStory() {
