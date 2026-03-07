@@ -3978,7 +3978,7 @@ header h1 {
 
 .hp35-tile-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
     padding: 8px 0;
     align-items: start;
@@ -3998,13 +3998,33 @@ header h1 {
     padding: 0;
     display: flex;
     justify-content: center;
+    grid-column: 1;
+    grid-row: 1;
 }
 
-.hp35-tile-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-width: 0;
+.hp35-tile-stack {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.hp35-tile-trace {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.hp35-tile-guide {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+@media (max-width: 700px) {
+    .hp35-tile-grid {
+        grid-template-columns: 1fr;
+    }
+    .hp35-tile-calc, .hp35-tile-stack, .hp35-tile-trace, .hp35-tile-guide {
+        grid-column: 1;
+        grid-row: auto;
+    }
 }
 
 .hp35-tile-header {

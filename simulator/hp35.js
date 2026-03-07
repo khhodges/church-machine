@@ -324,26 +324,24 @@ function renderHP35Calculator() {
                     </div>
                 </div>
             </div>
-            <div class="hp35-tile-column">
-                <div class="hp35-tile hp35-tile-stack">
-                    <div class="hp35-tile-header">4-Register Stack</div>
-                    <div class="hp35-stack-display">
-                        <div class="hp35-stack-reg" data-reg="3"></div>
-                        <div class="hp35-stack-reg" data-reg="2"></div>
-                        <div class="hp35-stack-reg" data-reg="1"></div>
-                        <div class="hp35-stack-reg" data-reg="0"></div>
-                    </div>
-                    <div class="hp35-stack-diagram">
-                        <div class="hp35-stack-row"><span class="hp35-sreg">T</span> <span class="hp35-sdesc">Top \u2014 oldest value, falls off when full</span></div>
-                        <div class="hp35-stack-row"><span class="hp35-sreg">Z</span> <span class="hp35-sdesc">Third level \u2014 holds earlier numbers</span></div>
-                        <div class="hp35-stack-row"><span class="hp35-sreg">Y</span> <span class="hp35-sdesc">Second operand for +, \u2212, \u00d7, \u00f7</span></div>
-                        <div class="hp35-stack-row"><span class="hp35-sreg">X</span> <span class="hp35-sdesc">Display \u2014 what you see and type into</span></div>
-                    </div>
+            <div class="hp35-tile hp35-tile-stack">
+                <div class="hp35-tile-header">4-Register Stack</div>
+                <div class="hp35-stack-display">
+                    <div class="hp35-stack-reg" data-reg="3"></div>
+                    <div class="hp35-stack-reg" data-reg="2"></div>
+                    <div class="hp35-stack-reg" data-reg="1"></div>
+                    <div class="hp35-stack-reg" data-reg="0"></div>
                 </div>
-                <div class="hp35-tile hp35-tile-trace">
-                    <div class="hp35-tile-header">Lambda Calculus Trace</div>
-                    <div class="hp35-trace-area"></div>
+                <div class="hp35-stack-diagram">
+                    <div class="hp35-stack-row"><span class="hp35-sreg">T</span> <span class="hp35-sdesc">Top \u2014 oldest value, falls off when full</span></div>
+                    <div class="hp35-stack-row"><span class="hp35-sreg">Z</span> <span class="hp35-sdesc">Third level \u2014 holds earlier numbers</span></div>
+                    <div class="hp35-stack-row"><span class="hp35-sreg">Y</span> <span class="hp35-sdesc">Second operand for +, \u2212, \u00d7, \u00f7</span></div>
+                    <div class="hp35-stack-row"><span class="hp35-sreg">X</span> <span class="hp35-sdesc">Display \u2014 what you see and type into</span></div>
                 </div>
+            </div>
+            <div class="hp35-tile hp35-tile-trace">
+                <div class="hp35-tile-header">Lambda Calculus Trace</div>
+                <div class="hp35-trace-area"></div>
             </div>
             <div class="hp35-tile hp35-tile-guide">
                 <div class="hp35-tile-header">How to Use RPN</div>
