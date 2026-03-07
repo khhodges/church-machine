@@ -136,31 +136,91 @@ function renderAbacusCalculator() {
     }
 
     container.innerHTML = `
-    <div class="abacus-calc-wrapper">
-        <div class="abacus-frame">
-            <div class="abacus-title">
-                <span class="abacus-title-label">SOROBAN</span>
-                <span class="abacus-title-ns">NS[17] · Abacus</span>
-            </div>
-            <div class="abacus-readout">
-                <span class="abacus-readout-value">0</span>
-            </div>
-            <div class="abacus-rods-area">
-                ${rodsHTML}
-            </div>
-            <div class="abacus-controls">
-                <button class="abacus-btn" onclick="abacusClear()">Clear</button>
+    <div class="abacus-tile-grid">
+        <div class="abacus-tile abacus-tile-calc">
+            <div class="abacus-frame">
+                <div class="abacus-title">
+                    <span class="abacus-title-label">SOROBAN</span>
+                    <span class="abacus-title-ns">NS[17] \u00b7 Abacus</span>
+                </div>
+                <div class="abacus-readout">
+                    <span class="abacus-readout-value">0</span>
+                </div>
+                <div class="abacus-rods-area">
+                    ${rodsHTML}
+                </div>
+                <div class="abacus-controls">
+                    <button class="abacus-btn" onclick="abacusClear()">Clear</button>
+                </div>
             </div>
         </div>
 
-        <div class="abacus-stack-display">
-            <div class="abacus-stack-header">Place Values</div>
-            <div class="abacus-place-info">Each rod: 1 heaven bead (5) + 4 earth beads (1 each) = 0–9 per digit</div>
+        <div class="abacus-tile-column">
+            <div class="abacus-tile">
+                <div class="abacus-tile-header">Place Values</div>
+                <div class="abacus-place-info">Each rod: 1 heaven bead (5) + 4 earth beads (1 each) = 0\u20139 per digit</div>
+            </div>
+            <div class="abacus-tile abacus-tile-trace">
+                <div class="abacus-tile-header">Church Machine Trace</div>
+                <div class="abacus-trace-area"></div>
+            </div>
         </div>
 
-        <div class="abacus-trace-inline">
-            <div class="abacus-trace-header">Church Machine Trace</div>
-            <div class="abacus-trace-area"></div>
+        <div class="abacus-tile abacus-tile-abstraction">
+            <div class="abacus-tile-header">The Church Abstraction as a Digital Abacus</div>
+            <div class="abacus-abstraction-body">
+                <p>A Church Machine <strong>abstraction</strong> is like a digital abacus \u2014 a self-contained block with rods (methods) and beads (data) that only the owner can move.</p>
+                <div class="abacus-analogy-grid">
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Abacus Frame</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Abstraction (NS Entry)</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Rods</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Methods (code at offset 0)</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Beads</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Data (within the lump)</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Heaven Beads (5)</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Capabilities (c-list, Church domain)</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Earth Beads (1 each)</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Data words (Turing domain)</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Beam Bar</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Domain purity boundary</span>
+                    </div>
+                    <div class="abacus-analogy-row">
+                        <span class="abacus-analogy-abacus">Place Value (10\u207f)</span>
+                        <span class="abacus-analogy-arrow">\u2194</span>
+                        <span class="abacus-analogy-church">Abstraction layer (1\u20139)</span>
+                    </div>
+                </div>
+                <div class="abacus-abstraction-section">
+                    <div class="abacus-abstraction-title">Why It Matters</div>
+                    <p>On a soroban, each rod is independent \u2014 you can only change beads on the rod you\u2019re touching. In the Church Machine, each abstraction works the same way: you can only call its methods through a <strong>Golden Token</strong> with the right permissions. No token, no access.</p>
+                </div>
+                <div class="abacus-abstraction-section">
+                    <div class="abacus-abstraction-title">Structure of a Lump</div>
+                    <p class="abacus-lump-diagram"><span class="abacus-lump-code">[Code at offset 0]</span> <span class="abacus-lump-free">[Free space]</span> <span class="abacus-lump-clist">[C-list at end]</span></p>
+                    <p>Methods live at the start. The capability list (c-list) lives at the end. Free space grows between them \u2014 just like beads slide along rods.</p>
+                </div>
+                <div class="abacus-abstraction-section">
+                    <div class="abacus-abstraction-title">Functional Methods</div>
+                    <p>Each method is a pure function: give it inputs, get outputs. No side effects, no hidden state changes. Just as sliding a bead is a single, visible action \u2014 every method call is explicit and auditable through the trace below.</p>
+                </div>
+            </div>
         </div>
     </div>`;
 

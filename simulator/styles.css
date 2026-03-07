@@ -4222,12 +4222,51 @@ header h1 {
     overflow-y: auto;
 }
 
-.abacus-calc-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+.abacus-tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 12px;
     padding: 8px 0;
+    align-items: start;
+}
+
+.abacus-tile {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    min-width: 0;
+}
+
+.abacus-tile-calc {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.abacus-tile-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.abacus-tile-header {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--church-gold);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.abacus-tile-trace {
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .abacus-frame {
@@ -4398,18 +4437,6 @@ header h1 {
     background: linear-gradient(180deg, #a08060, #8B7355);
 }
 
-.abacus-stack-display {
-    width: 340px;
-}
-
-.abacus-stack-header {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--church-gold);
-    font-weight: 600;
-    margin-bottom: 4px;
-}
 
 .abacus-place-info {
     font-size: 0.68rem;
@@ -4420,26 +4447,6 @@ header h1 {
     padding: 8px 10px;
 }
 
-.abacus-trace-inline {
-    width: 340px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    max-height: 200px;
-    display: flex;
-    flex-direction: column;
-}
-
-.abacus-trace-header {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--church-gold);
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
 
 .abacus-trace-area {
     overflow-y: auto;
@@ -4468,6 +4475,90 @@ header h1 {
     font-size: 0.66rem;
     color: var(--text-secondary);
     margin-top: 1px;
+}
+
+.abacus-abstraction-body p {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.abacus-abstraction-body strong {
+    color: var(--text-primary);
+}
+
+.abacus-analogy-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 10px 0;
+}
+
+.abacus-analogy-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #1a1f2e;
+    border-radius: 4px;
+    font-size: 0.72rem;
+}
+
+.abacus-analogy-abacus {
+    flex: 1;
+    color: #8B7355;
+    font-weight: 600;
+    text-align: right;
+}
+
+.abacus-analogy-arrow {
+    color: var(--church-gold);
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.abacus-analogy-church {
+    flex: 1.5;
+    color: var(--text-secondary);
+}
+
+.abacus-abstraction-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}
+
+.abacus-abstraction-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--church-gold);
+    margin-bottom: 4px;
+}
+
+.abacus-lump-diagram {
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    background: #1a1f2e;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin: 6px 0;
+    display: flex;
+    gap: 4px;
+}
+
+.abacus-lump-code {
+    color: #4fc3f7;
+}
+
+.abacus-lump-free {
+    color: #666;
+    flex: 1;
+    text-align: center;
+}
+
+.abacus-lump-clist {
+    color: var(--church-gold);
 }
 
 .sliderule-calc-wrapper {
