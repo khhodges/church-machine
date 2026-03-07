@@ -137,31 +137,31 @@ function renderAbacusCalculator() {
 
     container.innerHTML = `
     <div class="abacus-tile-grid">
-        <div class="abacus-tile abacus-tile-calc">
-            <div class="abacus-frame">
-                <div class="abacus-title">
-                    <span class="abacus-title-label">SOROBAN</span>
-                    <span class="abacus-title-ns">NS[17] \u00b7 Abacus</span>
-                </div>
-                <div class="abacus-readout">
-                    <span class="abacus-readout-value">0</span>
-                </div>
-                <div class="abacus-rods-area">
-                    ${rodsHTML}
-                </div>
-                <div class="abacus-controls">
-                    <button class="abacus-btn" onclick="abacusClear()">Clear</button>
-                </div>
-                <div class="abacus-place-info">Each rod: 1 heaven bead (5) + 4 earth beads (1 each) = 0\u20139 per digit</div>
-            </div>
-        </div>
-
         <div class="abacus-tile-column">
+            <div class="abacus-tile abacus-tile-calc">
+                <div class="abacus-frame">
+                    <div class="abacus-title">
+                        <span class="abacus-title-label">SOROBAN</span>
+                        <span class="abacus-title-ns">NS[17] \u00b7 Abacus</span>
+                    </div>
+                    <div class="abacus-readout">
+                        <span class="abacus-readout-value">0</span>
+                    </div>
+                    <div class="abacus-rods-area">
+                        ${rodsHTML}
+                    </div>
+                    <div class="abacus-controls">
+                        <button class="abacus-btn" onclick="abacusClear()">Clear</button>
+                    </div>
+                    <div class="abacus-place-info">Each rod: 1 heaven bead (5) + 4 earth beads (1 each) = 0\u20139 per digit</div>
+                </div>
+            </div>
             <div class="abacus-tile abacus-tile-trace">
                 <div class="abacus-tile-header">Church Machine Trace</div>
                 <div class="abacus-trace-area"></div>
             </div>
         </div>
+
 
         <div class="abacus-tile abacus-tile-abstraction">
             <div class="abacus-tile-header">The Church Abstraction as a Digital Abacus</div>
