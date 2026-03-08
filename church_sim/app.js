@@ -85,33 +85,72 @@ function closePageViewer() {
 
 function renderPagesDirectory() {
     function card(href, name, tag, tagClass, desc) {
-        const escaped = href.replace(/'/g, "\\'");
-        const eName = name.replace(/'/g, "\\'");
-        return `<div onclick="openPageInFrame('${escaped}','${eName}')" style="cursor:pointer;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;color:#c9d1d9;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#58a6ff'" onmouseout="this.style.borderColor='#30363d'"><div style="font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;">${name} <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;${tagClass}">${tag}</span></div><div style="font-size:0.7rem;color:#8b949e;line-height:1.3;">${desc}</div></div>`;
+        const div = document.createElement('div');
+        div.style.cssText = 'cursor:pointer;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;color:#c9d1d9;transition:border-color 0.2s;';
+        div.addEventListener('click', () => openPageInFrame(href, name));
+        div.addEventListener('mouseover', () => { div.style.borderColor = '#58a6ff'; });
+        div.addEventListener('mouseout', () => { div.style.borderColor = '#30363d'; });
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;';
+        header.textContent = name + ' ';
+        const span = document.createElement('span');
+        span.style.cssText = 'font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;' + tagClass;
+        span.textContent = tag;
+        header.appendChild(span);
+        const body = document.createElement('div');
+        body.style.cssText = 'font-size:0.7rem;color:#8b949e;line-height:1.3;';
+        body.textContent = desc;
+        div.appendChild(header);
+        div.appendChild(body);
+        return div;
     }
     function navCard(href, name, tag, tagClass, desc) {
-        return `<div onclick="window.location.href='${href}'" style="cursor:pointer;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;color:#c9d1d9;transition:border-color 0.2s;" onmouseover="this.style.borderColor='#58a6ff'" onmouseout="this.style.borderColor='#30363d'"><div style="font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;">${name} <span style="font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;${tagClass}">${tag}</span></div><div style="font-size:0.7rem;color:#8b949e;line-height:1.3;">${desc}</div><div style="font-size:0.6rem;color:#484f58;margin-top:0.2rem;">Opens in full window</div></div>`;
+        const div = document.createElement('div');
+        div.style.cssText = 'cursor:pointer;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:0.7rem 0.9rem;color:#c9d1d9;transition:border-color 0.2s;';
+        div.addEventListener('click', () => { window.location.href = href; });
+        div.addEventListener('mouseover', () => { div.style.borderColor = '#58a6ff'; });
+        div.addEventListener('mouseout', () => { div.style.borderColor = '#30363d'; });
+        const header = document.createElement('div');
+        header.style.cssText = 'font-size:0.85rem;font-weight:600;color:#58a6ff;margin-bottom:0.2rem;';
+        header.textContent = name + ' ';
+        const span = document.createElement('span');
+        span.style.cssText = 'font-size:0.6rem;padding:0.1rem 0.35rem;border-radius:3px;' + tagClass;
+        span.textContent = tag;
+        header.appendChild(span);
+        const body = document.createElement('div');
+        body.style.cssText = 'font-size:0.7rem;color:#8b949e;line-height:1.3;';
+        body.textContent = desc;
+        const footer = document.createElement('div');
+        footer.style.cssText = 'font-size:0.6rem;color:#484f58;margin-top:0.2rem;';
+        footer.textContent = 'Opens in full window';
+        div.appendChild(header);
+        div.appendChild(body);
+        div.appendChild(footer);
+        return div;
+    }
+    function fill(containerId, ...items) {
+        document.getElementById(containerId).replaceChildren(...items);
     }
     const tc = 'background:#1a2a1a;border:1px solid #3fb950;color:#3fb950;';
     const ts = 'background:#1a1a2a;border:1px solid #58a6ff;color:#58a6ff;';
     const tr = 'background:#2a1a2a;border:1px solid #bc8cff;color:#bc8cff;';
     const td = 'background:#2a2a1a;border:1px solid #d4a843;color:#d4a843;';
     const tt = 'background:#2a1a1a;border:1px solid #f0883e;color:#f0883e;';
+    const tp = 'background:#2a1a2a;border:1px solid #da70d6;color:#da70d6;';
 
-    const el = id => document.getElementById(id);
-    el('pagesSimulators').innerHTML = [
+    fill('pagesSimulators',
         navCard('/', 'Home', 'landing', ts, 'Landing page with links to all simulators.'),
         navCard('/church/', 'Church Machine', 'Pure Church', tc, '10 opcodes, zero Turing instructions, REPL, pipeline, Bernoulli tutorial.'),
         navCard('/ctmm/', 'CTMM Simulator', 'Sim-64', ts, 'Custom ISA, 64-bit Golden Tokens, namespace browser, assembly editor.'),
         navCard('/rv32/', 'RV32-Cap Simulator', 'RISC-V', tr, 'RISC-V RV32I with capability security extensions, 32-bit GTs.'),
-    ].join('');
-    el('pagesReference').innerHTML = [
+    );
+    fill('pagesReference',
         card('/church/flowchart.html', 'Microcode Flowchart', 'Church', tc, 'All 20 instructions with memory bus annotations, TSB gates, GC cycle, fault catalog.'),
         navCard('/test/', 'Tunnel Test Harness', 'testing', tt, 'Side-by-side testing with automated messaging and real-time test logging.'),
-    ].join('');
-    el('pagesFigures').innerHTML = [
+    );
+    fill('pagesFigures',
         card('/figures/dual-gate-tsb', 'Fig 1: Dual-Gate TSB', 'figure', td, 'mLoad + mSave as the complete Trusted Security Base.'),
-        card('/figures/gt-format-type-field', 'Fig 2: GT Format &amp; Type', 'figure', td, 'Bit layout of all four GT types: Inform, Outform, NULL, Abstract (Sim-32 + Sim-64).'),
+        card('/figures/gt-format-type-field', 'Fig 2: GT Format & Type', 'figure', td, 'Bit layout of all four GT types: Inform, Outform, NULL, Abstract (Sim-32 + Sim-64).'),
         card('/figures/b-bit-propagation', 'Fig 3: B-bit Propagation', 'figure', td, 'B-bit flow: default B=0, CALL clears B, TPERM sets B=1, mSave enforces B=1.'),
         card('/figures/lambda-vs-call', 'Fig 4: LAMBDA vs CALL', 'figure', td, 'Side-by-side: LAMBDA ~3 cycles vs CALL 10+ cycles, with comparison table.'),
         card('/figures/machine-status-fast-path', 'Fig 5: Machine-Status Fast Path', 'figure', td, 'LAMBDA entry/return with zero stack access via machine-status registers.'),
@@ -121,11 +160,11 @@ function renderPagesDirectory() {
         card('/figures/vulnerability-elimination', 'Fig 9: Vulnerability Elimination', 'figure', td, '8 vulnerability classes eliminated by construction: absent hardware + dual-gate TSB.'),
         card('/figures/atomic-abstraction-architecture', 'Fig 10: 7 Zeroes Architecture', 'figure', td, 'Conventional vs CTMM: no OS, no VM, no rings, no root, no ACLs, no MMU, no ambient authority.'),
         card('/figures/safe-turing-abstractions', 'Fig 11: Safe Turing Abstractions', 'figure', td, 'Church armor wraps hidden Turing sword: CALL/RETURN interface, atomic execution, domain purity.'),
-        card('/figures/unified-address-space', 'Fig 12: Unified Address Space', 'figure', td, 'Memory (0x00-0xFD), devices (0xFE), registers (0xFF) &mdash; all gated by mLoad.'),
+        card('/figures/unified-address-space', 'Fig 12: Unified Address Space', 'figure', td, 'Memory (0x00-0xFD), devices (0xFE), registers (0xFF) \u2014 all gated by mLoad.'),
         card('/figures/network-transparency-fbit', 'Fig 13: Network Transparency', 'figure', td, 'F-bit routes to encrypted tunnel; GC version bump revokes atomically.'),
         card('/figures/three-dispatch-styles', 'Fig 14: Three Dispatch Styles', 'figure', td, 'Same CALL, three resolutions: symbolic resolver, LAMBDA fast-path, compiled binary.'),
-        card('/figures/five-phase-boot', 'Fig 15: Six-Phase Boot', 'figure', td, 'IDLE &#x2192; FAULT_RST &#x2192; LOAD_NS &#x2192; INIT_THRD &#x2192; INIT_CLIST &#x2192; LOAD_NUC &#x2192; COMPLETE.'),
-        card('/figures/church-numeral-dispatch', 'Fig 16: Church Numeral Dispatch', 'figure', td, 'DR0 &#x2192; SUCC/ZERO &#x2192; c-list index &#x2192; TPERM &#x2192; LAMBDA. Zero branches.'),
+        card('/figures/five-phase-boot', 'Fig 15: Six-Phase Boot', 'figure', td, 'IDLE \u2192 FAULT_RST \u2192 LOAD_NS \u2192 INIT_THRD \u2192 INIT_CLIST \u2192 LOAD_NUC \u2192 COMPLETE.'),
+        card('/figures/church-numeral-dispatch', 'Fig 16: Church Numeral Dispatch', 'figure', td, 'DR0 \u2192 SUCC/ZERO \u2192 c-list index \u2192 TPERM \u2192 LAMBDA. Zero branches.'),
         card('/figures/data-objects-bridge', 'Fig 17: DATA Objects Bridge', 'figure', td, 'Church GT provides access, Turing DREAD/DWRITE operates, mLoad validates R/W + bounds.'),
         card('/figures/lambda-nesting-sequence', 'Fig 18: LAMBDA Nesting', 'figure', td, 'Non-nestable LAMBDA with CALL-mediated nesting.'),
         card('/figures/lambda-calculus-mapping', 'Fig 19: Lambda Mapping', 'figure', td, 'Lambda calculus to CTMM hardware mapping.'),
@@ -137,15 +176,14 @@ function renderPagesDirectory() {
         card('/figures/mload-validation-pipeline', 'Fig 25: mLoad Pipeline', 'figure', td, 'Five sequential validation checks.'),
         card('/figures/mint-abstraction-nesting', 'Fig 26: Mint Abstraction', 'figure', td, 'Abstraction nesting and domain purity.'),
         card('/figures/hello-mum-tunnel', 'Fig 27: Hello Mum Tunnel', 'figure', td, 'Encrypted capability tunnel example.'),
-    ].join('');
-    const tp = 'background:#2a1a2a;border:1px solid #da70d6;color:#da70d6;';
-    el('pagesPatent').innerHTML = [
+    );
+    fill('pagesPatent',
         navCard('/docs/patent', 'Unified Patent Submission', 'patent', tp, 'Consolidated 28-claim patent: dual-gate TSB, B-bit propagation, LAMBDA, Pure Church, safe Turing abstractions.'),
-    ].join('');
-    el('pagesBusiness').innerHTML = [
+    );
+    fill('pagesBusiness',
         card('/docs/business/plan.html', 'Business Plan', 'business', tt, 'Church Machine business plan.'),
         card('/docs/business/deck.html', 'Investor Deck', 'business', tt, 'Church Machine investor presentation.'),
-    ].join('');
+    );
 }
 
 function switchDashTab(tabId) {
