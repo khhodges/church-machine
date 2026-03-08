@@ -327,8 +327,11 @@
                 <div class="intro-scroll-arrow hidden" id="welcomeScrollArrow"><span>&#x25BC;</span></div>
             </div>
             <div class="welcome-footer">
-                <button class="btn btn-primary" id="welcomeSetupBtn" onclick="welcomeSetup()">Set Up My Family</button>
-                <button class="btn btn-view" onclick="welcomeSkip()">Skip for Now</button>
+                <label class="popup-dismiss-check"><input type="checkbox" id="welcomeDontShow"> Don't show again</label>
+                <div>
+                    <button class="btn btn-primary" id="welcomeSetupBtn" onclick="welcomeSetup()">Set Up My Family</button>
+                    <button class="btn btn-view" onclick="welcomeSkip()">Skip for Now</button>
+                </div>
             </div>
         </div>
     </div>
@@ -339,7 +342,8 @@
                 <div class="modal-title">Mind and Body</div>
             </div>
             <div class="intro-body" id="mathGuideBody"></div>
-            <div style="text-align:center;padding:0.75rem;">
+            <div class="popup-footer-bar">
+                <label class="popup-dismiss-check"><input type="checkbox" id="mathGuideDontShow"> Don't show again</label>
                 <button class="btn btn-primary" onclick="dismissMathGuide()">Got it</button>
             </div>
         </div>
@@ -351,7 +355,8 @@
                 <div class="modal-title" id="toolGuideTitle"></div>
             </div>
             <div class="intro-body" id="toolGuideBody"></div>
-            <div style="text-align:center;padding:0.75rem;">
+            <div class="popup-footer-bar">
+                <label class="popup-dismiss-check"><input type="checkbox" id="toolGuideDontShow"> Don't show again</label>
                 <button class="btn btn-primary" onclick="dismissToolGuide()">Got it!</button>
             </div>
         </div>
@@ -399,7 +404,7 @@
                         <div id="subjectsGrid" class="subjects-grid"></div>
                     </div>
                     <div class="settings-section">
-                        <button class="btn btn-view" onclick="resetGuidePopups()" style="font-size:0.82rem;">Show Guides Again</button>
+                        <label class="popup-dismiss-check" style="cursor:pointer;"><input type="checkbox" id="showAllPopupsCheck" onchange="toggleShowAllPopups(this.checked)"> Show all popups</label>
                     </div>
                 </div>
                 <div class="settings-page-col">

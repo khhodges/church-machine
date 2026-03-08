@@ -3661,6 +3661,7 @@ function showChallengeExplanation(el, c) {
 }
 
 function showMathGuidePopup() {
+    if (localStorage.getItem('churchMachine_mathGuideDismissed_perm')) return;
     if (localStorage.getItem('churchMachine_mathGuideDismissed')) return;
     if (!localStorage.getItem('church_welcome_dismissed')) return;
 
@@ -3713,19 +3714,29 @@ function showMathGuidePopup() {
 }
 
 function dismissMathGuide() {
+    const dontShow = document.getElementById('mathGuideDontShow');
+    if (dontShow && dontShow.checked) {
+        localStorage.setItem('churchMachine_mathGuideDismissed_perm', '1');
+    }
     localStorage.setItem('churchMachine_mathGuideDismissed', '1');
     const modal = document.getElementById('mathGuideModal');
     if (modal) modal.style.display = 'none';
     showToolGuide('interactive');
 }
 
-function resetGuidePopups() {
+function resetAllPopups() {
     localStorage.removeItem('church_welcome_dismissed');
+    localStorage.removeItem('church_welcome_dismissed_perm');
     localStorage.removeItem('churchMachine_mathGuideDismissed');
+    localStorage.removeItem('churchMachine_mathGuideDismissed_perm');
     localStorage.removeItem('churchMachine_toolGuide_interactive');
+    localStorage.removeItem('churchMachine_toolGuide_interactive_perm');
     localStorage.removeItem('churchMachine_toolGuide_hp35');
+    localStorage.removeItem('churchMachine_toolGuide_hp35_perm');
     localStorage.removeItem('churchMachine_toolGuide_abacus');
+    localStorage.removeItem('churchMachine_toolGuide_abacus_perm');
     localStorage.removeItem('churchMachine_toolGuide_sliderule');
+    localStorage.removeItem('churchMachine_toolGuide_sliderule_perm');
     closeSettings();
     showWelcomePopup();
 }
@@ -3844,6 +3855,7 @@ let currentToolGuide = null;
 
 function showToolGuide(tool) {
     if (!TOOL_GUIDES[tool]) return;
+    if (localStorage.getItem('churchMachine_toolGuide_' + tool + '_perm')) return;
     if (localStorage.getItem('churchMachine_toolGuide_' + tool)) return;
     if (!localStorage.getItem('church_welcome_dismissed')) return;
     if (!localStorage.getItem('churchMachine_mathGuideDismissed')) return;
@@ -3863,6 +3875,10 @@ function showToolGuide(tool) {
 function dismissToolGuide() {
     if (currentToolGuide) {
         localStorage.setItem('churchMachine_toolGuide_' + currentToolGuide, '1');
+        const dontShow = document.getElementById('toolGuideDontShow');
+        if (dontShow && dontShow.checked) {
+            localStorage.setItem('churchMachine_toolGuide_' + currentToolGuide + '_perm', '1');
+        }
     }
     const modal = document.getElementById('toolGuideModal');
     if (modal) modal.style.display = 'none';
@@ -4660,7 +4676,43 @@ function openSettings() {
     document.getElementById('settingName').value = settings.name || '';
     renderFamilyMembers(settings.familyMembers || []);
     renderProgressReport();
+    const anyPerm = hasAnyPopupDismissedPerm();
+    const showAllCheck = document.getElementById('showAllPopupsCheck');
+    if (showAllCheck) showAllCheck.checked = !anyPerm;
     document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function hasAnyPopupDismissedPerm() {
+    const keys = [
+        'church_welcome_dismissed_perm',
+        'churchMachine_mathGuideDismissed_perm',
+        'churchMachine_toolGuide_interactive_perm',
+        'churchMachine_toolGuide_hp35_perm',
+        'churchMachine_toolGuide_abacus_perm',
+        'churchMachine_toolGuide_sliderule_perm'
+    ];
+    return keys.some(k => localStorage.getItem(k));
+}
+
+function toggleShowAllPopups(checked) {
+    if (checked) {
+        resetAllPopupsFlags();
+    }
+}
+
+function resetAllPopupsFlags() {
+    localStorage.removeItem('church_welcome_dismissed');
+    localStorage.removeItem('church_welcome_dismissed_perm');
+    localStorage.removeItem('churchMachine_mathGuideDismissed');
+    localStorage.removeItem('churchMachine_mathGuideDismissed_perm');
+    localStorage.removeItem('churchMachine_toolGuide_interactive');
+    localStorage.removeItem('churchMachine_toolGuide_interactive_perm');
+    localStorage.removeItem('churchMachine_toolGuide_hp35');
+    localStorage.removeItem('churchMachine_toolGuide_hp35_perm');
+    localStorage.removeItem('churchMachine_toolGuide_abacus');
+    localStorage.removeItem('churchMachine_toolGuide_abacus_perm');
+    localStorage.removeItem('churchMachine_toolGuide_sliderule');
+    localStorage.removeItem('churchMachine_toolGuide_sliderule_perm');
 }
 
 function closeSettings() {
@@ -4811,6 +4863,7 @@ function collectFamilyMembers() {
 }
 
 function isWelcomeNeeded() {
+    if (localStorage.getItem('church_welcome_dismissed_perm')) return false;
     const settings = getStudentSettings();
     const hasFamily = settings.familyMembers && settings.familyMembers.length > 0 &&
         settings.familyMembers.some(m => m.name && m.name.trim() !== '');
@@ -4906,6 +4959,10 @@ function showWelcomePopup() {
 }
 
 function closeWelcome() {
+    const dontShow = document.getElementById('welcomeDontShow');
+    if (dontShow && dontShow.checked) {
+        localStorage.setItem('church_welcome_dismissed_perm', '1');
+    }
     localStorage.setItem('church_welcome_dismissed', '1');
     const modal = document.getElementById('welcomeModal');
     if (modal) modal.style.display = 'none';
