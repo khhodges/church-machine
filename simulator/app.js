@@ -674,14 +674,14 @@ function renderMemoryDump(location, limit) {
             const pStr = permNames.filter((_, b) => perms & (1 << b)).join('') || '------';
             const tName = typeNames[gtType] || '?';
             const label = sim.nsLabels[index] || '';
-            decoded = `<span style="color:#4ec9b0;">${tName}</span> ` +
-                      `<span style="color:#d4a843;">${pStr}</span> ` +
-                      `\u2192 idx <span style="color:#569cd6;">${index}</span>` +
-                      (label ? ` <span style="color:#9cdcfe;">(${label})</span>` : '') +
+            decoded = `<span style="color:rgba(78,201,176,0.7);">${tName}</span> ` +
+                      `<span style="color:rgba(200,155,60,0.55);">${pStr}</span> ` +
+                      `\u2192 idx <span style="color:rgba(86,156,214,0.7);">${index}</span>` +
+                      (label ? ` <span style="color:rgba(156,220,254,0.6);">(${label})</span>` : '') +
                       ` v${ver}`;
         }
         const addrHex = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
-        html += `<tr><td style="color:#888;">+${i}</td><td>${addrHex}</td><td style="color:#ce9178;">${hex}</td><td>${decoded}</td></tr>`;
+        html += `<tr><td style="color:#666;">+${i}</td><td>${addrHex}</td><td style="color:rgba(206,145,120,0.6);">${hex}</td><td>${decoded}</td></tr>`;
     }
     html += '</tbody></table>';
     if (limit > 64) {

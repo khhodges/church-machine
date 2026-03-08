@@ -2702,27 +2702,27 @@ a.next-step-link:hover {
 }
 
 .ns-row-active {
-    background: rgba(78, 201, 176, 0.12) !important;
-    border-left: 3px solid var(--church-gold);
+    background: rgba(78, 201, 176, 0.08) !important;
+    border-left: 3px solid rgba(200, 155, 60, 0.4);
 }
 
 .ns-detail-row td {
     padding: 0 !important;
-    border-bottom: 2px solid var(--church-gold) !important;
+    border-bottom: 1px solid rgba(200, 155, 60, 0.25) !important;
 }
 
 .ns-detail-panel {
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.2);
     padding: 0.5rem 0.75rem;
     margin: 0;
 }
 
 .ns-detail-title {
     font-size: 0.75rem;
-    color: var(--church-gold);
+    color: rgba(200, 155, 60, 0.7);
     font-weight: 600;
     padding-bottom: 0.4rem;
-    border-bottom: 1px solid rgba(212, 168, 67, 0.3);
+    border-bottom: 1px solid rgba(212, 168, 67, 0.15);
     margin-bottom: 0.4rem;
     font-family: 'Courier New', monospace;
 }
