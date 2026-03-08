@@ -460,7 +460,7 @@ function renderSlideRuleCalculator() {
                     <div class="sliderule-readout">
                         <span class="sliderule-readout-value"></span>
                     </div>
-                    <svg class="sliderule-svg" width="${totalW}" height="110" viewBox="0 0 ${totalW} 110" preserveAspectRatio="xMidYMid meet"></svg>
+                    <svg class="sliderule-svg" width="100%" height="110" viewBox="0 0 ${totalW} 110" preserveAspectRatio="xMidYMid meet"></svg>
                     <div class="sliderule-instructions">Drag <span style="color:#33cc66;">green slide</span> to set value \u00b7 Drag <span style="color:#ff3333;">red cursor</span> to read</div>
                     <div class="sliderule-presets">
                         <span class="sliderule-preset-label">Try:</span>

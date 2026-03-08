@@ -4959,6 +4959,7 @@ a.next-step-link:hover {
     border-radius: 12px;
     padding: 16px 12px;
     width: 100%;
+    box-sizing: border-box;
     box-shadow: 0 6px 24px rgba(0,0,0,0.5);
 }
 
@@ -5002,6 +5003,7 @@ a.next-step-link:hover {
 .sliderule-svg {
     display: block;
     width: 100%;
+    height: auto;
     border-radius: 4px;
     margin-bottom: 8px;
 }
