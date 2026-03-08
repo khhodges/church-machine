@@ -377,57 +377,60 @@
         </div>
     </div>
 
-    <div id="settingsModal" class="modal-overlay" style="display:none;">
-        <div class="modal-dialog settings-dialog">
-            <div class="intro-header">
+    <div id="settingsModal" class="modal-overlay settings-fullpage" style="display:none;">
+        <div class="settings-page">
+            <div class="settings-page-header">
                 <div class="modal-title">Settings</div>
-                <button class="intro-close" onclick="closeSettings()">&times;</button>
-            </div>
-            <div class="settings-body">
-                <div class="settings-section">
-                    <div class="settings-section-title">Student Profile</div>
-                    <label class="settings-label">Name
-                        <input type="text" id="settingName" class="modal-input" placeholder="Your name">
-                    </label>
-                    <label class="settings-label">School
-                        <input type="text" id="settingSchool" class="modal-input" placeholder="School name">
-                    </label>
-                    <label class="settings-label">Grade Level
-                        <select id="settingGrade" class="modal-input" onchange="onGradeChange()">
-                            <option value="">-- Select --</option>
-                            <option value="K">Kindergarten</option>
-                            <option value="1">Grade 1</option>
-                            <option value="2">Grade 2</option>
-                            <option value="3">Grade 3</option>
-                            <option value="4">Grade 4</option>
-                            <option value="5">Grade 5</option>
-                            <option value="6">Grade 6</option>
-                            <option value="7">Grade 7</option>
-                            <option value="8">Grade 8</option>
-                            <option value="9">Grade 9</option>
-                            <option value="10">Grade 10</option>
-                            <option value="11">Grade 11</option>
-                            <option value="12">Grade 12</option>
-                            <option value="IB">IB (International Baccalaureate)</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">Family Members</div>
-                    <div id="familyMembersList"></div>
-                    <button class="btn-add-member" onclick="addFamilyMemberRow()">+ Add Family Member</button>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title">Progress Report</div>
-                    <div id="progressReport" class="progress-report"></div>
-                </div>
-                <div class="settings-section">
-                    <button class="btn btn-view" onclick="resetGuidePopups()" style="font-size:0.82rem;">Show Guides Again</button>
+                <div class="settings-page-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+                    <button class="btn btn-warning" onclick="closeSettings()">Cancel</button>
                 </div>
             </div>
-            <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="saveSettings()">Save</button>
-                <button class="btn btn-warning" onclick="closeSettings()">Cancel</button>
+            <div class="settings-page-grid">
+                <div class="settings-page-col">
+                    <div class="settings-section">
+                        <div class="settings-section-title">Student Profile</div>
+                        <label class="settings-label">Name
+                            <input type="text" id="settingName" class="modal-input" placeholder="Your name">
+                        </label>
+                        <label class="settings-label">School
+                            <input type="text" id="settingSchool" class="modal-input" placeholder="School name">
+                        </label>
+                        <label class="settings-label">Grade Level
+                            <select id="settingGrade" class="modal-input" onchange="onGradeChange()">
+                                <option value="">-- Select --</option>
+                                <option value="K">Kindergarten</option>
+                                <option value="1">Grade 1</option>
+                                <option value="2">Grade 2</option>
+                                <option value="3">Grade 3</option>
+                                <option value="4">Grade 4</option>
+                                <option value="5">Grade 5</option>
+                                <option value="6">Grade 6</option>
+                                <option value="7">Grade 7</option>
+                                <option value="8">Grade 8</option>
+                                <option value="9">Grade 9</option>
+                                <option value="10">Grade 10</option>
+                                <option value="11">Grade 11</option>
+                                <option value="12">Grade 12</option>
+                                <option value="IB">IB (International Baccalaureate)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">Progress Report</div>
+                        <div id="progressReport" class="progress-report"></div>
+                    </div>
+                    <div class="settings-section">
+                        <button class="btn btn-view" onclick="resetGuidePopups()" style="font-size:0.82rem;">Show Guides Again</button>
+                    </div>
+                </div>
+                <div class="settings-page-col">
+                    <div class="settings-section">
+                        <div class="settings-section-title">Family Members &amp; Golden Tokens</div>
+                        <div id="familyMembersList"></div>
+                        <button class="btn-add-member" onclick="addFamilyMemberRow()">+ Add Family Member</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
