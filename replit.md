@@ -21,7 +21,7 @@ The system is composed of hardware (Amaranth HDL for FPGA), a web IDE (HTML/JS/C
 
 **UI/UX Decisions:**
 The web IDE features nine views (Math, Code, Tutorial, Dashboard, Namespace, Abstractions, Pipeline, Reference, Docs) and incorporates interactive learning tools:
-- **Pure Math:** A calculator with a "Compile Session" feature for converting let-bindings to Church Machine code.
+- **Pure Math:** A calculator with a "Compile Session" feature for converting let-bindings to Church Machine code. Includes a symbol picker button (summation icon) on the input line that opens a categorized dropdown (Greek, Arithmetic, Sets, Logic, Calculus, Physics, Lambda) for inserting mathematical symbols at cursor position.
 - **HP-35 Calculator:** A pure lambda calculus implementation of the 1972 HP-35 scientific calculator, including RPN engine and Church numeral operation tracing.
 - **Abacus:** A soroban-style abacus with digital readout and Church Machine trace for operations.
 - **Slide Rule:** A logarithmic slide rule with draggable scales and trace of Church Machine operations.

@@ -4444,6 +4444,147 @@ function replKeydown(event) {
     }
 }
 
+var MATH_SYMBOLS = {
+    'Greek': [
+        ['\u03B1','alpha'], ['\u03B2','beta'], ['\u03B3','gamma'], ['\u03B4','delta'],
+        ['\u03B5','epsilon'], ['\u03B6','zeta'], ['\u03B7','eta'], ['\u03B8','theta'],
+        ['\u03B9','iota'], ['\u03BA','kappa'], ['\u03BB','lambda'], ['\u03BC','mu'],
+        ['\u03BD','nu'], ['\u03BE','xi'], ['\u03C0','pi'], ['\u03C1','rho'],
+        ['\u03C3','sigma'], ['\u03C4','tau'], ['\u03C6','phi'], ['\u03C7','chi'],
+        ['\u03C8','psi'], ['\u03C9','omega'],
+        ['\u0393','Gamma'], ['\u0394','Delta'], ['\u0398','Theta'], ['\u039B','Lambda'],
+        ['\u03A0','Pi'], ['\u03A3','Sigma'], ['\u03A6','Phi'], ['\u03A8','Psi'], ['\u03A9','Omega']
+    ],
+    'Arithmetic': [
+        ['\u00B1','plus-minus'], ['\u00D7','times'], ['\u00F7','divide'],
+        ['\u2212','minus'], ['\u22C5','dot product'], ['\u2219','bullet dot'],
+        ['\u221A','square root'], ['\u221B','cube root'], ['\u221C','fourth root'],
+        ['\u00B2','squared'], ['\u00B3','cubed'], ['\u207F','superscript n'],
+        ['\u2260','not equal'], ['\u2248','approx equal'], ['\u2261','identical'],
+        ['\u2264','less or equal'], ['\u2265','greater or equal'],
+        ['\u226A','much less'], ['\u226B','much greater'],
+        ['\u221E','infinity'], ['\u2030','per mille'], ['\u2031','per ten thousand']
+    ],
+    'Sets': [
+        ['\u2205','empty set'], ['\u2208','element of'], ['\u2209','not element of'],
+        ['\u220B','contains'], ['\u2282','subset'], ['\u2283','superset'],
+        ['\u2286','subset or equal'], ['\u2287','superset or equal'],
+        ['\u222A','union'], ['\u2229','intersection'], ['\u2216','set minus'],
+        ['\u2295','direct sum'], ['\u2297','tensor product'],
+        ['\u2115','naturals N'], ['\u2124','integers Z'], ['\u211A','rationals Q'],
+        ['\u211D','reals R'], ['\u2102','complex C'],
+        ['\u2200','for all'], ['\u2203','exists'], ['\u2204','not exists']
+    ],
+    'Logic': [
+        ['\u00AC','not'], ['\u2227','and'], ['\u2228','or'],
+        ['\u2295','xor'], ['\u21D2','implies'], ['\u21D4','iff'],
+        ['\u22A2','proves'], ['\u22A8','models'], ['\u22A4','true/top'],
+        ['\u22A5','false/bottom'],
+        ['\u25A1','necessity'], ['\u25C7','possibility'],
+        ['\u2234','therefore'], ['\u2235','because'],
+        ['\u22A3','does not prove']
+    ],
+    'Calculus': [
+        ['\u2202','partial derivative'], ['\u222B','integral'], ['\u222C','double integral'],
+        ['\u222D','triple integral'], ['\u222E','contour integral'],
+        ['\u2207','nabla/del'], ['\u2206','increment/Laplacian'],
+        ['\u2211','summation'], ['\u220F','product'],
+        ['\u2032','prime'], ['\u2033','double prime'],
+        ['\u1D45','dx'], ['\u2202','del'],
+        ['\u221D','proportional to'], ['\u2243','asymptotic'],
+        ['\u2A01','big oplus'], ['\u2A02','big otimes']
+    ],
+    'Physics': [
+        ['\u210F','h-bar'], ['\u212B','angstrom'],
+        ['\u2126','ohm'], ['\u00B5','micro'],
+        ['\u2220','angle'], ['\u22A5','perpendicular'], ['\u2225','parallel'],
+        ['\u2190','left arrow'], ['\u2192','right arrow'],
+        ['\u2194','left-right arrow'], ['\u21C0','harpoon right'],
+        ['\u2191','up arrow'], ['\u2193','down arrow'],
+        ['\u20D7','combining vector'], ['\u00B0','degree'],
+        ['\u2297','cross product'], ['\u2299','circled dot']
+    ],
+    'Lambda': [
+        ['\u03BB','lambda'], ['\u2192','arrow'], ['\u21A6','maps to'],
+        ['\u2218','compose'], ['\u2261','definitional equal'],
+        ['\u03B1','alpha (rename)'], ['\u03B2','beta (reduce)'],
+        ['\u03B7','eta (expand)'],
+        ['\u22A2','turnstile'], ['\u22A8','double turnstile'],
+        ['\u2200','forall'], ['\u2203','exists'],
+        ['\u27E8','left angle bracket'], ['\u27E9','right angle bracket'],
+        ['\u2983','left brace bar'], ['\u2984','right brace bar'],
+        ['\u22C6','star'], ['\u2022','bullet']
+    ]
+};
+
+var symbolPickerCat = 'Greek';
+
+function buildSymbolPicker() {
+    var dd = document.getElementById('symbolPickerDropdown');
+    if (!dd) return;
+
+    var catsHtml = '<div class="symbol-picker-cats">';
+    for (var cat in MATH_SYMBOLS) {
+        catsHtml += '<button class="symbol-cat-btn' + (cat === symbolPickerCat ? ' active' : '') + '" data-cat="' + cat + '">' + cat + '</button>';
+    }
+    catsHtml += '</div>';
+
+    var gridHtml = '<div class="symbol-grid">';
+    var syms = MATH_SYMBOLS[symbolPickerCat] || [];
+    for (var i = 0; i < syms.length; i++) {
+        gridHtml += '<button class="symbol-grid-btn" data-sym="' + syms[i][0] + '" title="' + syms[i][1] + '">' + syms[i][0] + '</button>';
+    }
+    gridHtml += '</div>';
+
+    dd.innerHTML = catsHtml + gridHtml;
+
+    dd.querySelectorAll('.symbol-cat-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            symbolPickerCat = btn.dataset.cat;
+            buildSymbolPicker();
+            dd.classList.add('open');
+        });
+    });
+
+    dd.querySelectorAll('.symbol-grid-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            insertSymbol(btn.dataset.sym);
+        });
+    });
+}
+
+function toggleSymbolPicker() {
+    var dd = document.getElementById('symbolPickerDropdown');
+    if (!dd) return;
+    if (dd.classList.contains('open')) {
+        dd.classList.remove('open');
+    } else {
+        buildSymbolPicker();
+        dd.classList.add('open');
+    }
+}
+
+function insertSymbol(sym) {
+    var input = document.getElementById('replInput');
+    if (!input) return;
+    var start = input.selectionStart || 0;
+    var end = input.selectionEnd || 0;
+    var val = input.value;
+    input.value = val.slice(0, start) + sym + val.slice(end);
+    input.focus();
+    var newPos = start + sym.length;
+    input.setSelectionRange(newPos, newPos);
+}
+
+document.addEventListener('click', function(e) {
+    var dd = document.getElementById('symbolPickerDropdown');
+    if (dd && !e.target.closest('.symbol-picker-wrap')) {
+        dd.classList.remove('open');
+    }
+});
+
 function loadBernoulliInREPL() {
     const output = document.getElementById('replOutput');
     if (!output) return;

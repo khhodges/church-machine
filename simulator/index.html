@@ -225,6 +225,10 @@
                     <div class="repl-input-bar">
                         <span class="repl-prompt">&#955;&gt;</span>
                         <input type="text" id="replInput" placeholder="let x = 2 + 3" onkeydown="replKeydown(event)">
+                        <div class="symbol-picker-wrap">
+                            <button class="btn symbol-picker-btn" onclick="toggleSymbolPicker()" title="Insert mathematical symbol">&#8721;</button>
+                            <div class="symbol-picker-dropdown" id="symbolPickerDropdown"></div>
+                        </div>
                         <button class="btn btn-primary" onclick="replExecute()">Enter</button>
                     </div>
                 </div>

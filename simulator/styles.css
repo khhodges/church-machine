@@ -1256,6 +1256,114 @@ a.next-step-link:hover {
 
 #replInput:focus { outline: 1px solid var(--accent); }
 
+.symbol-picker-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.symbol-picker-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--church-gold);
+    font-size: 1.1rem;
+    padding: 0.35rem 0.55rem;
+    cursor: pointer;
+    border-radius: 4px;
+    line-height: 1;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.symbol-picker-btn:hover {
+    border-color: var(--church-gold);
+    background: rgba(251,191,36,0.1);
+}
+
+.symbol-picker-dropdown {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 4px;
+    z-index: 300;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+    width: 320px;
+    max-height: 360px;
+    overflow: hidden;
+    display: none;
+}
+
+.symbol-picker-dropdown.open {
+    display: flex;
+    flex-direction: column;
+}
+
+.symbol-picker-cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.symbol-cat-btn {
+    padding: 0.25rem 0.5rem;
+    background: none;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+
+.symbol-cat-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.05);
+}
+
+.symbol-cat-btn.active {
+    color: var(--church-gold);
+    border-color: var(--church-gold);
+    background: rgba(251,191,36,0.1);
+}
+
+.symbol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+    gap: 2px;
+    padding: 0.4rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.symbol-grid-btn {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    padding: 0.35rem;
+    cursor: pointer;
+    border-radius: 4px;
+    text-align: center;
+    transition: background 0.12s, border-color 0.12s;
+    line-height: 1.2;
+}
+
+.symbol-grid-btn:hover {
+    background: rgba(251,191,36,0.15);
+    border-color: var(--church-gold);
+}
+
+.symbol-grid-btn[title]::after {
+    content: none;
+}
+
 .repl-prompt {
     color: var(--church-gold);
     font-family: 'Courier New', monospace;
