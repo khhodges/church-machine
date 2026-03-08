@@ -2478,6 +2478,7 @@ a.next-step-link:hover {
 
 .settings-fullpage {
     padding: 0;
+    background: var(--bg-main);
 }
 
 .settings-page {
