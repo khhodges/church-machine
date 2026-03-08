@@ -1125,6 +1125,25 @@ a.next-step-link:hover {
     line-height: 1.5;
 }
 
+.math-tool-history {
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    padding: 0.4rem 0.6rem;
+    background: rgba(200, 155, 60, 0.05);
+    border-left: 2px solid rgba(200, 155, 60, 0.25);
+    margin-bottom: 0.5rem;
+    border-radius: 0 4px 4px 0;
+}
+
+.math-tool-history code {
+    background: rgba(0,0,0,0.3);
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    color: var(--church-gold);
+    font-size: 0.74rem;
+}
+
 .repl-input-bar {
     display: flex;
     gap: 0.5rem;
