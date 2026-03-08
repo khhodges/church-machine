@@ -2518,62 +2518,121 @@ header h1 {
     margin-top: 0.3rem;
 }
 
-.progress-report {
-    font-size: 0.8rem;
-    color: var(--text-primary);
-    line-height: 1.7;
+.subjects-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
 }
 
-.progress-stat {
+.subject-card {
     display: flex;
-    justify-content: space-between;
-    padding: 0.3rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.8rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
 }
 
-.progress-stat-label {
-    color: var(--text-secondary);
+.subject-card:hover {
+    border-color: var(--church-gold);
+    background: rgba(200, 155, 60, 0.08);
 }
 
-.progress-stat-value {
-    color: var(--church-gold);
+.subject-card.subject-active {
+    border-color: rgba(200, 155, 60, 0.4);
+}
+
+.subject-card-icon {
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    width: 2rem;
+    text-align: center;
+}
+
+.subject-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.subject-card-name {
     font-weight: 600;
-    font-family: 'Courier New', monospace;
+    color: var(--text-primary);
+    font-size: 0.85rem;
 }
 
-.progress-langs {
-    display: flex;
-    gap: 0.4rem;
-    flex-wrap: wrap;
-    margin-top: 0.3rem;
+.subject-card-desc {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    margin-top: 0.1rem;
 }
 
-.progress-lang-badge {
-    background: rgba(200, 155, 60, 0.15);
-    border: 1px solid rgba(200, 155, 60, 0.3);
+.subject-card-status {
+    font-size: 0.65rem;
     color: var(--church-gold);
-    padding: 0.15rem 0.5rem;
-    border-radius: 10px;
-    font-size: 0.7rem;
+    margin-top: 0.15rem;
     font-weight: 500;
 }
 
-.progress-history {
-    margin-top: 0.5rem;
-    max-height: 120px;
-    overflow-y: auto;
-    font-size: 0.75rem;
-    font-family: 'Courier New', monospace;
-    color: var(--text-secondary);
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 0.4rem 0.6rem;
+.subject-back-btn {
+    margin-bottom: 0.6rem;
+    font-size: 0.78rem;
+    padding: 0.3rem 0.7rem;
+    background: rgba(200, 155, 60, 0.12);
+    border: 1px solid rgba(200, 155, 60, 0.3);
+    color: var(--church-gold);
+    border-radius: 6px;
+    cursor: pointer;
 }
 
-.progress-history-entry {
-    padding: 0.15rem 0;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
+.subject-back-btn:hover {
+    background: rgba(200, 155, 60, 0.2);
+}
+
+.subject-lesson-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.subject-lesson-icon {
+    font-size: 1.4rem;
+}
+
+.subject-lesson-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.subject-lesson-card {
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 0.4rem;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.subject-lesson-card:hover {
+    border-color: var(--church-gold);
+    background: rgba(200, 155, 60, 0.08);
+}
+
+.subject-lesson-name {
+    font-weight: 600;
+    color: var(--church-gold);
+    font-size: 0.82rem;
+}
+
+.subject-lesson-desc {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    margin-top: 0.15rem;
 }
 
 .grade-indicator {

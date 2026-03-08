@@ -4623,7 +4623,7 @@ function getStudentSettings() {
             return s;
         }
     } catch (e) {}
-    return { name: '', grade: '', familyMembers: [] };
+    return { name: '', familyMembers: [] };
 }
 
 function getStudentProgress() {
@@ -4658,7 +4658,6 @@ function openSettings() {
     if (!requirePermission('settings', 'Change Settings')) return;
     const settings = getStudentSettings();
     document.getElementById('settingName').value = settings.name || '';
-    document.getElementById('settingGrade').value = settings.grade || '';
     renderFamilyMembers(settings.familyMembers || []);
     renderProgressReport();
     document.getElementById('settingsModal').style.display = 'flex';
@@ -4671,7 +4670,6 @@ function closeSettings() {
 function saveSettings() {
     const settings = {
         name: document.getElementById('settingName').value.trim(),
-        grade: document.getElementById('settingGrade').value,
         familyMembers: collectFamilyMembers()
     };
     localStorage.setItem('church_student_settings', JSON.stringify(settings));
@@ -4931,48 +4929,177 @@ function welcomeSkip() {
     showMathGuidePopup();
 }
 
-function renderProgressReport() {
-    const el = document.getElementById('progressReport');
+const SUBJECTS = [
+    {
+        key: 'english',
+        name: 'English',
+        icon: '\uD83D\uDCD6',
+        color: '#4fc3f7',
+        desc: 'Write programs in plain English sentences',
+        lessons: [
+            { title: 'Your First Program', code: 'create abstraction called Hello\nadd method greet that prints "Hello World"', desc: 'Learn to write commands the Church Machine understands' },
+            { title: 'Variables & Storage', code: 'create abstraction called Counter\nadd data count starting at 0\nadd method increment that adds 1 to count', desc: 'Store and change values using data words' },
+            { title: 'Conditions', code: 'create abstraction called Guard\nadd method check that if count is greater than 10 then print "Too many"', desc: 'Make decisions with if-then logic' }
+        ]
+    },
+    {
+        key: 'javascript',
+        name: 'JavaScript',
+        icon: '\uD83D\uDCBB',
+        color: '#f0c674',
+        desc: 'Modern programming with functions and objects',
+        lessons: [
+            { title: 'Functions', code: 'function add(a, b) {\n  return a + b;\n}', desc: 'Define reusable blocks of code' },
+            { title: 'Arrays & Loops', code: 'let nums = [1, 2, 3, 4, 5];\nfor (let n of nums) {\n  console.log(n * n);\n}', desc: 'Work with lists and repeat actions' },
+            { title: 'Objects as Abstractions', code: 'let counter = {\n  count: 0,\n  increment() { this.count++; },\n  read() { return this.count; }\n};', desc: 'Group data and methods together' }
+        ]
+    },
+    {
+        key: 'haskell',
+        name: 'Haskell',
+        icon: '\u03BB',
+        color: '#b48ead',
+        desc: 'Pure functional programming with lambda calculus',
+        lessons: [
+            { title: 'Lambda Expressions', code: 'double = \\x -> x * 2\nadd = \\x y -> x + y', desc: 'Define functions with lambda notation' },
+            { title: 'Pattern Matching', code: 'factorial 0 = 1\nfactorial n = n * factorial (n - 1)', desc: 'Handle different cases elegantly' },
+            { title: 'Higher-Order Functions', code: 'map (\\x -> x * x) [1, 2, 3, 4, 5]', desc: 'Pass functions as arguments' }
+        ]
+    },
+    {
+        key: 'symbolic',
+        name: 'Symbolic Math',
+        icon: '\u222B',
+        color: '#f0c674',
+        desc: 'Ada Lovelace\'s mathematical notation',
+        lessons: [
+            { title: 'Let Bindings', code: 'let x = 2 + 3\nlet y = x * 4\nlet result = y - 1', desc: 'Define values step by step, like algebra' },
+            { title: 'Expressions', code: 'let area = 3.14159 * r * r\nlet circumference = 2 * 3.14159 * r', desc: 'Write mathematical formulas' },
+            { title: 'Bernoulli Numbers', code: 'let b0 = 1\nlet b1 = -1/2\nlet b2 = 1/6', desc: 'Ada\'s original computation from Note G' }
+        ]
+    },
+    {
+        key: 'assembly',
+        name: 'Assembly',
+        icon: '\u2699',
+        color: '#81a1c1',
+        desc: 'Direct Church Machine instructions',
+        lessons: [
+            { title: 'Load & Store', code: 'LOAD R0, #42\nSTORE R0, [R1]\nLOAD R2, [R1]', desc: 'Move data between registers and memory' },
+            { title: 'Arithmetic', code: 'LOAD R0, #7\nLOAD R1, #5\nADD R2, R0, R1\nMUL R3, R2, R0', desc: 'Compute with the Turing instruction set' },
+            { title: 'Capabilities', code: 'MINT R0\nSEAL R0, R1\nCALL R0, #method', desc: 'Work with Golden Tokens and the Church instruction set' }
+        ]
+    },
+    {
+        key: 'math',
+        name: 'Math Tools',
+        icon: '\uD83E\uDDEE',
+        color: '#8B7355',
+        desc: 'HP-35, Abacus, Slide Rule',
+        lessons: [
+            { title: 'RPN Calculator', code: '', desc: 'Use the HP-35 reverse Polish notation calculator', view: 'repl', tab: 'hp35' },
+            { title: 'Soroban Abacus', code: '', desc: 'Learn place value with the Japanese abacus', view: 'repl', tab: 'abacus' },
+            { title: 'Slide Rule', code: '', desc: 'Multiply with logarithmic scales', view: 'repl', tab: 'sliderule' }
+        ]
+    },
+    {
+        key: 'security',
+        name: 'Security',
+        icon: '\uD83D\uDD10',
+        color: '#C89B3C',
+        desc: 'Capability security and Golden Tokens',
+        lessons: [
+            { title: 'What is a Golden Token?', code: '', desc: 'Unforgeable 32-bit keys that control access', view: 'reference' },
+            { title: 'Namespace & Abstractions', code: '', desc: 'How programs are isolated from each other', view: 'abstractions' },
+            { title: 'The mLoad Pipeline', code: '', desc: 'How capabilities are checked in hardware', view: 'pipeline' }
+        ]
+    }
+];
+
+function renderSubjects() {
+    const el = document.getElementById('subjectsGrid');
     if (!el) return;
     const progress = getStudentProgress();
-    const settings = getStudentSettings();
-    const grade = document.getElementById('settingGrade').value || settings.grade;
-    const name = document.getElementById('settingName').value.trim() || settings.name || 'Student';
+    const langsUsed = progress.langsUsed || [];
 
-    const gradeLabel = getGradeLabel(grade);
     let html = '';
-    html += `<div class="progress-stat"><span class="progress-stat-label">Student</span><span class="progress-stat-value">${escapeHtml(name)}</span></div>`;
-    if (gradeLabel) {
-        html += `<div class="progress-stat"><span class="progress-stat-label">Level</span><span class="progress-stat-value">${gradeLabel}</span></div>`;
-    }
-    html += `<div class="progress-stat"><span class="progress-stat-label">Programs Compiled</span><span class="progress-stat-value">${progress.compilations}</span></div>`;
-    html += `<div class="progress-stat"><span class="progress-stat-label">Abstractions Created</span><span class="progress-stat-value">${progress.abstractions}</span></div>`;
-    html += `<div class="progress-stat"><span class="progress-stat-label">Drafts Viewed</span><span class="progress-stat-value">${progress.drafts}</span></div>`;
-    html += `<div class="progress-stat"><span class="progress-stat-label">Interactive Math Sessions</span><span class="progress-stat-value">${progress.replSessions}</span></div>`;
-
-    if (progress.langsUsed.length > 0) {
-        const langNames = { english: 'English', symbolic: 'Symbolic Math', javascript: 'JavaScript', haskell: 'Haskell', assembly: 'Assembly' };
-        html += `<div style="margin-top:0.5rem;"><span class="progress-stat-label">Languages Used</span></div>`;
-        html += `<div class="progress-langs">`;
-        for (const l of progress.langsUsed) {
-            html += `<span class="progress-lang-badge">${langNames[l] || l}</span>`;
+    for (const subject of SUBJECTS) {
+        const used = langsUsed.includes(subject.key);
+        const statusClass = used ? ' subject-active' : '';
+        html += `<div class="subject-card${statusClass}" onclick="openSubject('${subject.key}')">`;
+        html += `<div class="subject-card-icon" style="color:${subject.color}">${subject.icon}</div>`;
+        html += `<div class="subject-card-info">`;
+        html += `<div class="subject-card-name">${escapeHtml(subject.name)}</div>`;
+        html += `<div class="subject-card-desc">${escapeHtml(subject.desc)}</div>`;
+        if (used) {
+            html += `<div class="subject-card-status">Started</div>`;
         }
         html += `</div>`;
-    }
-
-    if (progress.history.length > 0) {
-        html += `<div style="margin-top:0.75rem;"><span class="progress-stat-label">Recent Activity</span></div>`;
-        html += `<div class="progress-history">`;
-        for (const h of progress.history.slice(0, 20)) {
-            html += `<div class="progress-history-entry">${escapeHtml(h)}</div>`;
-        }
         html += `</div>`;
     }
-
     el.innerHTML = html;
 }
 
+function openSubject(key) {
+    const subject = SUBJECTS.find(s => s.key === key);
+    if (!subject) return;
 
+    const el = document.getElementById('subjectsGrid');
+    if (!el) return;
+
+    let html = `<button class="btn subject-back-btn" onclick="renderSubjects()">&larr; Back to Subjects</button>`;
+    html += `<div class="subject-lesson-header">`;
+    html += `<span class="subject-lesson-icon" style="color:${subject.color}">${subject.icon}</span>`;
+    html += `<span class="subject-lesson-title">${escapeHtml(subject.name)}</span>`;
+    html += `</div>`;
+
+    for (const lesson of subject.lessons) {
+        html += `<div class="subject-lesson-card" onclick="startLesson('${subject.key}', '${escapeHtml(lesson.title)}')">`;
+        html += `<div class="subject-lesson-name">${escapeHtml(lesson.title)}</div>`;
+        html += `<div class="subject-lesson-desc">${escapeHtml(lesson.desc)}</div>`;
+        html += `</div>`;
+    }
+    el.innerHTML = html;
+}
+
+function startLesson(subjectKey, lessonTitle) {
+    const subject = SUBJECTS.find(s => s.key === subjectKey);
+    if (!subject) return;
+    const lesson = subject.lessons.find(l => l.title === lessonTitle);
+    if (!lesson) return;
+
+    closeSettings();
+
+    if (lesson.view) {
+        switchView(lesson.view);
+        if (lesson.tab) {
+            setTimeout(() => {
+                const tabBtn = document.querySelector(`.math-tab[data-tab="${lesson.tab}"]`);
+                if (tabBtn) tabBtn.click();
+            }, 100);
+        }
+        return;
+    }
+
+    switchView('editor');
+    const langMap = { english: 'english', javascript: 'javascript', haskell: 'haskell', symbolic: 'symbolic', assembly: 'assembly' };
+    const sel = document.getElementById('langSelector');
+    if (sel && langMap[subjectKey]) {
+        sel.value = langMap[subjectKey];
+        onLangChange(false);
+    }
+    if (lesson.code) {
+        const editor = document.getElementById('asmEditor');
+        if (editor) {
+            editor.value = lesson.code;
+        }
+    }
+    appendOutput(`Lesson: ${lessonTitle} \u2014 ${lesson.desc}`, 'info');
+}
+
+function renderProgressReport() {
+    renderSubjects();
+}
 
 function getGradeLabel(grade) {
     if (!grade) return '';

@@ -28,6 +28,7 @@ The web IDE features nine views (Math, Code, Tutorial, Dashboard, Namespace, Abs
 - **Math Challenge:** A sidebar providing grade-appropriate problems with hints and dual-domain explanations (Turing/Church).
 - **History Tab:** Dynamic historical stories related to the active math tool, encouraging contextual learning.
 - **Syntax Tab:** Quick-reference cheat sheet for the currently selected language, auto-updates on language change.
+- **Subjects:** Settings page displays 7 subject cards (English, JavaScript, Haskell, Symbolic Math, Assembly, Math Tools, Security). Each card opens a lesson list; clicking a lesson navigates to the editor with starter code or the relevant view/tab.
 - **Responsive Design:** Panels often use a 50-50 split with draggable dividers, adapting to narrow screens.
 - **Popups:** Educational popups for welcome, math guide, and individual tool guides enhance the learning experience.
 - **State Persistence:** Utilizes localStorage for editor state, settings, progress, and dismissals.

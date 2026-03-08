@@ -393,29 +393,10 @@
                         <label class="settings-label">Name
                             <input type="text" id="settingName" class="modal-input" placeholder="Your name">
                         </label>
-                        <label class="settings-label">What are you learning?
-                            <select id="settingGrade" class="modal-input" onchange="onGradeChange()">
-                                <option value="">-- Select --</option>
-                                <option value="K">Counting, patterns, drag beads on the abacus</option>
-                                <option value="1">Addition &amp; subtraction, place value, abacus &amp; calculator</option>
-                                <option value="2">Multiplication, skip counting, first programs in English</option>
-                                <option value="3">Division, fractions, simple loops and conditions</option>
-                                <option value="4">Decimals, area &amp; perimeter, writing functions</option>
-                                <option value="5">Order of operations, coordinates, slide rule basics</option>
-                                <option value="6">Ratios, negative numbers, intro to JavaScript</option>
-                                <option value="7">Algebra, exponents, namespace &amp; abstractions</option>
-                                <option value="8">Linear equations, geometry, Haskell &amp; lambda calculus</option>
-                                <option value="9">Quadratics, trigonometry, capability security model</option>
-                                <option value="10">Functions &amp; graphs, logarithms, Golden Tokens &amp; permissions</option>
-                                <option value="11">Calculus intro, matrices, compiler internals &amp; pipeline</option>
-                                <option value="12">Advanced maths, proofs, FPGA synthesis &amp; hardware design</option>
-                                <option value="IB">Formal methods, type theory, full Church Machine architecture</option>
-                            </select>
-                        </label>
                     </div>
                     <div class="settings-section">
-                        <div class="settings-section-title">Progress Report</div>
-                        <div id="progressReport" class="progress-report"></div>
+                        <div class="settings-section-title">Subjects</div>
+                        <div id="subjectsGrid" class="subjects-grid"></div>
                     </div>
                     <div class="settings-section">
                         <button class="btn btn-view" onclick="resetGuidePopups()" style="font-size:0.82rem;">Show Guides Again</button>
