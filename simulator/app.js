@@ -5079,15 +5079,16 @@ const SUBJECTS = [
     },
     {
         key: 'assembly',
-        name: 'Assembly',
+        name: 'Assembly \u2014 CLOOMC',
         icon: '\u2699',
         color: '#81a1c1',
-        desc: 'Direct Church Machine instructions',
+        desc: 'Church + Turing: not just values, but functions and capabilities',
         lessons: [
-            { title: 'Load & Store', code: 'LOAD R0, #42\nSTORE R0, [R1]\nLOAD R2, [R1]', desc: 'Move data between registers and memory' },
-            { title: 'Arithmetic', code: 'LOAD R0, #7\nLOAD R1, #5\nADD R2, R0, R1\nMUL R3, R2, R0', desc: 'Compute with the Turing instruction set — values only' },
-            { title: 'First-Class Variables', code: 'MINT R0\nSEAL R0, R1\nCALL R0, #method\n; CALL passes an abstraction (a function)\n; not a value — this is the Church domain', desc: 'CALL passes functions via Golden Tokens — Turing cannot do this' },
-            { title: 'Capabilities', code: 'MINT R0\nSEAL R0, R1\nCALL R0, #method', desc: 'Work with Golden Tokens and the Church instruction set' }
+            { title: 'Turing: Load & Store', code: '; === TURING DOMAIN ===\n; Move numbers between registers and memory.\n; This is what ALL processors can do.\n;\nLOAD  R0, #42        ; put the number 42 into R0\nSTORE R0, [R1]       ; write R0 to memory at address R1\nLOAD  R2, [R1]       ; read it back into R2\n;\n; R0, R1, R2 hold VALUES — plain numbers.\n; They cannot hold functions or permissions.', desc: 'Basic Turing: move numbers — every processor does this' },
+            { title: 'Turing: Arithmetic', code: '; === TURING DOMAIN ===\n; Add and multiply numbers in registers.\n;\nLOAD R0, #7\nLOAD R1, #5\nADD  R2, R0, R1      ; R2 = 7 + 5 = 12\nMUL  R3, R2, R0      ; R3 = 12 * 7 = 84\n;\n; This is computation on VALUES.\n; No security. No isolation. No functions.\n; Any program can read any register.', desc: 'Turing adds values — but cannot pass functions or enforce security' },
+            { title: 'Church: CALL with GT', code: '; === CHURCH DOMAIN ===\n; CALL does what Turing cannot:\n; it passes a FUNCTION, not a value.\n;\nMINT  R0             ; create a Golden Token (unforgeable key)\nSEAL  R0, R1         ; bind the GT to abstraction at NS index R1\nCALL  R0, #greet     ; invoke method "greet" on that abstraction\n;\n; What just happened:\n;   1. R0 holds a GT — a capability, not a number\n;   2. SEAL locked it to a specific abstraction\n;   3. CALL passed the function body to the processor\n;      through a secure envelope (the lump)\n;\n; The body runs INSIDE the envelope.\n; When it finishes, the envelope closes.\n; No other program can see inside.\n;\n; THIS is first-class: the GT in R0 is a function\n; passed as a value. Ada did this in 1843.', desc: 'CALL passes a function via a Golden Token — this is what makes CLOOMC different' },
+            { title: 'Church vs Turing', code: '; === THE DIFFERENCE ===\n;\n; TURING (every processor):\n;   ADD R0, R1, R2     — adds two numbers\n;   R0 is a VALUE (plain 32-bit integer)\n;   Any program can read R0\n;   No isolation, no security\n;\n; CHURCH (only CLOOMC):\n;   CALL R0, #method   — invokes an abstraction\n;   R0 is a GOLDEN TOKEN (unforgeable capability)\n;   Only the holder can invoke it\n;   The function runs in a sealed envelope\n;   No other program can see inside\n;\n; Ada wrote functions that took other functions\n; as arguments. Church formalised it. CLOOMC\n; builds it into the hardware with MINT,\n; SEAL, and CALL.\n;\n; Basic assembly: values only.\n; CLOOMC assembly: values AND functions.', desc: 'Turing moves values. Church passes functions. CLOOMC does both.' },
+            { title: 'First-Class Variables', code: '; === FIRST-CLASS VARIABLES ===\n;\n; In Turing, a variable holds a number:\n;   LOAD R0, #5       ; R0 = 5 (a value)\n;\n; In CLOOMC, a variable holds a function:\n;   MINT R0           ; R0 = Golden Token (a capability)\n;   SEAL R0, R1       ; R0 now refers to an abstraction\n;   CALL R0, #run     ; invoke the function R0 points to\n;\n; You can pass R0 to another abstraction:\n;   STORE R0, [R2]    ; give your GT to someone else\n;   ; They can CALL it too — if they have permission\n;\n; This is what "first-class" means:\n; functions are values you can store, pass,\n; and return — just like numbers.', desc: 'A variable can hold a function, not just a number — that is first-class' }
         ]
     },
     {
