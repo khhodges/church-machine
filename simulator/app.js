@@ -4015,6 +4015,8 @@ function _appendToTraceTab(command, result) {
         const cyclesEl = document.createElement('div');
         cyclesEl.className = 'repl-trace-entry-cycles';
         cyclesEl.textContent = '\u23F1 ' + result.cycles + ' cycles';
+        cyclesEl.title = 'The number of hardware clock cycles the Church Machine processor needs to evaluate this expression on the Tang Nano 20K FPGA. Each instruction (ELOADCALL, XLOADLAMBDA, RETURN) takes one cycle. Compound expressions chain multiple operations, so the total is the sum of all steps. Lower counts mean faster execution.';
+        cyclesEl.style.cursor = 'help';
         entry.appendChild(cyclesEl);
     }
 
