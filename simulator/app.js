@@ -4841,7 +4841,7 @@ function addFamilyMemberRow(role, name) {
         permsHTML += `</div>`;
     }
 
-    const roleOptions = ['Mum', 'Dad', 'Me', 'Brother', 'Sister', 'Grandpa', 'Grandma', 'Uncle', 'Auntie', 'Cousin', 'Friend', 'Teacher'];
+    const roleOptions = ['Mum', 'Dad', 'Me', 'Brother', 'Sister', 'Grandpa', 'Grandma', 'Uncle', 'Auntie', 'Cousin', 'Friend', 'School Friend', 'Class Mate', 'Teacher'];
     let roleSelectHTML = `<select class="modal-input family-role-select">`;
     roleOptions.forEach(opt => {
         roleSelectHTML += `<option value="${opt}"${r === opt ? ' selected' : ''}>${opt}</option>`;
