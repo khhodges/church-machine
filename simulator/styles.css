@@ -2478,11 +2478,11 @@ a.next-step-link:hover {
 
 .settings-fullpage {
     padding: 0;
-    background: var(--bg-main);
+    background: var(--bg-dark);
 }
 
 .settings-page {
-    background: var(--bg-main);
+    background: var(--bg-dark);
     width: 100%;
     height: 100%;
     display: flex;
