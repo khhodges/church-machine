@@ -3967,6 +3967,22 @@ function updateMathWelcome() {
     el.textContent = prompt;
 }
 
+var SUPERSCRIPT_MAP = {
+    '0':'\u2070','1':'\u00B9','2':'\u00B2','3':'\u00B3','4':'\u2074',
+    '5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079',
+    '+':'\u207A','-':'\u207B','n':'\u207F','i':'\u2071'
+};
+
+function convertCaretToSuperscript(text) {
+    return text.replace(/\^([0-9+\-ni]+)/g, function(match, digits) {
+        var result = '';
+        for (var i = 0; i < digits.length; i++) {
+            result += SUPERSCRIPT_MAP[digits[i]] || digits[i];
+        }
+        return result;
+    });
+}
+
 function replExecute(cmdOverride) {
     const input = document.getElementById('replInput');
     const output = document.getElementById('replOutput');
@@ -3975,12 +3991,12 @@ function replExecute(cmdOverride) {
     const command = cmdOverride || input.value.trim();
     if (!command) return;
 
-    output.innerHTML += `<div class="repl-input-echo">\u03BB&gt; ${escapeHtml(command)}</div>`;
+    output.innerHTML += `<div class="repl-input-echo">\u03BB&gt; ${convertCaretToSuperscript(escapeHtml(command))}</div>`;
 
     const result = repl.execute(command);
     if (result) {
         if (result.type === 'result') {
-            output.innerHTML += `<div class="repl-result">${escapeHtml(result.text)}</div>`;
+            output.innerHTML += `<div class="repl-result">${convertCaretToSuperscript(escapeHtml(result.text))}</div>`;
             if (result.churchSteps && result.churchSteps.length > 0) {
                 let traceHtml = '<div class="repl-trace">';
                 for (const step of result.churchSteps) {
@@ -4459,11 +4475,33 @@ var MATH_SYMBOLS = {
         ['\u00B1','plus-minus'], ['\u00D7','times'], ['\u00F7','divide'],
         ['\u2212','minus'], ['\u22C5','dot product'], ['\u2219','bullet dot'],
         ['\u221A','square root'], ['\u221B','cube root'], ['\u221C','fourth root'],
-        ['\u00B2','squared'], ['\u00B3','cubed'], ['\u207F','superscript n'],
+        ['\u2070','superscript 0'], ['\u00B9','superscript 1'], ['\u00B2','superscript 2'],
+        ['\u00B3','superscript 3'], ['\u2074','superscript 4'], ['\u2075','superscript 5'],
+        ['\u2076','superscript 6'], ['\u2077','superscript 7'], ['\u2078','superscript 8'],
+        ['\u2079','superscript 9'], ['\u207A','superscript +'], ['\u207B','superscript -'],
+        ['\u207F','superscript n'],
+        ['\u2080','subscript 0'], ['\u2081','subscript 1'], ['\u2082','subscript 2'],
+        ['\u2083','subscript 3'], ['\u2084','subscript 4'], ['\u2085','subscript 5'],
+        ['\u2086','subscript 6'], ['\u2087','subscript 7'], ['\u2088','subscript 8'],
+        ['\u2089','subscript 9'],
         ['\u2260','not equal'], ['\u2248','approx equal'], ['\u2261','identical'],
         ['\u2264','less or equal'], ['\u2265','greater or equal'],
         ['\u226A','much less'], ['\u226B','much greater'],
-        ['\u221E','infinity'], ['\u2030','per mille'], ['\u2031','per ten thousand']
+        ['\u221E','infinity'], ['\u2030','per mille']
+    ],
+    'Constants': [
+        ['\u03C0','pi = 3.14159...'], ['e','Euler\'s number = 2.71828...'],
+        ['\u03C6','golden ratio = 1.61803...'], ['\u221E','infinity'],
+        ['c','speed of light'], ['G','gravitational constant'],
+        ['g','gravitational accel = 9.81'], ['h','Planck constant'],
+        ['\u210F','reduced Planck (h-bar)'], ['k\u0299','Boltzmann constant'],
+        ['N\u2090','Avogadro number'], ['R','gas constant'],
+        ['\u03B5\u2080','vacuum permittivity'], ['\u03BC\u2080','vacuum permeability'],
+        ['e\u207B','electron charge'], ['m\u2091','electron mass'],
+        ['m\u209A','proton mass'], ['\u03C3','Stefan-Boltzmann'],
+        ['i','imaginary unit'], ['\u03B3','Euler-Mascheroni = 0.5772...'],
+        ['\u03B6','Ap\u00E9ry\'s constant \u03B6(3)'], ['\u221A2','Pythagoras = 1.4142...'],
+        ['ln2','natural log of 2 = 0.6931...'], ['ln10','natural log of 10 = 2.3025...']
     ],
     'Sets': [
         ['\u2205','empty set'], ['\u2208','element of'], ['\u2209','not element of'],
