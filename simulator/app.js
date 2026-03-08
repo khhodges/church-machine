@@ -4670,12 +4670,49 @@ function trackAction(action, detail) {
     saveStudentProgress(progress);
 }
 
+function renderFamilyIntroQR() {
+    const el = document.getElementById('familyIntroQR');
+    if (!el) return;
+    const fa = getFamilyAbstraction();
+    const seed = fa ? parseInt(fa.owner.replace('0x',''), 16) : 0xDEADBEEF;
+    const size = 9;
+    const cells = [];
+    let s = seed;
+    for (let y = 0; y < size; y++) {
+        cells[y] = [];
+        for (let x = 0; x < size; x++) {
+            if ((x < 3 && y < 3) || (x >= size - 3 && y < 3) || (x < 3 && y >= size - 3)) {
+                const ox = x < 3 ? x : (x >= size - 3 ? x - (size - 3) : x);
+                const oy = y < 3 ? y : (y >= size - 3 ? y - (size - 3) : y);
+                cells[y][x] = (ox === 0 || ox === 2 || oy === 0 || oy === 2 || (ox === 1 && oy === 1)) ? 1 : 0;
+            } else {
+                s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
+                cells[y][x] = (s >> 16) & 1;
+            }
+        }
+    }
+    const cellSize = 6;
+    const svgSize = size * cellSize;
+    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">`;
+    svg += `<rect width="${svgSize}" height="${svgSize}" fill="rgba(200,155,60,0.08)" rx="2"/>`;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            if (cells[y][x]) {
+                svg += `<rect x="${x*cellSize}" y="${y*cellSize}" width="${cellSize}" height="${cellSize}" fill="rgba(200,155,60,0.6)" rx="0.5"/>`;
+            }
+        }
+    }
+    svg += '</svg>';
+    el.innerHTML = svg;
+}
+
 function openSettings() {
     if (!requirePermission('settings', 'Change Settings')) return;
     const settings = getStudentSettings();
     document.getElementById('settingName').value = settings.name || '';
     renderFamilyMembers(settings.familyMembers || []);
     renderProgressReport();
+    renderFamilyIntroQR();
     const anyPerm = hasAnyPopupDismissedPerm();
     const showAllCheck = document.getElementById('showAllPopupsCheck');
     if (showAllCheck) showAllCheck.checked = !anyPerm;
@@ -4805,7 +4842,7 @@ function addFamilyMemberRow(role, name) {
     }
 
     const roleOptions = ['Mum', 'Dad', 'Me', 'Brother', 'Sister', 'Grandpa', 'Grandma', 'Uncle', 'Auntie', 'Cousin', 'Friend', 'Teacher', 'Pet'];
-    let roleSelectHTML = `<select class="modal-input family-role-select" style="width:100px;flex:none;">`;
+    let roleSelectHTML = `<select class="modal-input family-role-select">`;
     roleOptions.forEach(opt => {
         roleSelectHTML += `<option value="${opt}"${r === opt ? ' selected' : ''}>${opt}</option>`;
     });

@@ -2362,6 +2362,54 @@ a.next-step-link:hover {
     line-height: 1.5;
 }
 
+.family-intro {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: rgba(200, 155, 60, 0.06);
+    border: 1px solid rgba(200, 155, 60, 0.15);
+    border-radius: 8px;
+}
+
+.family-intro-qr {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+}
+
+.family-intro-qr svg {
+    width: 56px;
+    height: 56px;
+}
+
+.family-intro-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.family-intro-text p {
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    margin: 0 0 0.3rem;
+}
+
+.family-intro-text p:last-child {
+    margin-bottom: 0;
+}
+
+.family-intro-text strong {
+    color: var(--church-gold);
+}
+
+.family-role-select {
+    width: auto;
+    min-width: 90px;
+    flex: none;
+}
+
 .family-member-row {
     display: flex;
     flex-direction: column;
