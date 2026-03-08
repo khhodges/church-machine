@@ -4030,13 +4030,9 @@ function switchMathMode(mode) {
     if (mode === 'sliderule' && !slideruleState.rendered) renderSlideRuleCalculator();
 
     const hiwTab = document.getElementById('sidebarTabHowItWorks');
-    if (hiwTab) hiwTab.style.display = mode === 'sliderule' ? '' : 'none';
-    if (mode === 'sliderule') {
-        switchSidebarTab('howitworks');
-    } else {
-        const hiwContent = document.getElementById('sidebarHowItWorksContent');
-        if (hiwContent && hiwContent.style.display !== 'none') switchSidebarTab('history');
-    }
+    if (hiwTab) hiwTab.style.display = '';
+    populateHowItWorks(mode);
+    switchSidebarTab('howitworks');
 
     if (typeof historySetTool === 'function') historySetTool(mode);
 
@@ -4102,6 +4098,114 @@ function switchSidebarTab(tab) {
         if (challengeContent) challengeContent.style.display = 'block';
         if (tabChallenge) tabChallenge.classList.add('active');
     }
+}
+
+function populateHowItWorks(mode) {
+    const container = document.getElementById('sidebarHowItWorksContent');
+    if (!container) return;
+
+    const content = {
+        hp35: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How the HP-35 Works</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    The HP-35 uses <strong>Reverse Polish Notation</strong> (RPN) &mdash; you enter numbers first, then the operation.
+                    Type <code>2 ENTER 3 +</code> instead of <code>2 + 3 =</code>.
+                    There are no brackets and no equals key. A <strong>4-register stack</strong> (X, Y, Z, T) holds intermediate results automatically.
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">The Stack</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">Every number you enter goes onto the <strong>X register</strong>. When you press ENTER, X is copied up to Y, making room for the next number.</p>
+                    <p style="margin:0 0 0.4rem 0;">Operations like <code>+</code> take X and Y, compute the result, and put it back in X. The stack drops down &mdash; no lost values, no parentheses needed.</p>
+                    <p style="margin:0;">This is exactly how the Church Machine&rsquo;s Turing domain manages data registers &mdash; push, operate, pop.</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Church Machine Connection</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">Every key press is a <strong>Church Machine instruction</strong>. The trace panel shows each operation as a lambda expression.</p>
+                    <p style="margin:0;"><code>SIN</code>, <code>LOG</code>, and <code>e<sup>x</sup></code> are all computed using the CORDIC algorithm &mdash; the same method used in the original 1972 chip, rebuilt here in pure lambda calculus.</p>
+                </div>
+            </div>`,
+
+        abacus: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How the Abacus Works</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    The soroban (Japanese abacus) uses <strong>positional notation</strong> &mdash; each column is a power of 10.
+                    The top bead is worth <strong>5</strong>, the four bottom beads are worth <strong>1</strong> each.
+                    Move beads toward the bar to add their value; move them away to subtract.
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Place Value</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">Each column represents a digit: ones, tens, hundreds, thousands. The rightmost column is ones.</p>
+                    <p style="margin:0 0 0.4rem 0;">To show <strong>7</strong>: move the top bead down (5) and two bottom beads up (1+1). Total: 5+2 = 7.</p>
+                    <p style="margin:0;">When a column exceeds 9, you <strong>carry</strong> &mdash; reset the column to 0 and add 1 to the next column left. This is exactly how binary carry works in the Church Machine&rsquo;s ALU.</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Church Machine Connection</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">The abacus is a <strong>register machine</strong>. Each column is a register holding one digit. Operations propagate carries left &mdash; the same ripple-carry logic used in hardware adders.</p>
+                    <p style="margin:0;">Every bead move is traced as a Church Machine operation, showing how physical computation maps to <code>IADD</code> and <code>ISUB</code> instructions.</p>
+                </div>
+            </div>`,
+
+        sliderule: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How the Slide Rule Works</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    The slide rule computes by <em>adding or comparing logarithmic lengths</em>.
+                    On the C/D scales, sliding by log(a) and reading at C=b gives D = a&times;b.
+                    <span style="color:#ff6644;">a</span> and <span style="color:#44aaff;">b</span> are labelled above the scale. The <span style="color:#ff3333;">red arrow</span> below shows a &times; b.
+                    Other scales use the same principle for squares (A/B), cubes (K),
+                    reciprocals (CI), and trigonometry (S/T) &mdash; all backed by
+                    CALL SlideRule at NS[16].
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Floating Point &mdash; The Slide Rule Inside Your Computer</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.5rem 0;">Every floating-point number works like a slide rule reading: a <strong>mantissa</strong> (scale position) and an <strong>exponent</strong> (power of 10). IEEE 754 does the same in binary.</p>
+                    <div style="display:flex;flex-direction:column;gap:0.3rem;background:rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem;margin-bottom:0.5rem;font-size:0.78rem;font-family:monospace;">
+                        <div><span style="color:var(--church-gold);">Slide Rule:</span> &plusmn; scale position (1&ndash;10) &times; 10&#8319;</div>
+                        <div><span style="color:rgba(130,200,255,0.95);">IEEE 754:</span> sign bit &middot; mantissa (1.xxx&#8322;) &times; 2&#7497;</div>
+                    </div>
+                    <p style="margin:0 0 0.3rem 0;"><strong style="color:var(--church-gold);">Multiply = add logs:</strong> <span style="color:var(--church-gold);">log(a &times; b) = log(a) + log(b)</span>. CPUs do the same: add exponents, multiply mantissas.</p>
+                    <p style="margin:0;"><strong style="color:var(--church-gold);">In the Church Machine:</strong> 32-bit Turing data words follow the same mantissa + exponent structure.</p>
+                </div>
+            </div>`,
+
+        interactive: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How Interactive Math Works</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    Type expressions using <code>let</code> bindings to define variables and build calculations step by step.
+                    For example: <code>let x = 5</code>, then <code>let y = x * 3</code>.
+                    The REPL evaluates each line and remembers your variables.
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Compile Session</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">Click <strong>Compile Session</strong> to convert your let-bindings into Church Machine assembly code. Each variable becomes a register allocation and each operation becomes an instruction.</p>
+                    <p style="margin:0;">This is Ada Lovelace&rsquo;s symbolic math notation &mdash; the same front-end used by the CLOOMC++ compiler. Your calculator session becomes a real program.</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Church Machine Connection</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;">Every <code>let</code> binding is a <strong>lambda abstraction</strong>: <code>let x = 5 in ...</code> is (&lambda;x. ...) 5.</p>
+                    <p style="margin:0;">The Compile Session button shows this transformation explicitly &mdash; from symbolic math to Church Machine instructions, proving that your calculator and the processor speak the same language.</p>
+                </div>
+            </div>`
+    };
+
+    container.innerHTML = content[mode] || content.interactive;
 }
 
 function replKeydown(event) {

@@ -276,32 +276,7 @@
                         <div id="historyContent"></div>
                     </div>
                 </div>
-                <div id="sidebarHowItWorksContent" style="display:none;">
-                    <div class="panel">
-                        <div class="panel-title" style="color:var(--church-gold);">How the Slide Rule Works</div>
-                        <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
-                            The slide rule computes by <em>adding or comparing logarithmic lengths</em>.
-                            On the C/D scales, sliding by log(a) and reading at C=b gives D = a&times;b.
-                            <span style="color:#ff6644;">a</span> and <span style="color:#44aaff;">b</span> are labelled above the scale. The <span style="color:#ff3333;">red arrow</span> below shows a &times; b.
-                            Other scales use the same principle for squares (A/B), cubes (K),
-                            reciprocals (CI), and trigonometry (S/T) &mdash; all backed by
-                            CALL SlideRule at NS[16].
-                        </div>
-                    </div>
-                    <div class="panel" style="margin-top:0.75rem;">
-                        <div class="panel-title" style="color:rgba(130,200,255,0.95);">Floating Point &mdash; The Slide Rule Inside Your Computer</div>
-                        <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
-                            <p style="margin:0 0 0.5rem 0;">Every floating-point number works like a slide rule reading: a <strong>mantissa</strong> (scale position) and an <strong>exponent</strong> (power of 10). IEEE 754 does the same in binary.</p>
-                            <div style="display:flex;flex-direction:column;gap:0.3rem;background:rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem;margin-bottom:0.5rem;font-size:0.78rem;font-family:monospace;">
-                                <div><span style="color:var(--church-gold);">Slide Rule:</span> &plusmn; scale position (1&ndash;10) &times; 10&#8319;</div>
-                                <div><span style="color:rgba(130,200,255,0.95);">IEEE 754:</span> sign bit &middot; mantissa (1.xxx&#8322;) &times; 2&#7497;</div>
-                            </div>
-                            <p style="margin:0 0 0.3rem 0;"><strong style="color:var(--church-gold);">Why logarithmic?</strong> Numbers are spread so 1&ndash;2 takes the same space as 2&ndash;4 or 4&ndash;8 &mdash; equal precision per order of magnitude.</p>
-                            <p style="margin:0 0 0.3rem 0;"><strong style="color:var(--church-gold);">Multiply = add logs:</strong> <span style="color:var(--church-gold);">log(a &times; b) = log(a) + log(b)</span>. CPUs do the same: add exponents, multiply mantissas.</p>
-                            <p style="margin:0;"><strong style="color:var(--church-gold);">In the Church Machine:</strong> 32-bit Turing data words follow the same mantissa + exponent structure. The slide rule on screen and the ALU in hardware are doing the same mathematics.</p>
-                        </div>
-                    </div>
-                </div>
+                <div id="sidebarHowItWorksContent" style="display:none;"></div>
             </div>
         </div>
     </div>
