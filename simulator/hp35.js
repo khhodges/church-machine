@@ -346,29 +346,6 @@ function renderHP35Calculator() {
                 <div class="hp35-tile-header">Lambda Calculus Trace</div>
                 <div class="hp35-trace-area"></div>
             </div>
-            <div class="hp35-tile hp35-tile-guide">
-                <div class="hp35-tile-header">How to Use RPN</div>
-                <div class="hp35-stack-guide-body">
-                    <p>The HP-35 uses a <strong>4-level stack</strong> instead of an <strong>=</strong> key. You enter numbers first, then press the operation.</p>
-                    <div class="hp35-stack-tips">
-                        <div class="hp35-tip-title">Key Actions</div>
-                        <p><strong>ENTER \u2191</strong> \u2014 Pushes X up into Y (and Y\u2192Z, Z\u2192T). Use between numbers.</p>
-                        <p><strong>+  \u2212  \u00d7  \u00f7</strong> \u2014 Takes X and Y, puts the result in X, stack drops down.</p>
-                        <p><strong>x\u21c4y</strong> \u2014 Swaps X and Y. Fix wrong order without retyping.</p>
-                        <p><strong>R\u2193</strong> \u2014 Rolls the whole stack down: T\u2192X, X\u2192Y, Y\u2192Z, Z\u2192T.</p>
-                    </div>
-                    <div class="hp35-stack-tips">
-                        <div class="hp35-tip-title">Try It: (3 + 4) \u00d7 5</div>
-                        <p class="hp35-example">3 <span class="hp35-ekey">ENTER</span> 4 <span class="hp35-ekey">+</span> 5 <span class="hp35-ekey">\u00d7</span> \u2192 35</p>
-                        <div class="hp35-tip-title">Try It: (9 \u2212 2) \u00f7 (1 + 6)</div>
-                        <p class="hp35-example">9 <span class="hp35-ekey">ENTER</span> 2 <span class="hp35-ekey">\u2212</span> 1 <span class="hp35-ekey">ENTER</span> 6 <span class="hp35-ekey">+</span> <span class="hp35-ekey">\u00f7</span> \u2192 1</p>
-                    </div>
-                    <div class="hp35-stack-tips">
-                        <div class="hp35-tip-title">Why RPN?</div>
-                        <p>No parentheses needed. No = key. Complex expressions flow naturally left to right. The stack remembers intermediate results for you \u2014 like how you'd work it out on paper, one step at a time.</p>
-                    </div>
-                </div>
-            </div>
           </div>
         </div>
     `;

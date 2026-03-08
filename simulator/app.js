@@ -4030,8 +4030,11 @@ function switchMathMode(mode) {
     if (mode === 'sliderule' && !slideruleState.rendered) renderSlideRuleCalculator();
 
     const hiwTab = document.getElementById('sidebarTabHowItWorks');
+    const htuTab = document.getElementById('sidebarTabHowToUse');
     if (hiwTab) hiwTab.style.display = '';
+    if (htuTab) htuTab.style.display = '';
     populateHowItWorks(mode);
+    populateHowToUse(mode);
     switchSidebarTab('howitworks');
 
     if (typeof historySetTool === 'function') historySetTool(mode);
@@ -4070,33 +4073,28 @@ function switchCodeTab(tab) {
 }
 
 function switchSidebarTab(tab) {
-    const challengeContent = document.getElementById('sidebarChallengeContent');
-    const historyContent = document.getElementById('sidebarHistoryContent');
-    const hiwContent = document.getElementById('sidebarHowItWorksContent');
-    const tabChallenge = document.getElementById('sidebarTabChallenge');
-    const tabHistory = document.getElementById('sidebarTabHistory');
-    const tabHIW = document.getElementById('sidebarTabHowItWorks');
+    const panels = {
+        challenge: document.getElementById('sidebarChallengeContent'),
+        history: document.getElementById('sidebarHistoryContent'),
+        howitworks: document.getElementById('sidebarHowItWorksContent'),
+        howtouse: document.getElementById('sidebarHowToUseContent')
+    };
+    const tabs = {
+        challenge: document.getElementById('sidebarTabChallenge'),
+        history: document.getElementById('sidebarTabHistory'),
+        howitworks: document.getElementById('sidebarTabHowItWorks'),
+        howtouse: document.getElementById('sidebarTabHowToUse')
+    };
 
-    if (challengeContent) challengeContent.style.display = 'none';
-    if (historyContent) historyContent.style.display = 'none';
-    if (hiwContent) hiwContent.style.display = 'none';
-    if (tabChallenge) tabChallenge.classList.remove('active');
-    if (tabHistory) tabHistory.classList.remove('active');
-    if (tabHIW) tabHIW.classList.remove('active');
+    for (const key in panels) { if (panels[key]) panels[key].style.display = 'none'; }
+    for (const key in tabs) { if (tabs[key]) tabs[key].classList.remove('active'); }
 
-    if (tab === 'history') {
-        if (historyContent) historyContent.style.display = 'block';
-        if (tabHistory) tabHistory.classList.add('active');
-        if (typeof historyRefresh === 'function') {
-            const area = document.getElementById('historyContent');
-            if (area && !area.innerHTML.trim()) historyRefresh();
-        }
-    } else if (tab === 'howitworks') {
-        if (hiwContent) hiwContent.style.display = 'block';
-        if (tabHIW) tabHIW.classList.add('active');
-    } else {
-        if (challengeContent) challengeContent.style.display = 'block';
-        if (tabChallenge) tabChallenge.classList.add('active');
+    if (panels[tab]) panels[tab].style.display = 'block';
+    if (tabs[tab]) tabs[tab].classList.add('active');
+
+    if (tab === 'history' && typeof historyRefresh === 'function') {
+        const area = document.getElementById('historyContent');
+        if (area && !area.innerHTML.trim()) historyRefresh();
     }
 }
 
@@ -4201,6 +4199,138 @@ function populateHowItWorks(mode) {
                 <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
                     <p style="margin:0 0 0.4rem 0;">Every <code>let</code> binding is a <strong>lambda abstraction</strong>: <code>let x = 5 in ...</code> is (&lambda;x. ...) 5.</p>
                     <p style="margin:0;">The Compile Session button shows this transformation explicitly &mdash; from symbolic math to Church Machine instructions, proving that your calculator and the processor speak the same language.</p>
+                </div>
+            </div>`
+    };
+
+    container.innerHTML = content[mode] || content.interactive;
+}
+
+function populateHowToUse(mode) {
+    const container = document.getElementById('sidebarHowToUseContent');
+    if (!container) return;
+
+    const content = {
+        hp35: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How to Use RPN</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.5rem 0;">The HP-35 uses a <strong>4-level stack</strong> instead of an <strong>=</strong> key. You enter numbers first, then press the operation.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Key Actions</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;"><strong>ENTER \u2191</strong> \u2014 Pushes X up into Y (and Y\u2192Z, Z\u2192T). Use between numbers.</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>+  \u2212  \u00d7  \u00f7</strong> \u2014 Takes X and Y, puts the result in X, stack drops down.</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>x\u21c4y</strong> \u2014 Swaps X and Y. Fix wrong order without retyping.</p>
+                    <p style="margin:0;"><strong>R\u2193</strong> \u2014 Rolls the whole stack down: T\u2192X, X\u2192Y, Y\u2192Z, Z\u2192T.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Try It</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.4rem 0;"><strong>(3 + 4) \u00d7 5:</strong></p>
+                    <p style="margin:0 0 0.6rem 0;font-family:monospace;background:rgba(0,0,0,0.2);padding:0.4rem 0.6rem;border-radius:4px;">3 <span style="color:var(--church-gold);">ENTER</span> 4 <span style="color:var(--church-gold);">+</span> 5 <span style="color:var(--church-gold);">\u00d7</span> \u2192 35</p>
+                    <p style="margin:0 0 0.4rem 0;"><strong>(9 \u2212 2) \u00f7 (1 + 6):</strong></p>
+                    <p style="margin:0;font-family:monospace;background:rgba(0,0,0,0.2);padding:0.4rem 0.6rem;border-radius:4px;">9 <span style="color:var(--church-gold);">ENTER</span> 2 <span style="color:var(--church-gold);">\u2212</span> 1 <span style="color:var(--church-gold);">ENTER</span> 6 <span style="color:var(--church-gold);">+</span> <span style="color:var(--church-gold);">\u00f7</span> \u2192 1</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(180,140,255,0.95);">Why RPN?</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    No parentheses needed. No = key. Complex expressions flow naturally left to right. The stack remembers intermediate results for you \u2014 like how you'd work it out on paper, one step at a time.
+                </div>
+            </div>`,
+
+        abacus: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How to Use the Abacus</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    Click beads to move them toward or away from the centre bar. Each column is one digit.
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Reading a Number</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;"><strong>Top bead</strong> (above bar) = <strong>5</strong> when moved down.</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>Bottom beads</strong> (below bar) = <strong>1 each</strong> when moved up.</p>
+                    <p style="margin:0;">Count active beads in each column. Rightmost column = ones, next = tens, and so on.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Try It: Enter 42</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;">In the <strong>tens</strong> column: move 4 bottom beads up.</p>
+                    <p style="margin:0;">In the <strong>ones</strong> column: move 2 bottom beads up.</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(180,140,255,0.95);">Addition</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;">Set the first number, then add the second by moving more beads.</p>
+                    <p style="margin:0;">When a column exceeds 9, reset it and carry 1 to the next column left \u2014 exactly like the Church Machine\u2019s binary carry.</p>
+                </div>
+            </div>`,
+
+        sliderule: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How to Use the Slide Rule</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;"><strong>Drag the <span style="color:#33cc66;">green slide</span></strong> to set the first value.</p>
+                    <p style="margin:0;"><strong>Drag the <span style="color:#ff3333;">red cursor</span></strong> to read the result at any point on the scale.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Scales</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;"><strong>C / D</strong> \u2014 Multiplication and division.</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>A / B</strong> \u2014 Squares and square roots.</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>C / CI</strong> \u2014 Reciprocals (inverted C).</p>
+                    <p style="margin:0 0 0.3rem 0;"><strong>D / K</strong> \u2014 Cubes and cube roots.</p>
+                    <p style="margin:0;"><strong>S / T</strong> \u2014 Sine and tangent.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Try It: 2 \u00d7 3</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;">On C/D: slide the C scale so its 1 aligns with D=2.</p>
+                    <p style="margin:0;">Move the cursor to C=3. Read D under the cursor \u2192 6.</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(180,140,255,0.95);">Try the Presets</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    Click the <strong>Try</strong> buttons below the slide rule to see multiplication and square root examples animated automatically.
+                </div>
+            </div>`,
+
+        interactive: `
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:var(--church-gold);">How to Use Interactive Math</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    Type expressions into the REPL input and press Enter. Use <code>let</code> to define variables.
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(130,200,255,0.95);">Commands</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0 0 0.3rem 0;"><code>let x = 5</code> \u2014 Define a variable.</p>
+                    <p style="margin:0 0 0.3rem 0;"><code>let y = x * 3 + 1</code> \u2014 Use variables in expressions.</p>
+                    <p style="margin:0 0 0.3rem 0;"><code>VARS</code> \u2014 Show all defined variables.</p>
+                    <p style="margin:0;"><code>CLEAR</code> \u2014 Reset everything.</p>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:0.75rem;">
+                <div class="panel-title" style="color:rgba(100,200,100,0.9);">Try It</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    <p style="margin:0;font-family:monospace;background:rgba(0,0,0,0.2);padding:0.4rem 0.6rem;border-radius:4px;line-height:1.8;">let r = 5<br>let area = 3.14159 * r * r<br>area</p>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:rgba(180,140,255,0.95);">Compile Session</div>
+                <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                    Click <strong>Compile Session</strong> to convert your let-bindings into Church Machine assembly. Each variable becomes a register and each operation becomes an instruction.
                 </div>
             </div>`
     };
