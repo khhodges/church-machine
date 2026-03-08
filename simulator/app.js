@@ -3752,7 +3752,10 @@ function dismissMathGuide() {
     localStorage.setItem('churchMachine_mathGuideDismissed', '1');
     const modal = document.getElementById('mathGuideModal');
     if (modal) modal.style.display = 'none';
-    showToolGuide('interactive');
+    const activeTab = document.querySelector('.math-mode-tab.active');
+    const activeModeId = activeTab ? activeTab.id.replace('mathTab', '').toLowerCase() : 'hp35';
+    const modeMap = { 'hp35': 'hp35', 'abacus': 'abacus', 'sliderule': 'sliderule', 'interactive': 'interactive' };
+    showToolGuide(modeMap[activeModeId] || 'hp35');
 }
 
 function resetAllPopups() {
