@@ -4029,6 +4029,12 @@ function switchMathMode(mode) {
     if (mode === 'abacus' && !abacusState.rendered) renderAbacusCalculator();
     if (mode === 'sliderule' && !slideruleState.rendered) renderSlideRuleCalculator();
 
+    if (typeof slideruleRemoveSidebar === 'function') slideruleRemoveSidebar();
+    if (mode === 'sliderule' && typeof slideruleInjectSidebar === 'function') {
+        slideruleInjectSidebar();
+        switchSidebarTab('history');
+    }
+
     if (typeof historySetTool === 'function') historySetTool(mode);
 
     showToolGuide(mode);

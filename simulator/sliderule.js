@@ -329,37 +329,45 @@ function slideruleGenerateArrows(cx) {
     return arrows;
 }
 
-function slideruleTogglePanel(panel) {
-    const panels = ['howitworks', 'history', 'fp'];
-    const ids = { howitworks: 'sliderulePanelHowitworks', history: 'sliderulePanelHistory', fp: 'sliderulePanelFp' };
-    const arrows = { howitworks: 'slideruleArrowHowitworks', history: 'slideruleArrowHistory', fp: 'slideruleArrowFp' };
-    const el = document.getElementById(ids[panel]);
-    if (!el) return;
-    const isOpen = el.style.display !== 'none';
-    el.style.display = isOpen ? 'none' : '';
-    const arrow = document.getElementById(arrows[panel]);
-    if (arrow) arrow.textContent = isOpen ? '\u25BC' : '\u25B2';
-    if (!isOpen && panel === 'history') sliderulePopulateHistory();
+function slideruleInjectSidebar() {
+    const historyContent = document.getElementById('historyContent');
+    if (!historyContent) return;
+    const existing = document.getElementById('slideruleSidebarHIW');
+    if (existing) return;
+
+    const hiwHTML = `<div id="slideruleSidebarHIW" style="margin-bottom:1rem;">
+        <div class="panel" style="margin-bottom:0.75rem;">
+            <div class="panel-title" style="color:var(--church-gold);">How the Slide Rule Works</div>
+            <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                The slide rule computes by <em>adding or comparing logarithmic lengths</em>.
+                On the C/D scales, sliding by log(a) and reading at C=b gives D = a\u00d7b.
+                <span style="color:#ff6644;">a</span> and <span style="color:#44aaff;">b</span> are labelled above the scale. The <span style="color:#ff3333;">red arrow</span> below shows a \u00d7 b.
+                Other scales use the same principle for squares (A/B), cubes (K),
+                reciprocals (CI), and trigonometry (S/T) \u2014 all backed by
+                CALL SlideRule at NS[16].
+            </div>
+        </div>
+        <div class="panel" style="margin-bottom:0.75rem;">
+            <div class="panel-title" style="color:rgba(130,200,255,0.95);">Floating Point \u2014 The Slide Rule Inside Your Computer</div>
+            <div style="font-size:0.82rem;line-height:1.55;color:var(--text-secondary);">
+                <p style="margin:0 0 0.5rem 0;">Every floating-point number works like a slide rule reading: a <strong>mantissa</strong> (scale position) and an <strong>exponent</strong> (power of 10). IEEE 754 does the same in binary.</p>
+                <div style="display:flex;flex-direction:column;gap:0.3rem;background:rgba(0,0,0,0.2);border-radius:6px;padding:0.5rem;margin-bottom:0.5rem;font-size:0.78rem;font-family:monospace;">
+                    <div><span style="color:var(--church-gold);">Slide Rule:</span> \u00b1 scale position (1\u201310) \u00d7 10\u207f</div>
+                    <div><span style="color:rgba(130,200,255,0.95);">IEEE 754:</span> sign bit \u00b7 mantissa (1.xxx\u2082) \u00d7 2\u1d49</div>
+                </div>
+                <p style="margin:0 0 0.3rem 0;"><strong style="color:var(--church-gold);">Why logarithmic?</strong> Numbers are spread so 1\u20132 takes the same space as 2\u20134 or 4\u20138 \u2014 equal precision per order of magnitude.</p>
+                <p style="margin:0 0 0.3rem 0;"><strong style="color:var(--church-gold);">Multiply = add logs:</strong> <span style="color:var(--church-gold);">log(a \u00d7 b) = log(a) + log(b)</span>. CPUs do the same: add exponents, multiply mantissas.</p>
+                <p style="margin:0;"><strong style="color:var(--church-gold);">In the Church Machine:</strong> 32-bit Turing data words follow the same mantissa + exponent structure. The slide rule on screen and the ALU in hardware are doing the same mathematics.</p>
+            </div>
+        </div>
+    </div>`;
+
+    historyContent.insertAdjacentHTML('afterbegin', hiwHTML);
 }
 
-function sliderulePopulateHistory() {
-    const area = document.getElementById('sliderulePanelHistory');
-    if (!area) return;
-    if (typeof historyStories === 'undefined') return;
-    const stories = historyStories.sliderule || historyStories.interactive || [];
-    if (!stories.length) {
-        area.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem;">No history stories available yet.</p>';
-        return;
-    }
-    const idx = Math.floor(Math.random() * stories.length);
-    const story = stories[idx];
-    let html = `<div style="padding:0.5rem 0;">`;
-    html += `<div style="font-weight:700;color:var(--church-gold);margin-bottom:0.4rem;">${story.title || 'History'}</div>`;
-    if (story.year) html += `<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.3rem;">${story.year}</div>`;
-    html += `<p style="font-size:0.82rem;line-height:1.55;margin:0 0 0.4rem 0;">${story.text || ''}</p>`;
-    if (story.wiki) html += `<a href="${story.wiki}" target="_blank" rel="noopener" class="history-wiki" style="color:var(--church-gold);font-size:0.8rem;">Read more on Wikipedia \u2197</a>`;
-    html += `</div>`;
-    area.innerHTML = html;
+function slideruleRemoveSidebar() {
+    const el = document.getElementById('slideruleSidebarHIW');
+    if (el) el.remove();
 }
 
 function slideruleGenerateTopLabels(scaleDef, offset) {
@@ -512,66 +520,7 @@ function renderSlideRuleCalculator() {
             </div>
         </div>
 
-        <div class="sliderule-tile-column">
-            <div class="sliderule-tile sliderule-tile-howitworks" style="cursor:pointer;" onclick="slideruleTogglePanel('howitworks')">
-                <div class="sliderule-tile-header" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>How It Works</span>
-                    <span class="sliderule-panel-arrow" id="slideruleArrowHowitworks" style="font-size:0.7rem;opacity:0.6;">\u25B2</span>
-                </div>
-                <div class="sliderule-info-text" id="sliderulePanelHowitworks">
-                    The slide rule computes by <em>adding or comparing logarithmic lengths</em>.
-                    On the C/D scales, sliding by log(a) and reading at C=b gives D = a\u00d7b.
-                    <span style="color:#ff6644;">a</span> and <span style="color:#44aaff;">b</span> are labelled above the scale. The <span style="color:#ff3333;">red arrow</span> below shows a \u00d7 b.
-                    Other scales use the same principle for squares (A/B), cubes (K),
-                    reciprocals (CI), and trigonometry (S/T) \u2014 all backed by
-                    CALL SlideRule at NS[16].
-                </div>
-            </div>
-            <div class="sliderule-tile" style="cursor:pointer;" onclick="slideruleTogglePanel('history')">
-                <div class="sliderule-tile-header" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>History</span>
-                    <span class="sliderule-panel-arrow" id="slideruleArrowHistory" style="font-size:0.7rem;opacity:0.6;">\u25BC</span>
-                </div>
-                <div class="sliderule-history-area" id="sliderulePanelHistory" style="display:none;"></div>
-            </div>
-            <div class="sliderule-tile" style="cursor:pointer;" onclick="slideruleTogglePanel('fp')">
-                <div class="sliderule-tile-header" style="display:flex;justify-content:space-between;align-items:center;">
-                    <span>Floating Point \u2014 The Slide Rule Inside Your Computer</span>
-                    <span class="sliderule-panel-arrow" id="slideruleArrowFp" style="font-size:0.7rem;opacity:0.6;">\u25BC</span>
-                </div>
-                <div id="sliderulePanelFp" style="display:none;">
-                <div class="sliderule-fp-body">
-                    <p>Every floating-point number in a computer works exactly like a slide rule reading. A slide rule gives you a <strong>mantissa</strong> (where the cursor sits on the scale) and you keep track of the <strong>exponent</strong> (the power of 10) in your head. IEEE 754 does the same thing in binary.</p>
-                    <div class="sliderule-fp-diagram">
-                        <div class="sliderule-fp-row">
-                            <span class="sliderule-fp-label">Slide Rule</span>
-                            <span class="sliderule-fp-parts"><span class="sliderule-fp-sign">\u00b1</span> <span class="sliderule-fp-mant">scale position (1\u201310)</span> <span class="sliderule-fp-exp">\u00d7 10\u207f</span></span>
-                        </div>
-                        <div class="sliderule-fp-row">
-                            <span class="sliderule-fp-label">IEEE 754</span>
-                            <span class="sliderule-fp-parts"><span class="sliderule-fp-sign">sign bit</span> <span class="sliderule-fp-mant">mantissa (1.xxx\u2082)</span> <span class="sliderule-fp-exp">\u00d7 2\u1d49</span></span>
-                        </div>
-                    </div>
-                    <div class="sliderule-fp-section">
-                        <div class="sliderule-fp-title">Why Logarithmic?</div>
-                        <p>A slide rule spreads numbers logarithmically \u2014 1 to 2 takes the same space as 2 to 4, or 4 to 8. This is exactly how floating-point works: it gives equal precision to each <em>order of magnitude</em>. Small numbers get fine detail. Large numbers get broad strokes. You never waste bits on empty leading zeros.</p>
-                    </div>
-                    <div class="sliderule-fp-section">
-                        <div class="sliderule-fp-title">Precision vs Range</div>
-                        <p>A 10-inch slide rule gives about 3 significant figures \u2014 good enough for engineering. A 32-bit float gives ~7 significant figures. A 64-bit double gives ~15. But like a slide rule, floating point is <strong>never exact</strong> for most values. The number 0.1 cannot be represented exactly in binary, just as 1/3 can\u2019t be written exactly in decimal. The slide rule taught generations of engineers to think about precision, and that lesson still applies.</p>
-                    </div>
-                    <div class="sliderule-fp-section">
-                        <div class="sliderule-fp-title">Multiplication = Addition of Logs</div>
-                        <p>On a slide rule, you multiply by <em>sliding</em> \u2014 physically adding logarithmic distances. Inside a CPU\u2019s floating-point unit, multiplication works the same way: add the exponents, multiply the mantissas. The slide rule makes this visible. <span style="color:var(--church-gold);">log(a \u00d7 b) = log(a) + log(b)</span></p>
-                    </div>
-                    <div class="sliderule-fp-section">
-                        <div class="sliderule-fp-title">In the Church Machine</div>
-                        <p>The Church Machine\u2019s Turing domain handles 32-bit data words. When those words represent floating-point values, the same slide rule principles apply \u2014 mantissa, exponent, logarithmic spacing. The slide rule on screen and the ALU in hardware are doing the same mathematics.</p>
-                    </div>
-                </div>
-                </div>
-            </div>
-        </div>
+        
     </div>`;
 
     slideruleState.rendered = true;
