@@ -761,6 +761,21 @@ header h1 {
     margin-bottom: 0.3rem;
 }
 
+a.next-step-link {
+    color: var(--church-gold);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(200, 155, 60, 0.4);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+}
+
+a.next-step-link:hover {
+    color: #e8c84a;
+    border-bottom-color: #e8c84a;
+    border-bottom-style: solid;
+}
+
 .next-steps-box ul {
     margin: 0.3rem 0 0 0;
     padding-left: 1.2rem;

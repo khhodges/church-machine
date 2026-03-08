@@ -7027,12 +7027,13 @@ function showNextSteps(context) {
     const box = document.getElementById('nextStepsBox');
     if (!box) return;
 
+    const link = (label, view) => `<a class="next-step-link" href="#" onclick="event.preventDefault();switchView('${view}')">${label}</a>`;
     const steps = {
         'compiled': `
             <div class="next-steps-label">Next Steps</div>
             <ul>
-                <li><strong>Name this abstract idea</strong> — does the abstraction name describe what it does?</li>
-                <li><strong>What functions does it perform?</strong> — look at the methods. Each one is a capability you are giving to the world.</li>
+                <li>${link('Name this abstract idea', 'abstractions')} — does the abstraction name describe what it does?</li>
+                <li>${link('Check the Namespace', 'namespace')} — see where your abstraction will live once created.</li>
                 <li><strong>Step through it</strong> — click <strong>Step</strong> to watch each instruction execute one at a time.</li>
                 <li><strong>Create Abstraction</strong> — when you are ready, click the green button to give your idea a Body in the Church Machine.</li>
             </ul>`,
@@ -7041,30 +7042,31 @@ function showNextSteps(context) {
             <ul>
                 <li><strong>Step through it</strong> — click <strong>Step</strong> to execute one instruction at a time and watch the registers change.</li>
                 <li><strong>Run it</strong> — click <strong>Run</strong> to execute all instructions until halt or fault.</li>
-                <li><strong>Save to NS</strong> — save the assembled program to a namespace slot.</li>
-                <li><strong>Try a different example</strong> — click the tabs above to explore more programs.</li>
+                <li>${link('Check the Namespace', 'namespace')} — see the namespace slots and save your program.</li>
+                <li>${link('View the Pipeline', 'pipeline')} — watch instructions flow through the mLoad pipeline.</li>
             </ul>`,
         'created': `
             <div class="next-steps-label">Next Steps</div>
             <ul>
-                <li><strong>Check the Namespace</strong> — click the <strong>Namespace</strong> tab to see your new abstraction's entry.</li>
-                <li><strong>Inspect it</strong> — click <strong>Abstractions</strong> to see the lump layout, c-list, and Golden Token.</li>
-                <li><strong>Call it</strong> — write another abstraction that holds a capability to yours, then CALL it.</li>
-                <li><strong>Build something bigger</strong> — every abstraction you create can be used by the next one.</li>
+                <li>${link('Check the Namespace', 'namespace')} — see your new abstraction\'s entry in the namespace table.</li>
+                <li>${link('Inspect it in Abstractions', 'abstractions')} — see the lump layout, c-list, and Golden Token.</li>
+                <li>${link('View the Pipeline', 'pipeline')} — watch how capabilities are checked in hardware.</li>
+                <li>${link('Read the Reference', 'reference')} — look up instructions and permission bits.</li>
             </ul>`,
         'error': `
             <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li><strong>Read the error</strong> — the line number tells you where to look.</li>
                 <li><strong>Check your syntax</strong> — does every <code>{</code> have a matching <code>}</code>?</li>
-                <li><strong>Try an example</strong> — click an example tab above to see working code you can modify.</li>
+                <li>${link('Try the Tutorial', 'tutorial')} — guided lessons to help you learn the syntax.</li>
+                <li>${link('Read the Reference', 'reference')} — look up instruction formats and examples.</li>
             </ul>`,
         'draft': `
             <div class="next-steps-label">Next Steps</div>
             <ul>
-                <li><strong>Review the methods</strong> — are these the functions your abstraction needs?</li>
-                <li><strong>Check capabilities</strong> — does your abstraction need access to other abstractions?</li>
-                <li><strong>Look at the lump layout</strong> — code region (CR7) + capability list (CR6). Is the size right?</li>
+                <li>${link('Check the Namespace', 'namespace')} — see where your abstraction will be placed.</li>
+                <li>${link('Inspect Abstractions', 'abstractions')} — review existing abstractions and their layouts.</li>
+                <li>${link('View the Pipeline', 'pipeline')} — understand how the mLoad pipeline processes capabilities.</li>
                 <li><strong>Compile</strong> — click <strong>Compile</strong> to see the actual machine instructions.</li>
             </ul>`
     };
