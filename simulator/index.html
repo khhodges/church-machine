@@ -35,12 +35,13 @@
     <div id="dashboard" class="view active">
         <div id="flagsDisplay" class="flags-bar"></div>
         <div class="dash-tabs">
-            <button onclick="switchDashTab('cr')" class="dash-tab active" id="dashTab-cr">Context Registers</button>
-            <button onclick="switchDashTab('dr')" class="dash-tab" id="dashTab-dr">Data Registers</button>
-            <button onclick="switchDashTab('state')" class="dash-tab" id="dashTab-state">Machine State</button>
-            <button class="btn" onclick="runGC()" style="background:#9b59b6;color:#fff;border:none;" title="Run PP250 garbage collection">Run GC</button>
-            <button onclick="switchDashTab('crdetail')" class="dash-tab" id="dashTab-crdetail" style="display:none;">CR Detail</button>
-            <button onclick="exportSimulatorToGitHub()" class="dash-tab" id="dashTab-export" title="Push simulator files to GitHub">Push to GitHub</button>
+            <button onclick="switchDashTab('cr')" class="dash-tab active" id="dashTab-cr" data-tooltip="View all 16 context registers (128-bit, 4 words each)">Context Registers</button>
+            <button onclick="switchDashTab('dr')" class="dash-tab" id="dashTab-dr" data-tooltip="View all 16 data registers (32-bit values, DR0 = zero)">Data Registers</button>
+            <button onclick="switchDashTab('state')" class="dash-tab" id="dashTab-state" data-tooltip="View machine architecture and current state">Machine State</button>
+            <button class="btn" onclick="runGC()" style="background:#9b59b6;color:#fff;border:none;" title="Run PP250 garbage collection" data-tooltip="Run PP250 garbage collection (scan, identify, clear, flip)">Run GC</button>
+            <button onclick="switchDashTab('crdetail')" class="dash-tab" id="dashTab-crdetail" style="display:none;" data-tooltip="Detailed view of a single context register">CR Detail</button>
+            <button onclick="exportSimulatorToGitHub()" class="dash-tab" id="dashTab-export" title="Push simulator files to GitHub" data-tooltip="Push simulator files to GitHub">Push to GitHub</button>
+            <button class="btn" onclick="showLibrary()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" title="Browse and share abstractions via Mum Tunnel Library" data-tooltip="Browse and share abstractions via Mum Tunnel Library">Get from GitHub</button>
         </div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
@@ -92,7 +93,6 @@
                     <div class="toolbar-phase">
                         <span class="phase-label">Install</span>
                         <button class="btn" onclick="saveUploadJSON()" style="background:#2a6fdb;color:#fff;border:none;" title="Compile and save upload.json file">Save Upload JSON</button>
-                        <button class="btn" onclick="showLibrary()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" title="Browse and share abstractions via Mum Tunnel Library">Library</button>
                         <button class="btn btn-primary" onclick="showSaveToNamespace()" id="btnSaveNS" disabled title="Save assembled program to namespace">Save to NS</button>
                         <button class="btn btn-deploy" onclick="downloadHardwareImage()" title="Download binary for Tang Nano 20K">Download .bin</button>
                         <button class="btn btn-deploy" onclick="uploadToTang()" title="Upload to Tang Nano 20K via WebSerial">Deploy to Tang</button>
