@@ -613,7 +613,7 @@ class SlideRuleTutorial {
         html += `<button class="btn btn-tutorial" onclick="slideRuleTutorial.stepForward()">${this.currentStep >= this.steps.length - 1 ? 'Reset' : 'Next &raquo;'}</button>`;
         html += '</div>';
 
-        html += this._renderProgressBar();
+        // progress bar removed
         html += '</div>';
 
         html += '<div class="sr-body">';
