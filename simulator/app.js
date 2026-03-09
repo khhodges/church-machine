@@ -2813,6 +2813,111 @@ function showGCConsole(phases, result, isError) {
     (isError ? closeBtn : stepBtn).focus();
 }
 
+var _ghConsoleOutput = null;
+var _ghConsoleStatus = null;
+var _ghConsoleOverlay = null;
+var _ghConsoleToken = 0;
+var _ghAutoCloseTimer = null;
+
+function showGitHubConsole(phases, mode, initialStatus) {
+    closeGitHubConsole();
+
+    _ghConsoleToken++;
+    var token = _ghConsoleToken;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'ghConsoleOverlay';
+    overlay.className = 'modal-overlay';
+    overlay._token = token;
+    _ghConsoleOverlay = overlay;
+
+    var dialog = document.createElement('div');
+    dialog.className = 'gc-console-dialog';
+    dialog.style.borderColor = '#C89B3C';
+    dialog.style.boxShadow = '0 8px 32px rgba(200,155,60,0.3)';
+
+    var title = document.createElement('div');
+    title.className = 'gc-console-title';
+    title.style.color = '#C89B3C';
+    title.textContent = mode === 'push' ? 'Push to GitHub' : 'Get from GitHub';
+    dialog.appendChild(title);
+
+    var output = document.createElement('pre');
+    output.className = 'gc-console-output';
+    output.id = 'ghConsoleOutput';
+    _ghConsoleOutput = output;
+    dialog.appendChild(output);
+
+    for (var i = 0; i < phases.length; i++) {
+        var p = phases[i];
+        var body = p.lines.filter(function(l) { return l.trim(); }).join('\n');
+        output.textContent += (output.textContent ? '\n' : '') + p.heading + '\n' + body + '\n';
+    }
+
+    var status = document.createElement('div');
+    status.className = 'gc-console-status';
+    status.id = 'ghConsoleStatus';
+    status.style.borderLeftColor = '#C89B3C';
+    status.textContent = initialStatus || 'Working...';
+    _ghConsoleStatus = status;
+    dialog.appendChild(status);
+
+    var buttons = document.createElement('div');
+    buttons.className = 'gc-console-buttons';
+
+    var closeBtn = document.createElement('button');
+    closeBtn.className = 'btn';
+    closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = 'background:#555;color:#fff;border:none;';
+    closeBtn.addEventListener('click', closeGitHubConsole);
+    buttons.appendChild(closeBtn);
+
+    dialog.appendChild(buttons);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeGitHubConsole();
+    });
+
+    function escHandler(e) {
+        if (e.key === 'Escape') closeGitHubConsole();
+    }
+    document.addEventListener('keydown', escHandler);
+    overlay._escHandler = escHandler;
+
+    return token;
+}
+
+function appendGitHubPhase(phase, token) {
+    if (token !== undefined && token !== _ghConsoleToken) return;
+    if (!_ghConsoleOutput) return;
+    var body = phase.lines.filter(function(l) { return l.trim(); }).join('\n');
+    _ghConsoleOutput.textContent += '\n' + phase.heading + '\n' + body + '\n';
+    _ghConsoleOutput.scrollTop = _ghConsoleOutput.scrollHeight;
+}
+
+function updateGitHubStatus(msg, isError, token) {
+    if (token !== undefined && token !== _ghConsoleToken) return;
+    if (!_ghConsoleStatus) return;
+    _ghConsoleStatus.textContent = msg;
+    if (isError) {
+        _ghConsoleStatus.style.borderLeftColor = '#e74c3c';
+        if (_ghConsoleOutput) _ghConsoleOutput.style.color = '#e74c3c';
+    }
+}
+
+function closeGitHubConsole() {
+    if (_ghAutoCloseTimer) { clearTimeout(_ghAutoCloseTimer); _ghAutoCloseTimer = null; }
+    if (_ghConsoleOverlay) {
+        if (_ghConsoleOverlay._escHandler) document.removeEventListener('keydown', _ghConsoleOverlay._escHandler);
+        _ghConsoleOverlay.remove();
+        _ghConsoleOverlay = null;
+    }
+    _ghConsoleOutput = null;
+    _ghConsoleStatus = null;
+}
+
 function loadExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
@@ -7848,17 +7953,41 @@ function buildDocBlock(result, source) {
 async function exportSimulatorToGitHub() {
     const btn = document.getElementById('dashTab-export');
     if (btn) btn.textContent = 'Pushing...';
+
+    const phases = [];
+    phases.push({ heading: '=== Push to GitHub ===', lines: ['Connecting to GitHub API...'] });
+
+    var tok = showGitHubConsole(phases, 'push', 'Connecting to GitHub...');
+
     try {
         const r = await fetch('/api/github/export-simulator', { method: 'POST' });
         const data = await r.json();
         if (data.ok) {
-            alert(`Exported ${data.total} files to GitHub.\n\nPushed:\n${data.pushed.join('\n')}`);
+            const fileLines = (data.pushed || []).map(function(f) { return '  + ' + f; });
+            appendGitHubPhase({ heading: '--- Files Pushed ---', lines: fileLines }, tok);
+            appendGitHubPhase({ heading: '=== Push Complete ===', lines: [
+                'Total files exported: ' + data.total,
+                'All files pushed successfully.'
+            ]}, tok);
+            updateGitHubStatus('Push complete — ' + data.total + ' files exported.', false, tok);
         } else {
             const msg = data.errors ? data.errors.join('\n') : (data.error || 'Unknown error');
-            alert(`Export had issues:\n\nPushed: ${data.pushed ? data.pushed.length : 0}\nErrors:\n${msg}`);
+            const pushed = data.pushed ? data.pushed.length : 0;
+            appendGitHubPhase({ heading: '--- Push Results ---', lines: [
+                'Files pushed: ' + pushed,
+                '',
+                'Errors:',
+                msg
+            ]}, tok);
+            updateGitHubStatus('Push completed with errors.', true, tok);
         }
     } catch (e) {
-        alert('Export failed: ' + e.message);
+        appendGitHubPhase({ heading: '--- Error ---', lines: [
+            'Push failed: ' + e.message,
+            '',
+            'Check that GitHub is configured and accessible.'
+        ]}, tok);
+        updateGitHubStatus('Push failed — ' + e.message, true, tok);
     } finally {
         if (btn) btn.textContent = 'Push to GitHub';
     }
@@ -7869,19 +7998,70 @@ let libraryAllItems = [];
 
 async function showLibrary() {
     if (!requirePermission('browseLibrary', 'Browse Library')) return;
-    document.getElementById('libraryModal').style.display = 'flex';
+
+    const phases = [];
+    phases.push({ heading: '=== Get from GitHub ===', lines: ['Connecting to Mum Tunnel Library...'] });
+    var tok = showGitHubConsole(phases, 'get', 'Fetching library index...');
+
     const repoLink = document.getElementById('libraryGitHubLink');
+    let repoUrl = '';
     if (repoLink) {
         repoLink.href = '/api/library/repo-url';
         try {
             const r = await fetch('/api/library/repo-url');
             if (r.ok) {
                 const data = await r.json();
-                if (data.url) repoLink.href = data.url;
+                if (data.url) { repoLink.href = data.url; repoUrl = data.url; }
             }
         } catch (e) {}
     }
-    await loadLibraryItems();
+
+    try {
+        const langFilter = document.getElementById('libraryLangFilter');
+        const langParam = langFilter && langFilter.value ? '?language=' + langFilter.value : '';
+        const resp = await fetch('/api/library/browse' + langParam);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        libraryAllItems = data.items || [];
+
+        if (libraryAllItems.length > 0) {
+            const itemLines = libraryAllItems.slice(0, 20).map(function(item) {
+                var doc = item.doc || {};
+                return '  ' + (item.name || 'Untitled') + ' — ' + (doc.language || 'unknown') + ' by ' + (doc.author || 'Anonymous');
+            });
+            if (libraryAllItems.length > 20) itemLines.push('  ... and ' + (libraryAllItems.length - 20) + ' more');
+            appendGitHubPhase({ heading: '--- Abstractions Found ---', lines: itemLines }, tok);
+            appendGitHubPhase({ heading: '=== Fetch Complete ===', lines: [
+                'Found ' + libraryAllItems.length + ' shared abstractions.',
+                repoUrl ? 'Repository: ' + repoUrl : ''
+            ]}, tok);
+            updateGitHubStatus('Loaded ' + libraryAllItems.length + ' abstractions. Opening library...', false, tok);
+        } else {
+            appendGitHubPhase({ heading: '=== Library Empty ===', lines: [
+                'No shared abstractions found.',
+                'Be the first to publish!'
+            ]}, tok);
+            updateGitHubStatus('Library is empty.', false, tok);
+        }
+
+        var capturedItems = libraryAllItems;
+        _ghAutoCloseTimer = setTimeout(function() {
+            _ghAutoCloseTimer = null;
+            if (tok === _ghConsoleToken) {
+                closeGitHubConsole();
+                document.getElementById('libraryModal').style.display = 'flex';
+                renderLibraryGrid(capturedItems);
+            }
+        }, 1500);
+
+    } catch (e) {
+        appendGitHubPhase({ heading: '--- Error ---', lines: [
+            'Could not load library: ' + e.message,
+            '',
+            'Check your network connection and try again.'
+        ]}, tok);
+        updateGitHubStatus('Fetch failed — ' + e.message, true, tok);
+    }
 }
 
 async function loadLibraryItems() {
