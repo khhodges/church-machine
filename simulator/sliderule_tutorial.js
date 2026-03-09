@@ -7,8 +7,7 @@ class SlideRuleTutorial {
     _buildSteps() {
         return [
             {
-                title: "The Church Machine",
-                subtitle: "A Capability-Secured Processor with Multi-Language Compilation",
+                title: "The Church Turing Machine: Solving Lethal Autonomous Weapons",
                 type: "intro",
                 content: `<p>The root cause of modern computer insecurity is in the hardware. Conventional processors grant every program <strong>shared access rights to physical memory</strong> &mdash; any running code can read or write any address the hardware can reach. This single design flaw forces the entire industry to build centralised operating systems and privileged monitors that attempt to <em>restrict</em> what programs can do after the fact.</p>
 <p>The result is <strong>ambient authority</strong>: programs run with broad permissions granted by the operating system, and security is enforced by checking identity rather than capability. A web browser, a text editor, and a cryptocurrency wallet all execute under the same user account, with the same file system access. Because the underlying hardware does not enforce boundaries, every layer of software protection &mdash; access-control lists, process isolation, sandboxes &mdash; can, in principle, be bypassed.</p>
