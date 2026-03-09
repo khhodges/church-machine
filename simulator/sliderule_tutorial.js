@@ -22,7 +22,7 @@ class SlideRuleTutorial {
 <div class="sr-obj-item"><span class="sr-obj-num">2</span>How the CLOOMC++ compiler targets it from JavaScript and Haskell</div>
 <div class="sr-obj-item"><span class="sr-obj-num">3</span>A side-by-side comparison of the SlideRule abstraction in both languages</div>
 <div class="sr-obj-item"><span class="sr-obj-num">4</span>Performance analysis on the Tang Nano 20K FPGA (27 MHz)</div>
-<div class="sr-obj-item"><span class="sr-obj-num">5</span>Why the compiler can produce incorrect programs but never insecure ones</div>
+<div class="sr-obj-item"><span class="sr-obj-num">5</span>Why the CLOOMC++ compiler can produce incorrect programs but never insecure ones</div>
 <div class="sr-obj-item"><span class="sr-obj-num">6</span>How to write and compile your own abstraction</div>
 </div>
 <p class="sr-hardware">Target: Sipeed Tang Nano 20K &mdash; Gowin GW2AR-18 FPGA, QN88 package, 20,736 LUTs, 27 MHz clock. Synthesised with Amaranth HDL and oss-cad-suite.</p>`
