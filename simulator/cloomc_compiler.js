@@ -341,6 +341,28 @@ class CLOOMCCompiler {
             return dr;
         }
 
+        const mulMatch = expr.match(/^(\w+)\s*\*\s*(.+)$/);
+        if (mulMatch) {
+            const leftDR = this._resolveExpr(mulMatch[1], code, locals, rom, errors, lineNum, method);
+            const rightExpr = mulMatch[2].trim();
+            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
+            const accDR = this._allocTemp(locals);
+            const cntDR = this._allocTemp(locals);
+            const oneDR = this._allocTemp(locals);
+            code.push(this.encode(this.opcodes.IADD, 14, accDR, 0, 0));
+            code.push(this.encode(this.opcodes.IADD, 14, cntDR, rightDR, 0));
+            code.push(this.encode(this.opcodes.IADD, 14, oneDR, 0, 1));
+            const loopStart = code.length;
+            code.push(this.encode(this.opcodes.MCMP, 14, cntDR, 0, 0));
+            const branchIdx = code.length;
+            code.push(this.encode(this.opcodes.BRANCH, 0, 0, 0, 0));
+            code.push(this.encode(this.opcodes.IADD, 14, accDR, accDR, leftDR));
+            code.push(this.encode(this.opcodes.ISUB, 14, cntDR, cntDR, oneDR));
+            code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, loopStart & 0x7FFF));
+            code[branchIdx] = this.encode(this.opcodes.BRANCH, 0, 0, 0, code.length & 0x7FFF);
+            return accDR;
+        }
+
         const shlMatch = expr.match(/^(\w+)\s*<<\s*(\d+)$/);
         if (shlMatch) {
             const srcDR = this._resolveExpr(shlMatch[1], code, locals, rom, errors, lineNum, method);
@@ -1760,6 +1782,7 @@ class CLOOMCCompiler {
         for (const line of lines) {
             const t = line.trim().toLowerCase();
             if (!t || t.startsWith('//') || t.startsWith('--')) continue;
+            if (t.match(/^english\s+abstraction\s+/)) return true;
             if (t.match(/^(create|define|make)\s+(an?\s+)?abstraction\s+(called|named)\s+/)) englishScore += 3;
             if (t.match(/^(add|define|create)\s+(an?\s+)?method\s+(called|named)\s+/)) englishScore += 2;
             if (t.match(/^(set|store|put|assign)\s+/)) englishScore++;
@@ -1802,6 +1825,11 @@ class CLOOMCCompiler {
         const result = { name: '', capabilities: [], methods: [] };
         const lines = source.split('\n');
         let currentMethod = null;
+
+        const blockMatch = lines[0] && lines[0].trim().match(/^ENGLISH\s+abstraction\s+(\w+)\s*\{?\s*$/i);
+        if (blockMatch) {
+            return this._parseEnglishBlock(source, errors);
+        }
 
         for (let i = 0; i < lines.length; i++) {
             const raw = lines[i];
@@ -1861,6 +1889,144 @@ class CLOOMCCompiler {
         }
 
         return result;
+    }
+
+    _parseEnglishBlock(source, errors) {
+        const result = { name: '', capabilities: [], methods: [] };
+        const lines = source.split('\n');
+        let currentMethod = null;
+        let inCapabilities = false;
+
+        const mergedLines = [];
+        for (let i = 0; i < lines.length; i++) {
+            const t = lines[i].trim();
+            const lo = t.toLowerCase();
+            if (mergedLines.length > 0 && lo.match(/^and\s+/)) {
+                mergedLines[mergedLines.length - 1].text += ' ' + t;
+            } else {
+                mergedLines.push({ text: t, lineNum: i });
+            }
+        }
+
+        for (const entry of mergedLines) {
+            const t = entry.text;
+            const i = entry.lineNum;
+            if (!t || t === '{' || t === '}' || t.startsWith('//') || t.startsWith('--')) {
+                if (t === '}' && inCapabilities) inCapabilities = false;
+                continue;
+            }
+            const lo = t.toLowerCase();
+
+            const absMatch = lo.match(/^english\s+abstraction\s+(\w+)\s*\{?\s*$/);
+            if (absMatch) {
+                result.name = t.match(/abstraction\s+(\w+)/i)[1];
+                continue;
+            }
+
+            const capBlockMatch = lo.match(/^capabilities\s*\{\s*(.*?)\s*\}?\s*$/);
+            if (capBlockMatch) {
+                const inner = capBlockMatch[1];
+                if (inner) {
+                    const caps = inner.replace(/[{}]/g, '').replace(/\band\b/g, ',').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+                    result.capabilities.push(...caps);
+                }
+                if (!t.includes('}')) inCapabilities = true;
+                continue;
+            }
+
+            if (inCapabilities) {
+                const caps = t.replace(/[{}]/g, '').replace(/\band\b/g, ',').split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+                result.capabilities.push(...caps);
+                if (t.includes('}')) inCapabilities = false;
+                continue;
+            }
+
+            const methodMatch = t.match(/^(\w+)\s*\(([^)]*)\)\s*:\s*$/);
+            if (methodMatch) {
+                if (currentMethod) result.methods.push(currentMethod);
+                const name = methodMatch[1];
+                const params = methodMatch[2].split(',').map(s => s.trim()).filter(Boolean);
+                currentMethod = { name, params, body: [], startLine: i };
+                continue;
+            }
+
+            if (!currentMethod) continue;
+
+            const stmts = this._translateEnglishBlockStatement(t, i);
+            if (stmts) {
+                for (const s of stmts) {
+                    currentMethod.body.push({ text: s, lineNum: i });
+                }
+            }
+        }
+
+        if (currentMethod) result.methods.push(currentMethod);
+
+        if (!result.name) {
+            errors.push({ line: 0, message: 'No abstraction name found. Use: ENGLISH abstraction MyName {' });
+        }
+        if (result.methods.length === 0) {
+            errors.push({ line: 0, message: 'No methods found. Use: MethodName(params):' });
+        }
+
+        return result;
+    }
+
+    _translateEnglishBlockStatement(text, lineNum) {
+        const lo = text.toLowerCase().replace(/\.$/, '').trim();
+
+        const returnMatch = lo.match(/^(?:return|give back|send back)\s+(?:the\s+)?(.+)/);
+        if (returnMatch) {
+            const val = this._translateEnglishExpr(returnMatch[1]);
+            return [`return(${val})`];
+        }
+
+        const addReturnMatch = lo.match(/^add\s+(.+?)\s+(?:to|and)\s+(.+?)\s+and\s+return\s+(?:the\s+)?(.+)/);
+        if (addReturnMatch) {
+            const a = this._translateEnglishExpr(addReturnMatch[1]);
+            const b = this._translateEnglishExpr(addReturnMatch[2]);
+            return [`result = ${a} + ${b}`, `return(result)`];
+        }
+
+        const mulReturnMatch = lo.match(/^multiply\s+(.+?)\s+by\s+(.+?)(?:\s+using\s+.*)?\s+and\s+return\s+(?:the\s+)?(.+)/);
+        if (mulReturnMatch) {
+            const a = this._translateEnglishExpr(mulReturnMatch[1]);
+            const b = this._translateEnglishExpr(mulReturnMatch[2]);
+            return [`result = ${a} * ${b}`, `return(result)`];
+        }
+
+        const addMatch = lo.match(/^add\s+(.+?)\s+(?:to|and)\s+(.+)/);
+        if (addMatch) {
+            const a = this._translateEnglishExpr(addMatch[1]);
+            const b = this._translateEnglishExpr(addMatch[2]);
+            return [`result = ${a} + ${b}`];
+        }
+
+        const mulMatch = lo.match(/^multiply\s+(.+?)\s+by\s+(.+?)(\s+using\s+.*)?$/);
+        if (mulMatch) {
+            const a = this._translateEnglishExpr(mulMatch[1]);
+            const b = this._translateEnglishExpr(mulMatch[2]);
+            return [`result = ${a} * ${b}`];
+        }
+
+        const subMatch = lo.match(/^subtract\s+(.+?)\s+from\s+(.+)/);
+        if (subMatch) {
+            const a = this._translateEnglishExpr(subMatch[2]);
+            const b = this._translateEnglishExpr(subMatch[1]);
+            return [`result = ${a} - ${b}`];
+        }
+
+        const divMatch = lo.match(/^divide\s+(.+?)\s+by\s+(.+)/);
+        if (divMatch) {
+            const a = this._translateEnglishExpr(divMatch[1]);
+            const b = this._translateEnglishExpr(divMatch[2]);
+            return [`result = ${a} / ${b}`];
+        }
+
+        const stmt = this._translateEnglishStatement(text, lineNum);
+        if (stmt) return [stmt];
+
+        return null;
     }
 
     _translateEnglishStatement(text, lineNum) {
