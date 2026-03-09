@@ -101,15 +101,22 @@ class SecurityTutorial {
             {
                 title: "The Universal Target Argument",
                 type: "conclusion",
-                content: `<p>The fact that both JavaScript and Haskell compile to the same 20 instructions is not merely a compiler trick &mdash; it is a demonstration of <strong>computational universality</strong>.</p>
+                content: `<p>The fact that all four languages &mdash; English, JavaScript, Haskell, and Machine code &mdash; compile to the same 20 instructions is not merely a compiler trick. It is a demonstration of <strong>computational universality</strong>.</p>
+<table class="sr-table sr-table-wide"><tr><th>Language</th><th>Style</th><th>Compiles to</th><th>Security model</th></tr>
+<tr><td>English</td><td>Natural language</td><td>20 instructions + abstraction calls</td><td>Identical</td></tr>
+<tr><td>JavaScript</td><td>Imperative</td><td>20 instructions</td><td>Identical</td></tr>
+<tr><td>Haskell</td><td>Functional</td><td>20 instructions</td><td>Identical</td></tr>
+<tr><td>Machine code</td><td>Direct hex</td><td>20 instructions (verbatim)</td><td>Identical</td></tr>
+</table>
 <ul>
 <li>The instruction set is <strong>Turing-complete</strong> (conditional branching + memory access)</li>
 <li>The instruction set is <strong>Church-complete</strong> (LAMBDA + CALL)</li>
 <li>Any computable function can be expressed in these 20 instructions</li>
+<li>No language can bypass the capability model &mdash; not even raw machine code</li>
 </ul>
 <div class="sr-key-concept">
 <div class="sr-concept-title">Separation of Concerns</div>
-<p>The programmer writes in a comfortable notation. The compiler reduces it to the universal substrate. The hardware enforces security at every instruction.</p>
+<p>The programmer writes in any comfortable notation &mdash; natural English, imperative JavaScript, functional Haskell, or direct hex. The compiler reduces it to the universal substrate. The hardware enforces security at every instruction, regardless of source language.</p>
 <p><strong>Expressiveness at the top, security at the bottom.</strong></p>
 </div>`
             },
