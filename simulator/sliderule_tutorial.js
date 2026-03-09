@@ -411,61 +411,6 @@ class SlideRuleTutorial {
 </div>`
             },
             {
-                title: "Disassembly: Mul (the dramatic difference)",
-                type: "disassembly",
-                content: `<p>JavaScript's Mul is <strong>35 instructions</strong>: an explicit shift-and-add loop with sign handling, bitfield extraction, accumulation, and conditional negation.</p>
-<p>Haskell's <code>a * b</code> is <strong>8 instructions</strong>:</p>
-<pre class="sr-asm">0: IADD.AL  DR12, DR0, #0   ; DR12 = a (accumulator)
-1: MCMP.AL  DR1, DR0, #0    ; compare b to 0
-2: BRANCH.EQ  #6            ; if b == 0, done
-3: IADD.AL  DR12, DR12, #0  ; acc += a
-4: ISUB.AL  DR1, DR1, #1    ; b -= 1
-5: BRANCH.AL  #1            ; loop back
-6: IADD.AL  DR0, DR12, #0   ; DR0 = result
-7: RETURN.AL                 ; return</pre>
-<div class="sr-key-concept">
-<div class="sr-concept-title">Smaller Code &ne; Faster Execution</div>
-<p>For <code>Mul(7, 100)</code>:</p>
-<ul>
-<li><strong>JavaScript:</strong> shift-and-add runs 7 iterations (ceil(log2(100))). ~8 instr/iter = <strong>~56 dynamic instructions</strong></li>
-<li><strong>Haskell:</strong> repeated addition runs 100 iterations. ~4 instr/iter = <strong>~400 dynamic instructions</strong></li>
-</ul>
-<p>JavaScript is <strong>7x faster</strong> despite having 4x more static code.</p>
-</div>`
-            },
-            {
-                title: "Performance: Static Code Size",
-                type: "performance",
-                content: `<p>On the Tang Nano 20K, each instruction is one 32-bit word (4 bytes):</p>
-<table class="sr-table sr-table-wide"><tr><th>Implementation</th><th>Methods</th><th>Instructions</th><th>Code Size</th><th>Lump Size</th></tr>
-<tr><td>JavaScript</td><td>8</td><td>153</td><td>612 bytes</td><td>1024 bytes</td></tr>
-<tr><td>Haskell</td><td>11</td><td>151</td><td>604 bytes</td><td>1024 bytes</td></tr>
-</table>
-<p>Both fit in a 1024-byte lump (256 words). Lump allocation is power-of-2, so both versions occupy the same physical memory despite Haskell being slightly smaller.</p>
-<p><strong>Execution time:</strong> 1 instruction/cycle at 27 MHz = ~37 ns per instruction.</p>
-<table class="sr-table sr-table-wide"><tr><th>Method</th><th>JS Cycles</th><th>JS Time</th><th>HS Cycles</th><th>HS Time</th></tr>
-<tr><td>Add</td><td>5</td><td>185 ns</td><td>4</td><td>148 ns</td></tr>
-<tr><td>Sub</td><td>4</td><td>148 ns</td><td>3</td><td>111 ns</td></tr>
-</table>`
-            },
-            {
-                title: "The Code Size vs. Runtime Trade-off",
-                type: "performance",
-                content: `<table class="sr-table sr-table-wide"><tr><th>Property</th><th>JavaScript</th><th>Haskell</th></tr>
-<tr><td>Source lines</td><td>110</td><td>38</td></tr>
-<tr><td>Static code size</td><td>153 instructions</td><td>151 instructions</td></tr>
-<tr><td>Algorithmic sophistication</td><td>High (bit-level)</td><td>Low (expressions)</td></tr>
-<tr><td>Worst-case runtime</td><td>O(log n) for Mul</td><td>O(n) for Mul</td></tr>
-<tr><td>Programmer effort</td><td>High (manual algorithms)</td><td>Low (declarative)</td></tr>
-<tr><td>Debugging difficulty</td><td>High (loop state)</td><td>Low (pure expressions)</td></tr>
-</table>
-<div class="sr-key-concept">
-<div class="sr-concept-title">The Fundamental Trade-off</div>
-<p>Haskell is more concise and easier to reason about. JavaScript can encode more efficient algorithms because the programmer has direct access to bitfield operations and explicit loop control.</p>
-<p>Both compile to the same 20 instructions. The Church Machine does not favour one paradigm over another.</p>
-</div>`
-            },
-            {
                 title: "Security: What the Compiler Cannot Do",
                 type: "security",
                 content: `<p>Regardless of language or compilation strategy, the CLOOMC++ compiler <strong>cannot</strong>:</p>
