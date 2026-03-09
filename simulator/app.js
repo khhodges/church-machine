@@ -282,23 +282,7 @@ function renderCListEntryDetail(nsIdx, entry) {
         const rawClistCount = lim.clistCount || 0;
         const allocSize = lim.limit + 1;
         const safeClistCount = Math.max(0, Math.min(rawClistCount, allocSize));
-        const isBootCList = (nsIdx === 2 && loc === 2 * sim.SLOT_SIZE);
-
-        if (isBootCList) {
-            h += '<div class="clist-detail-title" style="margin-top:0.4rem;">C-List (GT Entries)</div>';
-            let gtHtml = '<table class="cr-table code-view-table"><thead><tr><th>#</th><th>Addr</th><th>Hex</th><th>GT Decoded</th></tr></thead><tbody>';
-            let hasGT = false;
-            for (let w = 0; w < wordCount; w++) {
-                const addr = loc + w;
-                if (addr >= sim.memory.length) break;
-                const word = sim.memory[addr] || 0;
-                if (word === 0) continue;
-                hasGT = true;
-                gtHtml += _renderGTRow(w, addr, word);
-            }
-            gtHtml += '</tbody></table>';
-            if (hasGT) h += gtHtml;
-        } else if (safeClistCount > 0) {
+        if (safeClistCount > 0) {
             const codeEnd = allocSize - safeClistCount;
             let hasCode = false;
             const asm = new ChurchAssembler();
@@ -808,19 +792,7 @@ function renderMemoryDump(location, limit, nsIndex) {
         const rawClistCount = parsedW1 ? parsedW1.clistCount : 0;
         const allocSize = limit;
         const safeClistCount = Math.max(0, Math.min(rawClistCount, allocSize));
-        const isBootCList = (nsIndex === 2 && location === 2 * sim.SLOT_SIZE);
-
-        if (isBootCList) {
-            html = '<table class="ns-mem-table"><thead><tr>';
-            html += '<th>#</th><th>Address</th><th>Hex</th><th>GT Decoded</th>';
-            html += '</tr></thead><tbody>';
-            for (let i = 0; i < wordCount; i++) {
-                const addr = location + i;
-                const word = sim.memory[addr] || 0;
-                if (word === 0) continue;
-                html += _renderGTRow(i, addr, word);
-            }
-        } else if (safeClistCount > 0) {
+        if (safeClistCount > 0) {
             const codeEnd = allocSize - safeClistCount;
             const codeShow = Math.min(codeEnd, wordCount);
             html = '<div style="color:rgba(156,220,254,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">CLOOMC Code</div>';
@@ -3706,29 +3678,30 @@ HALT
 ; ============================================
 ;
 ; Namespace reference:
-;   Slot 2  Boot.Abstraction (E only, L bypassed via CR6 M-elevation)
-;   Slot 3  Boot.CLOOMC (X only)
-;   Slot 22 TRUE       (L only \u2014 no X, no E)
-;   Slot 23 FALSE      (L only \u2014 no X, no E)
-;   Slot 27 GC         (E only)
+;   Slot 2  Boot.Abstr (E only \u2014 combined code + C-List)
+;   Slot 3  (empty)
+;   Slot 26 TRUE       (L only \u2014 no X, no E)
+;   Slot 27 FALSE      (L only \u2014 no X, no E)
+;   Slot 44 GC         (E only)
 ; ============================================
 
 ; --- ATTACK 1: CALL without E permission ---
-; TRUE (slot 22) has only L \u2014 no E.
+; TRUE (slot 26) has only L \u2014 no E.
 ; CALL requires E via mLoad. Should FAULT.
-LOAD CR0, CR6, 22      ; CR0 = TRUE (L only)
+LOAD CR0, CR6, 26      ; CR0 = TRUE (L only)
 CALL CR0               ; FAULT: lacks E permission
 
 ; --- ATTACK 2: LAMBDA without X permission ---
-; Constants (slot 7) has only E \u2014 no X.
+; Constants (slot 18) has only E \u2014 no X.
 ; LAMBDA requires X via mLoad. Should FAULT.
-LOAD CR1, CR6, 7       ; CR1 = Constants (E only)
+LOAD CR1, CR6, 18      ; CR1 = Constants (E only)
 LAMBDA CR1             ; FAULT: lacks X permission
 
 ; --- ATTACK 3: CALL something with only X ---
-; Boot.CLOOMC (slot 3) has only X \u2014 no E.
+; Salvation (slot 4) has E. Strip to X-only via TPERM.
 ; CALL requires E. Should FAULT.
-LOAD CR2, CR6, 3       ; CR2 = Boot.CLOOMC (X only)
+LOAD CR2, CR6, 4       ; CR2 = Salvation (E-GT from C-List)
+TPERM CR2, X           ; Strip E, keep X only
 CALL CR2               ; FAULT: lacks E permission
 
 ; --- If we get here, something is broken ---
@@ -3752,7 +3725,7 @@ HALT
 ; --- ATTACK 1: SAVE with default B=0 ---
 ; After boot, B defaults to 0 on all entries.
 ; SAVE should FAULT because B=0.
-LOAD CR0, CR6, 10      ; CR0 = SUCC (XLE, B=0)
+LOAD CR0, CR6, 20      ; CR0 = SUCC (XLE, B=0)
 SAVE CR0, CR6, 28      ; FAULT: B=0, cannot bind
 
 ; --- If we get here, B-bit default failed ---

@@ -456,8 +456,8 @@ class ChurchREPL {
 
     _nsIndex(name) {
         const map = {
-            'Boot.NS': 0, 'Boot.Thread': 1, 'Boot.CList': 2,
-            'Boot.CLOOMC': 3, 'Salvation': 4, 'Navana': 5,
+            'Boot.NS': 0, 'Boot.Thread': 1, 'Boot.Abstr': 2,
+            '(empty)': 3, 'Salvation': 4, 'Navana': 5,
             'Mint': 6, 'Memory': 7, 'Scheduler': 8, 'Stack': 9,
             'DijkstraFlag': 10, 'UART': 11, 'LED': 12, 'Button': 13,
             'Timer': 14, 'Display': 15, 'SlideRule': 16, 'Abacus': 17,

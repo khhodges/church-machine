@@ -16,7 +16,7 @@ const BOOT_UPLOADS = [
         methods: []
     },
     {
-        abstraction: 'Boot.CList',
+        abstraction: 'Boot.Abstr',
         type: 'boot',
         index: 2,
         grants: ['E'],
@@ -24,10 +24,10 @@ const BOOT_UPLOADS = [
         methods: []
     },
     {
-        abstraction: 'Boot.CLOOMC',
+        abstraction: '(empty)',
         type: 'boot',
         index: 3,
-        grants: ['R', 'W', 'X'],
+        grants: [],
         capabilities: [],
         methods: []
     },

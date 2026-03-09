@@ -173,8 +173,8 @@ class ChurchSimulator {
         return [
             { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
             { label: 'Boot.Thread',   perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
-            { label: 'Boot.CList',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
-            { label: 'Boot.CLOOMC',   perms: {R:1,W:1,X:1,L:0,S:0,E:0}, chainable: false },
+            { label: 'Boot.Abstr',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { label: '(empty)',       perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
             { label: 'Salvation',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Navana',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Mint',          perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
@@ -224,27 +224,43 @@ class ChurchSimulator {
         this.nsCount = 0;
         const abstractions = this._getAbstractionCatalog();
         const clistChildren = [];
+        const clistGTs = [];
+
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
+            if (i === 3) {
+                this.writeNSEntry(i, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+                this.nsLabels[i] = a.label;
+                clistGTs.push(0);
+                clistChildren.push(i);
+                continue;
+            }
             const loc = (i === 0) ? this.NS_TABLE_BASE : i * this.SLOT_SIZE;
-            const lim17 = (i === 0) ? (abstractions.length * this.NS_ENTRY_WORDS) : 0xFF;
-            const gtWord = this.createGT(0, i, a.perms, 1);
-            this.writeNSEntry(i, loc, lim17, 0, 0, 0, a.chainable ? 1 : 0, 1, 0);
+            const lim17 = (i === 0) ? (abstractions.length * this.NS_ENTRY_WORDS) : (this.SLOT_SIZE - 1);
+            this.writeNSEntry(i, loc, lim17, 0, 0, 0, a.chainable ? 1 : 0, 1, 0, 0);
             this.nsLabels[i] = a.label;
             if (a.handler) {
                 this.nsHandlers[i] = a.handler;
             }
             clistChildren.push(i);
+            const gtWord = this.createGT(0, i, a.perms, 1);
+            clistGTs.push(gtWord);
         }
         this.nsClistMap[2] = clistChildren;
 
         const bootAbstrLoc = 2 * this.SLOT_SIZE;
-        for (let i = 0; i < abstractions.length; i++) {
-            const gtWord = this.createGT(0, i, abstractions[i].perms, 1);
-            this.memory[bootAbstrLoc + i] = gtWord;
+        const bootAllocSize = this.SLOT_SIZE;
+        const bootClistCount = clistGTs.length;
+        const clistStart = bootAllocSize - bootClistCount;
+        for (let i = 0; i < bootClistCount; i++) {
+            this.memory[bootAbstrLoc + clistStart + i] = clistGTs[i];
         }
-        const clooomcGT = this.createGT(0, 3, {R:0,W:0,X:1,L:0,S:0,E:0}, 1);
-        this.memory[bootAbstrLoc] = clooomcGT;
+        this.memory[bootAbstrLoc + clistStart] = 0;
+
+        const bootNSBase = this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS;
+        const bootW1 = this.packNSWord1(bootAllocSize - 1, 0, 0, 0, 0, 1, bootClistCount);
+        this.memory[bootNSBase + 1] = bootW1;
+        this.memory[bootNSBase + 2] = this.makeVersionSeals(0, bootAbstrLoc, bootAllocSize - 1);
     }
 
     _bootStep() {
@@ -289,11 +305,11 @@ class ChurchSimulator {
                 const gt6 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                 const check6 = this.mLoad(gt6, null, undefined);
                 if (!check6.ok) {
-                    this.fault('BOOT', `INIT_CLIST mLoad(Boot.CList) failed: ${check6.message}`);
+                    this.fault('BOOT', `INIT_ABSTR mLoad(Boot.Abstr) failed: ${check6.message}`);
                     return false;
                 }
                 this._writeCR(6, gt6, check6.entry);
-                this.output += '[BOOT] INIT_CLIST — CR6 <- mLoad(Slot 2) Boot C-List (E, L bypassed via CR6 M-elevation)\n';
+                this.output += '[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot 2) Boot.Abstr (E, M-elevation)\n';
                 this.bootStep++;
                 break;
             }
@@ -301,54 +317,50 @@ class ChurchSimulator {
                 const gt2 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
                 const check2 = this.mLoad(gt2, 'E', undefined);
                 if (!check2.ok) {
-                    this.fault('BOOT', `LOAD_NUC mLoad(Slot 2) failed: ${check2.message}`);
+                    this.fault('BOOT', `LOAD_NUC mLoad(Boot.Abstr) failed: ${check2.message}`);
                     return false;
                 }
-                const clistEntry = check2.entry;
-                const clistParsed = this.parseNSWord1(clistEntry.word1_limit);
-                if (clistParsed.f === 1) {
-                    this.fault('BOOT', 'LOAD_NUC: Slot 2 GT has F-bit set (Far) — FAULT');
+                const abstrEntry = check2.entry;
+                const abstrParsed = this.parseNSWord1(abstrEntry.word1_limit);
+                if (abstrParsed.f === 1) {
+                    this.fault('BOOT', 'LOAD_NUC: Boot.Abstr has F-bit set (Far) — FAULT');
                     return false;
                 }
                 if (check2.parsed.type !== 1) {
-                    this.fault('BOOT', `LOAD_NUC: Slot 2 GT type is ${check2.parsed.typeName}, must be Inform`);
+                    this.fault('BOOT', `LOAD_NUC: Boot.Abstr type is ${check2.parsed.typeName}, must be Inform`);
                     return false;
                 }
-                this._writeCR(6, gt2, clistEntry);
-                const bootCListLoc = clistEntry.word0_location;
-                const cr7GT = this.memory[bootCListLoc];
-                if (cr7GT === 0) {
-                    this.fault('BOOT', 'LOAD_NUC: Boot C-List offset 0 is empty — no CR7 GT');
+                const base = abstrEntry.word0_location;
+                const allocSize = abstrParsed.limit + 1;
+                const clistCount = abstrParsed.clistCount;
+                if (clistCount === 0) {
+                    this.fault('BOOT', 'LOAD_NUC: Boot.Abstr has clistCount=0 — no C-List');
                     return false;
                 }
-                const cr7Parsed = this.parseGT(cr7GT);
-                const bootSlot0Check = this._validateClistSlotPerms(cr7Parsed, 0);
-                if (!bootSlot0Check.ok) {
-                    this.fault('BOOT', `LOAD_NUC: ${bootSlot0Check.message}`);
-                    return false;
-                }
-                if (cr7Parsed.type !== 1) {
-                    this.fault('BOOT', `LOAD_NUC: CR7 GT type is ${cr7Parsed.typeName}, must be Inform`);
-                    return false;
-                }
-                const cr7Entry = this.readNSEntry(cr7Parsed.index);
-                if (!cr7Entry) {
-                    this.fault('BOOT', `LOAD_NUC: CR7 NS entry ${cr7Parsed.index} not found`);
-                    return false;
-                }
-                const cr7Word1 = this.parseNSWord1(cr7Entry.word1_limit);
-                if (cr7Word1.f === 1) {
-                    this.fault('BOOT', 'LOAD_NUC: CR7 GT has F-bit set (Far) — FAULT');
-                    return false;
-                }
-                const cr7Check = this.mLoad(cr7GT, 'X', undefined);
-                if (!cr7Check.ok) {
-                    this.fault('BOOT', `LOAD_NUC mLoad(CR7) failed: ${cr7Check.message}`);
-                    return false;
-                }
-                this._writeCR(7, cr7GT, cr7Check.entry);
+                const clistStart = allocSize - clistCount;
+
+                const cr7GT = this.createGT(0, 2, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
+                const cr7Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
+                this.cr[7] = {
+                    word0: cr7GT,
+                    word1: base,
+                    word2: cr7Word1,
+                    word3: abstrEntry.word2_seals,
+                    m: this.mElevation ? 1 : 0
+                };
+
+                const cr6GT = this.createGT(0, 2, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+                const cr6Word1 = this.packNSWord1(clistCount - 1, 0, 0, 0, 0, 1, 0);
+                this.cr[6] = {
+                    word0: cr6GT,
+                    word1: (base + clistStart) >>> 0,
+                    word2: cr6Word1,
+                    word3: abstrEntry.word2_seals,
+                    m: this.mElevation ? 1 : 0
+                };
+
                 this.pc = 0;
-                this.output += '[BOOT] LOAD_NUC — CALL into Slot 2 (Boot C-List); CR6 <- mLoad(E), CR7 <- mLoad(offset 0 = Slot 3, Boot.CLOOMC, X), PC=0\n';
+                this.output += `[BOOT] LOAD_NUC — CALL into Boot.Abstr (Slot 2); CR7(code,RWX,lim=${clistStart-1}), CR6(clist,L,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${clistCount-1}), PC=0\n`;
                 this.bootStep++;
                 break;
             }
@@ -1711,20 +1723,14 @@ class ChurchSimulator {
     }
 
     loadProgram(words, startAddr) {
-        const clooomcSlot = 3;
-        const clooomcBase = this.NS_TABLE_BASE + clooomcSlot * this.NS_ENTRY_WORDS;
-        const codeLoc = this.memory[clooomcBase] || 0x0300;
+        const abstrSlot = 2;
+        const abstrBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const codeLoc = this.memory[abstrBase] || (abstrSlot * this.SLOT_SIZE);
         const baseAddr = this.bootComplete ? codeLoc : (startAddr || 0);
         for (let i = 0; i < words.length; i++) {
             if (baseAddr + i < this.memory.length) {
                 this.memory[baseAddr + i] = words[i] >>> 0;
             }
-        }
-        if (this.bootComplete) {
-            const oldW1 = this.memory[clooomcBase + 1];
-            const newLimit = Math.max(words.length, this.parseNSWord1(oldW1).limit);
-            this.memory[clooomcBase + 1] = (oldW1 & 0xFFFE0000) | (newLimit & 0x1FFFF);
-            this.memory[clooomcBase + 2] = this.makeVersionSeals(0, codeLoc, newLimit);
         }
         this.pc = 0;
         this.halted = false;
@@ -1758,23 +1764,29 @@ class ChurchSimulator {
             this.nsCount = i + 1;
         }
 
-        const clistBase = 0x0200;
-        for (let i = 0; i < hwClist.length; i++) {
-            this.memory[clistBase + i] = hwClist[i] >>> 0;
+        const abstrSlot = 2;
+        const abstrNSBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const abstrLoc = this.memory[abstrNSBase] || (abstrSlot * this.SLOT_SIZE);
+        const abstrW1 = this.memory[abstrNSBase + 1];
+        const abstrParsed = this.parseNSWord1(abstrW1);
+        const abstrAllocSize = abstrParsed.limit + 1;
+        const abstrClistCount = abstrParsed.clistCount || hwClist.length;
+        const abstrClistStart = abstrAllocSize - abstrClistCount;
+        const safeClistCopy = Math.min(hwClist.length, abstrClistCount);
+
+        for (let i = 0; i < safeClistCopy; i++) {
+            this.memory[abstrLoc + abstrClistStart + i] = hwClist[i] >>> 0;
+        }
+
+        for (let i = 0; i < hwProgram.length; i++) {
+            if (hwProgram[i] !== 0) {
+                this.memory[abstrLoc + i] = hwProgram[i] >>> 0;
+            }
         }
 
         const clistChildren = [];
         for (let i = 0; i < nsEntryCount; i++) clistChildren.push(i);
         this.nsClistMap[2] = clistChildren;
-
-        const clooomcSlot = 3;
-        const clooomcBase = this.NS_TABLE_BASE + clooomcSlot * this.NS_ENTRY_WORDS;
-        const clooomcLoc = this.memory[clooomcBase] || 0x0300;
-        for (let i = 0; i < hwProgram.length; i++) {
-            if (hwProgram[i] !== 0) {
-                this.memory[clooomcLoc + i] = hwProgram[i] >>> 0;
-            }
-        }
 
         if (abstractions) {
             for (const abs of abstractions) {
@@ -1798,8 +1810,8 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== HARDWARE BINARY LOADED (Tang Nano 20K) ===\n';
         this.output += `Namespace: ${nsEntryCount} entries written to NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `C-List: ${hwClist.length} GTs written at 0x${clistBase.toString(16).padStart(4,'0').toUpperCase()}\n`;
-        this.output += `Boot ROM: ${hwProgram.length} instructions at CLOOMC location 0x${clooomcLoc.toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `Boot.Abstr: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `Boot ROM: ${hwProgram.length} instructions at code region 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}\n`;
         if (abstractions) {
             for (const abs of abstractions) {
                 const label = abs.label || `NS ${abs.nsIndex}`;
@@ -1824,11 +1836,11 @@ class ChurchSimulator {
                            (p.permissions.S ? 'S':'') + (p.permissions.E ? 'E':'');
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'------').padEnd(6)} -> idx ${p.index}\n`;
         }
-        this.output += `\n--- CLOOMC Code (CR7, at 0x${clooomcLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+        this.output += `\n--- CLOOMC Code (Boot.Abstr code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
         for (let i = 0; i < hwProgram.length; i++) {
             const w = hwProgram[i] >>> 0;
             if (w === 0) continue;
-            this.output += `  PC=${i} (0x${(clooomcLoc+i).toString(16).padStart(4,'0')}): 0x${w.toString(16).padStart(8,'0')}\n`;
+            this.output += `  PC=${i} (0x${(abstrLoc+i).toString(16).padStart(4,'0')}): 0x${w.toString(16).padStart(8,'0')}\n`;
         }
         if (abstractions) {
             for (const abs of abstractions) {
@@ -1885,20 +1897,26 @@ class ChurchSimulator {
             this.nsCount = i + 1;
         }
 
-        const clistBase = 0x0200;
+        const abstrSlot = 2;
+        const abstrNSBase = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+        const abstrLoc = this.memory[abstrNSBase] || (abstrSlot * this.SLOT_SIZE);
+        const abstrW1 = this.memory[abstrNSBase + 1];
+        const abstrParsed = this.parseNSWord1(abstrW1);
+        const abstrAllocSize = abstrParsed.limit + 1;
         const clistCount = Math.min(clistWords.length, CLIST_WORDS);
-        for (let i = 0; i < clistCount; i++) {
-            this.memory[clistBase + i] = clistWords[i] >>> 0;
+        const abstrClistCount = abstrParsed.clistCount || clistCount;
+        const abstrClistStart = abstrAllocSize - abstrClistCount;
+        const safeClistCopy = Math.min(clistCount, abstrClistCount);
+
+        for (let i = 0; i < safeClistCopy; i++) {
+            this.memory[abstrLoc + abstrClistStart + i] = clistWords[i] >>> 0;
         }
 
         const hwBoot = bootProgram || (typeof HW_BOOT_PROGRAM !== 'undefined' ? HW_BOOT_PROGRAM : null);
         if (hwBoot) {
-            const clooomcSlot = 3;
-            const clooomcBase = this.NS_TABLE_BASE + clooomcSlot * this.NS_ENTRY_WORDS;
-            const codeLoc = this.memory[clooomcBase] || 0x0300;
             for (let i = 0; i < hwBoot.length; i++) {
                 if (hwBoot[i] !== 0) {
-                    this.memory[codeLoc + i] = hwBoot[i] >>> 0;
+                    this.memory[abstrLoc + i] = hwBoot[i] >>> 0;
                 }
             }
         }
@@ -1910,13 +1928,7 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== BINARY IMAGE LOADED ===\n';
         this.output += `Namespace: ${nsEntryCount} entries at NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `C-List: ${clistCount} GTs at 0x${clistBase.toString(16).padStart(4,'0').toUpperCase()}\n`;
-        if (hwBoot) {
-            const clooomcSlot2 = 3;
-            const clooomcBase2 = this.NS_TABLE_BASE + clooomcSlot2 * this.NS_ENTRY_WORDS;
-            const codeLoc2 = this.memory[clooomcBase2] || 0x0300;
-            this.output += `Boot Code: ${hwBoot.filter(w=>w!==0).length} instructions at CLOOMC 0x${codeLoc2.toString(16).padStart(4,'0').toUpperCase()}\n`;
-        }
+        this.output += `Boot.Abstr: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
             const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
@@ -1937,15 +1949,12 @@ class ChurchSimulator {
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'------').padEnd(6)} -> idx ${p.index}\n`;
         }
         if (hwBoot) {
-            const clooomcSlot3 = 3;
-            const clooomcBase3 = this.NS_TABLE_BASE + clooomcSlot3 * this.NS_ENTRY_WORDS;
-            const codeLoc3 = this.memory[clooomcBase3] || 0x0300;
-            this.output += `\n--- CLOOMC Code (CR7, at 0x${codeLoc3.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+            this.output += `\n--- CLOOMC Code (Boot.Abstr code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
             for (let i = 0; i < hwBoot.length; i++) {
                 const w = hwBoot[i] >>> 0;
                 if (w === 0) continue;
                 const disasm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler().disassemble(w) : '';
-                this.output += `  PC=${i} (0x${(codeLoc3+i).toString(16).padStart(4,'0')}): 0x${w.toString(16).padStart(8,'0')}  ${disasm}\n`;
+                this.output += `  PC=${i} (0x${(abstrLoc+i).toString(16).padStart(4,'0')}): 0x${w.toString(16).padStart(8,'0')}  ${disasm}\n`;
             }
         }
         this.output += '\nStep or Run to begin boot sequence with loaded data.\n';
@@ -1978,8 +1987,15 @@ class ChurchSimulator {
         }
 
         const clistWords = new Uint32Array(CLIST_WORDS);
-        const clistBase = 0x0200;
-        for (let i = 0; i < CLIST_WORDS; i++) {
+        const abstrNSBase = this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS;
+        const abstrLoc = this.memory[abstrNSBase] || (2 * this.SLOT_SIZE);
+        const abstrW1 = this.memory[abstrNSBase + 1];
+        const abstrParsed = this.parseNSWord1(abstrW1);
+        const abstrAllocSize = abstrParsed.limit + 1;
+        const abstrClistCount = abstrParsed.clistCount || 0;
+        const abstrClistStart = abstrAllocSize - abstrClistCount;
+        const clistBase = abstrLoc + abstrClistStart;
+        for (let i = 0; i < Math.min(abstrClistCount, CLIST_WORDS); i++) {
             clistWords[i] = this.memory[clistBase + i] >>> 0;
         }
 

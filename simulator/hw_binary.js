@@ -1,6 +1,6 @@
 const HW_BOOT_PROGRAM = [
     0x27440001, // PC=0  CHANGE CR8, CR8, 1
-    0x070B0000, // PC=1  LOAD CR1, [CR6 + 0]
+    0x070B0003, // PC=1  LOAD CR1, [CR6 + 3]  (Boot.Abstr E-GT — self-reference)
     0x07130001, // PC=2  LOAD CR2, [CR6 + 1]
     0x37100003, // PC=3  TPERM CR2, X
     0x3F100000, // PC=4  LAMBDA CR2
@@ -12,8 +12,8 @@ const HW_BOOT_PROGRAM = [
 const HW_NAMESPACE = [
     0x0000FD00, 0x84000008, 0x00000000, // Slot 0: Boot.NS (NS_TABLE_BASE=0xFD00) type=01 Inform
     0x00000100, 0x84000008, 0x00000000, // Slot 1: Boot.Thread type=01 Inform
-    0x00000200, 0x84000008, 0x00000000, // Slot 2: Boot.CList type=01 Inform
-    0x00000300, 0x84000008, 0x00000000, // Slot 3: Boot.CLOOMC type=01 Inform
+    0x00000200, 0x841000FF, 0x00000000, // Slot 2: Boot.Abstr type=01 Inform, clistCount=8, limit=0xFF
+    0x00000000, 0x00000000, 0x00000000, // Slot 3: (empty)
     0x00000400, 0x84000008, 0x00000000, // Slot 4: Salvation type=01 Inform
     0x00000500, 0x84000008, 0x00000000, // Slot 5: Navana type=01 Inform
     0x00000600, 0x84000008, 0x00000000, // Slot 6: Mint type=01 Inform
@@ -31,10 +31,10 @@ const HW_NAMESPACE = [
 ];
 
 const HW_CLIST = [
-    0x00000315, // CList[0] Inform RX  -> NS idx 3 (Boot.CLOOMC) type=01
+    0x00000000, // CList[0] NULL (was Boot.CLOOMC — now merged into Boot.Abstr)
     0x00000411, // CList[1] Inform X   -> NS idx 4 (Salvation) type=01
     0x00000000, // CList[2] NULL       (SAVE target) type=00
-    0x00000281, // CList[3] Inform E   -> NS idx 2 (Boot.CList) type=01
+    0x00000281, // CList[3] Inform E   -> NS idx 2 (Boot.Abstr) type=01
     0x00000681, // CList[4] Inform E   -> NS idx 6 (Mint) type=01
     0x00000721, // CList[5] Inform L   -> NS idx 7 (Memory) type=01
     0x00000481, // CList[6] Inform E   -> NS idx 4 (Salvation CALL target) type=01
@@ -59,8 +59,8 @@ const HW_SALVATION_CODE = [
 const HW_NS_LABELS = {
     0: 'Boot.NS',
     1: 'Boot.Thread',
-    2: 'Boot.CList',
-    3: 'Boot.CLOOMC',
+    2: 'Boot.Abstr',
+    3: '(empty)',
     4: 'Salvation',
     5: 'Navana',
     6: 'Mint',
