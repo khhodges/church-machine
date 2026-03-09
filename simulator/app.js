@@ -65,6 +65,20 @@ function init() {
     updateDashboard();
     pipelineViz.render();
     showWelcomePopup();
+    initTooltipAutoFlip();
+}
+
+function initTooltipAutoFlip() {
+    document.addEventListener('pointerenter', function(e) {
+        const el = e.target.closest('[data-tooltip]');
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        if (rect.top < 60) {
+            el.classList.add('tooltip-below');
+        } else {
+            el.classList.remove('tooltip-below');
+        }
+    }, true);
 }
 
 function checkBootId() {
