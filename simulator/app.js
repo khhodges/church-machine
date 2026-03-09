@@ -8224,6 +8224,81 @@ function adjustViewTop() {
 }
 
 window.addEventListener('resize', adjustViewTop);
+
+(function initPullToRefresh() {
+    let startY = 0;
+    let pulling = false;
+    let indicator = null;
+
+    function getIndicator() {
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.className = 'pull-refresh-indicator';
+            indicator.innerHTML = '<span class="pull-refresh-arrow">&#8635;</span><span class="pull-refresh-text">Pull to refresh</span>';
+            document.body.appendChild(indicator);
+        }
+        return indicator;
+    }
+
+    document.addEventListener('touchstart', function(e) {
+        const activeView = document.querySelector('.view.active');
+        if (!activeView || activeView.scrollTop > 5) return;
+        const toolbar = document.querySelector('.fixed-toolbar');
+        const toolbarBottom = toolbar ? toolbar.offsetHeight : 60;
+        const touchY = e.touches[0].clientY;
+        if (touchY > toolbarBottom + 100) return;
+        startY = touchY;
+        pulling = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+        if (!pulling) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy < 0) { pulling = false; return; }
+        if (dy > 10) {
+            const ind = getIndicator();
+            const progress = Math.min(dy / 120, 1);
+            const offset = Math.min(dy * 0.4, 60);
+            ind.style.transform = `translateX(-50%) translateY(${offset}px)`;
+            ind.style.opacity = progress;
+            ind.querySelector('.pull-refresh-arrow').style.transform = `rotate(${progress * 360}deg)`;
+            if (progress >= 1) {
+                ind.querySelector('.pull-refresh-text').textContent = 'Release to refresh';
+                ind.classList.add('ready');
+            } else {
+                ind.querySelector('.pull-refresh-text').textContent = 'Pull to refresh';
+                ind.classList.remove('ready');
+            }
+            ind.style.display = 'flex';
+        }
+    }, { passive: true });
+
+    function resetIndicator() {
+        if (!indicator) return;
+        indicator.style.opacity = '0';
+        indicator.style.transform = 'translateX(-50%) translateY(0)';
+        setTimeout(() => { if (indicator) indicator.style.display = 'none'; }, 200);
+    }
+
+    document.addEventListener('touchend', function() {
+        if (!pulling) return;
+        pulling = false;
+        const ind = indicator;
+        if (ind && ind.classList.contains('ready')) {
+            ind.querySelector('.pull-refresh-text').textContent = 'Refreshing...';
+            ind.querySelector('.pull-refresh-arrow').style.animation = 'pullSpin 0.6s linear infinite';
+            setTimeout(() => location.reload(), 400);
+        } else {
+            resetIndicator();
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchcancel', function() {
+        pulling = false;
+        resetIndicator();
+    }, { passive: true });
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     init();
     initAllTabOverflows();

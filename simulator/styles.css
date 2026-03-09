@@ -5552,3 +5552,42 @@ a.next-step-link:hover {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
 }
+
+.pull-refresh-indicator {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: rgba(26, 26, 46, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 18px;
+    z-index: 9999;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.pull-refresh-arrow {
+    font-size: 1.2rem;
+    color: var(--church-gold);
+    transition: transform 0.1s ease;
+    display: inline-block;
+}
+
+.pull-refresh-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: monospace;
+}
+
+.pull-refresh-indicator.ready .pull-refresh-text {
+    color: var(--church-gold);
+}
+
+@keyframes pullSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
