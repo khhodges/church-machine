@@ -7286,14 +7286,17 @@ function compileDraft() {
     if (!editor) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
-    const sel = document.getElementById('langSelector');
-    const lang = sel ? sel.value : 'assembly';
 
-    if (lang === 'assembly') {
+    if (!cloomcCompiler) return;
+
+    const isHighLevel = cloomcCompiler._detectEnglish(source) ||
+                        cloomcCompiler._detectHaskell(source) ||
+                        cloomcCompiler._detectSymbolic(source) ||
+                        source.trim().match(/^(?:\/\/|abstraction\s)/im);
+    if (!isHighLevel) {
         return compileDraftAssembly(source, con);
     }
 
-    if (!cloomcCompiler) return;
     const result = cloomcCompiler.compile(source, []);
 
     if (result.errors.length > 0) {
