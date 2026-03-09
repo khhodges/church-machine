@@ -72,10 +72,11 @@ function init() {
 
 function initTooltipAutoFlip() {
     document.addEventListener('pointerenter', function(e) {
+        if (!e.target || typeof e.target.closest !== 'function') return;
         const el = e.target.closest('[data-tooltip]');
         if (!el) return;
         const rect = el.getBoundingClientRect();
-        if (rect.top < 60) {
+        if (rect.top < 80) {
             el.classList.add('tooltip-below');
         } else {
             el.classList.remove('tooltip-below');
@@ -7234,12 +7235,65 @@ function smartCompile() {
     }
 }
 
+function compileDraftAssembly(source, con) {
+    if (!source || !source.trim()) {
+        if (con) con.textContent = 'Draft — no code to draft. Enter assembly code first.';
+        return;
+    }
+    const result = assembler.assemble(source);
+    if (result.errors.length > 0) {
+        const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
+        if (con) con.textContent = `Assembly Draft — errors:\n${errText}`;
+        showNextSteps('error');
+        return;
+    }
+    const words = result.words;
+    const codeSize = words.length;
+    const allocSize = Math.max(32, nextPow2(codeSize));
+    const freespace = allocSize - codeSize;
+
+    let draft = `═══════════════════════════════════════════════════\n`;
+    draft += `  ASSEMBLY DRAFT — ${codeSize} instruction(s) [Machine Code]\n`;
+    draft += `═══════════════════════════════════════════════════\n\n`;
+
+    draft += `  Lump Layout:\n`;
+    draft += `    ┌─────────────────────────────────────────┐\n`;
+    draft += `    │ Code             ${codeSize.toString().padStart(5)} words  (offset 0)  │\n`;
+    draft += `    │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │\n`;
+    draft += `    │ FREESPACE        ${freespace.toString().padStart(5)} words              │\n`;
+    draft += `    └─────────────────────────────────────────┘\n`;
+    draft += `    Total alloc: ${allocSize} words (power-of-2)\n\n`;
+
+    draft += `═══════════════════════════════════════════════════\n`;
+    draft += `  Instruction Listing:\n`;
+    draft += `═══════════════════════════════════════════════════\n\n`;
+
+    for (let i = 0; i < words.length; i++) {
+        const hex = '0x' + words[i].toString(16).padStart(8, '0');
+        const dis = assembler.disassemble(words[i]);
+        draft += `  ${i.toString().padStart(4)}: ${hex}  ${dis}\n`;
+    }
+
+    draft += `\n═══════════════════════════════════════════════════\n`;
+
+    if (con) con.textContent = draft;
+    showNextSteps('drafted');
+    trackProgress('draft');
+}
+
 function compileDraft() {
     const editor = document.getElementById('asmEditor');
-    if (!editor || !cloomcCompiler) return;
+    if (!editor) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    const sel = document.getElementById('langSelector');
+    const lang = sel ? sel.value : 'assembly';
 
+    if (lang === 'assembly') {
+        return compileDraftAssembly(source, con);
+    }
+
+    if (!cloomcCompiler) return;
     const result = cloomcCompiler.compile(source, []);
 
     if (result.errors.length > 0) {
@@ -7250,7 +7304,7 @@ function compileDraft() {
     }
 
     const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript' };
-    const lang = langNames[result.language] || 'JavaScript';
+    const langLabel = langNames[result.language] || 'JavaScript';
     const caps = result.capabilities || [];
     const clistCount = caps.length;
     let totalCodeWords = 0;
@@ -7265,7 +7319,7 @@ function compileDraft() {
     const freespace = allocSize - codeSize - clistCount;
 
     let draft = `═══════════════════════════════════════════════════\n`;
-    draft += `  CLOOMC++ DRAFT — "${result.abstractionName}" [${lang}]\n`;
+    draft += `  CLOOMC++ DRAFT — "${result.abstractionName}" [${langLabel}]\n`;
     draft += `═══════════════════════════════════════════════════\n\n`;
 
     draft += `  Methods (${result.methods.length}):\n`;

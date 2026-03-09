@@ -459,7 +459,8 @@ header h1 {
 }
 
 [data-tooltip].tooltip-below::after,
-.fixed-toolbar [data-tooltip]::after {
+.fixed-toolbar [data-tooltip]::after,
+.example-tabs-row [data-tooltip]::after {
     bottom: auto;
     top: calc(100% + 8px);
 }
