@@ -5283,6 +5283,40 @@ a.next-step-link:hover {
     color: #88aacc;
     padding: 2px 0;
 }
+.sliderule-expl-layout {
+    margin-top: 8px;
+    font-size: 0.68rem;
+    color: #99aa88;
+    font-style: italic;
+    border-top: 1px solid #3a5a3a;
+    padding-top: 6px;
+}
+.sliderule-layout-ref {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background: rgba(40, 30, 15, 0.5);
+    border: 1px solid #5a4a2a;
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+.sliderule-layout-label {
+    color: #888;
+    font-size: 0.62rem;
+    text-transform: uppercase;
+}
+.sliderule-layout-scales {
+    font-weight: 700;
+    font-size: 0.72rem;
+}
+.sliderule-layout-sep {
+    color: #555;
+    margin: 0 2px;
+}
 
 .sliderule-scale-selector {
     display: flex;

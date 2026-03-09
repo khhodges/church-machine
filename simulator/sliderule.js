@@ -17,69 +17,90 @@ const slideruleState = {
     scaleMode: 'CD'
 };
 
+const SCALE_DEFS = {
+    A:  { name: 'A',  color: '#cc9933', map: v => Math.log10(v) / 2, unmap: x => Math.pow(10, x * 2), range: [1, 100] },
+    B:  { name: 'B',  color: '#33cc66', map: v => Math.log10(v) / 2, unmap: x => Math.pow(10, x * 2), range: [1, 100] },
+    C:  { name: 'C',  color: '#33cc66', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
+    CI: { name: 'CI', color: '#ff6699', map: v => 1 - Math.log10(v), unmap: x => Math.pow(10, 1 - x), range: [1, 10] },
+    D:  { name: 'D',  color: '#cc9933', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
+    K:  { name: 'K',  color: '#cc9933', map: v => Math.log10(v) / 3, unmap: x => Math.pow(10, x * 3), range: [1, 1000] },
+    S:  { name: 'S',  color: '#cc9933', map: v => Math.log10(Math.sin(v * Math.PI / 180) * 10), unmap: x => Math.asin(Math.pow(10, x) / 10) * 180 / Math.PI, range: [5.7, 90] },
+    T:  { name: 'T',  color: '#66bbff', map: v => Math.log10(Math.tan(v * Math.PI / 180) * 10), unmap: x => Math.atan(Math.pow(10, x) / 10) * 180 / Math.PI, range: [5.7, 45] }
+};
+
 const SLIDERULE_SCALES = {
     CD: {
         label: 'C / D',
         desc: 'Multiplication & Division',
-        fixed: { name: 'D', color: '#cc9933', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
-        slide: { name: 'C', color: '#33cc66', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
-        readout: (d, c) => `D: ${d}  \u00b7  C: ${c}  \u00b7  D\u00d7C \u2248 ${Math.round(d * c * 1000) / 1000}`
+        top: SCALE_DEFS.A,       topActive: false,
+        slide: SCALE_DEFS.C,     slideActive: true,
+        bottom: SCALE_DEFS.D,    bottomActive: true,
+        readout: (t, s, b) => `D: ${b}  \u00b7  C: ${s}  \u00b7  D\u00d7C \u2248 ${Math.round(b * s * 1000) / 1000}`
     },
     AB: {
-        label: 'A / B',
+        label: 'A / D',
         desc: 'Squares & Square Roots',
-        fixed: { name: 'A', color: '#cc9933', map: v => Math.log10(v) / 2, unmap: x => Math.pow(10, x * 2), range: [1, 100] },
-        slide: { name: 'B', color: '#33cc66', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
-        readout: (d, c) => `A: ${d}  \u00b7  B: ${c}  \u00b7  \u221aA = B \u2248 ${Math.round(c * 1000) / 1000}`
+        top: SCALE_DEFS.A,       topActive: true,
+        slide: SCALE_DEFS.B,     slideActive: false,
+        bottom: SCALE_DEFS.D,    bottomActive: true,
+        readout: (t, s, b) => `A: ${t}  \u00b7  D: ${b}  \u00b7  \u221aA = D \u2248 ${Math.round(b * 1000) / 1000}`
     },
     CI: {
-        label: 'C / CI',
-        desc: 'Reciprocals (inverted C)',
-        fixed: { name: 'C', color: '#cc9933', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
-        slide: { name: 'CI', color: '#ff6699', map: v => 1 - Math.log10(v), unmap: x => Math.pow(10, 1 - x), range: [1, 10] },
-        readout: (d, c) => `C: ${d}  \u00b7  CI: ${c}  \u00b7  D\u00f7C \u2248 ${Math.round(d / c * 1000) / 1000}`
+        label: 'CI / D',
+        desc: 'Reciprocals (inverted slide)',
+        top: SCALE_DEFS.A,       topActive: false,
+        slide: SCALE_DEFS.CI,    slideActive: true,
+        bottom: SCALE_DEFS.D,    bottomActive: true,
+        readout: (t, s, b) => `CI: ${s}  \u00b7  D: ${b}  \u00b7  1/CI \u2248 ${Math.round(1 / s * 10000) / 10000}`
     },
     K: {
-        label: 'D / K',
+        label: 'K / D',
         desc: 'Cubes & Cube Roots',
-        fixed: { name: 'K', color: '#cc9933', map: v => Math.log10(v) / 3, unmap: x => Math.pow(10, x * 3), range: [1, 1000] },
-        slide: { name: 'D', color: '#33cc66', map: v => Math.log10(v), unmap: x => Math.pow(10, x), range: [1, 10] },
-        readout: (d, c) => `K: ${d}  \u00b7  D: ${c}  \u00b7  \u00b3\u221aK \u2248 ${Math.round(Math.pow(d, 1/3) * 1000) / 1000}`
+        top: SCALE_DEFS.K,       topActive: true,
+        slide: SCALE_DEFS.C,     slideActive: false,
+        bottom: SCALE_DEFS.D,    bottomActive: true,
+        readout: (t, s, b) => `K: ${t}  \u00b7  D: ${b}  \u00b7  \u00b3\u221aK \u2248 ${Math.round(Math.pow(t, 1/3) * 1000) / 1000}`
     },
     ST: {
         label: 'S / T',
         desc: 'Sine & Tangent',
-        fixed: { name: 'S', color: '#cc9933', map: v => Math.log10(Math.sin(v * Math.PI / 180) * 10), unmap: x => Math.asin(Math.pow(10, x) / 10) * 180 / Math.PI, range: [5.7, 90] },
-        slide: { name: 'T', color: '#66bbff', map: v => Math.log10(Math.tan(v * Math.PI / 180) * 10), unmap: x => Math.atan(Math.pow(10, x) / 10) * 180 / Math.PI, range: [5.7, 45] },
-        readout: (d, c) => `S: ${d}\u00b0  \u00b7  sin \u2248 ${Math.round(Math.sin(d * Math.PI / 180) * 10000) / 10000}  \u00b7  T: ${c}\u00b0  \u00b7  tan \u2248 ${Math.round(Math.tan(c * Math.PI / 180) * 10000) / 10000}`
+        top: SCALE_DEFS.S,       topActive: true,
+        slide: SCALE_DEFS.C,     slideActive: false,
+        bottom: SCALE_DEFS.T,    bottomActive: true,
+        readout: (t, s, b) => `S: ${t}\u00b0  \u00b7  sin \u2248 ${Math.round(Math.sin(t * Math.PI / 180) * 10000) / 10000}  \u00b7  T: ${b}\u00b0  \u00b7  tan \u2248 ${Math.round(Math.tan(b * Math.PI / 180) * 10000) / 10000}`
     }
 };
 
 const SLIDERULE_EXPLANATIONS = {
     CD: {
         title: 'C / D \u2014 Multiplication & Division',
-        body: 'The C and D scales are the workhorse of any slide rule. Both are single-decade logarithmic scales running 1\u201310. Because distances represent logarithms, sliding C relative to D adds log values \u2014 which multiplies the numbers. To compute a \u00d7 b: slide C so its 1 aligns with a on D, then read D under b on C. Division reverses this: align b on C over a on D, read D under 1 on C.',
-        scales: 'D (fixed body) \u2014 single decade 1\u201310, left\u2192right\nC (sliding rod) \u2014 single decade 1\u201310, left\u2192right'
+        body: 'The C and D scales are the workhorse of any slide rule. Both are single-decade logarithmic scales (1\u201310). Because distances represent logarithms, sliding C relative to D adds log values \u2014 which multiplies the numbers. To compute a \u00d7 b: slide C so its 1 aligns with a on D, then read D under b on C.',
+        scales: 'Body top: A (double decade 1\u2013100) \u2014 context\nSlide: C (single decade 1\u201310, left\u2192right) \u2014 active\nBody bottom: D (single decade 1\u201310, left\u2192right) \u2014 active',
+        layout: 'On your rule: A is on the body top, C is on the slide, D is on the body bottom. The cursor bridges C and D to multiply.'
     },
     AB: {
-        title: 'A / B \u2014 Squares & Square Roots',
-        body: 'The A scale compresses two decades (1\u2013100) into the rule length. The B scale below it spans one decade (1\u201310). Because A covers x\u00b2 in the same space B covers x, the cursor links each value on A to its square root on B. To find \u221aN: place the cursor on N on the A scale and read the answer on the B scale. To square a number: find it on B and read A.',
-        scales: 'A (fixed body) \u2014 double decade 1\u2013100, left\u2192right\nB (sliding rod) \u2014 single decade 1\u201310, left\u2192right'
+        title: 'A / D \u2014 Squares & Square Roots',
+        body: 'The A scale compresses two decades (1\u2013100) into the rule length. D spans one decade (1\u201310). Because A covers x\u00b2 in the same space D covers x, the cursor links each value on A to its square root on D. To find \u221aN: place the cursor on N on A and read D. To square: find x on D and read A.',
+        scales: 'Body top: A (double decade 1\u2013100) \u2014 active\nSlide: B (double decade 1\u2013100) \u2014 context\nBody bottom: D (single decade 1\u201310) \u2014 active',
+        layout: 'On your rule: A is on the body top, B is on the slide (same scale as A), D is on the body bottom. The cursor links A\u2194D for squares and roots.'
     },
     CI: {
-        title: 'C / CI \u2014 Reciprocals & Division',
-        body: 'The CI (C-Inverted) scale runs right-to-left \u2014 it is a mirror image of C. Where C reads x, CI reads 1/x at the same position. This lets you divide without moving the slide: align the cursor and read the reciprocal directly. On a physical slide rule the inverted scale runs from 10 on the left to 1 on the right.',
-        scales: 'C (fixed body) \u2014 single decade 1\u201310, left\u2192right\nCI (sliding rod) \u2014 single decade 10\u21921, right\u2192left (inverted)'
+        title: 'CI / D \u2014 Reciprocals & Division',
+        body: 'The CI (C-Inverted) scale runs right-to-left \u2014 it is a mirror image of C. Where D reads x, CI reads 1/x at the same position. This lets you divide without moving the slide: align the cursor and read the reciprocal directly. On your rule the inverted scale runs from 10 on the left to 1 on the right.',
+        scales: 'Body top: A (double decade 1\u2013100) \u2014 context\nSlide: CI (single decade 10\u21921, right\u2192left) \u2014 active\nBody bottom: D (single decade 1\u201310, left\u2192right) \u2014 active',
+        layout: 'On your rule: CI is on the slide between B and C, running backwards. D is on the body bottom. The cursor reads CI against D for reciprocals.'
     },
     K: {
-        title: 'D / K \u2014 Cubes & Cube Roots',
-        body: 'The K scale compresses three decades (1\u20131000) into the rule length. Paired with D (single decade 1\u201310), it links each value on K to its cube root on D. To find \u00b3\u221aN: place the cursor on N on the K scale and read D. To cube a number: find it on D and read K.',
-        scales: 'K (fixed body) \u2014 triple decade 1\u20131000, left\u2192right\nD (sliding rod) \u2014 single decade 1\u201310, left\u2192right'
+        title: 'K / D \u2014 Cubes & Cube Roots',
+        body: 'The K scale compresses three decades (1\u20131000) into the rule length. Paired with D (1\u201310), the cursor links each value on K to its cube root on D. To find \u00b3\u221aN: place the cursor on N on K and read D. To cube: find x on D and read K.',
+        scales: 'Body top: K (triple decade 1\u20131000) \u2014 active\nSlide: C (single decade 1\u201310) \u2014 context\nBody bottom: D (single decade 1\u201310) \u2014 active',
+        layout: 'On your rule: K is on the body top (between L and A), D is on the body bottom. The slide (C) is not used \u2014 the cursor bridges K\u2194D directly.'
     },
     ST: {
         title: 'S / T \u2014 Sine & Tangent',
-        body: 'The S scale maps angles (5.7\u00b0\u201390\u00b0) to their sine values on a logarithmic scale. The T scale maps angles (5.7\u00b0\u201345\u00b0) to their tangent values. Both are paired with the D scale underneath, so the cursor links an angle to its trig function value. These scales were essential for navigation and surveying before electronic calculators.',
-        scales: 'S (fixed body) \u2014 sine scale 5.7\u00b0\u201390\u00b0\nT (sliding rod) \u2014 tangent scale 5.7\u00b0\u201345\u00b0'
+        body: 'The S scale maps angles (5.7\u00b0\u201390\u00b0) to positions where D reads sin(\u03b8). The T scale maps angles (5.7\u00b0\u201345\u00b0) to positions where D reads tan(\u03b8). To find sin(30\u00b0): locate 30 on S and read D \u2248 0.5. These scales were essential for navigation and surveying.',
+        scales: 'Body top: S (sine, 5.7\u00b0\u201390\u00b0) \u2014 active\nSlide: C (single decade 1\u201310) \u2014 context\nBody bottom: T (tangent, 5.7\u00b0\u201345\u00b0) \u2014 active',
+        layout: 'On your rule: S, ST, and T are all on the body bottom alongside D. Here we show S on top and T on bottom so you can read both at the cursor.'
     }
 };
 
@@ -95,7 +116,7 @@ function slideruleLog10(val) {
 function slideruleValToX(val, offset) {
     offset = offset || 0;
     const mode = SLIDERULE_SCALES[slideruleState.scaleMode];
-    const mapped = mode.fixed.map(val);
+    const mapped = mode.bottom.map(val);
     return slideruleState.scaleStart + mapped * slideruleState.scaleWidth + offset;
 }
 
@@ -119,11 +140,12 @@ function slideruleClampVal(v, range) {
 function slideruleReadAtCursor() {
     const mode = SLIDERULE_SCALES[slideruleState.scaleMode];
     const cx = slideruleState.cursorX;
-    const dVal = slideruleClampVal(slideruleXToValForScale(cx, mode.fixed, 0), mode.fixed.range);
-    const cVal = slideruleClampVal(slideruleXToValForScale(cx, mode.slide, -slideruleState.slideOffset), mode.slide.range);
-    slideruleState.lastReadD = dVal;
-    slideruleState.lastReadC = cVal;
-    return { d: dVal, c: cVal };
+    const topVal = slideruleClampVal(slideruleXToValForScale(cx, mode.top, 0), mode.top.range);
+    const slideVal = slideruleClampVal(slideruleXToValForScale(cx, mode.slide, -slideruleState.slideOffset), mode.slide.range);
+    const bottomVal = slideruleClampVal(slideruleXToValForScale(cx, mode.bottom, 0), mode.bottom.range);
+    slideruleState.lastReadD = bottomVal;
+    slideruleState.lastReadC = slideVal;
+    return { top: topVal, slide: slideVal, bottom: bottomVal, d: bottomVal, c: slideVal };
 }
 
 function slideruleGetScaleFactor() {
@@ -177,18 +199,19 @@ function slideruleDragMove(e) {
 }
 
 function slideruleDragEnd() {
+    const mode = SLIDERULE_SCALES[slideruleState.scaleMode];
     if (slideruleState.draggingSlide) {
         const vals = slideruleReadAtCursor();
         slideruleTraceLog(
             `CALL SlideRule.Slide(${slideruleState.scaleMode})`,
-            `Slide positioned: ${SLIDERULE_SCALES[slideruleState.scaleMode].fixed.name}=${vals.d}, ${SLIDERULE_SCALES[slideruleState.scaleMode].slide.name}=${vals.c}`
+            `Slide positioned: ${mode.top.name}=${vals.top}, ${mode.slide.name}=${vals.slide}, ${mode.bottom.name}=${vals.bottom}`
         );
     }
     if (slideruleState.draggingCursor) {
         const vals = slideruleReadAtCursor();
         slideruleTraceLog(
             `CALL SlideRule.Read(cursor)`,
-            `Cursor reads: ${SLIDERULE_SCALES[slideruleState.scaleMode].fixed.name}=${vals.d}, ${SLIDERULE_SCALES[slideruleState.scaleMode].slide.name}=${vals.c}`
+            `Cursor reads: ${mode.top.name}=${vals.top}, ${mode.slide.name}=${vals.slide}, ${mode.bottom.name}=${vals.bottom}`
         );
     }
     slideruleState.draggingSlide = false;
@@ -227,7 +250,7 @@ function sliderulePresetMultiply(a, b) {
     const aClamp = Math.max(1, Math.min(10, a));
     const bClamp = Math.max(1, Math.min(10, b));
     const mode = SLIDERULE_SCALES.CD;
-    slideruleState.slideOffset = mode.fixed.map(aClamp) * slideruleState.scaleWidth;
+    slideruleState.slideOffset = mode.bottom.map(aClamp) * slideruleState.scaleWidth;
     slideruleState.cursorX = slideruleValToXForScale(bClamp, mode.slide, slideruleState.slideOffset);
     slideruleState.cursorX = Math.max(slideruleState.scaleStart, Math.min(slideruleState.scaleStart + slideruleState.scaleWidth, slideruleState.cursorX));
     const result = aClamp * bClamp;
@@ -243,10 +266,10 @@ function sliderulePresetSqrt(val) {
     const v = Math.max(1, Math.min(100, val));
     const sqr = Math.sqrt(v);
     slideruleState.slideOffset = 0;
-    slideruleState.cursorX = slideruleValToXForScale(v, SLIDERULE_SCALES.AB.fixed, 0);
+    slideruleState.cursorX = slideruleValToXForScale(v, SLIDERULE_SCALES.AB.top, 0);
     slideruleTraceLog(
         `CALL SlideRule.Sqrt(${v}) \u2192 ${Math.round(sqr * 1000) / 1000}`,
-        `Square root: find ${v} on A scale, read B scale \u2192 \u221a${v} = ${Math.round(sqr * 1000) / 1000}`
+        `Square root: find ${v} on A scale (body top), read D scale (body bottom) \u2192 \u221a${v} = ${Math.round(sqr * 1000) / 1000}`
     );
     slideruleUpdateDisplay();
 }
@@ -268,9 +291,11 @@ function slideruleUpdateExplanation() {
     const info = SLIDERULE_EXPLANATIONS[slideruleState.scaleMode];
     if (!info) { el.innerHTML = ''; return; }
     const scaleLines = info.scales.split('\n').map(l => '<span class="sliderule-expl-scale">' + l + '</span>').join('');
+    const layoutLine = info.layout ? '<div class="sliderule-expl-layout">' + info.layout + '</div>' : '';
     el.innerHTML = '<div class="sliderule-expl-title">' + info.title + '</div>' +
         '<div class="sliderule-expl-body">' + info.body + '</div>' +
-        '<div class="sliderule-expl-scales">' + scaleLines + '</div>';
+        '<div class="sliderule-expl-scales">' + scaleLines + '</div>' +
+        layoutLine;
 }
 
 function slideruleGenerateScaleTicksForDef(scaleDef, offset) {
@@ -346,8 +371,8 @@ function slideruleGenerateArrows(cx) {
     const ss = slideruleState.scaleStart;
     const cOneX = ss + so;
     const vals = slideruleReadAtCursor();
-    const aVal = Math.round(vals.d * 1000) / 1000;
-    const bVal = Math.round(vals.c * 1000) / 1000;
+    const aVal = Math.round(vals.bottom * 1000) / 1000;
+    const bVal = Math.round(vals.slide * 1000) / 1000;
     const product = Math.round(aVal * bVal * 1000) / 1000;
 
     const labelY = -8;
@@ -363,7 +388,7 @@ function slideruleGenerateArrows(cx) {
     if (cx > ss + 2) {
         arrows += slideruleHandArrow(ss, sumY, cx, colorR, 'sum');
         const midR = (ss + cx) / 2;
-        arrows += `<text x="${midR}" y="${sumY + 18}" text-anchor="middle" fill="${colorR}" font-size="14" font-weight="bold" font-family="'Comic Sans MS', 'Marker Felt', cursive">a × b = ${product}</text>`;
+        arrows += `<text x="${midR}" y="${sumY + 18}" text-anchor="middle" fill="${colorR}" font-size="14" font-weight="bold" font-family="'Comic Sans MS', 'Marker Felt', cursive">a \u00d7 b = ${product}</text>`;
     }
 
     return arrows;
@@ -402,13 +427,14 @@ function slideruleRenderDisplay() {
     const vals = slideruleReadAtCursor();
 
     const readout = container.querySelector('.sliderule-readout-value');
-    if (readout) readout.textContent = mode.readout(vals.d, vals.c);
+    if (readout) readout.textContent = mode.readout(vals.top, vals.slide, vals.bottom);
 
     const svgEl = container.querySelector('.sliderule-svg');
     if (svgEl) {
         const totalW = slideruleState.scaleStart * 2 + slideruleState.scaleWidth;
-        const fixedTicks = slideruleGenerateScaleTicksForDef(mode.fixed, 0);
+        const topTicks = slideruleGenerateScaleTicksForDef(mode.top, 0);
         const slideTicks = slideruleGenerateScaleTicksForDef(mode.slide, slideruleState.slideOffset);
+        const bottomTicks = slideruleGenerateScaleTicksForDef(mode.bottom, 0);
         const cx = slideruleState.cursorX;
         const arrowsSVG = slideruleGenerateArrows(cx);
         const hasArrows = Math.abs(slideruleState.slideOffset) > 2 && slideruleState.scaleMode === 'CD';
@@ -417,23 +443,31 @@ function slideruleRenderDisplay() {
 
         svgEl.setAttribute('viewBox', `0 ${svgTop} ${totalW} ${svgHeight - svgTop}`);
 
-        const topLabels = slideruleGenerateTopLabels(mode.fixed, 0);
+        const topLabels = slideruleGenerateTopLabels(mode.top, 0);
+
+        const topOpacity = mode.topActive ? '1' : '0.4';
+        const slideOpacity = mode.slideActive ? '1' : '0.4';
+        const bottomOpacity = mode.bottomActive ? '1' : '0.4';
+        const topFill = mode.topActive ? '#1a1a1a' : '#141414';
+        const slideFill = mode.slideActive ? '#1a3318' : '#141e14';
+        const bottomFill = mode.bottomActive ? '#1a1a1a' : '#141414';
 
         svgEl.innerHTML = `
-            ${topLabels}
+            <g opacity="${topOpacity}">${topLabels}</g>
 
             <rect x="0" y="0" width="${totalW}" height="110" rx="4" fill="#2a1a0a" stroke="#8B7355" stroke-width="2"/>
-            <rect x="${slideruleState.scaleStart - 4}" y="2" width="${slideruleState.scaleWidth + 8}" height="32" fill="#1a1a1a" rx="2"/>
-            <text x="14" y="22" fill="${mode.fixed.color}" font-size="14" font-weight="bold" font-family="monospace">${mode.fixed.name}</text>
-            <g transform="translate(0, 4)">${fixedTicks}</g>
 
-            <rect x="${slideruleState.scaleStart - 4 + slideruleState.slideOffset}" y="38" width="${slideruleState.scaleWidth + 8}" height="32" fill="#1a3318" rx="2" class="sliderule-slide-rect" style="cursor:grab;"/>
-            <text x="${slideruleState.scaleStart - 18 + slideruleState.slideOffset}" y="58" fill="${mode.slide.color}" font-size="14" font-weight="bold" font-family="monospace">${mode.slide.name}</text>
-            <g transform="translate(0, 42)">${slideTicks}</g>
+            <rect x="${slideruleState.scaleStart - 4}" y="2" width="${slideruleState.scaleWidth + 8}" height="32" fill="${topFill}" rx="2"/>
+            <text x="14" y="22" fill="${mode.top.color}" font-size="14" font-weight="bold" font-family="monospace" opacity="${topOpacity}">${mode.top.name}</text>
+            <g transform="translate(0, 4)" opacity="${topOpacity}">${topTicks}</g>
 
-            <rect x="${slideruleState.scaleStart - 4}" y="74" width="${slideruleState.scaleWidth + 8}" height="32" fill="#1a1a1a" rx="2"/>
-            <text x="14" y="94" fill="${mode.fixed.color}" font-size="14" font-weight="bold" font-family="monospace">${mode.fixed.name}</text>
-            <g transform="translate(0, 78)">${fixedTicks}</g>
+            <rect x="${slideruleState.scaleStart - 4 + slideruleState.slideOffset}" y="38" width="${slideruleState.scaleWidth + 8}" height="32" fill="${slideFill}" rx="2" class="sliderule-slide-rect" style="cursor:grab;"/>
+            <text x="${slideruleState.scaleStart - 18 + slideruleState.slideOffset}" y="58" fill="${mode.slide.color}" font-size="14" font-weight="bold" font-family="monospace" opacity="${slideOpacity}">${mode.slide.name}</text>
+            <g transform="translate(0, 42)" opacity="${slideOpacity}">${slideTicks}</g>
+
+            <rect x="${slideruleState.scaleStart - 4}" y="74" width="${slideruleState.scaleWidth + 8}" height="32" fill="${bottomFill}" rx="2"/>
+            <text x="14" y="94" fill="${mode.bottom.color}" font-size="14" font-weight="bold" font-family="monospace" opacity="${bottomOpacity}">${mode.bottom.name}</text>
+            <g transform="translate(0, 78)" opacity="${bottomOpacity}">${bottomTicks}</g>
 
             <line x1="${cx}" y1="${svgTop}" x2="${cx}" y2="110" stroke="rgba(255,50,50,0.8)" stroke-width="1.5" stroke-dasharray="3,2"/>
             <rect x="${cx - 10}" y="${svgTop}" width="20" height="${110 - svgTop}" fill="rgba(255,50,50,0.08)" class="sliderule-cursor-zone" style="cursor:crosshair;"/>
@@ -494,6 +528,13 @@ function renderSlideRuleCalculator() {
                     <div class="sliderule-title">
                         <span class="sliderule-title-label">SLIDE RULE</span>
                         <span class="sliderule-title-ns">NS[16] \u00b7 SlideRule</span>
+                    </div>
+                    <div class="sliderule-layout-ref">
+                        <span class="sliderule-layout-label">Body top:</span> <span class="sliderule-layout-scales" style="color:#cc9933;">L \u00b7 K \u00b7 A</span>
+                        <span class="sliderule-layout-sep">\u2502</span>
+                        <span class="sliderule-layout-label">Slide:</span> <span class="sliderule-layout-scales" style="color:#33cc66;">B \u00b7 CI \u00b7 C</span>
+                        <span class="sliderule-layout-sep">\u2502</span>
+                        <span class="sliderule-layout-label">Body bottom:</span> <span class="sliderule-layout-scales" style="color:#cc9933;">D \u00b7 S \u00b7 ST \u00b7 T</span>
                     </div>
                     <div class="sliderule-scale-selector">
                         ${scaleButtonsHTML}
