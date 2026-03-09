@@ -2635,8 +2635,19 @@ function resetSim() {
 
 function runGC() {
     if (!sim.bootComplete) {
-        const con = document.getElementById('editorConsole');
-        if (con) con.textContent += '\nGC Error: Boot must complete before running GC.\n';
+        showGCConsole(
+            [{ heading: '=== PP250 Garbage Collection ===', lines: [
+                'ERROR: Machine has not been booted.',
+                '',
+                'Click the Boot button (top-right) to initialize the',
+                'Church Machine before running garbage collection.',
+                '',
+                'The boot sequence loads system abstractions into the',
+                'namespace and prepares the GC subsystem.'
+            ]}],
+            { freedSlots: 0, freedWords: 0, liveCount: 0, report: '' },
+            true
+        );
         return;
     }
 
@@ -2659,10 +2670,10 @@ function runGC() {
     }
     if (current) phases.push(current);
 
-    showGCConsole(phases, result);
+    showGCConsole(phases, result, false);
 }
 
-function showGCConsole(phases, result) {
+function showGCConsole(phases, result, isError) {
     let existing = document.getElementById('gcConsoleOverlay');
     if (existing) existing.remove();
 
@@ -2686,7 +2697,6 @@ function showGCConsole(phases, result) {
     const status = document.createElement('div');
     status.className = 'gc-console-status';
     status.id = 'gcConsoleStatus';
-    status.textContent = 'GC executed — Step through the report one phase at a time, or Run All to replay.';
     dialog.appendChild(status);
 
     const buttons = document.createElement('div');
@@ -2709,9 +2719,21 @@ function showGCConsole(phases, result) {
     closeBtn.textContent = 'Close';
     closeBtn.style.cssText = 'background:#555;color:#fff;border:none;';
 
-    buttons.appendChild(stepBtn);
-    buttons.appendChild(runBtn);
-    buttons.appendChild(closeBtn);
+    if (isError) {
+        for (const phase of phases) {
+            const body = phase.lines.join('\n');
+            output.textContent = phase.heading + '\n' + body;
+        }
+        output.style.color = '#e74c3c';
+        status.textContent = 'Boot the machine first, then run GC.';
+        status.style.borderLeftColor = '#e74c3c';
+        buttons.appendChild(closeBtn);
+    } else {
+        status.textContent = 'GC executed — Step through the report one phase at a time, or Run All to replay.';
+        buttons.appendChild(stepBtn);
+        buttons.appendChild(runBtn);
+        buttons.appendChild(closeBtn);
+    }
     dialog.appendChild(buttons);
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
@@ -2787,8 +2809,8 @@ function showGCConsole(phases, result) {
 
     document.addEventListener('keydown', escHandler);
 
-    updateStatus();
-    stepBtn.focus();
+    if (!isError) updateStatus();
+    (isError ? closeBtn : stepBtn).focus();
 }
 
 function loadExample(name) {
