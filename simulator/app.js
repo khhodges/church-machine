@@ -261,16 +261,16 @@ function renderCListEntryDetail(nsIdx, entry) {
     const lim = sim.parseNSWord1(entry.word1_limit);
     const ver = (entry.word2_seals >>> 25) & 0x7F;
     const seal = entry.word2_seals & 0x01FFFFFF;
-    h += `<tr><td style="color:var(--church-blue);width:120px;">Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">B (Bind)</td><td>${lim.b}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">F (Far)</td><td>${lim.f}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">G (GC)</td><td>${entry.gBit}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">Chainable</td><td>${lim.chainable ? 'Yes' : 'No'}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue);width:120px;">W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
     const typeNames = ['NULL','Inform','Outform','Abstract'];
-    h += `<tr><td style="color:var(--church-blue)">GT Type</td><td>${typeNames[entry.gtType] || '?'} (${entry.gtType})</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">Version</td><td>${ver}</td></tr>`;
-    h += `<tr><td style="color:var(--church-blue)">FNV Seal</td><td>0x${seal.toString(16).toUpperCase().padStart(7,'0')}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: Type</td><td>${typeNames[entry.gtType] || '?'} (${entry.gtType})</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: B (Bind)</td><td>${lim.b}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: F (Far)</td><td>${lim.f}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: Chainable</td><td>${lim.chainable ? 'Yes' : 'No'}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W2: Version</td><td>${ver}</td></tr>`;
+    h += `<tr><td style="color:var(--church-blue)">W2: FNV Seal</td><td>0x${seal.toString(16).toUpperCase().padStart(7,'0')}</td></tr>`;
     h += '</tbody></table>';
 
     const wordCount = Math.min(lim.limit + 1, 64);
@@ -408,7 +408,7 @@ function updateCRDetail() {
             html += '<div style="color:var(--text-secondary);padding:0.5rem;">No namespace entries within this capability\'s range.</div>';
         } else {
             html += '<table class="cr-table"><thead><tr>';
-            html += '<th>Idx</th><th>Label</th><th>Type</th><th>Location</th><th>B</th><th>Limit</th><th>FNV</th>';
+            html += '<th>Idx</th><th>Label</th><th>W0: Location</th><th>W1: Type</th><th>W1: B</th><th>W1: Limit</th><th>W2: FNV</th>';
             html += '</tr></thead><tbody>';
             for (let j = 0; j < clistEntries.length; j++) {
                 const c = clistEntries[j];
@@ -419,8 +419,8 @@ function updateCRDetail() {
                 html += `<tr class="cr-active clist-clickable${isExpanded ? ' clist-selected' : ''}" onclick="toggleCListEntry(${c.idx})" title="Click to inspect NS[${c.idx}]">`;
                 html += `<td class="cr-idx">${c.idx}</td>`;
                 html += `<td class="cr-name">${e.label || ''}</td>`;
-                html += `<td>${typeNames[e.gtType] || '?'}</td>`;
                 html += `<td>0x${c.loc.toString(16).toUpperCase().padStart(8,'0')}</td>`;
+                html += `<td>${typeNames[e.gtType] || '?'}</td>`;
                 html += `<td class="cr-flag">${c.lim.b}</td>`;
                 html += `<td>0x${c.lim.limit.toString(16).toUpperCase().padStart(5,'0')}</td>`;
                 html += `<td>0x${sealFNV.toString(16).toUpperCase().padStart(7,'0')}</td>`;
@@ -457,7 +457,7 @@ function updateCRDetail() {
             html += '<div style="color:var(--text-secondary);padding:0.5rem;">Namespace table is empty.</div>';
         } else {
             html += '<table class="cr-table"><thead><tr>';
-            html += '<th>Idx</th><th>Label</th><th>Type</th><th>Location</th><th>B</th><th>G</th><th>Chain</th>';
+            html += '<th>Idx</th><th>Label</th><th>W0: Location</th><th>W1: Type</th><th>W1: B</th><th>W1: G</th><th>W1: Chain</th>';
             html += '</tr></thead><tbody>';
             const typeNames = ['NULL','Inform','Outform','Abstract'];
             for (let i = 0; i < sim.nsCount; i++) {
@@ -467,8 +467,8 @@ function updateCRDetail() {
                 html += '<tr class="cr-active">';
                 html += `<td class="cr-idx">${i}</td>`;
                 html += `<td class="cr-name">${e.label || ''}</td>`;
-                html += `<td>${typeNames[e.gtType] || '?'}</td>`;
                 html += `<td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td>`;
+                html += `<td>${typeNames[e.gtType] || '?'}</td>`;
                 html += `<td class="cr-flag">${sim.parseNSWord1(e.word1_limit).b}</td>`;
                 html += `<td class="cr-flag">${e.gBit}</td>`;
                 html += `<td>${e.chainable ? 'Yes' : 'No'}</td>`;
@@ -518,16 +518,16 @@ function updateCRDetail() {
         const typeNames = ['NULL','Inform','Outform','Abstract'];
 
         html += '<table class="cr-table"><tbody>';
-        html += `<tr><td>Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
-        html += `<tr><td>GT Permissions</td><td>[${gtPermStr}]</td></tr>`;
-        html += `<tr><td>GT Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
-        html += `<tr><td>B (Bind)</td><td>${lim.b}</td></tr>`;
-        html += `<tr><td>F (Far)</td><td>${lim.f}</td></tr>`;
-        html += `<tr><td>Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
-        html += `<tr><td>Version</td><td>${sealVer}</td></tr>`;
-        html += `<tr><td>FNV Seal</td><td>0x${sealFNV.toString(16).toUpperCase().padStart(7,'0')}</td></tr>`;
-        html += `<tr><td>G bit</td><td>${entry.gBit}</td></tr>`;
-        html += `<tr><td>Chainable</td><td>${entry.chainable ? 'Yes' : 'No'}</td></tr>`;
+        html += `<tr><td>W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
+        html += `<tr><td>W1: Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
+        html += `<tr><td>W1: B (Bind)</td><td>${lim.b}</td></tr>`;
+        html += `<tr><td>W1: F (Far)</td><td>${lim.f}</td></tr>`;
+        html += `<tr><td>W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
+        html += `<tr><td>W1: Chainable</td><td>${entry.chainable ? 'Yes' : 'No'}</td></tr>`;
+        html += `<tr><td>W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
+        html += `<tr><td>W2: Version</td><td>${sealVer}</td></tr>`;
+        html += `<tr><td>W2: FNV Seal</td><td>0x${sealFNV.toString(16).toUpperCase().padStart(7,'0')}</td></tr>`;
+        html += `<tr><td>CR Permissions</td><td>[${gtPermStr}]</td></tr>`;
         if (entry.codeLength !== undefined) {
             html += `<tr><td>Code Length</td><td>${entry.codeLength} words (${entry.codeLength * 4} bytes)</td></tr>`;
         }
@@ -723,10 +723,10 @@ function updateNamespace() {
     let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 3 words per entry (96 bits) \u2014 click a row to inspect memory</div>';
     html += '<table class="ns-table"><thead><tr>';
     html += '<th>Idx</th><th class="ns-label-col">Label</th>';
-    html += '<th>Type</th><th>Location</th>';
-    html += '<th>B</th><th>F</th><th>Limit</th>';
-    html += '<th>Ver</th><th>FNV Seal</th>';
-    html += '<th>G</th><th>Actions</th>';
+    html += '<th>W0: Location</th>';
+    html += '<th>W1: Type</th><th>W1: B</th><th>W1: F</th><th>W1: G</th><th>W1: Limit</th>';
+    html += '<th>W2: Ver</th><th>W2: FNV Seal</th>';
+    html += '<th>Actions</th>';
     html += '</tr></thead><tbody>';
 
     const typeNames = ['NULL','Inform','Outform','Abstract'];
@@ -740,14 +740,14 @@ function updateNamespace() {
         html += `<tr class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;">`;
         html += `<td>${i}</td>`;
         html += `<td class="ns-label">${e.label || '-'}</td>`;
-        html += `<td>${typeNames[e.gtType] || '?'}</td>`;
         html += `<td>0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        html += `<td>${typeNames[e.gtType] || '?'}</td>`;
         html += `<td class="ns-flag">${lim.b}</td>`;
         html += `<td class="ns-flag">${lim.f}</td>`;
+        html += `<td class="ns-flag">${e.gBit}</td>`;
         html += `<td>0x${lim.limit.toString(16).toUpperCase().padStart(5, '0')}</td>`;
         html += `<td>${ver}</td>`;
         html += `<td>0x${seal.toString(16).toUpperCase().padStart(7, '0')}</td>`;
-        html += `<td class="ns-flag">${e.gBit}</td>`;
         html += `<td class="ns-entry-actions"><button class="btn btn-primary btn-xs" onclick="event.stopPropagation();exportEntryMemory(${i})">Export</button> <button class="btn btn-xs" onclick="event.stopPropagation();importEntryMemory(${i})" style="background:#3a86ff;color:#fff;border:none;">Import</button></td>`;
         html += '</tr>';
         if (isExpanded) {
@@ -5331,9 +5331,9 @@ function confirmCreateNamespace() {
     let listing = `Namespace entry "${name}" created via Navana.Add:\n\n`;
     listing += `  NS Index:     ${r.nsIndex}\n`;
     listing += `  Version:      ${r.version}\n`;
-    listing += `  GT Type:      ${typeNames[gtType] || 'Unknown'}\n`;
-    listing += `  Location:     0x${location.toString(16)}\n`;
-    listing += `  Limit:        ${limit}\n`;
+    listing += `  W1 Type:      ${typeNames[gtType] || 'Unknown'}\n`;
+    listing += `  W0 Location:  0x${location.toString(16)}\n`;
+    listing += `  W1 Limit:     ${limit}\n`;
     listing += `  Alloc Size:   ${allocSize} words\n`;
     listing += `  C-List Slots: ${clistCount}\n`;
     listing += `  Freespace:    ${freespace} words\n`;
