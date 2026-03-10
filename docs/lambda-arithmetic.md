@@ -74,6 +74,37 @@ abstraction FixedPointMath {
 - **Truncation**: Integer division always rounds toward zero. `roundFixed` compensates for this in the final step.
 - **Scale factor is fixed**: The abstraction uses 100 (two decimal places). For more precision, change the scale to 1000 or 10000 and adjust the methods accordingly.
 
+### Overflow Limits (Scale Factor 100, 32-bit integers)
+
+The Church Machine uses 32-bit integers with a maximum value of 2,147,483,647 (~2.1 billion). With a scale factor of 100, each operation has a specific safe range before overflow occurs:
+
+| Operation | Max operand(s) | Max real value | Why |
+|---|---|---|---|
+| **Add / Subtract** | ~1,073,741,823 each | ~10,737,418.23 | Sum must fit in 32 bits |
+| **toFixed** | 21,474,836 | 21,474,836.00 | `n × 100` must not overflow |
+| **Multiply** | ~46,340 each | ~463.40 × 463.40 | `a × b` intermediate must fit before `/100` rescale |
+| **Divide (numerator)** | 21,474,836 | 214,748.36 | `a × 100` prescale must fit |
+| **Divide (denominator)** | any non-zero | unlimited | No scaling applied to denominator |
+| **Percent** | whole × pct < 2.1B | depends on combination | Same constraint as multiply |
+| **roundFixed** | 2,147,483,597 | ~21,474,835.97 | `f + 50` must fit |
+
+**Multiplication is the tightest constraint** — values above ~463 risk overflow because the intermediate product `a × b` must fit in 32 bits *before* the rescaling division by 100.
+
+**Worked example — why 463 is the limit:**
+- `46340 × 46340 = 2,147,395,600` — fits in 32 bits, then `/ 100 = 21,473,956` (represents 463.40 × 463.40 = 214,739.56)
+- `46341 × 46341 = 2,147,488,281` — exceeds 2,147,483,647 and overflows
+
+**Reducing the scale factor extends the range:**
+
+| Scale factor | Decimal places | Multiply limit (real value) |
+|---|---|---|
+| 10 | 1 | ~4,634.0 |
+| 100 | 2 | ~463.40 |
+| 1,000 | 3 | ~46.34 |
+| 10,000 | 4 | ~4.63 |
+
+There is a direct trade-off: more precision means smaller numbers, fewer decimal places means larger numbers. For most practical uses (prices, measurements, percentages), scale factor 100 with a ~463 multiply limit is sufficient. If you need larger numbers and can tolerate less precision, drop to scale factor 10. If you need both large numbers and exact precision, use the rational number abstraction instead.
+
 ---
 
 ## 2. Remainder / Modulo
