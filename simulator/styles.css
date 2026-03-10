@@ -3837,6 +3837,7 @@ a.next-step-link:hover {
     .docs-layout {
         grid-template-columns: 1fr;
         height: auto;
+        min-height: calc(100vh - 90px);
     }
 
     .docs-sidebar {
@@ -3849,6 +3850,19 @@ a.next-step-link:hover {
         padding: 0;
         opacity: 0;
         overflow: hidden;
+    }
+
+    .docs-content-panel {
+        min-height: 60vh;
+    }
+
+    .docs-content-panel .panel {
+        height: auto;
+        min-height: 100%;
+    }
+
+    .docs-content-body {
+        min-height: 50vh;
     }
 
     .docs-back-btn {

@@ -8798,17 +8798,19 @@ async function loadDoc(filename) {
         if (sidebar) sidebar.classList.add('docs-sidebar-collapsed');
     }
 
-    const contentPanel = document.querySelector('.docs-content-panel');
-    if (isMobile && contentPanel) {
-        contentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
     try {
         const resp = await fetch('/api/docs/read/' + filename);
         const data = await resp.json();
         if (body) body.innerHTML = renderMarkdown(data.content);
     } catch (e) {
         if (body) body.innerHTML = '<div class="docs-placeholder">Failed to load document.</div>';
+    }
+
+    if (isMobile) {
+        const contentPanel = document.querySelector('.docs-content-panel');
+        if (contentPanel) {
+            setTimeout(() => contentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+        }
     }
 }
 
