@@ -8043,6 +8043,9 @@ abstraction ChurchNumerals {
     -- Multiplication: a * b
     method multiply(a, b) = a * b
 
+    -- Division: a / b (integer, guarded)
+    method divide(a, b) = if b == 0 then 0 else a * b
+
     -- Predecessor: max(0, n - 1)
     method predecessor(n) = if n > 0 then n - 1 else 0
 
