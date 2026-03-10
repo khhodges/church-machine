@@ -289,6 +289,87 @@ All three techniques compile to the same 20 Church Machine instructions. The har
 
 ---
 
+## Composing Abstractions — The Supercall Pattern
+
+### Why Not Instances?
+
+If you've used object-oriented languages, you might expect to create an "instance" of `FixedPointMath` or `RationalArith` that holds a value — like `myPrice = FixedPointMath(350)`. The Church Machine doesn't work that way. An abstraction is a **code block with methods**, not a data container. When you call `addFixed(350, 275)`, the values are passed in as parameters and the result comes back, but nothing is stored between calls. The abstraction has no persistent fields or internal state.
+
+Data lives in **registers and memory**. Abstractions provide **operations** on that data. This is closer to how a real CPU works than to an object-oriented language.
+
+### How Values Are Tracked
+
+The caller keeps track of what values mean. For fixed-point:
+
+```
+DR1 = 350       (represents £3.50)
+DR2 = 275       (represents £2.75)
+
+DR3 = FixedPointMath.addFixed(DR1, DR2)   → 625 (represents £6.25)
+```
+
+For rational numbers, numerator and denominator live in separate registers:
+
+```
+DR1 = 1, DR2 = 3       (represents 1/3)
+DR3 = 1, DR4 = 6       (represents 1/6)
+
+DR5 = RationalArith.addNum(DR1, DR2, DR3, DR4)   → 9
+DR6 = RationalArith.addDen(DR2, DR4)              → 18
+-- Result: 9/18
+```
+
+### Supercalls — Composing Abstractions via Capabilities
+
+The real power comes from **composing** abstractions. One abstraction can hold a **capability** (a Golden Token) to another abstraction in its C-List, and then call its methods using `CALL`. This is the "supercall" pattern — cross-abstraction method invocation, secured by the capability system.
+
+In CLOOMC++, this looks like:
+
+```
+abstraction FixedPointWallet {
+    capabilities { FixedPointMath }
+
+    method addPrices(a, b) = FixedPointMath.addFixed(a, b)
+    method taxTotal(price, taxRate) = FixedPointMath.mulFixed(price, taxRate)
+}
+```
+
+Here, `FixedPointWallet` doesn't re-implement arithmetic — it delegates to `FixedPointMath` through its capability. The Golden Token in the C-List grants permission to call those methods. Without the token, the call is blocked by hardware.
+
+You can chain this further:
+
+```
+abstraction Shop {
+    capabilities { FixedPointWallet, RationalArith }
+
+    method checkout(price, taxRate) = FixedPointWallet.taxTotal(price, taxRate)
+    method splitBill(total, people) = RationalArith.divNum(total, people)
+}
+```
+
+### The Security Dimension
+
+This isn't just a calling convention — it's the Church Machine's security model:
+
+- **You can only call methods on abstractions you hold a Golden Token for.** If `Shop` doesn't have `FixedPointMath` in its C-List, it cannot call `addFixed` directly — it must go through `FixedPointWallet`, which does hold that token.
+- **Capabilities are unforgeable.** You cannot fabricate a Golden Token. They are granted by the system when an abstraction is created.
+- **The principle of least authority applies.** Each abstraction only has access to the specific capabilities it needs. `FixedPointWallet` can do arithmetic but cannot access the shop's inventory. `Shop` can use the wallet but cannot forge new tokens.
+
+### Instances vs. Capabilities — A Different Mental Model
+
+| OOP concept | Church Machine equivalent |
+|---|---|
+| Class | Abstraction (code + method table) |
+| Instance | Caller's registers + memory (data lives outside the abstraction) |
+| Method call | `CALL` through a Golden Token capability |
+| Inheritance | Supercall — one abstraction calls another via capability |
+| Private fields | Memory within an abstraction's lump (only accessible by its own methods) |
+| Constructor | The caller sets up registers and memory before the first call |
+
+The key insight: **the "instance" is really the caller's context** — its registers, its memory region, its C-List of capabilities. The abstraction provides the operations; the caller provides the data. This is Alonzo Church's original idea applied to hardware — everything is a function, and capabilities control who can call what.
+
+---
+
 ## Further Reading
 
 - The **LC: Slide Rule** example demonstrates fixed-point thinking — its `SineApprox` method returns `sin(θ) × 10` to preserve one decimal place on integer hardware.
