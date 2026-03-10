@@ -3842,27 +3842,14 @@ a.next-step-link:hover {
 
     .docs-sidebar {
         max-height: 40vh;
-        transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
     }
 
     .docs-sidebar.docs-sidebar-collapsed {
-        max-height: 0;
-        padding: 0;
-        opacity: 0;
-        overflow: hidden;
+        display: none !important;
     }
 
     .docs-content-panel {
-        min-height: 60vh;
-    }
-
-    .docs-content-panel .panel {
-        height: auto;
-        min-height: 100%;
-    }
-
-    .docs-content-body {
-        min-height: 50vh;
+        min-height: calc(100vh - 90px);
     }
 
     .docs-back-btn {

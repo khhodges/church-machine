@@ -8807,10 +8807,8 @@ async function loadDoc(filename) {
     }
 
     if (isMobile) {
-        const contentPanel = document.querySelector('.docs-content-panel');
-        if (contentPanel) {
-            setTimeout(() => contentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
-        }
+        const docsView = document.getElementById('docs');
+        if (docsView) docsView.scrollTop = 0;
     }
 }
 
@@ -8829,8 +8827,8 @@ function loadFigure(filename) {
     if (isMobile) {
         const sidebar = document.querySelector('.docs-sidebar');
         if (sidebar) sidebar.classList.add('docs-sidebar-collapsed');
-        const contentPanel = document.querySelector('.docs-content-panel');
-        if (contentPanel) contentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const docsView = document.getElementById('docs');
+        if (docsView) docsView.scrollTop = 0;
     }
 }
 
