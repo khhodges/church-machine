@@ -1,10 +1,35 @@
-# Beyond Integer Division — Arithmetic on the Church Machine
+# The Church Machine — From Integer Arithmetic to Provably Secure Systems
+
+## Why This Matters
+
+A telephone exchange drops a call and leaks the billing record of the previous caller. A banking system processes a transaction after the session has expired, debiting the wrong account. An autonomous weapons platform fires on a target whose authorisation token was revoked three seconds ago but hasn't been garbage-collected yet. A surgical robot's control thread is paused by a GC storm mid-incision.
+
+These are not hypothetical scenarios. They are the inevitable consequences of building safety-critical systems on architectures that cannot guarantee deterministic resource management, temporal safety, or capability revocation.
+
+The Church Machine was designed to make these failures **impossible at the hardware level** — not by adding layers of software checks, but by implementing Alonzo Church's lambda calculus as a physical processor architecture where security guarantees emerge from the mathematical foundation itself.
+
+This document starts with a simple question — how do you divide numbers on integer-only hardware? — and follows the thread all the way through: from arithmetic techniques, to abstraction composition, to threads as dynamic instances, to deterministic garbage collection, and finally to the security properties that make the Church Machine suitable for systems where failure is not an option.
+
+### The domains where this matters most:
+
+- **Telecommunications** — A PP250 telephone exchange handling thousands of concurrent calls, each a dynamic thread with its own capabilities, where a stale token from a terminated call must never grant access to a new call's billing data.
+- **Banking and finance** — Transaction processing where every operation must be authorised by a current, valid capability, and where expired session tokens must be revoked instantly and completely — not "eventually, when the GC gets around to it."
+- **Autonomous lethal weapons** — Systems where a revoked authorisation to fire *must* take effect immediately. A weapon that continues to act on a stale capability because garbage collection hasn't reclaimed the authorisation token is not a software bug — it is a war crime. There is no acceptable latency between revocation and enforcement.
+- **Medical instruments** — Surgical robots, infusion pumps, and diagnostic systems where a GC pause of even 50 milliseconds can cause tissue damage or deliver a fatal overdose. Deterministic execution with bounded pause times is not a performance preference — it is a patient safety requirement.
+
+In all of these domains, the question is the same: **can you prove, at the hardware level, that a revoked capability cannot be used, that a terminated thread's resources will be reclaimed in bounded time, and that no stale token can ever grant access to a recycled resource?**
+
+The Church Machine answers yes. This document explains how.
+
+---
+
+## The Starting Point: Integer Arithmetic
 
 The Church Machine operates on 32-bit integers. There are no floating-point registers or instructions. Every value in a data register (DR0–DR7) is a whole number, and the division instruction (`/`) performs integer division via repeated subtraction, truncating any fractional part.
 
 This means `7 / 3 = 2`, not `2.333...`.
 
-So how do you compute precise results on integer-only hardware? This document covers three techniques — **fixed-point arithmetic**, **remainder/modulo**, and **rational numbers** — each implemented as a Lambda Calculus abstraction in the Church Machine IDE.
+So how do you compute precise results on integer-only hardware? The first part of this document covers three techniques — **fixed-point arithmetic**, **remainder/modulo**, and **rational numbers** — each implemented as a Lambda Calculus abstraction in the Church Machine IDE. The later sections show how these building blocks compose into the capability-secured, deterministically-collected system that makes the Church Machine suitable for the domains described above.
 
 ---
 
@@ -538,7 +563,27 @@ This is not coincidental. The Church Machine's security model is a direct implem
 - **Substitution is the only way to bind values** — capabilities are granted through the C-List, never forged or guessed
 - **Reduction eliminates intermediate terms** — thread termination and GC sweep are the hardware equivalent of beta-reduction's cleanup
 
-The PP250 telephone exchange is Church's lambda calculus made physical: every call is a lambda expression in flight, every thread is a reduction in progress, and garbage collection is the mechanism that ensures completed reductions release their resources. The security guarantees are not bolted on — they emerge naturally from the mathematical foundation.
+The PP250 telephone exchange is Church's lambda calculus made physical: every call is a lambda expression in flight, every thread is a reduction in progress, and garbage collection is the mechanism that ensures completed reductions release their resources.
+
+The same is true for a banking transaction, a weapon's fire-control authorisation, and a surgical robot's motor command. Each is a thread — a lambda expression in flight — and each is subject to the same guarantees: deterministic collection, instant revocation, and zero-window temporal safety. The security properties are not bolted on after the fact. They emerge naturally from the mathematical foundation that Alonzo Church established in 1936.
+
+---
+
+## The Full Picture
+
+This document began with a simple question — how do you divide 7 by 3 on integer hardware? — and arrived at a hardware architecture that can provably prevent a weapons platform from firing on a revoked authorisation, a banking system from processing a stale transaction, and a surgical robot from pausing mid-incision.
+
+The path was:
+
+1. **Integer arithmetic** — fixed-point, remainder, and rational techniques give precise results on integer-only hardware
+2. **Abstraction composition** — the supercall pattern lets abstractions delegate to each other through capability-secured method calls
+3. **Threads as dynamic instances** — each concurrent task (phone call, transaction, fire-control check, motor command) gets its own register file, program counter, and capability context
+4. **Deterministic garbage collection** — terminated threads' resources are reclaimed in bounded time, with version bumping instantly invalidating all stale tokens
+5. **Provable security** — no dangling capabilities, no resource exhaustion, no information leakage, no ambient authority, no window of vulnerability
+
+Every layer builds on the one below it. The arithmetic is exact because the abstractions are correct. The abstractions compose safely because capabilities enforce least authority. The threads are isolated because each has its own capability context. The resources are recovered because GC is deterministic. And the system is secure because all of these properties are enforced by hardware, not software.
+
+This is what it means to build a processor on Alonzo Church's lambda calculus: the security guarantees are not features — they are theorems.
 
 ---
 
@@ -547,3 +592,6 @@ The PP250 telephone exchange is Church's lambda calculus made physical: every ca
 - The **LC: Slide Rule** example demonstrates fixed-point thinking — its `SineApprox` method returns `sin(θ) × 10` to preserve one decimal place on integer hardware.
 - The **LC: Church** example's `divide` method shows the basic integer division that all three techniques build upon.
 - The **LC: Pairs** example shows how Church pairs `(a, b)` work — the same encoding used by rational numbers to represent fractions.
+- The **[Deterministic Garbage Collection](garbage-collection.md)** document covers the G-bit mechanism, mLoad integration, and three-phase Mark-Scan-Sweep cycle in full technical detail.
+- The **[Golden Tokens](golden-tokens.md)** document explains the 32-bit unforgeable capability format, permission bits, and version-based revocation.
+- The **[Architecture](architecture.md)** document covers the PP250 GC model, the 20-instruction set, and the Church/Turing domain split.
