@@ -3834,27 +3834,6 @@ a.next-step-link:hover {
         flex-wrap: wrap;
     }
 
-    .docs-layout {
-        grid-template-columns: 1fr;
-        height: auto;
-        min-height: calc(100vh - 90px);
-    }
-
-    .docs-sidebar {
-        max-height: 40vh;
-    }
-
-    .docs-sidebar.docs-sidebar-collapsed {
-        display: none !important;
-    }
-
-    .docs-content-panel {
-        min-height: calc(100vh - 90px);
-    }
-
-    .docs-back-btn {
-        display: inline-block !important;
-    }
 }
 
 .docs-layout {
@@ -4050,6 +4029,35 @@ a.next-step-link:hover {
     min-height: calc(100vh - 140px);
     background: #ffffff;
     border-radius: 6px;
+}
+
+@media (max-width: 768px) {
+    .docs-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    .docs-sidebar {
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+
+    .docs-sidebar.docs-sidebar-collapsed {
+        display: none !important;
+    }
+
+    .docs-content-panel {
+        overflow-y: visible;
+    }
+
+    .docs-content-panel .panel {
+        height: auto;
+    }
+
+    .docs-back-btn {
+        display: inline-block !important;
+    }
 }
 
 .tutorial-selector {
