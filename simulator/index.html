@@ -82,6 +82,7 @@
                             <option value="assembly">Assembly</option>
                             <option value="javascript">JS (CLOOMC++)</option>
                             <option value="haskell">Haskell (CLOOMC++)</option>
+                            <option value="lambda">Lambda Calculus</option>
                         </select>
                         <button class="btn" onclick="compileDraft()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
                     </div>
@@ -124,6 +125,10 @@
                         <button class="example-tab" onclick="loadCLOOMCExample('ada_note_g')" data-example="cloomc_ada_note_g" style="color:#e8a87c;" data-tooltip="Ada: Note G — Ada Lovelace's algorithm in high-level CLOOMC++">Ada: Note G</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('english_hello')" data-example="cloomc_english_hello" style="color:#4fc3f7;" data-tooltip="EN: Hello — Hello world in plain English CLOOMC++">EN: Hello</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('english_counter')" data-example="cloomc_english_counter" style="color:#4fc3f7;" data-tooltip="EN: Counter — Counter abstraction in plain English CLOOMC++">EN: Counter</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('lambda_church')" data-example="cloomc_lambda_church" style="color:#81c784;" data-tooltip="LC: Church — Church numerals in Lambda Calculus">LC: Church</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('lambda_booleans')" data-example="cloomc_lambda_booleans" style="color:#81c784;" data-tooltip="LC: Booleans — Church booleans in Lambda Calculus">LC: Booleans</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('lambda_pairs')" data-example="cloomc_lambda_pairs" style="color:#81c784;" data-tooltip="LC: Pairs — Church-encoded pairs in Lambda Calculus">LC: Pairs</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('lambda_ycomb')" data-example="cloomc_lambda_ycomb" style="color:#81c784;" data-tooltip="LC: Y-Comb — Y combinator and recursive factorial in Lambda Calculus">LC: Y-Comb</button>
                     </div>
                     <button class="example-arrow" onclick="scrollExamples(1)" data-tooltip="Scroll Right — See more examples">&rsaquo;</button>
                 </div>
@@ -523,6 +528,7 @@
                     <option value="haskell">Haskell</option>
                     <option value="symbolic">Symbolic Math</option>
                     <option value="assembly">Assembly</option>
+                    <option value="lambda">Lambda Calculus</option>
                 </select>
                 <button class="btn" onclick="publishToLibrary()" style="background:#4a7a2e;color:#fff;border:none;" data-tooltip="Publish Current — Share your current abstraction with the library">Publish Current</button>
             </div>

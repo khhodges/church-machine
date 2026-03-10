@@ -37,6 +37,9 @@ class CLOOMCCompiler {
         if (this._detectEnglish(source)) {
             return this.compileEnglish(source, capabilities);
         }
+        if (this._detectLambda(source)) {
+            return this.compileLambda(source, capabilities);
+        }
         if (this._detectSymbolic(source)) {
             return this.compileSymbolic(source, capabilities);
         }
@@ -68,6 +71,404 @@ class CLOOMCCompiler {
         }
 
         return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'javascript' };
+    }
+
+    _detectLambda(source) {
+        const lines = source.split('\n');
+        for (const line of lines) {
+            const t = line.trim();
+            if (t.startsWith('--')) {
+                if (/^--\s*LAMBDA\s+CALCULUS\s*$/i.test(t)) return true;
+                continue;
+            }
+            if (/\u03BB[a-z]\s*\./.test(t)) return true;
+            if (/^method\s+\w+\s*\([^)]*\)\s*=\s*.*\u03BB[a-z]\s*\./.test(t)) return true;
+        }
+        return false;
+    }
+
+    compileLambda(source, capabilities) {
+        const errors = [];
+        const parsed = this._parseLambdaAbstraction(source, errors);
+        if (errors.length > 0) {
+            return { methods: [], errors, manifest: [] };
+        }
+
+        const rom = this._buildROM(parsed.capabilities, capabilities || []);
+        const methods = [];
+        const manifest = [];
+
+        for (const method of parsed.methods) {
+            const result = this._compileLambdaMethod(method, rom, parsed.capabilities, errors);
+            if (result.errors.length > 0) {
+                errors.push(...result.errors);
+            } else {
+                methods.push({ name: method.name, code: result.code });
+                manifest.push({ name: method.name, mapping: result.manifest });
+            }
+        }
+
+        return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'lambda' };
+    }
+
+    _parseLambdaAbstraction(source, errors) {
+        const result = { name: '', capabilities: [], methods: [] };
+        const lines = source.split('\n');
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i].trim();
+            if (!line || line.startsWith('--')) { i++; continue; }
+
+            const absMatch = line.match(/^abstraction\s+(\w+)\s*\{/);
+            if (absMatch) {
+                result.name = absMatch[1];
+                i++;
+                i = this._parseLambdaBody(lines, i, result, errors);
+                break;
+            }
+            i++;
+        }
+
+        if (!result.name) {
+            errors.push({ line: 0, message: 'No abstraction declaration found. Expected: abstraction Name { ... }' });
+        }
+        return result;
+    }
+
+    _parseLambdaBody(lines, i, result, errors) {
+        while (i < lines.length) {
+            const line = lines[i].trim();
+            if (!line || line.startsWith('--')) { i++; continue; }
+            if (line === '}') return i + 1;
+
+            const capMatch = line.match(/^capabilities\s*\{/);
+            if (capMatch) {
+                const inlineMatch = line.match(/^capabilities\s*\{\s*(.*?)\s*\}$/);
+                if (inlineMatch) {
+                    if (inlineMatch[1]) {
+                        const names = inlineMatch[1].replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                        result.capabilities.push(...names);
+                    }
+                    i++;
+                } else {
+                    i++;
+                    while (i < lines.length) {
+                        const capLine = lines[i].trim();
+                        if (capLine === '}') { i++; break; }
+                        if (capLine && !capLine.startsWith('--')) {
+                            const names = capLine.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                            result.capabilities.push(...names);
+                        }
+                        i++;
+                    }
+                }
+                continue;
+            }
+
+            const methodMatch = line.match(/^method\s+(\w+)\s*\(([^)]*)\)\s*=\s*(.+)$/);
+            if (methodMatch) {
+                const method = {
+                    name: methodMatch[1],
+                    params: methodMatch[2] ? methodMatch[2].split(',').map(p => p.trim()).filter(Boolean) : [],
+                    expr: methodMatch[3].trim(),
+                    startLine: i,
+                    isLambda: true
+                };
+                i++;
+                while (i < lines.length) {
+                    const contLine = lines[i].trim();
+                    if (!contLine || contLine.startsWith('--') || contLine.startsWith('method ') || contLine === '}') break;
+                    method.expr += ' ' + contLine;
+                    i++;
+                }
+                result.methods.push(method);
+                continue;
+            }
+
+            const blockMethodMatch = line.match(/^method\s+(\w+)\s*\(([^)]*)\)\s*=\s*$/);
+            if (blockMethodMatch) {
+                const method = {
+                    name: blockMethodMatch[1],
+                    params: blockMethodMatch[2] ? blockMethodMatch[2].split(',').map(p => p.trim()).filter(Boolean) : [],
+                    expr: '',
+                    startLine: i,
+                    isLambda: true
+                };
+                i++;
+                while (i < lines.length) {
+                    const contLine = lines[i].trim();
+                    if (!contLine || contLine.startsWith('--')) { i++; continue; }
+                    if (contLine.startsWith('method ') || contLine === '}') break;
+                    method.expr += (method.expr ? ' ' : '') + contLine;
+                    i++;
+                }
+                result.methods.push(method);
+                continue;
+            }
+
+            i++;
+        }
+        return i;
+    }
+
+    _tokenizeLambda(input) {
+        const tokens = [];
+        let i = 0;
+        while (i < input.length) {
+            if (input[i] === ' ' || input[i] === '\t' || input[i] === '\n') { i++; continue; }
+
+            if (input[i] === '\u03BB' || (input[i] === '\\' && i + 1 < input.length && /[a-z]/.test(input[i + 1]))) {
+                tokens.push({ type: 'lambda', pos: i });
+                i++;
+                continue;
+            }
+            if (input[i] === '.') {
+                tokens.push({ type: 'dot', pos: i });
+                i++;
+                continue;
+            }
+            if (input[i] === '(') { tokens.push({ type: 'lparen', pos: i }); i++; continue; }
+            if (input[i] === ')') { tokens.push({ type: 'rparen', pos: i }); i++; continue; }
+            if (input[i] === ',') { tokens.push({ type: 'comma', pos: i }); i++; continue; }
+            if (input[i] === '+') { tokens.push({ type: 'op', value: '+', pos: i }); i++; continue; }
+            if (input[i] === '-' && i + 1 < input.length) {
+                if (/\d/.test(input[i + 1]) && (tokens.length === 0 || tokens[tokens.length - 1].type === 'op' || tokens[tokens.length - 1].type === 'dot' || tokens[tokens.length - 1].type === 'lambda')) {
+                    let num = '-';
+                    i++;
+                    while (i < input.length && /\d/.test(input[i])) { num += input[i]; i++; }
+                    tokens.push({ type: 'number', value: parseInt(num), pos: i });
+                    continue;
+                }
+                tokens.push({ type: 'op', value: '-', pos: i }); i++; continue;
+            }
+            if (input[i] === '*') { tokens.push({ type: 'op', value: '*', pos: i }); i++; continue; }
+            if (input.substring(i, i + 2) === '==') { tokens.push({ type: 'op', value: '==', pos: i }); i += 2; continue; }
+            if (input.substring(i, i + 2) === '<=') { tokens.push({ type: 'op', value: '<=', pos: i }); i += 2; continue; }
+            if (input.substring(i, i + 2) === '>=') { tokens.push({ type: 'op', value: '>=', pos: i }); i += 2; continue; }
+            if (input[i] === '<') { tokens.push({ type: 'op', value: '<', pos: i }); i++; continue; }
+            if (input[i] === '>') { tokens.push({ type: 'op', value: '>', pos: i }); i++; continue; }
+
+            if (/\d/.test(input[i])) {
+                let num = '';
+                if (input[i] === '0' && i + 1 < input.length && input[i + 1] === 'x') {
+                    num = '0x';
+                    i += 2;
+                    while (i < input.length && /[0-9a-fA-F]/.test(input[i])) { num += input[i]; i++; }
+                } else {
+                    while (i < input.length && /\d/.test(input[i])) { num += input[i]; i++; }
+                }
+                tokens.push({ type: 'number', value: parseInt(num), pos: i });
+                continue;
+            }
+
+            if (/[a-zA-Z_]/.test(input[i])) {
+                let ident = '';
+                while (i < input.length && /[a-zA-Z0-9_]/.test(input[i])) { ident += input[i]; i++; }
+                if (i < input.length && input[i] === '.' && /[A-Z]/.test(ident[0])) {
+                    ident += '.';
+                    i++;
+                    while (i < input.length && /[a-zA-Z0-9_]/.test(input[i])) { ident += input[i]; i++; }
+                }
+                if (ident === 'let') tokens.push({ type: 'let', pos: i });
+                else if (ident === 'in') tokens.push({ type: 'in', pos: i });
+                else if (ident === 'if') tokens.push({ type: 'hif', pos: i });
+                else if (ident === 'then') tokens.push({ type: 'then', pos: i });
+                else if (ident === 'else') tokens.push({ type: 'helse', pos: i });
+                else tokens.push({ type: 'ident', value: ident, pos: i });
+                continue;
+            }
+
+            i++;
+        }
+        return tokens;
+    }
+
+    _parseLambdaExpr(input) {
+        const tokens = this._tokenizeLambda(input.trim());
+        if (tokens.length === 0) return { type: 'literal', value: 0 };
+        return this._parseLambdaExprFromTokens(tokens, 0).node;
+    }
+
+    _parseLambdaExprFromTokens(tokens, pos) {
+        if (pos >= tokens.length) return { node: { type: 'literal', value: 0 }, pos: pos };
+
+        const t = tokens[pos];
+
+        if (t.type === 'lambda') {
+            const params = [];
+            pos++;
+            while (pos < tokens.length && tokens[pos].type === 'ident') {
+                params.push(tokens[pos].value);
+                pos++;
+            }
+            if (pos < tokens.length && tokens[pos].type === 'dot') pos++;
+            const body = this._parseLambdaExprFromTokens(tokens, pos);
+            return { node: { type: 'lambda', params: params, body: body.node }, pos: body.pos };
+        }
+
+        if (t.type === 'let') {
+            pos++;
+            const bindings = [];
+            while (pos < tokens.length && tokens[pos].type !== 'in') {
+                if (tokens[pos].type === 'ident') {
+                    const name = tokens[pos].value;
+                    pos++;
+                    if (pos < tokens.length && tokens[pos].type === 'op' && (tokens[pos].value === '=' || tokens[pos].value === '==')) pos++;
+                    const val = this._parseLambdaSimpleExpr(tokens, pos);
+                    bindings.push({ name: name, value: val.node });
+                    pos = val.pos;
+                } else {
+                    pos++;
+                }
+            }
+            if (pos < tokens.length && tokens[pos].type === 'in') pos++;
+            const body = this._parseLambdaExprFromTokens(tokens, pos);
+            return { node: { type: 'let', bindings: bindings, body: body.node }, pos: body.pos };
+        }
+
+        if (t.type === 'hif') {
+            pos++;
+            const cond = this._parseLambdaSimpleExpr(tokens, pos);
+            pos = cond.pos;
+            if (pos < tokens.length && tokens[pos].type === 'then') pos++;
+            const thenExpr = this._parseLambdaSimpleExpr(tokens, pos);
+            pos = thenExpr.pos;
+            if (pos < tokens.length && tokens[pos].type === 'helse') pos++;
+            const elseExpr = this._parseLambdaExprFromTokens(tokens, pos);
+            return { node: { type: 'ifExpr', cond: cond.node, thenBranch: thenExpr.node, elseBranch: elseExpr.node }, pos: elseExpr.pos };
+        }
+
+        return this._parseLambdaBinOp(tokens, pos);
+    }
+
+    _parseLambdaBinOp(tokens, pos) {
+        let left = this._parseLambdaApp(tokens, pos);
+        pos = left.pos;
+
+        while (pos < tokens.length && tokens[pos].type === 'op') {
+            const op = tokens[pos].value;
+            pos++;
+            const right = this._parseLambdaApp(tokens, pos);
+            left = { node: { type: 'binop', op: op, left: left.node, right: right.node }, pos: right.pos };
+            pos = right.pos;
+        }
+
+        return left;
+    }
+
+    _parseLambdaApp(tokens, pos) {
+        let func = this._parseLambdaAtom(tokens, pos);
+        pos = func.pos;
+
+        while (pos < tokens.length) {
+            const t = tokens[pos];
+            if (t.type === 'number' || t.type === 'ident' || t.type === 'lparen') {
+                const arg = this._parseLambdaAtom(tokens, pos);
+                func = { node: { type: 'app', func: func.node, arg: arg.node }, pos: arg.pos };
+                pos = arg.pos;
+            } else {
+                break;
+            }
+        }
+
+        return func;
+    }
+
+    _parseLambdaAtom(tokens, pos) {
+        if (pos >= tokens.length) return { node: { type: 'literal', value: 0 }, pos: pos };
+
+        const t = tokens[pos];
+
+        if (t.type === 'number') {
+            return { node: { type: 'literal', value: t.value }, pos: pos + 1 };
+        }
+
+        if (t.type === 'ident') {
+            return { node: { type: 'var', name: t.value }, pos: pos + 1 };
+        }
+
+        if (t.type === 'lparen') {
+            pos++;
+            if (pos < tokens.length && tokens[pos].type === 'rparen') {
+                return { node: { type: 'literal', value: 0 }, pos: pos + 1 };
+            }
+
+            const inner = this._parseLambdaExprFromTokens(tokens, pos);
+            pos = inner.pos;
+
+            if (pos < tokens.length && tokens[pos].type === 'comma') {
+                pos++;
+                const second = this._parseLambdaExprFromTokens(tokens, pos);
+                pos = second.pos;
+                if (pos < tokens.length && tokens[pos].type === 'rparen') pos++;
+                return { node: { type: 'pair', fst: inner.node, snd: second.node }, pos: pos };
+            }
+
+            if (pos < tokens.length && tokens[pos].type === 'rparen') pos++;
+            return { node: inner.node, pos: pos };
+        }
+
+        if (t.type === 'lambda') {
+            return this._parseLambdaExprFromTokens(tokens, pos);
+        }
+
+        return { node: { type: 'literal', value: 0 }, pos: pos + 1 };
+    }
+
+    _parseLambdaSimpleExpr(tokens, pos) {
+        if (pos >= tokens.length) return { node: { type: 'literal', value: 0 }, pos: pos };
+
+        const t = tokens[pos];
+
+        if (t.type === 'lambda') {
+            return this._parseLambdaExprFromTokens(tokens, pos);
+        }
+
+        if (t.type === 'let') {
+            return this._parseLambdaExprFromTokens(tokens, pos);
+        }
+
+        if (t.type === 'hif') {
+            return this._parseLambdaExprFromTokens(tokens, pos);
+        }
+
+        return this._parseLambdaBinOp(tokens, pos);
+    }
+
+    _compileLambdaMethod(method, rom, capNames, outerErrors) {
+        const errors = [];
+        const code = [];
+        const manifest = [];
+        const locals = {};
+        let nextLocal = this.DR_LOCALS_START;
+
+        for (let pi = 0; pi < method.params.length; pi++) {
+            if (pi <= this.DR_ARGS_END) {
+                locals[method.params[pi]] = pi;
+            } else {
+                if (nextLocal > this.DR_LOCALS_END) {
+                    errors.push({ line: method.startLine, message: 'Too many parameters' });
+                    return { code: [], errors, manifest: [] };
+                }
+                locals[method.params[pi]] = nextLocal++;
+            }
+        }
+
+        const ast = this._parseLambdaExpr(method.expr);
+        const resultReg = this._emitHaskellExpr(ast, code, locals, rom, capNames, errors, manifest, method.startLine);
+
+        if (errors.length > 0) {
+            return { code: [], errors, manifest: [] };
+        }
+
+        if (resultReg !== 0) {
+            code.push(this.encode(this.opcodes.IADD, 14, 0, resultReg, 0));
+        }
+        manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
+        code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
+
+        return { code, errors, manifest };
     }
 
     _detectHaskell(source) {

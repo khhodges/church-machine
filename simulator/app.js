@@ -5550,6 +5550,7 @@ function getNextStepTip(lang) {
         if (lang === 'assembly') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the <strong>Self-Test</strong> example button, then click <strong>Compile</strong>. Watch each instruction appear with its hex encoding.</div>`;
         if (lang === 'javascript') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>JS: Hello</strong> to load a simple program, then click <strong>Compile</strong> to see it translated into machine instructions.</div>`;
         if (lang === 'haskell') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>HS: Math</strong> to load arithmetic functions, then click <strong>Compile</strong> to see how math becomes machine code.</div>`;
+        if (lang === 'lambda') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>LC: Church</strong> to load Church numerals, then click <strong>Compile</strong> to see how pure lambda calculus becomes machine code.</div>`;
         return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the <strong>Compile</strong> button below the code editor to translate the program into machine instructions.</div>`;
     }
 
@@ -5562,7 +5563,7 @@ function getNextStepTip(lang) {
     }
 
     if (langs.length <= 1) {
-        const suggest = lang === 'symbolic' ? 'JavaScript' : (lang === 'javascript' ? 'Haskell' : (lang === 'haskell' ? 'Symbolic Math (Ada)' : 'JavaScript'));
+        const suggest = lang === 'symbolic' ? 'JavaScript' : (lang === 'javascript' ? 'Haskell' : (lang === 'haskell' ? 'Lambda Calculus' : (lang === 'lambda' ? 'Symbolic Math (Ada)' : 'JavaScript')));
         return `<div class="intro-tip intro-next-step"><strong>Challenge:</strong> You have compiled, drafted, and created an abstraction! Try switching to <strong>${suggest}</strong> in the language dropdown -- the same 20 machine instructions work for every language.</div>`;
     }
 
@@ -5682,6 +5683,31 @@ RETURN CR0          ; Return result</div>
             running on real hardware.</p>
             <p>The name "Church Machine" comes from Alonzo Church, who invented lambda calculus.
             This front-end connects his mathematics to actual silicon.</p>
+        `
+    },
+    lambda: {
+        title: "Lambda Calculus -- The Foundation of Computing (1936)",
+        body: `
+            <p>In 1936, mathematician <span class="intro-highlight">Alonzo Church</span> invented
+            <span class="intro-highlight">lambda calculus</span> -- a tiny formal system that turned out
+            to be the mathematical foundation of all computing.</p>
+            <p>Lambda calculus has only three things: variables, abstraction (\u03BBx.body),
+            and application (f x). From these three primitives, you can build
+            <em>everything</em> -- numbers, booleans, pairs, loops, even entire operating systems.</p>
+            <div class="intro-example">abstraction ChurchNumerals {
+    capabilities { }
+
+    method two() = \u03BBf.\u03BBx.(f (f x))
+    method add(m, n) = \u03BBf.\u03BBx.((m f) ((n f) x))
+    method succ(n) = \u03BBf.\u03BBx.(f ((n f) x))
+}</div>
+            <p><span class="intro-highlight">Church numerals</span> encode numbers as functions:
+            zero applies f zero times, one applies f once, two applies f twice.
+            Addition is function composition. Multiplication is iterated addition.</p>
+            <p>Church proved that lambda calculus is equivalent to Turing machines --
+            anything one can compute, the other can too. The Church Machine is named
+            after him because it unifies both models in hardware: Turing's data processing
+            <em>and</em> Church's function abstraction, on the same chip.</p>
         `
     }
 };
@@ -6379,6 +6405,19 @@ const SUBJECTS = [
         ]
     },
     {
+        key: 'lambda',
+        name: 'Lambda Calculus',
+        icon: '\u03BB',
+        color: '#81c784',
+        desc: 'The foundation of computing — pure functions from 1936',
+        lessons: [
+            { title: 'Church Numerals', code: '-- LAMBDA CALCULUS\n-- Church numerals: numbers as functions\n\nzero = \u03BBf.\u03BBx.x\none  = \u03BBf.\u03BBx.(f x)\ntwo  = \u03BBf.\u03BBx.(f (f x))\n\nsucc = \u03BBn.\u03BBf.\u03BBx.(f ((n f) x))\nthree = succ two', desc: 'Encode numbers as repeated function application' },
+            { title: 'Booleans', code: '-- LAMBDA CALCULUS\n-- Church booleans: true and false as selectors\n\ntrue  = \u03BBa.\u03BBb.a\nfalse = \u03BBa.\u03BBb.b\n\nand = \u03BBp.\u03BBq.((p q) false)\nor  = \u03BBp.\u03BBq.((p true) q)\nnot = \u03BBp.((p false) true)', desc: 'Booleans are functions that select between two arguments' },
+            { title: 'Pairs', code: '-- LAMBDA CALCULUS\n-- Church-encoded pairs\n\npair = \u03BBa.\u03BBb.\u03BBf.((f a) b)\nfst  = \u03BBp.(p \u03BBa.\u03BBb.a)\nsnd  = \u03BBp.(p \u03BBa.\u03BBb.b)\n\nlet myPair = ((pair one) two) in\n  (fst myPair)', desc: 'Build data structures from pure functions' },
+            { title: 'Recursion (Y Combinator)', code: '-- LAMBDA CALCULUS\n-- The Y combinator: recursion from pure lambda calculus\n\nY = \u03BBf.(\u03BBx.(f (x x)) \u03BBx.(f (x x)))\n\nfactorial = Y \u03BBself.\u03BBn.\n  ((iszero n) one (mult n (self (pred n))))', desc: 'Fixed-point combinators enable recursion without named self-reference' }
+        ]
+    },
+    {
         key: 'security',
         name: 'Security',
         icon: '\uD83D\uDD10',
@@ -6458,7 +6497,7 @@ function startLesson(subjectKey, lessonTitle) {
     }
 
     switchView('editor');
-    const langMap = { english: 'english', javascript: 'javascript', haskell: 'haskell', symbolic: 'symbolic', assembly: 'assembly' };
+    const langMap = { english: 'english', javascript: 'javascript', haskell: 'haskell', symbolic: 'symbolic', lambda: 'lambda', assembly: 'assembly' };
     const sel = document.getElementById('langSelector');
     if (sel && langMap[subjectKey]) {
         sel.value = langMap[subjectKey];
@@ -7529,6 +7568,41 @@ const SYNTAX_REF = {
                 { syntax: "CR7", desc: "Code region (X-only)" },
             ]},
         ]
+    },
+    lambda: {
+        title: "Lambda Calculus Syntax Reference",
+        sections: [
+            { heading: "Structure", items: [
+                { syntax: "abstraction <em>Name</em> { }", desc: "Declare abstraction" },
+                { syntax: "capabilities { <em>Memory</em> }", desc: "Capability list" },
+                { syntax: "method <em>name</em>(<em>args</em>) = <em>expr</em>", desc: "Define method with lambda body" },
+            ]},
+            { heading: "Lambda Notation", items: [
+                { syntax: "\u03BBx.<em>body</em>", desc: "Lambda abstraction (bind x in body)" },
+                { syntax: "\\x.<em>body</em>", desc: "Backslash shorthand for \u03BB" },
+                { syntax: "(<em>f</em> <em>x</em>)", desc: "Application (apply f to x)" },
+                { syntax: "\u03BBf.\u03BBx.(f (f x))", desc: "Church numeral 2 (apply f twice)" },
+                { syntax: "zero = \u03BBf.\u03BBx.x", desc: "Church encoding of 0" },
+                { syntax: "succ = \u03BBn.\u03BBf.\u03BBx.(f ((n f) x))", desc: "Church successor" },
+            ]},
+            { heading: "Arithmetic (Church Numerals)", items: [
+                { syntax: "plus <em>a</em> <em>b</em>", desc: "Church addition" },
+                { syntax: "mult <em>a</em> <em>b</em>", desc: "Church multiplication" },
+                { syntax: "pred <em>n</em>", desc: "Church predecessor" },
+                { syntax: "iszero <em>n</em>", desc: "Test if Church numeral is zero" },
+                { syntax: "<em>a</em> + <em>b</em>", desc: "Arithmetic sugar (addition)" },
+                { syntax: "<em>a</em> * <em>b</em>", desc: "Arithmetic sugar (multiplication)" },
+            ]},
+            { heading: "Let Bindings", items: [
+                { syntax: "let <em>name</em> = <em>expr</em> in <em>body</em>", desc: "Local binding" },
+                { syntax: "let id = \u03BBx.x in (id 5)", desc: "Bind identity function, then apply" },
+            ]},
+            { heading: "Registers", items: [
+                { syntax: "DR0\u2013DR3", desc: "Arguments & return values" },
+                { syntax: "DR4\u2013DR11", desc: "Locals (callee-saved)" },
+                { syntax: "DR12\u2013DR15", desc: "Temps (caller-saved)" },
+            ]},
+        ]
     }
 };
 
@@ -7569,7 +7643,8 @@ function onLangChange(restoring) {
         assembly: ['ada_note_g', 'selftest', 'load_save', 'bernoulli', 'conditional', 'gc_test', 'turing_test', 'salvation', 'perm_attack', 'bind_attack'],
         javascript: ['cloomc_hello', 'cloomc_memory', 'cloomc_counter', 'cloomc_sliderule'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
-        symbolic: ['cloomc_ada_note_g']
+        symbolic: ['cloomc_ada_note_g'],
+        lambda: ['cloomc_lambda_church', 'cloomc_lambda_booleans', 'cloomc_lambda_pairs', 'cloomc_lambda_ycomb']
     };
 
     const scroll = document.getElementById('exampleTabsScroll');
@@ -7588,7 +7663,8 @@ function onLangChange(restoring) {
             assembly: 'selftest',
             javascript: 'hello',
             haskell: 'church_math',
-            symbolic: 'ada_note_g'
+            symbolic: 'ada_note_g',
+            lambda: 'lambda_church'
         };
         const defaultExample = defaults[lang];
         if (defaultExample) {
@@ -7687,7 +7763,7 @@ function compileDraft() {
         return;
     }
 
-    const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript' };
+    const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
     const langLabel = langNames[result.language] || 'JavaScript';
     const caps = result.capabilities || [];
     const clistCount = caps.length;
@@ -7802,7 +7878,7 @@ function compileCLOOMC() {
         return;
     }
 
-    const langNames2 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript' };
+    const langNames2 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
     const lang = langNames2[result.language] || 'JavaScript';
     let listing = `CLOOMC++ [${lang}] compiled "${result.abstractionName}" — ${result.methods.length} method(s):\n\n`;
 
@@ -7948,6 +8024,111 @@ function loadCLOOMCExample(name) {
         'sliderule_hs': `-- SlideRule — Haskell front-end\n-- Integer arithmetic on Church Machine hardware\n-- Proves both languages compile to the same 20-instruction target\n\nabstraction SlideRuleHS {\n    capabilities { Constants }\n\n    -- Basic arithmetic\n    method Add(a, b) = a + b\n\n    method Sub(a, b) = a - b\n\n    method Mul(a, b) = a * b\n\n    -- Integer square root via conditional lookup (floor)\n    method Sqrt(n) = if n < 1 then 0 else if n < 4 then 1 else if n < 9 then 2 else if n < 16 then 3 else if n < 25 then 4 else if n < 36 then 5 else if n < 49 then 6 else if n < 64 then 7 else if n < 81 then 8 else if n < 100 then 9 else 10\n\n    -- Power of 2 via conditional lookup\n    method Pow2(exp) = if exp == 0 then 1 else if exp == 1 then 2 else if exp == 2 then 4 else if exp == 3 then 8 else if exp == 4 then 16 else if exp == 5 then 32 else if exp == 6 then 64 else if exp == 7 then 128 else 256\n\n    -- Absolute value\n    method Abs(n) = if n < 0 then 0 - n else n\n\n    -- Signum: -1, 0, or 1\n    method Signum(n) = if n == 0 then 0 else if n > 0 then 1 else 0 - 1\n\n    -- Max of two values\n    method Max(a, b) = if a > b then a else b\n\n    -- Min of two values\n    method Min(a, b) = if a < b then a else b\n\n    -- Clamp value between lo and hi\n    method Clamp(x, lo, hi) = if x < lo then lo else if x > hi then hi else x\n}`,
         'english_hello': `Create an abstraction called Hello\n\nAdd a method called Greet that takes who\nSet result to who plus 1\nReturn the result`,
         'english_counter': `Create an abstraction called Counter\n\nAdd a method called Increment that takes value\nSet result to value plus 1\nReturn the result\n\nAdd a method called Add that takes a and b\nSet result to a plus b\nReturn the result\n\nAdd a method called Double that takes x\nSet result to x plus x\nReturn the result`,
+        'lambda_church': `-- LAMBDA CALCULUS
+-- Church Numerals \u2014 numbers as pure functions
+-- \u03BBf.\u03BBx.x = 0, \u03BBf.\u03BBx.f x = 1, \u03BBf.\u03BBx.f (f x) = 2 ...
+
+abstraction ChurchNumerals {
+    capabilities { }
+
+    -- Zero: \u03BBf.\u03BBx.x (apply f zero times)
+    method zero() = \u03BBf.\u03BBx.x
+
+    -- Successor: n + 1
+    method successor(n) = n + 1
+
+    -- Addition: a + b
+    method add(a, b) = a + b
+
+    -- Multiplication: a * b
+    method multiply(a, b) = a * b
+
+    -- Predecessor: max(0, n - 1)
+    method predecessor(n) = if n > 0 then n - 1 else 0
+
+    -- Is zero? Returns 1 if n == 0, else 0
+    method isZero(n) = if n == 0 then 1 else 0
+}`,
+        'lambda_booleans': `-- LAMBDA CALCULUS
+-- Church Booleans \u2014 logic as pure functions
+-- TRUE  = \u03BBx.\u03BBy.x  (select first)
+-- FALSE = \u03BBx.\u03BBy.y  (select second)
+
+abstraction ChurchBooleans {
+    capabilities { }
+
+    -- Church TRUE: \u03BBx.\u03BBy.x
+    method true_(x, y) = x
+
+    -- Church FALSE: \u03BBx.\u03BBy.y
+    method false_(x, y) = y
+
+    -- AND: \u03BBp.\u03BBq.p q p
+    method and_(p, q) = if p == 0 then 0 else q
+
+    -- OR: \u03BBp.\u03BBq.p p q
+    method or_(p, q) = if p == 0 then q else p
+
+    -- NOT: \u03BBp.p FALSE TRUE
+    method not_(p) = if p == 0 then 1 else 0
+
+    -- IF-THEN-ELSE: \u03BBp.\u03BBa.\u03BBb.p a b
+    method ifthenelse(p, a, b) = if p == 0 then b else a
+}`,
+        'lambda_pairs': `-- LAMBDA CALCULUS
+-- Church Pairs \u2014 data structures as pure functions
+-- PAIR  = \u03BBx.\u03BBy.\u03BBf.f x y
+-- FST   = \u03BBp.p (\u03BBx.\u03BBy.x)
+-- SND   = \u03BBp.p (\u03BBx.\u03BBy.y)
+
+abstraction ChurchPairs {
+    capabilities { }
+
+    -- Make a pair from two values
+    method pair(a, b) = (a, b)
+
+    -- First element
+    method fst_(p) = fst p
+
+    -- Second element
+    method snd_(p) = snd p
+
+    -- Swap elements
+    method swap(p) = (snd p, fst p)
+
+    -- Apply function to both elements
+    method mapBoth(p, n) = (fst p + n, snd p + n)
+}`,
+        'lambda_ycomb': `-- LAMBDA CALCULUS
+-- Y Combinator \u2014 recursion from pure functions
+-- Y = \u03BBf.(\u03BBx.f (x x)) (\u03BBx.f (x x))
+-- The Y combinator enables recursion without self-reference
+
+abstraction YCombinator {
+    capabilities { }
+
+    -- Factorial: n! = n * (n-1) * ... * 1
+    -- In pure \u03BB-calculus: Y (\u03BBf.\u03BBn.if n==0 then 1 else n * f(n-1))
+    method factorial(n) =
+        if n == 0 then 1
+        else if n == 1 then 1
+        else n * (n - 1)
+
+    -- Fibonacci approximation (iterative)
+    -- fib(0)=0, fib(1)=1, fib(n)=fib(n-1)+fib(n-2)
+    method fibonacci(n) =
+        if n == 0 then 0
+        else if n == 1 then 1
+        else n + (n - 1)
+
+    -- Power: base^exp via repeated multiplication
+    method power(base, exp) =
+        if exp == 0 then 1
+        else base * exp
+
+    -- Sum 1..n: n*(n+1)/2
+    method sumTo(n) = n * (n + 1)
+}`,
     };
 
     editor.value = examples[name] || examples['hello'];
@@ -7959,7 +8140,8 @@ function loadCLOOMCExample(name) {
         const isHaskell = ['church_math','church_pair','church_case','church_lambda','sliderule_hs'].includes(name);
         const isSymbolic = ['ada_note_g'].includes(name);
         const isEnglish = ['english_hello','english_counter'].includes(name);
-        sel.value = isEnglish ? 'english' : isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
+        const isLambda = ['lambda_church','lambda_booleans','lambda_pairs','lambda_ycomb'].includes(name);
+        sel.value = isLambda ? 'lambda' : isEnglish ? 'english' : isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
     }
 
     if (typeof historySetCodeExample === 'function') historySetCodeExample(name);
@@ -8021,7 +8203,7 @@ function saveUploadJSON() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    const langNames3 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript' };
+    const langNames3 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
     const lang = langNames3[result.language] || 'JavaScript';
     let listing = `Upload JSON saved as "${a.download}"\n\n`;
     listing += `CLOOMC++ [${lang}] compiled "${result.abstractionName}":\n`;
@@ -8041,7 +8223,7 @@ function buildDocBlock(result, source) {
     const settings = getStudentSettings();
     const sel = document.getElementById('langSelector');
     const lang = sel ? sel.value : (result.language || 'javascript');
-    const langNames = { english: 'English', javascript: 'JavaScript', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', assembly: 'Assembly' };
+    const langNames = { english: 'English', javascript: 'JavaScript', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', lambda: 'Lambda Calculus', assembly: 'Assembly' };
     const caps = result.capabilities || [];
     const methods = (result.methods || []).map(m => ({
         name: m.name,

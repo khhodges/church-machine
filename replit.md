@@ -12,7 +12,7 @@ The Church Machine is a capability-secured processor architecture with an educat
 - No separate dynamicObjects — all entries in namespaceObjects
 - B (Bind) bit defaults to 0, auto-cleared by CALL
 - C-Lists only have E permission, CLOOMC only X or RX
-- Phase 1 + 1b + 1c + 1d: English, JS, Haskell, and Symbolic Math (Ada) front-ends implemented; auto-detected by compiler
+- Phase 1 + 1b + 1c + 1d + 1e: English, JS, Haskell, Symbolic Math (Ada), and Lambda Calculus front-ends implemented; auto-detected by compiler
 - Pure Math "Compile Session" button: compiles interactive let-bindings to Church Machine code via symbolic math front-end
 
 ## System Architecture
@@ -28,7 +28,7 @@ The web IDE features nine views (Math, Code, Tutorial, Dashboard, Namespace, Abs
 - **Math Challenge:** A sidebar providing grade-appropriate problems with hints and dual-domain explanations (Turing/Church).
 - **History Tab:** Dynamic historical stories related to the active math tool, encouraging contextual learning.
 - **Syntax Tab:** Quick-reference cheat sheet for the currently selected language, auto-updates on language change.
-- **Subjects:** Settings page displays 7 subject cards (English, JavaScript, Haskell, Symbolic Math, Assembly, Math Tools, Security). Each card opens a lesson list; clicking a lesson navigates to the editor with starter code or the relevant view/tab.
+- **Subjects:** Settings page displays 8 subject cards (English, JavaScript, Haskell, Symbolic Math, Lambda Calculus, Assembly, Math Tools, Security). Each card opens a lesson list; clicking a lesson navigates to the editor with starter code or the relevant view/tab.
 - **Responsive Design:** Panels often use a 50-50 split with draggable dividers, adapting to narrow screens. Tab bars (.math-mode-tabs, .sidebar-tabs) auto-collapse overflowing tabs into a hamburger (☰) dropdown when panels are resized via dividers.
 - **Popups:** Educational popups for welcome, math guide, and individual tool guides enhance the learning experience.
 - **Tooltips:** Global CSS tooltip system using `data-tooltip` attribute on all buttons (100 total in `simulator/index.html`). Dark-themed tooltips (#1b2d45 background, #3a86ff border) with consistent "LABEL — Description" format. Uses `::after` pseudo-element; `.tooltip-below` modifier for elements near top edge. No `title` attributes on tooltip'd buttons (prevents double tooltips). HP-35 calculator buttons also use `data-tooltip` (set in `hp35.js`).
@@ -40,7 +40,7 @@ The web IDE features nine views (Math, Code, Tutorial, Dashboard, Namespace, Abs
 - **NS Entry and Lump Layout:** Defines the structure of Namespace entries and memory lumps for abstractions. Lumps are power-of-2 allocated (minimum 32 words). Code at offset 0, c-list at allocSize-clistCount, freespace between. Boot.Abstr (NS[2]) is a combined slot holding both boot code and C-List GTs using the clistCount split. NS[3] is empty (was Boot.CLOOMC, now merged). C-List[0] is NULL (was Boot.CLOOMC GT).
 - **Self-Documenting Abstractions:** Every upload.json includes a `doc` block with author, date, language, description, tags, method signatures, capabilities, and sourcePreview. Auto-generated from compiler output and student settings. Displayed in the Abstractions view detail panel.
 - **Mum Tunnel Library:** GitHub-backed shared abstraction library. Server API (`/api/library/browse`, `/api/library/get/<path>`, `/api/library/publish`) pushes/reads from a GitHub repo. UI: Library modal with search, language filter, card grid, import/publish. Requires `GITHUB_TOKEN` environment variable.
-- **CLOOMC++ Compiler:** A multi-language compiler targeting the 20-instruction Church Machine instruction set. It supports English, JavaScript, Haskell, and Symbolic Math (Ada Lovelace's notation) front-ends. The compiler auto-detects language from source syntax and outputs in a JSON format for abstraction deployment.
+- **CLOOMC++ Compiler:** A multi-language compiler targeting the 20-instruction Church Machine instruction set. It supports English, JavaScript, Haskell, Symbolic Math (Ada Lovelace's notation), and Lambda Calculus front-ends. The compiler auto-detects language from source syntax (lambda detection uses anchored `-- LAMBDA CALCULUS` header or `λx.` dot notation to disambiguate from Haskell's `\x ->` arrow syntax). Outputs in JSON format for abstraction deployment.
 - **Navana Master Controller:** Acts as the sole writer for Namespace entries, managing abstraction creation, allocation, and secure deployment by validating uploads and enforcing security constraints.
 - **Instruction Set:** Comprises 20 instructions, evenly split between Church (capability-focused) and Turing (data manipulation) sets, all supporting ARM-style conditional execution.
 - **Hardware Target:** The Tang Nano 20K FPGA (Gowin GW2AR-18) is the primary hardware target, with all features enabled (CHANGE/SWITCH, SEAL_CHECK, FUSED_OPS, GC). It uses specific pins for UART, LEDs, and buttons.

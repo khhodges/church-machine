@@ -420,6 +420,25 @@ const LANGUAGE_STORIES = {
         question: "Haskell has no mutable variables — once you set a value, it can never change. If nothing can change, how does a Haskell program do anything useful? How is state managed?",
         era: "Church → Curry → Haskell, 1936–1990"
     },
+    lambda: {
+        title: "Lambda Calculus — The Purest Language of Computation (1936)",
+        body: "<strong>The idea:</strong> In 1936, Alonzo Church published a paper that changed mathematics and computing forever. He showed that every computable function can be expressed using just three things: variables, abstraction (λx.body), and application (f x). No numbers, no data types, no hardware — just functions applied to functions.<br><br>" +
+            "<strong>The 1936 paper:</strong> Church's 'An Unsolvable Problem of Elementary Number Theory' introduced the lambda calculus and proved that the Entscheidungsproblem (decision problem) posed by David Hilbert had no solution — there is no general algorithm that can decide whether an arbitrary mathematical statement is true or false. This was one of the most profound results in the history of mathematics, published independently of Turing's equivalent result using Turing machines.<br><br>" +
+            "<strong>Church-Rosser theorem:</strong> Church and his student J. Barkley Rosser proved that the order in which you reduce (simplify) a lambda expression doesn't matter — if an answer exists, you'll reach the same one regardless of the path you take. This confluence property is what makes lambda calculus reliable as a foundation for computation. It means the Church Machine gives the same answer no matter how the hardware schedules its reductions.<br><br>" +
+            "<strong>Alpha and Beta reduction:</strong> Lambda calculus has only two fundamental operations. Alpha reduction (α) renames variables to avoid confusion: λx.x becomes λy.y. Beta reduction (β) applies a function to an argument: (λx.x+1) 3 becomes 3+1. Every computation — sorting, searching, encrypting, rendering — is ultimately a sequence of beta reductions.<br><br>" +
+            "<strong>Connection to Lisp:</strong> In 1958, John McCarthy created Lisp, the first programming language based directly on Church's lambda calculus. McCarthy's insight was that lambda expressions could be implemented on real hardware. The <code>(lambda (x) (+ x 1))</code> of Lisp is Church's <code>λx.x+1</code> in parenthesized form. Every functional programming language since — ML, Haskell, Erlang, Clojure, Scala — descends from Church through McCarthy.<br><br>" +
+            "<strong>Church numerals:</strong> Church proved that numbers themselves can be built from pure functions. Zero is λf.λx.x (apply f zero times). One is λf.λx.f(x). Two is λf.λx.f(f(x)). Addition, multiplication, and even predecessor can all be defined as lambda expressions. The examples in this editor let you compile Church numerals to real machine code — completing the circle from abstract mathematics back to hardware.<br><br>" +
+            "<strong>How it works here:</strong> The Lambda Calculus front-end accepts pure λ-notation: <code>λx.body</code> for abstraction, juxtaposition <code>(f x)</code> for application, and Church encoding for data. The compiler translates these expressions into the same 32-bit Church Machine instructions as JavaScript and Haskell. The machine is named after Church because it runs on his model.<br><br>" +
+            "<strong>Syntax patterns:</strong><br>" +
+            "<code>λx.x</code> — identity function (returns its argument)<br>" +
+            "<code>λf.λx.f (f x)</code> — Church numeral 2 (apply f twice)<br>" +
+            "<code>(λx.x + 1) 3</code> — application (evaluates to 4)<br>" +
+            "<code>let succ = λn.λf.λx.f (n f x) in ...</code> — let binding with lambda<br>" +
+            "<code>zero = λf.λx.x</code> — Church encoding of zero<br>" +
+            "<code>plus = λm.λn.λf.λx.m f (n f x)</code> — addition of Church numerals<br>",
+        question: "Church showed that numbers, booleans, pairs, and lists can all be encoded as pure functions. If everything is a function, what exactly IS a function? Is it a rule, a process, a mapping, or something else entirely?",
+        era: "Princeton, 1936 — The Foundation of Computing"
+    },
     symbolic: {
         title: "Symbolic Math — Ada Lovelace's Notation (1843)",
         body: "<strong>The idea:</strong> In 1843, Ada Lovelace wrote the first computer program using a notation of variables (V1, V2, ...) and operations (one per line). She was describing an algorithm for Charles Babbage's Analytical Engine — a mechanical computer that was never built. The Church Machine's Symbolic Math front-end uses her exact notation, 180 years later.<br><br>" +
