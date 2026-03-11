@@ -25,7 +25,7 @@ The Church Machine answers yes. This document explains how.
 
 ## The Starting Point: Integer Arithmetic
 
-The Church Machine operates on 32-bit integers. There are no floating-point registers or instructions. Every value in a data register (DR0–DR7) is a whole number, and the division instruction (`/`) performs integer division via repeated subtraction, truncating any fractional part.
+The Church Machine operates on 32-bit integers. There are no floating-point registers or instructions. Every value in a data register (DR0–DR15) is a whole number, and the division instruction (`/`) performs integer division via repeated subtraction, truncating any fractional part.
 
 This means `7 / 3 = 2`, not `2.333...`.
 
@@ -303,7 +303,7 @@ The statement that "each fraction operation is split into two method calls" dese
 
 The hardware is fully capable of returning multiple values from a single method call. Here is why, and how it could work:
 
-**1. The registers are there.** The Church Machine has 8 data registers (DR0–DR7) and 16 capability registers (CR0–CR15). The CALL and RETURN instructions do not restrict how many of these registers carry meaningful data. A method that computes both a numerator and a denominator could write the numerator to DR1 and the denominator to DR2 before executing RETURN. The caller would then read both registers — no second method call needed.
+**1. The registers are there.** The Church Machine has 16 data registers (DR0–DR15) and 16 capability registers (CR0–CR15). The CALL and RETURN instructions do not restrict how many of these registers carry meaningful data. A method that computes both a numerator and a denominator could write the numerator to DR1 and the denominator to DR2 before executing RETURN. The caller would then read both registers — no second method call needed.
 
 **2. Memory lumps can store tuples.** A capability register can point to an abstraction's memory lump — a contiguous block of words. A method could write a tuple's components as adjacent words in the lump (numerator at offset 0, denominator at offset 1), and the caller could LOAD each word by offset. This is analogous to returning a struct pointer in C — the data lives in memory, the caller knows the layout.
 
@@ -518,7 +518,7 @@ The answer is **threads**. On the Church Machine, a thread *is* a dynamic instan
 
 When a call to Australia is initiated, the system spawns a new thread. That thread gets:
 
-- **Its own register file** — DR0–DR7 hold call-specific data (caller ID in DR1, destination in DR2, duration counter in DR3, billing rate in DR4)
+- **Its own register file** — DR0–DR15 hold call-specific data (caller ID in DR1, destination in DR2, duration counter in DR3, billing rate in DR4)
 - **Its own program counter** — the thread executes the telephony abstraction's code independently
 - **Its own capability context** — the thread holds Golden Tokens for exactly the abstractions it needs
 

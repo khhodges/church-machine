@@ -52,7 +52,7 @@ The GT stores exactly 6 permission bits. These are access rights, not metadata:
 | M (Machine/Microcode) | Transient signal during mLoad | Prevents privilege escalation -- no user code can set or observe it |
 | B (Bind) | Namespace entry metadata | Policy about whether a capability can be copied -- property of the slot, not the token |
 | F (Far/Foreign) | Namespace entry metadata | Whether the resource is remote -- property of where it lives, not what you can do with it |
-| G (Garbage) | Implicit in version mechanism | Sim-32 uses version bump for GC, not a G-bit flag |
+| G (Garbage) | Namespace entry bit 29 | Sim-32 uses both a G-bit (cleared on access to prove reachability) and a 7-bit version field for GC sweep revocation |
 
 ### mLoad Validation Pipeline (Sim-32)
 
@@ -142,7 +142,7 @@ Same 6 permission bits (R, W, X, L, S, E). Same domain purity rule. Key differen
 |--------|--------|--------|
 | GT width | 32-bit | 64-bit |
 | Namespace index | 17-bit Index (131K entries) | 32-bit Offset |
-| GC mechanism | 7-bit version bump on sweep | G-bit cleared on access, spare field as version |
+| GC mechanism | G-bit cleared on access + 7-bit version bump on sweep | G-bit cleared on access, spare field as version |
 | Integrity check | 25-bit FNV seal | Hardware MAC hash |
 | CR width | 128-bit (4 x 32-bit words) | 256-bit (4 x 64-bit words) |
 | Implementation | Software simulator (JavaScript) | Synthesizable Amaranth HDL |
@@ -183,7 +183,7 @@ The `perm_check.py` module provides combinational validation logic alongside mLo
 
 ### Total TSB Size
 
-The entire Sim-64 trusted security base is **329 lines** of synthesizable Amaranth HDL:
+The entire Sim-64 trusted security base is approximately **329 lines** of synthesizable Amaranth HDL (at time of writing):
 - mLoad: 218 lines
 - perm_check: 111 lines
 
@@ -214,7 +214,7 @@ Two orders of magnitude smaller than seL4. Five orders of magnitude smaller than
 | Aspect | Sim-32 | Sim-64 |
 |--------|--------|--------|
 | TSB implementation | Software (JavaScript mLoad function) | Hardware (Amaranth HDL FSM) |
-| GC stale detection | Version field in GT (7-bit, 128 generations) | G-bit in GT + spare field as version |
+| GC stale detection | G-bit in NS entry + version field in GT (7-bit, 128 generations) | G-bit in GT + spare field as version |
 | Integrity validation | 25-bit FNV seal | Hardware MAC |
 | Namespace capacity | 131K entries (17-bit index) | 4B entries (32-bit offset) |
 | ISA | RISC-V RV32I + custom opcodes | Custom ARM-style encoding |

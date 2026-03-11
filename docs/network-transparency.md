@@ -1,6 +1,6 @@
 # Network Transparency
 
-> **Status**: Architectural design document. The GT Type field (Inform, Outform, NULL, Abstract) exists in the simulator's 32-bit GT format. Outform behavior, TRAP handling, and tunnel operations are not yet implemented in the simulator. This document specifies the planned design.
+> **Status**: Architectural design document. The GT Type field (NULL, Inform, Outform, Abstract) exists in the simulator's 32-bit GT format. Tunnel messaging proof-of-concept exists (see [Tunnel Messaging Example](tunnel-messaging-example.md)). TRAP handling and full tunnel operations are not yet implemented in the simulator. This document specifies the planned design.
 >
 > See also: [GT Type Field and Domain Separation](gt-literals.md) for the Type field specification and the [LAMBDA Instruction Specification](lambda-instruction.md) for the lightweight code application mechanism.
 
@@ -20,9 +20,9 @@ The 2-bit Type field in the 32-bit Golden Token classifies each resource:
 
 | Value | Type | Description |
 |-------|------|-------------|
-| 00 | **Inform** | Local resource — data or code in the local namespace |
-| 01 | **Outform** | Remote resource — data or service at a network URL, accessed transparently |
-| 10 | **NULL** | Empty/invalid/revoked capability — any operation FAULTs |
+| 00 | **NULL** | Empty/invalid/revoked capability — any operation FAULTs |
+| 01 | **Inform** | Local resource — data or code in the local namespace |
+| 10 | **Outform** | Remote resource — data or service at a network URL, accessed transparently |
 | 11 | **Abstract** | Unforgeable constant value (e.g., pi) |
 
 The Type field combines with permissions to determine behavior:

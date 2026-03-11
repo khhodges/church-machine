@@ -114,7 +114,7 @@ The prior art's capability registers hold references exclusively but lack a hard
 
 ### Prior Art Limitations — Academic Capability Architectures
 
-Beyond the PP250 patent family, academic capability architectures including Cambridge CAP (Wilkes and Needham, 1979), IBM System/38 (Berstis, 1980), Intel iAPX 432 (Pollack et al., 1981), and CHERI (Watson et al., 2015) treat all capability register contents as either valid references or raw data. No prior architecture provides:
+Beyond the PP250 patent family, academic capability architectures including Cambridge CAP (Wilkes and Needham, 1978), IBM System/38 (Berstis, 1980), Intel iAPX 432 (Pollack et al., 1981), and CHERI (Watson et al., 2014) treat all capability register contents as either valid references or raw data. No prior architecture provides:
 
 1. A hardware-enforced NULL capability type that represents an empty or invalid register, distinct from any valid reference, detectable at every instruction
 2. A lightweight in-scope code application instruction (LAMBDA) that stays within the current protection domain using X permission, as distinct from a domain-crossing CALL using E permission
