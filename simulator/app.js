@@ -4849,10 +4849,6 @@ function populateTrace(mode) {
     const content = {
         hp35: `
             <div class="panel" style="margin-bottom:0.75rem;">
-                <div class="panel-title" style="color:var(--church-gold);">Lambda Calculus Trace</div>
-                <div class="hp35-trace-area"></div>
-            </div>
-            <div class="panel">
                 <div class="panel-title" style="color:var(--church-gold);">4-Register Stack</div>
                 <div class="hp35-stack-display">
                     <div class="hp35-stack-reg" data-reg="3"></div>
@@ -4866,6 +4862,10 @@ function populateTrace(mode) {
                     <div class="hp35-stack-row"><span class="hp35-sreg">Y</span> <span class="hp35-sdesc">Second operand for +, \u2212, \u00d7, \u00f7</span></div>
                     <div class="hp35-stack-row"><span class="hp35-sreg">X</span> <span class="hp35-sdesc">Display \u2014 what you see and type into</span></div>
                 </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title" style="color:var(--church-gold);">Lambda Calculus Trace</div>
+                <div class="hp35-trace-area"></div>
             </div>`,
 
         abacus: `
