@@ -4,7 +4,7 @@
 
 Every abstraction in the Church Machine is a **security block** — a protected unit of functionality with measurable reliability.
 
-- **Namespace entry** — A single lump in memory. CALL uses the clistCount field in word1 to split the lump into a code region (CR7, X-only) and a c-list region (CR6, L-only). The code object is a DATA-domain entity — never Church domain.
+- **Namespace entry** — One shared GT, one lump. mLoad derives CR7 (code, X-only: base = slot base address, limit = code size) and CR6 (c-list, L-only: base = slot limit − GTcount) from the same slot metadata. The code object is a DATA-domain entity — never Church domain.
 - **Entry** — Via CALL (Inform E-GT). LAMBDA (X-GT) is a method/instruction within abstractions, not a separate security block.
 - **MTBF** — Mean Time Between Failures, measured by fault reports over time in the namespace. Every fault against a security block is counted. The MTBF ratio provides continuous reliability measurement.
 - **Method dispatch** — Symbolic dispatch (high-security), LAMBDA fast-path (performance), or compiled binary (fastest)
@@ -21,18 +21,10 @@ clistStart:     C-list (GT slots)       → CR6 (c-list, Church L-only)
 allocatedSize:  (power-of-2)
 ```
 
-Where `clistStart = allocSize - clistCount`. CALL computes the split from the clistCount field in the NS entry's word1. CR7 gets location=base, limit=clistStart-1 with X-only permissions. CR6 gets location=base+clistStart, limit=clistCount-1 with L-only permissions.
+mLoad reads the single shared GT's slot metadata to derive both registers:
 
-## Polymorphic Interface
-
-Every abstraction — regardless of layer — responds to the same four operations:
-
-1. **create(index, params)** — Instantiate an abstraction in a namespace slot
-2. **destroy(index)** — Remove an abstraction (Mint.Revoke invalidates GT, Memory.Free releases memory)
-3. **call(methodName, args)** — Dispatch a method (same entry point for all abstractions)
-4. **inspect()** — Return abstraction metadata (name, layer, methods, permissions)
-
-This uniformity is intentional and fundamental. The same pattern applies whether the abstraction is a boot service, a hardware driver, a math library, or a social networking tool. Creation, removal, and method dispatch are repetitive by design — the polymorphic interface ensures every abstraction behaves identically at the structural level.
+- **CR7 (code)**: base = slot base address, limit = code size (X-only)
+- **CR6 (c-list)**: base = slot limit − GTcount (L-only)
 
 ## Scale-Free Architecture
 
