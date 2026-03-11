@@ -155,8 +155,8 @@ Not abandon Turing — Turing's model is essential for data processing, arithmet
 
 The instruction set reflects this split exactly:
 
-- **10 Church instructions** — capability manipulation: LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA
-- **10 Turing instructions** — data processing: DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR
+- **~10 Church instructions** — capability manipulation: LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA (the exact count varies by implementation: Sim-32 uses 7 core Church instructions, Sim-64 uses 11 with fused variants)
+- **~10 Turing instructions** — data processing: DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR (Sim-64 uses ARM-style mnemonics with additional variants)
 
 The Turing domain handles computation. The Church domain handles authority. The Turing domain operates within boundaries set by the Church domain. A Turing instruction can add two numbers — but only if the thread holds a capability granting access to those numbers. The Church domain is the constitution; the Turing domain is the government that operates under it.
 

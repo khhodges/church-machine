@@ -27,10 +27,10 @@ The M (Meta/Microcode) permission is a **transient hardware elevation** — set 
 
 ### CR6 — Active C-List
 
-- **GT permission: E only**
+- **GT permission: L only**
 - **CR elevation: M added by microcode**
 - Dynamic — switches on every CALL/RETURN.
-- The GT grants only E (Enter) to the owner, meaning the only user-visible action is CALL. When the microcode processes a LOAD instruction, it temporarily elevates M on the CR, which allows the microcode to perform the L (Load) action internally — extracting a capability from the C-List and placing it into the destination CR. The GT itself never carries L; the microcode bridges that gap. This enforces the rule that users can only access C-List contents through the controlled mLoad path.
+- CALL hardcodes CR6 to L-only (Church domain) as an architectural invariant. The GT grants only L (Load), which allows the LOAD instruction to extract capabilities from the C-List into destination CRs via the mLoad validation path. The microcode temporarily elevates M on the CR during LOAD operations for internal access. This enforces the rule that users can only access C-List contents through the controlled mLoad path. No Turing permissions (R, W, X) are permitted on the C-List — domain purity is maintained.
 - CR6 contains **symbolic method names** — these are capability entries, not code references. The implementation details of each method are hidden behind the abstraction's nucleus (CR7).
 
 ### CR7 — Active Nucleus (Method Code)
@@ -56,7 +56,7 @@ The M (Meta/Microcode) permission is a **transient hardware elevation** — set 
 | CR15 | Namespace        | —        | M            | Stable    | Pure metadata, no user access                     |
 | CR8  | Thread           | —        | M            | Stable    | Pure metadata, no user access                     |
 | CR5  | Services C-List  | L+S      | M (transient)| Stable    | Thread's services gateway, needs Load+Save        |
-| CR6  | Active C-List    | E        | M (transient)| Dynamic   | Current abstraction's symbolic method names       |
+| CR6  | Active C-List    | L        | M (transient)| Dynamic   | Current abstraction's capability list              |
 | CR7  | Active Nucleus   | X (+R)   | —            | Dynamic   | Current method code, resolves CR6 symbols to code |
 
 The architecture defines two mutually exclusive permission domains: **Turing** (R, W, X) for data and code operations, and **Church** (L, S, E) for capability operations through C-Lists and abstraction entry. M is a transient microcode elevation, never stored in the GT. B (Bind) and F (Far/Foreign) are namespace entry metadata, not GT permission bits.
@@ -66,7 +66,7 @@ The architecture defines two mutually exclusive permission domains: **Turing** (
 1. **Step 1 (Fault Restart)**: Clear all registers. Cold restart.
 2. **Step 2 (Load Namespace)**: Microcode writes CR15 with M elevation. GT has zero RWXLSE.
 3. **Step 3 (Switch Thread)**: Microcode writes CR8 with M elevation. GT has zero RWXLSE. Also writes CR5 with the Thread's Services C-List (GT has L+S).
-4. **Step 4 (Call Boot)**: Microcode writes CR6 (GT has E only, CR gets M during LOAD operations) and CR7 (GT has X, optionally R). NIA set to 0.
+4. **Step 4 (Call Boot)**: Microcode writes CR6 (GT has L only, CR gets M during LOAD operations) and CR7 (GT has X, optionally R). NIA set to 0.
 
 ## Thread Creation via Mint
 

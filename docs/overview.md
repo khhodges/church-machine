@@ -81,6 +81,7 @@ Both simulators enforce the same core security model:
 |   +-- app.py / server.py  Python HTTP server
 |   +-- images/             UI assets
 |
++-- hardware/               Amaranth HDL hardware implementation (Sim-32, Tang Nano 20K)
 +-- ctmm_amaranth/          Amaranth HDL hardware implementation (Sim-64)
 +-- verilog/                SystemVerilog hardware implementation (Sim-64)
 +-- CTMM/                   Haskell console simulator (Sim-64)

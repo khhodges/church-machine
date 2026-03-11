@@ -99,6 +99,8 @@ LAMBDA = macro's speed + function's code reuse.
 
 ## Constructive Example: Clamp Function
 
+The following examples use Sim-32 RISC-V register naming (x0-x31, MV, BGE, BLE, LI, J) which maps to the Church Machine's data register conventions. In Sim-64, these would be DR0-DR15 with Church Machine mnemonics (IADD, MCMP, BRANCH, etc.).
+
 A graphics program needs to clamp RGB values to 0-255 range:
 
 ### With a macro (code duplicated 3 times):

@@ -16,7 +16,8 @@ with sufficient permissions. Every risk below is tracked to resolution.
   entry. CR7 gets R and W in addition to X because Boot.CLOOMC uses DREAD to load constants
   from data tables appended after HALT in the code region (e.g., Ada Note G's .org/.word
   constants). Domain purity is maintained: CR7 has no Church permissions (L/S/E) and CR6 has
-  no Turing permissions (R/W/X).
+  no Turing permissions (R/W/X). The simulator confirms this: `createGT(... {L:1} ...)` for
+  CR6 (simulator.js line 352).
 - **Task**: T002
 - **Status**: RESOLVED
 

@@ -28,6 +28,8 @@ This paper serves as both a student tutorial and a comparative analysis. We pres
 4. Performance analysis on the target hardware (Tang Nano 20K FPGA, 27 MHz)
 5. An honest assessment of the architecture's strengths and limitations
 
+**Note on Haskell implementations:** The Haskell versions of Div, Sqrt, and Pow2 are intentionally simplified to demonstrate expression-based compilation on integer hardware. They are not production-correct algorithms — see Section 7.2 for discussion.
+
 ### 1.3 Target Hardware
 
 The Church Machine targets the Sipeed Tang Nano 20K development board, built around the Gowin GW2AR-18 FPGA (QN88 package). This device provides 20,736 look-up tables (LUTs), 27 MHz base clock, and sufficient block RAM for the namespace table, memory, and register file. The design is synthesised using the open-source Amaranth HDL framework and the oss-cad-suite toolchain.

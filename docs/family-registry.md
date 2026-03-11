@@ -202,8 +202,8 @@ Namespace Entry [4] — TunnelKey_Mum (Inform, R):
   Created by: FamilyRegistry.Register at bind time
 
 Namespace Entry [5] — Mum_Messaging (Outform, E):
-  Location: <PRISCILLA'S REMOTE ENDPOINT hash>
-  Limit:    B=1, F=1
+  Location: 0xA3B80002     ← PRISCILLA'S REMOTE ENDPOINT (hash)
+  Limit:    B=1, F=1, limit=0x201FF
   Created by: FamilyRegistry.Register at bind time
   Remote ID: rv32cap-sim32-priscilla
 

@@ -181,7 +181,8 @@ The server starts on port 5000 and serves the simulator IDE.
 ### Project Layout
 
 ```
-hardware/           Synthesizable Amaranth HDL
+hardware/           Synthesizable Amaranth HDL (Sim-32, Tang Nano 20K target)
+ctmm_amaranth/      Amaranth HDL hardware implementation (Sim-64)
 simulator/          Web IDE (HTML/JS/CSS)
 server/             Flask backend
 docs/               Documentation

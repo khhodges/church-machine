@@ -8334,6 +8334,10 @@ abstraction RationalArith {
     updateLineNumbers();
     saveEditorState();
 
+    document.querySelectorAll('.example-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.example === 'cloomc_' + name);
+    });
+
     const sel = document.getElementById('langSelector');
     if (sel) {
         const isHaskell = ['church_math','church_pair','church_case','church_lambda','sliderule_hs'].includes(name);

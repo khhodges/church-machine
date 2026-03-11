@@ -145,7 +145,7 @@ All instructions use a **32-bit fixed-width format** with a 4-bit condition code
 |--------|------|------:|--------|-------------|
 | CTMMCore | core.py | 463 | Complete | Top-level integration, state machine, 5-phase boot sequencer |
 | CTMMDecoder | decoder.py | 136 | Complete | 32-bit instruction decode, Church/Turing split, 3-bit CR / 4-bit DR addressing |
-| CTMMRegisters | registers.py | 114 | Complete | CR0-CR15 (256-bit capability) + DR0-DR15 (64-bit data) + NZCV flags |
+| CTMMRegisters | registers.py | 114 | Complete | CR0-CR15 (256-bit capability, 4×64-bit words) + DR0-DR15 (64-bit data) + NZCV flags. Note: Sim-32 (Tang Nano 20K) uses 128-bit CRs (4×32-bit words). |
 | CTMMPermCheck | perm_check.py | 96 | Complete | 6-bit permission validation (R/W/X/L/S/E) |
 | CTMMMLoad | mload.py | 217 | Complete | The Golden Rule gate — permission, bounds, G-bit reset, thread shadow |
 | CTMMMSave | msave.py | 90 | Complete | Namespace write path with permission check |
