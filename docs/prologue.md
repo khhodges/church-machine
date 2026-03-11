@@ -21,6 +21,8 @@ Church and Turing proved that their two models are equivalent in computational p
 
 In 1936, these were theoretical distinctions of interest to logicians. Within a decade, they would determine the architecture of every computer on Earth.
 
+The Church Machine project combines these ideas by hiding the fragile binary computer as the hidden digital engine inside the flawless functions of the Church Machine.
+
 ---
 
 ## 1939–1945: The War and the Drive for Speed
