@@ -7011,13 +7011,13 @@ async function uploadToTang() {
 const INSTRUCTION_DATA = [
     {
         opcode: 0, mnemonic: 'LOAD', domain: 'church',
-        syntax: 'LOAD CRd, CRs, imm',
+        syntax: 'LOAD CRd, CRs, slot',
         brief: 'Load a Golden Token from the namespace into a context register',
         encoding: 'opcode[5]=00000 | cond[4] | CRd[4] | CRs[4] | slot[15]',
         fields: [
-            { name: 'CRd', desc: 'Destination context register (CR0-CR15)' },
-            { name: 'CRs', desc: 'Source C-List GT (must have L permission)' },
-            { name: 'imm', desc: 'Namespace slot index (0-32767)' },
+            { name: 'CRd',  desc: 'Destination context register (CR0-CR15)' },
+            { name: 'CRs',  desc: 'Source C-List GT (must have L permission)' },
+            { name: 'slot', desc: 'Slot offset into the C-List pointed to by CRs (0–32767)' },
         ],
         permission: 'L (Load) on CRs',
         flags: 'None',
