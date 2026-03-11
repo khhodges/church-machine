@@ -7453,7 +7453,7 @@ function showInstructionDetail(opcode) {
 
         <div class="instr-detail-section">
             <div class="instr-detail-label">Description</div>
-            <div class="instr-detail-text">${instr.details}</div>
+            <pre class="instr-detail-text">${instr.details}</pre>
         </div>
 
         <div class="instr-detail-section">
