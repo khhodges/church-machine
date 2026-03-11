@@ -70,10 +70,15 @@ Saves the GT in CRs to the c-list pointed to by CRd at the given slot. Requires 
 ### CALL (opcode 2)
 
 ```
-CALL CRd
+CALL CRs, offset
 ```
 
-Enters the abstraction referenced by CRd. Requires E (enter) permission. Pushes current CR6, CR14, and PC onto the call stack. Loads target's c-list into CR6 and code into CR14 (privileged). Sets PC=0. Clears B-bit on all preserved CRs.
+Enters the abstraction identified by an E-GT. Two modes:
+
+- **C-List mode** (offset 0–14, L permission on CRs): mLoad fetches the E-GT stored at `CRs[offset]` in the C-List.
+- **Direct mode** (offset = 0xF = all-1s, E permission on CRs): CRs itself is the E-GT — no C-List lookup.
+
+CRd is implicit and always CR6; CALL hardcodes CR6 as the callee c-list output. Pushes caller PC, CR6, CR14, and remaining context onto the call stack. Loads callee c-list into CR6 and code into CR14 (privileged). Sets PC=0. Clears B-bit on all preserved CRs.
 
 ### RETURN (opcode 3)
 
@@ -252,7 +257,7 @@ Applies the code object referenced by CRd in the current scope. Requires X (exec
 ELOADCALL CRd, CRs, #slot
 ```
 
-Fused LOAD + CALL. Loads a GT from CRs's c-list at slot, then immediately enters it. Equivalent to `LOAD CRd, CRs, #slot` followed by `CALL CRd`, but atomic.
+Fused LOAD + CALL. Loads a GT from CRs's c-list at slot, then immediately enters it. Equivalent to `LOAD CRd, CRs, #slot` followed by `CALL CRd, 0xF` (direct mode), but atomic.
 
 ### XLOADLAMBDA (opcode 9)
 

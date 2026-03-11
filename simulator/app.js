@@ -7062,35 +7062,40 @@ const INSTRUCTION_DATA = [
     },
     {
         opcode: 2, mnemonic: 'CALL', domain: 'church',
-        syntax: 'CALL CRd, offset',
-        brief: 'Enter an abstraction — fetch E-GT (direct or via C-List), set up CR6/CR14, push context',
-        encoding: 'opcode[5]=00010 | cond[4] | CRd[4] | offset[4] | 0[15]',
+        syntax: 'CALL CRs, offset',
+        brief: 'Enter an abstraction — fetch E-GT via C-List or directly from CRs, set up CR6/CR14, push context',
+        encoding: 'opcode[5]=00010 | cond[4] | CRs[4] | offset[4] | 0[15]',
         fields: [
-            { name: 'CRd',    desc: 'C-List (L permission — mLoad fetches E-GT at CRd[offset]) or direct E-GT (E permission — offset ignored)' },
-            { name: 'offset', desc: '4-bit index into the C-List at CRd (0–14); ignored when CRd is a direct E-GT' },
+            { name: 'CRs',    desc: 'Source: C-List (L permission — mLoad fetches E-GT at CRs[offset]) or direct E-GT (E permission — offset must be 0xF)' },
+            { name: 'offset', desc: '4-bit index into the C-List (0–14, C-List mode). All-1s (0xF = 15) selects direct mode: CRs itself is the E-GT.' },
         ],
-        permission: 'L on CRd (C-List mode, mLoad fetches E-GT at offset) or E on CRd (direct mode)',
+        permission: 'L on CRs (C-List mode) or E on CRs (direct mode, offset=0xF)',
         flags: 'None',
         details:
             '  31    27│26   23│22   19│18   15│14                0\n'
           + '  ┌──────┬──────┬──────┬──────┬───────────────────┐\n'
-          + '  │00010 │ cond │  CRd │offset│         0         │\n'
+          + '  │00010 │ cond │  CRs │offset│         0         │\n'
           + '  └──────┴──────┴──────┴──────┴───────────────────┘\n'
           + '   5-bit   4-bit   4-bit  4-bit       15-bit\n\n'
-          + 'C-List mode (L on CRd): mLoad fetches the E-GT at CRd[offset] (offset 0–14).\n'
-          + 'Direct mode  (E on CRd): CRd is the E-GT; offset is ignored.\n\n'
+          + 'CRs field identifies the source register (always a caller-specified CRn).\n'
+          + 'CRd is implicit and always CR6 — CALL hardcodes CR6 as the callee c-list output.\n\n'
+          + 'C-List mode (offset 0–14, L on CRs):\n'
+          + '  mLoad fetches the E-GT stored at CRs[offset] from the C-List.\n\n'
+          + 'Direct mode (offset = 0xF = all-1s, E on CRs):\n'
+          + '  CRs itself is the E-GT — no C-List lookup. offset = 0xF is the sentinel.\n\n'
           + 'Each abstraction occupies one shared GT (one slot). The slot layout is:\n'
           + '  [ code | · · · free space · · · | c-list ]\n'
           + '    ↑ base                          ↑ limit\n\n'
           + 'Code starts at the slot base address; the C-List is packed at the top\n'
           + '(limit). mLoad reads the same slot metadata to derive both registers:\n'
           + '  CR14 (code):   base = slot base address, limit = code size  [privileged]\n'
-          + '  CR6  (c-list): base = slot limit − GTcount\n\n'
+          + '  CR6  (c-list): base = slot limit − GTcount  [implicit CRd, always CR6]\n\n'
           + 'Caller PC, CR0–CR11, CR14, CR15, DRs, and flags are pushed to the call stack.\n'
           + 'B bit is cleared on every passed GT (hardware "use it, don\'t keep it").\n'
           + 'To allow delegation, set B=1 via TPERM before CALL.\n'
           + 'PC is set to 0. RETURN is the only exit.',
-        example: 'CALL CR6, 3          ; Fetch E-GT at offset 3 in C-List CR6 → enter abstraction\n                     ; CR6 ← c-list region (base = limit−GTcount), CR14 ← code region',
+        example: 'CALL CR6, 3          ; C-List mode: fetch E-GT at offset 3 from C-List in CR6\n'
+               + 'CALL CR2, 0xF        ; Direct mode: CR2 is the E-GT (offset=0xF sentinel)',
     },
     {
         opcode: 3, mnemonic: 'RETURN', domain: 'church',
@@ -7857,7 +7862,7 @@ const SYNTAX_REF = {
             { heading: "Church Domain (Mind)", items: [
                 { syntax: "LOAD CRd, [CRs, <em>idx</em>]", desc: "Load Golden Token" },
                 { syntax: "SAVE [CRd, <em>idx</em>], CRs", desc: "Save Golden Token" },
-                { syntax: "CALL CRd", desc: "Enter abstraction (E perm)" },
+                { syntax: "CALL CRs, <em>off</em>", desc: "Enter abstraction via C-List (L perm, off 0–14) or direct (E perm, off=0xF)" },
                 { syntax: "RETURN", desc: "Return from abstraction" },
                 { syntax: "LAMBDA CRd, <em>offset</em>", desc: "Capture closure" },
                 { syntax: "SEAL CRd, CRs", desc: "Seal token" },
