@@ -8025,15 +8025,24 @@ function loadCLOOMCExample(name) {
 // capability list (c-list). Think of it as a locked
 // room: nothing gets in or out without a Golden Token.
 //
+// Golden Tokens (GTs) are first-class values. They
+// live in capability registers CR0-CR5 — separate
+// from data registers. A GT can be passed to another
+// abstraction, stored in a c-list, or returned from
+// a method. This makes them fundamentally different
+// from access-control lists: GTs are values you hold,
+// not entries in a table someone else controls.
+//
 // The "capabilities" section lists other abstractions
 // this one needs access to. Empty means it is fully
 // self-contained — it cannot reach anything else.
 //
 // Methods are called via CALL with an E (Enter)
-// permission Golden Token. Arguments arrive in data
-// registers (DR0-DR3). Results return the same way.
-// Hardware enforces every boundary — no software
-// can bypass it.
+// permission Golden Token. Integer arguments arrive
+// in data registers (DR0-DR3); Golden Tokens arrive
+// in capability registers (CR0-CR5). Results return
+// the same way. Hardware enforces every boundary —
+// no software can bypass it.
 
 abstraction IntegerOps {
     capabilities {
