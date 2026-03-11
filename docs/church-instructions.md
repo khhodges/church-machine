@@ -86,9 +86,10 @@ All Church instructions that access the namespace route through the **mLoad mast
 **Operation**:
 1. Check required permission on the target CR via mLoad → FAULT if not
 2. Validate the GT → FAULT if invalid
-3. Reset G=0 on the accessed namespace entry
-4. Push return context onto the call stack
-5. Transfer control to the target abstraction
+3. Reset G=0 on the callee's namespace entry
+4. FAULT if call stack full (256 frames)
+5. Push 2-word frame: [caller's E-GT | NIA+machine_indicators]
+6. Set CR6 = callee c-list (L-only), CR14 = callee code (X-only, privileged), PC = 0
 
 **Mnemonic**: `CALL CRs`
 
@@ -97,9 +98,10 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **Required Permission** | E (Enter) on source CR |
 | **GT Validation** | Version match + MAC seal validation |
 | **G-bit Reset** | Yes — on callee namespace entry via mLoad |
-| **Saved Context** | PC, CR5, CR6, CR14 pushed to call stack (max 256 frames) |
-| **Stack Overflow** | FAULT if call stack full. Updates stackSpace/stackFrames indicators |
-| **New Context** | CR6 set to callee C-List (M-bit set), CR14 set to callee code (privileged), PC set to entry point |
+| **Frame Pushed** | 2 words: [caller E-GT \| NIA+machine_indicators] — no CRs or DRs saved |
+| **Stack Overflow** | FAULT if stack full (256 frames). stackSpace indicator updated |
+| **New Context** | CR6 = callee c-list (L-only), CR14 = callee code (X-only, privileged), PC = 0 |
+| **Unchanged** | DR0–DR15, CR0–CR5, CR7–CR13, CR15 — callee inherits all from caller |
 
 ---
 
@@ -109,27 +111,28 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 **Required Permission**: None (return is always permitted if a saved context exists)
 
-**Validation Path**: Routes saved CR5/CR6/CR14 GTs through mLoad for namespace revalidation — version check, MAC check, G-bit reset. Catches recycled entries (use-after-free prevention).
+**Frame structure**: CALL pushes 2 words. RETURN pops them. The caller's E-GT in Word 0 is revalidated by mLoad — this catches use-after-free (version mismatch → FAULT) and resets the G-bit for GC liveness tracking.
 
 **Operation**:
-1. Check that a saved context exists on the call stack → FAULT if empty
-2. Pop the saved context
-3. Restore CR5 via mLoad (tolerant — clears CR5 on fault, continues)
-4. Restore CR6 via mLoad (fatal — FAULTs on validation failure)
-5. Restore CR14 via mLoad (fatal — FAULTs on validation failure)
-6. Reset G=0 on all restored namespace entries
-7. Resume execution at the saved return address
+1. Check that a frame exists on the call stack → FAULT if empty
+2. Pop Word 0 (caller's E-GT) and Word 1 (NIA | machine indicators)
+3. mLoad the caller's E-GT: version check + MAC + G-bit reset → FAULT on failure
+4. Re-run NS split on caller's NS entry → re-derive CR6 (caller c-list) and CR14 (caller code)
+5. Restore PC from NIA (Word 1)
+6. Restore machine indicators from Word 1
 
 **Mnemonic**: `RETURN`
 
 | Aspect | Detail |
 |--------|--------|
 | **Permission Check** | None |
-| **Restored Registers** | CR5 (tolerant), CR6 (M-bit set), CR14, PC via mLoad revalidation |
-| **CR5 Fault Tolerance** | CR5 fault clears CR5, continues to CR6/CR14 |
-| **G-bit Reset** | Yes — on all restored namespace entries via mLoad |
-| **Stack Underflow** | FAULT: "No saved context to restore" |
-| **Stack Indicators** | Updates stackFrames and stackSpace |
+| **E-GT Revalidation** | mLoad on caller's E-GT: version, MAC, G-bit reset (FAULT on failure) |
+| **CR6 / CR14 Restore** | Re-derived from caller's NS entry via NS split — not stored directly in frame |
+| **PC Restore** | NIA from Word 1 |
+| **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, stackSpace, etc.) |
+| **Unchanged** | DR0–DR15, CR0–CR5, CR7–CR13, CR15 |
+| **Stack Underflow** | FAULT: no saved context |
+| **Stack Indicators** | stackFrames and stackSpace updated |
 
 ---
 

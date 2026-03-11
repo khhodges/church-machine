@@ -7090,9 +7090,14 @@ const INSTRUCTION_DATA = [
           + '(limit). mLoad reads the same slot metadata to derive both registers:\n'
           + '  CR14 (code):   base = slot base address, limit = code size  [privileged]\n'
           + '  CR6  (c-list): base = slot limit − GTcount  [implicit CRd, always CR6]\n\n'
-          + 'Caller PC, CR0–CR11, CR14, CR15, DRs, and flags are pushed to the call stack.\n'
+          + 'CALL pushes exactly 2 words onto the call stack:\n'
+          + '  Word 0: caller\'s E-GT — the GT identifying the calling abstraction;\n'
+          + '          RETURN uses it to revalidate and re-derive CR6 and CR14.\n'
+          + '  Word 1: NIA (return offset into caller\'s code) | packed machine indicators\n'
+          + '          (LAMBDA-active, M-elevation, condition flags, stackSpace, etc.).\n\n'
+          + 'No DRs and no other CRs are pushed or modified.\n'
+          + 'The callee inherits DR0–DR15, CR0–CR5, CR7–CR13, CR15 unchanged from caller.\n\n'
           + 'B bit is cleared on every passed GT (hardware "use it, don\'t keep it").\n'
-          + 'To allow delegation, set B=1 via TPERM before CALL.\n'
           + 'PC is set to 0. RETURN is the only exit.',
         example: 'CALL CR6, 3          ; C-List mode: fetch E-GT at offset 3 from C-List in CR6\n'
                + 'CALL CR2, 0xF        ; Direct mode: CR2 is the E-GT (offset=0xF sentinel)',
@@ -7115,7 +7120,12 @@ const INSTRUCTION_DATA = [
           + '   5-bit   4-bit   4-bit  zero        zero\n\n'
           + 'CRd = return value register (conventionally CR0).\n'
           + 'src and imm15 are zero.\n\n'
-          + 'Pops the call stack, restoring caller PC, all CRs, DRs, and flags.\n'
+          + 'Pops the 2-word call frame pushed by CALL:\n'
+          + '  Word 0: caller\'s E-GT — revalidated via mLoad (version+MAC+G-bit reset);\n'
+          + '          NS split re-runs to re-derive caller\'s CR6 (c-list) and CR14 (code).\n'
+          + '  Word 1: NIA | machine indicators — restores PC and machine status.\n\n'
+          + 'DRs and all other CRs (CR0–CR5, CR7–CR13, CR15) are not changed by RETURN;\n'
+          + 'they retain whatever values the callee left in them.\n'
           + 'Shared between Church and Turing domains — the only exit from a safe\n'
           + 'Turing abstraction. If the call stack is empty, the machine halts.',
         example: 'RETURN CR0           ; Exit abstraction, restore caller',

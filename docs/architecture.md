@@ -209,15 +209,24 @@ CALL performs (single NS entry with clistCount):
    - clistStart = (limit + 1) - clistCount
    - CR14 (code): location = base, limit = clistStart - 1, perms = **X-only** (hardcoded, privileged)
    - CR6 (c-list): location = base + clistStart, limit = clistCount - 1, perms = **L-only** (hardcoded)
-5. Save caller's CR6, CR14, PC to call stack
-6. Clear B-bit on preserved CRs
-7. Set PC = 0
+5. Push 2-word call frame: [caller's E-GT | NIA+machine_indicators]
+6. Set PC = 0
+
+**Frame layout** — 2 words only:
+- Word 0: The caller's own E-GT (the GT that identified the calling abstraction).
+  RETURN uses this to revalidate the caller and re-derive CR6/CR14 via NS split.
+- Word 1: NIA (return offset into caller's code) | packed machine indicators
+  (LAMBDA-active, condition flags, M-elevation, stackSpace, stackFrames, etc.)
+
+No DRs and no other CRs are pushed. The callee inherits DR0–DR15, CR0–CR5, CR7–CR13, CR15 from the caller unchanged.
 
 CR14 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. This resolves R001. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at allocSize-clistCount. All lumps are allocated as power-of-2 blocks (minimum 32 words).
 
-RETURN restores:
-1. Pop saved CR6, CR14, PC from call stack
-2. Resume at saved PC
+RETURN:
+1. Pop 2-word frame from call stack
+2. mLoad caller's E-GT (Word 0): version + MAC + G-bit reset (FAULT on failure)
+3. Re-run NS split on caller's NS entry → re-derive CR6 (c-list) and CR14 (code)
+4. Restore PC from NIA (Word 1) and machine indicators from Word 1
 
 ## LAMBDA
 

@@ -2,70 +2,67 @@
 
 ## CALL Operation
 
-The CALL instruction invokes a protected abstraction (service or function) referenced by a Golden Token. It saves the caller's context so that execution can resume after the callee returns.
+The CALL instruction enters a protected abstraction referenced by a Golden Token. It pushes a **2-word frame** onto the call stack — nothing more.
+
+### CALL Frame Layout
+
+```
+Word 0:  The caller's E-GT — the complete Golden Token identifying the
+         calling abstraction. Pushed so RETURN can revalidate and
+         re-derive the caller's CR6 (c-list) and CR14 (code) regions.
+
+Word 1:  NIA | packed machine indicators
+         NIA = Next Instruction Address — the return offset within the
+         caller's code region (i.e., PC of the instruction after CALL).
+         Machine indicators: LAMBDA-active, M-elevation, condition flags
+         (Z, N, C, V), stackFrames, stackSpace, and other status bits.
+```
+
+**Total frame cost: 2 words per CALL.**
 
 ### CALL Flow
 
 | Step | Detail |
 |------|--------|
-| **1. Permission Check** | E (Enter) on source CR |
-| **2. GT Validation** | Version match + MAC seal validation |
-| **3. Context Save** | PC, CR5, CR6, CR14, LAMBDA-active pushed to call stack |
-| **3a. LAMBDA Clear** | Clears LAMBDA-active flag (callee gets clean LAMBDA state) |
-| **4. Stack Check** | FAULT if stack full (256 frames) |
-| **5. Register Setup** | CR6 = callee C-List (M-bit set), CR14 = callee code (privileged) |
-| **6. Register Clearing** | CR5 cleared after push; software clears others |
-| **7. PC Update** | PC set to namespace entry Location |
+| **1. Permission Check** | L on CRs (C-List mode) or E on CRs (direct mode, offset=0xF) |
+| **2. GT Validation** | mLoad: version match + MAC seal + G-bit reset |
+| **3. Stack Check** | FAULT if stack full (256 frames) |
+| **4. Frame Push** | 2 words: [caller E-GT \| NIA+machine_indicators] |
+| **5. Register Setup** | CR6 = callee C-List (L-only), CR14 = callee code (X-only, privileged) |
+| **6. PC Reset** | PC = 0 |
+
+**Registers not touched by CALL**: DR0–DR15, CR0–CR5, CR7–CR13, CR15.
+The callee inherits all of these from the caller unchanged.
 
 ---
 
 ## RETURN Operation
 
-The RETURN instruction has two paths: a **LAMBDA fast path** and a **stack path**.
+RETURN pops the top 2-word frame and resumes the caller.
 
-### LAMBDA Fast Path
-
-When RETURN executes and the LAMBDA-active flag is set in machine status:
-1. Restore PC from LAMBDA_PC machine status register
-2. Clear LAMBDA-active flag
-3. Zero stack access — pure machine-status operation
-
-### Stack Path (CALL Frame)
-
-When RETURN executes and LAMBDA-active is NOT set, pop the top stack frame:
+### RETURN Flow
 
 | Aspect | Detail |
 |--------|--------|
 | **Permission Check** | None |
-| **Restored Registers** | CR5, CR6 (M-bit set), CR14, PC (+4) |
-| **LAMBDA State Restore** | Restores LAMBDA-active from frame |
-| **Stack Underflow** | FAULT: "No saved context to restore" |
-| **Stack Indicators** | Updates stackFrames and stackSpace flags |
+| **Stack Underflow** | FAULT: no saved context |
+| **E-GT Revalidation** | mLoad on caller's E-GT: version check + MAC + G-bit reset |
+| **CR6/CR14 Restore** | Re-derived from caller's NS entry via NS split (same logic as CALL) |
+| **PC Restore** | Set to NIA from Word 1 |
+| **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, etc.) |
+| **Stack Indicators** | stackFrames and stackSpace updated |
 
-RETURN requires no permission -- it is always permitted if a saved context exists on the call stack. If the stack is empty, a FAULT is triggered.
+RETURN requires no permission — it is always permitted if a saved context exists on the call stack. If the stack is empty, a FAULT is triggered.
 
-When RETURN restores a CALL frame that was pushed while LAMBDA was active, the LAMBDA-active flag and LAMBDA_PC are restored from the frame. This means the next RETURN will use the LAMBDA fast path, correctly completing the interrupted LAMBDA return. This is how CALL-mediated LAMBDA nesting works: CALL saves the LAMBDA state, the callee runs freely, and RETURN restores the LAMBDA return path.
+CR6 and CR14 are recomputed from the caller's E-GT rather than stored directly — the NS split is re-run on RETURN, which simultaneously revalidates the caller's GT (use-after-free protection: version mismatch → FAULT).
 
-In Church Machine, the M-bit is set on the restored CR6. This marks the C-List as having Machine permission, indicating that the caller's context has been properly restored through the hardware return mechanism.
-
----
-
-## CR5 Save Area
-
-CR5 serves as a programmer-controlled register for call frame data. It provides a mechanism for passing data between caller and callee:
-
-- Before CALL, the caller can place data in CR5 that the callee needs.
-- The hardware automatically pushes CR5 to the call stack during CALL.
-- The hardware restores CR5 from the call stack during RETURN.
-- After CALL completes (entering the callee), CR5 is cleared.
-
-This gives the programmer a dedicated register for inter-abstraction data transfer without relying on global state or shared memory.
+DRs and all other CRs (CR0–CR5, CR7–CR13, CR15) are unchanged by RETURN — they retain whatever values the callee left.
 
 ---
 
 ## Stack Indicators (Church Machine)
 
-Church Machine provides two 1-bit stack indicator flags that are automatically maintained by the CALL and RETURN microcode:
+Church Machine provides two 1-bit stack indicator flags automatically maintained by CALL and RETURN. They are packed into the machine indicators field of the frame's Word 1 and reflected in machine status at all times:
 
 | Flag | Meaning |
 |------|---------|

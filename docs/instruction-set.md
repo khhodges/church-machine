@@ -78,7 +78,11 @@ Enters the abstraction identified by an E-GT. Two modes:
 - **C-List mode** (offset 0–14, L permission on CRs): mLoad fetches the E-GT stored at `CRs[offset]` in the C-List.
 - **Direct mode** (offset = 0xF = all-1s, E permission on CRs): CRs itself is the E-GT — no C-List lookup.
 
-CRd is implicit and always CR6; CALL hardcodes CR6 as the callee c-list output. Pushes caller PC, CR6, CR14, and remaining context onto the call stack. Loads callee c-list into CR6 and code into CR14 (privileged). Sets PC=0. Clears B-bit on all preserved CRs.
+CRd is implicit and always CR6. CALL pushes **2 words** onto the call stack:
+- **Word 0** — the caller's E-GT (used by RETURN to revalidate and re-derive CR6/CR14)
+- **Word 1** — NIA (return offset) | packed machine indicators
+
+No DRs and no other CRs are pushed. Callee inherits DR0–DR15, CR0–CR5, CR7–CR13, CR15. Sets CR6 = callee c-list (L-only), CR14 = callee code (X-only, privileged), PC = 0.
 
 ### RETURN (opcode 3)
 
@@ -86,7 +90,11 @@ CRd is implicit and always CR6; CALL hardcodes CR6 as the callee c-list output. 
 RETURN
 ```
 
-Returns from the current abstraction. Pops saved CR6, CR14, and PC from the call stack. Shared between Church and Turing domains.
+Returns from the current abstraction. Pops the 2-word frame pushed by CALL:
+- **Word 0** (caller's E-GT) — revalidated via mLoad (version + MAC + G-bit reset); NS split re-runs to re-derive CR6 and CR14 for the caller
+- **Word 1** (NIA | machine indicators) — restores PC and machine status
+
+DRs and all other CRs (CR0–CR5, CR7–CR13, CR15) are unchanged — they retain whatever values the callee left. Shared between Church and Turing domains.
 
 If the call stack is empty, RETURN triggers a reboot (warm restart) — not a halt.
 
