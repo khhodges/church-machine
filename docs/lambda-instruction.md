@@ -38,7 +38,7 @@ LAMBDA CRn, x
 1. LAMBDA-active flag is NOT set (CALL cleared it)
 2. Pop stack frame
 3. Check 1-bit tag on frame:
-   - Tag=0 (CALL frame): restore CR6+CR7+PC (CR5 is stable — not saved/restored), check E permission on saved CR6 GT, revalidate
+   - Tag=0 (CALL frame): restore CR5+CR6+CR7+PC, check E permission on saved CR6 GT, revalidate
    - Tag=1 (LAMBDA frame): restore PC only
 
 ## Stack Frame 1-Bit Tag
@@ -46,7 +46,7 @@ LAMBDA CRn, x
 Every frame on the capability stack carries a 1-bit tag:
 | Tag | Type | Contents | RETURN behavior |
 |-----|------|----------|-----------------|
-| 0 | CALL | CR6+CR7+PC+LAMBDA state | Full domain restoration (CR5 is stable, not saved) |
+| 0 | CALL | CR5+CR6+CR7+PC+LAMBDA state | Full domain restoration (CR5 carries private instance data) |
 | 1 | LAMBDA | PC only | Simple PC restoration |
 
 The tag makes the thread's execution history **self-describing**. When resuming a suspended thread, the stack tells you exactly what kind of return each frame requires. No external metadata needed.

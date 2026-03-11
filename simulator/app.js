@@ -8011,8 +8011,75 @@ function loadCLOOMCExample(name) {
     if (!editor) return;
 
     const examples = {
-        'memory': `abstraction Memory {\n    capabilities {\n    }\n    method Allocate(size) {\n        location = read(CR7, 0)\n        needed = size + 255\n        needed = needed >> 8\n        needed = needed << 8\n        write(CR7, 0, location + needed)\n        return(location, needed)\n    }\n    method Free(location) {\n        return(0)\n    }\n}`,
-        'mint': `abstraction Mint {\n    capabilities {\n        Memory\n    }\n    method Create(size, perms) {\n        result = call(Memory.Allocate(size))\n        return(result)\n    }\n    method Revoke(index) {\n        return(0)\n    }\n}`,
+        'memory': `// ── Memory Allocator using CR5 Instance Data ──
+// Base abstractions are shared code — they hold no
+// state themselves. Instance state lives in CR5,
+// the private instance data register.
+//
+// CR5 is saved on CALL and restored on RETURN by
+// hardware. Each thread carries its own CR5, so
+// multiple threads can share the same Memory code
+// while each maintains its own heap pointer.
+//
+// CR5 points to a region where this instance keeps
+// its bookkeeping (here: the current heap offset).
+// The read/write operations go through CR5's Golden
+// Token, so access is hardware-enforced.
+
+abstraction Memory {
+    capabilities {
+    }
+
+    // Allocate: reserve 'size' bytes of memory.
+    // Rounds up to 256-byte alignment (>> 8, << 8).
+    // Returns (location, actual_size).
+    method Allocate(size) {
+        location = read(CR5, 0)
+        needed = size + 255
+        needed = needed >> 8
+        needed = needed << 8
+        write(CR5, 0, location + needed)
+        return(location, needed)
+    }
+
+    // Free: placeholder — bump allocators don't free.
+    // A real deallocator would be a separate abstraction.
+    method Free(location) {
+        return(0)
+    }
+}`,
+        'mint': `// ── Mint: Creating New Golden Tokens ──
+// Mint depends on Memory (listed in capabilities).
+// At install time the system places a GT for Memory
+// into Mint's c-list. Without that GT, Mint cannot
+// reach Memory at all — hardware enforces this.
+//
+// Mint's own CR5 holds its private instance data,
+// separate from Memory's CR5. When Mint calls
+// Memory.Allocate, the CALL hardware saves Mint's
+// CR5 and loads Memory's. On RETURN, Mint's CR5
+// is restored. Neither abstraction can see the
+// other's private data.
+
+abstraction Mint {
+    capabilities {
+        Memory
+    }
+
+    // Create: allocate space for a new GT.
+    // Delegates to Memory via CALL (needs E permission).
+    method Create(size, perms) {
+        result = call(Memory.Allocate(size))
+        return(result)
+    }
+
+    // Revoke: invalidate an existing GT.
+    // Placeholder — real revocation walks the
+    // namespace and clears matching entries.
+    method Revoke(index) {
+        return(0)
+    }
+}`,
         'hello': `// ── Church Machine: Anatomy of an Abstraction ──
 // The Church Machine is a 32-bit integer machine.
 // There are no strings, no floats, no data types.
