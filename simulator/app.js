@@ -8503,7 +8503,6 @@ function compileDraftAssembly(source, con) {
 
     if (con) con.textContent = draft;
     showNextSteps('drafted');
-    trackProgress('draft');
 }
 
 function compileDraft() {
