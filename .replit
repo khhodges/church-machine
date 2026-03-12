@@ -47,3 +47,7 @@ packages = ["freetype", "gitFull", "lcms2", "libimagequant", "libjpeg", "libtiff
 [userenv]
 
 [userenv.shared]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 30000
