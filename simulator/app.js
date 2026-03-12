@@ -6,6 +6,7 @@ let churchTutorial = null;
 let slideRuleTutorial = null;
 let securityTutorial = null;
 let threadTutorial = null;
+let abstrTutorial = null;
 let activeTutorial = 'sliderule';
 let cloomcCompiler = null;
 let currentView = 'dashboard';
@@ -28,6 +29,7 @@ function init() {
     slideRuleTutorial = new SlideRuleTutorial();
     securityTutorial = new SecurityTutorial();
     threadTutorial = new ThreadTutorial();
+    abstrTutorial = new AbstractionTutorial();
 
     abstractionRegistry = new AbstractionRegistry();
     systemAbstractions = new SystemAbstractions(abstractionRegistry);
@@ -145,6 +147,8 @@ function switchView(viewId) {
             securityTutorial.render('tutorialView');
         } else if (activeTutorial === 'thread') {
             threadTutorial.render('tutorialView');
+        } else if (activeTutorial === 'abstraction') {
+            abstrTutorial.render('tutorialView');
         } else {
             churchTutorial.render('tutorialView');
         }
@@ -172,6 +176,8 @@ function selectTutorial(which) {
         securityTutorial.render('tutorialView');
     } else if (which === 'thread') {
         threadTutorial.render('tutorialView');
+    } else if (which === 'abstraction') {
+        abstrTutorial.render('tutorialView');
     } else {
         churchTutorial.render('tutorialView');
     }
