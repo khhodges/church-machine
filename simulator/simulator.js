@@ -298,7 +298,21 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(8, gt8, check8.entry);
-                this.output += '[BOOT] INIT_THRD — CR8 <- mLoad(Slot 1) Thread identity\n';
+                const threadEntry = check8.entry;
+                const threadParsed = this.parseNSWord1(threadEntry.word1_limit);
+                const threadBase = threadEntry.word0_location;
+                const threadLimit = threadParsed.limit;
+                const GT_ZONE_WORDS = 12;
+                const cr12GT = this.createGT(0, 1, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);
+                const cr12Word1 = this.packNSWord1(threadLimit - GT_ZONE_WORDS, 0, 0, 0, 0, 1, 0);
+                this.cr[12] = {
+                    word0: cr12GT,
+                    word1: (threadBase + GT_ZONE_WORDS) >>> 0,
+                    word2: cr12Word1,
+                    word3: threadEntry.word2_seals,
+                    m: this.mElevation ? 1 : 0
+                };
+                this.output += `[BOOT] INIT_THRD — CR8 <- mLoad(Slot 1) Thread identity; CR12(Stack,RW,base=0x${(threadBase+GT_ZONE_WORDS).toString(16).toUpperCase()},lim=${threadLimit-GT_ZONE_WORDS})\n`;
                 this.bootStep++;
                 break;
             }
@@ -340,12 +354,12 @@ class ChurchSimulator {
                 }
                 const clistStart = allocSize - clistCount;
 
-                const cr7GT = this.createGT(0, 2, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
-                const cr7Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
-                this.cr[7] = {
-                    word0: cr7GT,
+                const cr14GT = this.createGT(0, 2, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
+                const cr14Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
+                this.cr[14] = {
+                    word0: cr14GT,
                     word1: base,
-                    word2: cr7Word1,
+                    word2: cr14Word1,
                     word3: abstrEntry.word2_seals,
                     m: this.mElevation ? 1 : 0
                 };

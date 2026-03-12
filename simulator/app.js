@@ -2724,9 +2724,9 @@ function _buildNIARows(prevAddr, currAddr) {
 const _BOOT_STEPS = [
     { addrStr: 'B:00', disasm: 'FAULT_RST',  label: 'Clear all CRs / DRs',    offset: null, prog: 'boot' },
     { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] root',  offset: null, prog: 'boot' },
-    { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR8 \u2190 NS[1] Thread', offset: null, prog: 'boot' },
-    { addrStr: 'B:03', disasm: 'INIT_ABSTR', label: 'CR6 \u2190 NS[2] Abstr',  offset: null, prog: 'boot' },
-    { addrStr: 'B:04', disasm: 'LOAD_NUC',   label: 'CR7/CR14 \u2190 code',    offset: null, prog: 'boot' },
+    { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR8/CR12 \u2190 NS[1] Thread/Stack', offset: null, prog: 'boot' },
+    { addrStr: 'B:03', disasm: 'INIT_ABSTR', label: 'CR6 \u2190 NS[2] Abstr',              offset: null, prog: 'boot' },
+    { addrStr: 'B:04', disasm: 'LOAD_NUC',   label: 'CR14 \u2190 code (CLOOMC)',           offset: null, prog: 'boot' },
     { addrStr: 'B:05', disasm: 'COMPLETE',   label: 'Boot done',               offset: null, prog: 'boot' },
 ];
 
