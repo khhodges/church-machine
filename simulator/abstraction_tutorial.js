@@ -55,9 +55,9 @@ class AbstractionTutorial {
     _buildSteps() {
         return [
             {
-                title: 'What Is a Plain Abstraction?',
+                title: 'What Is a Programmed Abstraction?',
                 type: 'intro',
-                content: `<p>An <strong>Abstraction</strong> is the Church Machine\u2019s fundamental computational unit \u2014 the equivalent of a function or lambda term. It lives inside a <em>lump</em> (a contiguous, <strong>power-of-2-sized</strong> block of namespace words) with three zones, top to bottom.</p>
+                content: `<p>A <strong>Programmed Abstraction</strong> is the Church Machine\u2019s fundamental computational unit \u2014 the equivalent of a class with methods. It lives inside a <em>lump</em> (a contiguous, <strong>power-of-2-sized</strong> block of namespace words) with three zones, top to bottom.</p>
 ${this._memMap(null)}
 ${this._p2Sizes()}
 <div class="sr-key-concept"><div class="sr-concept-title">Three Zones, One Lump</div>
@@ -75,6 +75,20 @@ ${this._p2Sizes()}
 <li><strong>Abstractions are stateless and shareable</strong> \u2014 any number of threads can hold an E-GT for the same abstraction and enter it concurrently without interference, because the lump is never written during execution.</li>
 <li><strong>Threads carry all mutable state</strong>: the FIFO stack, heap, data registers, and the privileged CR12\u2013CR15 window. The abstraction lump is unchanged between calls.</li>
 </ul></div>`
+            },
+            {
+                title: 'Calling Methods \u2014 Three Access Paths',
+                type: 'egt',
+                content: `<p>A caller can invoke a method inside a Programmed Abstraction by three different paths, depending on how the E-GT for the callee was obtained.</p>
+<table class="sr-table"><tr><th>Path</th><th>Mechanism</th><th>When to use</th></tr>
+<tr><td><strong>By Name</strong></td><td>The CLOOMC compiler resolves the method name to a C-List index at compile time and emits <code>ELOAD CRd, &lt;idx&gt;</code> automatically.</td><td>Normal application code written in CLOOMC++. The programmer writes <code>object.methodName(args)</code> and the compiler handles the rest.</td></tr>
+<tr><td><strong>By Number</strong></td><td>The programmer directly specifies the C-List slot index in an <code>ELOAD CRd, idx</code> or <code>LOAD CRd, idx</code> / <code>CALL CRd</code> pair. The index is a compile-time constant.</td><td>Assembly-level code or performance-critical paths where the slot number is a well-known fixed interface contract.</td></tr>
+<tr><td><strong>By Address</strong></td><td>An E-GT for the callee has already been loaded into a CR by a prior <code>LOAD</code> or passed in as an argument (CR0\u2013CR5). The caller issues <code>CALL CRd</code> directly against the pre-loaded GT without consulting the C-List.</td><td>Higher-order code (callbacks, dispatch tables, dependency injection) where the callee is determined at runtime.</td></tr>
+</table>
+<div class="sr-key-concept"><div class="sr-concept-title">All Three Paths Arrive at the Same Hardware Gate</div>
+<p>Regardless of how the E-GT was obtained, the hardware performs the same validation on <code>CALL</code>: check E\u202f=\u202f1, recompute the FNV-32 seal against the NS entry, derive CR14 and CR6, push the 2-word frame, set PC\u202f=\u202f0. The three paths are only distinguished at the <em>source of the E-GT</em> \u2014 name (compiler), number (C-List index), or address (pre-loaded register). Once the GT is in a CR the call mechanism is identical.</p></div>
+<div class="sr-key-concept"><div class="sr-concept-title">ELOAD = LOAD + CALL in One Instruction</div>
+<p><code>ELOAD CRd, idx</code> reads the GT at C-List[idx] into CRd and immediately calls it in a single atomic operation \u2014 equivalent to <code>LOAD CRd, idx; CALL CRd</code> but without the GT remaining in the register after the call returns. Use <code>LOAD</code> + <code>CALL</code> separately only when you need to inspect or retain the GT.</p></div>`
             },
             {
                 title: '\u2460 Code Region \u2014 CR14 (CLOOMC)',
@@ -196,7 +210,7 @@ ${this._p2Sizes()}
 <div class="sr-sec-item"><span class="sr-sec-num">7</span><strong>CHANGE (abstraction as CLOOMC).</strong> A scheduler thread can switch which abstraction is the \u201crunning code\u201d by saving CR14 and CR6 as part of per-thread context and restoring them for a different thread. The abstraction\u2019s own lump is never modified during a context switch.</div>
 </div>
 <div class="sr-key-concept"><div class="sr-concept-title">No Mutable State in an Abstraction</div>
-<p>Unlike a Thread, a plain abstraction has <strong>no mutable live state</strong> in its lump between calls. Its code words are read-only (X-only permission). Its C-List can be written only via SAVE (S permission), and only by code that holds a SAVE-permissioned GT for that c-list. If no such GT is issued, the abstraction\u2019s capabilities are frozen at upload time.</p></div>`
+<p>Unlike a Thread, a Programmed Abstraction has <strong>no mutable live state</strong> in its lump between calls. Its code words are read-only (X-only permission). Its C-List can be written only via SAVE (S permission), and only by code that holds a SAVE-permissioned GT for that c-list. If no such GT is issued, the abstraction\u2019s capabilities are frozen at upload time.</p></div>`
             }
         ];
     }
@@ -207,8 +221,8 @@ ${this._p2Sizes()}
 
         let html = '<div class="sr-wrapper">';
         html += '<div class="sr-header">';
-        html += '<h2>Plain Abstraction</h2>';
-        html += '<p class="sr-tagline">Code Region \u00b7 C-List \u00b7 E-GT \u00b7 CALL / RETURN \u00b7 CR6 \u00b7 CR14</p>';
+        html += '<h2>Programmed Abstractions</h2>';
+        html += '<p class="sr-tagline">Code Region \u00b7 C-List \u00b7 E-GT \u00b7 CALL / RETURN \u00b7 CR6 \u00b7 CR14 \u00b7 Three Method-Access Paths</p>';
         html += '<div class="sr-controls">';
         html += `<button class="btn btn-tutorial" onclick="abstrTutorial.stepBack()" ${this.currentStep <= 0 ? 'disabled' : ''}>&laquo; Back</button>`;
         html += `<span class="tutorial-progress">${Math.max(0, this.currentStep + 1)} / ${this.steps.length}</span>`;
@@ -226,9 +240,9 @@ ${this._p2Sizes()}
             html += '</div>';
         } else {
             html += '<div class="sr-step-container sr-type-intro">';
-            html += '<div class="sr-step-title">Plain Abstraction</div>';
+            html += '<div class="sr-step-title">Programmed Abstractions</div>';
             html += '<div class="sr-step-content">';
-            html += '<p>This tutorial walks through the two memory regions of a Church Machine Plain Abstraction: the Code region (executed via CR14) and the C-List (accessed via CR6). It then covers the E-GT mechanism, how CALL derives CR6 and CR14 on entry, and how RETURN re-validates the E-GT on exit to restore the caller\'s context.</p>';
+            html += '<p>This tutorial walks through the structure of a Church Machine Programmed Abstraction: the Code region (CR14), C-List (CR6), E-GT mechanism, CALL/RETURN derivation, and the three paths by which a caller can invoke a method \u2014 by name, by C-List index, or by pre-loaded address.</p>';
             html += '<p>Click <strong>Next</strong> to begin.</p>';
             html += '</div></div>';
         }

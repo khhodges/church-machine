@@ -47,7 +47,7 @@ class ThreadTutorial {
             {
                 title: 'What Is a Thread Abstraction?',
                 type: 'intro',
-                content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a plain abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
+                content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a Programmed Abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
 <p>At boot (B:02) the machine loads a Thread Identity GT into <strong>CR12</strong> from NS Slot 1 (zero perms, Inform-type). CR12 tells the running thread where its own lump lives; its metadata defines the lump base, total size, and heap limit. The stack region occupies lump words 12 \u2192 heap base; its current position is tracked by the hidden <strong>STO register</strong>.</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Five Regions, One Lump</div>
