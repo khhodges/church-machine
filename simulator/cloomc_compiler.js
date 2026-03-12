@@ -53,7 +53,7 @@ class CLOOMCCompiler {
         const errors = [];
         const parsed = this._parseAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [] };
+            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
         }
 
         const rom = this._buildROM(parsed.capabilities, capabilities || []);
@@ -91,7 +91,7 @@ class CLOOMCCompiler {
         const errors = [];
         const parsed = this._parseLambdaAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [] };
+            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'lambda' };
         }
 
         const rom = this._buildROM(parsed.capabilities, capabilities || []);
@@ -1007,7 +1007,7 @@ class CLOOMCCompiler {
         const errors = [];
         const parsed = this._parseHaskellAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [] };
+            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'haskell' };
         }
 
         const rom = this._buildROM(parsed.capabilities, capabilities || []);
@@ -1786,7 +1786,7 @@ class CLOOMCCompiler {
         let opKeywords = 0;
         for (const line of lines) {
             const t = line.trim();
-            if (!t || t.startsWith('--') || t.startsWith('//')) continue;
+            if (!t || t.startsWith('--') || t.startsWith('//') || t.startsWith(';')) continue;
             if (t.match(/^abstraction\s+\w+\s*\{/)) continue;
             if (t.match(/^capabilities\s*\{/)) continue;
             if (t === '}') continue;
@@ -1802,7 +1802,7 @@ class CLOOMCCompiler {
         const errors = [];
         const parsed = this._parseSymbolicAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [] };
+            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'symbolic' };
         }
 
         const rom = this._buildROM(parsed.capabilities, capabilities || []);
@@ -1830,7 +1830,7 @@ class CLOOMCCompiler {
 
         while (i < lines.length) {
             const line = lines[i].trim();
-            if (!line || line.startsWith('--') || line.startsWith('//')) { i++; continue; }
+            if (!line || line.startsWith('--') || line.startsWith('//') || line.startsWith(';')) { i++; continue; }
 
             const absMatch = line.match(/^abstraction\s+(\w+)\s*\{/);
             if (absMatch) {
@@ -1848,7 +1848,7 @@ class CLOOMCCompiler {
             const stmts = [];
             for (let j = 0; j < lines.length; j++) {
                 const line = lines[j].trim();
-                if (!line || line.startsWith('--') || line.startsWith('//')) continue;
+                if (!line || line.startsWith('--') || line.startsWith('//') || line.startsWith(';')) continue;
                 stmts.push({ line: j + 1, text: line });
             }
             if (stmts.length > 0) {
@@ -1862,7 +1862,7 @@ class CLOOMCCompiler {
     _parseSymbolicBody(lines, i, result, errors) {
         while (i < lines.length) {
             const line = lines[i].trim();
-            if (!line || line.startsWith('--') || line.startsWith('//')) { i++; continue; }
+            if (!line || line.startsWith('--') || line.startsWith('//') || line.startsWith(';')) { i++; continue; }
             if (line === '}') return i + 1;
 
             const capMatch = line.match(/^capabilities\s*\{/);
@@ -2227,7 +2227,7 @@ class CLOOMCCompiler {
         const errors = [];
         const parsed = this._parseEnglishAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [] };
+            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'english' };
         }
 
         const rom = this._buildROM(parsed.capabilities, capabilities || []);
