@@ -238,9 +238,10 @@ class ChurchSimulator {
                 clistChildren.push(i);
                 continue;
             }
-            const loc = (i === 0) ? this.NS_TABLE_BASE : i * this.SLOT_SIZE;
-            const lim17 = (i === 0) ? (abstractions.length * this.NS_ENTRY_WORDS) : (this.SLOT_SIZE - 1);
-            this.writeNSEntry(i, loc, lim17, 0, 0, 0, a.chainable ? 1 : 0, 1, 0, 0);
+            const loc = (i === 0) ? 0 : i * this.SLOT_SIZE;
+            const lim17 = (i === 0) ? (this.memory.length - 1) : (this.SLOT_SIZE - 1);
+            const nsTableCount = (i === 0) ? abstractions.length : 0;
+            this.writeNSEntry(i, loc, lim17, 0, 0, 0, a.chainable ? 1 : 0, 1, 0, nsTableCount);
             this.nsLabels[i] = a.label;
             if (a.handler) {
                 this.nsHandlers[i] = a.handler;
@@ -288,7 +289,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(15, gt15, check.entry);
-                this.output += '[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace root (zero perms, Inform)\n';
+                this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount})\n`;
                 this.bootStep++;
                 break;
             }

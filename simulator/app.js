@@ -7,6 +7,7 @@ let slideRuleTutorial = null;
 let securityTutorial = null;
 let threadTutorial = null;
 let abstrTutorial = null;
+let nsTutorial = null;
 let activeTutorial = 'sliderule';
 let cloomcCompiler = null;
 let currentView = 'dashboard';
@@ -30,6 +31,7 @@ function init() {
     securityTutorial = new SecurityTutorial();
     threadTutorial = new ThreadTutorial();
     abstrTutorial = new AbstractionTutorial();
+    nsTutorial = new NamespaceTutorial();
 
     abstractionRegistry = new AbstractionRegistry();
     systemAbstractions = new SystemAbstractions(abstractionRegistry);
@@ -149,6 +151,8 @@ function switchView(viewId) {
             threadTutorial.render('tutorialView');
         } else if (activeTutorial === 'abstraction') {
             abstrTutorial.render('tutorialView');
+        } else if (activeTutorial === 'namespace') {
+            nsTutorial.render('tutorialView');
         } else {
             churchTutorial.render('tutorialView');
         }
@@ -178,6 +182,8 @@ function selectTutorial(which) {
         threadTutorial.render('tutorialView');
     } else if (which === 'abstraction') {
         abstrTutorial.render('tutorialView');
+    } else if (which === 'namespace') {
+        nsTutorial.render('tutorialView');
     } else {
         churchTutorial.render('tutorialView');
     }
@@ -2731,7 +2737,7 @@ function _buildNIARows(prevAddr, currAddr) {
 
 const _BOOT_STEPS = [
     { addrStr: 'B:00', disasm: 'FAULT_RST',  label: 'Clear all CRs / DRs',    offset: null, prog: 'boot' },
-    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] root',  offset: null, prog: 'boot' },
+    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Namespace (base=0x0000, full memory)',  offset: null, prog: 'boot' },
     { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR12 \u2190 NS[1] Thread Identity', offset: null, prog: 'boot' },
     { addrStr: 'B:03', disasm: 'INIT_ABSTR', label: 'CR6 \u2190 NS[2] Abstr',              offset: null, prog: 'boot' },
     { addrStr: 'B:04', disasm: 'LOAD_NUC',   label: 'CR14 \u2190 code (CLOOMC)',           offset: null, prog: 'boot' },
