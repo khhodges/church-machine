@@ -8502,7 +8502,7 @@ function compileDraftAssembly(source, con) {
     draft += `\n═══════════════════════════════════════════════════\n`;
 
     if (con) con.textContent = draft;
-    showNextSteps('drafted');
+    showNextSteps('draft');
 }
 
 function compileDraft() {
