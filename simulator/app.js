@@ -17,6 +17,8 @@ function init() {
     sim = new ChurchSimulator();
     assembler = new ChurchAssembler();
     pipelineViz = new PipelineVisualizer('pipelineContainer');
+    pipelineViz.setNIAProvider(() => _buildNIARows(sim.pc > 0 ? sim.pc - 1 : null, sim.pc));
+    pipelineViz.render();
     repl = new ChurchREPL(sim, pipelineViz);
     churchTutorial = new BernoulliTutorial(repl, pipelineViz);
     slideRuleTutorial = new SlideRuleTutorial();
@@ -185,6 +187,7 @@ function updateDashboard() {
     updateInfoDisplay();
     updateGateLog();
     if (selectedCR !== null) updateCRDetail();
+    if (pipelineViz && !pipelineViz.animating) pipelineViz.render();
 }
 
 function updateGateLog() {
@@ -2637,6 +2640,21 @@ function assembleAndLoad() {
     updateDashboard();
 }
 
+function _nsOwnerOf(addr) {
+    if (!sim || !sim.nsCount) return null;
+    for (let i = 0; i < sim.nsCount; i++) {
+        const nsBase  = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const loc     = sim.memory[nsBase];
+        const w1      = sim.memory[nsBase + 1];
+        if (!loc && !w1) continue;
+        const limit   = w1 & 0x1FFFF;
+        if (addr >= loc && addr < loc + limit) {
+            return { label: sim.nsLabels[i] || `NS[${i}]`, nsIdx: i, offset: addr - loc };
+        }
+    }
+    return null;
+}
+
 function _niaMeta(addr) {
     if (addr === null || addr === undefined || addr < 0) return null;
     const word = (sim.memory && addr < sim.memory.length) ? sim.memory[addr] : 0;
@@ -2649,11 +2667,12 @@ function _niaMeta(addr) {
         const dist = rel - labelRel;
         if (dist >= 0 && dist < bestDist) { bestDist = dist; bestName = name; }
     }
+    const ns = !bestName ? _nsOwnerOf(addr) : null;
     return {
         addr,
         disasm: dis || (word === 0 ? 'HALT' : `0x${word.toString(16).padStart(8,'0')}`),
-        label:  bestName,
-        offset: bestName ? bestDist : null,
+        label:  bestName || (ns ? ns.label : null),
+        offset: bestName ? bestDist : (ns ? ns.offset : null),
         prog:   sim.programName || ''
     };
 }

@@ -15,12 +15,17 @@ class PipelineVisualizer {
         this.niaRows = (rows && rows.curr) ? rows : null;
     }
 
+    setNIAProvider(fn) {
+        this.niaProvider = fn;
+    }
+
     _renderNIA() {
-        if (!this.niaRows) return '';
+        const niaData = this.niaRows || (this.niaProvider ? this.niaProvider() : null);
+        if (!niaData || !niaData.curr) return '';
         const rows = [
-            { key: 'last', label: 'last',    data: this.niaRows.last, dim: true  },
-            { key: 'curr', label: '\u25b6\u202fthis', data: this.niaRows.curr, dim: false },
-            { key: 'next', label: 'next',    data: this.niaRows.next, dim: true  }
+            { key: 'last', label: 'last',               data: niaData.last },
+            { key: 'curr', label: '\u25b6\u202fthis',   data: niaData.curr },
+            { key: 'next', label: 'next',               data: niaData.next }
         ];
         let html = '<table class="nia-table">';
         for (const row of rows) {
