@@ -7876,7 +7876,7 @@ const INSTRUCTION_DATA = [
     {
         opcode: 17, mnemonic: 'BRANCH', domain: 'turing',
         syntax: 'BRANCH[cond] offset',
-        brief: 'Conditional branch with signed PC-relative offset',
+        brief: 'Conditional branch with signed PC-relative offset \u2014 use for error catch after a conditional instruction',
         encoding: 'opcode[5]=10001 | cond[4] | 0[4] | 0[4] | signed_offset[15]',
         fields: [
             { name: 'offset', desc: 'Signed 15-bit PC-relative offset (-16384 to +16383)' },
