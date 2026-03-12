@@ -57,20 +57,20 @@ ${this._memMap(null)}
                 title: '\u2460 Capabilities \u2014 GT Zone for CR0\u2013CR11',
                 type: 'capabilities',
                 content: `${this._memMap('cap')}
-<p>The top 12 words of the thread lump are the <strong>GT zone</strong>: one 32-bit Golden Token word for each of CR0\u2013CR11. CR12\u2013CR13 are system-wide (fault/interrupt handlers, not per-thread). CR14 (code) and CR15 (namespace) are per-thread privileged registers saved separately by CHANGE.</p>
-<table class="sr-table"><tr><th>Word</th><th>CR</th><th>Typical contents</th></tr>
-<tr><td>0</td><td>CR0</td><td>Return value \u00b7 first return GT</td></tr>
-<tr><td>1</td><td>CR1</td><td>Argument 1 \u00b7 general capability</td></tr>
-<tr><td>2</td><td>CR2</td><td>Thread-local Constants GT</td></tr>
-<tr><td>3</td><td>CR3</td><td>Thread-local Memory GT</td></tr>
-<tr><td>4</td><td>CR4</td><td>Thread-local I/O device GT</td></tr>
-<tr><td>5</td><td>CR5</td><td>User-defined</td></tr>
-<tr><td>6</td><td>CR6</td><td>C-list (L-only) for current abstraction</td></tr>
-<tr><td>7</td><td>CR7</td><td>Spare \u00b7 user capability</td></tr>
-<tr><td>8</td><td>CR8</td><td>Thread identity (self-reference GT)</td></tr>
-<tr><td>9</td><td>CR9</td><td>Heap base GT</td></tr>
-<tr><td>10</td><td>CR10</td><td>Namespace root (R/W admin)</td></tr>
-<tr><td>11</td><td>CR11</td><td>Extended capability \u00b7 spare</td></tr>
+<p>The top 12 words of the thread lump are the <strong>GT zone</strong>: one 32-bit Golden Token word for each of CR0\u2013CR11. Three of these are <em>architecture-defined</em>; the remaining nine are freely allocated by the programmer.</p>
+<table class="sr-table"><tr><th>Word</th><th>CR</th><th>Role</th><th>Controlled by</th></tr>
+<tr><td>0</td><td>CR0</td><td>Return value \u00b7 first return GT</td><td><strong>Architecture</strong></td></tr>
+<tr><td>1</td><td>CR1</td><td>First argument GT</td><td><strong>Architecture</strong></td></tr>
+<tr><td>2</td><td>CR2</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>3</td><td>CR3</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>4</td><td>CR4</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>5</td><td>CR5</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>6</td><td>CR6</td><td>C-list (L-only) \u00b7 set by CALL/RETURN</td><td><strong>Architecture</strong></td></tr>
+<tr><td>7</td><td>CR7</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>8</td><td>CR8</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>9</td><td>CR9</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>10</td><td>CR10</td><td>Programmer-defined</td><td>Programmer</td></tr>
+<tr><td>11</td><td>CR11</td><td>Programmer-defined</td><td>Programmer</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">mLoad Keeps the GT Zone in Sync</div>
 <p>Every time mLoad executes it <strong>writes the loaded GT back into the corresponding GT-zone word</strong> (word N for CR_N). This guarantees the lump\u2019s GT zone always mirrors the live CR registers. When CHANGE suspends the thread, the hardware simply reads the GT zone directly \u2014 no separate save step needed for CR0\u2013CR11.</p></div>`
@@ -164,7 +164,7 @@ ${this._memMap(null)}
 <div class="sr-sec-item"><span class="sr-sec-num">2</span><strong>mLoad \u2014 GT zone maintenance.</strong> Every time mLoad loads a GT into CR_N, it <strong>writes the same GT word back to lump word N</strong>. The GT zone is always a live mirror of CR0\u2013CR11. No separate \u201csave\u201d step is needed at context-switch time.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">3</span><strong>CALL.</strong> Entering any abstraction pushes a 2-word frame onto the FIFO stack at word 12+. The CALL instruction checks CR14 bounds, writes <code>[caller E-GT, MASK\u2019d CRs]</code>, and advances the stack pointer by 2.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">4</span><strong>RETURN.</strong> Reads the MASK field (12-bit), restores the selected CRs from the frame, re-derives CR6 and CR14 by re-running the NS split on the caller\u2019s E-GT, then jumps to the return address.</div>
-<div class="sr-sec-item"><span class="sr-sec-num">5</span><strong>CHANGE \u2014 Suspend &amp; Resume.</strong> CHANGE atomically swaps CR8 for a new thread GT. Before the swap, the outgoing thread\u2019s context (DR0\u2013DR15, CR0\u2013CR11, CR14, CR15, PC) is saved to its thread-table entry. Because mLoad kept the GT zone in sync, <strong>the NS slot is updated only if the metadata fields have changed</strong> \u2014 otherwise the GT zone words already contain the correct saved state.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">5</span><strong>CHANGE \u2014 Suspend &amp; Resume.</strong> CHANGE atomically swaps CR8 for a new thread GT. The outgoing thread\u2019s context is saved in two parts: (a) <strong>the GT zone (CR0\u2013CR11) is already persisted</strong> \u2014 mLoad wrote every GT back to the lump in real time, so no additional save is needed; (b) CHANGE <strong>explicitly saves</strong> the remaining live state: <strong>DR0\u2013DR15</strong> (data registers), <strong>CR14</strong> (the CLOOMC code-segment register), <strong>NAI</strong> (Next Address Index \u2014 the program counter), and <strong>FLAGS</strong> (condition codes). The NS slot is updated only if lump metadata has changed.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">6</span><strong>Resume.</strong> CHANGE restores the incoming thread\u2019s saved context from its thread-table entry. CR12 and CR13 (fault/interrupt handlers) are system-wide and are <em>not</em> changed.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">7</span><strong>Heap allocation &amp; GC.</strong> Objects are written into the heap via DWRITE using CR9. When freespace is exhausted a <code>FAULT [HEAP_FULL]</code> fires. The <strong>Run GC</strong> button triggers the Garbage Collector, which compacts the live heap set and restores freespace without moving the stack or the GT zone.</div>
 </div>
