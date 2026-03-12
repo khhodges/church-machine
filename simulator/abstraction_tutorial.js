@@ -6,12 +6,14 @@ class AbstractionTutorial {
 
     _memMap(highlighted) {
         const sections = [
-            { id: 'code',  label: '\u2460 Code',   sub: 'Instruction words  (word\u202f0 \u2192 clistStart\u22121)',  bg: '#001a30', border: '#2080c0', text: '#70bfff' },
-            { id: 'clist', label: '\u2461 C-List', sub: 'Golden Token words  (clistStart \u2192 allocSize\u22121)', bg: '#1a1000', border: '#c08020', text: '#f0c050' },
+            { id: 'code',  label: '\u2460 Code',             sub: 'Instruction words  (word\u202f0 \u2192 codeEnd)', bg: '#001a30', border: '#2080c0', text: '#70bfff', dashed: false },
+            { id: 'free',  label: '\u00b7\u00b7\u00b7 Freespace', sub: 'Unused headroom \u2014 artifact of power-of-2 lump sizing',  bg: '#070707', border: '#333', text: '#555', dashed: true },
+            { id: 'clist', label: '\u2461 C-List',            sub: 'Golden Token words  (clistStart \u2192 allocSize\u22121)',        bg: '#1a1000', border: '#c08020', text: '#f0c050', dashed: false },
         ];
-        const heights = { code: 120, clist: 96 };
+        const heights = { code: 100, free: 50, clist: 80 };
         const addrLabels = {
             code:  'word\u202f0 \u2192',
+            free:  '\u2195 gap',
             clist: 'clistStart \u2192',
         };
         let html = '<div style="display:flex;gap:8px;margin:12px 0 4px 0;align-items:stretch;">';
@@ -23,16 +25,30 @@ class AbstractionTutorial {
         html += '<div style="flex:1;display:flex;flex-direction:column;">';
         for (const s of sections) {
             const isHL = s.id === highlighted;
-            const outline = isHL ? `3px solid ${s.border}` : `1px solid ${s.border}`;
-            const opacity = (!highlighted || isHL) ? '1' : '0.45';
+            const borderLine = s.dashed ? 'dashed' : 'solid';
+            const outline = isHL ? `3px solid ${s.border}` : `1px ${borderLine} ${s.border}`;
+            const opacity = (!highlighted || isHL) ? '1' : '0.38';
             const shadow = isHL ? `0 0 16px ${s.border}44` : 'none';
             html += `<div style="height:${heights[s.id]}px;background:${s.bg};border:${outline};box-shadow:${shadow};opacity:${opacity};padding:6px 10px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;transition:opacity 0.2s;">`;
             html += `<span style="color:${s.text};font-weight:700;font-size:0.85rem;">${s.label}</span>`;
-            html += `<span style="color:#aaa;font-size:0.75rem;margin-top:2px;">${s.sub}</span>`;
+            html += `<span style="color:${s.id === 'free' ? '#444' : '#aaa'};font-size:0.75rem;margin-top:2px;">${s.sub}</span>`;
             html += '</div>';
-            if (s.id !== 'clist') html += '<div style="height:2px;background:#111;"></div>';
         }
         html += '</div></div>';
+        return html;
+    }
+
+    _p2Sizes() {
+        const sizes = [64, 128, 256, 512, 1024, 2048, 4096];
+        let html = '<div style="margin:6px 0 10px 0;">';
+        html += '<span style="font-size:0.72rem;color:#555;font-family:monospace;letter-spacing:0.02em;">allocSize options (power-of-2, in words):</span>';
+        html += '<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap;">';
+        for (const n of sizes) {
+            html += `<span style="background:#0f0f0f;border:1px solid #2a2a2a;color:#777;font-family:monospace;font-size:0.72rem;padding:2px 8px;border-radius:3px;">${n}</span>`;
+        }
+        html += '</div>';
+        html += '<span style="font-size:0.68rem;color:#444;margin-top:4px;display:block;">freeWords = allocSize \u2212 codeWords \u2212 clistWords \u2265 0</span>';
+        html += '</div>';
         return html;
     }
 
@@ -41,11 +57,24 @@ class AbstractionTutorial {
             {
                 title: 'What Is a Plain Abstraction?',
                 type: 'intro',
-                content: `<p>An <strong>Abstraction</strong> is the Church Machine\u2019s fundamental computational unit \u2014 the equivalent of a function or lambda term. Like all Church Machine objects it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is deliberately minimal: just <strong>two regions</strong>.</p>
+                content: `<p>An <strong>Abstraction</strong> is the Church Machine\u2019s fundamental computational unit \u2014 the equivalent of a function or lambda term. It lives inside a <em>lump</em> (a contiguous, <strong>power-of-2-sized</strong> block of namespace words) with three zones, top to bottom.</p>
 ${this._memMap(null)}
-<div class="sr-key-concept"><div class="sr-concept-title">Two Regions, One Lump</div>
-<p>Reading top-to-bottom (word\u202f0\u202f\u2192\u202fbase): <strong>\u2460\u202fCode \u2192 \u2461\u202fC-List</strong>. The Code region holds the instruction words the CPU executes. The C-List (Capability List) holds the Golden Token words that give this abstraction access to everything outside itself \u2014 other abstractions, data objects, and services.</p>
-<p>There is no stack, no heap, and no hardware register file inside an abstraction\u2019s lump. Those belong to the <em>Thread</em> that enters the abstraction via CALL.</p></div>`
+${this._p2Sizes()}
+<div class="sr-key-concept"><div class="sr-concept-title">Three Zones, One Lump</div>
+<p>Reading top-to-bottom (word\u202f0\u202f\u2192\u202fbase): <strong>\u2460\u202fCode \u2192 \u00b7\u00b7\u00b7\u202fFreespace \u2192 \u2461\u202fC-List</strong>.</p>
+<ul style="margin:4px 0 0 0;padding-left:1.2em;line-height:1.7;">
+<li>The <strong>Code</strong> region holds instruction words (word\u202f0 upward). Its size is fixed at upload time by the compiler.</li>
+<li>The <strong>Freespace</strong> is the unaddressed gap between the end of code and the start of the C-List. It exists because lump sizes must be a power of\u202f2 \u2014 the IDE packs code and C-List to the two ends, and any leftover words sit between them, inaccessible at runtime.</li>
+<li>The <strong>C-List</strong> is packed at the high end of the lump (clistStart through allocSize\u22121). Each word is a Golden Token giving this abstraction access to some named object or service outside itself.</li>
+</ul></div>
+<div class="sr-key-concept"><div class="sr-concept-title">Separation of Concerns \u2014 Abstractions vs Threads</div>
+<ul style="margin:4px 0 0 0;padding-left:1.2em;line-height:1.7;">
+<li><strong>Static code</strong> lives in the abstraction\u2019s Code region \u2014 read-only (X-perm), never modified at runtime.</li>
+<li><strong>Static capabilities</strong> live in the C-List \u2014 the abstraction\u2019s fixed authority boundary, frozen at upload unless an explicit S-permissioned GT was issued to a writer.</li>
+<li><strong>Dynamic data</strong> (stack frames, temporaries, heap objects, DR0\u2013DR15) lives exclusively in the <em>Thread</em> lump \u2014 never inside the abstraction.</li>
+<li><strong>Abstractions are stateless and shareable</strong> \u2014 any number of threads can hold an E-GT for the same abstraction and enter it concurrently without interference, because the lump is never written during execution.</li>
+<li><strong>Threads carry all mutable state</strong>: the FIFO stack, heap, data registers, and the privileged CR12\u2013CR15 window. The abstraction lump is unchanged between calls.</li>
+</ul></div>`
             },
             {
                 title: '\u2460 Code Region \u2014 CR14 (CLOOMC)',
@@ -134,9 +163,11 @@ ${this._memMap(null)}
                 title: 'Complete Layout \u2014 NS Slot Metadata',
                 type: 'summary',
                 content: `${this._memMap(null)}
+${this._p2Sizes()}
 <p>The full abstraction lump, from word\u202f0 to allocSize\u202f\u2212\u202f1:</p>
-<table class="sr-table"><tr><th>Region</th><th>Start</th><th>Size</th><th>Defined by</th></tr>
-<tr><td>\u2460 Code</td><td>word\u202f0</td><td>clistStart words</td><td>NS slot\u202fword0_location + (limit+1 \u2212 clistCount)</td></tr>
+<table class="sr-table"><tr><th>Zone</th><th>Start</th><th>Size</th><th>Defined by</th></tr>
+<tr><td>\u2460 Code</td><td>word\u202f0</td><td>codeWords</td><td>compiler (instructions placed from word\u202f0 upward)</td></tr>
+<tr><td>\u00b7\u00b7\u00b7 Freespace</td><td>word\u202fcodeWords</td><td>allocSize \u2212 codeWords \u2212 clistCount</td><td>rounding up to next power-of-2</td></tr>
 <tr><td>\u2461 C-List</td><td>word\u202fclistStart</td><td>clistCount words</td><td>NS slot word1 field clistCount[25:17]</td></tr>
 </table>
 <p>The NS slot holds everything the hardware needs to enter and leave any abstraction:</p>
@@ -147,7 +178,7 @@ ${this._memMap(null)}
 <tr><td>word2 seal</td><td>FNV-32 hash of (location, limit) \u2014 checked on every CALL and RETURN</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">clistStart = allocSize \u2212 clistCount</div>
-<p>The C-List is always packed at the <em>top</em> (highest addresses) of the lump. The Code region fills everything below it. The hardware derives clistStart from allocSize and clistCount at boot (B:04) and on every CALL entry \u2014 there is no separate \u201cpointer\u201d stored anywhere.</p></div>`
+<p>The C-List is always packed at the <em>top</em> (highest addresses) of the lump. The Code region occupies word\u202f0 upward. Any unused words between codeEnd and clistStart are <strong>freespace</strong> \u2014 an inert gap that arises from the power-of-2 lump constraint. The hardware derives clistStart from allocSize and clistCount on every CALL entry \u2014 there is no separate pointer stored anywhere.</p></div>`
             },
             {
                 title: 'Abstraction Lifecycle \u2014 Boot to CALL/RETURN',
