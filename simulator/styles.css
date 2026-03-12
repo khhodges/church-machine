@@ -196,6 +196,38 @@ header h1 {
 .cr-clickable { cursor: pointer; }
 .cr-clickable:hover { background: rgba(96,165,250,0.12) !important; }
 
+.cr-arch   { border-left: 2px solid #c8a020; }
+.cr-system { border-left: 2px solid #e53e3e; background: rgba(229,62,62,0.05); opacity: 0.75; }
+.cr-system.cr-active { opacity: 1; }
+.cr-privil { border-left: 2px solid #805ad5; background: rgba(128,90,213,0.06); }
+
+.cr-role-badge {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 1px 4px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.cr-role-arch   { background: rgba(200,160,32,0.18); color: #c8a020; }
+.cr-role-prog   { background: rgba(96,165,250,0.10); color: #60a5fa; }
+.cr-role-system { background: rgba(229,62,62,0.18);  color: #fc8181; }
+.cr-role-privil { background: rgba(128,90,213,0.22); color: #b794f4; }
+
+.cr-separator td {
+    padding: 2px 0.4rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: rgba(255,255,255,0.03);
+}
+
 .clist-clickable { cursor: pointer; transition: background 0.15s; }
 .clist-clickable:hover { background: rgba(96,165,250,0.15) !important; }
 .clist-selected { background: rgba(96,165,250,0.22) !important; border-left: 2px solid var(--church-blue); }

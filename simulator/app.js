@@ -241,24 +241,52 @@ function updateCRDisplay() {
     const container = document.getElementById('crRegs');
     if (!container) return;
     const localNames = {
-        6: 'C-List', 7: 'CLOOMC', 8: 'Thread', 9: 'IRQ', 10: 'Fault', 15: 'Namespace'
+        0: 'Return', 1: 'Arg 1', 6: 'C-List',
+        12: 'Fault', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
     };
+    const crMeta = {
+        0:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
+        1:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
+        2:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        3:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        4:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        5:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        6:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
+        7:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        8:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        9:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        10: { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        11: { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        12: { group: 'system', role: 'system', badge: 'System' },
+        13: { group: 'system', role: 'system', badge: 'System' },
+        14: { group: 'privil', role: 'privil', badge: 'Priv'   },
+        15: { group: 'privil', role: 'privil', badge: 'Priv'   },
+    };
+    const COLS = 14;
     let html = '<table class="cr-table"><thead><tr>';
-    html += '<th>CR</th><th>M</th><th>Local Name</th>';
+    html += '<th>CR</th><th>M</th><th>Name</th><th>Role</th>';
     html += '<th>word0: GT</th><th>Perms</th><th>Ver</th><th>Idx</th><th>Type</th>';
     html += '<th>word1: Location</th>';
     html += '<th>word2: B</th><th>F</th><th>Limit[16:0]</th>';
     html += '<th>word3: Ver</th><th>FNV Seal</th>';
     html += '</tr></thead><tbody>';
     for (let i = 0; i < 16; i++) {
+        if (i === 12) {
+            html += `<tr class="cr-separator"><td colspan="${COLS + 1}">&#9472;&#9472; System-wide hidden (not in GT zone) &#9472;&#9472;</td></tr>`;
+        } else if (i === 14) {
+            html += `<tr class="cr-separator"><td colspan="${COLS + 1}">&#9472;&#9472; Per-thread privileged (saved by CHANGE) &#9472;&#9472;</td></tr>`;
+        }
         const cr = sim.getFormattedCR(i);
         const name = localNames[i] || '';
-        const cls = cr.isNull ? 'cr-null' : 'cr-active';
+        const meta = crMeta[i];
+        const nullCls = cr.isNull ? ' cr-null' : ' cr-active';
+        const groupCls = meta.group === 'system' ? ' cr-system' : meta.group === 'privil' ? ' cr-privil' : (meta.role === 'arch' ? ' cr-arch' : '');
         const clickable = !cr.isNull ? ' cr-clickable' : '';
-        html += `<tr class="${cls}${clickable}" ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
+        html += `<tr class="${nullCls}${groupCls}${clickable}" ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
         html += `<td class="cr-idx">${i}</td>`;
         html += `<td class="cr-m ${cr.mBit ? 'cr-m-set' : ''}">${cr.mBit}</td>`;
         html += `<td class="cr-name">${name}</td>`;
+        html += `<td><span class="cr-role-badge cr-role-${meta.role}">${meta.badge}</span></td>`;
         html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
         html += `<td class="cr-perms">[${cr.perms}]</td>`;
         html += `<td>${cr.gtVersion}</td>`;
@@ -284,7 +312,8 @@ function openCRDetail(crIdx) {
     if (detailTab) {
         const cr = sim.getFormattedCR(crIdx);
         const localNames = {
-            6: 'C-List', 7: 'CLOOMC', 8: 'Thread', 9: 'IRQ', 10: 'Fault', 15: 'Namespace'
+            0: 'Return', 1: 'Arg 1', 6: 'C-List',
+            12: 'Fault', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
         };
         const name = localNames[crIdx] || '';
         detailTab.textContent = `CR${crIdx}${name ? ' \u2014 ' + name : ''}`;
