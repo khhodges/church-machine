@@ -8,7 +8,7 @@ class PipelineVisualizer {
         this.stageData = [];
         this.chainSteps = [];
         this.niaRows = null;
-        this._setMode('full');
+        this._setMode('audit');
     }
 
     setNIA(rows) {
