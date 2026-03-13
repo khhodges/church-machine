@@ -142,29 +142,53 @@ const TangSerial = (function() {
         }
 
         const rxTotal = rxBytes.length;
-        const rxHex = rxBytes.slice(0, 32).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        const rxAscii = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(rxBytes));
-
-        const hasTextOK   = /CHURCH|HALT|OK|DONE|ACK|BOOT|READY/i.test(rxAscii);
-        const hasBinaryAck = rxBytes.length > 0 && rxBytes[0] === 0x06;
-        const echoMatch   = rxTotal >= 4 && rxBytes[0] === (payload[0]) && rxBytes[1] === (payload[1]);
-
         const success = rxTotal > 0;
 
         if (rxTotal === 0) {
             status('No response from FPGA. Check baud rate and reset timing.');
         } else {
-            status(`Received ${rxTotal} byte${rxTotal === 1 ? '' : 's'} from FPGA.`);
-            if (rxHex) status(`  RX[0..${Math.min(rxTotal,32)-1}]: ${rxHex}`);
-            const printable = rxAscii.replace(/[^\x20-\x7E\r\n]/g, '.').trim();
-            if (printable) status(`  ASCII: ${printable.substring(0, 120)}`);
-            if (hasTextOK)   status('  ✓ Recognised boot banner in response.');
-            else if (hasBinaryAck) status('  ✓ Binary ACK (0x06) received.');
-            else if (echoMatch)    status('  ✓ Echo match — FPGA echoed header back.');
-            else status('  Response is binary (no text banner). FPGA is alive.');
+            status(`Received ${rxTotal} bytes from FPGA.`);
         }
 
-        return { success, rxTotal, rxHex, lines: rxAscii.split(/\r?\n/).map(l => l.trim()).filter(Boolean) };
+        return { success, rxTotal, rawBytes: rxBytes };
+    }
+
+    function parseReadback(rawBytes) {
+        // Protocol: every pair is 0xFA <value_byte>
+        // 0xFA 0xFA = escaped literal 0xFA in the data stream.
+        const vals = [];
+        let i = 0;
+        while (i < rawBytes.length) {
+            if (rawBytes[i] === 0xFA) {
+                if (i + 1 < rawBytes.length) {
+                    vals.push(rawBytes[i + 1]);
+                    i += 2;
+                } else {
+                    i++;
+                }
+            } else {
+                i++;
+            }
+        }
+
+        // Group value bytes into 32-bit little-endian words
+        const words = [];
+        for (let j = 0; j + 3 < vals.length; j += 4) {
+            words.push((vals[j] | (vals[j+1] << 8) | (vals[j+2] << 16) | (vals[j+3] << 24)) >>> 0);
+        }
+        const leftover = vals.length % 4;
+
+        // Interpret structure:
+        //  word[0]       = header echo (total words sent, should = 256)
+        //  words[1..16]  = CR0–CR15
+        //  words[17..32] = DR0–DR15
+        //  words[33..]   = additional (NS readback or firmware-specific)
+        const headerEcho = words.length > 0 ? words[0] : null;
+        const crs = words.slice(1, 17);
+        const drs = words.slice(17, 33);
+        const extra = words.slice(33);
+
+        return { vals, words, leftover, headerEcho, crs, drs, extra };
     }
 
     return {
@@ -173,6 +197,7 @@ const TangSerial = (function() {
         connect,
         disconnect,
         uploadToFPGA,
+        parseReadback,
         NS_WORDS,
         CLIST_WORDS,
         TOTAL_WORDS

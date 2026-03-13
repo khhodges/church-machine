@@ -7314,8 +7314,44 @@ async function uploadToTang() {
         );
 
         if (result.success) {
-            con.textContent += '\nUpload complete. FPGA received data and responded.\n';
-            con.textContent += `(${result.rxTotal} bytes back — see RX lines above for detail)\n`;
+            con.textContent += '\nUpload complete. Decoding FPGA readback...\n';
+            const rb = TangSerial.parseReadback(result.rawBytes);
+            const hex = w => '0x' + w.toString(16).toUpperCase().padStart(8, '0');
+            const dec = w => w.toString(10).padStart(10, ' ');
+
+            con.textContent += '─'.repeat(56) + '\n';
+
+            if (rb.headerEcho !== null) {
+                const ok = rb.headerEcho === 256 ? ' ✓' : ' ✗ (expected 256)';
+                con.textContent += `  Header echo: ${rb.headerEcho} words${ok}\n`;
+            }
+
+            if (rb.words.length < 2) {
+                con.textContent += `  ${rb.vals.length} value bytes (${rb.words.length} complete words) — too short for register decode.\n`;
+                con.textContent += `  Raw values: ${rb.vals.slice(0, 64).map(b => b.toString(16).padStart(2,'0')).join(' ')}\n`;
+            } else {
+                if (rb.crs.length > 0) {
+                    con.textContent += '\n  Context Registers:\n';
+                    for (let i = 0; i < rb.crs.length; i++) {
+                        const priv = i >= 12 ? ' [priv]' : '';
+                        const label = ('CR' + i).padEnd(4);
+                        con.textContent += `    ${label}  ${hex(rb.crs[i])}  ${dec(rb.crs[i])}${priv}\n`;
+                    }
+                }
+                if (rb.drs.length > 0) {
+                    con.textContent += '\n  Data Registers:\n';
+                    for (let i = 0; i < rb.drs.length; i++) {
+                        const label = ('DR' + i).padEnd(4);
+                        con.textContent += `    ${label}  ${hex(rb.drs[i])}  ${dec(rb.drs[i])}\n`;
+                    }
+                }
+                if (rb.extra.length > 0) {
+                    con.textContent += `\n  Additional words: ${rb.extra.length}`;
+                    con.textContent += ` (${rb.vals.length} value bytes total, ${rb.leftover} leftover)\n`;
+                }
+            }
+
+            con.textContent += '─'.repeat(56) + '\n';
         } else {
             con.textContent += '\nNo response from FPGA after sending data.\n\n';
             con.textContent += 'TIPS:\n';
