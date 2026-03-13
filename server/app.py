@@ -3,6 +3,8 @@ import json
 import logging
 import uuid
 import base64
+import mimetypes
+import gzip as _gzip
 import requests as http_requests
 from flask import Flask, jsonify, send_from_directory, redirect, make_response, request
 from flask_sqlalchemy import SQLAlchemy
@@ -32,6 +34,38 @@ DOCS_DIR = os.path.join(BASE_DIR, "docs")
 
 BOOT_ID = str(uuid.uuid4())
 
+_COMPRESSIBLE = ('javascript', 'css', 'html', 'json', 'text/')
+
+def _serve_file(filepath, filename):
+    """Read a file from disk and return a gzip-compressed response with ETag support."""
+    if not os.path.isfile(filepath):
+        return make_response("Not found", 404)
+    stat = os.stat(filepath)
+    etag = f'"{int(stat.st_mtime)}-{stat.st_size}"'
+    if request.headers.get('If-None-Match') == etag:
+        resp = make_response('', 304)
+        resp.headers['ETag'] = etag
+        return resp
+    ct = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+    with open(filepath, 'rb') as f:
+        data = f.read()
+    ae = request.headers.get('Accept-Encoding', '')
+    if 'gzip' in ae and len(data) >= 1024 and any(x in ct for x in _COMPRESSIBLE):
+        compressed = _gzip.compress(data, compresslevel=6)
+        if len(compressed) < len(data):
+            resp = make_response(compressed)
+            resp.headers['Content-Type'] = ct
+            resp.headers['Content-Encoding'] = 'gzip'
+            resp.headers['Content-Length'] = len(compressed)
+            resp.headers['Vary'] = 'Accept-Encoding'
+            resp.headers['ETag'] = etag
+            return resp
+    resp = make_response(data)
+    resp.headers['Content-Type'] = ct
+    resp.headers['Content-Length'] = len(data)
+    resp.headers['ETag'] = etag
+    return resp
+
 @app.after_request
 def add_cache_control(response):
     if response.content_type and (
@@ -39,7 +73,7 @@ def add_cache_control(response):
         or "text/css" in response.content_type
         or "text/html" in response.content_type
     ):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     response.headers["Permissions-Policy"] = "serial=(self)"
@@ -59,17 +93,15 @@ def boot_id():
 
 @app.route("/simulator/")
 def simulator_index():
-    if os.path.isfile(os.path.join(SIMULATOR_DIR, "index.html")):
-        resp = make_response(send_from_directory(SIMULATOR_DIR, "index.html"))
-        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        return resp
+    filepath = os.path.join(SIMULATOR_DIR, "index.html")
+    if os.path.isfile(filepath):
+        return _serve_file(filepath, "index.html")
     return jsonify({"status": "simulator not yet built"})
 
 @app.route("/simulator/<path:path>")
 def simulator_static(path):
-    resp = make_response(send_from_directory(SIMULATOR_DIR, path))
-    resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    return resp
+    filepath = os.path.join(SIMULATOR_DIR, path)
+    return _serve_file(filepath, os.path.basename(path))
 
 @app.route("/docs/figures/<path:path>")
 def docs_figures(path):
