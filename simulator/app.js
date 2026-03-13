@@ -81,6 +81,7 @@ function init() {
     pipelineViz.render();
     showWelcomePopup();
     initTooltipAutoFlip();
+    hideLoadingOverlay();
 }
 
 function initTooltipAutoFlip() {
@@ -204,6 +205,13 @@ function switchDashTab(tabId) {
     if (panel) panel.classList.add('active');
 
     updateDashboard();
+}
+
+function hideLoadingOverlay() {
+    const el = document.getElementById('appLoading');
+    if (!el) return;
+    el.classList.add('hidden');
+    setTimeout(() => { el.style.display = 'none'; }, 300);
 }
 
 const BOOT_STEP_NAMES = ['FAULT_RST','LOAD_NS','INIT_THRD','INIT_ABSTR','LOAD_NUC','COMPLETE'];

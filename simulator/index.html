@@ -6,8 +6,46 @@
     <title>Church Machine IDE</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .app-loading {
+            position: fixed; inset: 0; z-index: 99999;
+            background: #08080f;
+            display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.25s ease;
+        }
+        .app-loading.hidden { opacity: 0; pointer-events: none; }
+        .app-loading-inner { text-align: center; }
+        .app-loading-logo {
+            font-family: Georgia, serif; font-size: 4rem; color: #daa520;
+            line-height: 1; margin-bottom: 0.4rem;
+            animation: app-pulse 1.4s ease-in-out infinite;
+        }
+        .app-loading-text {
+            font-family: Georgia, serif; font-size: 1rem; color: #888;
+            letter-spacing: 0.12em; margin-bottom: 1.2rem;
+        }
+        .app-loading-bar {
+            width: 160px; height: 2px; background: #1a1a2e;
+            border-radius: 2px; overflow: hidden; margin: 0 auto;
+        }
+        .app-loading-bar-fill {
+            height: 100%; width: 40%;
+            background: linear-gradient(90deg, transparent, #daa520, transparent);
+            animation: app-slide 1.4s ease-in-out infinite;
+        }
+        @keyframes app-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+        @keyframes app-slide { 0%{transform:translateX(-200%)} 100%{transform:translateX(450%)} }
+    </style>
 </head>
 <body>
+    <div id="appLoading" class="app-loading">
+        <div class="app-loading-inner">
+            <div class="app-loading-logo">λ</div>
+            <div class="app-loading-text">Church Machine</div>
+            <div class="app-loading-bar"><div class="app-loading-bar-fill"></div></div>
+        </div>
+    </div>
+    <script>setTimeout(function(){var e=document.getElementById('appLoading');if(e&&!e.classList.contains('hidden')){e.classList.add('hidden');setTimeout(function(){e.style.display='none'},300);}},8000);</script>
     <div class="fixed-toolbar">
         <header>
             <h1>Church Machine</h1>
