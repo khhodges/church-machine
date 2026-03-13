@@ -107,7 +107,9 @@ function checkBootId() {
                 localStorage.removeItem('churchMachine_toolGuide_hp35');
                 localStorage.removeItem('churchMachine_toolGuide_abacus');
                 localStorage.removeItem('churchMachine_toolGuide_sliderule');
-                showWelcomePopup();
+                if (!sessionStorage.getItem('church_welcome_dismissed_session')) {
+                    showWelcomePopup();
+                }
             }
             localStorage.setItem('churchMachine_bootId', data.bootId);
         })
@@ -6596,6 +6598,7 @@ function closeWelcome() {
         localStorage.setItem('church_welcome_dismissed_perm', '1');
     }
     localStorage.setItem('church_welcome_dismissed', '1');
+    sessionStorage.setItem('church_welcome_dismissed_session', '1');
     const modal = document.getElementById('welcomeModal');
     if (modal) modal.style.display = 'none';
     const welcomeBody = document.getElementById('welcomeBody');
