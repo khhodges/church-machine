@@ -46,7 +46,7 @@ const TangSerial = (function() {
         }
 
         port = await navigator.serial.requestPort({
-            filters: [{ usbVendorId: 0x0403 }]
+            filters: []
         });
         await ensureOpen();
     }

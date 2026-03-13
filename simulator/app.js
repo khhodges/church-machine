@@ -7245,12 +7245,12 @@ async function uploadToTang() {
     const con = document.getElementById('editorConsole');
     if (!con) return;
 
-    if (typeof PicoSerial === 'undefined') {
+    if (typeof TangSerial === 'undefined') {
         con.textContent = 'Error: WebSerial module not loaded (webserial.js missing)';
         return;
     }
 
-    if (!PicoSerial.isSupported()) {
+    if (!TangSerial.isSupported()) {
         con.textContent = 'WebSerial is not supported in this browser.\nUse Chrome or Edge to upload to Tang Nano 20K.';
         return;
     }
@@ -7259,11 +7259,11 @@ async function uploadToTang() {
         const image = sim.exportHardwareImage();
         con.textContent = `Ready: ${image.namespace.length} NS words + ${image.clist.length} C-list words\n\n`;
 
-        if (!PicoSerial.isConnected()) {
+        if (!TangSerial.isConnected()) {
             con.textContent += 'Select the FPGA UART port when prompted...\n';
             con.textContent += '(Choose the Tang Nano 20K serial port)\n\n';
             try {
-                await PicoSerial.connect();
+                await TangSerial.connect();
             } catch(e) {
                 if (e.name === 'NotFoundError') {
                     con.textContent += 'No port selected. Cancelled.\n';
@@ -7280,7 +7280,7 @@ async function uploadToTang() {
 
         con.textContent += 'Port connected. Sending data...\n';
 
-        const result = await PicoSerial.uploadToFPGA(
+        const result = await TangSerial.uploadToFPGA(
             image.namespace,
             image.clist,
             function(msg) {
