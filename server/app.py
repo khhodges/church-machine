@@ -560,7 +560,7 @@ def download_fpga_package():
             }), 500
 
         if not os.path.isfile(rtlil_path):
-            return jsonify({"error": "RTLIL file not generated"}), 500
+            return jsonify({"error": "RTLIL file not generated", "stderr": ""}), 500
 
         logging.info("FPGA package: running Yosys synthesis (RTLIL -> JSON + Verilog)...")
         synth_cmd = (
@@ -580,22 +580,24 @@ def download_fpga_package():
             }), 500
 
         if not os.path.isfile(json_path):
-            return jsonify({"error": "Yosys JSON netlist not generated"}), 500
+            return jsonify({"error": "Yosys JSON netlist not generated", "stderr": ""}), 500
         if not os.path.isfile(verilog_path):
-            return jsonify({"error": "Yosys Verilog output not generated"}), 500
+            return jsonify({"error": "Yosys Verilog output not generated", "stderr": ""}), 500
+
+        cst_path = os.path.join(hw_dir, "tang_nano_20k.cst")
+        if not os.path.isfile(cst_path):
+            return jsonify({"error": "Pin constraints file (tang_nano_20k.cst) not found", "stderr": ""}), 500
+
+        makefile_path = os.path.join(hw_dir, "Makefile")
+        if not os.path.isfile(makefile_path):
+            return jsonify({"error": "Makefile not found in hardware/", "stderr": ""}), 500
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(verilog_path, "church_tang_nano_20k.v")
             zf.write(json_path, "church_tang_nano_20k.json")
-
-            cst_path = os.path.join(hw_dir, "tang_nano_20k.cst")
-            if os.path.isfile(cst_path):
-                zf.write(cst_path, "tang_nano_20k.cst")
-
-            makefile_path = os.path.join(hw_dir, "Makefile")
-            if os.path.isfile(makefile_path):
-                zf.write(makefile_path, "Makefile")
+            zf.write(cst_path, "tang_nano_20k.cst")
+            zf.write(makefile_path, "Makefile")
 
             zf.writestr("BUILD.md", BUILD_MD_TEMPLATE)
 
@@ -609,10 +611,10 @@ def download_fpga_package():
         return resp
 
     except subprocess.TimeoutExpired:
-        return jsonify({"error": "Build timed out (120s limit)"}), 500
+        return jsonify({"error": "Build timed out (120s limit)", "stderr": ""}), 500
     except Exception as e:
         logging.exception("FPGA package generation failed")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "stderr": ""}), 500
 
 with app.app_context():
     import sys
