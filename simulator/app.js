@@ -7456,7 +7456,9 @@ async function downloadFPGAPackage() {
             con.textContent += 'Next steps:\n';
             con.textContent += '  1. Unzip the package\n';
             con.textContent += '  2. Install OSS CAD Suite (oss-cad-suite-build on GitHub)\n';
-            con.textContent += '  3. Run: make pnr pack prog\n';
+            con.textContent += '  3. Run: make pnr pack\n';
+            con.textContent += '  4. Run: make prog\n';
+            con.textContent += '  5. Upload to Tang Nano 20K via Deploy to Tang in this IDE\n';
         }
     } catch (e) {
         if (con) con.textContent += '\nError: ' + e.message + '\n';

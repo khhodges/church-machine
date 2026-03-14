@@ -492,7 +492,10 @@ BUILD_MD_TEMPLATE = """# Church Machine — Tang Nano 20K Build Package
 ## Prerequisites
 
 ```bash
+# Linux
 curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-linux-x64.tgz | tar xz
+# macOS (Apple Silicon)
+# curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-darwin-arm64.tgz | tar xz
 source oss-cad-suite/environment
 ```
 
