@@ -7422,7 +7422,7 @@ async function downloadFPGAPackage() {
     const con = document.getElementById('editorConsole');
     const btn = document.getElementById('btnFPGAPkg');
     if (con) con.textContent = 'Generating FPGA build package...\nThis runs Amaranth + Yosys synthesis (may take 30-60 seconds).\n';
-    if (btn) { btn.disabled = true; btn.textContent = 'Building...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Building...'; }
 
     try {
         const resp = await fetch('/api/download/fpga-package');
@@ -7463,7 +7463,7 @@ async function downloadFPGAPackage() {
     } catch (e) {
         if (con) con.textContent += '\nError: ' + e.message + '\n';
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Download FPGA Package'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Download FPGA Package'; }
     }
 }
 

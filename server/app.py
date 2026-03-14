@@ -513,7 +513,7 @@ make prog        # flash to Tang Nano 20K via openFPGALoader (USB-C)
 1. Open the Church Machine IDE in **Chrome or Edge** (WebSerial required)
 2. Plug in the Tang Nano 20K via USB-C
 3. Go to the **Code** tab → **Console Output** sub-tab
-4. Click **Deploy to Tang** to upload your program via WebSerial at 115200 baud
+4. Click **Upload to Tang Nano 20K** to send your program via WebSerial at 115200 baud
 
 ## LED Pinout (active-low)
 
