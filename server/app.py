@@ -491,12 +491,8 @@ BUILD_MD_TEMPLATE = """# Church Machine — Tang Nano 20K Build Package
 
 ## Prerequisites
 
-Install OSS CAD Suite (provides nextpnr-gowin, gowin_pack, openFPGALoader):
-
 ```bash
-# Linux / macOS — download latest release:
-# https://github.com/YosysHQ/oss-cad-suite-build/releases/latest
-tar xzf oss-cad-suite-*.tgz
+curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-linux-x64.tgz | tar xz
 source oss-cad-suite/environment
 ```
 
@@ -509,12 +505,12 @@ make pnr pack    # place-and-route (nextpnr-gowin) + generate .fs bitstream (gow
 make prog        # flash to Tang Nano 20K via openFPGALoader (USB-C)
 ```
 
-## After Flashing
+## Upload to Tang Nano 20K
 
 1. Open the Church Machine IDE in **Chrome or Edge** (WebSerial required)
 2. Plug in the Tang Nano 20K via USB-C
 3. Go to the **Code** tab → **Console Output** sub-tab
-4. Click **Deploy to Tang** to upload your program
+4. Click **Deploy to Tang** to upload your program via WebSerial at 115200 baud
 
 ## LED Pinout (active-low)
 
@@ -522,10 +518,10 @@ make prog        # flash to Tang Nano 20K via openFPGALoader (USB-C)
 |-----|-----|-------------------|
 | 0   | 15  | Boot in progress  |
 | 1   | 16  | Running / blink   |
-| 2   | 17  | Fault             |
-| 3   | 18  | Boot complete inv |
-| 4   | 19  | Halted            |
-| 5   | 20  | Stepping          |
+| 2   | 10  | Fault             |
+| 3   | 11  | Boot complete inv |
+| 4   | 13  | Halted            |
+| 5   | 14  | Stepping          |
 
 ## Device
 
