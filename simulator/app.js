@@ -58,6 +58,7 @@ function deleteUserTab(id) {
         if (sel) showIntro(sel.value);
     }
     renderUserTabs();
+    updateSaveUserTabBtn();
 }
 
 function selectUserTab(id) {
@@ -77,6 +78,7 @@ function selectUserTab(id) {
     }
     document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
     renderUserTabs();
+    updateSaveUserTabBtn();
     updateLineNumbers();
     const outputEl = document.getElementById('assemblyOutput');
     if (outputEl) outputEl.innerHTML = '';
@@ -93,12 +95,19 @@ function saveActiveUserTab() {
     userTabDirty = false;
     saveUserTabsToStorage();
     renderUserTabs();
+    updateSaveUserTabBtn();
+}
+
+function updateSaveUserTabBtn() {
+    const btn = document.getElementById('btnSaveUserTab');
+    if (btn) btn.disabled = !activeUserTabId || !userTabDirty;
 }
 
 function markUserTabDirty() {
     if (activeUserTabId && !userTabDirty) {
         userTabDirty = true;
         renderUserTabs();
+        updateSaveUserTabBtn();
     }
 }
 
@@ -278,6 +287,7 @@ function switchView(viewId) {
         if (asmEd) asmEd.value = '';
         document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
         renderUserTabs();
+        updateSaveUserTabBtn();
         const outputEl = document.getElementById('assemblyOutput');
         if (outputEl) outputEl.innerHTML = '';
         const sel = document.getElementById('langSelector');
@@ -3648,6 +3658,7 @@ function loadExample(name) {
     activeUserTabId = null;
     userTabDirty = false;
     renderUserTabs();
+    updateSaveUserTabBtn();
 
     const examples = {
         'ada_note_g': `; ============================================
@@ -8870,15 +8881,6 @@ function onLangChange(restoring) {
         });
     }
 
-    const utContainer = document.getElementById('userTabsContainer');
-    if (utContainer) {
-        utContainer.querySelectorAll('.user-tab').forEach(btn => {
-            const tabId = btn.getAttribute('data-tab-id');
-            const tab = userTabs.find(t => t.id === tabId);
-            if (tab) btn.style.display = tab.lang === lang ? '' : 'none';
-        });
-    }
-
     if (activeUserTabId) {
         const activeTab = userTabs.find(t => t.id === activeUserTabId);
         if (activeTab) { activeTab.lang = lang; saveUserTabsToStorage(); }
@@ -9239,6 +9241,7 @@ function loadCLOOMCExample(name) {
     activeUserTabId = null;
     userTabDirty = false;
     renderUserTabs();
+    updateSaveUserTabBtn();
 
     const examples = {
         'memory': `// ── Memory Allocator using CR5 Instance Data ──

@@ -142,6 +142,7 @@
                     <div class="toolbar-phase">
                         <span class="phase-label">Install</span>
                         <button class="btn" onclick="saveUploadJSON()" style="background:#2a6fdb;color:#fff;border:none;" data-tooltip="Save Upload JSON — Compile and save the upload.json deployment file">Save Upload JSON</button>
+                        <button class="btn" onclick="saveActiveUserTab()" id="btnSaveUserTab" disabled style="background:#1976d2;color:#fff;border:none;" data-tooltip="Save Program — Save the current user program (Ctrl+S)">Save Program</button>
                         <button class="btn btn-primary" onclick="showSaveToNamespace()" id="btnSaveNS" disabled data-tooltip="Save to NS — Save the assembled program as a namespace entry">Save to NS</button>
                         <button class="btn btn-deploy" onclick="downloadHardwareImage()" data-tooltip="Download .bin — Download binary image for Tang Nano 20K hardware">Download .bin</button>
                         <button class="btn btn-deploy" onclick="downloadFPGAPackage()" id="btnFPGAPkg" data-tooltip="Download FPGA Package — Verilog + synthesis + build files for Tang Nano 20K">Download FPGA Package</button>
