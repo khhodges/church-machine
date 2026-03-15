@@ -8887,26 +8887,28 @@ function onLangChange(restoring) {
     }
 
     if (!restoring) {
-        const defaults = {
-            english: 'english_hello',
-            assembly: 'selftest',
-            javascript: 'hello',
-            haskell: 'church_math',
-            symbolic: 'ada_note_g',
-            lambda: 'lambda_church'
-        };
-        const defaultExample = defaults[lang];
-        if (defaultExample) {
-            if (lang === 'assembly') {
-                loadExample(defaultExample);
-            } else {
-                loadCLOOMCExample(defaultExample);
+        if (!activeUserTabId) {
+            const defaults = {
+                english: 'english_hello',
+                assembly: 'selftest',
+                javascript: 'hello',
+                haskell: 'church_math',
+                symbolic: 'ada_note_g',
+                lambda: 'lambda_church'
+            };
+            const defaultExample = defaults[lang];
+            if (defaultExample) {
+                if (lang === 'assembly') {
+                    loadExample(defaultExample);
+                } else {
+                    loadCLOOMCExample(defaultExample);
+                }
             }
+            showIntro(lang);
         }
         if (typeof historyShowLanguageStory === 'function') historyShowLanguageStory(lang);
         const syntaxPanel = document.getElementById('codeSyntaxPanel');
         if (syntaxPanel && syntaxPanel.style.display !== 'none') renderSyntaxRef(lang);
-        showIntro(lang);
     }
 }
 
