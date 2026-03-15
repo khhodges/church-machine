@@ -183,7 +183,22 @@
                         <button class="example-tab" onclick="loadCLOOMCExample('lambda_fixedpoint')" data-example="cloomc_lambda_fixedpoint" style="color:#81c784;" data-tooltip="LC: Fixed-Pt — Fixed-point decimal arithmetic in Lambda Calculus">LC: Fixed-Pt</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('lambda_rational')" data-example="cloomc_lambda_rational" style="color:#81c784;" data-tooltip="LC: Rational — Exact rational number arithmetic in Lambda Calculus">LC: Rational</button>
                     </div>
+                    <div id="userTabsContainer" class="user-tabs-container"></div>
+                    <button class="new-tab-btn" onclick="showNewTabDialog()" data-tooltip="New Program — Create a new blank program tab">+</button>
                     <button class="example-arrow" onclick="scrollExamples(1)" data-tooltip="Scroll Right — See more examples">&rsaquo;</button>
+                </div>
+                <div id="newTabDialog" class="new-tab-dialog" style="display:none;">
+                    <input type="text" id="newTabName" class="new-tab-input" placeholder="Program name" maxlength="32" onkeydown="if(event.key==='Enter')confirmNewTab();if(event.key==='Escape')hideNewTabDialog();">
+                    <select id="newTabLang" class="lang-selector new-tab-lang">
+                        <option value="english">English</option>
+                        <option value="symbolic">Symbolic Math</option>
+                        <option value="assembly">Assembly</option>
+                        <option value="javascript">JS (CLOOMC++)</option>
+                        <option value="haskell">Haskell (CLOOMC++)</option>
+                        <option value="lambda">Lambda Calculus</option>
+                    </select>
+                    <button class="btn btn-primary new-tab-create" onclick="confirmNewTab()">Create</button>
+                    <button class="btn new-tab-cancel" onclick="hideNewTabDialog()">Cancel</button>
                 </div>
                 <div class="code-editor-wrap">
                     <div class="line-numbers" id="lineNumbers"></div>

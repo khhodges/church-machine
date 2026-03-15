@@ -18,6 +18,140 @@ let abstractionRegistry = null;
 let systemAbstractions = null;
 let deviceAbstractions = null;
 
+let userTabs = [];
+let activeUserTabId = null;
+let userTabDirty = false;
+
+function loadUserTabs() {
+    try {
+        const raw = localStorage.getItem('church_user_tabs');
+        userTabs = raw ? JSON.parse(raw) : [];
+    } catch (e) { userTabs = []; }
+}
+
+function saveUserTabsToStorage() {
+    localStorage.setItem('church_user_tabs', JSON.stringify(userTabs));
+}
+
+function generateTabId() {
+    return 'ut_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+}
+
+function createUserTab(name, lang) {
+    const tab = { id: generateTabId(), name: name, lang: lang || 'assembly', code: '' };
+    userTabs.push(tab);
+    saveUserTabsToStorage();
+    renderUserTabs();
+    selectUserTab(tab.id);
+    return tab;
+}
+
+function deleteUserTab(id) {
+    userTabs = userTabs.filter(t => t.id !== id);
+    saveUserTabsToStorage();
+    if (activeUserTabId === id) {
+        activeUserTabId = null;
+        userTabDirty = false;
+        const editor = document.getElementById('asmEditor');
+        if (editor) editor.value = '';
+        const sel = document.getElementById('langSelector');
+        if (sel) showIntro(sel.value);
+    }
+    renderUserTabs();
+}
+
+function selectUserTab(id) {
+    if (activeUserTabId && userTabDirty) {
+        saveActiveUserTab();
+    }
+    const tab = userTabs.find(t => t.id === id);
+    if (!tab) return;
+    activeUserTabId = id;
+    userTabDirty = false;
+    const editor = document.getElementById('asmEditor');
+    if (editor) editor.value = tab.code;
+    const sel = document.getElementById('langSelector');
+    if (sel && sel.value !== tab.lang) {
+        sel.value = tab.lang;
+        onLangChange(true);
+    }
+    document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+    renderUserTabs();
+    updateLineNumbers();
+    const outputEl = document.getElementById('assemblyOutput');
+    if (outputEl) outputEl.innerHTML = '';
+}
+
+function saveActiveUserTab() {
+    if (!activeUserTabId) return;
+    const tab = userTabs.find(t => t.id === activeUserTabId);
+    if (!tab) return;
+    const editor = document.getElementById('asmEditor');
+    if (editor) tab.code = editor.value;
+    const sel = document.getElementById('langSelector');
+    if (sel) tab.lang = sel.value;
+    userTabDirty = false;
+    saveUserTabsToStorage();
+    renderUserTabs();
+}
+
+function markUserTabDirty() {
+    if (activeUserTabId && !userTabDirty) {
+        userTabDirty = true;
+        renderUserTabs();
+    }
+}
+
+function renderUserTabs() {
+    const container = document.getElementById('userTabsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    userTabs.forEach(tab => {
+        const btn = document.createElement('button');
+        btn.className = 'example-tab user-tab' + (activeUserTabId === tab.id ? ' active' : '');
+        btn.setAttribute('data-tab-id', tab.id);
+        const label = tab.name + (activeUserTabId === tab.id && userTabDirty ? ' \u25CF' : '');
+        btn.innerHTML = '<span class="user-tab-label">' + label + '</span><span class="user-tab-close" title="Close tab">\u00D7</span>';
+        btn.querySelector('.user-tab-label').addEventListener('click', () => selectUserTab(tab.id));
+        btn.querySelector('.user-tab-close').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('Delete program "' + tab.name + '"?')) deleteUserTab(tab.id);
+        });
+        container.appendChild(btn);
+    });
+}
+
+function showNewTabDialog() {
+    const dialog = document.getElementById('newTabDialog');
+    if (!dialog) return;
+    dialog.style.display = 'flex';
+    const nameInput = document.getElementById('newTabName');
+    if (nameInput) { nameInput.value = ''; nameInput.focus(); }
+    const langSel = document.getElementById('newTabLang');
+    const mainSel = document.getElementById('langSelector');
+    if (langSel && mainSel) langSel.value = mainSel.value;
+}
+
+function hideNewTabDialog() {
+    const dialog = document.getElementById('newTabDialog');
+    if (dialog) dialog.style.display = 'none';
+}
+
+function confirmNewTab() {
+    const nameInput = document.getElementById('newTabName');
+    const langSel = document.getElementById('newTabLang');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name) { alert('Please enter a program name.'); return; }
+    const lang = langSel ? langSel.value : 'assembly';
+    hideNewTabDialog();
+    const sel = document.getElementById('langSelector');
+    if (sel && sel.value !== lang) {
+        sel.value = lang;
+        onLangChange(true);
+    }
+    createUserTab(name, lang);
+}
+
 function init() {
     sim = new ChurchSimulator();
     assembler = new ChurchAssembler();
@@ -42,13 +176,15 @@ function init() {
     sim.on('fault', (f) => { appendOutput(`FAULT [${f.type}]: ${f.message}`, 'error'); showFaultModal(f); });
     sim.on('halt', () => appendOutput('Machine halted.', 'info'));
 
+    loadUserTabs();
     loadEditorState();
+    renderUserTabs();
     initReplDivider();
     initEditorDivider();
     initConsoleAutoSwitch();
     const asmEd = document.getElementById('asmEditor');
     if (asmEd) {
-        asmEd.addEventListener('input', updateLineNumbers);
+        asmEd.addEventListener('input', function() { updateLineNumbers(); markUserTabDirty(); });
         asmEd.addEventListener('scroll', syncLineScroll);
         asmEd.addEventListener('keydown', function(e) {
             if (e.key === 'Tab') {
@@ -57,6 +193,11 @@ function init() {
                 this.value = this.value.substring(0, s) + '    ' + this.value.substring(end);
                 this.selectionStart = this.selectionEnd = s + 4;
                 updateLineNumbers();
+                markUserTabDirty();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (activeUserTabId) saveActiveUserTab();
             }
         });
     }
@@ -130,9 +271,13 @@ function switchView(viewId) {
     if (viewId === 'pipeline') pipelineViz.render();
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
     if (viewId === 'editor') {
+        if (activeUserTabId && userTabDirty) saveActiveUserTab();
+        activeUserTabId = null;
+        userTabDirty = false;
         const asmEd = document.getElementById('asmEditor');
         if (asmEd) asmEd.value = '';
         document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+        renderUserTabs();
         const outputEl = document.getElementById('assemblyOutput');
         if (outputEl) outputEl.innerHTML = '';
         const sel = document.getElementById('langSelector');
@@ -3499,6 +3644,10 @@ function closeGitHubConsole() {
 function loadExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    if (activeUserTabId && userTabDirty) saveActiveUserTab();
+    activeUserTabId = null;
+    userTabDirty = false;
+    renderUserTabs();
 
     const examples = {
         'ada_note_g': `; ============================================
@@ -8713,12 +8862,26 @@ function onLangChange(restoring) {
 
     const scroll = document.getElementById('exampleTabsScroll');
     if (scroll) {
-        const tabs = scroll.querySelectorAll('.example-tab');
+        const tabs = scroll.querySelectorAll('.example-tab:not(.user-tab)');
         const allowedSet = langExampleGroups[lang] || [];
         tabs.forEach(tab => {
             const ex = tab.getAttribute('data-example');
             tab.style.display = allowedSet.includes(ex) ? '' : 'none';
         });
+    }
+
+    const utContainer = document.getElementById('userTabsContainer');
+    if (utContainer) {
+        utContainer.querySelectorAll('.user-tab').forEach(btn => {
+            const tabId = btn.getAttribute('data-tab-id');
+            const tab = userTabs.find(t => t.id === tabId);
+            if (tab) btn.style.display = tab.lang === lang ? '' : 'none';
+        });
+    }
+
+    if (activeUserTabId) {
+        const activeTab = userTabs.find(t => t.id === activeUserTabId);
+        if (activeTab) { activeTab.lang = lang; saveUserTabsToStorage(); }
     }
 
     if (!restoring) {
@@ -9072,6 +9235,10 @@ function compileAndCreateAbstraction() {
 function loadCLOOMCExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    if (activeUserTabId && userTabDirty) saveActiveUserTab();
+    activeUserTabId = null;
+    userTabDirty = false;
+    renderUserTabs();
 
     const examples = {
         'memory': `// ── Memory Allocator using CR5 Instance Data ──
