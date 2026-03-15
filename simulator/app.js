@@ -80,6 +80,7 @@ function selectUserTab(id) {
     renderUserTabs();
     updateSaveUserTabBtn();
     updateLineNumbers();
+    if (editor) editor.focus();
     const outputEl = document.getElementById('assemblyOutput');
     if (outputEl) outputEl.innerHTML = '';
 }
@@ -120,9 +121,17 @@ function renderUserTabs() {
         btn.className = 'example-tab user-tab' + (activeUserTabId === tab.id ? ' active' : '');
         btn.setAttribute('data-tab-id', tab.id);
         const label = tab.name + (activeUserTabId === tab.id && userTabDirty ? ' \u25CF' : '');
-        btn.innerHTML = '<span class="user-tab-label">' + label + '</span><span class="user-tab-close" title="Close tab">\u00D7</span>';
-        btn.querySelector('.user-tab-label').addEventListener('click', () => selectUserTab(tab.id));
-        btn.querySelector('.user-tab-close').addEventListener('click', (e) => {
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'user-tab-label';
+        labelSpan.textContent = label;
+        const closeSpan = document.createElement('span');
+        closeSpan.className = 'user-tab-close';
+        closeSpan.title = 'Close tab';
+        closeSpan.textContent = '\u00D7';
+        btn.appendChild(labelSpan);
+        btn.appendChild(closeSpan);
+        labelSpan.addEventListener('click', () => selectUserTab(tab.id));
+        closeSpan.addEventListener('click', (e) => {
             e.stopPropagation();
             if (confirm('Delete program "' + tab.name + '"?')) deleteUserTab(tab.id);
         });
