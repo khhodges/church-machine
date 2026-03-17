@@ -3094,7 +3094,13 @@ function _bootNIARows(bootStep) {
 function stepSim() {
     if (!sim.bootComplete) {
         sim.auditLog = [];
-        sim._bootStep();
+        try {
+            sim._bootStep();
+        } catch(e) {
+            console.error('stepSim _bootStep error:', e);
+            updateDashboard();
+            return;
+        }
         const con = document.getElementById('editorConsole');
         if (con) {
             con.textContent += `\n[boot ${sim.bootStep}/6] ${sim.output.split('\n').filter(l => l).pop()}`;
@@ -3114,7 +3120,14 @@ function stepSim() {
         updateDashboard();
         return;
     }
-    const result = sim.step();
+    let result;
+    try {
+        result = sim.step();
+    } catch(e) {
+        console.error('stepSim step error:', e);
+        updateDashboard();
+        return;
+    }
     if (result) {
         const con = document.getElementById('editorConsole');
         if (con) {
@@ -3190,6 +3203,10 @@ function walkNext() {
                 walkRunning = false;
                 updateDashboard();
             }
+        }).catch(err => {
+            console.error('walkNext animate error:', err);
+            walkRunning = false;
+            updateDashboard();
         });
     } else {
         updateDashboard();
@@ -3245,9 +3262,22 @@ function slowBoot() {
 
 function runSim() {
     while (!sim.bootComplete) {
-        sim._bootStep();
+        try {
+            sim._bootStep();
+        } catch(e) {
+            console.error('runSim _bootStep error:', e);
+            updateDashboard();
+            return;
+        }
     }
-    const steps = sim.run(10000);
+    let steps;
+    try {
+        steps = sim.run(10000);
+    } catch(e) {
+        console.error('runSim run error:', e);
+        updateDashboard();
+        return;
+    }
     const con = document.getElementById('editorConsole');
     if (con) {
         let status = 'Stopped.';
