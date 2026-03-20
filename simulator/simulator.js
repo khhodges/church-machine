@@ -1079,8 +1079,8 @@ class ChurchSimulator {
             this.fault('TYPE', `CALL: CR${d.crDst} GT type is NULL — cannot CALL a NULL GT`);
             return;
         }
-        if (srcParsed.type !== 1 && srcParsed.type !== 3) {
-            this.fault('TYPE', `CALL: CR${d.crDst} GT type is ${srcParsed.typeName}, must be Inform or Abstract`);
+        if (srcParsed.type !== 1 && srcParsed.type !== 2) {
+            this.fault('TYPE', `CALL: CR${d.crDst} GT type is ${srcParsed.typeName}, must be Real or Abstract`);
             return null;
         }
         const check = this.mLoad(sourceGT, 'E', d.crDst);
@@ -1133,7 +1133,7 @@ class ChurchSimulator {
             const allocSize = limit + 1;
             const clistStart = allocSize - clistCount;
 
-            const cr7GT = this.createGT(srcParsed.version, check.index, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
+            const cr7GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
             const cr7Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
             this.cr[7] = {
                 word0: cr7GT,
@@ -1143,7 +1143,7 @@ class ChurchSimulator {
                 m: this.mElevation ? 1 : 0
             };
 
-            const cr6GT = this.createGT(srcParsed.version, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
             const cr6Word1 = this.packNSWord1(clistCount - 1, 0, 0, 0, 0, 1, 0);
             this.cr[6] = {
                 word0: cr6GT,
@@ -1191,7 +1191,7 @@ class ChurchSimulator {
             const cr1GT = this.cr[1].word0;
             if (cr1GT !== 0) {
                 const cr1Parsed = this.parseGT(cr1GT);
-                if (cr1Parsed.type === 3) {
+                if (cr1Parsed.type === 2) {
                     const desc = `CALL CR${d.crDst} -> Navana.ValidatePassKey [PassKey in CR1]`;
                     this.output += desc + '\n';
 
@@ -1570,7 +1570,7 @@ class ChurchSimulator {
         const cr7GT = this.memory[clistLoc];
         if (cr7GT !== 0) {
             const cr7Parsed = this.parseGT(cr7GT);
-            if (cr7Parsed.type === 1 || cr7Parsed.type === 3) {
+            if (cr7Parsed.type === 1 || cr7Parsed.type === 2) {
                 const cr7Entry = this.readNSEntry(cr7Parsed.index);
                 if (cr7Entry) {
                     const cr7Check = this.mLoad(cr7GT, 'X', undefined);
