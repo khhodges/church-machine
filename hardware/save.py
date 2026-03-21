@@ -11,7 +11,7 @@ class ChurchSave(Elaboratable):
         self.save_start = Signal()
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.save_busy = Signal()
         self.save_complete = Signal()
         self.save_fault = Signal()

@@ -8,8 +8,8 @@ def encode_church(opcode, cond=CondCode.AL, cr_dst=0, cr_src=0, imm=0):
            ((cr_dst & 0xF) << 19) | ((cr_src & 0xF) << 15) | (imm & 0x7FFF)
 
 
-def make_gt(gt_type=GT_TYPE_NULL, perms=0, index=0, version=0):
-    return (version << 25) | (index << 8) | (perms << 2) | gt_type
+def make_gt(gt_type=GT_TYPE_NULL, perms=0, slot_id=0, gt_seq=0):
+    return (perms << 25) | (gt_type << 23) | (gt_seq << 16) | slot_id
 
 
 BOOT_PROGRAM = []
@@ -47,18 +47,18 @@ DEMO_NAMESPACE = []
 for i in range(16):
     location = NS_TABLE_BASE if i == 0 else i * 0x100
     limit = 0x80000000 | 8
-    seal_word = (0 << 25) | (0 & FNV_SEAL_MASK)
+    seal_word = (0 << 25) | (0 & CRC_SEAL_MASK)
     DEMO_NAMESPACE.extend([location, limit, seal_word])
 
 
 DEMO_CLIST = [
-    make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_X, 3, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_X, 4, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_R | PERM_MASK_X, 3, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_X, 4, 0),
     make_gt(GT_TYPE_NULL, 0, 0, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 5, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_L, 6, 0),
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 4, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_E, 2, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_E, 5, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_L, 6, 0),
+    make_gt(GT_TYPE_REAL, PERM_MASK_E, 4, 0),
     make_gt(GT_TYPE_NULL, 0, 0, 0),
 ]
 

@@ -11,7 +11,7 @@ class ChurchELoadCall(Elaboratable):
         self.start = Signal()
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.mask = Signal(16)
         self.busy = Signal()
         self.complete = Signal()
@@ -73,7 +73,7 @@ class ChurchELoadCall(Elaboratable):
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
-        mload_index = Signal(17)
+        mload_index = Signal(16)
         with m.Switch(phase):
             with m.Case(0):
                 m.d.comb += [
@@ -259,7 +259,7 @@ class ChurchXLoadLambda(Elaboratable):
         self.start = Signal()
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.busy = Signal()
         self.complete = Signal()
         self.fault = Signal()

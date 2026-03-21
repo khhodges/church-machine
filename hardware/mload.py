@@ -12,7 +12,7 @@ class ChurchMLoad(Elaboratable):
         self.sub_start = Signal()
         self.sub_cr_src = Signal(4)
         self.sub_cr_dst = Signal(4)
-        self.sub_index = Signal(17)
+        self.sub_index = Signal(16)
         self.sub_direct = Signal()
         self.sub_direct_gt = Signal(32)
         self.sub_m_elevated = Signal()
@@ -52,7 +52,7 @@ class ChurchMLoad(Elaboratable):
 
         cr_src_reg = Signal(4)
         cr_dst_reg = Signal(4)
-        index_reg = Signal(17)
+        index_reg = Signal(16)
         direct_mode = Signal()
         direct_gt_reg = Signal(32)
         src_cap = Signal(CAP_REG_LAYOUT)
@@ -77,10 +77,10 @@ class ChurchMLoad(Elaboratable):
         m.d.comb += clist_gt_addr.eq(src_view.word1_location + (index_reg << 2))
 
         ns_entry_addr = Signal(32)
-        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (result_gt.index << 3) + (result_gt.index << 2))
+        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (result_gt.slot_id << 3) + (result_gt.slot_id << 2))
 
         ns_index_in_bounds = Signal()
-        m.d.comb += ns_index_in_bounds.eq(result_gt.index < ns_view.word2_limit[:17])
+        m.d.comb += ns_index_in_bounds.eq(result_gt.slot_id < ns_view.word2_limit[:17])
 
         ns_w1_saved = Signal(32)
         ns_w1_view = View(NS_LIMIT_LAYOUT, ns_w1_saved)
@@ -88,28 +88,25 @@ class ChurchMLoad(Elaboratable):
         if self.enable_seal_check:
             result_seals = View(SEALS_LAYOUT, result_view.word3_seals)
 
-            version_match = Signal()
-            m.d.comb += version_match.eq(result_gt.version == result_seals.version)
+            gt_seq_match = Signal()
+            m.d.comb += gt_seq_match.eq(result_gt.gt_seq == result_seals.gt_seq)
 
-            fnv_xor_input = Signal(32)
-            m.d.comb += fnv_xor_input.eq(FNV_OFFSET_32 ^ result_view.word1_location)
-            fnv_mul = Signal(32)
-            m.d.comb += fnv_mul.eq(
-                fnv_xor_input
-                + (fnv_xor_input << 1)
-                + (fnv_xor_input << 4)
-                + (fnv_xor_input << 7)
-                + (fnv_xor_input << 8)
-                + (fnv_xor_input << 24)
-            )
-            fnv_hash = Signal(32)
-            fnv_masked = Signal(25)
-            m.d.comb += [
-                fnv_hash.eq(fnv_mul ^ result_view.word2_limit),
-                fnv_masked.eq(fnv_hash[:25]),
-            ]
+            crc_stages = [Signal(16, name=f"crc16_{i}") for i in range(65)]
+            m.d.comb += crc_stages[0].eq(0xFFFF)
+            for i in range(64):
+                if i < 32:
+                    data_bit = result_view.word1_location[31 - i]
+                else:
+                    data_bit = result_view.word2_limit[63 - i]
+                top_bit = Signal(name=f"crc16_top_{i}")
+                shifted = Signal(16, name=f"crc16_sh_{i}")
+                m.d.comb += top_bit.eq(crc_stages[i][15] ^ data_bit)
+                m.d.comb += shifted.eq(Cat(Const(0, 1), crc_stages[i][:15]))
+                m.d.comb += crc_stages[i + 1].eq(shifted ^ Mux(top_bit, 0x1021, 0))
+            crc16_result = Signal(16, name="crc16_result")
+            m.d.comb += crc16_result.eq(crc_stages[64])
             seal_ok = Signal()
-            m.d.comb += seal_ok.eq(fnv_masked == result_seals.seal)
+            m.d.comb += seal_ok.eq(crc16_result == result_seals.seal)
 
         with m.FSM(name="mload") as fsm:
             with m.State("IDLE"):
@@ -202,7 +199,7 @@ class ChurchMLoad(Elaboratable):
                         m.next = "CHECK_VERSION"
 
                 with m.State("CHECK_VERSION"):
-                    with m.If(~version_match):
+                    with m.If(~gt_seq_match):
                         m.d.sync += fault_type_reg.eq(FaultType.VERSION)
                         m.next = "FAULT"
                     with m.Elif(~seal_ok):

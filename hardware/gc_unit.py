@@ -19,20 +19,20 @@ class ChurchGCUnit(Elaboratable):
         self.ns_wr_data = Signal(32 * 3)
         self.ns_wr_en = Signal()
 
-        self.ns_start_index = Signal(17)
-        self.ns_end_index = Signal(17)
+        self.ns_start_index = Signal(16)
+        self.ns_end_index = Signal(16)
 
         self.marked_count = Signal(32)
         self.garbage_count = Signal(32)
 
         self.valid_key_access = Signal()
-        self.access_index = Signal(17)
+        self.access_index = Signal(16)
         self.g_bit_reset = Signal()
 
     def elaborate(self, platform):
         m = Module()
 
-        current_index = Signal(17)
+        current_index = Signal(16)
         mark_counter = Signal(32)
         garbage_counter = Signal(32)
 
@@ -45,7 +45,7 @@ class ChurchGCUnit(Elaboratable):
         w2_view = View(SEALS_LAYOUT, latched_w2)
 
         next_version = Signal(7)
-        m.d.comb += next_version.eq(w2_view.version + 1)
+        m.d.comb += next_version.eq(w2_view.gt_seq + 1)
 
         with m.FSM(name="gc") as fsm:
             with m.State("IDLE"):
@@ -124,7 +124,7 @@ class ChurchGCUnit(Elaboratable):
                 swept_w2_view = View(SEALS_LAYOUT, swept_w2)
                 m.d.comb += [
                     swept_entry.eq(0),
-                    swept_w2_view.version.eq(next_version),
+                    swept_w2_view.gt_seq.eq(next_version),
                     swept_w2_view.seal.eq(0),
                 ]
                 m.d.comb += [

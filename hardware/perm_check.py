@@ -11,16 +11,16 @@ class ChurchPermCheck(Elaboratable):
         self.required_perms = Signal(6)
         self.check_valid = Signal()
 
-        self.access_index = Signal(17)
+        self.access_index = Signal(16)
         self.limit = Signal(32)
         self.check_bounds = Signal()
 
-        self.stored_version = Signal(7)
-        self.gt_version = Signal(7)
+        self.stored_gt_seq = Signal(7)
+        self.gt_seq = Signal(7)
         self.check_version = Signal()
 
-        self.calculated_seal = Signal(25)
-        self.stored_seal = Signal(25)
+        self.calculated_seal = Signal(16)
+        self.stored_seal = Signal(16)
         self.check_seal = Signal()
 
         self.perm_granted = Signal()
@@ -57,8 +57,8 @@ class ChurchPermCheck(Elaboratable):
             self.domain_purity_ok.eq(~(has_turing & has_church)),
         ]
 
-        m.d.comb += self.bounds_ok.eq(~self.check_bounds | (self.access_index < self.limit[:17]))
-        m.d.comb += self.version_ok.eq(~self.check_version | (self.gt_version == self.stored_version))
+        m.d.comb += self.bounds_ok.eq(~self.check_bounds | (self.access_index < self.limit[:16]))
+        m.d.comb += self.version_ok.eq(~self.check_version | (self.gt_seq == self.stored_gt_seq))
         m.d.comb += self.seal_valid.eq(~self.check_seal | (self.calculated_seal == self.stored_seal))
 
         m.d.comb += self.all_checks_pass.eq(

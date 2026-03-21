@@ -9,7 +9,7 @@ class ChurchCall(Elaboratable):
     def __init__(self):
         self.call_start = Signal()
         self.cr_src = Signal(4)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.mask = Signal(16)
         self.call_busy = Signal()
         self.call_complete = Signal()
@@ -25,7 +25,7 @@ class ChurchCall(Elaboratable):
         self.mload_start = Signal()
         self.mload_cr_src = Signal(4)
         self.mload_cr_dst = Signal(4)
-        self.mload_index = Signal(17)
+        self.mload_index = Signal(16)
         self.mload_direct = Signal()
         self.mload_direct_gt = Signal(32)
         self.mload_m_elevated = Signal()
@@ -45,7 +45,7 @@ class ChurchCall(Elaboratable):
         m = Module()
 
         CR6_CLIST = 6
-        CR7_NUCLEUS = 7
+        CR14_CODE = 14
         MAX_SRC_REG = 5
         B_BIT_POS = 31
         LIMIT_WIDTH = 32
@@ -72,14 +72,14 @@ class ChurchCall(Elaboratable):
 
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
-        src_has_l_perm = src_gt.perms[PERM_L]
+        src_has_e_perm = src_gt.perms[PERM_E]
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
-        mload_index = Signal(17)
+        mload_index = Signal(16)
         m.d.comb += [
             mload_src.eq(Mux(phase, CR6_CLIST, self.cr_src)),
-            mload_dst.eq(Mux(phase, CR7_NUCLEUS, CR6_CLIST)),
+            mload_dst.eq(Mux(phase, CR14_CODE, CR6_CLIST)),
             mload_index.eq(Mux(phase, 0, self.index)),
         ]
 
@@ -122,7 +122,7 @@ class ChurchCall(Elaboratable):
             with m.State("CHECK_SRC"):
                 m.d.comb += local_cr_rd_addr.eq(self.cr_src)
                 with m.If(~src_in_range):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
                 with m.Else():
                     m.next = "READ_SRC"
@@ -133,8 +133,8 @@ class ChurchCall(Elaboratable):
                 m.next = "CHECK_PERM"
 
             with m.State("CHECK_PERM"):
-                with m.If(~src_has_l_perm):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
+                with m.If(~src_has_e_perm):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
                 with m.Else():
                     m.d.comb += local_cr_rd_addr.eq(5)
@@ -196,13 +196,13 @@ class ChurchCall(Elaboratable):
 
             with m.State("CLEAR_B_WRITE"):
                 b_src = View(CAP_REG_LAYOUT, b_cr_data)
-                cleared_limit = Signal(LIMIT_WIDTH, name="cleared_limit")
-                m.d.comb += cleared_limit.eq(b_src.word2_limit & ~(1 << B_BIT_POS))
+                cleared_gt = Signal(32, name="cleared_gt")
+                m.d.comb += cleared_gt.eq(b_src.word0_gt & ~(1 << B_BIT_POS))
                 b_dst = View(CAP_REG_LAYOUT, b_clear_wr_data)
                 m.d.comb += [
-                    b_dst.word0_gt.eq(b_src.word0_gt),
+                    b_dst.word0_gt.eq(cleared_gt),
                     b_dst.word1_location.eq(b_src.word1_location),
-                    b_dst.word2_limit.eq(cleared_limit),
+                    b_dst.word2_limit.eq(b_src.word2_limit),
                     b_dst.word3_seals.eq(b_src.word3_seals),
                     b_clear_wr_en.eq(1),
                     b_clear_wr_addr.eq(b_idx),

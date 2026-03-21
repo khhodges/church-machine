@@ -12,7 +12,7 @@ class ChurchMSave(Elaboratable):
         self.sub_start = Signal()
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)
         self.sub_src_gt = Signal(32)
-        self.sub_index = Signal(17)
+        self.sub_index = Signal(16)
         self.sub_busy = Signal()
         self.sub_done = Signal()
         self.sub_fault = Signal()
@@ -35,7 +35,7 @@ class ChurchMSave(Elaboratable):
 
         dst_cap_reg = Signal(CAP_REG_LAYOUT)
         src_gt_reg = Signal(32)
-        index_reg = Signal(17)
+        index_reg = Signal(16)
         fault_type_reg = Signal(4)
 
         dst_view = View(CAP_REG_LAYOUT, dst_cap_reg)
@@ -54,7 +54,7 @@ class ChurchMSave(Elaboratable):
         m.d.comb += write_addr.eq(dst_view.word1_location + (index_reg << 2))
 
         ns_entry_addr = Signal(32)
-        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (src_gt_view.index << 3) + (src_gt_view.index << 2))
+        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (src_gt_view.slot_id << 3) + (src_gt_view.slot_id << 2))
 
         ns_location_reg = Signal(32)
         ns_limit_reg = Signal(32)
@@ -65,28 +65,25 @@ class ChurchMSave(Elaboratable):
             ns_seals_reg = Signal(32)
             ns_seals_view = View(SEALS_LAYOUT, ns_seals_reg)
 
-            version_match = Signal()
-            m.d.comb += version_match.eq(src_gt_view.version == ns_seals_view.version)
+            gt_seq_match = Signal()
+            m.d.comb += gt_seq_match.eq(src_gt_view.gt_seq == ns_seals_view.gt_seq)
 
-            fnv_xor_input = Signal(32)
-            m.d.comb += fnv_xor_input.eq(FNV_OFFSET_32 ^ ns_location_reg)
-            fnv_mul = Signal(32)
-            m.d.comb += fnv_mul.eq(
-                fnv_xor_input
-                + (fnv_xor_input << 1)
-                + (fnv_xor_input << 4)
-                + (fnv_xor_input << 7)
-                + (fnv_xor_input << 8)
-                + (fnv_xor_input << 24)
-            )
-            fnv_hash = Signal(32)
-            fnv_masked = Signal(25)
-            m.d.comb += [
-                fnv_hash.eq(fnv_mul ^ ns_limit_reg),
-                fnv_masked.eq(fnv_hash[:25]),
-            ]
+            crc_stages = [Signal(16, name=f"crc16_{i}") for i in range(65)]
+            m.d.comb += crc_stages[0].eq(0xFFFF)
+            for i in range(64):
+                if i < 32:
+                    data_bit = ns_location_reg[31 - i]
+                else:
+                    data_bit = ns_limit_reg[63 - i]
+                top_bit = Signal(name=f"crc16_top_{i}")
+                shifted = Signal(16, name=f"crc16_sh_{i}")
+                m.d.comb += top_bit.eq(crc_stages[i][15] ^ data_bit)
+                m.d.comb += shifted.eq(Cat(Const(0, 1), crc_stages[i][:15]))
+                m.d.comb += crc_stages[i + 1].eq(shifted ^ Mux(top_bit, 0x1021, 0))
+            crc16_result = Signal(16, name="crc16_result")
+            m.d.comb += crc16_result.eq(crc_stages[64])
             seal_ok = Signal()
-            m.d.comb += seal_ok.eq(fnv_masked == ns_seals_view.seal)
+            m.d.comb += seal_ok.eq(crc16_result == ns_seals_view.seal)
 
         with m.FSM(name="msave") as fsm:
             with m.State("IDLE"):
@@ -152,7 +149,7 @@ class ChurchMSave(Elaboratable):
                         m.next = "CHECK_VERSION"
 
                 with m.State("CHECK_VERSION"):
-                    with m.If(~version_match):
+                    with m.If(~gt_seq_match):
                         m.d.sync += fault_type_reg.eq(FaultType.VERSION)
                         m.next = "FAULT"
                     with m.Elif(~seal_ok):

@@ -10,7 +10,7 @@ class ChurchChange(Elaboratable):
     def __init__(self):
         self.change_start = Signal()
         self.cr_src = Signal(4)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.change_mask = Signal(16)
         self.change_busy = Signal()
         self.change_complete = Signal()
@@ -54,7 +54,7 @@ class ChurchChange(Elaboratable):
 
         cr_index = Signal(4)
         crn_reg_latched = Signal(CAP_REG_LAYOUT)
-        index_latched = Signal(17)
+        index_latched = Signal(16)
         mask_latched = Signal(16)
         fault_latched = Signal()
         fault_type_latched = Signal(4)
@@ -94,7 +94,7 @@ class ChurchChange(Elaboratable):
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
-        mload_index = Signal(17)
+        mload_index = Signal(16)
 
         m.d.comb += [
             u_mload.sub_start.eq(mload_start_reg),

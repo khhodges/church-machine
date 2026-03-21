@@ -2,10 +2,11 @@ from amaranth import *
 from amaranth.lib.data import StructLayout
 
 GT_LAYOUT = StructLayout({
+    "slot_id": unsigned(16),
+    "gt_seq":  unsigned(7),
     "gt_type": unsigned(2),
     "perms":   unsigned(6),
-    "index":   unsigned(17),
-    "version": unsigned(7),
+    "b_flag":  unsigned(1),
 })
 
 CAP_REG_LAYOUT = StructLayout({
@@ -30,8 +31,9 @@ NS_LIMIT_LAYOUT = StructLayout({
 })
 
 SEALS_LAYOUT = StructLayout({
-    "seal":    unsigned(25),
-    "version": unsigned(7),
+    "seal":     unsigned(16),
+    "reserved": unsigned(9),
+    "gt_seq":   unsigned(7),
 })
 
 COND_FLAGS_LAYOUT = StructLayout({

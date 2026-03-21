@@ -27,7 +27,7 @@ class ChurchReturn(Elaboratable):
         self.mload_start = Signal()
         self.mload_cr_src = Signal(4)
         self.mload_cr_dst = Signal(4)
-        self.mload_index = Signal(17)
+        self.mload_index = Signal(16)
         self.mload_direct = Signal()
         self.mload_direct_gt = Signal(32)
         self.mload_m_elevated = Signal()

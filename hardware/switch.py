@@ -11,7 +11,7 @@ class ChurchSwitch(Elaboratable):
         self.switch_start = Signal()
         self.cr_src = Signal(3)
         self.target = Signal(3)
-        self.index = Signal(17)
+        self.index = Signal(16)
         self.switch_busy = Signal()
         self.switch_complete = Signal()
         self.switch_fault = Signal()

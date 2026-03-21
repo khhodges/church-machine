@@ -500,7 +500,7 @@ function updateCRDisplay() {
     const container = document.getElementById('crRegs');
     if (!container) return;
     const localNames = {
-        0: 'Return', 1: 'Arg 1', 6: 'C-List',
+        0: 'Result', 1: 'Arg 1', 6: 'C-List',
         12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
     };
     const crMeta = {
@@ -569,7 +569,7 @@ function openCRDetail(crIdx) {
     if (detailTab) {
         const cr = sim.getFormattedCR(crIdx);
         const localNames = {
-            0: 'Return', 1: 'Arg 1', 6: 'C-List',
+            0: 'Result', 1: 'Arg 1', 6: 'C-List',
             12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
         };
         const name = localNames[crIdx] || '';
@@ -699,7 +699,7 @@ function updateCRDetail() {
     const crIdx = selectedCR;
     const cr = sim.getFormattedCR(crIdx);
     const localNames = {
-        0: 'Return', 1: 'Arg 1', 6: 'C-List',
+        0: 'Result', 1: 'Arg 1', 6: 'C-List',
         12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
     };
     const name = localNames[crIdx] || '';
