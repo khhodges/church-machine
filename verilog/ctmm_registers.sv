@@ -40,13 +40,13 @@ module ctmm_registers
     // Word-level write interface (for microcode sequencing)
     input  logic [3:0]  cr_word_wr_addr,      // Register address
     input  logic [1:0]  cr_word_sel,          // Word select (0-3)
-    input  logic [63:0] cr_word_wr_data,      // 64-bit word data
+    input  logic [31:0] cr_word_wr_data,      // 32-bit word data
     input  logic        cr_word_wr_en,        // Word write enable
     
     // Word-level read interface
     input  logic [3:0]  cr_word_rd_addr,      // Register address
     input  logic [1:0]  cr_word_rd_sel,       // Word select (0-3)
-    output logic [63:0] cr_word_rd_data,      // 64-bit word data
+    output logic [31:0] cr_word_rd_data,      // 32-bit word data
     
     // Special register direct access (for fast paths)
     output capability_reg_t cr6_clist,        // CR6: Current C-List
@@ -112,7 +112,7 @@ module ctmm_registers
     
     // Word-level read
     always_comb begin
-        cr_word_rd_data = 64'h0;
+        cr_word_rd_data = 32'h0;
         if (cr_word_rd_addr < NUM_CAP_REGS) begin
             case (cr_word_rd_sel)
                 2'd0: cr_word_rd_data = cap_regs[cr_word_rd_addr].word0_gt;

@@ -38,7 +38,7 @@ module ctmm_save
     input  logic        save_start,           // Start SAVE execution
     input  logic [3:0]  cr_src,               // Source register (CRs) - GT to save
     input  logic [3:0]  cr_dst,               // Destination C-List (CRd) - must be CR0-CR6
-    input  logic [7:0]  index,                // C-List index
+    input  logic [15:0] index,                // C-List index
     output logic        save_busy,            // SAVE in progress
     output logic        save_complete,        // SAVE finished successfully
     output logic        save_fault,           // SAVE caused a fault
@@ -48,18 +48,20 @@ module ctmm_save
     output logic [3:0]  cr_rd_addr,           // Register to read
     input  capability_reg_t cr_rd_data,       // Full 256-bit register data
     
-    // Memory write interface (directly from subroutine)
-    output logic [63:0] mem_wr_addr,          // Memory address to write
-    output logic [63:0] mem_wr_data,          // Data to write (GT)
-    output logic        mem_wr_en,            // Write enable
-    input  logic        mem_wr_done,          // Write complete acknowledgment
-    
-    // CR15 (Namespace) interface for G-bit reset
-    input  capability_reg_t cr15_namespace,   // CR15 Namespace register
-    
-    // G bit reset interface
-    output logic        g_bit_reset,          // Signal to reset G bit
-    output logic [63:0] g_bit_addr            // Address: CR15.Location + GT.offset + 16
+    // Memory write interface (32-bit)
+    output logic [31:0] mem_wr_addr,
+    output logic [31:0] mem_wr_data,
+    output logic        mem_wr_en,
+    input  logic        mem_wr_done,
+
+    // Memory read interface (for NS validation)
+    output logic [31:0] mem_rd_addr,
+    output logic        mem_rd_en,
+    input  logic [31:0] mem_rd_data,
+    input  logic        mem_rd_valid,
+
+    // CR15 (Namespace) interface
+    input  capability_reg_t cr15_namespace
 );
 
     // ========================================================================
@@ -174,24 +176,25 @@ module ctmm_save
     assign sub_start = sub_start_reg;
     
     ctmm_msave u_msave (
-        .clk            (clk),
-        .rst_n          (rst_n),
-        
-        // Subroutine interface
-        .sub_start      (sub_start),
-        .sub_dst_cap    (dst_reg_latched),
-        .sub_src_gt     (src_reg_latched.word0_gt),
-        .sub_index      (index),
-        .sub_busy       (sub_busy),
-        .sub_done       (sub_done),
-        .sub_fault      (sub_fault),
-        .sub_fault_type (sub_fault_type),
-        
-        // Memory write interface
-        .mem_wr_addr    (mem_wr_addr),
-        .mem_wr_data    (mem_wr_data),
-        .mem_wr_en      (mem_wr_en),
-        .mem_wr_done    (mem_wr_done)
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .sub_start       (sub_start),
+        .sub_dst_cap     (dst_reg_latched),
+        .sub_src_gt      (src_reg_latched.word0_gt),
+        .sub_index       (index),
+        .sub_busy        (sub_busy),
+        .sub_done        (sub_done),
+        .sub_fault       (sub_fault),
+        .sub_fault_type  (sub_fault_type),
+        .cr15_namespace  (cr15_namespace),
+        .mem_wr_addr     (mem_wr_addr),
+        .mem_wr_data     (mem_wr_data),
+        .mem_wr_en       (mem_wr_en),
+        .mem_wr_done     (mem_wr_done),
+        .mem_rd_addr     (mem_rd_addr),
+        .mem_rd_en       (mem_rd_en),
+        .mem_rd_data     (mem_rd_data),
+        .mem_rd_valid    (mem_rd_valid)
     );
     
     // ========================================================================
@@ -287,17 +290,9 @@ module ctmm_save
     //   - +16 = offset to Word 3 (Seals) where G-bit resides
     // ========================================================================
     
-    assign g_bit_reset = (state == SAVE_RESET_G);
-    assign g_bit_addr = cr15_namespace.word1_location +
-                         {32'h0, dst_reg_latched.word0_gt.offset} + 64'd16;
-    
     // ========================================================================
     // Output Signals
     // ========================================================================
-    // Note: sub_done/sub_fault may be single-cycle pulses from mSave.
-    // SAVE uses sticky latches (sub_done_latched, sub_fault_latched) to
-    // ensure completion/fault signals are not missed.
-    
     assign save_busy = (state != SAVE_IDLE);
     assign save_complete = (state == SAVE_RESET_G);
     assign save_fault = fault_latched;

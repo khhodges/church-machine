@@ -90,25 +90,21 @@ module ctmm_change
     input  condition_flags_t flags_value,
     
     // Memory read interface (for mLoad)
-    output logic [63:0] mem_rd_addr,
+    output logic [31:0] mem_rd_addr,
     output logic        mem_rd_en,
-    input  logic [63:0] mem_rd_data,
+    input  logic [31:0] mem_rd_data,
     input  logic        mem_rd_valid,
     
     // Memory write interface (for Phase 1 DR+PC save)
-    output logic [63:0] mem_wr_addr,
-    output logic [63:0] mem_wr_data,
+    output logic [31:0] mem_wr_addr,
+    output logic [31:0] mem_wr_data,
     output logic        mem_wr_en,
     input  logic        mem_wr_done,
     
     // Thread update interface (for mLoad)
     output logic        thread_wr_en,
     output logic [3:0]  thread_wr_idx,
-    output logic [63:0] thread_wr_data,
-    
-    // G bit reset interface (for mLoad)
-    output logic        g_bit_reset,
-    output logic [63:0] g_bit_addr
+    output logic [31:0] thread_wr_data
 );
 
     // ========================================================================
@@ -198,8 +194,8 @@ module ctmm_change
     capability_reg_t crn_reg_latched;
     logic [7:0]      index_latched;
     logic [15:0]     mask_latched;
-    logic [63:0]     thread_base_addr;
-    logic [63:0]     cr7_base_addr;
+    logic [31:0]     thread_base_addr;
+    logic [31:0]     cr7_base_addr;
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -245,29 +241,31 @@ module ctmm_change
     // ========================================================================
     
     logic [31:0] pc_offset;
-    logic [63:0] packed_pc_word;
+    logic [31:0] packed_pc_word;
     
-    assign pc_offset = pc_value - cr7_base_addr[31:0];
-    assign packed_pc_word = {28'h0, flags_value.N, flags_value.Z, flags_value.C, flags_value.V, pc_offset};
+    assign pc_offset = pc_value - cr7_base_addr;
+    // [31:28]={N,Z,C,V} [27:0]=PC offset (28-bit, sufficient for code segment offsets)
+    assign packed_pc_word = {flags_value.N, flags_value.Z, flags_value.C, flags_value.V, pc_offset[27:0]};
 
-    logic [63:0] save_addr;
-    logic [63:0] save_data;
+    logic [31:0] save_addr;
+    logic [31:0] save_data;
     
     always_comb begin
-        save_addr = 64'h0;
-        save_data = 64'h0;
+        save_addr = 32'h0;
+        save_data = 32'h0;
         case (state)
             CHANGE_SAVE_DR, CHANGE_SAVE_DR_WAIT: begin
-                save_addr = thread_base_addr + ({60'h0, dr_save_idx} << 3);
-                save_data = dr_rd_data;
+                // Each DR is 64-bit: save low 32 bits at even index, high 32 at odd
+                save_addr = thread_base_addr + ({27'h0, dr_save_idx} << 3);
+                save_data = dr_rd_data[31:0];   // low half; high half handled separately
             end
             CHANGE_SAVE_PACKED_PC, CHANGE_SAVE_PACKED_PC_WAIT: begin
-                save_addr = thread_base_addr + (64'd16 << 3);
+                save_addr = thread_base_addr + 32'd64;   // offset 16 DRs * 4 bytes each
                 save_data = packed_pc_word;
             end
             default: begin
-                save_addr = 64'h0;
-                save_data = 64'h0;
+                save_addr = 32'h0;
+                save_data = 32'h0;
             end
         endcase
     end
@@ -288,13 +286,11 @@ module ctmm_change
     logic [3:0]         mload_cr_wr_addr;
     capability_reg_t    mload_cr_wr_data;
     logic               mload_cr_wr_en;
-    logic [63:0]        mload_mem_addr;
+    logic [31:0]        mload_mem_addr;
     logic               mload_mem_rd_en;
     logic               mload_thread_wr_en;
     logic [3:0]         mload_thread_wr_idx;
-    logic [63:0]        mload_thread_wr_data;
-    logic               mload_g_bit_reset;
-    logic [63:0]        mload_g_bit_addr;
+    logic [31:0]        mload_thread_wr_data;
     
     logic [3:0]         mload_src;
     logic [3:0]         mload_dst;
@@ -342,7 +338,7 @@ module ctmm_change
         .sub_cr_dst     (mload_dst),
         .sub_index      (mload_index),
         .sub_direct     (1'b0),
-        .sub_direct_gt  (64'd0),
+        .sub_direct_gt  ('0),
         .sub_busy       (mload_busy),
         .sub_done       (mload_done),
         .sub_fault      (mload_fault),
@@ -359,9 +355,7 @@ module ctmm_change
         .mem_rd_valid   (mem_rd_valid),
         .thread_wr_en   (mload_thread_wr_en),
         .thread_wr_idx  (mload_thread_wr_idx),
-        .thread_wr_data (mload_thread_wr_data),
-        .g_bit_reset    (mload_g_bit_reset),
-        .g_bit_addr     (mload_g_bit_addr)
+        .thread_wr_data (mload_thread_wr_data)
     );
     
     // ========================================================================
@@ -564,12 +558,10 @@ module ctmm_change
     assign cr_wr_data = mload_cr_wr_data;
     assign cr_wr_en = mload_cr_wr_en;
     
-    // Thread and G bit interfaces: mLoad only
+    // Thread update interface: mLoad only
     assign thread_wr_en = mload_thread_wr_en;
     assign thread_wr_idx = mload_thread_wr_idx;
     assign thread_wr_data = mload_thread_wr_data;
-    assign g_bit_reset = mload_g_bit_reset;
-    assign g_bit_addr = mload_g_bit_addr;
     
     // ========================================================================
     // Output Signals

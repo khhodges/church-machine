@@ -1,105 +1,98 @@
 // ============================================================================
 // CTMM Permission Checker - Hardware Permission Validation
 // ============================================================================
-// Implements capability-based access control via Golden Token permissions
-// All security checks are performed here - single FAULT output for failsafe
+// Combinational module: checks GT permissions, bounds, version, and seal.
+// Single fault_type output for fail-safe security.
 // ============================================================================
 
 module ctmm_perm_check
     import ctmm_pkg::*;
 (
-    input  logic        clk,
-    input  logic        rst_n,
-    
     // Permission check request
     input  golden_token_t gt_in,          // Golden Token to check
-    input  logic [5:0]  required_perms,   // Required permission mask
-    input  logic        check_valid,      // Check request valid
-    
+    input  logic [5:0]    required_perms, // Required permission mask
+    input  logic          check_valid,    // Enable all checks
+
     // Bounds checking
-    input  logic [31:0] access_index,     // Index being accessed
-    input  logic [63:0] limit,            // Limit from namespace entry
-    input  logic        check_bounds,     // Enable bounds check
-    
-    // MAC validation
-    input  logic [63:0] calculated_mac,   // MAC calculated from data
-    input  logic [63:0] stored_mac,       // MAC from namespace entry
-    input  logic        check_mac,        // Enable MAC check
-    
+    input  logic [15:0]   access_index,   // Index being accessed
+    input  logic [15:0]   limit,          // Namespace slot count limit
+    input  logic          check_bounds,   // Enable bounds check
+
+    // Version (gt_seq) checking
+    input  logic [6:0]    stored_gt_seq,  // GT sequence from namespace seals
+    input  logic          check_version,  // Enable version check
+
+    // Seal (CRC-16) checking
+    input  logic [15:0]   calculated_seal, // CRC-16 computed by caller
+    input  logic [15:0]   stored_seal,    // Seal from namespace entry
+    input  logic          check_seal,     // Enable seal check
+
+    // Domain purity check (TPERM)
+    input  logic          check_domain_purity,
+
     // Results
-    output logic        perm_granted,     // All permissions granted
-    output logic        bounds_ok,        // Bounds check passed
-    output logic        mac_valid,        // MAC validation passed
-    output logic        all_checks_pass,  // All enabled checks pass
-    output fault_type_t fault_type,       // Type of fault if any
-    output logic        fault_valid,      // Fault occurred
-    
-    // G bit garbage collection output
-    output logic        g_bit_set,        // G bit is set on this GT
-    output logic        is_namespace_access // This is a namespace entry access
+    output logic          perm_granted,
+    output logic          bounds_ok,
+    output logic          version_ok,
+    output logic          seal_valid,
+    output logic          domain_purity_ok,
+    output logic          all_checks_pass,
+    output fault_type_t   fault_type,
+    output logic          fault_valid
 );
 
     // ========================================================================
-    // Permission Check Logic
+    // Permission Check
     // ========================================================================
-    
+
     logic [5:0] gt_perms;
-    assign gt_perms = gt_in.perms;
-    
-    logic is_null_gt;
-    assign is_null_gt = (gt_in.offset == 32'h0) && (gt_in.perms == 6'h0);
-    
-    // Check if all required permissions are present
-    logic perms_match;
+    logic       is_null_gt;
+    logic       perms_match;
+
+    assign gt_perms    = gt_in.perms;
+    assign is_null_gt  = (gt_in.gt_type == GT_TYPE_NULL);
     assign perms_match = ((gt_perms & required_perms) == required_perms);
-    
-    // Permission granted if not null and permissions match
     assign perm_granted = !is_null_gt && perms_match;
-    
+
     // ========================================================================
-    // Bounds Check Logic
+    // Domain Purity (TPERM restriction)
     // ========================================================================
-    
-    // Access index must be less than limit
-    assign bounds_ok = !check_bounds || (access_index < limit[31:0]);
-    
+
+    logic has_turing_perms;
+    logic has_church_perms;
+    assign has_turing_perms  = |(gt_perms & DATA_PERMS);
+    assign has_church_perms  = |(gt_perms & CAP_PERMS);
+    assign domain_purity_ok  = !(has_turing_perms && has_church_perms);
+
     // ========================================================================
-    // MAC Validation Logic
+    // Bounds, Version, Seal Checks
     // ========================================================================
-    
-    // MAC must match exactly
-    assign mac_valid = !check_mac || (calculated_mac == stored_mac);
-    
-    // ========================================================================
-    // G Bit and Namespace Access Detection
-    // ========================================================================
-    
-    assign g_bit_set = gt_in.spare[0];
-    
-    assign is_namespace_access = gt_perms[PERM_L];
-    
+
+    assign bounds_ok  = !check_bounds  || (access_index < limit);
+    assign version_ok = !check_version || (gt_in.gt_seq == stored_gt_seq);
+    assign seal_valid = !check_seal    || (calculated_seal == stored_seal);
+
     // ========================================================================
     // Combined Result
     // ========================================================================
-    
-    assign all_checks_pass = perm_granted && bounds_ok && mac_valid;
-    
+
+    assign all_checks_pass = perm_granted && bounds_ok && version_ok && seal_valid;
+
     // ========================================================================
-    // Fault Detection - Single FAULT for failsafe security
+    // Fault Detection
     // ========================================================================
-    
+
     always_comb begin
         fault_valid = 1'b0;
-        fault_type = FAULT_NONE;
-        
+        fault_type  = FAULT_NONE;
+
         if (check_valid) begin
             if (is_null_gt) begin
                 fault_valid = 1'b1;
-                fault_type = FAULT_NULL_CAP;
+                fault_type  = FAULT_NULL_CAP;
             end else if (!perms_match) begin
                 fault_valid = 1'b1;
-                // Determine which permission failed (first one found)
-                if ((required_perms & PERM_MASK_R) && !(gt_perms & PERM_MASK_R))
+                if      ((required_perms & PERM_MASK_R) && !(gt_perms & PERM_MASK_R))
                     fault_type = FAULT_PERM_R;
                 else if ((required_perms & PERM_MASK_W) && !(gt_perms & PERM_MASK_W))
                     fault_type = FAULT_PERM_W;
@@ -115,10 +108,16 @@ module ctmm_perm_check
                     fault_type = FAULT_PERM_R;
             end else if (check_bounds && !bounds_ok) begin
                 fault_valid = 1'b1;
-                fault_type = FAULT_BOUNDS;
-            end else if (check_mac && !mac_valid) begin
+                fault_type  = FAULT_BOUNDS;
+            end else if (check_version && !version_ok) begin
                 fault_valid = 1'b1;
-                fault_type = FAULT_MAC;
+                fault_type  = FAULT_VERSION;
+            end else if (check_seal && !seal_valid) begin
+                fault_valid = 1'b1;
+                fault_type  = FAULT_SEAL;
+            end else if (check_domain_purity && !domain_purity_ok) begin
+                fault_valid = 1'b1;
+                fault_type  = FAULT_DOMAIN_PURITY;
             end
         end
     end

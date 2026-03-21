@@ -45,8 +45,8 @@ module ctmm_tb;
     // Data Memory
     logic [31:0] dmem_addr;
     logic        dmem_rd_en;
-    logic [63:0] dmem_rd_data;
-    logic [63:0] dmem_wr_data;
+    logic [31:0] dmem_rd_data;
+    logic [31:0] dmem_wr_data;
     logic        dmem_wr_en;
     
     // Boot Control
@@ -149,14 +149,14 @@ module ctmm_tb;
     // Data Memory Model
     // ========================================================================
     
-    logic [63:0] dmem [0:1023];
+    logic [31:0] dmem [0:1023];
     
     always_ff @(posedge clk) begin
         if (dmem_rd_en) begin
-            dmem_rd_data <= dmem[dmem_addr[11:3]];
+            dmem_rd_data <= dmem[dmem_addr[11:2]];
         end
         if (dmem_wr_en) begin
-            dmem[dmem_addr[11:3]] <= dmem_wr_data;
+            dmem[dmem_addr[11:2]] <= dmem_wr_data;
         end
     end
     
@@ -177,21 +177,21 @@ module ctmm_tb;
             clist_mem[i] = GT_NULL;
         end
         for (int i = 0; i < 16; i++) begin
-            ns_mem[i] = '{word1_location: 64'h0, word2_limit: 64'h1000, word3_seals: 64'h0};
+            ns_mem[i] = '{word2_seals: 32'h0, word1_limit: 32'h1000, word0_location: 32'h0};
         end
         for (int i = 0; i < 1024; i++) begin
-            dmem[i] = 64'h0;
+            dmem[i] = 32'h0;
         end
         
         // Initialize Boot C-List entries
-        clist_mem[0] = '{perms: PERM_MASK_X, spare: 26'h0, offset: 32'h1};           // Access.asm
-        clist_mem[1] = '{perms: PERM_MASK_L, spare: 26'h0, offset: 32'h3};           // Kenneth
-        clist_mem[2] = '{perms: PERM_MASK_L, spare: 26'h0, offset: 32'h4};           // Matthew
-        clist_mem[3] = '{perms: PERM_MASK_L, spare: 26'h0, offset: 32'h5};           // Daniel
-        clist_mem[4] = '{perms: PERM_MASK_E, spare: 26'h0, offset: 32'h6};           // SlideRule
-        clist_mem[5] = '{perms: PERM_MASK_E, spare: 26'h0, offset: 32'h7};           // Abacus
-        clist_mem[6] = '{perms: PERM_MASK_E, spare: 26'h0, offset: 32'h8};           // Circle
-        clist_mem[7] = '{perms: PERM_MASK_E, spare: 26'h0, offset: 32'h9};           // CapabilityManager
+        clist_mem[0] = '{b_flag: 1'b0, perms: PERM_MASK_X, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0001};  // Access.asm
+        clist_mem[1] = '{b_flag: 1'b0, perms: PERM_MASK_L, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0003};  // Kenneth
+        clist_mem[2] = '{b_flag: 1'b0, perms: PERM_MASK_L, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0004};  // Matthew
+        clist_mem[3] = '{b_flag: 1'b0, perms: PERM_MASK_L, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0005};  // Daniel
+        clist_mem[4] = '{b_flag: 1'b0, perms: PERM_MASK_E, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0006};  // SlideRule
+        clist_mem[5] = '{b_flag: 1'b0, perms: PERM_MASK_E, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0007};  // Abacus
+        clist_mem[6] = '{b_flag: 1'b0, perms: PERM_MASK_E, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0008};  // Circle
+        clist_mem[7] = '{b_flag: 1'b0, perms: PERM_MASK_E, gt_type: GT_TYPE_REAL, gt_seq: 7'h0, slot_id: 16'h0009};  // CapabilityManager
         
         // Test program: MOV DR0, #42; ADD DR1, DR0, #10; CMP DR1, #52
         // MOV instruction: opcode=010000, dr_dst=0, imm=42, use_imm=1
@@ -221,18 +221,22 @@ module ctmm_tb;
         wait(boot_complete);
         $display("Boot state: %s", boot_state.name());
         $display("Boot complete: %b", boot_complete);
-        $display("CR15 (Namespace): offset=0x%08X, perms=0x%04X", 
-                 dut.u_registers.cr15_reg.offset,
-                 dut.u_registers.cr15_reg.perms);
-        $display("CR8 (Thread):     offset=0x%08X, perms=0x%04X",
-                 dut.u_registers.cr8_reg.offset,
-                 dut.u_registers.cr8_reg.perms);
-        $display("CR6 (C-List):     offset=0x%08X, perms=0x%04X",
-                 dut.u_registers.cr6_reg.offset,
-                 dut.u_registers.cr6_reg.perms);
-        $display("CR7 (Nucleus):    offset=0x%08X, perms=0x%04X",
-                 dut.u_registers.cr7_reg.offset,
-                 dut.u_registers.cr7_reg.perms);
+        $display("CR15 (Namespace): slot_id=0x%04X, perms=0x%04X, gt_seq=%0d",
+                 dut.u_registers.cap_regs[15].word0_gt.slot_id,
+                 dut.u_registers.cap_regs[15].word0_gt.perms,
+                 dut.u_registers.cap_regs[15].word0_gt.gt_seq);
+        $display("CR8  (Thread):    slot_id=0x%04X, perms=0x%04X, gt_seq=%0d",
+                 dut.u_registers.cap_regs[8].word0_gt.slot_id,
+                 dut.u_registers.cap_regs[8].word0_gt.perms,
+                 dut.u_registers.cap_regs[8].word0_gt.gt_seq);
+        $display("CR6  (C-List):    slot_id=0x%04X, perms=0x%04X, gt_seq=%0d",
+                 dut.u_registers.cap_regs[6].word0_gt.slot_id,
+                 dut.u_registers.cap_regs[6].word0_gt.perms,
+                 dut.u_registers.cap_regs[6].word0_gt.gt_seq);
+        $display("CR14 (Code):      slot_id=0x%04X, perms=0x%04X, gt_seq=%0d",
+                 dut.u_registers.cap_regs[14].word0_gt.slot_id,
+                 dut.u_registers.cap_regs[14].word0_gt.perms,
+                 dut.u_registers.cap_regs[14].word0_gt.gt_seq);
         
         // Execute test program
         $display("\n[TEST 2] Turing Instructions");
@@ -250,8 +254,8 @@ module ctmm_tb;
         $display("------------------------------------------");
         
         // Set G bit on some entries
-        clist_mem[10] = '{perms: PERM_MASK_R, spare: 26'h1, offset: 32'hA};  // spare[0]=G bit
-        clist_mem[11] = '{perms: PERM_MASK_W, spare: 26'h1, offset: 32'hB};  // spare[0]=G bit
+        clist_mem[10] = '{b_flag: 1'b1, perms: PERM_MASK_R, gt_type: GT_TYPE_REAL, gt_seq: 7'h1, slot_id: 16'h000A};
+        clist_mem[11] = '{b_flag: 1'b1, perms: PERM_MASK_W, gt_type: GT_TYPE_REAL, gt_seq: 7'h1, slot_id: 16'h000B};
         
         gc_start = 1;
         #10;

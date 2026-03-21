@@ -61,31 +61,27 @@ module ctmm_return
     
     // NIA update interface
     output logic        nia_set,
-    output logic [63:0] nia_value,
-    
+    output logic [31:0] nia_value,
+
     // M bit clear interface
     output logic        clear_m_bit,
-    
+
     // CR15 (Namespace) interface for mLoad
     input  capability_reg_t cr15_namespace,
-    
-    // Memory interface (for mLoad namespace fetches)
-    output logic [63:0] mem_addr,
+
+    // Memory interface (32-bit)
+    output logic [31:0] mem_addr,
     output logic        mem_rd_en,
-    input  logic [63:0] mem_rd_data,
+    input  logic [31:0] mem_rd_data,
     input  logic        mem_rd_valid,
-    
+
     // Thread update interface (driven by mLoad)
     output logic        thread_wr_en,
     output logic [3:0]  thread_wr_idx,
-    output logic [63:0] thread_wr_data,
-    
-    // G bit reset interface (driven by mLoad)
-    output logic        g_bit_reset,
-    output logic [63:0] g_bit_addr,
-    
+    output logic [31:0] thread_wr_data,
+
     // Saved CR5 GT input - from call stack for restoration
-    input  golden_token_t saved_cr5_gt       // CR5 GT from call stack for restoration
+    input  golden_token_t saved_cr5_gt
 );
 
     // ========================================================================
@@ -94,7 +90,7 @@ module ctmm_return
     
     localparam logic [3:0] CR5_SAVED = 4'd5;
     localparam logic [3:0] CR6_CLIST = 4'd6;
-    localparam logic [3:0] CR7_NUCLEUS = 4'd7;
+    localparam logic [3:0] CR14_CODE  = 4'd14;
     
     // ========================================================================
     // State Machine
@@ -149,7 +145,7 @@ module ctmm_return
     // Extracted Return Values
     // ========================================================================
     
-    logic [63:0] saved_nia;
+    logic [31:0] saved_nia;
     golden_token_t saved_cr6_gt;
     golden_token_t saved_cr7_gt;
     
@@ -260,7 +256,7 @@ module ctmm_return
     logic [3:0]  sub_cr_rd_addr;
     
     logic [3:0]  mload_dst;
-    logic [63:0] mload_direct_gt;
+    logic [31:0] mload_direct_gt;
     
     always_comb begin
         case (phase)
@@ -273,7 +269,7 @@ module ctmm_return
                 mload_direct_gt = saved_cr6_gt;
             end
             default: begin
-                mload_dst = CR7_NUCLEUS;
+                mload_dst = CR14_CODE;
                 mload_direct_gt = saved_cr7_gt;
             end
         endcase
@@ -310,9 +306,10 @@ module ctmm_return
         .sub_start      (sub_start),
         .sub_cr_src     (4'd0),            // Unused in direct mode
         .sub_cr_dst     (mload_dst),
-        .sub_index      (10'd0),           // Unused in direct mode
-        .sub_direct     (1'b1),            // RETURN uses direct GT validation
-        .sub_direct_gt  (mload_direct_gt), // Saved GT for revalidation
+        .sub_index      (16'd0),
+        .sub_direct     (1'b1),
+        .sub_direct_gt  (mload_direct_gt),
+        .sub_m_elevated (1'b0),
         .sub_busy       (sub_busy),
         .sub_done       (sub_done),
         .sub_fault      (sub_fault_sig),
@@ -333,10 +330,7 @@ module ctmm_return
         
         .thread_wr_en   (thread_wr_en),
         .thread_wr_idx  (thread_wr_idx),
-        .thread_wr_data (thread_wr_data),
-        
-        .g_bit_reset    (g_bit_reset),
-        .g_bit_addr     (g_bit_addr)
+        .thread_wr_data (thread_wr_data)
     );
     
     // ========================================================================
@@ -440,7 +434,7 @@ module ctmm_return
     
     // NIA update - advance past saved instruction (CALL or CHANGE)
     assign nia_set = (state == SET_NIA);
-    assign nia_value = saved_nia + 64'd1;
+    assign nia_value = saved_nia + 32'd1;
     
     assign clear_m_bit = 1'b0;
 
