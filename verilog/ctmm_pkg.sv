@@ -160,6 +160,33 @@ package ctmm_pkg;
     localparam int NS_ENTRY_STRIDE = 16;
 
     // ========================================================================
+    // LUMP Header structure (word3_lump field in namespace_entry_t)
+    // LSB-first packed struct matching LUMP_HEADER_LAYOUT in layouts.py
+    // ========================================================================
+    // Bit  [0]     - r:         restrict flag
+    // Bit  [1]     - c:         construct flag
+    // Bit  [2]     - h:         handler flag
+    // Bits [8:3]   - mw:        max-word (6 bits, argument word count)
+    // Bits [10:9]  - typ:       type tag (2 bits)
+    // Bits [18:11] - cc:        calling-convention flags (8 bits)
+    // Bits [22:19] - n_minus_6: total frame words minus 6 (4 bits)
+    // Bits [26:23] - ver:       version (4 bits)
+    // Bits [31:27] - magic:     signature (5 bits)
+    // ========================================================================
+
+    typedef struct packed {
+        logic [4:0]  magic;     // Bits [31:27] - signature
+        logic [3:0]  ver;       // Bits [26:23] - version
+        logic [3:0]  n_minus_6; // Bits [22:19] - total frame words minus 6
+        logic [7:0]  cc;        // Bits [18:11] - calling-convention flags
+        logic [1:0]  typ;       // Bits [10:9]  - type tag
+        logic [5:0]  mw;        // Bits  [8:3]  - max-word (arg count)
+        logic        h;         // Bit   [2]    - handler flag
+        logic        c;         // Bit   [1]    - construct flag
+        logic        r;         // Bit   [0]    - restrict flag
+    } lump_header_t;
+
+    // ========================================================================
     // Condition Codes (ARM-style)
     // ========================================================================
 

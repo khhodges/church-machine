@@ -153,18 +153,18 @@ module ctmm_call
             lump_reg <= mem_rd_data;
     end
 
-    // LUMP_HEADER_LAYOUT (from layouts.py):
-    //   bits [5:0]  = mw (max-word, number of argument registers – 1)
-    //   bits [11:6] = cc (calling-convention flags)
-    //   bits [17:12]= n_minus_6 (total frame words minus 6)
-    //   bits [31:18]= spare
-    logic [5:0] mw_field;
-    assign mw_field = lump_reg[5:0];    // LUMP_HEADER_LAYOUT.mw
+    // Decode word3_lump via lump_header_t struct (defined in ctmm_pkg.sv)
+    // lump_header_t is a packed struct matching LUMP_HEADER_LAYOUT in layouts.py:
+    //   .r [0], .c [1], .h [2], .mw [8:3], .typ [10:9], .cc [18:11],
+    //   .n_minus_6 [22:19], .ver [26:23], .magic [31:27]
+    lump_header_t lump_view;
+    assign lump_view = lump_reg;
 
     // NIA = code_base + (1 + mw) * 4  (skip over the prologue header word)
+    // mw is 6 bits from lump_view.mw (bits [8:3] of word3_lump)
     logic [31:0] nia_computed;
     assign nia_computed = cr14_latched.word1_location
-                        + ({26'd0, mw_field} + 32'd1) * 32'd4;
+                        + ({26'd0, lump_view.mw} + 32'd1) * 32'd4;
 
     // ========================================================================
     // Operand Latching
