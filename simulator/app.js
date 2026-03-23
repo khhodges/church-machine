@@ -6,6 +6,7 @@ let pipelineViz = null;
 let repl = null;
 let churchTutorial = null;
 let slideRuleTutorial = null;
+let cloomcTutorial = null;
 let securityTutorial = null;
 let threadTutorial = null;
 let abstrTutorial = null;
@@ -311,6 +312,8 @@ function switchView(viewId) {
         _ensureTutorialObjects();
         if (activeTutorial === 'sliderule' && slideRuleTutorial) {
             slideRuleTutorial.render('tutorialView');
+        } else if (activeTutorial === 'cloomc' && cloomcTutorial) {
+            cloomcTutorial.render('tutorialView');
         } else if (activeTutorial === 'security' && securityTutorial) {
             securityTutorial.render('tutorialView');
         } else if (activeTutorial === 'thread' && threadTutorial) {
@@ -345,6 +348,8 @@ function selectTutorial(which) {
     _ensureTutorialObjects();
     if (which === 'sliderule' && slideRuleTutorial) {
         slideRuleTutorial.render('tutorialView');
+    } else if (which === 'cloomc' && cloomcTutorial) {
+        cloomcTutorial.render('tutorialView');
     } else if (which === 'security' && securityTutorial) {
         securityTutorial.render('tutorialView');
     } else if (which === 'thread' && threadTutorial) {
@@ -380,6 +385,10 @@ function _ensureTutorialObjects() {
     if (!slideRuleTutorial && typeof SlideRuleTutorial !== 'undefined') {
         slideRuleTutorial = new SlideRuleTutorial();
         window.slideRuleTutorial = slideRuleTutorial;
+    }
+    if (!cloomcTutorial && typeof CLOOMCTutorial !== 'undefined') {
+        cloomcTutorial = new CLOOMCTutorial();
+        window.cloomcTutorial = cloomcTutorial;
     }
     if (!securityTutorial && typeof SecurityTutorial !== 'undefined')
         securityTutorial = new SecurityTutorial();
