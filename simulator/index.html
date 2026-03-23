@@ -4,6 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Church Machine IDE</title>
+    <script>
+    (function() {
+        window.addEventListener('unhandledrejection', function(event) {
+            if (!(event.reason instanceof Error)) {
+                var msg = (event.reason === null || event.reason === undefined)
+                    ? 'null/undefined rejection'
+                    : (typeof event.reason === 'object'
+                        ? (event.reason.message || event.reason.name || JSON.stringify(event.reason))
+                        : String(event.reason));
+                console.warn('[Church Machine] Caught non-Error rejection:', msg);
+                event.preventDefault();
+            }
+        });
+        window.addEventListener('error', function(event) {
+            if (!event.error) {
+                console.warn('[Church Machine] Caught non-Error window error:', event.message || '(no message)', 'at', event.filename + ':' + event.lineno);
+                event.preventDefault();
+            }
+        });
+    })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles.css">
     <style>
