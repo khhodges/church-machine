@@ -37,15 +37,12 @@ fetches exactly the version of the lump that was current when that GT was forged
 The Lazy Loader activates when the hardware raises a **lump-not-resident**
 condition. This happens when:
 
-1. A CALL instruction is executed against a Golden Token (GT) whose NS entry
-   has a valid `base` address, but the lump at that address has not yet been
-   installed into the unified address space.
-2. The hardware checks the NS entry's `G` (guard) bit. If `G = 1` the lump
-   is marked as lazy — it has a valid NS entry but no physical memory
-   allocation yet.
-
-The processor suspends the calling thread and raises an interrupt to the
-Lazy Loader service.
+1. A CALL instruction is executed against a Golden Token (GT) whose NS entry's
+   `G` (guard) bit is set to `1`. The NS entry itself is valid (the GT's
+   `gt_seq` matches the stored sequence), but the lump has not yet been
+   physically allocated — `base` is `0` and no memory region has been assigned.
+2. The hardware detects `G = 1` during the CALL gate-check, suspends the
+   calling thread, and raises an interrupt to the Lazy Loader service.
 
 ---
 
