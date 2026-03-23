@@ -173,7 +173,7 @@ class SlideRuleTutorial {
 <div class="sr-comp-side-panel open" style="flex:1;min-width:0">
 <div class="sr-comp-side-title">Bare Metal Security</div>
 <p>CLOOMC++ runs on <strong>bare metal hardware</strong> with no operating system required.</p>
-<p>No malware. No ransomware. No ethical constraints on AI behaviour to patch after the fact. No lethal autonomous weapons. No AI breakout problems.</p>
+<p>No malware. No ransomware. No ethical constraints on AI behaviour to patch after the fact. No lethal autonomous software. No AI breakout problems.</p>
 <p>The hardware enforces security at every cycle &mdash; software cannot override what the silicon forbids.</p>
 </div>
 </div>
