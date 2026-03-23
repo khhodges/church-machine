@@ -234,6 +234,7 @@ Presets are split into two mutually exclusive groups matching domain purity:
 | 3 | X | X |
 | 4 | RX | R, X |
 | 5 | RWX | R, W, X |
+| 10 | W | W |
 
 **Church domain** (L, S, E — capability list operations):
 
@@ -243,17 +244,22 @@ Presets are split into two mutually exclusive groups matching domain purity:
 | 7 | S | S |
 | 8 | E | E |
 | 9 | LS | L, S |
-| 10 | — | Reserved — E must be standalone (raises FAULT) |
-| 11 | — | Reserved — E must be standalone (raises FAULT) |
-| 12 | — | Reserved — E must be standalone (raises FAULT) |
+
+**Reserved codes** (raise FAULT at runtime):
+
+| Value | Name |
+|-------|------|
+| 11 | — |
+| 12 | — |
+| 13 | — |
 
 **E isolation rule**: E (Execute — enter an abstraction) must never be combined with L (Load from c-list) or S (Save to c-list). Combining E with L or S in a single token would allow a holder to both traverse the nodal c-list and enter an abstraction with one capability, creating an attack path into the c-list structure. E is the entry key to a function; L and S are the keys to the capability list that owns it. Keeping them separate ensures that holding the ability to call something does not grant the ability to read or modify the c-list it came from.
 
 Valid Church presets: L, S, E, LS. No preset may combine E with L or S.
 
-No preset combines Turing and Church bits. Domain purity is a hardware invariant enforced at the instruction encoding level — a cross-domain or E-combined preset value is illegal and raises a FAULT.
+**Cross-domain rule**: No preset combines Turing and Church bits. Domain purity is a hardware invariant enforced at the instruction encoding level — a cross-domain preset value is illegal and raises a FAULT.
 
-B-modifier variants (add 0x10): RB, RWB, XB, EB, LSB — sets B-bit alongside a valid domain-pure permission set. LSB is the maximum Church c-list preset with bind.
+B-modifier variants (add 0x10): RB, RWB, XB, EB, LSB, WB — sets B-bit alongside a valid domain-pure permission set. LSB is the maximum Church c-list preset with bind.
 
 #### Design Rationale
 

@@ -204,10 +204,10 @@ permission preset. The assembled word uses the numeric code directly.
 | 0x07 | S       | 0x17 | SB       |
 | 0x08 | E       | 0x18 | EB       |
 | 0x09 | LS      | 0x19 | LSB      |
-| 0x0A | LE      | 0x1A | LEB      |
-| 0x0B | SE      | 0x1B | SEB      |
-| 0x0C | LSE     | 0x1C | LSEB     |
-| 0x0D | RWXLSE  | 0x1D | RWXLSEB  |
+| 0x0A | W       | 0x1A | WB       |
+| 0x0B | *(rsv)* | 0x1B | *(rsv)*  |
+| 0x0C | *(rsv)* | 0x1C | *(rsv)*  |
+| 0x0D | *(rsv)* | 0x1D | *(rsv)*  |
 | 0x0E | *(rsv)* | 0x0F | *(rsv)*  |
 
 Permission bit key: **R**=Read, **W**=Write, **X**=Execute, **L**=Load
