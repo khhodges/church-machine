@@ -95,7 +95,7 @@ class SlideRuleTutorial {
 &#x2514;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2534;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2500;&#x2518;</pre>
 <table class="sr-table sr-table-wide"><tr><th>Field</th><th>Bits</th><th>Purpose</th></tr>
 <tr><td>Perms (B&thinsp;R&thinsp;W&thinsp;X&thinsp;L&thinsp;S&thinsp;E)</td><td>7</td><td>Capability permissions. Turing domain: R(ead), W(rite), X(ecute). Church domain: L(oad), S(ave), E(nter). B = Bounds (access-size limit). MSB=B, LSB=E.</td></tr>
-<tr><td>typ</td><td>2</td><td>00=NULL (invalid), 01=Real (GT points to an NS entry &rarr; memory lump), 10=Abstract (GT <em>is</em> the value), 11=Reserved.</td></tr>
+<tr><td>typ</td><td>2</td><td>00=NULL (invalid), 01=Real (GT points to an NS entry &rarr; memory lump), 10=Abstract (GT <em>is</em> the value), 11=Outform (GT resolved by Abstraction Library, e.g. GitHub).</td></tr>
 <tr><td>gt_seq</td><td>7</td><td>Revocation counter. Incrementing gt_seq in the NS entry instantly invalidates every derived copy — the next mLoad that presents a stale gt_seq faults.</td></tr>
 <tr><td>object_id</td><td>16</td><td>Index into the namespace (65&thinsp;536 possible entries).</td></tr>
 </table>
