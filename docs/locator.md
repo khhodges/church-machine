@@ -1,7 +1,4 @@
-# Lazy Loader — Absent-Lump Fetch Protocol
-
-> **Naming note:** The component that performs on-demand loading is architecturally
-> called the **Locator**. "Lazy Loader" is a colloquial shorthand for the same mechanism.
+# Locator — Absent-Lump Fetch Protocol
 
 ---
 

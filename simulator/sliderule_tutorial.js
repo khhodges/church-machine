@@ -24,7 +24,7 @@ class SlideRuleTutorial {
 </div>
 <div class="sr-key-concept" style="margin-top:1rem">
 <div class="sr-concept-title">CLOOMC++ Language Tutorial</div>
-<p>The <strong>CLOOMC++ Language Tutorial</strong> (select it above) continues where this study ends: it walks through the SlideRule mathematical abstraction implemented in all six front-ends, compares instruction counts and algorithm choices across languages, and explains how the Lump Library and Lazy Loader work together to deploy compiled abstractions on demand.</p>
+<p>The <strong>CLOOMC++ Language Tutorial</strong> (select it above) continues where this study ends: it walks through the SlideRule mathematical abstraction implemented in all six front-ends, compares instruction counts and algorithm choices across languages, and explains how the Lump Library and Locator work together to deploy compiled abstractions on demand.</p>
 </div>
 <p class="sr-hardware">Target: Sipeed Tang Nano 20K &mdash; Gowin GW2AR-18 FPGA, QN88 package, 20,736 LUTs, 27 MHz clock. Synthesised with Amaranth HDL and oss-cad-suite.</p>`
             },
@@ -181,7 +181,7 @@ class SlideRuleTutorial {
 <div class="sr-comp-arrow">&darr;</div>
 <div class="sr-comp-output"><strong>Lump Library (GitHub)</strong><br><small>32-bit code words &rarr; lump.zip</small></div>
 <div class="sr-comp-arrow">&darr;</div>
-<div class="sr-comp-output" style="background:rgba(30,100,200,0.12);border-color:rgba(30,100,200,0.35);color:#79c0ff"><strong>Lazy Loader</strong><br><small>on-demand fetch &amp; install</small></div>
+<div class="sr-comp-output" style="background:rgba(30,100,200,0.12);border-color:rgba(30,100,200,0.35);color:#79c0ff"><strong>Locator</strong><br><small>on-demand fetch &amp; install</small></div>
 </div>
 <div class="sr-key-concept">
 <div class="sr-concept-title">Resident Object Model</div>

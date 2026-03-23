@@ -27,7 +27,7 @@ Every format embeds or references the **entry object**, which is the decoded in-
 | `word1_limit`   | number  | Word 1, raw packed | Full 32-bit packed flags word. Decode with `parseNSWord1` to get the fields below. |
 | `word2_seals`   | number  | Word 2, raw packed | Full 32-bit version+seal word. `(word2_seals >>> 25) & 0x7F` = version; `word2_seals & 0x01FFFFFF` = FNV seal. |
 | `gBit`          | 0 or 1  | Word 1 [29]    | GC mark bit. Set by the PP250 garbage collector during mark phase. Not meaningful to application code. |
-| `gtType`        | 0–3     | Word 1 [27:26] | Entry type code: `0`=NULL, `1`=Inform, `2`=Outform, `3`=Abstract. |
+| `gtType`        | 0–3     | Word 1 [27:26] | Entry type code: `0`=NULL, `1`=Inform, `2`=Outform, `3`=Abstract. When `gtType=2` (Outform), the backing NS slot Words 1–3 hold a **96-bit opaque IDE token** rather than the normal lump descriptor — the Locator reads this token to fetch and inflate the lump on first LOAD. See [locator.md](locator.md). |
 | `clistCount`    | 0–511   | Word 1 [25:17] | Number of c-list GT slots at the top of the lump (9-bit field). `0` = data object; `>0` = abstraction lump. |
 | `chainable`     | boolean | Word 1 [28]    | Whether the chain bit is set. Decoded from the raw `word1_limit`. |
 | `label`         | string  | `sim.nsLabels` | Human-readable name. Stored separately from the three-word slot; not encoded in the hardware words. |

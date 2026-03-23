@@ -4,7 +4,7 @@
 
 The CLOOMC++ compiler produces this format automatically. You can also write it by hand when building assembler programs directly.
 
-> **Note:** `upload.json` is the *informational* definition format — the human-readable source of truth for an abstraction. The physical deployment artefact produced from it is `lump.zip`. See [lazy-loader.md](lazy-loader.md) for how lump.zip archives are stored in the Lump Library and loaded on demand at runtime.
+> **Note:** `upload.json` is the *informational* definition format — the human-readable source of truth for an abstraction. The physical deployment artefact produced from it is `lump.zip`. See [locator.md](locator.md) for how lump.zip archives are stored in the Lump Library and loaded on demand at runtime by the Locator.
 
 ---
 
