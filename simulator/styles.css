@@ -3890,6 +3890,127 @@ a.next-step-link:hover {
     padding: 0.75rem;
 }
 
+.abs-methods-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.abs-methods-header .abs-detail-label {
+    margin-bottom: 0;
+}
+
+.abs-methods-controls {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.abs-method-ctrl-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+    background: rgba(30, 60, 120, 0.4);
+    color: var(--text-secondary);
+    border: 1px solid rgba(100, 160, 255, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.abs-method-ctrl-btn:hover:not(:disabled) {
+    background: rgba(30, 100, 200, 0.5);
+    color: var(--church-gold);
+    border-color: var(--church-gold);
+}
+
+.abs-method-ctrl-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.abs-method-form-container {
+    margin-top: 0.5rem;
+}
+
+.abs-method-form {
+    background: rgba(5, 15, 35, 0.6);
+    border: 1px solid rgba(100, 160, 255, 0.25);
+    border-radius: 6px;
+    padding: 0.7rem 0.8rem;
+    animation: absPanelFade 0.12s ease;
+}
+
+.abs-method-form-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--church-gold);
+    margin-bottom: 0.55rem;
+}
+
+.abs-method-form-label {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.2rem;
+    margin-top: 0.35rem;
+}
+
+.abs-method-form-input,
+.abs-method-form-textarea,
+.abs-method-form-select {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(8, 20, 50, 0.7);
+    border: 1px solid rgba(100, 160, 255, 0.2);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    padding: 0.3rem 0.5rem;
+    resize: vertical;
+    outline: none;
+    font-family: inherit;
+}
+
+.abs-method-form-input:focus,
+.abs-method-form-textarea:focus,
+.abs-method-form-select:focus {
+    border-color: rgba(100, 160, 255, 0.5);
+}
+
+.abs-method-form-code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+}
+
+.abs-method-form-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+}
+
+.abs-method-form-cancel {
+    background: rgba(40, 40, 60, 0.5);
+    color: var(--text-secondary);
+}
+
+.abs-method-del-confirm {
+    background: rgba(160, 30, 30, 0.5);
+    color: #ff9999;
+    border-color: rgba(200, 60, 60, 0.4);
+}
+
+.abs-method-del-confirm:hover {
+    background: rgba(200, 40, 40, 0.6);
+}
+
 .abs-method-tabs {
     display: flex;
     flex-wrap: wrap;

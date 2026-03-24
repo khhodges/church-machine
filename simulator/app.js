@@ -1233,6 +1233,7 @@ function updateNamespace() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
+let userMethodData = {};
 
 function renderAbstractions() {
     if (!abstractionRegistry) return;
@@ -1311,7 +1312,13 @@ function showAbstractionDetail(index) {
         const methods = (abs.methods && abs.methods.length > 0) ? abs.methods : [];
         const uid = abs.index;
         html += '<div class="abs-detail-section abs-methods-section">';
+        html += '<div class="abs-methods-header">';
         html += '<div class="abs-detail-label">Methods</div>';
+        html += '<div class="abs-methods-controls">';
+        html += `<button class="btn abs-method-ctrl-btn" title="Add method" onclick="absShowAddForm(${uid})">+</button>`;
+        html += `<button class="btn abs-method-ctrl-btn abs-method-del-ctrl" title="Delete method" onclick="absShowDeleteForm(${uid})"${methods.length === 0 ? ' disabled' : ''}>\u2212</button>`;
+        html += '</div>';
+        html += '</div>';
         if (methods.length === 0) {
             html += '<div class="abs-method-empty">No methods registered \u2014 CALL enters the abstraction directly.</div>';
         } else {
@@ -1338,6 +1345,7 @@ function showAbstractionDetail(index) {
             }
             html += '</div>';
         }
+        html += `<div class="abs-method-form-container" id="abs-form-${uid}"></div>`;
         html += '</div>';
     }
 
@@ -1434,6 +1442,82 @@ function absSelectMethod(tabEl, panelId) {
     if (panel) panel.style.display = '';
 }
 
+function absShowAddForm(absIdx) {
+    const fc = document.getElementById(`abs-form-${absIdx}`);
+    if (!fc) return;
+    if (fc.dataset.mode === 'add') { fc.innerHTML = ''; fc.dataset.mode = ''; return; }
+    fc.dataset.mode = 'add';
+    fc.innerHTML = `
+<div class="abs-method-form">
+  <div class="abs-method-form-title">Add Method</div>
+  <label class="abs-method-form-label">Method name</label>
+  <input class="abs-method-form-input" id="abs-add-name-${absIdx}" type="text" placeholder="e.g. Run" spellcheck="false">
+  <label class="abs-method-form-label">Description</label>
+  <textarea class="abs-method-form-textarea" id="abs-add-desc-${absIdx}" rows="2" placeholder="What this method does…"></textarea>
+  <label class="abs-method-form-label">Pseudocode / Assembly (optional)</label>
+  <textarea class="abs-method-form-textarea abs-method-form-code" id="abs-add-code-${absIdx}" rows="4" placeholder="; assembly here…" spellcheck="false"></textarea>
+  <div class="abs-method-form-actions">
+    <button class="btn btn-sm" onclick="absSaveMethod(${absIdx})">Save</button>
+    <button class="btn btn-sm abs-method-form-cancel" onclick="absHideForm(${absIdx})">Cancel</button>
+  </div>
+</div>`;
+}
+
+function absShowDeleteForm(absIdx) {
+    const fc = document.getElementById(`abs-form-${absIdx}`);
+    if (!fc) return;
+    if (fc.dataset.mode === 'del') { fc.innerHTML = ''; fc.dataset.mode = ''; return; }
+    const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
+    if (!abs || !abs.methods || abs.methods.length === 0) return;
+    fc.dataset.mode = 'del';
+    let opts = abs.methods.map(m => `<option value="${m}">${m}</option>`).join('');
+    fc.innerHTML = `
+<div class="abs-method-form">
+  <div class="abs-method-form-title">Delete Method</div>
+  <label class="abs-method-form-label">Select method to remove</label>
+  <select class="abs-method-form-select" id="abs-del-select-${absIdx}">${opts}</select>
+  <div class="abs-method-form-actions">
+    <button class="btn btn-sm abs-method-del-confirm" onclick="absDeleteMethod(${absIdx})">Delete</button>
+    <button class="btn btn-sm abs-method-form-cancel" onclick="absHideForm(${absIdx})">Cancel</button>
+  </div>
+</div>`;
+}
+
+function absHideForm(absIdx) {
+    const fc = document.getElementById(`abs-form-${absIdx}`);
+    if (fc) { fc.innerHTML = ''; fc.dataset.mode = ''; }
+}
+
+function absSaveMethod(absIdx) {
+    const nameEl = document.getElementById(`abs-add-name-${absIdx}`);
+    const descEl = document.getElementById(`abs-add-desc-${absIdx}`);
+    const codeEl = document.getElementById(`abs-add-code-${absIdx}`);
+    if (!nameEl) return;
+    const name = nameEl.value.trim();
+    if (!name) { nameEl.focus(); return; }
+    const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
+    if (!abs) return;
+    if (!abs.methods) abs.methods = [];
+    if (!abs.methods.includes(name)) abs.methods.push(name);
+    const key = `${absIdx}:${name}`;
+    userMethodData[key] = {
+        purpose: descEl ? descEl.value.trim() : '',
+        example: codeEl ? codeEl.value.trim() : ''
+    };
+    showAbstractionDetail(absIdx);
+}
+
+function absDeleteMethod(absIdx) {
+    const sel = document.getElementById(`abs-del-select-${absIdx}`);
+    if (!sel) return;
+    const name = sel.value;
+    const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
+    if (!abs || !abs.methods) return;
+    abs.methods = abs.methods.filter(m => m !== name);
+    delete userMethodData[`${absIdx}:${name}`];
+    showAbstractionDetail(absIdx);
+}
+
 function getMethodPurposes(abs) {
     const purposes = {};
     const knownPurposes = {
@@ -1480,13 +1564,16 @@ function getMethodPurposes(abs) {
             'Compile':  'Thread.Compile(f_GT) \u2014 creates a new Thread Abstraction whose initial start abstraction is f. Calls Memory.Allocate for a fresh lump (GT zone + LIFO stack + heap + DR file), calls Mint.Create(Inform, lumpSize, 0) to mint a zero-perm Thread Identity GT (CR12 of the new thread), stores f_GT into the new thread\u2019s c-list as CR0 (the return/first-call slot), and returns the new Thread GT to the caller. The new thread is ready to run as soon as switchTo is called on its GT.',
         },
     };
-    if (knownPurposes[abs.name]) {
-        return knownPurposes[abs.name];
-    }
+    const base = knownPurposes[abs.name] ? Object.assign({}, knownPurposes[abs.name]) : purposes;
     for (const m of abs.methods) {
-        purposes[m] = 'Dispatched via CALL';
+        const key = `${abs.index}:${m}`;
+        if (userMethodData[key] && userMethodData[key].purpose) {
+            base[m] = userMethodData[key].purpose;
+        } else if (!base[m]) {
+            base[m] = 'Dispatched via CALL';
+        }
     }
-    return purposes;
+    return base;
 }
 
 function getMethodExamples(abs) {
@@ -3030,7 +3117,14 @@ DWRITE DR0, lump[0]     ; store f_GT into new thread's GT zone word 0
 ; Returns: new Thread GT — call Thread.switchTo to begin execution`,
         },
     };
-    return examples[abs.name] || {};
+    const base = Object.assign({}, examples[abs.name] || {});
+    for (const m of abs.methods) {
+        const key = `${abs.index}:${m}`;
+        if (userMethodData[key] && userMethodData[key].example) {
+            base[m] = userMethodData[key].example;
+        }
+    }
+    return base;
 }
 
 function assembleAndLoad() {
