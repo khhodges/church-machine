@@ -3722,6 +3722,7 @@ a.next-step-link:hover {
 
 .abs-detail-panel .panel {
     height: 100%;
+    overflow-y: auto;
 }
 
 .abs-layer-header {

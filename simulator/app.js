@@ -1784,6 +1784,7 @@ function absShowEditForm(absIdx, mi) {
     <button class="btn btn-sm abs-method-form-cancel" onclick="absHideForm(${absIdx})">Cancel</button>
   </div>
 </div>`;
+    fc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function absUpdateMethod(absIdx) {
