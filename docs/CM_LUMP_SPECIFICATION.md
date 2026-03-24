@@ -775,6 +775,44 @@ The difference from `Mint.Lump`:
 
 ---
 
+## Thread.zip Distribution Format
+
+Thread lumps are distributed as `*.thread.zip` files, following the same
+ZIP container rules as function abstraction lumps (bit 3 = 0, uncompressed
+size present in local file header). The contained binary is the 256-word
+Thread lump image — header word followed by the five zones.
+
+```
+MyApp.thread.zip
++-- MyApp.thread.bin    ← 256-word Thread lump binary (1 024 bytes)
+                           Word 0:      0xF900_020C (header)
+                           Words 1..12: Zone ① — initial CR0..CR11 GT Word 0 values
+                           Words 13..44: Zone ② — LIFO Stack (all zero at creation)
+                           Words 45..175: Zone ③ — Freespace (all zero — Mint verifies)
+                           Words 176..239: Zone ④ — Heap (all zero at creation)
+                           Words 240..255: Zone ⑤ — DR0..DR15 (all zero at creation)
+```
+
+The ZIP pre-allocation sequence is identical to that for function
+abstraction lumps — the Locator reads `uncompressed_size` from the local
+file header, derives `n = log2(size / 4) = 8` (always 8 for Thread), calls
+the Memory Manager to reserve a 256-word region, inflates into it, then
+passes `(base, 8)` to `Mint.Thread` for validation and GT issuance.
+
+### What the IDE Writes at Compile Time
+
+The IDE populates Zone ① (Words 1..12) with the initial GT Word 0 values
+that the Thread will hold in CR0..CR11 on first context-load. These are the
+thread's birth capabilities — typically the Thread's own E-GT (CR0),
+Scheduler E-GT (CR2), Mint E-GT (CR3), and any application-specific
+capabilities (CR4 onward). All other zones are all-zero in the distributed
+binary; runtime activity populates Stack, Heap, and DR.
+
+Zone ③ must be all-zero in the zip binary. `Mint.Thread` verifies this at
+install time and rejects the binary if any freespace word is non-zero.
+
+---
+
 ## Thread Lump vs Function Abstraction — Summary
 
 | Property | Function Abstraction | Thread |
@@ -791,7 +829,7 @@ The difference from `Mint.Lump`:
 | Transient CR6 | C-list view (L) derived on CALL | Not applicable |
 | Issued GTs | One E-GT (caller holds) | E-GT (Scheduler) + RW-GT (Thread) |
 | GC interaction | G bit in lump's NS slot | G bits in all live CRs in Zone ① |
-| Zip format | `*.lump.zip` | Created in-place; not distributed as zip |
+| Zip format | `*.lump.zip` | `*.thread.zip` |
 | lumpSize | 2^n, compiler-chosen | Fixed 2^8 = 256 words |
 | Header word | 0xF8xx_xxxx (typ=00) | 0xF900_020C (typ=10, cw=0, cc=12) |
 
@@ -1250,7 +1288,7 @@ already owns.
 | **GC interaction** | G bit in NS slot Word 3 | G bits in all live CRs in Zone ① | G bits in all Live NS Table entries (Word 3) |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | Fixed 2^8 = 256 words | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
 | **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1 all-zero | Zone ③ only (words 45..175); Zone ① skipped | Yes — between init code end and NS Table start |
-| **Distribution format** | `*.lump.zip` | Created in-place; not zipped | `*.namespace.zip` with `manifest.json` |
+| **Distribution format** | `*.lump.zip` | `*.thread.zip` | `*.namespace.zip` with `manifest.json` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target?** | Yes | No | Yes (typ=00) or No (typ=10) |
 
