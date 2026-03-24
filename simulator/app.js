@@ -1238,6 +1238,65 @@ let absCollapsedLayers = {};
 let userMethodData = {};
 let userMethodLists = {};
 
+// ── Boot Sequence Code ─────────────────────────────────────────────────────
+// Actual hardware boot steps that install each Layer-0 abstraction.
+// Mirrors simulator.js _bootStep() exactly.
+const BOOT_SEQ_CODE = {
+    0: [
+        '; Boot.NS — Namespace Root (Slot 0)',
+        '',
+        'B:00  FAULT_RST',
+        '      CR0–CR15  ← NULL          ; all capability registers cleared',
+        '      DR0–DR15  ← 0             ; all data registers zeroed',
+        '      M-Elevation ← ON          ; hardware supervisor mode enabled',
+        '',
+        'B:01  LOAD_NS',
+        '      GT15 ← createGT(Slot=0, perms=[none], type=Real)',
+        '      entry ← mLoad(GT15)       ; load NS table entry for Slot 0',
+        '      CR15 ← { word0=GT15, word1=base=0x0000,',
+        '               word2=NS_TABLE_BASE, word3=seals }',
+        '      ; CR15 = Namespace root — full memory view, no user perms',
+    ].join('\n'),
+
+    1: [
+        '; Boot.Thread — Initial Thread Identity (Slot 1)',
+        '',
+        'B:02  INIT_THRD',
+        '      GT12 ← createGT(Slot=1, perms=[none], type=Real)',
+        '      entry ← mLoad(GT12)       ; load NS table entry for Slot 1',
+        '      CR12 ← { word0=GT12, word1=entry.base,',
+        '               word2=entry.word1_limit, word3=entry.seals }',
+        '      ; CR12 = Thread identity — Priv zone, zero perms',
+        '      ; Informs-only: cannot be used for direct CALL',
+    ].join('\n'),
+
+    2: [
+        '; Boot.Abstr — Boot Code + C-List in one NS slot (Slot 2)',
+        '',
+        'B:03  INIT_ABSTR',
+        '      GT6a ← createGT(Slot=2, perms=[E], type=Real)',
+        '      entry ← mLoad(GT6a, perm=E)   ; must have E permission',
+        '      CR6  ← GT6a + entry            ; c-list pointer (temporary)',
+        '',
+        'B:04  LOAD_NUC',
+        '      GT2  ← createGT(Slot=2, perms=[E], type=Real)',
+        '      entry ← mLoad(GT2, perm=E)',
+        '      ; Validate: F-bit must=0 (Near), type must=Real',
+        '      base  = entry.word0_location',
+        '      alloc = entry.word1_limit + 1',
+        '      cN    = entry.clistCount       ; words allocated for c-list',
+        '      cStart = alloc − cN            ; c-list starts here',
+        '      CR14 ← { GT2, base=base,   limit=cStart-1, perms=[R,W,X] }',
+        '      CR6  ← { GT2, base=base+cStart, limit=cN-1, perms=[L]    }',
+        '      PC   ← 0                       ; enter Boot.Abstr code',
+        '',
+        'B:05  COMPLETE',
+        '      M-Elevation ← OFF',
+        '      bootComplete ← true',
+        '      ; All Layer 0–1 abstractions now initialized',
+    ].join('\n'),
+};
+
 // ── Implementation Status ──────────────────────────────────────────────────
 // Keys: "absIdx:methodName" (per method) or "abs:absIdx" (abstraction level)
 // Values: one of IMPL_STATUS_LEVELS
@@ -1543,6 +1602,14 @@ function showAbstractionDetail(index) {
             html += '</div>';
         }
         html += `<div class="abs-method-form-container" id="abs-form-${uid}"></div>`;
+        html += '</div>';
+    }
+
+    if (BOOT_SEQ_CODE[abs.index] !== undefined) {
+        html += '<div class="abs-detail-section abs-boot-code-section">';
+        html += '<div class="abs-detail-label">Boot Sequence Code</div>';
+        html += '<div class="abs-boot-code-desc">Installed implementation \u2014 executed by the STEP controller at power-on reset. Mirrors <code>_bootStep()</code> in simulator.js exactly.</div>';
+        html += `<pre class="abs-method-panel-code abs-boot-code-pre">${BOOT_SEQ_CODE[abs.index]}</pre>`;
         html += '</div>';
     }
 

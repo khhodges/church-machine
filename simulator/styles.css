@@ -7661,3 +7661,24 @@ pre:hover .code-copy-btn {
     border-radius: 50%;
     flex-shrink: 0;
 }
+
+/* Boot Sequence Code section */
+.abs-boot-code-section .abs-detail-label {
+    color: var(--impl-installed);
+    border-bottom-color: var(--impl-installed);
+}
+.abs-boot-code-desc {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-style: italic;
+}
+.abs-boot-code-desc code {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-style: normal;
+    color: var(--impl-js);
+    font-size: 0.68rem;
+}
+.abs-boot-code-pre {
+    border-left: 3px solid var(--impl-installed) !important;
+}
