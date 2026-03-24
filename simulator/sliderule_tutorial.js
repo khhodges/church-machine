@@ -102,7 +102,7 @@ class SlideRuleTutorial {
 </table>
 <div class="sr-key-concept">
 <div class="sr-concept-title">Instant Revocation</div>
-<p>The c-list is approval made concrete. Neither children, or experts cannot grant their abstraction access to resources they have not declared in advance then approved by the owner. Revoking this approval is easy just incrementing the GT version instantly cuts access — all copies become invalid.</p>
+<p>The c-list is digital approval made concrete. A spy cannot grant their abstraction access to resources the owner does to approve by providing a copy of the key, the Golden Token. Revoking a GT increments the version and instantly cuts access — all prior copies become invalid.</p>
 </div>`
             },
             {
