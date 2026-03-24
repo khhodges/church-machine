@@ -1388,7 +1388,6 @@ function _implStatusBest(abs) {
 
 function absSetMethodStatus(absIdx, mName, value) {
     _implStatusSet(`${absIdx}:${mName}`, value);
-    renderAbstractions();
     showAbstractionDetail(absIdx);
 }
 
@@ -1561,7 +1560,7 @@ function showAbstractionDetail(index) {
             ).join('');
             html += `<div class="abs-method-tabs abs-method-tabs-empty" style="display:flex;align-items:center;gap:6px;margin-top:4px">`;
             html += `<span style="font-size:0.65rem;color:var(--text-secondary)">Status:</span>`;
-            html += `<select class="impl-status-select impl-status-${absLvlStatus}" title="Abstraction implementation status" onchange="this.className='impl-status-select impl-status-'+this.value;_implStatusSet('abs:${uid}',this.value);renderAbstractions()">${absStatusOpts}</select>`;
+            html += `<select class="impl-status-select impl-status-${absLvlStatus}" title="Abstraction implementation status" onchange="_implStatusSet('abs:${uid}',this.value);showAbstractionDetail(${uid})">${absStatusOpts}</select>`;
             html += `<button class="btn abs-method-ctrl-btn" title="Add method" onclick="absShowAddForm(${uid})">+</button>`;
             html += '</div>';
         } else {
