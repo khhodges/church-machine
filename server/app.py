@@ -740,6 +740,42 @@ with app.app_context():
     db.create_all()
     logging.info("Database tables created")
 
+def _free_port(port):
+    """Kill any process holding the given port using /proc/net/tcp."""
+    import signal
+    for proto in ('tcp', 'tcp6'):
+        try:
+            with open(f'/proc/net/{proto}') as f:
+                for line in f:
+                    try:
+                        parts = line.strip().split()
+                        if len(parts) < 10:
+                            continue
+                        local = parts[1]
+                        if ':' not in local:
+                            continue
+                        lport = int(local.split(':')[1], 16)
+                        if lport != port:
+                            continue
+                        inode = parts[9]
+                        for pid in os.listdir('/proc'):
+                            if not pid.isdigit():
+                                continue
+                            try:
+                                for fd in os.listdir(f'/proc/{pid}/fd'):
+                                    try:
+                                        if f'socket:[{inode}]' in os.readlink(f'/proc/{pid}/fd/{fd}'):
+                                            os.kill(int(pid), signal.SIGKILL)
+                                    except OSError:
+                                        pass
+                            except OSError:
+                                pass
+                    except (ValueError, IndexError):
+                        continue
+        except OSError:
+            pass
+
 if __name__ == "__main__":
+    _free_port(5000)
     logging.info("Starting Church Machine server on port 5000")
     app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False, threaded=True)
