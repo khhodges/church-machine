@@ -4014,8 +4014,18 @@ a.next-step-link:hover {
 .abs-method-tabs {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0.4rem;
     margin-bottom: 0.6rem;
+}
+
+.abs-method-tab-spacer {
+    flex: 1;
+    min-width: 0.4rem;
+}
+
+.abs-method-tabs-empty {
+    margin-top: 0.3rem;
 }
 
 .abs-method-tab {

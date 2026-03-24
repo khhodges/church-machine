@@ -1312,15 +1312,12 @@ function showAbstractionDetail(index) {
         const methods = (abs.methods && abs.methods.length > 0) ? abs.methods : [];
         const uid = abs.index;
         html += '<div class="abs-detail-section abs-methods-section">';
-        html += '<div class="abs-methods-header">';
         html += '<div class="abs-detail-label">Methods</div>';
-        html += '<div class="abs-methods-controls">';
-        html += `<button class="btn abs-method-ctrl-btn" title="Add method" onclick="absShowAddForm(${uid})">+</button>`;
-        html += `<button class="btn abs-method-ctrl-btn abs-method-del-ctrl" title="Delete method" onclick="absShowDeleteForm(${uid})"${methods.length === 0 ? ' disabled' : ''}>\u2212</button>`;
-        html += '</div>';
-        html += '</div>';
         if (methods.length === 0) {
             html += '<div class="abs-method-empty">No methods registered \u2014 CALL enters the abstraction directly.</div>';
+            html += '<div class="abs-method-tabs abs-method-tabs-empty">';
+            html += `<button class="btn abs-method-ctrl-btn" title="Add method" onclick="absShowAddForm(${uid})">+</button>`;
+            html += '</div>';
         } else {
             html += `<div class="abs-method-tabs" id="abs-tabs-${uid}">`;
             for (let mi = 0; mi < methods.length; mi++) {
@@ -1328,6 +1325,9 @@ function showAbstractionDetail(index) {
                 const active = mi === 0 ? ' abs-method-tab-active' : '';
                 html += `<span class="abs-method-tab${active}" onclick="absSelectMethod(this,'abs-panel-${uid}-${mi}')">${m}</span>`;
             }
+            html += `<span class="abs-method-tab-spacer"></span>`;
+            html += `<button class="btn abs-method-ctrl-btn" title="Add method" onclick="absShowAddForm(${uid})">+</button>`;
+            html += `<button class="btn abs-method-ctrl-btn abs-method-del-ctrl" title="Delete method" onclick="absShowDeleteForm(${uid})">\u2212</button>`;
             html += '</div>';
             html += `<div class="abs-method-panels" id="abs-panels-${uid}">`;
             for (let mi = 0; mi < methods.length; mi++) {
@@ -1511,6 +1511,7 @@ function absDeleteMethod(absIdx) {
     const sel = document.getElementById(`abs-del-select-${absIdx}`);
     if (!sel) return;
     const name = sel.value;
+    if (!confirm(`Delete method "${name}"? This cannot be undone.`)) return;
     const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
     if (!abs || !abs.methods) return;
     abs.methods = abs.methods.filter(m => m !== name);
