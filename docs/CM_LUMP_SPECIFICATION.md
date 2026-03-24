@@ -5,8 +5,15 @@
 A **lump** is the fundamental deployable unit of the Church Machine. It is a
 contiguous, capability-secured memory region containing an executable code
 section and an optional capability list (c-list). Every function abstraction
-compiles to exactly one lump. The Thread is a specialised lump whose code
-section is replaced by a live execution context — see Appendix A.
+compiles to exactly one lump.
+
+- **Appendix A** covers the Thread — a specialised lump whose body holds live
+  execution state (capabilities, LIFO stack, heap, data registers) rather than
+  code.
+- **Appendix B** covers the Namespace LUMP — the root lump of every application,
+  which defines the physical address space, the pre-populated Namespace Table
+  (Live / Outform / NULL entries), and the lazy-load protocol for fetching absent
+  lumps from a Home Base IDE.
 
 ---
 
@@ -787,6 +794,435 @@ The difference from `Mint.Lump`:
 | Zip format | `*.lump.zip` | Created in-place; not distributed as zip |
 | lumpSize | 2^n, compiler-chosen | Fixed 2^8 = 256 words |
 | Header word | 0xF8xx_xxxx (typ=00) | 0xF900_020C (typ=10, cw=0, cc=12) |
+
+---
+
+*Document applies to: Church Machine IDE simulator · Boot.NS slots 1 (Boot.Thread), 2 (Boot.Abstr), 45 (Thread) · Tang Nano 20 K + Efinix Ti60 F225 targets.*
+
+---
+
+---
+
+# Appendix B — Namespace LUMP
+
+## Overview
+
+A **Namespace LUMP** is the root lump of a deployed application. Every
+running Church Machine application has exactly one Namespace LUMP, which
+defines three things that no other lump type defines:
+
+1. **Physical memory map** — the base address and total size of the
+   application's entire address space.
+2. **Namespace Table** — a fully pre-populated directory of every
+   abstraction the application can ever reach, in Live, Outform, or NULL
+   state.
+3. **Lazy-load machinery** — the Outform token format and the Locator
+   interface that fetches absent lumps on demand from a Home Base IDE.
+
+The system's root Namespace LUMP is Boot.NS (Slot 0), which spans the
+entire physical address space and whose NS Table covers every object in
+the machine. Application-scope Namespace LUMPs cover a sub-range and
+list only the abstractions their application references.
+
+---
+
+## Namespace LUMP Header Word (Word 0)
+
+A Namespace LUMP is a callable lump (`typ=00`) if it contains
+initialisation microcode (PC=1 on first CALL), or a clist-only lump
+(`typ=10`) if the NS Table is the sole content. Boot.NS uses `typ=00`
+because it runs the boot microcode sequence.
+
+### Boot.NS Header
+
+```
+31      27 26    23 22                10 9   8 7              0
++──────────+────────+──────────────────+──────+────────────────+
+│ 0x1F [5] │ n-6[4] │     cw [13]      │00[2] │    cc [8]      │
++──────────+────────+──────────────────+──────+────────────────+
+```
+
+| Field | Boot.NS value | Meaning |
+|-------|--------------|---------|
+| magic | 0x1F | Traps if executed out-of-sequence |
+| n-6   | 8 (2^14 = 16 384 words) | Covers full 64 KB physical address space |
+| cw    | boot sequence word count | Words 1..cw are boot microcode |
+| typ   | 00 | Callable — PC=1 on CALL, runs boot dispatcher |
+| cc    | 3 | C-list: Mint E-GT, Scheduler E-GT, Locator E-GT |
+
+### Application NS Header (pure-directory variant)
+
+```
+Boot.NS  (n=14, cw=BOOT_CODE_LEN, cc=3, typ=00):  0xF_nnnnn_00_03
+App.NS   (n=10, cw=INIT_CODE_LEN, cc=4, typ=00):  0xFA0_xxxxx_00_04
+```
+
+---
+
+## Physical Memory Map
+
+The Namespace LUMP's E-GT (Word 1 = base, Word 2 limit_offset) defines
+the **complete physical address range** the application owns. No memory
+outside this range is accessible to the application — Mint refuses to
+issue GTs that reference addresses beyond the NS LUMP's limit.
+
+```
+┌─────────────────────────────────────────────────────────┐  ← base
+│  Word 0     NS LUMP header                              │
+│  Words 1..cw  Boot / init microcode                     │
+│  Words cw+1..NS_TABLE_START-1  Freespace (all-zero)     │
+│  Words NS_TABLE_START..NS_TABLE_END  NS Table           │  ← N × 3 words
+│  Words NS_TABLE_END+1..lumpSize-cc-1  Trailing zeros    │
+│  Words lumpSize-cc..lumpSize-1  C-list                  │
+└─────────────────────────────────────────────────────────┘  ← base + lumpSize - 1
+```
+
+### Boot.NS Physical Map (simulator)
+
+| Region | Start | End | Size | Contents |
+|--------|-------|-----|------|----------|
+| Boot microcode | 0x0001 | 0x000B | 11 words | BOOT_SEQ pseudo-assembly (B:00–B:08) |
+| NS LUMP freespace | 0x000C | 0xFCFF | variable | All zero — Mint-verified |
+| NS Table | 0xFD00 | 0xFD83 | 44 × 3 = 132 words | 44 NS slots × 3 words each |
+| C-list (Mint, Sched, Locator) | 0xFD84 | 0xFD86 | 3 words | E-GT Word 0 × 3 |
+
+The NS Table lives at a **hardware-known fixed offset** within Boot.NS.
+On Tang Nano 20 K, `NS_TABLE_BASE = 0xFD00` is wired in the decoder;
+on Efinix Ti60 F225, the base is parameterised but fixed at synthesis time.
+
+---
+
+## Namespace Table — Entry Format
+
+The NS Table is a flat array of **N entries × 3 words**. N is the total
+number of object slots in the namespace. Only the object owner holds
+GT Word 0 (the per-holder credential) in their c-list — GT Word 0 is
+never stored in the NS Table.
+
+Each entry has one of three states: **Live**, **Outform**, or **NULL**.
+
+```
+Live entry   (lump resident in RAM):
+  Word 1:  base [32]                    physical base of lump binary
+  Word 2:  spare[4] | gt_seq[7] | limit_offset[21]
+  Word 3:  spare[15] | G[1] | CRC[16]   CRC-16/CCITT over GT Wrd0[24:0]+W1+W2
+
+Outform entry   (lump absent — lazy load pending):
+  Word 1:  content_id[32]               first 32 bits of SHA256 content hash
+  Word 2:  content_id[32]               next 32 bits of SHA256 content hash
+  Word 3:  spare[7] | loc_idx[8] | flags[8] | OUTFORM_MARKER[9]
+           loc_idx   → which Locator NS slot to call for this fetch
+           flags     → bit 0: required (fault if unreachable)
+                       bit 1: bundle (pre-bundled in install zip)
+                       bit 2: pinned (do not evict)
+           OUTFORM_MARKER = 0x1FF (9-bit sentinel, distinguishes from Live CRC)
+
+NULL entry   (no capability installed):
+  Word 1:  0x00000000
+  Word 2:  0x00000000
+  Word 3:  0x00000000
+```
+
+### Distinguishing Live from Outform
+
+The hardware distinguishes the three states at LOAD time using the low 9
+bits of NS Word 3:
+
+| NS Word 3 [8:0] | Interpretation |
+|-----------------|----------------|
+| `000000000` | NULL — all zero, faults immediately |
+| `111111111` (0x1FF) | Outform — Absent event fired, Locator invoked |
+| anything else | Live — CRC-16 field; LOAD re-computes and checks |
+
+A valid CRC-16/CCITT value of exactly `0x1FF` is astronomically unlikely
+and forbidden by Mint (Mint re-generates the lump if this collision occurs).
+The hardware state machine therefore requires no extra tag bit.
+
+---
+
+## NS Entry State Machine
+
+```
+         Mint.Lump()                Locator.fetch() + Mint.Lump()
+ NULL ─────────────────► Live ◄──────────────────────────────── Outform
+  ▲                        │                                       ▲
+  │      Revoke /          │ Evict                                 │
+  │      Mint.Revoke()     ▼                                       │
+  └──────────────────── Outform ──── IDE token preserved ──────────┘
+                           │
+                           ▼
+                      Absent event on LOAD/CALL
+                      → Locator subroutine invoked
+```
+
+| Transition | Who | How |
+|------------|-----|-----|
+| NULL → Live | Mint.Lump() | Binary validated, E-GT issued, NS Words 1-3 written |
+| NULL → Outform | IDE install | Outform token written into NS Words 1-3 |
+| Outform → Live | Locator + Mint.Lump() | Binary fetched, inflated, validated, NS slot updated |
+| Live → Outform | Memory Manager (eviction) | Lump binary freed; Outform token restored from manifest |
+| Live → NULL | Mint.Revoke() | gt_seq incremented in NS Word 2, slot zeroed |
+| Outform → NULL | Mint.Revoke() | Slot zeroed; content hash discarded |
+
+---
+
+## Outform Token Detail
+
+The 96-bit Outform token (NS Words 1–3) encodes enough information for
+the Locator to perform a cold fetch without any additional state:
+
+```
+NS Word 1  [31:0]   SHA256 content hash, bits [31:0]
+NS Word 2  [31:0]   SHA256 content hash, bits [63:32]
+NS Word 3  [31:9]   spare[7] | loc_idx[8] | dep_flags[8]
+           [8:0]    0x1FF — Outform marker (sentinel value)
+```
+
+The full SHA256 hash (256 bits) is too wide for 3 × 32-bit words.
+The first 64 bits (Words 1-2) are stored. The Locator fetches the lump by
+URL (resolved from a label→URL table it maintains), then verifies the full
+SHA256 against the downloaded bytes. The 64-bit prefix is sufficient for
+the Locator to select the correct cached copy if multiple versions exist
+locally.
+
+`loc_idx` is the NS slot index of the Locator abstraction to call. This
+allows different fetch policies (LAN cache, CDN, origin, peer-to-peer)
+for different subsets of the namespace, simply by pointing groups of
+Outform entries at different Locator NS slots.
+
+---
+
+## Lazy Load Protocol — Step by Step
+
+This is the full thread-level sequence when a LOAD or CALL targets an
+Outform NS slot. The calling thread is never aware of the pause.
+
+```
+① Thread issues:  LOAD CR_d, CR6, #slot_idx
+                  (or CALL CR_s  where CR_s.object_id → Outform NS slot)
+
+② Hardware reads NS[slot_idx] Words 1-3.
+   Detects Outform marker (Word 3 [8:0] == 0x1FF).
+   Hardware parks calling thread (CHANGE to Scheduler).
+
+③ Scheduler receives control.
+   Reads Outform token from NS[slot_idx].
+   Extracts loc_idx (NS Word 3 [24:17]) and content_id prefix (Words 1-2).
+
+④ Scheduler CALLs Locator[loc_idx].fetch(content_id_prefix).
+
+⑤ Locator resolves label → URL:
+     label = Locator's internal label-to-URL table
+     url   = cm://homebase.ide/{label}@sha256:{full_hash}
+
+⑥ Locator sends HTTP GET to Home Base IDE:
+     GET /lump/{label}@sha256:{hash}.lump.zip  HTTP/1.1
+     Authorization: Bearer <PassKey credential>
+   Response: ZIP file with the lump binary.
+
+⑦ Locator verifies ZIP:
+   a. Signature = 0x04034B50 ✓
+   b. Bit 3 of flags = 0 (no data descriptor) ✓
+   c. uncompressed_size → derive n = log2(size / 4) ✓
+   d. n in [6..14] ✓
+
+⑧ Locator calls Memory Manager (via RW-GT):
+   base = MemoryManager.alloc(n)   → returns physical base address
+
+⑨ Locator inflates ZIP payload into [base, base + 2^n × 4).
+
+⑩ Locator verifies SHA256 of inflated binary — reject + free if mismatch.
+
+⑪ Locator calls Mint.Lump(base, n):
+   Mint validates header, scans freespace, validates c-list.
+   Mint writes Live NS slot:
+     NS[slot_idx].Word1 = base
+     NS[slot_idx].Word2 = spare | gt_seq | (lumpSize-1)
+     NS[slot_idx].Word3 = spare | G=0 | CRC-16(...)
+   Mint issues E-GT to Locator (Locator stores in its own c-list).
+
+⑫ Locator RETURNs to Scheduler.
+
+⑬ Scheduler un-parks calling thread (CHANGE back).
+
+⑭ Thread retries LOAD / CALL.
+   NS slot is now Live — LOAD reconstructs GT normally.
+   Execution continues as if the lump had always been present.
+```
+
+**Cost:** one CHANGE out (step ②) and one CHANGE back (step ⑬). The
+thread pays exactly two context switches for a cold fetch. All network
+I/O is absorbed inside the Locator's own CHANGE cycle (see Flag Pool in
+the main body). The calling thread sees no network latency — only a
+brief scheduler pause.
+
+---
+
+## Home Base IDE Interface
+
+The Home Base IDE is the authoritative source for all application lumps.
+In the Church Machine IDE development environment this is the Replit-hosted
+Flask server (`server/app.py`). In production it is any server conforming
+to the following interface.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/lump/{label}@sha256:{hash}.lump.zip` | Fetch a specific lump by label and content hash |
+| `GET` | `/namespace/{app_id}/manifest.json` | Fetch the application's NS manifest |
+| `GET` | `/namespace/{app_id}/bundle.zip` | Fetch a full install bundle (namespace.zip) |
+| `POST` | `/lump/publish` | Upload a new lump binary (authenticated) |
+| `GET` | `/lump/{label}/latest` | Resolve latest hash for a label (for IDE use only) |
+
+### Authentication
+
+```
+Authorization: Bearer <PassKey GT credential>
+```
+
+The Locator holds a PassKey E-GT in its c-list (issued by the IDE at
+install time). The Home Base IDE verifies the credential against its
+registered application PassKey list. Unsigned requests are rejected.
+
+### Response Format
+
+A successful `GET /lump/...` returns:
+```
+Content-Type: application/zip
+Content-Length: <compressed_size>
+
+[ZIP local file header]
+[Compressed lump binary — DEFLATE or RLE]
+[ZIP central directory]
+```
+
+Bit 3 of the ZIP general-purpose flags is always 0 (uncompressed size
+present in local file header). The Locator reads the uncompressed size
+before downloading the body, pre-allocates physical memory, then streams
+directly into the allocated region.
+
+---
+
+## Application Namespace Bundle (namespace.zip)
+
+An application is distributed as a `namespace.zip` file containing the
+NS LUMP binary, a manifest, and an optional set of pre-bundled dependency
+lumps. The Loader inflates the bundle at install time.
+
+```
+app_name.namespace.zip
+├── manifest.json          ← install metadata + NS Table declarations
+├── App.bin                ← application NS LUMP binary
+├── [optional pre-bundled deps]
+│   ├── SlideRule.bin
+│   ├── Decimal.bin
+│   └── ...
+└── [everything else is Outform — fetched on demand from Home Base]
+```
+
+### manifest.json Schema
+
+```json
+{
+  "app_id":   "com.example.SlideRuleApp",
+  "version":  "1.0.0",
+  "ns_lump":  "App.bin",
+  "base":     "0x00010000",
+  "n":        10,
+  "entries": [
+    {
+      "slot":    0,
+      "label":   "Boot.NS",
+      "state":   "live",
+      "file":    null,
+      "hash":    null
+    },
+    {
+      "slot":    16,
+      "label":   "SlideRule",
+      "state":   "bundled",
+      "file":    "SlideRule.bin",
+      "hash":    "sha256:a3f9c2..."
+    },
+    {
+      "slot":    17,
+      "label":   "Decimal",
+      "state":   "outform",
+      "file":    null,
+      "hash":    "sha256:d4e8f1...",
+      "loc_idx": 2,
+      "flags":   1
+    }
+  ]
+}
+```
+
+| `state` value | NS Table entry written | Binary needed? |
+|---------------|----------------------|----------------|
+| `live`        | Live entry (base+CRC) | Must be present at install |
+| `bundled`     | Live entry after Mint | Included in namespace.zip |
+| `outform`     | Outform token (hash + loc_idx) | Fetched on demand |
+| `null`        | NULL entry (all zeros) | Never fetched |
+
+### Install Sequence
+
+```
+1. Loader receives namespace.zip
+2. Extract manifest.json — parse base, n, entry list
+3. Verify App.bin header: magic=0x1F, typ correct, n matches
+4. Pre-allocate NS LUMP region at declared base
+5. Inflate App.bin into region — Mint.Lump validates and issues E-GT
+6. For each 'bundled' entry:
+   a. Inflate *.bin from zip into Memory Manager allocation
+   b. Mint.Lump → Live NS slot
+7. For each 'outform' entry:
+   a. Write Outform token (hash prefix + loc_idx + flags) into NS slot
+8. For each 'null' entry:
+   a. Zero NS slot (already zero; explicit for clarity)
+9. Install complete — NS Table is fully populated
+   Any un-fetched lumps fire Absent events on first LOAD/CALL
+```
+
+---
+
+## Boot.NS as the Root Namespace LUMP
+
+Boot.NS (Slot 0) is a special case of the Namespace LUMP:
+
+| Property | Boot.NS | Application NS LUMP |
+|----------|---------|---------------------|
+| Base | 0x0000 | Declared in manifest |
+| limit_offset | Entire RAM − 1 | 2^n − 1 (sub-range) |
+| typ | 00 (callable — runs boot microcode) | 00 or 10 |
+| N (NS Table entries) | All 46 boot slots | App-specific count |
+| NS Table location | `NS_TABLE_BASE = 0xFD00` (hardware fixed) | Declared in manifest or header field |
+| C-list | Mint, Scheduler, Locator (cc=3) | App-chosen (cc=1..255) |
+| Issued by | Hardware at power-on (pre-written) | Mint.Lump() at install time |
+| Distribution | Embedded in FPGA bitstream | namespace.zip |
+
+Boot.NS is the only lump that is not itself issued by Mint. It is written
+directly by the hardware synthesis toolchain into the FPGA block RAM image.
+All subsequent Namespace LUMPs (application and sub-application) are issued
+by Mint and occupy sub-ranges of the physical address space that Boot.NS
+already owns.
+
+---
+
+## Namespace LUMP vs Function Abstraction — Summary
+
+| Property | Function Abstraction | Namespace LUMP |
+|----------|---------------------|----------------|
+| Word 0 | Header (magic 0x1F, typ=00) | Header (magic 0x1F, typ=00 or 10) |
+| cw | Code words (methods + dispatcher) | Init microcode (may be 0) |
+| cc | Compiler-fixed (deps) | Mint E-GT + Scheduler + Locator(s) |
+| Body | Code + freespace + c-list | Code + freespace + **NS Table** + c-list |
+| Physical scope | One lump region | **Entire application address space** |
+| NS Table | None — uses parent NS | **IS the NS Table** |
+| Outform entries | Never — all deps resident | Supported — lazy-loads on demand |
+| Lazy load | Via Locator in c-list | **Hosts** the Locator via its c-list |
+| Distribution | `*.lump.zip` | `*.namespace.zip` with manifest |
+| CALL target | Yes — method dispatcher at PC=1 | Yes (typ=00) or No (typ=10) |
 
 ---
 
