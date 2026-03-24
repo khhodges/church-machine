@@ -223,6 +223,7 @@ class ChurchSimulator {
             { label: 'Email',         perms: {R:0,W:0,X:0,L:1,S:0,E:1}, chainable: false },
             { label: 'PAIR',          perms: {R:0,W:0,X:1,L:1,S:0,E:1}, chainable: false },
             { label: 'GC',            perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false, handler: 'gc' },
+            { label: 'Thread',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
         ];
     }
 

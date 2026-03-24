@@ -187,6 +187,7 @@ function init() {
     systemAbstractions = new SystemAbstractions(abstractionRegistry);
     deviceAbstractions = new DeviceAbstractions(abstractionRegistry);
     sim.initAbstractions(abstractionRegistry, systemAbstractions, deviceAbstractions);
+    sim.reset();
 
     if (typeof CLOOMCCompiler !== 'undefined') {
         cloomcCompiler = new CLOOMCCompiler();
@@ -1056,7 +1057,7 @@ function updateInfoDisplay() {
         <div class="info-item"><span class="info-label">Golden Tokens</span><span class="info-value">32-bit: Version(7) | Index(17) | Perms(6) | Type(2)</span></div>
         <div class="info-item"><span class="info-label">Security Gates</span><span class="info-value">mLoad (R\u2192DREAD, W\u2192DWRITE, X\u2192LAMBDA, L\u2192LOAD, S\u2192SAVE, E\u2192CALL) + mSave (Version, Seal, Bounds, B-bit, F-bit)</span></div>
         <div class="info-item"><span class="info-label">Security Blocks</span><span class="info-value">Each abstraction is a security block with MTBF \u2014 Turing hidden inside Church-callable entries, CALL in, RETURN out, atomic</span></div>
-        <div class="info-item"><span class="info-label">Abstraction Layers</span><span class="info-value">9 layers, ${abstractionRegistry ? abstractionRegistry.count() : 45} abstractions (Boot, System, Hardware, Math, Lambda Calculus, Social, IDE, Internet, GC)</span></div>
+        <div class="info-item"><span class="info-label">Abstraction Layers</span><span class="info-value">9 layers, ${abstractionRegistry ? abstractionRegistry.count() : 46} abstractions (Boot, System, Hardware, Math, Lambda Calculus, Social, IDE, Internet, GC)</span></div>
     `;
 }
 
@@ -2716,7 +2717,7 @@ CALL   CR1              ; Debugger.Inspect:
                 'Build': `; Deployer.Build — compile binary for ${brdName}\nLOAD   CR1, NS[36]      ; Load Deployer E-GT\nLOAD   CR2, NS[81]      ; Binary GT (DATA object)\n\nCALL   CR1              ; Deployer.Build:\n;   1. DREAD binary from CR2's location\n;   2. Add boot vector and NS table initialization\n;   3. Package for FPGA: ${chip} bitstream\n;   4. Memory.Allocate for deployment image\n;   5. Mint.Create GT for image\n; CR2 <- deployment image GT`,
                 'Upload': `; Deployer.Upload — send to ${brdName} via UART\nLOAD   CR1, NS[36]      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Upload:\n;   1. LOAD UART GT from c-list (NS[11])\n;   2. For each word in deployment image:\n;      SAVE word to UART (S perm on UART GT)\n${uartNote}\n;   4. Wait for ACK after each block`,
                 'Verify': `; Deployer.Verify — verify upload integrity\nLOAD   CR1, NS[36]      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Verify:\n;   1. Request readback from ${brdName} via UART\n;   2. LOAD bytes from UART (L perm)\n;   3. Compare against original image\n;   4. Compute checksum match\n; DR0 <- 1 if verified, 0 if mismatch`,
-                'Boot': `; Deployer.Boot — boot the FPGA\nLOAD   CR1, NS[36]      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Boot:\n;   1. Send boot command via UART\n${bootLine}\n;   3. FPGA initializes NS table (slots 0-44)\n;   4. Boot -> Salvation -> Navana (same as simulator)\n${clkNote}`,
+                'Boot': `; Deployer.Boot — boot the FPGA\nLOAD   CR1, NS[36]      ; Load Deployer E-GT\n\nCALL   CR1              ; Deployer.Boot:\n;   1. Send boot command via UART\n${bootLine}\n;   3. FPGA initializes NS table (slots 0-45)\n;   4. Boot -> Salvation -> Navana (same as simulator)\n${clkNote}`,
             };
         })(),
         'Browser': {
@@ -2952,12 +2953,12 @@ CALL   CR1              ; GC.Scan:
 LOAD   CR1, NS[44]      ; Load GC E-GT
 
 CALL   CR1              ; GC.Identify:
-;   1. Scan NS table (slots 45..nsCount):
+;   1. Scan NS table (slots 46..nsCount):
 ;      read word1[29] (G-bit) for each entry
 ;      if G-bit != current polarity: entry is garbage
 ;   2. Build garbage list
 ; DR0 <- number of garbage entries found
-; Skip boot slots 0-44 (always live)`,
+; Skip boot slots 0-45 (always live)`,
             'Clear': `; GC.Clear — zero garbage memory
 LOAD   CR1, NS[44]      ; Load GC E-GT
 
