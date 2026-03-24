@@ -1183,6 +1183,58 @@ a.next-step-link:hover {
     margin-bottom: 0.1rem;
 }
 
+.boot-image-view {
+    padding: 0.4rem 0.6rem 0.8rem;
+    font-size: 0.78rem;
+}
+.boot-image-header {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--church-gold, #f4b942);
+    letter-spacing: 0.02em;
+    margin-bottom: 0.15rem;
+}
+.boot-image-subtitle {
+    color: #6b7280;
+    font-size: 0.72rem;
+    margin-bottom: 0.9rem;
+    font-style: italic;
+}
+.boot-section-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #e0e0e0;
+    margin: 0.85rem 0 0.35rem;
+    border-left: 3px solid var(--church-gold, #f4b942);
+    padding-left: 0.5rem;
+}
+.boot-section-note {
+    color: #6b7280;
+    font-weight: 400;
+    font-size: 0.7rem;
+}
+.boot-microcode {
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 5px;
+    padding: 0.5rem 0.7rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.74rem;
+    line-height: 1.55;
+}
+.boot-code-blank  { height: 0.5rem; }
+.boot-code-comment { color: #4b7c2e; }
+.boot-code-step   { color: #e0e0e0; }
+.boot-step-kw     { color: #f4b942; font-weight: 700; }
+.boot-code-body   { color: #a1a1aa; padding-left: 1.4rem; }
+
+.boot-ns-table th, .boot-clist-table th {
+    background: rgba(244,185,66,0.08);
+}
+.boot-ns-idx   { color: rgba(200,155,60,0.85); font-family: monospace; font-size: 0.73rem; }
+.boot-ns-label { color: #93c5fd; font-style: italic; font-size: 0.75rem; }
+.boot-ns-addr  { color: #f97316; font-family: monospace; font-size: 0.73rem; }
+
 .pipeline-wrapper {
     padding: 1rem;
 }

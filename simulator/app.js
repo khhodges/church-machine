@@ -1096,55 +1096,124 @@ function _renderGTRow(idx, addr, word) {
     return `<tr><td style="color:rgba(200,155,60,0.7);">${idx}</td><td>0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td><td style="color:rgba(206,145,120,0.6);">${hex}</td><td>${decoded}</td></tr>`;
 }
 
+function _bootHtmlEsc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderBootNSImage() {
+    const typeColors = ['#6b7280','#60a5fa','#c084fc','#34d399'];
+    const typeNames  = ['NULL','Real','Abstract','Outform'];
+
+    let html = '<div class="boot-image-view">';
+
+    // ── Header ────────────────────────────────────────────────────────────
+    html += '<div class="boot-image-header">Boot ROM Image — Boot.NS (Slot 0)</div>';
+    html += '<div class="boot-image-subtitle">Content below is hardwired at design time and frozen into the FPGA BRAM / SPI-flash bitstream.</div>';
+
+    // ── Section 1: Boot Microcode ──────────────────────────────────────────
+    html += '<div class="boot-section-label">① Boot Microcode &nbsp;<span class="boot-section-note">6 steps · hardwired state machine · not stored as code words in RAM</span></div>';
+    html += '<div class="boot-microcode">';
+    for (const code of Object.values(BOOT_SEQ_CODE)) {
+        for (const raw of code.split('\n')) {
+            const line = raw;
+            if (line.trim() === '') {
+                html += '<div class="boot-code-blank"></div>';
+            } else if (line.trim().startsWith(';')) {
+                html += `<div class="boot-code-comment">${_bootHtmlEsc(line)}</div>`;
+            } else if (/^\s*B:\d+/.test(line)) {
+                const m = line.match(/^(\s*B:\d+\s+\S+)(.*)/);
+                if (m) html += `<div class="boot-code-step"><span class="boot-step-kw">${_bootHtmlEsc(m[1])}</span>${_bootHtmlEsc(m[2])}</div>`;
+                else    html += `<div class="boot-code-step">${_bootHtmlEsc(line)}</div>`;
+            } else {
+                html += `<div class="boot-code-body">${_bootHtmlEsc(line)}</div>`;
+            }
+        }
+        html += '<div class="boot-code-blank"></div>';
+    }
+    html += '</div>';
+
+    // ── Section 2: NS Table ────────────────────────────────────────────────
+    const nsWords = sim.nsCount * sim.NS_ENTRY_WORDS;
+    html += `<div class="boot-section-label">② NS Table &nbsp;<span class="boot-section-note">at 0x${sim.NS_TABLE_BASE.toString(16).toUpperCase().padStart(4,'0')} · ${sim.nsCount} entries × 3 words = ${nsWords} words (${nsWords*4} bytes)</span></div>`;
+    html += '<table class="ns-mem-table boot-ns-table"><thead><tr>';
+    html += '<th>Entry</th><th>Label</th><th>W0 · Base Addr</th><th>W1 · Type / Flags / Limit</th><th>W2 · Ver · CRC</th><th>C-list</th>';
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < sim.nsCount; i++) {
+        const base  = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const w0    = sim.memory[base]     || 0;
+        const w1    = sim.memory[base + 1] || 0;
+        const w2    = sim.memory[base + 2] || 0;
+        const p     = sim.parseNSWord1(w1);
+        const ver   = (w2 >>> 25) & 0x7F;
+        const seal  = w2 & 0xFFFF;
+        const label = sim.nsLabels[i] || '-';
+        const tName = typeNames[p.gtType] || '?';
+        const tCol  = typeColors[p.gtType] || '#888';
+        const empty = (w0 === 0 && w1 === 0 && w2 === 0);
+        const flags = (p.f ? ' F' : '') + (p.b ? ' B' : '') + (p.g ? ' G' : '') + (p.chainable ? ' Chain' : '');
+        html += `<tr${empty ? ' style="opacity:0.28;"' : ''}>`;
+        html += `<td class="boot-ns-idx">NS[${i}]</td>`;
+        html += `<td class="boot-ns-label">${_bootHtmlEsc(label)}</td>`;
+        html += `<td class="boot-ns-addr">0x${(w0>>>0).toString(16).toUpperCase().padStart(4,'0')}</td>`;
+        html += `<td style="color:${tCol};font-family:monospace;font-size:0.75rem;">${tName}${flags} · Lim=0x${p.limit.toString(16).toUpperCase().padStart(4,'0')} (${p.limit+1}w)</td>`;
+        html += `<td style="color:#71717a;font-family:monospace;font-size:0.73rem;">v${ver} · CRC=0x${seal.toString(16).toUpperCase().padStart(4,'0')}</td>`;
+        html += `<td style="color:#f59e0b;font-size:0.73rem;">${p.clistCount ? p.clistCount + ' GT' + (p.clistCount!==1?'s':'') : ''}</td>`;
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    // ── Section 3: Boot.Abstr C-list ──────────────────────────────────────
+    const slot2Entry = sim.readNSEntry(2);
+    if (slot2Entry) {
+        const s2lim      = sim.parseNSWord1(slot2Entry.word1_limit);
+        const clistCount = s2lim.clistCount;
+        const allocSize  = s2lim.limit + 1;
+        const clistStart = allocSize - clistCount;
+        const clistBase  = slot2Entry.word0_location + clistStart;
+        html += `<div class="boot-section-label">③ Boot.Abstr C-list &nbsp;<span class="boot-section-note">at 0x${clistBase.toString(16).toUpperCase().padStart(4,'0')} · ${clistCount} capability entries · one GT per NS slot</span></div>`;
+        html += '<table class="ns-mem-table boot-clist-table"><thead><tr>';
+        html += '<th>#</th><th>Addr</th><th>GT Word (32-bit)</th><th>Slot</th><th>Label</th><th>Perms</th><th>Type</th>';
+        html += '</tr></thead><tbody>';
+        for (let i = 0; i < clistCount; i++) {
+            const addr   = clistBase + i;
+            const gtWord = sim.memory[addr] || 0;
+            const addrHex = '0x' + addr.toString(16).toUpperCase().padStart(4,'0');
+            const gtHex   = '0x' + (gtWord>>>0).toString(16).toUpperCase().padStart(8,'0');
+            if (gtWord === 0) {
+                html += `<tr style="opacity:0.3;"><td style="color:#888">${i}</td><td>${addrHex}</td><td style="font-family:monospace;">${gtHex}</td><td colspan="4" style="color:#555;">NULL — Slot 3 (reserved empty)</td></tr>`;
+                continue;
+            }
+            const gt       = sim.parseGT(gtWord);
+            const slotLabel= sim.nsLabels[gt.index] || '-';
+            const perms    = gt.permissions;
+            const permStr  = Object.entries(perms).filter(([,v])=>v).map(([k])=>k).join('') || 'none';
+            const tCol     = typeColors[gt.type] || '#888';
+            html += '<tr>';
+            html += `<td style="color:rgba(200,155,60,0.8);font-size:0.73rem;">${i}</td>`;
+            html += `<td style="font-family:monospace;color:#525252;font-size:0.73rem;">${addrHex}</td>`;
+            html += `<td style="font-family:monospace;color:rgba(206,145,120,0.85);font-size:0.73rem;">${gtHex}</td>`;
+            html += `<td style="color:#f59e0b;font-size:0.73rem;">${gt.index}</td>`;
+            html += `<td style="color:#93c5fd;font-style:italic;font-size:0.73rem;">${_bootHtmlEsc(slotLabel)}</td>`;
+            html += `<td style="color:#4ade80;font-family:monospace;font-size:0.73rem;">${permStr}</td>`;
+            html += `<td style="color:${tCol};font-size:0.73rem;">${gt.typeName}</td>`;
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
 function renderMemoryDump(location, limit, nsIndex) {
+    if (nsIndex === 0) return renderBootNSImage();
+
     const wordCount = limit;
     if (wordCount <= 0) return '<span style="color:#888;">Empty (limit=0)</span>';
 
-    const isBootNS = (nsIndex === 0 && location === sim.NS_TABLE_BASE);
-
     let html = '<table class="ns-mem-table"><thead><tr>';
-    if (isBootNS) {
-        html += '<th>Entry</th><th>Address</th><th>W0: Location</th><th>W1: Flags+Limit</th><th>W2: Ver+Seal</th><th>Decoded</th>';
-    } else {
-        html += '<th>Offset</th><th>Address</th><th>Hex</th><th>Decoded</th>';
-    }
+    html += '<th>Offset</th><th>Address</th><th>Hex</th><th>Decoded</th>';
     html += '</tr></thead><tbody>';
 
-    const permNames = ['B','R','W','X','L','S','E'];
-    const typeNamesGT = {0:'NULL', 1:'Real', 2:'Abstract', 3:'???'};
-
-    if (isBootNS) {
-        const entryCount = Math.floor(wordCount / 3);
-        for (let e = 0; e < entryCount; e++) {
-            const base = location + e * 3;
-            const w0 = sim.memory[base] || 0;
-            const w1 = sim.memory[base + 1] || 0;
-            const w2 = sim.memory[base + 2] || 0;
-            if (w0 === 0 && w1 === 0 && w2 === 0) continue;
-            const parsed = sim.parseNSWord1(w1);
-            const ver = (w2 >>> 25) & 0x7F;
-            const seal = w2 & 0xFFFF;
-            const label = sim.nsLabels[e] || '';
-            const typeName = typeNamesGT[parsed.gtType] || '?';
-            const addrHex = '0x' + base.toString(16).toUpperCase().padStart(4, '0');
-            const w0Hex = '0x' + (w0 >>> 0).toString(16).toUpperCase().padStart(8, '0');
-            const w1Hex = '0x' + (w1 >>> 0).toString(16).toUpperCase().padStart(8, '0');
-            const w2Hex = '0x' + (w2 >>> 0).toString(16).toUpperCase().padStart(8, '0');
-            let decoded = `<span style="color:rgba(78,201,176,0.7);">${typeName}</span>`;
-            decoded += ` F=${parsed.f} G=${parsed.g}`;
-            decoded += ` Lim=0x${parsed.limit.toString(16).toUpperCase().padStart(5,'0')}`;
-            decoded += ` v${ver}`;
-            if (label) decoded += ` <span style="color:rgba(156,220,254,0.6);">(${label})</span>`;
-            html += `<tr>`;
-            html += `<td style="color:rgba(200,155,60,0.7);">NS[${e}]</td>`;
-            html += `<td>${addrHex}</td>`;
-            html += `<td style="color:rgba(206,145,120,0.6);">${w0Hex}</td>`;
-            html += `<td style="color:rgba(206,145,120,0.6);">${w1Hex}</td>`;
-            html += `<td style="color:rgba(206,145,120,0.6);">${w2Hex}</td>`;
-            html += `<td>${decoded}</td>`;
-            html += '</tr>';
-        }
-    } else {
+    {
         const nsEntry = sim.readNSEntry(nsIndex);
         const parsedW1 = nsEntry ? sim.parseNSWord1(nsEntry.word1_limit) : null;
         const rawClistCount = parsedW1 ? parsedW1.clistCount : 0;
