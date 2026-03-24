@@ -142,9 +142,9 @@ ${this._memMap(null)}
 <tr><td>DR1\u2013DR3</td><td>Arguments 2\u20134</td></tr>
 <tr><td>DR4\u2013DR11</td><td>Local variables (caller-saved)</td></tr>
 <tr><td>DR12\u2013DR14</td><td>Temporaries</td></tr>
-<tr><td>DR15</td><td>Stack-spill pointer \u00b7 reserved</td></tr>
+<tr><td>DR15</td><td><strong>Stack-spill base pointer \u00b7 architecture-reserved.</strong> When the LIFO stack approaches its depth limit the hardware raises <code>STACK_OVERFLOW</code> and uses DR15 to record the base of the spill area so suspended frame words can be relocated safely. DR15 must not be used as a general-purpose register; the compiler leaves it alone and the runtime owns it exclusively.</td></tr>
 </table>
-<p>Being at the <em>fixed base</em> of the lump means the CPU always knows their addresses: <code>lumpBase + allocSize \u2212 16</code>. No pointer arithmetic needed at runtime.</p>
+<p>Because the Data Register file always occupies the <em>last 16 words</em> of the thread lump, the CPU derives their physical address at thread-creation time and never recalculates it: <code>lumpBase + allocSize \u2212 16</code>. This eliminates any runtime pointer arithmetic for register save/restore during CHANGE \u2014 CHANGE writes DR0\u2013DR15 directly to those fixed words and reads them back on resume without walking any indirection chain.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">DREAD / DWRITE</div>
 <p>DR registers are addressed by the <strong>DREAD</strong> and <strong>DWRITE</strong> instructions using a Golden Token (like every other memory region). This means a TPERM check runs on every register access \u2014 no register can be read or written without the correct permission bits in the GT.</p></div>`
             },
