@@ -98,8 +98,8 @@ ${this._memMap(null)}
 <tr><td>STO [11:0]</td><td>Saved stack-top-offset hidden register (restored by RETURN)</td></tr>
 </table>
 <p><strong>MASK is in the RETURN instruction, not the frame.</strong> The low 12 bits of the RETURN literal specify which CRs to clear after context restoration. This frees the 12 bits in the frame word for STO instead.</p>
-<div class="sr-key-concept"><div class="sr-concept-title">FIFO, Not LIFO</div>
-<p>The stack discipline is <strong>First-In First-Out</strong> from the runtime\u2019s perspective: CALL is the entry, RETURN is the exit, and nested calls push sequentially downward. The abstraction model guarantees no frame can be forged or overwritten because all stack words are inside the thread\u2019s lump boundary. The hidden <strong>STO register</strong> (0\u20134095) tracks the current stack top offset from word 12 and is saved/restored across every call and context switch.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">LIFO, Not FIFO</div>
+<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL pushes a frame downward and RETURN pops the most recent frame first \u2014 the last call entered is the first to exit. Nested calls push sequentially deeper; unwinding always reverses that order. The abstraction model guarantees no frame can be forged or overwritten because all stack words are inside the thread\u2019s lump boundary. The hidden <strong>STO register</strong> (0\u20134095) tracks the current stack top offset from word 12 and is saved/restored across every call and context switch.</p></div>`
             },
             {
                 title: '\u2462 Freespace \u2014 The Dynamic Buffer',
