@@ -85,7 +85,7 @@ class SlideRuleTutorial {
 </div>`
             },
             {
-                title: "Security: Negotiated Approval Made Concrete",
+                title: "Security: The C-List as Authority",
                 type: "architecture",
                 content: `<p>A Golden Token (GT) is a 32-bit unforgeable capability — one word stored in a c-list slot:</p>
 <pre class="sr-encoding"> 31      25 24  23 22      16 15           0
