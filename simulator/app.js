@@ -1593,7 +1593,7 @@ function showAbstractionDetail(index) {
                 html += `<div class="abs-method-panel-item" id="abs-panel-${uid}-${mi}"${display}>`;
                 html += `<div class="abs-method-panel-header">`;
                 html += `<div class="abs-method-panel-name">${abs.name}.${m}</div>`;
-                html += `<button class="btn abs-method-ctrl-btn abs-method-edit-btn" title="Edit method" onclick="absShowEditForm(${uid},${JSON.stringify(m)})">&#9998;</button>`;
+                html += `<button class="btn abs-method-ctrl-btn abs-method-edit-btn" title="Edit method" onclick="absShowEditForm(${uid},${mi})">&#9998;</button>`;
                 html += `</div>`;
                 html += `<div class="abs-method-panel-desc">${purpose}</div>`;
                 if (example) {
@@ -1755,14 +1755,16 @@ function absHideForm(absIdx) {
     if (fc) { fc.innerHTML = ''; fc.dataset.mode = ''; }
 }
 
-function absShowEditForm(absIdx, mName) {
+function absShowEditForm(absIdx, mi) {
     const fc = document.getElementById(`abs-form-${absIdx}`);
     if (!fc) return;
+    const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
+    if (!abs) return;
+    const mName = abs.methods[mi];
+    if (!mName) return;
     if (fc.dataset.mode === 'edit' && fc.dataset.editTarget === mName) {
         fc.innerHTML = ''; fc.dataset.mode = ''; fc.dataset.editTarget = ''; return;
     }
-    const abs = abstractionRegistry && abstractionRegistry.getAbstraction(absIdx);
-    if (!abs) return;
     const purposes = getMethodPurposes(abs);
     const examples = getMethodExamples(abs);
     const curDesc = purposes[mName] || '';
@@ -1778,13 +1780,16 @@ function absShowEditForm(absIdx, mName) {
   <label class="abs-method-form-label">Pseudocode / Assembly</label>
   <textarea class="abs-method-form-textarea abs-method-form-code" id="abs-edit-code-${absIdx}" rows="4" spellcheck="false">${curCode.replace(/</g,'&lt;')}</textarea>
   <div class="abs-method-form-actions">
-    <button class="btn btn-sm" onclick="absUpdateMethod(${absIdx},${JSON.stringify(mName)})">Save</button>
+    <button class="btn btn-sm" onclick="absUpdateMethod(${absIdx})">Save</button>
     <button class="btn btn-sm abs-method-form-cancel" onclick="absHideForm(${absIdx})">Cancel</button>
   </div>
 </div>`;
 }
 
-function absUpdateMethod(absIdx, mName) {
+function absUpdateMethod(absIdx) {
+    const fc = document.getElementById(`abs-form-${absIdx}`);
+    const mName = fc ? fc.dataset.editTarget : null;
+    if (!mName) return;
     const descEl = document.getElementById(`abs-edit-desc-${absIdx}`);
     const codeEl = document.getElementById(`abs-edit-code-${absIdx}`);
     if (!descEl) return;
