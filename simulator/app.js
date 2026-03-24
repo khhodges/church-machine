@@ -1605,7 +1605,8 @@ function showAbstractionDetail(index) {
         html += '</div>';
     }
 
-    if (BOOT_SEQ_CODE[abs.index] !== undefined) {
+    const _methods = (abs.methods && abs.methods.length > 0) ? abs.methods : [];
+    if (BOOT_SEQ_CODE[abs.index] !== undefined && _methods.length === 0) {
         html += '<div class="abs-detail-section abs-boot-code-section">';
         html += '<div class="abs-detail-label">Boot Sequence Code</div>';
         html += '<div class="abs-boot-code-desc">Installed implementation \u2014 executed by the STEP controller at power-on reset. Mirrors <code>_bootStep()</code> in simulator.js exactly.</div>';
@@ -1873,6 +1874,14 @@ function getMethodPurposes(abs) {
             'switchTo': 'Thread.switchTo(thread_GT) — issues CHANGE targeting thread_GT; saves the calling thread\u2019s full context (DR0\u2013DR15, PC, FLAGS, STO, CR12, CR14, CR15) into its lump, then restores the target thread\u2019s saved context and resumes it at its saved PC. Requires E perm on thread_GT.',
             'Kill':     'Thread.Kill(thread_GT) — terminates the target thread: suspends it via CHANGE, releases its lump via Memory.Free, revokes its Thread GT via Mint.Revoke (incrementing gt_seq so all live copies of the GT become instantly invalid). Requires E perm on thread_GT.',
             'Compile':  'Thread.Compile(f_GT) \u2014 creates a new Thread Abstraction whose initial start abstraction is f. Calls Memory.Allocate for a fresh lump (GT zone + LIFO stack + heap + DR file), calls Mint.Create(Inform, lumpSize, 0) to mint a zero-perm Thread Identity GT (CR12 of the new thread), stores f_GT into the new thread\u2019s c-list as CR0 (the return/first-call slot), and returns the new Thread GT to the caller. The new thread is ready to run as soon as switchTo is called on its GT.',
+        },
+        'Boot.Thread': {
+            'run': 'Boot.Thread.run \u2014 The initial thread\u2019s continuous existence as the hardware execution context. ' +
+                   'CR12 holds the thread identity GT as an \u2018Inform\u2019: perms=[none], meaning no E-bit, so no code can invoke it via CALL. ' +
+                   'The final comment in B:02 \u2014 \u201cInforms-only: cannot be used for direct CALL\u201d \u2014 means exactly this: ' +
+                   'the thread does not run by being invoked. It runs because it IS the processor\u2019s current execution context \u2014 ' +
+                   'the STEP controller simply advances PC through the thread\u2019s code lump each cycle. ' +
+                   'You cannot CALL a thread from outside; you can only CHANGE into one via Thread.switchTo (which requires E perm on the Thread GT, not on CR12).',
         },
     };
     const base = knownPurposes[abs.name] ? Object.assign({}, knownPurposes[abs.name]) : purposes;
@@ -3426,6 +3435,43 @@ CALL   CR_mint, #Create ; Mint.Create(Inform, lumpSize, perms=0) ->
 DWRITE DR0, lump[0]     ; store f_GT into new thread's GT zone word 0
                          ;   (CR0 of the new thread = first-call slot)
 ; Returns: new Thread GT — call Thread.switchTo to begin execution`,
+        },
+        'Boot.Thread': {
+            'run': `; Boot.Thread.run — B:02 INIT_THRD boot step (Slot 1)
+; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+; This method IS the thread — it has no entry point.
+; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+B:02  INIT_THRD
+      GT12 ← createGT(Slot=1, perms=[none], type=Real)
+      entry ← mLoad(GT12)       ; load NS entry for Slot 1
+      CR12 ← { word0=GT12, word1=entry.base,
+               word2=entry.word1_limit, word3=entry.seals }
+      ; CR12 = Thread identity — Priv zone, zero perms
+      ; Informs-only: cannot be used for direct CALL  ◄── see below
+
+; ── What does the last line mean? ─────────────────
+;
+; CR12 holds an Inform GT: perms=[none] means no E-bit.
+; In the Church Machine, CALL requires E perm on the GT
+; in CR6. CR12 carries the thread's *identity*, not its
+; *entry point*. It is an Inform — it answers "who am I?"
+; not "how do you call me?".
+;
+; The thread does NOT run by being invoked.
+; It runs because it IS the hardware execution context:
+;   - The STEP controller advances PC each cycle through
+;     the thread's code lump, unconditionally.
+;   - No CALL instruction is needed; the thread simply is.
+;
+; To switch threads: Thread.switchTo(thread_GT)
+;   — that requires E perm on the *Thread GT* (not CR12),
+;     and uses CHANGE to save/restore full register state.
+;
+; An Inform is a capability with zero permissions.
+; It can be passed, stored, and compared, but never used
+; to invoke computation. The thread identity tells the
+; system "thread 0 exists here" — nothing more.`,
         },
     };
     const base = Object.assign({}, examples[abs.name] || {});

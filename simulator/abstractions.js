@@ -171,7 +171,7 @@ class AbstractionRegistry {
             'Namespace root (location = NS_TABLE_BASE)',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
-        this.createAbstraction(1, 'Boot.Thread', 0, [],
+        this.createAbstraction(1, 'Boot.Thread', 0, ['run'],
             'Initial thread identity (CR8)',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
