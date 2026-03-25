@@ -280,7 +280,7 @@ Physical base address of the memory region. CRC covered.
 
 **Revocation:** Mint increments gt_seq in the Object NS slot. On LOAD,
 hardware checks Word 0 gt_seq against Word 2 gt_seq — a mismatch means the
-GT has been revoked and the LOAD faults.
+GT has been revoked and the LOAD faults and the GT is set to NULL.
 
 ### Word 3 — CRC and GC
 
