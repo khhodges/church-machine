@@ -1357,25 +1357,6 @@ already owns.
 
 ---
 
-## Namespace LUMP vs Function Abstraction — Summary
-
-| Property | Function Abstraction | Namespace LUMP |
-|----------|---------------------|----------------|
-| Word 0 | Header (magic 0x1F, typ=00) | Header (magic 0x1F, typ=10) |
-| cw | Code words (methods + dispatcher) | Always 0 — no code section |
-| cc | Compiler-fixed (deps) | None — NS Table only (binary data, not GT slots) |
-| Body | Code + freespace + c-list | Freespace + **NS Table** (Binary Data) |
-| Physical scope | One lump region | **Entire application address space** |
-| NS Table | None — uses parent NS | **IS the NS Table** |
-| Outform entries | Never — all deps resident | Supported — lazy-loads on demand |
-| Lazy load | Via Locator in c-list | **Hosts** the Locator — cc field identifies Locator count |
-| Distribution | `*.lump.zip` | `*.namespace.zip` with manifest |
-| CALL target | Yes — method dispatcher at PC=1 | No |
-
----
-
----
-
 # All Three Lump Types — Side-by-Side Reference
 
 | Property | Function Abstraction | Thread | Namespace LUMP |
