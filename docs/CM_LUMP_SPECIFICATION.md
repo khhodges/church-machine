@@ -452,7 +452,7 @@ reference that is defined by the object reference.
 | Turing/Church mutual exclusion | Data and capability instructions operate on strictly separate rights |
 | GT unforgeable | Only Mint issues GTs — raw bytes cannot be reinterpreted as capabilities |
 | Execute isolation | Transient CR14 grants X only — code is execute-only, DREAD cannot reach it |
-| C-list isolation | Transient CR6 grants E+M only — callers can load capabilities out but cannot SAVE into slots |
+| C-list isolation | Transient CR6 grants E+M only — callers can load capabilities out but cannot SAVE into slots without B=1 |
 | Permission non-escalation | TPERM can only remove bits, never add; perms excluded from CRC enables pure-hardware TPERM |
 | Entry point integrity | PC always starts at 1 — the header word cannot be executed |
 | CRC check | Every LOAD validates CRC-16/CCITT over Word 0[24:0] + Word 1 + Word 2 |
