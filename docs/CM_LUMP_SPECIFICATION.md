@@ -423,6 +423,10 @@ serve it. **Bit 3** of the ZIP general-purpose flags must be 0 (no data
 descriptor). The Locator rejects any lump zip where bit 3 is 1 or the
 uncompressed-size field is zero.
 
+Network-cached lumps are only used for network browsing using a GT with
+Read (R) permission and to set up a CM tunnel. The NS slot holds the
+reference that is defined by the object reference.
+
 ### ZIP Pre-Allocation Sequence
 
 ```
