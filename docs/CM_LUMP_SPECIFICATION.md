@@ -361,9 +361,11 @@ If CALL CR_s   (CR_s holds the E-GT for the target lump), if RETURN (E-GT found 
 
 ## C-List — Compiler-Populated
 
-The IDE toolchain pre-fills every c-list slot at compile time. Each c-list
-slot is **one 32-bit word** — Word 0 of the GT only. LOAD reads Word 0 from
-the c-list, then fetches Words 1–3 from the NS table.
+The IDE toolchain pre-fills every c-list slot at compile time with a Golden
+Token as a resident inform or a IDE outform. Inform GT reference c-list slot
+is one 32-bit word as Word 0 of the NS slot. LOAD reads Word 0 from the
+c-list, then fetches Words 1–3 from the NS table. Otherwise, mLoad triggers
+an Outform Event only if the download remains absent.
 
 | Slot Word 0 value       | typ | Meaning |
 |-------------------------|-----|---------|
