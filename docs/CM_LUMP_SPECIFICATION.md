@@ -541,7 +541,7 @@ What makes the Thread distinct is how the rest of the lump is used.
 A function abstraction lump holds executable CLOOMC code followed by
 freespace. The Thread lump holds **live execution state** — capability
 registers, a call stack, heap, and data registers — rather than code.
-PC never enters the Thread lump. It is a data structure, not a program.
+PC never enters the Thread lump. It is a static data structure of a suspended Thread registers, indicators, GTs, heap and stack saved and restored by the CHANGE instruction, not a program.
 
 The Church Machine has two lump types:
 
