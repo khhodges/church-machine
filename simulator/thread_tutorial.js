@@ -65,7 +65,7 @@ ${this._memMap(null)}
 <tr><td>+247</td><td>CR3</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+248</td><td>CR4</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+249</td><td>CR5</td><td>General-purpose</td><td>Programmer</td></tr>
-<tr><td>+250</td><td>CR6</td><td>C-list view (E+M+B?-only) \u00b7 set by CALL, cleared by RETURN</td><td><strong>Architecture</strong></td></tr>
+<tr><td>+250</td><td>CR6</td><td>C-list view (E+M+B?-only) \u00b7 re-derived on CALL/RETURN/CHANGE</td><td><strong>Architecture</strong></td></tr>
 <tr><td>+251</td><td>CR7</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+252</td><td>CR8</td><td>General-purpose</td><td>Programmer</td></tr>
 <tr><td>+253</td><td>CR9</td><td>General-purpose</td><td>Programmer</td></tr>

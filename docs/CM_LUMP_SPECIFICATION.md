@@ -693,8 +693,8 @@ Only **CR1** and **CR6** carry hardware-defined roles in this zone:
   argument GT here before CALL; RETURN deposits the result GT here.
   Hardware reads CR1 by name during these instructions.
 - **CR6** — the transient c-list view. Hardware sets this from the callee's
-  NS slot on every CALL and clears it on RETURN. Its GT Word 0 is not
-  persistently stored in Zone ①; it is re-derived on each CALL.
+  NS slot/lump on every CALL/RETURN/CHANGE. Its E-GT Word 0 is persistently
+  stored in CR6 (as E+M+B?) and it is re-derived on each CALL/RETURN/CHANGE.
 
 ### System GTs — C-list Slots, Not Fixed CRs
 
