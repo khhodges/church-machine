@@ -394,12 +394,12 @@ SlideRule.lump.zip
 ```
 MyApp.thread.zip
 +-- MyApp.thread.bin    ← 256-word Thread lump binary (1 024 bytes)
-                           Word 0:       0xF900_020C (header)
-                           Words 1..12:  Zone ① — initial CR0..CR11 GT Word 0 values
-                           Words 13..44: Zone ② — LIFO Stack (all zero at creation)
-                           Words 45..175: Zone ③ — Freespace (all zero — Mint verifies)
-                           Words 176..239: Zone ④ — Heap (all zero at creation)
-                           Words 240..255: Zone ⑤ — DR0..DR15 (all zero at creation)
+                           Word 0:        0xF900_020C (header)
+                           Words 1..16:   Zone ⑤ — DR0..DR15 (all zero at creation)
+                           Words 17..80:  Zone ④ — Heap (all zero at creation)
+                           Words 81..211: Zone ③ — Freespace (all zero — Mint verifies)
+                           Words 212..243: Zone ② — LIFO Stack (all zero at creation)
+                           Words 244..255: Zone ① — initial CR0..CR11 GT Word 0 values
 ```
 
 ### Namespace Bundle
@@ -593,30 +593,29 @@ Word addresses increase downward from the base.
 ┌─────────────────────────────────────────────┐  ← base  (+0)   ← Word 0
 │  Header word  0xF900_020C                   │  [1 word]
 │  magic=0x1F · n-6=2 · cw=0 · typ=10 · cc=12│  never executed
-├─────────────────────────────────────────────┤  ← base  (+1)
-│  ① Capabilities                             │  [12 words]
-│     CR0 … CR11 — Golden Token words         │  (one 32-bit GT Word 0 per slot)
-│     Fixed zone — mLoad keeps this zone      │  = the c-list tail (cc=12)
-├─────────────────────────────────────────────┤  ← base  (+12/+13)  ← STO initial = 12 (empty)
-│  ② LIFO Stack  ↓                            │  [32 words]
-│     CALL: 2-word frame  [E-GT · frame word] │  STO += 2  (first CALL: words 13–14)
-│     LAMBDA: 1-word frame  [frame word]      │  STO += 1  (first LAMBDA: word 13)
-│     Grows downward; STO hidden register     │
-├─────────────────────────────────────────────┤  ← base  (+45)
+├─────────────────────────────────────────────┤  ← base  (+1)   ← DR base
+│  ⑤ Data Registers                           │  [16 words]
+│     DR0 … DR15 — 32-bit registers           │  Fixed zone
+├─────────────────────────────────────────────┤  ← base  (+17)  ← heap base
+│  ④ Heap  ↑                                  │  [64 words]
+│     Fixed size — set by IDE at design time  │
+│     Objects allocated from heap base upward │
+│     Grows toward Freespace                  │
+├─────────────────────────────────────────────┤  ← base  (+81)  ← FREE base
 │  ③ Freespace                                │  [131 words]
 │     Unallocated — dynamic                   │
 │     Shrinks as Stack grows ↓                │
 │     Shrinks as Heap grows ↑                 │
 │     Mint verifies all-zero at creation time │
-├─────────────────────────────────────────────┤  ← base  (+176)  ← heap base
-│  ④ Heap  ↑                                  │  [64 words]
-│     Fixed size — set by IDE at design time  │
-│     Objects allocated from heap base upward │
-│     Grows toward Freespace                  │
-├─────────────────────────────────────────────┤  ← base  (+240)  ← DR base
-│  ⑤ Data Registers                           │  [16 words]
-│     DR0 … DR15 — 32-bit registers           │
-│     Fixed zone — always at lump tail        │
+├─────────────────────────────────────────────┤  ← base  (+212) ← STO initial = 212 (empty)
+│  ② LIFO Stack  ↓                            │  [32 words]
+│     CALL: 2-word frame  [E-GT · frame word] │  STO -= 2  (first CALL: words 211–210)
+│     LAMBDA: 1-word frame  [frame word]      │  STO -= 1  (first LAMBDA: word 211)
+│     Grows downward; STO hidden register     │
+├─────────────────────────────────────────────┤  ← base  (+244) ← c-list base
+│  ① Capabilities                             │  [12 words]
+│     CR0 … CR11 — Golden Token words         │  (one 32-bit GT Word 0 per slot)
+│     Fixed zone — mLoad keeps this zone      │  = the c-list tail (cc=12)
 └─────────────────────────────────────────────┘  ← base  (+255)
 ```
 
@@ -625,67 +624,62 @@ Word addresses increase downward from the base.
 | Zone | Identifier | Offset range | Words | Bytes | Notes |
 |------|-----------|--------------|-------|-------|-------|
 | Header        | HDR   | +0          | 1   | 4    | `0xF900_020C` — never executed |
-| ① Capabilities | CAPS  | +1 … +12   | 12  | 48   | GT Word 0 × 12; also the lump c-list (cc=12) |
-| ② LIFO Stack   | STACK | +13 … +44  | 32  | 128  | |
-| ③ Freespace    | FREE  | +45 … +175 | 131 | 524  | 1 word less than naïve layout — consumed by header |
-| ④ Heap         | HEAP  | +176 … +239| 64  | 256  | |
-| ⑤ Data Regs    | DR    | +240 … +255| 16  | 64   | |
+| ⑤ Data Regs    | DR    | +1 … +16   | 16  | 64   | DR0…DR15 (16 × 32-bit) |
+| ④ Heap         | HEAP  | +17 … +80  | 64  | 256  | Fixed size; grows upward |
+| ③ Freespace    | FREE  | +81 … +211 | 131 | 524  | Dynamic gap; collision zone |
+| ② LIFO Stack   | STACK | +212 … +243| 32  | 128  | Grows downward (STO decreases) |
+| ① Capabilities | CAPS  | +244 … +255| 12  | 48   | GT Word 0 × 12; c-list tail (cc=12) |
 | **Total**      |       | 0 … 255    | **256** | **1 024** | = 2^8 words |
 
-Heap and DR zone boundaries are identical between the Thread and the
-function abstraction freespace rule. The header word costs 1 word from
-the freespace zone — Freespace is 131 words, not 132.
+All five zones fit in the standard 256-word layout. The Capabilities zone at
+the tail (words +244..+255) is identical to the lump c-list tail, eliminating
+the overlap from the previous layout.
 
 ---
 
-## Why the C-List Is at the Tail, Not the Head
+## C-List at the Tail — Zone ① (Capabilities)
 
 The LUMP spec places the c-list at the physical tail (last `cc` words).
 In a Thread lump `cc=12` so the c-list occupies words `lumpSize-12`..
-`lumpSize-1` = words 244..255. But Zone ① (CR0..CR11) is at words +1..+12.
-These are **not the same words**.
+`lumpSize-1` = words 244..255. **Zone ① (CR0..CR11) is now also at words
++244..+255** — the same region.
 
-The resolution: the Thread's Zone ① (the live capability registers at words
-+1..+12) and the lump c-list tail (words +244..+255) serve different roles:
+The resolution: by reversing the zone order, Zone ① and the c-list tail are
+now co-located:
 
 | Region | Offsets | Role |
 |--------|---------|------|
-| Zone ① (live CRs) | +1 … +12 | Save/restore target for SAVE/LOAD at runtime |
+| Zone ① (live CRs) | +244 … +255 | Save/restore target for SAVE/LOAD at runtime AND c-list pre-population |
 | C-list tail | +244 … +255 | Boot-time initialisation — pre-populated by Mint.Thread with the initial 12 GT Word 0 values |
 
-`Mint.Thread` copies the initial GT Word 0 values into the c-list tail at
-creation time. The boot sequence then LOAD-s them into Zone ① via `mLoad`.
-Thereafter SAVE/LOAD operates on Zone ① directly. The c-list tail words
-become part of the Heap zone in practice but are used as the initial
-bootstrap credential store — they are not visible to the running thread after
-boot.
-
-In the simulator's 256-word layout the c-list tail falls within Zone ⑤
-(Data Registers, words +240..+255) for the 12 slots — a minor overlap that
-the boot sequence resolves before DR usage begins.
+`Mint.Thread` populates words +244..+255 with the initial GT Word 0 values at
+creation time. The boot sequence then LOAD-s them into the CRs via `mLoad`.
+Thereafter SAVE/LOAD operates on Zone ① (words +244..+255) directly. Zone ①
+serves both as the live capability register zone and the c-list tail — one
+12-word region with two semantic roles.
 
 ---
 
 ## Zone ① — Capabilities (CR0–CR11)
 
-Twelve 32-bit words at offsets +1..+12. Each word is **GT Word 0** — the
+Twelve 32-bit words at offsets +244..+255. Each word is **GT Word 0** — the
 per-holder credential. Words 1–3 of the full 128-bit CR are held in the
 hardware CR file, not in lump memory. Only Word 0 is written to / read from
 lump memory by SAVE/LOAD.
 
 ```
-+1   CR0    — Thread's own E-GT (self-reference for context switch)
-+2   CR1    — caller's return capability (CALL pushes here)
-+3   CR2    — Scheduler E-GT
-+4   CR3    — Mint E-GT
-+5   CR4    — NS write authority
-+6   CR5    — (general — working capability)
-+7   CR6    — transient C-list view (set by CALL, not stored permanently)
-+8   CR7    — Prog zone · programmer-defined (no arch role · not set at boot)
-+9   CR8    — Prog zone · programmer-defined (no arch role · not set at boot)
-+10  CR9    — Prog zone · programmer-defined (no arch role · not set at boot)
-+11  CR10   — Prog zone · programmer-defined (no arch role · not set at boot)
-+12  CR11   — Prog zone · programmer-defined (no arch role · not set at boot)
++244  CR0    — Thread's own E-GT (self-reference for context switch)
++245  CR1    — caller's return capability (CALL pushes here)
++246  CR2    — Scheduler E-GT
++247  CR3    — Mint E-GT
++248  CR4    — NS write authority
++249  CR5    — (general — working capability)
++250  CR6    — transient C-list view (set by CALL, not stored permanently)
++251  CR7    — Prog zone · programmer-defined (no arch role · not set at boot)
++252  CR8    — Prog zone · programmer-defined (no arch role · not set at boot)
++253  CR9    — Prog zone · programmer-defined (no arch role · not set at boot)
++254  CR10   — Prog zone · programmer-defined (no arch role · not set at boot)
++255  CR11   — Prog zone · programmer-defined (no arch role · not set at boot)
 ```
 
 CR7–CR11 form the **Prog zone** — five slots with no architecture-assigned
@@ -702,31 +696,31 @@ are never written to lump memory and are never accessible via DREAD.
 
 **CR12 — Thread Identity.** CR12 specifically encodes the Thread lump's
 base address and total word count. It acts as the hardware anchor for the
-stack: the effective stack region is lump words 12 → heap base, with the
+stack: the effective stack region is lump words 212 → 81, with the
 hidden **STO** (Stack Top Offset) register tracking the current top.
-`Mint.Thread` sets STO = 12 at Thread creation — this is the empty-stack
-position; the first pushed word lands at word 13 (Zone ② base). CR12 is
-saved and restored on every CHANGE alongside STO, DR0–DR15, PC, FLAGS,
-CR14, and CR15 (see §CHANGE Context Save below).
+`Mint.Thread` sets STO = 212 at Thread creation — this is the empty-stack
+position; the first pushed word lands at word 211 (Zone ② base, STO -= 1).
+CR12 is saved and restored on every CHANGE alongside STO, DR0–DR15, PC,
+FLAGS, CR14, and CR15 (see §CHANGE Context Save below).
 
 ---
 
 ## Zone ② — LIFO Stack
 
-32 words at offsets +13..+44. The stack grows downward (toward higher
+32 words at offsets +212..+243. The stack grows downward (toward lower
 offsets). **STO** (Stack Top Offset, a hidden per-thread register) tracks
-the current top. `Mint.Thread` initialises STO = 12 at Thread creation
-(the empty-stack sentinel at the Zone ①/② boundary); the first word
-pushed lands at word 13.
+the current top. `Mint.Thread` initialises STO = 212 at Thread creation
+(the empty-stack sentinel just below Freespace); the first word
+pushed lands at word 211 (STO -= 1 for LAMBDA, -= 2 for CALL).
 
 ### Frame Formats
 
 ```
-CALL frame (SZ=1 — 2 words):      STO += 2 after push
-  STO-1:  E-GT Word 0 of the callee  (Golden Token, Church-side)
+CALL frame (SZ=1 — 2 words):      STO -= 2 after push
   STO+0:  Frame word: SZ[1] | return_PC[15] | prev_STO[16]
+  STO-1:  E-GT Word 0 of the callee  (Golden Token, Church-side)
 
-LAMBDA frame (SZ=0 — 1 word):     STO += 1 after push
+LAMBDA frame (SZ=0 — 1 word):     STO -= 1 after push
   STO+0:  Frame word: SZ[1]=0 | lambda_arg[15] | prev_STO[16]
 ```
 
@@ -738,19 +732,19 @@ No kernel involvement.
 
 With 32 words and 2-word CALL frames, the maximum call depth is **16
 nested calls** before the stack overflows into Freespace. The hardware
-detects overflow when STO would reach offset +45 (Zone ③).
+detects overflow when STO would reach offset +81 (Zone ③ base).
 
 ---
 
 ## Zone ③ — Freespace
 
-131 words at offsets +45..+175. This is the collision zone between the
-downward-growing Stack and the upward-growing Heap. At Thread creation
+131 words at offsets +81..+211. This is the collision zone between the
+upward-growing Heap and the downward-growing Stack. At Thread creation
 `Mint.Thread` verifies all 131 words are zero.
 
-At runtime, Stack frames below the initial high-water mark and Heap
-objects above heap base both consume words from this zone. The sum of
-live Stack depth and live Heap allocation must not exceed 131 words.
+At runtime, Heap objects above heap base and Stack frames below the initial
+high-water mark both consume words from this zone. The sum of live Heap
+allocation and live Stack depth must not exceed 131 words.
 
 This is the only zone in any Church Machine lump that is dynamically
 variable at runtime. Function abstraction freespace is fixed at compile
@@ -760,8 +754,8 @@ time and never changes; Thread freespace is live.
 
 ## Zone ④ — Heap
 
-64 words at offsets +176..+239. Fixed size set by the IDE slot metadata
-at design time. Objects are allocated from base+176 upward. The GC
+64 words at offsets +17..+80. Fixed size set by the IDE slot metadata
+at design time. Objects are allocated from base+17 upward. The GC
 abstraction manages the heap — the G bit in Word 3 of each live GT
 enables mark-and-sweep collection of unreachable heap objects.
 
@@ -769,8 +763,9 @@ enables mark-and-sweep collection of unreachable heap objects.
 
 ## Zone ⑤ — Data Registers
 
-16 words at offsets +240..+255. DR0–DR15 are 32-bit general-purpose
-data registers. Always at the physical tail of the Thread lump.
+16 words at offsets +1..+16. DR0–DR15 are 32-bit general-purpose
+data registers. Always at the physical head of the Thread body (after the
+header).
 
 DR contents are raw 32-bit integers — subject to DREAD/DWRITE via a
 Turing-rights view, never to LOAD/SAVE. A data value cannot be
@@ -820,8 +815,8 @@ Step 4  n-6[26:23] == 2 — Thread lump size is fixed at 256 words;
           reject if mismatch.
 Step 5  cw[22:10] == 0 — Thread lump has no code; reject if non-zero.
 Step 6  cc[7:0] == 12 — Thread c-list is always 12 slots; reject if not.
-Step 7  Scan words 45..175 (Zone ③, Freespace): reject if any word
-          is non-zero. Zone ①  and Zone ② are pre-populated by the
+Step 7  Scan words 81..211 (Zone ③, Freespace): reject if any word
+          is non-zero. Zone ①  and Zone ⑤ are pre-populated by the
           boot sequence and are not scanned.
 Step 8  Copy initial GT Word 0 values into c-list tail (words 244..255).
 Step 9  Issue E-GT (B E) for Scheduler, RW-GT (B R W) for Thread.
@@ -832,7 +827,7 @@ The difference from `Mint.Lump`:
 - `typ` is `10`, not `00`
 - `cw == 0` is enforced, not derived
 - Freespace scan covers Zone ③ only (not words 1..cw+1, since cw=0)
-- Zone ① is intentionally pre-populated; the scan skips it
+- Zone ① and Zone ⑤ are intentionally pre-populated; the scan skips them
 - Two GTs are issued instead of one
 
 ---
@@ -847,12 +842,12 @@ Thread lump image — header word followed by the five zones.
 ```
 MyApp.thread.zip
 +-- MyApp.thread.bin    ← 256-word Thread lump binary (1 024 bytes)
-                           Word 0:      0xF900_020C (header)
-                           Words 1..12: Zone ① — initial CR0..CR11 GT Word 0 values
-                           Words 13..44: Zone ② — LIFO Stack (all zero at creation)
-                           Words 45..175: Zone ③ — Freespace (all zero — Mint verifies)
-                           Words 176..239: Zone ④ — Heap (all zero at creation)
-                           Words 240..255: Zone ⑤ — DR0..DR15 (all zero at creation)
+                           Word 0:        0xF900_020C (header)
+                           Words 1..16:   Zone ⑤ — DR0..DR15 (all zero at creation)
+                           Words 17..80:  Zone ④ — Heap (all zero at creation)
+                           Words 81..211: Zone ③ — Freespace (all zero — Mint verifies)
+                           Words 212..243: Zone ② — LIFO Stack (all zero at creation)
+                           Words 244..255: Zone ① — initial CR0..CR11 GT Word 0 values
 ```
 
 The ZIP pre-allocation sequence is identical to that for function
@@ -884,7 +879,7 @@ install time and rejects the binary if any freespace word is non-zero.
 | cw | Code word count > 0 | Always 0 |
 | cc | Compiler-chosen c-list depth | Always 12 (CR0..CR11) |
 | `Mint` entry | `Mint.Lump(base, n)` | `Mint.Thread(base, n)` |
-| Freespace scan | Words cw+1..lumpSize-cc-1 | Zone ③ only (words 45..175) |
+| Freespace scan | Words cw+1..lumpSize-cc-1 | Zone ③ only (words 81..211) |
 | Zone ① scan | Not applicable | Skipped — pre-populated |
 | Entry point | PC = 1 on every CALL | Never — not callable |
 | Transient CR14 | Code view (X) derived on CALL | Loaded into CR12 |
@@ -1348,7 +1343,7 @@ already owns.
 | **GC interaction** | G bit in NS slot Word 3 | G bits in all live CRs in Zone ① | G bits in all Live NS Table entries (Word 3) |
 | **CHANGE saves** | Not applicable | CR12 · STO · DR0–DR15 · PC · FLAGS · CR14 · CR15 | Not applicable (not a thread) |
 | **lumpSize** | 2^n compiler-chosen (64–16 384 words) | IDE defined 2^n (< 1024 words) | 2^n IDE-chosen; Boot.NS = 2^14 = 16 384 words |
-| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1 all-zero | Zone ③ only (words 45..175); Zone ① skipped | Scan CRC per slot |
+| **Freespace verified by Mint** | Yes — words cw+1..lumpSize-cc-1 all-zero | Zone ③ only (words 81..211); Zone ① skipped | Scan CRC per slot |
 | **Distribution format** | `*.lump.zip` | `*.thread.zip` | `*.namespace.zip` with `manifest.json` |
 | **Simulator NS slot** | Most slots (Salvation=4, Mint=6, …) | Slots 1 and 45 | Slot 0 (Boot.NS) |
 | **CALL target?** | Yes | No | No |
