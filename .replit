@@ -46,7 +46,7 @@ build = ["pip", "install", "-r", "requirements.txt"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "gitFull", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "symbiyosys", "tcl", "tk", "yices", "yosys", "zlib", "nextpnr", "icestorm"]
+packages = ["fontconfig", "freetype", "ghostscript", "gitFull", "glib", "harfbuzz", "icestorm", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "nextpnr", "openjpeg", "pango", "symbiyosys", "tcl", "tk", "yices", "yosys", "zlib"]
 
 [userenv]
 

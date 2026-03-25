@@ -6,3 +6,6 @@ gunicorn==25.1.0
 psycopg2-binary==2.9.11
 resend==2.21.0
 Werkzeug==3.1.5
+markdown
+waitress
+weasyprint
