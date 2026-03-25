@@ -157,6 +157,7 @@ BOOK_CHAPTERS = [
     ("Part II: Architecture", [
         "architecture.md",
         "instruction-set.md",
+        "isa_encoding.md",
         "church-instructions.md",
         "instruction_matrix.md",
         "lambda-instruction.md",
@@ -172,10 +173,13 @@ BOOK_CHAPTERS = [
         "risks.md",
     ]),
     ("Part IV: Runtime", [
+        "CM_LUMP_SPECIFICATION.md",
         "abstractions.md",
         "garbage-collection.md",
         "locator.md",
         "family-registry.md",
+        "namespace-json.md",
+        "json-information.md",
     ]),
     ("Part V: Networking", [
         "network-transparency.md",
