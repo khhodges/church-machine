@@ -54,7 +54,7 @@ class ChurchCall(Elaboratable):
 
         CR6_CLIST   = 6
         CR14_CODE   = 14
-        MAX_SRC_REG = 10   # cr_src must be in CR0–CR10 (< CR11)
+        MAX_SRC_REG = 11   # cr_src must be in CR0–CR11
 
         phase = Signal()
         src_reg_latched = Signal(CAP_REG_LAYOUT)
