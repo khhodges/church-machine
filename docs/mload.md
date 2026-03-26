@@ -17,7 +17,7 @@ Every security property of the Church Machine is enforced in mLoad:
 | No capability can be read beyond its index range | CHECK\_BOUNDS stage |
 | No revoked GT can be re-used | CHECK\_VERSION stage (gt\_seq match) |
 | No forged GT can ever load | CHECK\_VERSION + seal stage (CRC-16/CCITT) |
-| GC always knows which slots are live | RESET\_GBIT stage |
+| GC always knows which slots are live | RESET\_GBIT to match GC cycle (0→1 or 1→0) |
 | Thread lump always mirrors live CRs | UPDATE\_THREAD stage |
 
 Because all eight properties collapse to a single code path, the attack
