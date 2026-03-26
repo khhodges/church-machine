@@ -3,7 +3,8 @@
 mLoad is the hardware micro-operation that every Church instruction uses to
 read a Golden Token from memory and make it live in a Capability Register.
 No GT can enter a CR by any other path. mLoad is not an instruction —
-it is a sub-operation invoked internally by LOAD, CALL, RETURN, and CHANGE.
+it is a sub-operation invoked internally by LOAD, CALL, RETURN, CHANGE,
+SWITCH, TPERM, LAMBDA, ELOADCALL, and XLOADLAMBDA.
 
 ## Why One Gate
 
@@ -32,9 +33,15 @@ of per-instruction permission checks.
 | **CALL** | Phase 2 (post E-perm check) | Populate CR6 (c-list) and CR14 (code) from callee NS slot |
 | **RETURN** | Restoring caller context | Reload caller's CR6 from the return frame |
 | **CHANGE** | Load target thread + restore CRs | Switch thread context; restore per-thread capability set |
+| **SWITCH** | Context switch to new thread | Load the incoming thread's capability set into CRs |
+| **TPERM** | Permission transfer phase | Load the delegated GT into the recipient's CR |
+| **LAMBDA** | Closure capture | Load the closed-over GT into the lambda's internal CR slot |
+| **ELOADCALL** | Extended load-and-call | Load GT and immediately populate CRs for the callee entry point |
+| **XLOADLAMBDA** | Cross-domain lambda invocation | Load the lambda GT across a domain boundary into the target CR |
 
-CHANGE uses its own private `ChurchMLoad` instance; LOAD, CALL, and
-RETURN share a single `u_shared_mload` arbiter in the core.
+CHANGE uses its own private `ChurchMLoad` instance; LOAD, CALL, RETURN,
+SWITCH, TPERM, LAMBDA, ELOADCALL, and XLOADLAMBDA share a single
+`u_shared_mload` arbiter in the core.
 
 ---
 
