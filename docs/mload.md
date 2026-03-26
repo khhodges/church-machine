@@ -31,9 +31,7 @@ Every security property of the Church Machine is enforced in mLoad:
 7. **Thread Shadow Sync** — Thread lump capability zone kept in sync with live CRs
 8. **Outform Lazy-Load** — Absent remote objects trigger download and registration
 
-Because all eight properties collapse to a single code path, the attack
-surface is a small, formally verifiable FSM rather than a distributed set
-of per-instruction permission checks.
+Because all eight properties collapse to a single code path, the attack surface is a small, formally verifiable FSM rather than a distributed set of per-instruction permission checks. The hardware design for mLoad is arranged to perform these tests in parallel with the instruction and prevent the operation if any check fails, preventing any digital damage in advance and updating the MTBF calculations for the Abstraction. A first fault detection can be caught by simple instruction recovery code (if loaded) but a second fault by the same abstraction leads to system recovery that isolates error-prone modules (hardware or software).
 
 ---
 
