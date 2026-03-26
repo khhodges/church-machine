@@ -12,6 +12,7 @@ Every security property of the Church Machine is enforced in mLoad:
 
 | Property | Where enforced |
 |---|---|
+| Absent Outform objects are detected and trigger a lazy-load event | CHECK\_NS stage (type check on GT) |
 | Only L-perm holders can unlock the permitted access right(s) to the object or resource defined by a GT in their posession | CHECK\_L stage |
 | No capability can be read beyond its index range | CHECK\_BOUNDS stage |
 | No revoked GT can be re-used | CHECK\_VERSION stage (gt\_seq match) |
@@ -19,7 +20,7 @@ Every security property of the Church Machine is enforced in mLoad:
 | GC always knows which slots are live | RESET\_GBIT stage |
 | Thread lump always mirrors live CRs | UPDATE\_THREAD stage |
 
-Because all seven properties collapse to a single code path, the attack
+Because all eight properties collapse to a single code path, the attack
 surface is a small, formally verifiable FSM rather than a distributed set
 of per-instruction permission checks.
 
