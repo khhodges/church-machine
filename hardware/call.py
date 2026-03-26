@@ -10,7 +10,7 @@ class ChurchCall(Elaboratable):
         self.call_start = Signal()
         self.cr_src = Signal(4)
         self.index = Signal(16)
-        self.mask = Signal(16)
+        self.mask = Signal(16)   # bits [0:12] → null-GT write mask for CR0–CR11
         self.call_busy = Signal()
         self.call_complete = Signal()
         self.call_fault = Signal()
@@ -34,10 +34,6 @@ class ChurchCall(Elaboratable):
         self.mload_fault = Signal()
         self.mload_fault_type = Signal(4)
 
-        # Kept for core.py interface compatibility; CALL does not snapshot CR5.
-        # Always outputs 0 (no special significance for CALL per architecture).
-        self.saved_cr5_gt = Signal(32)
-
         self.nia_set = Signal()
         self.nia_value = Signal(32)
 
@@ -58,7 +54,7 @@ class ChurchCall(Elaboratable):
 
         CR6_CLIST   = 6
         CR14_CODE   = 14
-        MAX_SRC_REG = 10   # cr_src must be in CR0–CR10
+        MAX_SRC_REG = 10   # cr_src must be in CR0–CR10 (< CR11)
 
         phase = Signal()
         src_reg_latched = Signal(CAP_REG_LAYOUT)
@@ -70,12 +66,19 @@ class ChurchCall(Elaboratable):
         sub_fault_latched = Signal()
 
         local_cr_rd_addr = Signal(4)
+        local_cr_wr_en = Signal()
+        local_cr_wr_addr = Signal(4)
+        local_cr_wr_data = Signal(CAP_REG_LAYOUT)
 
-        b_idx = Signal(4)          # 4 bits: counts 0–11 for CR0–CR11 sweep
+        b_idx = Signal(4)          # 4 bits: counts 0–11 for b-flag sweep
         b_cr_data = Signal(CAP_REG_LAYOUT)
-        b_clear_wr_en = Signal()
-        b_clear_wr_addr = Signal(4)
-        b_clear_wr_data = Signal(CAP_REG_LAYOUT)
+
+        n_idx = Signal(4)          # 4 bits: counts 0–11 for null-GT sweep
+
+        # Latched CR14 for M-bit write-back after Phase 2
+        cr14_latched = Signal(CAP_REG_LAYOUT)
+        cr14_lat_view = View(CAP_REG_LAYOUT, cr14_latched)
+        cr14_lat_gt   = View(GT_LAYOUT, cr14_lat_view.word0_gt)
 
         src_in_range = Signal()
         m.d.comb += src_in_range.eq(self.cr_src <= MAX_SRC_REG)
@@ -93,9 +96,8 @@ class ChurchCall(Elaboratable):
             mload_index.eq(Mux(phase, 0, self.index)),
         ]
 
-        # M-elevation (sub_m_elevated) is permanently asserted: CALL's FSM
-        # validates E-perm in CHECK_PERM before any mLoad fires, so the
-        # CHECK_L stage inside mLoad is externalised to this FSM.
+        # M-elevation is permanently asserted: CALL's FSM validates E-perm
+        # in CHECK_PERM before any mLoad fires, so CHECK_L is externalised.
         m.d.comb += [
             self.mload_start.eq(sub_start_reg),
             self.mload_cr_src.eq(mload_src),
@@ -107,12 +109,11 @@ class ChurchCall(Elaboratable):
         ]
 
         m.d.comb += [
-            self.cr_wr_addr.eq(b_clear_wr_addr),
-            self.cr_wr_data.eq(b_clear_wr_data),
-            self.cr_wr_en.eq(b_clear_wr_en),
+            self.cr_wr_addr.eq(local_cr_wr_addr),
+            self.cr_wr_data.eq(local_cr_wr_data),
+            self.cr_wr_en.eq(local_cr_wr_en),
+            self.cr_rd_addr.eq(local_cr_rd_addr),
         ]
-
-        m.d.comb += self.cr_rd_addr.eq(local_cr_rd_addr)
 
         # NS lump header fetch
         cr14_view = View(CAP_REG_LAYOUT, self.cr14_code)
@@ -127,14 +128,45 @@ class ChurchCall(Elaboratable):
         lump_reg = Signal(32)
         lump_view = View(LUMP_HEADER_LAYOUT, lump_reg)
 
-        # Latched fields from LUMP_HEADER
-        mw_reg        = Signal(6)   # max-word (arg count)
-        cc_reg        = Signal(8)   # calling-convention flags
-        n_minus_6_reg = Signal(4)   # total frame words minus 6
+        mw_reg        = Signal(6)
+        cc_reg        = Signal(8)
+        n_minus_6_reg = Signal(4)
 
         # NIA: code starts at word offset +1 after the lump header (size = cw)
         nia_computed = Signal(32)
         m.d.comb += nia_computed.eq(cr14_view.word1_location + 4)
+
+        # CR14 with M=1 (PERM_X asserted) for SET_M_WRITE
+        cr14_with_m = Signal(CAP_REG_LAYOUT)
+        cr14_wm_view = View(CAP_REG_LAYOUT, cr14_with_m)
+        cr14_wm_gt   = View(GT_LAYOUT, cr14_wm_view.word0_gt)
+        m.d.comb += [
+            cr14_wm_gt.slot_id.eq(cr14_lat_gt.slot_id),
+            cr14_wm_gt.gt_seq.eq(cr14_lat_gt.gt_seq),
+            cr14_wm_gt.gt_type.eq(cr14_lat_gt.gt_type),
+            cr14_wm_gt.perms.eq(cr14_lat_gt.perms | PERM_MASK_X),
+            cr14_wm_gt.b_flag.eq(cr14_lat_gt.b_flag),
+            cr14_wm_view.word1_location.eq(cr14_lat_view.word1_location),
+            cr14_wm_view.word2_w2.eq(cr14_lat_view.word2_w2),
+            cr14_wm_view.word3_w3.eq(cr14_lat_view.word3_w3),
+        ]
+
+        # b-flag cleared capability (computed from b_cr_data, used in CLEAR_B_WRITE)
+        b_cleared = Signal(CAP_REG_LAYOUT)
+        b_src_view = View(CAP_REG_LAYOUT, b_cr_data)
+        b_src_gt   = View(GT_LAYOUT, b_src_view.word0_gt)
+        b_clr_view = View(CAP_REG_LAYOUT, b_cleared)
+        b_clr_gt   = View(GT_LAYOUT, b_clr_view.word0_gt)
+        m.d.comb += [
+            b_clr_gt.slot_id.eq(b_src_gt.slot_id),
+            b_clr_gt.gt_seq.eq(b_src_gt.gt_seq),
+            b_clr_gt.gt_type.eq(b_src_gt.gt_type),
+            b_clr_gt.perms.eq(b_src_gt.perms),
+            b_clr_gt.b_flag.eq(0),
+            b_clr_view.word1_location.eq(b_src_view.word1_location),
+            b_clr_view.word2_w2.eq(b_src_view.word2_w2),
+            b_clr_view.word3_w3.eq(b_src_view.word3_w3),
+        ]
 
         with m.FSM(name="call") as fsm:
             with m.State("IDLE"):
@@ -192,10 +224,24 @@ class ChurchCall(Elaboratable):
                 with m.If(sub_fault_latched):
                     m.next = "FAULT"
                 with m.Elif(sub_done_latched):
-                    m.next = "FETCH_LUMP"
+                    m.next = "SET_M_READ"
+
+            with m.State("SET_M_READ"):
+                # Read CR14 so we can assert M=1 (PERM_X) on the code capability
+                m.d.comb += local_cr_rd_addr.eq(CR14_CODE)
+                m.d.sync += cr14_latched.eq(self.cr_rd_data)
+                m.next = "SET_M_WRITE"
+
+            with m.State("SET_M_WRITE"):
+                # Write CR14 back with PERM_X forced to 1 (M=1 for method entry)
+                m.d.comb += [
+                    local_cr_wr_addr.eq(CR14_CODE),
+                    local_cr_wr_data.eq(cr14_with_m),
+                    local_cr_wr_en.eq(1),
+                ]
+                m.next = "FETCH_LUMP"
 
             with m.State("FETCH_LUMP"):
-                # Fetch NS word3_lump (+12) for callee; latch mw/cc/n_minus_6
                 m.d.comb += [
                     self.mem_rd_addr.eq(callee_ns_entry_addr + 12),
                     self.mem_rd_en.eq(1),
@@ -216,7 +262,7 @@ class ChurchCall(Elaboratable):
             with m.State("CLEAR_B_CHECK"):
                 # Strip b_flag from every CR0–CR11 unconditionally
                 with m.If(b_idx > 11):
-                    m.next = "COMPLETE"
+                    m.next = "NULL_WRITE_INIT"
                 with m.Else():
                     m.d.comb += local_cr_rd_addr.eq(b_idx)
                     m.next = "CLEAR_B_READ"
@@ -227,22 +273,31 @@ class ChurchCall(Elaboratable):
                 m.next = "CLEAR_B_WRITE"
 
             with m.State("CLEAR_B_WRITE"):
-                b_src = View(CAP_REG_LAYOUT, b_cr_data)
-                b_dst = View(CAP_REG_LAYOUT, b_clear_wr_data)
                 m.d.comb += [
-                    b_dst.word0_gt.slot_id.eq(b_src.word0_gt.slot_id),
-                    b_dst.word0_gt.gt_seq.eq(b_src.word0_gt.gt_seq),
-                    b_dst.word0_gt.gt_type.eq(b_src.word0_gt.gt_type),
-                    b_dst.word0_gt.perms.eq(b_src.word0_gt.perms),
-                    b_dst.word0_gt.b_flag.eq(0),
-                    b_dst.word1_location.eq(b_src.word1_location),
-                    b_dst.word2_w2.eq(b_src.word2_w2),
-                    b_dst.word3_w3.eq(b_src.word3_w3),
-                    b_clear_wr_en.eq(1),
-                    b_clear_wr_addr.eq(b_idx),
+                    local_cr_wr_en.eq(1),
+                    local_cr_wr_addr.eq(b_idx),
+                    local_cr_wr_data.eq(b_cleared),
                 ]
                 m.d.sync += b_idx.eq(b_idx + 1)
                 m.next = "CLEAR_B_CHECK"
+
+            with m.State("NULL_WRITE_INIT"):
+                # Write null GT to each CR0–CR11 slot flagged in mask_latched[0:12]
+                m.d.sync += n_idx.eq(0)
+                m.next = "NULL_WRITE_CHECK"
+
+            with m.State("NULL_WRITE_CHECK"):
+                with m.If(n_idx > 11):
+                    m.next = "COMPLETE"
+                with m.Elif(mask_latched.bit_select(n_idx, 1)):
+                    m.d.comb += [
+                        local_cr_wr_en.eq(1),
+                        local_cr_wr_addr.eq(n_idx),
+                        local_cr_wr_data.eq(0),
+                    ]
+                    m.d.sync += n_idx.eq(n_idx + 1)
+                with m.Else():
+                    m.d.sync += n_idx.eq(n_idx + 1)
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"
