@@ -56,13 +56,13 @@ class NamespaceTutorial {
         const sections = [
             {
                 id: 'bootstrap',
-                label: '\u2460 Bootstrap \u2191',
-                sub: `0x0000 \u00b7 IDE-set \u00b7 ${this.BOOTSTRAP_SLOTS} slots (NS root \u00b7 boot thread \u00b7 boot abstr.) \u00b7 \u2026 ${h(B-1)}`,
+                label: '\u2460 Bootstrap',
+                sub: `0x0000 \u00b7 design-fixed \u00b7 ${this.BOOTSTRAP_SLOTS} slots (NS root \u00b7 boot thread \u00b7 boot abstr.) \u00b7 \u2026 ${h(B-1)}`,
                 bg: '#1a0030', border: '#8040c0', text: '#b080f0'
             },
             {
                 id: 'resident',
-                label: '\u2461 Resident Lumps \u2191',
+                label: '\u2461 Resident Lumps',
                 sub: `${h(B)} \u00b7 IDE-set \u00b7 ${this.RESIDENT_SLOTS} always-loaded slots \u00b7 \u2026 ${h(B+R-1)}`,
                 bg: '#001830', border: '#2070b0', text: '#70b8ff'
             },
@@ -81,8 +81,8 @@ class NamespaceTutorial {
         ];
         const heights = { bootstrap: 58, resident: 66, freespace: 72, nstable: 58 };
         const addrLabels = {
-            bootstrap: `0x0000 \u2191`,
-            resident:  `${h(B)} \u2191`,
+            bootstrap: `0x0000`,
+            resident:  `${h(B)}`,
             freespace: `${h(B+R)} \u2195`,
             nstable:   `${h(this.TOTAL_WORDS - 1)} \u2193`,
         };
