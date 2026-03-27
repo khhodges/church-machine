@@ -111,8 +111,12 @@ ${this._memMap(null)}
 <tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>HW</td><td><strong>Physical address space = 2^cc words</strong> (repurposed from c-list count); e.g. cc=16 \u2192 2^16 = 65\u202f536 total words; NS Table starts at 2^cc and grows \u2193</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout</div>
-<p><strong>Lump Space</strong> starts at <code>0x0000</code> and grows <strong>upward \u2191</strong> \u2014 slots are allocated from the bottom. <strong>NS Table</strong> starts at <code>2^cc</code> (the top of the address space) and grows <strong>downward \u2193</strong> as entries are added. The boundary between them is: <code>NS Table base = 2^cc \u2212 cw</code>.</p>
-<p>Example: cc=16, cw=768 \u2192 NS Table base = 65\u202f536 \u2212 768 = <code>0xFD00</code>; Lump Space = <code>0x0000</code>\u2026<code>0xFCFF</code>.</p></div>
+<p><strong>Lump Space</strong> starts at <code>0x0000</code> and grows <strong>upward \u2191</strong> \u2014 slots are allocated from the bottom. <strong>NS Table</strong> starts at <code>2^cc</code> (the top of the address space) and grows <strong>downward \u2193</strong> as entries are added.</p>
+<p>The NS Table contains <code>cw</code> words in total. Since the Table ends at the last word of the address space (<code>2^cc \u2212 1</code>) and occupies <code>cw</code> words, its <em>base</em> (first word) must be:</p>
+<p style="text-align:center;font-family:monospace;font-size:0.9rem;margin:6px 0;">NS Table base &nbsp;=&nbsp; (last word + 1) \u2212 cw &nbsp;=&nbsp; 2^cc \u2212 cw</p>
+<p>Example: <code>cc=16</code> \u2192 total words = 2^16 = 65\u202f536; &nbsp;<code>cw=768</code> = 256 entries \u00d7 3 words.</p>
+<p style="text-align:center;font-family:monospace;font-size:0.9rem;margin:6px 0;">NS Table base &nbsp;=&nbsp; 65\u202f536 \u2212 768 &nbsp;=&nbsp; 64\u202f768 &nbsp;=&nbsp; <strong>0xFD00</strong></p>
+<p>Lump Space therefore spans <code>0x0000</code> \u2026 <code>0xFCFF</code> \u2014 every word below the NS Table base.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
 <p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | cc</code></p>
 <p>Example \u2014 65536-word namespace (cc=16, cw=768 NS Table words, n\u22126=10):</p>
