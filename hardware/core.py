@@ -66,6 +66,10 @@ class ChurchCore(Elaboratable):
         self.fault = Signal(5)   # widened: FaultType.STACK_OVERFLOW=0x10 needs 5 bits
         self.fault_valid = Signal()
 
+        # IDE-configurable stack word limit fed to u_call.  Default 256 words.
+        # Connect to a software-visible config register to allow runtime tuning.
+        self.stack_limit = Signal(16, init=256)
+
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
 
@@ -406,7 +410,7 @@ class ChurchCore(Elaboratable):
             u_call.cr5_heap.eq(u_regs.cr5_heap),
             u_call.lambda_frame_reg.eq(lambda_pc_reg),    # LAMBDA hidden reg: saved NIA
             u_call.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
-            u_call.stack_limit.eq(256),  # TODO: expose as configurable IDE register
+            u_call.stack_limit.eq(self.stack_limit),
         ]
 
         m.d.comb += ret_start_sig.eq(
