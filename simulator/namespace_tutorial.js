@@ -1,10 +1,18 @@
 class NamespaceTutorial {
     constructor() {
         this.currentStep = -1;
-        this.NS_TABLE_BASE = 0xFD00;
-        this.TOTAL_WORDS = 65536;
+        this.TOTAL_WORDS    = 65536;
+        this.SLOT_SIZE      = 256;
         this.NS_ENTRY_WORDS = 3;
-        this.SLOT_SIZE = 256;
+        // Zone 1 — Bootstrap: NS root (slot 0) + boot thread (slot 1) + boot abstraction (slot 2)
+        this.BOOTSTRAP_SLOTS = 3;
+        this.BOOTSTRAP_WORDS = this.BOOTSTRAP_SLOTS * this.SLOT_SIZE;   // 768
+        // Zone 2 — Resident: always-loaded IDE abstractions (IDE-set count)
+        this.RESIDENT_SLOTS  = 10;
+        this.RESIDENT_WORDS  = this.RESIDENT_SLOTS  * this.SLOT_SIZE;   // 2560
+        // Zone 4 — NS Table: sits at the top, grows downward
+        this.NS_TABLE_BASE   = 0xFD00;
+        this.NS_CW           = this.TOTAL_WORDS - this.NS_TABLE_BASE;   // 768 = 256 entries × 3 words
         this.steps = this._buildSteps();
     }
 
@@ -39,42 +47,61 @@ class NamespaceTutorial {
     }
 
     _memMap(highlighted) {
-        const nsTableEnd = this.TOTAL_WORDS - 1;
-        const nsTableStart = this.NS_TABLE_BASE;
-        const lumpEnd = nsTableStart - 1;
+        const h  = this._hex.bind(this);
+        const B  = this.BOOTSTRAP_WORDS;
+        const R  = this.RESIDENT_WORDS;
+        const NS = this.NS_TABLE_BASE;
+        const freespaceEnd = NS - 1;
 
         const sections = [
             {
-                id: 'lumps',
-                label: 'Lump Space',
-                sub: `0x0000 \u2191 grows up  \u00b7  one ${this.SLOT_SIZE}-word slot per abstraction  \u00b7  \u2026 ${this._hex(lumpEnd)}`,
+                id: 'bootstrap',
+                label: '\u2460 Bootstrap',
+                sub: `0x0000 \u2191 \u00b7 IDE-set \u00b7 ${this.BOOTSTRAP_SLOTS} slots (NS root \u00b7 boot thread \u00b7 boot abstr.) \u00b7 \u2026 ${h(B-1)}`,
+                bg: '#1a0030', border: '#8040c0', text: '#b080f0'
+            },
+            {
+                id: 'resident',
+                label: '\u2461 Resident Lumps',
+                sub: `${h(B)} \u2191 \u00b7 IDE-set \u00b7 ${this.RESIDENT_SLOTS} always-loaded slots \u00b7 \u2026 ${h(B+R-1)}`,
                 bg: '#001830', border: '#2070b0', text: '#70b8ff'
             },
             {
+                id: 'freespace',
+                label: '\u2462 Freespace \u2195',
+                sub: `${h(B+R)} \u00b7 IDE-set \u00b7 cache for lazy-loaded lumps \u00b7 \u2026 ${h(freespaceEnd)}`,
+                bg: '#0a0a0a', border: '#303030', text: '#555'
+            },
+            {
                 id: 'nstable',
-                label: 'NS Table',
-                sub: `2^cc \u2212 cw \u2192 ${this._hex(nsTableEnd)}  \u00b7  cw words \u00b7 3 per entry \u00b7 grows \u2193`,
+                label: '\u2463 NS Table',
+                sub: `2^cc\u2212cw = ${h(NS)} \u2193 \u00b7 cw words \u00b7 ${this.NS_ENTRY_WORDS} per entry \u00b7 grows \u2193 \u00b7 \u2026 0xFFFF`,
                 bg: '#1a1000', border: '#b07820', text: '#f0c050'
             },
         ];
-        const heights = { lumps: 96, nstable: 80 };
-        const addrLabels = { lumps: `${this._hex(0)} \u2192`, nstable: `${this._hex(nsTableStart)} \u2192` };
+        const heights = { bootstrap: 58, resident: 66, freespace: 72, nstable: 58 };
+        const addrLabels = {
+            bootstrap: `0x0000 \u2191`,
+            resident:  `${h(B)} \u2191`,
+            freespace: `${h(B+R)} \u2195`,
+            nstable:   `${h(NS)} \u2193`,
+        };
 
         let html = '<div style="display:flex;gap:8px;margin:12px 0 4px 0;align-items:stretch;">';
         html += '<div style="display:flex;flex-direction:column;justify-content:flex-start;width:88px;flex-shrink:0;font-size:0.68rem;color:#666;font-family:monospace;">';
         for (const s of sections) {
-            html += `<div style="height:${heights[s.id]}px;display:flex;align-items:flex-start;padding-top:6px;justify-content:flex-end;padding-right:4px;box-sizing:border-box;">${addrLabels[s.id]}</div>`;
+            html += `<div style="height:${heights[s.id]}px;display:flex;align-items:flex-start;padding-top:6px;justify-content:flex-end;padding-right:4px;box-sizing:border-box;white-space:nowrap;">${addrLabels[s.id]}</div>`;
         }
         html += '</div>';
         html += '<div style="flex:1;display:flex;flex-direction:column;">';
         for (const s of sections) {
-            const isHL = s.id === highlighted;
+            const isHL = s.id === highlighted || (highlighted === 'lumps' && s.id !== 'nstable');
             const outline = isHL ? `3px solid ${s.border}` : `1px solid ${s.border}`;
-            const opacity = (!highlighted || isHL) ? '1' : '0.45';
-            const shadow = isHL ? `0 0 16px ${s.border}44` : 'none';
+            const opacity = (!highlighted || isHL) ? '1' : '0.38';
+            const shadow  = isHL ? `0 0 16px ${s.border}44` : 'none';
             html += `<div style="height:${heights[s.id]}px;background:${s.bg};border:${outline};box-shadow:${shadow};opacity:${opacity};padding:6px 10px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;transition:opacity 0.2s;">`;
             html += `<span style="color:${s.text};font-weight:700;font-size:0.85rem;">${s.label}</span>`;
-            html += `<span style="color:#aaa;font-size:0.75rem;margin-top:2px;">${s.sub}</span>`;
+            html += `<span style="color:${s.id === 'freespace' ? '#444' : '#aaa'};font-size:0.75rem;margin-top:2px;">${s.sub}</span>`;
             html += '</div>';
             if (s.id !== 'nstable') html += '<div style="height:2px;background:#111;"></div>';
         }
@@ -94,8 +121,15 @@ class NamespaceTutorial {
                 type: 'intro',
                 content: `<p>The <strong>Namespace Abstraction</strong> is the Church Machine\u2019s description of its own physical memory. It is not a computation \u2014 it is the container that holds all computations. Every abstraction, every thread, every capability lives inside the namespace.</p>
 ${this._memMap(null)}
-<div class="sr-key-concept"><div class="sr-concept-title">Two Regions, One Address Space</div>
-<p>The ${hex(this.TOTAL_WORDS)}-word physical address space is divided into two regions: <strong>Lump Space</strong> (${hex(0)}\u202f\u2013\u202f${hex(this.NS_TABLE_BASE - 1)}) where abstraction and thread lumps are allocated, and the <strong>NS Table</strong> (${NS}\u202f\u2013\u202f${END}) where the hardware stores the 3-word metadata entry for every slot. <strong>NS Slot\u202f0</strong> (the root entry) describes the entire physical address space and encodes the NS Table size in its metadata.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">Four Zones, One Namespace</div>
+<p>The ${hex(this.TOTAL_WORDS)}-word physical address space is divided into four IDE-set zones, top to bottom:</p>
+<table class="sr-table" style="margin-top:4px;">
+<tr><th>Zone</th><th>Start</th><th>Size</th><th>Purpose</th></tr>
+<tr><td><strong>\u2460 Bootstrap</strong></td><td><code>0x0000</code> \u2191</td><td>IDE-set</td><td>NS root + boot thread + boot abstraction (fixed slots)</td></tr>
+<tr><td><strong>\u2461 Resident Lumps</strong></td><td>${hex(this.BOOTSTRAP_WORDS)} \u2191</td><td>IDE-set</td><td>Always-loaded abstractions \u2014 never evicted</td></tr>
+<tr><td><strong>\u2462 Freespace</strong></td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)} \u2195</td><td>IDE-set</td><td>Cache for lazy-loaded lumps \u2014 dynamic, grows from both ends</td></tr>
+<tr><td><strong>\u2463 NS Table</strong></td><td>${NS} \u2193</td><td>cw words</td><td>3-word metadata entry per slot \u2014 grows downward from 2^cc</td></tr>
+</table></div>`
             },
             {
                 title: 'Header[0] \u2014 Namespace Lump Bit Fields',
@@ -110,13 +144,15 @@ ${this._memMap(null)}
 <tr><td><code style="color:#888">typ</code></td><td>[9:8]</td><td>2&nbsp;b</td><td><code>10</code></td><td>clist-only \u2014 same type code as Thread; marks NS as a data lump, not a callable</td></tr>
 <tr><td><code style="color:#f0c050">cc</code></td><td>[7:0]</td><td>8&nbsp;b</td><td>HW</td><td><strong>Physical address space = 2^cc words</strong> (repurposed from c-list count); e.g. cc=16 \u2192 2^16 = 65\u202f536 total words; NS Table starts at 2^cc and grows \u2193</td></tr>
 </table>
-<div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout</div>
-<p><strong>Lump Space</strong> starts at <code>0x0000</code> and grows <strong>upward \u2191</strong> \u2014 slots are allocated from the bottom. <strong>NS Table</strong> starts at <code>2^cc</code> (the top of the address space) and grows <strong>downward \u2193</strong> as entries are added.</p>
-<p>The NS Table contains <code>cw</code> words in total. Since the Table ends at the last word of the address space (<code>2^cc \u2212 1</code>) and occupies <code>cw</code> words, its <em>base</em> (first word) must be:</p>
-<p style="text-align:center;font-family:monospace;font-size:0.9rem;margin:6px 0;">NS Table base &nbsp;=&nbsp; (last word + 1) \u2212 cw &nbsp;=&nbsp; 2^cc \u2212 cw</p>
-<p>Example: <code>cc=16</code> \u2192 total words = 2^16 = 65\u202f536; &nbsp;<code>cw=768</code> = 256 entries \u00d7 3 words.</p>
-<p style="text-align:center;font-family:monospace;font-size:0.9rem;margin:6px 0;">NS Table base &nbsp;=&nbsp; 65\u202f536 \u2212 768 &nbsp;=&nbsp; 64\u202f768 &nbsp;=&nbsp; <strong>0xFD00</strong></p>
-<p>Lump Space therefore spans <code>0x0000</code> \u2026 <code>0xFCFF</code> \u2014 every word below the NS Table base.</p></div>
+<div class="sr-key-concept"><div class="sr-concept-title">Address Space Layout \u2014 Four Zones</div>
+<p>The namespace divides physical memory into four IDE-set zones. Lump zones grow <strong>upward \u2191</strong> from <code>0x0000</code>; the NS Table grows <strong>downward \u2193</strong> from <code>2^cc</code>.</p>
+<table class="sr-table" style="margin:6px 0;"><tr><th>Zone</th><th>Base</th><th>Top</th><th>Size</th></tr>
+<tr><td>\u2460 Bootstrap</td><td><code>0x0000</code></td><td>2^cc\u2212cw\u2212resident\u2212free\u22121</td><td>IDE-set (boot slots)</td></tr>
+<tr><td>\u2461 Resident Lumps</td><td>Bootstrap end + 1</td><td>Resident end</td><td>IDE-set (always-loaded)</td></tr>
+<tr><td>\u2462 Freespace</td><td>Resident end + 1</td><td>2^cc\u2212cw\u22121</td><td>IDE-set (lazy-load cache)</td></tr>
+<tr><td>\u2463 NS Table</td><td><code>2^cc \u2212 cw</code></td><td><code>2^cc \u2212 1</code></td><td>cw words (IDE-set)</td></tr>
+</table>
+<p>The NS Table base: since the Table ends at <code>2^cc \u2212 1</code> and occupies <code>cw</code> words, its base = <code>(2^cc \u2212 1 + 1) \u2212 cw = 2^cc \u2212 cw</code>. Example: cc=16, cw=768 \u2192 base = 65\u202f536 \u2212 768 = <strong>0xFD00</strong>.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Encoding Formula</div>
 <p><code>(0x1F &lt;&lt; 27) | (n_minus_6 &lt;&lt; 23) | (cw &lt;&lt; 10) | (0b10 &lt;&lt; 8) | cc</code></p>
 <p>Example \u2014 65536-word namespace (cc=16, cw=768 NS Table words, n\u22126=10):</p>
@@ -129,19 +165,20 @@ ${this._memMap(null)}
 </table></div>`,
             },
             {
-                title: '\u2460 Lump Space \u2014 Slot Allocations',
+                title: '\u2460\u2461\u2462 Lump Zones \u2014 Bootstrap, Resident, Freespace',
                 type: 'lumps',
                 content: `${this._memMap('lumps')}
-<p>Lump space spans from ${hex(0)} to ${hex(this.NS_TABLE_BASE - 1)}. The IDE allocates each abstraction or thread a fixed-size slot of <strong>${SLOT} words</strong> (${hex(SLOT)} words). Slots are assigned by slot index:</p>
-<table class="sr-table"><tr><th>Slot index</th><th>Lump base address</th><th>Default occupant</th></tr>
-<tr><td>0</td><td colspan="2"><em>NS Slot 0 is the namespace root \u2014 its lump IS the entire physical memory (see slide 3)</em></td></tr>
-<tr><td>1</td><td>${hex(1 * SLOT)}</td><td>Thread Abstraction (boot thread)</td></tr>
-<tr><td>2</td><td>${hex(2 * SLOT)}</td><td>Boot.Abstr (CLOOMC entry point)</td></tr>
-<tr><td>3\u2026N</td><td>${hex(3 * SLOT)}\u202f\u2026</td><td>Programmer-uploaded abstractions</td></tr>
+<p>The three lump zones each serve a distinct purpose. All sizes are <strong>IDE-set</strong>; every slot is ${SLOT} words (one abstraction or thread per slot). The hardware locates any lump from its NS entry\u2019s <code>word0_location</code> = slot\u202f\u00d7\u202f${SLOT}.</p>
+<table class="sr-table">
+<tr><th>Zone</th><th>Slots</th><th>Base</th><th>Purpose</th></tr>
+<tr><td><strong>\u2460 Bootstrap</strong></td><td>0\u20132 (fixed)</td><td><code>0x0000</code></td><td>NS root (Slot\u202f0), boot thread (Slot\u202f1), boot abstraction (Slot\u202f2) \u2014 loaded at power-on</td></tr>
+<tr><td><strong>\u2461 Resident Lumps</strong></td><td>3\u2026${2 + this.RESIDENT_SLOTS} (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS)}</td><td>Always-loaded abstractions: installed at boot, <em>never</em> evicted from namespace memory</td></tr>
+<tr><td><strong>\u2462 Freespace</strong></td><td>${3 + this.RESIDENT_SLOTS}\u2026 (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)}</td><td>Cache pool for lazy-loaded lumps: allocated on first CALL, evicted when memory pressure demands</td></tr>
 </table>
-<p>Each ${SLOT}-word slot is self-contained: code + c-list for abstractions, GT zone + stack + heap + DR for threads. The hardware locates any lump from its NS entry\u2019s <code>word0_location</code>.</p>
-<div class="sr-key-concept"><div class="sr-concept-title">Slot Index = Lump Address / ${SLOT}</div>
-<p>For every slot except Slot\u202f0, <code>word0_location\u202f=\u202fidx\u202f\u00d7\u202f${SLOT}</code>. This means the hardware can compute any lump base from the slot index alone without reading memory. Slot\u202f0 is the exception: its lump is the full physical address space.</p></div>`
+<div class="sr-key-concept"><div class="sr-concept-title">Lazy Loading via Freespace</div>
+<p>When the hardware raises <code>FaultType.ABSENT_OUTFORM</code> (0x11) on a CALL to an unloaded abstraction, the SW trap handler downloads and deflates the lump into a free slot in Zone\u202f\u2462. The slot remains warm for subsequent calls. If freespace runs out, the IDE evicts the least-recently-used cached lump before loading the new one. Bootstrap and Resident zones are <em>never</em> eligible for eviction.</p></div>
+<div class="sr-key-concept"><div class="sr-concept-title">Slot Index = Lump Address \u00f7 ${SLOT}</div>
+<p>For every slot except Slot\u202f0, <code>word0_location\u202f=\u202fidx\u202f\u00d7\u202f${SLOT}</code>. The hardware computes any lump base from the slot index alone without reading memory. Slot\u202f0 is the exception \u2014 its \u201clump\u201d is the full physical address space.</p></div>`
             },
             {
                 title: 'NS Slot 0 \u2014 The Namespace Root',
