@@ -587,7 +587,7 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 ```
 31      27 26    23 22                10 9   8 7              0
 +──────────+────────+──────────────────+──────+────────────────+
-│ 0x1F [5] │ n-6[4] │      sw [13]     │10[2] │   cc=12 [8]    │
+│ 0x1F [5] │ n-6[4] │      sw [13]     │10[2] │    cc [8]      │
 +──────────+────────+──────────────────+──────+────────────────+
 ```
 
@@ -597,22 +597,22 @@ field `0x1F` as every other lump. The `typ` field is set to `10`
 | n-6   | IDE   | lumpSize = 2^(val+6); e.g. val=2 → 256 words |
 | sw    | IDE   | **Stack words** — `cw` field reinterpreted for `typ=10`; set by IDE at thread creation, validated by Mint |
 | typ   | 10    | clist-only — Mint does not scan for an executable code region |
-| cc    | 12    | C-list = CR0..CR11, 12 slots at the tail (architecture-fixed for Thread) |
+| cc    | IDE   | **heapWords** — IDE-set max heap words; caps zone is architecture-fixed at 12 words |
 
 > **`cw` → `sw` reinterpretation:** For `typ=10` (Thread/clist-only) lumps,
 > the 13-bit `cw` (code word count) field is otherwise wasted — a Thread
 > carries no executable code. The hardware and Mint **reinterpret** it as `sw`
 > (stack words). The IDE sets `sw` at thread-creation time; Mint validates
-> that `sw > 0` and `17 + heapWords + sw ≤ lumpSize − cc`. All zone
+> that `sw > 0`, `cc > 0`, and `17 + cc + sw ≤ lumpSize − 12`. All zone
 > boundaries are then derived from `sw` at CALL time — no literals in the FSM.
 
 **Encoding example** (256-word thread, 32 stack words):
 
 ```
-(0x1F << 27) | (2 << 23) | (sw << 10) | (0b10 << 8) | 12
+(0x1F << 27) | (2 << 23) | (sw << 10) | (0b10 << 8) | heapWords
 
-Boot.Thread   (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
-Thread        (n-6=2, sw=32, cc=12, typ=10):  0xF900_820C
+Boot.Thread   (n-6=2, sw=32, cc=64, typ=10):  0xF900_8240
+Thread        (n-6=2, sw=32, cc=64, typ=10):  0xF900_8240
 ```
 
 Thread lumps of the same geometry share the same header word. Version is
@@ -633,7 +633,7 @@ Word addresses increase downward from the base.
 │     DR0 … DR15 — 32-bit registers           │
 ├─────────────────────────────────────────────┤  ← base  (+17)           ← heap base
 │  ④ Heap  ↑                                  │  [heapWords]  IDE-defined
-│     Size = heapWords · NS clistCount field  │
+│     Size = cc words · cc field in Header[0] │
 │     Objects allocated from heap base upward │
 │     Grows toward Freespace                  │
 ├─────────────────────────────────────────────┤  ← 17+heapWords →        ← FREE base
@@ -644,26 +644,26 @@ Word addresses increase downward from the base.
 │  ② LIFO Stack  ↓                            │  [sw words]  IDE-defined
 │     CALL: 2-word frame  [E-GT · frame word] │  STO -= 2
 │     LAMBDA: 1-word frame  [frame word]      │  STO -= 1
-│     Grows downward; STO hidden register     │  sp_max = lumpSize−cc−1
-│     sp_min = lumpSize−cc−sw+2               │  CALL fault if STO < sp_min
-├─────────────────────────────────────────────┤  ← lumpSize−cc →         ← c-list base
-│  ① Capabilities                             │  [cc=12 words]  fixed
+│     Grows downward; STO hidden register     │  sp_max = lumpSize−12−1
+│     sp_min = lumpSize−12−sw+2               │  CALL fault if STO < sp_min
+├─────────────────────────────────────────────┤  ← lumpSize−12 →         ← c-list base
+│  ① Capabilities                             │  [12 words]  architecture-fixed
 │     CR0 … CR11 — Golden Token words         │  one 32-bit GT Word 0 per slot
-│     Fixed zone — mLoad keeps this zone      │  = c-list tail (cc=12)
+│     Fixed zone — mLoad keeps this zone      │  = c-list tail (12 words)
 └─────────────────────────────────────────────┘  ← lumpSize−1 →
 ```
 
 **Stack bound formulas** (all in word offsets from lump base, IDE-controlled via `sw`):
 
-| Signal | Formula | Example (sw=32, cc=12, lumpSize=256) |
-|--------|---------|--------------------------------------|
-| `sp_max` | `lumpSize − cc − 1` | 243 (initial STO, empty stack) |
-| `stack_min` | `lumpSize − cc − sw` | 212 (bottom of Stack zone) |
-| `sp_min` | `lumpSize − cc − sw + 2` | 214 (CALL minimum: needs 2 slots) |
+| Signal | Formula | Example (sw=32, lumpSize=256) |
+|--------|---------|-------------------------------|
+| `sp_max` | `lumpSize − 12 − 1` | 243 (initial STO, empty stack) |
+| `stack_min` | `lumpSize − 12 − sw` | 212 (bottom of Stack zone) |
+| `sp_min` | `lumpSize − 12 − sw + 2` | 214 (CALL minimum: needs 2 slots) |
 
-The CALL FSM reads the thread header at `thread_base` to recover `sw`, `cc`,
-and `n_minus_6` before checking the stack pointer. Both bounds are enforced
-in hardware — no literals in the FSM.
+The CALL FSM reads the thread header at `thread_base` to recover `sw` and
+`n_minus_6` (caps zone is architecture-fixed at 12). Both bounds are enforced
+in hardware — no literals for stack bounds in the FSM.
 
 ### Zone Constants (all offsets from Thread lump base, IDE-parameterised)
 
@@ -674,20 +674,20 @@ in hardware — no literals in the FSM.
 | ④ Heap         | HEAP  | +17 … +17+heapWords−1           | heapWords | IDE-defined; grows upward |
 | ③ Freespace    | FREE  | +17+heapWords … +sp_max          | dynamic  | Collision zone; all-zero at creation |
 | ② LIFO Stack   | STACK | +stack_min … +sp_max            | sw       | IDE-defined; grows downward |
-| ① Capabilities | CAPS  | +lumpSize−cc … +lumpSize−1      | cc=12    | GT Word 0 × 12; c-list tail |
+| ① Capabilities | CAPS  | +lumpSize−12 … +lumpSize−1      | 12       | GT Word 0 × 12; c-list tail (architecture-fixed) |
 
 All five zones fit within `lumpSize` words. The Capabilities zone at
-the tail (last `cc` words) is identical to the lump c-list tail, eliminating
-the overlap from the previous layout.
+the tail (last 12 words, architecture-fixed) is identical to the lump c-list
+tail, eliminating the overlap from the previous layout.
 
 ---
 
 ## C-List at the Tail — Zone ① (Capabilities)
 
 The LUMP spec places the c-list at the physical tail (last `cc` words).
-In a Thread lump `cc=12` so the c-list occupies words `lumpSize-12`..
-`lumpSize-1` = words 244..255. **Zone ① (CR0..CR11) is now also at words
-+244..+255** — the same region.
+In a Thread lump the caps zone is always 12 words (architecture-fixed), so
+the c-list occupies words `lumpSize-12`..`lumpSize-1` = words 244..255 (for
+lumpSize=256). **Zone ① (CR0..CR11) is also at words +244..+255** — the same region.
 
 The resolution: by reversing the zone order, Zone ① and the c-list tail are
 now co-located:
@@ -780,8 +780,8 @@ are never written to lump memory and are never accessible via DREAD.
 
 **CR12 — Thread Identity.** CR12 specifically encodes the Thread lump's
 base address and total word count. It acts as the hardware anchor for the
-stack: the effective stack zone spans `stack_min` (= `lumpSize−cc−sw`,
-example: 212) up to `sp_max` (= `lumpSize−cc−1`, example: 243), with the
+stack: the effective stack zone spans `stack_min` (= `lumpSize−12−sw`,
+example: 212) up to `sp_max` (= `lumpSize−12−1`, example: 243), with the
 hidden **STO** (Stack Top Offset) register tracking the current top.
 `Mint.Thread` sets STO = `sp_max` (example: 243) at Thread creation — this
 is the empty-stack sentinel; the first word pushed onto the stack occupies
@@ -817,10 +817,10 @@ heap objects without any further indirection.
 
 ## Zone ② — LIFO Stack
 
-`sw` words at offsets `lumpSize−cc−sw .. lumpSize−cc−1` (IDE-defined).
+`sw` words at offsets `lumpSize−12−sw .. lumpSize−12−1` (IDE-defined).
 The stack grows downward (toward lower offsets). **STO** (Stack Top Offset,
 a hidden per-thread register) tracks the current top. `Mint.Thread`
-initialises STO = `lumpSize−cc−1` = **sp_max** at Thread creation (the
+initialises STO = `lumpSize−12−1` = **sp_max** at Thread creation (the
 empty-stack sentinel at the top of Zone ②); the first word pushed lands at
 `sp_max−1` (STO -= 1 for LAMBDA, -= 2 for CALL).
 
@@ -957,7 +957,8 @@ Step 3  typ[9:8] == 0b10 (clist-only) — reject if not; prevents calling
 Step 4  n-6[26:23] == 2 — Thread lump size is fixed at 256 words;
           reject if mismatch.
 Step 5  cw[22:10] == 0 — Thread lump has no code; reject if non-zero.
-Step 6  cc[7:0] == 12 — Thread c-list is always 12 slots; reject if not.
+Step 6  cc[7:0] > 0 AND 17 + cc + sw ≤ lumpSize − 12 — heapWords (cc) must be
+          positive and all zones must fit; reject if not.
 Step 7  Scan words 81..211 (Zone ③, Freespace): reject if any word
           is non-zero. Zone ①  and Zone ⑤ are pre-populated by the
           boot sequence and are not scanned.
@@ -1426,8 +1427,8 @@ already owns.
 | **Word 0** | Header `0x1F` | Header `0x1F` | Header `0x1F` |
 | **`typ` field** | `00` — callable · Enter only | `10` — clist-only | `10` NS table directory only |
 | **`cw` field** | Code word count (≥ 0) | Always `0` | Always `0` |
-| **`cc` field** | Compiler-chosen GT count | Always `12` (CR0–CR11) + Stack (EGT+NIA) | None — NS Table only |
-| **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_020C` (n=8 cw=0 cc=12) | Binary data |
+| **`cc` field** | Compiler-chosen GT count | **heapWords** (IDE-set; caps always 12, architecture-fixed) | None — NS Table only |
+| **Example header** | `0xF881_AC00` (Decimal, n=7 cw=107 cc=0) | `0xF900_8240` (n-6=2, sw=32, heapWords=cc=64) | Binary data |
 | **Entry point** | PC = 1 on every CALL | Never — not callable | Never — not callable |
 | **Words 1..cw** | CLOOMC code (dispatcher + methods) | Absent — `cw = 0` | Boot / init microcode and SWITCH |
 | **Freespace zone** | Compile-time fixed · all-zero · immutable per release | Dynamic 131 words — Stack ↓ and Heap ↑ collide | Between init code and NS Table · all-zero |

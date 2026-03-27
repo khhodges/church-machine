@@ -99,17 +99,17 @@ class ChurchCall(Elaboratable):
 
         # Thread header fields — latched by FETCH_THREAD_HDR from thread_base+0
         thr_sw_reg  = Signal(13)   # stack words (cw field reinterpreted for typ=10)
-        thr_cc_reg  = Signal(8)    # cap-list slot count (always 12 for Thread)
+        thr_hw_reg  = Signal(8)    # heapWords (cc field repurposed for typ=10; caps zone is architecture-fixed at 12)
         thr_n6_reg  = Signal(4)    # n-6 field from thread header
         thr_lump_sz = Signal(15)   # 1 << (thr_n6_reg + 6), latched in FETCH_THREAD_HDR
 
-        # sp_max = thr_lump_sz − thr_cc_reg − 1      (top of Stack zone, initial STO)
-        # sp_min = thr_lump_sz − thr_cc_reg − sw + 2 (CALL needs 2 words: STO >= sp_min)
+        # sp_max = thr_lump_sz − 12 − 1      (top of Stack zone; caps = 12, architecture-fixed)
+        # sp_min = thr_lump_sz − 12 − sw + 2 (CALL needs 2 words: STO >= sp_min)
         sp_max = Signal(15)
         sp_min = Signal(15)
         m.d.comb += [
-            sp_max.eq(thr_lump_sz - thr_cc_reg - 1),
-            sp_min.eq(thr_lump_sz - thr_cc_reg - thr_sw_reg + 2),
+            sp_max.eq(thr_lump_sz - 12 - 1),
+            sp_min.eq(thr_lump_sz - 12 - thr_sw_reg + 2),
         ]
 
         # Callee E-GT: the raw 32-bit GT deposited into CR6 by Phase 1 mLoad.
@@ -469,7 +469,7 @@ class ChurchCall(Elaboratable):
                     _thdr = View(LUMP_HEADER_LAYOUT, self.mem_rd_data)
                     m.d.sync += [
                         thr_sw_reg.eq(_thdr.cw),
-                        thr_cc_reg.eq(_thdr.cc),
+                        thr_hw_reg.eq(_thdr.cc),   # cc repurposed as heapWords for typ=10
                         thr_n6_reg.eq(_thdr.n_minus_6),
                         thr_lump_sz.eq(Const(1, 15) << (_thdr.n_minus_6 + 6)),
                     ]

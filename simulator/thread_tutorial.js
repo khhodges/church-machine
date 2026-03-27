@@ -10,7 +10,7 @@ class ThreadTutorial {
             { bits: '[26:23]', name: 'n\u22126', val: 'IDE',   note: 'lumpSize = 2^(val+6)',               w: 4,  bg: '#3a2000', border: '#c86000', text: '#f09040' },
             { bits: '[22:10]', name: 'sw',     val: 'IDE',   note: 'Stack words (cw reused, typ=10)',    w: 13, bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { bits: '[9:8]',   name: 'typ',    val: '10',    note: 'clist-only = Thread abstraction',    w: 2,  bg: '#2a2a2a', border: '#555',    text: '#888'    },
-            { bits: '[7:0]',   name: 'cc',     val: '12',    note: 'C-list slots \u2014 always 12 for Thread', w: 8,  bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
+            { bits: '[7:0]',   name: 'cc',     val: 'IDE',   note: 'heapWords \u2014 IDE-set max heap words (caps always 12, architecture-fixed)', w: 8,  bg: '#002a10', border: '#20a040', text: '#60d080' },
         ];
         const total = 32;
         let bar = '<div style="display:flex;width:100%;border-radius:3px;overflow:hidden;margin-bottom:2px;">';
@@ -37,7 +37,7 @@ class ThreadTutorial {
     _memMap(highlighted) {
         const sections = [
             { id: 'dr',    label: '\u2464 Data Registers',    sub: 'DR0\u2013DR15  (16 \u00d7 32-bit, fixed)',        bg: '#1e0840', border: '#8040c0', text: '#b080f0' },
-            { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = heapWords \u00b7 NS clistCount field \u00b7 SW-defined by IDE', bg: '#002a10', border: '#20a040', text: '#60d080' },
+            { id: 'heap',  label: '\u2463 Heap \u2193',       sub: 'Size = cc words \u00b7 cc field in Header[0] \u00b7 IDE-set', bg: '#002a10', border: '#20a040', text: '#60d080' },
             { id: 'free',  label: '\u2462 Freespace',         sub: 'Dynamic gap \u00b7 shrinks as stack/heap grow', bg: '#181818', border: '#404040', text: '#888'    },
             { id: 'stack', label: '\u2461 LIFO Stack \u2191', sub: 'Size = sw words \u00b7 sw field in Header[0] \u00b7 SW-defined by IDE', bg: '#002a40', border: '#2080c0', text: '#60b8f0' },
             { id: 'cap',   label: '\u2460 Capabilities',     sub: 'GT for CR0\u2013CR11  (12 words, architecture-fixed)',            bg: '#3a2c00', border: '#c8a020', text: '#f0d060' },
@@ -78,10 +78,10 @@ class ThreadTutorial {
                 title: 'What Is a Thread Abstraction?',
                 type: 'intro',
                 content: `<p>A <strong>Thread Abstraction</strong> is the Church Machine\u2019s representation of a running computation. Like all abstractions it lives inside a <em>lump</em> (a contiguous block of namespace words), but its internal structure is different from a Programmed Abstraction: it carries both a protected capability set <em>and</em> a live execution context.</p>
-<p>At boot (B:02) the machine loads a Thread Identity GT into <strong>CR12</strong> from NS Slot 1 (zero perms, Inform-type). CR12 tells the running thread where its own lump lives; its metadata defines the lump base and total size (<code>lumpSize = 2^(n-6+6)</code>). The thread header at word 0 carries two IDE-set fields: <code>sw</code> (stack words, stored in the <code>cw</code> position for typ=10 lumps) and <code>cc</code> (c-list slot count = GT zone words). The NS entry separately holds <code>heapWords</code> (NS <code>clistCount</code> field). The stack region expands downward from <code>sp_max = lumpSize \u2212 cc \u2212 1</code>; its current position is tracked by the <strong>cursor register</strong> \u2014 a 32-bit hardware-only word packing both the next instruction offset (NIA) and the stack top offset (STO, initially = sp_max).</p>
+<p>At boot (B:02) the machine loads a Thread Identity GT into <strong>CR12</strong> from NS Slot 1 (zero perms, Inform-type). CR12 tells the running thread where its own lump lives; its metadata defines the lump base and total size (<code>lumpSize = 2^(n-6+6)</code>). The thread header at word 0 carries two IDE-set fields: <code>sw</code> (stack words, stored in the <code>cw</code> position for typ=10 lumps) and <code>cc</code> (heapWords \u2014 IDE-set max heap words; the caps zone is architecture-fixed at 12 words for CR0\u2013CR11). The stack region expands downward from <code>sp_max = lumpSize \u2212 12 \u2212 1</code>; its current position is tracked by the <strong>cursor register</strong> \u2014 a 32-bit hardware-only word packing both the next instruction offset (NIA) and the stack top offset (STO, initially = sp_max).</p>
 ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">Five Regions, One Lump</div>
-<p>Reading top-to-bottom (word 0 \u2192 base): <strong>Header \u2192 \u2464 Data Registers \u2192 \u2463 Heap \u2192 \u2462 Freespace \u2192 \u2461 Stack \u2192 \u2460 Capabilities</strong>. Every region lives inside the same protected lump; the hardware enforces bounds on every access. The Capabilities zone at the tail (<code>lumpSize\u2212cc</code> \u2026 <code>lumpSize\u22121</code>, exactly <code>cc</code> words) is the c-list, eliminating any overlap.</p></div>
+<p>Reading top-to-bottom (word 0 \u2192 base): <strong>Header \u2192 \u2464 Data Registers \u2192 \u2463 Heap \u2192 \u2462 Freespace \u2192 \u2461 Stack \u2192 \u2460 Capabilities</strong>. Every region lives inside the same protected lump; the hardware enforces bounds on every access. The Capabilities zone at the tail (<code>lumpSize\u221212</code> \u2026 <code>lumpSize\u22121</code>, exactly 12 words, architecture-fixed) is the c-list, eliminating any overlap.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
 <p>Zone \u2463 (Heap) is <strong>not individually scanned</strong> by the hardware GC. The G-bit mark-and-sweep operates at the <em>Thread object</em> level: when the system GC marks the Thread GT as reachable, the <strong>entire lump</strong> \u2014 all five zones \u2014 is considered live and left untouched. If the Thread GT becomes unreachable, the whole lump is reclaimed at once. All heap memory management within Zone \u2463 \u2014 allocation, compaction, and freeing \u2014 is a <strong>software concern</strong> left to the thread\u2019s own code.</p></div>`
             },
@@ -108,7 +108,7 @@ ${this._memMap(null)}
 <p>Capabilities for system services \u2014 Scheduler, Mint, NS write authority, etc. \u2014 are held in <strong>c-list slots</strong>, not in fixed CRs. A thread LOADs the GT it needs into any free general-purpose CR immediately before use. This is identical to how data registers work: the register is a transient holder; the durable home is the c-list.</p>
 <p>The architecture assigns no permanent role to CR0 or CR2\u2013CR11. Only <strong>CR1</strong> (CALL/RETURN ABI) and <strong>CR6</strong> (hardware-managed c-list view) are hardware-defined within Zone \u2460.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">mLoad Keeps the GT Zone in Sync</div>
-<p>Every time mLoad executes it <strong>writes the loaded GT back into the corresponding GT-zone word</strong> (<code>(lumpSize\u2212cc)+N</code> for CR_N). This guarantees the lump\u2019s GT zone always mirrors the live CR registers. When CHANGE suspends a thread, DR0\u2013DR15 are saved into the thread image along with the <strong>cursor register</strong> (one 32-bit word encoding both NIA and STO), CR12, CR14, and CR15. Because mLoad already kept the GT zone in sync during execution, no separate save step is needed for CR0\u2013CR11.</p></div>`
+<p>Every time mLoad executes it <strong>writes the loaded GT back into the corresponding GT-zone word</strong> (<code>(lumpSize\u221212)+N</code> for CR_N). This guarantees the lump\u2019s GT zone always mirrors the live CR registers. When CHANGE suspends a thread, DR0\u2013DR15 are saved into the thread image along with the <strong>cursor register</strong> (one 32-bit word encoding both NIA and STO), CR12, CR14, and CR15. Because mLoad already kept the GT zone in sync during execution, no separate save step is needed for CR0\u2013CR11.</p></div>`
             },
             {
                 title: '\u2461 LIFO Stack \u2014 Grows Downward',
@@ -116,8 +116,8 @@ ${this._memMap(null)}
                 content: `${this._memMap('stack')}
 <p>The <strong>LIFO call stack</strong> begins at the word offset set by the IDE (<code>sw</code> field in the thread header) and expands <em>downward</em> toward lower offsets into freespace. The current stack position is held in the <strong>cursor register</strong> \u2014 a single 32-bit hardware-only register that packs both the current instruction offset (NIA) and the current stack top offset (STO) into one word. CALL pushes a 2-word frame; LAMBDA pushes a 1-word frame. RETURN pops the correct number based on the SZ bit.</p>
 <ul>
-<li><strong>Stack top</strong> (<code>sp_max</code>): <code>lumpSize \u2212 cc \u2212 1</code> \u2014 derived from the thread header; initial cursor STO field = sp_max</li>
-<li><strong>Stack floor</strong> (<code>sp_min</code>): <code>lumpSize \u2212 cc \u2212 sw + 2</code> \u2014 IDE-controlled via the <code>sw</code> (stack words) field in the thread header</li>
+<li><strong>Stack top</strong> (<code>sp_max</code>): <code>lumpSize \u2212 12 \u2212 1</code> \u2014 caps zone is 12 words, architecture-fixed; initial cursor STO field = sp_max</li>
+<li><strong>Stack floor</strong> (<code>sp_min</code>): <code>lumpSize \u2212 12 \u2212 sw + 2</code> \u2014 IDE-controlled via the <code>sw</code> (stack words) field in the thread header</li>
 <li><strong>Overflow</strong>: hardware raises <code>STACK_OVERFLOW</code> <em>before any write</em> when STO &lt; sp_min; raises <code>STACK_CORRUPT</code> when STO &gt; sp_max</li>
 <li><strong>2-word CALL frame (SZ=1)</strong>: <code>[E-GT \u00b7 frame\u202fword]</code> \u2014 cursor STO field decreases by 2</li>
 <li><strong>1-word LAMBDA frame (SZ=0)</strong>: <code>[frame\u202fword only]</code> \u2014 cursor STO field decreases by 1</li>
@@ -143,7 +143,7 @@ ${this._memMap(null)}
 <div class="sr-key-concept"><div class="sr-concept-title">STO Is Hardware-Only \u2014 No Data Instruction Can Reach It</div>
 <p>The cursor register (and therefore STO) is <strong>inaccessible to DREAD and DWRITE</strong>. CR5 (the Heap GT) covers only Zone \u2463 (words 17 \u2026 17+heapWords\u22121); it cannot reach the cursor register. No forged STO value can be injected through a data write. The only hardware paths that update the cursor register are CALL, RETURN, LAMBDA, and CHANGE \u2014 all of which apply the IDE-defined <code>sp_min</code> / <code>sp_max</code> bounds checks before any stack write occurs. Stack bounds are derived from the thread header <code>sw</code> field set by the IDE at thread-creation time, not from constants baked into the silicon.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">LIFO, Not FIFO</div>
-<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump, bounds are hardware-enforced, and the cursor register is unreachable by data instructions. Initial STO = <code>sp_max = lumpSize \u2212 cc \u2212 1</code> (empty stack).</p></div>`
+<p>The stack discipline is <strong>Last-In First-Out</strong>: CALL decrements the STO field of the cursor register and RETURN increments it (via <code>prev_STO</code> in the frame word). Nested calls push sequentially deeper; unwinding always reverses that order. No frame can be forged or overwritten because all stack words are inside the thread\u2019s lump, bounds are hardware-enforced, and the cursor register is unreachable by data instructions. Initial STO = <code>sp_max = lumpSize \u2212 12 \u2212 1</code> (empty stack; caps zone is 12 words, architecture-fixed).</p></div>`
             },
             {
                 title: '\u2462 Freespace \u2014 The Dynamic Buffer',
@@ -165,14 +165,13 @@ ${this._memMap(null)}
 <p>After the Data Registers, the <strong>heap</strong> holds dynamically-allocated objects. Its size is fixed at thread-creation time by the IDE slot metadata stored in the NS entry\u2019s heapSize field.</p>
 <ul>
 <li><strong>Heap base</strong>: word 17 (immediately after Data Registers)</li>
-<li><strong>Heap limit</strong>: word <code>17+heapWords\u22121</code> (must not collide with freespace; <code>heapWords</code> from NS <code>clistCount</code> field)</li>
+<li><strong>Heap limit</strong>: word <code>17+heapWords\u22121</code> (must not collide with freespace; <code>heapWords = cc</code> field in Header[0])</li>
 <li><strong>Allocation</strong>: thread objects advance the heap pointer upward (bump allocation); objects grow from heap base toward freespace</li>
 <li><strong>Fixed ceiling</strong>: the heap cannot expand beyond its allocated words; each thread owns its heap region exclusively</li>
 <li><strong>Object GC</strong>: Zone \u2463 is not individually scanned \u2014 the hardware G-bit GC operates at the Thread object level; the entire lump is live or reclaimed as one unit; heap memory management within Zone \u2463 is a software concern</li>
 </ul>
-<table class="sr-table"><tr><th>NS word1 field</th><th>Encodes</th></tr>
-<tr><td>clistCount (bits 25\u201317)</td><td>Number of heap words reserved</td></tr>
-<tr><td>limit (bits 16\u20130)</td><td>Total lump word count \u2212 1</td></tr>
+<table class="sr-table"><tr><th>Header[0] field</th><th>Bits</th><th>Encodes</th></tr>
+<tr><td>cc</td><td>[7:0]</td><td>heapWords \u2014 IDE-set number of heap words reserved</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">How Is the Heap Limit Enforced? \u2014 CR5</div>
 <p><strong>CR5</strong> is the Heap Golden Token. It is installed by CHANGE each time this thread is resumed. Its two key fields set the hardware boundary:</p>
@@ -180,7 +179,7 @@ ${this._memMap(null)}
 <tr><td>word1_location</td><td>lumpBase + 17\u00d74 (byte addr)</td><td>Heap base \u2014 first valid byte of Zone \u2463</td></tr>
 <tr><td>limit_offset</td><td>heapWords \u2212 1</td><td>Inclusive word count; last valid index from base</td></tr>
 </table>
-<p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. A write beyond word <code>17+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into freespace or the stack. The IDE sets <code>heapWords</code> (via the NS <code>clistCount</code> field); CHANGE loads the correct CR5 on every resume; the hardware enforces the ceiling on every access.</p></div>
+<p>Every <code>DREAD</code> and <code>DWRITE</code> instruction that uses CR5 runs a <strong>TPERM bounds check</strong> before touching memory: <code>offset \u2264 CR5.limit_offset</code>. A write beyond word <code>17+heapWords\u22121</code> faults immediately \u2014 the heap can never silently overflow into freespace or the stack. The IDE sets <code>heapWords</code> via the <code>cc</code> field in Header[0] (bits [7:0]); CHANGE loads the correct CR5 on every resume; the hardware enforces the ceiling on every access.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Why Fixed at Design Time?</div>
 <p>The IDE declares heap size as part of the thread\u2019s capability contract. A thread cannot silently consume unbounded memory \u2014 it must declare its maximum heap at upload time, and Navana enforces that limit at allocation. This makes memory usage auditable before the program runs.</p></div>
 <div class="sr-key-concept"><div class="sr-concept-title">Object Garbage Collection</div>
@@ -211,9 +210,9 @@ ${this._memMap(null)}
                 content: `${this._memMap(null)}
 <p>The full thread lump, from word 0 to <code>allocSize \u2212 1</code>:</p>
 <table class="sr-table"><tr><th>Region</th><th>Start</th><th>Size</th><th>Defined by</th></tr>
-<tr><td>Header</td><td>word 0</td><td>1 word (fixed)</td><td>0xF900_020C (magic, typ=10, cc, sw)</td></tr>
+<tr><td>Header</td><td>word 0</td><td>1 word (fixed)</td><td>0xF900_8240 (magic, typ=10, sw=32, heapWords=cc=64)</td></tr>
 <tr><td>\u2464 Data Registers</td><td>word 1</td><td>16 words (fixed)</td><td>Architecture constant (DR0\u2013DR15)</td></tr>
-<tr><td>\u2463 Heap</td><td>word 17</td><td><code>heapWords</code> \u2193</td><td>NS entry <code>clistCount</code> field \u00b7 SW-defined by IDE</td></tr>
+<tr><td>\u2463 Heap</td><td>word 17</td><td><code>heapWords</code> \u2193</td><td>Header[0] <code>cc</code> field \u00b7 IDE-set</td></tr>
 <tr><td>\u2462 Freespace</td><td>17+heapWords</td><td>dynamic</td><td>Residual gap between heap top and stack floor</td></tr>
 <tr><td>\u2461 LIFO Stack</td><td><code>sp_min</code> \u2026 <code>sp_max</code></td><td><code>sw</code> words \u2193</td><td>IDE thread header <code>sw</code> field \u00b7 cursor STO = sp_max (empty)</td></tr>
 <tr><td>\u2460 GT Zone (Capabilities)</td><td>lumpSize \u2212 12</td><td>12 words (architecture-fixed)</td><td>c-list tail = CR0\u2013CR11 zone</td></tr>
