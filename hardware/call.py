@@ -131,10 +131,11 @@ class ChurchCall(Elaboratable):
         cw_reg        = Signal(13)
         cc_reg        = Signal(8)
         n_minus_6_reg = Signal(4)
+        lumpSize_reg  = Signal(15)   # 1 << (n_minus_6 + 6); range 64..16384 words
 
-        # NIA: code starts at word offset +1 after the lump header (size = cw)
+        # NIA: word offset 1 — first instruction is always lump word 1 (word 0 is header)
         nia_computed = Signal(32)
-        m.d.comb += nia_computed.eq(cr14_view.word1_location + 4)
+        m.d.comb += nia_computed.eq(1)
 
         # CR14 with M=1 (PERM_X asserted) for SET_M_WRITE
         cr14_with_m = Signal(CAP_REG_LAYOUT)
@@ -149,6 +150,56 @@ class ChurchCall(Elaboratable):
             cr14_wm_view.word1_location.eq(cr14_lat_view.word1_location),
             cr14_wm_view.word2_w2.eq(cr14_lat_view.word2_w2),
             cr14_wm_view.word3_w3.eq(cr14_lat_view.word3_w3),
+        ]
+
+        # NS_base derived from CR14.base after Phase 2 (mLoad sets CR14.base = NS_base+4)
+        ns_base_from_cr14 = Signal(32)
+        m.d.comb += ns_base_from_cr14.eq(cr14_lat_view.word1_location - 4)
+
+        # CR14 with M=1 AND corrected limit_offset — written in SET_CR14_LIMIT_WRITE
+        cr14_with_limit = Signal(CAP_REG_LAYOUT)
+        cr14_wl_view = View(CAP_REG_LAYOUT, cr14_with_limit)
+        cr14_wl_gt   = View(GT_LAYOUT, cr14_wl_view.word0_gt)
+        cr14_wl_w2   = View(WORD2_LAYOUT, cr14_wl_view.word2_w2)
+        cr14_lat_w2  = View(WORD2_LAYOUT, cr14_lat_view.word2_w2)
+        m.d.comb += [
+            cr14_wl_gt.slot_id.eq(cr14_wm_gt.slot_id),
+            cr14_wl_gt.gt_seq.eq(cr14_wm_gt.gt_seq),
+            cr14_wl_gt.gt_type.eq(cr14_wm_gt.gt_type),
+            cr14_wl_gt.perms.eq(cr14_wm_gt.perms),        # includes PERM_X (M=1)
+            cr14_wl_gt.b_flag.eq(cr14_wm_gt.b_flag),
+            cr14_wl_view.word1_location.eq(cr14_wm_view.word1_location),  # NS_base+4
+            cr14_wl_w2.limit_offset.eq(lumpSize_reg - cc_reg - 2),        # lumpSize−cc−2
+            cr14_wl_w2.gt_seq.eq(cr14_lat_w2.gt_seq),
+            cr14_wl_w2.spare.eq(0),
+            cr14_wl_view.word3_w3.eq(cr14_wm_view.word3_w3),
+        ]
+
+        # CR6 read latch — filled by SET_CR6_BASE
+        cr6_latched  = Signal(CAP_REG_LAYOUT)
+        cr6_lat_view = View(CAP_REG_LAYOUT, cr6_latched)
+        cr6_lat_gt   = View(GT_LAYOUT, cr6_lat_view.word0_gt)
+        cr6_lat_w2   = View(WORD2_LAYOUT, cr6_lat_view.word2_w2)
+
+        # CR6 with corrected base and limit — written in SET_CR6_LIMIT
+        cr6_adjusted = Signal(CAP_REG_LAYOUT)
+        cr6_adj_view = View(CAP_REG_LAYOUT, cr6_adjusted)
+        cr6_adj_gt   = View(GT_LAYOUT, cr6_adj_view.word0_gt)
+        cr6_adj_w2   = View(WORD2_LAYOUT, cr6_adj_view.word2_w2)
+        m.d.comb += [
+            cr6_adj_gt.slot_id.eq(cr6_lat_gt.slot_id),
+            cr6_adj_gt.gt_seq.eq(cr6_lat_gt.gt_seq),
+            cr6_adj_gt.gt_type.eq(cr6_lat_gt.gt_type),
+            cr6_adj_gt.perms.eq(cr6_lat_gt.perms),
+            cr6_adj_gt.b_flag.eq(cr6_lat_gt.b_flag),
+            # base = NS_base + (lumpSize − cc) × 4  (byte address of c-list word 0)
+            cr6_adj_view.word1_location.eq(
+                ns_base_from_cr14 + ((lumpSize_reg - cc_reg) << 2)
+            ),
+            cr6_adj_w2.limit_offset.eq(cc_reg - 1),       # cc − 1 (inclusive count)
+            cr6_adj_w2.gt_seq.eq(cr6_lat_w2.gt_seq),
+            cr6_adj_w2.spare.eq(0),
+            cr6_adj_view.word3_w3.eq(cr6_lat_view.word3_w3),
         ]
 
         # b-flag cleared capability (computed from b_cr_data, used in CLEAR_B_WRITE)
@@ -247,13 +298,48 @@ class ChurchCall(Elaboratable):
                     self.mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
+                    _hdr = View(LUMP_HEADER_LAYOUT, self.mem_rd_data)
                     m.d.sync += lump_reg.eq(self.mem_rd_data)
                     m.d.sync += [
-                        cw_reg.eq(View(LUMP_HEADER_LAYOUT, self.mem_rd_data).cw),
-                        cc_reg.eq(View(LUMP_HEADER_LAYOUT, self.mem_rd_data).cc),
-                        n_minus_6_reg.eq(View(LUMP_HEADER_LAYOUT, self.mem_rd_data).n_minus_6),
+                        cw_reg.eq(_hdr.cw),
+                        cc_reg.eq(_hdr.cc),
+                        n_minus_6_reg.eq(_hdr.n_minus_6),
+                        lumpSize_reg.eq(Const(1, 15) << (_hdr.n_minus_6 + 6)),
+                    ]
+                    m.next = "SET_CR14_LIMIT_WRITE"
+
+            with m.State("SET_CR14_LIMIT_WRITE"):
+                # Write CR14 with PERM_X (M=1) and corrected limit_offset = lumpSize−cc−2
+                m.d.comb += [
+                    local_cr_wr_addr.eq(CR14_CODE),
+                    local_cr_wr_data.eq(cr14_with_limit),
+                    local_cr_wr_en.eq(1),
+                ]
+                m.next = "SET_CR6_BASE"
+
+            with m.State("SET_CR6_BASE"):
+                # cc=0: c-list absent — write NULL GT to CR6 per spec step 7
+                # cc>0: read CR6 (Phase 1 deposited the E-GT there) to latch for adjustment
+                with m.If(cc_reg == 0):
+                    m.d.comb += [
+                        local_cr_wr_en.eq(1),
+                        local_cr_wr_addr.eq(CR6_CLIST),
+                        local_cr_wr_data.eq(0),
                     ]
                     m.next = "CLEAR_B_INIT"
+                with m.Else():
+                    m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
+                    m.d.sync += cr6_latched.eq(self.cr_rd_data)
+                    m.next = "SET_CR6_LIMIT"
+
+            with m.State("SET_CR6_LIMIT"):
+                # Write CR6 with new base (c-list start) and limit_offset = cc−1
+                m.d.comb += [
+                    local_cr_wr_addr.eq(CR6_CLIST),
+                    local_cr_wr_data.eq(cr6_adjusted),
+                    local_cr_wr_en.eq(1),
+                ]
+                m.next = "CLEAR_B_INIT"
 
             with m.State("CLEAR_B_INIT"):
                 m.d.sync += b_idx.eq(0)
