@@ -25,6 +25,7 @@ GT_TYPE_RSV      = 0b11
 NUM_CAP_REGS = 16
 NUM_DATA_REGS = 16
 
+CR_HEAP      = 5
 CR_CLIST     = 6
 CR_CLOOMC    = 7
 CR_THREAD    = 12

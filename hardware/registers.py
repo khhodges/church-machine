@@ -33,6 +33,7 @@ class ChurchRegisters(Elaboratable):
         self.cr_word_rd_sel = Signal(2)
         self.cr_word_rd_data = Signal(32)
 
+        self.cr5_heap = Signal(CAP_REG_LAYOUT)
         self.cr6_clist = Signal(CAP_REG_LAYOUT)
         self.cr7_cloomc = Signal(CAP_REG_LAYOUT)
         self.cr12_thread = Signal(CAP_REG_LAYOUT)
@@ -76,6 +77,7 @@ class ChurchRegisters(Elaboratable):
                 m.d.comb += self.cr_word_rd_data.eq(View(CAP_REG_LAYOUT, cap_regs[self.cr_word_rd_addr]).word3_w3)
 
         m.d.comb += [
+            self.cr5_heap.eq(cap_regs[CR_HEAP]),
             self.cr6_clist.eq(cap_regs[CR_CLIST]),
             self.cr7_cloomc.eq(cap_regs[CR_CLOOMC]),
             self.cr12_thread.eq(cap_regs[CR_THREAD]),

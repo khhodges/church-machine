@@ -63,7 +63,7 @@ class ChurchCore(Elaboratable):
         self.gc_busy = Signal()
         self.gc_garbage_count = Signal(32)
 
-        self.fault = Signal(4)
+        self.fault = Signal(5)   # widened: FaultType.STACK_OVERFLOW=0x10 needs 5 bits
         self.fault_valid = Signal()
 
         self.nia = Signal(32)
@@ -402,6 +402,11 @@ class ChurchCore(Elaboratable):
             u_call.cr14_code.eq(u_regs.cr14_code),
             u_call.mem_rd_data.eq(self.dmem_rd_data),
             u_call.mem_rd_valid.eq(1),
+            # Stack push inputs (Task #46)
+            u_call.cr5_heap.eq(u_regs.cr5_heap),
+            u_call.lambda_frame_reg.eq(lambda_pc_reg),    # LAMBDA hidden reg: saved NIA
+            u_call.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
+            u_call.stack_limit.eq(256),  # TODO: expose as configurable IDE register
         ]
 
         m.d.comb += ret_start_sig.eq(
@@ -664,10 +669,17 @@ class ChurchCore(Elaboratable):
                 self.dmem_wr_en.eq(u_shared_mload.mem_wr_en),
             ]
         with m.Elif(u_call.mem_rd_en):
-            # CALL FETCH_LUMP: read NS word3_lump (+12) for NIA computation
+            # CALL FETCH_LUMP / STACK_READ_SP: data memory read
             m.d.comb += [
                 self.dmem_addr.eq(u_call.mem_rd_addr),
                 self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_call.mem_wr_en):
+            # CALL stack push: write E-GT word, LAMBDA frame word, or updated SP
+            m.d.comb += [
+                self.dmem_addr.eq(u_call.mem_wr_addr),
+                self.dmem_wr_data.eq(u_call.mem_wr_data),
+                self.dmem_wr_en.eq(1),
             ]
         with m.Elif(u_save.mem_wr_en):
             m.d.comb += [

@@ -97,7 +97,7 @@ class ChurchMLoad(Elaboratable):
             m.d.comb += crc_stages[0].eq(0xFFFF)
             for i in range(89):
                 if i < 25:
-                    data_bit = result_view.word0_gt[24 - i]
+                    data_bit = result_view.word0_gt.as_value()[24 - i]
                 elif i < 57:
                     data_bit = result_view.word1_location[56 - i]
                 else:
