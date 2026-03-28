@@ -2,10 +2,34 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, WORD2_LAYOUT, WORD3_LAYOUT, LUMP_HEADER_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, WORD2_LAYOUT, WORD3_LAYOUT
+from .ns_gate import ChurchNSGate
 
 
 class ChurchMLoad(Elaboratable):
+    """mLoad — load a Golden Token from a c-list into a capability register.
+
+    Security gate
+    ─────────────
+    The NS integrity check (3 reads + gt_seq + CRC) is performed by the
+    shared ChurchNSGate sub-module.  mLoad adds the c-list walk before the
+    gate and g-bit reset + CR write after it.
+
+    FSM (seal-check enabled)
+    ────────────────────────
+        IDLE → FETCH_SRC → CHECK_L → CHECK_BOUNDS → FETCH_GT
+             → CHECK_NS → START_GATE → WAIT_GATE
+             → RESET_GBIT → UPDATE_THREAD → COMPLETE
+             → FAULT (any error)
+
+    FSM (seal-check disabled)
+    ─────────────────────────
+        IDLE → FETCH_SRC → CHECK_L → CHECK_BOUNDS → FETCH_GT
+             → CHECK_NS → START_GATE → WAIT_GATE
+             → UPDATE_THREAD → COMPLETE
+             → FAULT
+    """
+
     def __init__(self, enable_seal_check=None):
         self.enable_seal_check = enable_seal_check if enable_seal_check is not None else ENABLE_SEAL_CHECK
 
@@ -50,6 +74,10 @@ class ChurchMLoad(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
+        m.submodules.u_ns_gate = u_ns_gate = ChurchNSGate(
+            enable_seal_check=self.enable_seal_check
+        )
+
         cr_src_reg = Signal(4)
         cr_dst_reg = Signal(4)
         index_reg = Signal(16)
@@ -77,40 +105,35 @@ class ChurchMLoad(Elaboratable):
         clist_gt_addr = Signal(32)
         m.d.comb += clist_gt_addr.eq(src_view.word1_location + (index_reg << 2))
 
-        ns_entry_addr = Signal(32)
-        ns_ns_w2 = View(WORD2_LAYOUT, ns_view.word2_w2)
-        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (result_gt.slot_id * 12))
+        ns_view_for_bounds = View(CAP_REG_LAYOUT, self.cr15_namespace)
+        ns_ns_w2 = View(WORD2_LAYOUT, ns_view_for_bounds.word2_w2)
 
         ns_index_in_bounds = Signal()
         m.d.comb += ns_index_in_bounds.eq(result_gt.slot_id < ns_ns_w2.limit_offset[:16])
 
         ns_w3_saved = Signal(32)
 
-        if self.enable_seal_check:
-            result_w2 = View(WORD2_LAYOUT, result_view.word2_w2)
-            result_w3 = View(WORD3_LAYOUT, result_view.word3_w3)
+        local_mem_addr  = Signal(32)
+        local_mem_rd_en = Signal()
+        local_mem_wr_en  = Signal()
+        local_mem_wr_data = Signal(32)
 
-            gt_seq_match = Signal()
-            m.d.comb += gt_seq_match.eq(result_gt.gt_seq == result_w2.gt_seq)
+        m.d.comb += u_ns_gate.cr15_namespace.eq(self.cr15_namespace)
 
-            crc_stages = [Signal(16, name=f"crc16_{i}") for i in range(90)]
-            m.d.comb += crc_stages[0].eq(0xFFFF)
-            for i in range(89):
-                if i < 25:
-                    data_bit = result_view.word0_gt.as_value()[24 - i]
-                elif i < 57:
-                    data_bit = result_view.word1_location[56 - i]
-                else:
-                    data_bit = result_view.word2_w2[88 - i]
-                top_bit = Signal(name=f"crc16_top_{i}")
-                shifted = Signal(16, name=f"crc16_sh_{i}")
-                m.d.comb += top_bit.eq(crc_stages[i][15] ^ data_bit)
-                m.d.comb += shifted.eq(Cat(Const(0, 1), crc_stages[i][:15]))
-                m.d.comb += crc_stages[i + 1].eq(shifted ^ Mux(top_bit, 0x1021, 0))
-            crc16_result = Signal(16, name="crc16_result")
-            m.d.comb += crc16_result.eq(crc_stages[89])
-            seal_ok = Signal()
-            m.d.comb += seal_ok.eq(crc16_result == result_w3.crc)
+        m.d.comb += [
+            self.mem_addr.eq(
+                Mux(u_ns_gate.ns_gate_busy, u_ns_gate.mem_addr, local_mem_addr)
+            ),
+            self.mem_rd_en.eq(
+                Mux(u_ns_gate.ns_gate_busy, u_ns_gate.mem_rd_en, local_mem_rd_en)
+            ),
+            self.mem_wr_en.eq(local_mem_wr_en),
+            self.mem_wr_data.eq(local_mem_wr_data),
+            u_ns_gate.mem_rd_data.eq(self.mem_rd_data),
+            u_ns_gate.mem_rd_valid.eq(u_ns_gate.ns_gate_busy & self.mem_rd_valid),
+        ]
+
+        m.d.comb += self.ns_entry_addr_out.eq(u_ns_gate.ns_entry_addr_out)
 
         with m.FSM(name="mload") as fsm:
             with m.State("IDLE"):
@@ -154,8 +177,8 @@ class ChurchMLoad(Elaboratable):
 
             with m.State("FETCH_GT"):
                 m.d.comb += [
-                    self.mem_addr.eq(clist_gt_addr),
-                    self.mem_rd_en.eq(1),
+                    local_mem_addr.eq(clist_gt_addr),
+                    local_mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += result_view.word0_gt.eq(self.mem_rd_data)
@@ -166,56 +189,34 @@ class ChurchMLoad(Elaboratable):
                     m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "FETCH_LOC"
+                    m.next = "START_GATE"
 
-            with m.State("FETCH_LOC"):
+            with m.State("START_GATE"):
                 m.d.comb += [
-                    self.mem_addr.eq(ns_entry_addr),
-                    self.mem_rd_en.eq(1),
+                    u_ns_gate.ns_gate_start.eq(1),
+                    u_ns_gate.gt_word0.eq(result_view.word0_gt.as_value()),
                 ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += result_view.word1_location.eq(self.mem_rd_data)
-                    m.next = "FETCH_W2"
+                m.next = "WAIT_GATE"
 
-            with m.State("FETCH_W2"):
-                # word1_w2 is at NS entry offset +4 (limit_offset | gt_seq)
-                m.d.comb += [
-                    self.mem_addr.eq(ns_entry_addr + 4),
-                    self.mem_rd_en.eq(1),
-                ]
-                with m.If(self.mem_rd_valid):
-                    m.d.sync += result_view.word2_w2.eq(self.mem_rd_data)
+            with m.State("WAIT_GATE"):
+                with m.If(u_ns_gate.ns_gate_fault):
+                    m.d.sync += fault_type_reg.eq(u_ns_gate.ns_gate_fault_type)
+                    m.next = "FAULT"
+                with m.Elif(u_ns_gate.ns_gate_done):
+                    m.d.sync += [
+                        result_view.word1_location.eq(u_ns_gate.raw_base),
+                        result_view.word2_w2.eq(u_ns_gate.raw_w2),
+                        result_view.word3_w3.eq(u_ns_gate.raw_w3),
+                    ]
                     if self.enable_seal_check:
-                        m.next = "FETCH_W3"
+                        m.d.sync += ns_w3_saved.eq(u_ns_gate.raw_w3)
+                        m.next = "RESET_GBIT"
                     else:
                         m.next = "UPDATE_THREAD"
 
             if self.enable_seal_check:
-                with m.State("FETCH_W3"):
-                    # word2_w3 is at NS entry offset +8 (crc | g_bit)
-                    m.d.comb += [
-                        self.mem_addr.eq(ns_entry_addr + 8),
-                        self.mem_rd_en.eq(1),
-                    ]
-                    with m.If(self.mem_rd_valid):
-                        m.d.sync += [
-                            result_view.word3_w3.eq(self.mem_rd_data),
-                            ns_w3_saved.eq(self.mem_rd_data),
-                        ]
-                        m.next = "CHECK_VERSION"
-
-                with m.State("CHECK_VERSION"):
-                    with m.If(~gt_seq_match):
-                        m.d.sync += fault_type_reg.eq(FaultType.VERSION)
-                        m.next = "FAULT"
-                    with m.Elif(~seal_ok):
-                        m.d.sync += fault_type_reg.eq(FaultType.SEAL)
-                        m.next = "FAULT"
-                    with m.Else():
-                        m.next = "RESET_GBIT"
-
                 with m.State("RESET_GBIT"):
-                    gbit_cleared_w3 = Signal(32)
+                    gbit_cleared_w3  = Signal(32)
                     gbit_cleared_view = View(WORD3_LAYOUT, gbit_cleared_w3)
                     ns_w3_view = View(WORD3_LAYOUT, ns_w3_saved)
                     m.d.comb += [
@@ -224,10 +225,9 @@ class ChurchMLoad(Elaboratable):
                         gbit_cleared_view.spare.eq(ns_w3_view.spare),
                     ]
                     m.d.comb += [
-                        self.mem_addr.eq(ns_entry_addr + 8),
-                        self.mem_wr_en.eq(1),
-                        self.mem_wr_data.eq(gbit_cleared_w3),
-                        self.ns_entry_addr_out.eq(ns_entry_addr),
+                        local_mem_addr.eq(u_ns_gate.ns_entry_addr_out + 8),
+                        local_mem_wr_en.eq(1),
+                        local_mem_wr_data.eq(gbit_cleared_w3),
                         self.gbit_reset_done.eq(1),
                     ]
                     m.next = "UPDATE_THREAD"
