@@ -2,146 +2,173 @@
 
 ## Namespace Table Structure
 
-The namespace is the master directory of all resources in the system. Every Golden Token references an entry in the namespace table. Each entry describes a resource with three fields:
+The namespace is the master directory of all resources in the system. Every Golden Token references an entry in the namespace table. Each entry describes a resource with three 32-bit words:
 
-| Field | Content |
-|-------|---------|
-| **Word 1** | Location (32-bit) |
-| **Word 2** | Limit (32-bit) |
-| **Word 3** | VersionSeals (32-bit) |
+| Word   | Content |
+|--------|---------|
+| **Word 0** | Base address — 32-bit lump base byte address |
+| **Word 1** | Limit + gt_seq (`spare[3] \| gt_seq[7] \| limit_offset[21]`) |
+| **Word 2** | CRC + G-bit (`spare[15] \| g_bit[1] \| CRC-16[16]`) |
 
 ### Namespace Entry Format
 
-Each namespace entry uses 3 x 32-bit words. The VersionSeals word combines two pieces of information:
+Each namespace entry occupies exactly **3 consecutive 32-bit words** (12 bytes). The slot byte address is calculated as:
 
 ```
- VersionSeals [31:0]:
-  [31:25] Version  (7 bits)  -- 128 generations
-  [24:0]  Seal     (25 bits) -- FNV hash of Location + Limit
+NS_entry_addr = NS_table_base + object_id × 12
 ```
 
-The 25-bit FNV seal provides integrity verification for the namespace entry. The 7-bit version field enables garbage collection by allowing stale tokens to be detected and invalidated.
+The namespace table supports up to **65,536 entries**, bounded by the 16-bit `object_id` field in the Golden Token.
 
-The namespace table in Church Machine supports up to 131,072 entries (limited by the 17-bit index field in the Golden Token). Each entry occupies 3 words, so the slot address is calculated as `Index x 3`.
+#### Word 1 Layout (WORD2_LAYOUT)
 
-**Note on B and F flags**: The B (Bind) and F (Far/Foreign) flags are namespace entry metadata stored in the namespace table entry, not permission bits in the Golden Token. B indicates whether the entry is bound to a specific C-List, and F marks foreign/remote proxy entries. These are properties of the namespace entry itself, not of the GT that references it.
+```
+31      28 27      21 20                  0
+┌──────────┬──────────┬────────────────────┐
+│  spare   │  gt_seq  │   limit_offset     │
+│  [3:0]   │  [6:0]   │     [20:0]         │
+└──────────┴──────────┴────────────────────┘
+```
+
+| Bits    | Field          | Description |
+|---------|---------------|-------------|
+| [20:0]  | `limit_offset` | Object size in words minus 1 |
+| [27:21] | `gt_seq`       | Revocation counter — compared against GT `gt_seq` by ChurchNSGate |
+| [31:28] | spare          | Reserved |
+
+#### Word 2 Layout (WORD3_LAYOUT)
+
+```
+31              17 16    15              0
+┌────────────────┬───┬────────────────────┐
+│     spare      │ G │    CRC-16          │
+│    [14:0]      │   │    [15:0]          │
+└────────────────┴───┴────────────────────┘
+```
+
+| Bits    | Field   | Description |
+|---------|--------|-------------|
+| [15:0]  | `crc`   | CRC-16/CCITT integrity check result |
+| [16]    | `g_bit` | GC mark bit — cleared on every ChurchNSGate access (G=0 = reachable) |
+| [31:17] | spare   | Reserved |
+
+**Note on B and F flags**: The B (Bind) flag lives in **bit [31] of GT Word 0** itself (`b_flag` in GT_LAYOUT) — it is a property of the token, not the NS entry. The F (Far/Foreign) concept is represented by the `typ` field in the GT (`typ=11` for Outform). Neither B nor F has a dedicated field in the 3-word NS entry.
 
 ---
 
 ## The mLoad Master Validation Path
 
-All namespace access in the Church Machine architecture routes through a single trusted validation path called **mLoad**. This is the fundamental security principle: one master validation pipeline that every Church instruction must use to access the namespace.
+All namespace access in the Church Machine architecture routes through a single trusted validation path called **mLoad** (implemented as `ChurchMLoad` + `ChurchNSGate` in Amaranth HDL). This is the fundamental security principle: one master validation pipeline that every Church instruction must use to access the namespace.
 
 ### Why One Path
 
 Having a single validation path:
 - **Minimizes the Trusted Computing Base (TCB)**: Only one piece of code needs to be correct for all namespace access.
-- **Eliminates validation gaps**: No instruction can bypass permission checks, bounds checks, MAC validation, or G-bit reset.
-- **Maps directly to hardware**: In ASIC/FPGA implementations, mLoad is a single pipeline — there is no way to access namespace memory without passing through it.
+- **Eliminates validation gaps**: No instruction can bypass permission checks, bounds checks, CRC validation, or G-bit reset.
+- **Maps directly to hardware**: In ASIC/FPGA implementations, mLoad + ChurchNSGate form a single pipeline — there is no way to access namespace memory without passing through them.
 
-### mLoad Validation Sequence
+### mLoad / ChurchNSGate Validation Sequence
 
 Every namespace access follows this exact sequence. Any failure at any step triggers an immediate FAULT:
 
 ```
 mLoad(source_capability, required_permission, index, destCR):
 
-  1. Permission Check
+  1. Permission Check (mLoad — CHECK_L state)
      Does the source capability have L or M permission?
      (requiredPerm=null skips this check — used for RETURN context restoration)
      Failure → FAULT
 
-  2. Bounds Check
+  2. Bounds Check (mLoad — CHECK_BOUNDS state)
      Is the index within the source C-List range?
-     Index must be < namespaceTable.length
+     Index must be < ns_w2.limit_offset
      Failure → FAULT
 
-  3. Fetch Golden Token
-     Read the GT from the C-List at the given index.
+  3. Fetch Golden Token (mLoad — FETCH_GT state)
+     Read the 32-bit GT from the C-List at the given index.
 
-  4. Namespace Bounds Check
-     Is the GT's offset within the CR15 namespace range?
-     Does CR15 have M (Machine) permission?
+  4. NS Slot Bounds Check (mLoad — CHECK_NS state)
+     Is the GT's object_id within the CR15 namespace range?
      Failure → FAULT
 
-  5. Fetch Namespace Entry
-     Read Location, Limit, and Seals from the namespace.
+  5. Fetch NS Entry (ChurchNSGate — FETCH_LOC / FETCH_W2 / FETCH_W3 states)
+     Read NS Entry Word 0 (base), Word 1 (gt_seq + limit_offset), Word 2 (CRC + G-bit).
 
-  6. MAC/Seal Validation
-     Version match + 25-bit FNV seal recomputation
-     Failure → FAULT
+  6. gt_seq Match (ChurchNSGate — CHECK_VERSION state)
+     Does GT gt_seq [22:16] match NS Entry Word 1 gt_seq [27:21]?
+     Failure → FAULT VERSION (stale token — entry was revoked or GC'd)
 
-  7. G-bit Reset
-     Clear G=0 on the accessed namespace entry.
+  7. CRC-16/CCITT Integrity (ChurchNSGate — CHECK_VERSION state)
+     Recompute CRC-16/CCITT (poly=0x1021, init=0xFFFF) over:
+       gt_word0[24:0] + NS Word 0 (base) + NS Word 1 (limit/gt_seq)  [89 bits total]
+     Compare against NS Entry Word 2 bits [15:0].
+     Failure → FAULT SEAL (tampered NS entry)
+
+  8. G-bit Reset (ChurchNSGate — CHECK_VERSION state)
+     Clear G=0 on the accessed namespace entry (NS Entry Word 2 bit [16]).
      This is unconditional — happens on every successful access.
      (GC integration: signals that this entry is reachable)
 
-  8. Write to Destination CR (if destCR specified)
-     Write the full capability (GT + namespace entry data) to the destination register.
+  9. Write to Destination CR (mLoad — COMPLETE state)
+     Write the full capability (GT + NS entry data) to the destination register.
      This is the SOLE path for writing to any CR.
 
-  9. Thread Table Shadow Update
-     Write the full CR to Thread[CRd] in the thread table shadow.
-     This is unconditional — happens on every CR write.
-     Keeps the thread table continuously current, eliminating the need
-     to save CRs during CHANGE context switches.
+ 10. Thread Table Shadow Update (mLoad — UPDATE_THREAD state)
+     Write the GT word to the thread table shadow.
+     Keeps the thread table continuously current.
 ```
 
 ### The Golden Rule: mLoad Is the Sole Path for All CR Writes
 
-No instruction directly writes to a capability register. All CR writes route through mLoad (or its helpers `_writeCR` and `_clearCR`), which:
+No instruction directly writes to a capability register. All CR writes route through mLoad, which:
 
-1. **Validates** the GT against the namespace (version, MAC, bounds)
+1. **Validates** the GT against the namespace (gt_seq, CRC-16, bounds)
 2. **Resets G=0** on the accessed namespace entry (GC liveness)
 3. **Writes** the validated capability to the destination CR
 4. **Updates** the thread table shadow at Thread[CRd]
 
 This means:
 - **LOAD**: mLoad validates and writes to CRd
-- **CALL**: mLoad writes CR6 (nodal C-List) and CR7 (access code); `_clearCR` writes NULL to CR5
-- **RETURN**: mLoad (direct mode: `sub_direct=1`) revalidates saved CR6/CR7 GTs against namespace before restoring — catches recycled entries (use-after-free prevention)
-- **SWITCH**: mLoad validates source GT and writes to system register CR8-CR15
-- **CHANGE**: Only saves data registers + PC (CRs already current in thread table shadow)
+- **CALL**: cLoad runs NSGate + lump header read → writes CR6 (c-list) and CR14 (code)
+- **RETURN**: mLoad (direct mode: `sub_direct=1`) revalidates saved E-GT against namespace — catches use-after-free
+- **SWITCH**: mLoad validates source GT and writes to privileged register CR12–CR15
+- **CHANGE**: Saves data registers + PC to thread lump; CRs reloaded via cLoad on next CALL/RETURN
 
-### Instructions Using mLoad
+### Instructions Using mLoad / ChurchNSGate
 
-| Instruction | Source | Destination | Notes |
-|-------------|--------|-------------|-------|
-| **LOAD** | CRs (user-specified) | CRd (user-specified) | Standard capability fetch via mLoad |
-| **CALL** | CRs (callee C-List) | CR6, CR7 | Two-phase mLoad: CRs[idx]→CR6, CR6[0]→CR7 |
-| **RETURN** | Saved GTs from stack | CR5, CR6, CR7 | mLoad revalidates saved GTs, catches recycled entries |
-| **CHANGE** | CRs/C-List | CR8 (Thread) | Thread switch; CRs saved via thread table shadow |
-| **SWITCH** | CRs/C-List | CR8-CR15 (system) | mLoad validates and writes to system register |
-| **SAVE** | CRd (C-List dest) | Namespace write | G-bit reset on accessed C-List entry |
+| Instruction | Validation Path | Destination |
+|-------------|----------------|-------------|
+| **LOAD** | ChurchMLoad + ChurchNSGate | CRd (user-specified) |
+| **CALL** | ChurchMLoad → ChurchNSGate → cLoad | CR6 (c-list), CR14 (code) |
+| **RETURN** | ChurchMLoad (direct mode) | CR6, CR14 (re-derived from saved E-GT) |
+| **CHANGE** | ChurchMLoad + ChurchNSGate | CR12 (Thread) |
+| **SWITCH** | ChurchMLoad + ChurchNSGate | CR12–CR15 (system) |
+| **SAVE** | Bounds check only (no NSGate) | Namespace write (GT Word 0) |
 
 ---
 
-## MAC Seal Validation
+## CRC-16/CCITT Integrity Validation
 
-MAC seal validation is the mechanism that ensures Golden Tokens and namespace entries have not been corrupted or forged.
+CRC-16/CCITT validation is the mechanism that ensures Golden Tokens and namespace entries have not been corrupted or forged.
 
 ### When Validation Occurs
 
-Validation occurs on every mLoad call — which means every Church instruction that accesses namespace:
+Validation occurs inside ChurchNSGate on every mLoad call — which means every Church instruction that reads from the namespace:
 
 | Operation | Validation |
 |-----------|------------|
-| **LOAD** | Version match + FNV seal checked on source GT and target namespace entry |
-| **CALL** | Version match + FNV seal checked on both source GT and target namespace entry |
-| **SAVE** | FNV seal recomputed from Location + Limit, preserving existing version |
+| **LOAD** | gt_seq match + CRC-16 checked |
+| **CALL** | gt_seq match + CRC-16 checked |
+| **RETURN** | gt_seq match + CRC-16 checked (on saved E-GT) |
 
 ### How Validation Works
 
-When mLoad accesses a namespace entry:
+When ChurchNSGate processes a namespace entry:
 
-1. The **version** in the Golden Token (bits [31:25]) is compared against the version in the namespace entry's VersionSeals word (bits [31:25]). If they do not match, the token is stale and a FAULT is triggered.
-2. The **FNV seal** is recomputed from the entry's Location and Limit values and compared against the stored seal in VersionSeals (bits [24:0]). If they do not match, the entry has been corrupted and a FAULT is triggered.
+1. The **`gt_seq`** in the Golden Token (bits [22:16]) is compared against the `gt_seq` in NS Entry Word 1 (bits [27:21]). If they do not match, the token is stale and a `VERSION` FAULT is triggered.
+2. The **CRC-16/CCITT** is recomputed over 89 bits (`gt_word0[24:0]` + NS Word 0 + NS Word 1) and compared against NS Entry Word 2 bits [15:0]. If they do not match, a `SEAL` FAULT is triggered.
 
-When a SAVE instruction writes to a namespace entry:
-
-1. The Location and Limit values from the source capability register are written to the namespace entry.
-2. A new FNV seal is computed from the written Location and Limit values.
-3. The VersionSeals word is constructed by combining the existing version with the new seal.
+Revocation: increment the `gt_seq` counter in NS Entry Word 1 by 1. All existing GTs for that entry now have a stale `gt_seq` and FAULT on next use. No tracking of outstanding GTs is required — revocation is O(1).
 
 ---
 
@@ -151,8 +178,8 @@ The Church Machine architecture follows a strict failsafe design: **any validati
 
 This applies uniformly to:
 - Permission violations (missing required permission bit)
-- Version mismatches (stale Golden Token)
-- MAC/seal failures (corrupted namespace entry)
+- gt_seq mismatches (stale Golden Token)
+- CRC-16 failures (corrupted or tampered NS entry)
 - Bounds violations (index out of range)
 - Stack overflows (call stack full)
 - Stack underflows (return with empty stack)
@@ -165,17 +192,17 @@ The fault handler is the single point of error management, ensuring consistent a
 
 The Church Machine enforces the following invariants at all times:
 
-### No Direct System Register Access
+### No Direct Privileged Register Access
 
-Only CR0-CR7 are addressable through the 3-bit register encoding in Church instructions. System registers CR8-CR15 are physically unreachable through instruction encoding. This is an architectural constraint, not a software convention.
+Only CR0–CR11 are addressable through the 4-bit register encoding in Church instructions. Privileged registers CR12–CR15 are physically unreachable through instruction encoding. This is an architectural constraint, not a software convention.
 
 ### Privilege Through SWITCH Only
 
-The SWITCH instruction is the sole mechanism for writing to system registers CR8-CR15. It requires M (Machine) permission on the source capability.
+The SWITCH instruction is the sole mechanism for writing to privileged registers CR12–CR15. It requires appropriate permissions on the source capability.
 
 ### Capability-Mediated Access Through mLoad
 
-All resource access goes through capability-mediated C-Lists via the mLoad validation path. LOAD reads from a C-List entry. SAVE writes to a C-List entry. There is no instruction that can access raw memory without a valid Golden Token authorizing the operation. The mLoad path ensures that every access is validated, bounds-checked, MAC-verified, and G-bit-reset.
+All resource access goes through capability-mediated C-Lists via the mLoad + ChurchNSGate validation path. LOAD reads from a C-List entry. SAVE writes a GT Word 0 back to memory. There is no instruction that can access namespace entries without a valid Golden Token authorizing the operation. The mLoad path ensures that every access is validated, bounds-checked, CRC-verified, and G-bit-reset.
 
 ### Mutually Exclusive Permission Domains
 
@@ -186,11 +213,11 @@ The two mutually exclusive permission domains (Turing and Church) cannot be mixe
 | Turing | R, W, X | Read/Write data, Execute code |
 | Church | L, S, E | Load/Save Golden Tokens through C-Lists, Enter abstractions |
 
-M (Machine) is a transient microcode elevation on the CR, never stored in the GT. B (Bind) and F (Far/Foreign) are namespace entry metadata, not GT permission bits. G is a GC flag managed by the mLoad pipeline.
+M (Machine) is a transient microcode elevation (`sub_m_elevated`), never stored in the GT. G is the GC mark bit in NS Entry Word 2, managed by ChurchNSGate.
 
 ### G-bit Reset as Security Invariant
 
-The G-bit reset on every namespace access is not optional — it is a security invariant enforced by the mLoad path. This ensures that the garbage collector can accurately determine which entries are reachable, preventing:
-- **Use-after-free**: Reclaimed entries have their version bumped, instantly invalidating stale Golden Tokens.
+The G-bit reset on every namespace access is not optional — it is a security invariant enforced by ChurchNSGate. This ensures that the garbage collector can accurately determine which entries are reachable, preventing:
+- **Use-after-free**: Revoked entries have their `gt_seq` incremented, instantly invalidating stale Golden Tokens.
 - **Resource leaks**: Unreachable entries are identified and reclaimed.
 - **GC evasion**: No instruction can access namespace without triggering G-bit reset.

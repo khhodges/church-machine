@@ -15,20 +15,30 @@ This document describes the Church Machine's TSB design.
 ### Golden Token Layout (32-bit)
 
 ```
-[31:25] Version     (7 bits)   -- GC invalidation (128 generations)
-[24:8]  Index       (17 bits)  -- Namespace entry index (0-131,071)
-[7:2]   Permissions (6 bits)   -- E, S, L, X, W, R
-[1:0]   Type        (2 bits)   -- Inform/Outform/NULL/Abstract
+31      25 24  23 22      16 15           0
+┌─────────┬──────┬──────────┬─────────────┐
+│B R W X  │ typ  │  gt_seq  │  object_id  │
+│ L S E   │ [2]  │   [7]    │    [16]     │
+│  [7]    │      │          │             │
+└─────────┴──────┴──────────┴─────────────┘
 ```
+
+| Bits    | Field        | Description |
+|---------|-------------|-------------|
+| [15:0]  | `object_id`  | Namespace slot index (0–65,535) |
+| [22:16] | `gt_seq`     | Revocation counter — must match NS Entry Word 1 `gt_seq` |
+| [24:23] | `typ`        | GT class: 00=NULL, 01=Real, 10=Abstract, 11=Outform |
+| [30:25] | permissions  | R(25) W(26) X(27) L(28) S(29) E(30) |
+| [31]    | `B`          | Bind flag — stored in GT bit [31] |
 
 Each capability register is 128 bits wide (4 x 32-bit words):
 
-| Word | Content |
-|------|---------|
+| Word  | Content |
+|-------|---------|
 | word0 | The 32-bit Golden Token |
-| word1 | Location (physical address from namespace entry) |
-| word2 | Limit (bounds from namespace entry) |
-| word3 | VersionSeals: Version(7) + FNV Seal(25) |
+| word1 | Lump base address (NS Entry Word 0) |
+| word2 | NS Entry Word 1: `spare[31:28] \| gt_seq[27:21] \| limit_offset[20:0]` |
+| word3 | NS Entry Word 2: `spare[31:17] \| g_bit[16] \| CRC-16[15:0]` |
 
 ### Permission Bits -- Only Six, Mutually Exclusive
 
@@ -45,20 +55,20 @@ The GT stores exactly 6 permission bits. These are access rights, not metadata:
 
 **Domain Purity Rule**: Turing (R, W, X) xor Church (L, S, E). A GT may carry permissions from one domain or the other, never both. Enforced in hardware at TPERM time.
 
-### What Is NOT in the GT
+### What Is NOT in the GT Permission Bits
 
-| Item | Where It Lives | Why Not in GT |
-|------|---------------|---------------|
-| M (Machine/Microcode) | Transient signal during mLoad | Prevents privilege escalation -- no user code can set or observe it |
-| B (Bind) | Namespace entry metadata | Policy about whether a capability can be copied -- property of the slot, not the token |
-| F (Far/Foreign) | Namespace entry metadata | Whether the resource is remote -- property of where it lives, not what you can do with it |
-| G (Garbage) | Namespace entry bit 29 | Church Machine uses both a G-bit (cleared on access to prove reachability) and a 7-bit version field for GC sweep revocation |
+| Item | Where It Lives | Notes |
+|------|---------------|-------|
+| M (Machine/Microcode) | Transient signal during mLoad (`sub_m_elevated`) | Prevents privilege escalation — no user code can set or observe it |
+| G (Garbage) | NS Entry Word 2 bit [16] (`g_bit`) | Cleared on every ChurchNSGate access to prove liveness for GC |
+
+Note: **B (Bind) IS stored in GT Word 0 bit [31]** (`b_flag` in GT_LAYOUT). It is not a namespace metadata field separate from the GT — it travels with the GT.
 
 ### mLoad Validation Pipeline (Church Machine)
 
 Five Church instructions write Golden Tokens into capability registers: LOAD, CALL, RETURN, CHANGE, and SWITCH. Every one of them routes through mLoad. SAVE writes to the namespace (not CRs). LAMBDA reads an existing GT and jumps (no CR write).
 
-The mLoad validation sequence in Church Machine (`simulator.js`):
+The mLoad + ChurchNSGate validation sequence:
 
 ```
 mLoad(source_capability, required_permission, index, destCR):
@@ -68,46 +78,46 @@ mLoad(source_capability, required_permission, index, destCR):
      Failure → FAULT
 
   2. Bounds Check
-     Is the index within the namespace table?
+     Is the index within the C-List range?
      Failure → FAULT
 
   3. Fetch Golden Token
      Read the GT from the C-List at the given index.
 
-  4. Version Match
-     Does the GT's version (bits [31:25]) match the
-     namespace entry's version (VersionSeals bits [31:25])?
-     Failure → FAULT (stale token -- entry was GC'd and recycled)
+  4. gt_seq Match (ChurchNSGate — CHECK_VERSION)
+     Does GT gt_seq [22:16] match NS Entry Word 1 gt_seq [27:21]?
+     Failure → FAULT VERSION (stale token — entry was revoked or GC'd)
 
-  5. MAC/Seal Validation
-     Recompute 25-bit FNV seal from Location + Limit.
-     Does it match the stored seal (VersionSeals bits [24:0])?
-     Failure → FAULT (tampered namespace entry)
+  5. CRC-16/CCITT Integrity (ChurchNSGate — CHECK_VERSION)
+     Recompute CRC-16/CCITT (poly=0x1021, init=0xFFFF) over:
+       gt_word0[24:0] + NS Entry Word 0 + NS Entry Word 1  [89 bits]
+     Compare against NS Entry Word 2 bits [15:0] (crc field).
+     Failure → FAULT SEAL (tampered NS entry)
 
-  6. G-bit Reset
-     Clear G=0 on the accessed namespace entry.
+  6. G-bit Reset (ChurchNSGate — CHECK_VERSION)
+     Clear G=0 on the accessed namespace entry (NS Entry Word 2 bit [16]).
      (GC integration: proves this entry is reachable)
 
-  7. Write to Destination CR
-     Write the full 128-bit capability (GT + Location + Limit + VersionSeals)
+  7. Write to Destination CR (mLoad — COMPLETE)
+     Write the full 128-bit capability (GT + NS Entry data)
      to the destination register. This is the SOLE path for all CR writes.
 
-  8. Thread Table Shadow Update
-     Write the CR to Thread[CRd] in the thread table.
+  8. Thread Table Shadow Update (mLoad — UPDATE_THREAD)
+     Write the GT word to the thread table shadow.
      Keeps the thread table continuously current.
 ```
 
 Any failure at any step triggers an immediate FAULT. There is no partial write, no speculative execution past a fault, no recovery path.
 
-### Version-Based Garbage Collection (Church Machine)
+### gt_seq-Based Garbage Collection (Church Machine)
 
-Church Machine uses a 7-bit version field (128 generations) for deterministic GC:
+Church Machine uses a 7-bit `gt_seq` field (128 revocation generations) for deterministic GC:
 
-1. **Mark**: Set G=1 on all non-empty namespace entries
-2. **Scan**: Walk reachability tree from all live roots (CRs, call stack, thread table), clearing G=0 on reachable entries
-3. **Sweep**: Entries still marked G=1 are unreachable -- increment their version, invalidating all outstanding GTs that reference the old version
+1. **Mark**: Set G=1 on all non-empty namespace entries (NS Entry Word 2 `g_bit`)
+2. **Scan**: Walk reachability tree from all live roots (CRs, call stack, thread table), clearing G=0 on reachable entries (via ChurchNSGate on every LOAD/CALL)
+3. **Sweep**: Entries still marked G=1 are unreachable — increment their `gt_seq` in NS Entry Word 1, invalidating all outstanding GTs that reference the old `gt_seq`
 
-When a stale GT is later used, mLoad detects the version mismatch and faults. This prevents use-after-free without any runtime overhead on the fast path.
+When a stale GT is later used, ChurchNSGate detects the `gt_seq` mismatch and faults. This prevents use-after-free without any runtime overhead on the fast path.
 
 ### Security Invariants (Church Machine)
 
@@ -116,36 +126,37 @@ When a stale GT is later used, mLoad detects the version mismatch and faults. Th
 3. **No NULL Dereference**: mLoad checks GT type before validation. NULL GTs immediately fault.
 4. **No Out-of-Bounds Access**: Every C-List access is bounds-checked. Every namespace offset is validated.
 5. **No Domain Mixing**: TPERM enforces domain purity -- Turing (RWX) xor Church (LSE), never both.
-6. **No Stale Access**: Version mismatch detection catches GC'd entries. 7-bit version gives 128 generations.
-7. **No Tampered Entries**: 25-bit FNV seal integrity check on every mLoad access.
+6. **No Stale Access**: gt_seq mismatch detection catches revoked/GC'd entries. 7-bit gt_seq gives 128 revocation generations.
+7. **No Tampered Entries**: CRC-16/CCITT integrity check on every ChurchNSGate access.
 8. **Failsafe Fault Handling**: All failures route to a single FAULT handler.
 
 ---
 
 ## Part 2: Church Machine Hardware (Amaranth HDL) Trusted Security Base
 
-The Church Machine hardware implementation follows the same architectural principles with a 64-bit GT and synthesizable HDL.
+The Church Machine hardware implementation realises the same GT format in synthesizable Amaranth HDL.
 
-### Golden Token Layout (64-bit)
+### Golden Token Layout (32-bit, `GT_LAYOUT` in `hardware/layouts.py`)
 
 ```
- 63    58 57 56 55 54       32 31                    0
- ┌──────┬──┬─────┬───────────┬────────────────────────┐
- │perms │G │type │   spare   │        offset          │
- │(6)   │  │(2)  │   (23)    │        (32)            │
- └──────┴──┴─────┴───────────┴────────────────────────┘
+31      25 24  23 22      16 15           0
+┌─────────┬──────┬──────────┬─────────────┐
+│B R W X  │ typ  │  gt_seq  │  object_id  │
+│ L S E   │ [2]  │   [7]    │    [16]     │
+│  [7]    │      │          │             │
+└─────────┴──────┴──────────┴─────────────┘
 ```
 
-Same 6 permission bits (R, W, X, L, S, E). Same domain purity rule. The hardware implementation uses wider data paths:
+Same 6 permission bits (R, W, X, L, S, E). Same domain purity rule. Same 32-bit width as the golden format:
 
-| Aspect | Simulator | Hardware (HDL) |
-|--------|-----------|----------------|
-| GT width | 32-bit | 64-bit |
-| Namespace index | 17-bit Index (131K entries) | 32-bit Offset |
-| GC mechanism | G-bit cleared on access + 7-bit version bump on sweep | G-bit cleared on access, spare field as version |
-| Integrity check | 25-bit FNV seal | Hardware MAC hash |
-| CR width | 128-bit (4 x 32-bit words) | 256-bit (4 x 64-bit words) |
-| Implementation | Software simulator (JavaScript) | Synthesizable Amaranth HDL |
+| Aspect | Simulator (pre-hardware) | Hardware (HDL) |
+|--------|--------------------------|----------------|
+| GT width | 32-bit | 32-bit |
+| Namespace slot | 17-bit Index (131K entries) — simulator-era | 16-bit `object_id` (65,536 entries) |
+| GC mechanism | G-bit + version field | G-bit in NS Entry Word 2 + `gt_seq` revocation |
+| Integrity check | 25-bit FNV seal — simulator-era | CRC-16/CCITT over 89-bit input |
+| CR width | 128-bit (4 x 32-bit words) | 128-bit (4 x 32-bit words) |
+| Implementation | Software simulator | Synthesizable Amaranth HDL |
 
 ### mLoad FSM (Amaranth HDL -- 218 lines, 14 states)
 
@@ -202,23 +213,23 @@ Two orders of magnitude smaller than seL4. Five orders of magnitude smaller than
 
 1. **mLoad is the sole trusted path** for all CR writes
 2. **6 permission bits** (R, W, X, L, S, E) stored in the GT
-3. **Domain purity** -- Turing xor Church, never both
-4. **M is transient** -- microcode elevation only, never stored
-5. **B and F are namespace metadata** -- not GT permission bits
+3. **B flag in GT bit [31]** (`b_flag`) — bind policy travels with the token
+4. **Domain purity** -- Turing xor Church, never both
+5. **M is transient** -- microcode elevation only, never stored
 6. **Single FAULT handler** -- all validation failures, no partial writes
-7. **GC integration** -- every mLoad access contributes to liveness tracking
-8. **Version-based stale detection** -- prevents use-after-free
+7. **GC integration** -- every NS access clears g_bit (G=0 = reachable)
+8. **gt_seq-based stale detection** -- prevents use-after-free
 
 ### Where They Differ
 
-| Aspect | Simulator | Hardware (HDL) |
-|--------|-----------|----------------|
-| TSB implementation | Software (JavaScript mLoad function) | Hardware (Amaranth HDL FSM) |
-| GC stale detection | G-bit in NS entry + version field in GT (7-bit, 128 generations) | G-bit in GT + spare field as version |
-| Integrity validation | 25-bit FNV seal | Hardware MAC |
-| Namespace capacity | 131K entries (17-bit index) | 4B entries (32-bit offset) |
+| Aspect | Simulator (pre-hardware) | Hardware (HDL) |
+|--------|--------------------------|----------------|
+| TSB implementation | Software (JavaScript mLoad function) | Amaranth HDL FSM (ChurchMLoad + ChurchNSGate) |
+| GC stale detection | G-bit in NS entry + version field in GT (7-bit, 128 generations) | G-bit in NS Entry Word 2 + `gt_seq` revocation counter |
+| Integrity validation | 25-bit FNV-1a seal (simulator-era) | CRC-16/CCITT over 89-bit input |
+| Namespace capacity | Up to 131K entries (17-bit Index) | Up to 65,536 entries (16-bit `object_id`) |
 | ISA | RISC-V RV32I + custom opcodes | Custom ARM-style encoding |
-| Target | Software simulation, future FPGA | Synthesizable for FPGA/ASIC |
+| Target | Software simulation | Synthesizable for FPGA/ASIC |
 
 ### The Core Guarantee
 

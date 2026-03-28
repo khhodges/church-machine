@@ -47,18 +47,29 @@ R, W, and X permissions are NOT permitted on hardware devices.
 ## Golden Token Format
 
 ```
-31        25 24          8 7      2 1  0
-| Version  |    Index    | Perms  |Type|
-|  7 bits  |   17 bits   | 6 bits |2 b |
+31      25 24  23 22      16 15           0
+┌─────────┬──────┬──────────┬─────────────┐
+│B R W X  │ typ  │  gt_seq  │  object_id  │
+│ L S E   │ [2]  │   [7]    │    [16]     │
+│  [7]    │      │          │             │
+└─────────┴──────┴──────────┴─────────────┘
 ```
 
-### Version (7 bits)
+| Bits    | Field       | Width | Description |
+|---------|------------|-------|-------------|
+| [15:0]  | `object_id` | 16   | Namespace slot index (0–65,535) |
+| [22:16] | `gt_seq`    | 7    | Revocation sequence counter |
+| [24:23] | `typ`       | 2    | GT class (NULL / Real / Abstract / Outform) |
+| [30:25] | permissions | 6    | R, W, X, L, S, E |
+| [31]    | `B`         | 1    | Bind flag |
 
-Monotonically increasing counter. Must match the version stored in the namespace entry. On mismatch, the GT is dead — access FAULTs. Revocation is instant: increment the namespace version, and every copy of every GT referencing that entry dies on next use.
+### gt_seq (7 bits)
 
-### Index (17 bits)
+Revocation sequence counter. Must match the `gt_seq` stored in NS Entry Word 1 bits [27:21]. On mismatch, the GT is stale — access FAULTs. Revocation is instant: increment the NS entry `gt_seq`, and every outstanding GT referencing that entry dies on next use.
 
-Points to a namespace entry. Supports up to 131,072 entries.
+### object_id (16 bits)
+
+Points to a namespace slot. Supports up to 65,536 entries.
 
 ### Permissions (6 bits)
 
@@ -73,28 +84,28 @@ Points to a namespace entry. Supports up to 131,072 entries.
 
 R and W are pure Turing permissions (data access). L, S, and E are pure Church permissions (capability access). X (Execute) bridges the two domains: it is grouped with R and W for TPERM domain purity enforcement (presets 3–5: X, RX, RWX), but it gates a Church instruction (LAMBDA) because code application is a capability-mediated operation. A code object is DATA (accessed via X), but applying it is Church's function application. This dual nature is by design — X is the permission that connects the Turing computation domain to the Church security domain.
 
-### Type (2 bits)
+### Type (`typ`, bits [24:23])
 
 | Value | Type | Meaning |
 |-------|------|---------|
-| 00 | NULL | Zero value — no capability. A zeroed GT is naturally NULL. |
+| 00 | NULL | Zero value — no capability. A zeroed GT (typ=00) always faults on use. |
 | 01 | Inform | GT points to memory via an NS entry — abstractions, data objects, lumps |
-| 10 | Outform | GT points to remote memory (F-bit auto-set, tunneled access) |
-| 11 | Abstract | GT IS the value — constants (pi), immutable credentials, escale variables |
+| 10 | Abstract | GT IS the value — constants (pi), immutable credentials, escale variables |
+| 11 | Outform | GT references an IDE-managed dependency; lazy-loaded via Locator on first LOAD |
 
-All abstractions use **Inform (01)** GTs. The Inform GT points to a namespace entry, which points to a memory lump. CALL uses the clistCount field in the NS entry's word1 to split the lump into code (CR14, privileged) and c-list (CR6) regions.
+All abstractions use **Real (01)** GTs. The Real GT's `object_id` indexes a namespace slot that holds the lump base address and limit. CALL loads the lump header from `raw_base` via cLoad and reads `cc` (c-list count) and `n_minus_6` (size exponent) to split the lump into code (CR14, privileged) and c-list (CR6) regions.
 
 ## Namespace Table Slot Format
 
-The namespace table begins at `0xFD00`. Each entry occupies exactly **3 consecutive 32-bit words**:
+The namespace table begins at `0xFD00`. Each entry occupies exactly **3 consecutive 32-bit words** (12 bytes):
 
 ```
-NS[idx] base address = 0xFD00 + idx × 3
+NS[object_id] byte address = 0xFD00 + object_id × 12
 ```
 
-The table supports up to 256 entries (`MAX_NS_ENTRIES = 256`). Slots 0–7 are reserved by the boot sequence; application abstractions start at slot 8 or higher.
+The table supports up to **65,536 entries** (bounded by the 16-bit `object_id` field). Slots 0–7 are reserved by the boot sequence; application abstractions start at slot 8 or higher.
 
-An entry is considered **empty** when both word0 and word1 are zero.
+An entry is considered **empty** when both Word 0 and Word 1 are zero.
 
 ---
 
@@ -112,121 +123,91 @@ The base address of the memory object (abstraction lump, data object, or device 
 
 ---
 
-### Word 1 — Flags + clistCount + Limit
+### Word 1 — Limit + gt_seq (WORD2_LAYOUT)
 
 ```
-31 30 29 28 27  26 25          17 16              0
-┌──┬──┬──┬──┬────┬──────────────┬──────────────────┐
-│B │F │G │Ch│Type│  clistCount  │      limit       │
-│1 │1 │1 │1 │ 2  │    9 bits    │     17 bits      │
-└──┴──┴──┴──┴────┴──────────────┴──────────────────┘
+31      28 27      21 20                  0
+┌──────────┬──────────┬────────────────────┐
+│  spare   │  gt_seq  │   limit_offset     │
+│  [3:0]   │  [6:0]   │     [20:0]         │
+└──────────┴──────────┴────────────────────┘
 ```
 
-| Bits  | Width | Name        | Meaning |
-|-------|-------|-------------|---------|
-| 31    | 1     | B (Bind)    | 1 = GT may be saved into another c-list via mSave. 0 = mSave FAULTs. Cleared automatically by CALL on preserved CRs. |
-| 30    | 1     | F (Far)     | 1 = remote / Outform object; mLoad tunnels access via the Tunnel abstraction instead of direct memory read. |
-| 29    | 1     | G (GC mark) | Used by the PP250 garbage collector mark phase. Set during mark; cleared during flip. Not meaningful to application code. |
-| 28    | 1     | chain       | Reserved for linked-entry chains. Not used by current implementation. |
-| 27:26 | 2     | gtType      | Entry type: `00`=NULL, `01`=Inform, `10`=Outform, `11`=Abstract. Must match the Type field of the GT that references this entry. |
-| 25:17 | 9     | clistCount  | Number of c-list Golden Token slots at the top of the lump (0–511). 0 means a plain data object; > 0 means an abstraction lump that CALL will split. |
-| 16:0  | 17    | limit       | Size of the memory object minus 1, in words. Maximum object size = 131,072 words. |
-
-Encoding expression (from `packNSWord1`):
-
-```js
-word1 = ((B        & 1)    << 31)
-      | ((F        & 1)    << 30)
-      | ((G        & 1)    << 29)
-      | ((chain    & 1)    << 28)
-      | ((gtType   & 3)    << 26)
-      | ((clistCount & 0x1FF) << 17)
-      | ( limit17  & 0x1FFFF)
-```
-
-#### Lump split (clistCount > 0)
-
-When CALL resolves an entry with `clistCount > 0`, the lump is divided into two regions:
-
-```
-offset 0                        clistStart          limit+1
-┌───────────────────────────────┬────────────────────┐
-│   code  (method table + body) │   c-list (GTs)     │
-│   CR14, X-only                │   CR6, L-only      │
-└───────────────────────────────┴────────────────────┘
-```
-
-```
-clistStart = (limit + 1) - clistCount
-CR14: location = word0,                  limit = clistStart - 1,  perms = X-only
-CR6:  location = word0 + clistStart,     limit = clistCount - 1,  perms = L-only
-PC = 0
-```
+| Bits    | Width | Name            | Meaning |
+|---------|-------|----------------|---------|
+| [20:0]  | 21    | `limit_offset`  | Object size in words minus 1 |
+| [27:21] | 7     | `gt_seq`        | Revocation sequence counter; compared against GT `gt_seq` by ChurchNSGate. Increment to revoke all outstanding GTs instantly. |
+| [31:28] | 4     | spare           | Reserved |
 
 ---
 
-### Word 2 — Version + Seal
+### Word 2 — CRC + G-bit (WORD3_LAYOUT)
 
 ```
-31        25 24                               0
-┌───────────┬───────────────────────────────────┐
-│  version  │             seal                  │
-│  7 bits   │            25 bits                │
-└───────────┴───────────────────────────────────┘
+31              17 16    15              0
+┌────────────────┬───┬────────────────────┐
+│     spare      │ G │    CRC-16          │
+│    [14:0]      │   │    [15:0]          │
+└────────────────┴───┴────────────────────┘
 ```
 
-| Bits  | Width | Name    | Meaning |
-|-------|-------|---------|---------|
-| 31:25 | 7     | version | Monotonically increasing revocation counter (0–127). Must exactly match the Version field of any GT referencing this entry. Incrementing this field instantly revokes all outstanding GTs. |
-| 24:0  | 25    | seal    | FNV-1a integrity hash of (word0, limit17). Recomputed and verified by every mLoad call. Tamper with word0 or word1's limit field and the seal fails — the GT dies on next use. |
+| Bits    | Width | Name    | Meaning |
+|---------|-------|--------|---------|
+| [15:0]  | 16    | `crc`   | CRC-16/CCITT integrity result |
+| [16]    | 1     | `g_bit` | GC mark bit — cleared by ChurchNSGate on every NS access (G=0 = reachable) |
+| [31:17] | 15    | spare   | Reserved |
 
-Encoding expression (from `makeVersionSeals`):
+#### CRC-16/CCITT integrity
 
-```js
-word2 = (((version & 0x7F) << 25) | (seal & 0x01FFFFFF)) >>> 0
-```
-
-#### Seal algorithm
-
-The seal covers the two fields that define what the entry *points to* and *how large it is* — the minimum set an attacker would need to forge a capability:
-
-```js
-// FNV-1a, 32-bit
-function computeSeal(location, limit17) {
-    let h = 0x811c9dc5;                       // FNV offset basis
-    h = ((h ^ location)  * 0x01000193) >>> 0; // mix in word0
-    h = ((h ^ limit17)   * 0x01000193) >>> 0; // mix in limit field of word1
-    return h & 0x01FFFFFF;                    // keep 25 bits
-}
-```
-
-Only `location` (word0) and `limit17` (bits [16:0] of word1) are covered. The flag bits (B, F, G, chain, gtType, clistCount) in word1 are **not** included in the seal — they may be updated by the runtime without re-sealing.
-
-#### Version matching (GT ↔ NS)
-
-The 7-bit version in word2 must equal the Version field in the GT at every mLoad call:
+ChurchNSGate recomputes CRC-16/CCITT (polynomial 0x1021, init 0xFFFF) over 89 bits:
 
 ```
-GT[31:25]  =?=  NS[idx].word2[31:25]
+input = gt_word0[24:0] (25 bits) ++ NS Word 0 (32 bits) ++ NS Word 1 (32 bits)
+result compared against NS Word 2 bits [15:0]
 ```
 
-Revocation: increment `word2[31:25]` by 1. All existing GTs for this entry now have a stale version and FAULT on next use. No tracking of outstanding GTs is required.
+A mismatch faults with `SEAL` error. The covered input includes the identifying fields of the GT and both the base address and limit/gt_seq of the NS entry — the minimum set an attacker would need to forge a valid capability.
+
+#### gt_seq revocation
+
+Revocation: increment `NS Word 1 [27:21]` by 1. All existing GTs for this entry now have a mismatched `gt_seq` and FAULT on next use. No tracking of outstanding GTs is required — revocation is O(1).
+
+---
+
+### Lump split (abstraction lumps)
+
+When CALL resolves a Real GT, cLoad reads the **lump header** at `raw_base`. The header encodes:
+- `cc` — 8-bit c-list count (number of GTs at the top of the lump)
+- `n_minus_6` — 4-bit size exponent: lump size in words = `2^(n_minus_6 + 6)`
+
+The lump is then divided into two regions:
+
+```
+offset 0                       lumpSize-cc        lumpSize
+┌──────────────────────────────┬────────────────────┐
+│  code  (method table + body) │   c-list (GTs)     │
+│  CR14, X-only                │   CR6, L-only      │
+└──────────────────────────────┴────────────────────┘
+
+CR14: location = raw_base,             limit = (lumpSize - cc) - 1,  perms = X-only
+CR6:  location = raw_base + lumpSize - cc*4,  limit = cc - 1,        perms = L-only
+PC = 0
+```
+
+The c-list count and lump size come from the **lump header** in memory, not from a field in the NS entry.
 
 ---
 
 ### Complete slot at a glance
 
 ```
-Offset +0   location        [31:0]   Base address of the memory object
-Offset +1   flags/meta      [31]     B — bindable flag
-                            [30]     F — far (remote/tunnel) flag
-                            [29]     G — GC mark bit
-                            [28]     chain — reserved
-                            [27:26]  gtType — 00 NULL / 01 Inform / 10 Outform / 11 Abstract
-                            [25:17]  clistCount — c-list slots (0 = data, >0 = abstraction)
-                            [16:0]   limit17 — object size - 1
-Offset +2   version+seal    [31:25]  version (7-bit revocation counter)
-                            [24:0]   seal (25-bit FNV-1a of location + limit17)
+Offset +0   Word 0 — base      [31:0]   Lump base byte address
+Offset +1   Word 1 — limit     [31:28]  spare
+            (WORD2_LAYOUT)     [27:21]  gt_seq (7-bit revocation counter)
+                               [20:0]   limit_offset (object size - 1 in words)
+Offset +2   Word 2 — crc       [31:17]  spare
+            (WORD3_LAYOUT)     [16]     g_bit (GC liveness, cleared on access)
+                               [15:0]   CRC-16/CCITT integrity check
 ```
 
 ## Register Architecture
@@ -235,18 +216,20 @@ Offset +2   version+seal    [31:25]  version (7-bit revocation counter)
 
 128-bit registers holding Golden Tokens. Each CR stores four 32-bit words:
 
-- **word0**: The GT itself (version + index + perms + type)
-- **word1**: Location/base address, plus B-bit (bit 31) and F-bit (bit 30)
-- **word2**: Limit/bounds
-- **word3**: Seal (FNV-1a hash for integrity)
+- **word0**: The GT itself (`B | perms | typ | gt_seq | object_id`)
+- **word1**: Lump base address (NS Entry Word 0)
+- **word2**: NS Entry Word 1 (`spare | gt_seq | limit_offset`)
+- **word3**: NS Entry Word 2 (`spare | g_bit | CRC-16`)
 
-Special assignments:
-- **CR6**: Current capability list (c-list) — entered via CALL (programmer-accessible)
-- **CR8**: Thread identity (programmer-accessible)
-- **CR12**: Data fault handler (privileged — system-wide)
-- **CR13**: Interrupt handler (privileged — system-wide)
-- **CR14**: Current code object (CLOOMC) — instruction fetch source (privileged — per-thread)
-- **CR15**: Namespace root (privileged — per-thread)
+Special assignments (from `hardware/hw_types.py`):
+- **CR5**:  Heap pointer (CR_HEAP) — bump-allocation frontier
+- **CR6**:  Current capability list (CR_CLIST) — entered via CALL (programmer-accessible)
+- **CR7**:  CLOOMC (CR_CLOOMC) — instruction fetch source from callee's code object
+- **CR9**:  Interrupt handler (CR_INTERRUPT) — privileged, system-wide
+- **CR10**: Data fault handler (CR_DFAULT) — privileged, system-wide
+- **CR12**: Thread identity (CR_THREAD) — updated by CHANGE
+- **CR14**: Code (CR_CODE) — current code object, X-only (privileged, per-thread)
+- **CR15**: Namespace root (CR_NAMESPACE) — privileged, per-thread
 
 ### Data Registers (DR0–DR15)
 
@@ -271,33 +254,17 @@ All segments are accessed through the same GT gate via mLoad.
 
 ### Namespace Entries
 
-Each namespace entry is 3 words (96 bits):
+Each namespace entry is **3 words (12 bytes)**, stride = `object_id × 12` from the NS table base:
 
-- **Word 0**: Location (32-bit base address of the object)
-- **Word 1**: B(31) | F(30) | G(29) | chain(28) | type(27:26) | clistCount(25:17) | Limit(16:0)
-- **Word 2**: Version(31:25) | Seal(24:0) — 7-bit version + 25-bit FNV-1a integrity hash
+- **Word 0** (base): 32-bit lump base byte address
+- **Word 1** (WORD2_LAYOUT): `spare[31:28] | gt_seq[27:21] | limit_offset[20:0]`
+- **Word 2** (WORD3_LAYOUT): `spare[31:17] | g_bit[16] | CRC-16[15:0]`
 
-### word1 Layout
+The NS table supports up to 65,536 entries (16-bit `object_id`).
 
-```
-Bit 31:    B (Bind) — defaults 0, auto-cleared by CALL
-Bit 30:    F (Far) — set for Outform GTs
-Bit 29:    G (GC mark) — used by PP250 garbage collector
-Bit 28:    chain — reserved for linked entries
-Bits 27:26: type — 00=NULL, 01=Inform, 10=Outform, 11=Abstract
-Bits 25:17: clistCount — number of c-list slots (0-511)
-Bits 16:0:  limit — object size limit (0-131071)
-```
+When the GT's `object_id` identifies an abstraction lump, CALL invokes cLoad, which reads the lump header at `raw_base` to obtain `cc` (c-list count) and `n_minus_6` (size exponent) and performs the lump split. The NS entry itself contains only the base address, gt_seq, and limit_offset — no clistCount or type field.
 
-When `clistCount > 0`, the NS entry describes an abstraction lump. CALL splits the lump:
-- `clistStart = (limit + 1) - clistCount`
-- **CR14** (code): location = base, limit = clistStart - 1, permissions = X-only (hardcoded, privileged)
-- **CR6** (c-list): location = base + clistStart, limit = clistCount - 1, permissions = L-only (hardcoded)
-- PC = 0
-
-When `clistCount = 0`, the entry is a plain data object (no lump split).
-
-Seal = FNV-1a(word0, word1[16:0]). Recomputed and verified on every mLoad access (step 3). If word0 or word1 are tampered, the seal check fails.
+Integrity = CRC-16/CCITT recomputed over `gt_word0[24:0]` + NS Word 0 + NS Word 1 (89 bits), compared against NS Word 2 bits [15:0] on every ChurchNSGate access. Tamper with any covered field and the CRC fails — the GT faults on next use.
 
 ## Boot Sequence
 
@@ -305,35 +272,35 @@ The boot sequence follows a deterministic flow:
 
 1. **FAULT_RST**: All CRs cleared to NULL, all DRs zeroed. M-Elevation ON.
 2. **LOAD_NS**: CR15 initialized with GT to Namespace Root (Slot 0).
-3. **INIT_THRD**: CR8 initialized with Thread Identity (Slot 1).
+3. **INIT_THRD**: CR12 initialized with Thread Identity (Slot 1).
 4. **INIT_CLIST**: CR6 loaded with Boot C-List (Slot 2).
 5. **LOAD_NUC**: CR14 loaded with Boot Code (CLOOMC from Slot 3, privileged). PC = 0.
 6. **COMPLETE**: M-Elevation OFF. Machine begins executing boot code.
 
 After boot, the code CALLs Salvation (NS[4]) to verify the security pipeline. Salvation proves LOAD, TPERM, and LAMBDA work correctly, then transitions to Navana (NS[5]). Navana does not RETURN — it becomes the permanent namespace controller, managing all abstractions, intrusion detection (IDS), and system lifecycle indefinitely.
 
-## Security Pipeline (mLoad)
+## Security Pipeline (mLoad + ChurchNSGate)
 
-Every read-side memory access passes through this 7-step pipeline:
+Every capability register load passes through this pipeline:
 
-1. **GT Type Check** — NULL type → FAULT
-2. **Version Match** — GT version must equal NS entry version
-3. **Seal Verify** — FNV-1a hash must match NS entry seal
-4. **Bounds Check** — Access address must be within [location, location + limit)
+1. **GT Type Check** — `typ=00` (NULL) → FAULT immediately
+2. **gt_seq Match** — GT `gt_seq` must equal NS Entry Word 1 `gt_seq`
+3. **CRC-16 Verify** — CRC-16/CCITT over 89-bit input must match NS Entry Word 2 bits [15:0]
+4. **Bounds Check** — Access offset must be within `[0, limit_offset]`
 5. **Permission Check** — Required permission bit must be set in GT
-6. **F-bit Check** — F=1 means far/foreign object (requires tunnel)
-7. **Data Delivery** — Access permitted, data returned
+6. **G-bit Reset** — NS Entry Word 2 `g_bit` cleared (GC liveness proof)
+7. **CR Write** — Validated capability written to destination register
 
-mSave (write gate) performs the symmetric check for c-list writes, additionally requiring B=1 (bindable) on the source GT.
+mSave (write gate) performs the symmetric check for c-list writes, additionally requiring `B=1` (bit [31] of GT Word 0) on the source GT.
 
 ## B-bit (Bind)
 
-Namespace entry word1, bit 31. Controls whether a GT can be saved into another c-list:
+GT Word 0 bit [31] (`b_flag` in `GT_LAYOUT`). Controls whether a GT can be saved into another c-list:
 
 - B=0 (default): GT cannot be copied to other c-lists — mSave FAULTs
 - B=1: GT is bindable — mSave permits the write
 
-CALL automatically clears B on all preserved CRs passed to the callee ("no bind by default"). Explicit TPERM with B modifier enables binding.
+The B flag travels with the GT in bit [31] of the 32-bit token word. CALL automatically clears B on all preserved CRs passed to the callee ("no bind by default"). Explicit TPERM with B modifier enables binding.
 
 ## Instruction Fetch
 
@@ -346,31 +313,31 @@ Instruction fetch uses CR14 (CLOOMC, privileged):
 
 ## CALL / RETURN
 
-CALL performs (single NS entry with clistCount):
-1. Validate E permission on target Inform GT
-2. mLoad resolves GT → validates version, seal, E-perm
-3. Parse word1 → extract clistCount and limit
-4. If clistCount > 0 (abstraction lump):
-   - clistStart = (limit + 1) - clistCount
-   - CR14 (code): location = base, limit = clistStart - 1, perms = **X-only** (hardcoded, privileged)
-   - CR6 (c-list): location = base + clistStart, limit = clistCount - 1, perms = **L-only** (hardcoded)
+CALL performs:
+1. Validate E permission on target Real GT (`typ=01`)
+2. ChurchNSGate validates gt_seq + CRC-16 on the NS entry
+3. cLoad reads the **lump header** at `raw_base` → extracts `cc` (c-list count, 8-bit) and `n_minus_6` (size exponent, 4-bit)
+4. Compute lump split:
+   - `lumpSize = 2^(n_minus_6 + 6)` words
+   - CR14 (code): location = raw_base, limit = (lumpSize - cc) - 1, perms = **X-only** (privileged)
+   - CR6 (c-list): location = raw_base + (lumpSize - cc) × 4, limit = cc - 1, perms = **L-only**
 5. Push 2-word call frame: [caller's E-GT | NIA+machine_indicators]
 6. Set PC = 0
 
 **Frame layout** — 2 words only:
 - Word 0: The caller's own E-GT (the GT that identified the calling abstraction).
-  RETURN uses this to revalidate the caller and re-derive CR6/CR14 via NS split.
+  RETURN uses this to revalidate the caller and re-derive CR6/CR14 via lump split.
 - Word 1: NIA (return offset into caller's code) | packed machine indicators
   (LAMBDA-active, condition flags, M-elevation, stackSpace, stackFrames, etc.)
 
-No DRs and no other CRs are pushed. The callee inherits DR0–DR15, CR0–CR5, CR7–CR13, CR15 from the caller unchanged.
+No DRs and no other CRs are pushed. The callee inherits DR0–DR15, CR0–CR5, CR7–CR11, CR13, CR15 from the caller unchanged.
 
-CR14 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. This resolves R001. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at allocSize-clistCount. All lumps are allocated as power-of-2 blocks (minimum 32 words).
+CR14 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at `lumpSize-cc`. All lumps are allocated as power-of-2 blocks (minimum 64 words, i.e. `n_minus_6=0`).
 
 RETURN:
 1. Pop 2-word frame from call stack
-2. mLoad caller's E-GT (Word 0): version + MAC + G-bit reset (FAULT on failure)
-3. Re-run NS split on caller's NS entry → re-derive CR6 (c-list) and CR14 (code)
+2. ChurchNSGate revalidates caller's E-GT (Word 0): gt_seq + CRC-16 + G-bit reset (FAULT on failure)
+3. cLoad re-runs lump split on caller's lump header → re-derives CR6 (c-list) and CR14 (code)
 4. Restore PC from NIA (Word 1) and machine indicators from Word 1
 
 ## LAMBDA
@@ -396,10 +363,10 @@ PP250 excludes HALT — the machine always returns to boot sequence. Namespace a
 
 Revocation is instant, global, and unforgeable:
 
-1. Increment the version on the namespace entry
-2. Every outstanding GT referencing that entry now has a version mismatch
-3. Next mLoad check FAULTs — no need to find or track copies
-4. Re-grant by creating a new GT with the new version
+1. Increment `gt_seq` in NS Entry Word 1 bits [27:21]
+2. Every outstanding GT referencing that entry now has a mismatched `gt_seq`
+3. Next ChurchNSGate check FAULTs — no need to find or track copies
+4. Re-grant by issuing a new GT with the updated `gt_seq` value
 
 ## Network Transparency
 
@@ -414,9 +381,9 @@ Outform GTs (type=10) with F-bit=1 represent remote resources:
 
 Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go through Navana:
 
-- **Navana.Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
-- **Navana.Remove**: Revoke GT (increment version), free NS slot
-- **Navana.Abstraction.Add**: Process upload.json, allocate lump (power-of-2), write code + c-list, create NS entry, forge E-GT
+- **Navana.Add**: Find free NS slot, write 3-word entry (base, gt_seq+limit_offset, CRC+g_bit), return `object_id` + `gt_seq`
+- **Navana.Remove**: Revoke GT (increment `gt_seq` in NS Entry Word 1), free NS slot
+- **Navana.Abstraction.Add**: Process upload.json, allocate power-of-2 lump, write lump header (`cc`, `n_minus_6`), write code + c-list GTs, create NS entry, forge E-GT
 - **Navana.Abstraction.Update**: Re-carve lump or migrate to larger allocation
 - **Navana.Abstraction.Remove**: Revoke GT, free lump, clear NS slot
 
@@ -434,7 +401,7 @@ The one exception: boot writes Navana's own NS entry via mElevation (raw write).
 }
 ```
 
-Navana.Abstraction.Add validates: codeSize + clistCount <= allocSize, each capability target exists and creator holds sufficient permissions, clistCount <= 511, allocSize is power-of-2 (minimum 32 words). The method table is written at offset 0, code words follow, and c-list GTs are placed at allocSize-clistCount.
+Navana.Abstraction.Add validates: `codeSize + cc <= lumpSize`, each capability target exists and creator holds sufficient permissions, `cc <= 255` (8-bit field), `lumpSize` is power-of-2 (minimum 64 words). The lump header (`cc`, `n_minus_6`) is written at offset 0, method table and code words follow, and c-list GTs are placed at `lumpSize - cc`.
 
 ## CLOOMC++ Compiler
 
