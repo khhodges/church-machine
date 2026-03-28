@@ -15,8 +15,8 @@ class ChurchGCUnit(Elaboratable):
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
-        self.ns_rd_data = Signal(32 * 4)
-        self.ns_wr_data = Signal(32 * 4)
+        self.ns_rd_data = Signal(32 * 3)
+        self.ns_wr_data = Signal(32 * 3)
         self.ns_wr_en = Signal()
 
         self.ns_start_index = Signal(16)
@@ -36,12 +36,12 @@ class ChurchGCUnit(Elaboratable):
         mark_counter = Signal(32)
         garbage_counter = Signal(32)
 
-        # NS_ENTRY_LAYOUT (4 words at stride slot_id<<4):
-        #   word_select(0, 32) = word0_location (+0)  — code base address
+        # NS_ENTRY_LAYOUT (3 words at stride slot_id*12):
+        #   word_select(0, 32) = word0_location (+0)  — lump base byte address
         #   word_select(1, 32) = word1_w2       (+4)  — limit_offset | gt_seq  (WORD2_LAYOUT)
         #   word_select(2, 32) = word2_w3       (+8)  — crc | g_bit            (WORD3_LAYOUT)
-        #   word_select(3, 32) = word3_lump     (+12) — cached LUMP_HEADER
-        latched_entry = Signal(32 * 4)
+        # Lump header is at lump word 0 (word0_location), NOT cached in the NS table.
+        latched_entry = Signal(32 * 3)
         latched_w1 = latched_entry.word_select(1, 32)   # word1_w2: limit | gt_seq
         latched_w2 = latched_entry.word_select(2, 32)   # word2_w3: crc | g_bit
 
@@ -77,7 +77,7 @@ class ChurchGCUnit(Elaboratable):
                 m.next = "MARK_WRITE"
 
             with m.State("MARK_WRITE"):
-                wr_entry = Signal(32 * 4)
+                wr_entry = Signal(32 * 3)
                 wr_w2 = wr_entry.word_select(2, 32)   # word2_w3 (+8): crc | g_bit
                 wr_w2_view = View(WORD3_LAYOUT, wr_w2)
                 m.d.comb += wr_entry.eq(latched_entry)
@@ -123,7 +123,7 @@ class ChurchGCUnit(Elaboratable):
                         m.next = "SWEEP_READ"
 
             with m.State("SWEEP_WRITE"):
-                swept_entry = Signal(32 * 4)
+                swept_entry = Signal(32 * 3)
                 swept_w1 = swept_entry.word_select(1, 32)   # word1_w2 (+4): gt_seq | limit_offset
                 swept_w1_view = View(WORD2_LAYOUT, swept_w1)
                 m.d.comb += [

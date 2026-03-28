@@ -79,7 +79,7 @@ class ChurchMLoad(Elaboratable):
 
         ns_entry_addr = Signal(32)
         ns_ns_w2 = View(WORD2_LAYOUT, ns_view.word2_w2)
-        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (result_gt.slot_id << 4))
+        m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (result_gt.slot_id * 12))
 
         ns_index_in_bounds = Signal()
         m.d.comb += ns_index_in_bounds.eq(result_gt.slot_id < ns_ns_w2.limit_offset[:16])

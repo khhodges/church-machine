@@ -186,7 +186,7 @@ class ChurchCall(Elaboratable):
 
         callee_ns_entry_addr = Signal(32)
         m.d.comb += callee_ns_entry_addr.eq(
-            cr15_view.word1_location + (cr14_gt.slot_id << 4)
+            cr15_view.word1_location + (cr14_gt.slot_id * 12)
         )
 
         lump_reg = Signal(32)
@@ -211,14 +211,16 @@ class ChurchCall(Elaboratable):
             cr14_wm_gt.gt_type.eq(cr14_lat_gt.gt_type),
             cr14_wm_gt.perms.eq(cr14_lat_gt.perms | PERM_MASK_X),
             cr14_wm_gt.b_flag.eq(cr14_lat_gt.b_flag),
-            cr14_wm_view.word1_location.eq(cr14_lat_view.word1_location),
+            cr14_wm_view.word1_location.eq(cr14_lat_view.word1_location + 4),
             cr14_wm_view.word2_w2.eq(cr14_lat_view.word2_w2),
             cr14_wm_view.word3_w3.eq(cr14_lat_view.word3_w3),
         ]
 
-        # NS_base derived from CR14.base after Phase 2 (mLoad sets CR14.base = NS_base+4)
+        # mLoad stores raw NS[+0] = lump_base into CR14.word1_location (no +4 offset).
+        # SET_M_WRITE applies +4 so the final CR14.base points at the first instruction word.
+        # ns_base_from_cr14 therefore equals the raw lump base (= lump header address).
         ns_base_from_cr14 = Signal(32)
-        m.d.comb += ns_base_from_cr14.eq(cr14_lat_view.word1_location - 4)
+        m.d.comb += ns_base_from_cr14.eq(cr14_lat_view.word1_location)
 
         # CR14 with M=1 AND corrected limit_offset — written in SET_CR14_LIMIT_WRITE
         cr14_with_limit = Signal(CAP_REG_LAYOUT)
@@ -365,7 +367,7 @@ class ChurchCall(Elaboratable):
 
             with m.State("FETCH_LUMP"):
                 m.d.comb += [
-                    self.mem_rd_addr.eq(callee_ns_entry_addr + 12),
+                    self.mem_rd_addr.eq(ns_base_from_cr14),  # lump word 0 = lump header
                     self.mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):

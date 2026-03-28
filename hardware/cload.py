@@ -87,7 +87,7 @@ class ChurchCLoad(Elaboratable):
         ns_view       = View(CAP_REG_LAYOUT, self.cr15_namespace)
         ns_entry_addr = Signal(32)
         m.d.comb += ns_entry_addr.eq(
-            ns_view.word1_location + (e_gt_view.slot_id << 4)
+            ns_view.word1_location + (e_gt_view.slot_id * 12)
         )
 
         # ── CRC-16/CCITT (conditional; same polynomial as mload.py) ───────────
@@ -250,7 +250,7 @@ class ChurchCLoad(Elaboratable):
             # ── Gate passed — transient replacement begins ─────────────────────
             with m.State("FETCH_HDR"):
                 m.d.comb += [
-                    self.mem_addr.eq(ns_entry_addr + 12), # NS[+12]: cached lump header
+                    self.mem_addr.eq(raw_base),           # lump word 0 = lump header
                     self.mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):

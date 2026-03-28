@@ -45,8 +45,8 @@ class ChurchCore(Elaboratable):
 
         self.ns_addr = Signal(32)
         self.ns_rd_en = Signal()
-        self.ns_rd_data = Signal(32 * 4)
-        self.ns_wr_data = Signal(32 * 4)
+        self.ns_rd_data = Signal(32 * 3)
+        self.ns_wr_data = Signal(32 * 3)
         self.ns_wr_en = Signal()
 
         self.clist_addr = Signal(32)

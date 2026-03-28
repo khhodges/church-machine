@@ -133,15 +133,17 @@ while len(BOOT_PROGRAM) < 256:
 
 
 def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, cc=0, n_minus_6=0):
-    """Build a 4-word NS entry (stride = slot_id << 4, i.e. 16 bytes per entry).
+    """Build a 3-word NS entry (stride = slot_id * 12, i.e. 12 bytes per entry).
 
     Layout:
-      word0_location (+0): code base address (location)
+      word0_location (+0): lump base byte address (location)
       word1_w2       (+4): limit_offset[20:0] | gt_seq[6:0] | spare[3:0]
                            limit_offset = alloc_size - 1  (last valid index)
       word2_w3       (+8): crc[15:0] | g_bit | spare[14:0]
                            crc = CRC-16/CCITT over GT[24:0] + location + word1_w2
-      word3_lump     (+12): cached LUMP_HEADER_LAYOUT (cw, cc, n_minus_6, …)
+
+    The lump header (LUMP_HEADER_LAYOUT) is at word 0 of the lump itself (at location),
+    not cached in the NS table entry.
 
     The GT bits used in the CRC are the lower 25 bits of the GT word (no b_flag or top perms).
 
@@ -157,12 +159,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
     crc = crc16_ccitt(gt25, location, word1_w2)
     word2_w3 = crc & 0xFFFF
 
-    # Cached lump header word — LUMP_HEADER_LAYOUT (LSB→MSB):
-    # cc[7:0] | typ[9:8] | cw[22:10] | n_minus_6[26:23] | magic[31:27]
-    # typ=00 (lump) for all boot ROM entries.
-    word3_lump = (cc & 0xFF) | ((cw & 0x1FFF) << 10) | ((n_minus_6 & 0xF) << 23) | (0x1F << 27)
-
-    return [location, word1_w2, word2_w3, word3_lump]
+    return [location, word1_w2, word2_w3]
 
 
 # ---------------------------------------------------------------------------
