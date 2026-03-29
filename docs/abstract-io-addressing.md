@@ -120,7 +120,11 @@ given the GT has no path to the network, regardless of what code it runs.
 ## IDE Provisioning Protocol
 
 At boot, the IDE creates the Abstract GT table and distributes tokens to privileged
-threads. This happens before any user code runs.
+abstractions. This happens before any user code runs.
+
+C-Lists do not define any private identity structure. The identity and capability
+structure of the system — its DNA — is defined entirely by the structure and
+relationships of GTs within Secure Abstractions, not by the c-list itself.
 
 ### Boot sequence for Abstract GTs
 
@@ -132,7 +136,7 @@ threads. This happens before any user code runs.
       word0_gt  = (abstract_addr[15:0] as slot_id) | (0b11 << 23) | (perms << 25) | (b_flag << 31)
       word1_loc = abstract_addr          ← the Abstract Address for this resource
       word2, word3 = 0
-   b. Write the GT directly into the appropriate c-list slot of the privileged thread.
+   b. Write the GT directly into the appropriate c-list slot of the privileged abstraction.
       (No NS slot is allocated — Abstract GTs are self-defining.)
 4. The Home Base tunnel GT (word1_loc = 0xFF000000) is always provisioned first.
 5. Local peripheral GTs (0xFE000000 range) are provisioned based on attached hardware.
@@ -204,10 +208,10 @@ GTs can only be copied, attenuated (perms removed via TPERM), or nullified — n
 synthesised from scratch.
 
 ### Attenuation
-A privileged thread that holds the Home Base GT with `R | W | E` can create
+A privileged abstraction that holds the Home Base GT with `R | W | E` can create
 attenuated derivatives (using TPERM) with only `E` permission and distribute
-those to less-privileged threads. Those threads can make RPC calls but cannot read
-or write raw tunnel data.
+those to less-privileged abstractions. Those abstractions can make RPC calls but
+cannot read or write raw tunnel data.
 
 ### No namespace attack surface
 Abstract GTs bypass the entire namespace validation pipeline (NS table lookup,
