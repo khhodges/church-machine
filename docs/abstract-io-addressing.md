@@ -468,7 +468,7 @@ Isolated abstractions can still be called locally (E permission is independent o
 They simply cannot leave the c-list (abstraction) they are provisioned for.
 
 #### User-regulated
-The abstraction's MTBF score meets the user-tier threshold. The S bit is enabled for
+The abstraction's MTBF score meets the user-tier threshold preventing downloads, remote access and propagation. The S bit is enabled for
 GTs held by user-level abstractions. Distribution is mediated by the Home Base tunnel:
 the sending CTMM packages the abstraction via `mSave` and the receiving CTMM installs
 it via `mLoad` after the tunnel delivers it. The receiving CTMM recalculates a fresh
