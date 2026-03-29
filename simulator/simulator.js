@@ -358,7 +358,7 @@ class ChurchSimulator {
                 }
                 const clistStart = allocSize - clistCount;
 
-                const cr14GT = this.createGT(0, 2, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
+                const cr14GT = this.createGT(0, 2, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
                 const cr14Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
                 this.cr[14] = {
                     word0: cr14GT,
