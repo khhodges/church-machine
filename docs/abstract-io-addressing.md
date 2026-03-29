@@ -78,10 +78,17 @@ An Abstract GT is a 128-bit capability register with:
 | Word 0 | `perms[30:25]` | Access rights granted to the holder |
 | Word 0 | `b_flag[31]` | 1 = may be propagated via mSave |
 | **Word 1** (32-bit) | **`word1_location`** | **The Abstract Address — hardware-routed sentinel** |
-| Word 2, Word 3 | — | Reserved / zero for Abstract GTs |
+| **Word 2** (32-bit) | **`word2_backup1`** | **First backup Abstract Address** (tunnel GTs only; `0x00000000` = not configured) |
+| **Word 3** (32-bit) | **`word3_backup2`** | **Second backup Abstract Address** (tunnel GTs only; `0x00000000` = not configured) |
+
+For non-tunnel Abstract GTs (local peripherals, SWITCH PassKeys) Word 2 and Word 3
+are always zero. For tunnel-range Abstract GTs (`word1_location` in `0xFF000000–0xFF0000FE`)
+Word 2 and Word 3 may optionally encode programmer-defined backup IDE addresses. See
+[Programmer Backup Home Base IDEs](#programmer-backup-home-base-ides).
 
 No namespace lookup ever occurs for an Abstract GT. Hardware matches `word1_location`
-against the Abstract Address Space table and routes the operation directly.
+(and backup words if needed) against the Abstract Address Space table and routes the
+operation directly.
 
 ---
 
@@ -158,6 +165,87 @@ given the GT has no path to the network, regardless of what code it runs.
 
 ---
 
+## Programmer Backup Home Base IDEs
+
+Tunnel-range Abstract GTs (word1_location in `0xFF000000–0xFF0000FE`) may optionally
+carry **two backup Abstract Addresses** in Word 2 and Word 3. These encode alternative
+IDE endpoints that the hardware will try in order if the primary address is unreachable.
+
+### Purpose
+
+A developer can configure their CTMM to fall back to a private or secondary IDE server
+— for example a local development machine, a team server, or a geographically closer
+cloud region — without any degradation in security. The backup addresses are unforgeable
+(provisioned at boot by the IDE), hardware-validated (must be in the tunnel range),
+and subject to the same permission and b_flag constraints as the primary.
+
+### Structure
+
+| Word | Field | Meaning |
+|:-----|:------|:--------|
+| Word 1 (`word1_location`) | Primary Abstract Address | Tried first — the main IDE/Home Base |
+| Word 2 (`word2_backup1`) | First backup Abstract Address | Tried if primary unreachable; `0x00000000` = not configured |
+| Word 3 (`word3_backup2`) | Second backup Abstract Address | Tried if Word 2 also unreachable; `0x00000000` = not configured |
+
+### Hardware fallback sequence
+
+```
+1. Try word1_location (primary Abstract Address).
+2. If unreachable:
+   a. If word2_backup1 != 0x00000000 and is a valid tunnel-range address → try it.
+   b. If word2_backup1 also unreachable (or not configured):
+      i. If word3_backup2 != 0x00000000 and is a valid tunnel-range address → try it.
+      ii. If word3_backup2 also unreachable (or not configured) → TRAP: TUNNEL_UNAVAILABLE.
+3. All operations on a backup address use the same Word 0 permissions and b_flag as the primary.
+```
+
+The TRAP on total failure is recoverable: the caller's IRQ thread can decide to wait and
+retry, alert the user, or switch to local-only operation.
+
+### Security constraints
+
+1. **Tunnel range only.** Word 2 and Word 3 are only interpreted as backup addresses if
+   `word1_location` is itself in the tunnel range (`0xFF000000–0xFF0000FE`). For any
+   other Abstract GT (peripherals, SWITCH PassKeys) hardware ignores Word 2/3 entirely.
+
+2. **Hardware validation.** Before attempting a backup, hardware checks that the
+   backup address is also within the tunnel range. A value outside that range is treated
+   as `0x00000000` (not configured) — not attempted and not a fault.
+
+3. **Provisioned at boot only.** Word 2 and Word 3 are set by the IDE during the same
+   boot provisioning pass as Word 1. User code cannot write any word of an Abstract GT
+   directly. This is the same guarantee that protects Word 1.
+
+4. **Same permissions.** Backup IDEs inherit the permission bits from Word 0 exactly.
+   There is no mechanism to grant different permissions per backup — the GT is a single
+   atomic capability. If the holder may only `E`-call the primary, they may only
+   `E`-call a backup as well.
+
+5. **Same b_flag.** The `b_flag` from Word 0 governs propagation of the whole 128-bit
+   capability register. Propagating the GT (via mSave, if b_flag=1) always propagates
+   all three addresses together — a backup IDE cannot be stripped from a propagated copy.
+
+6. **No cross-address escalation.** A backup address in Word 2 or Word 3 carries no
+   new authority. It is a redundant route to an alternative provisioned by the same
+   IDE that provisioned the primary — not a hidden back-door. The same encrypted tunnel
+   key negotiation applies to every address tried.
+
+### Provisioning example (boot sequence step)
+
+```
+Primary Home Base:    word1_location = 0xFF000000  (main cloud IDE)
+Backup #1:            word2_backup1  = 0xFF000001  (developer's private IDE server)
+Backup #2:            word3_backup2  = 0xFF000002  (team fallback server)
+Permissions:          R | W | E
+b_flag:               0  (not propagable)
+```
+
+All three are set in a single IDE provisioning write at boot. The CTMM will try them
+in order whenever the primary is unreachable — transparently, without any change to
+the user's code or the permission model.
+
+---
+
 ## IDE Provisioning Protocol
 
 At boot, the IDE creates the Abstract GT table and distributes tokens to privileged
@@ -176,12 +264,16 @@ relationships of GTs within Secure Abstractions, not by the c-list itself.
    a. Construct the Abstract GT:
       word0_gt  = (abstract_addr[15:0] as slot_id) | (0b11 << 23) | (perms << 25) | (b_flag << 31)
       word1_loc = abstract_addr          ← the Abstract Address for this resource
-      word2, word3 = 0
+      word2     = backup1_addr           ← first backup IDE address if tunnel-range GT, else 0x00000000
+      word3     = backup2_addr           ← second backup IDE address if tunnel-range GT, else 0x00000000
    b. Write the GT directly into the appropriate c-list slot of the privileged abstraction.
       (No NS slot is allocated — Abstract GTs are self-defining.)
-4. The Home Base tunnel GT (word1_loc = 0xFF000000) is always provisioned first.
-5. Local peripheral GTs (0xFE000000 range) are provisioned based on attached hardware.
-6. IDE-defined channel GTs (0xFF000001–0xFF0000FE) are provisioned based on network config.
+4. The Home Base tunnel GT (word1_loc = 0xFF000000) is always provisioned first,
+   with up to two programmer-defined backup addresses in word2/word3.
+5. Local peripheral GTs (0xFE000000 range) are provisioned based on attached hardware
+   (word2 and word3 are always 0x00000000 for peripheral GTs).
+6. IDE-defined channel GTs (0xFF000001–0xFF0000FE) are provisioned based on network config,
+   each with optional backup addresses in word2/word3.
 7. Boot completes. User code starts with Abstract GTs in place.
 ```
 
