@@ -465,7 +465,7 @@ tier when:
 - Its MTBF score is below the Isolated floor set by the IDE threshold config.
 
 Isolated abstractions can still be called locally (E permission is independent of S).
-They simply cannot leave the machine they are running on.
+They simply cannot leave the c-list (abstraction) they are provisioned for.
 
 #### User-regulated
 The abstraction's MTBF score meets the user-tier threshold. The S bit is enabled for
