@@ -174,7 +174,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 DEMO_NAMESPACE = []
 for _i in range(16):
     _location = NS_TABLE_BASE if _i == 0 else _i * 0x100
-    _alloc_size = 8
+    _alloc_size = 64  # FPGA minimum: 2^6 = 64 words per spec. Demo uses 8 words in simulation.
     _gt_seq = 0
     _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, _gt_seq,
                             _location, _alloc_size)

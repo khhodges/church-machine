@@ -50,7 +50,7 @@ class SecureBootTutorial {
 ; No CLOOMC instruction is needed \u2014 this is hardware-only.
 ;
 ; After B:01 the following is guaranteed:
-;   CR15.word0  = make_gt(GT_TYPE_REAL, perms=0, slot_id=0, gt_seq=0)
+;   CR15.word0  = make_gt(GT_TYPE_INFORM, perms=0, slot_id=0, gt_seq=0)
 ;   CR15.word1  = word0_location = 0x0000      ; physical base
 ;   CR15.word2  = word1_packed   = 0xFFFF      ; limit = 65535
 ;   CR15.word3  = word2_seals    = (gt_seq &lt;&lt; 25) | CRC-16
@@ -122,19 +122,19 @@ INIT_THRD:  CHANGE  AL, CR12, CR12, #1   ; B:02 \u2014 switch to thread context<
 
 INIT_ABSTR:
     ; Load C-List entry 0 into CR1 \u2014 code/constants GT (R|X, Slot 3, gt_seq=0)
-    LOAD    AL, CR1, CR6[0]    ; CR1 = make_gt(GT_TYPE_REAL, R|X, slot_id=3, gt_seq=0)
+    LOAD    AL, CR1, CR6[0]    ; CR1 = make_gt(GT_TYPE_INFORM, R|X, slot_id=3, gt_seq=0)
     ;   GT word0 fields:
     ;     slot_id = 3          (code/constants lump at 0x0300)
     ;     gt_seq  = 0          (no revocations yet)
-    ;     gt_type = GT_TYPE_REAL (01)
+    ;     gt_type = GT_TYPE_INFORM (01)
     ;     perms   = R | X      (bits 0,2 set)
 
     ; Load C-List entry 1 into CR2 \u2014 boot code GT (X, Slot 4, gt_seq=0)
-    LOAD    AL, CR2, CR6[1]    ; CR2 = make_gt(GT_TYPE_REAL, X, slot_id=4, gt_seq=0)
+    LOAD    AL, CR2, CR6[1]    ; CR2 = make_gt(GT_TYPE_INFORM, X, slot_id=4, gt_seq=0)
     ;   GT word0 fields:
     ;     slot_id = 4          (Boot code lump \u2014 0x0400)
     ;     gt_seq  = 0
-    ;     gt_type = GT_TYPE_REAL
+    ;     gt_type = GT_TYPE_INFORM
     ;     perms   = X only     (bit 2 set)
 
     ; Restrict CR2 to X permission only (TPERM clears any other perm bits)
@@ -165,11 +165,11 @@ INIT_ABSTR:
 
 LOAD_NUC:
     ; Load C-List entry 6 into CR0 \u2014 the first user abstraction E-GT
-    LOAD    AL, CR0, CR6[6]    ; CR0 = make_gt(GT_TYPE_REAL, E, slot_id=4, gt_seq=0)
+    LOAD    AL, CR0, CR6[6]    ; CR0 = make_gt(GT_TYPE_INFORM, E, slot_id=4, gt_seq=0)
     ;   GT word0 fields:
     ;     slot_id = 4          (first programmer-uploaded abstraction, Slot 3+)
     ;     gt_seq  = 0          (no revocations)
-    ;     gt_type = GT_TYPE_REAL
+    ;     gt_type = GT_TYPE_INFORM
     ;     perms   = E only     (bit 5 set)
 
     ; Restrict CR0 to E permission only before the CALL
@@ -251,7 +251,7 @@ LOAD_NUC:
 
 ; ---- B:01 LOAD_NS ---------------------------------------
 ; Hardware only: mLoad NS Slot 0 \u2192 CR15
-;   CR15 = make_gt(GT_TYPE_REAL, perms=0, slot_id=0, gt_seq=0)
+;   CR15 = make_gt(GT_TYPE_INFORM, perms=0, slot_id=0, gt_seq=0)
 ;   CR15.word1 = location = 0x0000
 ;   CR15.word2 = word1_packed (limit=0xFFFF, clistCount=N)
 ;   CR15.word3 = word2_seals  (gt_seq=0, CRC-16 seal)
