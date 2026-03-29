@@ -1140,7 +1140,7 @@ class ChurchSimulator {
             const allocSize = limit + 1;
             const clistStart = allocSize - clistCount;
 
-            const cr7GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:1,X:1,L:0,S:0,E:0}, 1);
+            const cr7GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
             const cr7Word1 = this.packNSWord1(clistStart - 1, 0, 0, 0, 0, 1, 0);
             this.cr[7] = {
                 word0: cr7GT,
