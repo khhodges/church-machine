@@ -7346,7 +7346,16 @@ function getStudentSettings() {
             return s;
         }
     } catch (e) {}
-    return { name: '', familyMembers: [] };
+    return {
+        name: '',
+        familyMembers: [],
+        profession: 'student',
+        language: 'english',
+        nationality: 'us',
+        ageTier: '13-17',
+        fpgaBoard: 'tang-nano-20k',
+        selectedSubjects: []
+    };
 }
 
 function getStudentProgress() {
@@ -7469,6 +7478,14 @@ function openSettings() {
     if (!requirePermission('settings', 'Change Settings')) return;
     const settings = getStudentSettings();
     document.getElementById('settingName').value = settings.name || '';
+    const profSel = document.getElementById('settingProfession');
+    if (profSel) profSel.value = settings.profession || 'student';
+    const langSel = document.getElementById('settingLanguage');
+    if (langSel) langSel.value = settings.language || 'english';
+    const natSel = document.getElementById('settingNationality');
+    if (natSel) natSel.value = settings.nationality || 'us';
+    const ageSel = document.getElementById('settingAgeTier');
+    if (ageSel) ageSel.value = settings.ageTier || '13-17';
     renderFamilyMembers(settings.familyMembers || []);
     renderProgressReport();
     renderFamilyIntroQR();
@@ -7542,7 +7559,13 @@ function closeSettings() {
 function saveSettings() {
     const settings = {
         name: document.getElementById('settingName').value.trim(),
-        familyMembers: collectFamilyMembers()
+        familyMembers: collectFamilyMembers(),
+        profession: document.getElementById('settingProfession')?.value || 'student',
+        language: document.getElementById('settingLanguage')?.value || 'english',
+        nationality: document.getElementById('settingNationality')?.value || 'us',
+        ageTier: document.getElementById('settingAgeTier')?.value || '13-17',
+        fpgaBoard: document.getElementById('settingFPGABoard')?.value || 'tang-nano-20k',
+        selectedSubjects: getSelectedSubjects()
     };
     localStorage.setItem('church_student_settings', JSON.stringify(settings));
 
@@ -8002,6 +8025,15 @@ function startLesson(subjectKey, lessonTitle) {
         }
     }
     appendOutput(`Lesson: ${lessonTitle} \u2014 ${lesson.desc}`, 'info');
+}
+
+function getSelectedSubjects() {
+    const checkboxes = document.querySelectorAll('input[name="subjectCheckbox"]');
+    const selected = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) selected.push(cb.dataset.subject);
+    });
+    return selected;
 }
 
 function renderProgressReport() {
