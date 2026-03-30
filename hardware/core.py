@@ -407,6 +407,11 @@ class ChurchCore(Elaboratable):
             u_call.cr5_heap.eq(u_regs.cr5_heap),
             u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
             u_call.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
+            # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
+            u_call.thread_hdr.eq(u_change.thread_hdr_out),
+            # Parallel register-file mask operations for domain-crossing cleanup
+            u_regs.cr_b_clear_mask.eq(u_call.cr_b_clear_mask),
+            u_regs.cr_null_mask.eq(u_call.cr_null_mask),
         ]
 
         m.d.comb += ret_start_sig.eq(

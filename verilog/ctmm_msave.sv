@@ -15,8 +15,7 @@
 //           gt_seq from word1_w2.gt_seq must match src_gt.gt_seq
 //   Step 5: Write GT to Destination.Location + index*4 (32-bit words)
 //
-// NS entry stride: slot_id << 4 (×16 bytes = 4 words)
-// word3_lump (+12) is not read by mSave (only needed by CALL for NIA computation)
+// NS entry stride: slot_id * 12 (×12 bytes = 3 words)
 //
 // FAULT conditions:
 //   - Destination lacks B flag (FAULT_BIND)
@@ -127,13 +126,13 @@ module ctmm_msave
     assign write_addr = dst_cap_reg.word1_location + {14'h0, index_reg, 2'b00};
 
     // ========================================================================
-    // Namespace entry address and 4-word entry validation
+    // Namespace entry address and 3-word entry validation
     // ========================================================================
-    // NS stride: slot_id << 4  (4 words × 4 bytes = 16 bytes per entry)
+    // NS stride: slot_id * 12  (3 words × 4 bytes = 12 bytes per entry)
 
     logic [31:0] ns_entry_addr;
     assign ns_entry_addr = cr15_namespace.word1_location +
-                           ({16'h0, src_gt_reg.slot_id} << 4);
+                           ({16'h0, src_gt_reg.slot_id} * 32'd12);
 
     // NS entry registers (3 words needed for validation):
     //   ns_w0_reg: NS +0  = word0_location (code base address)
@@ -247,8 +246,8 @@ module ctmm_msave
     assign sub_fault      = (state == SUB_FAULT);
     assign sub_fault_type = fault_type_reg;
 
-    // Memory read (NS entry validation — 4-word entry, stride ×16)
-    // NS layout: +0=location, +4=word1_w2(limit|gt_seq), +8=word2_w3(crc|gbit), +12=word3_lump
+    // Memory read (NS entry validation — 3-word entry, stride ×12)
+    // NS layout: +0=location, +4=word1_w2(limit|gt_seq), +8=word2_w3(crc|gbit)
     always_comb begin
         mem_rd_addr = 32'h0;
         mem_rd_en   = 1'b0;

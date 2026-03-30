@@ -359,8 +359,14 @@ NS Word 2  spare[4] | gt_seq[7] | limit_offset[21]
 NS Word 3  spare[15] | G[1] | CRC[16]
 ```
 
-CALL reads the lump header word directly from `Mem[base]` to obtain
-`n_minus_6` and `cc`. No cached copy is held in the NS slot.
+CALL fetches the **callee** lump header word directly from `Mem[CR14.word1_location]`
+(FETCH_LUMP phase) to read `mw` and compute the entry NIA.
+
+The **THREAD_HDR** hidden register (loaded by CHANGE on thread restore from
+`Mem[CR12.word1_location + 0]`) holds the **current thread's** lump header and is
+used by CALL for stack-bound validation only. These are two separate fetches from two
+different lumps: the callee header (fetched each CALL) and the thread header (cached
+by CHANGE, shared across all CALLs in the thread's lifetime).
 
 ---
 

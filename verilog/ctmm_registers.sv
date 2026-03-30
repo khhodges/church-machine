@@ -52,6 +52,7 @@ module ctmm_registers
     output capability_reg_t cr6_clist,        // CR6: Current C-List
     output capability_reg_t cr7_cloomc,       // CR7: CLOOMC Nucleus (Function Abstraction Code)
     output capability_reg_t cr8_thread,       // CR8: Suspended Thread State
+    output capability_reg_t cr12_cap,         // CR12: incoming thread capability (word1_location = lump base after CHANGE)
     output capability_reg_t cr15_namespace,   // CR15: Namespace root
     
     // Special register write interfaces (GT only - Word 0)
@@ -97,6 +98,13 @@ module ctmm_registers
     input  condition_flags_t flags_in,
     input  logic        flags_wr_en,
     
+    // Parallel CALL isolation mask ports (single-cycle domain-crossing cleanup)
+    // cr_b_clear_mask: bit N high → clear b_flag on CR[N]  (CRs 0-5, preserved after CALL)
+    // cr_null_mask:    bit N high → write NULL to  CR[N]  (CRs 0-11, discarded after CALL)
+    // cr_null_mask takes priority when both bits are asserted for the same register.
+    input  logic [5:0]  cr_b_clear_mask,
+    input  logic [11:0] cr_null_mask,
+
     // Clear all registers (boot step 1)
     input  logic        clear_all
 );
@@ -124,10 +132,11 @@ module ctmm_registers
     end
     
     // Special register outputs
-    assign cr6_clist     = cap_regs[CR_CLIST];
-    assign cr7_cloomc    = cap_regs[CR_CLOOMC];
-    assign cr8_thread    = cap_regs[CR_THREAD];
-    assign cr15_namespace= cap_regs[CR_NAMESPACE];
+    assign cr6_clist      = cap_regs[CR_CLIST];
+    assign cr7_cloomc     = cap_regs[CR_CLOOMC];
+    assign cr8_thread     = cap_regs[CR_THREAD];
+    assign cr12_cap       = cap_regs[12];
+    assign cr15_namespace = cap_regs[CR_NAMESPACE];
     
     // Full register write and word-level write
     always_ff @(posedge clk or negedge rst_n) begin
@@ -162,6 +171,15 @@ module ctmm_registers
             if (cr13_wr_en) cap_regs[13].word0_gt <= cr13_wr_data;
             if (cr14_wr_en) cap_regs[14].word0_gt <= cr14_wr_data;
             if (cr15_wr_en) cap_regs[CR_NAMESPACE].word0_gt <= cr15_wr_data;
+
+            // Parallel CALL isolation: single-cycle mask operations.
+            // cr_null_mask takes priority over cr_b_clear_mask for the same register.
+            for (int i = 0; i < 12; i++) begin
+                if (cr_null_mask[i])
+                    cap_regs[i] <= CR_NULL;
+                else if (i < 6 && cr_b_clear_mask[i])
+                    cap_regs[i].word0_gt.b_flag <= 1'b0;
+            end
         end
     end
     

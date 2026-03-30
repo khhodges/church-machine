@@ -15,7 +15,7 @@ class ChurchChange(Elaboratable):
         self.change_busy = Signal()
         self.change_complete = Signal()
         self.change_fault = Signal()
-        self.fault_type = Signal(4)
+        self.fault_type = Signal(5)
 
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
@@ -44,6 +44,12 @@ class ChurchChange(Elaboratable):
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
 
+        # THREAD_HDR: hidden per-thread machine register.
+        # On thread restore CHANGE reads Mem[thread_base+0] (the thread lump header
+        # word) and stores it here. CALL reads stack bounds from this register
+        # directly, eliminating FETCH_THREAD_HDR from the CALL pipeline.
+        self.thread_hdr_out = Signal(32)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -57,7 +63,15 @@ class ChurchChange(Elaboratable):
         index_latched = Signal(16)
         mask_latched = Signal(16)
         fault_latched = Signal()
-        fault_type_latched = Signal(4)
+        fault_type_latched = Signal(5)
+
+        # THREAD_HDR hidden register — loaded from Mem[thread_base+0] on thread restore.
+        # No switch-out save is needed: the lump header is architecturally immutable
+        # (code lumps are write-protected), so CHANGE always re-reads the same value
+        # on the next switch-in.  The register is populated once per restore, consumed
+        # by every CALL until the next thread switch (zero extra reads per CALL).
+        thread_hdr_reg = Signal(32)
+        fetch_thr_hdr_active = Signal()  # high during FETCH_THREAD_HDR state
 
         save_index = Signal(5)
 
@@ -118,14 +132,15 @@ class ChurchChange(Elaboratable):
             self.mem_wr_addr.eq(mem_wr_addr_reg),
             self.mem_wr_data.eq(mem_wr_data_reg),
             self.mem_wr_en.eq(mem_wr_en_reg),
-            self.mem_rd_addr.eq(u_mload.mem_addr),
-            self.mem_rd_en.eq(u_mload.mem_rd_en),
+            self.mem_rd_addr.eq(Mux(fetch_thr_hdr_active, thread_base, u_mload.mem_addr)),
+            self.mem_rd_en.eq(fetch_thr_hdr_active | u_mload.mem_rd_en),
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
             self.cr_wr_data.eq(u_mload.cr_wr_data),
             self.cr_wr_en.eq(u_mload.cr_wr_en),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
             self.thread_wr_idx.eq(u_mload.thread_wr_idx),
             self.thread_wr_data.eq(u_mload.thread_wr_data),
+            self.thread_hdr_out.eq(thread_hdr_reg),
         ]
 
         with m.FSM(name="change") as fsm:
@@ -216,7 +231,7 @@ class ChurchChange(Elaboratable):
                 with m.If(skip_current_cr):
                     m.d.sync += cr_index.eq(cr_index + 1)
                     with m.If(cr_index >= 14):
-                        m.next = "COMPLETE"
+                        m.next = "FETCH_THREAD_HDR"
                 with m.Else():
                     m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                     m.d.sync += mload_start_reg.eq(1)
@@ -233,9 +248,21 @@ class ChurchChange(Elaboratable):
             with m.State("RESTORE_NEXT"):
                 m.d.sync += cr_index.eq(cr_index + 1)
                 with m.If(cr_index >= 14):
-                    m.next = "COMPLETE"
+                    m.next = "FETCH_THREAD_HDR"
                 with m.Else():
                     m.next = "RESTORE_CALL"
+
+            with m.State("FETCH_THREAD_HDR"):
+                # After RESTORE_CALL the incoming thread's CRs are all committed
+                # to the register file, so CR12 now holds the new thread capability.
+                # thread_base = CR12.word1_location = the incoming thread lump base.
+                # Read Mem[thread_base+0] (the lump header word) and store in
+                # THREAD_HDR — CALL uses it for stack-bound validation on every call
+                # without any additional memory reads.
+                m.d.comb += fetch_thr_hdr_active.eq(1)
+                with m.If(self.mem_rd_valid):
+                    m.d.sync += thread_hdr_reg.eq(self.mem_rd_data)
+                    m.next = "COMPLETE"
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"

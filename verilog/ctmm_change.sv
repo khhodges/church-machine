@@ -104,7 +104,12 @@ module ctmm_change
     // Thread update interface (for mLoad)
     output logic        thread_wr_en,
     output logic [3:0]  thread_wr_idx,
-    output logic [31:0] thread_wr_data
+    output logic [31:0] thread_wr_data,
+
+    // THREAD_HDR hidden per-thread register.
+    // Loaded from Mem[incoming_CR12.word1_location + 0] after RESTORE completes.
+    // CALL reads stack bounds from this register, eliminating one memory read per CALL.
+    output logic [31:0] thread_hdr_out
 );
 
     // ========================================================================
@@ -134,6 +139,7 @@ module ctmm_change
         CHANGE_LOAD_THREAD,
         CHANGE_RESTORE_CALL,
         CHANGE_RESTORE_NEXT,
+        CHANGE_FETCH_THREAD_HDR,
         CHANGE_COMPLETE,
         CHANGE_FAULT
     } change_state_t;
@@ -196,6 +202,8 @@ module ctmm_change
     logic [15:0]     mask_latched;
     logic [31:0]     thread_base_addr;
     logic [31:0]     cr7_base_addr;
+    logic [31:0]     new_thread_base;   // incoming thread lump base (CR12.word1_location after RESTORE)
+    logic [31:0]     thread_hdr_reg;    // THREAD_HDR: caches Mem[new_thread_base+0]
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -204,6 +212,8 @@ module ctmm_change
             mask_latched <= '0;
             thread_base_addr <= '0;
             cr7_base_addr <= '0;
+            new_thread_base <= '0;
+            thread_hdr_reg <= '0;
         end else begin
             if (state == CHANGE_IDLE && change_start) begin
                 index_latched <= index;
@@ -216,6 +226,13 @@ module ctmm_change
             if (state == CHANGE_LATCH_CRn) begin
                 crn_reg_latched <= cr_rd_data;
             end
+            // Capture the incoming thread's lump base when mLoad writes CR12 during RESTORE.
+            // After RESTORE, this is the correct thread_base for FETCH_THREAD_HDR.
+            if (cr_wr_en && cr_wr_addr == 4'd12)
+                new_thread_base <= cr_wr_data.word1_location;
+            // FETCH_THREAD_HDR: latch the incoming thread's lump header word
+            if (state == CHANGE_FETCH_THREAD_HDR && mem_rd_valid)
+                thread_hdr_reg <= mem_rd_data;
         end
     end
     
@@ -352,7 +369,7 @@ module ctmm_change
         .mem_addr       (mload_mem_addr),
         .mem_rd_en      (mload_mem_rd_en),
         .mem_rd_data    (mem_rd_data),
-        .mem_rd_valid   (mem_rd_valid),
+        .mem_rd_valid   ((state == CHANGE_FETCH_THREAD_HDR) ? 1'b0 : mem_rd_valid),
         .thread_wr_en   (mload_thread_wr_en),
         .thread_wr_idx  (mload_thread_wr_idx),
         .thread_wr_data (mload_thread_wr_data)
@@ -480,7 +497,7 @@ module ctmm_change
                 if (skip_current_cr) begin
                     cr_index_inc = 1'b1;
                     if (cr_index_next > 4'd14)
-                        next_state = CHANGE_COMPLETE;
+                        next_state = CHANGE_FETCH_THREAD_HDR;
                 end else begin
                     if (mload_fault_latched)
                         next_state = CHANGE_FAULT;
@@ -492,9 +509,18 @@ module ctmm_change
             CHANGE_RESTORE_NEXT: begin
                 cr_index_inc = 1'b1;
                 if (cr_index_next > 4'd14)
-                    next_state = CHANGE_COMPLETE;
+                    next_state = CHANGE_FETCH_THREAD_HDR;
                 else
                     next_state = CHANGE_RESTORE_CALL;
+            end
+
+            CHANGE_FETCH_THREAD_HDR: begin
+                // CR12 now holds the incoming thread's capability.
+                // new_thread_base = CR12.word1_location (captured when mLoad wrote CR12).
+                // Read Mem[new_thread_base + 0] → THREAD_HDR hidden register.
+                // mLoad is idle; mem_rd_addr is driven directly above.
+                if (mem_rd_valid)
+                    next_state = CHANGE_COMPLETE;
             end
             
             CHANGE_COMPLETE: begin
@@ -549,9 +575,9 @@ module ctmm_change
     assign mem_wr_en = (state == CHANGE_SAVE_DR) ||
                        (state == CHANGE_SAVE_PACKED_PC);
     
-    // Read interface: mLoad only
-    assign mem_rd_addr = mload_mem_addr;
-    assign mem_rd_en = mload_mem_rd_en;
+    // Read interface: local FETCH_THREAD_HDR read takes priority over mLoad
+    assign mem_rd_addr = (state == CHANGE_FETCH_THREAD_HDR) ? new_thread_base : mload_mem_addr;
+    assign mem_rd_en   = (state == CHANGE_FETCH_THREAD_HDR) ? 1'b1 : mload_mem_rd_en;
     
     // CR write interface: mLoad only
     assign cr_wr_addr = mload_cr_wr_addr;
@@ -567,9 +593,10 @@ module ctmm_change
     // Output Signals
     // ========================================================================
     
-    assign change_busy = (state != CHANGE_IDLE);
+    assign change_busy     = (state != CHANGE_IDLE);
     assign change_complete = (state == CHANGE_COMPLETE);
-    assign change_fault = fault_latched;
-    assign fault_type = fault_type_latched;
+    assign change_fault    = fault_latched;
+    assign fault_type      = fault_type_latched;
+    assign thread_hdr_out  = thread_hdr_reg;
 
 endmodule

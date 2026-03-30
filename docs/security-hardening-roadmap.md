@@ -123,6 +123,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 - **Hardware impact**: Small (1.5 KB registers) but requires layout planning.
 
 **Action 2b: Leased GT Validity (NS Layout Change)**
+- **Requires NS entry extension from 3 words (current: 12 bytes) to 4 words (16 bytes); not yet adopted.**
 - Add 16-bit **lease_ttl** field to NS Entry Word 0 (requires extending NS entry from 12 bytes to 16 bytes).
 - On every mLoad access, decrement TTL; if TTL=0, treat GT as revoked.
 - Sender sets TTL at provisioning time: 0=permanent, 1–65535=seconds TTL.
@@ -215,6 +216,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 - **Hardware impact**: May need HMAC coprocessor or AES-NI equivalent.
 
 **Action 2b: Dual CRC-32 (Practical Alternative)**
+- **Requires NS entry extension from 3 words (current: 12 bytes) to 4 words (16 bytes); not yet adopted.**
 - Replace single 16-bit CRC with **two independent 32-bit CRC-32 checksums** (different polynomials).
 - Both must match; collision resistance = 2^32 × 2^32 = 2^64.
 - Fits in existing NS Entry Word 2 (32 bits) + extend to Word 3 (add 32 bits).
@@ -349,6 +351,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 - **Blocking**: No — backward compatible.
 
 **Action 2b: Infinite gt_seq via Extended Counter**
+- **Requires NS entry extension from 3 words (current: 12 bytes) to 4 words (16 bytes); not yet adopted.**
 - Extend NS Entry from 3 words to 4 words, adding a 32-bit **gt_seq_extended** field.
 - Full revocation counter = `(gt_seq_extended << 7) | gt_seq[6:0]`.
 - Gives 2^39 revocation generations (~500 billion), eliminating wraparound risk entirely.

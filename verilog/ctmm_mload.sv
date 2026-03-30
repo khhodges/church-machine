@@ -9,9 +9,9 @@
 //   2. Check bounds: index < CRn.word2_w2.limit_offset[15:0]
 //   3. Fetch GT (32 bits) from CRn[index] in C-List memory
 //   4. Check GT.slot_id < CR15.word2_w2.limit_offset[15:0]  (namespace bounds)
-//   5. Fetch word0_location from NS[slot_id << 4]      (+0)  = code base address
-//   6. Fetch word1_w2       from NS[slot_id << 4]      (+4)  = limit_offset | gt_seq
-//   7. Fetch word2_w3       from NS[slot_id << 4]      (+8)  = crc[15:0] | g_bit
+//   5. Fetch word0_location from NS[slot_id * 12]      (+0)  = code base address
+//   6. Fetch word1_w2       from NS[slot_id * 12]      (+4)  = limit_offset | gt_seq
+//   7. Fetch word2_w3       from NS[slot_id * 12]      (+8)  = crc[15:0] | g_bit
 //   8. Validate: GT.gt_seq == word1_w2.gt_seq          (version check)
 //   9. Validate: CRC-16/CCITT(GT[24:0]+location+word1_w2) == word2_w3.crc
 //  10. Reset G-bit in NS word2_w3 (+8) if set
@@ -191,12 +191,12 @@ module ctmm_mload
     assign clist_gt_addr = src_cap.word1_location + {14'h0, index_reg, 2'b00};
 
     // ========================================================================
-    // Namespace entry address: base + slot_id*16
+    // Namespace entry address: base + slot_id*12 (3-word entries, stride = 12 bytes)
     // ========================================================================
 
     logic [31:0] ns_entry_addr;
     assign ns_entry_addr = cr15_namespace.word1_location +
-                           ({16'h0, result_cap.word0_gt.slot_id} << 4);
+                           ({16'h0, result_cap.word0_gt.slot_id} * 32'd12);
 
     // ========================================================================
     // CRC-16/CCITT over GT[24:0] + NS_location + NS_word1_w2 (89 bits, MSB first)

@@ -135,6 +135,28 @@ The CHANGE instruction performs thread context switching by modifying the thread
 
 CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, CR12 (Thread Identity), the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. Three registers are system-wide and are never touched by CHANGE: CR13 (IRQ handler), CR14 (code register — transient, rebuilt by cLoad on the next CALL), and CR15 (Namespace root — all threads in the same application share one namespace). To write CR13 or CR15, code must use SWITCH — the explicit privilege gate — presenting the correct PassKey for the target register.
 
+### THREAD_HDR — Hidden Per-Thread Machine Register
+
+As the final step of a CHANGE restore, after all incoming CRs have been written to the register file, hardware performs one additional memory read:
+
+```
+THREAD_HDR ← Mem[CR12.word1_location + 0]   (the incoming thread's lump header word)
+```
+
+This hidden register is invisible to software but is consulted by every subsequent CALL to validate stack bounds. By caching the thread lump header on thread restore rather than re-reading it on every CALL, hardware eliminates one memory read from the CALL critical path.
+
+**Lifetime**: THREAD_HDR is valid from the moment CHANGE completes until the next CHANGE on the same hardware thread.
+
+**Switch-out behaviour (restore-only, no save)**: THREAD_HDR is a *restore-only* register — CHANGE loads it on every thread switch-in but does **not** save it on switch-out. This is architecturally sound because:
+
+1. The lump header word at `Mem[CR12.word1_location + 0]` is **immutable**: it is written once by Mint during lump creation and is protected by the capability model thereafter.
+2. Since the source value never changes, restoring it from memory on the next switch-in always yields the same result as any saved copy would. Saving adds no information and wastes a write cycle.
+3. CHANGE is the *only* path that transitions a thread out; on each subsequent switch-in, it will re-read the lump header from DRAM, keeping THREAD_HDR correct across any number of context switches.
+
+This "restore-only from an immutable source" pattern eliminates the save path entirely without any loss of correctness.
+
+**Fields consumed by CALL**: `n_minus_6` (lump size exponent) and `cw` (code-word count) → used to compute `sp_max` and `sp_min` for stack-overflow/corruption detection.
+
 ---
 
 ## SWITCH: The Privilege Gate

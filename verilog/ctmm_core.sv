@@ -65,6 +65,7 @@ module ctmm_core
     golden_token_t cr_rd_data, cr_wr_data;
     logic        cr_wr_en;
     golden_token_t cr6_clist, cr7_cloomc, cr8_thread, cr15_namespace;
+    capability_reg_t cr12_cap;  // Full CR12 for THREAD_HDR: word1_location = incoming thread lump base
     golden_token_t cr6_wr_data, cr7_wr_data, cr8_wr_data, cr15_wr_data;
     golden_token_t cr9_wr_data, cr10_wr_data, cr11_wr_data, cr12_wr_data, cr13_wr_data, cr14_wr_data;
     logic        cr6_wr_en, cr7_wr_en, cr8_wr_en, cr15_wr_en;
@@ -152,6 +153,7 @@ module ctmm_core
         .cr7_cloomc     (cr7_cloomc),
         .cr8_thread     (cr8_thread),
         .cr15_namespace (cr15_namespace),
+        .cr12_cap       (cr12_cap),
         .cr6_wr_data    (cr6_wr_data),
         .cr6_wr_en      (cr6_wr_en),
         .cr7_wr_data    (cr7_wr_data),
@@ -182,6 +184,8 @@ module ctmm_core
         .flags          (flags_internal),
         .flags_in       (flags_in),
         .flags_wr_en    (flags_wr_en),
+        .cr_b_clear_mask(call_b_clear_mask),
+        .cr_null_mask   (call_cr_null_mask),
         .clear_all      (clear_all)
     );
     
@@ -580,8 +584,9 @@ module ctmm_core
     end
     
     // Data memory interface (for data operations)
-    assign dmem_addr = dr_rd_data1[31:0];
-    assign dmem_rd_en = 1'b0;  // Simplified
+    // dmem mux: THREAD_HDR fetch takes priority over normal Turing LOAD path
+    assign dmem_addr  = trhdr_fetch_pending ? trhdr_addr : dr_rd_data1[31:0];
+    assign dmem_rd_en = trhdr_fetch_pending ? 1'b1 : 1'b0;
     assign dmem_wr_data = dr_rd_data2;
     assign dmem_wr_en = 1'b0;  // Simplified
     
@@ -635,6 +640,61 @@ module ctmm_core
     logic [31:0] call_nia_value;
     logic [15:0] call_dr_clear_mask;
     logic [15:0] call_cr_clear_mask;
+    logic [5:0]  call_b_clear_mask;
+    logic [11:0] call_cr_null_mask;
+
+    // ======================================================================
+    // THREAD_HDR hidden register — populated by CHANGE, consumed by CALL
+    // ======================================================================
+    // Design: THREAD_HDR holds Mem[incoming_thread_lump_base + 0], the
+    // thread's lump-header word.  It is loaded on every thread RESTORE
+    // (switch-in) by reading one word from DRAM.  On switch-out (switch to
+    // another thread via CHANGE), no save is required because:
+    //   (a) The lump header is architecturally immutable — code lumps are
+    //       write-protected once loaded into the system.
+    //   (b) On the next switch-in of the same thread, CHANGE will re-read
+    //       the lump header from DRAM, always yielding the same value.
+    // This "restore-only from static source" pattern is safe and avoids the
+    // cost of a dedicated per-thread save slot.
+    //
+    // Production migration: when ctmm_change.sv is instantiated in core,
+    // replace this FSM with a direct wire from ctmm_change.thread_hdr_out.
+    // ======================================================================
+    // cr12_wr_en_d1: one-cycle delayed version of cr12_wr_en.
+    // CHANGE fires cr12_wr_en combinatorially at cycle N; cap_regs[12] is
+    // updated at the posedge of cycle N (visible as cr12_cap at cycle N+1).
+    // Using the delayed signal ensures cr12_cap.word1_location is stable when
+    // we capture trhdr_addr, avoiding a stale-value race on the same edge.
+    logic cr12_wr_en_d1;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) cr12_wr_en_d1 <= 1'b0;
+        else        cr12_wr_en_d1 <= cr12_wr_en;
+    end
+
+    logic        trhdr_fetch_pending;
+    logic [31:0] trhdr_addr;
+    logic [31:0] thread_hdr_reg;
+    logic [31:0] call_thread_hdr_in;
+    assign call_thread_hdr_in = thread_hdr_reg;
+
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            trhdr_fetch_pending <= 1'b0;
+            trhdr_addr          <= 32'd0;
+            thread_hdr_reg      <= 32'd0;
+        end else begin
+            // Trigger one cycle after cr12_wr_en: by now cr12_cap holds the
+            // incoming thread's full capability including word1_location.
+            if (cr12_wr_en_d1 && !trhdr_fetch_pending) begin
+                trhdr_addr          <= cr12_cap.word1_location;
+                trhdr_fetch_pending <= 1'b1;
+            end
+            if (trhdr_fetch_pending) begin
+                thread_hdr_reg      <= dmem_rd_data;
+                trhdr_fetch_pending <= 1'b0;
+            end
+        end
+    end
 
     ctmm_call u_call (
         .clk            (clk),
@@ -660,11 +720,14 @@ module ctmm_core
         .thread_wr_en   (call_thread_wr_en),
         .thread_wr_idx  (call_thread_wr_idx),
         .thread_wr_data (call_thread_wr_data),
+        .thread_hdr_in  (call_thread_hdr_in),
         .saved_cr5_gt   (saved_cr5_gt_wire),
         .nia_set        (call_nia_set),
         .nia_value      (call_nia_value),
         .dr_clear_mask  (call_dr_clear_mask),
-        .cr_clear_mask  (call_cr_clear_mask)
+        .cr_clear_mask  (call_cr_clear_mask),
+        .b_clear_mask   (call_b_clear_mask),
+        .cr_null_mask   (call_cr_null_mask)
     );
 
     assign call_start_sig = exec_enable && is_church_op && (church_op == OP_CALL) && all_checks_pass;

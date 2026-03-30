@@ -210,7 +210,7 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
 | LAMBDA frame size (1 word) | ✅ | ✅ PASS | All sources agree |
 | CRC-16/CCITT algorithm | ✅ | ⚠️ PARTIAL | Hardware clear, docs need explicit mention |
 | Minimum lump size | ✅ | ⚠️ PARTIAL | 64-word spec vs 8-word demo inconsistency |
-| NS entry format (3 words) | ✅ | ✅ PASS | Hardware matches docs |
+| NS entry format (3 words) | ✅ | ✅ PASS | Hardware matches docs; Verilog ctmm_mload/ctmm_msave/ctmm_call fixed from `<<4` (16-byte) stride to `*12` (12-byte) stride (Task #61) |
 | Boot ROM sequence | ✅ | ✅ PASS | GT_TYPE_INFORM naming fixed throughout |
 | MTBF counter fields | ✅ | ✅ PASS | Patent specs match hardware design |
 | Abstract GT type (11₂) | ✅ | ✅ PASS | Consistent across all sources |

@@ -134,14 +134,15 @@ package ctmm_pkg;
     localparam logic [3:0] CR_NAMESPACE = 4'd15;  // CR15: Namespace root
 
     // ========================================================================
-    // Namespace Entry - 4 x 32-bit words (128 bits) in memory
+    // Namespace Entry - 3 x 32-bit words (96 bits) in memory
     // ========================================================================
     // Word 0 (+0):  word0_location - code base address (32-bit pointer)
     // Word 1 (+4):  word1_w2       - gt_seq[6:0] | limit_offset[20:0]  (WORD2_T)
     // Word 2 (+8):  word2_w3       - spare[14:0] | g_bit | crc[15:0]   (WORD3_T)
-    // Word 3 (+12): word3_lump     - cached LUMP_HEADER (mw, cc, n_minus_6, …)
     //
-    // Stride = slot_id << 4  (16 bytes per entry)
+    // Stride = slot_id * 12  (12 bytes per entry)
+    // The lump header lives at Mem[slot_id × SLOT_SIZE] word 0 — it is NOT
+    // a 4th word inside the NS table.
     //
     // CRC-16/CCITT input (89 bits, MSB first):
     //   GT[24:0]  (lower 25 bits of GT word 0, no b_flag/upper perms)
@@ -150,40 +151,33 @@ package ctmm_pkg;
     // ========================================================================
 
     typedef struct packed {
-        logic [31:0] word3_lump;     // Cached lump header (mw, cc, n_minus_6, …)
         word3_t      word2_w3;       // g_bit + CRC-16 seal
         word2_t      word1_w2;       // gt_seq + limit_offset
         logic [31:0] word0_location; // Code base address
     } namespace_entry_t;
 
-    // Namespace entry stride = 16 bytes (4 x 32-bit words)
-    localparam int NS_ENTRY_STRIDE = 16;
+    // Namespace entry stride = 12 bytes (3 x 32-bit words)
+    localparam int NS_ENTRY_STRIDE = 12;
 
     // ========================================================================
-    // LUMP Header structure (word3_lump field in namespace_entry_t)
-    // LSB-first packed struct matching LUMP_HEADER_LAYOUT in layouts.py
-    // ========================================================================
-    // Bit  [0]     - r:         restrict flag
-    // Bit  [1]     - c:         construct flag
-    // Bit  [2]     - h:         handler flag
-    // Bits [8:3]   - mw:        max-word (6 bits, argument word count)
-    // Bits [10:9]  - typ:       type tag (2 bits)
-    // Bits [18:11] - cc:        calling-convention flags (8 bits)
-    // Bits [22:19] - n_minus_6: total frame words minus 6 (4 bits)
-    // Bits [26:23] - ver:       version (4 bits)
-    // Bits [31:27] - magic:     signature (5 bits)
+    // LUMP Header structure — standalone type for decoding lump header words.
+    // MSB-first packed struct matching LUMP_HEADER_LAYOUT in layouts.py.
+    //
+    // Bits  [7:0]  - cc:        c-list slot count (0..255); for typ=10 thread
+    //                           lump repurposed as heapWords (IDE-set max heap)
+    // Bits  [9:8]  - typ:       object type: 00=lump 01=data 10=thread 11=outform
+    // Bits [22:10] - cw:        code word count (0..8191); for thread lump: sw
+    //                           (stack word budget; CALL stack-bound validation)
+    // Bits [26:23] - n_minus_6: lumpSize = 2^(val+6); valid 0..8
+    // Bits [31:27] - magic:     always 0x1F; traps if executed as instruction
     // ========================================================================
 
     typedef struct packed {
-        logic [4:0]  magic;     // Bits [31:27] - signature
-        logic [3:0]  ver;       // Bits [26:23] - version
-        logic [3:0]  n_minus_6; // Bits [22:19] - total frame words minus 6
-        logic [7:0]  cc;        // Bits [18:11] - calling-convention flags
-        logic [1:0]  typ;       // Bits [10:9]  - type tag
-        logic [5:0]  mw;        // Bits  [8:3]  - max-word (arg count)
-        logic        h;         // Bit   [2]    - handler flag
-        logic        c;         // Bit   [1]    - construct flag
-        logic        r;         // Bit   [0]    - restrict flag
+        logic [4:0]  magic;      // Bits [31:27] — signature; always 0x1F
+        logic [3:0]  n_minus_6;  // Bits [26:23] — lumpSize = 2^(val+6)
+        logic [12:0] cw;         // Bits [22:10] — code/stack word count
+        logic [1:0]  typ;        // Bits  [9:8]  — object type
+        logic [7:0]  cc;         // Bits  [7:0]  — c-list slot count / heapWords
     } lump_header_t;
 
     // ========================================================================
@@ -307,23 +301,27 @@ package ctmm_pkg;
     // Fault Types
     // ========================================================================
 
-    typedef enum logic [3:0] {
-        FAULT_NONE         = 4'h0,
-        FAULT_PERM_R       = 4'h1,  // Read permission denied
-        FAULT_PERM_W       = 4'h2,  // Write permission denied
-        FAULT_PERM_X       = 4'h3,  // Execute permission denied
-        FAULT_PERM_L       = 4'h4,  // Load permission denied
-        FAULT_PERM_S       = 4'h5,  // Save permission denied
-        FAULT_PERM_E       = 4'h6,  // Enter permission denied
-        FAULT_NULL_CAP     = 4'h7,  // Null capability access
-        FAULT_BOUNDS       = 4'h8,  // Bounds check failed
-        FAULT_VERSION      = 4'h9,  // GT sequence mismatch
-        FAULT_SEAL         = 4'hA,  // CRC-16 seal validation failed
-        FAULT_INVALID_OP   = 4'hB,  // Invalid opcode
-        FAULT_TPERM_RSV    = 4'hC,  // Reserved TPERM code used
-        FAULT_DOMAIN_PURITY= 4'hD,  // Mixed data+capability permissions
-        FAULT_BIND         = 4'hE,  // Bind (B flag) constraint violated
-        FAULT_F_BIT        = 4'hF   // F flag constraint violated
+    // 5-bit fault_type_t to accommodate FAULT_STACK_OVERFLOW (0x10) and
+    // FAULT_STACK_CORRUPT (0x12) per hardware/hw_types.py FaultType enum.
+    typedef enum logic [4:0] {
+        FAULT_NONE          = 5'h00,
+        FAULT_PERM_R        = 5'h01,  // Read permission denied
+        FAULT_PERM_W        = 5'h02,  // Write permission denied
+        FAULT_PERM_X        = 5'h03,  // Execute permission denied
+        FAULT_PERM_L        = 5'h04,  // Load permission denied
+        FAULT_PERM_S        = 5'h05,  // Save permission denied
+        FAULT_PERM_E        = 5'h06,  // Enter permission denied
+        FAULT_NULL_CAP      = 5'h07,  // Null capability access
+        FAULT_BOUNDS        = 5'h08,  // Bounds check failed
+        FAULT_VERSION       = 5'h09,  // GT sequence mismatch
+        FAULT_SEAL          = 5'h0A,  // CRC-16 seal validation failed
+        FAULT_INVALID_OP    = 5'h0B,  // Invalid opcode
+        FAULT_TPERM_RSV     = 5'h0C,  // Reserved TPERM code used
+        FAULT_DOMAIN_PURITY = 5'h0D,  // Mixed data+capability permissions
+        FAULT_BIND          = 5'h0E,  // Bind (B flag) constraint violated
+        FAULT_F_BIT         = 5'h0F,  // F flag constraint violated
+        FAULT_STACK_OVERFLOW= 5'h10,  // STO < sp_min: stack would overflow zone floor
+        FAULT_STACK_CORRUPT = 5'h12   // STO > sp_max: stack pointer corrupted
     } fault_type_t;
 
     // ========================================================================

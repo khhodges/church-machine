@@ -70,6 +70,18 @@ class ChurchCall(Elaboratable):
         # Thread lump byte base address (CR12.word1_location)
         self.thread_base = Signal(32)
 
+        # THREAD_HDR: hidden per-thread register populated by CHANGE on thread restore.
+        # Holds Mem[thread_base+0] — the thread lump's header word — valid for the
+        # entire lifetime of the thread. CALL reads stack bounds from it directly,
+        # eliminating the FETCH_THREAD_HDR memory read from the CALL pipeline.
+        self.thread_hdr = Signal(32)
+
+        # Parallel domain-crossing register operations (driven for one cycle at CLEAR_B).
+        # cr_b_clear_mask: bit N=1 → clear b_flag on CRN (preserved registers)
+        # cr_null_mask:    bit N=1 → write NULL to CRN  (non-preserved registers)
+        self.cr_b_clear_mask = Signal(12)
+        self.cr_null_mask    = Signal(12)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -97,19 +109,20 @@ class ChurchCall(Elaboratable):
 
         sp_latched = Signal(32)    # STO read from Heap[0] = Mem[CR5.word1_location]
 
-        # Thread header fields — latched by FETCH_THREAD_HDR from thread_base+0
-        thr_sw_reg  = Signal(13)   # stack words (cw field reinterpreted for typ=10)
-        thr_hw_reg  = Signal(8)    # heapWords (cc field repurposed for typ=10; caps zone is architecture-fixed at 12)
-        thr_n6_reg  = Signal(4)    # n-6 field from thread header
-        thr_lump_sz = Signal(15)   # 1 << (thr_n6_reg + 6), latched in FETCH_THREAD_HDR
+        # Thread header — decoded combinatorially from THREAD_HDR hidden register.
+        # THREAD_HDR is loaded once by CHANGE on thread restore; valid for the entire
+        # lifetime of the thread. No memory read needed per CALL.
+        thread_hdr_view = View(LUMP_HEADER_LAYOUT, self.thread_hdr)
+        thr_lump_sz = Signal(15)
+        m.d.comb += thr_lump_sz.eq(Const(1, 15) << (thread_hdr_view.n_minus_6 + 6))
 
-        # sp_max = thr_lump_sz − 12 − 1      (top of Stack zone; caps = 12, architecture-fixed)
+        # sp_max = thr_lump_sz − 12 − 1      (top of Stack zone; caps zone = 12, fixed)
         # sp_min = thr_lump_sz − 12 − sw + 2 (CALL needs 2 words: STO >= sp_min)
         sp_max = Signal(15)
         sp_min = Signal(15)
         m.d.comb += [
             sp_max.eq(thr_lump_sz - 12 - 1),
-            sp_min.eq(thr_lump_sz - 12 - thr_sw_reg + 2),
+            sp_min.eq(thr_lump_sz - 12 - thread_hdr_view.cw + 2),
         ]
 
         # Callee E-GT: the raw 32-bit GT deposited into CR6 by Phase 1 mLoad.
@@ -127,11 +140,6 @@ class ChurchCall(Elaboratable):
         )
 
         cr5_heap_view = View(CAP_REG_LAYOUT, self.cr5_heap)
-
-        b_idx = Signal(4)          # 4 bits: counts 0–11 for b-flag sweep
-        b_cr_data = Signal(CAP_REG_LAYOUT)
-
-        n_idx = Signal(4)          # 4 bits: counts 0–11 for null-GT sweep
 
         # Latched CR14 for M-bit write-back after Phase 2
         cr14_latched = Signal(CAP_REG_LAYOUT)
@@ -269,21 +277,12 @@ class ChurchCall(Elaboratable):
             cr6_adj_view.word3_w3.eq(cr6_lat_view.word3_w3),
         ]
 
-        # b-flag cleared capability (computed from b_cr_data, used in CLEAR_B_WRITE)
-        b_cleared = Signal(CAP_REG_LAYOUT)
-        b_src_view = View(CAP_REG_LAYOUT, b_cr_data)
-        b_src_gt   = View(GT_LAYOUT, b_src_view.word0_gt)
-        b_clr_view = View(CAP_REG_LAYOUT, b_cleared)
-        b_clr_gt   = View(GT_LAYOUT, b_clr_view.word0_gt)
+
+        # Explicit combinatorial defaults so these signals are always driven to 0
+        # except during the single CLEAR_B state that pulses them.
         m.d.comb += [
-            b_clr_gt.slot_id.eq(b_src_gt.slot_id),
-            b_clr_gt.gt_seq.eq(b_src_gt.gt_seq),
-            b_clr_gt.gt_type.eq(b_src_gt.gt_type),
-            b_clr_gt.perms.eq(b_src_gt.perms),
-            b_clr_gt.b_flag.eq(0),
-            b_clr_view.word1_location.eq(b_src_view.word1_location),
-            b_clr_view.word2_w2.eq(b_src_view.word2_w2),
-            b_clr_view.word3_w3.eq(b_src_view.word3_w3),
+            self.cr_null_mask.eq(0),
+            self.cr_b_clear_mask.eq(0),
         ]
 
         with m.FSM(name="call") as fsm:
@@ -400,7 +399,7 @@ class ChurchCall(Elaboratable):
                         local_cr_wr_addr.eq(CR6_CLIST),
                         local_cr_wr_data.eq(0),
                     ]
-                    m.next = "CLEAR_B_INIT"
+                    m.next = "CLEAR_B"
                 with m.Else():
                     m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
                     m.d.sync += cr6_latched.eq(self.cr_rd_data)
@@ -413,70 +412,18 @@ class ChurchCall(Elaboratable):
                     local_cr_wr_data.eq(cr6_adjusted),
                     local_cr_wr_en.eq(1),
                 ]
-                m.next = "CLEAR_B_INIT"
+                m.next = "CLEAR_B"
 
-            with m.State("CLEAR_B_INIT"):
-                m.d.sync += b_idx.eq(0)
-                m.next = "CLEAR_B_CHECK"
-
-            with m.State("CLEAR_B_CHECK"):
-                # Strip b_flag from every CR0–CR11 unconditionally
-                with m.If(b_idx > 11):
-                    m.next = "NULL_WRITE_INIT"
-                with m.Else():
-                    m.d.comb += local_cr_rd_addr.eq(b_idx)
-                    m.next = "CLEAR_B_READ"
-
-            with m.State("CLEAR_B_READ"):
-                m.d.comb += local_cr_rd_addr.eq(b_idx)
-                m.d.sync += b_cr_data.eq(self.cr_rd_data)
-                m.next = "CLEAR_B_WRITE"
-
-            with m.State("CLEAR_B_WRITE"):
+            with m.State("CLEAR_B"):
+                # Single-cycle domain-crossing register cleanup via parallel mask ports:
+                #   mask bit=1 (null mask) → write NULL to whole register (b_flag → 0 implicitly)
+                #   mask bit=0 (b_clear)   → preserve register, clear only b_flag (bit 31 of GT)
+                # sp_max/sp_min are derived combinatorially from self.thread_hdr — no memory read.
                 m.d.comb += [
-                    local_cr_wr_en.eq(1),
-                    local_cr_wr_addr.eq(b_idx),
-                    local_cr_wr_data.eq(b_cleared),
+                    self.cr_null_mask.eq(mask_latched[:12]),
+                    self.cr_b_clear_mask.eq(~mask_latched[:12]),
                 ]
-                m.d.sync += b_idx.eq(b_idx + 1)
-                m.next = "CLEAR_B_CHECK"
-
-            with m.State("NULL_WRITE_INIT"):
-                # Write null GT to each CR0–CR11 slot flagged in mask_latched[0:12]
-                m.d.sync += n_idx.eq(0)
-                m.next = "NULL_WRITE_CHECK"
-
-            with m.State("NULL_WRITE_CHECK"):
-                with m.If(n_idx > 11):
-                    m.next = "FETCH_THREAD_HDR"
-                with m.Elif(mask_latched.bit_select(n_idx, 1)):
-                    m.d.comb += [
-                        local_cr_wr_en.eq(1),
-                        local_cr_wr_addr.eq(n_idx),
-                        local_cr_wr_data.eq(0),
-                    ]
-                    m.d.sync += n_idx.eq(n_idx + 1)
-                with m.Else():
-                    m.d.sync += n_idx.eq(n_idx + 1)
-
-            with m.State("FETCH_THREAD_HDR"):
-                # Read the Thread's own lump header word at thread_base+0.
-                # Extracts sw (cw field reinterpreted for typ=10), cc, n_minus_6,
-                # and derives thr_lump_sz = 1 << (n_minus_6 + 6).
-                # From these, sp_max and sp_min are derived combinatorially.
-                m.d.comb += [
-                    self.mem_rd_addr.eq(self.thread_base),
-                    self.mem_rd_en.eq(1),
-                ]
-                with m.If(self.mem_rd_valid):
-                    _thdr = View(LUMP_HEADER_LAYOUT, self.mem_rd_data)
-                    m.d.sync += [
-                        thr_sw_reg.eq(_thdr.cw),
-                        thr_hw_reg.eq(_thdr.cc),   # cc repurposed as heapWords for typ=10
-                        thr_n6_reg.eq(_thdr.n_minus_6),
-                        thr_lump_sz.eq(Const(1, 15) << (_thdr.n_minus_6 + 6)),
-                    ]
-                    m.next = "STACK_READ_SP"
+                m.next = "STACK_READ_SP"
 
             with m.State("STACK_READ_SP"):
                 # Read STO from Heap[0] = Mem[CR5.word1_location].

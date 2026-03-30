@@ -57,6 +57,13 @@ class ChurchRegisters(Elaboratable):
 
         self.clear_all = Signal()
 
+        # Parallel B-flag and null-write masks (CR0-CR11 only, one bit per register)
+        # cr_b_clear_mask: bit N=1 → clear b_flag (bit 31 of word0_gt) on CRN in one cycle
+        # cr_null_mask:    bit N=1 → write NULL (all zeros) to CRN in one cycle
+        # By construction CALL drives these mutually exclusive (preserved ↔ non-preserved).
+        self.cr_b_clear_mask = Signal(12)
+        self.cr_null_mask    = Signal(12)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -111,6 +118,14 @@ class ChurchRegisters(Elaboratable):
                 with m.If(self.cr_gt_wr_en[i]):
                     cr_view = View(CAP_REG_LAYOUT, cap_regs[i])
                     m.d.sync += cr_view.word0_gt.eq(self.cr_gt_wr_data[i])
+
+            # Parallel B-flag clear: cr_null_mask takes priority (it zeros the whole register)
+            for i in range(12):
+                with m.If(self.cr_null_mask[i]):
+                    m.d.sync += cap_regs[i].eq(0)
+                with m.Elif(self.cr_b_clear_mask[i]):
+                    cr_view = View(CAP_REG_LAYOUT, cap_regs[i])
+                    m.d.sync += cr_view.word0_gt[31].eq(0)
 
             with m.If(self.dr_wr_en & (self.dr_wr_addr != 0)):
                 m.d.sync += data_regs[self.dr_wr_addr].eq(self.dr_wr_data)

@@ -9,12 +9,14 @@
 //   Index = Index into the C-List
 //
 // CALL Steps (Two-Phase Load + Isolation):
-//   Pre: Save CR5 GT for later restoration by RETURN
+//   Pre:    Save CR5 GT for later restoration by RETURN
 //   Phase 1: mLoad CRs[Index] → CR6   (nodal C-List)
 //   Phase 2: mLoad CR6[0]    → CR14   (CLOOMC code capability)
-//   Phase 3: Fetch NS[CR14.slot_id].word3_lump (+12) to read mw field
-//   Phase 4: NIA = CR14.word1_location + (1 + mw) * 4
-//   Phase 5: Clear B-flag on preserved CRs, apply isolation
+//   Phase 3: Fetch Mem[CR14.word1_location] — callee lump header (cw, cc, n_minus_6)
+//   Phase 4: NIA = CR14.word1_location + 4  (lump word 0 = header; first instruction at word 1)
+//   Phase 5: Clear B-flag + null non-preserved CRs in one cycle (b_clear_mask out)
+//   Phase 6: Read STO from Heap[0] = Mem[CR5.word1_location]; check sp_min ≤ STO ≤ sp_max
+//            (bounds derived from THREAD_HDR hidden register via thread_hdr_in; no extra read)
 //
 // Permission check: source CR must have E (Enter) permission.
 //
@@ -67,6 +69,10 @@ module ctmm_call
     output logic [3:0]  thread_wr_idx,
     output logic [31:0] thread_wr_data,
 
+    // THREAD_HDR hidden register — loaded by CHANGE on thread restore.
+    // CALL reads stack bounds from this word directly (no memory read per CALL).
+    input  logic [31:0] thread_hdr_in,
+
     // Saved CR5 GT output for RETURN restoration
     output golden_token_t saved_cr5_gt,
 
@@ -74,7 +80,17 @@ module ctmm_call
     output logic        nia_set,
     output logic [31:0] nia_value,
     output logic [15:0] dr_clear_mask,
-    output logic [15:0] cr_clear_mask
+    output logic [15:0] cr_clear_mask,
+
+    // Parallel B-flag clear: one bit per CR0–CR5 domain register.
+    // Asserted for one cycle at CALL_CLEAR_B; register file clears b_flag on each
+    // masked CR in a single clock edge (no read-modify-write loop needed).
+    output logic [5:0]  b_clear_mask,
+
+    // Parallel null mask: bit N=1 → write NULL to CR[N] (CR0–CR11).
+    // Asserted at CALL_CLEAR_B for non-preserved CRs only.
+    // cr_null_mask takes priority over b_clear_mask in the register file.
+    output logic [11:0] cr_null_mask
 );
 
     // ========================================================================
@@ -100,10 +116,9 @@ module ctmm_call
         CALL_PHASE2,
         CALL_PHASE2_DONE,
         CALL_FETCH_LUMP,
-        CALL_CLEAR_B_INIT,
-        CALL_CLEAR_B_CHECK,
-        CALL_CLEAR_B_READ,
-        CALL_CLEAR_B_WRITE,
+        CALL_CLEAR_B,
+        CALL_STACK_READ_SP,   // Read STO from Heap[0] = Mem[CR5.word1_location]
+        CALL_STACK_CHECK,     // Validate sp_min ≤ STO ≤ sp_max (using THREAD_HDR)
         CALL_COMPLETE,
         CALL_FAULT
     } call_state_t;
@@ -135,16 +150,16 @@ module ctmm_call
     end
 
     // ========================================================================
-    // FETCH_LUMP: read NS[slot_id].word3_lump (+12) for mw field
+    // FETCH_LUMP: read the callee lump header from Mem[CR14.word1_location]
     // ========================================================================
-    // NS entry base = CR15.word1_location + (slot_id << 4); lump is at +12.
+    // After Phase 2, mLoad has written CR14 = the callee code capability.
+    // CR14.word1_location is the lump base address; word[0] = lump_header_t.
+    // No slot_id arithmetic is needed — mLoad already resolved the NS entry.
 
     logic [31:0] lump_fetch_addr;
-    logic [31:0] lump_reg;          // word3_lump raw value
+    logic [31:0] lump_reg;
 
-    assign lump_fetch_addr = cr15_namespace.word1_location
-                           + ({16'h0, cr14_latched.word0_gt.slot_id} << 4)
-                           + 32'd12;
+    assign lump_fetch_addr = cr14_latched.word1_location;
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
@@ -153,36 +168,76 @@ module ctmm_call
             lump_reg <= mem_rd_data;
     end
 
-    // Decode word3_lump via lump_header_t struct (defined in ctmm_pkg.sv)
+    // Decode callee lump header via lump_header_t struct (defined in ctmm_pkg.sv).
     // lump_header_t is a packed struct matching LUMP_HEADER_LAYOUT in layouts.py:
-    //   .r [0], .c [1], .h [2], .mw [8:3], .typ [10:9], .cc [18:11],
-    //   .n_minus_6 [22:19], .ver [26:23], .magic [31:27]
+    //   .cc [7:0], .typ [9:8], .cw [22:10], .n_minus_6 [26:23], .magic [31:27]
     lump_header_t lump_view;
     assign lump_view = lump_reg;
 
     // Latched lump fields (set when lump_reg captures mem_rd_data in FETCH_LUMP)
-    logic [5:0]  mw_latched;        // max-word: argument count
-    logic [7:0]  cc_latched;        // calling-convention flags
+    logic [12:0] cw_latched;        // callee code-word count
+    logic [7:0]  cc_latched;        // c-list slot count
     logic [3:0]  n_minus_6_latched; // frame-words minus 6
 
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            mw_latched        <= 6'd0;
+            cw_latched        <= 13'd0;
             cc_latched        <= 8'd0;
             n_minus_6_latched <= 4'd0;
         end else if (state == CALL_FETCH_LUMP && mem_rd_valid) begin
-            mw_latched        <= lump_view.mw;
+            cw_latched        <= lump_view.cw;
             cc_latched        <= lump_view.cc;
             n_minus_6_latched <= lump_view.n_minus_6;
         end
     end
 
-    // NIA = code_base + (1 + mw) * 4  (skip over the prologue header word)
-    // Uses lump_view.mw (combinational decode of lump_reg) before it is registered
-    // so NIA is available the same cycle lump_reg is latched.
+    // CR5 heap base: latched at CALL_READ_CR5 so STACK_READ_SP can use it
+    // without an extra CR read cycle.  CR5.word1_location = heap base address;
+    // STO is stored at Heap[0] = Mem[cr5_heap_base].
+    logic [31:0] cr5_heap_base;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) cr5_heap_base <= 32'd0;
+        else if (state == CALL_READ_CR5) cr5_heap_base <= cr_rd_data.word1_location;
+    end
+
+    // NIA = code_base + 4  (word 0 of the lump is the header; first instruction is word 1)
+    // CR14.word1_location = lump base byte address (set by mLoad after Phase 2).
     logic [31:0] nia_computed;
-    assign nia_computed = cr14_latched.word1_location
-                        + ({26'd0, lump_view.mw} + 32'd1) * 32'd4;
+    assign nia_computed = cr14_latched.word1_location + 32'd4;
+
+    // ========================================================================
+    // THREAD_HDR — Stack Bounds (decoded from hidden per-thread register)
+    // ========================================================================
+    // thread_hdr_in holds Mem[CR12.word1_location+0], loaded by CHANGE on
+    // thread restore.  CALL reads stack bounds from it directly (no memory
+    // read per CALL needed for the thread header).
+    //
+    // Stack bounds (word offsets into thread lump):
+    //   sp_max = thr_lump_words − 12 − 1    (top guard; caps zone = 12, fixed)
+    //   sp_min = thr_lump_words − 12 − cw + 2 (CALL needs 2 words of headroom)
+    // STO is read from Heap[0] = Mem[CR5.word1_location] in CALL_STACK_READ_SP.
+
+    lump_header_t thr_hdr_view;
+    assign thr_hdr_view = thread_hdr_in;
+
+    // thr_lump_words = 2^(n_minus_6 + 6)  (total words in thread lump)
+    // sp_max = thr_lump_words − 12 − 1    (top of stack zone; caps zone = 12, fixed)
+    // sp_min = thr_lump_words − 12 − cw + 2 (CALL needs 2 words of headroom)
+    // Both are word-offset-based; STO is a word offset into the thread lump.
+    logic [31:0] thr_lump_words;
+    logic [31:0] thr_sp_max;
+    logic [31:0] thr_sp_min;
+
+    assign thr_lump_words = 32'd1 << ({27'd0, thr_hdr_view.n_minus_6} + 5'd6);
+    assign thr_sp_max     = thr_lump_words - 32'd13;                          // -12 (caps) -1 (guard)
+    assign thr_sp_min     = thr_lump_words - 32'd12 - {19'd0, thr_hdr_view.cw} + 32'd2;
+
+    // sp_latched: STO (stack-top offset) read from Heap[0] = Mem[cr5_heap_base]
+    logic [31:0] sp_latched;
+    always_ff @(posedge clk or negedge rst_n) begin
+        if (!rst_n) sp_latched <= 32'd0;
+        else if (state == CALL_STACK_READ_SP && mem_rd_valid) sp_latched <= mem_rd_data;
+    end
 
     // ========================================================================
     // Operand Latching
@@ -257,6 +312,14 @@ module ctmm_call
         end else if ((state == CALL_PHASE1 || state == CALL_PHASE2) && sub_fault_latched) begin
             fault_latched      <= 1'b1;
             fault_type_latched <= sub_fault_type;
+        end else if (state == CALL_STACK_CHECK) begin
+            if (sp_latched > thr_sp_max) begin
+                fault_latched      <= 1'b1;
+                fault_type_latched <= FAULT_STACK_CORRUPT;
+            end else if (sp_latched < thr_sp_min) begin
+                fault_latched      <= 1'b1;
+                fault_type_latched <= FAULT_STACK_OVERFLOW;
+            end
         end
     end
 
@@ -333,44 +396,20 @@ module ctmm_call
         .mem_addr       (sub_mem_addr),
         .mem_rd_en      (sub_mem_rd_en),
         .mem_rd_data    (mem_rd_data),
-        .mem_rd_valid   (lump_fetch_active ? 1'b0 : mem_rd_valid),
+        .mem_rd_valid   (local_mem_active ? 1'b0 : mem_rd_valid),
         .thread_wr_en   (thread_wr_en),
         .thread_wr_idx  (thread_wr_idx),
         .thread_wr_data (thread_wr_data)
     );
 
     // ========================================================================
-    // B-Flag Clearing Loop
+    // B-Flag + Null Clear (Parallel, single-cycle)
     // ========================================================================
-    // After both loads complete, walk CR0-CR5 that are PRESERVED (mask=1)
-    // and clear the b_flag from word0_gt so they are unbound in the new domain.
-
-    logic [2:0]      b_idx;
-    capability_reg_t b_cr_latched;
-    logic            b_wr_en_local;
-    logic [3:0]      b_wr_addr_local;
-    capability_reg_t b_wr_data_local;
+    // cr_preserve[n]=1 means bit n of CR0-CR5 is preserved; clear only its b_flag.
+    // Non-preserved CRs are nulled via cr_clear_mask; no sequential loop needed.
 
     logic [5:0] cr_preserve;
     assign cr_preserve = mask_latched[10:5];
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            b_idx <= 3'd0;
-        else if (state == CALL_CLEAR_B_INIT)
-            b_idx <= 3'd0;
-        else if (state == CALL_CLEAR_B_CHECK && !cr_preserve[b_idx])
-            b_idx <= b_idx + 3'd1;
-        else if (state == CALL_CLEAR_B_WRITE)
-            b_idx <= b_idx + 3'd1;
-    end
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            b_cr_latched <= CR_NULL;
-        else if (state == CALL_CLEAR_B_READ)
-            b_cr_latched <= cr_rd_data;
-    end
 
     // ========================================================================
     // Memory Muxing (local FETCH_LUMP vs mLoad sub-module)
@@ -383,8 +422,15 @@ module ctmm_call
     assign lump_fetch_active = (state == CALL_FETCH_LUMP) ||
                                (state == CALL_PHASE2_DONE);
 
-    assign mem_addr   = lump_fetch_active ? lump_fetch_addr : sub_mem_addr;
-    assign mem_rd_en  = lump_fetch_active ? (state == CALL_FETCH_LUMP) : sub_mem_rd_en;
+    // Memory mux priority: lump fetch > stack SP read > mLoad sub-module.
+    // Also gate mLoad's mem_rd_valid during local reads so it cannot advance
+    // its own FSM while a local read is in progress.
+    wire local_mem_active = lump_fetch_active || (state == CALL_STACK_READ_SP);
+
+    assign mem_addr   = lump_fetch_active         ? lump_fetch_addr :
+                        (state == CALL_STACK_READ_SP) ? cr5_heap_base  : sub_mem_addr;
+    assign mem_rd_en  = lump_fetch_active         ? (state == CALL_FETCH_LUMP) :
+                        (state == CALL_STACK_READ_SP) ? 1'b1           : sub_mem_rd_en;
 
     // ========================================================================
     // Register Read/Write Muxing
@@ -393,31 +439,16 @@ module ctmm_call
     logic local_rd_en;
     logic [3:0] local_rd_addr;
 
-    assign local_rd_en  = (state == CALL_CHECK_SRC) || (state == CALL_READ_SRC) ||
-                          (state == CALL_READ_CR5)  || (state == CALL_CLEAR_B_CHECK) ||
-                          (state == CALL_CLEAR_B_READ);
-    assign local_rd_addr = (state == CALL_READ_CR5) ? 4'd5 :
-                           ((state == CALL_CLEAR_B_CHECK) || (state == CALL_CLEAR_B_READ))
-                           ? {1'b0, b_idx} : cr_src;
+    assign local_rd_en   = (state == CALL_CHECK_SRC) || (state == CALL_READ_SRC) ||
+                           (state == CALL_READ_CR5);
+    assign local_rd_addr = (state == CALL_READ_CR5) ? 4'd5 : cr_src;
 
     assign cr_rd_addr = local_rd_en ? local_rd_addr : sub_cr_rd_addr;
 
-    // B-flag clear write
-    always_comb begin
-        b_wr_en_local   = 1'b0;
-        b_wr_addr_local = 4'd0;
-        b_wr_data_local = CR_NULL;
-        if (state == CALL_CLEAR_B_WRITE) begin
-            b_wr_en_local        = 1'b1;
-            b_wr_addr_local      = {1'b0, b_idx};
-            b_wr_data_local      = b_cr_latched;
-            b_wr_data_local.word0_gt.b_flag = 1'b0;
-        end
-    end
-
-    assign cr_wr_en   = b_wr_en_local | sub_cr_wr_en;
-    assign cr_wr_addr = b_wr_en_local ? b_wr_addr_local : sub_cr_wr_addr;
-    assign cr_wr_data = b_wr_en_local ? b_wr_data_local : sub_cr_wr_data;
+    // mLoad subroutine writes are the only CR writes during CALL
+    assign cr_wr_en   = sub_cr_wr_en;
+    assign cr_wr_addr = sub_cr_wr_addr;
+    assign cr_wr_data = sub_cr_wr_data;
 
     // ========================================================================
     // State Register
@@ -465,21 +496,25 @@ module ctmm_call
                 next_state = CALL_FETCH_LUMP;
 
             CALL_FETCH_LUMP:
-                if (mem_rd_valid) next_state = CALL_CLEAR_B_INIT;
+                if (mem_rd_valid) next_state = CALL_CLEAR_B;
 
-            CALL_CLEAR_B_INIT:
-                next_state = CALL_CLEAR_B_CHECK;
+            CALL_CLEAR_B:
+                // Single cycle: b_clear_mask and cr_clear_mask are asserted
+                // by combinational outputs; no loop or read-modify-write needed.
+                next_state = CALL_STACK_READ_SP;
 
-            CALL_CLEAR_B_CHECK:
-                if (b_idx > 3'd5)                next_state = CALL_COMPLETE;
-                else if (cr_preserve[b_idx])     next_state = CALL_CLEAR_B_READ;
-                // else stay: b_idx increments in FF
+            CALL_STACK_READ_SP:
+                // Waiting for Heap[0] (STO) to be returned from memory.
+                if (mem_rd_valid) next_state = CALL_STACK_CHECK;
 
-            CALL_CLEAR_B_READ:
-                next_state = CALL_CLEAR_B_WRITE;
-
-            CALL_CLEAR_B_WRITE:
-                next_state = CALL_CLEAR_B_CHECK;
+            CALL_STACK_CHECK: begin
+                // sp_latched just captured from memory; evaluate bounds.
+                // Fault latching happens in the always_ff block above.
+                if (sp_latched > thr_sp_max || sp_latched < thr_sp_min)
+                    next_state = CALL_FAULT;
+                else
+                    next_state = CALL_COMPLETE;
+            end
 
             CALL_COMPLETE:
                 next_state = CALL_IDLE;
@@ -504,9 +539,18 @@ module ctmm_call
     assign call_fault    = fault_latched;
     assign fault_type    = fault_type_latched;
 
-    assign nia_set      = (state == CALL_COMPLETE);
-    assign nia_value    = nia_computed;
-    assign dr_clear_mask = (state == CALL_COMPLETE) ? dr_clear_computed : 16'd0;
-    assign cr_clear_mask = (state == CALL_COMPLETE) ? cr_clear_computed : 16'd0;
+    assign nia_set       = (state == CALL_COMPLETE);
+    assign nia_value     = nia_computed;
+    assign dr_clear_mask = (state == CALL_CLEAR_B) ? dr_clear_computed : 16'd0;
+    assign cr_clear_mask = (state == CALL_CLEAR_B) ? cr_clear_computed : 16'd0;
+
+    // b_clear_mask: one bit per CR0-CR5; high for one cycle during CALL_CLEAR_B.
+    // Register file clears b_flag on each asserted bit in a single clock edge,
+    // replacing the old 36-cycle sequential read-modify-write loop.
+    assign b_clear_mask = (state == CALL_CLEAR_B) ? cr_preserve : 6'd0;
+
+    // cr_null_mask: bits [5:0] null non-preserved CR0-CR5 during CALL_CLEAR_B.
+    // Bits [11:6] are 0 — CRs 6-11 are managed by the CALL protocol (Phases 1/2).
+    assign cr_null_mask = (state == CALL_CLEAR_B) ? {6'd0, ~cr_preserve} : 12'd0;
 
 endmodule

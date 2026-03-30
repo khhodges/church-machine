@@ -239,7 +239,7 @@ mLoad performs three or four sequential memory reads:
    Width:   32 bits
 ```
 
-NS entry addresses use a 16-byte stride: `slot_id << 4`. The NS table
+NS entry addresses use a **12-byte stride**: `slot_id * 12` (3 words × 4 bytes). The NS table
 base comes from `CR15.word1_location`.
 
 ---
