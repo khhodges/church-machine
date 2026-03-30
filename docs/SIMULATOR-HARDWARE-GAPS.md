@@ -5,89 +5,54 @@
 
 ---
 
-## CRITICAL GAP #1: CALL Type Validation is Wrong
+## GAP #1: CALL Type Validation — ✅ FIXED
 
-### Problem
-**Simulator line 1089** allows types 1 and 2, rejects type 3:
-```javascript
-if (srcParsed.type !== 1 && srcParsed.type !== 2) {
-    this.fault('TYPE', `CALL: CR${d.crDst} GT type is ${srcParsed.typeName}, must be Real or Abstract`);
-}
-```
+### Problem (historical)
+Simulator previously allowed types 1 (Inform) and 2 (Outform), rejecting type 3 (Abstract).
+The fault message said "must be Inform or Abstract" but the code was wrong.
 
-**But the error message says "must be Real or Abstract"**, which would be:
-- Type 1 = **Inform** (formerly "Real")
-- Type 3 = **Abstract** (PassKeys)
-
-**The code allows type 2 (Outform)** — which is WRONG for CALL!
-
-### Current Logic
-```
-Allows: type 1 (Inform) OR type 2 (Outform)
-Rejects: type 0 (NULL), type 3 (Abstract ← **WRONG!**)
-```
-
-### Correct Logic
+### Correct Logic (now implemented)
 ```
 Allows: type 1 (Inform) OR type 3 (Abstract)
 Rejects: type 0 (NULL), type 2 (Outform)
 ```
 
-### Impact
-🔴 **CRITICAL**: PassKeys (Abstract GTs, type 3) **CANNOT be used in CALL** — they will fault with TYPE error instead of working.
-
-### Fix Required
+### Fix Applied
 ```javascript
-// OLD (WRONG):
-if (srcParsed.type !== 1 && srcParsed.type !== 2) {
-
-// NEW (CORRECT):
+// simulator.js — CALL type check (line 1089):
 if (srcParsed.type !== 1 && srcParsed.type !== 3) {
+    this.fault('TYPE', `CALL: CR${d.crDst} GT type is ${srcParsed.typeName}, must be Inform or Abstract`);
+}
 ```
-
-**Line**: simulator.js line 1089
 
 ---
 
-## SECONDARY GAP #2: Wrong Type Checks in XLOADLAMBDA Path
+## GAP #2: Wrong Type Check in XLOADLAMBDA Path — ✅ FIXED
 
-### Problem
-**Simulator line 1580** also checks for types 1 and 2:
+### Problem (historical)
+Simulator previously checked `cr7Parsed.type === 1 || cr7Parsed.type === 2` for XLOADLAMBDA code chaining.
+Type 2 is Outform — only Inform (type 1) is valid for code loading.
+
+### Fix Applied
 ```javascript
-if (cr7Parsed.type === 1 || cr7Parsed.type === 2) {
+// simulator.js — XLOADLAMBDA code GT check:
+if (cr7Parsed.type === 1) {  // Inform only
     // Load code GT from c-list
 }
 ```
 
-This code path loads a code reference from the c-list (for code chaining). It should only accept **Inform (type 1)**, not Outform (type 2).
-
-### Fix Required
-```javascript
-// Should be specific to Inform GTs:
-if (cr7Parsed.type === 1) {
-```
-
-**Line**: simulator.js line 1580
-
 ---
 
-## DOCUMENTATION GAP #3: Type Comments are Outdated
+## GAP #3: Type Comments Outdated — ✅ FIXED
 
-### Problem
-**Lines 231, 234, 281** have wrong type comments:
+### Problem (historical)
+Type comments used old names. Canonical GT type encoding:
 ```javascript
-// WRONG:
-// GT type semantics: 0=NULL, 1=Real (concrete lump in memory), 2=Abstract (user-uploaded/PassKey), 3=reserved
-// Abstract (type=2) GTs are only created by Navana.Abstraction.Add (user uploads) and Navana.MintPassKey.
-// type=2 (Abstract) GTs are only created at runtime by Navana.Abstraction.Add and Navana.MintPassKey.
-
-// CORRECT:
-// GT type semantics: 0=NULL, 1=Inform (concrete lump in memory), 2=Outform (remote), 3=Abstract (PassKey/value)
-// Abstract (type=3) GTs are only created by Navana.Abstraction.Add (user uploads) and Navana.MintPassKey.
-// type=3 (Abstract) GTs are only created at runtime by Navana.Abstraction.Add and Navana.MintPassKey.
+// GT type semantics: 0=NULL, 1=Inform (concrete lump), 2=Outform (remote), 3=Abstract (PassKey/value)
+// Abstract (type=3) GTs are only created by Navana.Abstraction.Add and Navana.MintPassKey.
 ```
 
-**Lines**: simulator.js 231, 234, 281
+**Status**: All type comments in simulator.js updated (lines 231, 234, 281).
 
 ---
 

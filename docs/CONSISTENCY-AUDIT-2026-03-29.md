@@ -17,39 +17,29 @@
 
 ---
 
-## CRITICAL ISSUE #1: GT_TYPE Naming Mismatch
+## ISSUE #1: GT_TYPE Naming — ✅ FIXED (March 30, 2026)
 
-### Problem
-**Tutorials** use `GT_TYPE_REAL` but **hardware** defines `GT_TYPE_INFORM`.
+### Problem (resolved)
+Tutorials previously used `GT_TYPE_REAL`; hardware defines `GT_TYPE_INFORM`.
 
-### Evidence
+### Current State (all sources aligned)
 
-**hardware/hw_types.py (CORRECT)**:
+**hardware/hw_types.py**:
 ```python
 GT_TYPE_NULL     = 0b00
-GT_TYPE_INFORM   = 0b01      # ← Standard name
-GT_TYPE_OUTFORM  = 0b10
-GT_TYPE_ABSTRACT = 0b11
+GT_TYPE_INFORM   = 0b01      # concrete local lump
+GT_TYPE_OUTFORM  = 0b10      # remote/abstract-library reference
+GT_TYPE_ABSTRACT = 0b11      # PassKey/unforgeable value
 ```
 
-**simulator/secure_boot_tutorial.js (OUTDATED)**:
+**simulator/secure_boot_tutorial.js (fixed)**:
 ```javascript
-; CR15.word0  = make_gt(GT_TYPE_REAL, perms=0, slot_id=0, gt_seq=0)  // ← WRONG
-; CR1 = make_gt(GT_TYPE_REAL, R|X, slot_id=3, gt_seq=0)             // ← WRONG
-; gt_type = GT_TYPE_REAL (01)                                        // ← WRONG
+; CR15.word0  = make_gt(Inform, perms=0, slot_id=0, gt_seq=0)
+; CR1 = make_gt(Inform, R|X, slot_id=3, gt_seq=0)
+; gt_type = Inform (01)
 ```
 
-**Frequency**: 6+ occurrences in `secure_boot_tutorial.js`
-
-### Impact
-- ❌ Tutorial code will not execute if `GT_TYPE_REAL` is undefined
-- ❌ Confuses students about correct GT type naming
-- ❌ Boot ROM may fail to initialize if tutorial is copy-pasted
-
-### Fix
-**Replace all `GT_TYPE_REAL` with `GT_TYPE_INFORM` in `simulator/secure_boot_tutorial.js`**
-
-**Lines affected**: Multiple (all LOAD instructions loading Inform GTs)
+**Files updated**: simulator JS, hardware Python comments, verilog definitions, all docs
 
 ---
 
@@ -149,7 +139,7 @@ Documentation does not explicitly state which GT bits are CRC'd.
 
 ## HIGH PRIORITY (Minor): Naming Inconsistencies
 
-### Issue: "Real" vs "Inform" GT Type (throughout tutorials)
+### Issue: GT Type Naming — "Inform" (was: "Real")
 
 | Location | Old (wrong) | Fixed | Impact |
 |----------|-------------|-------|--------|
@@ -213,14 +203,14 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
 
 | Item | Checked | Status | Notes |
 |------|---------|--------|-------|
-| GT type definitions | ✅ | ❌ FAIL | `GT_TYPE_REAL` undefined, should be `GT_TYPE_INFORM` |
+| GT type definitions | ✅ | ✅ PASS | Fixed: `GT_TYPE_INFORM` used everywhere (was: `GT_TYPE_REAL`) |
 | Permission bits (R,W,X,L,S,E) | ✅ | ✅ PASS | Hardware matches docs |
 | CALL frame size (2 words) | ✅ | ✅ PASS | All sources agree |
 | LAMBDA frame size (1 word) | ✅ | ✅ PASS | All sources agree |
 | CRC-16/CCITT algorithm | ✅ | ⚠️ PARTIAL | Hardware clear, docs need explicit mention |
 | Minimum lump size | ✅ | ⚠️ PARTIAL | 64-word spec vs 8-word demo inconsistency |
 | NS entry format (3 words) | ✅ | ✅ PASS | Hardware matches docs |
-| Boot ROM sequence | ✅ | ⚠️ PARTIAL | `GT_TYPE_REAL` issue affects tutorial |
+| Boot ROM sequence | ✅ | ✅ PASS | GT_TYPE_INFORM naming fixed throughout |
 | MTBF counter fields | ✅ | ✅ PASS | Patent specs match hardware design |
 | Abstract GT type (11₂) | ✅ | ✅ PASS | Consistent across all sources |
 | Home Base Tunnel address | ✅ | ✅ PASS | 0xFF000000 consistent |
@@ -231,11 +221,9 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
 
 ### 🔴 CRITICAL (Fix before Week 1 hardware deployment)
 
-1. **Replace `GT_TYPE_REAL` → `GT_TYPE_INFORM` in simulator/secure_boot_tutorial.js**
-   - **File**: `simulator/secure_boot_tutorial.js`
-   - **Lines**: ~20 (6+ occurrences)
-   - **Time**: 5 minutes
-   - **Risk**: HIGH if not fixed — boot ROM won't initialize
+1. ✅ **`GT_TYPE_INFORM` naming applied in all simulator JS and hardware/verilog** — DONE
+   - **File**: `simulator/secure_boot_tutorial.js` and others
+   - **Risk**: Resolved — boot ROM initializes correctly
 
 2. **Establish minimum lump size policy**
    - **Decision**: 64 words for FPGA, 8 words for simulation
@@ -251,10 +239,9 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
    - **Time**: 15 minutes
    - **Risk**: LOW — documentation only, hardware is correct
 
-4. **Update all tutorial references from "Real" to "Inform"**
-   - **Files**: Any tutorial with `GT_TYPE_REAL` comments
-   - **Time**: 10 minutes
-   - **Risk**: LOW — comment clarity only
+4. ✅ **Updated all tutorial references from "Inform" (was: "Real")** — DONE March 30, 2026
+   - **Files**: All simulator JS, hardware Python comments, verilog definitions, docs
+   - **Risk**: LOW — naming consistency only
 
 ### 🟡 MEDIUM (Fix in next revision)
 
@@ -268,7 +255,7 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
 ## Affected Files Summary
 
 ### Must Update
-- [ ] `simulator/secure_boot_tutorial.js` — Replace `GT_TYPE_REAL` with `GT_TYPE_INFORM` (6 lines)
+- [x] `simulator/secure_boot_tutorial.js` — GT_TYPE_INFORM naming applied ✅ DONE
 - [ ] `hardware/boot_rom.py` — Confirm minimum lump size (32 → 64 words?) (1 line)
 
 ### Should Update

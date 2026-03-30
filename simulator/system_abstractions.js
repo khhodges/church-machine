@@ -801,7 +801,7 @@ class SystemAbstractions {
             const allocatedSize = memResult.result.size;
             const limit17 = (allocatedSize - 1) & 0x1FFFF;
 
-            const labelPrefix = gtType === 2 ? 'ABS' : (hasTuring ? 'DATA' : 'CAP');
+            const labelPrefix = gtType === 3 ? 'ABS' : (hasTuring ? 'DATA' : 'CAP');
             const label = `${labelPrefix}[mint]`;
 
             const addResult = sim.abstractionRegistry.dispatchMethod(5, 'Add', sim, {

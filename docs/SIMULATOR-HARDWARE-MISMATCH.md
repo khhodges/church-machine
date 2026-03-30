@@ -16,103 +16,47 @@ GT_TYPE_OUTFORM  = 0b10  # 2
 GT_TYPE_ABSTRACT = 0b11  # 3
 ```
 
-### Simulator Definition (simulator.js, line ~157)
+### Fixed Simulator Definition (simulator.js, line ~157)
 ```javascript
-typeName: ['NULL','Real','Abstract','???'][type & 3],
-```
-
-Maps to:
-- type=0 → 'NULL' ✅ CORRECT
-- type=1 → 'Real' ❌ WRONG (should be 'Inform')
-- type=2 → 'Abstract' ❌ WRONG (should be 'Outform')
-- type=3 → '???' ❌ WRONG (should be 'Abstract')
-
-### Impact
-
-| Type | Hardware | Simulator | Mismatch |
-|------|----------|-----------|----------|
-| 1 | INFORM | Real | ❌ Naming only |
-| 2 | OUTFORM | Abstract | ❌ **LOGIC ERROR** |
-| 3 | ABSTRACT | ??? | ❌ **UNDEFINED** |
-
-**Severity**: 🔴 **CRITICAL**
-- Type 2 logic is executing as if it's Abstract (wrong behavior)
-- Type 3 is treated as unknown (will cause faults or wrong dispatch)
-- Boot ROM and tutorials use Abstract GTs (type 3) but simulator treats them as '???'
-
----
-
-## Secondary Issue: Type Comparisons in Simulator
-
-**Location**: `simulator/simulator.js` lines 1171, 1201, 1580
-
-```javascript
-// Line 1171: Checks if type === 1 (Real/Inform)
-if (cr7Parsed.type === 1 && cr7Parsed.permissions.X) {
-    // ...treats as Inform/Real
-}
-
-// Line 1201: Checks if type === 2 (Abstract/Outform in simulator = Abstract)
-if (cr1Parsed.type === 2) {
-    // ...treats as Abstract (WRONG — this is Outform!)
-}
-
-// Line 1580: Checks both types 1 and 2
-if (cr7Parsed.type === 1 || cr7Parsed.type === 2) {
-    // ...mixed logic
-}
-```
-
-**Problem**: Logic assumes type 2 is Abstract, but hardware defines type 2 as **Outform**.
-
----
-
-## What Needs to be Fixed
-
-### File: `simulator/simulator.js`
-
-**Change 1** (line ~157): Update typeName array
-```javascript
-// OLD:
-typeName: ['NULL','Real','Abstract','???'][type & 3],
-
-// NEW:
 typeName: ['NULL','Inform','Outform','Abstract'][type & 3],
 ```
 
-**Change 2** (line ~1171): Update type comparison comments/logic
+Canonical mapping:
+- type=0 → 'NULL' ✅
+- type=1 → 'Inform' ✅ (concrete NS entry reference)
+- type=2 → 'Outform' ✅ (remote/abstract-library reference)
+- type=3 → 'Abstract' ✅ (PassKey/unforgeable value)
+
+### Type Encoding (all sources now aligned)
+
+| Type | Hardware (hw_types.py) | Simulator (simulator.js) | Status |
+|------|------------------------|--------------------------|--------|
+| 0 | GT_TYPE_NULL | 'NULL' | ✅ |
+| 1 | GT_TYPE_INFORM | 'Inform' | ✅ Fixed |
+| 2 | GT_TYPE_OUTFORM | 'Outform' | ✅ Fixed |
+| 3 | GT_TYPE_ABSTRACT | 'Abstract' | ✅ Fixed |
+
+---
+
+## Type Comparisons in Simulator — ✅ FIXED
+
+**Location**: `simulator/simulator.js`
+
 ```javascript
-// If checking for Inform (type 1), rename or comment clearly:
+// Inform GT with X permission — code reference for XLOADLAMBDA:
 if (cr7Parsed.type === 1 && cr7Parsed.permissions.X) {
-    // Inform GT with X permission — treat as code reference
-```
-
-**Change 3** (line ~1201): Fix Outform/Abstract confusion
-```javascript
-// OLD:
-if (cr1Parsed.type === 2) {
-    // ...assumes Abstract
-
-// NEW:
-if (cr1Parsed.type === 3) {  // Type 3 is Abstract, not type 2
-    // ...Abstract GT logic
+    // Load code GT from c-list
 }
-```
 
-**Change 4** (line ~1580): Verify type checks
-```javascript
-// OLD:
-if (cr7Parsed.type === 1 || cr7Parsed.type === 2) {
-
-// NEW (depends on logic):
-if (cr7Parsed.type === 1 || cr7Parsed.type === 3) {  // Inform or Abstract
-// OR
-if (cr7Parsed.type !== 0) {  // Any non-NULL type
+// CALL type check — Inform or Abstract only:
+if (srcParsed.type !== 1 && srcParsed.type !== 3) {
+    this.fault('TYPE', `CALL: must be Inform or Abstract`);
+}
 ```
 
 ---
 
-## Testing to Verify Fix
+## Testing to Verify Fix (all passing)
 
 After fixing, verify:
 
