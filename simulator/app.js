@@ -2439,7 +2439,7 @@ CALL   CR1              ; Mint.Create internally:
 ;      word2 = (newVer<<25) | CRC16_seal(loc, limit)
 ;   5. Pack GT:
 ;      GT = (seq<<16)|(50)|(0b000001<<25)|(0b01<<23)
-;         = seq=1, idx=50, R+W, Real
+;         = seq=1, idx=50, R+W, Inform
 ; Result: CR1 <- ready-to-use GT for NS[50]
 
 ; ── EXAMPLE B: Inform + Turing R,W,X (full data+code) ────

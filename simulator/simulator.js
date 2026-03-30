@@ -314,7 +314,7 @@ class ChurchSimulator {
                     return false;
                 }
                 this._writeCR(12, gt12, check12.entry);
-                this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) Thread identity (zero perms, Real)\n`;
+                this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) Thread identity (zero perms, Inform)\n`;
                 this.bootStep++;
                 this.ledBits = 0b000111;
                 break;

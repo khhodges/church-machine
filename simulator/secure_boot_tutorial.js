@@ -353,10 +353,10 @@ LOAD_NUC:
 ; points here:
 ;
 ; idx  Contents                              Role
-;  0   make_gt(Real, E, slot_id=2, gt_seq=0) Boot.Abstr E-GT (return channel)
-;  1   make_gt(Real, L, slot_id=6, gt_seq=0) NS C-List L-GT (for later BIND)
-;  2   (filled by boot SAVE: Thread GT)       Thread lump capability (R|W)
-;  3   make_gt(Real, E, slot_id=5, gt_seq=0) Navana system abstraction E-GT
+;  0   make_gt(Inform, E, slot_id=2, gt_seq=0) Boot.Abstr E-GT (return channel)
+;  1   make_gt(Inform, L, slot_id=6, gt_seq=0) NS C-List L-GT (for later BIND)
+;  2   (filled by boot SAVE: Thread GT)        Thread lump capability (R|W)
+;  3   make_gt(Inform, E, slot_id=5, gt_seq=0) Navana system abstraction E-GT
 ;  ...  (programmer-declared capabilities follow)
 ;
 ; CR14 after CALL:
@@ -372,7 +372,7 @@ LOAD_NUC:
 ; First instruction in the user abstraction:
 USER_ENTRY:
     ; Verify we have a valid Thread GT in C-List[2]
-    LOAD    AL, CR3, CR6[2]    ; CR3 = Thread GT (Real, R|W, Slot 1, gt_seq=0)
+    LOAD    AL, CR3, CR6[2]    ; CR3 = Thread GT (Inform, R|W, Slot 1, gt_seq=0)
     ;   Seal re-checked here: CRC-16 of (GT[24:0], 0x0100, word1_packed)
     ;   VERSION fault if the Thread slot has been revoked since boot
 
@@ -415,7 +415,7 @@ USER_ENTRY:
 <tr><td>[12]</td><td><code>SAVE AL, CR6, CR1, #2</code></td><td>Epilogue \u2014 persist Thread GT to c-list[2]</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">DEMO_CLIST and DEMO_NAMESPACE</div>
-<p>The boot ROM also defines <code>DEMO_NAMESPACE</code> (16 NS entries with stub metadata) and <code>DEMO_CLIST</code> (8 GTs). These are the C-List contents that CR6 points to when boot execution begins. The seven real GTs at indices 0\u202f\u2013\u202f6 correspond to the c-list[idx] references in the listing above. See <code>hardware/boot_rom.py</code> lines 102\u2013114.</p>
+<p>The boot ROM also defines <code>DEMO_NAMESPACE</code> (16 NS entries with stub metadata) and <code>DEMO_CLIST</code> (8 GTs). These are the C-List contents that CR6 points to when boot execution begins. The seven Inform-type GTs at indices 0\u202f\u2013\u202f6 correspond to the c-list[idx] references in the listing above. See <code>hardware/boot_rom.py</code> lines 102\u2013114.</p>
 </div>
 <div class="sr-key-concept"><div class="sr-concept-title">make_gt() and _make_ns_entry() Helper Functions</div>
 <p><code>make_gt(gt_type, perms, slot_id, gt_seq)</code> encodes the 32-bit GT word: <code>(perms &lt;&lt; 25) | (gt_type &lt;&lt; 23) | (gt_seq &lt;&lt; 16) | slot_id</code>. <code>_make_ns_entry()</code> builds the full 4-word NS table entry including the CRC-16 seal over <code>(GT[24:0], location, word1_w2)</code>. Both functions use the current field names \u2014 <code>slot_id</code>, <code>gt_seq</code>, Inform/Abstract type codes \u2014 matching the GT Word\u202f0 format shown on the overview slide.</p>
