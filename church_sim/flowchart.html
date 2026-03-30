@@ -291,7 +291,7 @@
             <div class="step"><span class="step-num">8</span><span class="step-text"><span class="bus bus-none">---</span> <span class="step-ok">PC++</span></span></div>
             <div class="sep"></div>
             <div class="step"><span class="step-text"><span class="step-detail">Bus: 0 MEM RD + 1 MEM WR (B to NS, only if +B passes) + 4 REG. Perm test is pure register.</span></span></div>
-            <div class="step"><span class="step-text"><span class="step-detail">Presets: CLEAR(0) R(1) RW(2) X(3) RX(4) RWX(5) L(6) S(7) E(8) LS(9) LE(10) SE(11) LSE(12) RSV(13–15) + B flag(bit4). No cross-domain presets (domain purity enforced).</span></span></div>
+            <div class="step"><span class="step-text"><span class="step-detail">Presets: CLEAR(0) R(1) RW(2) X(3) RX(4) RWX(5) L(6) S(7) E(8) LS(9) RSV(10–15). E isolation: E must not combine with L or S (codes 10–12 reserved). No cross-domain presets (code 13 reserved). B flag(bit4) clears GT B-bit on pass.</span></span></div>
         </div>
 
         <div class="flow-card">

@@ -37,7 +37,7 @@ This document maps each instruction across all implementation layers for verific
 - [ ] RETURN: Verify stack pop, context restore, mask handling
 - [ ] CHANGE: Verify thread switch, monitor clearing
 - [ ] SWITCH: Verify C-List context switch
-- [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Presets 0-12 verified (CLEAR through LSE). Codes 13-15 reserved — ignored/Z=0 (no FAULT). Domain purity enforced: no cross-domain (Turing+Church) preset exists. Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-flag (bit 4 of imm) clears GT B-bit on pass. Named B-variants: RB through LSEB added to assembler.
+- [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Valid presets 0-9 (CLEAR through LS). Codes 10-15 reserved/ignored (Z=0, no FAULT): codes 10-12 violate E isolation (LE/SE/LSE expose abstraction internals); code 13 violates domain purity (cross-domain); codes 14-15 unassigned. Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-flag (bit 4 of imm) clears GT B-bit on pass. Named B-variants: RB, RWB, XB, RXB, RWXB, LB, SB, EB, LSB.
 - [ ] LOADX: Verify monitor set, same validation as LOAD
 - [ ] SAVEX: Verify monitor check, conditional store, result in DR
 - [ ] LDM: Verify per-register mLoad validation, register list

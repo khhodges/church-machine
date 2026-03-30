@@ -268,9 +268,9 @@ package ctmm_pkg;
         TPERM_S      = 4'd7,    // Save capability
         TPERM_E      = 4'd8,    // Enter abstraction
         TPERM_LS     = 4'd9,    // Load + Save
-        TPERM_LE     = 4'd10,   // Load + Enter
-        TPERM_SE     = 4'd11,   // Save + Enter
-        TPERM_LSE    = 4'd12,   // Load + Save + Enter (full capability)
+        TPERM_RSV3   = 4'd10,   // Reserved — E isolation (LE invalid)
+        TPERM_RSV4   = 4'd11,   // Reserved — E isolation (SE invalid)
+        TPERM_RSV5   = 4'd12,   // Reserved — E isolation (LSE invalid)
         TPERM_RSV2   = 4'd13,   // Reserved — cross-domain (invalid)
         TPERM_RSV0   = 4'd14,   // RESERVED - causes FAULT
         TPERM_RSV1   = 4'd15    // RESERVED - causes FAULT
@@ -289,10 +289,7 @@ package ctmm_pkg;
             TPERM_S:      return PERM_MASK_S;
             TPERM_E:      return PERM_MASK_E;
             TPERM_LS:     return PERM_MASK_L | PERM_MASK_S;
-            TPERM_LE:     return PERM_MASK_L | PERM_MASK_E;
-            TPERM_SE:     return PERM_MASK_S | PERM_MASK_E;
-            TPERM_LSE:    return PERM_MASK_L | PERM_MASK_S | PERM_MASK_E;
-            default:      return 6'b000000;  // RSV — cross-domain / reserved
+            default:      return 6'b000000;  // RSV — E isolation / cross-domain / reserved
         endcase
     endfunction
 

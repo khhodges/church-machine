@@ -70,7 +70,7 @@ Within the Church domain, E (Enter — invoke an abstraction) must be **standalo
 Valid:   R, W, X, RW, RX, RWX             (Turing pure)
 Valid:   L, S, E, LS                       (Church pure — E standalone)
 Invalid: RL, WL, XE, RE, WS, RWXE, RWXL  (cross-domain — any mix of {R,W,X} with {L,S,E})
-Invalid: LE, SE, LSE                       (E isolation violation — E combined with L or S)
+Invalid: LE, SE, LSE                       (E isolation — E combined with L or S exposes abstraction internals)
 ```
 
 ### B Flag — Bind

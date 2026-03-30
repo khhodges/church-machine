@@ -1455,8 +1455,8 @@ class ChurchSimulator {
         const presetMasks = [
             [],                ['R'],           ['R','W'],       ['X'],
             ['R','X'],         ['R','W','X'],   ['L'],           ['S'],
-            ['E'],             ['L','S'],       ['L','E'],       ['S','E'],
-            ['L','S','E'],     null,  null,  null,
+            ['E'],             ['L','S'],       null,            null,
+            null,              null,  null,  null,
         ];
 
         if (presetMasks[presetCode] === null) {

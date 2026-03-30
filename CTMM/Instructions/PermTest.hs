@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import CTMM.Core.Types
 
 -- | Parse a permission mask string into a list of Permission values
--- Mask is a string like "RW", "LSE", "LSEB" — no cross-domain (RWXLSE) preset exists
+-- Mask is a string like "RW", "LS", "EB" — E isolation enforced: LE/SE/LSE are invalid presets
 parseMask :: String -> [Permission]
 parseMask = concatMap charToPerm
   where

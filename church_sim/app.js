@@ -1467,47 +1467,38 @@ HALT
 `,
         'tperm_attack': `; ============================================
 ; ADVERSARIAL TEST: TPERM Escalation
-; TPERM can only REMOVE permissions (AND gate).
-; Attempting to ADD permissions must fail.
-; ============================================
-;
-; Hardware guarantee: result = preset & existing
-; Even if FSM is bypassed, AND gate prevents
-; escalation. Two layers of defense.
+; TPERM is a READ-ONLY permission CHECK — Z=1 if ALL listed bits
+; are present, Z=0 otherwise. It never modifies the GT.
+; Domain purity (Turing vs Church) and E isolation (E alone in
+; Church domain) are enforced: no cross-domain or E+L/E+S presets exist.
 ; ============================================
 
 ; --- Setup: Load GTs with known permissions ---
-LOAD CR0, CR6, 7       ; CR0 = Constants (E only)
-LOAD CR1, CR6, 22      ; CR1 = TRUE (L only)
-LOAD CR2, CR6, 10      ; CR2 = SUCC (XLE)
+LOAD CR0, CR6, 7       ; CR0 = Constants (E only — Church, enter-only)
+LOAD CR1, CR6, 22      ; CR1 = TRUE (L only — Church, list-load only)
+LOAD CR2, CR6, 10      ; CR2 = SUCC (X only — Turing, code-execute only)
 
-; --- ATTACK 1: Verify Constants cannot have X added ---
-; Constants has E only. Check if it has X (it does not — different domain).
-; TPERM checks if ALL listed bits are present. Cross-domain presets don't exist.
-TPERM CR0, E           ; Z=1 — E is present (passes)
-TPERM CR0, X           ; Z=0 — X is not present (fails — different domain)
-; Caller cannot elevate a Church GT to Turing domain; TPERM is read-only.
+; --- ATTACK 1: Verify Constants cannot be tested as Turing ---
+; Constants has E only. Check if it has X (it does not — Turing domain).
+TPERM CR0, E           ; Z=1 — E is present (expected, passes)
+TPERM CR0, X           ; Z=0 — X is not present (cross-domain, fails)
+; TPERM is read-only — checking for X does NOT grant X.
 
-; --- ATTACK 2: Try to add E to TRUE ---
-; TRUE has L only. Request LE.
-; Result should be L only.
-TPERM CR1, LE          ; Result: L (only bit in common)
+; --- ATTACK 2: Verify TRUE cannot be entered ---
+; TRUE has L only. E permission is not present.
+TPERM CR1, L           ; Z=1 — L is present (expected, passes)
+TPERM CR1, E           ; Z=0 — E not present (attack fails — cannot call TRUE as abstraction)
 
-; --- ATTACK 3: Strip everything from SUCC ---
-; SUCC has XLE. Request nothing (0).
-; Result should be 0 — all permissions gone.
-TPERM CR2, 0           ; Result: 0 (Z=0, no perms left)
+; --- ATTACK 3: Verify SUCC cannot be treated as a c-list ---
+; SUCC has X only. L and S are not present.
+TPERM CR2, X           ; Z=1 — X is present (expected, can be applied via LAMBDA)
+TPERM CR2, L           ; Z=0 — L not present (attack fails — cannot read SUCC's internals)
+TPERM CR2, LS          ; Z=0 — neither L nor S (attack fails)
 
-; --- ATTACK 4: Now try to restore SUCC perms ---
-; CR2 has 0 permissions. Request XLE back.
-; AND with 0 = 0. Cannot restore.
-TPERM CR2, XLE         ; Result: 0 (still empty, Z=0)
-
-; --- Verify: CR2 is now useless ---
-; LAMBDA needs X, but CR2 has 0.
-LAMBDA CR2             ; FAULT: lacks X permission
-
-; --- If we get here, monotonicity held ---
+; --- ATTACK 4: Verify no preset can grant missing permissions ---
+; TPERM only checks — it never elevates. Z=0 means the GT does not qualify.
+; Code that gates on Z=1 will simply not execute.
+TPERM CR0, X           ; Z=0 — Constants lacks X; LAMBDA would fault if attempted
 HALT
 `,
         'version_attack': `; ============================================

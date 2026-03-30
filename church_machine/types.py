@@ -112,9 +112,9 @@ class TpermPreset(IntEnum):
     S     = 7
     E     = 8
     LS    = 9
-    LE    = 10
-    SE    = 11
-    LSE   = 12
+    RSV3   = 10
+    RSV4   = 11
+    RSV5   = 12
     RSV2   = 13
     RSV0   = 14
     RSV1   = 15
@@ -131,9 +131,9 @@ TPERM_MASKS = {
     TpermPreset.S:     PERM_MASK_S,
     TpermPreset.E:     PERM_MASK_E,
     TpermPreset.LS:    PERM_MASK_L | PERM_MASK_S,
-    TpermPreset.LE:    PERM_MASK_L | PERM_MASK_E,
-    TpermPreset.SE:    PERM_MASK_S | PERM_MASK_E,
-    TpermPreset.LSE:   PERM_MASK_L | PERM_MASK_S | PERM_MASK_E,
+    TpermPreset.RSV3:  0x00,
+    TpermPreset.RSV4:  0x00,
+    TpermPreset.RSV5:  0x00,
     TpermPreset.RSV2:  0x00,
     TpermPreset.RSV0:  0x00,
     TpermPreset.RSV1:  0x00,

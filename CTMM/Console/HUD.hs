@@ -119,7 +119,7 @@ showHelp = do
     putStrLn "  ------------------------------------------------"
     putStrLn "    TPERM <cr> <mask>             Test if CR has all permissions in mask"
     putStrLn "    TPERM <cr> <mask> BOUNDS <n>  Also verify offset n <= capability size"
-    putStrLn "      Mask: R W X L S E B (e.g. RW, LSE, LSEB) — no cross-domain presets"
+    putStrLn "      Mask: R W X L S E B (e.g. RW, LS, EB, LSB) — E isolation: E cannot combine with L or S"
     putStrLn "      Z=1 if pass, Z=0 if fail; C=perms OK, V=bounds OK, N=no perms"
     putStrLn ""
     putStrLn "  BRANCH"
