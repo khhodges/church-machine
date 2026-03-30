@@ -1,0 +1,26 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "RWNkgPlwMT98N6ULE5B-i"
+uri = "file://docs/io-device-led.md"
+type = "text"
+title = "IO Device — LED (Slot 7)"
+
+[[outputs]]
+id = "ODlhIVOCjGXvIEPjzDBfU"
+uri = "file://docs/io-device-uart.md"
+type = "text"
+title = "IO Device — UART (Slot 8)"
+
+[[outputs]]
+id = "31zsfS7nWKaFAPnAcZZbz"
+uri = "file://docs/io-device-btn.md"
+type = "text"
+title = "IO Device — Push Button (Slot 9)"
+
+[[outputs]]
+id = "Elz3bH1dq5iPUYkCqVrd1"
+uri = "file://docs/io-device-timer.md"
+type = "text"
+title = "IO Device — Timer (Slot 10)"
