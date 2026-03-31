@@ -85,9 +85,9 @@ class ChurchTangNano20K(Elaboratable):
         #   0x40000014  [ 5] UART_TX    — 8-bit write-only
         #   0x40000018  [ 6] UART_STATUS— 32-bit read-only {30'b0, rx_valid, tx_ready}
         #   0x4000001C  [ 7] UART_RX    — 8-bit read-only
-        #   0x40000020  [ 8] BTN        — 1-bit read-only
+        #   0x40000020  [ 8] (reserved)
         #   0x40000024  [ 9] (reserved)
-        #   0x40000028  [10] (reserved)
+        #   0x40000028  [10] BTN        — 1-bit read-only
         #   0x4000002C  [11] TIMER.TICKS_LO  — 32-bit free-running tick, low word
         #   0x40000030  [12] TIMER.TICKS_HI  — 32-bit free-running tick, high word
         #   0x40000034  [13] TIMER.TOD_EPOCH — Unix seconds (R/W, set by boot/IDE)
@@ -156,7 +156,7 @@ class ChurchTangNano20K(Elaboratable):
                 m.d.comb += mmio_rd_data.eq(Cat(~debug.busy, C(0, 31)))
             with m.Case(7):
                 m.d.comb += mmio_rd_data.eq(0)
-            with m.Case(8):
+            with m.Case(10):
                 m.d.comb += mmio_rd_data.eq(Cat(self.push_button, C(0, 31)))
             with m.Case(11):
                 m.d.comb += mmio_rd_data.eq(timer_lo)

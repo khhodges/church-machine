@@ -109,9 +109,9 @@ class ChurchTi60F225(Elaboratable):
         #   0x40000014  [ 5] UART_TX    — 8-bit write-only  (115200 baud)
         #   0x40000018  [ 6] UART_STATUS— 32-bit read-only  {30'b0, rx_valid, tx_ready}
         #   0x4000001C  [ 7] UART_RX    — 8-bit read-only
-        #   0x40000020  [ 8] BTN        — 1-bit read-only   (push button)
+        #   0x40000020  [ 8] (reserved)
         #   0x40000024  [ 9] (reserved)
-        #   0x40000028  [10] (reserved)
+        #   0x40000028  [10] BTN        — 1-bit read-only   (push button)
         #   0x4000002C  [11] TIMER.TICKS_LO  — 32-bit free-running tick, low word
         #   0x40000030  [12] TIMER.TICKS_HI  — 32-bit free-running tick, high word
         #   0x40000034  [13] TIMER.TOD_EPOCH — Unix seconds (R/W, set by boot/IDE)
@@ -179,7 +179,7 @@ class ChurchTi60F225(Elaboratable):
                 m.d.comb += mmio_rd_data.eq(Cat(~debug.busy, C(0, 31)))
             with m.Case(7):
                 m.d.comb += mmio_rd_data.eq(0)
-            with m.Case(8):
+            with m.Case(10):
                 m.d.comb += mmio_rd_data.eq(Cat(self.push_button, C(0, 31)))
             with m.Case(11):
                 m.d.comb += mmio_rd_data.eq(timer_lo)
@@ -243,7 +243,7 @@ class ChurchTi60F225(Elaboratable):
         m.d.comb += self.uart_tx.eq(debug.tx)
 
         # MMIO UART TX arbitration —————————————————————————————————————————
-        # mmio_uart_tx_wr fires for one cycle on DWRITE to 0x40000004.
+        # mmio_uart_tx_wr fires for one cycle on DWRITE to 0x40000014.
         # We latch the byte and send it when the debug module is free and the
         # debug FSM is not itself sending a byte (fsm_send_byte tracks that).
         mmio_uart_pending  = Signal()
