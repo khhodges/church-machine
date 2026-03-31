@@ -39,8 +39,9 @@ can falsify button state.
 | `gt_seq` | 22:16 | 0 | Boot-provisioned, sequence 0 |
 | `slot_id` | 15:0 | `0x0009` | Boot NS index 9 |
 
-**Word 1** (`word1_location`) = `0x40000010` — the MMIO base address.  
-**Words 2–3** = `0x00000000` — no tunnel backup (local peripheral GT).
+**Word 1** (`word1_location`) = `0x40000010` — MMIO base address (NS entry `word0_location`).  
+**Word 2** (`word1_w2`) = `0x00000000` — `limit_offset=0`, `gt_seq=0` (1-word device; offset 0 only).  
+**Word 3** (`word2_w3`) = `0x000001C3` — CRC-16/CCITT seal over `GT[24:0]` + location + word2.
 
 ---
 
