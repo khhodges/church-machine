@@ -49,7 +49,7 @@ class ChurchSimulator {
         this.bootStep = 0;
         this.lastCapability = null;
 
-        this.simLED        = 0;
+        this.simLED        = [0, 0, 0, 0, 0]; // 5 RGB LED registers; each bits[2:0]={B,G,R}
         this.simTimerLo    = 0;
         this.simTimerHi    = 0;
         this.simTodEpoch   = 0;
@@ -215,10 +215,10 @@ class ChurchSimulator {
         const mmioBase = abstractions.length;
         const GT_TYPE_INFORM = 1;
         const mmioSlotDefs = [
-            { type: 'led',   label: 'LED_DEV',   perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 0, addr: 0x40000000 },
-            { type: 'uart',  label: 'UART_DEV',  perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 2, addr: 0x40000004 },
-            { type: 'btn',   label: 'BTN_DEV',   perms: {R:1,W:0,X:0,L:0,S:0,E:0}, lim17: 0, addr: 0x40000010 },
-            { type: 'timer', label: 'TIMER_DEV', perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 4, addr: 0x40000014 },
+            { type: 'led',   label: 'LED_DEV',   perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 4, addr: 0x40000000 },
+            { type: 'uart',  label: 'UART_DEV',  perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 2, addr: 0x40000014 },
+            { type: 'btn',   label: 'BTN_DEV',   perms: {R:1,W:0,X:0,L:0,S:0,E:0}, lim17: 0, addr: 0x40000028 },
+            { type: 'timer', label: 'TIMER_DEV', perms: {R:1,W:1,X:0,L:0,S:0,E:0}, lim17: 4, addr: 0x4000002C },
         ];
         for (let i = 0; i < mmioSlotDefs.length; i++) {
             const slotIdx = mmioBase + i;
@@ -1305,7 +1305,10 @@ class ChurchSimulator {
 
     _readMMIO(devType, offset) {
         switch (devType) {
-            case 'led': return this.simLED >>> 0;
+            case 'led':
+                // offset 0–4 = LED 0–4; each word bits[2:0]={B,G,R}
+                if (offset >= 0 && offset <= 4) return (this.simLED[offset] & 0x7) >>> 0;
+                return 0;
             case 'uart':
                 if (offset === 0) return 0;
                 if (offset === 1) return 1;
@@ -1337,8 +1340,11 @@ class ChurchSimulator {
     _writeMMIO(devType, offset, value) {
         switch (devType) {
             case 'led':
-                this.simLED = value >>> 0;
-                this.emit('ledChange', { value: this.simLED });
+                // offset 0–4 = LED 0–4; each word bits[2:0]={B,G,R}
+                if (offset >= 0 && offset <= 4) {
+                    this.simLED[offset] = value & 0x7;
+                    this.emit('ledChange', { index: offset, value: this.simLED[offset], leds: this.simLED.slice() });
+                }
                 break;
             case 'uart':
                 if (offset === 0) {

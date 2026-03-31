@@ -6,7 +6,7 @@
 |:---------|:------|
 | Device name | `UART` |
 | Boot NS slot | **8** |
-| MMIO base address | `0x40000004` |
+| MMIO base address | `0x40000014` |
 | Allocation size | 3 words (96 bits) |
 | `limit_offset` | 2 (valid offsets: `{0, 1, 2}`) |
 | GT type | `GT_TYPE_INFORM` (`0b01`) |
@@ -40,9 +40,9 @@ for TX vs RX.
 | `gt_seq` | 22:16 | 0 | Boot-provisioned, sequence 0 |
 | `slot_id` | 15:0 | `0x0008` | Boot NS index 8 |
 
-**Word 1** (`word1_location`) = `0x40000004` — MMIO base address (NS entry `word0_location`).  
+**Word 1** (`word1_location`) = `0x40000014` — MMIO base address (NS entry `word0_location`).  
 **Word 2** (`word1_w2`) = `0x00000002` — `limit_offset=2`, `gt_seq=0` (3-word device; offsets 0–2).  
-**Word 3** (`word2_w3`) = `0x000047FE` — CRC-16/CCITT seal over `GT[24:0]` + location + word2.
+**Word 3** (`word2_w3`) = `0x000043A4` — CRC-16/CCITT seal over `GT[24:0]` + location + word2.
 
 ---
 
@@ -51,7 +51,7 @@ for TX vs RX.
 | Field | Value |
 |:------|:------|
 | Slot index | 8 |
-| MMIO base (`word1_location`) | `0x40000004` |
+| MMIO base (`word1_location`) | `0x40000014` |
 | `limit17` | 2 (→ `limit_offset = 2`) |
 | `b_flag` | 1 |
 | `f_flag` | 0 |

@@ -100,23 +100,30 @@ class ChurchTi60F225(Elaboratable):
 
         # ── MMIO decode ─────────────────────────────────────────────────────
         # MMIO range: address[31:30] == 0b01  →  bit-30 decode (ARM convention)
-        # Registers (word-addressed via bits[4:2]):
-        #   0x40000000  [0]  LED        — 4-bit write/read (active-HIGH)
-        #   0x40000004  [1]  UART_TX    — 8-bit write-only  (115200 baud)
-        #   0x40000008  [2]  UART_STATUS— 32-bit read-only  {30'b0, rx_valid, tx_ready}
-        #   0x4000000C  [3]  UART_RX    — 8-bit read-only
-        #   0x40000010  [4]  BTN        — 1-bit read-only   (push button)
-        #   0x40000014  [5]  TIMER.TICKS_LO  — 32-bit free-running tick, low word
-        #   0x40000018  [6]  TIMER.TICKS_HI  — 32-bit free-running tick, high word
-        #   0x4000001C  [7]  TIMER.TOD_EPOCH — Unix seconds (R/W, set by boot/IDE)
-        #   0x40000020  [8]  TIMER.ALARM_CMP — alarm compare vs TICKS_LO (R/W)
-        #   0x40000024  [9]  TIMER.ALARM_CTL — [0]=armed [1]=fired; write 1→[1] to clear (R/W)
+        # Registers (word-addressed via bits[5:2], i.e. reg_sel = addr[2:7]):
+        #   0x40000000  [ 0] LED[0]     — bits[2:0]={B,G,R}; R drives led0 (active-HIGH)
+        #   0x40000004  [ 1] LED[1]     — bits[2:0]={B,G,R}; R drives led1
+        #   0x40000008  [ 2] LED[2]     — bits[2:0]={B,G,R}; R drives led2
+        #   0x4000000C  [ 3] LED[3]     — bits[2:0]={B,G,R}; R drives led3
+        #   0x40000010  [ 4] LED[4]     — bits[2:0]={B,G,R}; no physical pin on Ti60
+        #   0x40000014  [ 5] UART_TX    — 8-bit write-only  (115200 baud)
+        #   0x40000018  [ 6] UART_STATUS— 32-bit read-only  {30'b0, rx_valid, tx_ready}
+        #   0x4000001C  [ 7] UART_RX    — 8-bit read-only
+        #   0x40000020  [ 8] BTN        — 1-bit read-only   (push button)
+        #   0x40000024  [ 9] (reserved)
+        #   0x40000028  [10] (reserved)
+        #   0x4000002C  [11] TIMER.TICKS_LO  — 32-bit free-running tick, low word
+        #   0x40000030  [12] TIMER.TICKS_HI  — 32-bit free-running tick, high word
+        #   0x40000034  [13] TIMER.TOD_EPOCH — Unix seconds (R/W, set by boot/IDE)
+        #   0x40000038  [14] TIMER.ALARM_CMP — alarm compare vs TICKS_LO (R/W)
+        #   0x4000003C  [15] TIMER.ALARM_CTL — [0]=armed [1]=fired; write 1→[1] to clear (R/W)
         is_mmio = Signal()
         m.d.comb += is_mmio.eq(core.dmem_addr[30] & ~core.dmem_addr[31])
         mmio_reg_sel = Signal(4)
         m.d.comb += mmio_reg_sel.eq(core.dmem_addr[2:6])
 
-        mmio_led_reg      = Signal(4)
+        # 5 RGB LED registers — bits[2:0]={B,G,R}; only R (bit 0) drives physical pin
+        mmio_led_reg = [Signal(3, name=f"mmio_led{i}") for i in range(5)]
         mmio_uart_tx_wr   = Signal()
         mmio_uart_tx_data = Signal(8)
 
@@ -140,18 +147,19 @@ class ChurchTi60F225(Elaboratable):
 
         with m.If(is_mmio_write):
             with m.Switch(mmio_reg_sel):
-                with m.Case(0):
-                    m.d.sync += mmio_led_reg.eq(core.dmem_wr_data[:4])
-                with m.Case(1):
+                for i in range(5):
+                    with m.Case(i):
+                        m.d.sync += mmio_led_reg[i].eq(core.dmem_wr_data[:3])
+                with m.Case(5):
                     m.d.comb += [
                         mmio_uart_tx_wr.eq(1),
                         mmio_uart_tx_data.eq(core.dmem_wr_data[:8]),
                     ]
-                with m.Case(7):
+                with m.Case(13):
                     m.d.sync += tod_epoch.eq(core.dmem_wr_data)
-                with m.Case(8):
+                with m.Case(14):
                     m.d.sync += alarm_cmp.eq(core.dmem_wr_data)
-                with m.Case(9):
+                with m.Case(15):
                     with m.If(core.dmem_wr_data[0]):
                         m.d.sync += alarm_armed.eq(1)
                     with m.If(core.dmem_wr_data[1]):
@@ -162,25 +170,26 @@ class ChurchTi60F225(Elaboratable):
 
         mmio_rd_data = Signal(32)
         with m.Switch(mmio_reg_sel):
-            with m.Case(0):
-                m.d.comb += mmio_rd_data.eq(mmio_led_reg)
-            with m.Case(1):
-                m.d.comb += mmio_rd_data.eq(0)
-            with m.Case(2):
-                m.d.comb += mmio_rd_data.eq(Cat(~debug.busy, C(0, 31)))
-            with m.Case(3):
-                m.d.comb += mmio_rd_data.eq(0)
-            with m.Case(4):
-                m.d.comb += mmio_rd_data.eq(Cat(self.push_button, C(0, 31)))
+            for i in range(5):
+                with m.Case(i):
+                    m.d.comb += mmio_rd_data.eq(mmio_led_reg[i])
             with m.Case(5):
-                m.d.comb += mmio_rd_data.eq(timer_lo)
+                m.d.comb += mmio_rd_data.eq(0)
             with m.Case(6):
-                m.d.comb += mmio_rd_data.eq(timer_hi)
+                m.d.comb += mmio_rd_data.eq(Cat(~debug.busy, C(0, 31)))
             with m.Case(7):
-                m.d.comb += mmio_rd_data.eq(tod_epoch)
+                m.d.comb += mmio_rd_data.eq(0)
             with m.Case(8):
+                m.d.comb += mmio_rd_data.eq(Cat(self.push_button, C(0, 31)))
+            with m.Case(11):
+                m.d.comb += mmio_rd_data.eq(timer_lo)
+            with m.Case(12):
+                m.d.comb += mmio_rd_data.eq(timer_hi)
+            with m.Case(13):
+                m.d.comb += mmio_rd_data.eq(tod_epoch)
+            with m.Case(14):
                 m.d.comb += mmio_rd_data.eq(alarm_cmp)
-            with m.Case(9):
+            with m.Case(15):
                 m.d.comb += mmio_rd_data.eq(Cat(alarm_armed, alarm_fired, C(0, 30)))
             with m.Default():
                 m.d.comb += mmio_rd_data.eq(0)
@@ -272,13 +281,15 @@ class ChurchTi60F225(Elaboratable):
         led_halted_blink = core.boot_complete & halted & ~core.fault_valid & heartbeat_blink
         led_fault = core.fault_valid
 
-        # Post-boot: software controls LEDs via DWRITE to 0x40000000 (mmio_led_reg).
         # Pre-boot:  show hardware status (boot, run, fault, heartbeat).
+        # Post-boot: software controls LEDs via DWRITE to LED[0..3] MMIO registers.
+        # Each LED word is bits[2:0]={B,G,R}; only bit 0 (R) drives the physical pin.
+        # Ti60 has 4 physical LEDs (led0–led3); LED[4] register exists but has no pin.
         m.d.comb += [
-            self.led[0].eq(Mux(core.boot_complete, mmio_led_reg[0], led_boot)),
-            self.led[1].eq(Mux(core.boot_complete, mmio_led_reg[1], led_run | led_halted_blink)),
-            self.led[2].eq(Mux(core.boot_complete, mmio_led_reg[2], led_fault)),
-            self.led[3].eq(Mux(core.boot_complete, mmio_led_reg[3], core.boot_complete)),
+            self.led[0].eq(Mux(core.boot_complete, mmio_led_reg[0][0], led_boot)),
+            self.led[1].eq(Mux(core.boot_complete, mmio_led_reg[1][0], led_run | led_halted_blink)),
+            self.led[2].eq(Mux(core.boot_complete, mmio_led_reg[2][0], led_fault)),
+            self.led[3].eq(Mux(core.boot_complete, mmio_led_reg[3][0], core.boot_complete)),
         ]
 
         boot_delay = Signal(4, init=0)

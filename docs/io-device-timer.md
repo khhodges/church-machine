@@ -6,7 +6,7 @@
 |:---------|:------|
 | Device name | `TIMER` |
 | Boot NS slot | **10** |
-| MMIO base address | `0x40000014` |
+| MMIO base address | `0x4000002C` |
 | Allocation size | 5 words (160 bits) |
 | `limit_offset` | 4 (valid offsets: `{0, 1, 2, 3, 4}`) |
 | GT type | `GT_TYPE_INFORM` (`0b01`) |
@@ -39,9 +39,9 @@ and alarm registers are read-write.
 | `gt_seq` | 22:16 | 0 | Boot-provisioned, sequence 0 |
 | `slot_id` | 15:0 | `0x000A` | Boot NS index 10 |
 
-**Word 1** (`word1_location`) = `0x40000014` — MMIO base address (NS entry `word0_location`).  
+**Word 1** (`word1_location`) = `0x4000002C` — MMIO base address (NS entry `word0_location`).  
 **Word 2** (`word1_w2`) = `0x00000004` — `limit_offset=4`, `gt_seq=0` (5-word device; offsets 0–4).  
-**Word 3** (`word2_w3`) = `0x0000E505` — CRC-16/CCITT seal over `GT[24:0]` + location + word2.
+**Word 3** (`word2_w3`) = `0x0000EBC6` — CRC-16/CCITT seal over `GT[24:0]` + location + word2.
 
 ---
 
@@ -50,7 +50,7 @@ and alarm registers are read-write.
 | Field | Value |
 |:------|:------|
 | Slot index | 10 |
-| MMIO base (`word1_location`) | `0x40000014` |
+| MMIO base (`word1_location`) | `0x4000002C` |
 | `limit17` | 4 (→ `limit_offset = 4`) |
 | `b_flag` | 1 |
 | `f_flag` | 0 |

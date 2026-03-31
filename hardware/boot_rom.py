@@ -173,27 +173,38 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 1:  Thread Abstraction lump
 #   Slot 2:  Boot.Abstr lump
 #   Slots 3–6: Programmer abstractions (boot-loaded)
-#   Slot 7:  LED_DEV    — 0x40000000, RW, limit=0 (1 word)
-#   Slot 8:  UART_DEV   — 0x40000004, RW, limit=2 (3 words: TX, STATUS, RX)
-#   Slot 9:  BTN_DEV    — 0x40000010, R,  limit=0 (1 word)
-#   Slot 10: TIMER_DEV  — 0x40000014, RW, limit=4 (5 words):
+#   Slot 7:  LED_DEV    — 0x40000000, RW, limit=4 (5 words, one per RGB LED)
+#             offset 0 = LED 0  bits[2:0]={B,G,R}  (only R drives physical pin)
+#             offset 1 = LED 1  bits[2:0]={B,G,R}
+#             offset 2 = LED 2  bits[2:0]={B,G,R}
+#             offset 3 = LED 3  bits[2:0]={B,G,R}
+#             offset 4 = LED 4  bits[2:0]={B,G,R}
+#   Slot 8:  UART_DEV   — 0x40000014, RW, limit=2 (3 words: TX, STATUS, RX)
+#   Slot 9:  BTN_DEV    — 0x40000028, R,  limit=0 (1 word)
+#   Slot 10: TIMER_DEV  — 0x4000002C, RW, limit=4 (5 words):
 #             offset 0 = TICKS_LO (R), offset 1 = TICKS_HI (R),
 #             offset 2 = TOD_EPOCH (R/W), offset 3 = ALARM_CMP (R/W),
 #             offset 4 = ALARM_CTL (R/W: [0]=armed, [1]=fired)
 #   Slots 11–15: reserved for future device GTs
+#
+# Physical LED mapping (R bit = bit 0 of each word):
+#   Ti60 F225 (4 LEDs active-HIGH):
+#     offset 0→led0, 1→led1, 2→led2, 3→led3; offset 4 = register-only (no pin)
+#   Tang Nano 20K (6 LEDs active-LOW, led3 pin absent):
+#     offset 0→led0, 1→led1, 2→led2, 3→led4, 4→led5; led3 pin not connected
 # ---------------------------------------------------------------------------
 MMIO_LED_SLOT   = 7
 MMIO_UART_SLOT  = 8
 MMIO_BTN_SLOT   = 9
 MMIO_TIMER_SLOT = 10
 
-MMIO_LED_ADDR   = 0x40000000
-MMIO_UART_ADDR  = 0x40000004   # TX=+0, STATUS=+4, RX=+8 bytes → offsets 0,1,2 words
-MMIO_BTN_ADDR   = 0x40000010
-MMIO_TIMER_ADDR = 0x40000014
+MMIO_LED_ADDR   = 0x40000000   # offsets 0–4: LED0–LED4, bits[2:0]={B,G,R}
+MMIO_UART_ADDR  = 0x40000014   # TX=+0, STATUS=+4, RX=+8 bytes → offsets 0,1,2 words
+MMIO_BTN_ADDR   = 0x40000028
+MMIO_TIMER_ADDR = 0x4000002C
 
 _MMIO_ENTRIES = {
-    MMIO_LED_SLOT:   (MMIO_LED_ADDR,   1,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
+    MMIO_LED_SLOT:   (MMIO_LED_ADDR,   5,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
     MMIO_UART_SLOT:  (MMIO_UART_ADDR,  3,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
     MMIO_BTN_SLOT:   (MMIO_BTN_ADDR,   1,  GT_TYPE_INFORM, PERM_MASK_R),
     MMIO_TIMER_SLOT: (MMIO_TIMER_ADDR, 5,  GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W),
