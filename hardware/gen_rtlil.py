@@ -9,7 +9,14 @@ from .ti60_f225 import ChurchTi60F225
 
 def _rtlil_to_verilog(il_path, v_path):
     """Convert Amaranth RTLIL to Verilog via Yosys for use in Efinity IDE."""
-    script = f"read_rtlil {il_path}; proc; write_verilog -noattr {v_path}"
+    script = (
+        f"read_rtlil {il_path}; "
+        f"hierarchy -top top; "
+        f"proc; "
+        f"flatten; "
+        f"clean; "
+        f"write_verilog -noattr {v_path}"
+    )
     try:
         result = subprocess.run(
             ["yosys", "-p", script],
