@@ -4,7 +4,7 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 from .core import ChurchCore
-from .boot_rom import BootRom, BOOT_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST
+from .boot_rom import BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST
 from .uart_tx import DebugPrinter
 from .uart_rx import UartRx
 
@@ -53,7 +53,7 @@ class ChurchTi60F225(Elaboratable):
         core = ChurchCore()
         m.submodules.core = core
 
-        boot_rom = BootRom(BOOT_PROGRAM)
+        boot_rom = BootRom(FULL_ROM)
         m.submodules.boot_rom = boot_rom
 
         debug = DebugPrinter(self.clk_freq, self.baud)
@@ -248,6 +248,24 @@ class ChurchTi60F225(Elaboratable):
         btn_press = Signal()
         m.d.comb += btn_press.eq(btn_prev & ~btn_sync[2])
 
+        # Button hold for ~1 second triggers free-run mode
+        BTN_HOLD_TARGET = self.clk_freq  # 50 000 000 cycles = 1 s
+        btn_hold_ctr  = Signal(range(BTN_HOLD_TARGET + 1))
+        btn_hold_done = Signal()
+        with m.If(~btn_sync[2]):  # active-low: low = pressed
+            with m.If(btn_hold_ctr < BTN_HOLD_TARGET):
+                m.d.sync += btn_hold_ctr.eq(btn_hold_ctr + 1)
+            with m.Else():
+                m.d.sync += btn_hold_done.eq(1)
+        with m.Else():
+            m.d.sync += [btn_hold_ctr.eq(0), btn_hold_done.eq(0)]
+
+        # Default free_run control signals to 0; driven by ENTER_FREE_RUN state
+        m.d.comb += [
+            core.free_run_start.eq(0),
+            core.free_run_nia.eq(0),
+        ]
+
         m.d.comb += self.uart_tx.eq(debug.tx)
 
         # MMIO UART TX arbitration —————————————————————————————————————————
@@ -301,9 +319,10 @@ class ChurchTi60F225(Elaboratable):
         demo_phase = Signal(3)                       # 0-4 (4 = all-off gap)
         demo_led   = [Signal(name=f"demo_led{i}") for i in range(4)]
 
-        # demo_led[i] is high only during the matching phase, after boot_complete
+        # demo_led[i] is high only during the matching phase, after boot_complete AND
+        # while halted (gated off during free-run so the CPU drives the LEDs itself).
         for i in range(4):
-            m.d.comb += demo_led[i].eq(core.boot_complete & (demo_phase == i))
+            m.d.comb += demo_led[i].eq(core.boot_complete & halted & (demo_phase == i))
 
         with m.If(core.boot_complete):
             with m.If(demo_ctr == demo_half_sec - 1):
@@ -420,9 +439,28 @@ class ChurchTi60F225(Elaboratable):
                         m.next = "HALTED"
 
             with m.State("HALTED"):
-                with m.If(btn_press):
+                with m.If(btn_hold_done):
+                    # Long press (~1 s): enter free-run (CPU takes over the LEDs)
+                    m.next = "ENTER_FREE_RUN"
+                with m.Elif(btn_press):
+                    # Short press: single-step
                     m.d.sync += stepping.eq(1)
                     m.next = "STEP_WAIT"
+
+            with m.State("ENTER_FREE_RUN"):
+                # Fire free_run_start for exactly one cycle to jump nia to NUC entry.
+                # NUC start = boot_rom word 256 = byte address 0x400.
+                m.d.comb += [
+                    core.free_run_start.eq(1),
+                    core.free_run_nia.eq(0x400),
+                ]
+                m.d.sync += halted.eq(0)
+                m.next = "FREE_RUN"
+
+            with m.State("FREE_RUN"):
+                # CPU runs freely, controlling the LEDs via DWRITE.
+                # Keep halted=0 every cycle (avoids any accidental re-halt).
+                m.d.sync += halted.eq(0)
 
             with m.State("STEP_WAIT"):
                 with m.If(step_complete):

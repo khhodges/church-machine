@@ -70,6 +70,8 @@ class ChurchCore(Elaboratable):
         self.fault = Signal(5)   # widened: FaultType.STACK_OVERFLOW=0x10 needs 5 bits
         self.fault_valid = Signal()
 
+        self.free_run_start = Signal()   # pulse high for 1 cycle to jump to free_run_nia
+        self.free_run_nia   = Signal(32) # target byte address when free_run_start fires
 
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
@@ -151,9 +153,12 @@ class ChurchCore(Elaboratable):
             u_decoder.flags.eq(u_regs.flags),
         ]
 
-        is_church_op = u_decoder.is_church_op
-        is_dread_op  = u_decoder.is_dread_op
-        is_dwrite_op = u_decoder.is_dwrite_op
+        is_church_op  = u_decoder.is_church_op
+        is_dread_op   = u_decoder.is_dread_op
+        is_dwrite_op  = u_decoder.is_dwrite_op
+        is_iadd_op    = u_decoder.is_iadd_op
+        is_isub_op    = u_decoder.is_isub_op
+        is_branch_op  = u_decoder.is_branch_op
         church_op = u_decoder.church_op
         cr_src = u_decoder.cr_src
         cr_dst = u_decoder.cr_dst
@@ -164,6 +169,12 @@ class ChurchCore(Elaboratable):
         cond_exec_enable = Signal()
         m.d.comb += cond_exec_enable.eq(self.boot_complete & exec_enable)
 
+        # 1-cycle busy registers for single-cycle Turing ops (prevent double-execution
+        # due to the 1-cycle ROM fetch pipeline latency)
+        iadd_busy_reg   = Signal()
+        isub_busy_reg   = Signal()
+        branch_busy_reg = Signal()
+
         any_unit_busy = Signal()
         busy_expr = (
             u_lambda.lambda_busy | u_tperm.tperm_busy | u_call.call_busy |
@@ -171,7 +182,8 @@ class ChurchCore(Elaboratable):
             u_gc.gc_busy |
             u_change.change_busy | u_switch.switch_busy |
             u_eloadcall.busy | u_xloadlambda.busy |
-            u_dread.busy | u_dwrite.busy
+            u_dread.busy | u_dwrite.busy |
+            iadd_busy_reg | isub_busy_reg | branch_busy_reg
         )
         m.d.comb += any_unit_busy.eq(busy_expr)
 
@@ -266,11 +278,37 @@ class ChurchCore(Elaboratable):
             u_regs.clear_all.eq(clear_all),
         ]
 
+        # Forward-declare Turing-op signals (logic connected after dwrite section)
+        iadd_start_sig  = Signal()
+        isub_start_sig  = Signal()
+        iadd_result     = Signal(33)
+        isub_result     = Signal(33)
+        iadd_flags_sig  = Signal(COND_FLAGS_LAYOUT)
+        isub_flags_sig  = Signal(COND_FLAGS_LAYOUT)
+        branch_taken    = Signal()
+        branch_sx32     = Signal(32)
+
         with m.If(u_dread.dr_wr_en):
             m.d.comb += [
                 u_regs.dr_wr_addr.eq(u_dread.dr_wr_addr),
                 u_regs.dr_wr_data.eq(u_dread.dr_wr_data),
                 u_regs.dr_wr_en.eq(1),
+            ]
+        with m.Elif(iadd_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(iadd_result[:32]),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(iadd_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(isub_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(isub_result[:32]),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(isub_flags_sig),
+                u_regs.flags_wr_en.eq(1),
             ]
         with m.Else():
             m.d.comb += [
@@ -278,6 +316,13 @@ class ChurchCore(Elaboratable):
                 u_regs.dr_wr_data.eq(0),
                 u_regs.dr_wr_en.eq(0),
             ]
+
+        # boot_cap_wr: full 128-bit CR write during boot initialization.
+        # Used to set word1_location and word2_w2 (e.g. CR6/CR15) in one cycle.
+        # Defaults to 0; driven from the boot state switch below.
+        boot_cap_wr_en   = Signal()
+        boot_cap_wr_addr = Signal(4)
+        boot_cap_wr_data = Signal(CAP_REG_LAYOUT)
 
         cr_wr_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_addr,
                                  Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_addr, 0))
@@ -293,20 +338,23 @@ class ChurchCore(Elaboratable):
         cr_wr_en_extra = cr_wr_en_extra | u_change.cr_wr_en | u_switch.cr_wr_en
         m.d.comb += [
             u_regs.cr_wr_addr.eq(
-                Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_addr,
-                    Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_addr,
-                        Mux(u_call.cr_wr_en, u_call.cr_wr_addr,
-                            Mux(u_return.cr_wr_en, u_return.cr_wr_addr,
-                                cr_wr_addr_inner))))
+                Mux(boot_cap_wr_en, boot_cap_wr_addr,
+                    Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_addr,
+                        Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_addr,
+                            Mux(u_call.cr_wr_en, u_call.cr_wr_addr,
+                                Mux(u_return.cr_wr_en, u_return.cr_wr_addr,
+                                    cr_wr_addr_inner)))))
             ),
             u_regs.cr_wr_data.eq(
-                Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_data,
-                    Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_data,
-                        Mux(u_call.cr_wr_en, u_call.cr_wr_data,
-                            Mux(u_return.cr_wr_en, u_return.cr_wr_data,
-                                cr_wr_data_inner))))
+                Mux(boot_cap_wr_en, boot_cap_wr_data,
+                    Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_data,
+                        Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_data,
+                            Mux(u_call.cr_wr_en, u_call.cr_wr_data,
+                                Mux(u_return.cr_wr_en, u_return.cr_wr_data,
+                                    cr_wr_data_inner)))))
             ),
             u_regs.cr_wr_en.eq(
+                boot_cap_wr_en |
                 u_shared_mload.cr_wr_en | u_tperm.cr_wr_en | u_call.cr_wr_en |
                 u_return.cr_wr_en | cr_wr_en_extra
             ),
@@ -316,6 +364,9 @@ class ChurchCore(Elaboratable):
             m.d.sync += [boot_state_reg.eq(BootState.FAULT_RST), nia_reg.eq(0)]
         with m.Elif(clear_all):
             m.d.sync += nia_reg.eq(0)
+        with m.Elif(self.free_run_start):
+            # Debug FSM jumps CPU to the NUC program entry point
+            m.d.sync += nia_reg.eq(self.free_run_nia)
         with m.Elif(u_lambda.nia_set):
             m.d.sync += nia_reg.eq(u_lambda.nia_value)
         with m.Elif(u_xloadlambda.nia_set):
@@ -326,7 +377,13 @@ class ChurchCore(Elaboratable):
             m.d.sync += nia_reg.eq(u_call.nia_value)
         with m.Elif(u_eloadcall.nia_set):
             m.d.sync += nia_reg.eq(u_eloadcall.nia_value)
-        with m.Elif(cond_exec_enable & ~any_unit_busy):
+        with m.Elif(branch_taken):
+            # PC-relative branch: nia += sign_extend(imm) * 4
+            # branch_sx32 is the 15-bit imm sign-extended to 32 bits (word offset).
+            # Cat(C(0,2), branch_sx32) = branch_sx32 << 2 as byte offset (34-bit, truncated to 32).
+            m.d.sync += nia_reg.eq(nia_reg + Cat(C(0, 2), branch_sx32))
+        with m.Elif(self.boot_complete & u_decoder.instr_valid & ~any_unit_busy):
+            # Advance PC for all instructions (including not-taken branches)
             m.d.sync += nia_reg.eq(nia_reg + 4)
 
         m.d.comb += [
@@ -340,15 +397,20 @@ class ChurchCore(Elaboratable):
 
         with m.Switch(boot_state_reg):
             with m.Case(BootState.LOAD_NS):
-                ns_gt = Signal(GT_LAYOUT)
-                ns_gt_view = View(GT_LAYOUT, ns_gt)
+                # CR15 (namespace cap): full 128-bit write to include word1_location=0
+                # (NS at dmem byte 0) and word2_w2=15 (limit: slots 0..15 accessible).
+                # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0
+                # word0_gt = (GT_TYPE_INFORM<<23) | 0 = 0x00800000
                 m.d.comb += [
-                    ns_gt_view.slot_id.eq(0),
-                    ns_gt_view.gt_seq.eq(0),
-                    ns_gt_view.gt_type.eq(GT_TYPE_INFORM),
-                    ns_gt_view.perms.eq(0),
+                    boot_cap_wr_en.eq(1),
+                    boot_cap_wr_addr.eq(15),
+                    boot_cap_wr_data.eq(Cat(
+                        C(0x00800000, 32),  # word0_gt: GT_TYPE_INFORM, slot_id=0
+                        C(0,          32),  # word1_location = 0 (NS at dmem start)
+                        C(15,         32),  # word2_w2: limit_offset=15 (slots 0-15)
+                        C(0,          32),  # word3_w3
+                    )),
                 ]
-                m.d.comb += [boot_wr_en[15].eq(1), boot_wr_gt[15].eq(ns_gt)]
             with m.Case(BootState.INIT_THRD):
                 thrd_gt = Signal(GT_LAYOUT)
                 thrd_gt_view = View(GT_LAYOUT, thrd_gt)
@@ -360,15 +422,21 @@ class ChurchCore(Elaboratable):
                 ]
                 m.d.comb += [boot_wr_en[8].eq(1), boot_wr_gt[8].eq(thrd_gt)]
             with m.Case(BootState.INIT_CLIST):
-                cr6_gt = Signal(GT_LAYOUT)
-                cr6_gt_view = View(GT_LAYOUT, cr6_gt)
+                # CR6 (c-list cap): full 128-bit write to include word1_location=0x400
+                # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63
+                # (limit: indices 0..63 accessible).
+                # cr6_gt: slot_id=2, GT_TYPE_INFORM, perms=PERM_MASK_E, gt_seq=0
+                # word0_gt = (PERM_MASK_E<<25) | (GT_TYPE_INFORM<<23) | 2 = 0x40800002
                 m.d.comb += [
-                    cr6_gt_view.slot_id.eq(2),
-                    cr6_gt_view.gt_seq.eq(0),
-                    cr6_gt_view.gt_type.eq(GT_TYPE_INFORM),
-                    cr6_gt_view.perms.eq(PERM_MASK_E),
+                    boot_cap_wr_en.eq(1),
+                    boot_cap_wr_addr.eq(6),
+                    boot_cap_wr_data.eq(Cat(
+                        C(0x40800002, 32),  # word0_gt: PERM_MASK_E, GT_TYPE_INFORM, slot=2
+                        C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
+                        C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
+                        C(0,          32),  # word3_w3
+                    )),
                 ]
-                m.d.comb += [boot_wr_en[6].eq(1), boot_wr_gt[6].eq(cr6_gt)]
             with m.Case(BootState.LOAD_NUC):
                 slot3_gt = Signal(GT_LAYOUT)
                 slot3_gt_view = View(GT_LAYOUT, slot3_gt)
@@ -517,6 +585,71 @@ class ChurchCore(Elaboratable):
         ]
         m.d.comb += u_regs.dr_rd_addr2.eq(
             Mux(u_dwrite.busy, u_dwrite.dr_rd_addr, 0)
+        )
+
+        # ── IADD / ISUB ──────────────────────────────────────────────────────
+        # Immediate arithmetic on data registers.
+        # DR[dst] = DR[src] + sign_extend(imm)  (IADD)
+        # DR[dst] = DR[src] - sign_extend(imm)  (ISUB)
+        # Flags: N = result[31], Z = (result==0), C = carry-out, V = 0.
+        # 1-cycle busy after execution prevents double-fire due to ROM pipeline latency.
+        # (Signals forward-declared above for use in DR write / nia chains.)
+
+        m.d.comb += [
+            iadd_start_sig.eq(cond_exec_enable & is_iadd_op & ~any_unit_busy),
+            isub_start_sig.eq(cond_exec_enable & is_isub_op & ~any_unit_busy),
+        ]
+
+        # Latch busy for exactly 1 cycle after start (cleared when start is gone)
+        m.d.sync += [
+            iadd_busy_reg.eq(iadd_start_sig & ~iadd_busy_reg),
+            isub_busy_reg.eq(isub_start_sig & ~isub_busy_reg),
+        ]
+
+        # Sign-extend 15-bit immediate to 32 bits for arithmetic
+        arith_imm_sx = Signal(32)
+        m.d.comb += arith_imm_sx.eq(
+            Cat(u_decoder.immediate, u_decoder.immediate[14].replicate(17))
+        )
+
+        # Source DR read (port 1 — CHANGE uses this too but reads DR0 by default)
+        m.d.comb += u_regs.dr_rd_addr1.eq(
+            Mux(iadd_start_sig | isub_start_sig, cr_src, 0)
+        )
+
+        # 33-bit results (bit 32 = carry for IADD, borrow for ISUB)
+        m.d.comb += [
+            iadd_result.eq(u_regs.dr_rd_data1 + arith_imm_sx),
+            isub_result.eq(u_regs.dr_rd_data1 - arith_imm_sx),
+        ]
+
+        iadd_flags_view = View(COND_FLAGS_LAYOUT, iadd_flags_sig)
+        isub_flags_view = View(COND_FLAGS_LAYOUT, isub_flags_sig)
+        m.d.comb += [
+            iadd_flags_view.N.eq(iadd_result[31]),
+            iadd_flags_view.Z.eq(iadd_result[:32] == 0),
+            iadd_flags_view.C.eq(iadd_result[32]),
+            iadd_flags_view.V.eq(0),
+            isub_flags_view.N.eq(isub_result[31]),
+            isub_flags_view.Z.eq(isub_result[:32] == 0),
+            isub_flags_view.C.eq(isub_result[32]),
+            isub_flags_view.V.eq(0),
+        ]
+
+        # ── BRANCH ───────────────────────────────────────────────────────────
+        # Conditional PC-relative branch.
+        # branch_target = nia_reg + sign_extend(imm) * 4
+        # (imm is a signed word offset from the current instruction's address)
+        # 1-cycle busy after taken branch prevents double-fire from ROM pipeline.
+        # (Signals forward-declared above for use in nia chain.)
+
+        m.d.comb += branch_taken.eq(
+            self.boot_complete & exec_enable & is_branch_op & ~any_unit_busy
+        )
+        m.d.sync += branch_busy_reg.eq(branch_taken & ~branch_busy_reg)
+
+        m.d.comb += branch_sx32.eq(
+            Cat(u_decoder.immediate, u_decoder.immediate[14].replicate(17))
         )
 
         load_start_sig = Signal()
