@@ -679,7 +679,8 @@ def download_fpga_package():
             logging.info("FPGA package: running Yosys synthesis (RTLIL -> EDIF + Verilog, Efinix target)...")
             synth_cmd = (
                 f"read_rtlil {rtlil_path}; "
-                f"synth_efinix -top top -edif {edif_path} -vout {verilog_path}"
+                f"synth_efinix -top top -edif {edif_path}; "
+                f"write_verilog {verilog_path}"
             )
         else:
             logging.info("FPGA package: running Yosys synthesis (RTLIL -> JSON + Verilog, Gowin target)...")
