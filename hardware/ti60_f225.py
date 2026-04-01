@@ -12,13 +12,21 @@ from .uart_rx import UartRx
 class ChurchTi60F225(Elaboratable):
     """Church Machine top-level for Efinix Titanium Ti60 F225 Development Board.
 
+    Clock: 25 MHz crystal at ball B2 → PLL_TL0 (M=4 N=1 O=2) → 50 MHz GCLK "clk"
+           There is NO clock oscillator at B8.  The PLL is configured via peri.xml
+           (setup_ti60_peri.py) and is entirely in the Efinity periphery.
+
+    NOTE: The Ti60F225 devkit has NO UART path to the FT4232H USB chip.
+          The FT4232H channels are used exclusively for JTAG programming/debug.
+          uart_tx (H14) and uart_rx (M14) are GPIO pins routed to device balls;
+          connect an external USB-UART adapter to use them.
+
     Differences from Tang Nano 20K:
-      - clk_freq = 50 MHz (on-board crystal, pin B8)
+      - clk_freq = 50 MHz (via PLL from 25 MHz at B2, NOT direct crystal at B8)
       - 4 LEDs, active-HIGH (USER_LED[3:0]; logic 1 = LED on)
       - Push button active-low (USER_PB, with external pull-up)
       - Memory uses plain Amaranth Memory (Yosys infers Efinix EBR tiles)
       - No BSRAM init FSM — Memory init= handles pre-loading directly
-      - UART via FTDI FT232H USB-UART bridge at 115200 baud
     """
 
     def __init__(self, clk_freq=50_000_000, baud=115200, sim_mode=False):

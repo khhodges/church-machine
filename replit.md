@@ -97,9 +97,22 @@ The Dashboard view has a "Push to GitHub" button that triggers `POST /api/github
 
 ## Ti60 F225 Hardware Build — Status & Workflow
 
-**Full bitstream successfully generated** (April 2026). The Church Machine runs on the Efinix Titanium Ti60 F225.
+**Full bitstream successfully generated and flashed** (April 2026).
+
+### Critical board facts (confirmed from Ti60F225_kit.isf)
+- **Clock**: 25 MHz crystal at ball **B2** → PLL_TL0 (M=4, N=1, O=2) → **50 MHz GCLK "clk"**. There is NO clock oscillator at B8. Previous designs that used B8 had a floating/undriven clock.
+- **UART**: The Ti60F225 devkit has **NO UART connection from the FPGA to the FT4232H**. The FT4232H is used exclusively for JTAG programming (Channel A) and JTAG debug (Channel B, protocol-based). uart_tx (H14) and uart_rx (M14) are bare GPIO balls — an external USB-UART adapter is required.
+- **Debug output**: Use JTAG_USER1 protocol (helloworld-dbg style) or route UART to a header/PMOD pin with an external adapter.
+- **LEDs**: 4 user LEDs at K14/J15/H10/J14 (led0–3); board also has 2 more at H15/H11 (not connected in our design).
 
 ### Build steps (run from `~/church-efinity/church_ti60_f225/` on Chromebook)
+0. Re-run peri.xml setup (only needed when pin config changes):
+   ```
+   PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \
+   EFXPT_HOME=$HOME/efinity/2025.2/pt \
+     $HOME/efinity/2025.2/bin/python3.11 \
+     ~/church-machine/hardware/setup_ti60_peri.py
+   ```
 1. Regenerate flat Verilog (flatten avoids escaped hierarchical names):
    ```
    yosys -p "read_rtlil ~/church-machine/build/church_ti60_f225.il; hierarchy -top top; proc; flatten; clean; write_verilog -noattr ~/church-efinity/build/church_ti60_f225.v"
@@ -113,9 +126,9 @@ The Dashboard view has a "Push to GitHub" button that triggers `POST /api/github
 ### Key lessons learned
 - Project XML must start with `<?xml version="1.0"?>`, use `<efx:sdc_file>` (not `<efx:isf_source>`), and have exactly ONE `<efx:design_file>` entry.
 - Yosys **must** use `flatten` before `write_verilog` — Efinity's `efx_map` cannot parse backslash-escaped hierarchical module names like `\top.boot_rom`.
-- `setup_ti60_peri.py` now purges any stale GPIOs/PLLs from template peri.xml before configuring our 8 signals. Must start from helloworld template and run the script.
+- `setup_ti60_peri.py` purges stale GPIOs/PLLs from template peri.xml, then adds our PLL + GPIO config. Must start from helloworld template.
 - Efinity tool order: `map` → `pnr` → `interface` → `pgm`. The `interface` step generates the LPF required by `pgm`.
-- SDC file: `create_clock -period 20.0 [get_ports {clk}]` (50 MHz → 20 ns).
+- SDC: constrain `pll_refclk` at 40.0 ns (25 MHz), generated `clk` at 50 MHz via `create_generated_clock`.
 - Efinity project at `~/church-efinity/church_ti60_f225/`; Verilog at `~/church-efinity/build/church_ti60_f225.v`; IL at `~/church-machine/build/church_ti60_f225.il`.
 
 ## FPGA Build Package
