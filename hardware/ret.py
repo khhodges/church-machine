@@ -42,6 +42,8 @@ class ChurchReturn(Elaboratable):
         self.lambda_pc = Signal(32)
         self.lambda_clear = Signal()
 
+        self.cload_e_gt = Signal(32)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -56,6 +58,8 @@ class ChurchReturn(Elaboratable):
         has_e_perm = ret_gt.perms[PERM_E]
         is_null_cap = Signal()
         m.d.comb += is_null_cap.eq(ret_gt.gt_type == GT_TYPE_NULL)
+
+        m.d.comb += self.cload_e_gt.eq(ret_view.word0_gt.as_value())
 
         saved_nia = ret_view.word1_location
         saved_cr6_gt = ret_view.word2_w2

@@ -19,6 +19,8 @@ from .switch import ChurchSwitch
 from .fused_unit import ChurchELoadCall, ChurchXLoadLambda
 from .dread import ChurchDRead
 from .dwrite import ChurchDWrite
+from .cload import ChurchCLoad
+from .outform import ChurchOutform
 
 
 class ChurchCore(Elaboratable):
@@ -76,6 +78,12 @@ class ChurchCore(Elaboratable):
         self.nia = Signal(32)
         self.flags = Signal(COND_FLAGS_LAYOUT)
 
+        self.outform_tx_valid = Signal()
+        self.outform_tx_data  = Signal(8)
+        self.outform_rx_valid = Signal()
+        self.outform_rx_data  = Signal(8)
+        self.outform_result_gt = Signal(32)
+
     def elaborate(self, platform):
         m = Module()
 
@@ -110,11 +118,15 @@ class ChurchCore(Elaboratable):
         m.submodules.u_switch = u_switch
         u_dread = ChurchDRead()
         u_dwrite = ChurchDWrite()
+        u_cload = ChurchCLoad()
+        u_outform = ChurchOutform()
 
         m.submodules.u_eloadcall = u_eloadcall
         m.submodules.u_xloadlambda = u_xloadlambda
         m.submodules.u_dread = u_dread
         m.submodules.u_dwrite = u_dwrite
+        m.submodules.u_cload = u_cload
+        m.submodules.u_outform = u_outform
 
         nia_reg = Signal(32)
 
@@ -186,6 +198,8 @@ class ChurchCore(Elaboratable):
         mcmp_busy_reg   = Signal()
 
         any_unit_busy = Signal()
+        cross_domain_ret = Signal()
+        cload_pending   = Signal()
         busy_expr = (
             u_lambda.lambda_busy | u_tperm.tperm_busy | u_call.call_busy |
             u_return.busy | u_save.save_busy | u_load.load_busy |
@@ -194,7 +208,9 @@ class ChurchCore(Elaboratable):
             u_eloadcall.busy | u_xloadlambda.busy |
             u_dread.busy | u_dwrite.busy |
             iadd_busy_reg | isub_busy_reg | branch_busy_reg |
-            shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg
+            shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg |
+            u_cload.cload_busy | cload_pending |
+            u_outform.outform_busy
         )
         m.d.comb += any_unit_busy.eq(busy_expr)
 
@@ -396,13 +412,15 @@ class ChurchCore(Elaboratable):
         cr_wr_data_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_data,
                                  Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_data, 0))
         cr_wr_en_extra = u_eloadcall.cr_wr_en | u_xloadlambda.cr_wr_en
-        cr_wr_addr_inner = Mux(u_change.change_busy, u_change.cr_wr_addr,
-                               Mux(u_switch.switch_busy, u_switch.cr_wr_addr,
-                                   cr_wr_addr_default))
-        cr_wr_data_inner = Mux(u_change.change_busy, u_change.cr_wr_data,
-                               Mux(u_switch.switch_busy, u_switch.cr_wr_data,
-                                   cr_wr_data_default))
-        cr_wr_en_extra = cr_wr_en_extra | u_change.cr_wr_en | u_switch.cr_wr_en
+        cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr,
+                               Mux(u_change.change_busy, u_change.cr_wr_addr,
+                                   Mux(u_switch.switch_busy, u_switch.cr_wr_addr,
+                                       cr_wr_addr_default)))
+        cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data,
+                               Mux(u_change.change_busy, u_change.cr_wr_data,
+                                   Mux(u_switch.switch_busy, u_switch.cr_wr_data,
+                                       cr_wr_data_default)))
+        cr_wr_en_extra = cr_wr_en_extra | u_cload.cr_wr_en | u_change.cr_wr_en | u_switch.cr_wr_en
         m.d.comb += [
             u_regs.cr_wr_addr.eq(
                 Mux(boot_cap_wr_en, boot_cap_wr_addr,
@@ -583,6 +601,22 @@ class ChurchCore(Elaboratable):
             u_return.cr_rd_data.eq(u_regs.cr_rd_data),
             u_return.lambda_active.eq(lambda_active_reg),
             u_return.lambda_pc.eq(lambda_pc_reg),
+        ]
+
+        with m.If(ret_start_sig):
+            m.d.sync += cross_domain_ret.eq(~lambda_active_reg)
+
+        with m.If(u_return.complete & ~u_return.fault_valid & ~u_return.reboot_request & cross_domain_ret):
+            m.d.sync += cload_pending.eq(1)
+        with m.Elif(cload_pending):
+            m.d.sync += cload_pending.eq(0)
+
+        m.d.comb += [
+            u_cload.cload_start.eq(cload_pending),
+            u_cload.e_gt.eq(u_return.cload_e_gt),
+            u_cload.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_cload.mem_rd_data.eq(self.dmem_rd_data),
+            u_cload.mem_rd_valid.eq(1),
         ]
 
         with m.If(clear_all):
@@ -915,6 +949,23 @@ class ChurchCore(Elaboratable):
             u_xloadlambda.saved_nia.eq(nia_reg + 4),
         ]
 
+        m.d.comb += [
+            u_outform.outform_start.eq(0),
+            u_outform.gt_raw.eq(0),
+            u_outform.slot_id.eq(0),
+            u_outform.rx_valid.eq(self.outform_rx_valid),
+            u_outform.rx_data.eq(self.outform_rx_data),
+            self.outform_tx_valid.eq(u_outform.tx_valid),
+            self.outform_tx_data.eq(u_outform.tx_data),
+            self.outform_result_gt.eq(u_outform.result_gt),
+            u_outform.alloc_done.eq(0),
+            u_outform.alloc_fault.eq(0),
+            u_outform.alloc_base.eq(0),
+            u_outform.mint_done.eq(0),
+            u_outform.mint_fault.eq(0),
+            u_outform.mint_result_gt.eq(0),
+        ]
+
         CR5_STACK_DEPTH = 256
         cr5_stack = Memory(width=32, depth=CR5_STACK_DEPTH, init=[])
         m.submodules.cr5_stack = cr5_stack
@@ -979,6 +1030,10 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_dread.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_dwrite.fault):
             m.d.comb += [self.fault.eq(u_dwrite.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_cload.cload_fault):
+            m.d.comb += [self.fault.eq(u_cload.cload_fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_outform.outform_fault):
+            m.d.comb += [self.fault.eq(u_outform.outform_fault_type), self.fault_valid.eq(1)]
         with m.Else():
             m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]
 
@@ -1082,6 +1137,17 @@ class ChurchCore(Elaboratable):
             m.d.comb += [
                 self.dmem_addr.eq(u_dwrite.dmem_addr),
                 self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
+                self.dmem_wr_en.eq(1),
+            ]
+        with m.Elif(u_cload.mem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_cload.mem_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_outform.mem_wr_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_outform.mem_wr_addr),
+                self.dmem_wr_data.eq(u_outform.mem_wr_data),
                 self.dmem_wr_en.eq(1),
             ]
 
