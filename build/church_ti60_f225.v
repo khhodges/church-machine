@@ -2807,7 +2807,7 @@ module church_ti60_f225(push_button, clk, uart_tx, led0, led1, led2, led3, uart_
       4'h6:
           /* empty */;
       4'h3:
-          free_run_nia = 32'd1024;
+          free_run_nia = 32'd0;
       4'h8:
           /* empty */;
       4'h9:

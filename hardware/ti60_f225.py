@@ -459,15 +459,16 @@ class ChurchTi60F225(Elaboratable):
                     m.next = "STEP_WAIT"
 
             with m.State("ENTER_FREE_RUN"):
-                # BOOT_PROGRAM has already completed (boot_complete asserted), proving
-                # the full capability boot chain (CHANGE → LOAD → TPERM → LAMBDA → CALL
-                # → RETURN → SAVE).  CR6 (c-list) and CR15 (NS) are live.
-                # We pulse free_run_start for one cycle to resume the CPU at the NUC
-                # entry point: ROM word 256 = byte 0x400.  This is the Turing-domain
-                # abstraction that the boot handed control to via slot-4 LAMBDA.
+                # Start the CPU from NIA=0 (BOOT_PROGRAM start) so the full capability
+                # chain executes naturally in free-run mode:
+                #   CHANGE → LOAD CR1 → LOAD CR2 → TPERM → LAMBDA CR2
+                # LAMBDA reads CR2 (slot-4 GT, GT[24:0]=0x00800004) and verifies it
+                # against NS entry 4 (location=0x400).  Perms bits [30:25] are excluded
+                # from the CRC input, so the seal passes regardless of perm subset used,
+                # and the CPU naturally lands at NUC_PROGRAM byte 0x400.
                 m.d.comb += [
                     core.free_run_start.eq(1),
-                    core.free_run_nia.eq(0x400),
+                    core.free_run_nia.eq(0),
                 ]
                 m.d.sync += halted.eq(0)
                 m.next = "FREE_RUN"
