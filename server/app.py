@@ -111,7 +111,7 @@ def index():
     # Return 200 so Replit's deployment health checker doesn't see a redirect
     # as a failure. The meta-refresh takes the browser to the actual app.
     return (
-        '<html><head><meta http-equiv="refresh" content="0;url=/simulator/">'
+        '<html><head><meta http-equiv="refresh" content="0;url=/simulator/#docs">'
         "</head><body></body></html>",
         200,
     )
