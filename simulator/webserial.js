@@ -20,10 +20,9 @@ const TangSerial = (function() {
         if (!port) {
             throw new Error('No port selected. Call connect() first.');
         }
-        if (port.readable && port.writable) {
-            return;
+        if (!port.readable || !port.writable) {
+            throw new Error('Port is not open. Call connect() again.');
         }
-        await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
     }
 
     function setBoardLabel(label) {
@@ -35,26 +34,35 @@ const TangSerial = (function() {
             throw new Error(`WebSerial not supported. Use Chrome or Edge to connect to your ${_boardLabel}.`);
         }
 
-        if (port) {
-            try {
-                if (port.readable) {
-                    const r = port.readable.getReader();
-                    r.releaseLock();
-                }
-                if (port.writable) {
-                    const w = port.writable.getWriter();
-                    w.releaseLock();
-                }
-                await port.close();
-            } catch(e) {}
-            port = null;
-            await new Promise(r => setTimeout(r, 200));
+        // Cancel any active reader first so the port can be closed cleanly
+        if (activeReader) {
+            try { await activeReader.cancel(); } catch(e) {}
+            activeReader = null;
+            await new Promise(r => setTimeout(r, 100));
         }
 
-        port = await navigator.serial.requestPort({
-            filters: []
-        });
-        await ensureOpen();
+        if (port) {
+            try { await port.close(); } catch(e) {}
+            port = null;
+            await new Promise(r => setTimeout(r, 400));
+        }
+
+        port = await navigator.serial.requestPort({ filters: [] });
+
+        try {
+            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
+        } catch(e) {
+            port = null;
+            const msg = e.message || String(e);
+            if (msg.includes('Failed to open') || msg.includes('Access denied') || msg.includes('busy')) {
+                throw new Error(
+                    `Could not open port — it is held by another app.\n\n` +
+                    `Fix: close Efinity IDE's serial terminal (or any other serial monitor), ` +
+                    `wait 5 seconds, then try again.`
+                );
+            }
+            throw e;
+        }
     }
 
     async function disconnect() {
