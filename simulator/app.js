@@ -7501,12 +7501,14 @@ function _buildLogAppend(text) {
     const area = document.getElementById('buildLogArea');
     if (!area) return;
     area.textContent += text;
-    area.scrollTop = area.scrollHeight;
+    requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
 }
 
 function _buildLogSet(text) {
     const area = document.getElementById('buildLogArea');
-    if (area) { area.textContent = text; area.scrollTop = 0; }
+    if (!area) return;
+    area.textContent = text;
+    requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
 }
 
 function _renderBuildFiles(files, isTi60) {
