@@ -1,5 +1,7 @@
 # Prologue — From Lambda Calculus to the Church Machine
 
+[Industrial Strength Computer Science](https://sipantic.blogspot.com/p/industrial-strength-computer-science_7.html)
+
 ## 1936: Two Models of Computation
 
 In 1936, two mathematicians independently solved the same fundamental problem — what does it mean for something to be computable? — and arrived at two radically different answers.
