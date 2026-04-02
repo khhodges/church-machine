@@ -8780,11 +8780,8 @@ async function uploadToTang() {
                     con.textContent += `Then click "Deploy to FPGA" from that tab. Chrome or Edge required.\n`;
                     return;
                 }
-                con.textContent += 'Could not open port: ' + e.message + '\n\n';
-                con.textContent += 'TROUBLESHOOTING:\n';
-                con.textContent += `1. Check that the ${boardLabel} is connected via USB\n`;
-                con.textContent += '2. Close any serial monitor that might have the port open\n';
-                con.textContent += '3. Try again\n';
+                con.textContent += e.message + '\n\n';
+                con.textContent += `Check that the ${boardLabel} is connected via USB and no other app (e.g. Efinity IDE serial terminal) has the port open, then try again.\n`;
                 return;
             }
         }
