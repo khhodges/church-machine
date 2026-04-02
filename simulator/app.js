@@ -5179,8 +5179,6 @@ HALT
 `,
         'led_blink': `; ============================================
 ; LED Blink — Ti60 F225 Hardware Nucleus Code
-; Reference only — this is HARDWARE code, not
-; simulator-executable as-is.
 ; ============================================
 ;
 ; This is the exact binary burned into the
