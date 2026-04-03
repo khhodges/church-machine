@@ -4189,6 +4189,7 @@ function _bootNIARows(bootStep) {
 }
 
 function stepSim() {
+    switchView('dashboard');
     if (!sim.bootComplete) {
         sim.auditLog = [];
         try {
@@ -4369,6 +4370,7 @@ function slowBoot() {
 }
 
 function runSim() {
+    switchView('dashboard');
     while (!sim.bootComplete) {
         try {
             sim._bootStep();
@@ -4507,6 +4509,7 @@ function faultModalInvestigate() {
 }
 
 function resetSim() {
+    switchView('dashboard');
     if (pipelineViz) pipelineViz.setNIA(null);
     _defaultProgramLoaded = false;
     sim.reset();
