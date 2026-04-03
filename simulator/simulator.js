@@ -904,8 +904,16 @@ class ChurchSimulator {
             p3Lines.push(`  ${typeName}  ·  @0x${loc.toString(16).toUpperCase().padStart(4,'0')}  ·  ${limit} words  ·  ${clistCnt} caps  ·  v${version}`);
             log.push(`  GARBAGE NS[${i}] "${label}" type=${typeName} @0x${loc.toString(16).toUpperCase().padStart(8,'0')} limit=${limit} clist=${clistCnt} ver=${version} — G=${garbageValue}`);
         }
-        if (candidates.length === 0) p3Lines.push('No garbage entries found — namespace is clean');
-        p3Lines.push(`${candidates.length} garbage ${candidates.length === 1 ? 'entry' : 'entries'} identified for reclamation`);
+        if (candidates.length === 0) {
+            p3Lines.push('No garbage entries — all NS entries are reachable from a CR root');
+        } else {
+            p3Lines.push('');
+            p3Lines.push('Why garbage? None of the above entries are reachable from');
+            p3Lines.push('any CR (CR0–CR15) or saved CR in the call-stack frames.');
+            p3Lines.push('Phase 4 will zero their NS table words and lump memory.');
+        }
+        p3Lines.push('');
+        p3Lines.push(`→ ${candidates.length} ${candidates.length === 1 ? 'entry' : 'entries'} queued for reclamation`);
         log.push('--- Phase 3: SWEEP ---');
         log.push(`Identified ${candidates.length} garbage entries.`);
         log.push('');
@@ -953,8 +961,13 @@ class ChurchSimulator {
         this.nsCount = newCount;
 
         this.gcPolarity = this.gcPolarity ? 0 : 1;
-        p4Lines.push(`${freedSlots} ${freedSlots === 1 ? 'slot' : 'slots'} freed, ${freedWords} object words reclaimed`);
-        p4Lines.push(`GC polarity flipped → G=${this.gcPolarity} now means garbage`);
+        p4Lines.push('');
+        p4Lines.push(`${priorCount}  entries before GC`);
+        p4Lines.push(`−  ${freedSlots}  freed (unreachable, no CR root)`);
+        p4Lines.push(`=  ${newCount}  entries remaining`);
+        p4Lines.push('');
+        p4Lines.push(`${freedWords} lump words reclaimed`);
+        p4Lines.push(`Polarity flipped → G=${this.gcPolarity} marks garbage next run`);
 
         log.push('--- Phase 4: CLEAR ---');
         log.push('');
