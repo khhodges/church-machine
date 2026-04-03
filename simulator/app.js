@@ -1456,6 +1456,38 @@ function renderMemoryDump(location, limit, nsIndex) {
                 const word = sim.memory[addr] || 0;
                 html += _renderGTRow(i, addr, word);
             }
+            html += '</tbody></table>';
+            // ── Physical Freespace: FPGA block-RAM padding beyond logical lump ──
+            const physSlot = sim.SLOT_SIZE || 64;
+            const physFree = physSlot - allocSize;
+            if (physFree > 0) {
+                const freeBase = location + allocSize;
+                const freeEnd  = location + physSlot - 1;
+                html += `<div style="color:rgba(113,113,122,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.3rem;">Freespace`
+                      + ` <span style="color:#3f3f46;font-size:0.72rem;">`
+                      + `offsets +${allocSize}\u2013+${physSlot - 1}`
+                      + ` \u00b7 ${physFree} words`
+                      + ` \u00b7 0x${freeBase.toString(16).toUpperCase().padStart(4,'0')}\u20130x${freeEnd.toString(16).toUpperCase().padStart(4,'0')}`
+                      + ` \u00b7 FPGA block-RAM padding (SLOT_SIZE=${physSlot})</span></div>`;
+                html += '<table class="ns-mem-table"><thead><tr>'
+                      + '<th>Offset</th><th>Address</th><th>Hex</th><th>Note</th>'
+                      + '</tr></thead><tbody>';
+                for (let i = 0; i < physFree; i++) {
+                    const off     = allocSize + i;
+                    const addr    = location + off;
+                    const addrHex = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+                    const word    = (addr < sim.memory.length) ? (sim.memory[addr] || 0) : 0;
+                    const hexW    = '0x' + (word >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                    html += `<tr style="opacity:0.28;">`
+                          + `<td style="color:#3f3f46;">+${off}</td>`
+                          + `<td style="font-family:monospace;color:#3f3f46;">${addrHex}</td>`
+                          + `<td style="font-family:monospace;color:#3f3f46;">${hexW}</td>`
+                          + `<td style="color:#3f3f46;font-style:italic;font-size:0.72rem;">FPGA pad \u2014 unused</td>`
+                          + `</tr>`;
+                }
+                html += '</tbody></table>';
+            }
+            return html;
         } else {
             var asm = new ChurchAssembler();
             for (let i = 0; i < wordCount; i++) {
