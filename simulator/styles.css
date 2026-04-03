@@ -943,6 +943,49 @@ header h1 {
     background: rgba(218,165,32,0.06);
 }
 
+.help-menu-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.help-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 210px;
+    background: #1a1a2e;
+    border: 1px solid rgba(218,165,32,0.35);
+    border-radius: 8px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+    z-index: 9999;
+    overflow: hidden;
+}
+.help-dropdown-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(218,165,32,0.55);
+    padding: 0.5rem 0.85rem 0.3rem;
+}
+.help-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(218,165,32,0.1);
+    color: rgba(255,255,255,0.85);
+    font-size: 0.82rem;
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.help-dropdown-item:hover {
+    background: rgba(218,165,32,0.1);
+    color: var(--church-gold);
+}
+
 .btn-info {
     background: #164e63;
     border-color: #22d3ee;

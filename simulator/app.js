@@ -236,7 +236,6 @@ function init() {
     requestAnimationFrame(() => {
         updateDashboard();
         pipelineViz.render();
-        showWelcomePopup();
         initTooltipAutoFlip();
         hideLoadingOverlay();
     });
@@ -268,9 +267,7 @@ function checkBootId() {
                 localStorage.removeItem('churchMachine_toolGuide_hp35');
                 localStorage.removeItem('churchMachine_toolGuide_abacus');
                 localStorage.removeItem('churchMachine_toolGuide_sliderule');
-                if (!sessionStorage.getItem('church_welcome_dismissed_session')) {
-                    showWelcomePopup();
-                }
+                // Guides are now on-demand via the ? button — no auto-popup.
             }
             localStorage.setItem('churchMachine_bootId', data.bootId);
         })
@@ -334,7 +331,6 @@ function switchView(viewId) {
     }
     if (viewId === 'repl') {
         updateMathWelcome();
-        showMathGuidePopup();
         if (typeof historyRefresh === 'function') {
             const area = document.getElementById('historyContent');
             if (area && !area.innerHTML.trim()) historyRefresh();
@@ -5926,7 +5922,6 @@ function resetAllPopups() {
     localStorage.removeItem('churchMachine_toolGuide_sliderule');
     localStorage.removeItem('churchMachine_toolGuide_sliderule_perm');
     closeSettings();
-    showWelcomePopup();
 }
 
 const TOOL_GUIDES = {
@@ -7929,9 +7924,6 @@ function dismissAllPopupsPerm() {
 
 function closeSettings() {
     document.getElementById('settingsModal').style.display = 'none';
-    if (!hasAnyPopupDismissedPerm() && isWelcomeNeeded()) {
-        showWelcomePopup();
-    }
 }
 
 function showReleaseHistory() {
@@ -8266,14 +8258,35 @@ function closeWelcome() {
 function welcomeSetup() {
     closeWelcome();
     openSettings();
-    showMathGuidePopup();
 }
 
 function welcomeSkip() {
     closeWelcome();
-    showMathGuidePopup();
-    if (currentView === 'builder' && typeof showBuilderHelpPopup === 'function') {
-        showBuilderHelpPopup();
+}
+
+function toggleHelpMenu() {
+    const dd = document.getElementById('helpDropdown');
+    if (!dd) return;
+    const open = dd.style.display !== 'none';
+    dd.style.display = open ? 'none' : 'block';
+    if (!open) {
+        setTimeout(() => {
+            document.addEventListener('click', _helpMenuOutsideClick, { once: true, capture: true });
+        }, 0);
+    }
+}
+
+function closeHelpMenu() {
+    const dd = document.getElementById('helpDropdown');
+    if (dd) dd.style.display = 'none';
+}
+
+function _helpMenuOutsideClick(e) {
+    const wrap = document.getElementById('helpMenuWrap');
+    if (wrap && !wrap.contains(e.target)) {
+        closeHelpMenu();
+    } else if (wrap && wrap.contains(e.target)) {
+        document.addEventListener('click', _helpMenuOutsideClick, { once: true, capture: true });
     }
 }
 

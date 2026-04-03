@@ -88,7 +88,16 @@
                     <button class="btn btn-success" onclick="runSim()" data-tooltip="Run — Execute all instructions until halt or fault">Run</button>
                     <button class="btn btn-warning" onclick="resetSim()" data-tooltip="Boot — Reset the machine and run the boot sequence">Boot</button>
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>
-                    <button class="btn btn-view btn-help-icon" onclick="showWelcomePopup(true)" data-tooltip="About — Why the Church Machine? What is the Lambda Calculus?">?</button>
+                    <div class="help-menu-wrap" id="helpMenuWrap">
+                        <button class="btn btn-sm view-help-btn" onclick="toggleHelpMenu()" data-tooltip="Help &amp; Guides — Access all guides and the welcome overview">?</button>
+                        <div class="help-dropdown" id="helpDropdown" style="display:none;">
+                            <div class="help-dropdown-title">Help &amp; Guides</div>
+                            <button class="help-dropdown-item" onclick="showWelcomePopup(true);closeHelpMenu()">About the Church Machine</button>
+                            <button class="help-dropdown-item" onclick="showMathGuidePopup(true);closeHelpMenu()">Math &amp; Mind Guide</button>
+                            <button class="help-dropdown-item" onclick="openCurrentToolGuide();closeHelpMenu()">Current Tool Guide</button>
+                            <button class="help-dropdown-item" onclick="(typeof showBuilderHelpPopup==='function'?showBuilderHelpPopup():showWelcomePopup(true));closeHelpMenu()">Builder Guide</button>
+                        </div>
+                    </div>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
                 </div>
             </nav>
