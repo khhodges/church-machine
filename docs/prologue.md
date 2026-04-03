@@ -146,7 +146,7 @@ The Church Machine begins where the PP250 left off, but with a deeper foundation
 
 The PP250 was a capability machine designed for telecom. It proved that full-immersion capability hardware works. But it was built for a specific domain, by a specific company, at a time when the broader industry was not ready to listen.
 
-The Church Machine asks a more fundamental question: **what happens when you go all the way back to 1936 and choose Church instead of Turing?**
+The Church Machine asks a more fundamental question: **what happens when you go all the way back to 1936 and choose Church instead of Turing?** It also answers the point of PQC (Post Quantum Catastrophe) when software cryptography is broken on demand.
 
 Not abandon Turing — Turing's model is essential for data processing, arithmetic, and the sequential computation that hardware excels at. But instead of building the entire architecture on Turing's model and patching security on top, the Church Machine builds the architecture on Church's model and contains Turing within it:
 
