@@ -91,6 +91,11 @@
                             <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference</button>
                             <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder</button>
                             <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');closeHamburger()">Docs</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Actions</div>
+                            <button class="ham-item" onclick="runGC();closeHamburger()">Run GC</button>
+                            <button class="ham-item" onclick="exportSimulatorToGitHub();closeHamburger()">Push to GitHub</button>
+                            <button class="ham-item" onclick="showLibrary();closeHamburger()">Get from GitHub</button>
                         </div>
                     </div>
                 </div>
@@ -110,6 +115,26 @@
                         </div>
                     </div>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
+                    <div id="hwLedBar" class="hw-led-bar hw-led-bar-inline">
+                        <span class="hw-led-label">Ti60 F225</span>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-green" id="hw-led0"></div>
+                            <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
+                        </div>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-red" id="hw-led1"></div>
+                            <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
+                        </div>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-green" id="hw-led2"></div>
+                            <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
+                        </div>
+                        <div class="hw-led-item">
+                            <div class="hw-led hw-led-green" id="hw-led3"></div>
+                            <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
+                        </div>
+                        <span class="hw-led-hint">← DWRITE CR3[0]</span>
+                    </div>
                 </div>
             </nav>
         </header>
@@ -117,36 +142,6 @@
 
     <div id="dashboard" class="view active">
         <div id="flagsDisplay" class="flags-bar"></div>
-        <div class="dash-tabs">
-            <button onclick="switchDashTab('cr')" class="dash-tab active" id="dashTab-cr" data-tooltip="Context Registers — View all 16 context registers (128-bit, 4 words each)">Context Registers</button>
-            <button onclick="switchDashTab('dr')" class="dash-tab" id="dashTab-dr" data-tooltip="Data Registers — View all 16 data registers (32-bit values, DR0 = zero)">Data Registers</button>
-            <button onclick="switchDashTab('gatelog')" class="dash-tab" id="dashTab-gatelog" data-tooltip="Gate Log — mLoad / mSave audit gates from the last instruction step">Gate Log</button>
-            <button onclick="switchDashTab('state')" class="dash-tab" id="dashTab-state" data-tooltip="Machine State — View machine architecture and current state">Machine State</button>
-            <button class="btn" onclick="runGC()" style="background:#9b59b6;color:#fff;border:none;" data-tooltip="Run GC — Run PP250 garbage collection (scan, identify, clear, flip)">Run GC</button>
-            <button onclick="switchDashTab('crdetail')" class="dash-tab" id="dashTab-crdetail" style="display:none;" data-tooltip="CR Detail — Detailed view of a single context register">CR Detail</button>
-            <button onclick="exportSimulatorToGitHub()" class="dash-tab" id="dashTab-export" data-tooltip="Push to GitHub — Push simulator files to GitHub">Push to GitHub</button>
-            <button class="btn" onclick="showLibrary()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" data-tooltip="Get from GitHub — Browse and share abstractions via Mum Tunnel Library">Get from GitHub</button>
-            <div id="hwLedBar" class="hw-led-bar hw-led-bar-inline">
-                <span class="hw-led-label">Ti60 F225</span>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led0"></div>
-                    <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
-                </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-red" id="hw-led1"></div>
-                    <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
-                </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led2"></div>
-                    <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
-                </div>
-                <div class="hw-led-item">
-                    <div class="hw-led hw-led-green" id="hw-led3"></div>
-                    <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
-                </div>
-                <span class="hw-led-hint">← DWRITE CR3[0]</span>
-            </div>
-        </div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
                 <div class="panel-title">CR0-CR15 -- 128-bit Context Registers (4 x 32-bit words)</div>
