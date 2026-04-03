@@ -405,7 +405,7 @@ class ChurchSimulator {
                 this.output += '[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot 2) Boot.Abstr (E, M-elevation)\n';
                 this.bootStep++;
                 this.ledBits = 0b001111;
-                break;
+                // B:03 INIT_ABSTR and B:04 LOAD_NUC are indivisible — both execute in one Step
             }
             case 4: {
                 const gt2 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
