@@ -201,7 +201,7 @@ function init() {
         if (currentView === 'namespace') updateNamespace();
         if (currentView === 'abstractions') renderAbstractions();
     });
-    sim.on('fault', (f) => { appendOutput(`FAULT [${f.type}]: ${f.message}`, 'error'); showFaultModal(f); });
+    sim.on('fault', (f) => { appendOutput(`FAULT [${f.type}]: ${f.message}`, 'error'); faultAlertOn(); showFaultModal(f); });
     sim.on('halt', () => appendOutput('Machine halted.', 'info'));
 
     loadUserTabs();
@@ -4436,7 +4436,22 @@ function runSim() {
     updateDashboard();
 }
 
+function faultAlertOn() {
+    const btn = document.getElementById('toolFaultBtn');
+    if (!btn) return;
+    btn.classList.remove('fault-idle');
+    btn.classList.add('fault-alert');
+}
+
+function faultAlertOff() {
+    const btn = document.getElementById('toolFaultBtn');
+    if (!btn) return;
+    btn.classList.remove('fault-alert');
+    btn.classList.add('fault-idle');
+}
+
 function faultClear() {
+    faultAlertOff();
     _defaultProgramLoaded = false;
     sim.reset();
     pipelineViz.reset();
@@ -4543,6 +4558,7 @@ function faultModalInvestigate() {
 
 function resetSim() {
     switchView('dashboard');
+    faultAlertOff();
     if (pipelineViz) pipelineViz.setNIA(null);
     _defaultProgramLoaded = false;
     sim.reset();
