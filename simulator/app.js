@@ -1436,7 +1436,29 @@ function renderMemoryDump(location, limit, nsIndex) {
         if (safeClistCount > 0) {
             const codeEnd = allocSize - safeClistCount;
             const codeShow = Math.min(codeEnd, wordCount);
-            html = '<div style="color:rgba(156,220,254,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">CLOOMC Code</div>';
+            // ── Lump Header (word 0 of the physical slot) ─────────────────────
+            const hdrWord    = (location < sim.memory.length) ? (sim.memory[location] || 0) : 0;
+            const hdrHex     = '0x' + (hdrWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            const hdrAddrHex = '0x' + location.toString(16).toUpperCase().padStart(4, '0');
+            const typeNames  = ['NULL','Inform','Outform','Abstract'];
+            const lumpType   = parsedW1 ? (typeNames[parsedW1.gtType] || '?') : '?';
+            const lumpVer    = nsEntry ? ((nsEntry.word2_seals >>> 25) & 0x7F) : 0;
+            const lumpSeal   = nsEntry ? (nsEntry.word2_seals & 0xFFFF) : 0;
+            const lumpNote   = `typ=${lumpType} \u00b7 clistCount=${safeClistCount} \u00b7 limit17=${allocSize - 1}`
+                             + ` \u00b7 codeWords=${codeEnd} \u00b7 ver=${lumpVer} \u00b7 CRC=0x${lumpSeal.toString(16).toUpperCase().padStart(4,'0')}`;
+            html = `<div style="color:rgba(156,220,254,0.5);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">Header`
+                 + ` <span style="color:#3f3f46;font-size:0.72rem;">word 0 of lump \u00b7 ${lumpNote}</span></div>`;
+            html += '<table class="ns-mem-table"><thead><tr>'
+                  + '<th>Offset</th><th>Address</th><th>Hex</th><th>Note</th>'
+                  + '</tr></thead><tbody>';
+            html += `<tr style="background:rgba(56,189,248,0.04);">`
+                  + `<td style="color:#38bdf8;">+0</td>`
+                  + `<td style="font-family:monospace;">${hdrAddrHex}</td>`
+                  + `<td style="font-family:monospace;color:rgba(206,145,120,0.7);">${hdrHex}</td>`
+                  + `<td style="color:#60a5fa;font-size:0.72rem;">${lumpNote}</td>`
+                  + `</tr>`;
+            html += '</tbody></table>';
+            html += '<div style="color:rgba(156,220,254,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">CLOOMC Code</div>';
             html += '<table class="ns-mem-table"><thead><tr><th>Offset</th><th>Address</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
             var asm = new ChurchAssembler();
             for (let i = 0; i < codeShow; i++) {
