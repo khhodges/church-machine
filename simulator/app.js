@@ -805,23 +805,51 @@ function updateCRDetail() {
     if (showCode) {
         html += '<div class="cr-detail-section">';
         html += '<div class="cr-detail-heading">Code View \u2014 Executable Memory</div>';
-        const baseLoc = cr.word1_location >>> 0;
-        const limitVal = cr.limit17;
-        const wordCount = Math.min(limitVal + 1, 256);
-        let hasCodeData = false;
+        const baseLoc   = cr.word1_location >>> 0;
+        const limitVal  = cr.limit17;
+        const asm       = new ChurchAssembler();
+
+        // Check if word 0 at baseLoc is a lump header (magic = 0x1F in top 5 bits).
+        // If so, render it as a distinct header row and scan instructions from word +1.
+        const word0 = (baseLoc < sim.memory.length) ? (sim.memory[baseLoc] >>> 0) : 0;
+        const lumpHdr = sim.parseLumpHeader(word0);
+
+        let codeStart = baseLoc;           // first instruction address
+        let codeLimit = limitVal + 1;      // max words to scan (relative to codeStart)
+
         let codeHtml = '<table class="cr-table code-view-table"><thead><tr>';
         codeHtml += '<th>Addr</th><th>Hex</th><th>Instruction</th>';
         codeHtml += '</tr></thead><tbody>';
-        const asm = new ChurchAssembler();
-        for (let w = 0; w < wordCount; w++) {
-            const addr = baseLoc + w;
+
+        if (lumpHdr.valid) {
+            // Show the header word as a special non-instruction row
+            const typNames  = ['lump', 'data', 'thread', 'outform'];
+            const typStr    = typNames[lumpHdr.typ] || String(lumpHdr.typ);
+            const hdrDisasm = `.header ${typStr} n\u22126=${lumpHdr.n_minus_6}\u2192${lumpHdr.lumpSize}w`
+                            + ` cw=${lumpHdr.cw} cc=${lumpHdr.cc}`;
+            codeHtml += `<tr style="opacity:0.55;font-style:italic;">`;
+            codeHtml += `<td class="cr-idx">0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}</td>`;
+            codeHtml += `<td class="cr-gt">0x${word0.toString(16).toUpperCase().padStart(8,'0')}</td>`;
+            codeHtml += `<td class="code-disasm" style="color:var(--text-secondary);">${hdrDisasm}</td>`;
+            codeHtml += '</tr>';
+            // Instructions start at word +1, run for cw words
+            codeStart = baseLoc + 1;
+            codeLimit = lumpHdr.cw;
+        }
+
+        let hasCodeData = lumpHdr.valid;  // header row counts as "something shown"
+        for (let w = 0; w < codeLimit; w++) {
+            const addr = codeStart + w;
             if (addr >= sim.memory.length) break;
-            const word = sim.memory[addr];
+            const word = sim.memory[addr] >>> 0;
             if (word === 0 && !hasCodeData) continue;
             hasCodeData = true;
-            const isPC = (addr === sim.pc);
+            // PC highlight: lump abstractions use word0+1+pc as fetch address
+            const isPC    = lumpHdr.valid
+                ? (addr === baseLoc + 1 + sim.pc)
+                : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc));
             const rowClass = isPC ? 'code-pc-row' : '';
-            const decoded = word === 0 ? 'NOP / HALT' : asm.disassemble(word);
+            const decoded  = word === 0 ? 'NOP / HALT' : asm.disassemble(word);
             codeHtml += `<tr class="${rowClass}">`;
             codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
@@ -829,11 +857,17 @@ function updateCRDetail() {
             codeHtml += '</tr>';
         }
         codeHtml += '</tbody></table>';
+
         if (!hasCodeData) {
             html += '<div style="color:var(--text-secondary);padding:0.5rem;">No code loaded in this memory range (0x' +
                 baseLoc.toString(16).toUpperCase().padStart(4,'0') + ' \u2013 0x' +
-                (baseLoc + wordCount - 1).toString(16).toUpperCase().padStart(4,'0') + ').</div>';
+                (baseLoc + limitVal).toString(16).toUpperCase().padStart(4,'0') + ').</div>';
         } else {
+            if (lumpHdr.valid && codeLimit === 0) {
+                // Header present but cw=0 — note it
+                codeHtml = codeHtml.replace('</tbody>', `<tr><td colspan="3" style="color:#555;font-style:italic;padding:0.3rem 0.5rem;">` +
+                    `(cw=0 \u2014 no instruction words in this lump)</td></tr></tbody>`);
+            }
             html += codeHtml;
         }
         html += '</div>';

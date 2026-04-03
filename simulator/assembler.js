@@ -343,6 +343,18 @@ class ChurchAssembler {
         const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
+        // Lump header: magic=0x1F in top 5 bits — format: magic(5)|n_minus_6(4)|cw(13)|typ(2)|cc(8)
+        // typ: 00=lump, 01=data, 10=thread, 11=outform
+        if (opcode === 0x1F) {
+            const n_minus_6 = (word >>> 23) & 0xF;
+            const cw        = (word >>> 10) & 0x1FFF;
+            const typ       = (word >>>  8) & 0x3;
+            const cc        = word & 0xFF;
+            const lumpSize  = 1 << (n_minus_6 + 6);
+            const typNames  = ['lump', 'data', 'thread', 'outform'];
+            return `.header ${typNames[typ]||'?'} n-6=${n_minus_6}\u2192${lumpSize}w cw=${cw} cc=${cc}`;
+        }
+
         if (opcode > 19) return `??? 0x${word.toString(16).padStart(8, '0')}`;
 
         const op = opNames[opcode];
