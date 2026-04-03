@@ -283,6 +283,23 @@ function goBack() {
     if (previousView) switchView(previousView);
 }
 
+function toggleHamburger() {
+    const dd = document.getElementById('hamDropdown');
+    if (!dd) return;
+    const open = dd.style.display !== 'none';
+    dd.style.display = open ? 'none' : 'flex';
+}
+
+function closeHamburger() {
+    const dd = document.getElementById('hamDropdown');
+    if (dd) dd.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    const wrap = document.getElementById('hamWrap');
+    if (wrap && !wrap.contains(e.target)) closeHamburger();
+});
+
 function switchView(viewId) {
     if (viewId !== currentView) previousView = currentView;
     currentView = viewId;
@@ -293,9 +310,9 @@ function switchView(viewId) {
     const el = document.getElementById(viewId);
     if (el) el.classList.add('active');
 
-    document.querySelectorAll('.view-buttons .btn-view').forEach(btn => btn.classList.remove('active'));
-    const activeBtn = document.getElementById('viewBtn-' + viewId);
-    if (activeBtn) activeBtn.classList.add('active');
+    document.querySelectorAll('.ham-item').forEach(btn => btn.classList.remove('ham-active'));
+    const activeHamItem = document.getElementById('hamItem-' + viewId);
+    if (activeHamItem) activeHamItem.classList.add('ham-active');
 
     if (viewId === 'dashboard') updateDashboard();
     if (viewId === 'namespace') updateNamespace();

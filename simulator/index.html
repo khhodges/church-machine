@@ -73,16 +73,26 @@
             <nav class="controls">
                 <div class="view-buttons">
                     <button id="backBtn" class="btn btn-view back-arrow-btn" onclick="goBack()" style="display:none;" data-tooltip="Back — Return to the previous view">&#8592;</button>
-                    <button onclick="switchView('repl')" class="btn btn-view active" id="viewBtn-repl" data-tooltip="Math — HP-35 calculator, abacus, slide rule, and pure math REPL">Math</button>
-                    <button onclick="switchView('editor')" class="btn btn-view" id="viewBtn-editor" data-tooltip="Code — Write, compile, and deploy Church Machine programs">Code</button>
-                    <button onclick="switchView('tutorial')" class="btn btn-view" id="viewBtn-tutorial" data-tooltip="Tutorial — Guided learning paths for Church Machine concepts">Tutorial</button>
-                    <button onclick="switchView('dashboard')" class="btn btn-view" id="viewBtn-dashboard" data-tooltip="Dashboard — View registers, machine state, and run GC">Dashboard</button>
-                    <button onclick="switchView('namespace')" class="btn btn-view" id="viewBtn-namespace" data-tooltip="Namespace — Browse and manage Golden Token entries">Namespace</button>
-                    <button onclick="switchView('abstractions')" class="btn btn-view" id="viewBtn-abstractions" data-tooltip="Abstractions — Explore the 9-layer abstraction catalog">Abstractions</button>
-                    <button onclick="switchView('pipeline')" class="btn btn-view" id="viewBtn-pipeline" data-tooltip="Pipeline — Visualise the instruction execution pipeline">Pipeline</button>
-                    <button onclick="switchView('reference')" class="btn btn-view" id="viewBtn-reference" data-tooltip="Reference — All 20 instructions with encoding and examples">Reference</button>
-                    <button onclick="switchView('builder')" class="btn btn-view" id="viewBtn-builder" data-tooltip="Builder — Design deployment topology: computers, namespaces, and abstractions">Builder</button>
-                    <button onclick="switchView('docs')" class="btn btn-view" id="viewBtn-docs" data-tooltip="Docs — Technical documents and architecture figures">Docs</button>
+                    <div class="ham-wrap" id="hamWrap">
+                        <button class="btn btn-view ham-btn" id="hamBtn" onclick="toggleHamburger()" data-tooltip="Menu — Browse all views">&#9776;</button>
+                        <div class="ham-dropdown" id="hamDropdown" style="display:none;">
+                            <div class="ham-group-title">Dashboard</div>
+                            <button class="ham-item" id="hamItem-dashboard" onclick="switchView('dashboard');switchDashTab('cr');closeHamburger()">Context Registers</button>
+                            <button class="ham-item" id="hamItem-dashboard-dr" onclick="switchView('dashboard');switchDashTab('dr');closeHamburger()">Data Registers</button>
+                            <button class="ham-item" id="hamItem-dashboard-gatelog" onclick="switchView('dashboard');switchDashTab('gatelog');closeHamburger()">Gate Log</button>
+                            <button class="ham-item" id="hamItem-dashboard-state" onclick="switchView('dashboard');switchDashTab('state');closeHamburger()">Machine State</button>
+                            <div class="ham-divider"></div>
+                            <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math</button>
+                            <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Code</button>
+                            <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
+                            <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace</button>
+                            <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Abstractions</button>
+                            <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline</button>
+                            <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference</button>
+                            <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder</button>
+                            <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');closeHamburger()">Docs</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="sim-controls">
                     <button class="btn btn-success" onclick="stepSim()" data-tooltip="Step — Execute one instruction and show the result">Step</button>
@@ -107,26 +117,6 @@
 
     <div id="dashboard" class="view active">
         <div id="flagsDisplay" class="flags-bar"></div>
-        <div id="hwLedBar" class="hw-led-bar">
-            <span class="hw-led-label">Ti60 F225</span>
-            <div class="hw-led-item">
-                <div class="hw-led hw-led-green" id="hw-led0"></div>
-                <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
-            </div>
-            <div class="hw-led-item">
-                <div class="hw-led hw-led-red" id="hw-led1"></div>
-                <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
-            </div>
-            <div class="hw-led-item">
-                <div class="hw-led hw-led-green" id="hw-led2"></div>
-                <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
-            </div>
-            <div class="hw-led-item">
-                <div class="hw-led hw-led-green" id="hw-led3"></div>
-                <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
-            </div>
-            <span class="hw-led-hint">← DWRITE CR3[0]</span>
-        </div>
         <div class="dash-tabs">
             <button onclick="switchDashTab('cr')" class="dash-tab active" id="dashTab-cr" data-tooltip="Context Registers — View all 16 context registers (128-bit, 4 words each)">Context Registers</button>
             <button onclick="switchDashTab('dr')" class="dash-tab" id="dashTab-dr" data-tooltip="Data Registers — View all 16 data registers (32-bit values, DR0 = zero)">Data Registers</button>
@@ -136,6 +126,26 @@
             <button onclick="switchDashTab('crdetail')" class="dash-tab" id="dashTab-crdetail" style="display:none;" data-tooltip="CR Detail — Detailed view of a single context register">CR Detail</button>
             <button onclick="exportSimulatorToGitHub()" class="dash-tab" id="dashTab-export" data-tooltip="Push to GitHub — Push simulator files to GitHub">Push to GitHub</button>
             <button class="btn" onclick="showLibrary()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" data-tooltip="Get from GitHub — Browse and share abstractions via Mum Tunnel Library">Get from GitHub</button>
+            <div id="hwLedBar" class="hw-led-bar hw-led-bar-inline">
+                <span class="hw-led-label">Ti60 F225</span>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-green" id="hw-led0"></div>
+                    <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
+                </div>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-red" id="hw-led1"></div>
+                    <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
+                </div>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-green" id="hw-led2"></div>
+                    <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
+                </div>
+                <div class="hw-led-item">
+                    <div class="hw-led hw-led-green" id="hw-led3"></div>
+                    <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
+                </div>
+                <span class="hw-led-hint">← DWRITE CR3[0]</span>
+            </div>
         </div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
