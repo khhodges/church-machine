@@ -355,159 +355,214 @@ class ChurchSimulator {
     }
 
     _bootStep() {
-        // All boot CRs use type=1 (Inform) GTs — they reference concrete NS slots with physical lumps.
-        // type=3 (Abstract) GTs are only created at runtime by Navana.Abstraction.Add and Navana.MintPassKey.
-        if (this.bootComplete) return false;
+        // All boot CRs are Inform-type (type=1) GTs — they name concrete NS slots that have
+        // physical lumps.  Abstract GTs (type=3) are only minted at runtime by Navana.Abstraction.Add
+        // and Navana.MintPassKey; the boot ROM never creates them.
+        if (this.bootComplete) return false;   // nothing to do once boot has finished
 
         switch (this.bootStep) {
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:00  FAULT_RST
+            // Hardware power-on reset: wipe all architectural state before any
+            // capability is loaded.  This is the only phase that runs unconditionally
+            // at every cold or warm reset.
+            // ════════════════════════════════════════════════════════════════════
             case 0: {
-                for (let i = 0; i < 16; i++) {
-                    this._clearCR(i);
+                for (let i = 0; i < 16; i++) {   // iterate CR0–CR15 (all 16 capability registers)
+                    this._clearCR(i);             // set each CR to NULL (word0=0, word1=0, …)
                 }
-                this.dr.fill(0);
-                this.mElevation = true;
+                this.dr.fill(0);                  // zero all 16 data registers (DR0–DR15)
+                this.mElevation = true;           // enable M-elevation: mLoad bypasses R/W/X/L perms during boot
                 this.output += '[BOOT] FAULT_RST — All CRs cleared to NULL, all DRs zeroed. M-Elevation ON.\n';
-                this.bootStep++;
-                this.ledBits = 0b000001; this.ledMode = 'boot';
+                this.bootStep++;                  // advance state machine → B:01
+                this.ledBits = 0b000001;          // LED bit 0 ON = FAULT_RST complete
+                this.ledMode = 'boot';            // set LED display to boot-progress mode
                 break;
             }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:01  LOAD_NS
+            // Load the Namespace descriptor (NS Slot 0) into CR15.
+            // CR15 is the privileged "namespace root": from here the hardware can
+            // locate every NS entry and therefore every lump in the system.
+            // Zero permissions — the NS slot is never directly read/written through
+            // CR15; it is only used internally by mLoad for bounds/version checks.
+            // ════════════════════════════════════════════════════════════════════
             case 1: {
-                const gt15 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
-                const check = this.mLoad(gt15, null, undefined);
+                const gt15 = this.createGT(0, 0, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
+                const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
                 if (!check.ok) {
-                    this.fault('BOOT', `LOAD_NS mLoad failed: ${check.message}`);
+                    this.fault('BOOT', `LOAD_NS mLoad failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
                     return false;
                 }
-                this._writeCR(15, gt15, check.entry);
+                this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
                 this.output += `[BOOT] LOAD_NS — CR15 <- mLoad(Slot 0) Namespace (base=0x0000, size=${this.memory.length} words, NS table entries=${this.nsCount})\n`;
-                this.bootStep++;
-                this.ledBits = 0b000011;
+                this.bootStep++;                  // advance state machine → B:02
+                this.ledBits = 0b000011;          // LED bit 1 ON = LOAD_NS complete
                 break;
             }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:02  INIT_THRD
+            // Load the Thread descriptor (NS Slot 1) into CR12.
+            // CR12 is the "thread identity" register: its NS entry encodes the lump
+            // base address and total size, from which the hardware derives the stack
+            // ceiling (sp_max = lumpSize − caps − 1) and heap floor.
+            // Zero permissions — the hardware reads CR12 internally; programs never
+            // issue mLoad/mSave through CR12 directly.
+            // ════════════════════════════════════════════════════════════════════
             case 2: {
-                const gt12 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
-                const check12 = this.mLoad(gt12, null, undefined);
+                const gt12 = this.createGT(0, 1, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
+                const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
                 if (!check12.ok) {
                     this.fault('BOOT', `INIT_THRD mLoad(Thread) failed: ${check12.message}`);
                     return false;
                 }
-                this._writeCR(12, gt12, check12.entry);
+                this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread identity token (encodes lump base + size)
                 this.output += `[BOOT] INIT_THRD — CR12 <- mLoad(Slot 1) Thread identity (zero perms, Inform)\n`;
-                this.bootStep++;
-                this.ledBits = 0b000111;
+                this.bootStep++;                  // advance state machine → B:03
+                this.ledBits = 0b000111;          // LED bit 2 ON = INIT_THRD complete
                 break;
             }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:03  INIT_ABSTR  (falls through directly to B:04 — indivisible pair)
+            // Load the Boot Abstraction descriptor (NS Slot 2) into CR6 with E-perm.
+            // The E-type GT written here is a transient snapshot: case 4 immediately
+            // snapshots it as oldCR6GT before overwriting CR6 with the L-type c-list
+            // token that LOAD_NUC derives from the lump header.
+            // ════════════════════════════════════════════════════════════════════
             case 3: {
-                const gt6 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                const check6 = this.mLoad(gt6, null, undefined);
+                const gt6 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm Inform GT for NS Slot 2 (Boot.Abstr)
+                const check6 = this.mLoad(gt6, null, undefined);                   // M-elevation mLoad; validates Boot.Abstr NS entry
                 if (!check6.ok) {
                     this.fault('BOOT', `INIT_ABSTR mLoad(Boot.Abstr) failed: ${check6.message}`);
                     return false;
                 }
-                this._writeCR(6, gt6, check6.entry);
+                this._writeCR(6, gt6, check6.entry);                              // CR6 ← E-type Inform token for Slot 2 (will be saved to stack frame in B:04)
                 this.output += '[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot 2) Boot.Abstr (E, M-elevation)\n';
-                this.bootStep++;
-                this.ledBits = 0b001111;
-                // B:03 INIT_ABSTR and B:04 LOAD_NUC are indivisible — both execute in one Step
+                this.bootStep++;                  // advance state machine → B:04
+                this.ledBits = 0b001111;          // LED bit 3 ON = INIT_ABSTR complete
+                // ↓ fall through — B:03 and B:04 always execute together in one Step
             }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:04  LOAD_NUC  (and B:05 COMPLETE, also indivisible)
+            // "Load Nucleus": the hardware's CALL microcode for the Boot Abstraction.
+            //
+            //   1. Re-issue an E-type mLoad on Slot 2 to walk its C-List (TPERM).
+            //   2. Read lump header[0] to extract cc (c-list words) and lumpSize.
+            //   3. Push a sentinel CALL frame into thread lump memory so that any
+            //      eventual RETURN from the root abstraction reboots the machine.
+            //   4. Simultaneously derive CR14 (code, R+X) and CR6 (c-list, L) from
+            //      the lump header — exactly as the CALL microcode does at runtime.
+            //   5. Set PC = 0 (first instruction of the Boot Abstraction).
+            //   6. Drop M-elevation and mark boot complete.
+            // ════════════════════════════════════════════════════════════════════
             case 4: {
-                const gt2 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                const check2 = this.mLoad(gt2, 'E', undefined);
+                // ── Step 1: TPERM — walk Boot.Abstr C-List via E-perm mLoad ──────────
+                const gt2 = this.createGT(0, 2, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);   // re-issue E-GT for Slot 2; triggers TPERM permission check
+                const check2 = this.mLoad(gt2, 'E', undefined);                    // E-perm mLoad: validates NS entry and returns C-List base
                 if (!check2.ok) {
                     this.fault('BOOT', `LOAD_NUC mLoad(Boot.Abstr) failed: ${check2.message}`);
                     return false;
                 }
-                const abstrEntry = check2.entry;
-                const abstrParsed = this.parseNSWord1(abstrEntry.word1_limit);
-                if (abstrParsed.f === 1) {
+                const abstrEntry = check2.entry;                                    // NS entry for Slot 2: word0_location = lump base address
+                const abstrParsed = this.parseNSWord1(abstrEntry.word1_limit);     // decode NS word1 to extract the F (Far) bit
+                if (abstrParsed.f === 1) {                                          // Far-lumps are not supported at boot (cross-chip capability)
                     this.fault('BOOT', 'LOAD_NUC: Boot.Abstr has F-bit set (Far) — FAULT');
                     return false;
                 }
-                if (check2.parsed.type !== 1) {
+                if (check2.parsed.type !== 1) {                                     // must be Inform (type=1); Abstract GTs forbidden at boot
                     this.fault('BOOT', `LOAD_NUC: Boot.Abstr type is ${check2.parsed.typeName}, must be Inform`);
                     return false;
                 }
-                const base = abstrEntry.word0_location;
-                // Read lump header at word 0 — hardware fetches this to simultaneously derive CR14+CR6
-                const hdrWord = this.memory[base] >>> 0;
-                const hdr = this.parseLumpHeader(hdrWord);
-                if (!hdr.valid) {
+
+                // ── Step 2: Read lump header (word 0) ────────────────────────────────
+                const base = abstrEntry.word0_location;                             // physical memory index of Boot.Abstr lump word 0
+                const hdrWord = this.memory[base] >>> 0;                            // raw 32-bit lump header word (magic | cc | cw | lumpSize)
+                const hdr = this.parseLumpHeader(hdrWord);                          // decode header fields into {magic, cc, cw, lumpSize, valid}
+                if (!hdr.valid) {                                                    // magic field must be 0x1F; any other value = corrupt image
                     this.fault('BOOT', `LOAD_NUC: lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F)`);
                     return false;
                 }
-                const cw        = hdr.cw;
-                const cc        = hdr.cc;
-                const lumpSz    = hdr.lumpSize;
-                const clistStart = lumpSz - cc;   // c-list at physical end of slot
-                if (cc === 0) {
+                const cw        = hdr.cw;                                           // code-words count (used by IDE for heap allocation; not used here)
+                const cc        = hdr.cc;                                           // c-list word count: fixes start of c-list zone in the lump
+                const lumpSz    = hdr.lumpSize;                                     // total lump size in 32-bit words
+                const clistStart = lumpSz - cc;                                     // c-list begins at the physical end of the slot (offset from base)
+                if (cc === 0) {                                                      // a zero cc means no C-List — CR6 cannot be set, so boot cannot proceed
                     this.fault('BOOT', 'LOAD_NUC: lump header cc=0 — no C-List');
                     return false;
                 }
 
-                // ── Sentinel CALL frame ────────────────────────────────────────────────
-                // Before overwriting CR6/CR14 with the callee's tokens, push a sentinel
-                // CALL frame exactly as the CALL microcode does:
-                //   STO+0 = frameWord (NIA=0x7FFF poison, sz=1, prev_STO=sp_max)
-                //   STO−1 = old CR6 E-GT (the E-type Inform token from step 3)
-                // Any RETURN from the root abstraction finds this sentinel and reboots.
-                const sp_max = 243;  // lumpSize(256) − caps(12) − 1
-                const oldCR6GT = this.cr[6].word0 >>> 0;  // E-type from INIT_ABSTR (step 3)
-                // Build sentinel frameWord: NIA=0x7FFF (all 15 bits = 1, poison marker)
-                const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max);
-                this.callStack.push({
-                    sentinel: true,
-                    returnPC: 0x7FFF,
-                    savedCRs: this.cr.map(c => ({...c})),
-                    savedDRs: [...this.dr],
-                    savedFlags: {...this.flags},
-                    savedSTO: sp_max,
-                    sz: 1,
-                    frameWord: sentinelFrameWord,
+                // ── Step 3: Push sentinel CALL frame ─────────────────────────────────
+                // CALL microcode saves the caller's CR6 E-GT and a frame word on the
+                // stack before overwriting CR6/CR14.  We replicate that here so that
+                // RETURN from the root abstraction sees a valid (sentinel) frame and
+                // reboots rather than crashing with an empty-stack fault.
+                const sp_max = 243;                                                  // stack ceiling: lumpSize(256) − caps(12) − 1 = 243
+                const oldCR6GT = this.cr[6].word0 >>> 0;                            // snapshot E-type GT written by B:03 INIT_ABSTR
+                const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max); // frameWord: NIA=0x7FFF (poison, all 15 bits set), sz=1 (CALL frame), prev_STO=243
+                this.callStack.push({               // push to JS call-stack mirror so RETURN handler can inspect it
+                    sentinel: true,                 // flag: RETURN will detect this and call _returnToBoot()
+                    returnPC: 0x7FFF,               // poison return address — never executed, catches stray RETs
+                    savedCRs: this.cr.map(c => ({...c})), // snapshot of all CRs at boot entry point
+                    savedDRs: [...this.dr],         // snapshot of all DRs (all zero at boot)
+                    savedFlags: {...this.flags},     // snapshot of flags (all clear at boot)
+                    savedSTO: sp_max,               // previous STO = sp_max = 243 (the empty-stack sentinel value)
+                    sz: 1,                          // sz=1 → CALL-type frame (not LAMBDA)
+                    frameWord: sentinelFrameWord,   // packed frame word for display in thread lump view
                 });
-                const threadBase = this.cr[12] && this.cr[12].word1;
+                const threadBase = this.cr[12] && this.cr[12].word1;               // physical base of thread lump (from CR12 NS entry, set in B:02)
                 if (threadBase) {
-                    this.memory[threadBase + sp_max]     = sentinelFrameWord;  // +243: frame word
-                    this.memory[threadBase + sp_max - 1] = oldCR6GT;           // +242: E-GT
+                    this.memory[threadBase + sp_max]     = sentinelFrameWord;       // lump[+243] = frame word (visible in ② stack zone as orange "sentinel")
+                    this.memory[threadBase + sp_max - 1] = oldCR6GT;               // lump[+242] = saved E-type CR6 GT from B:03
                 }
-                this.sto = sp_max - 2;  // = 241
+                this.sto = sp_max - 2;              // STO = 241: two words consumed by the sentinel frame (frame word + E-GT)
 
-                // ── CR14 (code, X) and CR6 (c-list, L) set simultaneously from header ─
-                const cr14GT = this.createGT(0, 2, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-                const cr14Word1 = this.packNSWord1(lumpSz - cc - 2, 0, 0, 0, 0, 1, 0);
+                // ── Step 4: Derive CR14 (code) and CR6 (c-list) from lump header ─────
+                // Hardware does this simultaneously from the header word; both tokens
+                // are Inform-type, zero gt_seq, referencing Slot 2 (same physical lump).
+                const cr14GT = this.createGT(0, 2, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);         // R+X Inform GT for Slot 2 → CR14 is the code-execution token
+                const cr14Word1 = this.packNSWord1(lumpSz - cc - 2, 0, 0, 0, 0, 1, 0);     // NS word1 encodes limit = lumpSz − cc − 2 (excludes header word 0 and c-list)
                 this.cr[14] = {
-                    word0: cr14GT,
-                    word1: base,
-                    word2: cr14Word1,
-                    word3: abstrEntry.word2_seals,
-                    m: this.mElevation ? 1 : 0
+                    word0: cr14GT,                  // Golden Token identifying the code lump
+                    word1: base,                    // physical base address of lump (first instruction at base+0)
+                    word2: cr14Word1,               // limit word (max reachable instruction offset)
+                    word3: abstrEntry.word2_seals,  // seal field copied from NS entry (version + seal bits)
+                    m: this.mElevation ? 1 : 0     // M-elevation is still ON at this point (cleared below)
                 };
 
-                const cr6GT = this.createGT(0, 2, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
-                const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);
+                const cr6GT = this.createGT(0, 2, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);          // L-perm Inform GT for Slot 2 → CR6 is the c-list (capability-list) token
+                const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);               // NS word1 encodes limit = cc − 1 (covers all c-list words)
                 this.cr[6] = {
-                    word0: cr6GT,
-                    word1: (base + clistStart) >>> 0,
-                    word2: cr6Word1,
-                    word3: abstrEntry.word2_seals,
+                    word0: cr6GT,                   // Golden Token with L-perm (allows mLoad of c-list entries)
+                    word1: (base + clistStart) >>> 0, // physical base of c-list zone (= base + lumpSz − cc)
+                    word2: cr6Word1,                // limit word for the c-list region
+                    word3: abstrEntry.word2_seals,  // same seal field as CR14
                     m: this.mElevation ? 1 : 0
                 };
-                // CR6 is NOT written to caps zone — it lives in the stack frame
+                // NOTE: CR6 is NOT written back to the caps zone (+250) — it lives exclusively
+                // in CALL stack frames.  The caps zone entry for CR6 remains 0 until a SAVE runs.
 
-                this.pc = 0;
+                // ── Step 5: Set PC and emit log ───────────────────────────────────────
+                this.pc = 0;                        // first instruction of Boot Abstraction is at lump word 0 (offset from lump base)
                 this.output += `[BOOT] LOAD_NUC — hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← simultaneous from lump header; CR14(X,lim=${lumpSz-cc-2}) CR6(L,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
                 this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
-                this.bootStep++;
-                // B:04 LOAD_NUC and B:05 COMPLETE are indivisible — both execute in one Step
-                this.mElevation = false;
-                this.bootComplete = true;
-                this.ledBits = 0b111111;
-                this.ledMode = 'boot';
+
+                // ── Step 6 (B:05): COMPLETE ───────────────────────────────────────────
+                this.bootStep++;                    // advance state machine → B:05 (COMPLETE)
+                this.mElevation = false;            // drop M-elevation: normal capability checks now apply to all subsequent instructions
+                this.bootComplete = true;           // signal the step-loop to stop calling _bootStep and start dispatching instructions
+                this.ledBits = 0b111111;            // all 6 LEDs ON = boot complete
+                this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
                 this.output += '[BOOT] COMPLETE — M-Elevation OFF. All Layer 0–1 abstractions initialized. Boot complete.\n';
                 break;
             }
         }
-        this.emit('stateChange', this.getState());
-        return true;
+        this.emit('stateChange', this.getState());  // notify UI that machine state has changed (triggers register/memory panel refresh)
+        return true;                                 // return true = a boot step was executed; false = already complete or faulted
     }
 
     parseGT(gt32) {
