@@ -2219,7 +2219,7 @@ class CLOOMCCompiler {
             if (t.match(/^(read|write|load|save)\s+(from|to|the value)\s+/)) englishScore++;
             if (t.match(/^(call|run|execute|invoke)\s+/)) englishScore++;
             if (t.match(/^(that takes|which takes|with parameters?|with inputs?)\s+/)) englishScore++;
-            if (t.match(/^\w+\s*\([^)]*\)\s*:?\s*$/)) hasBlockMethod = true;
+            if (t.match(/^\w+\s*\([^)]*\)\s*:\s*$/)) hasBlockMethod = true;  // colon required — bare JS signatures don't qualify
             if (t.match(/^(add|multiply|subtract|divide)\s+\w+\s+(to|by|from)\s+/)) hasEnglishBody = true;
             if (t.match(/\band\s+return\s+(the\s+)?/)) hasEnglishBody = true;
         }
@@ -2255,6 +2255,19 @@ class CLOOMCCompiler {
         const result = { name: '', capabilities: [], methods: [] };
         const lines = source.split('\n');
         let currentMethod = null;
+
+        // Guard: reject plain JS class/module files immediately with a clear message
+        const isJsClassFile = /^\s*class\s+\w+/m.test(source) ||
+                              /^\s*(?:export\s+)?(?:default\s+)?class\s+/m.test(source) ||
+                              /registry\.(bind|register)\s*\(/.test(source);
+        if (isJsClassFile) {
+            errors.push({ line: 0, message: 'Source looks like a JavaScript class file, not CLOOMC++ English.' });
+            errors.push({ line: 0, message: 'English mode expects natural language, e.g.:' });
+            errors.push({ line: 0, message: '  Create an abstraction called MyDevice' });
+            errors.push({ line: 0, message: '  Add a method called Send that takes data' });
+            errors.push({ line: 0, message: '    Write data to the UART register' });
+            return result;
+        }
 
         const firstLine = lines[0] ? lines[0].trim() : '';
         const blockMatch = firstLine.match(/^(?:ENGLISH\s+)?abstraction\s+(\w+)\s*\{?\s*$/i);
