@@ -11124,6 +11124,7 @@ function smartCompile() {
 }
 
 function compileDraftAssembly(source, con) {
+    switchCodeTab('console');
     if (!source || !source.trim()) {
         if (con) con.textContent = 'Draft — no code to draft. Enter assembly code first.';
         return;
@@ -11175,6 +11176,7 @@ function compileDraft() {
     const con = document.getElementById('editorConsole');
 
     if (!cloomcCompiler) return;
+    switchCodeTab('console');
 
     const isHighLevel = cloomcCompiler._detectEnglish(source) ||
                         cloomcCompiler._detectHaskell(source) ||
@@ -11297,6 +11299,7 @@ function compileCLOOMC() {
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    switchCodeTab('console');
 
     const capabilities = [];
     const result = cloomcCompiler.compile(source, capabilities);
