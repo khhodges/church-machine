@@ -807,16 +807,30 @@ class ChurchSimulator {
 
         // ── Phase 1: MARK ────────────────────────────────────────────────────
         const p1Lines = [];
-        p1Lines.push(`Polarity: G=${garbageValue} = garbage, G=${liveValue} = live`);
         const priorCount = this.nsCount;
+
+        // Collect holes and mark in a single pass
+        const holes = [];
         let markCount = 0;
         for (let i = 0; i < priorCount; i++) {
-            if (!this.isNSEntryValid(i)) continue;
-            this.markGarbage(i);
-            markCount++;
+            if (!this.isNSEntryValid(i)) {
+                holes.push(i);
+            } else {
+                this.markGarbage(i);
+                markCount++;
+            }
         }
-        p1Lines.push(`Marked ${markCount} valid NS entries as garbage suspects`);
-        p1Lines.push(`(Pessimistic assumption — every entry is suspect until proven live)`);
+
+        // Overview shown BEFORE marking description
+        p1Lines.push(`Namespace table: ${priorCount} slot${priorCount !== 1 ? 's' : ''}  [NS[0]..NS[${priorCount - 1}]]`);
+        p1Lines.push(`  ${markCount} valid  ·  ${holes.length} empty ${holes.length === 1 ? 'hole' : 'holes'}`);
+        if (holes.length > 0) {
+            p1Lines.push(`  Holes: ${holes.map(h => 'NS[' + h + ']').join(', ')}`);
+        }
+        p1Lines.push('');
+        p1Lines.push(`Polarity: G=${garbageValue} = garbage,  G=${liveValue} = live`);
+        p1Lines.push(`Marked all ${markCount} valid entries as garbage suspects`);
+        p1Lines.push('(Pessimistic — every entry suspect until proven reachable)');
         log.push('--- Phase 1: MARK ---');
         log.push(...p1Lines);
         log.push('');
@@ -961,10 +975,29 @@ class ChurchSimulator {
         this.nsCount = newCount;
 
         this.gcPolarity = this.gcPolarity ? 0 : 1;
+
+        // Slot accounting
         p4Lines.push('');
-        p4Lines.push(`${priorCount}  entries before GC`);
-        p4Lines.push(`−  ${freedSlots}  freed (unreachable, no CR root)`);
-        p4Lines.push(`=  ${newCount}  entries remaining`);
+        if (freedSlots > 0) {
+            p4Lines.push(`Reclaimed by this GC run:`);
+            for (const c of candidates) {
+                if (c.index === 0) continue;
+                p4Lines.push(`  NS[${c.index}]  "${c.label}"`);
+            }
+        } else {
+            p4Lines.push('No slots reclaimed — all entries were reachable');
+        }
+        if (holes.length > 0) {
+            p4Lines.push('');
+            p4Lines.push(`Already free before GC (empty holes):`);
+            p4Lines.push(`  ${holes.map(h => 'NS[' + h + ']').join('  ')}`);
+        } else {
+            p4Lines.push('No empty holes — table was contiguous');
+        }
+        p4Lines.push('');
+        p4Lines.push(`${priorCount}  slots before GC`);
+        p4Lines.push(`−  ${freedSlots}  reclaimed  (unreachable, no CR root)`);
+        p4Lines.push(`=  ${newCount}  slots remaining`);
         p4Lines.push('');
         p4Lines.push(`${freedWords} lump words reclaimed`);
         p4Lines.push(`Polarity flipped → G=${this.gcPolarity} marks garbage next run`);
