@@ -1,3 +1,6 @@
+// Offset of the caps zone (CR0-CR11 GT home slots) inside a 256-word thread lump
+const THREAD_CAPS_OFFSET = 244;
+
 class ChurchSimulator {
     constructor() {
         this._listeners = {};
@@ -461,6 +464,9 @@ class ChurchSimulator {
                     word3: abstrEntry.word2_seals,
                     m: this.mElevation ? 1 : 0
                 };
+                // Persist CR6 GT to thread home slot (direct struct write bypasses _writeCR)
+                const tnBase6 = this.cr[12] && this.cr[12].word1;
+                if (tnBase6) this.memory[tnBase6 + THREAD_CAPS_OFFSET + 6] = cr6GT >>> 0;
 
                 this.pc = 0;
                 this.output += `[BOOT] LOAD_NUC — hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← simultaneous from lump header; CR14(X,lim=${lumpSz-cc-2}) CR6(L,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
@@ -850,17 +856,32 @@ class ChurchSimulator {
         return { freedSlots, freedWords, liveCount: liveSet.size, report };
     }
 
+
     _writeCR(crIdx, gt32, entry) {
         this.cr[crIdx].word0 = gt32;
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
         this.cr[crIdx].word2 = entry.word1_limit >>> 0;
         this.cr[crIdx].word3 = entry.word2_seals >>> 0;
         this.cr[crIdx].m = this.mElevation ? 1 : 0;
+        // Persist GT to thread lump home slot (caps zone, CR0-CR11 only)
+        if (crIdx <= 11) {
+            const threadBase = this.cr[12] && this.cr[12].word1;
+            if (threadBase) {
+                this.memory[threadBase + THREAD_CAPS_OFFSET + crIdx] = gt32 >>> 0;
+            }
+        }
         return true;
     }
 
     _clearCR(crIdx) {
         this.cr[crIdx] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+        // Zero the home slot too
+        if (crIdx <= 11) {
+            const threadBase = this.cr[12] && this.cr[12].word1;
+            if (threadBase) {
+                this.memory[threadBase + THREAD_CAPS_OFFSET + crIdx] = 0;
+            }
+        }
     }
 
     checkCondition(condCode) {
@@ -1245,6 +1266,9 @@ class ChurchSimulator {
                 word3: nsEntry.word2_seals,
                 m: this.mElevation ? 1 : 0
             };
+            // Persist CR6 GT to thread home slot (direct struct write bypasses _writeCR)
+            const tnBase6c = this.cr[12] && this.cr[12].word1;
+            if (tnBase6c) this.memory[tnBase6c + THREAD_CAPS_OFFSET + 6] = cr6GT >>> 0;
 
             cr7Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(X,cw=${cw},lim=${lumpSz-cc-2}) CR6(L,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
         } else {
@@ -1471,8 +1495,13 @@ class ChurchSimulator {
         const mask = d.imm & 0xFFF;
         const frame = this.callStack.pop();
         if (frame.savedCRs) {
+            const tnBaseRet = this.cr[12] && this.cr[12].word1;
             for (let i = 0; i < frame.savedCRs.length; i++) {
                 this.cr[i] = {...frame.savedCRs[i]};
+                // Restore GT home slot for CR0-CR11
+                if (i <= 11 && tnBaseRet) {
+                    this.memory[tnBaseRet + THREAD_CAPS_OFFSET + i] = this.cr[i].word0 >>> 0;
+                }
             }
         }
         if (frame.savedDRs) this.dr = [...frame.savedDRs];
