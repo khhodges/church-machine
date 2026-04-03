@@ -648,7 +648,7 @@ function renderCListEntryDetail(nsIdx, entry) {
         // ── Read lump header at word 0 to derive layout (hardware-accurate) ─────────
         const hdrRaw  = (loc < sim.memory.length) ? (sim.memory[loc] >>> 0) : 0;
         const hdr     = sim.parseLumpHeader(hdrRaw);
-        if (hdr.valid && hdr.cc > 0) {
+        if (hdr.valid) {
             const cw        = hdr.cw;          // declared code word count
             const cc        = hdr.cc;          // c-list slot count
             const lumpSize  = hdr.lumpSize;    // physical slot size (2^(n_minus_6+6))
@@ -725,26 +725,57 @@ function renderCListEntryDetail(nsIdx, entry) {
             gtHtml += '</tbody></table>';
             h += gtHtml;
         } else {
-            let hasData = false;
-            const asm = new ChurchAssembler();
-            let memHtml = '<table class="cr-table code-view-table"><thead><tr><th>Addr</th><th>Hex</th><th>Decode</th></tr></thead><tbody>';
-            for (let w = 0; w < wordCount; w++) {
-                const addr = loc + w;
-                if (addr >= sim.memory.length) break;
-                const word = sim.memory[addr];
-                if (word === 0 && !hasData) continue;
-                hasData = true;
-                const decoded = asm.disassemble(word);
-                memHtml += `<tr>`;
-                memHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
-                memHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-                memHtml += `<td class="code-disasm">${decoded}</td>`;
-                memHtml += '</tr>';
+            // No valid lump header — derive LUMP layout from NS entry fields
+            const cc2        = lim.clistCount;
+            const allocSize2 = lim.limit + 1;
+            const clistStart2 = cc2 > 0 ? (allocSize2 - cc2) : allocSize2;
+            const locHex2    = '0x' + loc.toString(16).toUpperCase().padStart(4,'0');
+            const hdrHex2    = '0x' + (hdrRaw >>> 0).toString(16).toUpperCase().padStart(8,'0');
+            // Header note
+            h += `<div class="clist-detail-title" style="margin-top:0.4rem;color:rgba(156,220,254,0.35);">Header`;
+            h += ` <span style="font-size:0.72rem;color:#3f3f46;">no lump header at ${locHex2}`;
+            h += ` \u00b7 layout from NS entry \u00b7 alloc=${allocSize2}w \u00b7 cc=${cc2}</span></div>`;
+            h += '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
+            h += `<tr style="opacity:0.3;"><td class="cr-idx">+0</td>`;
+            h += `<td class="cr-idx">${locHex2}</td>`;
+            h += `<td class="cr-gt">${hdrHex2}</td>`;
+            h += `<td class="code-disasm" style="font-style:italic;color:#3f3f46;">(no lump header \u2014 raw word)</td></tr>`;
+            h += '</tbody></table>';
+            // Code section
+            h += `<div class="clist-detail-title" style="margin-top:0.3rem;">CLOOMC Code`;
+            if (clistStart2 === 0) {
+                h += ' <span style="color:#555;font-size:0.72rem;">(no code region)</span>';
             }
-            memHtml += '</tbody></table>';
-            if (hasData) {
-                h += '<div class="clist-detail-title" style="margin-top:0.4rem;">Memory Contents</div>';
-                h += memHtml;
+            h += '</div>';
+            if (clistStart2 > 0) {
+                const asm2 = new ChurchAssembler();
+                let codeHtml2 = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th></tr></thead><tbody>';
+                for (let w = 0; w < clistStart2; w++) {
+                    const addr = loc + w;
+                    if (addr >= sim.memory.length) break;
+                    const word = sim.memory[addr] >>> 0;
+                    const decoded = word === 0 ? 'HALT' : asm2.disassemble(word);
+                    const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
+                    codeHtml2 += `<tr${dimmed}><td class="cr-idx">+${w}</td>`;
+                    codeHtml2 += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
+                    codeHtml2 += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
+                    codeHtml2 += `<td class="code-disasm">${decoded}</td></tr>`;
+                }
+                codeHtml2 += '</tbody></table>';
+                h += codeHtml2;
+            }
+            // C-List section
+            if (cc2 > 0) {
+                h += `<div class="clist-detail-title" style="margin-top:0.4rem;">C-List (${cc2} GT entries)</div>`;
+                let gtHtml2 = '<table class="cr-table code-view-table"><thead><tr><th>#</th><th>Addr</th><th>Hex</th><th>GT Decoded</th></tr></thead><tbody>';
+                for (let w = 0; w < cc2; w++) {
+                    const addr = loc + clistStart2 + w;
+                    if (addr >= sim.memory.length) break;
+                    const word = sim.memory[addr] || 0;
+                    gtHtml2 += _renderGTRow(w, addr, word);
+                }
+                gtHtml2 += '</tbody></table>';
+                h += gtHtml2;
             }
         }
     }
@@ -1513,7 +1544,7 @@ function renderMemoryDump(location, limit, nsIndex) {
         // ── Read lump header at word 0 to derive layout (hardware-accurate) ──────
         const hdrWord    = (location < sim.memory.length) ? (sim.memory[location] >>> 0) : 0;
         const hdr        = sim.parseLumpHeader(hdrWord);
-        if (hdr.valid && hdr.cc > 0) {
+        if (hdr.valid) {
             const cw         = hdr.cw;
             const cc         = hdr.cc;
             const lumpSize   = hdr.lumpSize;
@@ -1597,6 +1628,60 @@ function renderMemoryDump(location, limit, nsIndex) {
             html += '</tbody></table>';
             return html;
         } else {
+            // No valid lump header — derive LUMP layout from NS entry metadata
+            const nsEntry2  = sim.readNSEntry(nsIndex);
+            const lim2      = nsEntry2 ? sim.parseNSWord1(nsEntry2.word1_limit) : null;
+            if (lim2 && lim2.limit > 0) {
+                const cc2        = lim2.clistCount;
+                const allocSize2 = lim2.limit + 1;
+                const clistStart2 = cc2 > 0 ? (allocSize2 - cc2) : allocSize2;
+                const lumpVer2   = (nsEntry2.word2_seals >>> 25) & 0x7F;
+                const lumpSeal2  = nsEntry2.word2_seals & 0xFFFF;
+                const locHex2    = '0x' + location.toString(16).toUpperCase().padStart(4, '0');
+                const hdrHex2    = '0x' + (hdrWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
+
+                html  = `<div style="color:rgba(156,220,254,0.3);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">Header`;
+                html += ` <span style="color:#3f3f46;font-size:0.72rem;">no lump header at ${locHex2}`;
+                html += ` \u00b7 layout from NS entry \u00b7 alloc=${allocSize2}w \u00b7 cc=${cc2}`;
+                html += ` \u00b7 ver=${lumpVer2} \u00b7 CRC=0x${lumpSeal2.toString(16).toUpperCase().padStart(4,'0')}</span></div>`;
+                html += '<table class="ns-mem-table"><thead><tr><th>Offset</th><th>Address</th><th>Hex</th><th>Note</th></tr></thead><tbody>';
+                html += `<tr style="opacity:0.3;">`;
+                html += `<td style="color:#3f3f46;">+0</td>`;
+                html += `<td style="font-family:monospace;color:#3f3f46;">${locHex2}</td>`;
+                html += `<td style="font-family:monospace;color:#3f3f46;">${hdrHex2}</td>`;
+                html += `<td style="color:#3f3f46;font-style:italic;font-size:0.72rem;">(no lump header \u2014 raw word)</td>`;
+                html += `</tr></tbody></table>`;
+
+                html += `<div style="color:rgba(156,220,254,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.2rem;">CLOOMC Code`;
+                html += ` <span style="color:#3f3f46;font-size:0.72rem;">words +0\u2013+${clistStart2 > 0 ? clistStart2-1 : 0} \u00b7 ${clistStart2} words</span></div>`;
+                html += '<table class="ns-mem-table"><thead><tr><th>Offset</th><th>Address</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
+                var asm2 = new ChurchAssembler();
+                for (let i = 0; i < clistStart2; i++) {
+                    const addr = location + i;
+                    if (addr >= sim.memory.length) break;
+                    const word = sim.memory[addr] || 0;
+                    const hex = '0x' + (word >>> 0).toString(16).toUpperCase().padStart(8, '0');
+                    const decoded = word === 0 ? '<span style="color:#666;">0 (empty)</span>' : asm2.disassemble(word);
+                    const addrHex = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+                    html += `<tr><td style="color:#666;">+${i}</td><td>${addrHex}</td><td style="color:rgba(206,145,120,0.6);">${hex}</td><td>${decoded}</td></tr>`;
+                }
+                html += '</tbody></table>';
+
+                if (cc2 > 0) {
+                    html += `<div style="color:rgba(200,155,60,0.7);font-size:0.75rem;padding:0.15rem 0.5rem;margin-top:0.3rem;">C-List (${cc2} GT entries)</div>`;
+                    html += '<table class="ns-mem-table"><thead><tr><th>#</th><th>Address</th><th>Hex</th><th>GT Decoded</th></tr></thead><tbody>';
+                    for (let i = 0; i < cc2; i++) {
+                        const addr = location + clistStart2 + i;
+                        if (addr >= sim.memory.length) break;
+                        const word = sim.memory[addr] || 0;
+                        html += _renderGTRow(i, addr, word);
+                    }
+                    html += '</tbody></table>';
+                }
+
+                return html;
+            }
+            // Fallback: last resort plain hex dump
             var asm = new ChurchAssembler();
             for (let i = 0; i < wordCount; i++) {
                 const addr = location + i;
