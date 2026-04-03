@@ -299,9 +299,9 @@
                     </div>
                     <div id="codeHistoryContent"></div>
                 </div>
-                <div id="codeJsPanel" style="display:none;">
-                    <div id="codeJsFileBar" style="display:flex;flex-wrap:wrap;gap:0.3rem;padding:0.35rem 0.4rem;border-bottom:1px solid var(--border);"></div>
-                    <pre id="codeJsSource" style="flex:1;overflow:auto;margin:0;padding:0.5rem 0.7rem;font-size:0.72rem;line-height:1.5;background:var(--bg-secondary);color:var(--text-primary);white-space:pre;tab-size:4;"></pre>
+                <div id="codeJsPanel" style="display:none;flex-direction:column;height:100%;overflow:hidden;">
+                    <div id="codeJsFileBar" style="flex-shrink:0;display:flex;flex-wrap:wrap;gap:0.3rem;padding:0.35rem 0.4rem;border-bottom:1px solid var(--border);"></div>
+                    <pre id="codeJsSource" style="flex:1;min-height:0;overflow:auto;margin:0;padding:0.5rem 0.7rem;font-size:0.72rem;line-height:1.5;background:var(--bg-secondary);color:var(--text-primary);white-space:pre;tab-size:4;"></pre>
                 </div>
             </div>
         </div>

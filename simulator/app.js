@@ -6636,7 +6636,7 @@ function switchCodeTab(tab) {
         if (tabSyntax) tabSyntax.classList.add('active');
         if (typeof renderSyntaxRef === 'function') renderSyntaxRef();
     } else if (tab === 'js') {
-        if (jsPanel) jsPanel.style.display = 'block';
+        if (jsPanel) jsPanel.style.display = 'flex';
         if (tabJs) tabJs.classList.add('active');
         renderJsTab();
     } else {
