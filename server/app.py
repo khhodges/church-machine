@@ -50,6 +50,7 @@ def _serve_file(filepath, filename):
     if request.headers.get('If-None-Match') == etag:
         resp = make_response('', 304)
         resp.headers['ETag'] = etag
+        resp.headers['Cache-Control'] = 'no-cache'
         return resp
     ct = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
     ae = request.headers.get('Accept-Encoding', '')
@@ -76,6 +77,7 @@ def _serve_file(filepath, filename):
             resp.headers['Content-Length'] = len(compressed)
             resp.headers['Vary'] = 'Accept-Encoding'
             resp.headers['ETag'] = etag
+            resp.headers['Cache-Control'] = 'no-cache'
             return resp
         if raw is None:
             with open(filepath, 'rb') as f:
@@ -84,6 +86,7 @@ def _serve_file(filepath, filename):
         resp.headers['Content-Type'] = ct
         resp.headers['Content-Length'] = len(raw)
         resp.headers['ETag'] = etag
+        resp.headers['Cache-Control'] = 'no-cache'
         return resp
     with open(filepath, 'rb') as f:
         data = f.read()
@@ -91,6 +94,7 @@ def _serve_file(filepath, filename):
     resp.headers['Content-Type'] = ct
     resp.headers['Content-Length'] = len(data)
     resp.headers['ETag'] = etag
+    resp.headers['Cache-Control'] = 'no-cache'
     return resp
 
 @app.after_request
