@@ -107,6 +107,7 @@
                     <button class="btn btn-success sim-icon-btn" onclick="runSim()" data-tooltip="Run — Execute until halt or fault">&#x1F3C3;</button>
                     <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence">&#x21BA;</button>
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>
+
                     <div class="help-menu-wrap" id="helpMenuWrap">
                         <button class="btn btn-sm builder-help-btn" onclick="toggleHelpMenu()" data-tooltip="Help &amp; Guides — Access all guides and the welcome overview">?</button>
                         <div class="help-dropdown" id="helpDropdown" style="display:none;">
@@ -118,26 +119,6 @@
                         </div>
                     </div>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
-                    <div id="hwLedBar" class="hw-led-bar hw-led-bar-inline">
-                        <span class="hw-led-label">Ti60 F225</span>
-                        <div class="hw-led-item">
-                            <div class="hw-led hw-led-green" id="hw-led0"></div>
-                            <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
-                        </div>
-                        <div class="hw-led-item">
-                            <div class="hw-led hw-led-red" id="hw-led1"></div>
-                            <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
-                        </div>
-                        <div class="hw-led-item">
-                            <div class="hw-led hw-led-green" id="hw-led2"></div>
-                            <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
-                        </div>
-                        <div class="hw-led-item">
-                            <div class="hw-led hw-led-green" id="hw-led3"></div>
-                            <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
-                        </div>
-                        <span class="hw-led-hint">← DWRITE CR3[0]</span>
-                    </div>
                 </div>
             </nav>
         </header>
@@ -147,6 +128,26 @@
         <div id="flagsDisplay" class="flags-bar"></div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">
+                <div id="hwLedBar" class="hw-led-bar hw-led-bar-panel">
+                    <span class="hw-led-label">Ti60 F225</span>
+                    <div class="hw-led-item">
+                        <div class="hw-led hw-led-green" id="hw-led0"></div>
+                        <span class="hw-led-name">LED0<br><span class="hw-led-role">Boot</span></span>
+                    </div>
+                    <div class="hw-led-item">
+                        <div class="hw-led hw-led-red" id="hw-led1"></div>
+                        <span class="hw-led-name">LED1<br><span class="hw-led-role">Run</span></span>
+                    </div>
+                    <div class="hw-led-item">
+                        <div class="hw-led hw-led-green" id="hw-led2"></div>
+                        <span class="hw-led-name">LED2<br><span class="hw-led-role">Fault</span></span>
+                    </div>
+                    <div class="hw-led-item">
+                        <div class="hw-led hw-led-green" id="hw-led3"></div>
+                        <span class="hw-led-name">LED3<br><span class="hw-led-role">Done</span></span>
+                    </div>
+                    <span class="hw-led-hint">← DWRITE CR3[0]</span>
+                </div>
                 <div class="panel-title">CR0-CR15 -- 128-bit Context Registers (4 x 32-bit words)</div>
                 <div id="crRegs"></div>
             </div>

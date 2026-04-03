@@ -1266,6 +1266,12 @@ header h1 {
     flex-shrink: 0;
 }
 
+.hw-led-bar-panel {
+    display: inline-flex;
+    margin-bottom: 0.6rem;
+    align-self: flex-start;
+}
+
 .hw-led-label {
     font-size: 0.62rem;
     font-weight: 700;
