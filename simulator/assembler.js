@@ -1,3 +1,73 @@
+// =============================================================================
+// assembler.js — Church Machine Assembly Language Encoder
+// =============================================================================
+//
+// Implements the single-pass assembler for the Church Machine instruction set.
+// Turns human-readable Church assembly mnemonics into 32-bit machine words
+// that can be loaded into the simulator or serialised to a hardware binary.
+//
+// PRIMARY CLASS
+//   ChurchAssembler
+//     Instantiated once in app.js as `assembler`.
+//     Entry point: assemble(sourceText) → { words[], errors[], listing[] }
+//
+// INSTRUCTION ENCODING  (32-bit word, big-endian field layout)
+//
+//   All instructions share a common header:
+//     bits[31:28]  opcode   (4 bits, 0–18)
+//     bit [27]     condition enable
+//     bits[26:23]  condition code (ARM-style: EQ/NE/CS/CC/MI/PL/VS/VC/
+//                                              HI/LS/GE/LT/GT/LE/AL/NV)
+//     bits[22:0]   operand fields  (vary by opcode — see cases in assemble())
+//
+// OPCODES
+//   0  LOAD       CR ← NS[idx]          Load abstraction GT into CR
+//   1  SAVE       NS[idx] ← CR          Save CR back to NS slot
+//   2  CALL       invoke CR             Enter abstraction, push call frame
+//   3  RETURN     unwind call frame     Return to caller
+//   4  CHANGE     DR ← imm / DR op DR  Integer / immediate data-register op
+//   5  SWITCH     swap CR pair          Exchange two CRs atomically
+//   6  TPERM      thread permission     Assert / revoke thread privilege
+//   7  LAMBDA     create closure        Mint a new capability from template
+//   8  ELOADCALL  c-list[n] → CALL      Load from c-list and call in one op
+//   9  XLOADLAMBDA                      Extended load-lambda
+//  10  DREAD      read device register  MMIO read from I/O segment
+//  11  DWRITE     write device register MMIO write to I/O segment
+//  12  BFEXT      bit-field extract     Extract bits[hi:lo] from DR
+//  13  BFINS      bit-field insert      Insert bits into DR at [hi:lo]
+//  14  MCMP       memory compare        Compare two memory regions
+//  15  IADD       integer add           DR ← DR + DR  (or DR + imm)
+//  16  ISUB       integer subtract      DR ← DR − DR  (or DR − imm)
+//  17  BRANCH     conditional branch    PC-relative jump
+//  18  SHL        shift left            DR ← DR << n
+//  19  SHR        shift right           DR ← DR >> n  (logical)
+//
+// CONDITION CODES  (ARM-compatible, bits[26:23])
+//   EQ=0  NE=1  CS=2  CC=3  MI=4  PL=5  VS=6  VC=7
+//   HI=8  LS=9  GE=10 LT=11 GT=12 LE=13 AL=14 NV=15
+//
+// ASSEMBLY SYNTAX  (one instruction per line)
+//   MNEMONIC  [.COND]  operand, operand, ...
+//   ; lines beginning with semicolon are comments
+//   ; B:N  marks a tutorial breakpoint (integer N)
+//
+// PSEUDO-OPS / DIRECTIVES
+//   .word  <hex>    — emit a raw 32-bit literal word
+//   .label <name>   — define a branch target label
+//   ; any text      — comment, stripped before encoding
+//
+// OUTPUT
+//   assemble() returns:
+//     words[]    — Uint32Array of encoded machine words
+//     errors[]   — { line, message } for any parse failures
+//     listing[]  — { addr, word, source } one entry per instruction
+//
+// HARDWARE CROSS-REFERENCE
+//   hardware/call.py      — CALL/RETURN micro-op encoding must match bit[27:23]
+//   simulator/simulator.js _bootStep() — hand-coded boot words verified here
+//
+// =============================================================================
+
 class ChurchAssembler {
     constructor() {
         this.opcodes = {

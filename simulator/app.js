@@ -1,3 +1,91 @@
+// =============================================================================
+// app.js — Church Machine IDE Front-End
+// =============================================================================
+//
+// This is the browser-side controller for the Church Machine IDE.  It wires
+// together the simulator, assembler, tutorials, and all UI panels into a
+// single-page application served by server/app.py (Flask).
+//
+// GLOBAL SINGLETONS  (initialised in DOMContentLoaded)
+//   sim            ChurchSimulator    — the CPU / memory / GC / NS table
+//   assembler      ChurchAssembler    — text → 32-bit word encoder
+//   pipelineViz    PipelineViz        — pipeline animation (pipeline.js)
+//   repl           ChurchREPL         — interactive REPL (repl.js)
+//   churchTutorial TutorialEngine     — main step-through tutorial
+//   slideRuleTutorial / cloomcTutorial / securityTutorial / threadTutorial
+//   abstrTutorial / nsTutorial / secureBootTutorial — specialised tutorials
+//
+// VIEWS  (switchView(id) shows one <div class="view"> at a time)
+//   editor         — Church assembly editor + Console/Syntax/History/JS tabs
+//   pipeline       — Pipeline visualisation (default on startup)
+//   namespace      — NS table browser (all 46+ slots)
+//   abstractions   — Abstraction catalog (9 layers)
+//   memory         — Word-addressed memory dump
+//   registers      — CR0–CR15 + DR0–DR15 table
+//   gc             — Garbage collector (4 phase cards, Run GC button)
+//   github         — GitHub sync (push / pull cards)
+//   tutorial       — Tutorial sidebar + step controls
+//
+// CODE TABS  (switchCodeTab(id) within the editor view)
+//   console        — Assembler output / execution log + LED strip
+//   syntax         — Instruction quick-reference (renderSyntaxRef)
+//   history        — AI-generated narrative about the loaded code
+//   js             — JS source browser (this file + 5 others)
+//
+// KEY UI FUNCTIONS
+//   switchView(id)         — show a top-level view; hide all others
+//   switchCodeTab(tab)     — switch among console/syntax/history/js
+//   renderCRTable()        — build the CR0–CR15 HTML table
+//   renderNSTable()        — build the namespace table HTML
+//   renderToolsView()      — populate the GC view (4 phase cards + stats)
+//   runGCFromTools()       — phase-step GC and animate each card in turn
+//   openCRDetail(cr)       — modal showing full CR GT decode
+//   renderJsTab()          — populate the JS source file bar
+//   loadJsFile(filename)   — fetch and display a .js source file
+//
+// ASSEMBLER FLOW
+//   1. User types Church assembly in the CodeMirror editor
+//   2. onAssemble() calls assembler.assemble(src)
+//   3. Words are loaded into sim.memory via sim.loadProgram(words)
+//   4. Console tab shows the listing; errors are highlighted in the editor
+//
+// BOOT FLOW
+//   onBoot() calls sim.boot() — runs all _bootStep() phases to completion,
+//   then calls renderCRTable() + renderNSTable() to reflect the post-boot state.
+//
+// GC PHASE STEPPING  (_gcPhaseStep state machine)
+//   0 = idle        → first click: calls sim.runGC(), stores result, reveals Phase 1
+//   1 = phase 1 done → click: reveals Phase 2
+//   2 = phase 2 done → click: reveals Phase 3
+//   3 = phase 3 done → click: reveals Phase 4 + resets to idle
+//   _tgcReset() clears state.   _tgcUpdateBtn() keeps button label in sync.
+//
+// TUTORIAL INTEGRATION
+//   Tutorials inject breakpoints (B:N) into assembly source.  The step
+//   controller halts at each breakpoint and calls tutorial.onBreakpoint(n).
+//   switchSidebarTab() manages the five sidebar panels per tutorial step.
+//
+// EVENT LISTENERS
+//   sim.on('stateChange', ...)  — re-render CR/DR tables + memory after each step
+//   window.onresize             — reflow pipeline SVG
+//   document.onkeydown          — F8 = step, F5 = run, Escape = stop
+//
+// FILE LAYOUT (other JS files loaded by index.html)
+//   simulator.js          — ChurchSimulator (CPU, GC, NS, boot)
+//   assembler.js          — ChurchAssembler (text → words)
+//   boot_uploads.js       — BOOT_UPLOADS manifest
+//   system_abstractions.js — SystemAbstractions (46 NS entries)
+//   device_abstractions.js — DeviceAbstractions (MMIO devices)
+//   pipeline.js           — Pipeline stage visualisation
+//   repl.js               — Interactive REPL
+//   history.js            — AI narrative generator
+//   tutorial.js + *_tutorial.js — step-through tutorials
+//   webserial.js          — WebSerial FPGA upload
+//   hw_binary.js          — Hardware binary serialiser
+//   cloomc_compiler.js    — CLOOMC → assembly compiler
+//
+// =============================================================================
+
 const POPUPS_DISABLED = false;
 
 let sim = null;

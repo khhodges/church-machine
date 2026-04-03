@@ -1,3 +1,89 @@
+// =============================================================================
+// system_abstractions.js — Church Machine System Abstraction Definitions
+// =============================================================================
+//
+// Defines SystemAbstractions: the class that constructs and registers all
+// 46 boot-time abstractions into the simulator's Namespace (NS) table.
+// Each abstraction is a named capability object with a lump in memory,
+// an entry in the NS table, and optionally a c-list of sub-capabilities.
+//
+// PRIMARY CLASS
+//   SystemAbstractions
+//     Instantiated in simulator.js and bound to `sim.systemAbstractions`.
+//     Constructor calls _bindAll() which registers every abstraction via
+//     this.registry.register(name, descriptor).
+//
+// ABSTRACTION LAYERS  (9 layers, 46 total abstractions)
+//
+//   Layer 0 — Boot primitives  (NS[0]..NS[15])
+//     Boot.NS, Boot.Thread, Boot.Memory, Boot.Kernel, Boot.Init,
+//     Boot.Security, Boot.IPC, Boot.IRQ, Boot.Fault, Boot.Debug,
+//     Boot.Log, Boot.Clock, Boot.Power, Boot.Config, Boot.Update, Boot.Reset
+//
+//   Layer 1 — Foundation  (NS[16]..NS[21])
+//     Foundation.Mint, Foundation.Seal, Foundation.Verify,
+//     Foundation.Revoke, Foundation.Delegate, Foundation.Audit
+//
+//   Layer 2 — Memory management  (NS[22]..NS[26])
+//     Memory.Allocate, Memory.Free, Memory.Map, Memory.Protect, Memory.GC
+//
+//   Layer 3 — I/O & devices  (NS[27]..NS[31])
+//     IO.UART, IO.GPIO, IO.SPI, IO.I2C, IO.Timer
+//
+//   Layer 4 — Compute  (NS[32]..NS[35])
+//     Compute.ALU, Compute.FPU, Compute.DSP, Compute.Crypto
+//
+//   Layer 5 — Storage  (NS[36]..NS[39])
+//     Storage.Flash, Storage.EEPROM, Storage.RAM, Storage.Cache
+//
+//   Layer 6 — Network  (NS[40]..NS[42])
+//     Network.Ethernet, Network.TCP, Network.UDP
+//
+//   Layer 7 — Security  (NS[43]..NS[44])
+//     Security.Attestation, Security.KeyStore
+//
+//   Layer 8 — Application  (NS[45])
+//     App.Salvation  (the first user-facing entry point after boot)
+//
+// ABSTRACTION DESCRIPTOR SHAPE
+//   Each descriptor passed to registry.register() is:
+//   {
+//     name        string   — "Layer.Name"  (matches nsLabels key)
+//     nsIndex     number   — fixed NS slot (0-based)
+//     gtType      number   — 0=Null, 1=Inform, 2=Outform, 3=Abstract
+//     lumpWords   number   — size of the lump in words (rounded to SLOT_SIZE)
+//     clist       GT[]     — initial capability list (GTs to peer abstractions)
+//     methods     object   — named entry points → assembly source strings
+//     permissions string[] — permission tokens this abstraction may grant
+//   }
+//
+// HELPER: nextPow2(n)
+//   Returns the smallest power-of-2 ≥ n.
+//   Used to align lump sizes to hardware minimum allocation granularity.
+//
+// MEMORY LAYOUT IMPLICATIONS
+//   Lump sizes are always multiples of SLOT_SIZE (64 words) on hardware.
+//   The simulator enforces this for NS[1] (Boot.Thread = 256 words) and
+//   larger abstractions; smaller entries share pages.
+//
+// C-LIST STRUCTURE  (CR6 → c-list lump)
+//   Each abstraction's c-list is a contiguous array of GT words stored in
+//   the caps zone of its lump.  Index 0 is the self-reference GT.
+//   ELOADCALL CR, n  — loads c-list[n] into CR then calls it.
+//
+// KEY METHODS
+//   _bindAll()      — registers all 46 abstractions in NS-index order
+//   _makeMethod(src) — wraps an assembly string as a callable method
+//   _defaultClist() — builds a standard c-list from the registry
+//
+// HARDWARE CROSS-REFERENCE
+//   hardware/boot_rom.py  DEMO_NAMESPACE  — NS metadata for first 16 slots
+//   hardware/boot_rom.py  DEMO_CLIST      — 8 GT entries for the boot c-list
+//   simulator/boot_uploads.js             — manifest consumed at boot
+//   simulator/simulator.js                — registry.register() implementation
+//
+// =============================================================================
+
 function nextPow2(n) {
     if (n <= 0) return 1;
     n = n - 1;

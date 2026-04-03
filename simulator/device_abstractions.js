@@ -1,3 +1,62 @@
+// =============================================================================
+// device_abstractions.js — Church Machine Device / MMIO Abstractions
+// =============================================================================
+//
+// Implements DeviceAbstractions: the class that simulates the memory-mapped
+// I/O devices present on the Efinix Ti60 F225 FPGA board.  Device registers
+// live in the I/O segment (0xFE00–0xFEFF) of the word-addressed memory space.
+//
+// PRIMARY CLASS
+//   DeviceAbstractions
+//     Instantiated in simulator.js, bound to `sim.deviceAbstractions`.
+//     The simulator calls deviceAbstractions.read(addr) and .write(addr, val)
+//     for any memory access that falls in the I/O segment.
+//
+// I/O SEGMENT MAP  (word addresses, each word = 32 bits)
+//   0xFE00   UART_STATUS    — bit[0] TX ready, bit[1] RX data available
+//   0xFE01   UART_DATA      — write: transmit byte; read: receive byte
+//   0xFE02   UART_BAUD      — baud rate divisor (default 115200)
+//   0xFE04   LED_STATE      — bit[5:0] control 6 on-board LEDs
+//   0xFE05   LED_COUNT      — number of addressable LEDs (read-only = 6)
+//   0xFE08   BUTTON_STATE   — bit[0] pushbutton pressed
+//   0xFE09   BUTTON_EVENT   — read clears pending button-press event
+//   0xFE0C   TIMER_CTRL     — bit[0] start/stop; bit[1] alarm enable
+//   0xFE0D   TIMER_COUNT    — current timer count (32-bit, read/write)
+//   0xFE0E   TIMER_ALARM    — alarm threshold; fires IRQ when count reaches it
+//   0xFE10   DISPLAY_CTRL   — bit[0] enable; bit[1] cursor visible
+//   0xFE11   DISPLAY_CHAR   — write: emit character at cursor; advances cursor
+//   0xFE12   DISPLAY_X      — cursor column (0-based)
+//   0xFE13   DISPLAY_Y      — cursor row (0-based)
+//   0xFE14   DISPLAY_WIDTH  — display width in columns (read-only = 80)
+//   0xFE15   DISPLAY_HEIGHT — display height in rows (read-only = 25)
+//
+// DEVICE STATE  (_deviceState)
+//   uart     { txBuffer[], rxBuffer[], baud }
+//   led      { state, count }
+//   button   { pressed, eventQueue[] }
+//   timer    { running, count, alarm, startTime }
+//   display  { buffer[], width, height, cursorX, cursorY }
+//
+// HARDWARE CROSS-REFERENCE
+//   hardware/boot_rom.py  _MMIO_ENTRIES — defines same registers in Amaranth HDL
+//   The address assignments here MUST match _MMIO_ENTRIES exactly.
+//   simulator/simulator.js reads/writes through this class for 0xFE00+ accesses.
+//   simulator/simulator.js SLOT_SIZE comment references boot_rom.py line 339.
+//
+// USED BY
+//   DREAD  CR, addr   — calls deviceAbstractions.read(addr)
+//   DWRITE addr, CR   — calls deviceAbstractions.write(addr, value)
+//   app.js LED strip  — reads led.state after each DWRITE to update the LED UI
+//
+// KEY METHODS
+//   read(wordAddr)         — returns the 32-bit register value at wordAddr
+//   write(wordAddr, val)   — updates the register and fires any side-effects
+//   _uartTx(byte)          — push to txBuffer; notifies app.js console
+//   _timerTick()           — called on each sim step if timer is running
+//   reset()                — clears all device state to power-on defaults
+//
+// =============================================================================
+
 class DeviceAbstractions {
     constructor(registry) {
         this.registry = registry;

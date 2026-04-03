@@ -1,3 +1,87 @@
+// =============================================================================
+// simulator.js — Church Machine CPU Simulator
+// =============================================================================
+//
+// This is the heart of the browser-based Church Machine IDE.  It implements a
+// cycle-accurate (at the instruction level) simulation of the Church Machine
+// CPU — a capability-based computer architecture targeting the Efinix Ti60
+// F225 FPGA.
+//
+// PRIMARY CLASS
+//   ChurchSimulator
+//     Instantiated once in app.js as `sim`.  Emits 'stateChange' events so the
+//     IDE UI can re-render after every instruction or boot step.
+//
+// MEMORY MAP  (all addresses are word-addressed 32-bit words)
+//   0x0000 – 0xFCFF   Object lumps  (heap / stack / thread lumps)
+//   0xFD00 – 0xFDFF   Namespace (NS) table  — up to 256 × 3-word entries
+//   0xFE00 – 0xFEFF   I/O segment  — memory-mapped device registers
+//   0xFF00 – 0xFFFF   Boot ROM  — read-only; written during _bootStep()
+//
+// NAMESPACE TABLE (NS)
+//   Each entry is 3 words wide:
+//     word0  location   — base address of the abstraction's lump (Golden Token)
+//     word1  limit/meta — bits[16:0] lump size in words; bits[25:17] c-list
+//                         count; bits[27:26] GT type (Null/Inform/Outform/
+//                         Abstract); bit[28] chainable; bit[29] f-flag;
+//                         bit[30] b-flag; bit[31] G-bit (GC liveness)
+//     word2  seals      — bits[31:25] version; bits[15:0] CRC-16 seal
+//
+// THREAD LUMP LAYOUT  (256 words, NS[1] "Boot.Thread")
+//   +0        Header word
+//   +1..+16   Data Registers  DR0–DR15
+//   +17..+80  Heap (64 words)
+//   +81..+211 Free space
+//   +212..+243 Stack (32 words, grows down from +243)
+//   +244..+255 Caps zone — GT home slots for CR0–CR11 (CR6=c-list root)
+//
+// CAPABILITY REGISTERS (CRs)
+//   CR0–CR11   General-purpose GT holders
+//   CR12       Thread identity (privileged)
+//   CR13       IRQ / system reserved
+//   CR14       Privileged
+//   CR15       Current abstraction (set by CALL, cleared by RETURN)
+//   CR6        C-list root — points to the abstraction's capability list
+//
+// BOOT SEQUENCE  (_bootStep)
+//   Step 0   CHANGE  — set DR0 to boot sentinel
+//   Step 1   LOAD    — CR15 ← NS[3] (Boot.Kernel)
+//   Step 2   CALL    — push sentinel frame, enter Boot.Kernel
+//   Step 3   ELOADCALL — load+call Boot.Init
+//   Step 4   RETURN  — unwind sentinel frame, boot complete
+//   The full sequence mirrors hardware/boot_rom.py BOOT_PROGRAM exactly.
+//
+// GARBAGE COLLECTOR  (runGC)
+//   Tri-colour mark-sweep over the NS table.
+//   Phase 1 MARK  — flip G-bit on all valid entries → garbage suspects
+//   Phase 2 SCAN  — walk CR0–CR15 + call-stack frames; mark reachable entries live
+//   Phase 3 SWEEP — collect entries still marked garbage
+//   Phase 4 CLEAR — zero NS words + lump words; bump version; flip polarity
+//
+// INSTRUCTION SET  (partial — see assembler.js for full encoding)
+//   LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA
+//   ELOADCALL, XLOADLAMBDA, DREAD, DWRITE
+//   BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR
+//
+// KEY METHODS
+//   boot()           — run the full boot sequence to completion
+//   _bootStep()      — execute one boot step (for single-stepping)
+//   step()           — execute one user instruction
+//   runGC()          — run a full GC cycle; returns structured phases[]
+//   readNSEntry(i)   — parse all fields of NS entry i into a plain object
+//   parseGT(word0)   — decode a Golden Token word into index/version/type
+//   parseNSWord1(w)  — decode limit/clistCount/gtType/G-bit from word1
+//   markGarbage(i)   — set G-bit to current garbage polarity
+//   markLive(i)      — set G-bit to current live polarity
+//   isNSEntryValid(i)— true if word0 or word1 is non-zero
+//
+// HARDWARE CROSS-REFERENCE
+//   hardware/boot_rom.py   — Amaranth HDL boot ROM (BOOT_PROGRAM, DEMO_CLIST,
+//                            DEMO_NAMESPACE); _bootStep() mirrors this exactly
+//   hardware/call.py       — CALL/RETURN micro-op implementation
+//
+// =============================================================================
+
 // Offset of the caps zone (CR0-CR11 GT home slots) inside a 256-word thread lump
 const THREAD_CAPS_OFFSET = 244;
 

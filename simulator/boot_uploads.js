@@ -1,3 +1,52 @@
+// =============================================================================
+// boot_uploads.js — Boot-Time Abstraction Upload Manifest
+// =============================================================================
+//
+// Defines BOOT_UPLOADS: the ordered list of abstractions that are installed
+// into the Namespace (NS) table when the simulator boots.  Each entry
+// describes one NS slot — its name, type, NS index, and the grants /
+// capabilities / methods it exposes.
+//
+// This file is the JS-side counterpart of hardware/boot_rom.py
+// DEMO_NAMESPACE and DEMO_CLIST.  The simulator reads BOOT_UPLOADS during
+// the boot sequence to populate NS[0]..NS[45] before the first user
+// instruction executes.
+//
+// STRUCTURE OF EACH ENTRY
+//   abstraction  string   Human-readable name (e.g. "Boot.Kernel")
+//   type         string   "boot" for all boot-time entries
+//   index        number   NS slot number (0-based; must be unique and dense)
+//   grants       array    Permission tokens this abstraction may issue
+//   capabilities array    GT references it holds in its c-list at boot
+//   methods      array    Named entry points (each is an assembly snippet)
+//
+// NS SLOT LAYOUT AT BOOT  (derived from system_abstractions.js)
+//   NS[0]   Boot.NS          — namespace root (protected; never GC'd)
+//   NS[1]   Boot.Thread      — thread lump (256 words; holds DRs, stack, caps)
+//   NS[2]   Boot.Memory      — memory allocator
+//   NS[3]   Boot.Kernel      — kernel / privilege gate
+//   NS[4]   Boot.Init        — initialisation sequence abstraction
+//   NS[5]   Boot.Security    — capability seal / unseal
+//   NS[6]   Boot.IPC         — inter-process communication
+//   NS[7]   Boot.IRQ         — interrupt routing
+//   NS[8]   Boot.Fault       — capability fault handler
+//   NS[9]   Boot.Debug       — debugger / single-step hook
+//   NS[10]  Boot.Log         — kernel log ring buffer
+//   NS[11]  Boot.Clock       — real-time clock / timer
+//   NS[12]  Boot.Power       — power management
+//   NS[13]  Boot.Config      — persistent configuration store
+//   NS[14]  Boot.Update      — firmware update gate
+//   NS[15]  Boot.Reset       — controlled reset / reboot
+//   NS[16+] User / system abstractions (see system_abstractions.js)
+//
+// HARDWARE CROSS-REFERENCE
+//   hardware/boot_rom.py   DEMO_NAMESPACE — same slots in Amaranth HDL
+//   hardware/boot_rom.py   DEMO_CLIST     — boot c-list contents (8 GTs)
+//   simulator/simulator.js _bootStep()    — reads BOOT_UPLOADS to init NS
+//   simulator/system_abstractions.js      — full method bodies for each slot
+//
+// =============================================================================
+
 const BOOT_UPLOADS = [
     {
         abstraction: 'Boot.NS',
