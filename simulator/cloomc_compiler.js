@@ -816,7 +816,7 @@ class CLOOMCCompiler {
     }
 
     _compileStatement(stmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method) {
-        const text = stmt.text.trim();
+        const text = stmt.text.trim().replace(/;$/, '');
         if (!text || text.startsWith('//')) return;
 
         const returnMatch = text.match(/^return\s*\(\s*(.*?)\s*\)$/);
@@ -912,7 +912,7 @@ class CLOOMCCompiler {
             return;
         }
 
-        const assignMatch = text.match(/^(?:var\s+)?(\w+)\s*=\s*(.+)$/);
+        const assignMatch = text.match(/^(?:(?:var|let|const)\s+)?(\w+)\s*=\s*(.+)$/);
         if (assignMatch) {
             const varName = assignMatch[1];
             const expr = assignMatch[2].trim();
