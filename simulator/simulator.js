@@ -1558,23 +1558,27 @@ class ChurchSimulator {
                 m: 1    // CALL Phase 1 mLoad is always M-elevated
             };
 
-            // CR6: preserve original E-GT (sourceGT) unchanged — E permission must NOT be dropped.
-            // Dropping E would prevent recursive CALL via CR6.  Matches cload.py line 133:
-            //   cr6_view.word0_gt.eq(e_gt_latched)   // Mint-issued, never modified
+            // CR6: E-only GT — same slot/seq/type as source but perms stripped to E alone.
+            // Must NOT carry L (or any other perm from a device GT like L+S+E).
+            // E is kept so the callee can do recursive CALL via CR6 directly.
+            // M is recorded in cr.m = 1 (not in the GT perms field).
+            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:0,S:0,E:1}, srcParsed.type);
             const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);
             this.cr[6] = {
-                word0: sourceGT,                    // original E-GT intact (has E perm; enables recursive CALL)
+                word0: cr6GT,                       // E-only (no L; enabling recursive CALL without leaking device perms)
                 word1: (base + clistStart) >>> 0,
                 word2: cr6Word1,
                 word3: nsEntry.word2_seals,
-                m: 1    // CALL Phase 1 mLoad always M-elevated (call.py: mload_m_elevated = 1)
+                m: 1    // M set (CALL Phase 1 mLoad always M-elevated; call.py: mload_m_elevated = 1)
             };
             // CR6 lives in the CALL stack frame (written above); NOT in the caps zone
 
             cr7Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(RX M=1,cw=${cw},lim=0..${cw-1}) CR6(E M=1,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
         } else {
-            this._writeCR(6, sourceGT, nsEntry);
-            this.cr[6].m = 1;   // CALL Phase 1 mLoad always M-elevated; _writeCR uses global mElevation which may be 0
+            // Non-lump-header path: write E-only GT to CR6 (strip L/other perms from source GT) + M.
+            const cr6GTnorm = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:0,S:0,E:1}, srcParsed.type);
+            this._writeCR(6, cr6GTnorm, nsEntry);
+            this.cr[6].m = 1;   // M set (CALL always M-elevated; _writeCR uses global mElevation which may be 0 post-boot)
 
             const clistLoc = nsEntry.word0_location;
             const cr14GTVal = this.memory[clistLoc];

@@ -264,7 +264,9 @@ class ChurchCall(Elaboratable):
         cr6_lat_gt   = View(GT_LAYOUT, cr6_lat_view.word0_gt)
         cr6_lat_w2   = View(WORD2_LAYOUT, cr6_lat_view.word2_w2)
 
-        # CR6 with corrected base, limit, and M=1 (PERM_X forced) — written in SET_CR6_LIMIT
+        # CR6 with corrected base, limit; perms stripped to E-only (L and others removed) — written in SET_CR6_LIMIT
+        # M-elevation for CR6 is implicit: CALL FSM always sets mload_m_elevated=1 (Phase 1).
+        # It is NOT encoded as a perm bit — contrast with CR14 where PERM_X = M flag.
         cr6_adjusted = Signal(CAP_REG_LAYOUT)
         cr6_adj_view = View(CAP_REG_LAYOUT, cr6_adjusted)
         cr6_adj_gt   = View(GT_LAYOUT, cr6_adj_view.word0_gt)
@@ -273,7 +275,7 @@ class ChurchCall(Elaboratable):
             cr6_adj_gt.slot_id.eq(cr6_lat_gt.slot_id),
             cr6_adj_gt.gt_seq.eq(cr6_lat_gt.gt_seq),
             cr6_adj_gt.gt_type.eq(cr6_lat_gt.gt_type),
-            cr6_adj_gt.perms.eq(cr6_lat_gt.perms | PERM_MASK_X),   # preserve E + set M=1 (PERM_X encoding, matching SET_M_WRITE for CR14)
+            cr6_adj_gt.perms.eq(cr6_lat_gt.perms & PERM_MASK_E),   # keep E only — strip L (and any other perms a device GT may carry)
             cr6_adj_gt.b_flag.eq(cr6_lat_gt.b_flag),
             # base = NS_base + (lumpSize − cc) × 4  (byte address of c-list word 0)
             cr6_adj_view.word1_location.eq(
