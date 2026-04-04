@@ -211,6 +211,49 @@ const TangSerial = (function() {
         return { vals, words, leftover, headerEcho, crs, drs, extra };
     }
 
+    async function pingFPGA(onStatus) {
+        const status = onStatus || function() {};
+
+        if (!isConnected()) {
+            throw new Error(`Not connected. Call connect() first.`);
+        }
+
+        await drainInput();
+
+        // Send a 4-byte probe: little-endian word 0xCEFACEFA ("CAFE CAFE").
+        // The FPGA may not understand this — that is fine.  We just want to
+        // confirm that bytes flow in both directions.
+        const probe = new Uint8Array([0xFA, 0xCE, 0xFA, 0xCE]);
+        status(`Sending 4-byte probe (0xCEFACEFA)...`);
+
+        const w = port.writable.getWriter();
+        try { await w.write(probe); } finally { w.releaseLock(); }
+
+        status('Probe sent. Listening for 1.5 s...');
+
+        const rxBytes = [];
+        const deadline = Date.now() + 1500;
+        const r = port.readable.getReader();
+        activeReader = r;
+        try {
+            while (Date.now() < deadline) {
+                const { value, done } = await Promise.race([
+                    r.read(),
+                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 500))
+                ]);
+                if (done || !value || value.length === 0) break;
+                for (let i = 0; i < value.length; i++) rxBytes.push(value[i]);
+            }
+        } catch(e) {
+            status('Read error: ' + e.message);
+        } finally {
+            activeReader = null;
+            try { r.releaseLock(); } catch(e) {}
+        }
+
+        return { bytesSent: probe.length, bytesReceived: rxBytes.length, rawBytes: rxBytes };
+    }
+
     window.addEventListener('pagehide', () => {
         if (activeReader) {
             try { activeReader.cancel(); } catch(e) {}
@@ -228,6 +271,7 @@ const TangSerial = (function() {
         connect,
         disconnect,
         uploadToFPGA,
+        pingFPGA,
         parseReadback,
         setBoardLabel,
         NS_WORDS,

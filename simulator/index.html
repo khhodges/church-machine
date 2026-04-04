@@ -378,6 +378,7 @@
                 <button class="btn btn-deploy" id="btnFPGAPkg" onclick="downloadFPGAPackage()" data-tooltip="Download FPGA Package — Download the last-built Verilog + netlist + constraints ZIP">Download FPGA Package</button>
                 <button class="btn btn-deploy" onclick="downloadHardwareImage()" data-tooltip="Download .bin — Download binary memory image from the current simulator state">Download .bin</button>
                 <button class="btn btn-deploy" onclick="uploadToTang()" data-tooltip="Deploy to FPGA — Upload .bin to the selected FPGA board via WebSerial (Chrome/Edge)">Deploy to FPGA</button>
+                <button class="btn btn-deploy" onclick="testUART()" data-tooltip="Test UART — Open the serial port and send a 4-byte probe to confirm the USB-UART link is alive (Chrome/Edge)">Test UART</button>
             </div>
             <div class="hardware-build-info" id="hardwareBuildInfo">
                 <span id="hwBuildInfoText"></span>

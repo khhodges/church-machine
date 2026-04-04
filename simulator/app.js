@@ -9784,6 +9784,106 @@ async function uploadToTang() {
     }
 }
 
+async function testUART() {
+    switchCodeTab('console');
+    const con = document.getElementById('editorConsole');
+    if (!con) return;
+    con.textContent = '';
+
+    const board = getSelectedBoard ? getSelectedBoard() : 'tang-nano-20k';
+    const boardLabel = getBoardLabel ? getBoardLabel(board) : 'FPGA';
+
+    if (!TangSerial.isSupported()) {
+        con.textContent =
+            'WebSerial is not supported in this browser.\n' +
+            'Use Chrome or Edge (desktop) to test the UART connection.\n\n' +
+            'If you are inside the Replit preview pane, open the app in a\n' +
+            'separate browser tab first:\n\n  ' + window.location.origin + '/simulator/\n';
+        return;
+    }
+
+    function isPermissionsPolicyError(e) {
+        const m = (e.message || '').toLowerCase();
+        return m.includes('permissions policy') || m.includes('disallowed') || e.name === 'SecurityError';
+    }
+
+    // ── Step 1: Open port ────────────────────────────────────────────────────
+    con.textContent = 'UART CONNECTION TEST\n' + '─'.repeat(40) + '\n\n';
+    con.textContent += 'Step 1/3  Open serial port...\n';
+    con.textContent += `(Select the ${boardLabel} USB-UART port in the browser dialog)\n\n`;
+
+    TangSerial.setBoardLabel(boardLabel);
+
+    if (!TangSerial.isConnected()) {
+        try {
+            await TangSerial.connect();
+        } catch(e) {
+            if (e.name === 'NotFoundError') {
+                con.textContent += 'Cancelled — no port selected.\n';
+                return;
+            }
+            if (isPermissionsPolicyError(e)) {
+                con.textContent +=
+                    'WebSerial blocked: running inside an embedded preview frame.\n\n' +
+                    'Open the app directly in a tab:\n  ' +
+                    window.location.origin + '/simulator/\n' +
+                    'Then run Test UART from there.\n';
+                return;
+            }
+            con.textContent +=
+                'Could not open port: ' + e.message + '\n\n' +
+                'Check:\n' +
+                '  • FPGA is plugged in via USB\n' +
+                '  • Efinity IDE serial terminal (or any serial monitor) is closed\n' +
+                '  • Wait 5 s then try again\n';
+            return;
+        }
+    }
+
+    con.textContent += '✓  Port opened at 115200 8-N-1\n\n';
+
+    // ── Step 2: Send probe ───────────────────────────────────────────────────
+    con.textContent += 'Step 2/3  Sending 4-byte probe (0xCEFACEFA)...\n';
+    let result;
+    try {
+        result = await TangSerial.pingFPGA(function(msg) {
+            con.textContent += '          ' + msg + '\n';
+        });
+    } catch(e) {
+        con.textContent += 'Error during probe: ' + e.message + '\n';
+        return;
+    }
+
+    // ── Step 3: Report ───────────────────────────────────────────────────────
+    con.textContent += '\nStep 3/3  Result\n' + '─'.repeat(40) + '\n';
+    con.textContent += `  Bytes sent:      ${result.bytesSent}\n`;
+    con.textContent += `  Bytes received:  ${result.bytesReceived}\n`;
+
+    if (result.bytesReceived > 0) {
+        const hex = result.rawBytes.map(b => b.toString(16).padStart(2,'0')).join(' ');
+        con.textContent += `  RX data:         ${hex}\n`;
+    }
+
+    con.textContent += '\n';
+
+    if (result.bytesReceived > 0) {
+        con.textContent +=
+            '✓  TX and RX both work — the UART link is alive.\n' +
+            '   (The probe bytes may look like garbage if the FPGA\n' +
+            '    firmware does not recognise the 0xCEFACEFA sequence;\n' +
+            '    any reply at all means the serial path is good.)\n';
+    } else {
+        con.textContent +=
+            '⚠  No bytes received within 1.5 s.\n\n' +
+            'Possible causes:\n' +
+            '  • FPGA firmware is not running (try pressing reset)\n' +
+            '  • UART RX is connected but UART TX is not wired back\n' +
+            '  • Baud mismatch (firmware expects a different rate)\n' +
+            '  • Wrong port selected (try a different COM/tty entry)\n\n' +
+            'TX path is confirmed OK — the port opened and bytes were sent.\n';
+    }
+}
+
 const INSTRUCTION_DATA = [
     {
         opcode: 0, mnemonic: 'LOAD', domain: 'church',
