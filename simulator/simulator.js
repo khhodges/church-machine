@@ -1546,7 +1546,8 @@ class ChurchSimulator {
             const lumpSz   = hdr.lumpSize;
             const clistStart = lumpSz - cc;  // c-list at physical end
 
-            // CR14 (code, X) and CR6 (c-list, L) set simultaneously from single lump header read
+            // CR14 (code, RX, M=1) and CR6 (c-list, E+M=1) set simultaneously from single lump header read.
+            // M=1 on both: CALL Phase 1 mLoad is always M-elevated (call.py: mload_m_elevated = 1).
             const cr14GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
             const cr14Word1 = this.packNSWord1(cw - 1, 0, 0, 0, 0, 1, 0);
             this.cr[14] = {
@@ -1554,23 +1555,26 @@ class ChurchSimulator {
                 word1: base,
                 word2: cr14Word1,
                 word3: nsEntry.word2_seals,
-                m: this.mElevation ? 1 : 0
+                m: 1    // CALL Phase 1 mLoad is always M-elevated
             };
 
-            const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+            // CR6: preserve original E-GT (sourceGT) unchanged — E permission must NOT be dropped.
+            // Dropping E would prevent recursive CALL via CR6.  Matches cload.py line 133:
+            //   cr6_view.word0_gt.eq(e_gt_latched)   // Mint-issued, never modified
             const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);
             this.cr[6] = {
-                word0: cr6GT,
+                word0: sourceGT,                    // original E-GT intact (has E perm; enables recursive CALL)
                 word1: (base + clistStart) >>> 0,
                 word2: cr6Word1,
                 word3: nsEntry.word2_seals,
-                m: this.mElevation ? 1 : 0
+                m: 1    // CALL Phase 1 mLoad always M-elevated (call.py: mload_m_elevated = 1)
             };
             // CR6 lives in the CALL stack frame (written above); NOT in the caps zone
 
-            cr7Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(X,cw=${cw},lim=0..${cw-1}) CR6(L,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
+            cr7Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → CR14+CR6 simultaneous: CR14(RX M=1,cw=${cw},lim=0..${cw-1}) CR6(E M=1,cc=${cc},base=0x${(base+clistStart).toString(16).toUpperCase()})`;
         } else {
             this._writeCR(6, sourceGT, nsEntry);
+            this.cr[6].m = 1;   // CALL Phase 1 mLoad always M-elevated; _writeCR uses global mElevation which may be 0
 
             const clistLoc = nsEntry.word0_location;
             const cr14GTVal = this.memory[clistLoc];
