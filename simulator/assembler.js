@@ -434,42 +434,42 @@ class ChurchAssembler {
         const mnemonic = op + condStr;
 
         switch (opcode) {
-            case 0: return `${mnemonic} CR${crDst}, [CR${crSrc} + ${imm}]`;
-            case 1: return `${mnemonic} CR${crDst} -> [CR${crSrc} + ${imm}]`;
+            case 0: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
+            case 1: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
             case 2: return `${mnemonic} CR${crDst}`;
             case 3: {
                 const retMask = imm & 0xFFF;
                 return retMask ? `${mnemonic} 0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;
             }
-            case 4: return `${mnemonic} CR${crDst}, idx=${imm}`;
-            case 5: return `${mnemonic} CR${crSrc} <-> CR${imm & 7}`;
+            case 4: return `${mnemonic} CR${crDst}, ${imm}`;
+            case 5: return `${mnemonic} CR${crSrc}, ${imm & 7}`;
             case 6: {
                 const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV','RSV','RSV','RSV','RSV','RSV'];
                 const bFlag = (imm >>> 4) & 1;
                 const baseName = presetNames[imm & 0xF];
-                return `${mnemonic} CR${crDst}, ${baseName}${bFlag ? '+B' : ''}`;
+                return `${mnemonic} CR${crDst}, ${baseName}${bFlag ? 'B' : ''}`;
             }
             case 7: return `${mnemonic} CR${crDst}`;
-            case 8: return `${mnemonic} CR${crDst}, [CR${crSrc} + ${imm}]`;
-            case 9: return `${mnemonic} CR${crDst}, [CR${crSrc} + ${imm}]`;
-            case 10: return `${mnemonic} DR${crDst}, [CR${crSrc} + ${imm}]`;
-            case 11: return `${mnemonic} DR${crDst}, [CR${crSrc} + ${imm}]`;
+            case 8: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
+            case 9: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
+            case 10: return `${mnemonic} DR${crDst}, CR${crSrc}, ${imm}`;
+            case 11: return `${mnemonic} DR${crDst}, CR${crSrc}, ${imm}`;
             case 12: {
                 const pos = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic} DR${crDst}, [CR${crSrc}], pos=${pos}, w=${width}`;
+                return `${mnemonic} DR${crDst}, CR${crSrc}, ${pos}, ${width}`;
             }
             case 13: {
                 const pos = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic} DR${crDst}, [CR${crSrc}], pos=${pos}, w=${width}`;
+                return `${mnemonic} DR${crDst}, CR${crSrc}, ${pos}, ${width}`;
             }
             case 14: return `${mnemonic} DR${crDst}, DR${crSrc}`;
             case 15: return (imm & 0x4000) ? `${mnemonic} DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic} DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
             case 16: return (imm & 0x4000) ? `${mnemonic} DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic} DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
             case 17: {
                 const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
-                return `${mnemonic} ${soff >= 0 ? '+' : ''}${soff}`;
+                return `${mnemonic} ${soff}`;
             }
             case 18: return `${mnemonic} DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
             case 19: {
