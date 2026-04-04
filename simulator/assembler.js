@@ -2,7 +2,7 @@
 // assembler.js — Church Machine Assembly Language Encoder
 // =============================================================================
 //
-// Implements the single-pass assembler for the Church Machine instruction set.
+// Implements the two-pass assembler for the Church Machine instruction set.
 // Turns human-readable Church assembly mnemonics into 32-bit machine words
 // that can be loaded into the simulator or serialised to a hardware binary.
 //
@@ -51,9 +51,24 @@
 //   ; lines beginning with semicolon are comments
 //   ; B:N  marks a tutorial breakpoint (integer N)
 //
+// LABEL SUPPORT
+//   Labels are defined with "name:" on their own line (before any instruction).
+//   BRANCH instructions accept a label name as the operand instead of a raw
+//   signed offset.  The assembler resolves label → signed relative offset
+//   automatically.  Numeric offsets still work unchanged.
+//   Example:
+//       loop_top:
+//           ISUB DR1, DR1, #1
+//           BRANCHNE loop_top      ; equivalent to BRANCHNE -1
+//
+// POST-ASSEMBLY BRANCH BOUNDS CHECK
+//   After encoding all words, the assembler verifies that every BRANCH
+//   target falls within [0, total_code_words).  Out-of-range targets are
+//   reported as assembly errors with the source line number and target address.
+//
 // PSEUDO-OPS / DIRECTIVES
 //   .word  <hex>    — emit a raw 32-bit literal word
-//   .label <name>   — define a branch target label
+//   name:           — define a branch target label (on its own line)
 //   ; any text      — comment, stripped before encoding
 //
 // OUTPUT
@@ -104,6 +119,7 @@ class ChurchAssembler {
         const lines = source.split('\n');
         const instructions = [];
 
+        // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
         for (let lineNum = 0; lineNum < lines.length; lineNum++) {
             let line = lines[lineNum].trim();
             const commentIdx = line.indexOf(';');
@@ -115,6 +131,7 @@ class ChurchAssembler {
             if (!line) continue;
 
             if (line.endsWith(':')) {
+                // Label definition — store word offset (= current instruction count)
                 this.labels[line.slice(0, -1).trim()] = instructions.length;
                 continue;
             }
@@ -138,19 +155,48 @@ class ChurchAssembler {
             instructions.push({ line, lineNum: lineNum + 1 });
         }
 
+        // ── Pass 2: encode instructions ───────────────────────────────────────────
+        // lineNums[i] tracks the source line that produced words[i], used by the
+        // bounds-check pass to report accurate error locations.
         const words = [];
-        for (const inst of instructions) {
+        const lineNums = [];
+        for (let i = 0; i < instructions.length; i++) {
+            const inst = instructions[i];
             if (inst.rawWord !== undefined) {
                 words.push(inst.rawWord);
+                lineNums.push(inst.lineNum);
                 continue;
             }
             if (inst.ispad) {
                 words.push(0);
+                lineNums.push(inst.lineNum);
                 continue;
             }
-            const word = this._assembleLine(inst.line, inst.lineNum, instructions.indexOf(inst));
+            // addr = i = word offset of this instruction (matches label offsets stored in pass 1)
+            const word = this._assembleLine(inst.line, inst.lineNum, i);
             if (word !== null) {
                 words.push(word);
+                lineNums.push(inst.lineNum);
+            }
+        }
+
+        // ── Pass 3: branch bounds check ───────────────────────────────────────────
+        // Every BRANCH target must fall within [0, words.length).
+        const totalWords = words.length;
+        const _condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
+        for (let i = 0; i < words.length; i++) {
+            const w = words[i] >>> 0;
+            if (((w >>> 27) & 0x1F) !== 17) continue;   // not a BRANCH instruction
+            const rawImm = w & 0x7FFF;
+            const signedOffset = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
+            const target = i + signedOffset;
+            if (target < 0 || target >= totalWords) {
+                const condCode = (w >>> 23) & 0xF;
+                const mnemonic = 'BRANCH' + _condNames[condCode];
+                this.errors.push({
+                    line: lineNums[i],
+                    message: `${mnemonic} at word ${i} → target ${target} is outside the code lump [0, ${totalWords})`
+                });
             }
         }
 
@@ -311,7 +357,21 @@ class ChurchAssembler {
                 break;
             }
             case 17: {
-                imm = this._parseImm(parts[1], lineNum, addr);
+                // BRANCH operand may be a label name or a raw signed integer offset.
+                // Labels are resolved to a signed PC-relative offset: label_word - current_word.
+                const branchToken = (parts[1] || '').replace(/,/g, '').trim();
+                if (branchToken && /^[a-zA-Z_]/.test(branchToken)) {
+                    // Identifier-like token → treat as label name
+                    if (this.labels[branchToken] !== undefined) {
+                        imm = this.labels[branchToken] - addr;   // signed relative offset
+                    } else {
+                        this.errors.push({ line: lineNum, message: `Label "${branchToken}" is not defined. Define it with "${branchToken}:" on its own line before the target instruction.` });
+                        imm = 0;
+                    }
+                } else {
+                    // Numeric literal (decimal, hex, binary, or signed integer)
+                    imm = this._parseImm(parts[1], lineNum);
+                }
                 break;
             }
             case 18: {
