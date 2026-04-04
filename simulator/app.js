@@ -163,12 +163,13 @@ function selectUserTab(id) {
     userTabDirty = false;
     const editor = document.getElementById('asmEditor');
     if (editor) editor.value = tab.code;
+    // Always show the personal group when a user tab is selected
     const sel = document.getElementById('langSelector');
-    if (sel && sel.value !== tab.lang) {
-        sel.value = tab.lang;
+    if (sel && sel.value !== 'personal') {
+        sel.value = 'personal';
         onLangChange(true);
     }
-    document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.example-tab:not(.user-tab)').forEach(t => t.classList.remove('active'));
     renderUserTabs();
     updateSaveUserTabBtn();
     updateLineNumbers();
@@ -182,8 +183,9 @@ function saveActiveUserTab() {
     if (!tab) return;
     const editor = document.getElementById('asmEditor');
     if (editor) tab.code = editor.value;
+    // Don't overwrite the tab's real language with 'personal'
     const sel = document.getElementById('langSelector');
-    if (sel) tab.lang = sel.value;
+    if (sel && sel.value !== 'personal') tab.lang = sel.value;
     userTabDirty = false;
     saveUserTabsToStorage();
     renderUserTabs();
@@ -207,6 +209,10 @@ function renderUserTabs() {
     const container = document.getElementById('userTabsContainer');
     if (!container) return;
     container.innerHTML = '';
+    // Visibility is controlled by onLangChange; ensure hidden unless in personal mode
+    const sel = document.getElementById('langSelector');
+    const isPersonal = sel && sel.value === 'personal';
+    container.style.display = isPersonal ? '' : 'none';
     userTabs.forEach(tab => {
         const btn = document.createElement('button');
         btn.className = 'example-tab user-tab' + (activeUserTabId === tab.id ? ' active' : '');
@@ -11357,26 +11363,32 @@ function onLangChange(restoring) {
         javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
         symbolic: ['cloomc_ada_note_g'],
-        lambda: ['cloomc_lambda_church', 'cloomc_lambda_booleans', 'cloomc_lambda_pairs', 'cloomc_lambda_ycomb', 'cloomc_lambda_sliderule', 'cloomc_lambda_fixedpoint', 'cloomc_lambda_rational']
+        lambda: ['cloomc_lambda_church', 'cloomc_lambda_booleans', 'cloomc_lambda_pairs', 'cloomc_lambda_ycomb', 'cloomc_lambda_sliderule', 'cloomc_lambda_fixedpoint', 'cloomc_lambda_rational'],
+        personal: []
     };
 
     const scroll = document.getElementById('exampleTabsScroll');
     if (scroll) {
+        // Built-in example tabs: hide all when in personal mode, else show only this lang's set
         const tabs = scroll.querySelectorAll('.example-tab:not(.user-tab)');
         const allowedSet = langExampleGroups[lang] || [];
         tabs.forEach(tab => {
             const ex = tab.getAttribute('data-example');
             tab.style.display = allowedSet.includes(ex) ? '' : 'none';
         });
+        // User tabs container: only visible in personal mode
+        const userTabsCont = document.getElementById('userTabsContainer');
+        if (userTabsCont) userTabsCont.style.display = lang === 'personal' ? '' : 'none';
     }
 
-    if (activeUserTabId) {
+    // Only update the tab's stored lang when switching to a real language (not 'personal')
+    if (activeUserTabId && lang !== 'personal') {
         const activeTab = userTabs.find(t => t.id === activeUserTabId);
         if (activeTab) { activeTab.lang = lang; saveUserTabsToStorage(); }
     }
 
     if (!restoring) {
-        if (!activeUserTabId) {
+        if (!activeUserTabId && lang !== 'personal') {
             const defaults = {
                 english: 'english_hello',
                 assembly: 'selftest',
@@ -11395,7 +11407,7 @@ function onLangChange(restoring) {
             }
             showIntro(lang);
         }
-        if (typeof historyShowLanguageStory === 'function') historyShowLanguageStory(lang);
+        if (lang !== 'personal' && typeof historyShowLanguageStory === 'function') historyShowLanguageStory(lang);
         const syntaxPanel = document.getElementById('codeSyntaxPanel');
         if (syntaxPanel && syntaxPanel.style.display !== 'none') renderSyntaxRef(lang);
     }
@@ -11405,6 +11417,13 @@ function smartCompile() {
     if (!requirePermission('compile', 'Compile Programs')) return;
     const sel = document.getElementById('langSelector');
     let lang = sel ? sel.value : 'assembly';
+
+    // In personal mode, use the active tab's stored language for compilation
+    if (lang === 'personal' && activeUserTabId) {
+        const activeTab = userTabs.find(t => t.id === activeUserTabId);
+        if (activeTab && activeTab.lang) lang = activeTab.lang;
+        else lang = 'javascript';
+    }
 
     // Auto-detect CLOOMC++ when code has abstraction/method keywords
     if (lang === 'assembly') {
