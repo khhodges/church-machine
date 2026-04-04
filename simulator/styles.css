@@ -3954,6 +3954,43 @@ a.next-step-link:hover {
     box-shadow: 0 0 10px rgba(233, 69, 96, 0.4);
 }
 
+.crd-tab-action {
+    margin-left: auto;
+    background: #1a3a1a;
+    border-color: #4caf50;
+    color: #4caf50;
+}
+.crd-tab-action:hover {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: white;
+}
+
+.cr-inject-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid #1e3a5f;
+    flex-wrap: wrap;
+}
+
+.cr-inject-log {
+    margin-top: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: #05111f;
+    border: 1px solid #1e3a5f;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    color: #a8d8a8;
+    font-family: var(--font-mono);
+    max-height: 8rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
 .ref-tab-row {
     display: flex;
     gap: 0.25rem;

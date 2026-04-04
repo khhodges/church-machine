@@ -265,12 +265,103 @@ const TangSerial = (function() {
         }
     });
 
+    // PATCH_LUMP — write N words at an arbitrary BRAM address.
+    // Protocol: [0xBE][0xEF][addrHi][addrLo][countHi][countLo][w0_LE ... wN-1_LE][crcHi][crcLo]
+    // The FPGA echoes back [addrHi][addrLo][countHi][countLo] on success.
+    // Requires hardware/boot_rom.py UART FSM extension to decode opcode 0xBEEF.
+    async function patchLump(baseAddr, words, onStatus) {
+        const status = onStatus || function() {};
+
+        if (!isConnected()) {
+            throw new Error('Not connected. Call connect() first.');
+        }
+
+        const N = words.length;
+        if (N === 0) { status('Nothing to send (0 words).'); return { success: true }; }
+
+        // Build payload: 2 magic + 2 addr + 2 count + N*4 data + 2 CRC
+        const payloadBody = new Uint8Array(2 + 2 + 2 + N * 4);
+        payloadBody[0] = 0xBE;
+        payloadBody[1] = 0xEF;
+        payloadBody[2] = (baseAddr >>> 8) & 0xFF;
+        payloadBody[3] = baseAddr & 0xFF;
+        payloadBody[4] = (N >>> 8) & 0xFF;
+        payloadBody[5] = N & 0xFF;
+        for (let i = 0; i < N; i++) {
+            const w = words[i] >>> 0;
+            payloadBody[6 + i * 4 + 0] = w & 0xFF;
+            payloadBody[6 + i * 4 + 1] = (w >>> 8) & 0xFF;
+            payloadBody[6 + i * 4 + 2] = (w >>> 16) & 0xFF;
+            payloadBody[6 + i * 4 + 3] = (w >>> 24) & 0xFF;
+        }
+
+        // CRC-16/CCITT-FALSE over the body (excluding the two CRC bytes themselves)
+        let crc = 0xFFFF;
+        for (const byte of payloadBody) {
+            for (let i = 0; i < 8; i++) {
+                const bit = ((byte >>> (7 - i)) & 1) ^ ((crc >>> 15) & 1);
+                crc = ((crc << 1) & 0xFFFF) ^ (bit ? 0x1021 : 0);
+            }
+        }
+        const frame = new Uint8Array(payloadBody.length + 2);
+        frame.set(payloadBody, 0);
+        frame[payloadBody.length]     = (crc >>> 8) & 0xFF;
+        frame[payloadBody.length + 1] = crc & 0xFF;
+
+        status(`PATCH_LUMP: addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')} N=${N} CRC=0x${crc.toString(16).toUpperCase().padStart(4,'0')} — sending ${frame.length} bytes...`);
+
+        await drainInput();
+        const w = port.writable.getWriter();
+        try { await w.write(frame); } finally { w.releaseLock(); }
+
+        status('Bytes sent. Waiting for echo...');
+
+        const rxBytes = [];
+        const deadline = Date.now() + 3000;
+        const r = port.readable.getReader();
+        activeReader = r;
+        try {
+            while (Date.now() < deadline) {
+                const { value, done } = await Promise.race([
+                    r.read(),
+                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 1000))
+                ]);
+                if (done || !value || value.length === 0) break;
+                for (let i = 0; i < value.length; i++) rxBytes.push(value[i]);
+                if (rxBytes.length >= 4) break;
+            }
+        } catch(e) {
+            status('Read error: ' + e.message);
+        } finally {
+            activeReader = null;
+            try { r.releaseLock(); } catch(e) {}
+        }
+
+        if (rxBytes.length >= 4) {
+            const echoAddr  = (rxBytes[0] << 8) | rxBytes[1];
+            const echoCount = (rxBytes[2] << 8) | rxBytes[3];
+            const addrOk  = echoAddr  === (baseAddr & 0xFFFF);
+            const countOk = echoCount === N;
+            if (addrOk && countOk) {
+                status(`Echo OK: addr=0x${echoAddr.toString(16).toUpperCase().padStart(4,'0')} count=${echoCount}`);
+                return { success: true };
+            } else {
+                status(`Echo mismatch: expected addr=0x${(baseAddr&0xFFFF).toString(16).toUpperCase().padStart(4,'0')} count=${N}, got addr=0x${echoAddr.toString(16).toUpperCase().padStart(4,'0')} count=${echoCount}`);
+                return { success: false };
+            }
+        } else {
+            status(`No echo received (${rxBytes.length} bytes). Firmware may not support PATCH_LUMP yet — update hardware/boot_rom.py.`);
+            return { success: false, rxBytes };
+        }
+    }
+
     return {
         isSupported,
         isConnected,
         connect,
         disconnect,
         uploadToFPGA,
+        patchLump,
         pingFPGA,
         parseReadback,
         setBoardLabel,

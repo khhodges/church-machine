@@ -1035,6 +1035,150 @@ function switchCRDetailTab(tab) {
     if (panel) panel.style.display = 'block';
 }
 
+function editCRCodeInEditor() {
+    if (selectedCR === null) return;
+    const crIdx = selectedCR;
+    const cr = sim.getFormattedCR(crIdx);
+    const baseLoc = cr.word1_location >>> 0;
+    const nsIdx = cr.gtIndex;
+    const asm = new ChurchAssembler();
+
+    const word0 = (baseLoc < sim.memory.length) ? (sim.memory[baseLoc] >>> 0) : 0;
+    const lumpHdr = sim.parseLumpHeader(word0);
+
+    let codeStart = baseLoc;
+    let codeLimit = (cr.limit17 || 0) + 1;
+    if (lumpHdr.valid) {
+        codeStart = baseLoc + 1;
+        codeLimit = lumpHdr.cw;
+    }
+
+    const lines = [];
+    lines.push(`; Disassembly of CR${crIdx}  NS[${nsIdx}]  @ 0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}  (${codeLimit} word${codeLimit !== 1 ? 's' : ''})`);
+    if (codeLimit === 0) {
+        lines.push('; (empty lump)');
+    } else {
+        for (let w = 0; w < codeLimit; w++) {
+            const addr = codeStart + w;
+            if (addr >= sim.memory.length) break;
+            const word = sim.memory[addr] >>> 0;
+            lines.push(word === 0 ? 'NOP' : asm.disassemble(word));
+        }
+    }
+
+    switchView('editor');
+    const sel = document.getElementById('langSelector');
+    if (sel) sel.value = 'assembly';
+    const asmEd = document.getElementById('asmEditor');
+    if (asmEd) asmEd.value = lines.join('\n');
+    switchCodeTab('console');
+}
+
+function injectCRCode(logEl) {
+    const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
+
+    if (selectedCR === null) { log('Error: No CR selected.'); return null; }
+    const crIdx = selectedCR;
+    const cr = sim.getFormattedCR(crIdx);
+    const baseLoc = cr.word1_location >>> 0;
+    const nsIdx = cr.gtIndex;
+
+    const src = (document.getElementById('asmEditor') || {}).value || '';
+    if (!src.trim()) { log('Error: Editor is empty — open the code in the editor first (Edit button).'); return null; }
+
+    const asmObj = new ChurchAssembler();
+    const result = asmObj.assemble(src);
+    if (result.errors && result.errors.length > 0) {
+        log('Assembly failed:');
+        result.errors.forEach(e => log(`  Line ${e.line}: ${e.message}`));
+        return null;
+    }
+
+    const newWords = result.words || [];
+    const newCW = newWords.length;
+
+    const hdrWord = (baseLoc < sim.memory.length) ? (sim.memory[baseLoc] >>> 0) : 0;
+    const lumpHdr = sim.parseLumpHeader(hdrWord);
+    if (!lumpHdr.valid) {
+        log('Error: No valid lump header at 0x' + baseLoc.toString(16).toUpperCase().padStart(4,'0') + '.');
+        return null;
+    }
+
+    const codeStart = baseLoc + 1;
+    const oldCW = lumpHdr.cw;
+
+    log(`CR${crIdx}  NS[${nsIdx}]  base=0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}  old cw=${oldCW}  new cw=${newCW}`);
+
+    for (let i = 0; i < newCW; i++) {
+        const addr = codeStart + i;
+        if (addr < sim.memory.length) sim.memory[addr] = newWords[i] >>> 0;
+    }
+    for (let i = newCW; i < oldCW; i++) {
+        const addr = codeStart + i;
+        if (addr < sim.memory.length) sim.memory[addr] = 0;
+    }
+
+    if (newCW !== oldCW) {
+        const newHdrWord = ((hdrWord >>> 0) & ~(0x1FFF << 10)) | ((newCW & 0x1FFF) << 10);
+        sim.memory[baseLoc] = newHdrWord >>> 0;
+
+        const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
+        const oldW1 = sim.memory[nsBase + 1] >>> 0;
+        const oldW2 = sim.memory[nsBase + 2] >>> 0;
+        const w1f = sim.parseNSWord1(oldW1);
+        const newLimit17 = Math.max(0, newCW - 1);
+        const newW1 = sim.packNSWord1(newLimit17, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
+        sim.memory[nsBase + 1] = newW1;
+
+        const existingGtSeq = (oldW2 >>> 25) & 0x7F;
+        const newW2 = sim.makeVersionSeals(existingGtSeq, baseLoc, newLimit17);
+        sim.memory[nsBase + 2] = newW2;
+
+        if (sim.cr[crIdx]) sim.cr[crIdx].word3 = newW2;
+
+        log(`Resized: lump cw updated, NS[${nsIdx}] limit17=${newLimit17}, CRC recomputed (gt_seq=${existingGtSeq} preserved).`);
+    }
+
+    log(`Simulator patched — ${newCW} word${newCW !== 1 ? 's' : ''} written.`);
+    updateDisplay();
+    return { newWords, baseLoc, codeStart, newCW, oldCW, nsIdx };
+}
+
+async function injectCRCodeToFPGA(logEl) {
+    const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
+
+    const patch = injectCRCode(logEl);
+    if (!patch) return;
+
+    if (!TangSerial.isConnected()) {
+        log('FPGA not connected — simulator updated only. Connect to FPGA and retry.');
+        return;
+    }
+
+    const { newWords, baseLoc, newCW, nsIdx } = patch;
+
+    if (patch.newCW !== patch.oldCW) {
+        log('Sending updated NS entry to FPGA...');
+        const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
+        const nsSlice = Array.from(sim.memory.slice(0, TangSerial.NS_WORDS));
+        const clSlice = Array.from(sim.memory.slice(TangSerial.NS_WORDS, TangSerial.NS_WORDS + TangSerial.CLIST_WORDS));
+        try {
+            await TangSerial.uploadToFPGA(nsSlice, clSlice, msg => log('  ' + msg));
+        } catch(e) {
+            log('NS upload failed: ' + e.message);
+            return;
+        }
+    }
+
+    log(`Sending code lump (${newCW} words at 0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}) to FPGA...`);
+    try {
+        await TangSerial.patchLump(baseLoc, newWords, msg => log('  ' + msg));
+        log('FPGA patched successfully.');
+    } catch(e) {
+        log('FPGA patch failed: ' + e.message);
+    }
+}
+
 function updateCRDetail() {
     if (selectedCR === null) return;
     const titleEl = document.getElementById('crDetailTitle');
@@ -1080,6 +1224,9 @@ function updateCRDetail() {
     html += `<button class="crd-tab${crDetailTab==='content'?' active':''}" id="crdTab-content" onclick="switchCRDetailTab('content')">Content</button>`;
     html += `<button class="crd-tab${crDetailTab==='register'?' active':''}" id="crdTab-register" onclick="switchCRDetailTab('register')">Register</button>`;
     html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
+    if (showCode) {
+        html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">Edit</button>`;
+    }
     html += '</div>';
 
     html += `<div class="crd-panel" id="crdPanel-content" style="display:${crDetailTab==='content'?'block':'none'}">`;
@@ -1153,6 +1300,23 @@ function updateCRDetail() {
             }
             html += codeHtml;
         }
+
+        // Inject panel — patch the code lump back after editing
+        html += `<div class="cr-inject-bar">`;
+        html += `<button class="btn btn-sm" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">&#x270E; Edit in Editor</button>`;
+        html += `<button class="btn btn-sm btn-primary" onclick="(function(){`;
+        html += `var el=document.getElementById('crInjectLog');`;
+        html += `el.style.display='block';el.textContent='';`;
+        html += `injectCRCode(el);`;
+        html += `})()" title="Assemble the editor content and patch this code lump in the simulator">&#x21A9; Patch Simulator</button>`;
+        html += `<button class="btn btn-sm" onclick="(function(){`;
+        html += `var el=document.getElementById('crInjectLog');`;
+        html += `el.style.display='block';el.textContent='';`;
+        html += `injectCRCodeToFPGA(el);`;
+        html += `})()" title="Patch simulator then send the new code lump to the FPGA over UART">&#x21A9; Patch FPGA</button>`;
+        html += `</div>`;
+        html += `<pre id="crInjectLog" class="cr-inject-log" style="display:none;"></pre>`;
+
         html += '</div>';
     }
 
