@@ -1223,42 +1223,71 @@ function showZonePopup(evt, zone, nsIdx) {
 
     } else if (zone === 2) {
         const sto = (sim.sto != null) ? sim.sto : TL.STACK_END;
-        const cs  = (sim.callStack && sim.callStack.length) ? sim.callStack : null;
-        const depth = cs ? cs.length : 0;
+        const SP_MAX = TL.STACK_END;  // 243
 
-        html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · STO=${sto}</div>`;
+        // Walk physical memory: frame word at ptr (high), E-GT at ptr-1 (low).
+        // ptr starts at sto+2 (the frame word of the most-recent frame).
+        // prev_STO field in each frame word gives the ptr for the next older frame.
+        const frames = [];
+        let ptr = sto + 2;
+        const MAX_WALK = 16;  // safety cap against corrupt stacks
+        while (ptr >= TL.STACK_START && ptr <= SP_MAX && frames.length < MAX_WALK) {
+            const fw  = sim.memory[slotBase + ptr] >>> 0;
+            if (!fw) break;
+            const niaBits = (fw >>> 13) & 0x7FFF;
+            const szBit   = (fw >>> 12) & 1;
+            const prevSTO =  fw & 0xFFF;
+            const egt     = (szBit && ptr > TL.STACK_START) ? (sim.memory[slotBase + ptr - 1] >>> 0) : 0;
+            frames.push({ ptr, fw, niaBits, szBit, prevSTO, egt });
+            if (prevSTO >= ptr || prevSTO < TL.STACK_START) break;  // guard against bad prev_STO
+            ptr = prevSTO;
+        }
+
+        html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · STO=${sto} · sp_max=${SP_MAX}</div>`;
         html += `<table>`;
-        html += `<tr><td>depth</td><td class="zdp-note">${depth} frame${depth!==1?'s':''} (incl. sentinel)</td></tr>`;
+        html += `<tr><td>depth</td><td class="zdp-note">${frames.length} frame${frames.length!==1?'s':''} (incl. sentinel)</td></tr>`;
         html += `</table>`;
 
-        // Show top frame pair + one more from callStack (most recent = last in array)
-        const showFrames = Math.min(2, depth);
-        for (let fi = 0; fi < showFrames; fi++) {
-            const frame = cs[depth - 1 - fi];
+        // Show top 2 frames decoded
+        const showN = Math.min(2, frames.length);
+        for (let fi = 0; fi < showN; fi++) {
+            const f = frames[fi];
             const isTop = fi === 0;
-            const label = isTop ? '▶ top frame' : '  prev frame';
+            const isSentinel = f.niaBits === 0x7FFF;
             const cls   = isTop ? 'zdp-frame-top' : 'zdp-frame-more';
-            const crLbl = (frame.calledCR != null) ? `CR${frame.calledCR}` : '?';
-            const nsLbl = (sim.nsLabels && frame.calledNS != null) ? (sim.nsLabels[frame.calledNS] || '') : '';
-            const sentinel = frame.returnPC === 0x7FFF;
+            const label = isTop ? '▶ top' : '  +1';
+
+            let egtStr = '';
+            if (f.egt) {
+                const gt = sim.parseGT ? sim.parseGT(f.egt) : null;
+                if (gt && gt.type !== 0) {
+                    const perms = Object.entries(gt.permissions || {}).filter(([,v])=>v).map(([k])=>k).join('') || 'none';
+                    const lbl = (sim.nsLabels && sim.nsLabels[gt.index]) || '';
+                    egtStr = `${gt.typeName} s=${gt.index}${lbl?' <span class="zdp-lbl">('+lbl+')</span>':''} [${perms}]`;
+                } else {
+                    egtStr = hexW(f.egt);
+                }
+            }
+
             html += `<div style="margin-top:0.4rem;padding-top:0.3rem;border-top:1px solid #1e3a5f;">`;
-            html += `<span class="${cls}">${label}</span>`;
-            if (sentinel) {
-                html += ` <span class="zdp-sentinel">sentinel</span>`;
-            }
+            html += `<span class="${cls}">frame @+${f.ptr}</span>`;
+            if (isSentinel) html += ` <span class="zdp-sentinel">sentinel</span>`;
             html += `<table>`;
-            html += `<tr><td>called via</td><td class="zdp-note">${crLbl}${nsLbl?' <span class="zdp-lbl">('+nsLbl+')</span>':''}</td></tr>`;
-            if (!sentinel) {
-                html += `<tr><td>returnPC</td><td class="zdp-val">${frame.returnPC} ${hex4(frame.returnPC)}</td></tr>`;
+            html += `<tr><td style="color:#6b8faf;">fw</td><td class="zdp-hex">${hexW(f.fw)}</td></tr>`;
+            if (!isSentinel) {
+                html += `<tr><td>returnPC</td><td class="zdp-val">${f.niaBits} <span style="color:#555;">${hex4(f.niaBits)}</span></td></tr>`;
             }
-            html += `<tr><td>sz</td><td class="zdp-val">${frame.sz} <span class="zdp-lbl">${frame.sz?'CALL frame':'LAMBDA frame'}</span></td></tr>`;
-            html += `<tr><td>prev STO</td><td class="zdp-val">${frame.savedSTO}</td></tr>`;
+            html += `<tr><td>sz</td><td class="zdp-val">${f.szBit} <span class="zdp-lbl">${f.szBit?'CALL':'LAMBDA'}</span></td></tr>`;
+            html += `<tr><td>prev STO</td><td class="zdp-val">${f.prevSTO}</td></tr>`;
+            if (f.egt) html += `<tr><td>E-GT @+${f.ptr-1}</td><td class="zdp-note">${egtStr}</td></tr>`;
             html += `</table>`;
             html += `</div>`;
         }
 
-        if (depth === 0) {
-            html += `<div class="zdp-empty" style="margin-top:0.3rem;">call stack is empty</div>`;
+        if (frames.length === 0) {
+            html += `<div class="zdp-empty" style="margin-top:0.3rem;">no frames found in memory (stack may be empty or sim not started)</div>`;
+        } else if (frames.length > 2) {
+            html += `<div style="margin-top:0.3rem;color:#4b5563;font-size:0.69rem;">… ${frames.length - 2} more frame${frames.length-2!==1?'s':''} below — click ②\u202FStack to see all</div>`;
         }
 
     } else if (zone === 1) {
