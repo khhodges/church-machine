@@ -1218,6 +1218,72 @@ async function injectCRCodeToFPGA(logEl) {
     }
 }
 
+function patchSimulator() {
+    const logEl = document.getElementById('crInjectLog');
+    if (logEl) { logEl.style.display = 'block'; logEl.textContent = ''; }
+    const result = injectCRCode(logEl);
+    const logText = logEl ? logEl.textContent.trim() : '';
+    showPatchModal(!!result, 'Patch Simulator', logText);
+    if (result) updateCRDetail();
+}
+
+async function patchFPGA() {
+    const logEl = document.getElementById('crInjectLog');
+    if (logEl) { logEl.style.display = 'block'; logEl.textContent = ''; }
+    await injectCRCodeToFPGA(logEl);
+    const logText = logEl ? logEl.textContent.trim() : '';
+    const ok = !!logText && !logText.includes('Error:') && !logText.includes('failed');
+    showPatchModal(ok, 'Patch FPGA', logText);
+}
+
+function showPatchModal(ok, opName, logText) {
+    const existing = document.getElementById('patchToastOverlay');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'patchToastOverlay';
+    toast.className = 'patch-toast ' + (ok ? 'patch-toast-ok' : 'patch-toast-fail');
+
+    const lines = (logText || '').split('\n').filter(l => l.trim());
+    const lastLine = lines[lines.length - 1] || (ok ? 'Done.' : 'Operation failed.');
+
+    toast.innerHTML = `
+        <div class="patch-toast-header">
+            <span class="patch-toast-icon">${ok ? '&#x2713;' : '&#x2717;'}</span>
+            <span class="patch-toast-title">${opName} &mdash; ${ok ? 'Success' : 'Failed'}</span>
+            <button class="patch-toast-close" onclick="document.getElementById('patchToastOverlay').remove()">&#x2715;</button>
+        </div>
+        <div class="patch-toast-summary">${lastLine}</div>
+        ${lines.length > 1 ? `<pre class="patch-toast-log">${lines.join('\n')}</pre>` : ''}
+    `;
+
+    document.body.appendChild(toast);
+
+    if (ok) {
+        setTimeout(() => {
+            const el = document.getElementById('patchToastOverlay');
+            if (el) {
+                el.classList.add('patch-toast-fade');
+                setTimeout(() => el.remove(), 400);
+            }
+        }, 3000);
+    }
+}
+
+function toggleCrdInfoPop(id) {
+    const pop = document.getElementById(id);
+    if (!pop) return;
+    const isOpen = pop.style.display !== 'none';
+    document.querySelectorAll('.crd-info-pop').forEach(p => { p.style.display = 'none'; });
+    if (!isOpen) pop.style.display = 'block';
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.crd-action-group')) {
+        document.querySelectorAll('.crd-info-pop').forEach(p => { p.style.display = 'none'; });
+    }
+});
+
 function updateCRDetail() {
     if (selectedCR === null) return;
     const titleEl = document.getElementById('crDetailTitle');
@@ -1271,8 +1337,16 @@ function updateCRDetail() {
     html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
     if (showEditButton) {
         html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">&#x270E; Edit</button>`;
-        html += `<button class="crd-tab crd-tab-action" onclick="(function(){var el=document.getElementById('crInjectLog');if(el){el.style.display='block';el.textContent='';}injectCRCode(el);})()" title="Assemble editor content and patch this code lump">&#x21A9; Patch</button>`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="(function(){var el=document.getElementById('crInjectLog');if(el){el.style.display='block';el.textContent='';}injectCRCodeToFPGA(el);})()" title="Patch simulator then send the new code lump to the FPGA over UART">&#x21A9; Patch FPGA</button>`;
+        html += `<span class="crd-action-group">`;
+        html += `<button class="crd-tab crd-tab-action" onclick="patchSimulator()" title="Assemble editor code and patch simulator memory">&#x21A9; Patch</button>`;
+        html += `<button class="crd-action-info-btn" onclick="toggleCrdInfoPop('patchSimInfoPop')" title="What does Patch do?">&#x2139;</button>`;
+        html += `<div class="crd-info-pop" id="patchSimInfoPop" style="display:none;"><b>Patch Simulator</b><br><br>Assembles the code currently in the Code editor and writes the resulting machine words directly into simulator memory at this lump\u2019s base address.<br><br>If the instruction count changed the lump header <code>cw</code> field, the NS entry <code>limit17</code>, and the CRC seal are all updated automatically so capability checks remain valid.</div>`;
+        html += `</span>`;
+        html += `<span class="crd-action-group">`;
+        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" title="Patch simulator then upload to FPGA over UART">&#x21A9; Patch FPGA</button>`;
+        html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('patchFPGAInfoPop')" title="What does Patch FPGA do?">&#x2139;</button>`;
+        html += `<div class="crd-info-pop" id="patchFPGAInfoPop" style="display:none;"><b>Patch FPGA</b><br><br>Runs <b>Patch Simulator</b> first, then uploads the updated code lump to the connected Efinix Ti60 F225 FPGA over WebSerial (UART).<br><br>If the instruction count changed, the full NS table is re-uploaded before the code lump. Requires an active WebSerial connection to the hardware.</div>`;
+        html += `</span>`;
     }
     html += '</div>';
 

@@ -4119,6 +4119,136 @@ a.next-step-link:hover {
     color: white;
 }
 
+.crd-action-group {
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+}
+
+.crd-action-info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-left: 2px;
+    padding: 0;
+    font-size: 0.78rem;
+    background: #1b2d45;
+    color: #5ba4f5;
+    border: 1px solid #2a4a6a;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.crd-action-info-btn:hover {
+    background: #3a86ff;
+    color: white;
+    border-color: #3a86ff;
+}
+.crd-action-info-btn-fpga {
+    color: #5ba4f5;
+    border-color: #2a4a6a;
+}
+
+.crd-info-pop {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 200;
+    background: #0d1b2a;
+    border: 1px solid #3a86ff;
+    border-radius: 7px;
+    padding: 0.75rem 1rem;
+    min-width: 260px;
+    max-width: 340px;
+    font-size: 0.8rem;
+    color: #c8d8e8;
+    line-height: 1.55;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+}
+.crd-info-pop code {
+    background: #1b2d45;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    color: #7dd3fc;
+}
+
+.patch-toast {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 2000;
+    min-width: 280px;
+    max-width: 400px;
+    background: #0d1b2a;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+    padding: 0;
+    overflow: hidden;
+    transition: opacity 0.4s ease;
+}
+.patch-toast-ok  { border: 2px solid #22c55e; }
+.patch-toast-fail { border: 2px solid #ef4444; }
+
+.patch-toast-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.8rem;
+}
+.patch-toast-ok   .patch-toast-header { background: rgba(34,197,94,0.15); }
+.patch-toast-fail .patch-toast-header { background: rgba(239,68,68,0.15); }
+
+.patch-toast-icon {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+.patch-toast-ok   .patch-toast-icon { color: #22c55e; }
+.patch-toast-fail .patch-toast-icon { color: #ef4444; }
+
+.patch-toast-title {
+    flex: 1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.patch-toast-close {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0 0.2rem;
+    line-height: 1;
+}
+.patch-toast-close:hover { color: #fff; }
+
+.patch-toast-summary {
+    padding: 0.4rem 0.8rem 0.5rem;
+    font-size: 0.78rem;
+    color: #b0c4d8;
+}
+
+.patch-toast-log {
+    margin: 0;
+    padding: 0.5rem 0.8rem 0.6rem;
+    font-size: 0.72rem;
+    font-family: 'Courier New', monospace;
+    color: #90a8c0;
+    background: #091420;
+    border-top: 1px solid #1e3a5f;
+    max-height: 120px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+.patch-toast-fade { opacity: 0; }
+
 .cr-inject-bar {
     display: flex;
     gap: 0.5rem;
