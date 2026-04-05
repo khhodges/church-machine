@@ -1128,6 +1128,179 @@ function scrollToThreadZone(zone) {
     });
 }
 
+// ── Zone-button rich hover popups ────────────────────────────────────────────
+let _zdpHideTimer = null;
+
+function cancelHideZonePopup() {
+    if (_zdpHideTimer) { clearTimeout(_zdpHideTimer); _zdpHideTimer = null; }
+}
+
+function hideZonePopup() {
+    _zdpHideTimer = setTimeout(() => {
+        const pop = document.getElementById('zone-data-popup');
+        if (pop) pop.style.display = 'none';
+    }, 80);
+}
+
+function showZonePopup(evt, zone, nsIdx) {
+    cancelHideZonePopup();
+    const pop = document.getElementById('zone-data-popup');
+    if (!pop || !sim) return;
+
+    const entry = sim.readNSEntry ? sim.readNSEntry(nsIdx) : null;
+    const slotBase = (entry && entry.word0_location != null) ? (entry.word0_location >>> 0) : (nsIdx * 256);
+    const TL = THREAD_LAYOUT;
+    const hexW = w => '0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    const hex4 = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(4, '0');
+
+    let html = '';
+
+    if (zone === 'hdr') {
+        const hdrWord = (sim.memory[slotBase] >>> 0) || TL.THREAD_HEADER;
+        const hdr = sim.parseLumpHeader ? sim.parseLumpHeader(hdrWord) : {};
+        const typNames = ['lump','data','clist-only','outform'];
+        html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">Lump Header · word +0</div>`;
+        html += `<table>`;
+        html += `<tr><td>raw</td><td class="zdp-hex">${hexW(hdrWord)}</td></tr>`;
+        if (hdr.valid) {
+            html += `<tr><td>magic</td><td class="zdp-val">0x1F <span class="zdp-lbl">(valid)</span></td></tr>`;
+            html += `<tr><td>n−6</td><td class="zdp-val">${hdr.n_minus_6} → <span class="zdp-note">${hdr.lumpSize} words</span></td></tr>`;
+            html += `<tr><td>cw</td><td class="zdp-val">${hdr.cw} <span class="zdp-lbl">code words</span></td></tr>`;
+            html += `<tr><td>typ</td><td class="zdp-val">${hdr.typ} <span class="zdp-lbl">${typNames[hdr.typ] || hdr.typ}</span></td></tr>`;
+            html += `<tr><td>cc</td><td class="zdp-val">${hdr.cc} <span class="zdp-lbl">c-list slots</span></td></tr>`;
+        } else {
+            html += `<tr><td colspan="2" class="zdp-empty">no valid lump header at this address</td></tr>`;
+        }
+        html += `</table>`;
+
+    } else if (zone === 5) {
+        html += `<div class="zdp-title" style="border-color:#a855f7;color:#c084fc;">⑤ Data Registers · DR0–DR15</div>`;
+        html += `<table>`;
+        const drSrc = (sim.dr && sim.dr.length >= 16) ? sim.dr : null;
+        for (let i = 0; i < 16; i++) {
+            const live = drSrc ? (drSrc[i] >>> 0) : 0;
+            const mem  = (sim.memory[slotBase + TL.DR_START + i] >>> 0) || 0;
+            const val  = drSrc ? live : mem;
+            const cls  = val ? 'zdp-val' : 'zdp-dim';
+            const src  = drSrc ? '' : '<span class="zdp-lbl"> (mem)</span>';
+            html += `<tr><td style="color:#a855f7;">DR${i}</td><td class="${cls}">${hexW(val)}${src}</td></tr>`;
+        }
+        html += `</table>`;
+
+    } else if (zone === 4) {
+        const dr5 = (sim.dr && sim.dr[5] != null) ? (sim.dr[5] >>> 0) : null;
+        let allocCount = 0;
+        let allocWords = [];
+        for (let i = 0; i < TL.HEAP_WORDS; i++) {
+            const w = sim.memory[slotBase + TL.HEAP_START + i] >>> 0;
+            if (w) { allocCount++; if (allocWords.length < 4) allocWords.push({off: TL.HEAP_START + i, w}); }
+        }
+        html += `<div class="zdp-title" style="border-color:#22c55e;color:#4ade80;">④ Heap · +${TL.HEAP_START}…+${TL.HEAP_END}</div>`;
+        html += `<table>`;
+        html += `<tr><td>allocated</td><td class="zdp-note">${allocCount} / ${TL.HEAP_WORDS} words</td></tr>`;
+        if (dr5 !== null) html += `<tr><td>DR5 (frontier)</td><td class="zdp-hex">${hexW(dr5)}</td></tr>`;
+        if (allocWords.length === 0) {
+            html += `<tr><td colspan="2" class="zdp-empty">heap is empty</td></tr>`;
+        } else {
+            html += `<tr><td colspan="2" style="color:#6b8faf;padding-top:0.25rem;">first ${allocWords.length} non-zero word${allocWords.length!==1?'s':''}:</td></tr>`;
+            for (const {off, w} of allocWords) html += `<tr><td>+${off}</td><td class="zdp-hex">${hexW(w)}</td></tr>`;
+        }
+        html += `</table>`;
+
+    } else if (zone === 3) {
+        const sto = (sim.sto != null) ? sim.sto : TL.STACK_END;
+        const freeWords = sto - TL.HEAP_END;          // between heap top and STO
+        let nonZero = 0;
+        for (let i = TL.FREE_START; i <= TL.FREE_END; i++) {
+            if (sim.memory[slotBase + i]) nonZero++;
+        }
+        html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">③ Freespace · +${TL.FREE_START}…+${TL.FREE_END}</div>`;
+        html += `<table>`;
+        html += `<tr><td>STO (live)</td><td class="zdp-note">${sto} <span class="zdp-lbl">(stack top offset)</span></td></tr>`;
+        html += `<tr><td>free gap</td><td class="zdp-val">${Math.max(0, freeWords)} words</td></tr>`;
+        html += `<tr><td>non-zero</td><td class="${nonZero?'zdp-note':'zdp-dim'}">${nonZero} word${nonZero!==1?'s':''}</td></tr>`;
+        html += `</table>`;
+
+    } else if (zone === 2) {
+        const sto = (sim.sto != null) ? sim.sto : TL.STACK_END;
+        const cs  = (sim.callStack && sim.callStack.length) ? sim.callStack : null;
+        const depth = cs ? cs.length : 0;
+
+        html += `<div class="zdp-title" style="border-color:#38bdf8;color:#7dd3fc;">② LIFO Stack · STO=${sto}</div>`;
+        html += `<table>`;
+        html += `<tr><td>depth</td><td class="zdp-note">${depth} frame${depth!==1?'s':''} (incl. sentinel)</td></tr>`;
+        html += `</table>`;
+
+        // Show top frame pair + one more from callStack (most recent = last in array)
+        const showFrames = Math.min(2, depth);
+        for (let fi = 0; fi < showFrames; fi++) {
+            const frame = cs[depth - 1 - fi];
+            const isTop = fi === 0;
+            const label = isTop ? '▶ top frame' : '  prev frame';
+            const cls   = isTop ? 'zdp-frame-top' : 'zdp-frame-more';
+            const crLbl = (frame.calledCR != null) ? `CR${frame.calledCR}` : '?';
+            const nsLbl = (sim.nsLabels && frame.calledNS != null) ? (sim.nsLabels[frame.calledNS] || '') : '';
+            const sentinel = frame.returnPC === 0x7FFF;
+            html += `<div style="margin-top:0.4rem;padding-top:0.3rem;border-top:1px solid #1e3a5f;">`;
+            html += `<span class="${cls}">${label}</span>`;
+            if (sentinel) {
+                html += ` <span class="zdp-sentinel">sentinel</span>`;
+            }
+            html += `<table>`;
+            html += `<tr><td>called via</td><td class="zdp-note">${crLbl}${nsLbl?' <span class="zdp-lbl">('+nsLbl+')</span>':''}</td></tr>`;
+            if (!sentinel) {
+                html += `<tr><td>returnPC</td><td class="zdp-val">${frame.returnPC} ${hex4(frame.returnPC)}</td></tr>`;
+            }
+            html += `<tr><td>sz</td><td class="zdp-val">${frame.sz} <span class="zdp-lbl">${frame.sz?'CALL frame':'LAMBDA frame'}</span></td></tr>`;
+            html += `<tr><td>prev STO</td><td class="zdp-val">${frame.savedSTO}</td></tr>`;
+            html += `</table>`;
+            html += `</div>`;
+        }
+
+        if (depth === 0) {
+            html += `<div class="zdp-empty" style="margin-top:0.3rem;">call stack is empty</div>`;
+        }
+
+    } else if (zone === 1) {
+        html += `<div class="zdp-title" style="border-color:#f4b942;color:#fde68a;">① Capabilities · CR0–CR11 (c-list tail)</div>`;
+        html += `<table>`;
+        for (let i = 0; i < TL.CAPS_WORDS; i++) {
+            const off  = TL.CAPS_START + i;
+            const word = sim.memory[slotBase + off] >>> 0;
+            if (!word) {
+                html += `<tr><td style="color:#f4b942;">CR${i}</td><td class="zdp-dim">0x00000000</td></tr>`;
+                continue;
+            }
+            const gt = sim.parseGT ? sim.parseGT(word) : null;
+            let decoded = hexW(word);
+            if (gt && gt.type !== 0) {
+                const perms = Object.entries(gt.permissions || {}).filter(([,v])=>v).map(([k])=>k).join('') || 'none';
+                const lbl = (sim.nsLabels && sim.nsLabels[gt.index]) || '';
+                decoded = `<span class="zdp-hex">${hexW(word)}</span> <span class="zdp-note">${gt.typeName}</span> s=${gt.index}${lbl?' <span class="zdp-lbl">('+lbl+')</span>':''} [${perms}]`;
+            }
+            html += `<tr><td style="color:#f4b942;">CR${i}</td><td>${decoded}</td></tr>`;
+        }
+        html += `</table>`;
+    }
+
+    pop.innerHTML = html;
+    pop.style.display = 'block';
+
+    // Position below the button, clamped to viewport
+    const rect = evt.currentTarget.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = rect.left;
+    let top  = rect.bottom + 6;
+    pop.style.left = '0'; pop.style.top = '0';  // measure natural size
+    const pw = pop.offsetWidth  || 300;
+    const ph = pop.offsetHeight || 200;
+    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
+    if (top  + ph > vh - 8) top  = Math.max(8, rect.top - ph - 6);
+    pop.style.left = left + 'px';
+    pop.style.top  = top  + 'px';
+}
+
 function editCRCodeInEditor() {
     if (selectedCR === null) return;
     const crIdx = selectedCR;
@@ -1396,13 +1569,13 @@ function updateCRDetail() {
     html += `<button class="crd-tab${crDetailTab==='register'?' active':''}" id="crdTab-register" onclick="switchCRDetailTab('register')">Register</button>`;
     html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
     if (showThread) {
-        html += `<span class="crd-zone-nav" title="Jump to zone">`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" title="Lump Header">Hdr</button>`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" title="⑤ Data Registers">⑤\u202FDR</button>`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" title="④ Heap">④\u202FHeap</button>`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" title="③ Freespace">③\u202FFree</button>`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" title="② LIFO Stack">②\u202FStack</button>`;
-        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" title="① Capabilities">①\u202FCaps</button>`;
+        html += `<span class="crd-zone-nav" title="Jump to zone · hover for live data">`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${nsIdx})" onmouseleave="hideZonePopup()">Hdr</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${nsIdx})" onmouseleave="hideZonePopup()">⑤\u202FDR</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" onmouseenter="showZonePopup(event,4,${nsIdx})" onmouseleave="hideZonePopup()">④\u202FHeap</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" onmouseenter="showZonePopup(event,3,${nsIdx})" onmouseleave="hideZonePopup()">③\u202FFree</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" onmouseenter="showZonePopup(event,2,${nsIdx})" onmouseleave="hideZonePopup()">②\u202FStack</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${nsIdx})" onmouseleave="hideZonePopup()">①\u202FCaps</button>`;
         html += `</span>`;
     }
     if (showEditButton) {

@@ -4253,6 +4253,57 @@ a.next-step-link:hover {
     border-color: #38bdf8;
 }
 
+#zone-data-popup {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    background: #07111c;
+    border: 1px solid #2a5a8a;
+    border-radius: 8px;
+    padding: 0.7rem 0.85rem;
+    min-width: 270px;
+    max-width: 400px;
+    font-size: 0.74rem;
+    color: #c8d8e8;
+    line-height: 1.5;
+    box-shadow: 0 6px 28px rgba(0,0,0,0.75);
+    pointer-events: auto;
+}
+#zone-data-popup .zdp-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.45rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid #1e3a5f;
+}
+#zone-data-popup table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 0.3rem;
+}
+#zone-data-popup td {
+    padding: 0.1rem 0.35rem 0.1rem 0;
+    vertical-align: top;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+}
+#zone-data-popup td:first-child {
+    color: #6b8faf;
+    white-space: nowrap;
+    padding-right: 0.5rem;
+}
+#zone-data-popup .zdp-hex { color: rgba(206,145,120,0.9); }
+#zone-data-popup .zdp-val { color: #e2e8f0; }
+#zone-data-popup .zdp-note { color: #7dd3fc; }
+#zone-data-popup .zdp-dim { color: #374151; }
+#zone-data-popup .zdp-frame-top { color: #38bdf8; font-weight: 600; }
+#zone-data-popup .zdp-frame-more { color: #7dd3fc; }
+#zone-data-popup .zdp-sentinel { color: #f97316; font-weight: 600; }
+#zone-data-popup .zdp-lbl { color: #93c5fd; font-style: italic; }
+#zone-data-popup .zdp-empty { color: #374151; font-style: italic; }
+
 .crd-action-group {
     display: inline-flex;
     align-items: center;
