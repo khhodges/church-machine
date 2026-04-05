@@ -2591,6 +2591,38 @@ class ChurchSimulator {
                 this.memory[codeStart + i] = words[i] >>> 0;
             }
         }
+
+        // After boot, keep the lump header cw and NS entry limit17 in sync with
+        // the actual instruction count so that the code view shows all words.
+        if (this.bootComplete && baseAddr < this.memory.length) {
+            const hdrWord  = this.memory[baseAddr] >>> 0;
+            const hdr      = this.parseLumpHeader(hdrWord);
+            if (hdr.valid) {
+                const clistStart = hdr.lumpSize - hdr.cc;           // first c-list word (relative to lump base)
+                const maxCW      = Math.max(0, clistStart - 1);     // can't overlap the c-list or header
+                const newCW      = Math.min(words.length, maxCW);
+                if (newCW !== hdr.cw) {
+                    // Update lump header cw field (bits 22:10)
+                    this.memory[baseAddr] = ((hdrWord & ~(0x1FFF << 10)) | ((newCW & 0x1FFF) << 10)) >>> 0;
+                    // Update NS entry word1 limit17 and reseal word2
+                    const nsBase       = this.NS_TABLE_BASE + abstrSlot * this.NS_ENTRY_WORDS;
+                    const oldW1        = this.memory[nsBase + 1] >>> 0;
+                    const oldW2        = this.memory[nsBase + 2] >>> 0;
+                    const w1f          = this.parseNSWord1(oldW1);
+                    const newLimit17   = newCW - 1;
+                    this.memory[nsBase + 1] = this.packNSWord1(newLimit17, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
+                    const existingGtSeq    = (oldW2 >>> 25) & 0x7F;
+                    this.memory[nsBase + 2] = this.makeVersionSeals(existingGtSeq, baseAddr, newLimit17);
+                    // Mirror into CR14 which holds the code-region capability
+                    const cr14 = this.cr[14];
+                    if (cr14) {
+                        cr14.word2 = this.memory[nsBase + 1];
+                        cr14.word3 = this.memory[nsBase + 2];
+                    }
+                }
+            }
+        }
+
         this.pc = 0;
         this.halted = false;
         this.running = false;
