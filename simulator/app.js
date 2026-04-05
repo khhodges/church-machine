@@ -1105,6 +1105,29 @@ function switchCRDetailTab(tab) {
     if (panel) panel.style.display = 'block';
 }
 
+function scrollToThreadZone(zone) {
+    switchCRDetailTab('content');
+    const id = 'thread-zone-' + zone;
+    // Allow the panel to become visible before scrolling
+    requestAnimationFrame(() => {
+        const target = document.getElementById(id);
+        if (!target) return;
+        // Find nearest scrollable ancestor
+        let scroller = target.parentElement;
+        while (scroller && scroller !== document.body) {
+            const overflow = getComputedStyle(scroller).overflowY;
+            if (overflow === 'auto' || overflow === 'scroll') break;
+            scroller = scroller.parentElement;
+        }
+        if (scroller && scroller !== document.body) {
+            const targetTop = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+            scroller.scrollTo({ top: targetTop, behavior: 'smooth' });
+        } else {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+}
+
 function editCRCodeInEditor() {
     if (selectedCR === null) return;
     const crIdx = selectedCR;
@@ -1380,6 +1403,16 @@ function updateCRDetail() {
     html += `<button class="crd-tab${crDetailTab==='content'?' active':''}" id="crdTab-content" onclick="switchCRDetailTab('content')">Content</button>`;
     html += `<button class="crd-tab${crDetailTab==='register'?' active':''}" id="crdTab-register" onclick="switchCRDetailTab('register')">Register</button>`;
     html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
+    if (showThread) {
+        html += `<span class="crd-zone-nav" title="Jump to zone">`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" title="Lump Header">Hdr</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" title="⑤ Data Registers">⑤\u202FDR</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" title="④ Heap">④\u202FHeap</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(3)" title="③ Freespace">③\u202FFree</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(2)" title="② LIFO Stack">②\u202FStack</button>`;
+        html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" title="① Capabilities">①\u202FCaps</button>`;
+        html += `</span>`;
+    }
     if (showEditButton) {
         html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">&#x270E; Edit</button>`;
         html += `<span class="crd-action-group">`;
@@ -1960,28 +1993,34 @@ function renderThreadMemoryLayout(nsIndex) {
     const label = sim.nsLabels[nsIndex] || ('Slot ' + nsIndex);
     const TL = THREAD_LAYOUT;
 
-    const secHdr = (num, title, note, color) =>
-        `<div class="thread-zone-hdr" style="border-left-color:${color};">${num} ${title}<span class="thread-zone-note">${note}</span></div>`;
+    const secHdr = (num, title, note, color, id='') =>
+        `<div class="thread-zone-hdr"${id ? ` id="${id}"` : ''} style="border-left-color:${color};">${num} ${title}<span class="thread-zone-note">${note}</span></div>`;
 
     const addrOf = (off) => '0x' + (slotBase + off).toString(16).toUpperCase().padStart(4, '0');
     const hexOf  = (w)   => '0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
 
     let html = '<div class="thread-layout-view">';
 
-    // Header
-    html += `<div class="thread-layout-header">${label} — Thread Memory Layout<span style="color:#6b7280;font-weight:400;font-size:0.75rem;margin-left:0.6rem;">NS Slot ${nsIndex} · base ${addrOf(0)} · 256 words (1 024 bytes)</span></div>`;
-
-    // ── Word 0: Lump Header ───────────────────────────────────────────────
+    // ── Sticky header block (title + lump header) ─────────────────────────
     const headerWord = sim.memory[slotBase + TL.HEADER_WORD] || TL.THREAD_HEADER;
-    html += secHdr('', 'Lump Header', 'word 0 · magic=0x1F · n-6=2 (256w) · cw=0 · typ=10 (clist-only) · cc=12', '#94a3b8');
-    html += `<div style="font-family:monospace;font-size:0.78rem;color:#94a3b8;padding:0.3rem 0.6rem 0.5rem;border-left:2px solid #334155;">`;
-    html += `<span style="color:#555;">+0 &nbsp;${addrOf(0)} &nbsp;</span>`;
-    html += `<span style="color:rgba(206,145,120,0.9);">${hexOf(headerWord)}</span>`;
-    html += ` &nbsp;<span style="color:#64748b;">0xF900_020C — never executed · traps if PC reaches word 0</span>`;
+    html += `<div class="thread-layout-sticky" id="thread-zone-hdr">`;
+    html += `<div class="thread-layout-header">${label} — Thread Memory Layout<span class="thread-layout-subhead">NS Slot ${nsIndex} · base ${addrOf(0)} · 256 words (1\u202F024 bytes)</span></div>`;
+    html += `<div class="thread-lump-hdr-block">`;
+    html += `<span class="thread-lump-hdr-label">Lump Header</span>`;
+    html += `<span class="thread-lump-hdr-note">word 0 · magic=0x1F · n\u22126=2 (256w) · cw=0 · typ=10 (clist-only) · cc=12</span>`;
+    html += `<div class="thread-lump-hdr-row">`;
+    html += `<span class="thread-lump-off">+0</span>`;
+    html += `<span class="thread-lump-addr">${addrOf(0)}</span>`;
+    html += `<span class="thread-lump-hex">${hexOf(headerWord)}</span>`;
+    const _hh = hexOf(headerWord); // e.g. "0xF900020C"
+    const _hhFmt = '0x' + _hh.slice(2, 6) + '_' + _hh.slice(6); // "0xF900_020C"
+    html += `<span class="thread-lump-desc">${_hhFmt} \u2014 never executed \u00b7 traps if PC reaches word\u00a00</span>`;
+    html += `</div>`;
+    html += `</div>`;
     html += `</div>`;
 
     // ── Zone ⑤: Data Registers (+1 … +16) ───────────────────────────────────
-    html += secHdr('⑤', 'Data Registers', '16 words · DR0–DR15 · offset +1 … +16 · head of the slot (after header)', '#a855f7');
+    html += secHdr('⑤', 'Data Registers', '16 words · DR0–DR15 · offset +1 … +16 · head of the slot (after header)', '#a855f7', 'thread-zone-5');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>DR</th><th>Offset</th><th>Addr</th><th>Value (hex)</th><th>Value (dec)</th></tr></thead><tbody>';
     for (let i = 0; i < TL.DR_WORDS; i++) {
         const off  = TL.DR_START + i;
@@ -1996,7 +2035,7 @@ function renderThreadMemoryLayout(nsIndex) {
     for (let i = TL.HEAP_START; i <= TL.HEAP_END; i++) {
         if (sim.memory[slotBase + i]) heapNonZero++;
     }
-    html += secHdr('④', 'Heap ↑', `64 words · offset +17 … +80 · base ${addrOf(TL.HEAP_START)} · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e');
+    html += secHdr('④', 'Heap ↑', `64 words · offset +17 … +80 · base ${addrOf(TL.HEAP_START)} · ${heapNonZero} word${heapNonZero!==1?'s':''} allocated`, '#22c55e', 'thread-zone-4');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
     for (let i = 0; i < TL.HEAP_WORDS; i++) {
         const off  = TL.HEAP_START + i;
@@ -2012,7 +2051,7 @@ function renderThreadMemoryLayout(nsIndex) {
     for (let i = TL.FREE_START; i <= TL.FREE_END; i++) {
         if (sim.memory[slotBase + i]) freeNonZero++;
     }
-    html += secHdr('③', 'Freespace', `131 words · offset +81 … +211 · ${freeNonZero} non-zero · shrinks as stack grows ↓ and heap grows ↑`, '#6b7280');
+    html += secHdr('③', 'Freespace', `131 words · offset +81 … +211 · ${freeNonZero} non-zero · shrinks as stack grows ↓ and heap grows ↑`, '#6b7280', 'thread-zone-3');
     if (freeNonZero === 0) {
         html += '<div class="thread-free-empty">All 131 words are zero — region is unallocated.</div>';
     } else {
@@ -2028,7 +2067,7 @@ function renderThreadMemoryLayout(nsIndex) {
     // ── Zone ②: LIFO Stack (+212 … +243) ─────────────────────────────────
     const stackWords = sim.memory.slice(slotBase + TL.STACK_START, slotBase + TL.STACK_END + 1);
     const stackUsed  = stackWords.filter(Boolean).length;
-    html += secHdr('②', 'LIFO Stack ↓', `32 words · STO=sp_max=243 (empty) · grows ↓ · sentinel frame: E-GT@+242, fw@+243 (NIA=0x7FFF) · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8');
+    html += secHdr('②', 'LIFO Stack ↓', `32 words · STO=sp_max=243 (empty) · grows ↓ · sentinel frame: E-GT@+242, fw@+243 (NIA=0x7FFF) · ${stackUsed} word${stackUsed!==1?'s':''} non-zero`, '#38bdf8', 'thread-zone-2');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decoded</th></tr></thead><tbody>';
     for (let i = 0; i < TL.STACK_WORDS; i++) {
         const off  = TL.STACK_START + i;
@@ -2064,7 +2103,7 @@ function renderThreadMemoryLayout(nsIndex) {
     html += '</tbody></table>';
 
     // ── Zone ①: Capabilities (+244 … +255) ───────────────────────────────
-    html += secHdr('①', 'Capabilities', `12 words · CR0–CR11 · offset +244 … +255 · c-list tail · saved/restored on context switch`, '#f4b942');
+    html += secHdr('①', 'Capabilities', `12 words · CR0–CR11 · offset +244 … +255 · c-list tail · saved/restored on context switch`, '#f4b942', 'thread-zone-1');
     html += '<table class="ns-mem-table thread-zone-table"><thead><tr><th>CR</th><th>Offset</th><th>Addr</th><th>Hex</th><th>Decoded (GT)</th></tr></thead><tbody>';
     for (let i = 0; i < TL.CAPS_WORDS; i++) {
         const off  = TL.CAPS_START + i;
