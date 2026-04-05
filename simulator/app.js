@@ -1225,7 +1225,6 @@ function updateCRDetail() {
     if (cr.isNull) {
         titleEl.textContent = `CR${crIdx}${name ? ' \u2014 ' + name : ''} (NULL)`;
         contentEl.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">Register is empty (all words zero).</div>';
-        _setToolbarCodeBtns(false);
         return;
     }
 
@@ -1260,6 +1259,10 @@ function updateCRDetail() {
     html += `<button class="crd-tab${crDetailTab==='content'?' active':''}" id="crdTab-content" onclick="switchCRDetailTab('content')">Content</button>`;
     html += `<button class="crd-tab${crDetailTab==='register'?' active':''}" id="crdTab-register" onclick="switchCRDetailTab('register')">Register</button>`;
     html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
+    if (showEditButton) {
+        html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">&#x270E; Edit</button>`;
+        html += `<button class="crd-tab crd-tab-action" onclick="(function(){var el=document.getElementById('crInjectLog');if(el){el.style.display='block';el.textContent='';}injectCRCode(el);})()" title="Assemble editor content and patch this code lump">&#x21A9; Patch</button>`;
+    }
     html += '</div>';
 
     html += `<div class="crd-panel" id="crdPanel-content" style="display:${crDetailTab==='content'?'block':'none'}">`;
@@ -1584,22 +1587,6 @@ function updateCRDetail() {
     html += '</div></div>';
 
     contentEl.innerHTML = html;
-    _setToolbarCodeBtns(showEditButton);
-}
-
-function _setToolbarCodeBtns(visible) {
-    const editBtn  = document.getElementById('toolEditBtn');
-    const patchBtn = document.getElementById('toolPatchBtn');
-    if (editBtn)  editBtn.style.display  = visible ? 'inline-flex' : 'none';
-    if (patchBtn) patchBtn.style.display = visible ? 'inline-flex' : 'none';
-}
-
-function toolPatchSimulator() {
-    let el = document.getElementById('crInjectLog');
-    if (!el) return;
-    el.style.display = 'block';
-    el.textContent   = '';
-    injectCRCode(el);
 }
 
 function updateDRDisplay() {
