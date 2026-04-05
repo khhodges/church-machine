@@ -2821,10 +2821,14 @@ class ChurchSimulator {
         return { namespace: nsWords, clist: clistWords };
     }
 
+    // run() returns { steps, stopReason, breakpointAddr? }
+    // stopReason: 'breakpoint' | 'halted' | 'maxSteps' | 'bootExit' | 'stopped'
     run(maxSteps, breakpoints) {
         maxSteps = maxSteps || 10000;
         this.running = true;
         let steps = 0;
+        let stopReason = 'stopped';
+        let breakpointAddr = null;
         while (this.running && !this.halted && this.bootComplete && steps < maxSteps) {
             // Stop-before-execute breakpoint check: compute the physical address of the NEXT
             // instruction to be fetched (from this.pc + CR14 lump base) and compare against
@@ -2832,14 +2836,23 @@ class ChurchSimulator {
             // simulator is already sitting on at entry to run().
             if (steps > 0 && breakpoints) {
                 const nextAddr = this._nextPhysicalAddr();
-                if (nextAddr >= 0 && breakpoints.has(nextAddr >>> 0)) break;
+                if (nextAddr >= 0 && breakpoints.has(nextAddr >>> 0)) {
+                    stopReason = 'breakpoint';
+                    breakpointAddr = nextAddr >>> 0;
+                    break;
+                }
             }
             const result = this.step();
-            if (!result || !this.bootComplete) break;
+            if (!result) { stopReason = this.halted ? 'halted' : 'bootExit'; break; }
+            if (!this.bootComplete) { stopReason = 'bootExit'; break; }
             steps++;
         }
+        if (stopReason === 'stopped') {
+            if (this.halted)         stopReason = 'halted';
+            else if (steps >= maxSteps) stopReason = 'maxSteps';
+        }
         this.running = false;
-        return steps;
+        return { steps, stopReason, breakpointAddr };
     }
 
     getState() {

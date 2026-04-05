@@ -5177,27 +5177,26 @@ function runSim() {
         }
     }
     _autoLoadDefaultProgram();
-    let steps;
+    let runResult;
     try {
-        steps = sim.run(10000, simBreakpoints.size > 0 ? simBreakpoints : null);
+        runResult = sim.run(10000, simBreakpoints.size > 0 ? simBreakpoints : null);
     } catch(e) {
         console.error('runSim run error:', e);
         updateDashboard();
         return;
     }
+    const { steps, stopReason, breakpointAddr } = runResult;
     const con = document.getElementById('editorConsole');
     if (con) {
         let status = 'Stopped.';
-        if (!sim.bootComplete) {
+        if (stopReason === 'bootExit' || !sim.bootComplete) {
             status = 'PP250: Returned to boot sequence.';
-        } else if (sim.halted) {
+        } else if (stopReason === 'halted' || sim.halted) {
             status = 'Faulted.';
-        } else if (simBreakpoints.size > 0) {
-            // run() stopped because _nextPhysicalAddr() matched a BP (stop-before-execute).
-            const nextAddr = sim._nextPhysicalAddr();
-            if (nextAddr >= 0 && simBreakpoints.has(nextAddr >>> 0)) {
-                status = `Breakpoint at 0x${(nextAddr >>> 0).toString(16).toUpperCase().padStart(4,'0')}.`;
-            }
+        } else if (stopReason === 'breakpoint' && breakpointAddr !== null) {
+            status = `Breakpoint at 0x${breakpointAddr.toString(16).toUpperCase().padStart(4,'0')}.`;
+        } else if (stopReason === 'maxSteps') {
+            status = `Max steps (${steps}) reached.`;
         }
         con.textContent += `\nBoot complete. Ran ${steps} steps. ${status}`;
         con.scrollTop = con.scrollHeight;
