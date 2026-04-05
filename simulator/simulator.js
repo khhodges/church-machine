@@ -596,7 +596,7 @@ class ChurchSimulator {
                 const oldCR6GT = this.cr[6].word0 >>> 0;                            // snapshot E-type GT written by B:03 INIT_ABSTR
                 const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max); // frameWord: NIA=0x7FFF (poison, all 15 bits set), sz=1 (CALL frame), prev_STO=243
                 this.callStack.push({               // push to JS call-stack mirror so RETURN handler can inspect it
-                    sentinel: true,                 // flag: RETURN will detect this and call _returnToBoot()
+                    sentinel: true,                 // flag: RETURN will detect this and raise STACK_UNDERFLOW fault
                     returnPC: 0x7FFF,               // poison return address — never executed, catches stray RETs
                     savedCRs: this.cr.map(c => ({...c})), // snapshot of all CRs at boot entry point
                     savedDRs: [...this.dr],         // snapshot of all DRs (all zero at boot)
@@ -1827,19 +1827,18 @@ class ChurchSimulator {
 
     _execReturn(d) {
         if (this.callStack.length === 0) {
-            this.output += `[PP250] RETURN with empty call stack — no HALT, returning to boot sequence\n`;
-            this._returnToBoot();
-            return { pc: this.pc, instr: d, desc: 'PP250: RETURN (empty stack) -> reboot' };
+            this.fault('STACK_UNDERFLOW', 'RETURN with no call frames — stack is empty (no sentinel pushed). Nothing to return to.');
+            return null;
         }
         const mask = d.imm & 0xFFF;
         const frame = this.callStack.pop();
 
-        // Sentinel frame: the boot pushed this as the first "call" — returning through it means
-        // the root abstraction has finished and there is no caller to return to.
+        // Sentinel frame: NIA=0x7FFF (poison) signals the bottom of the call stack.
+        // RETURN through the sentinel means the top-level abstraction tried to return
+        // past the last frame — this is a stack-underflow fault.
         if (frame.sentinel) {
-            this.output += `[PP250] RETURN from initial boot call — sentinel frame (NIA=0x7FFF) → reboot\n`;
-            this._returnToBoot();
-            return { pc: this.pc, instr: d, desc: 'RETURN (sentinel/boot frame) → reboot' };
+            this.fault('STACK_UNDERFLOW', 'RETURN through sentinel frame (NIA=0x7FFF) — stack underflow: no caller above the root abstraction.');
+            return null;
         }
 
         if (frame.savedCRs) {

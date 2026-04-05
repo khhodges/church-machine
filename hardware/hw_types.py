@@ -185,6 +185,7 @@ class FaultType(IntEnum):
     STACK_OVERFLOW  = 0x10   # CALL stack depth exceeded IDE-defined lower bound (sp < sp_min)
     ABSENT_OUTFORM  = 0x11   # mLoad: outform absent — SW trap downloads code, reissues CALL
     STACK_CORRUPT   = 0x12   # CALL stack pointer above sp_max (STO corrupted or header wrong)
+    STACK_UNDERFLOW = 0x13   # RETURN with no caller frame — popped past sentinel (NIA=0x7FFF)
 
 
 class BootState(IntEnum):
