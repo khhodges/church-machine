@@ -102,7 +102,13 @@ class ChurchTi60F225(Elaboratable):
             any_clist_access.eq(core.clist_rd_en | core.clist_wr_en),
         ]
 
-        with m.If(any_ns_access):
+        # READ_BRAM: when rb_rd_en is asserted, the debug FSM drives mem_addr
+        # directly to read BRAM words for the 0xBEAD readback protocol.
+        rb_rd_en    = Signal()   # comb: override mem_addr with rb_cur_addr
+        rb_cur_addr = Signal(16) # current BRAM word address for READ_BRAM
+        with m.If(rb_rd_en):
+            m.d.comb += mem_addr.eq(rb_cur_addr[:11])
+        with m.Elif(any_ns_access):
             m.d.comb += mem_addr.eq(core.ns_addr[2:13])
         with m.Elif(any_clist_access):
             m.d.comb += mem_addr.eq(core.clist_addr[2:13])
@@ -244,6 +250,14 @@ class ChurchTi60F225(Elaboratable):
 
         # Default PATCH_LUMP comb outputs — overridden only inside PL_WRITE_WORD state
         m.d.comb += [pl_wr_en.eq(0), pl_wr_addr.eq(0), pl_wr_data.eq(0)]
+
+        # ── READ_BRAM protocol registers (0xBEAD opcode, UART) ───────────────
+        # Frame:    [0xBE][0xAD][addrHi][addrLo][countHi][countLo]
+        # Response: N×4 raw LE bytes (no escaping)
+        # Reads N words from BRAM starting at word address rb_addr.
+        rb_addr      = Signal(16)   # base word address from READ_BRAM header
+        rb_count     = Signal(16)   # remaining words to send
+        rb_word      = Signal(32)   # latched BRAM word
 
         cpu_wr_data = Signal(32)
         cpu_wr_en   = Signal()
@@ -622,10 +636,12 @@ class ChurchTi60F225(Elaboratable):
             # ACK:   [addrHi][addrLo][countHi][countLo]
             # ─────────────────────────────────────────────────────────────────
             with m.State("PL_WAIT_EF"):
-                # Wait for 0xEF to confirm the BEEF header; abort on any other byte.
+                # 0xEF → PATCH_LUMP (write)   0xAD → READ_BRAM   other → abort
                 with m.If(rx_valid):
                     with m.If(rx_data == 0xEF):
                         m.next = "PL_RECV_ADDR_HI"
+                    with m.Elif(rx_data == 0xAD):
+                        m.next = "RB_RECV_ADDR_HI"
                     with m.Else():
                         m.d.sync += pl_active.eq(0)
                         m.next = "HALTED"
@@ -722,5 +738,74 @@ class ChurchTi60F225(Elaboratable):
                     with m.Else():
                         m.d.sync += pl_active.eq(0)
                         m.next = "HALTED"
+
+            # ── READ_BRAM protocol states (0xBEAD opcode) ────────────────────
+            # Frame:    [0xBE][0xAD][addrHi][addrLo][countHi][countLo]
+            # Response: rb_count × 4 raw LE bytes (no framing / escaping)
+            # CPU remains halted (pl_active held) throughout the transfer.
+
+            with m.State("RB_RECV_ADDR_HI"):
+                with m.If(rx_valid):
+                    m.d.sync += rb_addr[8:16].eq(rx_data)
+                    m.next = "RB_RECV_ADDR_LO"
+
+            with m.State("RB_RECV_ADDR_LO"):
+                with m.If(rx_valid):
+                    m.d.sync += rb_addr[0:8].eq(rx_data)
+                    m.next = "RB_RECV_CNT_HI"
+
+            with m.State("RB_RECV_CNT_HI"):
+                with m.If(rx_valid):
+                    m.d.sync += rb_count[8:16].eq(rx_data)
+                    m.next = "RB_RECV_CNT_LO"
+
+            with m.State("RB_RECV_CNT_LO"):
+                with m.If(rx_valid):
+                    m.d.sync += [
+                        rb_count[0:8].eq(rx_data),
+                        rb_cur_addr.eq(rb_addr),
+                    ]
+                    m.next = "RB_READ"
+
+            with m.State("RB_READ"):
+                # Assert rb_rd_en so mem_addr → rb_cur_addr (comb).
+                # BRAM has 1-cycle registered read latency even with transparent=True,
+                # so hold the address for one more cycle before latching data.
+                m.d.comb += rb_rd_en.eq(1)
+                m.next = "RB_LATCH"
+
+            with m.State("RB_LATCH"):
+                # Address still stable; latch BRAM output this cycle.
+                m.d.comb += rb_rd_en.eq(1)
+                m.d.sync += rb_word.eq(dmem_rd.data)
+                m.next = "RB_SEND_B0"
+
+            with m.State("RB_SEND_B0"):
+                with m.If(~debug.busy):
+                    m.d.comb += [fsm_byte_data.eq(rb_word[0:8]), fsm_send_byte.eq(1)]
+                    m.next = "RB_SEND_B1"
+
+            with m.State("RB_SEND_B1"):
+                with m.If(~debug.busy):
+                    m.d.comb += [fsm_byte_data.eq(rb_word[8:16]), fsm_send_byte.eq(1)]
+                    m.next = "RB_SEND_B2"
+
+            with m.State("RB_SEND_B2"):
+                with m.If(~debug.busy):
+                    m.d.comb += [fsm_byte_data.eq(rb_word[16:24]), fsm_send_byte.eq(1)]
+                    m.next = "RB_SEND_B3"
+
+            with m.State("RB_SEND_B3"):
+                with m.If(~debug.busy):
+                    m.d.comb += [fsm_byte_data.eq(rb_word[24:32]), fsm_send_byte.eq(1)]
+                    m.d.sync += [
+                        rb_count.eq(rb_count - 1),
+                        rb_cur_addr.eq(rb_cur_addr + 1),
+                    ]
+                    with m.If(rb_count == 1):
+                        m.d.sync += pl_active.eq(0)
+                        m.next = "HALTED"
+                    with m.Else():
+                        m.next = "RB_READ"
 
         return m

@@ -355,6 +355,68 @@ const TangSerial = (function() {
         }
     }
 
+    // READ_BRAM — read N words from BRAM starting at word address baseAddr.
+    // Protocol (Ti60 F225 debug_fsm, opcode 0xBEAD):
+    //   Send:    [0xBE][0xAD][addrHi][addrLo][countHi][countLo]
+    //   Receive: count × 4 raw LE bytes  (no framing or escaping)
+    // Requires the Ti60 F225 bitstream built with the READ_BRAM hardware extension.
+    async function readBRAM(baseAddr, count, onStatus) {
+        const status = onStatus || function() {};
+        await ensureOpen();
+        await drainInput();
+
+        const frame = new Uint8Array(6);
+        frame[0] = 0xBE;
+        frame[1] = 0xAD;
+        frame[2] = (baseAddr >>> 8) & 0xFF;
+        frame[3] =  baseAddr        & 0xFF;
+        frame[4] = (count    >>> 8) & 0xFF;
+        frame[5] =  count           & 0xFF;
+
+        const writer = port.writable.getWriter();
+        try { await writer.write(frame); } finally { writer.releaseLock(); }
+
+        status(`READ_BRAM: addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')} ` +
+               `count=${count} — awaiting ${count * 4} bytes…`);
+
+        const expected = count * 4;
+        const rxBytes  = new Uint8Array(expected);
+        let rxLen = 0;
+
+        const r = port.readable.getReader();
+        try {
+            while (rxLen < expected) {
+                const { value, done } = await Promise.race([
+                    r.read(),
+                    sleep(5000).then(() => ({ value: null, done: true })),
+                ]);
+                if (done || !value) break;
+                for (const b of value) {
+                    if (rxLen < expected) rxBytes[rxLen++] = b;
+                }
+            }
+        } finally {
+            r.releaseLock();
+        }
+
+        const words = [];
+        for (let i = 0; i < Math.min(count, Math.floor(rxLen / 4)); i++) {
+            const w = (rxBytes[i*4])
+                    | (rxBytes[i*4+1] << 8)
+                    | (rxBytes[i*4+2] << 16)
+                    | (rxBytes[i*4+3] << 24);
+            words.push(w >>> 0);
+        }
+
+        const ok = rxLen >= expected;
+        if (ok) {
+            status(`READ_BRAM: ${words.length} words received ✓`);
+        } else {
+            status(`READ_BRAM: timeout — got ${rxLen}/${expected} bytes (${words.length} complete words)`);
+        }
+        return { success: ok, words, rxBytes, rxLen };
+    }
+
     return {
         isSupported,
         isConnected,
@@ -362,6 +424,7 @@ const TangSerial = (function() {
         disconnect,
         uploadToFPGA,
         patchLump,
+        readBRAM,
         pingFPGA,
         parseReadback,
         setBoardLabel,

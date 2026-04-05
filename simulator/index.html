@@ -117,6 +117,7 @@
                     <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="runSim()" data-tooltip="Run — Execute until halt, fault, or breakpoint">&#x1F3C3;</button>
                     <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence">&#x21BA;</button>
                     <button class="btn fpga-conn-btn" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware">&#x26AC; FPGA</button>
+                    <button class="btn fpga-conn-btn fpga-readbram-btn" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">&#x1F4C4; BRAM</button>
                 </div>
                 <div class="sim-controls">
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>

@@ -197,6 +197,16 @@ header h1 {
     0%, 100% { opacity: 1; }
     50%       { opacity: 0.55; }
 }
+.fpga-readbram-btn {
+    background: #1a1a2e;
+    color: #818cf8;
+    border-color: #3730a3;
+}
+.fpga-readbram-btn:hover {
+    background: #1e1b4b;
+    color: #a5b4fc;
+    border-color: #4338ca;
+}
 
 /* ── Hamburger menu ──────────────────────────────────── */
 .ham-wrap {

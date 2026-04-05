@@ -5594,7 +5594,9 @@ function runSim() {
             con.textContent = lines.join('\n');
             con.scrollTop = con.scrollHeight;
         }
-        updateDashboard();
+        // Guard: updateDashboard can crash (e.g. null NS entry after stack overflow fault);
+        // catch here so the Run button is always re-enabled regardless.
+        try { updateDashboard(); } catch(e) { console.error('finishRun updateDashboard:', e); }
     }
 
     // Kick off the first batch
@@ -5681,6 +5683,51 @@ async function fpgaConnectToggle() {
 
 // Poll FPGA status every 2 s so the indicator stays current
 setInterval(updateFPGAStatusBtn, 2000);
+
+// ── BRAM readback ─────────────────────────────────────────────────────────────
+// Sends 0xBEAD to the Ti60 F225 debug FSM and dumps the returned words to the
+// editor console as a hex table.  Useful to verify PATCH_LUMP actually wrote the
+// correct words after a patch.
+async function fpgaReadBRAM() {
+    if (typeof TangSerial === 'undefined' || !TangSerial.isConnected()) {
+        _fpgaLog('Read BRAM: FPGA not connected — click ⬡ FPGA to connect first.');
+        return;
+    }
+    // Default: read the full NS+c-list region (0x0000..0xFF = 256 words)
+    const addrStr  = prompt('BRAM start word address (hex, default 0x0000):', '0x0000');
+    if (addrStr === null) return;
+    const countStr = prompt('Word count to read (default 256):', '256');
+    if (countStr === null) return;
+
+    const baseAddr = parseInt(addrStr, 16) || 0;
+    const count    = Math.min(Math.max(parseInt(countStr, 10) || 256, 1), 2048);
+
+    switchView('editor');
+    _fpgaLog(`Read BRAM: addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')} count=${count}…`);
+
+    try {
+        const result = await TangSerial.readBRAM(baseAddr, count, (msg) => _fpgaLog(msg));
+        if (result.words.length === 0) {
+            _fpgaLog('Read BRAM: no data received — is the Ti60 F225 bitstream built with READ_BRAM support?');
+            return;
+        }
+        // Display as hex table: 8 words per line
+        const PER_LINE = 8;
+        let out = `\nBRAM dump  addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')}  (${result.words.length} words):\n`;
+        for (let i = 0; i < result.words.length; i += PER_LINE) {
+            const lineAddr = baseAddr + i;
+            const hex = result.words.slice(i, i + PER_LINE)
+                .map(w => w.toString(16).toUpperCase().padStart(8, '0'))
+                .join('  ');
+            out += `  +${String(lineAddr).padStart(4)}  ${hex}\n`;
+        }
+        // Also note any word that matches a known NS entry location
+        const con = document.getElementById('editorConsole');
+        if (con) { con.textContent += out; con.scrollTop = con.scrollHeight; }
+    } catch(e) {
+        _fpgaLog('Read BRAM error: ' + e.message);
+    }
+}
 
 function faultAlertOn() {
     const btn = document.getElementById('toolFaultBtn');
