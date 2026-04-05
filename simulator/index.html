@@ -197,7 +197,21 @@
             <div class="editor-panel">
                 <div class="editor-toolbar">
                     <div class="toolbar-phase">
-                        <span class="phase-label">Design</span>
+                        <span class="phase-label">Editor</span>
+                        <div class="ham-wrap" id="editorActionsWrap">
+                            <button class="btn ham-btn editor-actions-btn" id="editorActionsBtn" onclick="toggleEditorActions()" data-tooltip="Actions — Compile · Create · Save">&#9776;</button>
+                            <div class="ham-dropdown editor-actions-dropdown" id="editorActionsDropdown" style="display:none;">
+                                <div class="ham-group-title">Build</div>
+                                <button class="ham-item" onclick="smartCompile();closeEditorActions()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
+                                <button class="ham-item" onclick="showCreateNamespace();closeEditorActions()" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
+                                <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
+                                <div class="ham-divider"></div>
+                                <div class="ham-group-title">Install</div>
+                                <button class="ham-item" onclick="saveUploadJSON();closeEditorActions()" data-tooltip="Save Upload JSON — Compile and save the upload.json deployment file">Save Upload JSON</button>
+                                <button class="ham-item" id="btnSaveUserTab" disabled onclick="saveActiveUserTab();closeEditorActions()" data-tooltip="Save Program — Save the current user program (Ctrl+S)">Save Program</button>
+                                <button class="ham-item" id="btnSaveNS" disabled onclick="showSaveToNamespace();closeEditorActions()" data-tooltip="Save to NS — Save the assembled program as a namespace entry">Save to NS</button>
+                            </div>
+                        </div>
                         <select id="langSelector" class="lang-selector" onchange="onLangChange()" title="Source language">
                             <option value="english">English</option>
                             <option value="symbolic">Symbolic Math (Ada)</option>
@@ -208,18 +222,6 @@
                             <option value="personal">My Programs</option>
                         </select>
                         <button class="btn" onclick="compileDraft()" style="background:#C89B3C;color:#141414;border:none;font-weight:bold;" data-tooltip="Draft — Show compilation draft: methods, capabilities, and lump layout">Draft</button>
-                    </div>
-                    <div class="toolbar-phase">
-                        <span class="phase-label">Build</span>
-                        <button class="btn btn-primary" onclick="smartCompile()" data-tooltip="Compile — Compile with auto-detected or selected source language">Compile</button>
-                        <button class="btn" onclick="showCreateNamespace()" style="background:#2196F3;color:#fff;border:none;" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
-                        <button class="btn" onclick="compileAndCreateAbstraction()" style="background:#4a7a2e;color:#fff;border:none;" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
-                    </div>
-                    <div class="toolbar-phase">
-                        <span class="phase-label">Install</span>
-                        <button class="btn" onclick="saveUploadJSON()" style="background:#2a6fdb;color:#fff;border:none;" data-tooltip="Save Upload JSON — Compile and save the upload.json deployment file">Save Upload JSON</button>
-                        <button class="btn" onclick="saveActiveUserTab()" id="btnSaveUserTab" disabled style="background:#1976d2;color:#fff;border:none;" data-tooltip="Save Program — Save the current user program (Ctrl+S)">Save Program</button>
-                        <button class="btn btn-primary" onclick="showSaveToNamespace()" id="btnSaveNS" disabled data-tooltip="Save to NS — Save the assembled program as a namespace entry">Save to NS</button>
                     </div>
                 </div>
                 <div class="example-tabs-row">

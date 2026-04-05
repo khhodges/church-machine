@@ -414,7 +414,21 @@ function closeHamburger() {
 document.addEventListener('click', function(e) {
     const wrap = document.getElementById('hamWrap');
     if (wrap && !wrap.contains(e.target)) closeHamburger();
+    const eaWrap = document.getElementById('editorActionsWrap');
+    if (eaWrap && !eaWrap.contains(e.target)) closeEditorActions();
 });
+
+function toggleEditorActions() {
+    const dd = document.getElementById('editorActionsDropdown');
+    if (!dd) return;
+    const open = dd.style.display !== 'none';
+    dd.style.display = open ? 'none' : 'flex';
+}
+
+function closeEditorActions() {
+    const dd = document.getElementById('editorActionsDropdown');
+    if (dd) dd.style.display = 'none';
+}
 
 function switchView(viewId) {
     if (viewId !== currentView) previousView = currentView;

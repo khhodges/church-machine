@@ -232,6 +232,12 @@ header h1 {
     color: var(--text-primary);
 }
 
+.ham-item:disabled {
+    opacity: 0.38;
+    cursor: default;
+    pointer-events: none;
+}
+
 .ham-item.ham-active {
     color: var(--accent);
     font-weight: 600;
