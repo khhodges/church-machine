@@ -1121,7 +1121,16 @@ function scrollToThreadZone(zone) {
         }
         if (scroller && scroller !== document.body) {
             const targetTop = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-            scroller.scrollTo({ top: targetTop, behavior: 'smooth' });
+            // Account for sticky elements that sit on top of the scroll viewport:
+            //   1. .crd-tabs   — sticky at top:0   (tab row with zone buttons)
+            //   2. .thread-layout-sticky — sticky at top:tabsHeight (lump header block)
+            // Both live inside the same scroller so their offsetHeight gives the true coverage.
+            const tabsEl   = scroller.querySelector('.crd-tabs');
+            const stickyEl = scroller.querySelector('.thread-layout-sticky');
+            const tabsH    = tabsEl   ? tabsEl.offsetHeight   : 46;
+            const stickyH  = stickyEl ? stickyEl.offsetHeight : 0;
+            const stickyOffset = tabsH + stickyH + 6;  // +6px breathing room
+            scroller.scrollTo({ top: Math.max(0, targetTop - stickyOffset), behavior: 'smooth' });
         } else {
             target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
