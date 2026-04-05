@@ -1324,17 +1324,25 @@ function showZonePopup(evt, zone, nsIdx) {
     pop.innerHTML = html;
     pop.style.display = 'block';
 
-    // Position below the button, clamped to viewport
-    const rect = evt.currentTarget.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let left = rect.left;
-    let top  = rect.bottom + 6;
-    pop.style.left = '0'; pop.style.top = '0';  // measure natural size
+    // Position below the button; only flip above if there is more room above than below.
+    const rect  = evt.currentTarget.getBoundingClientRect();
+    const vw    = window.innerWidth;
+    const vh    = window.innerHeight;
+    const spaceBelow = vh - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    // Measure natural popup size (place off-screen first so layout runs)
+    pop.style.left = '-9999px'; pop.style.top = '-9999px';
     const pw = pop.offsetWidth  || 300;
     const ph = pop.offsetHeight || 200;
+    // Choose side with more room; prefer below
+    let top;
+    if (spaceBelow >= ph || spaceBelow >= spaceAbove) {
+        top = rect.bottom + 6;   // below the button
+    } else {
+        top = Math.max(8, rect.top - ph - 6);  // above the button
+    }
+    let left = rect.left;
     if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
-    if (top  + ph > vh - 8) top  = Math.max(8, rect.top - ph - 6);
     pop.style.left = left + 'px';
     pop.style.top  = top  + 'px';
 }

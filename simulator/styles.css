@@ -4263,6 +4263,8 @@ a.next-step-link:hover {
     padding: 0.7rem 0.85rem;
     min-width: 270px;
     max-width: 400px;
+    max-height: 54vh;
+    overflow-y: auto;
     font-size: 0.74rem;
     color: #c8d8e8;
     line-height: 1.5;
