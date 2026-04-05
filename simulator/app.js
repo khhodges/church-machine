@@ -276,7 +276,7 @@ function init() {
     pipelineViz = new PipelineVisualizer('pipelineContainer');
     pipelineViz.setNIAProvider(() => {
         if (!sim.bootComplete) return _bootNIARows(sim.bootStep);
-        return _buildNIARows(sim.pc > 0 ? sim.pc - 1 : null, sim.pc);
+        return _buildNIARows(sim.physicalPC, sim._nextPhysicalAddr());
     });
     repl = new ChurchREPL(sim, pipelineViz);
     _ensureTutorialObjects();
@@ -4978,7 +4978,7 @@ function stepSim() {
             con.scrollTop = con.scrollHeight;
         }
         if (pipelineViz) {
-            pipelineViz.setNIA(_buildNIARows(result.pc, sim.pc));
+            pipelineViz.setNIA(_buildNIARows(result.physicalPC ?? result.pc, sim._nextPhysicalAddr()));
             if (pipelineViz.mode === 'audit' && result.auditPipeline) {
                 pipelineViz.showFullPipeline(result.auditPipeline);
             } else if (result.pipeline) {
@@ -5160,7 +5160,7 @@ function walkNext() {
         con.scrollTop = con.scrollHeight;
     }
     if (result.pipeline && pipelineViz) {
-        pipelineViz.setNIA(_buildNIARows(result.pc, sim.pc));
+        pipelineViz.setNIA(_buildNIARows(result.physicalPC ?? result.pc, sim._nextPhysicalAddr()));
         pipelineViz.animate(result.pipeline, 500).then(() => {
             updateDashboard();
             if (walkRunning && sim.bootComplete) {

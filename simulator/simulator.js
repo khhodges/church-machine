@@ -1327,13 +1327,13 @@ class ChurchSimulator {
             if (!this.bootComplete) {
                 this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
                 this._returnToBoot();
-                return { pc: this.pc, instr: null, desc: 'PP250: zero instruction -> reboot' };
+                return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'PP250: zero instruction -> reboot' };
             }
             this.output += `[PP250] HALT at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — machine stopped.\n`;
             this.halted = true;
             this.running = false;
             this.emit('stateChange', this.getState());
-            return { pc: this.pc, instr: null, desc: 'HALT: machine stopped' };
+            return { pc: this.pc, physicalPC: this.physicalPC, instr: null, desc: 'HALT: machine stopped' };
         }
 
         const d = this.decodeInstruction(instrWord);
@@ -1342,6 +1342,7 @@ class ChurchSimulator {
         if (!this.checkCondition(d.cond)) {
             const result = {
                 pc: this.pc,
+                physicalPC: this.physicalPC,
                 instr: d,
                 skipped: true,
                 desc: `${this.opName(d.opcode)}${this.condName(d.cond)} skipped (condition false)`,
@@ -1381,6 +1382,7 @@ class ChurchSimulator {
 
         if (result) {
             this.dr[0] = 0;
+            result.physicalPC = this.physicalPC;
             result.auditPipeline = this._auditPipeline();
             this.emit('step', result);
             this.emit('stateChange', this.getState());
