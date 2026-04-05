@@ -212,6 +212,19 @@ header h1 {
     font-weight: 600;
 }
 
+.sim-exec-btns {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.sim-exec-btns .btn {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+}
+
 .sim-controls {
     display: flex;
     align-items: center;
@@ -4937,6 +4950,11 @@ a.next-step-link:hover {
     .btn-view {
         padding: 0.25rem 0.45rem;
         font-size: 0.65rem;
+    }
+
+    .sim-exec-btns {
+        width: 100%;
+        justify-content: flex-start;
     }
 
     .sim-controls {
