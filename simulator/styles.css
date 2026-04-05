@@ -751,7 +751,7 @@ header h1 {
     background: var(--bg-secondary);
     color: var(--text-secondary);
     font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     line-height: 1.5;
     padding: 0.75rem 0.4rem 0.75rem 0;
     text-align: right;
@@ -770,7 +770,7 @@ header h1 {
     border-radius: 0;
     padding: 0.75rem;
     font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     resize: none;
     tab-size: 4;
     line-height: 1.5;
