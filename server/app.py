@@ -576,8 +576,7 @@ BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225 Build Package
 ## What's Inside
 
 - `church_ti60_f225.xml`  — Efinity project file (open this in Efinity IDE)
-- `church_ti60_f225.v`    — Synthesisable Verilog (Yosys from Amaranth RTLIL)
-- `church_ti60_f225.edif` — Yosys EDIF netlist (synth_efinix target)
+- `church_ti60_f225.v`    — RTL Verilog (Yosys from Amaranth RTLIL, no vendor cells)
 - `church_ti60_f225.sdc`  — Timing constraints (50 MHz clock)
 - `ti60_f225.isf`         — Pin constraints (Interface Setup File)
 - `setup_ti60_peri.py`    — **Run this first** — generates peri.xml via Efinity DesignAPI
@@ -621,7 +620,7 @@ appear pre-selected. Click **Program** to flash.
 ## Re-synthesise from Verilog (optional)
 
 ```bash
-yosys -p "read_verilog church_ti60_f225.v; synth_efinix -top top -titanium -edif church_ti60_f225.edif"
+yosys -p "read_rtlil church_ti60_f225.il; synth_efinix -top top -run begin:map_ram; write_verilog church_ti60_f225.v"
 ```
 
 ## LED Pinout (active-high, Ti60 F225 Dev Board)
@@ -650,7 +649,6 @@ def _fpga_paths(board):
         paths = {
             "rtlil":   os.path.join(build_dir, "church_ti60_f225.il"),
             "verilog": os.path.join(build_dir, "church_ti60_f225.v"),
-            "edif":    os.path.join(build_dir, "church_ti60_f225.edif"),
             "isf":     os.path.join(hw_dir,    "ti60_f225.isf"),
             "project": os.path.join(hw_dir,    "ti60_f225_project.xml"),
             "peri":    os.path.join(hw_dir,    "ti60_f225.peri.xml"),
@@ -662,7 +660,7 @@ def _fpga_paths(board):
         gen_args = ["python3", "-m", "hardware.gen_rtlil", "build", "--ti60"]
         synth_cmd_tpl = (
             "read_rtlil {rtlil}; "
-            "synth_efinix -top top -titanium -edif {edif}; "
+            "synth_efinix -top top -run begin:map_ram; "
             "write_verilog {verilog}"
         )
     else:
@@ -707,7 +705,6 @@ def _make_fpga_zip(is_ti60, paths, zip_name, build_md):
             project_xml = project_xml.replace('</efx:project>', programmer_block + '</efx:project>')
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(paths["verilog"], "church_ti60_f225.v")
-            zf.write(paths["edif"],    "church_ti60_f225.edif")
             zf.write(paths["isf"],     "ti60_f225.isf")
             zf.writestr("church_ti60_f225.xml",      project_xml)
             zf.write(paths["sdc"],     "church_ti60_f225.sdc")
