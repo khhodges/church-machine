@@ -126,7 +126,7 @@ class ChurchSimulator {
         this.pc = 0;
         this.physicalPC = 0;
         this.flags = { N: false, Z: false, C: false, V: false };
-        this.sto = 243;  // sp_max = lumpSize(256) − caps(12) − 1; hardware starts here, CALL decrements
+        this.sto = 11;   // sp_max (test value); hardware starts here, CALL decrements
         this.running = false;
         this.halted = false;
         this.stepCount = 0;
@@ -165,7 +165,7 @@ class ChurchSimulator {
         }
         this.dr.fill(0);
         this.flags = { N: false, Z: false, C: false, V: false };
-        this.sto = 243;  // sp_max reset
+        this.sto = 11;   // sp_max (test value)
         this.callStack = [];
         this.lambdaActive = false;
         this.lambdaReturnPC = 0;
@@ -592,25 +592,25 @@ class ChurchSimulator {
                 // stack before overwriting CR6/CR14.  We replicate that here so that
                 // RETURN from the root abstraction sees a valid (sentinel) frame and
                 // reboots rather than crashing with an empty-stack fault.
-                const sp_max = 243;                                                  // stack ceiling: lumpSize(256) − caps(12) − 1 = 243
+                const sp_max = 11;                                                   // stack ceiling (test value; was 243)
                 const oldCR6GT = this.cr[6].word0 >>> 0;                            // snapshot E-type GT written by B:03 INIT_ABSTR
-                const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max); // frameWord: NIA=0x7FFF (poison, all 15 bits set), sz=1 (CALL frame), prev_STO=243
+                const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max); // frameWord: NIA=0x7FFF (poison, all 15 bits set), sz=1 (CALL frame), prev_STO=sp_max
                 this.callStack.push({               // push to JS call-stack mirror so RETURN handler can inspect it
                     sentinel: true,                 // flag: RETURN will detect this and raise STACK_UNDERFLOW fault
                     returnPC: 0x7FFF,               // poison return address — never executed, catches stray RETs
                     savedCRs: this.cr.map(c => ({...c})), // snapshot of all CRs at boot entry point
                     savedDRs: [...this.dr],         // snapshot of all DRs (all zero at boot)
                     savedFlags: {...this.flags},     // snapshot of flags (all clear at boot)
-                    savedSTO: sp_max,               // previous STO = sp_max = 243 (the empty-stack sentinel value)
+                    savedSTO: sp_max,               // previous STO = sp_max (the empty-stack sentinel value)
                     sz: 1,                          // sz=1 → CALL-type frame (not LAMBDA)
                     frameWord: sentinelFrameWord,   // packed frame word for display in thread lump view
                 });
                 const threadBase = this.cr[12] && this.cr[12].word1;               // physical base of thread lump (from CR12 NS entry, set in B:02)
                 if (threadBase) {
-                    this.memory[threadBase + sp_max]     = sentinelFrameWord;       // lump[+243] = frame word (visible in ② stack zone as orange "sentinel")
-                    this.memory[threadBase + sp_max - 1] = oldCR6GT;               // lump[+242] = saved E-type CR6 GT from B:03
+                    this.memory[threadBase + sp_max]     = sentinelFrameWord;       // lump[+sp_max] = frame word (visible in ② stack zone as orange "sentinel")
+                    this.memory[threadBase + sp_max - 1] = oldCR6GT;               // lump[+sp_max-1] = saved E-type CR6 GT from B:03
                 }
-                this.sto = sp_max - 2;              // STO = 241: two words consumed by the sentinel frame (frame word + E-GT)
+                this.sto = sp_max - 2;              // STO = sp_max-2: two words consumed by the sentinel frame (frame word + E-GT)
 
                 // ── Step 4: Derive CR14 (code) and CR6 (c-list) from lump header ─────
                 // Hardware does this simultaneously from the header word; both tokens
@@ -2767,7 +2767,7 @@ class ChurchSimulator {
         this.faultLog = [];
         this.stepCount = 0;
         this.callStack = [];
-        this.sto = 243;  // sp_max reset
+        this.sto = 11;   // sp_max (test value)
 
         this.emit('programLoaded', { addr: 0, length: hwProgram.length });
         this.emit('stateChange', this.getState());
@@ -2870,7 +2870,7 @@ class ChurchSimulator {
         this.faultLog = [];
         this.stepCount = 0;
         this.callStack = [];
-        this.sto = 243;  // sp_max reset
+        this.sto = 11;   // sp_max (test value)
 
         this.emit('programLoaded', { addr: 0, length: hwBoot ? hwBoot.length : 0 });
         this.emit('stateChange', this.getState());
