@@ -7097,14 +7097,14 @@ HALT
 ; TPERM + CALL + HALT
 ; ============================================
 ;
-; CALL warning case first:
-;   TPERM checks E before every CALL.
-;   If the check fails (Z=0), branch to HALT.
-;   If it passes (Z=1), CALL proceeds.
+; CALL guard pattern: TPERM checks E before
+; every CALL. If Z=0 (fail) → branch to HALT.
+; If Z=1 (pass) → CALL proceeds.
 ;
-; Then: recursive CALL loop fills the
-; 32-word stack (sw=32). Frame ~16 faults
-; BOUNDS when STO < sp_min (212).
+; After the first guarded CALL returns, we
+; fall through into a recursive CALL loop
+; that fills the 32-word stack (sw=32).
+; Frame ~16 faults BOUNDS (STO < sp_min=212).
 ;
 ; HOW TO RUN:
 ;   1. Boot (Step x6 or Boot button)
@@ -7120,20 +7120,10 @@ TPERM CR0, E              ; has E? Z=1 yes, Z=0 no
 BRANCHNE halt             ; Z=0 → HALT (no E perm)
 CALL CR0                  ; Z=1 → safe to CALL
 
-; --- After CALL returns, test failure ---
-; Same GT but check W (Salvation has no W).
-; TPERM sets Z=0, we branch to HALT.
-
-TPERM CR0, W              ; has W? Z=0 (no)
-BRANCHEQ skip_halt        ; Z=1 would skip (won't)
-BRANCH halt               ; W missing → HALT
-
-skip_halt:
-HALT                      ; unreachable
-
 ; --- Recursive CALL — stack overflow ---
-; Each frame = 2 words on the 32-word stack.
-; ~15 frames fit before STO < sp_min (212).
+; After the first CALL returns, fall straight
+; into the recursive loop. Each CALL pushes a
+; 2-word frame. ~15 frames fit before BOUNDS.
 
 recurse:
 LOAD CR0, CR6, 4          ; CR0 = Salvation
