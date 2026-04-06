@@ -612,7 +612,11 @@ File → Open Project → church_ti60_f225.xml
 
 ### Step 3 — Build and flash
 
-Run **Synthesis → Place & Route → Generate Bitstream**, then flash via **Efinity Programmer** (JTAG).
+Run **Synthesis → Place & Route → Generate Bitstream**.
+
+The project file already includes a USB programmer target (JTAG, cable index 0).
+Once the bitstream is generated, go to **Tool → Programmer** — your board should
+appear pre-selected. Click **Program** to flash.
 
 ## Re-synthesise from Verilog (optional)
 
@@ -690,6 +694,17 @@ def _make_fpga_zip(is_ti60, paths, zip_name, build_md):
         project_xml = project_xml.replace(
             '../build/church_ti60_f225.v', 'church_ti60_f225.v'
         )
+        # Inject USB programmer target so Efinity IDE can flash without manual setup
+        programmer_block = (
+            '    <efx:programmer>\n'
+            '        <efx:param name="cable_name"  value="Efinix USB2.0 Device" value_type="e_string"/>\n'
+            '        <efx:param name="cable_index" value="0"                    value_type="e_integer"/>\n'
+            '        <efx:param name="mode"        value="jtag"                 value_type="e_option"/>\n'
+            '        <efx:param name="bitfile"     value="outflow/church_ti60_f225.bit" value_type="e_string"/>\n'
+            '    </efx:programmer>\n'
+        )
+        if '<efx:programmer>' not in project_xml:
+            project_xml = project_xml.replace('</efx:project>', programmer_block + '</efx:project>')
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(paths["verilog"], "church_ti60_f225.v")
             zf.write(paths["edif"],    "church_ti60_f225.edif")
