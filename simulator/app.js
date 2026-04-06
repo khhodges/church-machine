@@ -789,9 +789,15 @@ function updateGateLog() {
             if (k === 'perm' && v.perm) {
                 label = `PERM&nbsp;(${v.perm})`;
             } else if (k === 'range') {
-                label = v.pass
-                    ? `SCOPE&nbsp;(${v.offset}&nbsp;&le;&nbsp;${v.limit})`
-                    : `SCOPE&nbsp;(${v.offset}&nbsp;&gt;&nbsp;${v.limit}&nbsp;&#x26A0;)`;
+                if (v.address !== undefined) {
+                    label = v.pass
+                        ? `SCOPE&nbsp;(addr&nbsp;${v.address}&nbsp;&isin;&nbsp;[${v.base}..${v.limit}])`
+                        : `SCOPE&nbsp;(addr&nbsp;${v.address}&nbsp;&notin;&nbsp;[${v.base}..${v.limit}]&nbsp;&#x26A0;)`;
+                } else {
+                    label = v.pass
+                        ? `SCOPE&nbsp;(${v.offset}&nbsp;&le;&nbsp;${v.limit})`
+                        : `SCOPE&nbsp;(${v.offset}&nbsp;&gt;&nbsp;${v.limit}&nbsp;&#x26A0;)`;
+                }
             } else {
                 label = k.toUpperCase();
             }
@@ -5892,12 +5898,22 @@ function showFaultModal(f) {
     // When a DREAD/DWRITE range check fails, sim.auditLog has a checks.range entry.
     // Surface it here so the user can see exactly which offset exceeded which limit.
     let scopeSection = '';
-    if (f.type === 'BOUNDS') {
+    if (f.type === 'BOUNDS' || f.type === 'RANGE') {
         const auditEntries = sim.auditLog || [];
         const lastEntry = auditEntries.length > 0 ? auditEntries[auditEntries.length - 1] : null;
         if (lastEntry && lastEntry.checks && lastEntry.checks.range && !lastEntry.checks.range.pass) {
             const rc = lastEntry.checks.range;
-            scopeSection = `
+            if (rc.address !== undefined) {
+                scopeSection = `
+        <div class="fault-scope-section">
+            <div class="fault-scope-label">&#x26A0; Scope violation</div>
+            <div class="fault-scope-detail">
+                Address <code>${rc.address}</code> is outside valid range
+                <code>[${rc.base}..${rc.limit}]</code>.
+            </div>
+        </div>`;
+            } else {
+                scopeSection = `
         <div class="fault-scope-section">
             <div class="fault-scope-label">&#x26A0; Scope violation</div>
             <div class="fault-scope-detail">
@@ -5905,6 +5921,7 @@ function showFaultModal(f) {
                 &nbsp;&mdash;&nbsp;valid range is <code>0</code>&ndash;<code>${rc.limit}</code>.
             </div>
         </div>`;
+            }
         }
     }
 

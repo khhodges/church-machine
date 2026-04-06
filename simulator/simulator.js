@@ -376,8 +376,10 @@ class ChurchSimulator {
                 continue;
             }
             const loc = (i === 0) ? 0 : i * this.SLOT_SIZE;
+            const THREAD_LUMP_SIZE = 256;
             const lim17 = (i === 0) ? (this.memory.length - 1)
-                        : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i] : (this.SLOT_SIZE - 1));
+                        : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
+                        : (i === 1 ? (THREAD_LUMP_SIZE - 1) : (this.SLOT_SIZE - 1)));
             const nsTableCount = (i === 0) ? abstractions.length : 0;
             this.writeNSEntry(i, loc, lim17, 0, 0, 0, a.chainable ? 1 : 0, 1, 0, nsTableCount);
             this.nsLabels[i] = a.label;
@@ -745,7 +747,7 @@ class ChurchSimulator {
         return { ok: true };
     }
 
-    mLoad(gt32, requiredPerm, srcCRIdx) {
+    mLoad(gt32, requiredPerm, srcCRIdx, absoluteAddress) {
         const parsed = this.parseGT(gt32);
         if (parsed.index >= this.nsCount) {
             return { ok: false, fault: 'BOUNDS', message: `namespace index ${parsed.index} out of bounds` };
@@ -762,6 +764,17 @@ class ChurchSimulator {
         const fBit = (entry.word1_limit >>> 30) & 1;
 
         const permPass = requiredPerm === null || this.mElevation || !!parsed.permissions[requiredPerm];
+
+        let rangePass = true;
+        let rangeInfo = null;
+        if (absoluteAddress !== undefined && absoluteAddress !== null) {
+            const base = entry.word0_location;
+            const lim = this.parseNSWord1(entry.word1_limit);
+            const upperBound = (base + lim.limit) >>> 0;
+            rangePass = absoluteAddress >= base && absoluteAddress <= upperBound;
+            rangeInfo = { pass: rangePass, address: absoluteAddress, base, limit: upperBound };
+        }
+
         const auditEntry = {
             gate: 'mLoad',
             label: this.nsLabels[parsed.index] || 'entry_'+parsed.index,
@@ -773,8 +786,9 @@ class ChurchSimulator {
                 perm:    { pass: permPass, perm: requiredPerm },
             },
             b: bBit, f: fBit,
-            result: (versionMatch && sealValid && permPass) ? 'pass' : 'fail',
+            result: (versionMatch && sealValid && permPass && rangePass) ? 'pass' : 'fail',
         };
+        if (rangeInfo) auditEntry.checks.range = rangeInfo;
         this.auditLog.push(auditEntry);
         this.lastCapability = {
             op: requiredPerm,
@@ -794,11 +808,16 @@ class ChurchSimulator {
         if (requiredPerm !== null && !this.mElevation && !parsed.permissions[requiredPerm]) {
             return { ok: false, fault: 'PERMISSION', message: `lacks ${requiredPerm} permission` };
         }
+        if (!rangePass) {
+            const base = entry.word0_location;
+            const lim = this.parseNSWord1(entry.word1_limit);
+            return { ok: false, fault: 'RANGE', message: `address ${absoluteAddress} outside valid range [${base}..${(base + lim.limit) >>> 0}]` };
+        }
         this.markLive(parsed.index);
         return { ok: true, parsed, entry, index: parsed.index };
     }
 
-    mSave(gt32, targetIdx, srcCRIdx) {
+    mSave(gt32, targetIdx, srcCRIdx, absoluteAddress) {
         const parsed = this.parseGT(gt32);
         const srcEntry = this.readNSEntry(parsed.index);
         if (!srcEntry) {
@@ -820,6 +839,17 @@ class ChurchSimulator {
                 if (tgtWord1.f === 1 && !this.mElevation) farPass = false;
             }
         }
+
+        let rangePass = true;
+        let rangeInfo = null;
+        if (absoluteAddress !== undefined && absoluteAddress !== null) {
+            const base = srcEntry.word0_location;
+            const lim = this.parseNSWord1(srcEntry.word1_limit);
+            const upperBound = (base + lim.limit) >>> 0;
+            rangePass = absoluteAddress >= base && absoluteAddress <= upperBound;
+            rangeInfo = { pass: rangePass, address: absoluteAddress, base, limit: upperBound };
+        }
+
         const saveAudit = {
             gate: 'mSave',
             label: this.nsLabels[parsed.index] || 'entry_'+parsed.index,
@@ -832,8 +862,9 @@ class ChurchSimulator {
                 far:     { pass: farPass },
             },
             b: bBit, f: fBit,
-            result: (srcVersionMatch && srcSealValid && bindPass && farPass) ? 'pass' : 'fail',
+            result: (srcVersionMatch && srcSealValid && bindPass && farPass && rangePass) ? 'pass' : 'fail',
         };
+        if (rangeInfo) saveAudit.checks.range = rangeInfo;
         this.auditLog.push(saveAudit);
         this.lastCapability = {
             op: 'S',
@@ -855,6 +886,11 @@ class ChurchSimulator {
         }
         if (!farPass) {
             return { ok: false, fault: 'FAR', message: `target slot ${targetIdx} is FAR (F=1) — requires HTTP/tunnel access` };
+        }
+        if (!rangePass) {
+            const base = srcEntry.word0_location;
+            const lim = this.parseNSWord1(srcEntry.word1_limit);
+            return { ok: false, fault: 'RANGE', message: `address ${absoluteAddress} outside valid range [${base}..${(base + lim.limit) >>> 0}]` };
         }
         return { ok: true, parsed, srcEntry };
     }
@@ -1131,14 +1167,6 @@ class ChurchSimulator {
     }
 
 
-    _getStackFloor() {
-        const threadBase = this.cr[12] && this.cr[12].word1;
-        if (!threadBase) return 2;
-        const hdr = this.parseLumpHeader(this.memory[threadBase] >>> 0);
-        if (!hdr.valid) return 2;
-        return 18 + hdr.cc;
-    }
-
     _writeCR(crIdx, gt32, entry) {
         this.cr[crIdx].word0 = gt32;
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
@@ -1404,22 +1432,26 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `LOAD: CR${d.crSrc} is NULL`);
             return null;
         }
+        let clistLoc;
+        let clistMaxIdx;
+        if (d.crSrc === 6) {
+            clistLoc = this.cr[d.crSrc].word1;
+            clistMaxIdx = this.parseNSWord1(this.cr[6].word2).limit;
+        } else {
+            const lumpBase = this.cr[d.crSrc].word1;
+            const hdrWord = this.memory[lumpBase] >>> 0;
+            const hdr = this.parseLumpHeader(hdrWord);
+            clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
+            clistMaxIdx = (hdr.valid && hdr.cc > 0) ? hdr.cc - 1 : 0;
+        }
+        if (d.imm > clistMaxIdx) {
+            this.fault('BOUNDS', `LOAD: c-list offset ${d.imm} exceeds limit ${clistMaxIdx}`);
+            return null;
+        }
         const check = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc);
         if (!check.ok) {
             this.fault(check.fault, `LOAD: CR${d.crSrc}: ${check.message}`);
             return null;
-        }
-        // For CR6: word1 is the c-list base set by CALL/boot correctly.
-        // For other CRs: word1 = entry.word0_location (lump start, set by _writeCR).
-        // Recompute c-list base from lump header so non-CR6 loads read from c-list end, not lump start.
-        let clistLoc;
-        if (d.crSrc === 6) {
-            clistLoc = this.cr[d.crSrc].word1;
-        } else {
-            const lumpBase = check.entry.word0_location;
-            const hdrWord = this.memory[lumpBase] >>> 0;
-            const hdr = this.parseLumpHeader(hdrWord);
-            clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
         }
         const slotGT = this.memory[clistLoc + d.imm] || 0;
         if (slotGT === 0) {
@@ -1475,6 +1507,22 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `SAVE: CR${d.crSrc} C-List is NULL`);
             return null;
         }
+        let clistLoc;
+        let clistMaxIdx;
+        if (d.crSrc === 6) {
+            clistLoc = this.cr[d.crSrc].word1;
+            clistMaxIdx = this.parseNSWord1(this.cr[6].word2).limit;
+        } else {
+            const lumpBase = this.cr[d.crSrc].word1;
+            const hdrWord = this.memory[lumpBase] >>> 0;
+            const hdr = this.parseLumpHeader(hdrWord);
+            clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
+            clistMaxIdx = (hdr.valid && hdr.cc > 0) ? hdr.cc - 1 : 0;
+        }
+        if (d.imm > clistMaxIdx) {
+            this.fault('BOUNDS', `SAVE: c-list offset ${d.imm} exceeds limit ${clistMaxIdx}`);
+            return null;
+        }
         const clistCheck = this.mLoad(clistGT, 'S', d.crSrc);
         if (!clistCheck.ok) {
             this.fault(clistCheck.fault, `SAVE: CR${d.crSrc}: ${clistCheck.message}`);
@@ -1491,17 +1539,6 @@ class ChurchSimulator {
             }
         }
 
-        // For CR6: word1 is the c-list base set correctly by CALL/boot.
-        // For other CRs: word1 = lump_start (from _writeCR); recompute c-list base from lump header.
-        let clistLoc;
-        if (d.crSrc === 6) {
-            clistLoc = this.cr[d.crSrc].word1;
-        } else {
-            const lumpBase = clistCheck.entry.word0_location;
-            const hdrWord = this.memory[lumpBase] >>> 0;
-            const hdr = this.parseLumpHeader(hdrWord);
-            clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
-        }
         this.memory[clistLoc + d.imm] = srcGT;
         const srcParsed = saveCheck.parsed;
         const clistIdx = clistCheck.parsed.index;
@@ -1569,12 +1606,17 @@ class ChurchSimulator {
             }
         }
 
-        const stackFloor = this._getStackFloor();
-        if (this.sto < stackFloor) {
-            this.fault('RANGE', `CALL CR${d.crDst}: stack overflow — STO=${this.sto} < floor=${stackFloor} (${this.callStack.length} frame(s) deep); stack would collide with heap/DR zone`);
-            return null;
-        }
         const savedSTO = this.sto;
+        const callThreadBase = this.cr[12] && this.cr[12].word1;
+        if (callThreadBase) {
+            const cr12GT = this.cr[12].word0;
+            const lowestAddr = (callThreadBase + savedSTO - 1) >>> 0;
+            const boundsCheck = this.mLoad(cr12GT, null, undefined, lowestAddr);
+            if (!boundsCheck.ok) {
+                this.fault(boundsCheck.fault, `CALL CR${d.crDst}: stack overflow — STO=${savedSTO}, address ${lowestAddr}: ${boundsCheck.message} (${this.callStack.length} frame(s) deep)`);
+                return null;
+            }
+        }
         // STO-1 stores the CALLER'S old CR6 word0 (L-type post-boot).
         // RETURN restores CR6 from savedCRs (not from memory); STO-1 is the
         // hardware-accurate memory layout for the thread lump display.
@@ -1589,10 +1631,6 @@ class ChurchSimulator {
             sz: 1,
             frameWord,
         });
-        // Write 2-word CALL frame to thread lump stack zone (hardware-accurate):
-        //   STO+0 = frameWord  (returnPC, flags, sz, prev_STO)
-        //   STO−1 = old CR6 GT (caller's L-type c-list token, saved before CALL overwrites CR6)
-        const callThreadBase = this.cr[12] && this.cr[12].word1;
         if (callThreadBase) {
             this.memory[callThreadBase + savedSTO]     = frameWord;
             this.memory[callThreadBase + savedSTO - 1] = oldCR6GT;
@@ -2044,22 +2082,28 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `ELOADCALL: CR${d.crSrc} C-List is NULL`);
             return null;
         }
+        let srcLoc;
+        let ecClistMaxIdx;
+        if (d.crSrc === 6) {
+            srcLoc = this.cr[d.crSrc].word1;
+            ecClistMaxIdx = this.parseNSWord1(this.cr[6].word2).limit;
+        } else {
+            const lumpBase = this.cr[d.crSrc].word1;
+            const hdrWord = this.memory[lumpBase] >>> 0;
+            const hdr = this.parseLumpHeader(hdrWord);
+            srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
+            ecClistMaxIdx = (hdr.valid && hdr.cc > 0) ? hdr.cc - 1 : 0;
+        }
+        if (d.imm > ecClistMaxIdx) {
+            this.fault('BOUNDS', `ELOADCALL: c-list offset ${d.imm} exceeds limit ${ecClistMaxIdx}`);
+            return null;
+        }
         const loadCheck = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc);
         if (!loadCheck.ok) {
             this.fault(loadCheck.fault, `ELOADCALL LOAD: CR${d.crSrc}: ${loadCheck.message}`);
             return null;
         }
 
-        // Compute c-list base: CR6 has it pre-set by CALL/boot; other CRs need lump-header lookup.
-        let srcLoc;
-        if (d.crSrc === 6) {
-            srcLoc = this.cr[d.crSrc].word1;
-        } else {
-            const lumpBase = loadCheck.entry.word0_location;
-            const hdrWord = this.memory[lumpBase] >>> 0;
-            const hdr = this.parseLumpHeader(hdrWord);
-            srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
-        }
         const slotGT = this.memory[srcLoc + d.imm] || 0;
         if (slotGT === 0) {
             this.fault('NULL_CAP', `ELOADCALL: c-list offset ${d.imm} is empty`);
@@ -2102,12 +2146,17 @@ class ChurchSimulator {
             }
         }
 
-        const stackFloor_ec = this._getStackFloor();
-        if (this.sto < stackFloor_ec) {
-            this.fault('RANGE', `ELOADCALL CR${d.crDst}: stack overflow — STO=${this.sto} < floor=${stackFloor_ec} (${this.callStack.length} frame(s) deep); stack would collide with heap/DR zone`);
-            return null;
-        }
         const savedSTO_ec = this.sto;
+        const ecThreadBase = this.cr[12] && this.cr[12].word1;
+        if (ecThreadBase) {
+            const cr12GT = this.cr[12].word0;
+            const lowestAddr = (ecThreadBase + savedSTO_ec - 1) >>> 0;
+            const boundsCheck = this.mLoad(cr12GT, null, undefined, lowestAddr);
+            if (!boundsCheck.ok) {
+                this.fault(boundsCheck.fault, `ELOADCALL CR${d.crDst}: stack overflow — STO=${savedSTO_ec}, address ${lowestAddr}: ${boundsCheck.message} (${this.callStack.length} frame(s) deep)`);
+                return null;
+            }
+        }
         const frameWord_ec = this._packFrameWord(this.pc + 1, 1, savedSTO_ec);
         // Save CRs BEFORE any _writeCR calls so RETURN correctly restores the caller's context.
         this.callStack.push({
@@ -2141,22 +2190,28 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `XLOADLAMBDA: CR${d.crSrc} C-List is NULL`);
             return null;
         }
+        let srcLoc;
+        let xlClistMaxIdx;
+        if (d.crSrc === 6) {
+            srcLoc = this.cr[d.crSrc].word1;
+            xlClistMaxIdx = this.parseNSWord1(this.cr[6].word2).limit;
+        } else {
+            const lumpBase = this.cr[d.crSrc].word1;
+            const hdrWord = this.memory[lumpBase] >>> 0;
+            const hdr = this.parseLumpHeader(hdrWord);
+            srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
+            xlClistMaxIdx = (hdr.valid && hdr.cc > 0) ? hdr.cc - 1 : 0;
+        }
+        if (d.imm > xlClistMaxIdx) {
+            this.fault('BOUNDS', `XLOADLAMBDA: c-list offset ${d.imm} exceeds limit ${xlClistMaxIdx}`);
+            return null;
+        }
         const loadCheck = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc);
         if (!loadCheck.ok) {
             this.fault(loadCheck.fault, `XLOADLAMBDA LOAD: CR${d.crSrc}: ${loadCheck.message}`);
             return null;
         }
 
-        // Compute c-list base: CR6 has it pre-set by CALL/boot; other CRs need lump-header lookup.
-        let srcLoc;
-        if (d.crSrc === 6) {
-            srcLoc = this.cr[d.crSrc].word1;
-        } else {
-            const lumpBase = loadCheck.entry.word0_location;
-            const hdrWord = this.memory[lumpBase] >>> 0;
-            const hdr = this.parseLumpHeader(hdrWord);
-            srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
-        }
         const slotGT = this.memory[srcLoc + d.imm] || 0;
         if (slotGT === 0) {
             this.fault('NULL_CAP', `XLOADLAMBDA: c-list offset ${d.imm} is empty`);
@@ -2199,23 +2254,13 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `DREAD: CR${d.crSrc} is NULL`);
             return null;
         }
-        const check = this.mLoad(dataGT, 'R', d.crSrc);
-        if (!check.ok) {
-            this.fault(check.fault, `DREAD: CR${d.crSrc}: ${check.message}`);
-            return null;
-        }
         const srcCR = this.cr[d.crSrc];
         const loc = srcCR.word1;
-        const lim = this.parseNSWord1(srcCR.word2);
         const offset = d.imm;
-        const rangePass = offset <= lim.limit;
-        if (this.auditLog.length > 0) {
-            const lastEntry = this.auditLog[this.auditLog.length - 1];
-            lastEntry.checks.range = { pass: rangePass, offset, limit: lim.limit };
-            if (!rangePass) lastEntry.result = 'fail';
-        }
-        if (!rangePass) {
-            this.fault('BOUNDS', `DREAD: offset ${offset} exceeds DATA limit ${lim.limit}`);
+        const absAddr = (loc + offset) >>> 0;
+        const check = this.mLoad(dataGT, 'R', d.crSrc, absAddr);
+        if (!check.ok) {
+            this.fault(check.fault, `DREAD: CR${d.crSrc}: ${check.message}`);
             return null;
         }
         const value = this.memory[loc + offset];
@@ -2236,23 +2281,13 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `DWRITE: CR${d.crSrc} is NULL`);
             return null;
         }
-        const check = this.mLoad(dataGT, 'W', d.crSrc);
-        if (!check.ok) {
-            this.fault(check.fault, `DWRITE: CR${d.crSrc}: ${check.message}`);
-            return null;
-        }
         const srcCR = this.cr[d.crSrc];
         const loc = srcCR.word1;
-        const lim = this.parseNSWord1(srcCR.word2);
         const offset = d.imm;
-        const rangePass = offset <= lim.limit;
-        if (this.auditLog.length > 0) {
-            const lastEntry = this.auditLog[this.auditLog.length - 1];
-            lastEntry.checks.range = { pass: rangePass, offset, limit: lim.limit };
-            if (!rangePass) lastEntry.result = 'fail';
-        }
-        if (!rangePass) {
-            this.fault('BOUNDS', `DWRITE: offset ${offset} exceeds DATA limit ${lim.limit}`);
+        const absAddr = (loc + offset) >>> 0;
+        const check = this.mLoad(dataGT, 'W', d.crSrc, absAddr);
+        if (!check.ok) {
+            this.fault(check.fault, `DWRITE: CR${d.crSrc}: ${check.message}`);
             return null;
         }
         const value = this.dr[drIdx] >>> 0;
@@ -2321,12 +2356,12 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `BFEXT: CR${d.crSrc} is NULL`);
             return null;
         }
-        const check = this.mLoad(dataGT, 'R', d.crSrc);
+        const loc = this.cr[d.crSrc].word1;
+        const check = this.mLoad(dataGT, 'R', d.crSrc, loc);
         if (!check.ok) {
             this.fault(check.fault, `BFEXT: CR${d.crSrc}: ${check.message}`);
             return null;
         }
-        const loc = this.cr[d.crSrc].word1;
         const pos = (d.imm >>> 5) & 0x1F;
         const width = d.imm & 0x1F;
         if (width === 0 || pos + width > 32) {
@@ -2353,12 +2388,12 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `BFINS: CR${d.crSrc} is NULL`);
             return null;
         }
-        const check = this.mLoad(dataGT, 'W', d.crSrc);
+        const loc = this.cr[d.crSrc].word1;
+        const check = this.mLoad(dataGT, 'W', d.crSrc, loc);
         if (!check.ok) {
             this.fault(check.fault, `BFINS: CR${d.crSrc}: ${check.message}`);
             return null;
         }
-        const loc = this.cr[d.crSrc].word1;
         const pos = (d.imm >>> 5) & 0x1F;
         const width = d.imm & 0x1F;
         if (width === 0 || pos + width > 32) {
