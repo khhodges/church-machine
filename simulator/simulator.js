@@ -135,6 +135,7 @@ class ChurchSimulator {
         this.lambdaActive = false;
         this.lambdaReturnPC = 0;
         this.faultLog = [];
+        this._instrHistory = [];
 
         this.memory = new Uint32Array(65536);
 
@@ -1294,13 +1295,16 @@ class ChurchSimulator {
     }
 
     fault(type, message) {
+        const lastH = this._instrHistory && this._instrHistory.length > 0
+            ? this._instrHistory[this._instrHistory.length - 1] : null;
+        const faultStep = (lastH && lastH.step === this.stepCount) ? this.stepCount : null;
         const entry = {
             type, message, pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
-            // Snapshot machine state so the fault modal can show registers without
-            // navigating away.  Deep-copy so post-fault resets don't overwrite these.
             crSnapshot: this.cr ? this.cr.map(c => c ? {...c} : null) : [],
             drSnapshot: this.dr ? [...this.dr] : [],
             flagsSnapshot: this.flags ? {...this.flags} : {},
+            instrHistory: this._instrHistory ? this._instrHistory.map(h => ({...h})) : [],
+            faultStep: faultStep,
         };
         this.faultLog.push(entry);
         this.output += `FAULT [${type}] at PC=${this.pc}: ${message}\n`;
@@ -1393,6 +1397,19 @@ class ChurchSimulator {
 
         const d = this.decodeInstruction(instrWord);
         this.stepCount++;
+
+        this._instrHistory.push({
+            step: this.stepCount,
+            pc: this.pc,
+            physicalPC: fetch.addr,
+            raw: instrWord,
+            opName: this.opName(d.opcode),
+            cond: this.condName(d.cond),
+            crDst: d.crDst,
+            crSrc: d.crSrc,
+            imm: d.imm,
+        });
+        if (this._instrHistory.length > 5) this._instrHistory.shift();
 
         if (!this.checkCondition(d.cond)) {
             const result = {
@@ -2816,6 +2833,7 @@ class ChurchSimulator {
         this.bootStep = 0;
         this.ledBits = 0; this.ledMode = 'boot';
         this.faultLog = [];
+        this._instrHistory = [];
         this.stepCount = 0;
         this.callStack = [];
         this.sto = 243;  // sp_max reset
@@ -2919,6 +2937,7 @@ class ChurchSimulator {
         this.bootStep = 0;
         this.ledBits = 0; this.ledMode = 'boot';
         this.faultLog = [];
+        this._instrHistory = [];
         this.stepCount = 0;
         this.callStack = [];
         this.sto = 243;  // sp_max reset

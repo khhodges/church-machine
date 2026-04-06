@@ -5932,6 +5932,30 @@ function showFaultModal(f) {
         }
     }
 
+    const instrTrace = f.instrHistory || [];
+    let instrTraceSection = '';
+    if (instrTrace.length > 0) {
+        let traceRows = '';
+        for (const h of instrTrace) {
+            const addr = '0x' + (h.physicalPC >>> 0).toString(16).toUpperCase().padStart(4, '0');
+            const rawHex = '0x' + (h.raw >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            const instr = assembler ? assembler.disassemble(h.raw) : `${h.opName} CR${h.crDst}, CR${h.crSrc}, ${h.imm}`;
+            const isFault = (f.faultStep != null && h.step === f.faultStep);
+            const cls = isFault ? ' class="itrace-fault"' : '';
+            traceRows += `<tr${cls}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instr}</td></tr>`;
+        }
+        instrTraceSection = `
+        <div class="fault-trace-section">
+            <div class="fault-trace-label">Instruction Trace (last ${instrTrace.length})</div>
+            <div class="fault-trace-scroll">
+                <table class="fault-trace-table">
+                    <thead><tr><th>Step</th><th>Address</th><th>Raw</th><th>Instruction</th></tr></thead>
+                    <tbody>${traceRows}</tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
     const overlay = document.createElement('div');
     overlay.id = 'faultModalOverlay';
     overlay.className = 'modal-overlay';
@@ -5971,6 +5995,7 @@ function showFaultModal(f) {
             </div>` : ''}
         </div>
         ${scopeSection}
+        ${instrTraceSection}
         ${crSection}
         ${drSection}
         <div class="modal-buttons">

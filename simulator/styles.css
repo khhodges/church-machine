@@ -7808,6 +7808,65 @@ pre:hover .code-copy-btn {
     font-family: var(--font-mono, monospace);
 }
 
+.fault-trace-section {
+    margin-bottom: 0.85rem;
+    border: 1px solid rgba(100,180,220,0.18);
+    border-radius: 5px;
+    overflow: hidden;
+    font-size: 0.8rem;
+}
+.fault-trace-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #88bbdd;
+    background: rgba(0,0,0,0.22);
+    padding: 4px 10px;
+    border-bottom: 1px solid rgba(100,180,220,0.12);
+}
+.fault-trace-scroll {
+    overflow-x: auto;
+    max-height: 160px;
+    overflow-y: auto;
+}
+.fault-trace-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+}
+.fault-trace-table thead th {
+    background: rgba(0,0,0,0.18);
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    text-align: left;
+    border-bottom: 1px solid rgba(100,180,220,0.12);
+    white-space: nowrap;
+}
+.fault-trace-table tbody tr:nth-child(even) {
+    background: rgba(0,0,0,0.10);
+}
+.fault-trace-table tbody tr:hover {
+    background: rgba(80,160,220,0.10);
+}
+.fault-trace-table tbody td {
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+.itrace-step { color: var(--text-secondary); }
+.itrace-addr { color: #88ddaa; }
+.itrace-raw  { color: #aaa; font-size: 0.72rem; }
+.itrace-instr { color: #ddeeff; }
+tr.itrace-fault {
+    background: rgba(220, 60, 60, 0.18) !important;
+    border-left: 3px solid #e05555;
+}
+tr.itrace-fault td { color: #ff9999; }
+
 .gate-flag {
     font-family: 'Courier New', monospace;
     font-size: 0.72rem;
