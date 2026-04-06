@@ -1641,6 +1641,14 @@ class ChurchSimulator {
         const savedSTO = this.sto;
         const callThreadBase = this.cr[12] && this.cr[12].word1;
         if (callThreadBase) {
+            const newSTO = (savedSTO - 2) & 0xFFF;
+            const hdrWord = this.memory[callThreadBase] >>> 0;
+            const hdr = this.parseLumpHeader(hdrWord);
+            const heapFloor = 17 + (hdr.valid ? hdr.cc : 0);
+            if (newSTO < heapFloor) {
+                this.fault('BOUNDS', `CALL CR${d.crDst}: stack overflow — STO would become ${newSTO}, heap floor is ${heapFloor} (${this.callStack.length} frame(s) deep)`);
+                return null;
+            }
             const cr12GT = this.cr[12].word0;
             const lowestAddr = (callThreadBase + savedSTO - 1) >>> 0;
             const boundsCheck = this.mLoad(cr12GT, null, undefined, lowestAddr);
