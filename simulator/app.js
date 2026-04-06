@@ -7099,16 +7099,22 @@ HALT
 ;
 ; Three tests in one run:
 ;
-;   1. CALL guard — TPERM checks E before
-;      CALL. Z=0 (fail) → HALT; Z=1 → CALL.
+;   1. CALL guard — TPERM checks E on
+;      Salvation. Z=1 → CALL; Z=0 → HALT.
 ;
-;   2. TPERM failure — after the first CALL
-;      returns, check RW (Salvation has no RW).
-;      Z=0 confirms failure, fall through.
+;   2. TPERM failure — check RW on Salvation
+;      (has E only, not RW). Z=0 confirms
+;      failure, fall through to test 3.
 ;
-;   3. Recursive CALL — loop fills the
-;      32-word stack (sw=32). Frame ~16 faults
-;      BOUNDS when STO < sp_min (212).
+;   3. Recursive CALL — self-call via
+;      Boot.Abstr (c-list[2], our own code).
+;      Each CALL pushes a real 2-word frame.
+;      ~15 frames → BOUNDS (STO < sp_min=212).
+;
+; NOTE: Salvation has handler methods so CALL
+; dispatches atomically (no frame pushed).
+; Boot.Abstr is our own code — no handler —
+; so CALL pushes a real stack frame.
 ;
 ; HOW TO RUN:
 ;   1. Boot (Step x6 or Boot button)
@@ -7118,30 +7124,32 @@ HALT
 
 ; --- TEST 1: CALL guard (TPERM E) ---
 ; Load Salvation, verify E perm, CALL if ok.
+; Salvation dispatches atomically (handler).
 
 LOAD CR0, CR6, 4          ; CR0 = Salvation
 TPERM CR0, E              ; has E? Z=1 yes, Z=0 no
 BRANCHNE halt             ; Z=0 → HALT (no E perm)
-CALL CR0                  ; Z=1 → safe to CALL
+CALL CR0                  ; Z=1 → atomic dispatch
 
 ; --- TEST 2: TPERM failure (RW check) ---
 ; Salvation has E but NOT RW. TPERM sets Z=0.
-; If Z=1 (unexpected pass) → HALT as error.
 ; Z=0 (expected fail) → fall through to test 3.
 
 TPERM CR0, RW             ; has RW? Z=0 (no)
 BRANCHEQ halt             ; Z=1 → unexpected, HALT
 
 ; --- TEST 3: Recursive CALL — overflow ---
-; Each CALL pushes a 2-word frame. ~15 frames
-; fit before STO < sp_min (212) → BOUNDS.
+; Self-call via Boot.Abstr (c-list[2]).
+; This is our OWN code — no handler, so CALL
+; pushes a real 2-word frame each time.
+; ~15 frames before STO < sp_min (212).
 
 recurse:
-LOAD CR0, CR6, 4          ; CR0 = Salvation
+LOAD CR0, CR6, 2          ; CR0 = Boot.Abstr (self)
 TPERM CR0, E              ; guard: has E?
 BRANCHNE halt             ; no E → HALT
-CALL CR0                  ; push 2-word frame
-BRANCH recurse            ; loop
+CALL CR0                  ; push real 2-word frame
+BRANCH recurse            ; loop (after RETURN)
 
 halt:
 HALT
