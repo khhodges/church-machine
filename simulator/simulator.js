@@ -1131,6 +1131,14 @@ class ChurchSimulator {
     }
 
 
+    _getStackFloor() {
+        const threadBase = this.cr[12] && this.cr[12].word1;
+        if (!threadBase) return 2;
+        const hdr = this.parseLumpHeader(this.memory[threadBase] >>> 0);
+        if (!hdr.valid) return 2;
+        return 18 + hdr.cc;
+    }
+
     _writeCR(crIdx, gt32, entry) {
         this.cr[crIdx].word0 = gt32;
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
@@ -1561,11 +1569,9 @@ class ChurchSimulator {
             }
         }
 
-        // Stack overflow: need 2 words for frame (at sto and sto-1).
-        // Hardware reports this as a RANGE fault on CR14 (the code-execution token),
-        // because the stack growing into the code region is detected as a bounds violation.
-        if (this.sto < 2) {
-            this.fault('RANGE', `CALL CR${d.crDst}: stack overflow — STO=${this.sto} exhausted (${this.callStack.length} frame(s) deep); CR14 limit exceeded, thread lump full`);
+        const stackFloor = this._getStackFloor();
+        if (this.sto < stackFloor) {
+            this.fault('RANGE', `CALL CR${d.crDst}: stack overflow — STO=${this.sto} < floor=${stackFloor} (${this.callStack.length} frame(s) deep); stack would collide with heap/DR zone`);
             return null;
         }
         const savedSTO = this.sto;
@@ -2096,10 +2102,9 @@ class ChurchSimulator {
             }
         }
 
-        // Stack overflow: need 2 words for frame (at sto and sto-1).
-        // Hardware reports this as a RANGE fault on CR14 (bounds violation in the code region).
-        if (this.sto < 2) {
-            this.fault('RANGE', `ELOADCALL CR${d.crDst}: stack overflow — STO=${this.sto} exhausted (${this.callStack.length} frame(s) deep); CR14 limit exceeded, thread lump full`);
+        const stackFloor_ec = this._getStackFloor();
+        if (this.sto < stackFloor_ec) {
+            this.fault('RANGE', `ELOADCALL CR${d.crDst}: stack overflow — STO=${this.sto} < floor=${stackFloor_ec} (${this.callStack.length} frame(s) deep); stack would collide with heap/DR zone`);
             return null;
         }
         const savedSTO_ec = this.sto;
