@@ -7097,14 +7097,18 @@ HALT
 ; TPERM + CALL + HALT
 ; ============================================
 ;
-; CALL guard pattern: TPERM checks E before
-; every CALL. If Z=0 (fail) → branch to HALT.
-; If Z=1 (pass) → CALL proceeds.
+; Three tests in one run:
 ;
-; After the first guarded CALL returns, we
-; fall through into a recursive CALL loop
-; that fills the 32-word stack (sw=32).
-; Frame ~16 faults BOUNDS (STO < sp_min=212).
+;   1. CALL guard — TPERM checks E before
+;      CALL. Z=0 (fail) → HALT; Z=1 → CALL.
+;
+;   2. TPERM failure — after the first CALL
+;      returns, check W (Salvation has no W).
+;      Z=0 confirms failure, fall through.
+;
+;   3. Recursive CALL — loop fills the
+;      32-word stack (sw=32). Frame ~16 faults
+;      BOUNDS when STO < sp_min (212).
 ;
 ; HOW TO RUN:
 ;   1. Boot (Step x6 or Boot button)
@@ -7112,7 +7116,7 @@ HALT
 ;   3. Step or Run
 ; ============================================
 
-; --- CALL guard: TPERM E then CALL ---
+; --- TEST 1: CALL guard (TPERM E) ---
 ; Load Salvation, verify E perm, CALL if ok.
 
 LOAD CR0, CR6, 4          ; CR0 = Salvation
@@ -7120,10 +7124,17 @@ TPERM CR0, E              ; has E? Z=1 yes, Z=0 no
 BRANCHNE halt             ; Z=0 → HALT (no E perm)
 CALL CR0                  ; Z=1 → safe to CALL
 
-; --- Recursive CALL — stack overflow ---
-; After the first CALL returns, fall straight
-; into the recursive loop. Each CALL pushes a
-; 2-word frame. ~15 frames fit before BOUNDS.
+; --- TEST 2: TPERM failure (W check) ---
+; Salvation has E but NOT W. TPERM sets Z=0.
+; If Z=1 (unexpected pass) → HALT as error.
+; Z=0 (expected fail) → fall through to test 3.
+
+TPERM CR0, W              ; has W? Z=0 (no)
+BRANCHEQ halt             ; Z=1 → unexpected, HALT
+
+; --- TEST 3: Recursive CALL — overflow ---
+; Each CALL pushes a 2-word frame. ~15 frames
+; fit before STO < sp_min (212) → BOUNDS.
 
 recurse:
 LOAD CR0, CR6, 4          ; CR0 = Salvation
