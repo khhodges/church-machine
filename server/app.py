@@ -300,6 +300,19 @@ def download_build_file(filename):
     resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
 
+@app.route("/local_bridge.py")
+def download_local_bridge():
+    """Serve the local serial bridge script for download."""
+    bridge_path = os.path.join(os.path.dirname(__file__), "local_bridge.py")
+    if not os.path.isfile(bridge_path):
+        return make_response("Not found", 404)
+    with open(bridge_path, "rb") as f:
+        data = f.read()
+    resp = make_response(data, 200)
+    resp.headers["Content-Type"] = "text/plain"
+    resp.headers["Content-Disposition"] = 'attachment; filename="local_bridge.py"'
+    return resp
+
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_LIBRARY_REPO = os.environ.get("GITHUB_LIBRARY_REPO", "khhodges/cloomc-project")
 GITHUB_FOUNDATION_REPO = "khhodges/cloomc-foundation"
