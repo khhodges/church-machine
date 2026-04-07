@@ -6843,8 +6843,8 @@ HALT
 ; IADD, ISUB, MCMP, BRANCH, SHR
 
 ; --- Setup ---
-IADD DR1, DR0, 10      ; n = 10
-IADD DR2, DR1, 1       ; DR2 = n + 1 = 11
+IADD DR1, DR0, #10     ; n = 10
+IADD DR2, DR1, #1      ; DR2 = n + 1 = 11
 
 ; --- Software multiply: DR3 = n * (n+1) ---
 IADD DR3, DR0, DR0     ; product = 0
@@ -6853,7 +6853,7 @@ mul:
 MCMP DR4, DR0          ; counter == 0?
 BRANCHEQ div           ; → done with multiply
 IADD DR3, DR3, DR1     ; product += n
-ISUB DR4, DR4, 1       ; counter--
+ISUB DR4, DR4, #1      ; counter--
 BRANCH mul
 
 ; --- Divide by 2 ---
@@ -6862,12 +6862,12 @@ SHR DR3, DR3, 1        ; DR3 = n(n+1)/2 = 55
 
 ; --- Verify by loop: DR5 = 1+2+...+n ---
 IADD DR5, DR0, DR0     ; sum = 0
-IADD DR6, DR0, 1       ; k = 1
+IADD DR6, DR0, #1      ; k = 1
 loop:
 MCMP DR6, DR1          ; k > n?
 BRANCHGT done          ; → finished
 IADD DR5, DR5, DR6     ; sum += k
-IADD DR6, DR6, 1       ; k++
+IADD DR6, DR6, #1      ; k++
 BRANCH loop
 
 done:
