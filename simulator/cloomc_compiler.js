@@ -2044,7 +2044,10 @@ class CLOOMCCompiler {
                 const srMethod = slideRuleMatch[1];
                 const srArgStr = slideRuleMatch[2];
                 const srMethodKey = srMethod.charAt(0).toUpperCase() + srMethod.slice(1);
-                if (slideRuleMethodIndex[srMethodKey] !== undefined) {
+                if (slideRuleMethodIndex[srMethodKey] === undefined) {
+                    errors.push({ line: lineNum, message: `Unknown SlideRule method: ${srMethod}. Available: ${Object.keys(slideRuleMethodIndex).join(', ')}` });
+                    return dstDR;
+                }
                     const srArgs = srArgStr.split(/\s*,\s*/);
                     const leftArg = parseExprValue(srArgs[0]);
                     const leftDR = loadToReg(leftArg, this.DR_TEMP_START, lineNum);
@@ -2055,7 +2058,6 @@ class CLOOMCCompiler {
                     }
                     emitSlideRuleCall(srMethodKey, leftDR, rightDR, dstDR, lineNum, `SlideRule.${srMethodKey}(${srArgStr})`);
                     return dstDR;
-                }
             }
 
             const funcMatch = expr.match(/^(multiply|divide|add|subtract|succ|pred|negate|abs|bernoulli)\s*\(\s*(.+)\s*\)$/i);
