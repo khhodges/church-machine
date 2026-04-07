@@ -1347,16 +1347,16 @@ class SystemAbstractions {
         this.registry.bindMethod(16, 'Bernoulli', function(sim, args) {
             const n = args.dr0 !== undefined ? args.dr0 : 0;
             if (n < 0 || !Number.isInteger(n)) {
-                return { ok: true, result: 0, message: `SlideRule.Bernoulli(${n}) = 0 (invalid index)` };
+                return { ok: true, result: 0, result2: 0, message: `SlideRule.Bernoulli(${n}) = 0 (invalid index)` };
             }
             if (n === 0) {
-                return { ok: true, result: 1, message: `SlideRule.Bernoulli(0) = 1/1` };
+                return { ok: true, result: 1, result2: 1, message: `SlideRule.Bernoulli(0) = 1/1` };
             }
             if (n === 1) {
-                return { ok: true, result: -1, message: `SlideRule.Bernoulli(1) = -1/2` };
+                return { ok: true, result: -1, result2: 2, message: `SlideRule.Bernoulli(1) = -1/2` };
             }
             if (n > 1 && n % 2 === 1) {
-                return { ok: true, result: 0, message: `SlideRule.Bernoulli(${n}) = 0/1` };
+                return { ok: true, result: 0, result2: 1, message: `SlideRule.Bernoulli(${n}) = 0/1` };
             }
 
             const gcd = (a, c) => {
@@ -1397,7 +1397,7 @@ class SystemAbstractions {
             }
 
             const [rn, rd] = simplify(bNum[n], bDen[n]);
-            return { ok: true, result: rn, message: `SlideRule.Bernoulli(${n}) = ${rn}/${rd}` };
+            return { ok: true, result: rn, result2: rd, message: `SlideRule.Bernoulli(${n}) = ${rn}/${rd}` };
         });
     }
 }

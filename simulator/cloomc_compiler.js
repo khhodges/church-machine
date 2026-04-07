@@ -1842,11 +1842,11 @@ class CLOOMCCompiler {
         return (adaVars >= 2) || (arrowAssign >= 1) || (opKeywords >= 2);
     }
 
-    _sourceNeedsMulDiv(parsed) {
+    _sourceNeedsSlideRule(parsed) {
         for (const method of parsed.methods) {
             for (const stmt of method.body) {
                 const text = (stmt.text || '').replace(/×/g, '*').replace(/÷/g, '/');
-                if (/[*\/]/.test(text) || /\b(multiply|divide)\s*\(/i.test(text)) {
+                if (/[*\/]/.test(text) || /\b(multiply|divide|bernoulli)\s*\(/i.test(text) || /\bSlideRule\.\w+\s*\(/i.test(text)) {
                     return true;
                 }
             }
@@ -1861,7 +1861,7 @@ class CLOOMCCompiler {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'symbolic' };
         }
 
-        const needsSlideRule = this._sourceNeedsMulDiv(parsed);
+        const needsSlideRule = this._sourceNeedsSlideRule(parsed);
         if (needsSlideRule && !parsed.capabilities.map(c => c.toUpperCase()).includes('SLIDERULE')) {
             parsed.capabilities.push('SlideRule');
         }
@@ -2032,10 +2032,31 @@ class CLOOMCCompiler {
             manifest.push({ line: 0, instr: `IADD DR${dr}, DR0, #${value}`, comment: `load constant ${value}` });
         };
 
+        const slideRuleMethodIndex = { Multiply: 0, Divide: 1, Sqrt: 2, Mod: 3, Bernoulli: 12 };
+
         const emitExpr = (expr, dstDR, lineNum) => {
             expr = expr.trim();
 
             expr = expr.replace(/×/g, '*').replace(/÷/g, '/');
+
+            const slideRuleMatch = expr.match(/^SlideRule\.(\w+)\s*\(\s*(.+)\s*\)$/);
+            if (slideRuleMatch) {
+                const srMethod = slideRuleMatch[1];
+                const srArgStr = slideRuleMatch[2];
+                const srMethodKey = srMethod.charAt(0).toUpperCase() + srMethod.slice(1);
+                if (slideRuleMethodIndex[srMethodKey] !== undefined) {
+                    const srArgs = srArgStr.split(/\s*,\s*/);
+                    const leftArg = parseExprValue(srArgs[0]);
+                    const leftDR = loadToReg(leftArg, this.DR_TEMP_START, lineNum);
+                    let rightDR = 0;
+                    if (srArgs.length > 1) {
+                        const rightArg = parseExprValue(srArgs[1]);
+                        rightDR = loadToReg(rightArg, this.DR_TEMP_START + 1, lineNum);
+                    }
+                    emitSlideRuleCall(srMethodKey, leftDR, rightDR, dstDR, lineNum, `SlideRule.${srMethodKey}(${srArgStr})`);
+                    return dstDR;
+                }
+            }
 
             const funcMatch = expr.match(/^(multiply|divide|add|subtract|succ|pred|negate|abs|bernoulli)\s*\(\s*(.+)\s*\)$/i);
             if (funcMatch) {
@@ -2151,8 +2172,6 @@ class CLOOMCCompiler {
             }
             return 14;
         };
-
-        const slideRuleMethodIndex = { Multiply: 0, Divide: 1, Sqrt: 2, Mod: 3, Bernoulli: 12 };
 
         let slideRuleCR0Loaded = false;
 
