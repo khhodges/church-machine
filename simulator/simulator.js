@@ -1916,7 +1916,7 @@ class ChurchSimulator {
                     this.dr[0] = result.result;
                 }
                 if (result.result2 !== undefined && typeof result.result2 === 'number') {
-                    const secondReg = encodedDstReg !== null ? Math.min(encodedDstReg + 1, 15) : 1;
+                    const secondReg = encodedDstReg !== null && encodedDstReg < 15 ? encodedDstReg + 1 : 1;
                     this.dr[secondReg] = result.result2;
                 }
             }
