@@ -2092,12 +2092,25 @@ class ChurchSimulator {
         const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
         const isLeafLambda = frame.sz === 0 && this.lambdaActive && this.lambdaCachedFrame;
         if (isLeafLambda) {
+            const cachedReturnPC = this.lambdaReturnPC;
             this.lambdaActive = false;
             this.lambdaCachedFrame = null;
+            this.pc = cachedReturnPC;
+            const cr14 = this.cr[14];
+            if (cr14 && cr14.word0 !== 0) {
+                const cr14Parsed = this.parseGT(cr14.word0);
+                const entry = this.readNSEntry(cr14Parsed.index);
+                if (entry) {
+                    this.physicalPC = entry.word0_location + 1 + cachedReturnPC;
+                }
+            }
+            const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} cleared[${clearedCRs.join(',')}]` : '';
+            const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [leaf — NIA cache, no memory read]${maskDesc}`;
+            this.output += desc + '\n';
+            return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
         }
         const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} cleared[${clearedCRs.join(',')}]` : '';
-        const leafTag = isLeafLambda ? ' [leaf — no memory write]' : '';
-        const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}${leafTag}`;
+        const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}`;
         this.output += desc + '\n';
         this.pc = frame.returnPC;
         return { pc: frame.returnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
