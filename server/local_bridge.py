@@ -162,41 +162,72 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def _generate_self_signed_cert():
-    """Generate a self-signed certificate for HTTPS bridge (mixed-content workaround)."""
+    """Generate a self-signed certificate with SAN for HTTPS bridge."""
     import tempfile, subprocess, os
     cert_dir = tempfile.mkdtemp(prefix='church_bridge_')
     key_path  = os.path.join(cert_dir, 'key.pem')
     cert_path = os.path.join(cert_dir, 'cert.pem')
-    subprocess.run([
+    conf_path = os.path.join(cert_dir, 'openssl.cnf')
+    with open(conf_path, 'w') as f:
+        f.write(
+            "[req]\n"
+            "default_bits = 2048\n"
+            "prompt = no\n"
+            "distinguished_name = dn\n"
+            "x509_extensions = v3_ext\n"
+            "[dn]\n"
+            "CN = penguin.linux.test\n"
+            "[v3_ext]\n"
+            "subjectAltName = DNS:penguin.linux.test, DNS:localhost, IP:127.0.0.1\n"
+            "basicConstraints = CA:FALSE\n"
+            "keyUsage = digitalSignature, keyEncipherment\n"
+            "extendedKeyUsage = serverAuth\n"
+        )
+    result = subprocess.run([
         'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
         '-keyout', key_path, '-out', cert_path,
         '-days', '365', '-nodes',
-        '-subj', '/CN=penguin.linux.test',
-    ], capture_output=True, check=True)
+        '-config', conf_path,
+    ], capture_output=True)
+    if result.returncode != 0:
+        print(f"WARNING: openssl failed: {result.stderr.decode()}")
+        print("Falling back to plain HTTP (HTTPS not available)")
+        return None, None
     return cert_path, key_path
 
 
 if __name__ == '__main__':
-    import ssl as _ssl
-
     cert_path, key_path = _generate_self_signed_cert()
+    use_https = cert_path is not None
 
-    print(f'Church Machine FPGA Bridge (HTTPS)')
+    if use_https:
+        scheme = 'https'
+    else:
+        scheme = 'http'
+
+    print(f'Church Machine FPGA Bridge ({scheme.upper()})')
     print(f'  Serial : {SERIAL_PORT} @ {BAUD} baud')
-    print(f'  HTTPS  : https://0.0.0.0:{HTTP_PORT}')
-    print(f'  ChromeOS bridge URL: https://penguin.linux.test:{HTTP_PORT}')
+    print(f'  {scheme.upper():7s}: {scheme}://0.0.0.0:{HTTP_PORT}')
+    print(f'  ChromeOS bridge URL: {scheme}://penguin.linux.test:{HTTP_PORT}')
     print()
-    print('IMPORTANT — first time setup:')
-    print(f'  1. Open https://penguin.linux.test:{HTTP_PORT}/status in Chrome')
-    print(f'  2. Click "Advanced" → "Proceed to penguin.linux.test (unsafe)"')
-    print(f'  3. You should see {{"ok": true, ...}}')
-    print(f'  4. Now go to the IDE and click "Bridge"')
+    if use_https:
+        print('IMPORTANT — first time setup:')
+        print(f'  1. Open https://penguin.linux.test:{HTTP_PORT}/status in Chrome')
+        print(f'  2. Click "Advanced" → "Proceed to penguin.linux.test (unsafe)"')
+        print(f'  3. You should see {{"ok": true, ...}}')
+        print(f'  4. Now go to the IDE and click "Bridge"')
+    else:
+        print('NOTE: Running in HTTP mode (openssl not available).')
+        print('      Mixed-content blocking may prevent connection from HTTPS IDE pages.')
+        print(f'      Bridge URL: http://penguin.linux.test:{HTTP_PORT}')
     print()
     print('Press Ctrl+C to stop.')
     print()
 
     server = HTTPServer(('0.0.0.0', HTTP_PORT), Handler)
-    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
-    ctx.load_cert_chain(cert_path, key_path)
-    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    if use_https:
+        import ssl as _ssl
+        ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(cert_path, key_path)
+        server.socket = ctx.wrap_socket(server.socket, server_side=True)
     server.serve_forever()
