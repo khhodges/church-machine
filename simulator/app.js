@@ -1536,6 +1536,11 @@ function injectCRCode(logEl) {
     }
 
     log(`Simulator patched — ${newCW} word${newCW !== 1 ? 's' : ''} written.`);
+
+    sim.pc = 0;
+    sim.halted = false;
+    sim.running = false;
+
     updateCRDisplay();
     updateDRDisplay();
     updateFlagsDisplay();
