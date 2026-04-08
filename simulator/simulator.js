@@ -1682,6 +1682,21 @@ class ChurchSimulator {
             frameWord,
         });
         if (callThreadBase) {
+            const threadHdrWord = this.memory[callThreadBase] >>> 0;
+            const threadHdr = this.parseLumpHeader(threadHdrWord);
+            const threadLumpSize = threadHdr.valid ? threadHdr.lumpSize : 256;
+            const threadCC = threadHdr.valid ? threadHdr.cc : 0;
+            const heapEnd = 1 + 16 + threadCC;
+            if (savedSTO < heapEnd || savedSTO - 1 < heapEnd) {
+                this.callStack.pop();
+                this.fault('BOUNDS', `CALL CR${d.crDst}: stack overflow — STO=${savedSTO} would write into heap/DR zone (heapEnd=${heapEnd})`);
+                return null;
+            }
+            if (savedSTO >= threadLumpSize || savedSTO - 1 >= threadLumpSize) {
+                this.callStack.pop();
+                this.fault('BOUNDS', `CALL CR${d.crDst}: stack frame address ${savedSTO} out of thread lump (size=${threadLumpSize})`);
+                return null;
+            }
             this.memory[callThreadBase + savedSTO]     = frameWord;
             this.memory[callThreadBase + savedSTO - 1] = oldCR6GT;
         }
