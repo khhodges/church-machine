@@ -1584,9 +1584,17 @@ async function injectCRCodeToFPGA(logEl) {
     try {
         await TangSerial.patchLump(baseLoc, newWords, msg => log('  ' + msg));
         log('FPGA patched successfully.');
-        return true;
     } catch(e) {
         log('FPGA patch failed: ' + e.message);
+        return false;
+    }
+
+    log('Sending RUN command...');
+    try {
+        await TangSerial.runFPGA(msg => log('  ' + msg));
+        return true;
+    } catch(e) {
+        log('RUN command failed: ' + e.message);
         return false;
     }
 }

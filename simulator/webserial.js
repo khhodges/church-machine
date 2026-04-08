@@ -499,6 +499,26 @@ const TangSerial = (function() {
         return { success: ok, words, rxBytes, rxLen };
     }
 
+    async function runFPGA(onStatus) {
+        const status = onStatus || function() {};
+        if (!isConnected()) {
+            throw new Error('Not connected. Call connect() first.');
+        }
+        const frame = new Uint8Array([0xBE, 0xAA]);
+        status('Sending RUN command (0xBE 0xAA)...');
+        await drainInput();
+        if (_bridgeMode) {
+            const res = await _bTransact(Array.from(frame), 0, 500);
+            if (!res.ok) { status('Bridge error: ' + res.error); return { success: false }; }
+            status('RUN sent — core executing from PC=0.');
+            return { success: true };
+        }
+        const w = port.writable.getWriter();
+        try { await w.write(frame); } finally { w.releaseLock(); }
+        status('RUN sent — core executing from PC=0.');
+        return { success: true };
+    }
+
     return {
         isSupported,
         isConnected,
@@ -508,6 +528,7 @@ const TangSerial = (function() {
         disconnectBridge,
         uploadToFPGA,
         patchLump,
+        runFPGA,
         readBRAM,
         pingFPGA,
         parseReadback,

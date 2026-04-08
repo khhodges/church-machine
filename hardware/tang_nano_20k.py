@@ -504,10 +504,35 @@ class ChurchTangNano20K(Elaboratable):
             with m.State("HALTED"):
                 with m.If(uart_rx.valid & (uart_rx.data == 0xBE)):
                     m.d.sync += patch_rx_phase.eq(0)
-                    m.next = "PATCH_MAGIC2"
+                    m.next = "CMD_MAGIC2"
                 with m.Elif(btn_press):
                     m.d.sync += stepping.eq(1)
                     m.next = "STEP_WAIT"
+
+            with m.State("CMD_MAGIC2"):
+                with m.If(uart_rx.valid):
+                    with m.If(uart_rx.data == 0xEF):
+                        m.next = "PATCH_ADDR_HI"
+                    with m.Elif(uart_rx.data == 0xAA):
+                        m.d.sync += halted.eq(0)
+                        m.d.comb += [
+                            core.free_run_start.eq(1),
+                            core.free_run_nia.eq(0),
+                        ]
+                        m.next = "RUNNING"
+                    with m.Else():
+                        m.next = "HALTED"
+
+            with m.State("RUNNING"):
+                with m.If(core.fault_valid):
+                    m.d.sync += [
+                        halted.eq(1),
+                        step_nia.eq(core.nia),
+                        step_fault.eq(core.fault),
+                        step_had_fault.eq(1),
+                        fault_msg_idx.eq(0),
+                    ]
+                    m.next = "STEP_FAULT_LABEL"
 
             with m.State("STEP_WAIT"):
                 with m.If(step_complete):
@@ -577,12 +602,6 @@ class ChurchTangNano20K(Elaboratable):
             # Words are little-endian (LSB first).
             # CRC-16 is ignored for now (integrity via UART framing).
 
-            with m.State("PATCH_MAGIC2"):
-                with m.If(uart_rx.valid):
-                    with m.If(uart_rx.data == 0xEF):
-                        m.next = "PATCH_ADDR_HI"
-                    with m.Else():
-                        m.next = "HALTED"
 
             with m.State("PATCH_ADDR_HI"):
                 with m.If(uart_rx.valid):
