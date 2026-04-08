@@ -7,25 +7,21 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
   reg \$auto$verilog_backend.cc:2355:dump_module$15  = 0;
   wire \$1 ;
   wire \$10 ;
-  wire [2:0] \$100 ;
-  reg \$101 ;
-  reg [7:0] \$102 ;
-  reg [24:0] \$103 ;
-  reg \$104 ;
-  reg [3:0] \$105 ;
+  reg \$100 ;
+  reg [3:0] \$101 ;
+  reg \$102 ;
+  reg [27:0] \$103 ;
+  reg [3:0] \$104 ;
+  reg [4:0] \$105 ;
   reg \$106 ;
-  reg [27:0] \$107 ;
-  reg [3:0] \$108 ;
-  reg [4:0] \$109 ;
+  reg [2:0] \$107 ;
+  reg \$108 ;
+  reg [31:0] \$109 ;
   wire \$11 ;
-  reg \$110 ;
-  reg [2:0] \$111 ;
-  reg \$112 ;
-  reg [31:0] \$113 ;
-  reg [3:0] \$114 ;
-  reg \$115 ;
-  reg [1:0] \$116 ;
-  reg [1:0] \$117 ;
+  reg [3:0] \$110 ;
+  reg \$111 ;
+  reg [1:0] \$112 ;
+  reg [1:0] \$113 ;
   wire \$12 ;
   wire \$13 ;
   wire \$14 ;
@@ -69,59 +65,59 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
   wire \$49 ;
   wire \$5 ;
   wire \$50 ;
-  wire \$51 ;
-  wire \$52 ;
+  wire [32:0] \$51 ;
+  wire [32:0] \$52 ;
   wire \$53 ;
   wire \$54 ;
-  wire [32:0] \$55 ;
-  wire [32:0] \$56 ;
+  wire \$55 ;
+  wire \$56 ;
   wire \$57 ;
-  wire \$58 ;
+  wire [9:0] \$58 ;
   wire \$59 ;
   wire \$6 ;
   wire \$60 ;
-  wire \$61 ;
-  wire [9:0] \$62 ;
+  wire [25:0] \$61 ;
+  wire \$62 ;
   wire \$63 ;
   wire \$64 ;
-  wire [25:0] \$65 ;
-  wire \$66 ;
+  wire \$65 ;
+  wire [4:0] \$66 ;
   wire \$67 ;
-  wire \$68 ;
+  wire [28:0] \$68 ;
   wire \$69 ;
   wire \$7 ;
-  wire [4:0] \$70 ;
+  wire \$70 ;
   wire \$71 ;
-  wire [28:0] \$72 ;
+  wire [5:0] \$72 ;
   wire \$73 ;
   wire \$74 ;
   wire \$75 ;
-  wire [5:0] \$76 ;
+  wire [3:0] \$76 ;
   wire \$77 ;
   wire \$78 ;
-  wire \$79 ;
+  wire [2:0] \$79 ;
   wire \$8 ;
-  wire [3:0] \$80 ;
+  wire \$80 ;
   wire \$81 ;
   wire \$82 ;
   wire [2:0] \$83 ;
   wire \$84 ;
-  wire \$85 ;
-  wire \$86 ;
-  wire [2:0] \$87 ;
-  wire \$88 ;
-  reg [31:0] \$89 ;
+  reg [31:0] \$85 ;
+  reg \$86 ;
+  reg [2:0] \$87 ;
+  reg [2:0] \$88 ;
+  reg [2:0] \$89 ;
   wire \$9 ;
-  reg \$90 ;
-  reg [2:0] \$91 ;
-  reg [2:0] \$92 ;
-  reg [2:0] \$93 ;
-  reg [2:0] \$94 ;
-  reg [31:0] \$95 ;
-  reg [31:0] \$96 ;
+  reg [2:0] \$90 ;
+  reg [31:0] \$91 ;
+  reg [31:0] \$92 ;
+  reg \$93 ;
+  reg [8:0] \$94 ;
+  reg \$95 ;
+  wire [2:0] \$96 ;
   reg \$97 ;
-  reg [8:0] \$98 ;
-  reg \$99 ;
+  reg [7:0] \$98 ;
+  reg [24:0] \$99 ;
   (* src = "/home/runner/workspace/hardware/boot_rom.py:464" *)
   wire [8:0] addr;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:15" *)
@@ -376,183 +372,179 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
   assign btn_press = btn_prev & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:335" *) \$8 ;
   assign \$9  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) busy;
   assign \$10  = mmio_uart_pending & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) \$9 ;
-  assign \$11  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:385" *) mmio_led0[0];
-  assign \$12  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:370" *) dbg_boot_complete;
-  assign led0 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:385" *) \$11  : \$13 ;
-  assign \$14  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) mmio_led1[0];
-  assign \$15  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) dbg_fault_valid;
-  assign \$16  = dbg_boot_complete & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) \$15 ;
-  assign \$17  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) halted;
-  assign \$18  = \$16  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) \$17 ;
-  assign \$19  = dbg_boot_complete & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) halted;
-  assign \$20  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) dbg_fault_valid;
-  assign \$21  = \$19  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) \$20 ;
-  assign \$22  = \$21  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) heartbeat_blink;
-  assign \$23  = \$18  | (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) \$22 ;
-  assign \$24  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) \$23 ;
-  assign led1 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) \$14  : \$24 ;
-  assign \$25  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:387" *) mmio_led2[0];
-  assign \$26  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:387" *) dbg_fault_valid;
-  assign led2 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:387" *) \$25  : \$26 ;
-  assign \$27  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:388" *) mmio_led3[0];
-  assign \$28  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:388" *) heartbeat_blink;
-  assign led3 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:388" *) \$27  : \$28 ;
-  assign \$29  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) boot_triggered;
-  assign \$30  = \$29  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) init_done;
-  assign \$31  = boot_delay == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:402" *) 4'hf;
-  assign \$32  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:453" *) busy;
-  assign \$33  = banner_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:454" *) 5'h17;
-  assign \$34  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:464" *) busy;
-  assign \$35  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:472" *) busy;
-  assign \$36  = halt_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:473" *) 3'h6;
-  assign \$37  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:500" *) busy;
-  assign \$38  = step_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:501" *) 2'h2;
-  assign \$39  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:512" *) busy;
-  assign \$40  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:525" *) busy;
-  assign \$41  = fault_msg_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:526" *) 2'h2;
-  assign \$42  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:537" *) busy;
-  assign \$43  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) debug_fsm_state;
-  assign \$44  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
-  assign \$45  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
-  assign \$46  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
-  assign \$47  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
-  assign \$48  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
-  assign \$49  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
-  assign \$50  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
-  assign \$51  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
-  assign \$52  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
-  assign \$53  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
-  assign \$54  = timer_lo == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:112" *) 32'd4294967295;
-  assign \$55  = timer_hi + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:113" *) 1'h1;
-  assign \$56  = timer_lo + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:114" *) 1'h1;
-  assign \$57  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:116" *) alarm_fired;
-  assign \$58  = alarm_armed & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:116" *) \$57 ;
-  assign \$59  = timer_lo == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:117" *) alarm_cmp;
-  assign \$60  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:302" *) init_done;
-  assign \$61  = init_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:308" *) 9'h100;
-  assign \$62  = init_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:309" *) 1'h1;
-  assign \$63  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) busy;
-  assign \$64  = mmio_uart_pending & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) \$63 ;
-  assign \$65  = heartbeat_ctr + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:366" *) 1'h1;
-  assign \$66  = heartbeat_ctr == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:367" *) 25'h19bfcbf;
-  assign \$67  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:368" *) heartbeat_blink;
-  assign \$68  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) boot_triggered;
-  assign \$69  = \$68  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) init_done;
-  assign \$70  = boot_delay + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:401" *) 1'h1;
-  assign \$71  = boot_delay == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:402" *) 4'hf;
-  assign \$72  = startup_ctr + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:443" *) 1'h1;
-  assign \$73  = startup_ctr == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:444" *) 27'h4d3f63f;
-  assign \$74  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:453" *) busy;
-  assign \$75  = banner_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:454" *) 5'h17;
-  assign \$76  = banner_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:459" *) 1'h1;
-  assign \$77  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:464" *) busy;
-  assign \$78  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:472" *) busy;
-  assign \$79  = halt_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:473" *) 3'h6;
-  assign \$80  = halt_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:478" *) 1'h1;
-  assign \$81  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:500" *) busy;
-  assign \$82  = step_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:501" *) 2'h2;
-  assign \$83  = step_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:506" *) 1'h1;
-  assign \$84  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:512" *) busy;
-  assign \$85  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:525" *) busy;
-  assign \$86  = fault_msg_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:526" *) 2'h2;
-  assign \$87  = fault_msg_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:531" *) 1'h1;
-  assign \$88  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:537" *) busy;
+  assign \$11  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) dbg_fault_valid;
+  assign \$12  = dbg_boot_complete & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) \$11 ;
+  assign \$13  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) halted;
+  assign \$14  = \$12  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:371" *) \$13 ;
+  assign \$15  = dbg_boot_complete & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) halted;
+  assign \$16  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) dbg_fault_valid;
+  assign \$17  = \$15  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) \$16 ;
+  assign \$18  = \$17  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:372" *) heartbeat_blink;
+  assign \$19  = \$14  | (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:385" *) \$18 ;
+  assign \$20  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:385" *) \$19 ;
+  assign \$21  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:370" *) dbg_boot_complete;
+  assign led0 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:385" *) \$20  : \$22 ;
+  assign \$23  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) halted;
+  assign led1 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:386" *) \$23  : 1'h1;
+  assign \$24  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:387" *) dbg_fault_valid;
+  assign led2 = dbg_boot_complete ? (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:387" *) \$24  : 1'h1;
+  assign led3 = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:388" *) heartbeat_blink;
+  assign \$25  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) boot_triggered;
+  assign \$26  = \$25  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) init_done;
+  assign \$27  = boot_delay == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:402" *) 4'hf;
+  assign \$28  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:453" *) busy;
+  assign \$29  = banner_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:454" *) 5'h17;
+  assign \$30  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:464" *) busy;
+  assign \$31  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:472" *) busy;
+  assign \$32  = halt_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:473" *) 3'h6;
+  assign \$33  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:500" *) busy;
+  assign \$34  = step_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:501" *) 2'h2;
+  assign \$35  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:512" *) busy;
+  assign \$36  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:525" *) busy;
+  assign \$37  = fault_msg_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:526" *) 2'h2;
+  assign \$38  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:537" *) busy;
+  assign \$39  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) debug_fsm_state;
+  assign \$40  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
+  assign \$41  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
+  assign \$42  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
+  assign \$43  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
+  assign \$44  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
+  assign \$45  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
+  assign \$46  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
+  assign \$47  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
+  assign \$48  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
+  assign \$49  = debug_fsm_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
+  assign \$50  = timer_lo == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:112" *) 32'd4294967295;
+  assign \$51  = timer_hi + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:113" *) 1'h1;
+  assign \$52  = timer_lo + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:114" *) 1'h1;
+  assign \$53  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:116" *) alarm_fired;
+  assign \$54  = alarm_armed & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:116" *) \$53 ;
+  assign \$55  = timer_lo == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:117" *) alarm_cmp;
+  assign \$56  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:302" *) init_done;
+  assign \$57  = init_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:308" *) 9'h100;
+  assign \$58  = init_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:309" *) 1'h1;
+  assign \$59  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) busy;
+  assign \$60  = mmio_uart_pending & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:351" *) \$59 ;
+  assign \$61  = heartbeat_ctr + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:366" *) 1'h1;
+  assign \$62  = heartbeat_ctr == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:367" *) 25'h19bfcbf;
+  assign \$63  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:368" *) heartbeat_blink;
+  assign \$64  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) boot_triggered;
+  assign \$65  = \$64  & (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:400" *) init_done;
+  assign \$66  = boot_delay + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:401" *) 1'h1;
+  assign \$67  = boot_delay == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:402" *) 4'hf;
+  assign \$68  = startup_ctr + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:443" *) 1'h1;
+  assign \$69  = startup_ctr == (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:444" *) 27'h4d3f63f;
+  assign \$70  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:453" *) busy;
+  assign \$71  = banner_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:454" *) 5'h17;
+  assign \$72  = banner_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:459" *) 1'h1;
+  assign \$73  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:464" *) busy;
+  assign \$74  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:472" *) busy;
+  assign \$75  = halt_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:473" *) 3'h6;
+  assign \$76  = halt_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:478" *) 1'h1;
+  assign \$77  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:500" *) busy;
+  assign \$78  = step_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:501" *) 2'h2;
+  assign \$79  = step_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:506" *) 1'h1;
+  assign \$80  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:512" *) busy;
+  assign \$81  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:525" *) busy;
+  assign \$82  = fault_msg_idx < (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:526" *) 2'h2;
+  assign \$83  = fault_msg_idx + (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:531" *) 1'h1;
+  assign \$84  = ~ (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:537" *) busy;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:106" *)
   always @(posedge clk)
-    timer_hi <= \$89 ;
+    timer_hi <= \$85 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:105" *)
   always @(posedge clk)
-    timer_lo <= \$56 [31:0];
+    timer_lo <= \$52 [31:0];
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:110" *)
   always @(posedge clk)
-    alarm_fired <= \$90 ;
+    alarm_fired <= \$86 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:101" *)
   always @(posedge clk)
-    mmio_led0 <= \$91 ;
+    mmio_led0 <= \$87 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:101" *)
   always @(posedge clk)
-    mmio_led1 <= \$92 ;
+    mmio_led1 <= \$88 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:101" *)
   always @(posedge clk)
-    mmio_led2 <= \$93 ;
+    mmio_led2 <= \$89 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:101" *)
   always @(posedge clk)
-    mmio_led3 <= \$94 ;
+    mmio_led3 <= \$90 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:107" *)
   always @(posedge clk)
-    tod_epoch <= \$95 ;
+    tod_epoch <= \$91 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:108" *)
   always @(posedge clk)
-    alarm_cmp <= \$96 ;
+    alarm_cmp <= \$92 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:109" *)
   always @(posedge clk)
-    alarm_armed <= \$97 ;
+    alarm_armed <= \$93 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:290" *)
   always @(posedge clk)
-    init_idx <= \$98 ;
+    init_idx <= \$94 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:291" *)
   always @(posedge clk)
-    init_done <= \$99 ;
+    init_done <= \$95 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:316" *)
   always @(posedge clk)
     prev_nia <= imem_addr;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:326" *)
   always @(posedge clk)
-    btn_sync <= \$100 ;
+    btn_sync <= \$96 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:327" *)
   always @(posedge clk)
     btn_prev <= btn_sync[2];
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:340" *)
   always @(posedge clk)
-    mmio_uart_pending <= \$101 ;
+    mmio_uart_pending <= \$97 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:341" *)
   always @(posedge clk)
-    mmio_uart_byte_reg <= \$102 ;
+    mmio_uart_byte_reg <= \$98 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:364" *)
   always @(posedge clk)
-    heartbeat_ctr <= \$103 ;
+    heartbeat_ctr <= \$99 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:365" *)
   always @(posedge clk)
-    heartbeat_blink <= \$104 ;
+    heartbeat_blink <= \$100 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:397" *)
   always @(posedge clk)
-    boot_delay <= \$105 ;
+    boot_delay <= \$101 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:398" *)
   always @(posedge clk)
-    boot_triggered <= \$106 ;
+    boot_triggered <= \$102 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:439" *)
   always @(posedge clk)
-    startup_ctr <= \$107 ;
+    startup_ctr <= \$103 ;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
-    debug_fsm_state <= \$108 ;
+    debug_fsm_state <= \$104 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:412" *)
   always @(posedge clk)
-    banner_idx <= \$109 ;
+    banner_idx <= \$105 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:313" *)
   always @(posedge clk)
-    halted <= \$110 ;
+    halted <= \$106 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:417" *)
   always @(posedge clk)
-    halt_idx <= \$111 ;
+    halt_idx <= \$107 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:314" *)
   always @(posedge clk)
-    stepping <= \$112 ;
+    stepping <= \$108 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:431" *)
   always @(posedge clk)
-    step_nia <= \$113 ;
+    step_nia <= \$109 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:432" *)
   always @(posedge clk)
-    step_fault <= \$114 ;
+    step_fault <= \$110 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:433" *)
   always @(posedge clk)
-    step_had_fault <= \$115 ;
+    step_had_fault <= \$111 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:422" *)
   always @(posedge clk)
-    step_idx <= \$116 ;
+    step_idx <= \$112 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:427" *)
   always @(posedge clk)
-    fault_msg_idx <= \$117 ;
+    fault_msg_idx <= \$113 ;
   (* src = "/home/runner/workspace/hardware/tang_nano_20k.py:67" *)
   \top.boot_rom  boot_rom (
     .clk(clk),
@@ -944,8 +936,8 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
     boot_start = 1'h0;
     (* full_case = 32'd1 *)
-    if (\$30 ) begin
-      if (\$31 ) begin
+    if (\$26 ) begin
+      if (\$27 ) begin
         boot_start = 1'h1;
       end
     end else begin
@@ -961,16 +953,16 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h1:
           /* empty */;
       4'h2:
-          if (\$32 ) begin
-            if (\$33 ) begin
+          if (\$28 ) begin
+            if (\$29 ) begin
               fsm_byte_data = banner_byte;
             end
           end
       4'h3:
           /* empty */;
       4'h4:
-          if (\$35 ) begin
-            if (\$36 ) begin
+          if (\$31 ) begin
+            if (\$32 ) begin
               fsm_byte_data = halt_byte;
             end
           end
@@ -979,16 +971,16 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h6:
           /* empty */;
       4'h7:
-          if (\$37 ) begin
-            if (\$38 ) begin
+          if (\$33 ) begin
+            if (\$34 ) begin
               fsm_byte_data = step_byte;
             end
           end
       4'h8:
           /* empty */;
       4'h9:
-          if (\$40 ) begin
-            if (\$41 ) begin
+          if (\$36 ) begin
+            if (\$37 ) begin
               fsm_byte_data = fault_byte;
             end
           end
@@ -1003,16 +995,16 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h1:
           /* empty */;
       4'h2:
-          if (\$32 ) begin
-            if (\$33 ) begin
+          if (\$28 ) begin
+            if (\$29 ) begin
               fsm_send_byte = 1'h1;
             end
           end
       4'h3:
           /* empty */;
       4'h4:
-          if (\$35 ) begin
-            if (\$36 ) begin
+          if (\$31 ) begin
+            if (\$32 ) begin
               fsm_send_byte = 1'h1;
             end
           end
@@ -1021,16 +1013,16 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h6:
           /* empty */;
       4'h7:
-          if (\$37 ) begin
-            if (\$38 ) begin
+          if (\$33 ) begin
+            if (\$34 ) begin
               fsm_send_byte = 1'h1;
             end
           end
       4'h8:
           /* empty */;
       4'h9:
-          if (\$40 ) begin
-            if (\$41 ) begin
+          if (\$36 ) begin
+            if (\$37 ) begin
               fsm_send_byte = 1'h1;
             end
           end
@@ -1047,7 +1039,7 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h2:
           /* empty */;
       4'h3:
-          if (\$34 ) begin
+          if (\$30 ) begin
             \data$95  = imem_addr;
           end
       4'h4:
@@ -1059,13 +1051,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h7:
           /* empty */;
       4'h8:
-          if (\$39 ) begin
+          if (\$35 ) begin
             \data$95  = step_nia;
           end
       4'h9:
           /* empty */;
       4'ha:
-          if (\$42 ) begin
+          if (\$38 ) begin
             \data$95  = fault_word;
           end
     endcase
@@ -1081,7 +1073,7 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h2:
           /* empty */;
       4'h3:
-          if (\$34 ) begin
+          if (\$30 ) begin
             send = 1'h1;
           end
       4'h4:
@@ -1093,13 +1085,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h7:
           /* empty */;
       4'h8:
-          if (\$39 ) begin
+          if (\$35 ) begin
             send = 1'h1;
           end
       4'h9:
           /* empty */;
       4'ha:
-          if (\$42 ) begin
+          if (\$38 ) begin
             send = 1'h1;
           end
     endcase
@@ -1129,24 +1121,24 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h9:
           /* empty */;
       4'ha:
-          if (\$42 ) begin
+          if (\$38 ) begin
             fault_word = { 28'h0000000, step_fault };
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$89  = timer_hi;
-    if (\$54 ) begin
-      \$89  = \$55 [31:0];
+    \$85  = timer_hi;
+    if (\$50 ) begin
+      \$85  = \$51 [31:0];
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$90  = alarm_fired;
-    if (\$58 ) begin
-      if (\$59 ) begin
-        \$90  = 1'h1;
+    \$86  = alarm_fired;
+    if (\$54 ) begin
+      if (\$55 ) begin
+        \$86  = 1'h1;
       end
     end
     if (is_mmio_write) begin
@@ -1167,36 +1159,36 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
             /* empty */;
         4'hf:
             if (dmem_wr_data[1]) begin
-              \$90  = 1'h0;
+              \$86  = 1'h0;
             end
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$91  = mmio_led0;
+    \$87  = mmio_led0;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
-            \$91  = dmem_wr_data[2:0];
+            \$87  = dmem_wr_data[2:0];
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$92  = mmio_led1;
+    \$88  = mmio_led1;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
             /* empty */;
         4'h1:
-            \$92  = dmem_wr_data[2:0];
+            \$88  = dmem_wr_data[2:0];
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$93  = mmio_led2;
+    \$89  = mmio_led2;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
@@ -1204,13 +1196,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
         4'h1:
             /* empty */;
         4'h2:
-            \$93  = dmem_wr_data[2:0];
+            \$89  = dmem_wr_data[2:0];
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$94  = mmio_led3;
+    \$90  = mmio_led3;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
@@ -1220,13 +1212,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
         4'h2:
             /* empty */;
         4'h3:
-            \$94  = dmem_wr_data[2:0];
+            \$90  = dmem_wr_data[2:0];
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$95  = tod_epoch;
+    \$91  = tod_epoch;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
@@ -1240,13 +1232,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
         4'h5:
             /* empty */;
         4'hd:
-            \$95  = dmem_wr_data;
+            \$91  = dmem_wr_data;
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$96  = alarm_cmp;
+    \$92  = alarm_cmp;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
@@ -1262,13 +1254,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
         4'hd:
             /* empty */;
         4'he:
-            \$96  = dmem_wr_data;
+            \$92  = dmem_wr_data;
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$97  = alarm_armed;
+    \$93  = alarm_armed;
     if (is_mmio_write) begin
       casez (dmem_addr[5:2])
         4'h0:
@@ -1287,207 +1279,207 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
             /* empty */;
         4'hf:
             if (dmem_wr_data[0]) begin
-              \$97  = 1'h1;
+              \$93  = 1'h1;
             end
       endcase
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$98  = init_idx;
-    if (\$60 ) begin
-      if (\$61 ) begin
-        \$98  = \$62 [8:0];
+    \$94  = init_idx;
+    if (\$56 ) begin
+      if (\$57 ) begin
+        \$94  = \$58 [8:0];
       end
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$99  = init_done;
-    if (\$60 ) begin
+    \$95  = init_done;
+    if (\$56 ) begin
       (* full_case = 32'd1 *)
-      if (\$61 ) begin
+      if (\$57 ) begin
       end else begin
-        \$99  = 1'h1;
+        \$95  = 1'h1;
       end
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$101  = mmio_uart_pending;
+    \$97  = mmio_uart_pending;
     if (mmio_uart_tx_wr) begin
-      \$101  = 1'h1;
+      \$97  = 1'h1;
     end
     if (fsm_send_byte) begin
-    end else if (\$64 ) begin
-      \$101  = 1'h0;
+    end else if (\$60 ) begin
+      \$97  = 1'h0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$102  = mmio_uart_byte_reg;
+    \$98  = mmio_uart_byte_reg;
     if (mmio_uart_tx_wr) begin
-      \$102  = mmio_uart_tx_data;
+      \$98  = mmio_uart_tx_data;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$103  = \$65 [24:0];
-    if (\$66 ) begin
-      \$103  = 25'h0000000;
+    \$99  = \$61 [24:0];
+    if (\$62 ) begin
+      \$99  = 25'h0000000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$104  = heartbeat_blink;
-    if (\$66 ) begin
-      \$104  = \$67 ;
+    \$100  = heartbeat_blink;
+    if (\$62 ) begin
+      \$100  = \$63 ;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$105  = boot_delay;
-    if (\$69 ) begin
-      \$105  = \$70 [3:0];
+    \$101  = boot_delay;
+    if (\$65 ) begin
+      \$101  = \$66 [3:0];
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$106  = boot_triggered;
-    if (\$69 ) begin
-      if (\$71 ) begin
-        \$106  = 1'h1;
+    \$102  = boot_triggered;
+    if (\$65 ) begin
+      if (\$67 ) begin
+        \$102  = 1'h1;
       end
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$107  = startup_ctr;
+    \$103  = startup_ctr;
     casez (debug_fsm_state)
       4'h0:
-          \$107  = \$72 [27:0];
+          \$103  = \$68 [27:0];
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$108  = debug_fsm_state;
+    \$104  = debug_fsm_state;
     casez (debug_fsm_state)
       4'h0:
+          if (\$69 ) begin
+            \$104  = 4'h1;
+          end
+      4'h1:
+          if (dbg_boot_complete) begin
+            \$104  = 4'h2;
+          end
+      4'h2:
+          if (\$70 ) begin
+            (* full_case = 32'd1 *)
+            if (\$71 ) begin
+            end else begin
+              \$104  = 4'h3;
+            end
+          end
+      4'h3:
           if (\$73 ) begin
-            \$108  = 4'h1;
+            \$104  = 4'h4;
           end
-      4'h1:
-          if (dbg_boot_complete) begin
-            \$108  = 4'h2;
-          end
-      4'h2:
+      4'h4:
           if (\$74 ) begin
             (* full_case = 32'd1 *)
             if (\$75 ) begin
             end else begin
-              \$108  = 4'h3;
+              \$104  = 4'h5;
             end
           end
-      4'h3:
+      4'h5:
+          if (btn_press) begin
+            \$104  = 4'h6;
+          end
+      4'h6:
+          if (step_complete) begin
+            \$104  = 4'h7;
+          end
+      4'h7:
           if (\$77 ) begin
-            \$108  = 4'h4;
-          end
-      4'h4:
-          if (\$78 ) begin
             (* full_case = 32'd1 *)
-            if (\$79 ) begin
+            if (\$78 ) begin
             end else begin
-              \$108  = 4'h5;
+              \$104  = 4'h8;
             end
           end
-      4'h5:
-          if (btn_press) begin
-            \$108  = 4'h6;
+      4'h8:
+          if (\$80 ) begin
+            (* full_case = 32'd1 *)
+            if (step_had_fault) begin
+              \$104  = 4'h9;
+            end else begin
+              \$104  = 4'h4;
+            end
           end
-      4'h6:
-          if (step_complete) begin
-            \$108  = 4'h7;
-          end
-      4'h7:
+      4'h9:
           if (\$81 ) begin
             (* full_case = 32'd1 *)
             if (\$82 ) begin
             end else begin
-              \$108  = 4'h8;
-            end
-          end
-      4'h8:
-          if (\$84 ) begin
-            (* full_case = 32'd1 *)
-            if (step_had_fault) begin
-              \$108  = 4'h9;
-            end else begin
-              \$108  = 4'h4;
-            end
-          end
-      4'h9:
-          if (\$85 ) begin
-            (* full_case = 32'd1 *)
-            if (\$86 ) begin
-            end else begin
-              \$108  = 4'ha;
+              \$104  = 4'ha;
             end
           end
       4'ha:
-          if (\$88 ) begin
-            \$108  = 4'h4;
+          if (\$84 ) begin
+            \$104  = 4'h4;
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$109  = banner_idx;
+    \$105  = banner_idx;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
       4'h1:
           if (dbg_boot_complete) begin
-            \$109  = 5'h00;
+            \$105  = 5'h00;
           end
       4'h2:
+          if (\$70 ) begin
+            if (\$71 ) begin
+              \$105  = \$72 [4:0];
+            end
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    \$106  = halted;
+    casez (debug_fsm_state)
+      4'h0:
+          /* empty */;
+      4'h1:
+          if (dbg_boot_complete) begin
+            \$106  = 1'h1;
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    \$107  = halt_idx;
+    casez (debug_fsm_state)
+      4'h0:
+          /* empty */;
+      4'h1:
+          /* empty */;
+      4'h2:
+          /* empty */;
+      4'h3:
+          /* empty */;
+      4'h4:
           if (\$74 ) begin
-            if (\$75 ) begin
-              \$109  = \$76 [4:0];
-            end
-          end
-    endcase
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$110  = halted;
-    casez (debug_fsm_state)
-      4'h0:
-          /* empty */;
-      4'h1:
-          if (dbg_boot_complete) begin
-            \$110  = 1'h1;
-          end
-    endcase
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$111  = halt_idx;
-    casez (debug_fsm_state)
-      4'h0:
-          /* empty */;
-      4'h1:
-          /* empty */;
-      4'h2:
-          /* empty */;
-      4'h3:
-          /* empty */;
-      4'h4:
-          if (\$78 ) begin
             (* full_case = 32'd1 *)
-            if (\$79 ) begin
-              \$111  = \$80 [2:0];
+            if (\$75 ) begin
+              \$107  = \$76 [2:0];
             end else begin
-              \$111  = 3'h0;
+              \$107  = 3'h0;
             end
           end
       4'h5:
@@ -1497,24 +1489,24 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h7:
           /* empty */;
       4'h8:
-          if (\$84 ) begin
+          if (\$80 ) begin
             (* full_case = 32'd1 *)
             if (step_had_fault) begin
             end else begin
-              \$111  = 3'h0;
+              \$107  = 3'h0;
             end
           end
       4'h9:
           /* empty */;
       4'ha:
-          if (\$88 ) begin
-            \$111  = 3'h0;
+          if (\$84 ) begin
+            \$107  = 3'h0;
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$112  = stepping;
+    \$108  = stepping;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1528,17 +1520,17 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
           /* empty */;
       4'h5:
           if (btn_press) begin
-            \$112  = 1'h1;
+            \$108  = 1'h1;
           end
       4'h6:
           if (step_complete) begin
-            \$112  = 1'h0;
+            \$108  = 1'h0;
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$113  = step_nia;
+    \$109  = step_nia;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1554,13 +1546,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
           /* empty */;
       4'h6:
           if (step_complete) begin
-            \$113  = imem_addr;
+            \$109  = imem_addr;
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$114  = step_fault;
+    \$110  = step_fault;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1576,13 +1568,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
           /* empty */;
       4'h6:
           if (step_complete) begin
-            \$114  = fault[3:0];
+            \$110  = fault[3:0];
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$115  = step_had_fault;
+    \$111  = step_had_fault;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1598,13 +1590,13 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
           /* empty */;
       4'h6:
           if (step_complete) begin
-            \$115  = dbg_fault_valid;
+            \$111  = dbg_fault_valid;
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$116  = step_idx;
+    \$112  = step_idx;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1620,22 +1612,22 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
           /* empty */;
       4'h6:
           if (step_complete) begin
-            \$116  = 2'h0;
+            \$112  = 2'h0;
           end
       4'h7:
-          if (\$81 ) begin
+          if (\$77 ) begin
             (* full_case = 32'd1 *)
-            if (\$82 ) begin
-              \$116  = \$83 [1:0];
+            if (\$78 ) begin
+              \$112  = \$79 [1:0];
             end else begin
-              \$116  = 2'h0;
+              \$112  = 2'h0;
             end
           end
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
-    \$117  = fault_msg_idx;
+    \$113  = fault_msg_idx;
     casez (debug_fsm_state)
       4'h0:
           /* empty */;
@@ -1654,18 +1646,18 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
       4'h7:
           /* empty */;
       4'h8:
-          if (\$84 ) begin
+          if (\$80 ) begin
             if (step_had_fault) begin
-              \$117  = 2'h0;
+              \$113  = 2'h0;
             end
           end
       4'h9:
-          if (\$85 ) begin
+          if (\$81 ) begin
             (* full_case = 32'd1 *)
-            if (\$86 ) begin
-              \$117  = \$87 [1:0];
+            if (\$82 ) begin
+              \$113  = \$83 [1:0];
             end else begin
-              \$117  = 2'h0;
+              \$113  = 2'h0;
             end
           end
     endcase
@@ -1701,12 +1693,12 @@ module top(clk, push_button, uart_tx, led0, led1, led2, led3, uart_rx);
   assign \clist_wr_data.gt_type  = clist_wr_data[24:23];
   assign \clist_wr_data.perms  = clist_wr_data[30:25];
   assign \clist_wr_data.b_flag  = clist_wr_data[31];
-  assign \$100 [2] = btn_sync[1];
-  assign \$100 [1] = btn_sync[0];
-  assign \$100 [0] = push_button;
+  assign \$96 [2] = btn_sync[1];
+  assign \$96 [1] = btn_sync[0];
+  assign \$96 [0] = push_button;
   assign any_ns_access = 1'h0;
   assign any_clist_access = 1'h0;
-  assign \$13  = dbg_boot_complete;
+  assign \$22  = dbg_boot_complete;
 endmodule
 
 (* src = "/home/runner/workspace/hardware/boot_rom.py:468" *)
@@ -6716,7 +6708,7 @@ module \top.core (clk, imem_valid, boot_complete, perm_gt_sig, boot_start, \faul
     .mload_src(mload_cr_src),
     .mload_start(mload_start),
     .nia_computed(\nia_value$464 ),
-    .\port$3247$0 (instruction[18:0]),
+    .\port$3243$0 (instruction[18:0]),
     .thread_base(cr12_thread[63:32])
   );
   (* src = "/home/runner/workspace/hardware/core.py:141" *)
@@ -6769,7 +6761,7 @@ module \top.core (clk, imem_valid, boot_complete, perm_gt_sig, boot_start, \faul
     .dr_wr_en(dr_wr_en),
     .fault(fault),
     .fault_type(\fault_type$370 ),
-    .\port$3247$0 (instruction[22:0]),
+    .\port$3243$0 (instruction[22:0]),
     .start(dread_start_sig)
   );
   (* src = "/home/runner/workspace/hardware/core.py:140" *)
@@ -6785,7 +6777,7 @@ module \top.core (clk, imem_valid, boot_complete, perm_gt_sig, boot_start, \faul
     .dr_rd_data(dr_rd_data),
     .fault(\fault$358 ),
     .fault_type(\fault_type$371 ),
-    .\port$3247$0 (instruction[22:0]),
+    .\port$3243$0 (instruction[22:0]),
     .start(dwrite_start_sig)
   );
   (* src = "/home/runner/workspace/hardware/core.py:113" *)
@@ -6800,7 +6792,7 @@ module \top.core (clk, imem_valid, boot_complete, perm_gt_sig, boot_start, \faul
     .mload_fault(mload_fault),
     .mload_m_elevated(\mload_m_elevated$405 ),
     .mload_start(\mload_start$399 ),
-    .\port$3247$0 (instruction[22:0])
+    .\port$3243$0 (instruction[22:0])
   );
   (* src = "/home/runner/workspace/hardware/core.py:142" *)
   \top.core.u_outform  u_outform (
@@ -6926,7 +6918,7 @@ module \top.core (clk, imem_valid, boot_complete, perm_gt_sig, boot_start, \faul
     .mem_wr_addr(\mem_wr_addr$440 ),
     .mem_wr_data(\mem_wr_data$441 ),
     .mem_wr_en(\mem_wr_en$427 ),
-    .\port$3247$0 (instruction[22:0]),
+    .\port$3243$0 (instruction[22:0]),
     .save_busy(save_busy),
     .save_fault(save_fault),
     .save_start(save_start_sig)
@@ -8480,7 +8472,7 @@ endmodule
 (* src = "/home/runner/workspace/hardware/call.py:93" *)
 (* generator = "Amaranth" *)
 module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mload_index, code_lo_out, code_hi_out, call_busy, call_complete, mload_fault, mload_done, caller_pc, cr5_heap, thread_base, cr14_code, cr15_namespace, nia_computed, cr_null_mask, cr_b_clear_mask, cr_rd_addr, cr_wr_addr
-, cr_wr_data, cr_wr_en, mem_rd_addr, mem_rd_en, mem_wr_addr, mem_wr_data, mem_wr_en, call_fault, fault_type, mload_start, mload_fault_type, \port$3247$0 , mem_rd_data);
+, cr_wr_data, cr_wr_en, mem_rd_addr, mem_rd_en, mem_wr_addr, mem_wr_data, mem_wr_en, call_fault, fault_type, mload_start, mload_fault_type, \port$3243$0 , mem_rd_data);
   reg \$auto$verilog_backend.cc:2355:dump_module$18  = 0;
   wire [4:0] \$1 ;
   wire [32:0] \$10 ;
@@ -8931,8 +8923,8 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
   wire [31:0] ns_base_from_cr14;
   (* src = "/home/runner/workspace/hardware/call.py:99" *)
   reg phase = 1'h0;
-  input [18:0] \port$3247$0 ;
-  wire [18:0] \port$3247$0 ;
+  input [18:0] \port$3243$0 ;
+  wire [18:0] \port$3243$0 ;
   (* src = "/home/runner/workspace/hardware/call.py:22" *)
   wire [31:0] saved_cr5_gt;
   (* src = "/home/runner/workspace/hardware/call.py:22" *)
@@ -9078,10 +9070,10 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
   always @(posedge clk)
     sp_latched <= \$75 ;
   assign \$8  = caller_pc + (* src = "/home/runner/workspace/hardware/call.py:146" *) 1'h1;
-  assign src_in_range = \port$3247$0 [18:15] <= (* src = "/home/runner/workspace/hardware/call.py:157" *) 4'hb;
-  assign mload_src = phase ? (* src = "/home/runner/workspace/hardware/call.py:167" *) 4'h6 : \port$3247$0 [18:15];
+  assign src_in_range = \port$3243$0 [18:15] <= (* src = "/home/runner/workspace/hardware/call.py:157" *) 4'hb;
+  assign mload_src = phase ? (* src = "/home/runner/workspace/hardware/call.py:167" *) 4'h6 : \port$3243$0 [18:15];
   assign mload_dst = phase ? (* src = "/home/runner/workspace/hardware/call.py:168" *) 4'he : 4'h6;
-  assign mload_index = phase ? (* src = "/home/runner/workspace/hardware/call.py:169" *) 16'h0000 : { 1'h0, \port$3247$0 [14:0] };
+  assign mload_index = phase ? (* src = "/home/runner/workspace/hardware/call.py:169" *) 16'h0000 : { 1'h0, \port$3243$0 [14:0] };
   assign \$9  = cr14_code[15:0] * (* src = "/home/runner/workspace/hardware/call.py:204" *) 4'hc;
   assign \$10  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/hardware/call.py:204" *) \$9 ;
   assign \$13  = cr14_latched[63:32] + (* src = "/home/runner/workspace/hardware/call.py:226" *) 3'h4;
@@ -9166,9 +9158,9 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
       5'h00:
           /* empty */;
       5'h01:
-          cr_rd_addr = \port$3247$0 [18:15];
+          cr_rd_addr = \port$3243$0 [18:15];
       5'h03:
-          cr_rd_addr = \port$3247$0 [18:15];
+          cr_rd_addr = \port$3243$0 [18:15];
       5'h04:
           /* empty */;
       5'h05:
@@ -9671,7 +9663,7 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
     casez (call_state)
       5'h00:
           if (call_start) begin
-            \$63  = { 1'h0, \port$3247$0 [14:0] };
+            \$63  = { 1'h0, \port$3243$0 [14:0] };
           end
     endcase
   end
@@ -10036,8 +10028,8 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
   assign sp_max = \$4 [14:0];
   assign sp_min = \$7 [14:0];
   assign frame_word = { 1'h1, \$8 [14:0], sp_latched[15:0] };
-  assign cr_src = \port$3247$0 [18:15];
-  assign index = { 1'h0, \port$3247$0 [14:0] };
+  assign cr_src = \port$3243$0 [18:15];
+  assign index = { 1'h0, \port$3243$0 [14:0] };
   assign sub_start_reg = mload_start;
   assign mload_cr_src = mload_src;
   assign mload_cr_dst = mload_dst;
@@ -10060,7 +10052,7 @@ module \top.core.u_call (clk, call_start, cr_rd_data, mload_src, mload_dst, mloa
   assign nia_set = call_complete;
   assign nia_value = cr14_with_m[63:32];
   
-  assign mask = { 1'h0, \port$3247$0 [14:0] };
+  assign mask = { 1'h0, \port$3243$0 [14:0] };
   assign mem_rd_valid = 1'h1;
   assign code_lo_out = \$19 [31:0];
   assign code_hi_out = \$22 [31:0];
@@ -12540,7 +12532,7 @@ endmodule
 
 (* src = "/home/runner/workspace/hardware/dread.py:52" *)
 (* generator = "Amaranth" *)
-module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault_type, dmem_addr, dmem_rd_en, dr_wr_addr, dr_wr_data, dr_wr_en, \port$3247$0 , dmem_rd_data);
+module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault_type, dmem_addr, dmem_rd_en, dr_wr_addr, dr_wr_data, dr_wr_en, \port$3243$0 , dmem_rd_data);
   reg \$auto$verilog_backend.cc:2355:dump_module$22  = 0;
   wire \$1 ;
   reg [3:0] \$10 ;
@@ -12635,14 +12627,14 @@ module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault
   wire in_bounds;
   (* src = "/home/runner/workspace/hardware/dread.py:65" *)
   wire [15:0] limit;
-  input [22:0] \port$3247$0 ;
-  wire [22:0] \port$3247$0 ;
+  input [22:0] \port$3243$0 ;
+  wire [22:0] \port$3243$0 ;
   (* src = "/home/runner/workspace/hardware/dread.py:29" *)
   input start;
   wire start;
   assign gt_null = ! (* src = "/home/runner/workspace/hardware/dread.py:69" *) cr_rd_data[31:0];
   assign in_bounds = imm_reg <= (* src = "/home/runner/workspace/hardware/dread.py:72" *) cr_rd_data[79:64];
-  assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dread.py:75" *) cr_src_reg : \port$3247$0 [18:15];
+  assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dread.py:75" *) cr_src_reg : \port$3243$0 [18:15];
   assign \$1  = ~ (* src = "/home/runner/workspace/hardware/dread.py:92" *) cr_rd_data[25];
   assign \$2  = ~ (* src = "/home/runner/workspace/hardware/dread.py:95" *) in_bounds;
   assign \$3  = | (* src = "/home/runner/workspace/hardware/dread.py:109" *) dr_dst_reg;
@@ -12789,7 +12781,7 @@ module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault
     casez (dread_fsm_state)
       2'h0:
           if (start) begin
-            \$10  = \port$3247$0 [18:15];
+            \$10  = \port$3243$0 [18:15];
           end
     endcase
   end
@@ -12799,7 +12791,7 @@ module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault
     casez (dread_fsm_state)
       2'h0:
           if (start) begin
-            \$11  = \port$3247$0 [22:19];
+            \$11  = \port$3243$0 [22:19];
           end
     endcase
   end
@@ -12809,7 +12801,7 @@ module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault
     casez (dread_fsm_state)
       2'h0:
           if (start) begin
-            \$12  = \port$3247$0 [14:0];
+            \$12  = \port$3243$0 [14:0];
           end
     endcase
   end
@@ -12854,10 +12846,10 @@ module \top.core.u_dread (clk, start, cr_rd_data, cr_rd_addr, busy, fault, fault
   end
   assign has_r = cr_rd_data[25];
   assign limit = cr_rd_data[79:64];
-  assign cr_src = \port$3247$0 [18:15];
+  assign cr_src = \port$3243$0 [18:15];
   
-  assign dr_dst = \port$3247$0 [22:19];
-  assign imm = \port$3247$0 [14:0];
+  assign dr_dst = \port$3243$0 [22:19];
+  assign imm = \port$3243$0 [14:0];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
   assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
@@ -12871,7 +12863,7 @@ endmodule
 
 (* src = "/home/runner/workspace/hardware/dwrite.py:50" *)
 (* generator = "Amaranth" *)
-module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, busy, fault, fault_type, dmem_addr, dmem_wr_data, dmem_wr_en, \port$3247$0 , start);
+module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, busy, fault, fault_type, dmem_addr, dmem_wr_data, dmem_wr_en, \port$3243$0 , start);
   reg \$auto$verilog_backend.cc:2355:dump_module$23  = 0;
   wire \$1 ;
   reg [3:0] \$10 ;
@@ -12965,15 +12957,15 @@ module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, 
   wire in_bounds;
   (* src = "/home/runner/workspace/hardware/dwrite.py:64" *)
   wire [15:0] limit;
-  input [22:0] \port$3247$0 ;
-  wire [22:0] \port$3247$0 ;
+  input [22:0] \port$3243$0 ;
+  wire [22:0] \port$3243$0 ;
   (* src = "/home/runner/workspace/hardware/dwrite.py:28" *)
   input start;
   wire start;
   assign gt_null = ! (* src = "/home/runner/workspace/hardware/dwrite.py:68" *) cr_rd_data[31:0];
   assign in_bounds = imm_reg <= (* src = "/home/runner/workspace/hardware/dwrite.py:71" *) cr_rd_data[79:64];
-  assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:75" *) cr_src_reg : \port$3247$0 [18:15];
-  assign dr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:76" *) dr_src_reg : \port$3247$0 [22:19];
+  assign cr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:75" *) cr_src_reg : \port$3243$0 [18:15];
+  assign dr_rd_addr = busy ? (* src = "/home/runner/workspace/hardware/dwrite.py:76" *) dr_src_reg : \port$3243$0 [22:19];
   assign \$1  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:94" *) cr_rd_data[26];
   assign \$2  = ~ (* src = "/home/runner/workspace/hardware/dwrite.py:97" *) in_bounds;
   assign \$3  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) dwrite_fsm_state;
@@ -13098,7 +13090,7 @@ module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, 
     casez (dwrite_fsm_state)
       2'h0:
           if (start) begin
-            \$9  = \port$3247$0 [18:15];
+            \$9  = \port$3243$0 [18:15];
           end
     endcase
   end
@@ -13108,7 +13100,7 @@ module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, 
     casez (dwrite_fsm_state)
       2'h0:
           if (start) begin
-            \$10  = \port$3247$0 [22:19];
+            \$10  = \port$3243$0 [22:19];
           end
     endcase
   end
@@ -13118,7 +13110,7 @@ module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, 
     casez (dwrite_fsm_state)
       2'h0:
           if (start) begin
-            \$11  = \port$3247$0 [14:0];
+            \$11  = \port$3243$0 [14:0];
           end
     endcase
   end
@@ -13179,10 +13171,10 @@ module \top.core.u_dwrite (clk, cr_rd_data, dr_rd_data, cr_rd_addr, dr_rd_addr, 
   end
   assign has_w = cr_rd_data[26];
   assign limit = cr_rd_data[79:64];
-  assign cr_src = \port$3247$0 [18:15];
-  assign dr_src = \port$3247$0 [22:19];
+  assign cr_src = \port$3243$0 [18:15];
+  assign dr_src = \port$3243$0 [22:19];
   
-  assign imm = \port$3247$0 [14:0];
+  assign imm = \port$3243$0 [14:0];
   assign \cr_rd_data.word0_gt  = cr_rd_data[31:0];
   assign \cr_rd_data.word0_gt.slot_id  = cr_rd_data[15:0];
   assign \cr_rd_data.word0_gt.gt_seq  = cr_rd_data[22:16];
@@ -13196,7 +13188,7 @@ endmodule
 
 (* src = "/home/runner/workspace/hardware/load.py:31" *)
 (* generator = "Amaranth" *)
-module \top.core.u_load (clk, mload_m_elevated, load_busy, load_fault, mload_busy, mload_fault, mload_done, mload_start, fault_type, \port$3247$0 , load_start);
+module \top.core.u_load (clk, mload_m_elevated, load_busy, load_fault, mload_busy, mload_fault, mload_done, mload_start, fault_type, \port$3243$0 , load_start);
   reg \$auto$verilog_backend.cc:2355:dump_module$24  = 0;
   wire \$1 ;
   wire \$2 ;
@@ -13255,8 +13247,8 @@ module \top.core.u_load (clk, mload_m_elevated, load_busy, load_fault, mload_bus
   (* src = "/home/runner/workspace/hardware/load.py:17" *)
   output mload_start;
   reg mload_start;
-  input [22:0] \port$3247$0 ;
-  wire [22:0] \port$3247$0 ;
+  input [22:0] \port$3243$0 ;
+  wire [22:0] \port$3243$0 ;
   assign load_fault = \$4  & (* src = "/home/runner/workspace/hardware/load.py:60" *) mload_fault;
   assign \$1  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) load_wrapper_state;
   assign \$2  = load_wrapper_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
@@ -13266,7 +13258,7 @@ module \top.core.u_load (clk, mload_m_elevated, load_busy, load_fault, mload_bus
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
     load_wrapper_state <= \$6 ;
-  assign mload_m_elevated = \port$3247$0 [18:15] == (* src = "/home/runner/workspace/hardware/load.py:39" *) 3'h6;
+  assign mload_m_elevated = \port$3243$0 [18:15] == (* src = "/home/runner/workspace/hardware/load.py:39" *) 3'h6;
   assign load_busy = ~ (* src = "/home/runner/workspace/hardware/load.py:58" *) \$1 ;
   assign load_complete = \$4  & (* src = "/home/runner/workspace/hardware/load.py:59" *) mload_done;
   always @* begin
@@ -13302,12 +13294,12 @@ module \top.core.u_load (clk, mload_m_elevated, load_busy, load_fault, mload_bus
           end
     endcase
   end
-  assign mload_cr_src = \port$3247$0 [18:15];
-  assign cr_src = \port$3247$0 [18:15];
-  assign mload_cr_dst = \port$3247$0 [22:19];
-  assign cr_dst = \port$3247$0 [22:19];
-  assign mload_index = { 1'h0, \port$3247$0 [14:0] };
-  assign index = { 1'h0, \port$3247$0 [14:0] };
+  assign mload_cr_src = \port$3243$0 [18:15];
+  assign cr_src = \port$3243$0 [18:15];
+  assign mload_cr_dst = \port$3243$0 [22:19];
+  assign cr_dst = \port$3243$0 [22:19];
+  assign mload_index = { 1'h0, \port$3243$0 [14:0] };
+  assign index = { 1'h0, \port$3243$0 [14:0] };
   assign mload_direct = 1'h0;
   assign mload_direct_gt = 32'd0;
   assign mload_fault_type = fault_type;
@@ -17890,7 +17882,7 @@ endmodule
 
 (* src = "/home/runner/workspace/hardware/save.py:36" *)
 (* generator = "Amaranth" *)
-module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace, cr_rd_addr, save_fault, fault_type, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, \port$3247$0 , mem_rd_data);
+module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace, cr_rd_addr, save_fault, fault_type, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, \port$3243$0 , mem_rd_data);
   reg \$auto$verilog_backend.cc:2355:dump_module$29  = 0;
   wire \$1 ;
   reg \$10 ;
@@ -18049,8 +18041,8 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
   wire mem_wr_en;
   (* src = "/home/runner/workspace/hardware/msave.py:23" *)
   wire \mem_wr_en$23 ;
-  input [22:0] \port$3247$0 ;
-  wire [22:0] \port$3247$0 ;
+  input [22:0] \port$3243$0 ;
+  wire [22:0] \port$3243$0 ;
   (* src = "/home/runner/workspace/hardware/save.py:15" *)
   output save_busy;
   wire save_busy;
@@ -18126,7 +18118,7 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
   (* init = 1'h0 *)
   (* src = "/home/runner/workspace/hardware/save.py:48" *)
   wire sub_start_reg;
-  assign dst_in_range = \port$3247$0 [22:19] <= (* src = "/home/runner/workspace/hardware/save.py:53" *) 3'h6;
+  assign dst_in_range = \port$3243$0 [22:19] <= (* src = "/home/runner/workspace/hardware/save.py:53" *) 3'h6;
   assign save_busy = ~ (* src = "/home/runner/workspace/hardware/save.py:115" *) \$1 ;
   assign save_complete = \$5  & (* src = "/home/runner/workspace/hardware/save.py:116" *) sub_done_latched;
   assign \$1  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) save_wrapper_state;
@@ -18169,7 +18161,7 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
     .mem_wr_addr(mem_wr_addr),
     .mem_wr_data(mem_wr_data),
     .mem_wr_en(mem_wr_en),
-    .\port$3247$0 (\port$3247$0 [14:0]),
+    .\port$3243$0 (\port$3243$0 [14:0]),
     .sub_done(sub_done),
     .sub_dst_cap(sub_dst_cap),
     .sub_fault(sub_fault),
@@ -18184,11 +18176,11 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
       3'h0:
           /* empty */;
       3'h1:
-          cr_rd_addr = \port$3247$0 [22:19];
+          cr_rd_addr = \port$3243$0 [22:19];
       3'h2:
-          cr_rd_addr = \port$3247$0 [18:15];
+          cr_rd_addr = \port$3243$0 [18:15];
       3'h3:
-          cr_rd_addr = \port$3247$0 [18:15];
+          cr_rd_addr = \port$3243$0 [18:15];
     endcase
   end
   always @* begin
@@ -18336,12 +18328,12 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
           \$14  = 1'h0;
     endcase
   end
-  assign cr_dst = \port$3247$0 [22:19];
+  assign cr_dst = \port$3243$0 [22:19];
   assign \sub_start$3  = sub_start;
   assign dst_reg_latched = sub_dst_cap;
   assign sub_src_gt = src_reg_latched[31:0];
-  assign sub_index = { 1'h0, \port$3247$0 [14:0] };
-  assign index = { 1'h0, \port$3247$0 [14:0] };
+  assign sub_index = { 1'h0, \port$3243$0 [14:0] };
+  assign index = { 1'h0, \port$3243$0 [14:0] };
   assign mem_wr_done = 1'h1;
   assign \mem_wr_done$11  = 1'h1;
   assign \cr15_namespace$13  = cr15_namespace;
@@ -18354,7 +18346,7 @@ module \top.core.u_save (clk, save_start, cr_rd_data, save_busy, cr15_namespace,
   assign \mem_rd_addr$25  = mem_rd_addr;
   assign \mem_rd_en$27  = mem_rd_en;
   assign sub_start_reg = sub_start;
-  assign cr_src = \port$3247$0 [18:15];
+  assign cr_src = \port$3243$0 [18:15];
   assign fault_latched = save_fault;
   assign fault_type_latched = fault_type;
   
@@ -18416,7 +18408,7 @@ endmodule
 
 (* src = "/home/runner/workspace/hardware/msave.py:34" *)
 (* generator = "Amaranth" *)
-module \top.core.u_save.u_msave (clk, sub_fault, sub_done, cr15_namespace, sub_dst_cap, sub_src_gt, sub_start, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, \port$3247$0 , mem_rd_data);
+module \top.core.u_save.u_msave (clk, sub_fault, sub_done, cr15_namespace, sub_dst_cap, sub_src_gt, sub_start, mem_rd_addr, mem_rd_en, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, \port$3243$0 , mem_rd_data);
   reg \$auto$verilog_backend.cc:2355:dump_module$30  = 0;
   wire [18:0] \$1 ;
   wire [12:0] \$10 ;
@@ -19159,8 +19151,8 @@ module \top.core.u_save.u_msave (clk, sub_fault, sub_done, cr15_namespace, sub_d
   reg [31:0] ns_w2_reg = 32'd0;
   (* src = "/home/runner/workspace/hardware/msave.py:65" *)
   reg [31:0] ns_w3_reg = 32'd0;
-  input [14:0] \port$3247$0 ;
-  wire [14:0] \port$3247$0 ;
+  input [14:0] \port$3243$0 ;
+  wire [14:0] \port$3243$0 ;
   (* src = "/home/runner/workspace/hardware/msave.py:87" *)
   wire seal_ok;
   (* src = "/home/runner/workspace/hardware/msave.py:37" *)
@@ -19661,7 +19653,7 @@ module \top.core.u_save.u_msave (clk, sub_fault, sub_done, cr15_namespace, sub_d
     casez (msave_state)
       4'h0:
           if (sub_start) begin
-            \$112  = { 1'h0, \port$3247$0  };
+            \$112  = { 1'h0, \port$3243$0  };
           end
     endcase
   end
@@ -19900,7 +19892,7 @@ module \top.core.u_save.u_msave (clk, sub_fault, sub_done, cr15_namespace, sub_d
   assign crc16_result = crc16_89;
   assign fault_type_reg = sub_fault_type;
   
-  assign sub_index = { 1'h0, \port$3247$0  };
+  assign sub_index = { 1'h0, \port$3243$0  };
   assign mem_rd_valid = 1'h1;
   assign mem_wr_done = 1'h1;
   assign \dst_cap_reg.word0_gt  = dst_cap_reg[31:0];

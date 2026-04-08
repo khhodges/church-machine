@@ -377,15 +377,15 @@ class ChurchTangNano20K(Elaboratable):
         # Each LED word is bits[2:0]={B,G,R}; only R (bit 0) drives the physical pin.
         # Tang Nano 20K: active-LOW — invert R bit before driving pin.
         # 4 LEDs: pins 15,16,19,20 (pins 17,18 used by UART).
-        #   led0 (pin15): boot status — ON during boot
-        #   led1 (pin16): run/halt   — ON when running, blinks when halted
-        #   led2 (pin19): fault      — ON on capability fault
-        #   led3 (pin20): heartbeat  — blinks to show clock alive
+        #   led0 (pin15): boot/run  — ON during boot, then ON when running OK
+        #   led1 (pin16): halt      — ON when halted (blinks), OFF when running
+        #   led2 (pin19): fault     — ON on capability fault
+        #   led3 (pin20): heartbeat — always blinks ~1Hz to show clock alive
         m.d.comb += [
-            self.led[0].eq(Mux(core.boot_complete, ~mmio_led_reg[0][0], ~led_boot)),
-            self.led[1].eq(Mux(core.boot_complete, ~mmio_led_reg[1][0], ~(led_run | led_halted_blink))),
-            self.led[2].eq(Mux(core.boot_complete, ~mmio_led_reg[2][0], ~led_fault)),
-            self.led[3].eq(Mux(core.boot_complete, ~mmio_led_reg[3][0], ~heartbeat_blink)),
+            self.led[0].eq(Mux(core.boot_complete, ~(led_run | led_halted_blink), ~led_boot)),
+            self.led[1].eq(Mux(core.boot_complete, ~halted, C(1, 1))),
+            self.led[2].eq(Mux(core.boot_complete, ~led_fault, C(1, 1))),
+            self.led[3].eq(~heartbeat_blink),
         ]
 
         if not self.sim_mode:
