@@ -1293,7 +1293,7 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `${label}: CR12 (thread register) is NULL`);
             return { ok: false };
         }
-        const check = this.mLoad(cr12.word0, 'R', 12, absAddr);
+        const check = this.mLoad(cr12.word0, null, 12, absAddr);
         if (!check.ok) {
             this.fault(check.fault, `${label}: CR12 read @${absAddr}: ${check.message}`);
             return { ok: false };
@@ -1307,7 +1307,7 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `${label}: CR12 (thread register) is NULL`);
             return false;
         }
-        const check = this.mLoad(cr12.word0, 'W', 12, absAddr);
+        const check = this.mLoad(cr12.word0, null, 12, absAddr);
         if (!check.ok) {
             this.fault(check.fault, `${label}: CR12 write @${absAddr}: ${check.message}`);
             return false;

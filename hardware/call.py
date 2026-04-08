@@ -161,11 +161,7 @@ class ChurchCall(Elaboratable):
         cr12_cap_view = View(CAP_REG_LAYOUT, self.cr12_thread)
         cr12_gt = View(GT_LAYOUT, cr12_cap_view.word0_gt)
         cr12_null = Signal()
-        cr12_has_w = Signal()
-        m.d.comb += [
-            cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL),
-            cr12_has_w.eq(cr12_gt.perms[PERM_W]),
-        ]
+        m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
 
         # Latched CR14 for M-bit write-back after Phase 2
         cr14_latched = Signal(CAP_REG_LAYOUT)
@@ -475,9 +471,6 @@ class ChurchCall(Elaboratable):
                     m.next = "FAULT"
                 with m.Elif(cr12_null):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
-                    m.next = "FAULT"
-                with m.Elif(~cr12_has_w):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_W)]
                     m.next = "FAULT"
                 with m.Else():
                     m.next = "STACK_READ_SP"

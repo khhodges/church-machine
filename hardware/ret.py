@@ -83,11 +83,7 @@ class ChurchReturn(Elaboratable):
         cr12_view = View(CAP_REG_LAYOUT, self.cr12_thread)
         cr12_gt   = View(GT_LAYOUT, cr12_view.word0_gt)
         cr12_null = Signal()
-        cr12_has_r = Signal()
-        m.d.comb += [
-            cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL),
-            cr12_has_r.eq(cr12_gt.perms[PERM_R]),
-        ]
+        m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
 
         heap_base_latched   = Signal(32)
         thread_base_latched = Signal(32)
@@ -201,9 +197,6 @@ class ChurchReturn(Elaboratable):
                     m.next = "FAULT"
                 with m.Elif(cr12_null):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.NULL_CAP)]
-                    m.next = "FAULT"
-                with m.Elif(~cr12_has_r):
-                    m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.PERM_R)]
                     m.next = "FAULT"
                 with m.Else():
                     m.next = "READ_HEAP"
