@@ -22,6 +22,7 @@ from .dread import ChurchDRead
 from .dwrite import ChurchDWrite
 from .cload import ChurchCLoad
 from .outform import ChurchOutform
+from .outform_iot import ChurchOutformIoT
 
 
 class ChurchCore(Elaboratable):
@@ -37,9 +38,13 @@ class ChurchCore(Elaboratable):
     Any other invalid opcode faults immediately.
 
     All features enabled: GC, CHANGE/SWITCH, fused ops, seal checks.
+    When iot_profile=True: GC, Lambda, Change, Switch, ELoadCall, XLoadLambda
+    are excluded; excluded opcodes emit FAULT_OPCODE.  Outform uses the lean
+    tunnel-hunting ChurchOutformIoT instead of ChurchOutform.
     """
 
-    def __init__(self):
+    def __init__(self, iot_profile=False):
+        self.iot_profile = iot_profile
         self.imem_addr = Signal(32)
         self.imem_data = Signal(32)
         self.imem_valid = Signal()
@@ -90,25 +95,17 @@ class ChurchCore(Elaboratable):
         m = Module()
 
         u_regs = ChurchRegisters()
-        u_decoder = ChurchDecoder()
+        u_decoder = ChurchDecoder(iot_profile=self.iot_profile)
         u_perm = ChurchPermCheck()
-        u_gc = ChurchGCUnit()
-        u_lambda = ChurchLambda()
         u_call = ChurchCall()
         u_return = ChurchReturn()
         u_tperm = ChurchTperm()
         u_save = ChurchSave()
         u_load = ChurchLoad()
-        u_change = ChurchChange()
-        u_switch = ChurchSwitch()
-        u_eloadcall = ChurchELoadCall()
-        u_xloadlambda = ChurchXLoadLambda()
 
         m.submodules.u_registers = u_regs
         m.submodules.u_decoder = u_decoder
         m.submodules.u_perm_check = u_perm
-        m.submodules.u_gc_unit = u_gc
-        m.submodules.u_lambda = u_lambda
         m.submodules.u_call = u_call
         m.submodules.u_return = u_return
         m.submodules.u_tperm = u_tperm
@@ -116,15 +113,29 @@ class ChurchCore(Elaboratable):
         m.submodules.u_load = u_load
         u_shared_mload = ChurchMLoad()
         m.submodules.u_shared_mload = u_shared_mload
-        m.submodules.u_change = u_change
-        m.submodules.u_switch = u_switch
         u_dread = ChurchDRead()
         u_dwrite = ChurchDWrite()
         u_cload = ChurchCLoad()
-        u_outform = ChurchOutform()
 
-        m.submodules.u_eloadcall = u_eloadcall
-        m.submodules.u_xloadlambda = u_xloadlambda
+        if self.iot_profile:
+            u_outform = ChurchOutformIoT()
+        else:
+            u_outform = ChurchOutform()
+
+        if not self.iot_profile:
+            u_gc = ChurchGCUnit()
+            u_lambda = ChurchLambda()
+            u_change = ChurchChange()
+            u_switch = ChurchSwitch()
+            u_eloadcall = ChurchELoadCall()
+            u_xloadlambda = ChurchXLoadLambda()
+            m.submodules.u_gc_unit = u_gc
+            m.submodules.u_lambda = u_lambda
+            m.submodules.u_change = u_change
+            m.submodules.u_switch = u_switch
+            m.submodules.u_eloadcall = u_eloadcall
+            m.submodules.u_xloadlambda = u_xloadlambda
+
         m.submodules.u_dread = u_dread
         m.submodules.u_dwrite = u_dwrite
         m.submodules.u_cload = u_cload
@@ -221,11 +232,8 @@ class ChurchCore(Elaboratable):
         cross_domain_ret = Signal()
         cload_pending   = Signal()
         busy_expr = (
-            u_lambda.lambda_busy | u_tperm.tperm_busy | u_call.call_busy |
+            u_tperm.tperm_busy | u_call.call_busy |
             u_return.busy | u_save.save_busy | u_load.load_busy |
-            u_gc.gc_busy |
-            u_change.change_busy | u_switch.switch_busy |
-            u_eloadcall.busy | u_xloadlambda.busy |
             u_dread.busy | u_dwrite.busy |
             iadd_busy_reg | isub_busy_reg | branch_busy_reg |
             shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg |
@@ -233,6 +241,12 @@ class ChurchCore(Elaboratable):
             fence_pending_reg |
             u_outform.outform_busy
         )
+        if not self.iot_profile:
+            busy_expr = busy_expr | (
+                u_lambda.lambda_busy | u_gc.gc_busy |
+                u_change.change_busy | u_switch.switch_busy |
+                u_eloadcall.busy | u_xloadlambda.busy
+            )
         m.d.comb += any_unit_busy.eq(busy_expr)
 
         # Halt detection: zero instruction word fetched after boot, while no unit is busy.
@@ -242,31 +256,45 @@ class ChurchCore(Elaboratable):
         )
 
         lambda_start_sig = Signal()
-        m.d.comb += lambda_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
-        )
+        if not self.iot_profile:
+            m.d.comb += lambda_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
+            )
 
         tperm_start_sig = Signal()
         call_start_sig = Signal()
         ret_start_sig = Signal()
 
-        cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
-                                 Mux(u_xloadlambda.busy, u_xloadlambda.cr_rd_addr,
-                                     Mux(u_dread.busy, u_dread.cr_rd_addr,
-                                         Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
-                                             cr_src))))
-        cr_rd_addr_inner = Mux(u_change.change_busy, u_change.cr_rd_addr,
-                               Mux(u_switch.switch_busy, u_switch.cr_rd_addr,
-                                   cr_rd_addr_default))
-        m.d.comb += u_regs.cr_rd_addr.eq(
-            Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
-                Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
+        if not self.iot_profile:
+            cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_rd_addr,
+                                         Mux(u_dread.busy, u_dread.cr_rd_addr,
+                                             Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
+                                                 cr_src))))
+            cr_rd_addr_inner = Mux(u_change.change_busy, u_change.cr_rd_addr,
+                                   Mux(u_switch.switch_busy, u_switch.cr_rd_addr,
+                                       cr_rd_addr_default))
+            m.d.comb += u_regs.cr_rd_addr.eq(
+                Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
+                    Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
+                        Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
+                            Mux(u_call.call_busy, u_call.cr_rd_addr,
+                                Mux(u_return.busy, u_return.cr_rd_addr,
+                                    Mux(u_save.save_busy, u_save.cr_rd_addr,
+                                        cr_rd_addr_inner))))))
+            )
+        else:
+            cr_rd_addr_default = Mux(u_dread.busy, u_dread.cr_rd_addr,
+                                     Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
+                                         cr_src))
+            m.d.comb += u_regs.cr_rd_addr.eq(
+                Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
                     Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                         Mux(u_call.call_busy, u_call.cr_rd_addr,
                             Mux(u_return.busy, u_return.cr_rd_addr,
                                 Mux(u_save.save_busy, u_save.cr_rd_addr,
-                                    cr_rd_addr_inner))))))
-        )
+                                    cr_rd_addr_default)))))
+            )
 
         perm_gt_sig = Signal(GT_LAYOUT)
         m.d.comb += perm_gt_sig.eq(View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word0_gt)
@@ -279,16 +307,17 @@ class ChurchCore(Elaboratable):
                 m.d.comb += required_perms.eq(PERM_MASK_S)
             with m.Case(ChurchOpcode.CALL):
                 m.d.comb += required_perms.eq(PERM_MASK_E)
-            with m.Case(ChurchOpcode.SWITCH):
-                m.d.comb += required_perms.eq(PERM_MASK_L)
-            with m.Case(ChurchOpcode.CHANGE):
-                m.d.comb += required_perms.eq(PERM_MASK_L)
-            with m.Case(ChurchOpcode.LAMBDA):
-                m.d.comb += required_perms.eq(PERM_MASK_X)
-            with m.Case(ChurchOpcode.ELOADCALL):
-                m.d.comb += required_perms.eq(0)
-            with m.Case(ChurchOpcode.XLOADLAMBDA):
-                m.d.comb += required_perms.eq(0)
+            if not self.iot_profile:
+                with m.Case(ChurchOpcode.SWITCH):
+                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                with m.Case(ChurchOpcode.CHANGE):
+                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                with m.Case(ChurchOpcode.LAMBDA):
+                    m.d.comb += required_perms.eq(PERM_MASK_X)
+                with m.Case(ChurchOpcode.ELOADCALL):
+                    m.d.comb += required_perms.eq(0)
+                with m.Case(ChurchOpcode.XLOADLAMBDA):
+                    m.d.comb += required_perms.eq(0)
             with m.Default():
                 m.d.comb += required_perms.eq(0)
 
@@ -303,18 +332,24 @@ class ChurchCore(Elaboratable):
 
         all_checks_pass = u_perm.all_checks_pass
 
-        m.d.comb += [
-            u_gc.gc_start.eq(self.gc_start),
-            u_gc.gc_mark_en.eq(1),
-            u_gc.gc_sweep_en.eq(1),
-            u_gc.ns_start_index.eq(1),
-            u_gc.ns_end_index.eq(0x1000),
-            u_gc.ns_rd_data.eq(self.ns_rd_data),
-        ]
-        m.d.comb += [
-            self.gc_busy.eq(u_gc.gc_busy),
-            self.gc_garbage_count.eq(u_gc.garbage_count),
-        ]
+        if not self.iot_profile:
+            m.d.comb += [
+                u_gc.gc_start.eq(self.gc_start),
+                u_gc.gc_mark_en.eq(1),
+                u_gc.gc_sweep_en.eq(1),
+                u_gc.ns_start_index.eq(1),
+                u_gc.ns_end_index.eq(0x1000),
+                u_gc.ns_rd_data.eq(self.ns_rd_data),
+            ]
+            m.d.comb += [
+                self.gc_busy.eq(u_gc.gc_busy),
+                self.gc_garbage_count.eq(u_gc.garbage_count),
+            ]
+        else:
+            m.d.comb += [
+                self.gc_busy.eq(0),
+                self.gc_garbage_count.eq(0),
+            ]
 
         cr_rd_data_gt = Signal(GT_LAYOUT)
         m.d.comb += cr_rd_data_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word0_gt)
@@ -434,20 +469,25 @@ class ChurchCore(Elaboratable):
         boot_cap_wr_addr = Signal(4)
         boot_cap_wr_data = Signal(CAP_REG_LAYOUT)
 
-        cr_wr_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_addr,
-                                 Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_addr, 0))
-        cr_wr_data_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_data,
-                                 Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_data, 0))
-        cr_wr_en_extra = u_eloadcall.cr_wr_en | u_xloadlambda.cr_wr_en
-        cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr,
-                               Mux(u_change.change_busy, u_change.cr_wr_addr,
-                                   Mux(u_switch.switch_busy, u_switch.cr_wr_addr,
-                                       cr_wr_addr_default)))
-        cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data,
-                               Mux(u_change.change_busy, u_change.cr_wr_data,
-                                   Mux(u_switch.switch_busy, u_switch.cr_wr_data,
-                                       cr_wr_data_default)))
-        cr_wr_en_extra = cr_wr_en_extra | u_cload.cr_wr_en | u_change.cr_wr_en | u_switch.cr_wr_en
+        if not self.iot_profile:
+            cr_wr_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_addr,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_addr, 0))
+            cr_wr_data_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_data,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_data, 0))
+            cr_wr_en_extra = u_eloadcall.cr_wr_en | u_xloadlambda.cr_wr_en
+            cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr,
+                                   Mux(u_change.change_busy, u_change.cr_wr_addr,
+                                       Mux(u_switch.switch_busy, u_switch.cr_wr_addr,
+                                           cr_wr_addr_default)))
+            cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data,
+                                   Mux(u_change.change_busy, u_change.cr_wr_data,
+                                       Mux(u_switch.switch_busy, u_switch.cr_wr_data,
+                                           cr_wr_data_default)))
+            cr_wr_en_extra = cr_wr_en_extra | u_cload.cr_wr_en | u_change.cr_wr_en | u_switch.cr_wr_en
+        else:
+            cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr, 0)
+            cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data, 0)
+            cr_wr_en_extra = u_cload.cr_wr_en
         m.d.comb += [
             u_regs.cr_wr_addr.eq(
                 Mux(boot_cap_wr_en, boot_cap_wr_addr,
@@ -477,18 +517,19 @@ class ChurchCore(Elaboratable):
         with m.Elif(clear_all):
             m.d.sync += nia_reg.eq(0)
         with m.Elif(self.free_run_start):
-            # Debug FSM jumps CPU to the NUC program entry point
             m.d.sync += nia_reg.eq(self.free_run_nia)
-        with m.Elif(u_lambda.nia_set):
-            m.d.sync += nia_reg.eq(u_lambda.nia_value)
-        with m.Elif(u_xloadlambda.nia_set):
-            m.d.sync += nia_reg.eq(u_xloadlambda.nia_value)
+        if not self.iot_profile:
+            with m.Elif(u_lambda.nia_set):
+                m.d.sync += nia_reg.eq(u_lambda.nia_value)
+            with m.Elif(u_xloadlambda.nia_set):
+                m.d.sync += nia_reg.eq(u_xloadlambda.nia_value)
         with m.Elif(u_return.nia_set):
             m.d.sync += nia_reg.eq(u_return.nia_value)
         with m.Elif(u_call.nia_set):
             m.d.sync += nia_reg.eq(u_call.nia_value)
-        with m.Elif(u_eloadcall.nia_set):
-            m.d.sync += nia_reg.eq(u_eloadcall.nia_value)
+        if not self.iot_profile:
+            with m.Elif(u_eloadcall.nia_set):
+                m.d.sync += nia_reg.eq(u_eloadcall.nia_value)
         with m.Elif(branch_taken & ~fetch_bounds_fault):
             # PC-relative branch: nia += sign_extend(imm) * 4.
             # Gated by ~fetch_bounds_fault: if the *current* nia is already out-of-range
@@ -542,9 +583,9 @@ class ChurchCore(Elaboratable):
                     ((cr14_cload_w2.limit_offset + 1) << 2)   # limit_offset inclusive (cw-1)
                 ),
             ]
-        with m.Elif(u_lambda.nia_set | u_eloadcall.nia_set | u_xloadlambda.nia_set):
-            # Entering unknown code via LAMBDA/ELOADCALL/XLOADLAMBDA — suspend fence.
-            m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
+        if not self.iot_profile:
+            with m.Elif(u_lambda.nia_set | u_eloadcall.nia_set | u_xloadlambda.nia_set):
+                m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
         with m.Elif(u_call.call_complete):
             # CALL completed — establish callee fence from CALL unit byte-address outputs.
             m.d.sync += [
@@ -635,22 +676,23 @@ class ChurchCore(Elaboratable):
         runtime_wr_en = [Signal(name=f"rt_cr{i}_wr_en") for i in range(16)]
         runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cr{i}_wr_gt") for i in range(16)]
 
-        switch_change_active = Signal()
-        m.d.comb += switch_change_active.eq(
-            self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
-            ((church_op == ChurchOpcode.SWITCH) | (church_op == ChurchOpcode.CHANGE))
-        )
+        if not self.iot_profile:
+            switch_change_active = Signal()
+            m.d.comb += switch_change_active.eq(
+                self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
+                ((church_op == ChurchOpcode.SWITCH) | (church_op == ChurchOpcode.CHANGE))
+            )
 
-        switch_src_gt = Signal(GT_LAYOUT)
-        m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
+            switch_src_gt = Signal(GT_LAYOUT)
+            m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
 
-        effective_target = Signal(3)
-        m.d.comb += effective_target.eq(Mux(church_op == ChurchOpcode.CHANGE, 0, switch_target[:3]))
+            effective_target = Signal(3)
+            m.d.comb += effective_target.eq(Mux(church_op == ChurchOpcode.CHANGE, 0, switch_target[:3]))
 
-        with m.If(switch_change_active):
-            for i in range(8):
-                with m.If(effective_target == i):
-                    m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
+            with m.If(switch_change_active):
+                for i in range(8):
+                    with m.If(effective_target == i):
+                        m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
 
         for i in range(16):
             m.d.comb += [
@@ -676,7 +718,7 @@ class ChurchCore(Elaboratable):
             u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
             u_call.thread_base.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word1_location),
             # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
-            u_call.thread_hdr.eq(u_change.thread_hdr_out),
+            u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
             # Parallel register-file mask operations for domain-crossing cleanup
             u_regs.cr_b_clear_mask.eq(u_call.cr_b_clear_mask),
             u_regs.cr_null_mask.eq(u_call.cr_null_mask),
@@ -713,21 +755,25 @@ class ChurchCore(Elaboratable):
             u_cload.mem_rd_valid.eq(1),
         ]
 
-        with m.If(clear_all):
-            m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
-        with m.Elif(u_return.lambda_clear):
-            m.d.sync += lambda_active_reg.eq(0)
-        with m.Elif(u_call.call_complete & ~u_call.call_fault):
-            m.d.sync += lambda_active_reg.eq(0)
-        with m.Elif(u_lambda.lambda_complete & ~u_lambda.lambda_fault):
-            m.d.sync += [lambda_active_reg.eq(1), lambda_pc_reg.eq(u_lambda.saved_nia)]
+        if not self.iot_profile:
+            with m.If(clear_all):
+                m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
+            with m.Elif(u_return.lambda_clear):
+                m.d.sync += lambda_active_reg.eq(0)
+            with m.Elif(u_call.call_complete & ~u_call.call_fault):
+                m.d.sync += lambda_active_reg.eq(0)
+            with m.Elif(u_lambda.lambda_complete & ~u_lambda.lambda_fault):
+                m.d.sync += [lambda_active_reg.eq(1), lambda_pc_reg.eq(u_lambda.saved_nia)]
 
-        m.d.comb += [
-            u_lambda.lambda_start.eq(lambda_start_sig),
-            u_lambda.cr_target.eq(cr_dst),
-            u_lambda.cr_rd_data.eq(u_regs.cr_rd_data),
-            u_lambda.saved_nia.eq(nia_reg + 4),
-        ]
+            m.d.comb += [
+                u_lambda.lambda_start.eq(lambda_start_sig),
+                u_lambda.cr_target.eq(cr_dst),
+                u_lambda.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_lambda.saved_nia.eq(nia_reg + 4),
+            ]
+        else:
+            with m.If(clear_all):
+                m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
 
         m.d.comb += tperm_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM) & ~any_unit_busy
@@ -978,72 +1024,73 @@ class ChurchCore(Elaboratable):
             u_load.index.eq(cap_index),
         ]
 
-        change_start_sig = Signal()
-        m.d.comb += change_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy
-        )
-        m.d.comb += [
-            u_change.change_start.eq(change_start_sig),
-            u_change.cr_src.eq(cr_src),
-            u_change.index.eq(cap_index),
-            u_change.change_mask.eq(u_decoder.call_mask),
-            u_change.cr_rd_data.eq(u_regs.cr_rd_data),
-            u_change.cr12_thread.eq(u_regs.cr12_thread),
-            u_change.cr15_namespace.eq(u_regs.cr15_namespace),
-            u_change.mem_rd_data.eq(self.dmem_rd_data),
-            u_change.mem_rd_valid.eq(1),
-            u_change.mem_wr_done.eq(1),
-            u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
-            u_change.nia.eq(nia_reg),
-            u_change.flags.eq(u_regs.flags),
-        ]
+        if not self.iot_profile:
+            change_start_sig = Signal()
+            m.d.comb += change_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy
+            )
+            m.d.comb += [
+                u_change.change_start.eq(change_start_sig),
+                u_change.cr_src.eq(cr_src),
+                u_change.index.eq(cap_index),
+                u_change.change_mask.eq(u_decoder.call_mask),
+                u_change.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_change.cr12_thread.eq(u_regs.cr12_thread),
+                u_change.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_change.mem_rd_data.eq(self.dmem_rd_data),
+                u_change.mem_rd_valid.eq(1),
+                u_change.mem_wr_done.eq(1),
+                u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
+                u_change.nia.eq(nia_reg),
+                u_change.flags.eq(u_regs.flags),
+            ]
 
-        switch_start_sig = Signal()
-        m.d.comb += switch_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) & ~any_unit_busy
-        )
-        m.d.comb += [
-            u_switch.switch_start.eq(switch_start_sig),
-            u_switch.cr_src.eq(cr_src[:3]),
-            u_switch.target.eq(switch_target[:3]),
-            u_switch.index.eq(cap_index),
-            u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
-            u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
-            u_switch.mem_rd_data.eq(self.dmem_rd_data),
-            u_switch.mem_rd_valid.eq(1),
-        ]
+            switch_start_sig = Signal()
+            m.d.comb += switch_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) & ~any_unit_busy
+            )
+            m.d.comb += [
+                u_switch.switch_start.eq(switch_start_sig),
+                u_switch.cr_src.eq(cr_src[:3]),
+                u_switch.target.eq(switch_target[:3]),
+                u_switch.index.eq(cap_index),
+                u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_switch.mem_rd_data.eq(self.dmem_rd_data),
+                u_switch.mem_rd_valid.eq(1),
+            ]
 
-        eloadcall_start_sig = Signal()
-        m.d.comb += eloadcall_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & ~any_unit_busy
-        )
-        m.d.comb += [
-            u_eloadcall.start.eq(eloadcall_start_sig),
-            u_eloadcall.cr_src.eq(cr_src),
-            u_eloadcall.cr_dst.eq(cr_dst),
-            u_eloadcall.index.eq(cap_index),
-            u_eloadcall.mask.eq(u_decoder.call_mask),
-            u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
-            u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
-            u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),
-            u_eloadcall.mem_rd_valid.eq(1),
-        ]
+            eloadcall_start_sig = Signal()
+            m.d.comb += eloadcall_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & ~any_unit_busy
+            )
+            m.d.comb += [
+                u_eloadcall.start.eq(eloadcall_start_sig),
+                u_eloadcall.cr_src.eq(cr_src),
+                u_eloadcall.cr_dst.eq(cr_dst),
+                u_eloadcall.index.eq(cap_index),
+                u_eloadcall.mask.eq(u_decoder.call_mask),
+                u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),
+                u_eloadcall.mem_rd_valid.eq(1),
+            ]
 
-        xloadlambda_start_sig = Signal()
-        m.d.comb += xloadlambda_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & ~any_unit_busy
-        )
-        m.d.comb += [
-            u_xloadlambda.start.eq(xloadlambda_start_sig),
-            u_xloadlambda.cr_src.eq(cr_src),
-            u_xloadlambda.cr_dst.eq(cr_dst),
-            u_xloadlambda.index.eq(cap_index),
-            u_xloadlambda.cr_rd_data.eq(u_regs.cr_rd_data),
-            u_xloadlambda.cr15_namespace.eq(u_regs.cr15_namespace),
-            u_xloadlambda.mem_rd_data.eq(self.dmem_rd_data),
-            u_xloadlambda.mem_rd_valid.eq(1),
-            u_xloadlambda.saved_nia.eq(nia_reg + 4),
-        ]
+            xloadlambda_start_sig = Signal()
+            m.d.comb += xloadlambda_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & ~any_unit_busy
+            )
+            m.d.comb += [
+                u_xloadlambda.start.eq(xloadlambda_start_sig),
+                u_xloadlambda.cr_src.eq(cr_src),
+                u_xloadlambda.cr_dst.eq(cr_dst),
+                u_xloadlambda.index.eq(cap_index),
+                u_xloadlambda.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_xloadlambda.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_xloadlambda.mem_rd_data.eq(self.dmem_rd_data),
+                u_xloadlambda.mem_rd_valid.eq(1),
+                u_xloadlambda.saved_nia.eq(nia_reg + 4),
+            ]
 
         m.d.comb += [
             u_outform.outform_start.eq(0),
@@ -1088,13 +1135,14 @@ class ChurchCore(Elaboratable):
                 cr5_stack_wr.en.eq(1),
             ]
             m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
-        with m.Elif(u_eloadcall.complete & ~u_eloadcall.fault & ~cr5_stack_full):
-            m.d.comb += [
-                cr5_stack_wr.addr.eq(cr5_stack_ptr),
-                cr5_stack_wr.data.eq(u_eloadcall.saved_cr5_gt),
-                cr5_stack_wr.en.eq(1),
-            ]
-            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
+        if not self.iot_profile:
+            with m.Elif(u_eloadcall.complete & ~u_eloadcall.fault & ~cr5_stack_full):
+                m.d.comb += [
+                    cr5_stack_wr.addr.eq(cr5_stack_ptr),
+                    cr5_stack_wr.data.eq(u_eloadcall.saved_cr5_gt),
+                    cr5_stack_wr.en.eq(1),
+                ]
+                m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
         with m.Elif(u_return.complete & ~u_return.fault_valid & ~cr5_stack_empty):
             m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr - 1)
 
@@ -1113,8 +1161,9 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_decoder.fault), self.fault_valid.eq(1)]
         with m.Elif(u_perm.fault_valid):
             m.d.comb += [self.fault.eq(u_perm.fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_lambda.lambda_fault):
-            m.d.comb += [self.fault.eq(u_lambda.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_lambda.lambda_fault):
+                m.d.comb += [self.fault.eq(u_lambda.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_tperm.tperm_fault):
             m.d.comb += [self.fault.eq(u_tperm.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_call.call_fault):
@@ -1125,14 +1174,15 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_save.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_load.load_fault):
             m.d.comb += [self.fault.eq(u_load.fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_change.change_fault):
-            m.d.comb += [self.fault.eq(u_change.fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_switch.switch_fault):
-            m.d.comb += [self.fault.eq(u_switch.fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_eloadcall.fault):
-            m.d.comb += [self.fault.eq(u_eloadcall.fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_xloadlambda.fault):
-            m.d.comb += [self.fault.eq(u_xloadlambda.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_change.change_fault):
+                m.d.comb += [self.fault.eq(u_change.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_switch.switch_fault):
+                m.d.comb += [self.fault.eq(u_switch.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_eloadcall.fault):
+                m.d.comb += [self.fault.eq(u_eloadcall.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_xloadlambda.fault):
+                m.d.comb += [self.fault.eq(u_xloadlambda.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_dread.fault):
             m.d.comb += [self.fault.eq(u_dread.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_dwrite.fault):
@@ -1269,19 +1319,27 @@ class ChurchCore(Elaboratable):
                 self.dmem_wr_en.eq(1),
             ]
 
-        m.d.comb += [
-            u_gc.valid_key_access.eq(u_shared_mload.gbit_reset_done),
-            u_gc.access_index.eq(0),
-        ]
-
-        with m.If(u_gc.gc_busy):
+        if not self.iot_profile:
             m.d.comb += [
-                self.ns_addr.eq(u_gc.ns_addr),
-                self.ns_rd_en.eq(u_gc.ns_rd_en),
-                self.ns_wr_data.eq(u_gc.ns_wr_data),
-                self.ns_wr_en.eq(u_gc.ns_wr_en),
+                u_gc.valid_key_access.eq(u_shared_mload.gbit_reset_done),
+                u_gc.access_index.eq(0),
             ]
-        with m.Else():
+
+            with m.If(u_gc.gc_busy):
+                m.d.comb += [
+                    self.ns_addr.eq(u_gc.ns_addr),
+                    self.ns_rd_en.eq(u_gc.ns_rd_en),
+                    self.ns_wr_data.eq(u_gc.ns_wr_data),
+                    self.ns_wr_en.eq(u_gc.ns_wr_en),
+                ]
+            with m.Else():
+                m.d.comb += [
+                    self.ns_addr.eq(0),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(0),
+                    self.ns_wr_en.eq(0),
+                ]
+        else:
             m.d.comb += [
                 self.ns_addr.eq(0),
                 self.ns_rd_en.eq(0),

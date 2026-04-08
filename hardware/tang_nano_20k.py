@@ -38,10 +38,11 @@ class GowinBSRAM(Elaboratable):
 
 
 class ChurchTangNano20K(Elaboratable):
-    def __init__(self, clk_freq=27_000_000, baud=115200, sim_mode=False):
+    def __init__(self, clk_freq=27_000_000, baud=115200, sim_mode=False, iot_profile=False):
         self.clk_freq = clk_freq
         self.baud = baud
         self.sim_mode = sim_mode
+        self.iot_profile = iot_profile
 
         self.uart_tx = Signal(init=1)
         self.uart_rx = Signal()
@@ -59,7 +60,7 @@ class ChurchTangNano20K(Elaboratable):
 
         m.domains += ClockDomain("sync", reset_less=True)
 
-        core = ChurchCore()
+        core = ChurchCore(iot_profile=self.iot_profile)
         m.submodules.core = core
 
         boot_rom = BootRom(BOOT_PROGRAM)
@@ -407,7 +408,8 @@ class ChurchTangNano20K(Elaboratable):
 
         m.d.comb += core.gc_start.eq(0)
 
-        BANNER = Array([C(ord(c), 8) for c in "CHURCH TN20K v1.0\r\n"])
+        banner_str = "CHURCH TN20K-IoT v1.0\r\n" if self.iot_profile else "CHURCH TN20K v1.0\r\n"
+        BANNER = Array([C(ord(c), 8) for c in banner_str])
         banner_idx = Signal(range(len(BANNER) + 1))
         banner_byte = Signal(8)
         m.d.comb += banner_byte.eq(BANNER[banner_idx])

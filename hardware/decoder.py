@@ -21,9 +21,13 @@ class ChurchDecoder(Elaboratable):
     BRANCH, SHL, SHR.
     For Turing ops, cr_dst field is a DR index (0-15); cr_src is the CR
     holding the data GT or a second DR index; immediate meaning varies by op.
+
+    When iot_profile=True, LAMBDA, CHANGE, SWITCH, ELOADCALL, and XLOADLAMBDA
+    opcodes are treated as invalid (FAULT_OPCODE).
     """
 
-    def __init__(self):
+    def __init__(self, iot_profile=False):
+        self.iot_profile = iot_profile
         self.instruction = Signal(32)
         self.instr_valid = Signal()
         self.flags = Signal(COND_FLAGS_LAYOUT)
@@ -139,14 +143,26 @@ class ChurchDecoder(Elaboratable):
             is_mcmp.eq(opcode_field   == TuringOpcode.MCMP),
         ]
 
+        iot_excluded = Signal()
+        if self.iot_profile:
+            m.d.comb += iot_excluded.eq(
+                (opcode_field == ChurchOpcode.LAMBDA) |
+                (opcode_field == ChurchOpcode.CHANGE) |
+                (opcode_field == ChurchOpcode.SWITCH) |
+                (opcode_field == ChurchOpcode.ELOADCALL) |
+                (opcode_field == ChurchOpcode.XLOADLAMBDA)
+            )
+        else:
+            m.d.comb += iot_excluded.eq(0)
+
         valid_opcode = Signal()
         m.d.comb += valid_opcode.eq(
-            (opcode_field <= ChurchOpcode.XLOADLAMBDA) |
+            ((opcode_field <= ChurchOpcode.XLOADLAMBDA) & ~iot_excluded) |
             is_dread | is_dwrite | is_iadd | is_isub | is_branch |
             is_shl | is_shr | is_bfext | is_bfins | is_mcmp
         )
         m.d.comb += [
-            self.is_church_op.eq((opcode_field <= ChurchOpcode.XLOADLAMBDA) & self.instr_valid),
+            self.is_church_op.eq((opcode_field <= ChurchOpcode.XLOADLAMBDA) & ~iot_excluded & self.instr_valid),
             self.is_dread_op.eq(is_dread   & self.instr_valid),
             self.is_dwrite_op.eq(is_dwrite & self.instr_valid),
             self.is_iadd_op.eq(is_iadd     & self.instr_valid),
