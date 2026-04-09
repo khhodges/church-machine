@@ -461,18 +461,21 @@ function switchView(viewId) {
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
     if (viewId === 'builder') initHardwareBuildPanel();
     if (viewId === 'editor') {
-        if (activeUserTabId && userTabDirty) saveActiveUserTab();
-        activeUserTabId = null;
-        userTabDirty = false;
-        const asmEd = document.getElementById('asmEditor');
-        if (asmEd) asmEd.value = '';
-        document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
-        renderUserTabs();
-        updateSaveUserTabBtn();
-        const outputEl = document.getElementById('assemblyOutput');
-        if (outputEl) outputEl.innerHTML = '';
-        const sel = document.getElementById('langSelector');
-        if (sel) showIntro(sel.value);
+        if (!_editorCREditActive) {
+            if (activeUserTabId && userTabDirty) saveActiveUserTab();
+            activeUserTabId = null;
+            userTabDirty = false;
+            const asmEd = document.getElementById('asmEditor');
+            if (asmEd) asmEd.value = '';
+            document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
+            renderUserTabs();
+            updateSaveUserTabBtn();
+            const outputEl = document.getElementById('assemblyOutput');
+            if (outputEl) outputEl.innerHTML = '';
+            const sel = document.getElementById('langSelector');
+            if (sel) showIntro(sel.value);
+        }
+        _updateEditorPatchBar();
         if (typeof historyRefreshCode === 'function') {
             const area = document.getElementById('codeHistoryContent');
             if (area && !area.innerHTML.trim()) historyRefreshCode();
@@ -1418,6 +1421,8 @@ function showZonePopup(evt, zone, nsIdx) {
     pop.style.top  = top  + 'px';
 }
 
+var _editorCREditActive = false;
+
 function editCRCodeInEditor() {
     if (selectedCR === null) return;
     const crIdx = selectedCR;
@@ -1436,7 +1441,6 @@ function editCRCodeInEditor() {
         codeLimit = lumpHdr.cw;
     }
 
-    // Collect raw words (clamped to memory), then trim trailing zeros.
     const rawWords = [];
     for (let w = 0; w < codeLimit; w++) {
         const addr = codeStart + w;
@@ -1457,12 +1461,47 @@ function editCRCodeInEditor() {
         }
     }
 
+    _editorCREditActive = true;
+    _editorCREditCR = crIdx;
+    _editorCREditNS = nsIdx;
     switchView('editor');
     const sel = document.getElementById('langSelector');
     if (sel) sel.value = 'assembly';
     const asmEd = document.getElementById('asmEditor');
     if (asmEd) asmEd.value = lines.join('\n');
     switchCodeTab('console');
+    _updateEditorPatchBar();
+}
+
+var _editorCREditCR = null;
+var _editorCREditNS = null;
+
+function _updateEditorPatchBar() {
+    var bar = document.getElementById('editorPatchBar');
+    if (!bar) return;
+    if (_editorCREditActive && _editorCREditCR !== null) {
+        bar.style.display = 'flex';
+        var label = document.getElementById('editorPatchLabel');
+        if (label) label.textContent = 'Editing CR' + _editorCREditCR + ' \u00B7 NS[' + _editorCREditNS + ']';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+function clearEditorCREdit() {
+    _editorCREditActive = false;
+    _editorCREditCR = null;
+    _editorCREditNS = null;
+    _updateEditorPatchBar();
+    var asmEd = document.getElementById('asmEditor');
+    if (asmEd) asmEd.value = '';
+    var outputEl = document.getElementById('assemblyOutput');
+    if (outputEl) outputEl.innerHTML = '';
+    document.querySelectorAll('.example-tab').forEach(function(t) { t.classList.remove('active'); });
+    renderUserTabs();
+    updateSaveUserTabBtn();
+    var sel = document.getElementById('langSelector');
+    if (sel) showIntro(sel.value);
 }
 
 function injectCRCode(logEl) {
@@ -6896,6 +6935,10 @@ function closeGitHubConsole() {
 function loadExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    _editorCREditActive = false;
+    _editorCREditCR = null;
+    _editorCREditNS = null;
+    _updateEditorPatchBar();
     if (activeUserTabId && userTabDirty) saveActiveUserTab();
     activeUserTabId = null;
     userTabDirty = false;
@@ -13503,6 +13546,10 @@ function compileAndCreateAbstraction() {
 function loadCLOOMCExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
+    _editorCREditActive = false;
+    _editorCREditCR = null;
+    _editorCREditNS = null;
+    _updateEditorPatchBar();
     if (activeUserTabId && userTabDirty) saveActiveUserTab();
     activeUserTabId = null;
     userTabDirty = false;

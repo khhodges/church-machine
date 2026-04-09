@@ -10101,6 +10101,46 @@ tr.itrace-fault td { color: #ff9999; }
     font-size: 0.95rem;
 }
 .gh-get-started-link:hover { text-decoration: underline; }
+.editor-patch-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.35rem 0.6rem;
+    background: rgba(200,155,60,0.1);
+    border: 1px solid rgba(200,155,60,0.3);
+    border-radius: 6px;
+    margin-bottom: 0.3rem;
+}
+.editor-patch-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--church-gold, #daa520);
+    margin-right: 0.3rem;
+    white-space: nowrap;
+}
+.editor-patch-btn {
+    font-size: 0.72rem !important;
+    padding: 0.2rem 0.6rem !important;
+    border: 1px solid var(--border, #1e2040) !important;
+    background: var(--panel-bg, #10101e) !important;
+    color: #e2e8f0 !important;
+    border-radius: 4px !important;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.editor-patch-btn:hover { border-color: var(--church-gold, #daa520) !important; color: var(--church-gold, #daa520) !important; }
+.editor-patch-btn-fpga { color: #4ade80 !important; }
+.editor-patch-btn-fpga:hover { color: #22c55e !important; border-color: #22c55e !important; }
+.editor-patch-btn-close {
+    font-size: 0.72rem !important;
+    padding: 0.15rem 0.45rem !important;
+    background: transparent !important;
+    border: 1px solid var(--border, #1e2040) !important;
+    color: var(--text-secondary, #888) !important;
+    border-radius: 4px !important;
+    cursor: pointer;
+}
+.editor-patch-btn-close:hover { border-color: #e74c3c !important; color: #e74c3c !important; }
 @media (max-width: 768px) {
     .gh-repos-row, .gh-section-grid, .gh-actions-row { grid-template-columns: 1fr; }
 }

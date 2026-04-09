@@ -303,6 +303,15 @@
                     <button class="btn btn-primary new-tab-create" onclick="confirmNewTab()">Create</button>
                     <button class="btn new-tab-cancel" onclick="hideNewTabDialog()">Cancel</button>
                 </div>
+                <div id="editorPatchBar" class="editor-patch-bar" style="display:none;">
+                    <span class="editor-patch-label" id="editorPatchLabel">Editing CR</span>
+                    <button class="btn editor-patch-btn" onclick="patchSimulator()">&#x21A9; Patch</button>
+                    <button class="btn editor-patch-btn editor-patch-btn-fpga" onclick="patchFPGA()">&#x21A9; Patch FPGA</button>
+                    <button class="btn editor-patch-btn editor-patch-btn-fpga" onclick="exportPatchFile()">&#x2B73; Export Patch</button>
+                    <button class="btn editor-patch-btn" onclick="publishToLibrary()" style="background:#4a7a2e;">&#x21E1; Publish</button>
+                    <span style="flex:1"></span>
+                    <button class="btn editor-patch-btn-close" onclick="clearEditorCREdit()" title="Clear CR edit and return to examples">&#x2715;</button>
+                </div>
                 <div class="code-editor-wrap">
                     <div class="line-numbers" id="lineNumbers"></div>
                     <textarea id="asmEditor" spellcheck="false" wrap="off"></textarea>
