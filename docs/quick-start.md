@@ -2,7 +2,7 @@
 
 You do not need an FPGA to begin. The Church Machine IDE runs entirely
 in your browser and includes a full simulator that enforces every one
-of the six Laws. Everything you learn in the simulator transfers
+of the Six Laws of CLOOMC (see reference material later). Everything you learn in the simulator transfers
 directly to real hardware — the instruction set, the capability model,
 the security faults, the namespace, the SlideRule — it is all
 identical.
