@@ -151,7 +151,7 @@ def docs_figures(path):
 
 BOOK_CHAPTERS = [
     ("Getting Started", [
-        "patching-fpga.md",
+        "first-steps.md",
         "prologue.md",
         "contributing.md",
     ]),

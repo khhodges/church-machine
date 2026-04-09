@@ -1,4 +1,4 @@
-# Getting Started with Church Machine Hardware
+# First Steps
 
 Every computer you use today runs on an architecture designed in the 1940s.
 Programs share a flat memory space. Security is bolted on after the fact.
