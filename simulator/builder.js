@@ -132,22 +132,22 @@ class NamespaceBuilder {
         var ns = comp.namespaces.find(function(n) { return n.id === nsId; });
         if (!ns) return false;
         if (!json.abstraction || typeof json.abstraction !== 'string') {
-            this.error = 'Invalid upload.json: "abstraction" must be a non-empty string';
+            this.error = 'Invalid abstraction: "abstraction" must be a non-empty string';
             this.render();
             return false;
         }
         if (!json.methods || !Array.isArray(json.methods) || json.methods.length === 0) {
-            this.error = 'Invalid upload.json: "methods" must be a non-empty array';
+            this.error = 'Invalid abstraction: "methods" must be a non-empty array';
             this.render();
             return false;
         }
         if (!json.capabilities || !Array.isArray(json.capabilities)) {
-            this.error = 'Invalid upload.json: "capabilities" must be an array (use [] if none)';
+            this.error = 'Invalid abstraction: "capabilities" must be an array (use [] if none)';
             this.render();
             return false;
         }
         if (!json.grants || !Array.isArray(json.grants)) {
-            this.error = 'Invalid upload.json: "grants" must be an array';
+            this.error = 'Invalid abstraction: "grants" must be an array';
             this.render();
             return false;
         }
@@ -716,7 +716,7 @@ class NamespaceBuilder {
 
         if (!this._hintDismissed.namespace) {
             html += '<div class="builder-hint-banner builder-hint-schema" id="builderHintNamespace">';
-            html += '<span>Drop a <strong>upload.json</strong> file below. Required fields: ';
+            html += '<span>Drop an <strong>abstraction JSON</strong> file below. Required fields: ';
             html += '<code>abstraction</code> (string), <code>methods</code> (array), <code>capabilities</code> (array), <code>grants</code> (array).</span>';
             html += '<button class="builder-hint-dismiss" onclick="builder._hintDismissed.namespace=true;this.parentElement.remove()">\u00d7</button>';
             html += '</div>';
@@ -1267,7 +1267,7 @@ function showBuilderHelpPopup(force) {
         '<div class="welcome-step-text"><strong>Computer</strong> \u2014 Select a computer to configure namespaces, set a geographic location (e.g. "Stuart, FL"), and add data attributes.</div></div>' +
 
         '<div class="welcome-step"><span class="welcome-step-num">3</span>' +
-        '<div class="welcome-step-text"><strong>Namespace</strong> \u2014 Drop <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">upload.json</code> files to add abstractions. Each object supports key-value data attributes.</div></div>' +
+        '<div class="welcome-step-text"><strong>Namespace</strong> \u2014 Drop abstraction JSON files to add abstractions. Each object supports key-value data attributes.</div></div>' +
 
         '<div style="background:rgba(218,165,32,0.06);border:1px solid rgba(218,165,32,0.2);border-radius:8px;padding:0.6rem 1rem;margin-top:0.75rem;font-size:0.82rem;line-height:1.5;">' +
         '<strong style="color:var(--church-gold);">Tip:</strong> Use 🌍 Earth view and type a city in the <em>Locate</em> box to pin each computer to a real-world location on the map. ' +

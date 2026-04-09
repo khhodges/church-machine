@@ -241,7 +241,7 @@ The Namespace controller and sole NS entry writer. Navana runs indefinitely — 
 - **Init**: Initialize all higher-layer abstractions and register them in the namespace
 - **Add**: Find free NS slot, write 3-word entry with clistCount, return nsIndex + version
 - **Remove**: Revoke GT (increment version), free NS slot
-- **Abstraction.Add**: Process upload.json, allocate lump (power-of-2, minimum 64 words), write method table + code at offset 0, write c-list GTs at allocSize-clistCount, create NS entry with clistCount, forge Inform E-GT. Validates: codeSize + clistCount <= allocSize, clistCount <= 511, power-of-2 allocation, capability delegation rights.
+- **Abstraction.Add**: Process compiled abstraction, allocate lump (power-of-2, minimum 64 words), write method table + code at offset 0, write c-list GTs at allocSize-clistCount, create NS entry with clistCount, forge Inform E-GT. Validates: codeSize + clistCount <= allocSize, clistCount <= 511, power-of-2 allocation, capability delegation rights.
 - **Abstraction.Update**: Re-carve lump or migrate to larger allocation
 - **Abstraction.Remove**: Revoke GT, free lump, clear NS slot
 - **Manage**: Abstraction lifecycle — creation, destruction, and reconfiguration

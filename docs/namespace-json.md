@@ -23,7 +23,7 @@ Every format embeds or references the **entry object**, which is the decoded in-
 
 | Field           | Type    | Source in slot | Description |
 |-----------------|---------|----------------|-------------|
-| `word0_location`| number  | Word 0, all 32 bits | Raw base address of the memory object. Matches `location` in upload.json. |
+| `word0_location`| number  | Word 0, all 32 bits | Raw base address of the memory object. Matches `location` in the abstraction definition. |
 | `word1_limit`   | number  | Word 1, raw packed | Full 32-bit packed flags word. Decode with `parseNSWord1` to get the fields below. |
 | `word2_seals`   | number  | Word 2, raw packed | Simulator packing: `version[31:25]` (7-bit) `| spare[24:16] | CRC-16[15:0]`. Extract version via `(word2_seals >>> 25) & 0x7F`; extract seal via `word2_seals & 0xFFFF`. Note: hardware NS Entry Word 2 uses a different layout (`crc[15:0] | g_bit[16] | spare[31:17]`) with `gt_seq` in Word 1 instead. |
 | `gBit`          | 0 or 1  | Word 1 [29]    | GC mark bit. Set by the PP250 garbage collector during mark phase. Not meaningful to application code. |

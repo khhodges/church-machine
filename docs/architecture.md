@@ -401,7 +401,7 @@ Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go
 
 - **Navana.Add**: Find free NS slot, write 3-word entry (base, gt_seq+limit_offset, CRC+g_bit), return `object_id` + `gt_seq`
 - **Navana.Remove**: Revoke GT (increment `gt_seq` in NS Entry Word 1), free NS slot
-- **Navana.Abstraction.Add**: Process upload.json, allocate power-of-2 lump, write lump header (`cc`, `n_minus_6`), write code + c-list GTs, create NS entry, forge E-GT
+- **Navana.Abstraction.Add**: Process compiled abstraction, allocate power-of-2 lump, write lump header (`cc`, `n_minus_6`), write code + c-list GTs, create NS entry, forge E-GT
 - **Navana.Abstraction.Update**: Re-carve lump or migrate to larger allocation
 - **Navana.Abstraction.Remove**: Revoke GT, free lump, clear NS slot
 

@@ -44,7 +44,7 @@ Each risk has a severity rating, a description of the fix, a reference to the ta
 - CALL split arrows showing CR14 (code, X-only) and CR6 (c-list, L-only)
 - The E-GT format: Version(7) | Index(17) | Perms=E(6) | Type=01(2)
 - GT type legend: NULL(00), Inform(01), Outform(10), Abstract(11)
-- [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler flow: source → Resident Object Model → code words → upload.json
+- CLOOMC++ compiler flow: source → Resident Object Model → code words → compiled abstraction
 
 **Outcome:** Church Gold (#C89B3C) on dark (#141414) SVG, viewable in the IDE's Docs tab and in any browser. Every label matches the implemented code.
 
@@ -100,7 +100,7 @@ The permissions are not copied from the source GT. They are not read from the NS
 
 ### T004: AbstractionRegistry — Dynamic Method Support
 
-**Problem:** The abstraction registry needed to support adding and removing methods at runtime, so that Navana.Abstraction.Add could populate method tables from upload.json.
+**Problem:** The abstraction registry needed to support adding and removing methods at runtime, so that Navana.Abstraction.Add could populate method tables from compiled abstractions.
 
 **Solution:** Already implemented in `simulator/abstractions.js`. `addMethod(name, index, handler)` and `removeMethod(name, index)` exist on the registry. The polymorphic interface (create, destroy, call, inspect) is the base; additional methods are added per abstraction.
 
@@ -131,7 +131,7 @@ The permissions are not copied from the source GT. They are not read from the NS
 
 **C-list mapping** (R005 fix): capability names in the source map to c-list offsets. When the compiler sees `call(Memory, Allocate, size)`, it looks up "Memory" in the capability list to find its c-list slot number, then emits `LOAD CR0, CR6, <slot>` followed by `CALL CR0, 0xF` (direct mode).
 
-**Output format:** An array of methods, each containing an array of 32-bit code words, plus a manifest (upload.json) with abstraction name, capabilities, and grants.
+**Output format:** An array of methods, each containing an array of 32-bit code words, plus a manifest with abstraction name, capabilities, and grants.
 
 **Outcome:** The JS front-end compiles all system abstractions (Memory, Mint, Navana) and user programs (SlideRule) to valid Church Machine code.
 
@@ -429,7 +429,7 @@ Ada's table was its own documentation. Each row contained: operation number, the
 
 The Church Machine's structures are self-describing:
 - **word1 of every NS entry** tells you the structure: clistCount says how many capability slots, limit says the memory extent, type says Inform/Outform/Abstract
-- **upload.json** is human-readable: abstraction name, method names, capability names, grants
+- **Compiled abstractions** are self-describing: abstraction name, method names, capability names, grants
 - **Lumps** are self-describing: code at offset 0, c-list at allocSize - clistCount, freespace between them
 
 You can examine any namespace entry and reconstruct the structure of the abstraction it points to, without any external documentation, because the structure is encoded in the entry itself.

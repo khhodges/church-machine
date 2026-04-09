@@ -359,7 +359,7 @@ Nine risks (R001-R009) have been identified, documented, and resolved:
 Automated end-to-end testing confirms:
 - JavaScript source compiles and produces `[JavaScript]` tagged output with correct hex instruction words
 - Haskell source compiles and produces `[Haskell]` tagged output with correct hex instruction words
-- Both produce valid upload.json objects processed by Navana.Abstraction.Add
+- Both produce valid compiled abstractions processed by Navana.Abstraction.Add
 - Boot sequence completes with all 11 abstractions installed
 - CR14 and CR6 are correctly set from single NS entry with clistCount split
 
@@ -522,7 +522,7 @@ The processor of Claim 24, wherein:
 
 ### Figure 24: Multi-Language Compilation to Universal Target
 
-Diagram showing JavaScript and Haskell source code flowing through language-specific front-ends into the shared Resident Object Model and code generator, producing identical instruction words for equivalent operations, with the upload.json output feeding into Navana.Abstraction.Add.
+Diagram showing JavaScript and Haskell source code flowing through language-specific front-ends into the shared Resident Object Model and code generator, producing identical instruction words for equivalent operations, with the compiled output feeding into Navana.Abstraction.Add.
 
 ### Figure 25: Single-Lump CALL Split
 
@@ -534,7 +534,7 @@ Diagram showing the trust boundary: compiler produces code words (correctness do
 
 ### Figure 27: Upload-Driven Lifecycle
 
-Diagram showing the lifecycle: source code → [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler → upload.json → Navana.Abstraction.Add (validation) → Memory.Allocate (power-of-2 lump) → code write + c-list populate → NS entry creation → E-GT forge → return to creator.
+Diagram showing the lifecycle: source code → CLOOMC++ compiler → compiled abstraction → Navana.Abstraction.Add (validation) → Memory.Allocate (power-of-2 lump) → code write + c-list populate → NS entry creation → E-GT forge → return to creator.
 
 ### Figure 28: Scale-Free Security Model
 

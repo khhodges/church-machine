@@ -115,8 +115,8 @@ capability-checked machine code:
 - **Lambda Calculus** — Church numerals, Boolean logic, pure functions
 
 CLOOMC auto-detects the language. You never need to specify it. Write
-a program, click compile, and it produces an `upload.json` containing
-the compiled machine words, capability requirements, and self-documentation.
+a program, click Patch, and the IDE assembles it into machine words,
+validates capability requirements, and writes it into simulator memory.
 
 The key insight: regardless of which language you write in, every
 compiled abstraction obeys the same six Laws. A JavaScript program and

@@ -311,16 +311,16 @@ with a code identifying the failure mode (fetch / zip format / Mint rejection).
 
 ---
 
-## Relationship to lump.zip and upload.json
+## Relationship to lump.zip and .patch files
 
 | Artefact | Role | When produced |
 |----------|------|---------------|
-| `upload.json` | Abstraction definition (JSON). Human-readable. Source of truth for the compiler. See [json-information.md](json-information.md). | At compile time |
-| `lump.zip` | Standard ZIP archive containing the raw lump binary image. The Locator reads the ZIP local file header directly to derive `n` and inflate. | After Navana.Abstraction.Add processes upload.json |
+| `.patch` | Compiled binary frames (CHPF v1). Contains UART frames with CRC for direct FPGA upload. See [first-steps.md](first-steps.md). | At compile time (Export Patch) |
+| `lump.zip` | Standard ZIP archive containing the raw lump binary image. The Locator reads the ZIP local file header directly to derive `n` and inflate. | After Navana.Abstraction.Add processes the compiled abstraction |
 | Lump Library | Remote store of `lump.zip` archives, addressed by the 96-bit IDE token in the Outform NS slot. | Always available (GitHub-backed or DHT) |
 
-The [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler produces `upload.json`. `Navana.Abstraction.Add`
-processes it, allocates the lump, writes code and c-list, calls `Mint.Lump()`
+The CLOOMC++ compiler produces compiled abstractions. `Navana.Abstraction.Add`
+processes them, allocates the lump, writes code and c-list, calls `Mint.Lump()`
 to create the Live NS entry, and packages the result as `lump.zip` for
 archival in the Lump Library.
 
@@ -330,7 +330,7 @@ archival in the Lump Library.
 
 ```
 Compile time:
-  [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ ──► upload.json ──► Navana.Abstraction.Add ──► Mint.Lump()
+  CLOOMC++ ──► compiled abstraction ──► Navana.Abstraction.Add ──► Mint.Lump()
                                         │
                                ┌────────┴──────────────────────┐
                                │  NS slot created (Outform)     │
@@ -389,6 +389,6 @@ After eviction:
 
 ## See Also
 
-- [json-information.md](json-information.md) — The `upload.json` abstraction definition format (informational reference).
+- [json-information.md](json-information.md) — The abstraction definition format (informational reference).
 - [golden-tokens.md](golden-tokens.md) — GT structure, typ field, and revocation.
 - [abstractions.md](abstractions.md) — Navana.Abstraction.Add and the lump lifecycle.

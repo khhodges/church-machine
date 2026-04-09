@@ -143,11 +143,11 @@ These permissions are architecturally hardcoded by the CALL instruction. The cal
 
 ### 3.1 Design Philosophy
 
-[CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ is a multi-language compiler with a single back-end. Both the JavaScript front-end and the Haskell front-end produce the same output: arrays of 32-bit Church Machine instruction words packaged in an `upload.json` format.
+CLOOMC++ is a multi-language compiler with a single back-end. Both the JavaScript front-end and the Haskell front-end produce the same output: arrays of 32-bit Church Machine instruction words compiled into abstractions.
 
 ```
 JavaScript source ──┐
-                    ├──> [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler ──> 32-bit code words ──> upload.json
+                    ├──> CLOOMC++ compiler ──> 32-bit code words ──> compiled abstraction
 Haskell source ─────┘          |
                                |
                      Resident Object Model:

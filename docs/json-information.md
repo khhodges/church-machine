@@ -1,10 +1,10 @@
-# json-information — Abstraction Definition Format (upload.json)
+# Abstraction Definition Format
 
-`upload.json` is the serialisation format used to define a Church Machine abstraction and submit it to **Navana.Abstraction.Add**. It combines the compiled instruction words, the capability list, and optional documentation metadata into a single JSON object.
+The abstraction definition format is the JSON schema used to define a Church Machine abstraction and submit it to **Navana.Abstraction.Add**. It combines the compiled instruction words, the capability list, and optional documentation metadata into a single JSON object.
 
-The [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler produces this format automatically. You can also write it by hand when building assembler programs directly.
+The CLOOMC++ compiler produces this format automatically. You can also write it by hand when building assembler programs directly.
 
-> **Note:** `upload.json` is the *informational* definition format — the human-readable source of truth for an abstraction. The physical deployment artefact produced from it is `lump.zip`. See [locator.md](locator.md) for how lump.zip archives are stored in the Lump Library and loaded on demand at runtime by the Locator.
+> **Note:** This is the *informational* definition format — the human-readable source of truth for an abstraction. The physical deployment artefact produced from it is `lump.zip`. See [locator.md](locator.md) for how lump.zip archives are stored in the Lump Library and loaded on demand at runtime by the Locator.
 
 ---
 
