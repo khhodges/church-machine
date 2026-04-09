@@ -2183,6 +2183,60 @@ function updateCRDetail() {
         html += '</div>';
     }
 
+    if ((showCode || showCList) && nsEntry) {
+        const lumpBase = nsEntry.word0_location >>> 0;
+        const lumpWord0 = (lumpBase < sim.memory.length) ? (sim.memory[lumpBase] >>> 0) : 0;
+        const lHdr = sim.parseLumpHeader(lumpWord0);
+        if (lHdr.valid) {
+            const cw = lHdr.cw;
+            const cc = lHdr.cc;
+            const lumpSz = lHdr.lumpSize;
+            const clistStart = lumpSz - cc;
+            const freeStart = 1 + cw;
+            const freeWords = clistStart - freeStart;
+            const typNames = ['lump', 'data', 'thread', 'outform'];
+            const typStr = typNames[lHdr.typ] || String(lHdr.typ);
+            const hexW = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            const hexA = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(4, '0');
+
+            html += '<div class="cr-detail-section">';
+            html += `<div class="cr-detail-heading">Lump Layout \u2014 ${lumpSz} words at ${hexA(lumpBase)}</div>`;
+
+            html += '<table class="cr-table"><tbody>';
+            html += `<tr><td>Raw Header</td><td>${hexW(lumpWord0)}</td></tr>`;
+            html += `<tr><td>Magic</td><td>0x1F (valid)</td></tr>`;
+            html += `<tr><td>n\u22126</td><td>${lHdr.n_minus_6} \u2192 2<sup>${lHdr.n_minus_6 + 6}</sup> = ${lumpSz} words (${lumpSz * 4} bytes)</td></tr>`;
+            html += `<tr><td>Type</td><td>${lHdr.typ} (${typStr})</td></tr>`;
+            html += `<tr><td>Code Words (cw)</td><td>${cw}</td></tr>`;
+            html += `<tr><td>C-List Slots (cc)</td><td>${cc}</td></tr>`;
+            html += '</tbody></table>';
+
+            html += '<div class="lump-map">';
+            const barTotal = 300;
+            const hdrPx = Math.max(6, Math.round((1 / lumpSz) * barTotal));
+            const cwPx  = Math.max(cw > 0 ? 6 : 0, Math.round((cw / lumpSz) * barTotal));
+            const ccPx  = Math.max(cc > 0 ? 6 : 0, Math.round((cc / lumpSz) * barTotal));
+            const freePx = Math.max(barTotal - hdrPx - cwPx - ccPx, 0);
+
+            html += `<div class="lump-map-bar">`;
+            html += `<div class="lump-seg lump-seg-hdr" style="width:${hdrPx}px" title="Header: +0 (${hexA(lumpBase)})"></div>`;
+            if (cwPx > 0)  html += `<div class="lump-seg lump-seg-code" style="width:${cwPx}px" title="Code: +1..+${cw} (${hexA(lumpBase + 1)}..${hexA(lumpBase + cw)})"></div>`;
+            if (freePx > 0) html += `<div class="lump-seg lump-seg-free" style="width:${freePx}px" title="Free: +${freeStart}..+${clistStart - 1} (${freeWords} words)"></div>`;
+            if (ccPx > 0)  html += `<div class="lump-seg lump-seg-clist" style="width:${ccPx}px" title="C-List: +${clistStart}..+${lumpSz - 1} (${cc} slots)"></div>`;
+            html += `</div>`;
+
+            html += `<div class="lump-map-legend">`;
+            html += `<span class="lump-leg"><span class="lump-swatch lump-swatch-hdr"></span>Header +0</span>`;
+            html += `<span class="lump-leg"><span class="lump-swatch lump-swatch-code"></span>Code +1\u2026+${cw} (${cw}w)</span>`;
+            html += `<span class="lump-leg"><span class="lump-swatch lump-swatch-free"></span>Free +${freeStart}\u2026+${clistStart - 1} (${freeWords}w)</span>`;
+            html += `<span class="lump-leg"><span class="lump-swatch lump-swatch-clist"></span>C-List +${clistStart}\u2026+${lumpSz - 1} (${cc}w)</span>`;
+            html += `</div>`;
+
+            html += '</div>';
+            html += '</div>';
+        }
+    }
+
     html += '</div></div>';
 
     html += `<div class="crd-panel" id="crdPanel-binary" style="display:${crDetailTab==='binary'?'block':'none'}">`;
