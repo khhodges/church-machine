@@ -1895,7 +1895,7 @@ function updateCRDetail() {
         html += `<span class="crd-action-group">`;
         html += `<button class="crd-tab crd-tab-action" onclick="patchSimulator()" title="Assemble editor code and patch simulator memory">&#x21A9; Patch</button>`;
         html += `<button class="crd-action-info-btn" onclick="toggleCrdInfoPop('patchSimInfoPop')" title="What does Patch do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="patchSimInfoPop" style="display:none;"><b>Patch Simulator</b><br><br>Assembles the code currently in the Code editor and writes the resulting machine words directly into simulator memory at this lump\u2019s base address.<br><br>If the instruction count changed the lump header <code>cw</code> field, the NS entry <code>limit17</code>, and the CRC seal are all updated automatically so capability checks remain valid.</div>`;
+        html += `<div class="crd-info-pop" id="patchSimInfoPop" style="display:none;"><b>Patch Simulator</b><br><br>Assembles the code currently in the abstraction creator and writes the resulting machine words directly into simulator memory at this lump\u2019s base address.<br><br>If the instruction count changed the lump header <code>cw</code> field, the NS entry <code>limit17</code>, and the CRC seal are all updated automatically so capability checks remain valid.</div>`;
         html += `</span>`;
         html += `<span class="crd-action-group">`;
         html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" title="Patch simulator then upload to FPGA over UART">&#x21A9; Patch FPGA</button>`;
@@ -9547,12 +9547,12 @@ function getNextStepTip(lang) {
     const langs = progress.langsUsed || [];
 
     if (c === 0) {
-        if (lang === 'symbolic') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the gold <strong>Compile</strong> button below the code editor. This translates Ada's math into machine code -- you will see every instruction with a comment explaining what it does.</div>`;
+        if (lang === 'symbolic') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the gold <strong>Compile</strong> button below the abstraction creator. This translates Ada's math into machine code -- you will see every instruction with a comment explaining what it does.</div>`;
         if (lang === 'assembly') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the <strong>Self-Test</strong> example button, then click <strong>Compile</strong>. Watch each instruction appear with its hex encoding.</div>`;
         if (lang === 'javascript') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>JS: Hello</strong> to load a simple program, then click <strong>Compile</strong> to see it translated into machine instructions.</div>`;
         if (lang === 'haskell') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>HS: Math</strong> to load arithmetic functions, then click <strong>Compile</strong> to see how math becomes machine code.</div>`;
         if (lang === 'lambda') return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click <strong>LC: Church</strong> to load Church numerals, then click <strong>Compile</strong> to see how pure lambda calculus becomes machine code.</div>`;
-        return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the <strong>Compile</strong> button below the code editor to translate the program into machine instructions.</div>`;
+        return `<div class="intro-tip intro-next-step"><strong>Step 1:</strong> Click the <strong>Compile</strong> button below the abstraction creator to translate the program into machine instructions.</div>`;
     }
 
     if (d === 0) {

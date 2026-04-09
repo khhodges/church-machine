@@ -108,15 +108,15 @@ CLOOMC is both the instruction set — the language the Church Machine hardware 
 
 The IDE runs in a web browser. It provides:
 
-- **A code editor** where you write abstractions in a high-level language (currently a subset of JavaScript or Haskell) and the compiler translates them into CLOOMC instructions.
+- **An abstraction creator** where you design and write abstractions in a high-level language (currently a subset of JavaScript or Haskell) and the compiler translates them into CLOOMC instructions. Each abstraction is a problem-oriented, engineered solution — not a loose script, but a sealed component with a defined interface and a calibrated MTBF.
 
-- **A hardware simulator** that runs your code exactly as the real chip would — complete with Golden Token checks, capability fault detection, and the full security model. If your code violates a security rule, you see it immediately, before it ever touches real hardware.
+- **A hardware simulator** that runs your abstractions exactly as the real chip would — complete with Golden Token checks, capability fault detection, and the full security model. If your code violates a security rule, you see it immediately, before it ever touches real hardware.
 
 - **A register dashboard** that shows the state of every capability register, every data register, and every namespace entry in real time. You can watch the Golden Tokens being checked on every memory access.
 
-- **A namespace browser** where you can see every abstraction in the system, its seal, its permissions, and its relationships to other abstractions.
+- **A namespace browser** where you can see the CLOOMC namespace — the engineered library of sealed abstractions, each with its own MTBF, seal, permissions, and relationships. This is not a file system. It is a curated collection of problem-oriented solutions, each one verified and reusable.
 
-- **A fault investigation system** that captures the complete machine state when a security violation occurs, so you can understand exactly what went wrong and why.
+- **A fault investigation system** that captures the complete machine state when a security violation occurs, so you can understand exactly what went wrong and why. Every fault contributes to the MTBF measurement of the abstraction that caused it — reliability is calibrated, not assumed.
 
 The IDE targets the Efinix Ti60 F225 FPGA — a chip with 60,000 logic elements that can be physically programmed with the Church Machine architecture. It also supports the smaller Tang Nano 20K for education and IoT applications.
 

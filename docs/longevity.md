@@ -312,7 +312,7 @@ Mint still forges the GT (that is Mint's unique role — only Mint can create ne
    - Boot button advances the boot sequence
    - Code tab shows language selector with Assembly, JS, Haskell options
    - Compile and Draft buttons are present and functional
-   - Example loading populates the code editor
+   - Example loading populates the abstraction creator
    - All navigation tabs work (Dashboard, Code, Namespace, Abstractions, Pipeline, Tutorial, REPL, Reference, Docs)
 
 **Outcome:** All checks passed. The system works end-to-end from boot through compilation through abstraction creation.

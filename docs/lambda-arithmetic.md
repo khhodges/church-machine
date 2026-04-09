@@ -58,7 +58,7 @@ To compute `7 / 3` with two decimal places:
 
 ### The Abstraction: `FixedPointMath`
 
-Load the **LC: Fixed-Pt** example tab in the Code view.
+Load the **LC: Fixed-Pt** example tab in the Create view.
 
 ```
 abstraction FixedPointMath {
@@ -225,7 +225,7 @@ This is exactly what the `isEqual` method computes: `if (n1 * d2) == (n2 * d1) t
 
 ### The Abstraction: `RationalArith`
 
-Load the **LC: Rational** example tab in the Code view.
+Load the **LC: Rational** example tab in the Create view.
 
 ```
 abstraction RationalArith {

@@ -82,7 +82,7 @@
                             <button class="ham-item" id="hamItem-dashboard-state" onclick="switchView('dashboard');switchDashTab('state');closeHamburger()">Machine State</button>
                             <div class="ham-divider"></div>
                             <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math</button>
-                            <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Code</button>
+                            <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Create</button>
                             <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
                             <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace</button>
                             <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Abstractions</button>
@@ -504,7 +504,7 @@
                     <div class="math-tool-history">
                         <p>In 1843, Ada Lovelace wrote the first computer program — Note G, an algorithm for computing Bernoulli numbers. It was not just code. It was the first <em>first-class</em> program: it passed <strong>functions as arguments to other functions</strong>, not just values.</p>
                         <p>This is the vital distinction. Basic machine code (Turing) moves numbers between registers — <code>ADD R0, R1, R2</code> adds two values, nothing more. CLOOMC is different. In CLOOMC, a variable can hold a function, pass it to another function, and return a function as a result. <code>let double = \x -> x * 2</code> creates a function. <code>let apply = \f x -> f(x)</code> passes that function as an argument. Ada did this in 1843 — Alonzo Church formalised it in 1936 as the lambda calculus.</p>
-                        <p>Type <code>let x = 2 + 3</code> and you are writing what Ada wrote. To see her original algorithm as Church Machine code, click <strong>Code</strong> and select the <a href="#" onclick="event.preventDefault();switchView('editor');setTimeout(function(){var s=document.getElementById('langSelector');if(s){s.value='assembly';onLangChange(false);}loadExample('ada_note_g');},150);" style="color:var(--church-gold);">Bernoulli example</a>.</p>
+                        <p>Type <code>let x = 2 + 3</code> and you are writing what Ada wrote. To see her original algorithm as Church Machine code, click <strong>Create</strong> and select the <a href="#" onclick="event.preventDefault();switchView('editor');setTimeout(function(){var s=document.getElementById('langSelector');if(s){s.value='assembly';onLangChange(false);}loadExample('ada_note_g');},150);" style="color:var(--church-gold);">Bernoulli example</a>.</p>
                     </div>
                     <div id="replOutput">
                         <div class="repl-info" id="replWelcomeMsg"></div>

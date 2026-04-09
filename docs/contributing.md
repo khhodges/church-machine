@@ -7,7 +7,7 @@ contributor community for the Church Machine project. Members work on
 two areas:
 
 1. **The IDE** — the browser-based Church Machine development
-   environment, including the simulator, CLOOMC compiler, code editor,
+   environment, including the simulator, CLOOMC compiler, abstraction creator,
    capability register inspector, and hardware bridge.
 
 2. **Abstractions** — the library of Church Machine programs published

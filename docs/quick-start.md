@@ -324,7 +324,7 @@ IDE ── write ──► Patch (one click) ──► FPGA runs under full capa
 1. Open the Church Machine IDE in your browser
 2. Click **CRs** in the toolbar
 3. Click on a CR — for example, **CR14** (instruction fetch)
-4. Click **Edit** to open the code editor
+4. Click **Edit** to open the abstraction creator
 5. Write or modify your Church Machine assembly
 
 ### Step 7 — Compile and test in the simulator
@@ -542,7 +542,7 @@ by contributing.
 
 ### What you can work on
 
-- **IDE** — simulator accuracy, CLOOMC compiler, code editor, hardware
+- **IDE** — simulator accuracy, CLOOMC compiler, abstraction creator, hardware
   bridge, documentation, testing
 - **Abstractions** — system libraries, IoT drivers, educational
   tutorials, mathematical functions, protocol handlers
@@ -751,7 +751,7 @@ sudo chmod 666 /dev/ttyUSB1      # quick fix
 ### "Editor is empty"
 
 - Click a CR first (the CRs button), then click Edit
-- The code editor only appears when you select a CR to edit
+- The abstraction creator only appears when you select a CR to edit
 
 ### LEDs don't change after patching
 
