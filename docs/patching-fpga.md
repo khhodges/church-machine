@@ -152,7 +152,7 @@ connection needed.  The IDE exports a binary file, and a small Python script
 sends it over UART.
 
 ```
-IDE (browser) ──Export──► .bin file ──patch_fpga.py──► Tang Nano 20K
+IDE (browser) ──Export──► .patch file ──patch_fpga.py──► Tang Nano 20K
 ```
 
 ### Step 8 — Patch the simulator
