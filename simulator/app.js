@@ -2167,14 +2167,14 @@ function updateCRDetail() {
         const typeNames = ['NULL','Inform','Outform','Abstract'];
 
         html += '<table class="cr-table"><tbody>';
-        html += `<tr><td>W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
-        html += `<tr><td>W1: Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
-        html += `<tr><td>W1: F (Far)</td><td>${lim.f}</td></tr>`;
-        html += `<tr><td>W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
-        html += `<tr><td>W1: Chainable</td><td>${entry.chainable ? 'Yes' : 'No'}</td></tr>`;
-        html += `<tr><td>W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
-        html += `<tr><td>W2: GT Seq</td><td>${sealGtSeq}</td></tr>`;
-        html += `<tr><td>W2: CRC Seal</td><td>0x${sealCRC.toString(16).toUpperCase().padStart(4,'0')}</td></tr>`;
+        html += `<tr><td>NS W0: Location</td><td>0x${loc.toString(16).toUpperCase().padStart(8,'0')}</td></tr>`;
+        html += `<tr><td>NS W1: Type</td><td>${typeNames[entry.gtType] || '?'}</td></tr>`;
+        html += `<tr><td>NS W1: F (Far)</td><td>${lim.f}</td></tr>`;
+        html += `<tr><td>NS W1: G (GC)</td><td>${entry.gBit}</td></tr>`;
+        html += `<tr><td>NS W1: Chainable</td><td>${entry.chainable ? 'Yes' : 'No'}</td></tr>`;
+        html += `<tr><td>NS W1: Limit</td><td>0x${lim.limit.toString(16).toUpperCase().padStart(5,'0')} (${lim.limit + 1} words)</td></tr>`;
+        html += `<tr><td>NS W2: GT Seq</td><td>${sealGtSeq}</td></tr>`;
+        html += `<tr><td>NS W2: CRC Seal</td><td>0x${sealCRC.toString(16).toUpperCase().padStart(4,'0')}</td></tr>`;
         html += `<tr><td>CR Permissions</td><td>[${gtPermStr}]</td></tr>`;
         if (entry.codeLength !== undefined) {
             html += `<tr><td>Code Length</td><td>${entry.codeLength} words (${entry.codeLength * 4} bytes)</td></tr>`;
