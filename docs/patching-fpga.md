@@ -375,8 +375,9 @@ identical.
 abstractions run clean with MTBF = ∞, then plug in a board and flash.
 The code you wrote in the simulator runs unchanged on silicon.
 
-Start the IDE now — everything below this point is about hardware, and
-you can come back to it when you are ready for a board.
+[Start the IDE now](https://cloomc.com) — everything below this point
+is about hardware, and you can come back to it when you are ready for
+a board.
 
 ---
 
