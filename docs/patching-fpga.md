@@ -133,21 +133,27 @@ IDE (browser) ──Export──► .patch file ──patch_fpga.py──► Tan
 4. Click **Edit** to open the code editor for that CR's code lump
 5. Write or modify your Church Machine assembly
 
-### Step 7 — Test in the simulator (optional)
+### Step 7 — Compile and test in the simulator
 
-Click **Patch** to assemble your code and test it in the browser simulator
-before sending it to real hardware. You can step through instructions,
-inspect registers, and check for capability faults — all without touching
-the FPGA.
+Click **Patch** to assemble your code into binary machine words and write
+them into the simulator memory. This is the compilation step — it
+produces the binary code that will be sent to the FPGA. You can then
+step through instructions, inspect registers, and check for capability
+faults before committing to real hardware.
+
+If the assembler reports errors, fix them and click **Patch** again.
 
 ### Step 8 — Export the patch file
 
-Click **Export Patch** in the CR detail card. This does three things:
+Click **Export Patch** in the CR detail card. This takes the compiled
+binary from Step 7, packages it into a `.patch` file with UART framing
+and CRC checksums, and downloads it. Specifically it:
 
-1. Assembles your code and patches the simulator memory
-2. Shows a **patch preview** in the log — addresses, word counts, CRC
-   checksums, and whether a namespace table update is included
-3. Downloads a `.patch` file (e.g. `CR14_patch.patch`)
+1. Packages the compiled code into PATCH_LUMP UART frames (with tags,
+   addresses, and CRC-16/CCITT checksums)
+2. Appends the RUN sentinel so the FPGA starts executing after upload
+3. Shows a **patch preview** in the log for cross-checking
+4. Downloads a `.patch` file (e.g. `CR14_patch.patch`)
 
 The preview looks like:
 
@@ -206,8 +212,8 @@ After the RUN command:
 - **led1** stops blinking (core running, not halted)
 - **led2** OFF = no fault, ON = capability fault triggered
 
-**That's it!** To change your code, repeat Steps 6–10. Each cycle takes
-under a minute.
+**That's it!** To change your code, repeat Steps 6–10: edit, compile in
+the simulator, export, flash. Each cycle takes under a minute.
 
 ---
 
@@ -451,8 +457,8 @@ sudo chmod 666 /dev/ttyUSB1
 | Step | Where | What to do |
 |------|-------|------------|
 | 6 | IDE | Select CR, click Edit, write code |
-| 7 | IDE | Click Patch to test in the simulator (optional) |
-| 8 | IDE | Click Export Patch — downloads `.patch` file |
+| 7 | IDE | Click Patch — compiles code and tests in simulator |
+| 8 | IDE | Click Export Patch — packages compiled binary into `.patch` file |
 | 9 | Local | `python3 patch_fpga.py /dev/ttyUSB1 CR14_patch.patch` |
 | 10 | Local | Check LEDs + cross-check CRC values |
 
