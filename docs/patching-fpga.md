@@ -44,7 +44,8 @@ Model:
    and the abstraction library are all open. Anyone can inspect the
    security model, verify the implementation, build from source, and
    contribute improvements. No black boxes. No vendor lock-in. The
-   architecture belongs to everyone who builds on it.
+   architecture belongs to everyone who builds on it. Start at
+   [CLOOMC.org](https://cloomc.org).
 
 This is not theoretical. The Church Machine runs on real silicon today,
 on two FPGA boards you can buy for the price of a textbook.
@@ -363,6 +364,13 @@ identical.
   produces a `.patch` file you can flash to either FPGA with a single
   command.
 
+**Download the IDE and all project resources:**
+
+- [CLOOMC.org](https://cloomc.org) — project home, documentation,
+  and community
+- [CLOOMC.com](https://cloomc.com) — downloads, approved bitstreams,
+  and the Mum Tunnel Library
+
 **The path is simple:** learn in the IDE, experiment until your
 abstractions run clean with MTBF = ∞, then plug in a board and flash.
 The code you wrote in the simulator runs unchanged on silicon.
@@ -485,7 +493,15 @@ pip3 install pyserial
 
 ### Step 2 — Download the latest bitstream
 
-From the Church Machine IDE (Replit project), download:
+Download approved bitstreams and tools from
+[CLOOMC.com](https://cloomc.com):
+
+```
+church_tang_nano_20k_iot.fs     (bitstream)
+patch_fpga.py                   (CLI patcher)
+```
+
+Alternatively, from the Church Machine IDE (Replit project):
 
 ```
 build/church_tang_nano_20k_iot.fs     (bitstream)
@@ -695,8 +711,9 @@ everyone.
 
 ### The Mum Tunnel Library
 
-The Mum Tunnel is a community repository backed by GitHub where you can
-publish and browse Church Machine abstractions. Each abstraction includes:
+The Mum Tunnel is a community repository at
+[CLOOMC.com](https://cloomc.com) where you can publish and browse
+Church Machine abstractions. Each abstraction includes:
 
 - Compiled code (machine words)
 - A capability list (the exact permissions it requires)
