@@ -153,6 +153,7 @@ BOOK_CHAPTERS = [
     ("Getting Started", [
         "patching-fpga.md",
         "prologue.md",
+        "contributing.md",
     ]),
     ("Part I: Introduction", [
         "overview.md",

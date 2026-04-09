@@ -831,6 +831,59 @@ Share it with the world.
 
 ---
 
+## Open Source Contributors
+
+The Church Machine is built by its community. The **IDE/Abstractions
+Implementation Group** is open to anyone who wants to contribute —
+there is no application form, no interview, no gatekeeping. You join
+by contributing.
+
+### How to join
+
+1. Download the IDE from [CLOOMC.com](https://cloomc.com)
+2. Work through the tutorials and understand the six Laws
+3. Submit your first contribution — a bug fix, a new abstraction, a
+   documentation improvement, a test case, anything that makes the
+   project stronger
+4. Your first merged contribution makes you a member
+
+### What you can work on
+
+- **IDE** — simulator accuracy, CLOOMC compiler, code editor, hardware
+  bridge, documentation, testing
+- **Abstractions** — system libraries, IoT drivers, educational
+  tutorials, mathematical functions, protocol handlers
+- **Hardware** — Amaranth HDL processor core, new FPGA board support,
+  boot ROM, verification and testbenches
+
+### Group rules (summary)
+
+1. The six Laws are not negotiable — no contribution may weaken
+   capability enforcement
+2. Abstractions must be self-documenting with source, capability list,
+   and test cases
+3. Minimum capability grants — request only what you need
+4. Test before you submit — zero capability faults in the simulator
+5. No breaking changes to hardware-visible interfaces without
+   discussion first
+6. Be kind, be patient — many contributors are students and learners
+
+Full rules and guidance: see
+[contributing.md](contributing.md) in the documentation library.
+
+### Recognition
+
+- Every contributor is listed in the project
+- Every abstraction in the Mum Tunnel Library carries its author's
+  name permanently
+- Monthly Abstraction Challenge awards for Best New Abstraction,
+  Highest Reliability, and Best Educational Abstraction
+
+The more people who build on the Church Machine, the stronger it
+becomes. The architecture belongs to everyone who builds on it.
+
+---
+
 ## Building the Bitstream from Source
 
 If you need to modify the hardware design itself — add a peripheral,
