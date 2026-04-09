@@ -150,7 +150,8 @@ def docs_figures(path):
     return send_from_directory(os.path.join(DOCS_DIR, "figures"), path)
 
 BOOK_CHAPTERS = [
-    ("Prologue", [
+    ("Getting Started", [
+        "patching-fpga.md",
         "prologue.md",
     ]),
     ("Part I: Introduction", [
