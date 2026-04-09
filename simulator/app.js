@@ -395,6 +395,10 @@ function checkBootId() {
                 // Guides are now on-demand via the ? button — no auto-popup.
             }
             localStorage.setItem('churchMachine_bootId', data.bootId);
+            if (data.version) {
+                const el = document.getElementById('version-tag');
+                if (el) el.textContent = 'v' + data.version;
+            }
         })
         .catch(() => {});
 }

@@ -9978,3 +9978,14 @@ tr.itrace-fault td { color: #ff9999; }
 .trace-th-cond { min-width: 30px; }
 .trace-th-dst { min-width: 30px; }
 .trace-th-src { min-width: 30px; }
+
+#version-tag {
+    position: fixed;
+    bottom: 4px;
+    right: 8px;
+    font-size: 10px;
+    color: #555;
+    font-family: 'Courier New', monospace;
+    pointer-events: none;
+    z-index: 1;
+}

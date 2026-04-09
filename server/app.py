@@ -38,6 +38,17 @@ DOCS_DIR = os.path.join(BASE_DIR, "docs")
 
 BOOT_ID = str(uuid.uuid4())
 
+def _git_short_hash():
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=BASE_DIR, stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        return "unknown"
+
+BUILD_VERSION = _git_short_hash()
+
 _COMPRESSIBLE = ('javascript', 'css', 'html', 'json', 'text/')
 _gz_cache = {}
 
@@ -131,7 +142,7 @@ def favicon():
 
 @app.route("/api/boot-id")
 def boot_id():
-    return jsonify({"bootId": BOOT_ID})
+    return jsonify({"bootId": BOOT_ID, "version": BUILD_VERSION})
 
 @app.route("/simulator/")
 def simulator_index():
