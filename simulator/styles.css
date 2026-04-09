@@ -10085,6 +10085,22 @@ tr.itrace-fault td { color: #ff9999; }
     align-self: flex-start;
     margin-top: 0.3rem;
 }
+.gh-footer-message {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #888);
+    line-height: 1.7;
+    padding: 1rem 2rem 0.5rem;
+    font-style: italic;
+}
+.gh-get-started-link {
+    color: var(--church-gold, #daa520);
+    font-weight: 700;
+    font-style: normal;
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+.gh-get-started-link:hover { text-decoration: underline; }
 @media (max-width: 768px) {
     .gh-repos-row, .gh-section-grid, .gh-actions-row { grid-template-columns: 1fr; }
 }
