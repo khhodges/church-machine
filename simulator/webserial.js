@@ -430,73 +430,94 @@ const TangSerial = (function() {
     async function readBRAM(baseAddr, count, onStatus) {
         const status = onStatus || function() {};
         await ensureOpen();
+
+        await drainInput();
+        await sleep(50);
         await drainInput();
 
-        const frame = new Uint8Array(6);
-        frame[0] = 0xBE;
-        frame[1] = 0xAD;
-        frame[2] = (baseAddr >>> 8) & 0xFF;
-        frame[3] =  baseAddr        & 0xFF;
-        frame[4] = (count    >>> 8) & 0xFF;
-        frame[5] =  count           & 0xFF;
+        function buildFrame(addr, cnt) {
+            var f = new Uint8Array(6);
+            f[0] = 0xBE; f[1] = 0xAD;
+            f[2] = (addr >>> 8) & 0xFF; f[3] = addr & 0xFF;
+            f[4] = (cnt  >>> 8) & 0xFF; f[5] = cnt  & 0xFF;
+            return f;
+        }
+
+        var frame = buildFrame(baseAddr, count);
 
         status(`READ_BRAM: addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')} ` +
                `count=${count} — awaiting ${count * 4} bytes…`);
 
-        // ── bridge path ──────────────────────────────────────────────────────
         if (_bridgeMode) {
-            const res = await _bTransact(Array.from(frame), count * 4, 5000);
+            var res = await _bTransact(Array.from(frame), count * 4, 8000);
             if (!res.ok) { status('Bridge error: ' + res.error); return { success: false, words: [], rxLen: 0 }; }
-            const rb = res.rx || [];
-            const words = [];
-            for (let i = 0; i + 3 < rb.length; i += 4) {
-                words.push(((rb[i]) | (rb[i+1] << 8) | (rb[i+2] << 16) | (rb[i+3] << 24)) >>> 0);
+            var rb = res.rx || [];
+            var bWords = [];
+            for (var bi = 0; bi + 3 < rb.length; bi += 4) {
+                bWords.push(((rb[bi]) | (rb[bi+1] << 8) | (rb[bi+2] << 16) | (rb[bi+3] << 24)) >>> 0);
             }
-            const ok = rb.length >= count * 4;
-            status(ok ? `READ_BRAM: ${words.length} words received ✓`
-                      : `READ_BRAM: timeout — got ${rb.length}/${count*4} bytes`);
-            return { success: ok, words, rxBytes: new Uint8Array(rb), rxLen: rb.length };
+            var bOk = rb.length >= count * 4;
+            status(bOk ? `READ_BRAM: ${bWords.length} words received ✓`
+                       : `READ_BRAM: timeout — got ${rb.length}/${count*4} bytes`);
+            return { success: bOk, words: bWords, rxBytes: new Uint8Array(rb), rxLen: rb.length };
         }
 
-        const writer = port.writable.getWriter();
-        try { await writer.write(frame); } finally { writer.releaseLock(); }
+        async function doRead(f, expected) {
+            var writer = port.writable.getWriter();
+            try { await writer.write(f); } finally { writer.releaseLock(); }
 
-        const expected = count * 4;
-        const rxBytes  = new Uint8Array(expected);
-        let rxLen = 0;
-
-        const r = port.readable.getReader();
-        try {
-            while (rxLen < expected) {
-                const { value, done } = await Promise.race([
-                    r.read(),
-                    sleep(5000).then(() => ({ value: null, done: true })),
-                ]);
-                if (done || !value) break;
-                for (const b of value) {
-                    if (rxLen < expected) rxBytes[rxLen++] = b;
+            var rxBuf = new Uint8Array(expected);
+            var rxOff = 0;
+            var r = port.readable.getReader();
+            var deadline = Date.now() + 8000;
+            try {
+                while (rxOff < expected) {
+                    var remaining = Math.max(deadline - Date.now(), 0);
+                    if (remaining <= 0) break;
+                    var result = await Promise.race([
+                        r.read(),
+                        sleep(remaining).then(function() { return { value: null, done: true }; }),
+                    ]);
+                    if (result.done || !result.value) break;
+                    for (var j = 0; j < result.value.length; j++) {
+                        if (rxOff < expected) rxBuf[rxOff++] = result.value[j];
+                    }
                 }
+            } finally {
+                r.releaseLock();
             }
-        } finally {
-            r.releaseLock();
+            return { rxBuf: rxBuf, rxLen: rxOff };
         }
 
-        const words = [];
-        for (let i = 0; i < Math.min(count, Math.floor(rxLen / 4)); i++) {
-            const w = (rxBytes[i*4])
-                    | (rxBytes[i*4+1] << 8)
-                    | (rxBytes[i*4+2] << 16)
-                    | (rxBytes[i*4+3] << 24);
+        var result = await doRead(frame, count * 4);
+
+        if (result.rxLen === 0) {
+            status('READ_BRAM: no response — retrying with drain…');
+            await drainInput();
+            await sleep(200);
+            await drainInput();
+            result = await doRead(buildFrame(baseAddr, count), count * 4);
+        }
+
+        var words = [];
+        var nWords = Math.min(count, Math.floor(result.rxLen / 4));
+        for (var i = 0; i < nWords; i++) {
+            var w = (result.rxBuf[i*4])
+                  | (result.rxBuf[i*4+1] << 8)
+                  | (result.rxBuf[i*4+2] << 16)
+                  | (result.rxBuf[i*4+3] << 24);
             words.push(w >>> 0);
         }
 
-        const ok = rxLen >= expected;
+        var ok = result.rxLen >= count * 4;
         if (ok) {
             status(`READ_BRAM: ${words.length} words received ✓`);
+        } else if (result.rxLen > 0) {
+            status(`READ_BRAM: partial — got ${result.rxLen}/${count*4} bytes (${words.length} complete words)`);
         } else {
-            status(`READ_BRAM: timeout — got ${rxLen}/${expected} bytes (${words.length} complete words)`);
+            status(`READ_BRAM: timeout — got 0/${count*4} bytes. The FPGA did not respond to 0xBEAD. Check: (1) is the bitstream built with READ_BRAM? (2) is this the Ti60 F225 (not Tang Nano)?`);
         }
-        return { success: ok, words, rxBytes, rxLen };
+        return { success: ok, words: words, rxBytes: result.rxBuf, rxLen: result.rxLen };
     }
 
     async function runFPGA(onStatus) {

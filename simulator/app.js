@@ -6077,12 +6077,10 @@ function updateFPGAStatusBtn() {
 }
 
 function _fpgaLog(msg) {
-    // Write to the editor console so the user can see FPGA feedback
     const con = document.getElementById('editorConsole');
     if (con) {
         con.textContent += '\n' + msg;
         con.scrollTop = con.scrollHeight;
-        switchView('editor');
     }
 }
 
@@ -6231,7 +6229,6 @@ function fpgaReadBRAM() {
         const baseAddr = parseInt(addrStr, 16) || 0;
         const count    = Math.min(Math.max(parseInt(countStr, 10) || 256, 1), 2048);
 
-        switchView('editor');
         _fpgaLog(`Read BRAM: addr=0x${baseAddr.toString(16).toUpperCase().padStart(4,'0')} count=${count}…`);
 
         try {

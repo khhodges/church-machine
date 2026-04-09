@@ -45,7 +45,12 @@ def _git_short_hash():
             cwd=BASE_DIR, stderr=subprocess.DEVNULL
         ).decode().strip()
     except Exception:
-        return "unknown"
+        pass
+    for env_key in ("REPL_DEPLOY_ID", "REPL_ID"):
+        val = os.environ.get(env_key, "")
+        if val:
+            return val[:8]
+    return "unknown"
 
 BUILD_VERSION = _git_short_hash()
 
