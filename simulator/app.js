@@ -1635,7 +1635,10 @@ function patchSimulator() {
     const result = injectCRCode(logEl);
     const logText = logEl ? logEl.textContent.trim() : '';
     showPatchModal(!!result, 'Patch Simulator', logText);
-    if (result) updateCRDetail();
+    if (result) {
+        updateCRDetail();
+        runSim();
+    }
 }
 
 async function patchFPGA() {
