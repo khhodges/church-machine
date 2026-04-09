@@ -35,10 +35,10 @@ title = "Patching the Tang Nano 20K FPGA — Complete Guide"
 id = "5LtzCON58t7pyJ5QK4gpt"
 uri = "file://docs/flexibility-and-decisions.pdf"
 type = "pdf"
-title = "Flexibility and Decisions — Why Constraints Are a Feature, Not a Bug"
+title = "Flexibility and Decisions (updated tables)"
 
 [[outputs]]
 id = "LGBXHAPfrFZb1bTRbRGON"
 uri = "file://docs/fulcrum-of-computer-science.pdf"
 type = "pdf"
-title = "The Fulcrum of Computer Science — Where the Lever Meets the Load"
+title = "The Fulcrum of Computer Science (updated tables)"

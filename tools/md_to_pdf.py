@@ -63,6 +63,46 @@ def write_paragraph(text):
     render_inline(text)
     pdf.ln(7)
 
+def _cell_height(text, width, font_name, font_style, font_size):
+    pdf.set_font(font_name, font_style, font_size)
+    line_h = 4.5
+    lines = 1
+    if pdf.get_string_width(text) > width - 2:
+        words = text.split()
+        cur = ''
+        for w in words:
+            test = (cur + ' ' + w).strip()
+            if pdf.get_string_width(test) > width - 2:
+                lines += 1
+                cur = w
+            else:
+                cur = test
+    return max(lines * line_h + 2, 6.5)
+
+def _draw_multicell_row(cells, col_widths, row_h, font_name, font_style, font_size, fill):
+    x_start = pdf.get_x()
+    y_start = pdf.get_y()
+    line_h = 4.5
+    for idx, cell in enumerate(cells):
+        x = x_start + sum(col_widths[:idx])
+        pdf.set_xy(x, y_start)
+        pdf.set_font(font_name, font_style, font_size)
+        pdf.rect(x, y_start, col_widths[idx], row_h, 'DF')
+        pdf.set_xy(x + 1, y_start + 1)
+        words = cell.split()
+        cur_line = ''
+        for w in words:
+            test = (cur_line + ' ' + w).strip()
+            if pdf.get_string_width(test) > col_widths[idx] - 2:
+                pdf.cell(col_widths[idx] - 2, line_h, cur_line)
+                pdf.set_xy(x + 1, pdf.get_y() + line_h)
+                cur_line = w
+            else:
+                cur_line = test
+        if cur_line:
+            pdf.cell(col_widths[idx] - 2, line_h, cur_line)
+    pdf.set_xy(x_start, y_start + row_h)
+
 def write_table(table_lines):
     rows = []
     for tl in table_lines:
@@ -77,27 +117,34 @@ def write_table(table_lines):
 
     num_cols = len(rows[0])
     usable_w = 170
-    col_w = usable_w / num_cols
+    col_widths = [usable_w / num_cols] * num_cols
 
-    pdf.set_font(FONT, 'B', 8)
-    pdf.set_fill_color(232, 232, 232)
     pdf.set_draw_color(153, 153, 153)
-    for cell in rows[0]:
-        clean = re.sub(r'\*\*|`', '', cell)
-        pdf.cell(col_w, 6.5, clean[:45], border=1, fill=True)
-    pdf.ln()
 
-    pdf.set_font(FONT, '', 8)
+    header_cells = [re.sub(r'\*\*|`', '', c) for c in rows[0]]
+    row_h = 6.5
+    for idx, cell in enumerate(header_cells):
+        h = _cell_height(cell, col_widths[idx], FONT, 'B', 8)
+        if h > row_h:
+            row_h = h
+    pdf.set_fill_color(232, 232, 232)
+    _draw_multicell_row(header_cells, col_widths, row_h, FONT, 'B', 8, True)
+
     alt_fill = False
     for row in rows[1:]:
+        clean_cells = [re.sub(r'\*\*|`', '', c) for c in row]
+        row_h = 6.5
+        for idx, cell in enumerate(clean_cells):
+            h = _cell_height(cell, col_widths[idx], FONT, '', 8)
+            if h > row_h:
+                row_h = h
+        if pdf.get_y() + row_h > 277:
+            pdf.add_page()
         if alt_fill:
             pdf.set_fill_color(247, 247, 247)
         else:
             pdf.set_fill_color(255, 255, 255)
-        for cell in row:
-            clean = re.sub(r'\*\*|`', '', cell)
-            pdf.cell(col_w, 6.5, clean[:55], border=1, fill=True)
-        pdf.ln()
+        _draw_multicell_row(clean_cells, col_widths, row_h, FONT, '', 8, True)
         alt_fill = not alt_fill
     pdf.set_fill_color(255, 255, 255)
     pdf.ln(4)
