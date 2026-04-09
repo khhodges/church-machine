@@ -1646,6 +1646,123 @@ async function patchFPGA() {
     showPatchModal(ok, 'Patch FPGA', logText);
 }
 
+function exportPatchFile() {
+    const logEl = document.getElementById('crInjectLog');
+    if (logEl) { logEl.style.display = 'block'; logEl.textContent = ''; }
+    const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
+
+    const patch = injectCRCode(logEl);
+    if (!patch) return;
+
+    const { newWords, baseLoc, codeStart, newCW, oldCW, nsIdx } = patch;
+
+    const blocks = [];
+    const nsChanged = newCW !== oldCW;
+
+    if (nsChanged) {
+        const nsSlice = Array.from(sim.memory.slice(0, TangSerial.NS_WORDS));
+        const clSlice = Array.from(sim.memory.slice(TangSerial.NS_WORDS, TangSerial.NS_WORDS + TangSerial.CLIST_WORDS));
+        const totalWords = TangSerial.NS_WORDS + TangSerial.CLIST_WORDS;
+        const nsWords = new Array(totalWords);
+        for (let i = 0; i < TangSerial.NS_WORDS; i++) nsWords[i] = i < nsSlice.length ? nsSlice[i] : 0;
+        for (let i = 0; i < TangSerial.CLIST_WORDS; i++) nsWords[TangSerial.NS_WORDS + i] = i < clSlice.length ? clSlice[i] : 0;
+        blocks.push({ addr: 0x0000, words: nsWords });
+        log(`Block 0: NS table update  addr=0x0000  words=${totalWords}`);
+    }
+
+    blocks.push({ addr: codeStart, words: newWords });
+    log(`Block ${blocks.length - 1}: Code lump  addr=0x${codeStart.toString(16).toUpperCase().padStart(4,'0')}  words=${newCW}`);
+
+    const numBlocks = blocks.length;
+    let totalDataBytes = 0;
+    const blockBuffers = [];
+    for (const blk of blocks) {
+        const buf = new Uint8Array(4 + blk.words.length * 4);
+        buf[0] = (blk.addr >> 8) & 0xFF;
+        buf[1] = blk.addr & 0xFF;
+        buf[2] = (blk.words.length >> 8) & 0xFF;
+        buf[3] = blk.words.length & 0xFF;
+        for (let i = 0; i < blk.words.length; i++) {
+            const w = blk.words[i] >>> 0;
+            buf[4 + i * 4 + 0] = w & 0xFF;
+            buf[4 + i * 4 + 1] = (w >> 8) & 0xFF;
+            buf[4 + i * 4 + 2] = (w >> 16) & 0xFF;
+            buf[4 + i * 4 + 3] = (w >> 24) & 0xFF;
+        }
+        blockBuffers.push(buf);
+        totalDataBytes += buf.length;
+    }
+
+    const fileSize = 8 + totalDataBytes;
+    const fileData = new Uint8Array(fileSize);
+    fileData[0] = 0x43;
+    fileData[1] = 0x48;
+    fileData[2] = 0x50;
+    fileData[3] = 0x46;
+    fileData[4] = 0x01;
+    fileData[5] = numBlocks;
+    fileData[6] = 0x01;
+    fileData[7] = 0x00;
+
+    let offset = 8;
+    for (const buf of blockBuffers) {
+        fileData.set(buf, offset);
+        offset += buf.length;
+    }
+
+    log('');
+    log('--- Patch Preview (cross-check with patch_fpga.py output) ---');
+    for (let i = 0; i < blocks.length; i++) {
+        const blk = blocks[i];
+        const body = new Uint8Array(6 + blk.words.length * 4);
+        body[0] = 0xBE; body[1] = 0xEF;
+        body[2] = (blk.addr >> 8) & 0xFF;
+        body[3] = blk.addr & 0xFF;
+        body[4] = (blk.words.length >> 8) & 0xFF;
+        body[5] = blk.words.length & 0xFF;
+        for (let j = 0; j < blk.words.length; j++) {
+            const w = blk.words[j] >>> 0;
+            body[6 + j * 4 + 0] = w & 0xFF;
+            body[6 + j * 4 + 1] = (w >> 8) & 0xFF;
+            body[6 + j * 4 + 2] = (w >> 16) & 0xFF;
+            body[6 + j * 4 + 3] = (w >> 24) & 0xFF;
+        }
+        let crc = 0xFFFF;
+        for (const byte of body) {
+            for (let b = 0; b < 8; b++) {
+                const bit = ((byte >>> (7 - b)) & 1) ^ ((crc >>> 15) & 1);
+                crc = ((crc << 1) & 0xFFFF) ^ (bit ? 0x1021 : 0);
+            }
+        }
+        const frameLen = body.length + 2;
+        log(`  Block ${i}: addr=0x${blk.addr.toString(16).toUpperCase().padStart(4,'0')}  words=${blk.words.length}  CRC=0x${crc.toString(16).toUpperCase().padStart(4,'0')}  frame=${frameLen} bytes`);
+    }
+    log(`  RUN: yes (0xBE 0xAA after all blocks)`);
+    log(`  File size: ${fileSize} bytes`);
+    log('');
+
+    const crIdx = selectedCR !== null ? selectedCR : 0;
+    const fileName = `CR${crIdx}_patch.bin`;
+
+    const blob = new Blob([fileData], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    log(`Downloaded: ${fileName}`);
+    log('');
+    log('To flash to FPGA, run:');
+    log(`  python3 tools/patch_fpga.py /dev/ttyUSB1 ${fileName}`);
+
+    const logText = logEl ? logEl.textContent.trim() : '';
+    showPatchModal(true, 'Export Patch', logText);
+}
+
 function showPatchModal(ok, opName, logText) {
     const existing = document.getElementById('patchToastOverlay');
     if (existing) existing.remove();
@@ -1757,6 +1874,11 @@ function updateCRDetail() {
         html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" title="Patch simulator then upload to FPGA over UART">&#x21A9; Patch FPGA</button>`;
         html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('patchFPGAInfoPop')" title="What does Patch FPGA do?">&#x2139;</button>`;
         html += `<div class="crd-info-pop" id="patchFPGAInfoPop" style="display:none;"><b>Patch FPGA</b><br><br>Runs <b>Patch Simulator</b> first, then uploads the updated code lump to the connected Efinix Ti60 F225 FPGA over WebSerial (UART).<br><br>If the instruction count changed, the full NS table is re-uploaded before the code lump. Requires an active WebSerial connection to the hardware.</div>`;
+        html += `</span>`;
+        html += `<span class="crd-action-group">`;
+        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportPatchFile()" title="Export compiled patch as .bin file for command-line flashing">&#x2B73; Export Patch</button>`;
+        html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('exportPatchInfoPop')" title="What does Export Patch do?">&#x2139;</button>`;
+        html += `<div class="crd-info-pop" id="exportPatchInfoPop" style="display:none;"><b>Export Patch</b><br><br>Assembles the code and downloads a <code>.bin</code> patch file containing the pre-compiled binary blocks. Flash it to the FPGA with:<br><code>python3 patch_fpga.py /dev/ttyUSB1 file.bin</code><br><br>No bridge or browser connection needed &mdash; just one terminal command.</div>`;
         html += `</span>`;
     }
     html += '</div>';
