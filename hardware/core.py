@@ -605,16 +605,17 @@ class ChurchCore(Elaboratable):
         with m.Switch(boot_state_reg):
             with m.Case(BootState.LOAD_NS):
                 # CR15 (namespace cap): full 128-bit write to include word1_location=0
-                # (NS at dmem byte 0) and word2_w2=15 (limit: slots 0..15 accessible).
+                # (NS at dmem byte 0) and word2_w2=18 (limit: slots 0..18 accessible).
                 # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0
                 # word0_gt = (GT_TYPE_INFORM<<23) | 0 = 0x00800000
+                # Slots 16=SlideRule, 17=(empty), 18=Constants
                 m.d.comb += [
                     boot_cap_wr_en.eq(1),
                     boot_cap_wr_addr.eq(15),
                     boot_cap_wr_data.eq(Cat(
                         C(0x00800000, 32),  # word0_gt: GT_TYPE_INFORM, slot_id=0
                         C(0,          32),  # word1_location = 0 (NS at dmem start)
-                        C(15,         32),  # word2_w2: limit_offset=15 (slots 0-15)
+                        C(18,         32),  # word2_w2: limit_offset=18 (slots 0-18)
                         C(0,          32),  # word3_w3
                     )),
                 ]

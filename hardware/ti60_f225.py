@@ -4,7 +4,9 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 from .core import ChurchCore
-from .boot_rom import BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST, NUC_LUMP_HEADER
+from .boot_rom import (BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST,
+                        NUC_LUMP_HEADER, SLIDERULE_LUMP_HEADER,
+                        SLIDERULE_SLOT, CONSTANTS_SLOT, NS_SLOT_COUNT)
 from .uart_tx import DebugPrinter
 from .uart_rx import UartRx
 from .crc16 import CRC16_CCITT
@@ -67,7 +69,7 @@ class ChurchTi60F225(Elaboratable):
         rx_data  = uart_rx_mod.data
 
         m.d.comb += [
-            boot_rom.addr.eq(core.imem_addr[2:11]),
+            boot_rom.addr.eq(core.imem_addr[2:12]),
             core.imem_data.eq(boot_rom.data),
         ]
 
@@ -75,8 +77,6 @@ class ChurchTi60F225(Elaboratable):
         for i in range(0, len(DEMO_NAMESPACE), 3):
             if i + 2 < len(DEMO_NAMESPACE):
                 ns_init.extend([DEMO_NAMESPACE[i], DEMO_NAMESPACE[i+1], DEMO_NAMESPACE[i+2]])
-        # Pad to 255 words, then place the NUC_PROGRAM lump header at DMEM word 255 (byte 0x3FC).
-        # cload reads this header to obtain cw for CR14.word2 limit derivation.
         while len(ns_init) < 255:
             ns_init.append(0)
         ns_init.append(NUC_LUMP_HEADER)
@@ -88,6 +88,8 @@ class ChurchTi60F225(Elaboratable):
         dmem_init = ns_init + clist_init
         while len(dmem_init) < 2048:
             dmem_init.append(0)
+
+        dmem_init[511] = SLIDERULE_LUMP_HEADER
 
         dmem = Memory(width=32, depth=2048, init=dmem_init)
         m.submodules.dmem = dmem

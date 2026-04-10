@@ -241,7 +241,101 @@ NUC_PROGRAM = [
 _NUC_PADDED = list(NUC_PROGRAM)
 while len(_NUC_PADDED) < 256:
     _NUC_PADDED.append(0x00000000)
-FULL_ROM = BOOT_PROGRAM + _NUC_PADDED
+
+
+# ---------------------------------------------------------------------------
+# SLIDERULE ABSTRACTION — Layer 3 Mathematics (NS Slot 16)
+#
+# Compiled CLOOMC machine code from simulator/cloomc/SlideRule.json.
+# 8 methods: Add(0), Sub(1), Mul(2), Div(3), Sqrt(4), Pow(5),
+#            ToDegrees(6), ToRadians(7).
+#
+# Method dispatch convention: caller sets DR3 = method index before CALL.
+# The code block begins with a 16-word dispatch table (8 × ISUB+BRANCH pairs)
+# that compares DR3 against each method index and branches to the method body.
+# DR2 is used as scratch for the comparison; DR0/DR1 carry method arguments.
+#
+# Boot ROM layout:
+#   [0:255]   BOOT_PROGRAM
+#   [256:511] NUC_PROGRAM (padded)
+#   [512:680] SlideRule dispatch table (16) + method code (153) = 169 words
+# ---------------------------------------------------------------------------
+SLIDERULE_SLOT    = 16
+CONSTANTS_SLOT    = 18
+
+_SR_ADD  = [0x7f600000, 0x7f660000, 0x7f260000, 0x7f020000, 0x1f000000]
+_SR_SUB  = [0x87600000, 0x7f260000, 0x7f020000, 0x1f000000]
+_SR_MUL  = [
+    0x7f600000, 0x7f260000, 0x7f600000, 0x7f2e0000, 0x7f600000,
+    0x770e0000, 0x8d00000c, 0x7f600000, 0x87660000, 0x7f0e0000,
+    0x7f600001, 0x7f2e0000, 0x7f600000, 0x770e0000, 0x8e807fff,
+    0x67608001, 0x7f360000, 0x7f600001, 0x77360000, 0x88800017,
+    0x7f620000, 0x7f660000, 0x7f260000, 0x97600001, 0x7f060000,
+    0x9f608001, 0x7f0e0000, 0x7f600001, 0x772e0000, 0x88800021,
+    0x7f600000, 0x87660000, 0x7f260000, 0x7f020000, 0x1f000000,
+]
+_SR_DIV  = [
+    0x7f600000, 0x770e0000, 0x88800006, 0x7f600000, 0x7f060000,
+    0x1f000000, 0x7f600000, 0x7f260000, 0x7f600000, 0x77060000,
+    0x8d000010, 0x7f600000, 0x87660000, 0x7f060000, 0x7f620001,
+    0x7f260000, 0x7f600000, 0x770e0000, 0x8d000018, 0x7f600000,
+    0x87660000, 0x7f0e0000, 0x7f620001, 0x7f260000, 0x7f600000,
+    0x7f2e0000, 0x77008000, 0x8d807fff, 0x87600000, 0x7f060000,
+    0x7f628001, 0x7f2e0000, 0x7f600001, 0x77260000, 0x88800026,
+    0x7f600000, 0x87660000, 0x7f2e0000, 0x7f028000, 0x1f000000,
+]
+_SR_SQRT = [
+    0x7f600000, 0x77060000, 0x88800006, 0x7f600000, 0x7f060000,
+    0x1f000000, 0x7f600001, 0x77060000, 0x8880000c, 0x7f600001,
+    0x7f060000, 0x1f000000, 0x9f600001, 0x7f260000, 0x7f600000,
+    0x7f2e0000, 0x7f600014, 0x772e0000, 0x8d007fff, 0x7f600000,
+    0x7f360000, 0x7f380000, 0x773a0000, 0x8d807fff, 0x87638000,
+    0x7f3e0000, 0x7f630001, 0x7f360000, 0x7f620000, 0x7f660000,
+    0x7f460000, 0x9f640001, 0x7f460000, 0x7f240000, 0x7f628001,
+    0x7f2e0000, 0x7f020000, 0x1f000000,
+]
+_SR_POW  = [
+    0x7f600001, 0x7f260000, 0x7f600000, 0x770e0000, 0x8e807fff,
+    0x7f600000, 0x7f2e0000, 0x7f300000, 0x7f3a0000, 0x7f600000,
+    0x773e0000, 0x8e807fff, 0x67638001, 0x7f460000, 0x7f600001,
+    0x77460000, 0x88800014, 0x7f628000, 0x7f660000, 0x7f2e0000,
+    0x97630001, 0x7f360000, 0x9f638001, 0x7f3e0000, 0x7f228000,
+    0x87608001, 0x7f0e0000, 0x7f020000, 0x1f000000,
+]
+_SR_TODEG = [0x1f000000]
+_SR_TORAD = [0x1f000000]
+
+_SR_METHODS = [_SR_ADD, _SR_SUB, _SR_MUL, _SR_DIV, _SR_SQRT, _SR_POW, _SR_TODEG, _SR_TORAD]
+_SR_METHOD_NAMES = ['Add', 'Sub', 'Mul', 'Div', 'Sqrt', 'Pow', 'ToDegrees', 'ToRadians']
+_SR_DISPATCH_SIZE = len(_SR_METHODS) * 2
+
+_sr_offsets = []
+_sr_pos = _SR_DISPATCH_SIZE
+for _m in _SR_METHODS:
+    _sr_offsets.append(_sr_pos)
+    _sr_pos += len(_m)
+
+_SR_DISPATCH = []
+for _idx, _off in enumerate(_sr_offsets):
+    _SR_DISPATCH.append(encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=2, dr_src=3, imm=_idx))
+    _branch_pos = _idx * 2 + 1
+    _branch_offset = _off - _branch_pos
+    _SR_DISPATCH.append(encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=_branch_offset & 0x7FFF))
+
+SLIDERULE_CODE = list(_SR_DISPATCH)
+for _m in _SR_METHODS:
+    SLIDERULE_CODE.extend(_m)
+
+SLIDERULE_CW = len(SLIDERULE_CODE)
+SLIDERULE_N_MINUS_6 = 2
+SLIDERULE_LUMP_BASE = 511 * 4
+SLIDERULE_LUMP_HEADER = (0x1F << 27) | (SLIDERULE_N_MINUS_6 << 23) | (SLIDERULE_CW << 10)
+
+SLIDERULE_METHOD_OFFSETS = {name: off for name, off in zip(_SR_METHOD_NAMES, _sr_offsets)}
+
+FULL_ROM = BOOT_PROGRAM + _NUC_PADDED + list(SLIDERULE_CODE)
+while len(FULL_ROM) < 1024:
+    FULL_ROM.append(0x00000000)
 
 # ---------------------------------------------------------------------------
 # NUC_PROGRAM lump header constants — derived entirely from NUC_PROGRAM contents.
@@ -363,6 +457,9 @@ _MMIO_ENTRIES = {
 #   Slot 13: BTN_DEV       — MMIO 0x40000028, R,  1 word
 #   Slot 14: TIMER_DEV     — MMIO 0x4000002C, RW, 5 words
 #   Slot 15: Display       — reserved for future display device
+#   Slot 16: SlideRule     — Layer 3 Mathematics (8 methods, E-perm)
+#   Slot 17: (empty)       — reserved
+#   Slot 18: Constants     — Layer 3 read-only constants (R-perm)
 # ---------------------------------------------------------------------------
 _SYSTEM_ABSTRACTION_SLOTS = {
     5:  ('Navana',       PERM_MASK_E),
@@ -374,8 +471,10 @@ _SYSTEM_ABSTRACTION_SLOTS = {
     15: ('Display',      PERM_MASK_E),
 }
 
+NS_SLOT_COUNT = 19
+
 DEMO_NAMESPACE = []
-for _i in range(16):
+for _i in range(NS_SLOT_COUNT):
     if _i in _MMIO_ENTRIES:
         _loc, _sz, _gtype, _perms = _MMIO_ENTRIES[_i]
         _entry = _make_ns_entry(_gtype, _perms, _i, 0, _loc, _sz)
@@ -385,6 +484,12 @@ for _i in range(16):
     elif _i == 4:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
                                 NUC_LUMP_BASE, 64)
+    elif _i == SLIDERULE_SLOT:
+        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
+                                SLIDERULE_LUMP_BASE, 256)
+    elif _i == CONSTANTS_SLOT:
+        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R, _i, 0,
+                                CONSTANTS_SLOT * 0x100, 64)
     elif _i in _SYSTEM_ABSTRACTION_SLOTS:
         _name, _perms = _SYSTEM_ABSTRACTION_SLOTS[_i]
         _entry = _make_ns_entry(GT_TYPE_INFORM, _perms, _i, 0,
@@ -414,9 +519,11 @@ for _i in range(16):
 #   idx  9: make_gt(Inform, R|W, slot_id=11, b_flag=1)         — UART_DEV (MMIO, bindable)
 #   idx 10: make_gt(Inform, R,   slot_id=13, b_flag=1)         — BTN_DEV  (MMIO, bindable)
 #   idx 11: make_gt(Inform, R|W, slot_id=14, b_flag=1)         — TIMER_DEV(MMIO, bindable)
+#   idx 12: make_gt(Inform, E,   slot_id=16, gt_seq=0)         — SlideRule E-GT (Layer 3)
+#   idx 13: make_gt(Inform, R,   slot_id=18, gt_seq=0)         — Constants R-GT (Layer 3)
 #
 # Indices 0–3 are boot-internal (used by BOOT_PROGRAM firmware only).
-# Indices 4–11 are the user-visible c-list, matching simulator layout exactly.
+# Indices 4–13 are the user-visible c-list, matching simulator layout exactly.
 #
 # b_flag=1 marks each IO device GT as IDE-bound to a physical peripheral.  The flag is
 # excluded from the CRC seal input so the runtime can clear it on un-bind without
@@ -435,6 +542,8 @@ DEMO_CLIST = [
     make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_UART_SLOT,  0, b_flag=1),  # idx 9:  UART_DEV → NS 11
     make_gt(GT_TYPE_INFORM, PERM_MASK_R,                MMIO_BTN_SLOT,   0, b_flag=1),  # idx 10: BTN_DEV  → NS 13
     make_gt(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, MMIO_TIMER_SLOT, 0, b_flag=1),  # idx 11: TIMER_DEV→ NS 14
+    make_gt(GT_TYPE_INFORM, PERM_MASK_E, SLIDERULE_SLOT, 0),            # idx 12: SlideRule E-GT, Slot 16
+    make_gt(GT_TYPE_INFORM, PERM_MASK_R, CONSTANTS_SLOT, 0),            # idx 13: Constants R-GT, Slot 18
 ]
 
 while len(DEMO_CLIST) < 64:
@@ -442,11 +551,17 @@ while len(DEMO_CLIST) < 64:
 
 
 class BootRom(Elaboratable):
-    """Instruction ROM for Church Machine boot and demo program.
+    """Instruction ROM for Church Machine boot, demo, and abstraction code.
 
-    Uses Array constants for reliable iCE40 initialization.
+    Uses Array constants for reliable iCE40/EBR initialization.
     Only non-zero entries are stored; default is 0.
     Registered output maintains 1-cycle read latency matching original BRAM behavior.
+
+    Layout (1024 words):
+      [0:255]   BOOT_PROGRAM  — secure boot firmware
+      [256:511] NUC_PROGRAM   — LED blink demo (Salvation, Slot 4)
+      [512:680] SlideRule     — dispatch table (16) + 8 method bodies (153)
+      [681:1023] (reserved)   — future abstractions
 
     CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js
     The BOOT_PROGRAM words above correspond 1-to-1 with the annotated CLOOMC
@@ -457,11 +572,11 @@ class BootRom(Elaboratable):
     def __init__(self, program=None):
         if program is None:
             program = BOOT_PROGRAM
-        self.program = program[:512]
-        while len(self.program) < 512:
+        self.program = program[:1024]
+        while len(self.program) < 1024:
             self.program.append(0)
 
-        self.addr = Signal(9)
+        self.addr = Signal(10)
         self.data = Signal(32)
 
     def elaborate(self, platform):

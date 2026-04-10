@@ -4,7 +4,8 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 from .core import ChurchCore
-from .boot_rom import BootRom, BOOT_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST, NUC_LUMP_HEADER
+from .boot_rom import (BootRom, BOOT_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST,
+                        NUC_LUMP_HEADER, SLIDERULE_LUMP_HEADER)
 from .uart_tx import DebugPrinter
 from .uart_rx import UartRx
 from .crc16 import CRC16_CCITT
@@ -75,7 +76,7 @@ class ChurchTangNano20K(Elaboratable):
         m.d.comb += uart_rx.rx.eq(self.uart_rx)
 
         m.d.comb += [
-            boot_rom.addr.eq(core.imem_addr[2:11]),
+            boot_rom.addr.eq(core.imem_addr[2:12]),
             core.imem_data.eq(boot_rom.data),
         ]
 
@@ -217,6 +218,8 @@ class ChurchTangNano20K(Elaboratable):
             dmem_init = ns_init + clist_init
             while len(dmem_init) < 2048:
                 dmem_init.append(0)
+
+            dmem_init[511] = SLIDERULE_LUMP_HEADER
 
             dmem = Memory(width=32, depth=2048, init=dmem_init)
             m.submodules.dmem = dmem
