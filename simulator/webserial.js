@@ -255,6 +255,9 @@ const TangSerial = (function() {
         if (!_readerLoopRunning) {
             console.warn('[TangSerial] read loop failed to start after connect! err=' + (_loopError || 'unknown'));
         }
+        var pi = _getPortInfo();
+        console.log('[TangSerial] connected: VID=0x' + (pi.vid || '?') + ' PID=0x' + (pi.pid || '?') +
+                    ' readLoop=' + _readerLoopRunning);
     }
 
     async function disconnect() {
@@ -307,6 +310,16 @@ const TangSerial = (function() {
 
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function _getPortInfo() {
+        if (!port) return { vid: null, pid: null };
+        try {
+            var info = port.getInfo();
+            var vid = info.usbVendorId ? info.usbVendorId.toString(16).toUpperCase().padStart(4, '0') : null;
+            var pid = info.usbProductId ? info.usbProductId.toString(16).toUpperCase().padStart(4, '0') : null;
+            return { vid: vid, pid: pid, raw: info };
+        } catch(e) { return { vid: null, pid: null }; }
     }
 
     async function _writeBytes(data) {
@@ -550,10 +563,12 @@ const TangSerial = (function() {
             status('NAK (0x15) received \u2014 CRC mismatch on FPGA side. Frame may be corrupted.');
             return { success: false };
         } else {
+            var pi = _getPortInfo();
             status('No echo received (' + rxBytes.length + ' bytes). readLoop=' +
                    (_readerLoopRunning ? 'alive' : 'DEAD') + ' totalRx=' + _loopTotalBytes +
                    ' loopErr=' + (_loopError || 'none') +
-                   '. Check: (1) correct port selected? (2) FPGA UART TX connected? (3) try a serial terminal to verify data flow.');
+                   ' port=[VID=0x' + (pi.vid || '?') + ' PID=0x' + (pi.pid || '?') + ']' +
+                   '. Run in browser console: TangSerial.portInfo() and TangSerial.writeProbe()');
             return { success: false, rxBytes: rxBytes };
         }
     }
@@ -662,6 +677,54 @@ const TangSerial = (function() {
         };
     }
 
+    function portInfo() {
+        var pi = _getPortInfo();
+        console.log('[TangSerial] Port info:', JSON.stringify(pi));
+        return pi;
+    }
+
+    async function probeRx(seconds) {
+        seconds = seconds || 10;
+        if (!port) { console.log('Not connected'); return; }
+        console.log('[TangSerial] Probe: listening for ANY bytes for ' + seconds + 's…');
+        _rxBuffer.length = 0;
+        _loopTotalBytes = 0;
+        var t0 = Date.now();
+        var reported = 0;
+        while (Date.now() - t0 < seconds * 1000) {
+            await sleep(500);
+            if (_loopTotalBytes > reported) {
+                console.log('[TangSerial] Probe: received ' + _loopTotalBytes + ' bytes! buf=' + _rxBuffer.length);
+                reported = _loopTotalBytes;
+            }
+        }
+        console.log('[TangSerial] Probe done: totalRx=' + _loopTotalBytes + ' buf=' + _rxBuffer.length);
+        if (_rxBuffer.length > 0) {
+            var hex = Array.from(_rxBuffer.slice(0, 32)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join(' ');
+            console.log('[TangSerial] Probe data (first 32): ' + hex);
+        }
+        return _loopTotalBytes;
+    }
+
+    async function writeProbe() {
+        if (!port) { console.log('Not connected'); return; }
+        _rxBuffer.length = 0;
+        var before = _loopTotalBytes;
+        console.log('[TangSerial] writeProbe: sending 0x00 (should be ignored by FSM)');
+        await _writeBytes(new Uint8Array([0x00]));
+        await sleep(500);
+        console.log('[TangSerial] writeProbe: sending 0xBE 0x00 (invalid 2nd byte — FPGA should return to idle)');
+        await _writeBytes(new Uint8Array([0xBE, 0x00]));
+        await sleep(2000);
+        var delta = _loopTotalBytes - before;
+        console.log('[TangSerial] writeProbe done: +' + delta + ' bytes received (totalRx=' + _loopTotalBytes + ')');
+        if (_rxBuffer.length > 0) {
+            var hex = Array.from(_rxBuffer.slice(0, 32)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join(' ');
+            console.log('[TangSerial] writeProbe rx data: ' + hex);
+        }
+        return delta;
+    }
+
     return {
         isSupported,
         isConnected,
@@ -677,6 +740,9 @@ const TangSerial = (function() {
         parseReadback,
         setBoardLabel,
         readLoopStatus,
+        portInfo,
+        probeRx,
+        writeProbe,
         resetPort: _resetPort,
         NS_WORDS,
         CLIST_WORDS,
