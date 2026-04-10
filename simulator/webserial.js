@@ -1,9 +1,12 @@
 const TangSerial = (function() {
     let port = null;
-    let activeReader = null;
     let _boardLabel = 'Tang Nano 20K';
 
-    // ── Local Bridge (ChromeOS / WebSerial-blocked environments) ────────────
+    let _reader = null;
+    let _readerLoopRunning = false;
+    let _rxBuffer = [];
+    let _rxWaiters = [];
+
     let _bridgeMode = false;
     let _bridgeUrl  = '';
     let _bridgeOpen = false;
@@ -32,7 +35,6 @@ const TangSerial = (function() {
         _bridgeOpen = false;
     }
 
-    // Send tx bytes, wait for exactly rxCount bytes back (or timeout)
     async function _bTransact(txArr, rxCount, timeoutMs) {
         return _bFetch('/transact', { method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -42,8 +44,6 @@ const TangSerial = (function() {
     async function _bDrain() {
         try { await _bFetch('/drain'); } catch(e) {}
     }
-
-    // ── end bridge helpers ───────────────────────────────────────────────────
 
     const BAUD = 115200;
     const NS_WORDS = 192;
@@ -76,22 +76,129 @@ const TangSerial = (function() {
         _boardLabel = label || 'Tang Nano 20K';
     }
 
+    function _startReadLoop() {
+        if (_readerLoopRunning || !port || !port.readable) return;
+        _reader = port.readable.getReader();
+        _readerLoopRunning = true;
+        (async function loop() {
+            try {
+                while (_readerLoopRunning) {
+                    var result = await _reader.read();
+                    if (result.done) break;
+                    if (result.value && result.value.length > 0) {
+                        for (var i = 0; i < result.value.length; i++) {
+                            _rxBuffer.push(result.value[i]);
+                        }
+                        for (var wi = 0; wi < _rxWaiters.length; wi++) {
+                            _rxWaiters[wi]();
+                        }
+                    }
+                }
+            } catch(e) {
+            } finally {
+                _readerLoopRunning = false;
+                try { _reader.releaseLock(); } catch(e2) {}
+                _reader = null;
+            }
+        })();
+    }
+
+    async function _stopReadLoop() {
+        if (!_readerLoopRunning && !_reader) return;
+        _readerLoopRunning = false;
+        if (_reader) {
+            try { await _reader.cancel(); } catch(e) {}
+        }
+        var waited = 0;
+        while (_reader && waited < 500) {
+            await new Promise(function(r) { setTimeout(r, 20); });
+            waited += 20;
+        }
+    }
+
+    function _addWaiter(fn) {
+        _rxWaiters.push(fn);
+    }
+
+    function _removeWaiter(fn) {
+        var idx = _rxWaiters.indexOf(fn);
+        if (idx !== -1) _rxWaiters.splice(idx, 1);
+    }
+
+    function _readBytes(n, timeoutMs) {
+        return new Promise(function(resolve) {
+            var collected = [];
+            var deadline = Date.now() + timeoutMs;
+            var timer = null;
+            var resolved = false;
+
+            function finish() {
+                if (resolved) return;
+                resolved = true;
+                if (timer) clearTimeout(timer);
+                _removeWaiter(check);
+                resolve(collected);
+            }
+
+            function check() {
+                if (resolved) return;
+                while (collected.length < n && _rxBuffer.length > 0) {
+                    collected.push(_rxBuffer.shift());
+                }
+                if (collected.length >= n) { finish(); return; }
+                var remaining = deadline - Date.now();
+                if (remaining <= 0) { finish(); return; }
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(finish, remaining);
+            }
+
+            _addWaiter(check);
+            check();
+        });
+    }
+
+    function _readBytesGreedy(maxBytes, timeoutMs) {
+        return new Promise(function(resolve) {
+            var collected = [];
+            var deadline = Date.now() + timeoutMs;
+            var timer = null;
+            var resolved = false;
+
+            function finish() {
+                if (resolved) return;
+                resolved = true;
+                if (timer) clearTimeout(timer);
+                _removeWaiter(check);
+                resolve(collected);
+            }
+
+            function check() {
+                if (resolved) return;
+                while (collected.length < maxBytes && _rxBuffer.length > 0) {
+                    collected.push(_rxBuffer.shift());
+                }
+                var remaining = deadline - Date.now();
+                if (remaining <= 0 || collected.length >= maxBytes) { finish(); return; }
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(finish, remaining);
+            }
+
+            _addWaiter(check);
+            check();
+        });
+    }
+
     async function connect() {
         if (!isSupported()) {
             throw new Error(`WebSerial not supported. Use Chrome or Edge to connect to your ${_boardLabel}.`);
         }
 
-        // Cancel any active reader first so the port can be closed cleanly
-        if (activeReader) {
-            try { await activeReader.cancel(); } catch(e) {}
-            activeReader = null;
-            await new Promise(r => setTimeout(r, 100));
-        }
+        await _stopReadLoop();
 
         if (port) {
             try { await port.close(); } catch(e) {}
             port = null;
-            await new Promise(r => setTimeout(r, 400));
+            await new Promise(function(r) { setTimeout(r, 400); });
         }
 
         port = await navigator.serial.requestPort({ filters: [] });
@@ -110,14 +217,20 @@ const TangSerial = (function() {
             }
             throw e;
         }
+
+        _rxBuffer.length = 0;
+        _startReadLoop();
     }
 
     async function disconnect() {
         if (_bridgeMode) { await disconnectBridge(); return; }
+        await _stopReadLoop();
         if (port) {
             try { await port.close(); } catch(e) {}
             port = null;
         }
+        _rxBuffer.length = 0;
+        _rxWaiters.length = 0;
     }
 
     function wordToLE(word) {
@@ -133,24 +246,16 @@ const TangSerial = (function() {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    async function _writeBytes(data) {
+        var w = port.writable.getWriter();
+        try { await w.write(data); } finally { w.releaseLock(); }
+    }
+
     async function drainInput() {
         if (_bridgeMode) { await _bDrain(); return; }
-        if (!port || !port.readable) return;
-        var r = port.readable.getReader();
-        activeReader = r;
-        try {
-            while (true) {
-                var result = await Promise.race([
-                    r.read(),
-                    sleep(100).then(function() { return { value: null, done: true }; }),
-                ]);
-                if (result.done || !result.value) break;
-            }
-        } catch(e) {}
-        finally {
-            activeReader = null;
-            try { r.releaseLock(); } catch(e2) {}
-        }
+        _rxBuffer.length = 0;
+        await sleep(50);
+        _rxBuffer.length = 0;
     }
 
     async function uploadToFPGA(nsWords, clistWords, onStatus) {
@@ -180,35 +285,11 @@ const TangSerial = (function() {
 
         status(`Sending ${payload.length} bytes (${totalWords} words) to ${_boardLabel}...`);
 
-        const w = port.writable.getWriter();
-        try {
-            await w.write(payload);
-        } finally {
-            w.releaseLock();
-        }
+        await _writeBytes(payload);
 
         status(`Data sent to ${_boardLabel}. Waiting for FPGA response...`);
 
-        const rxBytes = [];
-        const deadline = Date.now() + 5000;
-
-        const r = port.readable.getReader();
-        activeReader = r;
-        try {
-            while (Date.now() < deadline) {
-                const { value, done } = await Promise.race([
-                    r.read(),
-                    new Promise(resolve => setTimeout(() => resolve({ value: null, done: true }), 2000))
-                ]);
-                if (done || !value || value.length === 0) break;
-                for (let i = 0; i < value.length; i++) rxBytes.push(value[i]);
-            }
-        } catch(e) {
-            status('Read error: ' + e.message);
-        } finally {
-            activeReader = null;
-            try { r.releaseLock(); } catch(e2) {}
-        }
+        var rxBytes = await _readBytesGreedy(2048, 5000);
 
         const rxTotal = rxBytes.length;
         const success = rxTotal > 0;
@@ -223,8 +304,6 @@ const TangSerial = (function() {
     }
 
     function parseReadback(rawBytes) {
-        // Protocol: every pair is 0xFA <value_byte>
-        // 0xFA 0xFA = escaped literal 0xFA in the data stream.
         const vals = [];
         let i = 0;
         while (i < rawBytes.length) {
@@ -240,18 +319,12 @@ const TangSerial = (function() {
             }
         }
 
-        // Group value bytes into 32-bit little-endian words
         const words = [];
         for (let j = 0; j + 3 < vals.length; j += 4) {
             words.push((vals[j] | (vals[j+1] << 8) | (vals[j+2] << 16) | (vals[j+3] << 24)) >>> 0);
         }
         const leftover = vals.length % 4;
 
-        // Interpret structure:
-        //  word[0]       = header echo (total words sent, should = 256)
-        //  words[1..16]  = CR0–CR15
-        //  words[17..32] = DR0–DR15
-        //  words[33..]   = additional (NS readback or firmware-specific)
         const headerEcho = words.length > 0 ? words[0] : null;
         const crs = words.slice(1, 17);
         const drs = words.slice(17, 33);
@@ -269,44 +342,22 @@ const TangSerial = (function() {
 
         await drainInput();
 
-        // Send a 4-byte probe: little-endian word 0xCEFACEFA ("CAFE CAFE").
-        // The FPGA may not understand this — that is fine.  We just want to
-        // confirm that bytes flow in both directions.
         const probe = new Uint8Array([0xFA, 0xCE, 0xFA, 0xCE]);
         status(`Sending 4-byte probe (0xCEFACEFA)...`);
 
-        const w = port.writable.getWriter();
-        try { await w.write(probe); } finally { w.releaseLock(); }
+        await _writeBytes(probe);
 
         status('Probe sent. Listening for 1.5 s...');
 
-        const rxBytes = [];
-        const deadline = Date.now() + 1500;
-        const r = port.readable.getReader();
-        activeReader = r;
-        try {
-            while (Date.now() < deadline) {
-                const { value, done } = await Promise.race([
-                    r.read(),
-                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 500))
-                ]);
-                if (done || !value || value.length === 0) break;
-                for (let i = 0; i < value.length; i++) rxBytes.push(value[i]);
-            }
-        } catch(e) {
-            status('Read error: ' + e.message);
-        } finally {
-            activeReader = null;
-            try { r.releaseLock(); } catch(e2) {}
-        }
+        var rxBytes = await _readBytesGreedy(64, 1500);
 
         return { bytesSent: probe.length, bytesReceived: rxBytes.length, rawBytes: rxBytes };
     }
 
     window.addEventListener('pagehide', () => {
-        if (activeReader) {
-            try { activeReader.cancel(); } catch(e) {}
-            activeReader = null;
+        _readerLoopRunning = false;
+        if (_reader) {
+            try { _reader.cancel(); } catch(e) {}
         }
         if (port) {
             try { port.close(); } catch(e) {}
@@ -314,11 +365,6 @@ const TangSerial = (function() {
         }
     });
 
-    // PATCH_LUMP — write N words at an arbitrary BRAM address.
-    // Protocol: [0xBE][0xEF][addrHi][addrLo][countHi][countLo][w0_LE ... wN-1_LE][crcHi][crcLo]
-    // The FPGA echoes back [addrHi][addrLo][countHi][countLo] on success,
-    // or 0x15 (NAK) on CRC mismatch.
-    // Requires hardware ti60_f225.py debug FSM (opcode 0xBEEF).
     async function patchLump(baseAddr, words, onStatus) {
         var status = onStatus || function() {};
 
@@ -385,44 +431,18 @@ const TangSerial = (function() {
             return { success: false };
         }
 
-        async function sendAndAwaitEcho(f) {
-            var wr = port.writable.getWriter();
-            try { await wr.write(f); } finally { wr.releaseLock(); }
-
-            status('Bytes sent. Waiting for echo\u2026');
-
-            var rxBuf = [];
-            var deadline = Date.now() + 5000;
-            var r = port.readable.getReader();
-            activeReader = r;
-            try {
-                while (rxBuf.length < 4) {
-                    var remaining = Math.max(deadline - Date.now(), 0);
-                    if (remaining <= 0) break;
-                    var result = await Promise.race([
-                        r.read(),
-                        sleep(remaining).then(function() { return { value: null, done: true }; }),
-                    ]);
-                    if (result.done || !result.value) break;
-                    for (var j = 0; j < result.value.length; j++) rxBuf.push(result.value[j]);
-                }
-            } catch(e) {
-                status('Read error: ' + e.message);
-            } finally {
-                activeReader = null;
-                try { r.releaseLock(); } catch(e2) {}
-            }
-            return rxBuf;
-        }
-
-        var rxBytes = await sendAndAwaitEcho(frame);
+        await _writeBytes(frame);
+        status('Bytes sent. Waiting for echo\u2026');
+        var rxBytes = await _readBytes(4, 5000);
 
         if (rxBytes.length === 0) {
             status('No echo \u2014 retrying with drain\u2026');
             await drainInput();
             await sleep(200);
             await drainInput();
-            rxBytes = await sendAndAwaitEcho(frame);
+            await _writeBytes(frame);
+            status('Bytes re-sent. Waiting for echo\u2026');
+            rxBytes = await _readBytes(4, 5000);
         }
 
         if (rxBytes.length >= 4) {
@@ -448,11 +468,6 @@ const TangSerial = (function() {
         }
     }
 
-    // READ_BRAM — read N words from BRAM starting at word address baseAddr.
-    // Protocol (Ti60 F225 debug_fsm, opcode 0xBEAD):
-    //   Send:    [0xBE][0xAD][addrHi][addrLo][countHi][countLo]
-    //   Receive: count × 4 raw LE bytes  (no framing or escaping)
-    // Requires the Ti60 F225 bitstream built with the READ_BRAM hardware extension.
     async function readBRAM(baseAddr, count, onStatus) {
         const status = onStatus || function() {};
         await ensureOpen();
@@ -488,62 +503,41 @@ const TangSerial = (function() {
             return { success: bOk, words: bWords, rxBytes: new Uint8Array(rb), rxLen: rb.length };
         }
 
-        async function doRead(f, expected) {
-            var writer = port.writable.getWriter();
-            try { await writer.write(f); } finally { writer.releaseLock(); }
+        await _writeBytes(frame);
+        var expected = count * 4;
+        var rxArr = await _readBytes(expected, 8000);
 
-            var rxBuf = new Uint8Array(expected);
-            var rxOff = 0;
-            var r = port.readable.getReader();
-            var deadline = Date.now() + 8000;
-            try {
-                while (rxOff < expected) {
-                    var remaining = Math.max(deadline - Date.now(), 0);
-                    if (remaining <= 0) break;
-                    var result = await Promise.race([
-                        r.read(),
-                        sleep(remaining).then(function() { return { value: null, done: true }; }),
-                    ]);
-                    if (result.done || !result.value) break;
-                    for (var j = 0; j < result.value.length; j++) {
-                        if (rxOff < expected) rxBuf[rxOff++] = result.value[j];
-                    }
-                }
-            } finally {
-                try { r.releaseLock(); } catch(e2) {}
-            }
-            return { rxBuf: rxBuf, rxLen: rxOff };
-        }
-
-        var result = await doRead(frame, count * 4);
-
-        if (result.rxLen === 0) {
+        if (rxArr.length === 0) {
             status('READ_BRAM: no response — retrying with drain…');
             await drainInput();
             await sleep(200);
             await drainInput();
-            result = await doRead(buildFrame(baseAddr, count), count * 4);
+            await _writeBytes(buildFrame(baseAddr, count));
+            rxArr = await _readBytes(expected, 8000);
         }
 
+        var rxBuf = new Uint8Array(rxArr);
+        var rxLen = rxBuf.length;
+
         var words = [];
-        var nWords = Math.min(count, Math.floor(result.rxLen / 4));
+        var nWords = Math.min(count, Math.floor(rxLen / 4));
         for (var i = 0; i < nWords; i++) {
-            var w = (result.rxBuf[i*4])
-                  | (result.rxBuf[i*4+1] << 8)
-                  | (result.rxBuf[i*4+2] << 16)
-                  | (result.rxBuf[i*4+3] << 24);
+            var w = (rxBuf[i*4])
+                  | (rxBuf[i*4+1] << 8)
+                  | (rxBuf[i*4+2] << 16)
+                  | (rxBuf[i*4+3] << 24);
             words.push(w >>> 0);
         }
 
-        var ok = result.rxLen >= count * 4;
+        var ok = rxLen >= expected;
         if (ok) {
             status(`READ_BRAM: ${words.length} words received ✓`);
-        } else if (result.rxLen > 0) {
-            status(`READ_BRAM: partial — got ${result.rxLen}/${count*4} bytes (${words.length} complete words)`);
+        } else if (rxLen > 0) {
+            status(`READ_BRAM: partial — got ${rxLen}/${expected} bytes (${words.length} complete words)`);
         } else {
-            status(`READ_BRAM: timeout — got 0/${count*4} bytes. The FPGA did not respond to 0xBEAD. Check: (1) is the bitstream built with READ_BRAM? (2) is this the Ti60 F225 (not Tang Nano)?`);
+            status(`READ_BRAM: timeout — got 0/${expected} bytes. The FPGA did not respond to 0xBEAD. Check: (1) is the bitstream built with READ_BRAM? (2) is this the Ti60 F225 (not Tang Nano)?`);
         }
-        return { success: ok, words: words, rxBytes: result.rxBuf, rxLen: result.rxLen };
+        return { success: ok, words: words, rxBytes: rxBuf, rxLen: rxLen };
     }
 
     async function runFPGA(onStatus) {
@@ -560,8 +554,7 @@ const TangSerial = (function() {
             status('RUN sent — core executing from PC=0.');
             return { success: true };
         }
-        const w = port.writable.getWriter();
-        try { await w.write(frame); } finally { w.releaseLock(); }
+        await _writeBytes(frame);
         status('RUN sent — core executing from PC=0.');
         return { success: true };
     }
