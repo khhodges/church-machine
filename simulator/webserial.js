@@ -235,7 +235,7 @@ const TangSerial = (function() {
         port = await navigator.serial.requestPort({ filters: [] });
 
         try {
-            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none', bufferSize: 4096 });
+            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none', bufferSize: 4096 });
         } catch(e) {
             port = null;
             const msg = e.message || String(e);
@@ -266,6 +266,34 @@ const TangSerial = (function() {
         }
         _rxBuffer.length = 0;
         _rxWaiters.length = 0;
+    }
+
+    async function _resetPort() {
+        if (!port) return false;
+        console.warn('[TangSerial] resetting port (close + reopen)…');
+        _readerLoopRunning = false;
+        if (_reader) {
+            try { await _reader.cancel(); } catch(e) {}
+        }
+        var waited = 0;
+        while (_reader && waited < 500) {
+            await sleep(20);
+            waited += 20;
+        }
+        try { await port.close(); } catch(e) {}
+        await sleep(300);
+        try {
+            await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none', bufferSize: 4096 });
+        } catch(e) {
+            console.warn('[TangSerial] port reopen failed:', e.message);
+            return false;
+        }
+        _rxBuffer.length = 0;
+        _rxWaiters.length = 0;
+        _startReadLoop();
+        await sleep(50);
+        console.log('[TangSerial] port reset complete, readLoop=' + _readerLoopRunning);
+        return _readerLoopRunning;
     }
 
     function wordToLE(word) {
@@ -488,6 +516,22 @@ const TangSerial = (function() {
             rxBytes = await _readBytes(4, 5000);
         }
 
+        if (rxBytes.length === 0 && _loopTotalBytes === 0) {
+            status('Still 0 bytes (totalRx=0 since connect). Resetting port\u2026');
+            var resetOk = await _resetPort();
+            if (resetOk) {
+                await drainInput();
+                status('Port reset done (readLoop=' + (_readerLoopRunning ? 'alive' : 'DEAD') +
+                       '). Re-sending frame\u2026');
+                await _writeBytes(frame);
+                status('Frame re-sent after port reset. Waiting for echo\u2026');
+                rxBytes = await _readBytes(4, 5000);
+                status('After port reset: got ' + rxBytes.length + ' bytes, totalRx=' + _loopTotalBytes);
+            } else {
+                status('Port reset FAILED. Cannot reopen serial port.');
+            }
+        }
+
         if (rxBytes.length >= 4) {
             var echoAddr  = (rxBytes[0] << 8) | rxBytes[1];
             var echoCount = (rxBytes[2] << 8) | rxBytes[3];
@@ -509,7 +553,7 @@ const TangSerial = (function() {
             status('No echo received (' + rxBytes.length + ' bytes). readLoop=' +
                    (_readerLoopRunning ? 'alive' : 'DEAD') + ' totalRx=' + _loopTotalBytes +
                    ' loopErr=' + (_loopError || 'none') +
-                   '. Check: FPGA connected? Bitstream includes debug FSM?');
+                   '. Check: (1) correct port selected? (2) FPGA UART TX connected? (3) try a serial terminal to verify data flow.');
             return { success: false, rxBytes: rxBytes };
         }
     }
@@ -633,6 +677,7 @@ const TangSerial = (function() {
         parseReadback,
         setBoardLabel,
         readLoopStatus,
+        resetPort: _resetPort,
         NS_WORDS,
         CLIST_WORDS,
         TOTAL_WORDS
