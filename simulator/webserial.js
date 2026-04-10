@@ -89,8 +89,9 @@ const TangSerial = (function() {
                         for (var i = 0; i < result.value.length; i++) {
                             _rxBuffer.push(result.value[i]);
                         }
-                        for (var wi = 0; wi < _rxWaiters.length; wi++) {
-                            _rxWaiters[wi]();
+                        var snapshot = _rxWaiters.slice();
+                        for (var wi = 0; wi < snapshot.length; wi++) {
+                            snapshot[wi]();
                         }
                     }
                 }
