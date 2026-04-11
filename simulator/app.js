@@ -1035,6 +1035,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     // Always show all cw slots so the user sees the code region layout.
                     // Empty slots (word=0) are shown dimmed; loaded instructions are bright.
                     const _clBase = (cc > 0) ? (loc + lumpSize - cc) : 0;
+                    const _crPets1 = {};
                     let codeHtml = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th><th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
                     for (let w = 0; w < cw; w++) {
                         const addr = loc + 1 + w;
@@ -1043,7 +1044,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const decoded = word === 0 ? 'HALT' : asm.disassemble(word);
                         const isPC   = sim.bootComplete && (addr === (sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                        const _dc = _decompileWord(word, addr, nsIdx, _clBase);
+                        const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
                         const _dcCls = _dc ? (_dc.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
                         const rowCls = isPC ? 'code-pc-row' : (_dc && _dc.compiler ? 'code-row-compiler' : '');
                         codeHtml += `<tr class="${rowCls}"${dimmed}>`;
@@ -1108,6 +1109,7 @@ function renderCListEntryDetail(nsIdx, entry) {
             if (clistStart2 > 0) {
                 const asm2 = new ChurchAssembler();
                 const _clBase2 = (cc2 > 0) ? (loc + allocSize2 - cc2) : 0;
+                const _crPets2 = {};
                 let codeHtml2 = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th><th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
                 for (let w = 0; w < clistStart2; w++) {
                     const addr = loc + w;
@@ -1115,7 +1117,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     const word = sim.memory[addr] >>> 0;
                     const decoded = word === 0 ? 'HALT' : asm2.disassemble(word);
                     const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                    const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2);
+                    const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2, _crPets2);
                     const _dc2Cls = _dc2 ? (_dc2.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
                     const rowCls2 = _dc2 && _dc2.compiler ? ' class="code-row-compiler"' : '';
                     codeHtml2 += `<tr${rowCls2}${dimmed}><td class="cr-idx">+${w}</td>`;
@@ -2037,56 +2039,119 @@ function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
     _lumpManifests[nsIdx] = annot;
 }
 
-function _decompileWord(word, addr, nsIdx, clistBase) {
+function _resolveClistPetName(clistBase, imm, nsIdx) {
+    if (clistBase > 0 && sim && (clistBase + imm) < sim.memory.length) {
+        const gtWord = sim.memory[clistBase + imm] >>> 0;
+        if (gtWord !== 0) {
+            const parsed = sim.parseGT(gtWord);
+            return (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
+        }
+    }
+    const stored = _lumpManifests[nsIdx];
+    const caps = stored && stored._caps;
+    if (caps && imm > 0 && imm <= caps.length) {
+        return caps[imm - 1];
+    }
+    return null;
+}
+
+function _crTag(crNum, crPets) {
+    const pet = crPets && crPets[crNum];
+    return pet ? `${pet.toLowerCase()}(CR${crNum})` : `CR${crNum}`;
+}
+
+function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
     word = word >>> 0;
     if (word === 0) return null;
-    const stored = _lumpManifests[nsIdx];
-    if (stored && stored[addr]) {
-        const s = stored[addr];
-        return { desc: _escDecomp(s.desc), compiler: s.compiler };
-    }
     const opcode = (word >>> 27) & 0x1F;
     const crDst = (word >>> 19) & 0xF;
     const crSrc = (word >>> 15) & 0xF;
     const imm = word & 0x7FFF;
-    if (opcode === 0 && crSrc === 6 && sim) {
-        if (clistBase > 0 && (clistBase + imm) < sim.memory.length) {
-            const gtWord = sim.memory[clistBase + imm] >>> 0;
-            if (gtWord !== 0) {
-                const parsed = sim.parseGT(gtWord);
-                const label = (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
-                return { desc: _escDecomp(`load ${label.toLowerCase()}`), compiler: true };
-            }
+
+    if (opcode === 0x1F) return null;
+
+    const stored = _lumpManifests[nsIdx];
+
+    if (opcode === 0 && crSrc === 6) {
+        const pet = _resolveClistPetName(clistBase, imm, nsIdx);
+        if (pet) {
+            if (crPets) crPets[crDst] = pet;
+            return { desc: _escDecomp(`load ${pet.toLowerCase()} \u2192 CR${crDst}`), compiler: true, pet: pet };
         }
-        const caps = stored && stored._caps;
-        if (caps && imm > 0 && imm <= caps.length) {
-            return { desc: _escDecomp(`load ${caps[imm - 1].toLowerCase()}`), compiler: true };
-        }
+        if (crPets) delete crPets[crDst];
+        return { desc: `load clist[${imm}] \u2192 CR${crDst}`, compiler: true };
     }
+
+    if (opcode === 0) {
+        const dTag = _crTag(crDst, crPets);
+        const sTag = _crTag(crSrc, crPets);
+        if (crPets && crPets[crSrc]) crPets[crDst] = crPets[crSrc];
+        return { desc: _escDecomp(`load ${dTag} \u2190 ${sTag}[${imm}]`), compiler: false };
+    }
+
+    if (opcode === 1) {
+        const dTag = _crTag(crDst, crPets);
+        const sTag = _crTag(crSrc, crPets);
+        return { desc: _escDecomp(`save ${dTag} \u2192 ${sTag}[${imm}]`), compiler: false };
+    }
+
     if (opcode === 2) {
         if (crDst === 6) return { desc: 'recall self', compiler: false };
-        const crNames = { 0: 'result', 1: 'arg1' };
-        if (crNames[crDst]) return { desc: `call ${crNames[crDst]}`, compiler: false };
+        const tag = _crTag(crDst, crPets);
+        return { desc: _escDecomp(`call ${tag}`), compiler: false };
     }
-    if (opcode === 8) {
-        if (clistBase > 0 && (clistBase + imm) < sim.memory.length) {
-            const gtWord = sim.memory[clistBase + imm] >>> 0;
-            if (gtWord !== 0) {
-                const parsed = sim.parseGT(gtWord);
-                const label = (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
-                return { desc: _escDecomp(`eloadcall ${label.toLowerCase()}`), compiler: true };
-            }
-        }
-    }
-    if (opcode === 10 || opcode === 11) {
-        const devNames = { 12: 'led', 11: 'uart', 13: 'button', 14: 'timer' };
-        const nsOfCR = sim.parseGT(sim.cr[crSrc] ? sim.cr[crSrc].word0 : 0);
-        const devName = devNames[nsOfCR.index];
-        if (devName) {
-            return { desc: `${opcode === 10 ? 'read' : 'write'} ${devName}[${imm}]`, compiler: false };
-        }
-    }
+
     if (opcode === 3) return { desc: 'return', compiler: false };
+
+    if (opcode === 5) {
+        const sTag = _crTag(crSrc, crPets);
+        return { desc: _escDecomp(`switch ${sTag}, ${imm & 7}`), compiler: false };
+    }
+
+    if (opcode === 6) {
+        const dTag = _crTag(crDst, crPets);
+        const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
+        const pName = presetNames[imm & 0xF] || `0x${imm.toString(16)}`;
+        return { desc: _escDecomp(`tperm ${dTag} ${pName}`), compiler: false };
+    }
+
+    if (opcode === 7) {
+        const dTag = _crTag(crDst, crPets);
+        return { desc: _escDecomp(`lambda \u2192 ${dTag}`), compiler: false };
+    }
+
+    if (opcode === 8) {
+        const pet = _resolveClistPetName(clistBase, imm, nsIdx);
+        if (pet) {
+            if (crPets) crPets[crDst] = pet;
+            return { desc: _escDecomp(`eloadcall ${pet.toLowerCase()}(CR${crDst})`), compiler: true, pet: pet };
+        }
+        return { desc: `eloadcall clist[${imm}] \u2192 CR${crDst}`, compiler: true };
+    }
+
+    if (opcode === 10 || opcode === 11) {
+        const sTag = _crTag(crSrc, crPets);
+        const verb = opcode === 10 ? 'read' : 'write';
+        return { desc: _escDecomp(`${verb} ${sTag}[${imm}]`), compiler: false };
+    }
+
+    if (opcode === 15 || opcode === 16) {
+        if (stored && stored[addr]) {
+            const s = stored[addr];
+            return { desc: _escDecomp(s.desc), compiler: s.compiler };
+        }
+    }
+
+    if (opcode === 17) {
+        const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
+        return { desc: `branch ${soff > 0 ? '+' : ''}${soff}`, compiler: false };
+    }
+
+    if (stored && stored[addr]) {
+        const s = stored[addr];
+        return { desc: _escDecomp(s.desc), compiler: s.compiler };
+    }
+
     return null;
 }
 
@@ -2229,6 +2294,7 @@ function updateCRDetail() {
             codeLimit = lumpHdr.cw;
         }
 
+        const _crPets3 = {};
         let hasCodeData = lumpHdr.valid;
         for (let w = 0; w < codeLimit; w++) {
             const addr = codeStart + w;
@@ -2241,7 +2307,7 @@ function updateCRDetail() {
                 : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc));
             const isBP    = simBreakpoints.has(addr);
 
-            const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase);
+            const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase, _crPets3);
             const isCompiler = decomp && decomp.compiler;
             let rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : (isCompiler ? 'code-row-compiler' : ''));
 
@@ -2283,7 +2349,7 @@ function updateCRDetail() {
         const clistBase = cr.word1_location >>> 0;
         const clistCount = cr.limit17 + 1;
         html += '<table class="cr-table"><thead><tr>';
-        html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Label</th>';
+        html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Pet Name</th>';
         html += '</tr></thead><tbody>';
         for (let i = 0; i < clistCount; i++) {
             const addr = clistBase + i;
