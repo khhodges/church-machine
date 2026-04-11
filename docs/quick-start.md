@@ -50,10 +50,17 @@ You do not need a board to start. Open the Church Machine IDE in your
 browser and begin writing code immediately.
 
 1. Open the Church Machine IDE
-2. Click **Boot** — the simulator initialises every capability register,
-   loads the namespace, and puts the core into HALT, just like real
-   hardware. You now have a running Church Machine in your browser.
-3. Click **CRs** in the toolbar
+2. Click the **Boot** button **↺** in the toolbar — the simulator
+   initialises every capability register, loads the namespace, and
+   puts the core into HALT, just like real hardware. You now have a
+   running Church Machine in your browser.
+
+   > **Finding the Boot button:** Look for the yellow **↺** icon in the
+   > top toolbar, between the navigation arrows and the coloured
+   > indicator lights. Hover over it to see the tooltip "Boot — Reset
+   > and run the boot sequence."
+
+3. Click **CRs** in the toolbar to see the capability registers
 4. Click on a CR — for example, **CR14** (instruction fetch)
 5. Click **Edit** to open the abstraction creator
 6. Write or modify your Church Machine assembly

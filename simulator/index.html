@@ -148,6 +148,7 @@
                             <button class="help-dropdown-item" onclick="showMathGuidePopup(true);closeHelpMenu()">Math &amp; Mind Guide</button>
                             <button class="help-dropdown-item" onclick="openCurrentToolGuide();closeHelpMenu()">Current Tool Guide</button>
                             <button class="help-dropdown-item" onclick="(typeof showBuilderHelpPopup==='function'?showBuilderHelpPopup():showWelcomePopup(true));closeHelpMenu()">Builder Guide</button>
+                            <button class="help-dropdown-item" onclick="showWhatsNew(true);closeHelpMenu()">What's New</button>
                             <div style="border-top:1px solid #333; margin:4px 0;"></div>
                             <a class="help-dropdown-item" href="https://github.com/khhodges/cloomc-project/discussions/categories/q-a" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;">Community Q&amp;A</a>
                         </div>
@@ -824,6 +825,24 @@
                     <button class="btn btn-primary" id="welcomeSetupBtn" onclick="welcomeSetup()" data-tooltip="Set Up My Family — Configure family members and permissions">Set Up My Family</button>
                     <button class="btn btn-view" onclick="welcomeSkip()" data-tooltip="Skip for Now — Close this dialog and explore on your own">Skip for Now</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="whatsNewModal" class="modal-overlay" style="display:none;">
+        <div class="modal-dialog" style="max-width:620px;">
+            <div class="intro-header">
+                <div class="modal-title" id="whatsNewTitle">What's New</div>
+                <div class="welcome-slide-nav">
+                    <button class="btn-slide-nav" id="whatsNewPrevBtn" onclick="stepWhatsNew(-1)" title="Previous">&#8592;</button>
+                    <span id="whatsNewIndicator" class="slide-indicator">1 / 1</span>
+                    <button class="btn-slide-nav" id="whatsNewNextBtn" onclick="stepWhatsNew(1)" title="Next">&#8594;</button>
+                </div>
+            </div>
+            <div class="intro-body" id="whatsNewBody"></div>
+            <div class="popup-footer-bar">
+                <label class="popup-dismiss-check"><input type="checkbox" id="whatsNewDontShow"> Don't show on updates</label>
+                <button class="btn btn-primary" onclick="closeWhatsNew()">Got it</button>
             </div>
         </div>
     </div>

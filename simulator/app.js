@@ -385,19 +385,25 @@ function checkBootId() {
         .then(r => r.json())
         .then(data => {
             const stored = localStorage.getItem('churchMachine_bootId');
-            if (stored && stored !== data.bootId) {
+            const isNewVersion = stored && stored !== data.bootId;
+            if (isNewVersion) {
                 localStorage.removeItem('church_welcome_dismissed');
                 localStorage.removeItem('churchMachine_mathGuideDismissed');
                 localStorage.removeItem('churchMachine_toolGuide_interactive');
                 localStorage.removeItem('churchMachine_toolGuide_hp35');
                 localStorage.removeItem('churchMachine_toolGuide_abacus');
                 localStorage.removeItem('churchMachine_toolGuide_sliderule');
-                // Guides are now on-demand via the ? button — no auto-popup.
             }
             localStorage.setItem('churchMachine_bootId', data.bootId);
             if (data.version) {
                 const el = document.getElementById('version-tag');
                 if (el) el.textContent = 'v' + data.version;
+            }
+            if (isNewVersion) {
+                const lastWhatsNewVersion = localStorage.getItem('church_whatsnew_version');
+                if (lastWhatsNewVersion !== data.bootId) {
+                    setTimeout(() => showWhatsNew(), 1500);
+                }
             }
         })
         .catch(() => {});
@@ -10908,6 +10914,88 @@ function welcomeSetup() {
 
 function welcomeSkip() {
     closeWelcome();
+}
+
+const WHATS_NEW_FEATURES = [
+    {
+        title: "One-command flash",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x26A1; flash.sh &mdash; one command to build and flash</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `The FPGA download package now includes <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">flash.sh</code> &mdash; ` +
+            `a single command that runs the full build-to-flash pipeline (nextpnr &rarr; gowin_pack &rarr; openFPGALoader). ` +
+            `It stops on the first error with a diagnostic hint, and ends with an LED success checklist.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `Go to <strong>Builder</strong> &rarr; <strong>Download FPGA Package</strong> to get the new ZIP.</p>`
+    },
+    {
+        title: "Serial bridge in the ZIP",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F310; bridge.sh &mdash; connect your board to the IDE</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `The download package now includes <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">bridge.sh</code> and ` +
+            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">local_bridge.py</code>. ` +
+            `After flashing, run <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">./bridge.sh --ide=https://cloomc.org</code> ` +
+            `and your board appears in the <strong>Devices</strong> panel within seconds.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `No need to clone the repo separately &mdash; the ZIP is fully self-contained.</p>`
+    },
+    {
+        title: "Devices panel",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4F1; Devices panel &mdash; see and manage connected boards</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `Open <strong>Devices</strong> from the hamburger menu to see every connected FPGA board. ` +
+            `Each board shows its status (online/offline), board type, firmware version, and boot count. ` +
+            `Click <strong>Deploy</strong> to push a compiled abstraction to any board, or ` +
+            `<strong>Deploy All</strong> to update every online board at once.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `Label your boards to keep track of multi-device IoT deployments.</p>`
+    },
+    {
+        title: "FPGA call-home",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E1; FPGA call-home &mdash; boards register automatically</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `When a Tang Nano 20K boots with the current bitstream, it sends a 13-byte call-home packet ` +
+            `over UART. The bridge detects this, sends an acknowledgment, and registers the board with the IDE. ` +
+            `A 60-second heartbeat keeps the board marked as online.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `No manual registration needed &mdash; plug in, flash, run bridge, done.</p>`
+    }
+];
+
+let _whatsNewIdx = 0;
+
+function showWhatsNew(force) {
+    if (POPUPS_DISABLED) return;
+    if (!force && localStorage.getItem('church_whatsnew_dismissed_perm')) return;
+    if (WHATS_NEW_FEATURES.length === 0) return;
+    _whatsNewIdx = 0;
+    _renderWhatsNewSlide(0);
+    document.getElementById('whatsNewModal').style.display = 'flex';
+}
+
+function _renderWhatsNewSlide(idx) {
+    const body = document.getElementById('whatsNewBody');
+    const indicator = document.getElementById('whatsNewIndicator');
+    const title = document.getElementById('whatsNewTitle');
+    if (!body) return;
+    _whatsNewIdx = ((idx % WHATS_NEW_FEATURES.length) + WHATS_NEW_FEATURES.length) % WHATS_NEW_FEATURES.length;
+    const feature = WHATS_NEW_FEATURES[_whatsNewIdx];
+    body.innerHTML = feature.html;
+    if (indicator) indicator.textContent = `${_whatsNewIdx + 1} / ${WHATS_NEW_FEATURES.length}`;
+    if (title) title.textContent = "What's New";
+}
+
+function stepWhatsNew(dir) {
+    _renderWhatsNewSlide(_whatsNewIdx + dir);
+}
+
+function closeWhatsNew() {
+    const dontShow = document.getElementById('whatsNewDontShow');
+    if (dontShow && dontShow.checked) {
+        localStorage.setItem('church_whatsnew_dismissed_perm', '1');
+    }
+    localStorage.setItem('church_whatsnew_version', localStorage.getItem('churchMachine_bootId') || '');
+    const modal = document.getElementById('whatsNewModal');
+    if (modal) modal.style.display = 'none';
 }
 
 function toggleHelpMenu() {
