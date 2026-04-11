@@ -1,6 +1,5 @@
 from amaranth import *
 
-# Outform-specific fault codes (extend the 5-bit FaultType space 0x11..0x17)
 OUTFORM_FAULT_SIG    = 0x11
 OUTFORM_FAULT_FLAGS  = 0x12
 OUTFORM_FAULT_METHOD = 0x13
@@ -8,31 +7,57 @@ OUTFORM_FAULT_N      = 0x14
 OUTFORM_FAULT_CRC32  = 0x15
 OUTFORM_FAULT_ALLOC  = 0x16
 OUTFORM_FAULT_MINT   = 0x17
+OUTFORM_FAULT_DEFL   = 0x18
+OUTFORM_FAULT_WIN    = 0x19
 
-# Custom 32-byte tunnel header (task-spec; CRC-32 at byte offset 16)
-# Byte layout:
-#  0-3:  signature (0x04034B50)
-#  4-5:  version needed
-#  6-7:  general purpose bit flag  (bit 3 = streaming — rejected)
-#  8-9:  compression method        (0=STORE, 8=DEFLATE)
-# 10-13: mod time + mod date
-# 14-15: (protocol-reserved)
-# 16-19: CRC-32
-# 20-23: compressed size
-# 24-27: uncompressed size
-# 28-29: filename length (L)
-# 30-31: extra field length (E)
 ZIP_SIGNATURE  = 0x04034B50
 METHOD_STORE   = 0
 METHOD_DEFLATE = 8
-HDR_LEN        = 32    # total header bytes per task spec
+METHOD_RLE     = 16
+HDR_LEN        = 32
 
-# CRC-32 IEEE 802.3, reflected poly 0xEDB88320
 CRC32_POLY  = 0xEDB88320
 CRC32_INIT  = 0xFFFFFFFF
 CRC32_FINAL = 0xFFFFFFFF
 
-TUNNEL_REQ_LEN = 6   # gt_raw[31:0] LE + slot_id[15:0] LE
+TUNNEL_REQ_LEN = 6
+
+DEFL_WIN_SIZE = 2048
+DEFL_WIN_MASK = DEFL_WIN_SIZE - 1
+
+_LEN_BASE = [
+    3, 4, 5, 6, 7, 8, 9, 10,
+    11, 13, 15, 17,
+    19, 23, 27, 31,
+    35, 43, 51, 59,
+    67, 83, 99, 115,
+    131, 163, 195, 227,
+    258,
+]
+
+_LEN_EXTRA = [
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1,
+    2, 2, 2, 2,
+    3, 3, 3, 3,
+    4, 4, 4, 4,
+    5, 5, 5, 5,
+    0,
+]
+
+_DIST_BASE = [
+    1, 2, 3, 4, 5, 7, 9, 13, 17, 25,
+    33, 49, 65, 97, 129, 193,
+    257, 385, 513, 769, 1025, 1537,
+    2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
+]
+
+_DIST_EXTRA = [
+    0, 0, 0, 0, 1, 1, 2, 2, 3, 3,
+    4, 4, 5, 5, 6, 6,
+    7, 7, 8, 8, 9, 9,
+    10, 10, 11, 11, 12, 12, 13, 13,
+]
 
 
 class ChurchOutform(Elaboratable):
@@ -42,50 +67,44 @@ class ChurchOutform(Elaboratable):
          READ_UCSIZE -> DERIVE_N -> ALLOC -> SKIP_FNAME -> SKIP_EXTRA ->
          INFLATE -> CHECK_CRC32 -> MINT -> MINT_WAIT -> COMPLETE / FAULT
 
-    INFLATE sub-states:
-         INFLATE_DEFLATE  (TODO: Huffman+LZ77 sub-FSM)
-         INFLATE_RLE      (TODO: custom RLE sub-FSM)
+    INFLATE methods:
+         METHOD_STORE   (0)  — raw byte copy (inline in INFLATE state)
+         METHOD_DEFLATE (8)  — fixed Huffman + LZ77 via DEFL_* sub-FSM
+         METHOD_RLE     (16) — byte-pair RLE via RLE_* sub-FSM
     """
 
     def __init__(self):
-        # trigger / status
         self.outform_start      = Signal()
         self.outform_busy       = Signal()
         self.outform_done       = Signal()
         self.outform_fault      = Signal()
         self.outform_fault_type = Signal(5)
 
-        # absent outform identity
         self.gt_raw  = Signal(32)
         self.slot_id = Signal(16)
 
-        # tunnel byte stream
         self.tx_valid = Signal()
         self.tx_data  = Signal(8)
         self.rx_valid = Signal()
         self.rx_data  = Signal(8)
 
-        # memory allocator
         self.alloc_req   = Signal()
         self.alloc_n     = Signal(5)
         self.alloc_done  = Signal()
         self.alloc_fault = Signal()
         self.alloc_base  = Signal(32)
 
-        # memory write (inflate destination)
         self.mem_wr_addr = Signal(32)
         self.mem_wr_data = Signal(32)
         self.mem_wr_en   = Signal()
 
-        # Mint.Lump interface
         self.mint_call      = Signal()
         self.mint_base      = Signal(32)
         self.mint_n         = Signal(5)
         self.mint_done      = Signal()
         self.mint_fault     = Signal()
-        self.mint_result_gt = Signal(32)  # E-GT issued by Mint (valid when mint_done=1)
+        self.mint_result_gt = Signal(32)
 
-        # result (valid when outform_done)
         self.result_gt = Signal(32)
 
     @staticmethod
@@ -103,10 +122,10 @@ class ChurchOutform(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        hdr_byte_cnt = Signal(6)    # 0..31
+        hdr_byte_cnt = Signal(6)
         tx_byte_cnt  = Signal(3)
-        fname_cnt    = Signal(16)   # L-counter (independent)
-        extra_cnt    = Signal(16)   # E-counter (independent)
+        fname_cnt    = Signal(16)
+        extra_cnt    = Signal(16)
 
         sig_reg        = Signal(32)
         flags_reg      = Signal(16)
@@ -123,16 +142,68 @@ class ChurchOutform(Elaboratable):
 
         base_reg       = Signal(32)
         wr_word_cnt    = Signal(32)
-        byte_buf       = Signal(24)  # bytes 0..2 of current inflate word
+        byte_buf       = Signal(24)
         byte_buf_cnt   = Signal(2)
 
-        crc_acc        = Signal(32, init=CRC32_INIT)
-        crc_next       = Signal(32)
         result_gt_reg  = Signal(32)
 
-        self._crc32_byte(m, crc_acc, self.rx_data, crc_next)
+        crc_byte_in = Signal(8, name="crc_byte_in")
+        m.d.comb += crc_byte_in.eq(self.rx_data)
 
-        # tunnel TX byte mux: gt_raw[31:0] LE, slot_id[15:0] LE
+        crc_acc  = Signal(32, init=CRC32_INIT)
+        crc_next = Signal(32)
+        self._crc32_byte(m, crc_acc, crc_byte_in, crc_next)
+
+        win_mem = Memory(width=8, depth=DEFL_WIN_SIZE, init=[])
+        m.submodules.win_mem = win_mem
+        win_rd = win_mem.read_port(transparent=True)
+        win_wr = win_mem.write_port()
+
+        m.d.comb += [
+            win_wr.addr.eq(0),
+            win_wr.data.eq(0),
+            win_wr.en.eq(0),
+            win_rd.addr.eq(0),
+        ]
+
+        defl_bits      = Signal(32, name="defl_bits")
+        defl_bit_cnt   = Signal(6,  name="defl_bit_cnt")
+        defl_bfinal    = Signal(    name="defl_bfinal")
+        defl_symbol    = Signal(9,  name="defl_symbol")
+        defl_copy_len  = Signal(9,  name="defl_copy_len")
+        defl_copy_dist = Signal(12, name="defl_copy_dist")
+        defl_copy_idx  = Signal(9,  name="defl_copy_idx")
+        defl_win_pos   = Signal(11, name="defl_win_pos")
+        defl_len_idx   = Signal(5,  name="defl_len_idx")
+        defl_dist_code = Signal(5,  name="defl_dist_code")
+
+        rle_count     = Signal(8, name="rle_count")
+        rle_literal   = Signal(8, name="rle_literal")
+        rle_remaining = Signal(8, name="rle_remaining")
+
+        len_base_tbl  = Array(_LEN_BASE)
+        len_extra_tbl = Array(_LEN_EXTRA)
+        dist_base_tbl = Array(_DIST_BASE)
+        dist_extra_tbl = Array(_DIST_EXTRA)
+
+        code7_rev = Signal(7,  name="code7_rev")
+        code8_rev = Signal(8,  name="code8_rev")
+        code9_rev = Signal(9,  name="code9_rev")
+        dist5_rev = Signal(5,  name="dist5_rev")
+        m.d.comb += [
+            code7_rev.eq(Cat(
+                defl_bits[6], defl_bits[5], defl_bits[4], defl_bits[3],
+                defl_bits[2], defl_bits[1], defl_bits[0])),
+            code8_rev.eq(Cat(
+                defl_bits[7], defl_bits[6], defl_bits[5], defl_bits[4],
+                defl_bits[3], defl_bits[2], defl_bits[1], defl_bits[0])),
+            code9_rev.eq(Cat(
+                defl_bits[8], defl_bits[7], defl_bits[6], defl_bits[5],
+                defl_bits[4], defl_bits[3], defl_bits[2], defl_bits[1], defl_bits[0])),
+            dist5_rev.eq(Cat(
+                defl_bits[4], defl_bits[3], defl_bits[2], defl_bits[1], defl_bits[0])),
+        ]
+
         tx_byte = Signal(8)
         with m.Switch(tx_byte_cnt):
             with m.Case(0): m.d.comb += tx_byte.eq(self.gt_raw[ 0: 8])
@@ -143,7 +214,6 @@ class ChurchOutform(Elaboratable):
             with m.Case(5): m.d.comb += tx_byte.eq(self.slot_id[8:16])
             with m.Default(): m.d.comb += tx_byte.eq(0)
 
-        # full 32-bit word: bytes 0-2 from byte_buf, byte 3 from rx_data (combinatorial)
         inflate_word = Signal(32)
         m.d.comb += inflate_word.eq(Cat(byte_buf, self.rx_data))
 
@@ -180,6 +250,19 @@ class ChurchOutform(Elaboratable):
                         byte_buf      .eq(0),
                         byte_buf_cnt  .eq(0),
                         result_gt_reg .eq(0),
+                        defl_bits     .eq(0),
+                        defl_bit_cnt  .eq(0),
+                        defl_bfinal   .eq(0),
+                        defl_symbol   .eq(0),
+                        defl_copy_len .eq(0),
+                        defl_copy_dist.eq(0),
+                        defl_copy_idx .eq(0),
+                        defl_win_pos  .eq(0),
+                        defl_len_idx  .eq(0),
+                        defl_dist_code.eq(0),
+                        rle_count     .eq(0),
+                        rle_literal   .eq(0),
+                        rle_remaining .eq(0),
                     ]
                     m.next = "TUNNEL_CONNECT"
 
@@ -194,9 +277,6 @@ class ChurchOutform(Elaboratable):
                 with m.Else():
                     m.d.sync += tx_byte_cnt.eq(tx_byte_cnt + 1)
 
-            # Receive 32-byte custom header; fields assigned by byte offset.
-            # Signature at 0-3, flags 6-7, method 8-9, CRC-32 at 16-19,
-            # comp_size 20-23, ucomp_size 24-27, fname_len 28-29, extra_len 30-31.
             with m.State("RECV_HDR"):
                 m.d.comb += self.outform_busy.eq(1)
                 with m.If(self.rx_valid):
@@ -298,7 +378,6 @@ class ChurchOutform(Elaboratable):
                     ]
                     m.next = "SKIP_FNAME"
 
-            # L-counter: independent Signal(16); not referenced in E arithmetic
             with m.State("SKIP_FNAME"):
                 m.d.comb += self.outform_busy.eq(1)
                 with m.If(fname_cnt == 0):
@@ -307,7 +386,6 @@ class ChurchOutform(Elaboratable):
                 with m.Elif(self.rx_valid):
                     m.d.sync += fname_cnt.eq(fname_cnt - 1)
 
-            # E-counter: independent Signal(16); not referenced in L arithmetic
             with m.State("SKIP_EXTRA"):
                 m.d.comb += self.outform_busy.eq(1)
                 with m.If(extra_cnt == 0):
@@ -315,7 +393,6 @@ class ChurchOutform(Elaboratable):
                 with m.Elif(self.rx_valid):
                     m.d.sync += extra_cnt.eq(extra_cnt - 1)
 
-            # Method dispatch: STORE inline; DEFLATE/RLE enter stub states
             with m.State("INFLATE"):
                 m.d.comb += self.outform_busy.eq(1)
                 with m.If(method_reg == METHOD_STORE):
@@ -341,21 +418,321 @@ class ChurchOutform(Elaboratable):
                                 with m.Case(2): m.d.sync += byte_buf[16:24].eq(self.rx_data)
                             m.d.sync += byte_buf_cnt.eq(byte_buf_cnt + 1)
                 with m.Elif(method_reg == METHOD_DEFLATE):
-                    m.next = "INFLATE_DEFLATE"
+                    m.d.sync += [
+                        defl_bits   .eq(0),
+                        defl_bit_cnt.eq(0),
+                        defl_win_pos.eq(0),
+                    ]
+                    m.next = "DEFL_BLOCK_HDR"
+                with m.Elif(method_reg == METHOD_RLE):
+                    m.next = "RLE_READ_COUNT"
                 with m.Else():
-                    m.next = "INFLATE_RLE"
+                    m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_METHOD)
+                    m.next = "FAULT"
 
-            # TODO: Huffman+LZ77 sub-FSM (separate hardware task)
-            with m.State("INFLATE_DEFLATE"):
-                m.d.comb += self.outform_busy.eq(1)
-                m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_METHOD)
-                m.next = "FAULT"
+            # ── DEFLATE sub-FSM (fixed Huffman, RFC 1951) ───────────────────
 
-            # TODO: custom RLE sub-FSM (method code TBD; separate hardware task)
-            with m.State("INFLATE_RLE"):
+            with m.State("DEFL_BLOCK_HDR"):
                 m.d.comb += self.outform_busy.eq(1)
-                m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_METHOD)
-                m.next = "FAULT"
+                with m.If(defl_bit_cnt >= 3):
+                    btype = Signal(2, name="btype")
+                    m.d.comb += btype.eq(defl_bits[1:3])
+                    m.d.sync += [
+                        defl_bfinal.eq(defl_bits[0]),
+                        defl_bits  .eq(defl_bits >> 3),
+                        defl_bit_cnt.eq(defl_bit_cnt - 3),
+                    ]
+                    with m.If(btype == 0b01):
+                        m.next = "DEFL_DECODE"
+                    with m.Else():
+                        m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_DEFL)
+                        m.next = "FAULT"
+                with m.Elif(self.rx_valid & (defl_bit_cnt <= 24)):
+                    m.d.sync += [
+                        defl_bits   .eq(defl_bits | (self.rx_data << defl_bit_cnt[:5])),
+                        defl_bit_cnt.eq(defl_bit_cnt + 8),
+                    ]
+
+            with m.State("DEFL_DECODE"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If((defl_bit_cnt >= 7) & (code7_rev <= 23)):
+                    m.d.sync += [
+                        defl_symbol .eq(256 + code7_rev),
+                        defl_bits   .eq(defl_bits >> 7),
+                        defl_bit_cnt.eq(defl_bit_cnt - 7),
+                    ]
+                    with m.If(code7_rev == 0):
+                        with m.If(defl_bfinal):
+                            with m.If((wr_word_cnt == total_words) & (byte_buf_cnt == 0)):
+                                m.next = "CHECK_CRC32"
+                            with m.Else():
+                                m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_DEFL)
+                                m.next = "FAULT"
+                        with m.Else():
+                            m.next = "DEFL_BLOCK_HDR"
+                    with m.Else():
+                        m.d.sync += defl_len_idx.eq(code7_rev - 1)
+                        m.next = "DEFL_LEN_EXTRA"
+                with m.Elif((defl_bit_cnt >= 8) & (code8_rev >= 48) & (code8_rev <= 191)):
+                    m.d.sync += [
+                        defl_symbol .eq(code8_rev - 48),
+                        defl_bits   .eq(defl_bits >> 8),
+                        defl_bit_cnt.eq(defl_bit_cnt - 8),
+                    ]
+                    m.next = "DEFL_LIT_EMIT"
+                with m.Elif((defl_bit_cnt >= 8) & (code8_rev >= 192) & (code8_rev <= 197)):
+                    m.d.sync += [
+                        defl_symbol .eq(code8_rev - 192 + 280),
+                        defl_len_idx.eq(code8_rev - 192 + 23),
+                        defl_bits   .eq(defl_bits >> 8),
+                        defl_bit_cnt.eq(defl_bit_cnt - 8),
+                    ]
+                    m.next = "DEFL_LEN_EXTRA"
+                with m.Elif((defl_bit_cnt >= 8) & (code8_rev >= 198) & (code8_rev <= 199)):
+                    m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_DEFL)
+                    m.next = "FAULT"
+                with m.Elif((defl_bit_cnt >= 9) & (code9_rev >= 400) & (code9_rev <= 511)):
+                    m.d.sync += [
+                        defl_symbol .eq(code9_rev - 400 + 144),
+                        defl_bits   .eq(defl_bits >> 9),
+                        defl_bit_cnt.eq(defl_bit_cnt - 9),
+                    ]
+                    m.next = "DEFL_LIT_EMIT"
+                with m.Elif(defl_bit_cnt >= 9):
+                    m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_DEFL)
+                    m.next = "FAULT"
+                with m.Elif(self.rx_valid & (defl_bit_cnt <= 24)):
+                    m.d.sync += [
+                        defl_bits   .eq(defl_bits | (self.rx_data << defl_bit_cnt[:5])),
+                        defl_bit_cnt.eq(defl_bit_cnt + 8),
+                    ]
+
+            with m.State("DEFL_LIT_EMIT"):
+                m.d.comb += [
+                    self.outform_busy.eq(1),
+                    crc_byte_in.eq(defl_symbol[:8]),
+                    win_wr.addr.eq(defl_win_pos),
+                    win_wr.data.eq(defl_symbol[:8]),
+                    win_wr.en.eq(1),
+                ]
+                m.d.sync += [
+                    crc_acc     .eq(crc_next),
+                    defl_win_pos.eq(defl_win_pos + 1),
+                ]
+                with m.If(byte_buf_cnt == 3):
+                    m.d.comb += [
+                        self.mem_wr_addr.eq(base_reg + (wr_word_cnt << 2)),
+                        self.mem_wr_data.eq(Cat(byte_buf, defl_symbol[:8])),
+                        self.mem_wr_en  .eq(1),
+                    ]
+                    m.d.sync += [
+                        wr_word_cnt .eq(wr_word_cnt + 1),
+                        byte_buf_cnt.eq(0),
+                        byte_buf    .eq(0),
+                    ]
+                    with m.If(wr_word_cnt + 1 == total_words):
+                        m.next = "CHECK_CRC32"
+                    with m.Else():
+                        m.next = "DEFL_DECODE"
+                with m.Else():
+                    with m.Switch(byte_buf_cnt):
+                        with m.Case(0): m.d.sync += byte_buf[ 0: 8].eq(defl_symbol[:8])
+                        with m.Case(1): m.d.sync += byte_buf[ 8:16].eq(defl_symbol[:8])
+                        with m.Case(2): m.d.sync += byte_buf[16:24].eq(defl_symbol[:8])
+                    m.d.sync += byte_buf_cnt.eq(byte_buf_cnt + 1)
+                    m.next = "DEFL_DECODE"
+
+            with m.State("DEFL_LEN_EXTRA"):
+                m.d.comb += self.outform_busy.eq(1)
+                extra_needed = Signal(4, name="len_extra_needed")
+                m.d.comb += extra_needed.eq(len_extra_tbl[defl_len_idx])
+                with m.If(defl_bit_cnt >= extra_needed):
+                    with m.Switch(extra_needed):
+                        with m.Case(0):
+                            m.d.sync += defl_copy_len.eq(len_base_tbl[defl_len_idx])
+                        with m.Case(1):
+                            m.d.sync += [
+                                defl_copy_len.eq(len_base_tbl[defl_len_idx] + defl_bits[:1]),
+                                defl_bits    .eq(defl_bits >> 1),
+                                defl_bit_cnt .eq(defl_bit_cnt - 1),
+                            ]
+                        with m.Case(2):
+                            m.d.sync += [
+                                defl_copy_len.eq(len_base_tbl[defl_len_idx] + defl_bits[:2]),
+                                defl_bits    .eq(defl_bits >> 2),
+                                defl_bit_cnt .eq(defl_bit_cnt - 2),
+                            ]
+                        with m.Case(3):
+                            m.d.sync += [
+                                defl_copy_len.eq(len_base_tbl[defl_len_idx] + defl_bits[:3]),
+                                defl_bits    .eq(defl_bits >> 3),
+                                defl_bit_cnt .eq(defl_bit_cnt - 3),
+                            ]
+                        with m.Case(4):
+                            m.d.sync += [
+                                defl_copy_len.eq(len_base_tbl[defl_len_idx] + defl_bits[:4]),
+                                defl_bits    .eq(defl_bits >> 4),
+                                defl_bit_cnt .eq(defl_bit_cnt - 4),
+                            ]
+                        with m.Case(5):
+                            m.d.sync += [
+                                defl_copy_len.eq(len_base_tbl[defl_len_idx] + defl_bits[:5]),
+                                defl_bits    .eq(defl_bits >> 5),
+                                defl_bit_cnt .eq(defl_bit_cnt - 5),
+                            ]
+                    m.next = "DEFL_DIST"
+                with m.Elif(self.rx_valid & (defl_bit_cnt <= 24)):
+                    m.d.sync += [
+                        defl_bits   .eq(defl_bits | (self.rx_data << defl_bit_cnt[:5])),
+                        defl_bit_cnt.eq(defl_bit_cnt + 8),
+                    ]
+
+            with m.State("DEFL_DIST"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If(defl_bit_cnt >= 5):
+                    m.d.sync += [
+                        defl_dist_code.eq(dist5_rev),
+                        defl_bits     .eq(defl_bits >> 5),
+                        defl_bit_cnt  .eq(defl_bit_cnt - 5),
+                    ]
+                    with m.If(dist5_rev > 21):
+                        m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_WIN)
+                        m.next = "FAULT"
+                    with m.Else():
+                        m.next = "DEFL_DIST_EXTRA"
+                with m.Elif(self.rx_valid & (defl_bit_cnt <= 24)):
+                    m.d.sync += [
+                        defl_bits   .eq(defl_bits | (self.rx_data << defl_bit_cnt[:5])),
+                        defl_bit_cnt.eq(defl_bit_cnt + 8),
+                    ]
+
+            with m.State("DEFL_DIST_EXTRA"):
+                m.d.comb += self.outform_busy.eq(1)
+                dextra_needed = Signal(4, name="dist_extra_needed")
+                m.d.comb += dextra_needed.eq(dist_extra_tbl[defl_dist_code])
+                with m.If(defl_bit_cnt >= dextra_needed):
+                    with m.Switch(dextra_needed):
+                        with m.Case(0):
+                            m.d.sync += defl_copy_dist.eq(dist_base_tbl[defl_dist_code])
+                        for n in range(1, 10):
+                            with m.Case(n):
+                                m.d.sync += [
+                                    defl_copy_dist.eq(dist_base_tbl[defl_dist_code] + defl_bits[:n]),
+                                    defl_bits     .eq(defl_bits >> n),
+                                    defl_bit_cnt  .eq(defl_bit_cnt - n),
+                                ]
+                    m.d.sync += defl_copy_idx.eq(0)
+                    m.next = "DEFL_COPY_RD"
+                with m.Elif(self.rx_valid & (defl_bit_cnt <= 24)):
+                    m.d.sync += [
+                        defl_bits   .eq(defl_bits | (self.rx_data << defl_bit_cnt[:5])),
+                        defl_bit_cnt.eq(defl_bit_cnt + 8),
+                    ]
+
+            with m.State("DEFL_COPY_RD"):
+                m.d.comb += [
+                    self.outform_busy.eq(1),
+                    win_rd.addr.eq((defl_win_pos - defl_copy_dist) & DEFL_WIN_MASK),
+                ]
+                m.next = "DEFL_COPY_EMIT"
+
+            with m.State("DEFL_COPY_EMIT"):
+                m.d.comb += [
+                    self.outform_busy.eq(1),
+                    crc_byte_in.eq(win_rd.data),
+                    win_wr.addr.eq(defl_win_pos),
+                    win_wr.data.eq(win_rd.data),
+                    win_wr.en.eq(1),
+                ]
+                m.d.sync += [
+                    crc_acc       .eq(crc_next),
+                    defl_win_pos  .eq(defl_win_pos + 1),
+                    defl_copy_idx .eq(defl_copy_idx + 1),
+                ]
+                with m.If(byte_buf_cnt == 3):
+                    m.d.comb += [
+                        self.mem_wr_addr.eq(base_reg + (wr_word_cnt << 2)),
+                        self.mem_wr_data.eq(Cat(byte_buf, win_rd.data)),
+                        self.mem_wr_en  .eq(1),
+                    ]
+                    m.d.sync += [
+                        wr_word_cnt .eq(wr_word_cnt + 1),
+                        byte_buf_cnt.eq(0),
+                        byte_buf    .eq(0),
+                    ]
+                    with m.If(wr_word_cnt + 1 == total_words):
+                        m.next = "CHECK_CRC32"
+                    with m.Elif(defl_copy_idx + 1 >= defl_copy_len):
+                        m.next = "DEFL_DECODE"
+                    with m.Else():
+                        m.next = "DEFL_COPY_RD"
+                with m.Else():
+                    with m.Switch(byte_buf_cnt):
+                        with m.Case(0): m.d.sync += byte_buf[ 0: 8].eq(win_rd.data)
+                        with m.Case(1): m.d.sync += byte_buf[ 8:16].eq(win_rd.data)
+                        with m.Case(2): m.d.sync += byte_buf[16:24].eq(win_rd.data)
+                    m.d.sync += byte_buf_cnt.eq(byte_buf_cnt + 1)
+                    with m.If(defl_copy_idx + 1 >= defl_copy_len):
+                        m.next = "DEFL_DECODE"
+                    with m.Else():
+                        m.next = "DEFL_COPY_RD"
+
+            # ── RLE sub-FSM (byte-pair: count + literal) ────────────────────
+
+            with m.State("RLE_READ_COUNT"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If(self.rx_valid):
+                    m.d.sync += rle_count.eq(self.rx_data)
+                    m.next = "RLE_READ_LIT"
+
+            with m.State("RLE_READ_LIT"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If(self.rx_valid):
+                    m.d.sync += [
+                        rle_literal  .eq(self.rx_data),
+                        rle_remaining.eq(rle_count),
+                    ]
+                    with m.If(rle_count == 0):
+                        m.next = "RLE_READ_COUNT"
+                    with m.Else():
+                        m.next = "RLE_EMIT"
+
+            with m.State("RLE_EMIT"):
+                m.d.comb += [
+                    self.outform_busy.eq(1),
+                    crc_byte_in.eq(rle_literal),
+                ]
+                m.d.sync += [
+                    crc_acc      .eq(crc_next),
+                    rle_remaining.eq(rle_remaining - 1),
+                ]
+                with m.If(byte_buf_cnt == 3):
+                    m.d.comb += [
+                        self.mem_wr_addr.eq(base_reg + (wr_word_cnt << 2)),
+                        self.mem_wr_data.eq(Cat(byte_buf, rle_literal)),
+                        self.mem_wr_en  .eq(1),
+                    ]
+                    m.d.sync += [
+                        wr_word_cnt .eq(wr_word_cnt + 1),
+                        byte_buf_cnt.eq(0),
+                        byte_buf    .eq(0),
+                    ]
+                    with m.If(wr_word_cnt + 1 == total_words):
+                        m.next = "CHECK_CRC32"
+                    with m.Elif(rle_remaining <= 1):
+                        m.next = "RLE_READ_COUNT"
+                    with m.Else():
+                        pass
+                with m.Else():
+                    with m.Switch(byte_buf_cnt):
+                        with m.Case(0): m.d.sync += byte_buf[ 0: 8].eq(rle_literal)
+                        with m.Case(1): m.d.sync += byte_buf[ 8:16].eq(rle_literal)
+                        with m.Case(2): m.d.sync += byte_buf[16:24].eq(rle_literal)
+                    m.d.sync += byte_buf_cnt.eq(byte_buf_cnt + 1)
+                    with m.If(rle_remaining <= 1):
+                        m.next = "RLE_READ_COUNT"
+
+            # ── Common tail states ──────────────────────────────────────────
 
             with m.State("CHECK_CRC32"):
                 m.d.comb += self.outform_busy.eq(1)
@@ -367,7 +744,6 @@ class ChurchOutform(Elaboratable):
                 with m.Else():
                     m.next = "MINT"
 
-            # single-cycle mint_call pulse then wait in MINT_WAIT
             with m.State("MINT"):
                 m.d.comb += [
                     self.outform_busy.eq(1),
