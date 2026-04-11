@@ -1007,7 +1007,9 @@ def _make_fpga_zip(is_ti60, paths, zip_name, build_md):
             bridge_info = zipfile.ZipInfo("bridge.sh")
             bridge_info.external_attr = 0o755 << 16
             zf.writestr(bridge_info, BRIDGE_SH.lstrip('\n'))
-            if os.path.isfile(bridge_path):
+            if not os.path.isfile(bridge_path):
+                logging.warning("FPGA zip: local_bridge.py not found at %s", bridge_path)
+            else:
                 zf.write(bridge_path, "local_bridge.py")
             zf.writestr("BUILD.md", build_md)
     return buf, zip_name

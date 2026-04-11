@@ -26,15 +26,16 @@ except ImportError:
     print("ERROR: pyserial not installed.  Run:  pip3 install pyserial")
     sys.exit(1)
 
+_positional = [a for a in sys.argv[1:] if not a.startswith('--')]
 _first_arg = sys.argv[1] if len(sys.argv) > 1 else ''
 if _first_arg.startswith('--'):
     SERIAL_PORT = '/dev/ttyUSB1'
     BAUD = 115200
     HTTP_PORT = 8766
 else:
-    SERIAL_PORT = _first_arg or '/dev/ttyUSB3'
-    BAUD        = int(sys.argv[2]) if len(sys.argv) > 2 else 115200
-    HTTP_PORT   = int(sys.argv[3]) if len(sys.argv) > 3 else 8766
+    SERIAL_PORT = _positional[0] if len(_positional) > 0 else '/dev/ttyUSB3'
+    BAUD        = int(_positional[1]) if len(_positional) > 1 else 115200
+    HTTP_PORT   = int(_positional[2]) if len(_positional) > 2 else 8766
 
 _ser       = None
 _ser_lock  = threading.Lock()
