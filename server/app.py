@@ -220,6 +220,7 @@ BOOK_CHAPTERS = [
         "civilization-threat.md",
     ]),
     ("Part IX: Hardware Implementation", [
+        "boot-rom-layout.md",
         "chipflow-cover-letter.md",
         "chipflow-technical-summary.md",
         "church-machine-pico-ice.md",
