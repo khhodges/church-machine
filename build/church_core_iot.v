@@ -213,13 +213,13 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire alloc_fault;
   (* src = "/home/runner/workspace/hardware/core.py:231" *)
   wire any_unit_busy;
-  (* src = "/home/runner/workspace/hardware/core.py:856" *)
+  (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire [31:0] arith_imm_sx;
-  (* src = "/home/runner/workspace/hardware/core.py:937" *)
+  (* src = "/home/runner/workspace/hardware/core.py:938" *)
   wire [31:0] bf_mask;
-  (* src = "/home/runner/workspace/hardware/core.py:935" *)
-  wire [4:0] bf_offset;
   (* src = "/home/runner/workspace/hardware/core.py:936" *)
+  wire [4:0] bf_offset;
+  (* src = "/home/runner/workspace/hardware/core.py:937" *)
   wire [4:0] bf_width;
   (* src = "/home/runner/workspace/hardware/core.py:227" *)
   reg bfext_busy_reg = 1'h0;
@@ -249,7 +249,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire \bfins_flags_sig.V ;
   (* src = "/home/runner/workspace/hardware/core.py:390" *)
   wire \bfins_flags_sig.Z ;
-  (* src = "/home/runner/workspace/hardware/core.py:965" *)
+  (* src = "/home/runner/workspace/hardware/core.py:966" *)
   wire [31:0] bfins_mask_shifted;
   (* src = "/home/runner/workspace/hardware/core.py:383" *)
   wire [31:0] bfins_result;
@@ -1027,21 +1027,21 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] \cr5_heap.word2_w2 ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [31:0] \cr5_heap.word3_w3 ;
-  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
-  wire cr5_stack_empty;
   (* src = "/home/runner/workspace/hardware/core.py:1118" *)
+  wire cr5_stack_empty;
+  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
   wire cr5_stack_full;
-  (* src = "/home/runner/workspace/hardware/core.py:1116" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
   reg [7:0] cr5_stack_ptr = 8'h00;
-  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1121" *)
   wire [7:0] cr5_stack_r_addr;
-  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1121" *)
   wire [31:0] cr5_stack_r_data;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg [7:0] cr5_stack_w_addr;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg [31:0] cr5_stack_w_data;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg cr5_stack_w_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [31:0] cr6_gt_wr_data;
@@ -1057,17 +1057,17 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [15:0] \cr6_gt_wr_data.slot_id ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr6_gt_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   reg [31:0] cr7_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire \cr7_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [6:0] \cr7_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [1:0] \cr7_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [5:0] \cr7_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [15:0] \cr7_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [31:0] cr7_gt_wr_data;
@@ -1530,9 +1530,9 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire dr_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:52" *)
   reg \dr_wr_en$91 ;
-  (* src = "/home/runner/workspace/hardware/core.py:805" *)
+  (* src = "/home/runner/workspace/hardware/core.py:806" *)
   wire dread_start_sig;
-  (* src = "/home/runner/workspace/hardware/core.py:818" *)
+  (* src = "/home/runner/workspace/hardware/core.py:819" *)
   wire dwrite_start_sig;
   (* src = "/home/runner/workspace/hardware/cload.py:61" *)
   wire [31:0] e_gt;
@@ -1742,7 +1742,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire load_fault;
   (* src = "/home/runner/workspace/hardware/load.py:8" *)
   wire load_start;
-  (* src = "/home/runner/workspace/hardware/core.py:1017" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1018" *)
   wire load_start_sig;
   (* src = "/home/runner/workspace/hardware/call.py:13" *)
   wire [15:0] mask;
@@ -1973,229 +1973,229 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr0_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr0_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr0_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr0_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr0_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr0_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr0_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr10_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr10_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr10_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr10_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr10_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr10_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr10_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr11_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr11_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr11_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr11_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr11_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr11_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr11_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr12_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr12_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr12_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr12_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr12_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr12_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr12_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr13_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr13_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr13_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr13_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr13_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr13_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr13_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr14_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr14_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr14_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr14_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr14_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr14_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr14_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr15_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr15_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr15_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr15_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr15_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr15_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr15_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr1_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr1_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr1_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr1_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr1_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr1_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr1_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr2_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr2_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr2_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr2_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr2_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr2_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr2_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr3_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr3_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr3_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr3_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr3_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr3_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr3_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr4_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr4_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr4_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr4_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr4_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr4_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr4_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr5_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr5_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr5_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr5_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr5_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr5_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr5_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr6_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr6_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr6_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr6_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr6_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr6_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr6_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr7_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr7_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr7_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr7_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr7_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr7_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr7_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr8_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr8_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr8_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr8_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr8_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr8_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr8_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr9_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr9_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr9_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr9_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr9_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr9_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr9_wr_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:41" *)
   wire [7:0] rx_data;
@@ -2207,7 +2207,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire save_fault;
   (* src = "/home/runner/workspace/hardware/save.py:11" *)
   wire save_start;
-  (* src = "/home/runner/workspace/hardware/core.py:789" *)
+  (* src = "/home/runner/workspace/hardware/core.py:790" *)
   wire save_start_sig;
   (* src = "/home/runner/workspace/hardware/ret.py:39" *)
   wire [31:0] saved_cr5_gt;
@@ -2223,7 +2223,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [5:0] \saved_cr5_gt$363.perms ;
   (* src = "/home/runner/workspace/hardware/call.py:22" *)
   wire [15:0] \saved_cr5_gt$363.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:904" *)
+  (* src = "/home/runner/workspace/hardware/core.py:905" *)
   wire [4:0] shift_amt;
   (* src = "/home/runner/workspace/hardware/core.py:225" *)
   reg shl_busy_reg = 1'h0;
@@ -2257,17 +2257,17 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] shr_result;
   (* src = "/home/runner/workspace/hardware/core.py:374" *)
   wire shr_start_sig;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   reg [31:0] slot3_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire \slot3_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [6:0] \slot3_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [1:0] \slot3_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [5:0] \slot3_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [15:0] \slot3_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:36" *)
   wire [15:0] slot_id;
@@ -2297,17 +2297,17 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   reg sub_m_elevated;
   (* src = "/home/runner/workspace/hardware/mload.py:36" *)
   reg sub_start;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   reg [31:0] thrd_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire \thrd_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [6:0] \thrd_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [1:0] \thrd_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [5:0] \thrd_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [15:0] \thrd_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/call.py:71" *)
   wire [31:0] thread_base;
@@ -2327,7 +2327,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [7:0] tx_data;
   (* src = "/home/runner/workspace/hardware/outform_iot.py:38" *)
   wire tx_valid;
-  (* src = "/home/runner/workspace/hardware/core.py:1114" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1115" *)
   reg [31:0] cr5_stack [255:0];
   initial begin
     cr5_stack[0] = 32'd0;
@@ -2652,115 +2652,115 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$45  = \$44  | (* src = "/home/runner/workspace/hardware/core.py:509" *) \cr_wr_en$109 ;
   assign \$46  = \$45  | (* src = "/home/runner/workspace/hardware/core.py:509" *) \cr_wr_en$110 ;
   assign \cr_wr_en$126  = \$47  | (* src = "/home/runner/workspace/hardware/core.py:509" *) \cr_wr_en$112 ;
-  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:700" *) boot_cr7_wr_gt : 32'd0;
-  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:700" *) boot_cr8_wr_gt : 32'd0;
-  assign \$48  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:704" *) is_church_op;
-  assign \$49  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:704" *) 2'h2;
-  assign \$50  = \$48  & (* src = "/home/runner/workspace/hardware/core.py:704" *) \$49 ;
-  assign \$51  = ~ (* src = "/home/runner/workspace/hardware/core.py:704" *) any_unit_busy;
-  assign call_start_sig = \$50  & (* src = "/home/runner/workspace/hardware/core.py:704" *) \$51 ;
-  assign \$52  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:729" *) is_church_op;
-  assign \$53  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:729" *) 2'h3;
-  assign \$54  = \$52  & (* src = "/home/runner/workspace/hardware/core.py:729" *) \$53 ;
-  assign \$55  = ~ (* src = "/home/runner/workspace/hardware/core.py:729" *) any_unit_busy;
-  assign ret_start_sig = \$54  & (* src = "/home/runner/workspace/hardware/core.py:729" *) \$55 ;
-  assign \$56  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:780" *) is_church_op;
-  assign \$57  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:780" *) 3'h6;
-  assign \$58  = \$56  & (* src = "/home/runner/workspace/hardware/core.py:780" *) \$57 ;
-  assign \$59  = ~ (* src = "/home/runner/workspace/hardware/core.py:780" *) any_unit_busy;
-  assign tperm_start_sig = \$58  & (* src = "/home/runner/workspace/hardware/core.py:780" *) \$59 ;
-  assign \$60  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:791" *) is_church_op;
-  assign \$61  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:791" *) 1'h1;
-  assign \$62  = \$60  & (* src = "/home/runner/workspace/hardware/core.py:791" *) \$61 ;
-  assign \$63  = ~ (* src = "/home/runner/workspace/hardware/core.py:791" *) any_unit_busy;
-  assign save_start_sig = \$62  & (* src = "/home/runner/workspace/hardware/core.py:791" *) \$63 ;
-  assign \$64  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:807" *) is_dread_op;
-  assign \$65  = ~ (* src = "/home/runner/workspace/hardware/core.py:807" *) any_unit_busy;
-  assign dread_start_sig = \$64  & (* src = "/home/runner/workspace/hardware/core.py:807" *) \$65 ;
-  assign \$66  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:820" *) is_dwrite_op;
-  assign \$67  = ~ (* src = "/home/runner/workspace/hardware/core.py:820" *) any_unit_busy;
-  assign dwrite_start_sig = \$66  & (* src = "/home/runner/workspace/hardware/core.py:820" *) \$67 ;
-  assign \$68  = bfins_start_sig ? (* src = "/home/runner/workspace/hardware/core.py:833" *) imem_data[22:19] : 4'h0;
-  assign dr_rd_addr2 = \busy$38  ? (* src = "/home/runner/workspace/hardware/core.py:832" *) dr_rd_addr : \$68 ;
-  assign \$69  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:845" *) is_iadd_op;
-  assign \$70  = ~ (* src = "/home/runner/workspace/hardware/core.py:845" *) any_unit_busy;
-  assign iadd_start_sig = \$69  & (* src = "/home/runner/workspace/hardware/core.py:845" *) \$70 ;
-  assign \$71  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:846" *) is_isub_op;
-  assign \$72  = ~ (* src = "/home/runner/workspace/hardware/core.py:846" *) any_unit_busy;
-  assign isub_start_sig = \$71  & (* src = "/home/runner/workspace/hardware/core.py:846" *) \$72 ;
-  assign \$73  = iadd_start_sig | (* src = "/home/runner/workspace/hardware/core.py:863" *) isub_start_sig;
-  assign \$74  = \$73  | (* src = "/home/runner/workspace/hardware/core.py:863" *) shl_start_sig;
-  assign \$75  = \$74  | (* src = "/home/runner/workspace/hardware/core.py:863" *) shr_start_sig;
-  assign \$76  = \$75  | (* src = "/home/runner/workspace/hardware/core.py:863" *) bfext_start_sig;
-  assign \$77  = \$76  | (* src = "/home/runner/workspace/hardware/core.py:863" *) bfins_start_sig;
-  assign \$78  = \$77  | (* src = "/home/runner/workspace/hardware/core.py:863" *) mcmp_start_sig;
-  assign dr_rd_addr1 = \$78  ? (* src = "/home/runner/workspace/hardware/core.py:863" *) imem_data[18:15] : 4'h0;
-  assign iadd_result = dr_rd_data1 + (* src = "/home/runner/workspace/hardware/core.py:871" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign isub_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:872" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign \$79  = ! (* src = "/home/runner/workspace/hardware/core.py:879" *) iadd_result[31:0];
-  assign \$80  = ! (* src = "/home/runner/workspace/hardware/core.py:883" *) isub_result[31:0];
-  assign \$81  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:896" *) is_shl_op;
-  assign \$82  = ~ (* src = "/home/runner/workspace/hardware/core.py:896" *) any_unit_busy;
-  assign shl_start_sig = \$81  & (* src = "/home/runner/workspace/hardware/core.py:896" *) \$82 ;
-  assign \$83  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:897" *) is_shr_op;
-  assign \$84  = ~ (* src = "/home/runner/workspace/hardware/core.py:897" *) any_unit_busy;
-  assign shr_start_sig = \$83  & (* src = "/home/runner/workspace/hardware/core.py:897" *) \$84 ;
-  assign \$85  = dr_rd_data1 << (* src = "/home/runner/workspace/hardware/core.py:908" *) imem_data[4:0];
-  assign shr_result = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:909" *) imem_data[4:0];
-  assign \$86  = ! (* src = "/home/runner/workspace/hardware/core.py:916" *) \$85 [31:0];
-  assign \$87  = ! (* src = "/home/runner/workspace/hardware/core.py:920" *) shr_result;
-  assign \$88  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:932" *) is_bfext_op;
-  assign \$89  = ~ (* src = "/home/runner/workspace/hardware/core.py:932" *) any_unit_busy;
-  assign bfext_start_sig = \$88  & (* src = "/home/runner/workspace/hardware/core.py:932" *) \$89 ;
-  assign \$90  = 1'h1 << (* src = "/home/runner/workspace/hardware/core.py:941" *) imem_data[9:5];
-  assign \$91  = \$90  - (* src = "/home/runner/workspace/hardware/core.py:941" *) 1'h1;
-  assign \$92  = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:942" *) imem_data[4:0];
-  assign bfext_result = \$92  & (* src = "/home/runner/workspace/hardware/core.py:942" *) \$91 [31:0];
-  assign \$93  = ! (* src = "/home/runner/workspace/hardware/core.py:948" *) bfext_result;
-  assign \$94  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:962" *) is_bfins_op;
-  assign \$95  = ~ (* src = "/home/runner/workspace/hardware/core.py:962" *) any_unit_busy;
-  assign bfins_start_sig = \$94  & (* src = "/home/runner/workspace/hardware/core.py:962" *) \$95 ;
-  assign \$96  = \$91 [31:0] << (* src = "/home/runner/workspace/hardware/core.py:967" *) imem_data[4:0];
-  assign \$97  = ~ (* src = "/home/runner/workspace/hardware/core.py:969" *) \$96 [31:0];
-  assign \$98  = dr_rd_data & (* src = "/home/runner/workspace/hardware/core.py:969" *) \$97 ;
-  assign \$99  = dr_rd_data1 & (* src = "/home/runner/workspace/hardware/core.py:970" *) \$91 [31:0];
-  assign \$100  = \$99  << (* src = "/home/runner/workspace/hardware/core.py:970" *) imem_data[4:0];
-  assign \$101  = { 31'h00000000, \$98  } | (* src = "/home/runner/workspace/hardware/core.py:969" *) \$100 ;
-  assign \$102  = ! (* src = "/home/runner/workspace/hardware/core.py:977" *) \$101 [31:0];
-  assign \$103  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:988" *) is_mcmp_op;
-  assign \$104  = ~ (* src = "/home/runner/workspace/hardware/core.py:988" *) any_unit_busy;
-  assign mcmp_start_sig = \$103  & (* src = "/home/runner/workspace/hardware/core.py:988" *) \$104 ;
-  assign mcmp_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:991" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign \$105  = ! (* src = "/home/runner/workspace/hardware/core.py:996" *) mcmp_result[31:0];
-  assign \$106  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1009" *) exec_enable;
-  assign \$107  = \$106  & (* src = "/home/runner/workspace/hardware/core.py:1009" *) is_branch_op;
-  assign \$108  = ~ (* src = "/home/runner/workspace/hardware/core.py:1009" *) any_unit_busy;
-  assign branch_taken = \$107  & (* src = "/home/runner/workspace/hardware/core.py:1009" *) \$108 ;
-  assign \$109  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1019" *) is_church_op;
-  assign \$110  = ! (* src = "/home/runner/workspace/hardware/core.py:1019" *) imem_data[31:27];
-  assign \$111  = \$109  & (* src = "/home/runner/workspace/hardware/core.py:1019" *) \$110 ;
-  assign \$112  = ~ (* src = "/home/runner/workspace/hardware/core.py:1019" *) any_unit_busy;
-  assign load_start_sig = \$111  & (* src = "/home/runner/workspace/hardware/core.py:1019" *) \$112 ;
-  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/hardware/core.py:1123" *) cr5_stack_ptr;
-  assign \$113  = cr5_stack_ptr > (* src = "/home/runner/workspace/hardware/core.py:1125" *) 1'h0;
-  assign \$114  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1125" *) 1'h1;
-  assign \$115  = \$113  ? (* src = "/home/runner/workspace/hardware/core.py:1125" *) \$114  : 9'h000;
-  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/hardware/core.py:1126" *) 32'd0 : cr5_stack_r_data;
-  assign \$116  = ~ (* src = "/home/runner/workspace/hardware/core.py:1132" *) call_fault;
-  assign \$117  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1132" *) \$116 ;
-  assign \$120  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) \fault_valid$362 ;
-  assign \$121  = complete & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$120 ;
-  assign \$122  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) cr5_stack_empty;
-  assign \$123  = \$121  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$122 ;
-  assign \$124  = ~ (* src = "/home/runner/workspace/hardware/core.py:1155" *) any_unit_busy;
-  assign \$125  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$124 ;
-  assign \$126  = code_lo_reg != (* src = "/home/runner/workspace/hardware/core.py:1156" *) code_hi_reg;
-  assign \$127  = \$125  & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$126 ;
-  assign \$128  = imem_addr < (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_lo_reg;
-  assign \$129  = imem_addr >= (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_hi_reg;
-  assign \$130  = \$128  | (* src = "/home/runner/workspace/hardware/core.py:1157" *) \$129 ;
-  assign fetch_bounds_fault = \$127  & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$130 ;
-  assign \$131  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:1258" *) mem_wr_en;
+  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:701" *) boot_cr7_wr_gt : 32'd0;
+  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:701" *) boot_cr8_wr_gt : 32'd0;
+  assign \$48  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:705" *) is_church_op;
+  assign \$49  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:705" *) 2'h2;
+  assign \$50  = \$48  & (* src = "/home/runner/workspace/hardware/core.py:705" *) \$49 ;
+  assign \$51  = ~ (* src = "/home/runner/workspace/hardware/core.py:705" *) any_unit_busy;
+  assign call_start_sig = \$50  & (* src = "/home/runner/workspace/hardware/core.py:705" *) \$51 ;
+  assign \$52  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:730" *) is_church_op;
+  assign \$53  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:730" *) 2'h3;
+  assign \$54  = \$52  & (* src = "/home/runner/workspace/hardware/core.py:730" *) \$53 ;
+  assign \$55  = ~ (* src = "/home/runner/workspace/hardware/core.py:730" *) any_unit_busy;
+  assign ret_start_sig = \$54  & (* src = "/home/runner/workspace/hardware/core.py:730" *) \$55 ;
+  assign \$56  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:781" *) is_church_op;
+  assign \$57  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:781" *) 3'h6;
+  assign \$58  = \$56  & (* src = "/home/runner/workspace/hardware/core.py:781" *) \$57 ;
+  assign \$59  = ~ (* src = "/home/runner/workspace/hardware/core.py:781" *) any_unit_busy;
+  assign tperm_start_sig = \$58  & (* src = "/home/runner/workspace/hardware/core.py:781" *) \$59 ;
+  assign \$60  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:792" *) is_church_op;
+  assign \$61  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:792" *) 1'h1;
+  assign \$62  = \$60  & (* src = "/home/runner/workspace/hardware/core.py:792" *) \$61 ;
+  assign \$63  = ~ (* src = "/home/runner/workspace/hardware/core.py:792" *) any_unit_busy;
+  assign save_start_sig = \$62  & (* src = "/home/runner/workspace/hardware/core.py:792" *) \$63 ;
+  assign \$64  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:808" *) is_dread_op;
+  assign \$65  = ~ (* src = "/home/runner/workspace/hardware/core.py:808" *) any_unit_busy;
+  assign dread_start_sig = \$64  & (* src = "/home/runner/workspace/hardware/core.py:808" *) \$65 ;
+  assign \$66  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:821" *) is_dwrite_op;
+  assign \$67  = ~ (* src = "/home/runner/workspace/hardware/core.py:821" *) any_unit_busy;
+  assign dwrite_start_sig = \$66  & (* src = "/home/runner/workspace/hardware/core.py:821" *) \$67 ;
+  assign \$68  = bfins_start_sig ? (* src = "/home/runner/workspace/hardware/core.py:834" *) imem_data[22:19] : 4'h0;
+  assign dr_rd_addr2 = \busy$38  ? (* src = "/home/runner/workspace/hardware/core.py:833" *) dr_rd_addr : \$68 ;
+  assign \$69  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:846" *) is_iadd_op;
+  assign \$70  = ~ (* src = "/home/runner/workspace/hardware/core.py:846" *) any_unit_busy;
+  assign iadd_start_sig = \$69  & (* src = "/home/runner/workspace/hardware/core.py:846" *) \$70 ;
+  assign \$71  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:847" *) is_isub_op;
+  assign \$72  = ~ (* src = "/home/runner/workspace/hardware/core.py:847" *) any_unit_busy;
+  assign isub_start_sig = \$71  & (* src = "/home/runner/workspace/hardware/core.py:847" *) \$72 ;
+  assign \$73  = iadd_start_sig | (* src = "/home/runner/workspace/hardware/core.py:864" *) isub_start_sig;
+  assign \$74  = \$73  | (* src = "/home/runner/workspace/hardware/core.py:864" *) shl_start_sig;
+  assign \$75  = \$74  | (* src = "/home/runner/workspace/hardware/core.py:864" *) shr_start_sig;
+  assign \$76  = \$75  | (* src = "/home/runner/workspace/hardware/core.py:864" *) bfext_start_sig;
+  assign \$77  = \$76  | (* src = "/home/runner/workspace/hardware/core.py:864" *) bfins_start_sig;
+  assign \$78  = \$77  | (* src = "/home/runner/workspace/hardware/core.py:864" *) mcmp_start_sig;
+  assign dr_rd_addr1 = \$78  ? (* src = "/home/runner/workspace/hardware/core.py:864" *) imem_data[18:15] : 4'h0;
+  assign iadd_result = dr_rd_data1 + (* src = "/home/runner/workspace/hardware/core.py:872" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign isub_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:873" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign \$79  = ! (* src = "/home/runner/workspace/hardware/core.py:880" *) iadd_result[31:0];
+  assign \$80  = ! (* src = "/home/runner/workspace/hardware/core.py:884" *) isub_result[31:0];
+  assign \$81  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:897" *) is_shl_op;
+  assign \$82  = ~ (* src = "/home/runner/workspace/hardware/core.py:897" *) any_unit_busy;
+  assign shl_start_sig = \$81  & (* src = "/home/runner/workspace/hardware/core.py:897" *) \$82 ;
+  assign \$83  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:898" *) is_shr_op;
+  assign \$84  = ~ (* src = "/home/runner/workspace/hardware/core.py:898" *) any_unit_busy;
+  assign shr_start_sig = \$83  & (* src = "/home/runner/workspace/hardware/core.py:898" *) \$84 ;
+  assign \$85  = dr_rd_data1 << (* src = "/home/runner/workspace/hardware/core.py:909" *) imem_data[4:0];
+  assign shr_result = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:910" *) imem_data[4:0];
+  assign \$86  = ! (* src = "/home/runner/workspace/hardware/core.py:917" *) \$85 [31:0];
+  assign \$87  = ! (* src = "/home/runner/workspace/hardware/core.py:921" *) shr_result;
+  assign \$88  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:933" *) is_bfext_op;
+  assign \$89  = ~ (* src = "/home/runner/workspace/hardware/core.py:933" *) any_unit_busy;
+  assign bfext_start_sig = \$88  & (* src = "/home/runner/workspace/hardware/core.py:933" *) \$89 ;
+  assign \$90  = 1'h1 << (* src = "/home/runner/workspace/hardware/core.py:942" *) imem_data[9:5];
+  assign \$91  = \$90  - (* src = "/home/runner/workspace/hardware/core.py:942" *) 1'h1;
+  assign \$92  = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:943" *) imem_data[4:0];
+  assign bfext_result = \$92  & (* src = "/home/runner/workspace/hardware/core.py:943" *) \$91 [31:0];
+  assign \$93  = ! (* src = "/home/runner/workspace/hardware/core.py:949" *) bfext_result;
+  assign \$94  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:963" *) is_bfins_op;
+  assign \$95  = ~ (* src = "/home/runner/workspace/hardware/core.py:963" *) any_unit_busy;
+  assign bfins_start_sig = \$94  & (* src = "/home/runner/workspace/hardware/core.py:963" *) \$95 ;
+  assign \$96  = \$91 [31:0] << (* src = "/home/runner/workspace/hardware/core.py:968" *) imem_data[4:0];
+  assign \$97  = ~ (* src = "/home/runner/workspace/hardware/core.py:970" *) \$96 [31:0];
+  assign \$98  = dr_rd_data & (* src = "/home/runner/workspace/hardware/core.py:970" *) \$97 ;
+  assign \$99  = dr_rd_data1 & (* src = "/home/runner/workspace/hardware/core.py:971" *) \$91 [31:0];
+  assign \$100  = \$99  << (* src = "/home/runner/workspace/hardware/core.py:971" *) imem_data[4:0];
+  assign \$101  = { 31'h00000000, \$98  } | (* src = "/home/runner/workspace/hardware/core.py:970" *) \$100 ;
+  assign \$102  = ! (* src = "/home/runner/workspace/hardware/core.py:978" *) \$101 [31:0];
+  assign \$103  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:989" *) is_mcmp_op;
+  assign \$104  = ~ (* src = "/home/runner/workspace/hardware/core.py:989" *) any_unit_busy;
+  assign mcmp_start_sig = \$103  & (* src = "/home/runner/workspace/hardware/core.py:989" *) \$104 ;
+  assign mcmp_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:992" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign \$105  = ! (* src = "/home/runner/workspace/hardware/core.py:997" *) mcmp_result[31:0];
+  assign \$106  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1010" *) exec_enable;
+  assign \$107  = \$106  & (* src = "/home/runner/workspace/hardware/core.py:1010" *) is_branch_op;
+  assign \$108  = ~ (* src = "/home/runner/workspace/hardware/core.py:1010" *) any_unit_busy;
+  assign branch_taken = \$107  & (* src = "/home/runner/workspace/hardware/core.py:1010" *) \$108 ;
+  assign \$109  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1020" *) is_church_op;
+  assign \$110  = ! (* src = "/home/runner/workspace/hardware/core.py:1020" *) imem_data[31:27];
+  assign \$111  = \$109  & (* src = "/home/runner/workspace/hardware/core.py:1020" *) \$110 ;
+  assign \$112  = ~ (* src = "/home/runner/workspace/hardware/core.py:1020" *) any_unit_busy;
+  assign load_start_sig = \$111  & (* src = "/home/runner/workspace/hardware/core.py:1020" *) \$112 ;
+  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/hardware/core.py:1124" *) cr5_stack_ptr;
+  assign \$113  = cr5_stack_ptr > (* src = "/home/runner/workspace/hardware/core.py:1126" *) 1'h0;
+  assign \$114  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1126" *) 1'h1;
+  assign \$115  = \$113  ? (* src = "/home/runner/workspace/hardware/core.py:1126" *) \$114  : 9'h000;
+  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/hardware/core.py:1127" *) 32'd0 : cr5_stack_r_data;
+  assign \$116  = ~ (* src = "/home/runner/workspace/hardware/core.py:1133" *) call_fault;
+  assign \$117  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1133" *) \$116 ;
+  assign \$120  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) \fault_valid$362 ;
+  assign \$121  = complete & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$120 ;
+  assign \$122  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) cr5_stack_empty;
+  assign \$123  = \$121  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$122 ;
+  assign \$124  = ~ (* src = "/home/runner/workspace/hardware/core.py:1156" *) any_unit_busy;
+  assign \$125  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$124 ;
+  assign \$126  = code_lo_reg != (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_hi_reg;
+  assign \$127  = \$125  & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$126 ;
+  assign \$128  = imem_addr < (* src = "/home/runner/workspace/hardware/core.py:1158" *) code_lo_reg;
+  assign \$129  = imem_addr >= (* src = "/home/runner/workspace/hardware/core.py:1158" *) code_hi_reg;
+  assign \$130  = \$128  | (* src = "/home/runner/workspace/hardware/core.py:1158" *) \$129 ;
+  assign fetch_bounds_fault = \$127  & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$130 ;
+  assign \$131  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:1259" *) mem_wr_en;
   assign \$132  = ~ (* src = "/home/runner/workspace/hardware/core.py:533" *) fetch_bounds_fault;
   assign \$133  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:533" *) \$132 ;
   assign \$134  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:538" *) instr_valid;
@@ -2778,36 +2778,36 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$146  = \cr_wr_en$112  & (* src = "/home/runner/workspace/hardware/core.py:573" *) \$145 ;
   assign \$147  = \cr_wr_data$120 [84:64] + (* src = "/home/runner/workspace/hardware/core.py:583" *) 1'h1;
   assign \$149  = \cr_wr_data$120 [63:32] + (* src = "/home/runner/workspace/hardware/core.py:582" *) \$148 ;
-  assign \$150  = ~ (* src = "/home/runner/workspace/hardware/core.py:744" *) lambda_active;
-  assign \$151  = ~ (* src = "/home/runner/workspace/hardware/core.py:746" *) \fault_valid$362 ;
-  assign \$152  = complete & (* src = "/home/runner/workspace/hardware/core.py:746" *) \$151 ;
-  assign \$153  = ~ (* src = "/home/runner/workspace/hardware/core.py:746" *) reboot_request;
-  assign \$154  = \$152  & (* src = "/home/runner/workspace/hardware/core.py:746" *) \$153 ;
-  assign \$155  = \$154  & (* src = "/home/runner/workspace/hardware/core.py:746" *) cross_domain_ret;
-  assign \$156  = ~ (* src = "/home/runner/workspace/hardware/core.py:851" *) iadd_busy_reg;
-  assign \$157  = iadd_start_sig & (* src = "/home/runner/workspace/hardware/core.py:851" *) \$156 ;
-  assign \$158  = ~ (* src = "/home/runner/workspace/hardware/core.py:852" *) isub_busy_reg;
-  assign \$159  = isub_start_sig & (* src = "/home/runner/workspace/hardware/core.py:852" *) \$158 ;
-  assign \$160  = ~ (* src = "/home/runner/workspace/hardware/core.py:900" *) shl_busy_reg;
-  assign \$161  = shl_start_sig & (* src = "/home/runner/workspace/hardware/core.py:900" *) \$160 ;
-  assign \$162  = ~ (* src = "/home/runner/workspace/hardware/core.py:901" *) shr_busy_reg;
-  assign \$163  = shr_start_sig & (* src = "/home/runner/workspace/hardware/core.py:901" *) \$162 ;
-  assign \$164  = ~ (* src = "/home/runner/workspace/hardware/core.py:933" *) bfext_busy_reg;
-  assign \$165  = bfext_start_sig & (* src = "/home/runner/workspace/hardware/core.py:933" *) \$164 ;
-  assign \$166  = ~ (* src = "/home/runner/workspace/hardware/core.py:963" *) bfins_busy_reg;
-  assign \$167  = bfins_start_sig & (* src = "/home/runner/workspace/hardware/core.py:963" *) \$166 ;
-  assign \$168  = ~ (* src = "/home/runner/workspace/hardware/core.py:989" *) mcmp_busy_reg;
-  assign \$169  = mcmp_start_sig & (* src = "/home/runner/workspace/hardware/core.py:989" *) \$168 ;
-  assign \$170  = ~ (* src = "/home/runner/workspace/hardware/core.py:1011" *) branch_busy_reg;
-  assign \$171  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:1011" *) \$170 ;
-  assign \$172  = ~ (* src = "/home/runner/workspace/hardware/core.py:1132" *) call_fault;
-  assign \$173  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1132" *) \$172 ;
-  assign \$176  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) \fault_valid$362 ;
-  assign \$177  = complete & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$176 ;
-  assign \$178  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) cr5_stack_empty;
-  assign \$179  = \$177  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$178 ;
-  assign \$180  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1138" *) 1'h1;
-  assign \$181  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1148" *) 1'h1;
+  assign \$150  = ~ (* src = "/home/runner/workspace/hardware/core.py:745" *) lambda_active;
+  assign \$151  = ~ (* src = "/home/runner/workspace/hardware/core.py:747" *) \fault_valid$362 ;
+  assign \$152  = complete & (* src = "/home/runner/workspace/hardware/core.py:747" *) \$151 ;
+  assign \$153  = ~ (* src = "/home/runner/workspace/hardware/core.py:747" *) reboot_request;
+  assign \$154  = \$152  & (* src = "/home/runner/workspace/hardware/core.py:747" *) \$153 ;
+  assign \$155  = \$154  & (* src = "/home/runner/workspace/hardware/core.py:747" *) cross_domain_ret;
+  assign \$156  = ~ (* src = "/home/runner/workspace/hardware/core.py:852" *) iadd_busy_reg;
+  assign \$157  = iadd_start_sig & (* src = "/home/runner/workspace/hardware/core.py:852" *) \$156 ;
+  assign \$158  = ~ (* src = "/home/runner/workspace/hardware/core.py:853" *) isub_busy_reg;
+  assign \$159  = isub_start_sig & (* src = "/home/runner/workspace/hardware/core.py:853" *) \$158 ;
+  assign \$160  = ~ (* src = "/home/runner/workspace/hardware/core.py:901" *) shl_busy_reg;
+  assign \$161  = shl_start_sig & (* src = "/home/runner/workspace/hardware/core.py:901" *) \$160 ;
+  assign \$162  = ~ (* src = "/home/runner/workspace/hardware/core.py:902" *) shr_busy_reg;
+  assign \$163  = shr_start_sig & (* src = "/home/runner/workspace/hardware/core.py:902" *) \$162 ;
+  assign \$164  = ~ (* src = "/home/runner/workspace/hardware/core.py:934" *) bfext_busy_reg;
+  assign \$165  = bfext_start_sig & (* src = "/home/runner/workspace/hardware/core.py:934" *) \$164 ;
+  assign \$166  = ~ (* src = "/home/runner/workspace/hardware/core.py:964" *) bfins_busy_reg;
+  assign \$167  = bfins_start_sig & (* src = "/home/runner/workspace/hardware/core.py:964" *) \$166 ;
+  assign \$168  = ~ (* src = "/home/runner/workspace/hardware/core.py:990" *) mcmp_busy_reg;
+  assign \$169  = mcmp_start_sig & (* src = "/home/runner/workspace/hardware/core.py:990" *) \$168 ;
+  assign \$170  = ~ (* src = "/home/runner/workspace/hardware/core.py:1012" *) branch_busy_reg;
+  assign \$171  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:1012" *) \$170 ;
+  assign \$172  = ~ (* src = "/home/runner/workspace/hardware/core.py:1133" *) call_fault;
+  assign \$173  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1133" *) \$172 ;
+  assign \$176  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) \fault_valid$362 ;
+  assign \$177  = complete & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$176 ;
+  assign \$178  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) cr5_stack_empty;
+  assign \$179  = \$177  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$178 ;
+  assign \$180  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1139" *) 1'h1;
+  assign \$181  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1149" *) 1'h1;
   (* src = "/home/runner/workspace/hardware/core.py:163" *)
   always @(posedge clk)
     boot_state <= \$182 ;
@@ -2859,7 +2859,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:224" *)
   always @(posedge clk)
     branch_busy_reg <= \$198 ;
-  (* src = "/home/runner/workspace/hardware/core.py:1116" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
   always @(posedge clk)
     cr5_stack_ptr <= \$199 ;
   (* src = "/home/runner/workspace/hardware/core.py:109" *)
@@ -3316,7 +3316,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     boot_cap_wr_data = 128'h00000000000000000000000000000000;
     casez (boot_state)
       3'h2:
-          boot_cap_wr_data = 128'h000000000000000f0000000000800000;
+          boot_cap_wr_data = 128'h00000000000000120000000000800000;
       3'h3:
           /* empty */;
       3'h4:
