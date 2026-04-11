@@ -11763,7 +11763,7 @@ async function buildFPGAOnly() {
     switchBuilderViewTab('buildlog');
 
     const ts = new Date().toLocaleTimeString();
-    _buildLogSet(`[${ts}] Building FPGA RTL for ${boardLabel}...\nRunning Amaranth elaboration + Yosys synthesis (typically 20–60 s).\n`);
+    _buildLogSet(`[${ts}] Building FPGA RTL for ${boardLabel}...\nRunning Amaranth elaboration + Yosys synthesis (may take up to 5 min).\n`);
     _setBuildStatus('running', `Building ${boardLabel}…`, boardLabel);
     document.getElementById('buildFileList').innerHTML = '<div class="build-file-empty">Building…</div>';
     document.getElementById('buildNextSteps').innerHTML = '<div class="build-file-empty">Waiting for build…</div>';
@@ -11780,8 +11780,13 @@ async function buildFPGAOnly() {
         const doneTs = new Date().toLocaleTimeString();
         _buildLogAppend(`\n[${doneTs}] Build complete. Files saved on server:\n`);
         (data.file_paths || data.files || []).forEach(f => { _buildLogAppend(`  ✓ ${f}\n`); });
+        if (data.warning) {
+            _buildLogAppend(`\n⚠ ${data.warning}\nThe RTLIL file is included — run Yosys locally for full synthesis.\n`);
+            _setBuildStatus('ok', `Build partial — ${boardLabel} (RTLIL only)`, boardLabel);
+        } else {
+            _setBuildStatus('ok', `Build succeeded — ${boardLabel}`, boardLabel);
+        }
         _buildLogAppend('\nClick "Download FPGA Package" to download the ZIP.\n');
-        _setBuildStatus('ok', `Build succeeded — ${boardLabel}`, boardLabel);
         _renderBuildFiles(data.files || [], isTi60);
         _renderBuildNextSteps(isTi60);
         if (dlBtn) dlBtn.disabled = false;

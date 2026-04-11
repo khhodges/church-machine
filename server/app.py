@@ -1037,7 +1037,7 @@ def build_fpga():
         os.makedirs(build_dir, exist_ok=True)
 
         logging.info("FPGA build: generating RTLIL from Amaranth (board=%s)...", board)
-        gen_result = subprocess.run(gen_args, cwd=BASE_DIR, capture_output=True, text=True, timeout=120)
+        gen_result = subprocess.run(gen_args, cwd=BASE_DIR, capture_output=True, text=True, timeout=180)
         if gen_result.returncode != 0:
             return jsonify({
                 "error": "Amaranth RTLIL generation failed",
@@ -1052,16 +1052,18 @@ def build_fpga():
         synth_cmd = synth_cmd_tpl.format(**fmt_args)
 
         logging.info("FPGA build: running Yosys synthesis...")
-        synth_result = subprocess.run(["yosys", "-p", synth_cmd], cwd=BASE_DIR, capture_output=True, text=True, timeout=120)
-        if synth_result.returncode != 0:
-            return jsonify({
-                "error": "Yosys synthesis failed",
-                "stderr": synth_result.stderr[-2000:] if synth_result.stderr else "",
-                "stdout": synth_result.stdout[-2000:] if synth_result.stdout else ""
-            }), 500
-
-        if not os.path.isfile(paths["verilog"]):
-            return jsonify({"error": "Yosys Verilog output not generated", "stderr": ""}), 500
+        synth_warning = None
+        try:
+            synth_result = subprocess.run(["yosys", "-p", synth_cmd], cwd=BASE_DIR, capture_output=True, text=True, timeout=300)
+            if synth_result.returncode != 0:
+                synth_warning = "Yosys synthesis failed (RTLIL still available)"
+                logging.warning("Yosys synthesis returned non-zero: %s", synth_result.stderr[-500:] if synth_result.stderr else "")
+        except subprocess.TimeoutExpired:
+            synth_warning = "Yosys synthesis timed out (RTLIL still available)"
+            logging.warning("Yosys synthesis timed out")
+        except Exception as synth_exc:
+            synth_warning = f"Yosys synthesis error: {synth_exc} (RTLIL still available)"
+            logging.warning("Yosys synthesis exception: %s", synth_exc)
 
         marker_path = os.path.join(build_dir, "_last_board.txt")
         with open(marker_path, 'w') as f:
@@ -1069,11 +1071,14 @@ def build_fpga():
 
         files = [os.path.basename(p) for p in paths.values() if os.path.isfile(p)]
         file_paths = [p for p in paths.values() if os.path.isfile(p)]
-        logging.info("FPGA build: synthesis complete, files=%s", files)
-        return jsonify({"ok": True, "board": board, "files": files, "file_paths": file_paths})
+        logging.info("FPGA build: complete, files=%s, warning=%s", files, synth_warning)
+        result = {"ok": True, "board": board, "files": files, "file_paths": file_paths}
+        if synth_warning:
+            result["warning"] = synth_warning
+        return jsonify(result)
 
     except subprocess.TimeoutExpired:
-        return jsonify({"error": "Build timed out (120s limit)", "stderr": ""}), 500
+        return jsonify({"error": "Build timed out (300s limit)", "stderr": ""}), 500
     except Exception as e:
         logging.exception("FPGA build failed")
         return jsonify({"error": str(e), "stderr": ""}), 500
