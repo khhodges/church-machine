@@ -11844,12 +11844,48 @@ async function downloadFPGAPackage() {
             _buildLogAppend('  church_ti60_f225.edif — Yosys EDIF netlist (synth_efinix)\n');
             _buildLogAppend('  ti60_f225.isf         — Pin constraints (Efinity IDE)\n');
             _buildLogAppend('  BUILD.md              — Instructions\n');
+            _buildLogAppend('\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+                '  NEXT STEPS — Ti60 F225\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+                '  1. Unzip the downloaded file\n' +
+                '  2. Open the project in Efinity IDE\n' +
+                '  3. Run synthesis + place-and-route in Efinity\n' +
+                '  4. Flash via Efinity Programmer (JTAG)\n' +
+                '  5. Watch LEDs — walking pattern confirms boot OK\n' +
+                '\n' +
+                '  See BUILD.md inside the zip for full details.\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         } else {
             _buildLogAppend('  church_tang_nano_20k.v    — Synthesisable Verilog\n');
             _buildLogAppend('  church_tang_nano_20k.json — Yosys netlist\n');
             _buildLogAppend('  tang_nano_20k.cst         — Pin constraints\n');
+            _buildLogAppend('  flash.sh                  — One-command build + flash\n');
+            _buildLogAppend('  bridge.sh                 — Connect board to IDE\n');
             _buildLogAppend('  Makefile                  — Build targets\n');
             _buildLogAppend('  BUILD.md                  — Instructions\n');
+            _buildLogAppend('\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+                '  NEXT STEPS — Tang Nano 20K\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+                '  Open a terminal and run these commands:\n' +
+                '\n' +
+                '    cd ~/Downloads\n' +
+                '    unzip church-nano-package.zip\n' +
+                '    cd church-nano-package\n' +
+                '    chmod +x flash.sh bridge.sh\n' +
+                '    ./flash.sh\n' +
+                '\n' +
+                '  flash.sh does everything: nextpnr, gowin_pack, and\n' +
+                '  openFPGALoader — just plug in your Tang Nano 20K via USB.\n' +
+                '\n' +
+                '  After flashing, connect the board to this IDE:\n' +
+                '\n' +
+                '    ./bridge.sh --ide=https://cloomc.org\n' +
+                '\n' +
+                '  LEDs: 3-LED chase pattern = boot OK.\n' +
+                '  See BUILD.md inside the zip for troubleshooting.\n' +
+                '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         }
     } catch (e) {
         _buildLogAppend('\nError: ' + e.message + '\n');
