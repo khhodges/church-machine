@@ -140,59 +140,65 @@ from unboxing to running your own code on real silicon.
 - A **USB-C cable** (data, not charge-only)
 - A computer running **Linux** or **ChromeOS** (with Linux container)
 
-### Step 1 — Install the tools
+### Step 1 — Download the official bitstream and flash your Church Machine
 
-You need **openFPGALoader** to flash the bitstream and **Python 3 +
-pyserial** to send code patches over UART.
+Plug in the Tang Nano 20K via USB-C and flash the official bitstream.
+This writes the Church Machine itself — the processor, capability
+registers, namespace controller, boot ROM, and security model — into
+the FPGA. After flashing you have a real Church Machine on silicon.
+
+**Install openFPGALoader** (one time):
 
 ```bash
-# OSS CAD Suite (includes openFPGALoader)
+# OSS CAD Suite (includes openFPGALoader, nextpnr, gowin_pack)
 # https://github.com/YosysHQ/oss-cad-suite-build
 source ~/oss-cad-suite/environment
 
-# pyserial (for the CLI patch tool)
+# pyserial (for the bridge and patch tools)
 pip3 install pyserial
 ```
 
-### Step 2 — Build and download the FPGA package
+**Download the bitstream:**
 
-**From the IDE (recommended):**
+Open the Church Machine IDE, go to **Builder**, select **Tang Nano 20K**,
+and click **Download FPGA Package**. Or download from
+[CLOOMC.com](https://cloomc.com).
 
-1. Open the Church Machine IDE, go to **Builder**
-2. Select **Tang Nano 20K** from the board dropdown
-3. Click **Build** — Amaranth + Yosys run on the server (~30 seconds)
-4. Click **Download FPGA Package** — saves a ZIP with everything needed
-
-Extract the ZIP:
+Extract and flash:
 
 ```bash
 mkdir -p ~/church-fpga && cd ~/church-fpga
 unzip church-nano-package.zip
 chmod +x flash.sh bridge.sh
+./flash.sh
 ```
+
+`flash.sh` runs nextpnr-himbaechel → gowin_pack → openFPGALoader in
+one command. It stops on the first error with a diagnostic hint, and
+ends with a success checklist telling you what to look for.
 
 The ZIP contains the Verilog, netlist, constraints, Makefile, `flash.sh`,
 `bridge.sh`, `local_bridge.py`, and `BUILD.md`.
 
-**Alternative — official pre-built bitstream:**
+**Manual alternative** (if you prefer individual commands):
 
-If an official tested bitstream is available, download it from
-[CLOOMC.com](https://cloomc.com) or the IDE Builder panel.
+```bash
+make pnr pack    # nextpnr + gowin_pack
+make prog        # openFPGALoader
+```
 
-### Step 3 — Plug in and check
-
-Connect the board via USB-C:
+### Step 2 — Check the USB ports
 
 ```bash
 ls /dev/ttyUSB*
 ```
 
-The FT2232 chip creates two ports:
+The BL616 chip creates two ports:
 
 | Port | Channel | Purpose |
 |------|---------|---------|
-| `/dev/ttyUSB0` | A (JTAG) | openFPGALoader uses this to flash |
-| `/dev/ttyUSB1` | B (UART) | patch_fpga.py sends code here at 115200 baud |
+| `/dev/ttyUSB0` | JTAG | openFPGALoader uses this to flash |
+| `/dev/ttyUSB1` | UART | Bridge / code patches at 115200 baud |
 
 If you get permission errors:
 
@@ -201,28 +207,7 @@ sudo usermod -aG dialout $USER   # permanent fix (log out and back in)
 sudo chmod 666 /dev/ttyUSB*      # quick fix
 ```
 
-### Step 4 — Build and flash
-
-**One-command flash (recommended):**
-
-```bash
-cd ~/church-fpga
-./flash.sh
-```
-
-`flash.sh` runs nextpnr-himbaechel → gowin_pack → openFPGALoader in
-sequence. It stops on the first error with a diagnostic hint, and ends
-with a success checklist telling you what to look for.
-
-**Manual alternative:**
-
-```bash
-cd ~/church-fpga
-make pnr pack    # nextpnr + gowin_pack
-make prog        # openFPGALoader
-```
-
-### Step 5 — Verify success (100% checklist)
+### Step 3 — Verify success (100% checklist)
 
 When the bitstream finishes flashing, the Church Machine boots
 automatically. The boot ROM initialises every capability register,
@@ -273,7 +258,7 @@ If something is wrong, find your symptom below:
 | "Cell ledN not found" in nextpnr log | Stale Verilog (old build) | Click Build in IDE, re-download ZIP |
 | Permission denied on /dev/ttyUSB* | User not in dialout group | `sudo usermod -aG dialout $USER` then log out/in |
 
-### Step 5b — Connect to the IDE and deploy code
+### Step 4 — Connect to the IDE and deploy code
 
 After flashing, connect the board to the Church Machine IDE so you can
 deploy code from the browser.
@@ -425,7 +410,7 @@ single confident action — not a multi-stage deployment pipeline.
 IDE ── write ──► Patch (one click) ──► FPGA runs under full capability enforcement
 ```
 
-### Step 6 — Write your code
+### Step 5 — Write your code
 
 1. Open the Church Machine IDE in your browser
 2. Click **CRs** in the toolbar
@@ -433,7 +418,7 @@ IDE ── write ──► Patch (one click) ──► FPGA runs under full capa
 4. Click **Edit** to open the abstraction creator
 5. Write or modify your Church Machine assembly
 
-### Step 7 — Compile and test in the simulator
+### Step 6 — Compile and test in the simulator
 
 Click **Patch**. This assembles your code into binary machine words and
 writes them into the simulator memory. This is the compilation step —
@@ -443,7 +428,7 @@ Step through instructions, inspect registers, and check for capability
 faults before committing to real hardware. If the assembler reports
 errors, fix them and click Patch again.
 
-### Step 8 — Export the patch file
+### Step 7 — Export the patch file
 
 Click **Export Patch**. This packages the compiled binary into a `.patch`
 file containing complete UART frames with CRC checksums and a RUN
@@ -463,7 +448,7 @@ NS table update included: no
 Downloaded: CR14_patch.patch
 ```
 
-### Step 9 — Flash the patch to the FPGA
+### Step 8 — Flash the patch to the FPGA
 
 ```bash
 python3 patch_fpga.py /dev/ttyUSB1 CR14_patch.patch
@@ -491,13 +476,13 @@ SUCCESS — all blocks patched and verified.
 Cross-check: the CRC and address values must match between the IDE
 preview and the script output.
 
-### Step 10 — Check the LEDs
+### Step 9 — Check the LEDs
 
 - **led0** stays solid (boot complete)
 - **led1** stops blinking (core now running your code)
 - **led2** OFF = no fault, ON = capability fault triggered
 
-To change your code, repeat Steps 6–10: edit, compile, export, patch.
+To change your code, repeat Steps 5–9: edit, compile, export, patch.
 Each cycle takes under a minute.
 
 ---
