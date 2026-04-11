@@ -154,44 +154,30 @@ source ~/oss-cad-suite/environment
 pip3 install pyserial
 ```
 
-### Step 2 — Download the latest bitstream
-
-Download the official tested bitstream directly from the IDE:
+### Step 2 — Build and download the FPGA package
 
 **From the IDE (recommended):**
-Open the Church Machine IDE, go to **Builder**, and click
-**Download Official Bitstream**. Or use this direct link:
 
-```
-/api/bitstream/download/tang-nano-20k-iot
-```
+1. Open the Church Machine IDE, go to **Builder**
+2. Select **Tang Nano 20K** from the board dropdown
+3. Click **Build** — Amaranth + Yosys run on the server (~30 seconds)
+4. Click **Download FPGA Package** — saves a ZIP with everything needed
 
-**From the command line:**
+Extract the ZIP:
 
 ```bash
-curl -LO https://cloomc.org/api/bitstream/download/tang-nano-20k-iot
+mkdir -p ~/church-fpga && cd ~/church-fpga
+unzip church-nano-package.zip
+chmod +x flash.sh bridge.sh
 ```
 
-**From CLOOMC.com:**
-Download approved bitstreams and tools from
-[CLOOMC.com](https://cloomc.com).
+The ZIP contains the Verilog, netlist, constraints, Makefile, `flash.sh`,
+`bridge.sh`, `local_bridge.py`, and `BUILD.md`.
 
-You also need the CLI patcher for manual deployments:
+**Alternative — official pre-built bitstream:**
 
-```
-tools/patch_fpga.py                   (CLI patcher)
-```
-
-If no official bitstream is available yet, you can build from source —
-see **Building from Source** below, then come back here.
-
-Put the files in a working directory:
-
-```
-~/church-fpga/
-├── church_tang_nano_20k_iot.fs
-└── patch_fpga.py
-```
+If an official tested bitstream is available, download it from
+[CLOOMC.com](https://cloomc.com) or the IDE Builder panel.
 
 ### Step 3 — Plug in and check
 
@@ -215,56 +201,104 @@ sudo usermod -aG dialout $USER   # permanent fix (log out and back in)
 sudo chmod 666 /dev/ttyUSB*      # quick fix
 ```
 
-### Step 4 — Flash the bitstream
+### Step 4 — Build and flash
+
+**One-command flash (recommended):**
 
 ```bash
 cd ~/church-fpga
-openFPGALoader -b tangnano20k church_tang_nano_20k_iot.fs
+./flash.sh
 ```
 
-Wait for `Done` / `DONE`. The entire flash takes about 10 seconds.
+`flash.sh` runs nextpnr-himbaechel → gowin_pack → openFPGALoader in
+sequence. It stops on the first error with a diagnostic hint, and ends
+with a success checklist telling you what to look for.
 
-### Step 5 — Boot the Church Machine and check the LEDs
+**Manual alternative:**
+
+```bash
+cd ~/church-fpga
+make pnr pack    # nextpnr + gowin_pack
+make prog        # openFPGALoader
+```
+
+### Step 5 — Verify success (100% checklist)
 
 When the bitstream finishes flashing, the Church Machine boots
 automatically. The boot ROM initialises every capability register,
 loads the namespace, and puts the core into HALT — waiting safely
-for you to send it code. This is why you flash first and patch
-second: the machine must exist before you can give it software.
+for you to send it code.
 
-| LED | Pin | Meaning | What you should see |
-|-----|-----|---------|---------------------|
+**LED checklist:**
+
+| LED | Pin | Signal | Expected |
+|-----|-----|--------|----------|
 | led0 | 15 | Boot/Run | Solid ON — boot complete |
 | led1 | 16 | Halt | Blinking — core halted, waiting for code |
 | led2 | 19 | Fault | OFF — no capability fault |
 | led3 | 20 | Heartbeat | Blinking ~1 Hz — clock alive |
 
+**100% success = all four of these are true:**
+
+1. **led0 solid ON** — boot ROM ran to completion
+2. **led1 blinking** — core is halted (ready for code)
+3. **led2 OFF** — no capability fault
+4. **led3 blinking** — 27 MHz clock is running, heartbeat active
+
 **One solid + two blinking = success.** The Church Machine booted and is
 waiting for you to send it code.
 
-### Step 5b — Deploy code from the IDE (multi-board)
+**Serial verification (optional):**
 
-The Church Machine IDE can deploy compiled abstractions directly to
-connected boards over the network. No need for WebSerial or the CLI
-patcher — just click Deploy in the Devices panel.
+```bash
+python3 local_bridge.py --monitor /dev/ttyUSB1
+```
 
-**Setup (one time per host machine):**
+You should see the boot banner followed by a 13-byte call-home packet
+(magic `0xCE11`).
+
+### Troubleshooting — Failure Diagnostic Table
+
+If something is wrong, find your symptom below:
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| 0 LEDs lit | Flash failed or wrong board selected | Re-run `./flash.sh`; check USB cable is data-capable |
+| 1 solid + 0 blinking | Clock not running (bad bitstream) | Rebuild from IDE Builder |
+| 1 solid + 1 blinking only | led3 missing from port list | Stale Verilog — click Build in IDE and re-download |
+| 2 blinking + 0 solid | Unexpected state | Report with serial log |
+| 3 LEDs correct but serial blank | Wrong serial port | Use `/dev/ttyUSB1` (UART), not `/dev/ttyUSB0` (JTAG) |
+| 3 LEDs + serial OK but no call-home | Bridge not running | Run `./bridge.sh --ide=URL` |
+| Board in Devices panel but offline after 90s | Heartbeat lost (USB disconnect) | Reconnect USB; restart bridge |
+| "Cell ledN not found" in nextpnr log | Stale Verilog (old build) | Click Build in IDE, re-download ZIP |
+| Permission denied on /dev/ttyUSB* | User not in dialout group | `sudo usermod -aG dialout $USER` then log out/in |
+
+### Step 5b — Connect to the IDE and deploy code
+
+After flashing, connect the board to the Church Machine IDE so you can
+deploy code from the browser.
+
+**Single board:**
+
+```bash
+cd ~/church-fpga
+./bridge.sh --ide=https://cloomc.org
+```
+
+`bridge.sh` auto-detects the serial port and launches `local_bridge.py`.
+The board sends a call-home packet; the bridge registers it with the IDE.
+Your board appears in the **Devices** panel within seconds.
+
+**Multiple boards (IoT deployment):**
 
 1. Plug your Tang Nano 20K boards into a USB hub (all use the same
    bitstream — flash each one with the same `.fs` file)
-2. On the machine with the USB hub, run the bridge launcher:
+2. On the machine with the USB hub, run one bridge per board:
 
 ```bash
-# Launch one bridge per detected USB serial port
-tools/launch_bridges.sh --ide=https://cloomc.org
-```
-
-Or run individual bridges manually:
-
-```bash
-python3 server/local_bridge.py /dev/ttyUSB1 --ide=https://cloomc.org
-python3 server/local_bridge.py /dev/ttyUSB3 --ide=https://cloomc.org
-python3 server/local_bridge.py /dev/ttyUSB5 --ide=https://cloomc.org
+python3 local_bridge.py /dev/ttyUSB1 --ide=https://cloomc.org
+python3 local_bridge.py /dev/ttyUSB3 --ide=https://cloomc.org
+python3 local_bridge.py /dev/ttyUSB5 --ide=https://cloomc.org
 ```
 
 3. Each board boots, sends a call-home packet, and appears in the IDE
@@ -675,10 +709,14 @@ for you. No terminal commands needed.
 
 | File | Purpose |
 |------|---------|
-| `church_tang_nano_20k_iot.json` | Yosys netlist (synthesis output) |
+| `church_tang_nano_20k.json` | Yosys netlist (synthesis output) |
+| `church_tang_nano_20k.v` | Synthesisable Verilog |
 | `tang_nano_20k.cst` | Pin constraints |
 | `Makefile` | Build targets for PnR + flash |
-| `BUILD.md` | Instructions for phase 2 |
+| `flash.sh` | One-command build + flash script |
+| `bridge.sh` | Connect board to IDE after flashing |
+| `local_bridge.py` | Serial bridge server (used by bridge.sh) |
+| `BUILD.md` | Instructions, LED pinout, diagnostics |
 
 **What the ZIP contains (Ti60 F225):**
 

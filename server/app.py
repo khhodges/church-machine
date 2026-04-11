@@ -644,8 +644,14 @@ BUILD_MD_TANG = """# Church Machine — Tang Nano 20K Build Package
 - `church_tang_nano_20k.json` — Yosys synthesis netlist (Gowin target)
 - `tang_nano_20k.cst` — Pin constraints for GW2AR-LV18QN88C8/I7
 - `Makefile` — Build automation (pnr, pack, prog targets)
+- `flash.sh` — One-command build + flash script
+- `bridge.sh` — Connect the flashed board to the Church Machine IDE
+- `local_bridge.py` — Serial bridge server (used by bridge.sh)
+- `BUILD.md` — This file
 
-## Prerequisites
+## Quick Start
+
+### 1. Install OSS CAD Suite + pyserial
 
 ```bash
 # Linux
@@ -653,41 +659,193 @@ curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/
 # macOS (Apple Silicon)
 # curl -L https://github.com/YosysHQ/oss-cad-suite-build/releases/latest/download/oss-cad-suite-darwin-arm64.tgz | tar xz
 source oss-cad-suite/environment
+
+pip3 install pyserial
 ```
 
-## Build and Flash
-
-The Verilog and synthesis JSON are pre-built. You only need two commands:
+### 2. Build and flash
 
 ```bash
-make pnr pack    # place-and-route (nextpnr-himbaechel) + generate .fs bitstream (gowin_pack)
-make prog        # flash to Tang Nano 20K via openFPGALoader (USB-C)
+chmod +x flash.sh bridge.sh
+./flash.sh
 ```
 
-## Upload to Tang Nano 20K
+`flash.sh` runs nextpnr-himbaechel, gowin_pack, and openFPGALoader in
+sequence. It stops on the first error with a diagnostic hint.
 
-1. Open the Church Machine IDE in **Chrome or Edge** (WebSerial required)
-2. Plug in the Tang Nano 20K via USB-C
-3. Go to the **Code** tab → **Console Output** sub-tab
-4. Click **Deploy to Tang** to send your program via WebSerial at 115200 baud
+### 3. Verify success — LED checklist
 
-## LED Pinout (active-low)
+| LED  | Pin | Signal    | Expected after flash          |
+|------|-----|-----------|-------------------------------|
+| led0 | 15  | Boot/Run  | Solid ON — boot complete      |
+| led1 | 16  | Halt      | Blinking — core halted        |
+| led2 | 19  | Fault     | OFF — no capability fault     |
+| led3 | 20  | Heartbeat | Blinking ~1 Hz — clock alive  |
 
-| LED | Pin | Signal            |
-|-----|-----|-------------------|
-| 0   | 10  | Boot complete     |
-| 1   | 11  | Running           |
-| 2   | 13  | Fault             |
-| 3   | 14  | Boot complete inv |
-| 4   | 9   | Halted            |
-| 5   | 8   | Stepping          |
+**One solid + two blinking = success.**
+
+### 4. Connect to IDE
+
+```bash
+./bridge.sh --ide=https://cloomc.org
+```
+
+The board appears in the IDE **Devices** panel within seconds.
+
+## Alternative: Makefile
+
+If you prefer manual steps:
+
+```bash
+make pnr pack    # place-and-route + generate .fs bitstream
+make prog        # flash via openFPGALoader
+```
+
+## Failure Diagnostic Table
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| 0 LEDs lit | Flash failed or wrong board | Re-run `./flash.sh`; check USB cable is data-capable |
+| 1 solid + 0 blinking | Clock not running | Bad bitstream — rebuild from IDE |
+| 1 solid + 1 blinking only | led3 missing from port list | Stale Verilog — click Build in IDE and re-download |
+| 2 blinking + 0 solid | Unexpected state | Report with serial log |
+| 3 LEDs correct but serial blank | Wrong serial port | Use `/dev/ttyUSB1` (UART), not `/dev/ttyUSB0` (JTAG) |
+| 3 LEDs + serial OK but no call-home | Bridge not running | Run `./bridge.sh --ide=URL` |
+| Board shows offline after 90s | Heartbeat lost | Check USB connection |
+| "Cell ledN not found" in nextpnr | Stale Verilog | Rebuild from IDE Builder |
 
 ## Device
 
 - **FPGA**: Gowin GW2AR-LV18QN88C8/I7 (nextpnr device: GW2A-LV18QN88)
 - **Board**: Sipeed Tang Nano 20K
 - **Clock**: 27 MHz crystal
-- **UART**: 115200 baud via BL616 USB bridge
+- **UART**: 115200 baud via BL616 USB bridge (pin 17 TX, pin 18 RX)
+- **LEDs**: 4 usable (pins 15, 16, 19, 20) — active-low; pins 17–18 used by UART
+"""
+
+FLASH_SH = """#!/usr/bin/env bash
+set -euo pipefail
+
+DEVICE="GW2AR-LV18QN88C8/I7"
+FAMILY="GW2A-18C"
+JSON="church_tang_nano_20k.json"
+CST="tang_nano_20k.cst"
+FS="church_tang_nano_20k.fs"
+FREQ="27"
+
+echo "========================================"
+echo " Church Machine — Tang Nano 20K Flash"
+echo "========================================"
+echo ""
+
+# Step 1: Place and Route
+echo "[1/3] Place and route (nextpnr-himbaechel)..."
+if ! nextpnr-himbaechel --json "$JSON" \\
+    --write "${JSON%.json}_pnr.json" \\
+    --device "$DEVICE" \\
+    --vopt family="$FAMILY" \\
+    --vopt cst="$CST" \\
+    --freq "$FREQ" 2>&1; then
+    echo ""
+    echo "FAIL: nextpnr-himbaechel failed."
+    echo "  Hint: If you see 'Cell ledN not found', the Verilog is stale."
+    echo "  Fix:  Click Build in the IDE and re-download the package."
+    exit 1
+fi
+echo "  OK"
+echo ""
+
+# Step 2: Pack bitstream
+echo "[2/3] Packing bitstream (gowin_pack)..."
+if ! gowin_pack -d "$FAMILY" -o "$FS" "${JSON%.json}_pnr.json" 2>&1; then
+    echo ""
+    echo "FAIL: gowin_pack failed."
+    echo "  Hint: Ensure OSS CAD Suite is sourced (source oss-cad-suite/environment)"
+    exit 1
+fi
+echo "  OK — $FS generated"
+echo ""
+
+# Step 3: Flash
+echo "[3/3] Flashing to Tang Nano 20K (openFPGALoader)..."
+if ! openFPGALoader -b tangnano20k "$FS" 2>&1; then
+    echo ""
+    echo "FAIL: openFPGALoader failed."
+    echo "  Hint: Is the board plugged in via USB-C? Is the cable data-capable?"
+    echo "  Try:  ls /dev/ttyUSB*  — you should see ttyUSB0 and ttyUSB1"
+    exit 1
+fi
+echo ""
+
+echo "========================================"
+echo " SUCCESS — Church Machine flashed!"
+echo "========================================"
+echo ""
+echo "Check the LEDs now:"
+echo "  led0 (pin 15): Solid ON      — boot complete"
+echo "  led1 (pin 16): Blinking      — core halted, waiting for code"
+echo "  led2 (pin 19): OFF           — no capability fault"
+echo "  led3 (pin 20): Blinking ~1Hz — heartbeat (clock alive)"
+echo ""
+echo "One solid + two blinking = success!"
+echo ""
+echo "Next step: run ./bridge.sh --ide=https://cloomc.org"
+echo "  to connect this board to the Church Machine IDE."
+"""
+
+BRIDGE_SH = """#!/usr/bin/env bash
+set -euo pipefail
+
+echo "========================================"
+echo " Church Machine — Serial Bridge"
+echo "========================================"
+echo ""
+
+PORT=""
+EXTRA_ARGS=()
+
+for arg in "$@"; do
+    if [[ "$arg" == /dev/* ]]; then
+        PORT="$arg"
+    else
+        EXTRA_ARGS+=("$arg")
+    fi
+done
+
+if [ -z "$PORT" ]; then
+    for p in /dev/ttyUSB1 /dev/ttyUSB3 /dev/ttyUSB5 /dev/ttyACM0 /dev/ttyACM1; do
+        if [ -e "$p" ]; then
+            PORT="$p"
+            break
+        fi
+    done
+fi
+
+if [ -z "$PORT" ]; then
+    echo "ERROR: No serial port found."
+    echo "  Plug in the Tang Nano 20K and try again."
+    echo "  Expected: /dev/ttyUSB1 (UART channel of BL616)"
+    echo "  Override: ./bridge.sh /dev/ttyUSBN [--ide=URL]"
+    exit 1
+fi
+
+echo "  Serial port: $PORT"
+echo ""
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BRIDGE="$SCRIPT_DIR/local_bridge.py"
+
+if [ ! -f "$BRIDGE" ]; then
+    echo "ERROR: local_bridge.py not found in $SCRIPT_DIR"
+    exit 1
+fi
+
+if ! python3 -c "import serial" 2>/dev/null; then
+    echo "ERROR: pyserial not installed.  Run: pip3 install pyserial"
+    exit 1
+fi
+
+exec python3 "$BRIDGE" "$PORT" "${EXTRA_ARGS[@]}"
 """
 
 BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225 Build Package
@@ -837,11 +995,20 @@ def _make_fpga_zip(is_ti60, paths, zip_name, build_md):
         with open(json_path, 'w') as f:
             f.write(json_text)
         logging.info("FPGA zip: patched JSON speed grade (ES -> C8)")
+        bridge_path = os.path.join(BASE_DIR, "server", "local_bridge.py")
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(paths["verilog"],  "church_tang_nano_20k.v")
             zf.write(json_path,         "church_tang_nano_20k.json")
             zf.write(paths["cst"],      "tang_nano_20k.cst")
             zf.write(paths["makefile"], "Makefile")
+            flash_info = zipfile.ZipInfo("flash.sh")
+            flash_info.external_attr = 0o755 << 16
+            zf.writestr(flash_info, FLASH_SH.lstrip('\n'))
+            bridge_info = zipfile.ZipInfo("bridge.sh")
+            bridge_info.external_attr = 0o755 << 16
+            zf.writestr(bridge_info, BRIDGE_SH.lstrip('\n'))
+            if os.path.isfile(bridge_path):
+                zf.write(bridge_path, "local_bridge.py")
             zf.writestr("BUILD.md", build_md)
     return buf, zip_name
 
