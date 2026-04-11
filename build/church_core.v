@@ -284,21 +284,21 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire \$99 ;
   (* src = "/home/runner/workspace/hardware/gc_unit.py:29" *)
   wire [15:0] access_index;
-  (* src = "/home/runner/workspace/hardware/outform.py:73" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
   wire [31:0] alloc_base;
-  (* src = "/home/runner/workspace/hardware/outform.py:71" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:94" *)
   wire alloc_done;
-  (* src = "/home/runner/workspace/hardware/outform.py:72" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:95" *)
   wire alloc_fault;
   (* src = "/home/runner/workspace/hardware/core.py:231" *)
   wire any_unit_busy;
-  (* src = "/home/runner/workspace/hardware/core.py:856" *)
+  (* src = "/home/runner/workspace/hardware/core.py:857" *)
   wire [31:0] arith_imm_sx;
-  (* src = "/home/runner/workspace/hardware/core.py:937" *)
+  (* src = "/home/runner/workspace/hardware/core.py:938" *)
   wire [31:0] bf_mask;
-  (* src = "/home/runner/workspace/hardware/core.py:935" *)
-  wire [4:0] bf_offset;
   (* src = "/home/runner/workspace/hardware/core.py:936" *)
+  wire [4:0] bf_offset;
+  (* src = "/home/runner/workspace/hardware/core.py:937" *)
   wire [4:0] bf_width;
   (* src = "/home/runner/workspace/hardware/core.py:227" *)
   reg bfext_busy_reg = 1'h0;
@@ -328,7 +328,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire \bfins_flags_sig.V ;
   (* src = "/home/runner/workspace/hardware/core.py:390" *)
   wire \bfins_flags_sig.Z ;
-  (* src = "/home/runner/workspace/hardware/core.py:965" *)
+  (* src = "/home/runner/workspace/hardware/core.py:966" *)
   wire [31:0] bfins_mask_shifted;
   (* src = "/home/runner/workspace/hardware/core.py:383" *)
   wire [31:0] bfins_result;
@@ -634,7 +634,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [15:0] change_mask;
   (* src = "/home/runner/workspace/hardware/change.py:11" *)
   wire change_start;
-  (* src = "/home/runner/workspace/hardware/core.py:1029" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1030" *)
   wire change_start_sig;
   (* src = "/home/runner/workspace/hardware/perm_check.py:34" *)
   wire check_domain_purity;
@@ -1222,21 +1222,21 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] \cr5_heap.word2_w2 ;
   (* src = "/home/runner/workspace/hardware/call.py:64" *)
   wire [31:0] \cr5_heap.word3_w3 ;
-  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
-  wire cr5_stack_empty;
   (* src = "/home/runner/workspace/hardware/core.py:1118" *)
+  wire cr5_stack_empty;
+  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
   wire cr5_stack_full;
-  (* src = "/home/runner/workspace/hardware/core.py:1116" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
   reg [7:0] cr5_stack_ptr = 8'h00;
-  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1121" *)
   wire [7:0] cr5_stack_r_addr;
-  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1121" *)
   wire [31:0] cr5_stack_r_data;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg [7:0] cr5_stack_w_addr;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg [31:0] cr5_stack_w_data;
-  (* src = "/home/runner/workspace/hardware/core.py:1119" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1120" *)
   reg cr5_stack_w_en;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [31:0] cr6_gt_wr_data;
@@ -1252,17 +1252,17 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [15:0] \cr6_gt_wr_data.slot_id ;
   (* src = "/home/runner/workspace/hardware/registers.py:44" *)
   wire cr6_gt_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   reg [31:0] cr7_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire \cr7_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [6:0] \cr7_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [1:0] \cr7_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [5:0] \cr7_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:657" *)
+  (* src = "/home/runner/workspace/hardware/core.py:658" *)
   wire [15:0] \cr7_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/registers.py:43" *)
   wire [31:0] cr7_gt_wr_data;
@@ -1947,15 +1947,15 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire dr_wr_en;
   (* src = "/home/runner/workspace/hardware/registers.py:52" *)
   reg \dr_wr_en$111 ;
-  (* src = "/home/runner/workspace/hardware/core.py:805" *)
+  (* src = "/home/runner/workspace/hardware/core.py:806" *)
   wire dread_start_sig;
-  (* src = "/home/runner/workspace/hardware/core.py:818" *)
+  (* src = "/home/runner/workspace/hardware/core.py:819" *)
   wire dwrite_start_sig;
   (* src = "/home/runner/workspace/hardware/cload.py:61" *)
   wire [31:0] e_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:689" *)
+  (* src = "/home/runner/workspace/hardware/core.py:690" *)
   wire [2:0] effective_target;
-  (* src = "/home/runner/workspace/hardware/core.py:1064" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1065" *)
   wire eloadcall_start_sig;
   (* src = "/home/runner/workspace/hardware/decoder.py:35" *)
   wire exec_enable;
@@ -2100,7 +2100,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [5:0] \gt_in.perms ;
   (* src = "/home/runner/workspace/hardware/perm_check.py:10" *)
   wire [15:0] \gt_in.slot_id ;
-  (* src = "/home/runner/workspace/hardware/outform.py:59" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:84" *)
   wire [31:0] gt_raw;
   (* src = "/home/runner/workspace/hardware/core.py:80" *)
   wire halt_valid;
@@ -2219,7 +2219,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire load_fault;
   (* src = "/home/runner/workspace/hardware/load.py:8" *)
   wire load_start;
-  (* src = "/home/runner/workspace/hardware/core.py:1017" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1018" *)
   wire load_start_sig;
   (* src = "/home/runner/workspace/hardware/call.py:13" *)
   wire [15:0] mask;
@@ -2301,7 +2301,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] mem_wr_addr;
   (* src = "/home/runner/workspace/hardware/save.py:23" *)
   wire [31:0] \mem_wr_addr$544 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:76" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:98" *)
   wire [31:0] \mem_wr_addr$551 ;
   (* src = "/home/runner/workspace/hardware/ret.py:53" *)
   wire [31:0] \mem_wr_addr$554 ;
@@ -2311,7 +2311,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] \mem_wr_data$543 ;
   (* src = "/home/runner/workspace/hardware/save.py:24" *)
   wire [31:0] \mem_wr_data$545 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:77" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:99" *)
   wire [31:0] \mem_wr_data$552 ;
   (* src = "/home/runner/workspace/hardware/ret.py:54" *)
   wire [31:0] \mem_wr_data$555 ;
@@ -2325,15 +2325,15 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire \mem_wr_en$530 ;
   (* src = "/home/runner/workspace/hardware/save.py:25" *)
   wire \mem_wr_en$531 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:78" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:100" *)
   wire \mem_wr_en$536 ;
   (* src = "/home/runner/workspace/hardware/ret.py:55" *)
   wire \mem_wr_en$538 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:84" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:105" *)
   wire mint_done;
-  (* src = "/home/runner/workspace/hardware/outform.py:85" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:106" *)
   wire mint_fault;
-  (* src = "/home/runner/workspace/hardware/outform.py:86" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:107" *)
   wire [31:0] mint_result_gt;
   (* src = "/home/runner/workspace/hardware/load.py:25" *)
   wire mload_busy;
@@ -2454,11 +2454,11 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   reg ns_wr_en;
   (* src = "/home/runner/workspace/hardware/gc_unit.py:20" *)
   wire \ns_wr_en$563 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:53" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:79" *)
   wire outform_busy;
-  (* src = "/home/runner/workspace/hardware/outform.py:55" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:81" *)
   wire outform_fault;
-  (* src = "/home/runner/workspace/hardware/outform.py:56" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:82" *)
   wire [4:0] outform_fault_type;
   (* src = "/home/runner/workspace/hardware/core.py:92" *)
   wire [31:0] outform_result_gt;
@@ -2466,7 +2466,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [7:0] outform_rx_data;
   (* src = "/home/runner/workspace/hardware/core.py:90" *)
   wire outform_rx_valid;
-  (* src = "/home/runner/workspace/hardware/outform.py:52" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:78" *)
   wire outform_start;
   (* src = "/home/runner/workspace/hardware/core.py:89" *)
   wire [7:0] outform_tx_data;
@@ -2492,7 +2492,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   reg [5:0] required_perms;
   (* src = "/home/runner/workspace/hardware/perm_check.py:11" *)
   wire [5:0] \required_perms$80 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:89" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:109" *)
   wire [31:0] result_gt;
   (* src = "/home/runner/workspace/hardware/core.py:266" *)
   wire ret_start_sig;
@@ -2501,233 +2501,233 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr0_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr0_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr0_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr0_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr0_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr0_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr0_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr10_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr10_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr10_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr10_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr10_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr10_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr10_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr11_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr11_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr11_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr11_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr11_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr11_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr11_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr12_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr12_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr12_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr12_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr12_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr12_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr12_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr13_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr13_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr13_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr13_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr13_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr13_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr13_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr14_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr14_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr14_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr14_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr14_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr14_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr14_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr15_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr15_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr15_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr15_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr15_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr15_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr15_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr1_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr1_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr1_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr1_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr1_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr1_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr1_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr2_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr2_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr2_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr2_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr2_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr2_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr2_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr3_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr3_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr3_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr3_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr3_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr3_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr3_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr4_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr4_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr4_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr4_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr4_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr4_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr4_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr5_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr5_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr5_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr5_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr5_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr5_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr5_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr6_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr6_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr6_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr6_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr6_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr6_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr6_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   wire rt_cr7_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [31:0] rt_cr7_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr7_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr7_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr7_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr7_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr7_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr8_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr8_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr8_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr8_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr8_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr8_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr8_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/core.py:676" *)
+  (* src = "/home/runner/workspace/hardware/core.py:677" *)
   reg rt_cr9_wr_en;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   reg [31:0] rt_cr9_wr_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire \rt_cr9_wr_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [6:0] \rt_cr9_wr_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [1:0] \rt_cr9_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [5:0] \rt_cr9_wr_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:677" *)
+  (* src = "/home/runner/workspace/hardware/core.py:678" *)
   wire [15:0] \rt_cr9_wr_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/outform.py:66" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:90" *)
   wire [7:0] rx_data;
-  (* src = "/home/runner/workspace/hardware/outform.py:65" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:89" *)
   wire rx_valid;
   (* src = "/home/runner/workspace/hardware/save.py:15" *)
   wire save_busy;
@@ -2735,7 +2735,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire save_fault;
   (* src = "/home/runner/workspace/hardware/save.py:11" *)
   wire save_start;
-  (* src = "/home/runner/workspace/hardware/core.py:789" *)
+  (* src = "/home/runner/workspace/hardware/core.py:790" *)
   wire save_start_sig;
   (* src = "/home/runner/workspace/hardware/ret.py:39" *)
   wire [31:0] saved_cr5_gt;
@@ -2757,7 +2757,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] saved_nia;
   (* src = "/home/runner/workspace/hardware/fused_unit.py:286" *)
   wire [31:0] \saved_nia$414 ;
-  (* src = "/home/runner/workspace/hardware/core.py:904" *)
+  (* src = "/home/runner/workspace/hardware/core.py:905" *)
   wire [4:0] shift_amt;
   (* src = "/home/runner/workspace/hardware/core.py:225" *)
   reg shl_busy_reg = 1'h0;
@@ -2791,19 +2791,19 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire [31:0] shr_result;
   (* src = "/home/runner/workspace/hardware/core.py:374" *)
   wire shr_start_sig;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   reg [31:0] slot3_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire \slot3_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [6:0] \slot3_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [1:0] \slot3_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [5:0] \slot3_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:648" *)
+  (* src = "/home/runner/workspace/hardware/core.py:649" *)
   wire [15:0] \slot3_gt.slot_id ;
-  (* src = "/home/runner/workspace/hardware/outform.py:60" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:85" *)
   wire [15:0] slot_id;
   (* src = "/home/runner/workspace/hardware/dread.py:29" *)
   wire start;
@@ -2837,41 +2837,41 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   reg sub_start;
   (* src = "/home/runner/workspace/hardware/switch.py:15" *)
   wire switch_busy;
-  (* src = "/home/runner/workspace/hardware/core.py:680" *)
+  (* src = "/home/runner/workspace/hardware/core.py:681" *)
   wire switch_change_active;
   (* src = "/home/runner/workspace/hardware/switch.py:17" *)
   wire switch_fault;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire [31:0] switch_src_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire \switch_src_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire [6:0] \switch_src_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire [1:0] \switch_src_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire [5:0] \switch_src_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:686" *)
+  (* src = "/home/runner/workspace/hardware/core.py:687" *)
   wire [15:0] \switch_src_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/switch.py:11" *)
   wire switch_start;
-  (* src = "/home/runner/workspace/hardware/core.py:1049" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1050" *)
   wire switch_start_sig;
   (* src = "/home/runner/workspace/hardware/decoder.py:56" *)
   wire [3:0] switch_target;
   (* src = "/home/runner/workspace/hardware/switch.py:13" *)
   wire [2:0] target;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   reg [31:0] thrd_gt;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire \thrd_gt.b_flag ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [6:0] \thrd_gt.gt_seq ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [1:0] \thrd_gt.gt_type ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [5:0] \thrd_gt.perms ;
-  (* src = "/home/runner/workspace/hardware/core.py:622" *)
+  (* src = "/home/runner/workspace/hardware/core.py:623" *)
   wire [15:0] \thrd_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/call.py:71" *)
   wire [31:0] thread_base;
@@ -2889,15 +2889,15 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   wire tperm_start;
   (* src = "/home/runner/workspace/hardware/core.py:264" *)
   wire tperm_start_sig;
-  (* src = "/home/runner/workspace/hardware/outform.py:64" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:88" *)
   wire [7:0] tx_data;
-  (* src = "/home/runner/workspace/hardware/outform.py:63" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:87" *)
   wire tx_valid;
   (* src = "/home/runner/workspace/hardware/gc_unit.py:28" *)
   wire valid_key_access;
-  (* src = "/home/runner/workspace/hardware/core.py:1080" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1081" *)
   wire xloadlambda_start_sig;
-  (* src = "/home/runner/workspace/hardware/core.py:1114" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1115" *)
   reg [31:0] cr5_stack [255:0];
   initial begin
     cr5_stack[0] = 32'd0;
@@ -3251,158 +3251,158 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$74  = \$73  | (* src = "/home/runner/workspace/hardware/core.py:486" *) \cr_wr_en$157 ;
   assign \$75  = \$74  | (* src = "/home/runner/workspace/hardware/core.py:486" *) \cr_wr_en$158 ;
   assign \cr_wr_en$154  = \$71  | (* src = "/home/runner/workspace/hardware/core.py:509" *) \$75 ;
-  assign \$76  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:682" *) cond_exec_enable;
-  assign \$77  = \$76  & (* src = "/home/runner/workspace/hardware/core.py:682" *) is_church_op;
-  assign \$78  = ~ (* src = "/home/runner/workspace/hardware/core.py:682" *) any_unit_busy;
-  assign \$79  = \$77  & (* src = "/home/runner/workspace/hardware/core.py:682" *) \$78 ;
-  assign \$80  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:683" *) 3'h5;
-  assign \$81  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:683" *) 3'h4;
-  assign \$82  = \$80  | (* src = "/home/runner/workspace/hardware/core.py:683" *) \$81 ;
-  assign switch_change_active = \$79  & (* src = "/home/runner/workspace/hardware/core.py:682" *) \$82 ;
-  assign \$83  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:690" *) 3'h4;
-  assign effective_target = \$83  ? (* src = "/home/runner/workspace/hardware/core.py:690" *) 3'h0 : imem_data[2:0];
-  assign \$84  = ! (* src = "/home/runner/workspace/hardware/core.py:694" *) effective_target;
-  assign \$85  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 1'h1;
-  assign \$86  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 2'h2;
-  assign \$87  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 2'h3;
-  assign \$88  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 3'h4;
-  assign \$89  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 3'h5;
-  assign \$90  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 3'h6;
-  assign \$91  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:694" *) 3'h7;
-  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:700" *) boot_cr7_wr_gt : 32'd0;
-  assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/hardware/core.py:699" *) rt_cr8_wr_en;
-  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:700" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
-  assign \$92  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:704" *) is_church_op;
-  assign \$93  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:704" *) 2'h2;
-  assign \$94  = \$92  & (* src = "/home/runner/workspace/hardware/core.py:704" *) \$93 ;
-  assign \$95  = ~ (* src = "/home/runner/workspace/hardware/core.py:704" *) any_unit_busy;
-  assign call_start_sig = \$94  & (* src = "/home/runner/workspace/hardware/core.py:704" *) \$95 ;
-  assign \$96  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:729" *) is_church_op;
-  assign \$97  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:729" *) 2'h3;
-  assign \$98  = \$96  & (* src = "/home/runner/workspace/hardware/core.py:729" *) \$97 ;
-  assign \$99  = ~ (* src = "/home/runner/workspace/hardware/core.py:729" *) any_unit_busy;
-  assign ret_start_sig = \$98  & (* src = "/home/runner/workspace/hardware/core.py:729" *) \$99 ;
-  assign \$100  = imem_addr + (* src = "/home/runner/workspace/hardware/core.py:773" *) 3'h4;
-  assign \$101  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:780" *) is_church_op;
-  assign \$102  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:780" *) 3'h6;
-  assign \$103  = \$101  & (* src = "/home/runner/workspace/hardware/core.py:780" *) \$102 ;
-  assign \$104  = ~ (* src = "/home/runner/workspace/hardware/core.py:780" *) any_unit_busy;
-  assign tperm_start_sig = \$103  & (* src = "/home/runner/workspace/hardware/core.py:780" *) \$104 ;
-  assign \$105  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:791" *) is_church_op;
-  assign \$106  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:791" *) 1'h1;
-  assign \$107  = \$105  & (* src = "/home/runner/workspace/hardware/core.py:791" *) \$106 ;
-  assign \$108  = ~ (* src = "/home/runner/workspace/hardware/core.py:791" *) any_unit_busy;
-  assign save_start_sig = \$107  & (* src = "/home/runner/workspace/hardware/core.py:791" *) \$108 ;
-  assign \$109  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:807" *) is_dread_op;
-  assign \$110  = ~ (* src = "/home/runner/workspace/hardware/core.py:807" *) any_unit_busy;
-  assign dread_start_sig = \$109  & (* src = "/home/runner/workspace/hardware/core.py:807" *) \$110 ;
-  assign \$111  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:820" *) is_dwrite_op;
-  assign \$112  = ~ (* src = "/home/runner/workspace/hardware/core.py:820" *) any_unit_busy;
-  assign dwrite_start_sig = \$111  & (* src = "/home/runner/workspace/hardware/core.py:820" *) \$112 ;
-  assign \$113  = bfins_start_sig ? (* src = "/home/runner/workspace/hardware/core.py:833" *) imem_data[22:19] : 4'h0;
-  assign dr_rd_addr2 = \busy$38  ? (* src = "/home/runner/workspace/hardware/core.py:832" *) dr_rd_addr : \$113 ;
-  assign \$114  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:845" *) is_iadd_op;
-  assign \$115  = ~ (* src = "/home/runner/workspace/hardware/core.py:845" *) any_unit_busy;
-  assign iadd_start_sig = \$114  & (* src = "/home/runner/workspace/hardware/core.py:845" *) \$115 ;
-  assign \$116  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:846" *) is_isub_op;
-  assign \$117  = ~ (* src = "/home/runner/workspace/hardware/core.py:846" *) any_unit_busy;
-  assign isub_start_sig = \$116  & (* src = "/home/runner/workspace/hardware/core.py:846" *) \$117 ;
-  assign \$118  = iadd_start_sig | (* src = "/home/runner/workspace/hardware/core.py:863" *) isub_start_sig;
-  assign \$119  = \$118  | (* src = "/home/runner/workspace/hardware/core.py:863" *) shl_start_sig;
-  assign \$120  = \$119  | (* src = "/home/runner/workspace/hardware/core.py:863" *) shr_start_sig;
-  assign \$121  = \$120  | (* src = "/home/runner/workspace/hardware/core.py:863" *) bfext_start_sig;
-  assign \$122  = \$121  | (* src = "/home/runner/workspace/hardware/core.py:863" *) bfins_start_sig;
-  assign \$123  = \$122  | (* src = "/home/runner/workspace/hardware/core.py:863" *) mcmp_start_sig;
-  assign dr_rd_addr1 = \$123  ? (* src = "/home/runner/workspace/hardware/core.py:863" *) imem_data[18:15] : 4'h0;
-  assign iadd_result = dr_rd_data1 + (* src = "/home/runner/workspace/hardware/core.py:871" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign isub_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:872" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign \$124  = ! (* src = "/home/runner/workspace/hardware/core.py:879" *) iadd_result[31:0];
-  assign \$125  = ! (* src = "/home/runner/workspace/hardware/core.py:883" *) isub_result[31:0];
-  assign \$126  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:896" *) is_shl_op;
-  assign \$127  = ~ (* src = "/home/runner/workspace/hardware/core.py:896" *) any_unit_busy;
-  assign shl_start_sig = \$126  & (* src = "/home/runner/workspace/hardware/core.py:896" *) \$127 ;
-  assign \$128  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:897" *) is_shr_op;
-  assign \$129  = ~ (* src = "/home/runner/workspace/hardware/core.py:897" *) any_unit_busy;
-  assign shr_start_sig = \$128  & (* src = "/home/runner/workspace/hardware/core.py:897" *) \$129 ;
-  assign \$130  = dr_rd_data1 << (* src = "/home/runner/workspace/hardware/core.py:908" *) imem_data[4:0];
-  assign shr_result = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:909" *) imem_data[4:0];
-  assign \$131  = ! (* src = "/home/runner/workspace/hardware/core.py:916" *) \$130 [31:0];
-  assign \$132  = ! (* src = "/home/runner/workspace/hardware/core.py:920" *) shr_result;
-  assign \$133  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:932" *) is_bfext_op;
-  assign \$134  = ~ (* src = "/home/runner/workspace/hardware/core.py:932" *) any_unit_busy;
-  assign bfext_start_sig = \$133  & (* src = "/home/runner/workspace/hardware/core.py:932" *) \$134 ;
-  assign \$135  = 1'h1 << (* src = "/home/runner/workspace/hardware/core.py:941" *) imem_data[9:5];
-  assign \$136  = \$135  - (* src = "/home/runner/workspace/hardware/core.py:941" *) 1'h1;
-  assign \$137  = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:942" *) imem_data[4:0];
-  assign bfext_result = \$137  & (* src = "/home/runner/workspace/hardware/core.py:942" *) \$136 [31:0];
-  assign \$138  = ! (* src = "/home/runner/workspace/hardware/core.py:948" *) bfext_result;
-  assign \$139  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:962" *) is_bfins_op;
-  assign \$140  = ~ (* src = "/home/runner/workspace/hardware/core.py:962" *) any_unit_busy;
-  assign bfins_start_sig = \$139  & (* src = "/home/runner/workspace/hardware/core.py:962" *) \$140 ;
-  assign \$141  = \$136 [31:0] << (* src = "/home/runner/workspace/hardware/core.py:967" *) imem_data[4:0];
-  assign \$142  = ~ (* src = "/home/runner/workspace/hardware/core.py:969" *) \$141 [31:0];
-  assign \$143  = dr_rd_data & (* src = "/home/runner/workspace/hardware/core.py:969" *) \$142 ;
-  assign \$144  = dr_rd_data1 & (* src = "/home/runner/workspace/hardware/core.py:970" *) \$136 [31:0];
-  assign \$145  = \$144  << (* src = "/home/runner/workspace/hardware/core.py:970" *) imem_data[4:0];
-  assign \$146  = { 31'h00000000, \$143  } | (* src = "/home/runner/workspace/hardware/core.py:969" *) \$145 ;
-  assign \$147  = ! (* src = "/home/runner/workspace/hardware/core.py:977" *) \$146 [31:0];
-  assign \$148  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:988" *) is_mcmp_op;
-  assign \$149  = ~ (* src = "/home/runner/workspace/hardware/core.py:988" *) any_unit_busy;
-  assign mcmp_start_sig = \$148  & (* src = "/home/runner/workspace/hardware/core.py:988" *) \$149 ;
-  assign mcmp_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:991" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
-  assign \$150  = ! (* src = "/home/runner/workspace/hardware/core.py:996" *) mcmp_result[31:0];
-  assign \$151  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1009" *) exec_enable;
-  assign \$152  = \$151  & (* src = "/home/runner/workspace/hardware/core.py:1009" *) is_branch_op;
-  assign \$153  = ~ (* src = "/home/runner/workspace/hardware/core.py:1009" *) any_unit_busy;
-  assign branch_taken = \$152  & (* src = "/home/runner/workspace/hardware/core.py:1009" *) \$153 ;
-  assign \$154  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1019" *) is_church_op;
-  assign \$155  = ! (* src = "/home/runner/workspace/hardware/core.py:1019" *) imem_data[31:27];
-  assign \$156  = \$154  & (* src = "/home/runner/workspace/hardware/core.py:1019" *) \$155 ;
-  assign \$157  = ~ (* src = "/home/runner/workspace/hardware/core.py:1019" *) any_unit_busy;
-  assign load_start_sig = \$156  & (* src = "/home/runner/workspace/hardware/core.py:1019" *) \$157 ;
-  assign \$158  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1031" *) is_church_op;
-  assign \$159  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1031" *) 3'h4;
-  assign \$160  = \$158  & (* src = "/home/runner/workspace/hardware/core.py:1031" *) \$159 ;
-  assign \$161  = ~ (* src = "/home/runner/workspace/hardware/core.py:1031" *) any_unit_busy;
-  assign change_start_sig = \$160  & (* src = "/home/runner/workspace/hardware/core.py:1031" *) \$161 ;
-  assign \$162  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1051" *) is_church_op;
-  assign \$163  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1051" *) 3'h5;
-  assign \$164  = \$162  & (* src = "/home/runner/workspace/hardware/core.py:1051" *) \$163 ;
-  assign \$165  = ~ (* src = "/home/runner/workspace/hardware/core.py:1051" *) any_unit_busy;
-  assign switch_start_sig = \$164  & (* src = "/home/runner/workspace/hardware/core.py:1051" *) \$165 ;
-  assign \$166  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1066" *) is_church_op;
-  assign \$167  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1066" *) 4'h8;
-  assign \$168  = \$166  & (* src = "/home/runner/workspace/hardware/core.py:1066" *) \$167 ;
-  assign \$169  = ~ (* src = "/home/runner/workspace/hardware/core.py:1066" *) any_unit_busy;
-  assign eloadcall_start_sig = \$168  & (* src = "/home/runner/workspace/hardware/core.py:1066" *) \$169 ;
-  assign \$170  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1082" *) is_church_op;
-  assign \$171  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1082" *) 4'h9;
-  assign \$172  = \$170  & (* src = "/home/runner/workspace/hardware/core.py:1082" *) \$171 ;
-  assign \$173  = ~ (* src = "/home/runner/workspace/hardware/core.py:1082" *) any_unit_busy;
-  assign xloadlambda_start_sig = \$172  & (* src = "/home/runner/workspace/hardware/core.py:1082" *) \$173 ;
-  assign \$174  = imem_addr + (* src = "/home/runner/workspace/hardware/core.py:1093" *) 3'h4;
-  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/hardware/core.py:1123" *) cr5_stack_ptr;
-  assign \$175  = cr5_stack_ptr > (* src = "/home/runner/workspace/hardware/core.py:1125" *) 1'h0;
-  assign \$176  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1125" *) 1'h1;
-  assign \$177  = \$175  ? (* src = "/home/runner/workspace/hardware/core.py:1125" *) \$176  : 9'h000;
-  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/hardware/core.py:1126" *) 32'd0 : cr5_stack_r_data;
-  assign \$178  = ~ (* src = "/home/runner/workspace/hardware/core.py:1132" *) call_fault;
-  assign \$179  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1132" *) \$178 ;
-  assign \$182  = ~ (* src = "/home/runner/workspace/hardware/core.py:1140" *) \fault$446 ;
-  assign \$183  = complete & (* src = "/home/runner/workspace/hardware/core.py:1140" *) \$182 ;
-  assign \$186  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) \fault_valid$448 ;
-  assign \$187  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$186 ;
-  assign \$188  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) cr5_stack_empty;
-  assign \$189  = \$187  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$188 ;
-  assign \$190  = ~ (* src = "/home/runner/workspace/hardware/core.py:1155" *) any_unit_busy;
-  assign \$191  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$190 ;
-  assign \$192  = code_lo_reg != (* src = "/home/runner/workspace/hardware/core.py:1156" *) code_hi_reg;
-  assign \$193  = \$191  & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$192 ;
-  assign \$194  = imem_addr < (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_lo_reg;
-  assign \$195  = imem_addr >= (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_hi_reg;
-  assign \$196  = \$194  | (* src = "/home/runner/workspace/hardware/core.py:1157" *) \$195 ;
-  assign fetch_bounds_fault = \$193  & (* src = "/home/runner/workspace/hardware/core.py:1155" *) \$196 ;
-  assign \$197  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:1258" *) mem_wr_en;
+  assign \$76  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:683" *) cond_exec_enable;
+  assign \$77  = \$76  & (* src = "/home/runner/workspace/hardware/core.py:683" *) is_church_op;
+  assign \$78  = ~ (* src = "/home/runner/workspace/hardware/core.py:683" *) any_unit_busy;
+  assign \$79  = \$77  & (* src = "/home/runner/workspace/hardware/core.py:683" *) \$78 ;
+  assign \$80  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:684" *) 3'h5;
+  assign \$81  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:684" *) 3'h4;
+  assign \$82  = \$80  | (* src = "/home/runner/workspace/hardware/core.py:684" *) \$81 ;
+  assign switch_change_active = \$79  & (* src = "/home/runner/workspace/hardware/core.py:683" *) \$82 ;
+  assign \$83  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:691" *) 3'h4;
+  assign effective_target = \$83  ? (* src = "/home/runner/workspace/hardware/core.py:691" *) 3'h0 : imem_data[2:0];
+  assign \$84  = ! (* src = "/home/runner/workspace/hardware/core.py:695" *) effective_target;
+  assign \$85  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 1'h1;
+  assign \$86  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 2'h2;
+  assign \$87  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 2'h3;
+  assign \$88  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 3'h4;
+  assign \$89  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 3'h5;
+  assign \$90  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 3'h6;
+  assign \$91  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:695" *) 3'h7;
+  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:701" *) boot_cr7_wr_gt : 32'd0;
+  assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/hardware/core.py:700" *) rt_cr8_wr_en;
+  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:701" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
+  assign \$92  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:705" *) is_church_op;
+  assign \$93  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:705" *) 2'h2;
+  assign \$94  = \$92  & (* src = "/home/runner/workspace/hardware/core.py:705" *) \$93 ;
+  assign \$95  = ~ (* src = "/home/runner/workspace/hardware/core.py:705" *) any_unit_busy;
+  assign call_start_sig = \$94  & (* src = "/home/runner/workspace/hardware/core.py:705" *) \$95 ;
+  assign \$96  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:730" *) is_church_op;
+  assign \$97  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:730" *) 2'h3;
+  assign \$98  = \$96  & (* src = "/home/runner/workspace/hardware/core.py:730" *) \$97 ;
+  assign \$99  = ~ (* src = "/home/runner/workspace/hardware/core.py:730" *) any_unit_busy;
+  assign ret_start_sig = \$98  & (* src = "/home/runner/workspace/hardware/core.py:730" *) \$99 ;
+  assign \$100  = imem_addr + (* src = "/home/runner/workspace/hardware/core.py:774" *) 3'h4;
+  assign \$101  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:781" *) is_church_op;
+  assign \$102  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:781" *) 3'h6;
+  assign \$103  = \$101  & (* src = "/home/runner/workspace/hardware/core.py:781" *) \$102 ;
+  assign \$104  = ~ (* src = "/home/runner/workspace/hardware/core.py:781" *) any_unit_busy;
+  assign tperm_start_sig = \$103  & (* src = "/home/runner/workspace/hardware/core.py:781" *) \$104 ;
+  assign \$105  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:792" *) is_church_op;
+  assign \$106  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:792" *) 1'h1;
+  assign \$107  = \$105  & (* src = "/home/runner/workspace/hardware/core.py:792" *) \$106 ;
+  assign \$108  = ~ (* src = "/home/runner/workspace/hardware/core.py:792" *) any_unit_busy;
+  assign save_start_sig = \$107  & (* src = "/home/runner/workspace/hardware/core.py:792" *) \$108 ;
+  assign \$109  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:808" *) is_dread_op;
+  assign \$110  = ~ (* src = "/home/runner/workspace/hardware/core.py:808" *) any_unit_busy;
+  assign dread_start_sig = \$109  & (* src = "/home/runner/workspace/hardware/core.py:808" *) \$110 ;
+  assign \$111  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:821" *) is_dwrite_op;
+  assign \$112  = ~ (* src = "/home/runner/workspace/hardware/core.py:821" *) any_unit_busy;
+  assign dwrite_start_sig = \$111  & (* src = "/home/runner/workspace/hardware/core.py:821" *) \$112 ;
+  assign \$113  = bfins_start_sig ? (* src = "/home/runner/workspace/hardware/core.py:834" *) imem_data[22:19] : 4'h0;
+  assign dr_rd_addr2 = \busy$38  ? (* src = "/home/runner/workspace/hardware/core.py:833" *) dr_rd_addr : \$113 ;
+  assign \$114  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:846" *) is_iadd_op;
+  assign \$115  = ~ (* src = "/home/runner/workspace/hardware/core.py:846" *) any_unit_busy;
+  assign iadd_start_sig = \$114  & (* src = "/home/runner/workspace/hardware/core.py:846" *) \$115 ;
+  assign \$116  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:847" *) is_isub_op;
+  assign \$117  = ~ (* src = "/home/runner/workspace/hardware/core.py:847" *) any_unit_busy;
+  assign isub_start_sig = \$116  & (* src = "/home/runner/workspace/hardware/core.py:847" *) \$117 ;
+  assign \$118  = iadd_start_sig | (* src = "/home/runner/workspace/hardware/core.py:864" *) isub_start_sig;
+  assign \$119  = \$118  | (* src = "/home/runner/workspace/hardware/core.py:864" *) shl_start_sig;
+  assign \$120  = \$119  | (* src = "/home/runner/workspace/hardware/core.py:864" *) shr_start_sig;
+  assign \$121  = \$120  | (* src = "/home/runner/workspace/hardware/core.py:864" *) bfext_start_sig;
+  assign \$122  = \$121  | (* src = "/home/runner/workspace/hardware/core.py:864" *) bfins_start_sig;
+  assign \$123  = \$122  | (* src = "/home/runner/workspace/hardware/core.py:864" *) mcmp_start_sig;
+  assign dr_rd_addr1 = \$123  ? (* src = "/home/runner/workspace/hardware/core.py:864" *) imem_data[18:15] : 4'h0;
+  assign iadd_result = dr_rd_data1 + (* src = "/home/runner/workspace/hardware/core.py:872" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign isub_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:873" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign \$124  = ! (* src = "/home/runner/workspace/hardware/core.py:880" *) iadd_result[31:0];
+  assign \$125  = ! (* src = "/home/runner/workspace/hardware/core.py:884" *) isub_result[31:0];
+  assign \$126  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:897" *) is_shl_op;
+  assign \$127  = ~ (* src = "/home/runner/workspace/hardware/core.py:897" *) any_unit_busy;
+  assign shl_start_sig = \$126  & (* src = "/home/runner/workspace/hardware/core.py:897" *) \$127 ;
+  assign \$128  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:898" *) is_shr_op;
+  assign \$129  = ~ (* src = "/home/runner/workspace/hardware/core.py:898" *) any_unit_busy;
+  assign shr_start_sig = \$128  & (* src = "/home/runner/workspace/hardware/core.py:898" *) \$129 ;
+  assign \$130  = dr_rd_data1 << (* src = "/home/runner/workspace/hardware/core.py:909" *) imem_data[4:0];
+  assign shr_result = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:910" *) imem_data[4:0];
+  assign \$131  = ! (* src = "/home/runner/workspace/hardware/core.py:917" *) \$130 [31:0];
+  assign \$132  = ! (* src = "/home/runner/workspace/hardware/core.py:921" *) shr_result;
+  assign \$133  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:933" *) is_bfext_op;
+  assign \$134  = ~ (* src = "/home/runner/workspace/hardware/core.py:933" *) any_unit_busy;
+  assign bfext_start_sig = \$133  & (* src = "/home/runner/workspace/hardware/core.py:933" *) \$134 ;
+  assign \$135  = 1'h1 << (* src = "/home/runner/workspace/hardware/core.py:942" *) imem_data[9:5];
+  assign \$136  = \$135  - (* src = "/home/runner/workspace/hardware/core.py:942" *) 1'h1;
+  assign \$137  = dr_rd_data1 >> (* src = "/home/runner/workspace/hardware/core.py:943" *) imem_data[4:0];
+  assign bfext_result = \$137  & (* src = "/home/runner/workspace/hardware/core.py:943" *) \$136 [31:0];
+  assign \$138  = ! (* src = "/home/runner/workspace/hardware/core.py:949" *) bfext_result;
+  assign \$139  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:963" *) is_bfins_op;
+  assign \$140  = ~ (* src = "/home/runner/workspace/hardware/core.py:963" *) any_unit_busy;
+  assign bfins_start_sig = \$139  & (* src = "/home/runner/workspace/hardware/core.py:963" *) \$140 ;
+  assign \$141  = \$136 [31:0] << (* src = "/home/runner/workspace/hardware/core.py:968" *) imem_data[4:0];
+  assign \$142  = ~ (* src = "/home/runner/workspace/hardware/core.py:970" *) \$141 [31:0];
+  assign \$143  = dr_rd_data & (* src = "/home/runner/workspace/hardware/core.py:970" *) \$142 ;
+  assign \$144  = dr_rd_data1 & (* src = "/home/runner/workspace/hardware/core.py:971" *) \$136 [31:0];
+  assign \$145  = \$144  << (* src = "/home/runner/workspace/hardware/core.py:971" *) imem_data[4:0];
+  assign \$146  = { 31'h00000000, \$143  } | (* src = "/home/runner/workspace/hardware/core.py:970" *) \$145 ;
+  assign \$147  = ! (* src = "/home/runner/workspace/hardware/core.py:978" *) \$146 [31:0];
+  assign \$148  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:989" *) is_mcmp_op;
+  assign \$149  = ~ (* src = "/home/runner/workspace/hardware/core.py:989" *) any_unit_busy;
+  assign mcmp_start_sig = \$148  & (* src = "/home/runner/workspace/hardware/core.py:989" *) \$149 ;
+  assign mcmp_result = dr_rd_data1 - (* src = "/home/runner/workspace/hardware/core.py:992" *) { imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14], imem_data[14:0] };
+  assign \$150  = ! (* src = "/home/runner/workspace/hardware/core.py:997" *) mcmp_result[31:0];
+  assign \$151  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1010" *) exec_enable;
+  assign \$152  = \$151  & (* src = "/home/runner/workspace/hardware/core.py:1010" *) is_branch_op;
+  assign \$153  = ~ (* src = "/home/runner/workspace/hardware/core.py:1010" *) any_unit_busy;
+  assign branch_taken = \$152  & (* src = "/home/runner/workspace/hardware/core.py:1010" *) \$153 ;
+  assign \$154  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1020" *) is_church_op;
+  assign \$155  = ! (* src = "/home/runner/workspace/hardware/core.py:1020" *) imem_data[31:27];
+  assign \$156  = \$154  & (* src = "/home/runner/workspace/hardware/core.py:1020" *) \$155 ;
+  assign \$157  = ~ (* src = "/home/runner/workspace/hardware/core.py:1020" *) any_unit_busy;
+  assign load_start_sig = \$156  & (* src = "/home/runner/workspace/hardware/core.py:1020" *) \$157 ;
+  assign \$158  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1032" *) is_church_op;
+  assign \$159  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1032" *) 3'h4;
+  assign \$160  = \$158  & (* src = "/home/runner/workspace/hardware/core.py:1032" *) \$159 ;
+  assign \$161  = ~ (* src = "/home/runner/workspace/hardware/core.py:1032" *) any_unit_busy;
+  assign change_start_sig = \$160  & (* src = "/home/runner/workspace/hardware/core.py:1032" *) \$161 ;
+  assign \$162  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1052" *) is_church_op;
+  assign \$163  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1052" *) 3'h5;
+  assign \$164  = \$162  & (* src = "/home/runner/workspace/hardware/core.py:1052" *) \$163 ;
+  assign \$165  = ~ (* src = "/home/runner/workspace/hardware/core.py:1052" *) any_unit_busy;
+  assign switch_start_sig = \$164  & (* src = "/home/runner/workspace/hardware/core.py:1052" *) \$165 ;
+  assign \$166  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1067" *) is_church_op;
+  assign \$167  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1067" *) 4'h8;
+  assign \$168  = \$166  & (* src = "/home/runner/workspace/hardware/core.py:1067" *) \$167 ;
+  assign \$169  = ~ (* src = "/home/runner/workspace/hardware/core.py:1067" *) any_unit_busy;
+  assign eloadcall_start_sig = \$168  & (* src = "/home/runner/workspace/hardware/core.py:1067" *) \$169 ;
+  assign \$170  = cond_exec_enable & (* src = "/home/runner/workspace/hardware/core.py:1083" *) is_church_op;
+  assign \$171  = imem_data[31:27] == (* src = "/home/runner/workspace/hardware/core.py:1083" *) 4'h9;
+  assign \$172  = \$170  & (* src = "/home/runner/workspace/hardware/core.py:1083" *) \$171 ;
+  assign \$173  = ~ (* src = "/home/runner/workspace/hardware/core.py:1083" *) any_unit_busy;
+  assign xloadlambda_start_sig = \$172  & (* src = "/home/runner/workspace/hardware/core.py:1083" *) \$173 ;
+  assign \$174  = imem_addr + (* src = "/home/runner/workspace/hardware/core.py:1094" *) 3'h4;
+  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/hardware/core.py:1124" *) cr5_stack_ptr;
+  assign \$175  = cr5_stack_ptr > (* src = "/home/runner/workspace/hardware/core.py:1126" *) 1'h0;
+  assign \$176  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1126" *) 1'h1;
+  assign \$177  = \$175  ? (* src = "/home/runner/workspace/hardware/core.py:1126" *) \$176  : 9'h000;
+  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/hardware/core.py:1127" *) 32'd0 : cr5_stack_r_data;
+  assign \$178  = ~ (* src = "/home/runner/workspace/hardware/core.py:1133" *) call_fault;
+  assign \$179  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1133" *) \$178 ;
+  assign \$182  = ~ (* src = "/home/runner/workspace/hardware/core.py:1141" *) \fault$446 ;
+  assign \$183  = complete & (* src = "/home/runner/workspace/hardware/core.py:1141" *) \$182 ;
+  assign \$186  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) \fault_valid$448 ;
+  assign \$187  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$186 ;
+  assign \$188  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) cr5_stack_empty;
+  assign \$189  = \$187  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$188 ;
+  assign \$190  = ~ (* src = "/home/runner/workspace/hardware/core.py:1156" *) any_unit_busy;
+  assign \$191  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$190 ;
+  assign \$192  = code_lo_reg != (* src = "/home/runner/workspace/hardware/core.py:1157" *) code_hi_reg;
+  assign \$193  = \$191  & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$192 ;
+  assign \$194  = imem_addr < (* src = "/home/runner/workspace/hardware/core.py:1158" *) code_lo_reg;
+  assign \$195  = imem_addr >= (* src = "/home/runner/workspace/hardware/core.py:1158" *) code_hi_reg;
+  assign \$196  = \$194  | (* src = "/home/runner/workspace/hardware/core.py:1158" *) \$195 ;
+  assign fetch_bounds_fault = \$193  & (* src = "/home/runner/workspace/hardware/core.py:1156" *) \$196 ;
+  assign \$197  = mem_rd_en | (* src = "/home/runner/workspace/hardware/core.py:1259" *) mem_wr_en;
   assign \$198  = ~ (* src = "/home/runner/workspace/hardware/core.py:533" *) fetch_bounds_fault;
   assign \$199  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:533" *) \$198 ;
   assign \$200  = boot_complete & (* src = "/home/runner/workspace/hardware/core.py:538" *) instr_valid;
@@ -3422,43 +3422,43 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$214  = \$213  | (* src = "/home/runner/workspace/hardware/core.py:587" *) \nia_set$567 ;
   assign \$215  = \cr_wr_data$148 [84:64] + (* src = "/home/runner/workspace/hardware/core.py:583" *) 1'h1;
   assign \$217  = \cr_wr_data$148 [63:32] + (* src = "/home/runner/workspace/hardware/core.py:582" *) \$216 ;
-  assign \$218  = ~ (* src = "/home/runner/workspace/hardware/core.py:744" *) lambda_active;
-  assign \$219  = ~ (* src = "/home/runner/workspace/hardware/core.py:746" *) \fault_valid$448 ;
-  assign \$220  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:746" *) \$219 ;
-  assign \$221  = ~ (* src = "/home/runner/workspace/hardware/core.py:746" *) reboot_request;
-  assign \$222  = \$220  & (* src = "/home/runner/workspace/hardware/core.py:746" *) \$221 ;
-  assign \$223  = \$222  & (* src = "/home/runner/workspace/hardware/core.py:746" *) cross_domain_ret;
-  assign \$224  = ~ (* src = "/home/runner/workspace/hardware/core.py:764" *) call_fault;
-  assign \$225  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:764" *) \$224 ;
-  assign \$226  = ~ (* src = "/home/runner/workspace/hardware/core.py:766" *) lambda_fault;
-  assign \$227  = lambda_complete & (* src = "/home/runner/workspace/hardware/core.py:766" *) \$226 ;
-  assign \$228  = ~ (* src = "/home/runner/workspace/hardware/core.py:851" *) iadd_busy_reg;
-  assign \$229  = iadd_start_sig & (* src = "/home/runner/workspace/hardware/core.py:851" *) \$228 ;
-  assign \$230  = ~ (* src = "/home/runner/workspace/hardware/core.py:852" *) isub_busy_reg;
-  assign \$231  = isub_start_sig & (* src = "/home/runner/workspace/hardware/core.py:852" *) \$230 ;
-  assign \$232  = ~ (* src = "/home/runner/workspace/hardware/core.py:900" *) shl_busy_reg;
-  assign \$233  = shl_start_sig & (* src = "/home/runner/workspace/hardware/core.py:900" *) \$232 ;
-  assign \$234  = ~ (* src = "/home/runner/workspace/hardware/core.py:901" *) shr_busy_reg;
-  assign \$235  = shr_start_sig & (* src = "/home/runner/workspace/hardware/core.py:901" *) \$234 ;
-  assign \$236  = ~ (* src = "/home/runner/workspace/hardware/core.py:933" *) bfext_busy_reg;
-  assign \$237  = bfext_start_sig & (* src = "/home/runner/workspace/hardware/core.py:933" *) \$236 ;
-  assign \$238  = ~ (* src = "/home/runner/workspace/hardware/core.py:963" *) bfins_busy_reg;
-  assign \$239  = bfins_start_sig & (* src = "/home/runner/workspace/hardware/core.py:963" *) \$238 ;
-  assign \$240  = ~ (* src = "/home/runner/workspace/hardware/core.py:989" *) mcmp_busy_reg;
-  assign \$241  = mcmp_start_sig & (* src = "/home/runner/workspace/hardware/core.py:989" *) \$240 ;
-  assign \$242  = ~ (* src = "/home/runner/workspace/hardware/core.py:1011" *) branch_busy_reg;
-  assign \$243  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:1011" *) \$242 ;
-  assign \$244  = ~ (* src = "/home/runner/workspace/hardware/core.py:1132" *) call_fault;
-  assign \$245  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1132" *) \$244 ;
-  assign \$248  = ~ (* src = "/home/runner/workspace/hardware/core.py:1140" *) \fault$446 ;
-  assign \$249  = complete & (* src = "/home/runner/workspace/hardware/core.py:1140" *) \$248 ;
-  assign \$252  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) \fault_valid$448 ;
-  assign \$253  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$252 ;
-  assign \$254  = ~ (* src = "/home/runner/workspace/hardware/core.py:1147" *) cr5_stack_empty;
-  assign \$255  = \$253  & (* src = "/home/runner/workspace/hardware/core.py:1147" *) \$254 ;
-  assign \$256  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1138" *) 1'h1;
-  assign \$257  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1146" *) 1'h1;
-  assign \$258  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1148" *) 1'h1;
+  assign \$218  = ~ (* src = "/home/runner/workspace/hardware/core.py:745" *) lambda_active;
+  assign \$219  = ~ (* src = "/home/runner/workspace/hardware/core.py:747" *) \fault_valid$448 ;
+  assign \$220  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:747" *) \$219 ;
+  assign \$221  = ~ (* src = "/home/runner/workspace/hardware/core.py:747" *) reboot_request;
+  assign \$222  = \$220  & (* src = "/home/runner/workspace/hardware/core.py:747" *) \$221 ;
+  assign \$223  = \$222  & (* src = "/home/runner/workspace/hardware/core.py:747" *) cross_domain_ret;
+  assign \$224  = ~ (* src = "/home/runner/workspace/hardware/core.py:765" *) call_fault;
+  assign \$225  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:765" *) \$224 ;
+  assign \$226  = ~ (* src = "/home/runner/workspace/hardware/core.py:767" *) lambda_fault;
+  assign \$227  = lambda_complete & (* src = "/home/runner/workspace/hardware/core.py:767" *) \$226 ;
+  assign \$228  = ~ (* src = "/home/runner/workspace/hardware/core.py:852" *) iadd_busy_reg;
+  assign \$229  = iadd_start_sig & (* src = "/home/runner/workspace/hardware/core.py:852" *) \$228 ;
+  assign \$230  = ~ (* src = "/home/runner/workspace/hardware/core.py:853" *) isub_busy_reg;
+  assign \$231  = isub_start_sig & (* src = "/home/runner/workspace/hardware/core.py:853" *) \$230 ;
+  assign \$232  = ~ (* src = "/home/runner/workspace/hardware/core.py:901" *) shl_busy_reg;
+  assign \$233  = shl_start_sig & (* src = "/home/runner/workspace/hardware/core.py:901" *) \$232 ;
+  assign \$234  = ~ (* src = "/home/runner/workspace/hardware/core.py:902" *) shr_busy_reg;
+  assign \$235  = shr_start_sig & (* src = "/home/runner/workspace/hardware/core.py:902" *) \$234 ;
+  assign \$236  = ~ (* src = "/home/runner/workspace/hardware/core.py:934" *) bfext_busy_reg;
+  assign \$237  = bfext_start_sig & (* src = "/home/runner/workspace/hardware/core.py:934" *) \$236 ;
+  assign \$238  = ~ (* src = "/home/runner/workspace/hardware/core.py:964" *) bfins_busy_reg;
+  assign \$239  = bfins_start_sig & (* src = "/home/runner/workspace/hardware/core.py:964" *) \$238 ;
+  assign \$240  = ~ (* src = "/home/runner/workspace/hardware/core.py:990" *) mcmp_busy_reg;
+  assign \$241  = mcmp_start_sig & (* src = "/home/runner/workspace/hardware/core.py:990" *) \$240 ;
+  assign \$242  = ~ (* src = "/home/runner/workspace/hardware/core.py:1012" *) branch_busy_reg;
+  assign \$243  = branch_taken & (* src = "/home/runner/workspace/hardware/core.py:1012" *) \$242 ;
+  assign \$244  = ~ (* src = "/home/runner/workspace/hardware/core.py:1133" *) call_fault;
+  assign \$245  = call_complete & (* src = "/home/runner/workspace/hardware/core.py:1133" *) \$244 ;
+  assign \$248  = ~ (* src = "/home/runner/workspace/hardware/core.py:1141" *) \fault$446 ;
+  assign \$249  = complete & (* src = "/home/runner/workspace/hardware/core.py:1141" *) \$248 ;
+  assign \$252  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) \fault_valid$448 ;
+  assign \$253  = \complete$447  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$252 ;
+  assign \$254  = ~ (* src = "/home/runner/workspace/hardware/core.py:1148" *) cr5_stack_empty;
+  assign \$255  = \$253  & (* src = "/home/runner/workspace/hardware/core.py:1148" *) \$254 ;
+  assign \$256  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1139" *) 1'h1;
+  assign \$257  = cr5_stack_ptr + (* src = "/home/runner/workspace/hardware/core.py:1147" *) 1'h1;
+  assign \$258  = cr5_stack_ptr - (* src = "/home/runner/workspace/hardware/core.py:1149" *) 1'h1;
   (* src = "/home/runner/workspace/hardware/core.py:163" *)
   always @(posedge clk)
     boot_state <= \$259 ;
@@ -3510,7 +3510,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:224" *)
   always @(posedge clk)
     branch_busy_reg <= \$275 ;
-  (* src = "/home/runner/workspace/hardware/core.py:1116" *)
+  (* src = "/home/runner/workspace/hardware/core.py:1117" *)
   always @(posedge clk)
     cr5_stack_ptr <= \$276 ;
   (* src = "/home/runner/workspace/hardware/core.py:109" *)
@@ -4085,7 +4085,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
     boot_cap_wr_data = 128'h00000000000000000000000000000000;
     casez (boot_state)
       3'h2:
-          boot_cap_wr_data = 128'h000000000000000f0000000000800000;
+          boot_cap_wr_data = 128'h00000000000000120000000000800000;
       3'h3:
           /* empty */;
       3'h4:
@@ -18468,57 +18468,295 @@ module \top.u_load (clk, rst, load_start, mload_m_elevated, load_busy, load_faul
   assign mload_fault_type = fault_type;
 endmodule
 
-(* src = "/home/runner/workspace/hardware/outform.py:104" *)
+(* src = "/home/runner/workspace/hardware/outform.py:124" *)
 (* generator = "Amaranth" *)
 module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr_data, mem_wr_en, outform_fault, result_gt, outform_fault_type, clk);
   reg \$auto$verilog_backend.cc:2355:dump_module$47  = 0;
   wire [31:0] \$1 ;
   wire [31:0] \$10 ;
+  wire \$100 ;
+  wire \$101 ;
+  wire [32:0] \$102 ;
+  wire [32:0] \$103 ;
+  wire \$104 ;
+  wire [2:0] \$105 ;
+  wire \$106 ;
+  wire \$107 ;
+  wire \$108 ;
+  wire \$109 ;
   wire [31:0] \$11 ;
+  wire [31:0] \$110 ;
+  wire [6:0] \$111 ;
+  wire \$112 ;
+  wire [38:0] \$113 ;
+  wire [38:0] \$114 ;
+  wire [6:0] \$115 ;
+  wire [32:0] \$116 ;
+  wire \$117 ;
+  wire \$118 ;
+  wire \$119 ;
   wire [31:0] \$12 ;
+  wire \$120 ;
+  wire \$121 ;
+  wire \$122 ;
+  wire \$123 ;
+  wire \$124 ;
+  wire \$125 ;
+  wire \$126 ;
+  wire \$127 ;
+  wire \$128 ;
+  wire \$129 ;
   wire [31:0] \$13 ;
+  wire \$130 ;
+  wire \$131 ;
+  wire \$132 ;
+  wire \$133 ;
+  wire \$134 ;
+  wire \$135 ;
+  wire \$136 ;
+  wire \$137 ;
+  wire \$138 ;
+  wire \$139 ;
   wire [31:0] \$14 ;
+  wire \$140 ;
+  wire \$141 ;
+  wire \$142 ;
+  wire \$143 ;
+  wire [9:0] \$144 ;
+  wire [31:0] \$145 ;
+  wire [6:0] \$146 ;
+  wire \$147 ;
+  wire \$148 ;
+  wire \$149 ;
   wire [31:0] \$15 ;
+  wire \$150 ;
+  wire [7:0] \$151 ;
+  wire [8:0] \$152 ;
+  wire [31:0] \$153 ;
+  wire [6:0] \$154 ;
+  wire [8:0] \$155 ;
+  wire [10:0] \$156 ;
+  wire [8:0] \$157 ;
+  wire [9:0] \$158 ;
+  wire [31:0] \$159 ;
   wire [31:0] \$16 ;
+  wire [6:0] \$160 ;
+  wire [9:0] \$161 ;
+  wire [10:0] \$162 ;
+  wire [31:0] \$163 ;
+  wire [6:0] \$164 ;
+  wire [38:0] \$165 ;
+  wire [38:0] \$166 ;
+  wire [6:0] \$167 ;
+  wire [32:0] \$168 ;
+  wire [11:0] \$169 ;
   wire \$17 ;
+  wire [32:0] \$170 ;
+  wire \$171 ;
+  wire [32:0] \$172 ;
+  wire [32:0] \$173 ;
+  wire \$174 ;
+  wire [2:0] \$175 ;
+  wire \$176 ;
+  wire \$177 ;
+  wire \$178 ;
+  wire \$179 ;
   wire [32:0] \$18 ;
+  reg [8:0] \$180 ;
+  reg [8:0] \$181 ;
+  wire [9:0] \$182 ;
+  wire [31:0] \$183 ;
+  wire [6:0] \$184 ;
+  reg [8:0] \$185 ;
+  wire [9:0] \$186 ;
+  wire [31:0] \$187 ;
+  wire [6:0] \$188 ;
+  reg [8:0] \$189 ;
   wire [32:0] \$19 ;
+  wire [9:0] \$190 ;
+  wire [31:0] \$191 ;
+  wire [6:0] \$192 ;
+  reg [8:0] \$193 ;
+  wire [9:0] \$194 ;
+  wire [31:0] \$195 ;
+  wire [6:0] \$196 ;
+  reg [8:0] \$197 ;
+  wire [9:0] \$198 ;
+  wire [31:0] \$199 ;
   wire [31:0] \$2 ;
   wire \$20 ;
+  wire [6:0] \$200 ;
+  wire [38:0] \$201 ;
+  wire [38:0] \$202 ;
+  wire [6:0] \$203 ;
+  wire [32:0] \$204 ;
+  wire \$205 ;
+  wire \$206 ;
+  wire \$207 ;
+  wire \$208 ;
+  wire [31:0] \$209 ;
   wire \$21 ;
+  wire [6:0] \$210 ;
+  wire \$211 ;
+  wire [38:0] \$212 ;
+  wire [38:0] \$213 ;
+  wire [6:0] \$214 ;
+  wire [32:0] \$215 ;
+  wire \$216 ;
+  wire \$217 ;
+  wire \$218 ;
+  wire \$219 ;
   wire \$22 ;
+  reg [14:0] \$220 ;
+  reg [14:0] \$221 ;
+  wire [15:0] \$222 ;
+  wire [31:0] \$223 ;
+  wire [6:0] \$224 ;
+  reg [14:0] \$225 ;
+  wire [15:0] \$226 ;
+  wire [31:0] \$227 ;
+  wire [6:0] \$228 ;
+  reg [14:0] \$229 ;
   wire \$23 ;
+  wire [15:0] \$230 ;
+  wire [31:0] \$231 ;
+  wire [6:0] \$232 ;
+  reg [14:0] \$233 ;
+  wire [15:0] \$234 ;
+  wire [31:0] \$235 ;
+  wire [6:0] \$236 ;
+  reg [14:0] \$237 ;
+  wire [15:0] \$238 ;
+  wire [31:0] \$239 ;
   wire \$24 ;
-  wire [34:0] \$25 ;
-  wire [35:0] \$26 ;
-  wire [31:0] \$27 ;
+  wire [6:0] \$240 ;
+  reg [14:0] \$241 ;
+  wire [15:0] \$242 ;
+  wire [31:0] \$243 ;
+  wire [6:0] \$244 ;
+  reg [14:0] \$245 ;
+  wire [15:0] \$246 ;
+  wire [31:0] \$247 ;
+  wire [6:0] \$248 ;
+  reg [14:0] \$249 ;
+  wire \$25 ;
+  wire [15:0] \$250 ;
+  wire [31:0] \$251 ;
+  wire [6:0] \$252 ;
+  reg [14:0] \$253 ;
+  wire [15:0] \$254 ;
+  wire [31:0] \$255 ;
+  wire [6:0] \$256 ;
+  wire [38:0] \$257 ;
+  wire [38:0] \$258 ;
+  wire [6:0] \$259 ;
+  wire [34:0] \$26 ;
+  wire [32:0] \$260 ;
+  wire \$261 ;
+  wire \$262 ;
+  wire \$263 ;
+  wire \$264 ;
+  wire \$265 ;
+  wire [11:0] \$266 ;
+  wire [32:0] \$267 ;
+  wire [9:0] \$268 ;
+  wire \$269 ;
+  wire [35:0] \$27 ;
+  wire [32:0] \$270 ;
+  wire [32:0] \$271 ;
+  wire \$272 ;
+  wire [9:0] \$273 ;
+  wire \$274 ;
+  wire [2:0] \$275 ;
+  wire [9:0] \$276 ;
+  wire \$277 ;
+  wire \$278 ;
+  wire [32:0] \$279 ;
   wire \$28 ;
+  wire \$280 ;
+  wire \$281 ;
+  wire \$282 ;
+  wire \$283 ;
+  wire [32:0] \$284 ;
+  wire \$285 ;
+  wire [32:0] \$286 ;
+  wire \$287 ;
+  wire [8:0] \$288 ;
+  wire \$289 ;
   wire \$29 ;
+  wire [32:0] \$290 ;
+  wire [32:0] \$291 ;
+  wire \$292 ;
+  wire \$293 ;
+  wire [2:0] \$294 ;
+  wire \$295 ;
+  wire \$296 ;
+  wire [32:0] \$297 ;
+  wire \$298 ;
+  reg [5:0] \$299 ;
   wire [31:0] \$3 ;
   wire \$30 ;
+  reg [2:0] \$300 ;
+  reg [15:0] \$301 ;
+  reg [15:0] \$302 ;
+  reg [31:0] \$303 ;
+  reg [15:0] \$304 ;
+  reg [15:0] \$305 ;
+  reg [31:0] \$306 ;
+  reg [31:0] \$307 ;
+  reg [31:0] \$308 ;
+  reg [15:0] \$309 ;
   wire \$31 ;
+  reg [15:0] \$310 ;
+  reg [31:0] \$311 ;
+  reg [4:0] \$312 ;
+  reg [31:0] \$313 ;
+  reg [31:0] \$314 ;
+  reg [31:0] \$315 ;
+  reg [23:0] \$316 ;
+  reg [1:0] \$317 ;
+  reg [31:0] \$318 ;
+  reg [31:0] \$319 ;
   wire \$32 ;
-  wire \$33 ;
-  wire \$34 ;
-  wire \$35 ;
-  wire \$36 ;
+  reg [5:0] \$320 ;
+  reg \$321 ;
+  reg [8:0] \$322 ;
+  reg [8:0] \$323 ;
+  reg [11:0] \$324 ;
+  reg [8:0] \$325 ;
+  reg [10:0] \$326 ;
+  reg [4:0] \$327 ;
+  reg [4:0] \$328 ;
+  reg [7:0] \$329 ;
+  wire [34:0] \$33 ;
+  reg [7:0] \$330 ;
+  reg [7:0] \$331 ;
+  reg [4:0] \$332 ;
+  reg [4:0] \$333 ;
+  reg [31:0] \$334 ;
+  reg [31:0] \$335 ;
+  reg [31:0] \$336 ;
+  reg [31:0] \$337 ;
+  wire [35:0] \$34 ;
+  reg [2:0] \$35 ;
+  reg [3:0] \$36 ;
   wire \$37 ;
-  wire \$38 ;
+  wire [31:0] \$38 ;
   wire \$39 ;
   wire [31:0] \$4 ;
   wire \$40 ;
   wire \$41 ;
   wire \$42 ;
   wire \$43 ;
-  wire \$44 ;
-  wire \$45 ;
+  wire [12:0] \$44 ;
+  wire [12:0] \$45 ;
   wire \$46 ;
-  wire [3:0] \$47 ;
-  wire [6:0] \$48 ;
+  wire [34:0] \$47 ;
+  wire [35:0] \$48 ;
   wire \$49 ;
   wire [31:0] \$5 ;
-  wire \$50 ;
-  wire \$51 ;
+  wire [34:0] \$50 ;
+  wire [35:0] \$51 ;
   wire [31:0] \$52 ;
   wire \$53 ;
   wire \$54 ;
@@ -18526,339 +18764,4108 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
   wire \$56 ;
   wire \$57 ;
   wire \$58 ;
-  wire [16:0] \$59 ;
+  wire \$59 ;
   wire [31:0] \$6 ;
   wire \$60 ;
-  wire [16:0] \$61 ;
+  wire \$61 ;
   wire \$62 ;
   wire \$63 ;
   wire \$64 ;
-  wire [32:0] \$65 ;
-  wire [32:0] \$66 ;
+  wire \$65 ;
+  wire \$66 ;
   wire \$67 ;
-  wire [2:0] \$68 ;
+  wire \$68 ;
   wire \$69 ;
   wire [31:0] \$7 ;
-  reg [5:0] \$70 ;
-  reg [2:0] \$71 ;
-  reg [15:0] \$72 ;
-  reg [15:0] \$73 ;
-  reg [31:0] \$74 ;
-  reg [15:0] \$75 ;
-  reg [15:0] \$76 ;
-  reg [31:0] \$77 ;
-  reg [31:0] \$78 ;
-  reg [31:0] \$79 ;
+  wire \$70 ;
+  wire \$71 ;
+  wire \$72 ;
+  wire \$73 ;
+  wire \$74 ;
+  wire \$75 ;
+  wire \$76 ;
+  wire \$77 ;
+  wire \$78 ;
+  wire \$79 ;
   wire [31:0] \$8 ;
-  reg [15:0] \$80 ;
-  reg [15:0] \$81 ;
-  reg [31:0] \$82 ;
-  reg [4:0] \$83 ;
-  reg [31:0] \$84 ;
-  reg [31:0] \$85 ;
-  reg [31:0] \$86 ;
-  reg [23:0] \$87 ;
-  reg [1:0] \$88 ;
-  reg [31:0] \$89 ;
+  wire \$80 ;
+  wire \$81 ;
+  wire \$82 ;
+  wire [3:0] \$83 ;
+  wire [6:0] \$84 ;
+  wire \$85 ;
+  wire \$86 ;
+  wire \$87 ;
+  wire [31:0] \$88 ;
+  wire \$89 ;
   wire [31:0] \$9 ;
-  reg [4:0] \$90 ;
-  reg [4:0] \$91 ;
-  reg [31:0] \$92 ;
+  wire \$90 ;
+  wire \$91 ;
+  wire \$92 ;
+  wire \$93 ;
+  wire \$94 ;
+  wire [16:0] \$95 ;
+  wire \$96 ;
+  wire [16:0] \$97 ;
+  wire \$98 ;
+  wire \$99 ;
   wire [31:0] \$auto$rtlil.cc:2739:Not$2 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs0;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs1;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs2;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs3;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs4;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs5;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs6;
-  (* src = "/home/runner/workspace/hardware/outform.py:97" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
   wire [31:0] _cs7;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb0;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb1;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb2;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb3;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb4;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb5;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb6;
-  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
   wire _cxb7;
-  (* src = "/home/runner/workspace/hardware/outform.py:73" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:96" *)
   wire [31:0] alloc_base;
-  (* src = "/home/runner/workspace/hardware/outform.py:71" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:94" *)
   wire alloc_done;
-  (* src = "/home/runner/workspace/hardware/outform.py:72" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:95" *)
   wire alloc_fault;
-  (* src = "/home/runner/workspace/hardware/outform.py:70" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:93" *)
   reg [4:0] alloc_n;
-  (* src = "/home/runner/workspace/hardware/outform.py:69" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:92" *)
   reg alloc_req;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/hardware/outform.py:124" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:144" *)
   wire [31:0] base_reg;
-  (* src = "/home/runner/workspace/hardware/outform.py:126" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:445" *)
+  reg [1:0] btype;
+  (* src = "/home/runner/workspace/hardware/outform.py:146" *)
   reg [23:0] byte_buf = 24'h000000;
-  (* src = "/home/runner/workspace/hardware/outform.py:127" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:147" *)
   reg [1:0] byte_buf_cnt = 2'h0;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
   wire clk;
-  (* src = "/home/runner/workspace/hardware/outform.py:115" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:193" *)
+  wire [6:0] code7_rev;
+  (* src = "/home/runner/workspace/hardware/outform.py:194" *)
+  wire [7:0] code8_rev;
+  (* src = "/home/runner/workspace/hardware/outform.py:195" *)
+  wire [8:0] code9_rev;
+  (* src = "/home/runner/workspace/hardware/outform.py:135" *)
   reg [31:0] comp_size_reg = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:114" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:134" *)
   reg [31:0] crc32_stored = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:129" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:154" *)
   reg [31:0] crc_acc = 32'd4294967295;
-  (* src = "/home/runner/workspace/hardware/outform.py:362" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:151" *)
+  reg [7:0] crc_byte_in;
+  (* src = "/home/runner/workspace/hardware/outform.py:799" *)
   reg [31:0] crc_final;
-  (* src = "/home/runner/workspace/hardware/outform.py:130" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:155" *)
   wire [31:0] crc_next;
-  (* src = "/home/runner/workspace/hardware/outform.py:109" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:172" *)
+  reg defl_bfinal = 1'h0;
+  (* src = "/home/runner/workspace/hardware/outform.py:171" *)
+  reg [5:0] defl_bit_cnt = 6'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:170" *)
+  reg [31:0] defl_bits = 32'd0;
+  (* src = "/home/runner/workspace/hardware/outform.py:181" *)
+  reg [31:0] defl_bytes_out = 32'd0;
+  (* src = "/home/runner/workspace/hardware/outform.py:175" *)
+  reg [11:0] defl_copy_dist = 12'h000;
+  (* src = "/home/runner/workspace/hardware/outform.py:176" *)
+  reg [8:0] defl_copy_idx = 9'h000;
+  (* src = "/home/runner/workspace/hardware/outform.py:174" *)
+  reg [8:0] defl_copy_len = 9'h000;
+  (* src = "/home/runner/workspace/hardware/outform.py:179" *)
+  reg [4:0] defl_dist_code = 5'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:662" *)
+  reg [31:0] defl_hist_depth;
+  (* src = "/home/runner/workspace/hardware/outform.py:178" *)
+  reg [4:0] defl_len_idx = 5'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:180" *)
+  reg [31:0] defl_rx_count = 32'd0;
+  (* src = "/home/runner/workspace/hardware/outform.py:173" *)
+  reg [8:0] defl_symbol = 9'h000;
+  (* src = "/home/runner/workspace/hardware/outform.py:177" *)
+  reg [10:0] defl_win_pos = 11'h000;
+  (* src = "/home/runner/workspace/hardware/outform.py:196" *)
+  wire [4:0] dist5_rev;
+  (* src = "/home/runner/workspace/hardware/outform.py:635" *)
+  reg [3:0] dist_extra_needed;
+  (* src = "/home/runner/workspace/hardware/outform.py:129" *)
   reg [15:0] extra_cnt = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:118" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:138" *)
   reg [15:0] extra_len_reg = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:112" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:132" *)
   reg [15:0] flags_reg = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:108" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:128" *)
   reg [15:0] fname_cnt = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:137" *)
   reg [15:0] fname_len_reg = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:59" *)
-  wire [31:0] gt_raw;
-  (* src = "/home/runner/workspace/hardware/outform.py:106" *)
-  reg [5:0] hdr_byte_cnt = 6'h00;
-  (* src = "/home/runner/workspace/hardware/outform.py:147" *)
-  wire [31:0] inflate_word;
-  (* src = "/home/runner/workspace/hardware/outform.py:259" *)
-  reg is_pow2;
-  (* src = "/home/runner/workspace/hardware/outform.py:76" *)
-  output [31:0] mem_wr_addr;
-  wire [31:0] mem_wr_addr;
-  (* src = "/home/runner/workspace/hardware/outform.py:77" *)
-  output [31:0] mem_wr_data;
-  wire [31:0] mem_wr_data;
-  (* src = "/home/runner/workspace/hardware/outform.py:78" *)
-  output mem_wr_en;
-  wire mem_wr_en;
-  (* src = "/home/runner/workspace/hardware/outform.py:113" *)
-  reg [15:0] method_reg = 16'h0000;
-  (* src = "/home/runner/workspace/hardware/outform.py:82" *)
-  reg [31:0] mint_base = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:81" *)
-  reg mint_call;
   (* src = "/home/runner/workspace/hardware/outform.py:84" *)
+  wire [31:0] gt_raw;
+  (* src = "/home/runner/workspace/hardware/outform.py:126" *)
+  reg [5:0] hdr_byte_cnt = 6'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:221" *)
+  wire [31:0] inflate_word;
+  (* src = "/home/runner/workspace/hardware/outform.py:343" *)
+  reg is_pow2;
+  (* src = "/home/runner/workspace/hardware/outform.py:563" *)
+  reg [3:0] len_extra_needed;
+  (* src = "/home/runner/workspace/hardware/outform.py:98" *)
+  output [31:0] mem_wr_addr;
+  reg [31:0] mem_wr_addr;
+  (* src = "/home/runner/workspace/hardware/outform.py:99" *)
+  output [31:0] mem_wr_data;
+  reg [31:0] mem_wr_data;
+  (* src = "/home/runner/workspace/hardware/outform.py:100" *)
+  output mem_wr_en;
+  reg mem_wr_en;
+  (* src = "/home/runner/workspace/hardware/outform.py:133" *)
+  reg [15:0] method_reg = 16'h0000;
+  (* src = "/home/runner/workspace/hardware/outform.py:103" *)
+  reg [31:0] mint_base = 32'd0;
+  (* src = "/home/runner/workspace/hardware/outform.py:102" *)
+  reg mint_call;
+  (* src = "/home/runner/workspace/hardware/outform.py:105" *)
   wire mint_done;
-  (* src = "/home/runner/workspace/hardware/outform.py:85" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:106" *)
   wire mint_fault;
-  (* src = "/home/runner/workspace/hardware/outform.py:83" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:104" *)
   reg [4:0] mint_n = 5'h00;
-  (* src = "/home/runner/workspace/hardware/outform.py:86" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:107" *)
   wire [31:0] mint_result_gt;
-  (* src = "/home/runner/workspace/hardware/outform.py:264" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:348" *)
   reg [4:0] n_computed;
   (* init = 5'h00 *)
-  (* src = "/home/runner/workspace/hardware/outform.py:121" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:141" *)
   wire [4:0] n_reg;
-  (* src = "/home/runner/workspace/hardware/outform.py:53" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:79" *)
   output outform_busy;
   reg outform_busy;
-  (* src = "/home/runner/workspace/hardware/outform.py:54" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:80" *)
   reg outform_done;
-  (* src = "/home/runner/workspace/hardware/outform.py:55" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:81" *)
   output outform_fault;
   reg outform_fault;
-  (* src = "/home/runner/workspace/hardware/outform.py:56" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:82" *)
   output [4:0] outform_fault_type;
   reg [4:0] outform_fault_type = 5'h00;
-  (* src = "/home/runner/workspace/hardware/outform.py:52" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:78" *)
   wire outform_start;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   reg [4:0] outform_state = 5'h00;
-  (* src = "/home/runner/workspace/hardware/outform.py:131" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:149" *)
   output [31:0] result_gt;
   reg [31:0] result_gt = 32'd0;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/hardware/outform.py:131" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:149" *)
   wire [31:0] result_gt_reg;
+  (* src = "/home/runner/workspace/hardware/outform.py:184" *)
+  reg [7:0] rle_count = 8'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:185" *)
+  reg [7:0] rle_literal = 8'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:186" *)
+  reg [7:0] rle_remaining = 8'h00;
+  (* src = "/home/runner/workspace/hardware/outform.py:182" *)
+  reg [31:0] rle_rx_count = 32'd0;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/hardware/outform.py:66" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:90" *)
   wire [7:0] rx_data;
-  (* src = "/home/runner/workspace/hardware/outform.py:65" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:89" *)
   wire rx_valid;
-  (* src = "/home/runner/workspace/hardware/outform.py:111" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:131" *)
   reg [31:0] sig_reg = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:60" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:85" *)
   wire [15:0] slot_id;
-  (* src = "/home/runner/workspace/hardware/outform.py:122" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:142" *)
   reg [31:0] total_words = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:64" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:88" *)
   output [7:0] tx_byte;
   reg [7:0] tx_byte;
-  (* src = "/home/runner/workspace/hardware/outform.py:107" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:127" *)
   reg [2:0] tx_byte_cnt = 3'h0;
-  (* src = "/home/runner/workspace/hardware/outform.py:64" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:88" *)
   wire [7:0] tx_data;
-  (* src = "/home/runner/workspace/hardware/outform.py:63" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:87" *)
   output tx_valid;
   reg tx_valid;
-  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:136" *)
   reg [31:0] ucomp_size_reg = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:120" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:160" *)
+  reg [10:0] win_mem_r_addr;
+  (* src = "/home/runner/workspace/hardware/outform.py:160" *)
+  wire [7:0] win_mem_r_data;
+  (* src = "/home/runner/workspace/hardware/outform.py:161" *)
+  reg [10:0] win_mem_w_addr;
+  (* src = "/home/runner/workspace/hardware/outform.py:161" *)
+  reg [7:0] win_mem_w_data;
+  (* src = "/home/runner/workspace/hardware/outform.py:161" *)
+  reg win_mem_w_en;
+  (* src = "/home/runner/workspace/hardware/outform.py:140" *)
   reg [31:0] word_count_reg = 32'd0;
-  (* src = "/home/runner/workspace/hardware/outform.py:125" *)
+  (* src = "/home/runner/workspace/hardware/outform.py:145" *)
   reg [31:0] wr_word_cnt = 32'd0;
-  assign _cs1 = \$3  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$4 ;
-  assign \$6  = _cxb2 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs2 = \$5  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$6 ;
-  assign \$8  = _cxb3 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs3 = \$7  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$8 ;
-  assign \$10  = _cxb4 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs4 = \$9  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$10 ;
-  assign \$12  = _cxb5 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs5 = \$11  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$12 ;
-  assign \$14  = _cxb6 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs6 = \$13  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$14 ;
-  assign \$16  = _cxb7 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs7 = \$15  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$16 ;
-  assign \$17  = | (* src = "/home/runner/workspace/hardware/outform.py:261" *) word_count_reg;
-  assign \$18  = word_count_reg - (* src = "/home/runner/workspace/hardware/outform.py:262" *) 1'h1;
-  assign \$19  = { 1'h0, word_count_reg } & (* src = "/home/runner/workspace/hardware/outform.py:262" *) \$18 ;
-  assign \$20  = ! (* src = "/home/runner/workspace/hardware/outform.py:262" *) \$19 ;
-  assign \$21  = \$17  & (* src = "/home/runner/workspace/hardware/outform.py:261" *) \$20 ;
-  assign \$22  = ! (* src = "/home/runner/workspace/hardware/outform.py:321" *) method_reg;
-  assign \$23  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:343" *) 4'h8;
-  assign \$24  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:324" *) 2'h3;
-  assign \$26  = mint_base + (* src = "/home/runner/workspace/hardware/outform.py:326" *) \$25 ;
-  assign \$28  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) outform_state;
-  assign \$29  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
-  assign \$30  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
-  assign \$31  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
-  assign \$32  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
-  assign \$33  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
-  assign \$34  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
-  assign \$35  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
-  assign \$36  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
-  assign \$37  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
-  assign \$38  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
-  assign \$39  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hb;
-  assign \$40  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hc;
-  assign \$41  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hd;
-  assign \$42  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'he;
-  assign \$43  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hf;
-  assign \$44  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h10;
-  assign \$45  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h11;
-  assign \$46  = tx_byte_cnt == (* src = "/home/runner/workspace/hardware/outform.py:191" *) 3'h5;
-  assign \$47  = tx_byte_cnt + (* src = "/home/runner/workspace/hardware/outform.py:195" *) 1'h1;
-  assign \$48  = hdr_byte_cnt + (* src = "/home/runner/workspace/hardware/outform.py:228" *) 1'h1;
-  assign \$49  = hdr_byte_cnt == (* src = "/home/runner/workspace/hardware/outform.py:229" *) 5'h1f;
-  assign \$50  = sig_reg != (* src = "/home/runner/workspace/hardware/outform.py:234" *) 27'h4034b50;
-  assign \$51  = | (* src = "/home/runner/workspace/hardware/outform.py:250" *) ucomp_size_reg[1:0];
-  assign \$53  = ~ (* src = "/home/runner/workspace/hardware/outform.py:271" *) is_pow2;
-  assign \$54  = n_computed < (* src = "/home/runner/workspace/hardware/outform.py:271" *) 3'h6;
-  assign \$55  = \$53  | (* src = "/home/runner/workspace/hardware/outform.py:271" *) \$54 ;
-  assign \$56  = n_computed > (* src = "/home/runner/workspace/hardware/outform.py:271" *) 4'he;
-  assign \$57  = \$55  | (* src = "/home/runner/workspace/hardware/outform.py:271" *) \$56 ;
-  assign \$58  = ! (* src = "/home/runner/workspace/hardware/outform.py:304" *) fname_cnt;
-  assign \$59  = fname_cnt - (* src = "/home/runner/workspace/hardware/outform.py:308" *) 1'h1;
-  assign \$60  = ! (* src = "/home/runner/workspace/hardware/outform.py:313" *) extra_cnt;
-  assign \$61  = extra_cnt - (* src = "/home/runner/workspace/hardware/outform.py:316" *) 1'h1;
-  assign \$62  = ! (* src = "/home/runner/workspace/hardware/outform.py:321" *) method_reg;
-  assign \$63  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:343" *) 4'h8;
-  assign \$64  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:324" *) 2'h3;
-  assign \$65  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:331" *) 1'h1;
-  assign \$66  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:335" *) 1'h1;
-  assign \$67  = \$66  == (* src = "/home/runner/workspace/hardware/outform.py:335" *) total_words;
-  assign \$68  = byte_buf_cnt + (* src = "/home/runner/workspace/hardware/outform.py:342" *) 1'h1;
-  assign \$69  = crc_final != (* src = "/home/runner/workspace/hardware/outform.py:364" *) crc32_stored;
-  (* src = "/home/runner/workspace/hardware/outform.py:106" *)
-  always @(posedge clk)
-    hdr_byte_cnt <= \$70 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:107" *)
-  always @(posedge clk)
-    tx_byte_cnt <= \$71 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:108" *)
-  always @(posedge clk)
-    fname_cnt <= \$72 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:109" *)
-  always @(posedge clk)
-    extra_cnt <= \$73 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:111" *)
-  always @(posedge clk)
-    sig_reg <= \$74 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:112" *)
-  always @(posedge clk)
-    flags_reg <= \$75 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:113" *)
-  always @(posedge clk)
-    method_reg <= \$76 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:114" *)
-  always @(posedge clk)
-    crc32_stored <= \$77 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:115" *)
-  always @(posedge clk)
-    comp_size_reg <= \$78 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:116" *)
-  always @(posedge clk)
-    ucomp_size_reg <= \$79 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:117" *)
-  always @(posedge clk)
-    fname_len_reg <= \$80 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:118" *)
-  always @(posedge clk)
-    extra_len_reg <= \$81 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:120" *)
-  always @(posedge clk)
-    word_count_reg <= \$82 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:121" *)
-  always @(posedge clk)
-    mint_n <= \$83 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:122" *)
-  always @(posedge clk)
-    total_words <= \$84 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:129" *)
-  always @(posedge clk)
-    crc_acc <= \$85 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:125" *)
-  always @(posedge clk)
-    wr_word_cnt <= \$86 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:158" *)
+  reg [7:0] win_mem [2047:0];
+  initial begin
+    win_mem[0] = 8'h00;
+    win_mem[1] = 8'h00;
+    win_mem[2] = 8'h00;
+    win_mem[3] = 8'h00;
+    win_mem[4] = 8'h00;
+    win_mem[5] = 8'h00;
+    win_mem[6] = 8'h00;
+    win_mem[7] = 8'h00;
+    win_mem[8] = 8'h00;
+    win_mem[9] = 8'h00;
+    win_mem[10] = 8'h00;
+    win_mem[11] = 8'h00;
+    win_mem[12] = 8'h00;
+    win_mem[13] = 8'h00;
+    win_mem[14] = 8'h00;
+    win_mem[15] = 8'h00;
+    win_mem[16] = 8'h00;
+    win_mem[17] = 8'h00;
+    win_mem[18] = 8'h00;
+    win_mem[19] = 8'h00;
+    win_mem[20] = 8'h00;
+    win_mem[21] = 8'h00;
+    win_mem[22] = 8'h00;
+    win_mem[23] = 8'h00;
+    win_mem[24] = 8'h00;
+    win_mem[25] = 8'h00;
+    win_mem[26] = 8'h00;
+    win_mem[27] = 8'h00;
+    win_mem[28] = 8'h00;
+    win_mem[29] = 8'h00;
+    win_mem[30] = 8'h00;
+    win_mem[31] = 8'h00;
+    win_mem[32] = 8'h00;
+    win_mem[33] = 8'h00;
+    win_mem[34] = 8'h00;
+    win_mem[35] = 8'h00;
+    win_mem[36] = 8'h00;
+    win_mem[37] = 8'h00;
+    win_mem[38] = 8'h00;
+    win_mem[39] = 8'h00;
+    win_mem[40] = 8'h00;
+    win_mem[41] = 8'h00;
+    win_mem[42] = 8'h00;
+    win_mem[43] = 8'h00;
+    win_mem[44] = 8'h00;
+    win_mem[45] = 8'h00;
+    win_mem[46] = 8'h00;
+    win_mem[47] = 8'h00;
+    win_mem[48] = 8'h00;
+    win_mem[49] = 8'h00;
+    win_mem[50] = 8'h00;
+    win_mem[51] = 8'h00;
+    win_mem[52] = 8'h00;
+    win_mem[53] = 8'h00;
+    win_mem[54] = 8'h00;
+    win_mem[55] = 8'h00;
+    win_mem[56] = 8'h00;
+    win_mem[57] = 8'h00;
+    win_mem[58] = 8'h00;
+    win_mem[59] = 8'h00;
+    win_mem[60] = 8'h00;
+    win_mem[61] = 8'h00;
+    win_mem[62] = 8'h00;
+    win_mem[63] = 8'h00;
+    win_mem[64] = 8'h00;
+    win_mem[65] = 8'h00;
+    win_mem[66] = 8'h00;
+    win_mem[67] = 8'h00;
+    win_mem[68] = 8'h00;
+    win_mem[69] = 8'h00;
+    win_mem[70] = 8'h00;
+    win_mem[71] = 8'h00;
+    win_mem[72] = 8'h00;
+    win_mem[73] = 8'h00;
+    win_mem[74] = 8'h00;
+    win_mem[75] = 8'h00;
+    win_mem[76] = 8'h00;
+    win_mem[77] = 8'h00;
+    win_mem[78] = 8'h00;
+    win_mem[79] = 8'h00;
+    win_mem[80] = 8'h00;
+    win_mem[81] = 8'h00;
+    win_mem[82] = 8'h00;
+    win_mem[83] = 8'h00;
+    win_mem[84] = 8'h00;
+    win_mem[85] = 8'h00;
+    win_mem[86] = 8'h00;
+    win_mem[87] = 8'h00;
+    win_mem[88] = 8'h00;
+    win_mem[89] = 8'h00;
+    win_mem[90] = 8'h00;
+    win_mem[91] = 8'h00;
+    win_mem[92] = 8'h00;
+    win_mem[93] = 8'h00;
+    win_mem[94] = 8'h00;
+    win_mem[95] = 8'h00;
+    win_mem[96] = 8'h00;
+    win_mem[97] = 8'h00;
+    win_mem[98] = 8'h00;
+    win_mem[99] = 8'h00;
+    win_mem[100] = 8'h00;
+    win_mem[101] = 8'h00;
+    win_mem[102] = 8'h00;
+    win_mem[103] = 8'h00;
+    win_mem[104] = 8'h00;
+    win_mem[105] = 8'h00;
+    win_mem[106] = 8'h00;
+    win_mem[107] = 8'h00;
+    win_mem[108] = 8'h00;
+    win_mem[109] = 8'h00;
+    win_mem[110] = 8'h00;
+    win_mem[111] = 8'h00;
+    win_mem[112] = 8'h00;
+    win_mem[113] = 8'h00;
+    win_mem[114] = 8'h00;
+    win_mem[115] = 8'h00;
+    win_mem[116] = 8'h00;
+    win_mem[117] = 8'h00;
+    win_mem[118] = 8'h00;
+    win_mem[119] = 8'h00;
+    win_mem[120] = 8'h00;
+    win_mem[121] = 8'h00;
+    win_mem[122] = 8'h00;
+    win_mem[123] = 8'h00;
+    win_mem[124] = 8'h00;
+    win_mem[125] = 8'h00;
+    win_mem[126] = 8'h00;
+    win_mem[127] = 8'h00;
+    win_mem[128] = 8'h00;
+    win_mem[129] = 8'h00;
+    win_mem[130] = 8'h00;
+    win_mem[131] = 8'h00;
+    win_mem[132] = 8'h00;
+    win_mem[133] = 8'h00;
+    win_mem[134] = 8'h00;
+    win_mem[135] = 8'h00;
+    win_mem[136] = 8'h00;
+    win_mem[137] = 8'h00;
+    win_mem[138] = 8'h00;
+    win_mem[139] = 8'h00;
+    win_mem[140] = 8'h00;
+    win_mem[141] = 8'h00;
+    win_mem[142] = 8'h00;
+    win_mem[143] = 8'h00;
+    win_mem[144] = 8'h00;
+    win_mem[145] = 8'h00;
+    win_mem[146] = 8'h00;
+    win_mem[147] = 8'h00;
+    win_mem[148] = 8'h00;
+    win_mem[149] = 8'h00;
+    win_mem[150] = 8'h00;
+    win_mem[151] = 8'h00;
+    win_mem[152] = 8'h00;
+    win_mem[153] = 8'h00;
+    win_mem[154] = 8'h00;
+    win_mem[155] = 8'h00;
+    win_mem[156] = 8'h00;
+    win_mem[157] = 8'h00;
+    win_mem[158] = 8'h00;
+    win_mem[159] = 8'h00;
+    win_mem[160] = 8'h00;
+    win_mem[161] = 8'h00;
+    win_mem[162] = 8'h00;
+    win_mem[163] = 8'h00;
+    win_mem[164] = 8'h00;
+    win_mem[165] = 8'h00;
+    win_mem[166] = 8'h00;
+    win_mem[167] = 8'h00;
+    win_mem[168] = 8'h00;
+    win_mem[169] = 8'h00;
+    win_mem[170] = 8'h00;
+    win_mem[171] = 8'h00;
+    win_mem[172] = 8'h00;
+    win_mem[173] = 8'h00;
+    win_mem[174] = 8'h00;
+    win_mem[175] = 8'h00;
+    win_mem[176] = 8'h00;
+    win_mem[177] = 8'h00;
+    win_mem[178] = 8'h00;
+    win_mem[179] = 8'h00;
+    win_mem[180] = 8'h00;
+    win_mem[181] = 8'h00;
+    win_mem[182] = 8'h00;
+    win_mem[183] = 8'h00;
+    win_mem[184] = 8'h00;
+    win_mem[185] = 8'h00;
+    win_mem[186] = 8'h00;
+    win_mem[187] = 8'h00;
+    win_mem[188] = 8'h00;
+    win_mem[189] = 8'h00;
+    win_mem[190] = 8'h00;
+    win_mem[191] = 8'h00;
+    win_mem[192] = 8'h00;
+    win_mem[193] = 8'h00;
+    win_mem[194] = 8'h00;
+    win_mem[195] = 8'h00;
+    win_mem[196] = 8'h00;
+    win_mem[197] = 8'h00;
+    win_mem[198] = 8'h00;
+    win_mem[199] = 8'h00;
+    win_mem[200] = 8'h00;
+    win_mem[201] = 8'h00;
+    win_mem[202] = 8'h00;
+    win_mem[203] = 8'h00;
+    win_mem[204] = 8'h00;
+    win_mem[205] = 8'h00;
+    win_mem[206] = 8'h00;
+    win_mem[207] = 8'h00;
+    win_mem[208] = 8'h00;
+    win_mem[209] = 8'h00;
+    win_mem[210] = 8'h00;
+    win_mem[211] = 8'h00;
+    win_mem[212] = 8'h00;
+    win_mem[213] = 8'h00;
+    win_mem[214] = 8'h00;
+    win_mem[215] = 8'h00;
+    win_mem[216] = 8'h00;
+    win_mem[217] = 8'h00;
+    win_mem[218] = 8'h00;
+    win_mem[219] = 8'h00;
+    win_mem[220] = 8'h00;
+    win_mem[221] = 8'h00;
+    win_mem[222] = 8'h00;
+    win_mem[223] = 8'h00;
+    win_mem[224] = 8'h00;
+    win_mem[225] = 8'h00;
+    win_mem[226] = 8'h00;
+    win_mem[227] = 8'h00;
+    win_mem[228] = 8'h00;
+    win_mem[229] = 8'h00;
+    win_mem[230] = 8'h00;
+    win_mem[231] = 8'h00;
+    win_mem[232] = 8'h00;
+    win_mem[233] = 8'h00;
+    win_mem[234] = 8'h00;
+    win_mem[235] = 8'h00;
+    win_mem[236] = 8'h00;
+    win_mem[237] = 8'h00;
+    win_mem[238] = 8'h00;
+    win_mem[239] = 8'h00;
+    win_mem[240] = 8'h00;
+    win_mem[241] = 8'h00;
+    win_mem[242] = 8'h00;
+    win_mem[243] = 8'h00;
+    win_mem[244] = 8'h00;
+    win_mem[245] = 8'h00;
+    win_mem[246] = 8'h00;
+    win_mem[247] = 8'h00;
+    win_mem[248] = 8'h00;
+    win_mem[249] = 8'h00;
+    win_mem[250] = 8'h00;
+    win_mem[251] = 8'h00;
+    win_mem[252] = 8'h00;
+    win_mem[253] = 8'h00;
+    win_mem[254] = 8'h00;
+    win_mem[255] = 8'h00;
+    win_mem[256] = 8'h00;
+    win_mem[257] = 8'h00;
+    win_mem[258] = 8'h00;
+    win_mem[259] = 8'h00;
+    win_mem[260] = 8'h00;
+    win_mem[261] = 8'h00;
+    win_mem[262] = 8'h00;
+    win_mem[263] = 8'h00;
+    win_mem[264] = 8'h00;
+    win_mem[265] = 8'h00;
+    win_mem[266] = 8'h00;
+    win_mem[267] = 8'h00;
+    win_mem[268] = 8'h00;
+    win_mem[269] = 8'h00;
+    win_mem[270] = 8'h00;
+    win_mem[271] = 8'h00;
+    win_mem[272] = 8'h00;
+    win_mem[273] = 8'h00;
+    win_mem[274] = 8'h00;
+    win_mem[275] = 8'h00;
+    win_mem[276] = 8'h00;
+    win_mem[277] = 8'h00;
+    win_mem[278] = 8'h00;
+    win_mem[279] = 8'h00;
+    win_mem[280] = 8'h00;
+    win_mem[281] = 8'h00;
+    win_mem[282] = 8'h00;
+    win_mem[283] = 8'h00;
+    win_mem[284] = 8'h00;
+    win_mem[285] = 8'h00;
+    win_mem[286] = 8'h00;
+    win_mem[287] = 8'h00;
+    win_mem[288] = 8'h00;
+    win_mem[289] = 8'h00;
+    win_mem[290] = 8'h00;
+    win_mem[291] = 8'h00;
+    win_mem[292] = 8'h00;
+    win_mem[293] = 8'h00;
+    win_mem[294] = 8'h00;
+    win_mem[295] = 8'h00;
+    win_mem[296] = 8'h00;
+    win_mem[297] = 8'h00;
+    win_mem[298] = 8'h00;
+    win_mem[299] = 8'h00;
+    win_mem[300] = 8'h00;
+    win_mem[301] = 8'h00;
+    win_mem[302] = 8'h00;
+    win_mem[303] = 8'h00;
+    win_mem[304] = 8'h00;
+    win_mem[305] = 8'h00;
+    win_mem[306] = 8'h00;
+    win_mem[307] = 8'h00;
+    win_mem[308] = 8'h00;
+    win_mem[309] = 8'h00;
+    win_mem[310] = 8'h00;
+    win_mem[311] = 8'h00;
+    win_mem[312] = 8'h00;
+    win_mem[313] = 8'h00;
+    win_mem[314] = 8'h00;
+    win_mem[315] = 8'h00;
+    win_mem[316] = 8'h00;
+    win_mem[317] = 8'h00;
+    win_mem[318] = 8'h00;
+    win_mem[319] = 8'h00;
+    win_mem[320] = 8'h00;
+    win_mem[321] = 8'h00;
+    win_mem[322] = 8'h00;
+    win_mem[323] = 8'h00;
+    win_mem[324] = 8'h00;
+    win_mem[325] = 8'h00;
+    win_mem[326] = 8'h00;
+    win_mem[327] = 8'h00;
+    win_mem[328] = 8'h00;
+    win_mem[329] = 8'h00;
+    win_mem[330] = 8'h00;
+    win_mem[331] = 8'h00;
+    win_mem[332] = 8'h00;
+    win_mem[333] = 8'h00;
+    win_mem[334] = 8'h00;
+    win_mem[335] = 8'h00;
+    win_mem[336] = 8'h00;
+    win_mem[337] = 8'h00;
+    win_mem[338] = 8'h00;
+    win_mem[339] = 8'h00;
+    win_mem[340] = 8'h00;
+    win_mem[341] = 8'h00;
+    win_mem[342] = 8'h00;
+    win_mem[343] = 8'h00;
+    win_mem[344] = 8'h00;
+    win_mem[345] = 8'h00;
+    win_mem[346] = 8'h00;
+    win_mem[347] = 8'h00;
+    win_mem[348] = 8'h00;
+    win_mem[349] = 8'h00;
+    win_mem[350] = 8'h00;
+    win_mem[351] = 8'h00;
+    win_mem[352] = 8'h00;
+    win_mem[353] = 8'h00;
+    win_mem[354] = 8'h00;
+    win_mem[355] = 8'h00;
+    win_mem[356] = 8'h00;
+    win_mem[357] = 8'h00;
+    win_mem[358] = 8'h00;
+    win_mem[359] = 8'h00;
+    win_mem[360] = 8'h00;
+    win_mem[361] = 8'h00;
+    win_mem[362] = 8'h00;
+    win_mem[363] = 8'h00;
+    win_mem[364] = 8'h00;
+    win_mem[365] = 8'h00;
+    win_mem[366] = 8'h00;
+    win_mem[367] = 8'h00;
+    win_mem[368] = 8'h00;
+    win_mem[369] = 8'h00;
+    win_mem[370] = 8'h00;
+    win_mem[371] = 8'h00;
+    win_mem[372] = 8'h00;
+    win_mem[373] = 8'h00;
+    win_mem[374] = 8'h00;
+    win_mem[375] = 8'h00;
+    win_mem[376] = 8'h00;
+    win_mem[377] = 8'h00;
+    win_mem[378] = 8'h00;
+    win_mem[379] = 8'h00;
+    win_mem[380] = 8'h00;
+    win_mem[381] = 8'h00;
+    win_mem[382] = 8'h00;
+    win_mem[383] = 8'h00;
+    win_mem[384] = 8'h00;
+    win_mem[385] = 8'h00;
+    win_mem[386] = 8'h00;
+    win_mem[387] = 8'h00;
+    win_mem[388] = 8'h00;
+    win_mem[389] = 8'h00;
+    win_mem[390] = 8'h00;
+    win_mem[391] = 8'h00;
+    win_mem[392] = 8'h00;
+    win_mem[393] = 8'h00;
+    win_mem[394] = 8'h00;
+    win_mem[395] = 8'h00;
+    win_mem[396] = 8'h00;
+    win_mem[397] = 8'h00;
+    win_mem[398] = 8'h00;
+    win_mem[399] = 8'h00;
+    win_mem[400] = 8'h00;
+    win_mem[401] = 8'h00;
+    win_mem[402] = 8'h00;
+    win_mem[403] = 8'h00;
+    win_mem[404] = 8'h00;
+    win_mem[405] = 8'h00;
+    win_mem[406] = 8'h00;
+    win_mem[407] = 8'h00;
+    win_mem[408] = 8'h00;
+    win_mem[409] = 8'h00;
+    win_mem[410] = 8'h00;
+    win_mem[411] = 8'h00;
+    win_mem[412] = 8'h00;
+    win_mem[413] = 8'h00;
+    win_mem[414] = 8'h00;
+    win_mem[415] = 8'h00;
+    win_mem[416] = 8'h00;
+    win_mem[417] = 8'h00;
+    win_mem[418] = 8'h00;
+    win_mem[419] = 8'h00;
+    win_mem[420] = 8'h00;
+    win_mem[421] = 8'h00;
+    win_mem[422] = 8'h00;
+    win_mem[423] = 8'h00;
+    win_mem[424] = 8'h00;
+    win_mem[425] = 8'h00;
+    win_mem[426] = 8'h00;
+    win_mem[427] = 8'h00;
+    win_mem[428] = 8'h00;
+    win_mem[429] = 8'h00;
+    win_mem[430] = 8'h00;
+    win_mem[431] = 8'h00;
+    win_mem[432] = 8'h00;
+    win_mem[433] = 8'h00;
+    win_mem[434] = 8'h00;
+    win_mem[435] = 8'h00;
+    win_mem[436] = 8'h00;
+    win_mem[437] = 8'h00;
+    win_mem[438] = 8'h00;
+    win_mem[439] = 8'h00;
+    win_mem[440] = 8'h00;
+    win_mem[441] = 8'h00;
+    win_mem[442] = 8'h00;
+    win_mem[443] = 8'h00;
+    win_mem[444] = 8'h00;
+    win_mem[445] = 8'h00;
+    win_mem[446] = 8'h00;
+    win_mem[447] = 8'h00;
+    win_mem[448] = 8'h00;
+    win_mem[449] = 8'h00;
+    win_mem[450] = 8'h00;
+    win_mem[451] = 8'h00;
+    win_mem[452] = 8'h00;
+    win_mem[453] = 8'h00;
+    win_mem[454] = 8'h00;
+    win_mem[455] = 8'h00;
+    win_mem[456] = 8'h00;
+    win_mem[457] = 8'h00;
+    win_mem[458] = 8'h00;
+    win_mem[459] = 8'h00;
+    win_mem[460] = 8'h00;
+    win_mem[461] = 8'h00;
+    win_mem[462] = 8'h00;
+    win_mem[463] = 8'h00;
+    win_mem[464] = 8'h00;
+    win_mem[465] = 8'h00;
+    win_mem[466] = 8'h00;
+    win_mem[467] = 8'h00;
+    win_mem[468] = 8'h00;
+    win_mem[469] = 8'h00;
+    win_mem[470] = 8'h00;
+    win_mem[471] = 8'h00;
+    win_mem[472] = 8'h00;
+    win_mem[473] = 8'h00;
+    win_mem[474] = 8'h00;
+    win_mem[475] = 8'h00;
+    win_mem[476] = 8'h00;
+    win_mem[477] = 8'h00;
+    win_mem[478] = 8'h00;
+    win_mem[479] = 8'h00;
+    win_mem[480] = 8'h00;
+    win_mem[481] = 8'h00;
+    win_mem[482] = 8'h00;
+    win_mem[483] = 8'h00;
+    win_mem[484] = 8'h00;
+    win_mem[485] = 8'h00;
+    win_mem[486] = 8'h00;
+    win_mem[487] = 8'h00;
+    win_mem[488] = 8'h00;
+    win_mem[489] = 8'h00;
+    win_mem[490] = 8'h00;
+    win_mem[491] = 8'h00;
+    win_mem[492] = 8'h00;
+    win_mem[493] = 8'h00;
+    win_mem[494] = 8'h00;
+    win_mem[495] = 8'h00;
+    win_mem[496] = 8'h00;
+    win_mem[497] = 8'h00;
+    win_mem[498] = 8'h00;
+    win_mem[499] = 8'h00;
+    win_mem[500] = 8'h00;
+    win_mem[501] = 8'h00;
+    win_mem[502] = 8'h00;
+    win_mem[503] = 8'h00;
+    win_mem[504] = 8'h00;
+    win_mem[505] = 8'h00;
+    win_mem[506] = 8'h00;
+    win_mem[507] = 8'h00;
+    win_mem[508] = 8'h00;
+    win_mem[509] = 8'h00;
+    win_mem[510] = 8'h00;
+    win_mem[511] = 8'h00;
+    win_mem[512] = 8'h00;
+    win_mem[513] = 8'h00;
+    win_mem[514] = 8'h00;
+    win_mem[515] = 8'h00;
+    win_mem[516] = 8'h00;
+    win_mem[517] = 8'h00;
+    win_mem[518] = 8'h00;
+    win_mem[519] = 8'h00;
+    win_mem[520] = 8'h00;
+    win_mem[521] = 8'h00;
+    win_mem[522] = 8'h00;
+    win_mem[523] = 8'h00;
+    win_mem[524] = 8'h00;
+    win_mem[525] = 8'h00;
+    win_mem[526] = 8'h00;
+    win_mem[527] = 8'h00;
+    win_mem[528] = 8'h00;
+    win_mem[529] = 8'h00;
+    win_mem[530] = 8'h00;
+    win_mem[531] = 8'h00;
+    win_mem[532] = 8'h00;
+    win_mem[533] = 8'h00;
+    win_mem[534] = 8'h00;
+    win_mem[535] = 8'h00;
+    win_mem[536] = 8'h00;
+    win_mem[537] = 8'h00;
+    win_mem[538] = 8'h00;
+    win_mem[539] = 8'h00;
+    win_mem[540] = 8'h00;
+    win_mem[541] = 8'h00;
+    win_mem[542] = 8'h00;
+    win_mem[543] = 8'h00;
+    win_mem[544] = 8'h00;
+    win_mem[545] = 8'h00;
+    win_mem[546] = 8'h00;
+    win_mem[547] = 8'h00;
+    win_mem[548] = 8'h00;
+    win_mem[549] = 8'h00;
+    win_mem[550] = 8'h00;
+    win_mem[551] = 8'h00;
+    win_mem[552] = 8'h00;
+    win_mem[553] = 8'h00;
+    win_mem[554] = 8'h00;
+    win_mem[555] = 8'h00;
+    win_mem[556] = 8'h00;
+    win_mem[557] = 8'h00;
+    win_mem[558] = 8'h00;
+    win_mem[559] = 8'h00;
+    win_mem[560] = 8'h00;
+    win_mem[561] = 8'h00;
+    win_mem[562] = 8'h00;
+    win_mem[563] = 8'h00;
+    win_mem[564] = 8'h00;
+    win_mem[565] = 8'h00;
+    win_mem[566] = 8'h00;
+    win_mem[567] = 8'h00;
+    win_mem[568] = 8'h00;
+    win_mem[569] = 8'h00;
+    win_mem[570] = 8'h00;
+    win_mem[571] = 8'h00;
+    win_mem[572] = 8'h00;
+    win_mem[573] = 8'h00;
+    win_mem[574] = 8'h00;
+    win_mem[575] = 8'h00;
+    win_mem[576] = 8'h00;
+    win_mem[577] = 8'h00;
+    win_mem[578] = 8'h00;
+    win_mem[579] = 8'h00;
+    win_mem[580] = 8'h00;
+    win_mem[581] = 8'h00;
+    win_mem[582] = 8'h00;
+    win_mem[583] = 8'h00;
+    win_mem[584] = 8'h00;
+    win_mem[585] = 8'h00;
+    win_mem[586] = 8'h00;
+    win_mem[587] = 8'h00;
+    win_mem[588] = 8'h00;
+    win_mem[589] = 8'h00;
+    win_mem[590] = 8'h00;
+    win_mem[591] = 8'h00;
+    win_mem[592] = 8'h00;
+    win_mem[593] = 8'h00;
+    win_mem[594] = 8'h00;
+    win_mem[595] = 8'h00;
+    win_mem[596] = 8'h00;
+    win_mem[597] = 8'h00;
+    win_mem[598] = 8'h00;
+    win_mem[599] = 8'h00;
+    win_mem[600] = 8'h00;
+    win_mem[601] = 8'h00;
+    win_mem[602] = 8'h00;
+    win_mem[603] = 8'h00;
+    win_mem[604] = 8'h00;
+    win_mem[605] = 8'h00;
+    win_mem[606] = 8'h00;
+    win_mem[607] = 8'h00;
+    win_mem[608] = 8'h00;
+    win_mem[609] = 8'h00;
+    win_mem[610] = 8'h00;
+    win_mem[611] = 8'h00;
+    win_mem[612] = 8'h00;
+    win_mem[613] = 8'h00;
+    win_mem[614] = 8'h00;
+    win_mem[615] = 8'h00;
+    win_mem[616] = 8'h00;
+    win_mem[617] = 8'h00;
+    win_mem[618] = 8'h00;
+    win_mem[619] = 8'h00;
+    win_mem[620] = 8'h00;
+    win_mem[621] = 8'h00;
+    win_mem[622] = 8'h00;
+    win_mem[623] = 8'h00;
+    win_mem[624] = 8'h00;
+    win_mem[625] = 8'h00;
+    win_mem[626] = 8'h00;
+    win_mem[627] = 8'h00;
+    win_mem[628] = 8'h00;
+    win_mem[629] = 8'h00;
+    win_mem[630] = 8'h00;
+    win_mem[631] = 8'h00;
+    win_mem[632] = 8'h00;
+    win_mem[633] = 8'h00;
+    win_mem[634] = 8'h00;
+    win_mem[635] = 8'h00;
+    win_mem[636] = 8'h00;
+    win_mem[637] = 8'h00;
+    win_mem[638] = 8'h00;
+    win_mem[639] = 8'h00;
+    win_mem[640] = 8'h00;
+    win_mem[641] = 8'h00;
+    win_mem[642] = 8'h00;
+    win_mem[643] = 8'h00;
+    win_mem[644] = 8'h00;
+    win_mem[645] = 8'h00;
+    win_mem[646] = 8'h00;
+    win_mem[647] = 8'h00;
+    win_mem[648] = 8'h00;
+    win_mem[649] = 8'h00;
+    win_mem[650] = 8'h00;
+    win_mem[651] = 8'h00;
+    win_mem[652] = 8'h00;
+    win_mem[653] = 8'h00;
+    win_mem[654] = 8'h00;
+    win_mem[655] = 8'h00;
+    win_mem[656] = 8'h00;
+    win_mem[657] = 8'h00;
+    win_mem[658] = 8'h00;
+    win_mem[659] = 8'h00;
+    win_mem[660] = 8'h00;
+    win_mem[661] = 8'h00;
+    win_mem[662] = 8'h00;
+    win_mem[663] = 8'h00;
+    win_mem[664] = 8'h00;
+    win_mem[665] = 8'h00;
+    win_mem[666] = 8'h00;
+    win_mem[667] = 8'h00;
+    win_mem[668] = 8'h00;
+    win_mem[669] = 8'h00;
+    win_mem[670] = 8'h00;
+    win_mem[671] = 8'h00;
+    win_mem[672] = 8'h00;
+    win_mem[673] = 8'h00;
+    win_mem[674] = 8'h00;
+    win_mem[675] = 8'h00;
+    win_mem[676] = 8'h00;
+    win_mem[677] = 8'h00;
+    win_mem[678] = 8'h00;
+    win_mem[679] = 8'h00;
+    win_mem[680] = 8'h00;
+    win_mem[681] = 8'h00;
+    win_mem[682] = 8'h00;
+    win_mem[683] = 8'h00;
+    win_mem[684] = 8'h00;
+    win_mem[685] = 8'h00;
+    win_mem[686] = 8'h00;
+    win_mem[687] = 8'h00;
+    win_mem[688] = 8'h00;
+    win_mem[689] = 8'h00;
+    win_mem[690] = 8'h00;
+    win_mem[691] = 8'h00;
+    win_mem[692] = 8'h00;
+    win_mem[693] = 8'h00;
+    win_mem[694] = 8'h00;
+    win_mem[695] = 8'h00;
+    win_mem[696] = 8'h00;
+    win_mem[697] = 8'h00;
+    win_mem[698] = 8'h00;
+    win_mem[699] = 8'h00;
+    win_mem[700] = 8'h00;
+    win_mem[701] = 8'h00;
+    win_mem[702] = 8'h00;
+    win_mem[703] = 8'h00;
+    win_mem[704] = 8'h00;
+    win_mem[705] = 8'h00;
+    win_mem[706] = 8'h00;
+    win_mem[707] = 8'h00;
+    win_mem[708] = 8'h00;
+    win_mem[709] = 8'h00;
+    win_mem[710] = 8'h00;
+    win_mem[711] = 8'h00;
+    win_mem[712] = 8'h00;
+    win_mem[713] = 8'h00;
+    win_mem[714] = 8'h00;
+    win_mem[715] = 8'h00;
+    win_mem[716] = 8'h00;
+    win_mem[717] = 8'h00;
+    win_mem[718] = 8'h00;
+    win_mem[719] = 8'h00;
+    win_mem[720] = 8'h00;
+    win_mem[721] = 8'h00;
+    win_mem[722] = 8'h00;
+    win_mem[723] = 8'h00;
+    win_mem[724] = 8'h00;
+    win_mem[725] = 8'h00;
+    win_mem[726] = 8'h00;
+    win_mem[727] = 8'h00;
+    win_mem[728] = 8'h00;
+    win_mem[729] = 8'h00;
+    win_mem[730] = 8'h00;
+    win_mem[731] = 8'h00;
+    win_mem[732] = 8'h00;
+    win_mem[733] = 8'h00;
+    win_mem[734] = 8'h00;
+    win_mem[735] = 8'h00;
+    win_mem[736] = 8'h00;
+    win_mem[737] = 8'h00;
+    win_mem[738] = 8'h00;
+    win_mem[739] = 8'h00;
+    win_mem[740] = 8'h00;
+    win_mem[741] = 8'h00;
+    win_mem[742] = 8'h00;
+    win_mem[743] = 8'h00;
+    win_mem[744] = 8'h00;
+    win_mem[745] = 8'h00;
+    win_mem[746] = 8'h00;
+    win_mem[747] = 8'h00;
+    win_mem[748] = 8'h00;
+    win_mem[749] = 8'h00;
+    win_mem[750] = 8'h00;
+    win_mem[751] = 8'h00;
+    win_mem[752] = 8'h00;
+    win_mem[753] = 8'h00;
+    win_mem[754] = 8'h00;
+    win_mem[755] = 8'h00;
+    win_mem[756] = 8'h00;
+    win_mem[757] = 8'h00;
+    win_mem[758] = 8'h00;
+    win_mem[759] = 8'h00;
+    win_mem[760] = 8'h00;
+    win_mem[761] = 8'h00;
+    win_mem[762] = 8'h00;
+    win_mem[763] = 8'h00;
+    win_mem[764] = 8'h00;
+    win_mem[765] = 8'h00;
+    win_mem[766] = 8'h00;
+    win_mem[767] = 8'h00;
+    win_mem[768] = 8'h00;
+    win_mem[769] = 8'h00;
+    win_mem[770] = 8'h00;
+    win_mem[771] = 8'h00;
+    win_mem[772] = 8'h00;
+    win_mem[773] = 8'h00;
+    win_mem[774] = 8'h00;
+    win_mem[775] = 8'h00;
+    win_mem[776] = 8'h00;
+    win_mem[777] = 8'h00;
+    win_mem[778] = 8'h00;
+    win_mem[779] = 8'h00;
+    win_mem[780] = 8'h00;
+    win_mem[781] = 8'h00;
+    win_mem[782] = 8'h00;
+    win_mem[783] = 8'h00;
+    win_mem[784] = 8'h00;
+    win_mem[785] = 8'h00;
+    win_mem[786] = 8'h00;
+    win_mem[787] = 8'h00;
+    win_mem[788] = 8'h00;
+    win_mem[789] = 8'h00;
+    win_mem[790] = 8'h00;
+    win_mem[791] = 8'h00;
+    win_mem[792] = 8'h00;
+    win_mem[793] = 8'h00;
+    win_mem[794] = 8'h00;
+    win_mem[795] = 8'h00;
+    win_mem[796] = 8'h00;
+    win_mem[797] = 8'h00;
+    win_mem[798] = 8'h00;
+    win_mem[799] = 8'h00;
+    win_mem[800] = 8'h00;
+    win_mem[801] = 8'h00;
+    win_mem[802] = 8'h00;
+    win_mem[803] = 8'h00;
+    win_mem[804] = 8'h00;
+    win_mem[805] = 8'h00;
+    win_mem[806] = 8'h00;
+    win_mem[807] = 8'h00;
+    win_mem[808] = 8'h00;
+    win_mem[809] = 8'h00;
+    win_mem[810] = 8'h00;
+    win_mem[811] = 8'h00;
+    win_mem[812] = 8'h00;
+    win_mem[813] = 8'h00;
+    win_mem[814] = 8'h00;
+    win_mem[815] = 8'h00;
+    win_mem[816] = 8'h00;
+    win_mem[817] = 8'h00;
+    win_mem[818] = 8'h00;
+    win_mem[819] = 8'h00;
+    win_mem[820] = 8'h00;
+    win_mem[821] = 8'h00;
+    win_mem[822] = 8'h00;
+    win_mem[823] = 8'h00;
+    win_mem[824] = 8'h00;
+    win_mem[825] = 8'h00;
+    win_mem[826] = 8'h00;
+    win_mem[827] = 8'h00;
+    win_mem[828] = 8'h00;
+    win_mem[829] = 8'h00;
+    win_mem[830] = 8'h00;
+    win_mem[831] = 8'h00;
+    win_mem[832] = 8'h00;
+    win_mem[833] = 8'h00;
+    win_mem[834] = 8'h00;
+    win_mem[835] = 8'h00;
+    win_mem[836] = 8'h00;
+    win_mem[837] = 8'h00;
+    win_mem[838] = 8'h00;
+    win_mem[839] = 8'h00;
+    win_mem[840] = 8'h00;
+    win_mem[841] = 8'h00;
+    win_mem[842] = 8'h00;
+    win_mem[843] = 8'h00;
+    win_mem[844] = 8'h00;
+    win_mem[845] = 8'h00;
+    win_mem[846] = 8'h00;
+    win_mem[847] = 8'h00;
+    win_mem[848] = 8'h00;
+    win_mem[849] = 8'h00;
+    win_mem[850] = 8'h00;
+    win_mem[851] = 8'h00;
+    win_mem[852] = 8'h00;
+    win_mem[853] = 8'h00;
+    win_mem[854] = 8'h00;
+    win_mem[855] = 8'h00;
+    win_mem[856] = 8'h00;
+    win_mem[857] = 8'h00;
+    win_mem[858] = 8'h00;
+    win_mem[859] = 8'h00;
+    win_mem[860] = 8'h00;
+    win_mem[861] = 8'h00;
+    win_mem[862] = 8'h00;
+    win_mem[863] = 8'h00;
+    win_mem[864] = 8'h00;
+    win_mem[865] = 8'h00;
+    win_mem[866] = 8'h00;
+    win_mem[867] = 8'h00;
+    win_mem[868] = 8'h00;
+    win_mem[869] = 8'h00;
+    win_mem[870] = 8'h00;
+    win_mem[871] = 8'h00;
+    win_mem[872] = 8'h00;
+    win_mem[873] = 8'h00;
+    win_mem[874] = 8'h00;
+    win_mem[875] = 8'h00;
+    win_mem[876] = 8'h00;
+    win_mem[877] = 8'h00;
+    win_mem[878] = 8'h00;
+    win_mem[879] = 8'h00;
+    win_mem[880] = 8'h00;
+    win_mem[881] = 8'h00;
+    win_mem[882] = 8'h00;
+    win_mem[883] = 8'h00;
+    win_mem[884] = 8'h00;
+    win_mem[885] = 8'h00;
+    win_mem[886] = 8'h00;
+    win_mem[887] = 8'h00;
+    win_mem[888] = 8'h00;
+    win_mem[889] = 8'h00;
+    win_mem[890] = 8'h00;
+    win_mem[891] = 8'h00;
+    win_mem[892] = 8'h00;
+    win_mem[893] = 8'h00;
+    win_mem[894] = 8'h00;
+    win_mem[895] = 8'h00;
+    win_mem[896] = 8'h00;
+    win_mem[897] = 8'h00;
+    win_mem[898] = 8'h00;
+    win_mem[899] = 8'h00;
+    win_mem[900] = 8'h00;
+    win_mem[901] = 8'h00;
+    win_mem[902] = 8'h00;
+    win_mem[903] = 8'h00;
+    win_mem[904] = 8'h00;
+    win_mem[905] = 8'h00;
+    win_mem[906] = 8'h00;
+    win_mem[907] = 8'h00;
+    win_mem[908] = 8'h00;
+    win_mem[909] = 8'h00;
+    win_mem[910] = 8'h00;
+    win_mem[911] = 8'h00;
+    win_mem[912] = 8'h00;
+    win_mem[913] = 8'h00;
+    win_mem[914] = 8'h00;
+    win_mem[915] = 8'h00;
+    win_mem[916] = 8'h00;
+    win_mem[917] = 8'h00;
+    win_mem[918] = 8'h00;
+    win_mem[919] = 8'h00;
+    win_mem[920] = 8'h00;
+    win_mem[921] = 8'h00;
+    win_mem[922] = 8'h00;
+    win_mem[923] = 8'h00;
+    win_mem[924] = 8'h00;
+    win_mem[925] = 8'h00;
+    win_mem[926] = 8'h00;
+    win_mem[927] = 8'h00;
+    win_mem[928] = 8'h00;
+    win_mem[929] = 8'h00;
+    win_mem[930] = 8'h00;
+    win_mem[931] = 8'h00;
+    win_mem[932] = 8'h00;
+    win_mem[933] = 8'h00;
+    win_mem[934] = 8'h00;
+    win_mem[935] = 8'h00;
+    win_mem[936] = 8'h00;
+    win_mem[937] = 8'h00;
+    win_mem[938] = 8'h00;
+    win_mem[939] = 8'h00;
+    win_mem[940] = 8'h00;
+    win_mem[941] = 8'h00;
+    win_mem[942] = 8'h00;
+    win_mem[943] = 8'h00;
+    win_mem[944] = 8'h00;
+    win_mem[945] = 8'h00;
+    win_mem[946] = 8'h00;
+    win_mem[947] = 8'h00;
+    win_mem[948] = 8'h00;
+    win_mem[949] = 8'h00;
+    win_mem[950] = 8'h00;
+    win_mem[951] = 8'h00;
+    win_mem[952] = 8'h00;
+    win_mem[953] = 8'h00;
+    win_mem[954] = 8'h00;
+    win_mem[955] = 8'h00;
+    win_mem[956] = 8'h00;
+    win_mem[957] = 8'h00;
+    win_mem[958] = 8'h00;
+    win_mem[959] = 8'h00;
+    win_mem[960] = 8'h00;
+    win_mem[961] = 8'h00;
+    win_mem[962] = 8'h00;
+    win_mem[963] = 8'h00;
+    win_mem[964] = 8'h00;
+    win_mem[965] = 8'h00;
+    win_mem[966] = 8'h00;
+    win_mem[967] = 8'h00;
+    win_mem[968] = 8'h00;
+    win_mem[969] = 8'h00;
+    win_mem[970] = 8'h00;
+    win_mem[971] = 8'h00;
+    win_mem[972] = 8'h00;
+    win_mem[973] = 8'h00;
+    win_mem[974] = 8'h00;
+    win_mem[975] = 8'h00;
+    win_mem[976] = 8'h00;
+    win_mem[977] = 8'h00;
+    win_mem[978] = 8'h00;
+    win_mem[979] = 8'h00;
+    win_mem[980] = 8'h00;
+    win_mem[981] = 8'h00;
+    win_mem[982] = 8'h00;
+    win_mem[983] = 8'h00;
+    win_mem[984] = 8'h00;
+    win_mem[985] = 8'h00;
+    win_mem[986] = 8'h00;
+    win_mem[987] = 8'h00;
+    win_mem[988] = 8'h00;
+    win_mem[989] = 8'h00;
+    win_mem[990] = 8'h00;
+    win_mem[991] = 8'h00;
+    win_mem[992] = 8'h00;
+    win_mem[993] = 8'h00;
+    win_mem[994] = 8'h00;
+    win_mem[995] = 8'h00;
+    win_mem[996] = 8'h00;
+    win_mem[997] = 8'h00;
+    win_mem[998] = 8'h00;
+    win_mem[999] = 8'h00;
+    win_mem[1000] = 8'h00;
+    win_mem[1001] = 8'h00;
+    win_mem[1002] = 8'h00;
+    win_mem[1003] = 8'h00;
+    win_mem[1004] = 8'h00;
+    win_mem[1005] = 8'h00;
+    win_mem[1006] = 8'h00;
+    win_mem[1007] = 8'h00;
+    win_mem[1008] = 8'h00;
+    win_mem[1009] = 8'h00;
+    win_mem[1010] = 8'h00;
+    win_mem[1011] = 8'h00;
+    win_mem[1012] = 8'h00;
+    win_mem[1013] = 8'h00;
+    win_mem[1014] = 8'h00;
+    win_mem[1015] = 8'h00;
+    win_mem[1016] = 8'h00;
+    win_mem[1017] = 8'h00;
+    win_mem[1018] = 8'h00;
+    win_mem[1019] = 8'h00;
+    win_mem[1020] = 8'h00;
+    win_mem[1021] = 8'h00;
+    win_mem[1022] = 8'h00;
+    win_mem[1023] = 8'h00;
+    win_mem[1024] = 8'h00;
+    win_mem[1025] = 8'h00;
+    win_mem[1026] = 8'h00;
+    win_mem[1027] = 8'h00;
+    win_mem[1028] = 8'h00;
+    win_mem[1029] = 8'h00;
+    win_mem[1030] = 8'h00;
+    win_mem[1031] = 8'h00;
+    win_mem[1032] = 8'h00;
+    win_mem[1033] = 8'h00;
+    win_mem[1034] = 8'h00;
+    win_mem[1035] = 8'h00;
+    win_mem[1036] = 8'h00;
+    win_mem[1037] = 8'h00;
+    win_mem[1038] = 8'h00;
+    win_mem[1039] = 8'h00;
+    win_mem[1040] = 8'h00;
+    win_mem[1041] = 8'h00;
+    win_mem[1042] = 8'h00;
+    win_mem[1043] = 8'h00;
+    win_mem[1044] = 8'h00;
+    win_mem[1045] = 8'h00;
+    win_mem[1046] = 8'h00;
+    win_mem[1047] = 8'h00;
+    win_mem[1048] = 8'h00;
+    win_mem[1049] = 8'h00;
+    win_mem[1050] = 8'h00;
+    win_mem[1051] = 8'h00;
+    win_mem[1052] = 8'h00;
+    win_mem[1053] = 8'h00;
+    win_mem[1054] = 8'h00;
+    win_mem[1055] = 8'h00;
+    win_mem[1056] = 8'h00;
+    win_mem[1057] = 8'h00;
+    win_mem[1058] = 8'h00;
+    win_mem[1059] = 8'h00;
+    win_mem[1060] = 8'h00;
+    win_mem[1061] = 8'h00;
+    win_mem[1062] = 8'h00;
+    win_mem[1063] = 8'h00;
+    win_mem[1064] = 8'h00;
+    win_mem[1065] = 8'h00;
+    win_mem[1066] = 8'h00;
+    win_mem[1067] = 8'h00;
+    win_mem[1068] = 8'h00;
+    win_mem[1069] = 8'h00;
+    win_mem[1070] = 8'h00;
+    win_mem[1071] = 8'h00;
+    win_mem[1072] = 8'h00;
+    win_mem[1073] = 8'h00;
+    win_mem[1074] = 8'h00;
+    win_mem[1075] = 8'h00;
+    win_mem[1076] = 8'h00;
+    win_mem[1077] = 8'h00;
+    win_mem[1078] = 8'h00;
+    win_mem[1079] = 8'h00;
+    win_mem[1080] = 8'h00;
+    win_mem[1081] = 8'h00;
+    win_mem[1082] = 8'h00;
+    win_mem[1083] = 8'h00;
+    win_mem[1084] = 8'h00;
+    win_mem[1085] = 8'h00;
+    win_mem[1086] = 8'h00;
+    win_mem[1087] = 8'h00;
+    win_mem[1088] = 8'h00;
+    win_mem[1089] = 8'h00;
+    win_mem[1090] = 8'h00;
+    win_mem[1091] = 8'h00;
+    win_mem[1092] = 8'h00;
+    win_mem[1093] = 8'h00;
+    win_mem[1094] = 8'h00;
+    win_mem[1095] = 8'h00;
+    win_mem[1096] = 8'h00;
+    win_mem[1097] = 8'h00;
+    win_mem[1098] = 8'h00;
+    win_mem[1099] = 8'h00;
+    win_mem[1100] = 8'h00;
+    win_mem[1101] = 8'h00;
+    win_mem[1102] = 8'h00;
+    win_mem[1103] = 8'h00;
+    win_mem[1104] = 8'h00;
+    win_mem[1105] = 8'h00;
+    win_mem[1106] = 8'h00;
+    win_mem[1107] = 8'h00;
+    win_mem[1108] = 8'h00;
+    win_mem[1109] = 8'h00;
+    win_mem[1110] = 8'h00;
+    win_mem[1111] = 8'h00;
+    win_mem[1112] = 8'h00;
+    win_mem[1113] = 8'h00;
+    win_mem[1114] = 8'h00;
+    win_mem[1115] = 8'h00;
+    win_mem[1116] = 8'h00;
+    win_mem[1117] = 8'h00;
+    win_mem[1118] = 8'h00;
+    win_mem[1119] = 8'h00;
+    win_mem[1120] = 8'h00;
+    win_mem[1121] = 8'h00;
+    win_mem[1122] = 8'h00;
+    win_mem[1123] = 8'h00;
+    win_mem[1124] = 8'h00;
+    win_mem[1125] = 8'h00;
+    win_mem[1126] = 8'h00;
+    win_mem[1127] = 8'h00;
+    win_mem[1128] = 8'h00;
+    win_mem[1129] = 8'h00;
+    win_mem[1130] = 8'h00;
+    win_mem[1131] = 8'h00;
+    win_mem[1132] = 8'h00;
+    win_mem[1133] = 8'h00;
+    win_mem[1134] = 8'h00;
+    win_mem[1135] = 8'h00;
+    win_mem[1136] = 8'h00;
+    win_mem[1137] = 8'h00;
+    win_mem[1138] = 8'h00;
+    win_mem[1139] = 8'h00;
+    win_mem[1140] = 8'h00;
+    win_mem[1141] = 8'h00;
+    win_mem[1142] = 8'h00;
+    win_mem[1143] = 8'h00;
+    win_mem[1144] = 8'h00;
+    win_mem[1145] = 8'h00;
+    win_mem[1146] = 8'h00;
+    win_mem[1147] = 8'h00;
+    win_mem[1148] = 8'h00;
+    win_mem[1149] = 8'h00;
+    win_mem[1150] = 8'h00;
+    win_mem[1151] = 8'h00;
+    win_mem[1152] = 8'h00;
+    win_mem[1153] = 8'h00;
+    win_mem[1154] = 8'h00;
+    win_mem[1155] = 8'h00;
+    win_mem[1156] = 8'h00;
+    win_mem[1157] = 8'h00;
+    win_mem[1158] = 8'h00;
+    win_mem[1159] = 8'h00;
+    win_mem[1160] = 8'h00;
+    win_mem[1161] = 8'h00;
+    win_mem[1162] = 8'h00;
+    win_mem[1163] = 8'h00;
+    win_mem[1164] = 8'h00;
+    win_mem[1165] = 8'h00;
+    win_mem[1166] = 8'h00;
+    win_mem[1167] = 8'h00;
+    win_mem[1168] = 8'h00;
+    win_mem[1169] = 8'h00;
+    win_mem[1170] = 8'h00;
+    win_mem[1171] = 8'h00;
+    win_mem[1172] = 8'h00;
+    win_mem[1173] = 8'h00;
+    win_mem[1174] = 8'h00;
+    win_mem[1175] = 8'h00;
+    win_mem[1176] = 8'h00;
+    win_mem[1177] = 8'h00;
+    win_mem[1178] = 8'h00;
+    win_mem[1179] = 8'h00;
+    win_mem[1180] = 8'h00;
+    win_mem[1181] = 8'h00;
+    win_mem[1182] = 8'h00;
+    win_mem[1183] = 8'h00;
+    win_mem[1184] = 8'h00;
+    win_mem[1185] = 8'h00;
+    win_mem[1186] = 8'h00;
+    win_mem[1187] = 8'h00;
+    win_mem[1188] = 8'h00;
+    win_mem[1189] = 8'h00;
+    win_mem[1190] = 8'h00;
+    win_mem[1191] = 8'h00;
+    win_mem[1192] = 8'h00;
+    win_mem[1193] = 8'h00;
+    win_mem[1194] = 8'h00;
+    win_mem[1195] = 8'h00;
+    win_mem[1196] = 8'h00;
+    win_mem[1197] = 8'h00;
+    win_mem[1198] = 8'h00;
+    win_mem[1199] = 8'h00;
+    win_mem[1200] = 8'h00;
+    win_mem[1201] = 8'h00;
+    win_mem[1202] = 8'h00;
+    win_mem[1203] = 8'h00;
+    win_mem[1204] = 8'h00;
+    win_mem[1205] = 8'h00;
+    win_mem[1206] = 8'h00;
+    win_mem[1207] = 8'h00;
+    win_mem[1208] = 8'h00;
+    win_mem[1209] = 8'h00;
+    win_mem[1210] = 8'h00;
+    win_mem[1211] = 8'h00;
+    win_mem[1212] = 8'h00;
+    win_mem[1213] = 8'h00;
+    win_mem[1214] = 8'h00;
+    win_mem[1215] = 8'h00;
+    win_mem[1216] = 8'h00;
+    win_mem[1217] = 8'h00;
+    win_mem[1218] = 8'h00;
+    win_mem[1219] = 8'h00;
+    win_mem[1220] = 8'h00;
+    win_mem[1221] = 8'h00;
+    win_mem[1222] = 8'h00;
+    win_mem[1223] = 8'h00;
+    win_mem[1224] = 8'h00;
+    win_mem[1225] = 8'h00;
+    win_mem[1226] = 8'h00;
+    win_mem[1227] = 8'h00;
+    win_mem[1228] = 8'h00;
+    win_mem[1229] = 8'h00;
+    win_mem[1230] = 8'h00;
+    win_mem[1231] = 8'h00;
+    win_mem[1232] = 8'h00;
+    win_mem[1233] = 8'h00;
+    win_mem[1234] = 8'h00;
+    win_mem[1235] = 8'h00;
+    win_mem[1236] = 8'h00;
+    win_mem[1237] = 8'h00;
+    win_mem[1238] = 8'h00;
+    win_mem[1239] = 8'h00;
+    win_mem[1240] = 8'h00;
+    win_mem[1241] = 8'h00;
+    win_mem[1242] = 8'h00;
+    win_mem[1243] = 8'h00;
+    win_mem[1244] = 8'h00;
+    win_mem[1245] = 8'h00;
+    win_mem[1246] = 8'h00;
+    win_mem[1247] = 8'h00;
+    win_mem[1248] = 8'h00;
+    win_mem[1249] = 8'h00;
+    win_mem[1250] = 8'h00;
+    win_mem[1251] = 8'h00;
+    win_mem[1252] = 8'h00;
+    win_mem[1253] = 8'h00;
+    win_mem[1254] = 8'h00;
+    win_mem[1255] = 8'h00;
+    win_mem[1256] = 8'h00;
+    win_mem[1257] = 8'h00;
+    win_mem[1258] = 8'h00;
+    win_mem[1259] = 8'h00;
+    win_mem[1260] = 8'h00;
+    win_mem[1261] = 8'h00;
+    win_mem[1262] = 8'h00;
+    win_mem[1263] = 8'h00;
+    win_mem[1264] = 8'h00;
+    win_mem[1265] = 8'h00;
+    win_mem[1266] = 8'h00;
+    win_mem[1267] = 8'h00;
+    win_mem[1268] = 8'h00;
+    win_mem[1269] = 8'h00;
+    win_mem[1270] = 8'h00;
+    win_mem[1271] = 8'h00;
+    win_mem[1272] = 8'h00;
+    win_mem[1273] = 8'h00;
+    win_mem[1274] = 8'h00;
+    win_mem[1275] = 8'h00;
+    win_mem[1276] = 8'h00;
+    win_mem[1277] = 8'h00;
+    win_mem[1278] = 8'h00;
+    win_mem[1279] = 8'h00;
+    win_mem[1280] = 8'h00;
+    win_mem[1281] = 8'h00;
+    win_mem[1282] = 8'h00;
+    win_mem[1283] = 8'h00;
+    win_mem[1284] = 8'h00;
+    win_mem[1285] = 8'h00;
+    win_mem[1286] = 8'h00;
+    win_mem[1287] = 8'h00;
+    win_mem[1288] = 8'h00;
+    win_mem[1289] = 8'h00;
+    win_mem[1290] = 8'h00;
+    win_mem[1291] = 8'h00;
+    win_mem[1292] = 8'h00;
+    win_mem[1293] = 8'h00;
+    win_mem[1294] = 8'h00;
+    win_mem[1295] = 8'h00;
+    win_mem[1296] = 8'h00;
+    win_mem[1297] = 8'h00;
+    win_mem[1298] = 8'h00;
+    win_mem[1299] = 8'h00;
+    win_mem[1300] = 8'h00;
+    win_mem[1301] = 8'h00;
+    win_mem[1302] = 8'h00;
+    win_mem[1303] = 8'h00;
+    win_mem[1304] = 8'h00;
+    win_mem[1305] = 8'h00;
+    win_mem[1306] = 8'h00;
+    win_mem[1307] = 8'h00;
+    win_mem[1308] = 8'h00;
+    win_mem[1309] = 8'h00;
+    win_mem[1310] = 8'h00;
+    win_mem[1311] = 8'h00;
+    win_mem[1312] = 8'h00;
+    win_mem[1313] = 8'h00;
+    win_mem[1314] = 8'h00;
+    win_mem[1315] = 8'h00;
+    win_mem[1316] = 8'h00;
+    win_mem[1317] = 8'h00;
+    win_mem[1318] = 8'h00;
+    win_mem[1319] = 8'h00;
+    win_mem[1320] = 8'h00;
+    win_mem[1321] = 8'h00;
+    win_mem[1322] = 8'h00;
+    win_mem[1323] = 8'h00;
+    win_mem[1324] = 8'h00;
+    win_mem[1325] = 8'h00;
+    win_mem[1326] = 8'h00;
+    win_mem[1327] = 8'h00;
+    win_mem[1328] = 8'h00;
+    win_mem[1329] = 8'h00;
+    win_mem[1330] = 8'h00;
+    win_mem[1331] = 8'h00;
+    win_mem[1332] = 8'h00;
+    win_mem[1333] = 8'h00;
+    win_mem[1334] = 8'h00;
+    win_mem[1335] = 8'h00;
+    win_mem[1336] = 8'h00;
+    win_mem[1337] = 8'h00;
+    win_mem[1338] = 8'h00;
+    win_mem[1339] = 8'h00;
+    win_mem[1340] = 8'h00;
+    win_mem[1341] = 8'h00;
+    win_mem[1342] = 8'h00;
+    win_mem[1343] = 8'h00;
+    win_mem[1344] = 8'h00;
+    win_mem[1345] = 8'h00;
+    win_mem[1346] = 8'h00;
+    win_mem[1347] = 8'h00;
+    win_mem[1348] = 8'h00;
+    win_mem[1349] = 8'h00;
+    win_mem[1350] = 8'h00;
+    win_mem[1351] = 8'h00;
+    win_mem[1352] = 8'h00;
+    win_mem[1353] = 8'h00;
+    win_mem[1354] = 8'h00;
+    win_mem[1355] = 8'h00;
+    win_mem[1356] = 8'h00;
+    win_mem[1357] = 8'h00;
+    win_mem[1358] = 8'h00;
+    win_mem[1359] = 8'h00;
+    win_mem[1360] = 8'h00;
+    win_mem[1361] = 8'h00;
+    win_mem[1362] = 8'h00;
+    win_mem[1363] = 8'h00;
+    win_mem[1364] = 8'h00;
+    win_mem[1365] = 8'h00;
+    win_mem[1366] = 8'h00;
+    win_mem[1367] = 8'h00;
+    win_mem[1368] = 8'h00;
+    win_mem[1369] = 8'h00;
+    win_mem[1370] = 8'h00;
+    win_mem[1371] = 8'h00;
+    win_mem[1372] = 8'h00;
+    win_mem[1373] = 8'h00;
+    win_mem[1374] = 8'h00;
+    win_mem[1375] = 8'h00;
+    win_mem[1376] = 8'h00;
+    win_mem[1377] = 8'h00;
+    win_mem[1378] = 8'h00;
+    win_mem[1379] = 8'h00;
+    win_mem[1380] = 8'h00;
+    win_mem[1381] = 8'h00;
+    win_mem[1382] = 8'h00;
+    win_mem[1383] = 8'h00;
+    win_mem[1384] = 8'h00;
+    win_mem[1385] = 8'h00;
+    win_mem[1386] = 8'h00;
+    win_mem[1387] = 8'h00;
+    win_mem[1388] = 8'h00;
+    win_mem[1389] = 8'h00;
+    win_mem[1390] = 8'h00;
+    win_mem[1391] = 8'h00;
+    win_mem[1392] = 8'h00;
+    win_mem[1393] = 8'h00;
+    win_mem[1394] = 8'h00;
+    win_mem[1395] = 8'h00;
+    win_mem[1396] = 8'h00;
+    win_mem[1397] = 8'h00;
+    win_mem[1398] = 8'h00;
+    win_mem[1399] = 8'h00;
+    win_mem[1400] = 8'h00;
+    win_mem[1401] = 8'h00;
+    win_mem[1402] = 8'h00;
+    win_mem[1403] = 8'h00;
+    win_mem[1404] = 8'h00;
+    win_mem[1405] = 8'h00;
+    win_mem[1406] = 8'h00;
+    win_mem[1407] = 8'h00;
+    win_mem[1408] = 8'h00;
+    win_mem[1409] = 8'h00;
+    win_mem[1410] = 8'h00;
+    win_mem[1411] = 8'h00;
+    win_mem[1412] = 8'h00;
+    win_mem[1413] = 8'h00;
+    win_mem[1414] = 8'h00;
+    win_mem[1415] = 8'h00;
+    win_mem[1416] = 8'h00;
+    win_mem[1417] = 8'h00;
+    win_mem[1418] = 8'h00;
+    win_mem[1419] = 8'h00;
+    win_mem[1420] = 8'h00;
+    win_mem[1421] = 8'h00;
+    win_mem[1422] = 8'h00;
+    win_mem[1423] = 8'h00;
+    win_mem[1424] = 8'h00;
+    win_mem[1425] = 8'h00;
+    win_mem[1426] = 8'h00;
+    win_mem[1427] = 8'h00;
+    win_mem[1428] = 8'h00;
+    win_mem[1429] = 8'h00;
+    win_mem[1430] = 8'h00;
+    win_mem[1431] = 8'h00;
+    win_mem[1432] = 8'h00;
+    win_mem[1433] = 8'h00;
+    win_mem[1434] = 8'h00;
+    win_mem[1435] = 8'h00;
+    win_mem[1436] = 8'h00;
+    win_mem[1437] = 8'h00;
+    win_mem[1438] = 8'h00;
+    win_mem[1439] = 8'h00;
+    win_mem[1440] = 8'h00;
+    win_mem[1441] = 8'h00;
+    win_mem[1442] = 8'h00;
+    win_mem[1443] = 8'h00;
+    win_mem[1444] = 8'h00;
+    win_mem[1445] = 8'h00;
+    win_mem[1446] = 8'h00;
+    win_mem[1447] = 8'h00;
+    win_mem[1448] = 8'h00;
+    win_mem[1449] = 8'h00;
+    win_mem[1450] = 8'h00;
+    win_mem[1451] = 8'h00;
+    win_mem[1452] = 8'h00;
+    win_mem[1453] = 8'h00;
+    win_mem[1454] = 8'h00;
+    win_mem[1455] = 8'h00;
+    win_mem[1456] = 8'h00;
+    win_mem[1457] = 8'h00;
+    win_mem[1458] = 8'h00;
+    win_mem[1459] = 8'h00;
+    win_mem[1460] = 8'h00;
+    win_mem[1461] = 8'h00;
+    win_mem[1462] = 8'h00;
+    win_mem[1463] = 8'h00;
+    win_mem[1464] = 8'h00;
+    win_mem[1465] = 8'h00;
+    win_mem[1466] = 8'h00;
+    win_mem[1467] = 8'h00;
+    win_mem[1468] = 8'h00;
+    win_mem[1469] = 8'h00;
+    win_mem[1470] = 8'h00;
+    win_mem[1471] = 8'h00;
+    win_mem[1472] = 8'h00;
+    win_mem[1473] = 8'h00;
+    win_mem[1474] = 8'h00;
+    win_mem[1475] = 8'h00;
+    win_mem[1476] = 8'h00;
+    win_mem[1477] = 8'h00;
+    win_mem[1478] = 8'h00;
+    win_mem[1479] = 8'h00;
+    win_mem[1480] = 8'h00;
+    win_mem[1481] = 8'h00;
+    win_mem[1482] = 8'h00;
+    win_mem[1483] = 8'h00;
+    win_mem[1484] = 8'h00;
+    win_mem[1485] = 8'h00;
+    win_mem[1486] = 8'h00;
+    win_mem[1487] = 8'h00;
+    win_mem[1488] = 8'h00;
+    win_mem[1489] = 8'h00;
+    win_mem[1490] = 8'h00;
+    win_mem[1491] = 8'h00;
+    win_mem[1492] = 8'h00;
+    win_mem[1493] = 8'h00;
+    win_mem[1494] = 8'h00;
+    win_mem[1495] = 8'h00;
+    win_mem[1496] = 8'h00;
+    win_mem[1497] = 8'h00;
+    win_mem[1498] = 8'h00;
+    win_mem[1499] = 8'h00;
+    win_mem[1500] = 8'h00;
+    win_mem[1501] = 8'h00;
+    win_mem[1502] = 8'h00;
+    win_mem[1503] = 8'h00;
+    win_mem[1504] = 8'h00;
+    win_mem[1505] = 8'h00;
+    win_mem[1506] = 8'h00;
+    win_mem[1507] = 8'h00;
+    win_mem[1508] = 8'h00;
+    win_mem[1509] = 8'h00;
+    win_mem[1510] = 8'h00;
+    win_mem[1511] = 8'h00;
+    win_mem[1512] = 8'h00;
+    win_mem[1513] = 8'h00;
+    win_mem[1514] = 8'h00;
+    win_mem[1515] = 8'h00;
+    win_mem[1516] = 8'h00;
+    win_mem[1517] = 8'h00;
+    win_mem[1518] = 8'h00;
+    win_mem[1519] = 8'h00;
+    win_mem[1520] = 8'h00;
+    win_mem[1521] = 8'h00;
+    win_mem[1522] = 8'h00;
+    win_mem[1523] = 8'h00;
+    win_mem[1524] = 8'h00;
+    win_mem[1525] = 8'h00;
+    win_mem[1526] = 8'h00;
+    win_mem[1527] = 8'h00;
+    win_mem[1528] = 8'h00;
+    win_mem[1529] = 8'h00;
+    win_mem[1530] = 8'h00;
+    win_mem[1531] = 8'h00;
+    win_mem[1532] = 8'h00;
+    win_mem[1533] = 8'h00;
+    win_mem[1534] = 8'h00;
+    win_mem[1535] = 8'h00;
+    win_mem[1536] = 8'h00;
+    win_mem[1537] = 8'h00;
+    win_mem[1538] = 8'h00;
+    win_mem[1539] = 8'h00;
+    win_mem[1540] = 8'h00;
+    win_mem[1541] = 8'h00;
+    win_mem[1542] = 8'h00;
+    win_mem[1543] = 8'h00;
+    win_mem[1544] = 8'h00;
+    win_mem[1545] = 8'h00;
+    win_mem[1546] = 8'h00;
+    win_mem[1547] = 8'h00;
+    win_mem[1548] = 8'h00;
+    win_mem[1549] = 8'h00;
+    win_mem[1550] = 8'h00;
+    win_mem[1551] = 8'h00;
+    win_mem[1552] = 8'h00;
+    win_mem[1553] = 8'h00;
+    win_mem[1554] = 8'h00;
+    win_mem[1555] = 8'h00;
+    win_mem[1556] = 8'h00;
+    win_mem[1557] = 8'h00;
+    win_mem[1558] = 8'h00;
+    win_mem[1559] = 8'h00;
+    win_mem[1560] = 8'h00;
+    win_mem[1561] = 8'h00;
+    win_mem[1562] = 8'h00;
+    win_mem[1563] = 8'h00;
+    win_mem[1564] = 8'h00;
+    win_mem[1565] = 8'h00;
+    win_mem[1566] = 8'h00;
+    win_mem[1567] = 8'h00;
+    win_mem[1568] = 8'h00;
+    win_mem[1569] = 8'h00;
+    win_mem[1570] = 8'h00;
+    win_mem[1571] = 8'h00;
+    win_mem[1572] = 8'h00;
+    win_mem[1573] = 8'h00;
+    win_mem[1574] = 8'h00;
+    win_mem[1575] = 8'h00;
+    win_mem[1576] = 8'h00;
+    win_mem[1577] = 8'h00;
+    win_mem[1578] = 8'h00;
+    win_mem[1579] = 8'h00;
+    win_mem[1580] = 8'h00;
+    win_mem[1581] = 8'h00;
+    win_mem[1582] = 8'h00;
+    win_mem[1583] = 8'h00;
+    win_mem[1584] = 8'h00;
+    win_mem[1585] = 8'h00;
+    win_mem[1586] = 8'h00;
+    win_mem[1587] = 8'h00;
+    win_mem[1588] = 8'h00;
+    win_mem[1589] = 8'h00;
+    win_mem[1590] = 8'h00;
+    win_mem[1591] = 8'h00;
+    win_mem[1592] = 8'h00;
+    win_mem[1593] = 8'h00;
+    win_mem[1594] = 8'h00;
+    win_mem[1595] = 8'h00;
+    win_mem[1596] = 8'h00;
+    win_mem[1597] = 8'h00;
+    win_mem[1598] = 8'h00;
+    win_mem[1599] = 8'h00;
+    win_mem[1600] = 8'h00;
+    win_mem[1601] = 8'h00;
+    win_mem[1602] = 8'h00;
+    win_mem[1603] = 8'h00;
+    win_mem[1604] = 8'h00;
+    win_mem[1605] = 8'h00;
+    win_mem[1606] = 8'h00;
+    win_mem[1607] = 8'h00;
+    win_mem[1608] = 8'h00;
+    win_mem[1609] = 8'h00;
+    win_mem[1610] = 8'h00;
+    win_mem[1611] = 8'h00;
+    win_mem[1612] = 8'h00;
+    win_mem[1613] = 8'h00;
+    win_mem[1614] = 8'h00;
+    win_mem[1615] = 8'h00;
+    win_mem[1616] = 8'h00;
+    win_mem[1617] = 8'h00;
+    win_mem[1618] = 8'h00;
+    win_mem[1619] = 8'h00;
+    win_mem[1620] = 8'h00;
+    win_mem[1621] = 8'h00;
+    win_mem[1622] = 8'h00;
+    win_mem[1623] = 8'h00;
+    win_mem[1624] = 8'h00;
+    win_mem[1625] = 8'h00;
+    win_mem[1626] = 8'h00;
+    win_mem[1627] = 8'h00;
+    win_mem[1628] = 8'h00;
+    win_mem[1629] = 8'h00;
+    win_mem[1630] = 8'h00;
+    win_mem[1631] = 8'h00;
+    win_mem[1632] = 8'h00;
+    win_mem[1633] = 8'h00;
+    win_mem[1634] = 8'h00;
+    win_mem[1635] = 8'h00;
+    win_mem[1636] = 8'h00;
+    win_mem[1637] = 8'h00;
+    win_mem[1638] = 8'h00;
+    win_mem[1639] = 8'h00;
+    win_mem[1640] = 8'h00;
+    win_mem[1641] = 8'h00;
+    win_mem[1642] = 8'h00;
+    win_mem[1643] = 8'h00;
+    win_mem[1644] = 8'h00;
+    win_mem[1645] = 8'h00;
+    win_mem[1646] = 8'h00;
+    win_mem[1647] = 8'h00;
+    win_mem[1648] = 8'h00;
+    win_mem[1649] = 8'h00;
+    win_mem[1650] = 8'h00;
+    win_mem[1651] = 8'h00;
+    win_mem[1652] = 8'h00;
+    win_mem[1653] = 8'h00;
+    win_mem[1654] = 8'h00;
+    win_mem[1655] = 8'h00;
+    win_mem[1656] = 8'h00;
+    win_mem[1657] = 8'h00;
+    win_mem[1658] = 8'h00;
+    win_mem[1659] = 8'h00;
+    win_mem[1660] = 8'h00;
+    win_mem[1661] = 8'h00;
+    win_mem[1662] = 8'h00;
+    win_mem[1663] = 8'h00;
+    win_mem[1664] = 8'h00;
+    win_mem[1665] = 8'h00;
+    win_mem[1666] = 8'h00;
+    win_mem[1667] = 8'h00;
+    win_mem[1668] = 8'h00;
+    win_mem[1669] = 8'h00;
+    win_mem[1670] = 8'h00;
+    win_mem[1671] = 8'h00;
+    win_mem[1672] = 8'h00;
+    win_mem[1673] = 8'h00;
+    win_mem[1674] = 8'h00;
+    win_mem[1675] = 8'h00;
+    win_mem[1676] = 8'h00;
+    win_mem[1677] = 8'h00;
+    win_mem[1678] = 8'h00;
+    win_mem[1679] = 8'h00;
+    win_mem[1680] = 8'h00;
+    win_mem[1681] = 8'h00;
+    win_mem[1682] = 8'h00;
+    win_mem[1683] = 8'h00;
+    win_mem[1684] = 8'h00;
+    win_mem[1685] = 8'h00;
+    win_mem[1686] = 8'h00;
+    win_mem[1687] = 8'h00;
+    win_mem[1688] = 8'h00;
+    win_mem[1689] = 8'h00;
+    win_mem[1690] = 8'h00;
+    win_mem[1691] = 8'h00;
+    win_mem[1692] = 8'h00;
+    win_mem[1693] = 8'h00;
+    win_mem[1694] = 8'h00;
+    win_mem[1695] = 8'h00;
+    win_mem[1696] = 8'h00;
+    win_mem[1697] = 8'h00;
+    win_mem[1698] = 8'h00;
+    win_mem[1699] = 8'h00;
+    win_mem[1700] = 8'h00;
+    win_mem[1701] = 8'h00;
+    win_mem[1702] = 8'h00;
+    win_mem[1703] = 8'h00;
+    win_mem[1704] = 8'h00;
+    win_mem[1705] = 8'h00;
+    win_mem[1706] = 8'h00;
+    win_mem[1707] = 8'h00;
+    win_mem[1708] = 8'h00;
+    win_mem[1709] = 8'h00;
+    win_mem[1710] = 8'h00;
+    win_mem[1711] = 8'h00;
+    win_mem[1712] = 8'h00;
+    win_mem[1713] = 8'h00;
+    win_mem[1714] = 8'h00;
+    win_mem[1715] = 8'h00;
+    win_mem[1716] = 8'h00;
+    win_mem[1717] = 8'h00;
+    win_mem[1718] = 8'h00;
+    win_mem[1719] = 8'h00;
+    win_mem[1720] = 8'h00;
+    win_mem[1721] = 8'h00;
+    win_mem[1722] = 8'h00;
+    win_mem[1723] = 8'h00;
+    win_mem[1724] = 8'h00;
+    win_mem[1725] = 8'h00;
+    win_mem[1726] = 8'h00;
+    win_mem[1727] = 8'h00;
+    win_mem[1728] = 8'h00;
+    win_mem[1729] = 8'h00;
+    win_mem[1730] = 8'h00;
+    win_mem[1731] = 8'h00;
+    win_mem[1732] = 8'h00;
+    win_mem[1733] = 8'h00;
+    win_mem[1734] = 8'h00;
+    win_mem[1735] = 8'h00;
+    win_mem[1736] = 8'h00;
+    win_mem[1737] = 8'h00;
+    win_mem[1738] = 8'h00;
+    win_mem[1739] = 8'h00;
+    win_mem[1740] = 8'h00;
+    win_mem[1741] = 8'h00;
+    win_mem[1742] = 8'h00;
+    win_mem[1743] = 8'h00;
+    win_mem[1744] = 8'h00;
+    win_mem[1745] = 8'h00;
+    win_mem[1746] = 8'h00;
+    win_mem[1747] = 8'h00;
+    win_mem[1748] = 8'h00;
+    win_mem[1749] = 8'h00;
+    win_mem[1750] = 8'h00;
+    win_mem[1751] = 8'h00;
+    win_mem[1752] = 8'h00;
+    win_mem[1753] = 8'h00;
+    win_mem[1754] = 8'h00;
+    win_mem[1755] = 8'h00;
+    win_mem[1756] = 8'h00;
+    win_mem[1757] = 8'h00;
+    win_mem[1758] = 8'h00;
+    win_mem[1759] = 8'h00;
+    win_mem[1760] = 8'h00;
+    win_mem[1761] = 8'h00;
+    win_mem[1762] = 8'h00;
+    win_mem[1763] = 8'h00;
+    win_mem[1764] = 8'h00;
+    win_mem[1765] = 8'h00;
+    win_mem[1766] = 8'h00;
+    win_mem[1767] = 8'h00;
+    win_mem[1768] = 8'h00;
+    win_mem[1769] = 8'h00;
+    win_mem[1770] = 8'h00;
+    win_mem[1771] = 8'h00;
+    win_mem[1772] = 8'h00;
+    win_mem[1773] = 8'h00;
+    win_mem[1774] = 8'h00;
+    win_mem[1775] = 8'h00;
+    win_mem[1776] = 8'h00;
+    win_mem[1777] = 8'h00;
+    win_mem[1778] = 8'h00;
+    win_mem[1779] = 8'h00;
+    win_mem[1780] = 8'h00;
+    win_mem[1781] = 8'h00;
+    win_mem[1782] = 8'h00;
+    win_mem[1783] = 8'h00;
+    win_mem[1784] = 8'h00;
+    win_mem[1785] = 8'h00;
+    win_mem[1786] = 8'h00;
+    win_mem[1787] = 8'h00;
+    win_mem[1788] = 8'h00;
+    win_mem[1789] = 8'h00;
+    win_mem[1790] = 8'h00;
+    win_mem[1791] = 8'h00;
+    win_mem[1792] = 8'h00;
+    win_mem[1793] = 8'h00;
+    win_mem[1794] = 8'h00;
+    win_mem[1795] = 8'h00;
+    win_mem[1796] = 8'h00;
+    win_mem[1797] = 8'h00;
+    win_mem[1798] = 8'h00;
+    win_mem[1799] = 8'h00;
+    win_mem[1800] = 8'h00;
+    win_mem[1801] = 8'h00;
+    win_mem[1802] = 8'h00;
+    win_mem[1803] = 8'h00;
+    win_mem[1804] = 8'h00;
+    win_mem[1805] = 8'h00;
+    win_mem[1806] = 8'h00;
+    win_mem[1807] = 8'h00;
+    win_mem[1808] = 8'h00;
+    win_mem[1809] = 8'h00;
+    win_mem[1810] = 8'h00;
+    win_mem[1811] = 8'h00;
+    win_mem[1812] = 8'h00;
+    win_mem[1813] = 8'h00;
+    win_mem[1814] = 8'h00;
+    win_mem[1815] = 8'h00;
+    win_mem[1816] = 8'h00;
+    win_mem[1817] = 8'h00;
+    win_mem[1818] = 8'h00;
+    win_mem[1819] = 8'h00;
+    win_mem[1820] = 8'h00;
+    win_mem[1821] = 8'h00;
+    win_mem[1822] = 8'h00;
+    win_mem[1823] = 8'h00;
+    win_mem[1824] = 8'h00;
+    win_mem[1825] = 8'h00;
+    win_mem[1826] = 8'h00;
+    win_mem[1827] = 8'h00;
+    win_mem[1828] = 8'h00;
+    win_mem[1829] = 8'h00;
+    win_mem[1830] = 8'h00;
+    win_mem[1831] = 8'h00;
+    win_mem[1832] = 8'h00;
+    win_mem[1833] = 8'h00;
+    win_mem[1834] = 8'h00;
+    win_mem[1835] = 8'h00;
+    win_mem[1836] = 8'h00;
+    win_mem[1837] = 8'h00;
+    win_mem[1838] = 8'h00;
+    win_mem[1839] = 8'h00;
+    win_mem[1840] = 8'h00;
+    win_mem[1841] = 8'h00;
+    win_mem[1842] = 8'h00;
+    win_mem[1843] = 8'h00;
+    win_mem[1844] = 8'h00;
+    win_mem[1845] = 8'h00;
+    win_mem[1846] = 8'h00;
+    win_mem[1847] = 8'h00;
+    win_mem[1848] = 8'h00;
+    win_mem[1849] = 8'h00;
+    win_mem[1850] = 8'h00;
+    win_mem[1851] = 8'h00;
+    win_mem[1852] = 8'h00;
+    win_mem[1853] = 8'h00;
+    win_mem[1854] = 8'h00;
+    win_mem[1855] = 8'h00;
+    win_mem[1856] = 8'h00;
+    win_mem[1857] = 8'h00;
+    win_mem[1858] = 8'h00;
+    win_mem[1859] = 8'h00;
+    win_mem[1860] = 8'h00;
+    win_mem[1861] = 8'h00;
+    win_mem[1862] = 8'h00;
+    win_mem[1863] = 8'h00;
+    win_mem[1864] = 8'h00;
+    win_mem[1865] = 8'h00;
+    win_mem[1866] = 8'h00;
+    win_mem[1867] = 8'h00;
+    win_mem[1868] = 8'h00;
+    win_mem[1869] = 8'h00;
+    win_mem[1870] = 8'h00;
+    win_mem[1871] = 8'h00;
+    win_mem[1872] = 8'h00;
+    win_mem[1873] = 8'h00;
+    win_mem[1874] = 8'h00;
+    win_mem[1875] = 8'h00;
+    win_mem[1876] = 8'h00;
+    win_mem[1877] = 8'h00;
+    win_mem[1878] = 8'h00;
+    win_mem[1879] = 8'h00;
+    win_mem[1880] = 8'h00;
+    win_mem[1881] = 8'h00;
+    win_mem[1882] = 8'h00;
+    win_mem[1883] = 8'h00;
+    win_mem[1884] = 8'h00;
+    win_mem[1885] = 8'h00;
+    win_mem[1886] = 8'h00;
+    win_mem[1887] = 8'h00;
+    win_mem[1888] = 8'h00;
+    win_mem[1889] = 8'h00;
+    win_mem[1890] = 8'h00;
+    win_mem[1891] = 8'h00;
+    win_mem[1892] = 8'h00;
+    win_mem[1893] = 8'h00;
+    win_mem[1894] = 8'h00;
+    win_mem[1895] = 8'h00;
+    win_mem[1896] = 8'h00;
+    win_mem[1897] = 8'h00;
+    win_mem[1898] = 8'h00;
+    win_mem[1899] = 8'h00;
+    win_mem[1900] = 8'h00;
+    win_mem[1901] = 8'h00;
+    win_mem[1902] = 8'h00;
+    win_mem[1903] = 8'h00;
+    win_mem[1904] = 8'h00;
+    win_mem[1905] = 8'h00;
+    win_mem[1906] = 8'h00;
+    win_mem[1907] = 8'h00;
+    win_mem[1908] = 8'h00;
+    win_mem[1909] = 8'h00;
+    win_mem[1910] = 8'h00;
+    win_mem[1911] = 8'h00;
+    win_mem[1912] = 8'h00;
+    win_mem[1913] = 8'h00;
+    win_mem[1914] = 8'h00;
+    win_mem[1915] = 8'h00;
+    win_mem[1916] = 8'h00;
+    win_mem[1917] = 8'h00;
+    win_mem[1918] = 8'h00;
+    win_mem[1919] = 8'h00;
+    win_mem[1920] = 8'h00;
+    win_mem[1921] = 8'h00;
+    win_mem[1922] = 8'h00;
+    win_mem[1923] = 8'h00;
+    win_mem[1924] = 8'h00;
+    win_mem[1925] = 8'h00;
+    win_mem[1926] = 8'h00;
+    win_mem[1927] = 8'h00;
+    win_mem[1928] = 8'h00;
+    win_mem[1929] = 8'h00;
+    win_mem[1930] = 8'h00;
+    win_mem[1931] = 8'h00;
+    win_mem[1932] = 8'h00;
+    win_mem[1933] = 8'h00;
+    win_mem[1934] = 8'h00;
+    win_mem[1935] = 8'h00;
+    win_mem[1936] = 8'h00;
+    win_mem[1937] = 8'h00;
+    win_mem[1938] = 8'h00;
+    win_mem[1939] = 8'h00;
+    win_mem[1940] = 8'h00;
+    win_mem[1941] = 8'h00;
+    win_mem[1942] = 8'h00;
+    win_mem[1943] = 8'h00;
+    win_mem[1944] = 8'h00;
+    win_mem[1945] = 8'h00;
+    win_mem[1946] = 8'h00;
+    win_mem[1947] = 8'h00;
+    win_mem[1948] = 8'h00;
+    win_mem[1949] = 8'h00;
+    win_mem[1950] = 8'h00;
+    win_mem[1951] = 8'h00;
+    win_mem[1952] = 8'h00;
+    win_mem[1953] = 8'h00;
+    win_mem[1954] = 8'h00;
+    win_mem[1955] = 8'h00;
+    win_mem[1956] = 8'h00;
+    win_mem[1957] = 8'h00;
+    win_mem[1958] = 8'h00;
+    win_mem[1959] = 8'h00;
+    win_mem[1960] = 8'h00;
+    win_mem[1961] = 8'h00;
+    win_mem[1962] = 8'h00;
+    win_mem[1963] = 8'h00;
+    win_mem[1964] = 8'h00;
+    win_mem[1965] = 8'h00;
+    win_mem[1966] = 8'h00;
+    win_mem[1967] = 8'h00;
+    win_mem[1968] = 8'h00;
+    win_mem[1969] = 8'h00;
+    win_mem[1970] = 8'h00;
+    win_mem[1971] = 8'h00;
+    win_mem[1972] = 8'h00;
+    win_mem[1973] = 8'h00;
+    win_mem[1974] = 8'h00;
+    win_mem[1975] = 8'h00;
+    win_mem[1976] = 8'h00;
+    win_mem[1977] = 8'h00;
+    win_mem[1978] = 8'h00;
+    win_mem[1979] = 8'h00;
+    win_mem[1980] = 8'h00;
+    win_mem[1981] = 8'h00;
+    win_mem[1982] = 8'h00;
+    win_mem[1983] = 8'h00;
+    win_mem[1984] = 8'h00;
+    win_mem[1985] = 8'h00;
+    win_mem[1986] = 8'h00;
+    win_mem[1987] = 8'h00;
+    win_mem[1988] = 8'h00;
+    win_mem[1989] = 8'h00;
+    win_mem[1990] = 8'h00;
+    win_mem[1991] = 8'h00;
+    win_mem[1992] = 8'h00;
+    win_mem[1993] = 8'h00;
+    win_mem[1994] = 8'h00;
+    win_mem[1995] = 8'h00;
+    win_mem[1996] = 8'h00;
+    win_mem[1997] = 8'h00;
+    win_mem[1998] = 8'h00;
+    win_mem[1999] = 8'h00;
+    win_mem[2000] = 8'h00;
+    win_mem[2001] = 8'h00;
+    win_mem[2002] = 8'h00;
+    win_mem[2003] = 8'h00;
+    win_mem[2004] = 8'h00;
+    win_mem[2005] = 8'h00;
+    win_mem[2006] = 8'h00;
+    win_mem[2007] = 8'h00;
+    win_mem[2008] = 8'h00;
+    win_mem[2009] = 8'h00;
+    win_mem[2010] = 8'h00;
+    win_mem[2011] = 8'h00;
+    win_mem[2012] = 8'h00;
+    win_mem[2013] = 8'h00;
+    win_mem[2014] = 8'h00;
+    win_mem[2015] = 8'h00;
+    win_mem[2016] = 8'h00;
+    win_mem[2017] = 8'h00;
+    win_mem[2018] = 8'h00;
+    win_mem[2019] = 8'h00;
+    win_mem[2020] = 8'h00;
+    win_mem[2021] = 8'h00;
+    win_mem[2022] = 8'h00;
+    win_mem[2023] = 8'h00;
+    win_mem[2024] = 8'h00;
+    win_mem[2025] = 8'h00;
+    win_mem[2026] = 8'h00;
+    win_mem[2027] = 8'h00;
+    win_mem[2028] = 8'h00;
+    win_mem[2029] = 8'h00;
+    win_mem[2030] = 8'h00;
+    win_mem[2031] = 8'h00;
+    win_mem[2032] = 8'h00;
+    win_mem[2033] = 8'h00;
+    win_mem[2034] = 8'h00;
+    win_mem[2035] = 8'h00;
+    win_mem[2036] = 8'h00;
+    win_mem[2037] = 8'h00;
+    win_mem[2038] = 8'h00;
+    win_mem[2039] = 8'h00;
+    win_mem[2040] = 8'h00;
+    win_mem[2041] = 8'h00;
+    win_mem[2042] = 8'h00;
+    win_mem[2043] = 8'h00;
+    win_mem[2044] = 8'h00;
+    win_mem[2045] = 8'h00;
+    win_mem[2046] = 8'h00;
+    win_mem[2047] = 8'h00;
+  end
+  always @(posedge clk) begin
+    if (win_mem_w_en)
+      win_mem[win_mem_w_addr] <= win_mem_w_data;
+  end
+  reg [10:0] _0_;
+  always @(posedge clk) begin
+    _0_ <= win_mem_r_addr;
+  end
+  assign win_mem_r_data = win_mem[_0_];
+  assign _cxb0 = crc_acc[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[0];
+  assign \$2  = _cxb0 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs0 = \$1  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$2 ;
+  assign _cxb1 = _cs0[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[1];
+  assign \$4  = _cxb1 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs1 = \$3  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$4 ;
+  assign _cxb2 = _cs1[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[2];
+  assign \$6  = _cxb2 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs2 = \$5  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$6 ;
+  assign _cxb3 = _cs2[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[3];
+  assign \$8  = _cxb3 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs3 = \$7  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$8 ;
+  assign _cxb4 = _cs3[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[4];
+  assign \$10  = _cxb4 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs4 = \$9  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$10 ;
+  assign _cxb5 = _cs4[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[5];
+  assign \$12  = _cxb5 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs5 = \$11  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$12 ;
+  assign _cxb6 = _cs5[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[6];
+  assign \$14  = _cxb6 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs6 = \$13  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$14 ;
+  assign _cxb7 = _cs6[0] ^ (* src = "/home/runner/workspace/hardware/outform.py:118" *) crc_byte_in[7];
+  assign \$16  = _cxb7 ? (* src = "/home/runner/workspace/hardware/outform.py:119" *) 32'd3988292384 : 32'd0;
+  assign _cs7 = \$15  ^ (* src = "/home/runner/workspace/hardware/outform.py:119" *) \$16 ;
+  assign \$17  = | (* src = "/home/runner/workspace/hardware/outform.py:345" *) word_count_reg;
+  assign \$18  = word_count_reg - (* src = "/home/runner/workspace/hardware/outform.py:346" *) 1'h1;
+  assign \$19  = { 1'h0, word_count_reg } & (* src = "/home/runner/workspace/hardware/outform.py:346" *) \$18 ;
+  assign \$20  = ! (* src = "/home/runner/workspace/hardware/outform.py:346" *) \$19 ;
+  assign \$21  = \$17  & (* src = "/home/runner/workspace/hardware/outform.py:345" *) \$20 ;
+  assign \$22  = ! (* src = "/home/runner/workspace/hardware/outform.py:402" *) method_reg;
+  assign \$23  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:424" *) 4'h8;
+  assign \$24  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:433" *) 5'h10;
+  assign \$25  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:405" *) 2'h3;
+  assign \$27  = mint_base + (* src = "/home/runner/workspace/hardware/outform.py:407" *) \$26 ;
+  assign \$28  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:444" *) 2'h3;
+  assign \$29  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:457" *) comp_size_reg;
+  assign \$30  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:460" *) 5'h18;
+  assign \$32  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:538" *) 2'h3;
+  assign \$34  = mint_base + (* src = "/home/runner/workspace/hardware/outform.py:540" *) \$33 ;
+  assign \$37  = defl_bytes_out >= (* src = "/home/runner/workspace/hardware/outform.py:663" *) 12'h800;
+  assign \$38  = \$37  ? (* src = "/home/runner/workspace/hardware/outform.py:663" *) 32'd2048 : defl_bytes_out;
+  assign \$39  = ! (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_copy_idx;
+  assign \$40  = ! (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_copy_dist;
+  assign \$41  = defl_copy_dist > (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_hist_depth;
+  assign \$42  = \$40  | (* src = "/home/runner/workspace/hardware/outform.py:664" *) \$41 ;
+  assign \$43  = \$39  & (* src = "/home/runner/workspace/hardware/outform.py:664" *) \$42 ;
+  assign \$44  = defl_win_pos - (* src = "/home/runner/workspace/hardware/outform.py:668" *) defl_copy_dist;
+  assign \$46  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:685" *) 2'h3;
+  assign \$48  = mint_base + (* src = "/home/runner/workspace/hardware/outform.py:687" *) \$47 ;
+  assign \$49  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:762" *) 2'h3;
+  assign \$51  = mint_base + (* src = "/home/runner/workspace/hardware/outform.py:764" *) \$50 ;
+  assign \$53  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) outform_state;
+  assign \$54  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
+  assign \$55  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
+  assign \$56  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
+  assign \$57  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
+  assign \$58  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
+  assign \$59  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
+  assign \$60  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
+  assign \$61  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
+  assign \$62  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
+  assign \$63  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
+  assign \$64  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hb;
+  assign \$65  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hc;
+  assign \$66  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hd;
+  assign \$67  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'he;
+  assign \$68  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hf;
+  assign \$69  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h10;
+  assign \$70  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h11;
+  assign \$71  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h12;
+  assign \$72  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h13;
+  assign \$73  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h14;
+  assign \$74  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h15;
+  assign \$75  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h16;
+  assign \$76  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h17;
+  assign \$77  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h18;
+  assign \$78  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h19;
+  assign \$79  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h1a;
+  assign \$80  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h1b;
+  assign \$81  = outform_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h1c;
+  assign \$82  = tx_byte_cnt == (* src = "/home/runner/workspace/hardware/outform.py:278" *) 3'h5;
+  assign \$83  = tx_byte_cnt + (* src = "/home/runner/workspace/hardware/outform.py:282" *) 1'h1;
+  assign \$84  = hdr_byte_cnt + (* src = "/home/runner/workspace/hardware/outform.py:312" *) 1'h1;
+  assign \$85  = hdr_byte_cnt == (* src = "/home/runner/workspace/hardware/outform.py:313" *) 5'h1f;
+  assign \$86  = sig_reg != (* src = "/home/runner/workspace/hardware/outform.py:318" *) 27'h4034b50;
+  assign \$87  = | (* src = "/home/runner/workspace/hardware/outform.py:334" *) ucomp_size_reg[1:0];
+  assign \$89  = ~ (* src = "/home/runner/workspace/hardware/outform.py:355" *) is_pow2;
+  assign \$90  = n_computed < (* src = "/home/runner/workspace/hardware/outform.py:355" *) 3'h6;
+  assign \$91  = \$89  | (* src = "/home/runner/workspace/hardware/outform.py:355" *) \$90 ;
+  assign \$92  = n_computed > (* src = "/home/runner/workspace/hardware/outform.py:355" *) 4'he;
+  assign \$93  = \$91  | (* src = "/home/runner/workspace/hardware/outform.py:355" *) \$92 ;
+  assign \$94  = ! (* src = "/home/runner/workspace/hardware/outform.py:387" *) fname_cnt;
+  assign \$95  = fname_cnt - (* src = "/home/runner/workspace/hardware/outform.py:391" *) 1'h1;
+  assign \$96  = ! (* src = "/home/runner/workspace/hardware/outform.py:395" *) extra_cnt;
+  assign \$97  = extra_cnt - (* src = "/home/runner/workspace/hardware/outform.py:398" *) 1'h1;
+  assign \$98  = ! (* src = "/home/runner/workspace/hardware/outform.py:402" *) method_reg;
+  assign \$99  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:424" *) 4'h8;
+  assign \$100  = method_reg == (* src = "/home/runner/workspace/hardware/outform.py:433" *) 5'h10;
+  assign \$101  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:405" *) 2'h3;
+  assign \$102  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:412" *) 1'h1;
+  assign \$103  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:416" *) 1'h1;
+  assign \$104  = \$103  == (* src = "/home/runner/workspace/hardware/outform.py:416" *) total_words;
+  assign \$105  = byte_buf_cnt + (* src = "/home/runner/workspace/hardware/outform.py:423" *) 1'h1;
+  assign \$106  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:444" *) 2'h3;
+  assign \$107  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:457" *) comp_size_reg;
+  assign \$108  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:460" *) 5'h18;
+  assign \$111  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:450" *) 2'h3;
+  assign \$112  = btype == (* src = "/home/runner/workspace/hardware/outform.py:452" *) 1'h1;
+  assign \$113  = 1'h0 << (* src = "/home/runner/workspace/hardware/outform.py:462" *) defl_bit_cnt[4:0];
+  assign \$114  = { 7'h00, defl_bits } | (* src = "/home/runner/workspace/hardware/outform.py:462" *) \$113 ;
+  assign \$115  = defl_bit_cnt + (* src = "/home/runner/workspace/hardware/outform.py:463" *) 4'h8;
+  assign \$116  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:464" *) 1'h1;
+  assign \$117  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:469" *) 3'h7;
+  assign \$118  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6] } <= (* src = "/home/runner/workspace/hardware/outform.py:469" *) 5'h17;
+  assign \$119  = \$117  & (* src = "/home/runner/workspace/hardware/outform.py:469" *) \$118 ;
+  assign \$120  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:487" *) 4'h8;
+  assign \$121  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } >= (* src = "/home/runner/workspace/hardware/outform.py:487" *) 6'h30;
+  assign \$122  = \$120  & (* src = "/home/runner/workspace/hardware/outform.py:487" *) \$121 ;
+  assign \$123  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } <= (* src = "/home/runner/workspace/hardware/outform.py:487" *) 8'hbf;
+  assign \$124  = \$122  & (* src = "/home/runner/workspace/hardware/outform.py:487" *) \$123 ;
+  assign \$125  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:494" *) 4'h8;
+  assign \$126  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } >= (* src = "/home/runner/workspace/hardware/outform.py:494" *) 8'hc0;
+  assign \$127  = \$125  & (* src = "/home/runner/workspace/hardware/outform.py:494" *) \$126 ;
+  assign \$128  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } <= (* src = "/home/runner/workspace/hardware/outform.py:494" *) 8'hc5;
+  assign \$129  = \$127  & (* src = "/home/runner/workspace/hardware/outform.py:494" *) \$128 ;
+  assign \$130  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:502" *) 4'h8;
+  assign \$131  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } >= (* src = "/home/runner/workspace/hardware/outform.py:502" *) 8'hc6;
+  assign \$132  = \$130  & (* src = "/home/runner/workspace/hardware/outform.py:502" *) \$131 ;
+  assign \$133  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } <= (* src = "/home/runner/workspace/hardware/outform.py:502" *) 8'hc7;
+  assign \$134  = \$132  & (* src = "/home/runner/workspace/hardware/outform.py:502" *) \$133 ;
+  assign \$135  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:505" *) 4'h9;
+  assign \$136  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7], defl_bits[8] } >= (* src = "/home/runner/workspace/hardware/outform.py:505" *) 9'h190;
+  assign \$137  = \$135  & (* src = "/home/runner/workspace/hardware/outform.py:505" *) \$136 ;
+  assign \$138  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7], defl_bits[8] } <= (* src = "/home/runner/workspace/hardware/outform.py:505" *) 9'h1ff;
+  assign \$139  = \$137  & (* src = "/home/runner/workspace/hardware/outform.py:505" *) \$138 ;
+  assign \$140  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:512" *) 4'h9;
+  assign \$141  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:515" *) comp_size_reg;
+  assign \$142  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:518" *) 5'h18;
+  assign \$144  = 9'h100 + (* src = "/home/runner/workspace/hardware/outform.py:471" *) { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6] };
+  assign \$146  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:473" *) 3'h7;
+  assign \$147  = ! (* src = "/home/runner/workspace/hardware/outform.py:475" *) { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6] };
+  assign \$148  = wr_word_cnt == (* src = "/home/runner/workspace/hardware/outform.py:477" *) total_words;
+  assign \$149  = ! (* src = "/home/runner/workspace/hardware/outform.py:477" *) byte_buf_cnt;
+  assign \$150  = \$148  & (* src = "/home/runner/workspace/hardware/outform.py:477" *) \$149 ;
+  assign \$151  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6] } - (* src = "/home/runner/workspace/hardware/outform.py:485" *) 1'h1;
+  assign \$152  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } - (* src = "/home/runner/workspace/hardware/outform.py:489" *) 6'h30;
+  assign \$154  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:491" *) 4'h8;
+  assign \$155  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } - (* src = "/home/runner/workspace/hardware/outform.py:496" *) 8'hc0;
+  assign \$156  = $signed(\$155 ) + (* src = "/home/runner/workspace/hardware/outform.py:496" *) $signed(10'h118);
+  assign \$157  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] } - (* src = "/home/runner/workspace/hardware/outform.py:497" *) 8'hc0;
+  assign \$158  = $signed(\$157 ) + (* src = "/home/runner/workspace/hardware/outform.py:497" *) $signed(6'h17);
+  assign \$160  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:499" *) 4'h8;
+  assign \$161  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7], defl_bits[8] } - (* src = "/home/runner/workspace/hardware/outform.py:507" *) 9'h190;
+  assign \$162  = $signed(\$161 ) + (* src = "/home/runner/workspace/hardware/outform.py:507" *) $signed(9'h090);
+  assign \$164  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:509" *) 4'h9;
+  assign \$165  = 1'h0 << (* src = "/home/runner/workspace/hardware/outform.py:520" *) defl_bit_cnt[4:0];
+  assign \$166  = { 7'h00, defl_bits } | (* src = "/home/runner/workspace/hardware/outform.py:520" *) \$165 ;
+  assign \$167  = defl_bit_cnt + (* src = "/home/runner/workspace/hardware/outform.py:521" *) 4'h8;
+  assign \$168  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:522" *) 1'h1;
+  assign \$169  = defl_win_pos + (* src = "/home/runner/workspace/hardware/outform.py:535" *) 1'h1;
+  assign \$170  = defl_bytes_out + (* src = "/home/runner/workspace/hardware/outform.py:536" *) 1'h1;
+  assign \$171  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:538" *) 2'h3;
+  assign \$172  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:545" *) 1'h1;
+  assign \$173  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:549" *) 1'h1;
+  assign \$174  = \$173  == (* src = "/home/runner/workspace/hardware/outform.py:549" *) total_words;
+  assign \$175  = byte_buf_cnt + (* src = "/home/runner/workspace/hardware/outform.py:558" *) 1'h1;
+  assign \$176  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:565" *) len_extra_needed;
+  assign \$177  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:600" *) comp_size_reg;
+  assign \$178  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:603" *) 5'h18;
+  assign \$182  = \$181  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[0];
+  assign \$184  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:573" *) 1'h1;
+  assign \$186  = \$185  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[1:0];
+  assign \$188  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:579" *) 2'h2;
+  assign \$190  = \$189  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[2:0];
+  assign \$192  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:585" *) 2'h3;
+  assign \$194  = \$193  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[3:0];
+  assign \$196  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:591" *) 3'h4;
+  assign \$198  = \$197  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[4:0];
+  assign \$200  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:597" *) 3'h5;
+  assign \$201  = 1'h0 << (* src = "/home/runner/workspace/hardware/outform.py:605" *) defl_bit_cnt[4:0];
+  assign \$202  = { 7'h00, defl_bits } | (* src = "/home/runner/workspace/hardware/outform.py:605" *) \$201 ;
+  assign \$203  = defl_bit_cnt + (* src = "/home/runner/workspace/hardware/outform.py:606" *) 4'h8;
+  assign \$204  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:607" *) 1'h1;
+  assign \$205  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:612" *) 3'h5;
+  assign \$206  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:623" *) comp_size_reg;
+  assign \$207  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:626" *) 5'h18;
+  assign \$210  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:616" *) 3'h5;
+  assign \$211  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4] } > (* src = "/home/runner/workspace/hardware/outform.py:618" *) 5'h15;
+  assign \$212  = 1'h0 << (* src = "/home/runner/workspace/hardware/outform.py:628" *) defl_bit_cnt[4:0];
+  assign \$213  = { 7'h00, defl_bits } | (* src = "/home/runner/workspace/hardware/outform.py:628" *) \$212 ;
+  assign \$214  = defl_bit_cnt + (* src = "/home/runner/workspace/hardware/outform.py:629" *) 4'h8;
+  assign \$215  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:630" *) 1'h1;
+  assign \$216  = defl_bit_cnt >= (* src = "/home/runner/workspace/hardware/outform.py:637" *) dist_extra_needed;
+  assign \$217  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:650" *) comp_size_reg;
+  assign \$218  = defl_bit_cnt <= (* src = "/home/runner/workspace/hardware/outform.py:653" *) 5'h18;
+  assign \$222  = \$221  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[0];
+  assign \$224  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 1'h1;
+  assign \$226  = \$225  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[1:0];
+  assign \$228  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 2'h2;
+  assign \$230  = \$229  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[2:0];
+  assign \$232  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 2'h3;
+  assign \$234  = \$233  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[3:0];
+  assign \$236  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 3'h4;
+  assign \$238  = \$237  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[4:0];
+  assign \$240  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 3'h5;
+  assign \$242  = \$241  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[5:0];
+  assign \$244  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 3'h6;
+  assign \$246  = \$245  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[6:0];
+  assign \$248  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 3'h7;
+  assign \$250  = \$249  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[7:0];
+  assign \$252  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 4'h8;
+  assign \$254  = \$253  + (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ast.py:2423" *) defl_bits[8:0];
+  assign \$256  = defl_bit_cnt - (* src = "/home/runner/workspace/hardware/outform.py:646" *) 4'h9;
+  assign \$257  = 1'h0 << (* src = "/home/runner/workspace/hardware/outform.py:655" *) defl_bit_cnt[4:0];
+  assign \$258  = { 7'h00, defl_bits } | (* src = "/home/runner/workspace/hardware/outform.py:655" *) \$257 ;
+  assign \$259  = defl_bit_cnt + (* src = "/home/runner/workspace/hardware/outform.py:656" *) 4'h8;
+  assign \$260  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:657" *) 1'h1;
+  assign \$261  = ! (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_copy_idx;
+  assign \$262  = ! (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_copy_dist;
+  assign \$263  = defl_copy_dist > (* src = "/home/runner/workspace/hardware/outform.py:664" *) defl_hist_depth;
+  assign \$264  = \$262  | (* src = "/home/runner/workspace/hardware/outform.py:664" *) \$263 ;
+  assign \$265  = \$261  & (* src = "/home/runner/workspace/hardware/outform.py:664" *) \$264 ;
+  assign \$266  = defl_win_pos + (* src = "/home/runner/workspace/hardware/outform.py:681" *) 1'h1;
+  assign \$267  = defl_bytes_out + (* src = "/home/runner/workspace/hardware/outform.py:682" *) 1'h1;
+  assign \$268  = defl_copy_idx + (* src = "/home/runner/workspace/hardware/outform.py:683" *) 1'h1;
+  assign \$269  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:685" *) 2'h3;
+  assign \$270  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:692" *) 1'h1;
+  assign \$271  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:696" *) 1'h1;
+  assign \$272  = \$271  == (* src = "/home/runner/workspace/hardware/outform.py:696" *) total_words;
+  assign \$273  = defl_copy_idx + (* src = "/home/runner/workspace/hardware/outform.py:698" *) 1'h1;
+  assign \$274  = \$273  >= (* src = "/home/runner/workspace/hardware/outform.py:698" *) defl_copy_len;
+  assign \$275  = byte_buf_cnt + (* src = "/home/runner/workspace/hardware/outform.py:707" *) 1'h1;
+  assign \$276  = defl_copy_idx + (* src = "/home/runner/workspace/hardware/outform.py:708" *) 1'h1;
+  assign \$277  = \$276  >= (* src = "/home/runner/workspace/hardware/outform.py:708" *) defl_copy_len;
+  assign \$278  = defl_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:715" *) comp_size_reg;
+  assign \$279  = defl_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:718" *) 1'h1;
+  assign \$280  = rle_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:724" *) comp_size_reg;
+  assign \$281  = wr_word_cnt == (* src = "/home/runner/workspace/hardware/outform.py:725" *) total_words;
+  assign \$282  = ! (* src = "/home/runner/workspace/hardware/outform.py:725" *) byte_buf_cnt;
+  assign \$283  = \$281  & (* src = "/home/runner/workspace/hardware/outform.py:725" *) \$282 ;
+  assign \$284  = rle_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:733" *) 1'h1;
+  assign \$285  = rle_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:739" *) comp_size_reg;
+  assign \$286  = rle_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:746" *) 1'h1;
+  assign \$287  = ! (* src = "/home/runner/workspace/hardware/outform.py:748" *) rle_count;
+  assign \$288  = rle_remaining - (* src = "/home/runner/workspace/hardware/outform.py:760" *) 1'h1;
+  assign \$289  = byte_buf_cnt == (* src = "/home/runner/workspace/hardware/outform.py:762" *) 2'h3;
+  assign \$290  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:769" *) 1'h1;
+  assign \$291  = wr_word_cnt + (* src = "/home/runner/workspace/hardware/outform.py:773" *) 1'h1;
+  assign \$292  = \$291  == (* src = "/home/runner/workspace/hardware/outform.py:773" *) total_words;
+  assign \$293  = rle_remaining <= (* src = "/home/runner/workspace/hardware/outform.py:775" *) 1'h1;
+  assign \$294  = byte_buf_cnt + (* src = "/home/runner/workspace/hardware/outform.py:784" *) 1'h1;
+  assign \$295  = rle_remaining <= (* src = "/home/runner/workspace/hardware/outform.py:785" *) 1'h1;
+  assign \$296  = rle_rx_count >= (* src = "/home/runner/workspace/hardware/outform.py:790" *) comp_size_reg;
+  assign \$297  = rle_rx_count + (* src = "/home/runner/workspace/hardware/outform.py:793" *) 1'h1;
+  assign \$298  = crc_final != (* src = "/home/runner/workspace/hardware/outform.py:801" *) crc32_stored;
   (* src = "/home/runner/workspace/hardware/outform.py:126" *)
   always @(posedge clk)
-    byte_buf <= \$87 ;
+    hdr_byte_cnt <= \$299 ;
   (* src = "/home/runner/workspace/hardware/outform.py:127" *)
   always @(posedge clk)
-    byte_buf_cnt <= \$88 ;
+    tx_byte_cnt <= \$300 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:128" *)
+  always @(posedge clk)
+    fname_cnt <= \$301 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:129" *)
+  always @(posedge clk)
+    extra_cnt <= \$302 ;
   (* src = "/home/runner/workspace/hardware/outform.py:131" *)
   always @(posedge clk)
-    result_gt <= \$89 ;
+    sig_reg <= \$303 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:132" *)
+  always @(posedge clk)
+    flags_reg <= \$304 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:133" *)
+  always @(posedge clk)
+    method_reg <= \$305 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:134" *)
+  always @(posedge clk)
+    crc32_stored <= \$306 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:135" *)
+  always @(posedge clk)
+    comp_size_reg <= \$307 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:136" *)
+  always @(posedge clk)
+    ucomp_size_reg <= \$308 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:137" *)
+  always @(posedge clk)
+    fname_len_reg <= \$309 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:138" *)
+  always @(posedge clk)
+    extra_len_reg <= \$310 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:140" *)
+  always @(posedge clk)
+    word_count_reg <= \$311 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:141" *)
+  always @(posedge clk)
+    mint_n <= \$312 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:142" *)
+  always @(posedge clk)
+    total_words <= \$313 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:154" *)
+  always @(posedge clk)
+    crc_acc <= \$314 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:145" *)
+  always @(posedge clk)
+    wr_word_cnt <= \$315 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:146" *)
+  always @(posedge clk)
+    byte_buf <= \$316 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:147" *)
+  always @(posedge clk)
+    byte_buf_cnt <= \$317 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:149" *)
+  always @(posedge clk)
+    result_gt <= \$318 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:170" *)
+  always @(posedge clk)
+    defl_bits <= \$319 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:171" *)
+  always @(posedge clk)
+    defl_bit_cnt <= \$320 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:172" *)
+  always @(posedge clk)
+    defl_bfinal <= \$321 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:173" *)
+  always @(posedge clk)
+    defl_symbol <= \$322 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:174" *)
+  always @(posedge clk)
+    defl_copy_len <= \$323 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:175" *)
+  always @(posedge clk)
+    defl_copy_dist <= \$324 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:176" *)
+  always @(posedge clk)
+    defl_copy_idx <= \$325 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:177" *)
+  always @(posedge clk)
+    defl_win_pos <= \$326 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:178" *)
+  always @(posedge clk)
+    defl_len_idx <= \$327 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:179" *)
+  always @(posedge clk)
+    defl_dist_code <= \$328 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:184" *)
+  always @(posedge clk)
+    rle_count <= \$329 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:185" *)
+  always @(posedge clk)
+    rle_literal <= \$330 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:186" *)
+  always @(posedge clk)
+    rle_remaining <= \$331 ;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
-    outform_state <= \$90 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:56" *)
+    outform_state <= \$332 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:82" *)
   always @(posedge clk)
-    outform_fault_type <= \$91 ;
-  (* src = "/home/runner/workspace/hardware/outform.py:124" *)
+    outform_fault_type <= \$333 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:144" *)
   always @(posedge clk)
-    mint_base <= \$92 ;
-  assign \$2  = _cxb0 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
-  assign _cs0 = \$1  ^ (* src = "/home/runner/workspace/hardware/outform.py:99" *) \$2 ;
-  assign \$4  = _cxb1 ? (* src = "/home/runner/workspace/hardware/outform.py:99" *) 32'd3988292384 : 32'd0;
+    mint_base <= \$334 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:181" *)
+  always @(posedge clk)
+    defl_bytes_out <= \$335 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:180" *)
+  always @(posedge clk)
+    defl_rx_count <= \$336 ;
+  (* src = "/home/runner/workspace/hardware/outform.py:182" *)
+  always @(posedge clk)
+    rle_rx_count <= \$337 ;
   assign \$auto$rtlil.cc:2739:Not$2  = ~ crc_acc;
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$35  = 3'h0;
+    casez (defl_len_idx)
+      5'h00:
+          \$35  = 3'h0;
+      5'h01:
+          \$35  = 3'h0;
+      5'h02:
+          \$35  = 3'h0;
+      5'h03:
+          \$35  = 3'h0;
+      5'h04:
+          \$35  = 3'h0;
+      5'h05:
+          \$35  = 3'h0;
+      5'h06:
+          \$35  = 3'h0;
+      5'h07:
+          \$35  = 3'h0;
+      5'h08:
+          \$35  = 3'h1;
+      5'h09:
+          \$35  = 3'h1;
+      5'h0a:
+          \$35  = 3'h1;
+      5'h0b:
+          \$35  = 3'h1;
+      5'h0c:
+          \$35  = 3'h2;
+      5'h0d:
+          \$35  = 3'h2;
+      5'h0e:
+          \$35  = 3'h2;
+      5'h0f:
+          \$35  = 3'h2;
+      5'h10:
+          \$35  = 3'h3;
+      5'h11:
+          \$35  = 3'h3;
+      5'h12:
+          \$35  = 3'h3;
+      5'h13:
+          \$35  = 3'h3;
+      5'h14:
+          \$35  = 3'h4;
+      5'h15:
+          \$35  = 3'h4;
+      5'h16:
+          \$35  = 3'h4;
+      5'h17:
+          \$35  = 3'h4;
+      5'h18:
+          \$35  = 3'h5;
+      5'h19:
+          \$35  = 3'h5;
+      5'h1a:
+          \$35  = 3'h5;
+      5'h1b:
+          \$35  = 3'h5;
+      5'h1c:
+          \$35  = 3'h0;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$36  = 4'h0;
+    casez (defl_dist_code)
+      5'h00:
+          \$36  = 4'h0;
+      5'h01:
+          \$36  = 4'h0;
+      5'h02:
+          \$36  = 4'h0;
+      5'h03:
+          \$36  = 4'h0;
+      5'h04:
+          \$36  = 4'h1;
+      5'h05:
+          \$36  = 4'h1;
+      5'h06:
+          \$36  = 4'h2;
+      5'h07:
+          \$36  = 4'h2;
+      5'h08:
+          \$36  = 4'h3;
+      5'h09:
+          \$36  = 4'h3;
+      5'h0a:
+          \$36  = 4'h4;
+      5'h0b:
+          \$36  = 4'h4;
+      5'h0c:
+          \$36  = 4'h5;
+      5'h0d:
+          \$36  = 4'h5;
+      5'h0e:
+          \$36  = 4'h6;
+      5'h0f:
+          \$36  = 4'h6;
+      5'h10:
+          \$36  = 4'h7;
+      5'h11:
+          \$36  = 4'h7;
+      5'h12:
+          \$36  = 4'h8;
+      5'h13:
+          \$36  = 4'h8;
+      5'h14:
+          \$36  = 4'h9;
+      5'h15:
+          \$36  = 4'h9;
+      5'h16:
+          \$36  = 4'ha;
+      5'h17:
+          \$36  = 4'ha;
+      5'h18:
+          \$36  = 4'hb;
+      5'h19:
+          \$36  = 4'hb;
+      5'h1a:
+          \$36  = 4'hc;
+      5'h1b:
+          \$36  = 4'hc;
+      5'h1c:
+          \$36  = 4'hd;
+      5'h1d:
+          \$36  = 4'hd;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$180  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$180  = 9'h003;
+      5'h01:
+          \$180  = 9'h004;
+      5'h02:
+          \$180  = 9'h005;
+      5'h03:
+          \$180  = 9'h006;
+      5'h04:
+          \$180  = 9'h007;
+      5'h05:
+          \$180  = 9'h008;
+      5'h06:
+          \$180  = 9'h009;
+      5'h07:
+          \$180  = 9'h00a;
+      5'h08:
+          \$180  = 9'h00b;
+      5'h09:
+          \$180  = 9'h00d;
+      5'h0a:
+          \$180  = 9'h00f;
+      5'h0b:
+          \$180  = 9'h011;
+      5'h0c:
+          \$180  = 9'h013;
+      5'h0d:
+          \$180  = 9'h017;
+      5'h0e:
+          \$180  = 9'h01b;
+      5'h0f:
+          \$180  = 9'h01f;
+      5'h10:
+          \$180  = 9'h023;
+      5'h11:
+          \$180  = 9'h02b;
+      5'h12:
+          \$180  = 9'h033;
+      5'h13:
+          \$180  = 9'h03b;
+      5'h14:
+          \$180  = 9'h043;
+      5'h15:
+          \$180  = 9'h053;
+      5'h16:
+          \$180  = 9'h063;
+      5'h17:
+          \$180  = 9'h073;
+      5'h18:
+          \$180  = 9'h083;
+      5'h19:
+          \$180  = 9'h0a3;
+      5'h1a:
+          \$180  = 9'h0c3;
+      5'h1b:
+          \$180  = 9'h0e3;
+      5'h1c:
+          \$180  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$181  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$181  = 9'h003;
+      5'h01:
+          \$181  = 9'h004;
+      5'h02:
+          \$181  = 9'h005;
+      5'h03:
+          \$181  = 9'h006;
+      5'h04:
+          \$181  = 9'h007;
+      5'h05:
+          \$181  = 9'h008;
+      5'h06:
+          \$181  = 9'h009;
+      5'h07:
+          \$181  = 9'h00a;
+      5'h08:
+          \$181  = 9'h00b;
+      5'h09:
+          \$181  = 9'h00d;
+      5'h0a:
+          \$181  = 9'h00f;
+      5'h0b:
+          \$181  = 9'h011;
+      5'h0c:
+          \$181  = 9'h013;
+      5'h0d:
+          \$181  = 9'h017;
+      5'h0e:
+          \$181  = 9'h01b;
+      5'h0f:
+          \$181  = 9'h01f;
+      5'h10:
+          \$181  = 9'h023;
+      5'h11:
+          \$181  = 9'h02b;
+      5'h12:
+          \$181  = 9'h033;
+      5'h13:
+          \$181  = 9'h03b;
+      5'h14:
+          \$181  = 9'h043;
+      5'h15:
+          \$181  = 9'h053;
+      5'h16:
+          \$181  = 9'h063;
+      5'h17:
+          \$181  = 9'h073;
+      5'h18:
+          \$181  = 9'h083;
+      5'h19:
+          \$181  = 9'h0a3;
+      5'h1a:
+          \$181  = 9'h0c3;
+      5'h1b:
+          \$181  = 9'h0e3;
+      5'h1c:
+          \$181  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$185  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$185  = 9'h003;
+      5'h01:
+          \$185  = 9'h004;
+      5'h02:
+          \$185  = 9'h005;
+      5'h03:
+          \$185  = 9'h006;
+      5'h04:
+          \$185  = 9'h007;
+      5'h05:
+          \$185  = 9'h008;
+      5'h06:
+          \$185  = 9'h009;
+      5'h07:
+          \$185  = 9'h00a;
+      5'h08:
+          \$185  = 9'h00b;
+      5'h09:
+          \$185  = 9'h00d;
+      5'h0a:
+          \$185  = 9'h00f;
+      5'h0b:
+          \$185  = 9'h011;
+      5'h0c:
+          \$185  = 9'h013;
+      5'h0d:
+          \$185  = 9'h017;
+      5'h0e:
+          \$185  = 9'h01b;
+      5'h0f:
+          \$185  = 9'h01f;
+      5'h10:
+          \$185  = 9'h023;
+      5'h11:
+          \$185  = 9'h02b;
+      5'h12:
+          \$185  = 9'h033;
+      5'h13:
+          \$185  = 9'h03b;
+      5'h14:
+          \$185  = 9'h043;
+      5'h15:
+          \$185  = 9'h053;
+      5'h16:
+          \$185  = 9'h063;
+      5'h17:
+          \$185  = 9'h073;
+      5'h18:
+          \$185  = 9'h083;
+      5'h19:
+          \$185  = 9'h0a3;
+      5'h1a:
+          \$185  = 9'h0c3;
+      5'h1b:
+          \$185  = 9'h0e3;
+      5'h1c:
+          \$185  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$189  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$189  = 9'h003;
+      5'h01:
+          \$189  = 9'h004;
+      5'h02:
+          \$189  = 9'h005;
+      5'h03:
+          \$189  = 9'h006;
+      5'h04:
+          \$189  = 9'h007;
+      5'h05:
+          \$189  = 9'h008;
+      5'h06:
+          \$189  = 9'h009;
+      5'h07:
+          \$189  = 9'h00a;
+      5'h08:
+          \$189  = 9'h00b;
+      5'h09:
+          \$189  = 9'h00d;
+      5'h0a:
+          \$189  = 9'h00f;
+      5'h0b:
+          \$189  = 9'h011;
+      5'h0c:
+          \$189  = 9'h013;
+      5'h0d:
+          \$189  = 9'h017;
+      5'h0e:
+          \$189  = 9'h01b;
+      5'h0f:
+          \$189  = 9'h01f;
+      5'h10:
+          \$189  = 9'h023;
+      5'h11:
+          \$189  = 9'h02b;
+      5'h12:
+          \$189  = 9'h033;
+      5'h13:
+          \$189  = 9'h03b;
+      5'h14:
+          \$189  = 9'h043;
+      5'h15:
+          \$189  = 9'h053;
+      5'h16:
+          \$189  = 9'h063;
+      5'h17:
+          \$189  = 9'h073;
+      5'h18:
+          \$189  = 9'h083;
+      5'h19:
+          \$189  = 9'h0a3;
+      5'h1a:
+          \$189  = 9'h0c3;
+      5'h1b:
+          \$189  = 9'h0e3;
+      5'h1c:
+          \$189  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$193  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$193  = 9'h003;
+      5'h01:
+          \$193  = 9'h004;
+      5'h02:
+          \$193  = 9'h005;
+      5'h03:
+          \$193  = 9'h006;
+      5'h04:
+          \$193  = 9'h007;
+      5'h05:
+          \$193  = 9'h008;
+      5'h06:
+          \$193  = 9'h009;
+      5'h07:
+          \$193  = 9'h00a;
+      5'h08:
+          \$193  = 9'h00b;
+      5'h09:
+          \$193  = 9'h00d;
+      5'h0a:
+          \$193  = 9'h00f;
+      5'h0b:
+          \$193  = 9'h011;
+      5'h0c:
+          \$193  = 9'h013;
+      5'h0d:
+          \$193  = 9'h017;
+      5'h0e:
+          \$193  = 9'h01b;
+      5'h0f:
+          \$193  = 9'h01f;
+      5'h10:
+          \$193  = 9'h023;
+      5'h11:
+          \$193  = 9'h02b;
+      5'h12:
+          \$193  = 9'h033;
+      5'h13:
+          \$193  = 9'h03b;
+      5'h14:
+          \$193  = 9'h043;
+      5'h15:
+          \$193  = 9'h053;
+      5'h16:
+          \$193  = 9'h063;
+      5'h17:
+          \$193  = 9'h073;
+      5'h18:
+          \$193  = 9'h083;
+      5'h19:
+          \$193  = 9'h0a3;
+      5'h1a:
+          \$193  = 9'h0c3;
+      5'h1b:
+          \$193  = 9'h0e3;
+      5'h1c:
+          \$193  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$197  = 9'h000;
+    casez (defl_len_idx)
+      5'h00:
+          \$197  = 9'h003;
+      5'h01:
+          \$197  = 9'h004;
+      5'h02:
+          \$197  = 9'h005;
+      5'h03:
+          \$197  = 9'h006;
+      5'h04:
+          \$197  = 9'h007;
+      5'h05:
+          \$197  = 9'h008;
+      5'h06:
+          \$197  = 9'h009;
+      5'h07:
+          \$197  = 9'h00a;
+      5'h08:
+          \$197  = 9'h00b;
+      5'h09:
+          \$197  = 9'h00d;
+      5'h0a:
+          \$197  = 9'h00f;
+      5'h0b:
+          \$197  = 9'h011;
+      5'h0c:
+          \$197  = 9'h013;
+      5'h0d:
+          \$197  = 9'h017;
+      5'h0e:
+          \$197  = 9'h01b;
+      5'h0f:
+          \$197  = 9'h01f;
+      5'h10:
+          \$197  = 9'h023;
+      5'h11:
+          \$197  = 9'h02b;
+      5'h12:
+          \$197  = 9'h033;
+      5'h13:
+          \$197  = 9'h03b;
+      5'h14:
+          \$197  = 9'h043;
+      5'h15:
+          \$197  = 9'h053;
+      5'h16:
+          \$197  = 9'h063;
+      5'h17:
+          \$197  = 9'h073;
+      5'h18:
+          \$197  = 9'h083;
+      5'h19:
+          \$197  = 9'h0a3;
+      5'h1a:
+          \$197  = 9'h0c3;
+      5'h1b:
+          \$197  = 9'h0e3;
+      5'h1c:
+          \$197  = 9'h102;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$220  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$220  = 15'h0001;
+      5'h01:
+          \$220  = 15'h0002;
+      5'h02:
+          \$220  = 15'h0003;
+      5'h03:
+          \$220  = 15'h0004;
+      5'h04:
+          \$220  = 15'h0005;
+      5'h05:
+          \$220  = 15'h0007;
+      5'h06:
+          \$220  = 15'h0009;
+      5'h07:
+          \$220  = 15'h000d;
+      5'h08:
+          \$220  = 15'h0011;
+      5'h09:
+          \$220  = 15'h0019;
+      5'h0a:
+          \$220  = 15'h0021;
+      5'h0b:
+          \$220  = 15'h0031;
+      5'h0c:
+          \$220  = 15'h0041;
+      5'h0d:
+          \$220  = 15'h0061;
+      5'h0e:
+          \$220  = 15'h0081;
+      5'h0f:
+          \$220  = 15'h00c1;
+      5'h10:
+          \$220  = 15'h0101;
+      5'h11:
+          \$220  = 15'h0181;
+      5'h12:
+          \$220  = 15'h0201;
+      5'h13:
+          \$220  = 15'h0301;
+      5'h14:
+          \$220  = 15'h0401;
+      5'h15:
+          \$220  = 15'h0601;
+      5'h16:
+          \$220  = 15'h0801;
+      5'h17:
+          \$220  = 15'h0c01;
+      5'h18:
+          \$220  = 15'h1001;
+      5'h19:
+          \$220  = 15'h1801;
+      5'h1a:
+          \$220  = 15'h2001;
+      5'h1b:
+          \$220  = 15'h3001;
+      5'h1c:
+          \$220  = 15'h4001;
+      5'h1d:
+          \$220  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$221  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$221  = 15'h0001;
+      5'h01:
+          \$221  = 15'h0002;
+      5'h02:
+          \$221  = 15'h0003;
+      5'h03:
+          \$221  = 15'h0004;
+      5'h04:
+          \$221  = 15'h0005;
+      5'h05:
+          \$221  = 15'h0007;
+      5'h06:
+          \$221  = 15'h0009;
+      5'h07:
+          \$221  = 15'h000d;
+      5'h08:
+          \$221  = 15'h0011;
+      5'h09:
+          \$221  = 15'h0019;
+      5'h0a:
+          \$221  = 15'h0021;
+      5'h0b:
+          \$221  = 15'h0031;
+      5'h0c:
+          \$221  = 15'h0041;
+      5'h0d:
+          \$221  = 15'h0061;
+      5'h0e:
+          \$221  = 15'h0081;
+      5'h0f:
+          \$221  = 15'h00c1;
+      5'h10:
+          \$221  = 15'h0101;
+      5'h11:
+          \$221  = 15'h0181;
+      5'h12:
+          \$221  = 15'h0201;
+      5'h13:
+          \$221  = 15'h0301;
+      5'h14:
+          \$221  = 15'h0401;
+      5'h15:
+          \$221  = 15'h0601;
+      5'h16:
+          \$221  = 15'h0801;
+      5'h17:
+          \$221  = 15'h0c01;
+      5'h18:
+          \$221  = 15'h1001;
+      5'h19:
+          \$221  = 15'h1801;
+      5'h1a:
+          \$221  = 15'h2001;
+      5'h1b:
+          \$221  = 15'h3001;
+      5'h1c:
+          \$221  = 15'h4001;
+      5'h1d:
+          \$221  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$225  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$225  = 15'h0001;
+      5'h01:
+          \$225  = 15'h0002;
+      5'h02:
+          \$225  = 15'h0003;
+      5'h03:
+          \$225  = 15'h0004;
+      5'h04:
+          \$225  = 15'h0005;
+      5'h05:
+          \$225  = 15'h0007;
+      5'h06:
+          \$225  = 15'h0009;
+      5'h07:
+          \$225  = 15'h000d;
+      5'h08:
+          \$225  = 15'h0011;
+      5'h09:
+          \$225  = 15'h0019;
+      5'h0a:
+          \$225  = 15'h0021;
+      5'h0b:
+          \$225  = 15'h0031;
+      5'h0c:
+          \$225  = 15'h0041;
+      5'h0d:
+          \$225  = 15'h0061;
+      5'h0e:
+          \$225  = 15'h0081;
+      5'h0f:
+          \$225  = 15'h00c1;
+      5'h10:
+          \$225  = 15'h0101;
+      5'h11:
+          \$225  = 15'h0181;
+      5'h12:
+          \$225  = 15'h0201;
+      5'h13:
+          \$225  = 15'h0301;
+      5'h14:
+          \$225  = 15'h0401;
+      5'h15:
+          \$225  = 15'h0601;
+      5'h16:
+          \$225  = 15'h0801;
+      5'h17:
+          \$225  = 15'h0c01;
+      5'h18:
+          \$225  = 15'h1001;
+      5'h19:
+          \$225  = 15'h1801;
+      5'h1a:
+          \$225  = 15'h2001;
+      5'h1b:
+          \$225  = 15'h3001;
+      5'h1c:
+          \$225  = 15'h4001;
+      5'h1d:
+          \$225  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$229  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$229  = 15'h0001;
+      5'h01:
+          \$229  = 15'h0002;
+      5'h02:
+          \$229  = 15'h0003;
+      5'h03:
+          \$229  = 15'h0004;
+      5'h04:
+          \$229  = 15'h0005;
+      5'h05:
+          \$229  = 15'h0007;
+      5'h06:
+          \$229  = 15'h0009;
+      5'h07:
+          \$229  = 15'h000d;
+      5'h08:
+          \$229  = 15'h0011;
+      5'h09:
+          \$229  = 15'h0019;
+      5'h0a:
+          \$229  = 15'h0021;
+      5'h0b:
+          \$229  = 15'h0031;
+      5'h0c:
+          \$229  = 15'h0041;
+      5'h0d:
+          \$229  = 15'h0061;
+      5'h0e:
+          \$229  = 15'h0081;
+      5'h0f:
+          \$229  = 15'h00c1;
+      5'h10:
+          \$229  = 15'h0101;
+      5'h11:
+          \$229  = 15'h0181;
+      5'h12:
+          \$229  = 15'h0201;
+      5'h13:
+          \$229  = 15'h0301;
+      5'h14:
+          \$229  = 15'h0401;
+      5'h15:
+          \$229  = 15'h0601;
+      5'h16:
+          \$229  = 15'h0801;
+      5'h17:
+          \$229  = 15'h0c01;
+      5'h18:
+          \$229  = 15'h1001;
+      5'h19:
+          \$229  = 15'h1801;
+      5'h1a:
+          \$229  = 15'h2001;
+      5'h1b:
+          \$229  = 15'h3001;
+      5'h1c:
+          \$229  = 15'h4001;
+      5'h1d:
+          \$229  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$233  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$233  = 15'h0001;
+      5'h01:
+          \$233  = 15'h0002;
+      5'h02:
+          \$233  = 15'h0003;
+      5'h03:
+          \$233  = 15'h0004;
+      5'h04:
+          \$233  = 15'h0005;
+      5'h05:
+          \$233  = 15'h0007;
+      5'h06:
+          \$233  = 15'h0009;
+      5'h07:
+          \$233  = 15'h000d;
+      5'h08:
+          \$233  = 15'h0011;
+      5'h09:
+          \$233  = 15'h0019;
+      5'h0a:
+          \$233  = 15'h0021;
+      5'h0b:
+          \$233  = 15'h0031;
+      5'h0c:
+          \$233  = 15'h0041;
+      5'h0d:
+          \$233  = 15'h0061;
+      5'h0e:
+          \$233  = 15'h0081;
+      5'h0f:
+          \$233  = 15'h00c1;
+      5'h10:
+          \$233  = 15'h0101;
+      5'h11:
+          \$233  = 15'h0181;
+      5'h12:
+          \$233  = 15'h0201;
+      5'h13:
+          \$233  = 15'h0301;
+      5'h14:
+          \$233  = 15'h0401;
+      5'h15:
+          \$233  = 15'h0601;
+      5'h16:
+          \$233  = 15'h0801;
+      5'h17:
+          \$233  = 15'h0c01;
+      5'h18:
+          \$233  = 15'h1001;
+      5'h19:
+          \$233  = 15'h1801;
+      5'h1a:
+          \$233  = 15'h2001;
+      5'h1b:
+          \$233  = 15'h3001;
+      5'h1c:
+          \$233  = 15'h4001;
+      5'h1d:
+          \$233  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$237  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$237  = 15'h0001;
+      5'h01:
+          \$237  = 15'h0002;
+      5'h02:
+          \$237  = 15'h0003;
+      5'h03:
+          \$237  = 15'h0004;
+      5'h04:
+          \$237  = 15'h0005;
+      5'h05:
+          \$237  = 15'h0007;
+      5'h06:
+          \$237  = 15'h0009;
+      5'h07:
+          \$237  = 15'h000d;
+      5'h08:
+          \$237  = 15'h0011;
+      5'h09:
+          \$237  = 15'h0019;
+      5'h0a:
+          \$237  = 15'h0021;
+      5'h0b:
+          \$237  = 15'h0031;
+      5'h0c:
+          \$237  = 15'h0041;
+      5'h0d:
+          \$237  = 15'h0061;
+      5'h0e:
+          \$237  = 15'h0081;
+      5'h0f:
+          \$237  = 15'h00c1;
+      5'h10:
+          \$237  = 15'h0101;
+      5'h11:
+          \$237  = 15'h0181;
+      5'h12:
+          \$237  = 15'h0201;
+      5'h13:
+          \$237  = 15'h0301;
+      5'h14:
+          \$237  = 15'h0401;
+      5'h15:
+          \$237  = 15'h0601;
+      5'h16:
+          \$237  = 15'h0801;
+      5'h17:
+          \$237  = 15'h0c01;
+      5'h18:
+          \$237  = 15'h1001;
+      5'h19:
+          \$237  = 15'h1801;
+      5'h1a:
+          \$237  = 15'h2001;
+      5'h1b:
+          \$237  = 15'h3001;
+      5'h1c:
+          \$237  = 15'h4001;
+      5'h1d:
+          \$237  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$241  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$241  = 15'h0001;
+      5'h01:
+          \$241  = 15'h0002;
+      5'h02:
+          \$241  = 15'h0003;
+      5'h03:
+          \$241  = 15'h0004;
+      5'h04:
+          \$241  = 15'h0005;
+      5'h05:
+          \$241  = 15'h0007;
+      5'h06:
+          \$241  = 15'h0009;
+      5'h07:
+          \$241  = 15'h000d;
+      5'h08:
+          \$241  = 15'h0011;
+      5'h09:
+          \$241  = 15'h0019;
+      5'h0a:
+          \$241  = 15'h0021;
+      5'h0b:
+          \$241  = 15'h0031;
+      5'h0c:
+          \$241  = 15'h0041;
+      5'h0d:
+          \$241  = 15'h0061;
+      5'h0e:
+          \$241  = 15'h0081;
+      5'h0f:
+          \$241  = 15'h00c1;
+      5'h10:
+          \$241  = 15'h0101;
+      5'h11:
+          \$241  = 15'h0181;
+      5'h12:
+          \$241  = 15'h0201;
+      5'h13:
+          \$241  = 15'h0301;
+      5'h14:
+          \$241  = 15'h0401;
+      5'h15:
+          \$241  = 15'h0601;
+      5'h16:
+          \$241  = 15'h0801;
+      5'h17:
+          \$241  = 15'h0c01;
+      5'h18:
+          \$241  = 15'h1001;
+      5'h19:
+          \$241  = 15'h1801;
+      5'h1a:
+          \$241  = 15'h2001;
+      5'h1b:
+          \$241  = 15'h3001;
+      5'h1c:
+          \$241  = 15'h4001;
+      5'h1d:
+          \$241  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$245  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$245  = 15'h0001;
+      5'h01:
+          \$245  = 15'h0002;
+      5'h02:
+          \$245  = 15'h0003;
+      5'h03:
+          \$245  = 15'h0004;
+      5'h04:
+          \$245  = 15'h0005;
+      5'h05:
+          \$245  = 15'h0007;
+      5'h06:
+          \$245  = 15'h0009;
+      5'h07:
+          \$245  = 15'h000d;
+      5'h08:
+          \$245  = 15'h0011;
+      5'h09:
+          \$245  = 15'h0019;
+      5'h0a:
+          \$245  = 15'h0021;
+      5'h0b:
+          \$245  = 15'h0031;
+      5'h0c:
+          \$245  = 15'h0041;
+      5'h0d:
+          \$245  = 15'h0061;
+      5'h0e:
+          \$245  = 15'h0081;
+      5'h0f:
+          \$245  = 15'h00c1;
+      5'h10:
+          \$245  = 15'h0101;
+      5'h11:
+          \$245  = 15'h0181;
+      5'h12:
+          \$245  = 15'h0201;
+      5'h13:
+          \$245  = 15'h0301;
+      5'h14:
+          \$245  = 15'h0401;
+      5'h15:
+          \$245  = 15'h0601;
+      5'h16:
+          \$245  = 15'h0801;
+      5'h17:
+          \$245  = 15'h0c01;
+      5'h18:
+          \$245  = 15'h1001;
+      5'h19:
+          \$245  = 15'h1801;
+      5'h1a:
+          \$245  = 15'h2001;
+      5'h1b:
+          \$245  = 15'h3001;
+      5'h1c:
+          \$245  = 15'h4001;
+      5'h1d:
+          \$245  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$249  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$249  = 15'h0001;
+      5'h01:
+          \$249  = 15'h0002;
+      5'h02:
+          \$249  = 15'h0003;
+      5'h03:
+          \$249  = 15'h0004;
+      5'h04:
+          \$249  = 15'h0005;
+      5'h05:
+          \$249  = 15'h0007;
+      5'h06:
+          \$249  = 15'h0009;
+      5'h07:
+          \$249  = 15'h000d;
+      5'h08:
+          \$249  = 15'h0011;
+      5'h09:
+          \$249  = 15'h0019;
+      5'h0a:
+          \$249  = 15'h0021;
+      5'h0b:
+          \$249  = 15'h0031;
+      5'h0c:
+          \$249  = 15'h0041;
+      5'h0d:
+          \$249  = 15'h0061;
+      5'h0e:
+          \$249  = 15'h0081;
+      5'h0f:
+          \$249  = 15'h00c1;
+      5'h10:
+          \$249  = 15'h0101;
+      5'h11:
+          \$249  = 15'h0181;
+      5'h12:
+          \$249  = 15'h0201;
+      5'h13:
+          \$249  = 15'h0301;
+      5'h14:
+          \$249  = 15'h0401;
+      5'h15:
+          \$249  = 15'h0601;
+      5'h16:
+          \$249  = 15'h0801;
+      5'h17:
+          \$249  = 15'h0c01;
+      5'h18:
+          \$249  = 15'h1001;
+      5'h19:
+          \$249  = 15'h1801;
+      5'h1a:
+          \$249  = 15'h2001;
+      5'h1b:
+          \$249  = 15'h3001;
+      5'h1c:
+          \$249  = 15'h4001;
+      5'h1d:
+          \$249  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$253  = 15'h0000;
+    casez (defl_dist_code)
+      5'h00:
+          \$253  = 15'h0001;
+      5'h01:
+          \$253  = 15'h0002;
+      5'h02:
+          \$253  = 15'h0003;
+      5'h03:
+          \$253  = 15'h0004;
+      5'h04:
+          \$253  = 15'h0005;
+      5'h05:
+          \$253  = 15'h0007;
+      5'h06:
+          \$253  = 15'h0009;
+      5'h07:
+          \$253  = 15'h000d;
+      5'h08:
+          \$253  = 15'h0011;
+      5'h09:
+          \$253  = 15'h0019;
+      5'h0a:
+          \$253  = 15'h0021;
+      5'h0b:
+          \$253  = 15'h0031;
+      5'h0c:
+          \$253  = 15'h0041;
+      5'h0d:
+          \$253  = 15'h0061;
+      5'h0e:
+          \$253  = 15'h0081;
+      5'h0f:
+          \$253  = 15'h00c1;
+      5'h10:
+          \$253  = 15'h0101;
+      5'h11:
+          \$253  = 15'h0181;
+      5'h12:
+          \$253  = 15'h0201;
+      5'h13:
+          \$253  = 15'h0301;
+      5'h14:
+          \$253  = 15'h0401;
+      5'h15:
+          \$253  = 15'h0601;
+      5'h16:
+          \$253  = 15'h0801;
+      5'h17:
+          \$253  = 15'h0c01;
+      5'h18:
+          \$253  = 15'h1001;
+      5'h19:
+          \$253  = 15'h1801;
+      5'h1a:
+          \$253  = 15'h2001;
+      5'h1b:
+          \$253  = 15'h3001;
+      5'h1c:
+          \$253  = 15'h4001;
+      5'h1d:
+          \$253  = 15'h6001;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    crc_byte_in = 8'h00;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          crc_byte_in = defl_symbol[7:0];
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          crc_byte_in = win_mem_r_data;
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          crc_byte_in = rle_literal;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    win_mem_w_addr = 11'h000;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          win_mem_w_addr = defl_win_pos;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          win_mem_w_addr = defl_win_pos;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    win_mem_w_data = 8'h00;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          win_mem_w_data = defl_symbol[7:0];
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          win_mem_w_data = win_mem_r_data;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    win_mem_w_en = 1'h0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          win_mem_w_en = 1'h1;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          win_mem_w_en = 1'h1;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    win_mem_r_addr = 11'h000;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          (* full_case = 32'd1 *)
+          if (\$43 ) begin
+          end else begin
+            win_mem_r_addr = \$45 [10:0];
+          end
+    endcase
+  end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
     (* full_case = 32'd1 *)
@@ -18907,15 +22914,37 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           outform_busy = 1'h1;
       5'h0d:
           outform_busy = 1'h1;
-      5'h0e:
-          outform_busy = 1'h1;
-      5'h0c:
-          outform_busy = 1'h1;
       5'h0f:
+          outform_busy = 1'h1;
+      5'h12:
+          outform_busy = 1'h1;
+      5'h11:
+          outform_busy = 1'h1;
+      5'h13:
+          outform_busy = 1'h1;
+      5'h14:
+          outform_busy = 1'h1;
+      5'h15:
+          outform_busy = 1'h1;
+      5'h16:
           outform_busy = 1'h1;
       5'h10:
           outform_busy = 1'h1;
-      5'h11:
+      5'h0e:
+          outform_busy = 1'h1;
+      5'h17:
+          outform_busy = 1'h1;
+      5'h18:
+          outform_busy = 1'h1;
+      5'h19:
+          outform_busy = 1'h1;
+      5'h0c:
+          outform_busy = 1'h1;
+      5'h1a:
+          outform_busy = 1'h1;
+      5'h1b:
+          outform_busy = 1'h1;
+      5'h1c:
           outform_busy = 1'h0;
       5'h04:
           outform_busy = 1'h0;
@@ -19039,6 +23068,330 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    mem_wr_addr = 32'd0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          if (\$32 ) begin
+            mem_wr_addr = \$34 [31:0];
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          if (\$46 ) begin
+            mem_wr_addr = \$48 [31:0];
+          end
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          if (\$49 ) begin
+            mem_wr_addr = \$51 [31:0];
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    mem_wr_data = 32'd0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          if (\$32 ) begin
+            mem_wr_data = { defl_symbol[7:0], byte_buf };
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          if (\$46 ) begin
+            mem_wr_data = { win_mem_r_data, byte_buf };
+          end
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          if (\$49 ) begin
+            mem_wr_data = { rle_literal, byte_buf };
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    mem_wr_en = 1'h0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          if (\$32 ) begin
+            mem_wr_en = 1'h1;
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          if (\$46 ) begin
+            mem_wr_en = 1'h1;
+          end
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          if (\$49 ) begin
+            mem_wr_en = 1'h1;
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    btype = 2'h0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          if (\$28 ) begin
+            btype = defl_bits[2:1];
+          end
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    len_extra_needed = 4'h0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          len_extra_needed = { 1'h0, \$35  };
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    dist_extra_needed = 4'h0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          dist_extra_needed = \$36 ;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    defl_hist_depth = 32'd0;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          defl_hist_depth = \$38 ;
+    endcase
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
     crc_final = 32'd0;
     casez (outform_state)
       5'h00:
@@ -19065,10 +23418,32 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h0d:
           /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          /* empty */;
+      5'h10:
+          /* empty */;
       5'h0e:
           /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          /* empty */;
+      5'h19:
+          /* empty */;
       5'h0c:
-          crc_final = \$27 ;
+          crc_final = \$52 ;
     endcase
   end
   always @* begin
@@ -19099,11 +23474,33 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h0d:
           /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          /* empty */;
+      5'h10:
+          /* empty */;
       5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          /* empty */;
+      5'h19:
           /* empty */;
       5'h0c:
           /* empty */;
-      5'h0f:
+      5'h1a:
           mint_call = 1'h1;
     endcase
   end
@@ -19135,15 +23532,37 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
-          /* empty */;
       5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
           /* empty */;
       5'h10:
           /* empty */;
-      5'h11:
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          /* empty */;
+      5'h19:
+          /* empty */;
+      5'h0c:
+          /* empty */;
+      5'h1a:
+          /* empty */;
+      5'h1b:
+          /* empty */;
+      5'h1c:
           outform_done = 1'h1;
     endcase
   end
@@ -19175,15 +23594,37 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
-          /* empty */;
       5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
           /* empty */;
       5'h10:
           /* empty */;
-      5'h11:
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          /* empty */;
+      5'h19:
+          /* empty */;
+      5'h0c:
+          /* empty */;
+      5'h1a:
+          /* empty */;
+      5'h1b:
+          /* empty */;
+      5'h1c:
           /* empty */;
       5'h04:
           outform_fault = 1'h1;
@@ -19191,39 +23632,39 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$70  = hdr_byte_cnt;
+    \$299  = hdr_byte_cnt;
     if (rst) begin
-      \$70  = 6'h00;
+      \$299  = 6'h00;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$71  = tx_byte_cnt;
+    \$300  = tx_byte_cnt;
     casez (outform_state)
       5'h00:
           /* empty */;
       5'h01:
           (* full_case = 32'd1 *)
-          if (\$46 ) begin
-            \$71  = 3'h0;
+          if (\$82 ) begin
+            \$300  = 3'h0;
           end else begin
-            \$71  = \$47 [2:0];
+            \$300  = \$83 [2:0];
           end
     endcase
     if (rst) begin
-      \$71  = 3'h0;
+      \$300  = 3'h0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$72  = fname_cnt;
+    \$301  = fname_cnt;
     if (rst) begin
-      \$72  = 16'h0000;
+      \$301  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$73  = extra_cnt;
+    \$302  = extra_cnt;
     casez (outform_state)
       5'h00:
           /* empty */;
@@ -19242,73 +23683,73 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
       5'h08:
           /* empty */;
       5'h09:
-          if (\$58 ) begin
-            \$73  = extra_len_reg;
+          if (\$94 ) begin
+            \$302  = extra_len_reg;
           end
     endcase
     if (rst) begin
-      \$73  = 16'h0000;
+      \$302  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$74  = sig_reg;
+    \$303  = sig_reg;
     if (rst) begin
-      \$74  = 32'd0;
+      \$303  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$75  = flags_reg;
+    \$304  = flags_reg;
     if (rst) begin
-      \$75  = 16'h0000;
+      \$304  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$76  = method_reg;
+    \$305  = method_reg;
     if (rst) begin
-      \$76  = 16'h0000;
+      \$305  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$77  = crc32_stored;
+    \$306  = crc32_stored;
     if (rst) begin
-      \$77  = 32'd0;
+      \$306  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$78  = comp_size_reg;
+    \$307  = comp_size_reg;
     if (rst) begin
-      \$78  = 32'd0;
+      \$307  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$79  = ucomp_size_reg;
+    \$308  = ucomp_size_reg;
     if (rst) begin
-      \$79  = 32'd0;
+      \$308  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$80  = fname_len_reg;
+    \$309  = fname_len_reg;
     if (rst) begin
-      \$80  = 16'h0000;
+      \$309  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$81  = extra_len_reg;
+    \$310  = extra_len_reg;
     if (rst) begin
-      \$81  = 16'h0000;
+      \$310  = 16'h0000;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$82  = word_count_reg;
+    \$311  = word_count_reg;
     casez (outform_state)
       5'h00:
           /* empty */;
@@ -19322,45 +23763,18 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h06:
           (* full_case = 32'd1 *)
-          if (\$51 ) begin
+          if (\$87 ) begin
           end else begin
-            \$82  = \$52 ;
+            \$311  = \$88 ;
           end
     endcase
     if (rst) begin
-      \$82  = 32'd0;
+      \$311  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$83  = mint_n;
-    casez (outform_state)
-      5'h00:
-          /* empty */;
-      5'h01:
-          /* empty */;
-      5'h02:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h05:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          (* full_case = 32'd1 *)
-          if (\$57 ) begin
-          end else begin
-            \$83  = n_computed;
-          end
-    endcase
-    if (rst) begin
-      \$83  = 5'h00;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$84  = total_words;
+    \$312  = mint_n;
     casez (outform_state)
       5'h00:
           /* empty */;
@@ -19376,135 +23790,100 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
           /* empty */;
       5'h07:
           (* full_case = 32'd1 *)
-          if (\$57 ) begin
+          if (\$93 ) begin
           end else begin
-            \$84  = word_count_reg;
+            \$312  = n_computed;
           end
     endcase
     if (rst) begin
-      \$84  = 32'd0;
+      \$312  = 5'h00;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$85  = crc_acc;
-    if (rst) begin
-      \$85  = 32'd4294967295;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$86  = wr_word_cnt;
-    if (rst) begin
-      \$86  = 32'd0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$87  = byte_buf;
-    if (rst) begin
-      \$87  = 24'h000000;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$88  = byte_buf_cnt;
-    if (rst) begin
-      \$88  = 2'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$89  = result_gt;
-    if (rst) begin
-      \$89  = 32'd0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$90  = outform_state;
+    \$313  = total_words;
     casez (outform_state)
       5'h00:
           /* empty */;
       5'h01:
-          if (\$46 ) begin
-            \$90  = 5'h02;
-          end
+          /* empty */;
       5'h02:
           /* empty */;
       5'h03:
-          (* full_case = 32'd1 *)
-          if (\$50 ) begin
-            \$90  = 5'h04;
-          end else begin
-            \$90  = 5'h05;
-          end
+          /* empty */;
       5'h05:
-          (* full_case = 32'd1 *)
-          if (flags_reg[3]) begin
-            \$90  = 5'h04;
-          end else begin
-            \$90  = 5'h06;
-          end
+          /* empty */;
       5'h06:
-          (* full_case = 32'd1 *)
-          if (\$51 ) begin
-            \$90  = 5'h04;
-          end else begin
-            \$90  = 5'h07;
-          end
+          /* empty */;
       5'h07:
           (* full_case = 32'd1 *)
-          if (\$57 ) begin
-            \$90  = 5'h04;
+          if (\$93 ) begin
           end else begin
-            \$90  = 5'h08;
+            \$313  = word_count_reg;
           end
+    endcase
+    if (rst) begin
+      \$313  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$314  = crc_acc;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
       5'h08:
           /* empty */;
       5'h09:
-          if (\$58 ) begin
-            \$90  = 5'h0a;
-          end
+          /* empty */;
       5'h0a:
-          if (\$60 ) begin
-            \$90  = 5'h0b;
-          end
+          /* empty */;
       5'h0b:
-          (* full_case = 32'd1 *)
-          if (\$62 ) begin
-          end else if (\$63 ) begin
-            \$90  = 5'h0d;
-          end else begin
-            \$90  = 5'h0e;
-          end
+          /* empty */;
       5'h0d:
-          \$90  = 5'h04;
-      5'h0e:
-          \$90  = 5'h04;
-      5'h0c:
-          (* full_case = 32'd1 *)
-          if (\$69 ) begin
-            \$90  = 5'h04;
-          end else begin
-            \$90  = 5'h0f;
-          end
+          /* empty */;
       5'h0f:
-          \$90  = 5'h10;
+          /* empty */;
+      5'h12:
+          \$314  = _cs7;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          \$314  = _cs7;
       5'h10:
           /* empty */;
-      5'h11:
-          \$90  = 5'h00;
-      5'h04:
-          \$90  = 5'h00;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          \$314  = _cs7;
     endcase
     if (rst) begin
-      \$90  = 5'h00;
+      \$314  = 32'd4294967295;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$91  = outform_fault_type;
+    \$315  = wr_word_cnt;
     casez (outform_state)
       5'h00:
           /* empty */;
@@ -19513,21 +23892,13 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
       5'h02:
           /* empty */;
       5'h03:
-          if (\$50 ) begin
-            \$91  = 5'h11;
-          end
+          /* empty */;
       5'h05:
-          if (flags_reg[3]) begin
-            \$91  = 5'h12;
-          end
+          /* empty */;
       5'h06:
-          if (\$51 ) begin
-            \$91  = 5'h14;
-          end
+          /* empty */;
       5'h07:
-          if (\$57 ) begin
-            \$91  = 5'h14;
-          end
+          /* empty */;
       5'h08:
           /* empty */;
       5'h09:
@@ -19537,27 +23908,1398 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
       5'h0b:
           /* empty */;
       5'h0d:
-          \$91  = 5'h13;
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          if (\$171 ) begin
+            \$315  = \$172 [31:0];
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          if (\$269 ) begin
+            \$315  = \$270 [31:0];
+          end
+      5'h10:
+          /* empty */;
       5'h0e:
-          \$91  = 5'h13;
-      5'h0c:
-          if (\$69 ) begin
-            \$91  = 5'h15;
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          if (\$289 ) begin
+            \$315  = \$290 [31:0];
           end
     endcase
     if (rst) begin
-      \$91  = 5'h00;
+      \$315  = 32'd0;
     end
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
-    \$92  = mint_base;
+    \$316  = byte_buf;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          (* full_case = 32'd1 *)
+          if (\$171 ) begin
+            \$316  = 24'h000000;
+          end else begin
+            casez (byte_buf_cnt)
+              2'h0:
+                  \$316 [7:0] = defl_symbol[7:0];
+              2'h1:
+                  \$316 [15:8] = defl_symbol[7:0];
+              2'h2:
+                  \$316 [23:16] = defl_symbol[7:0];
+            endcase
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          (* full_case = 32'd1 *)
+          if (\$269 ) begin
+            \$316  = 24'h000000;
+          end else begin
+            casez (byte_buf_cnt)
+              2'h0:
+                  \$316 [7:0] = win_mem_r_data;
+              2'h1:
+                  \$316 [15:8] = win_mem_r_data;
+              2'h2:
+                  \$316 [23:16] = win_mem_r_data;
+            endcase
+          end
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          (* full_case = 32'd1 *)
+          if (\$289 ) begin
+            \$316  = 24'h000000;
+          end else begin
+            casez (byte_buf_cnt)
+              2'h0:
+                  \$316 [7:0] = rle_literal;
+              2'h1:
+                  \$316 [15:8] = rle_literal;
+              2'h2:
+                  \$316 [23:16] = rle_literal;
+            endcase
+          end
+    endcase
     if (rst) begin
-      \$92  = 32'd0;
+      \$316  = 24'h000000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$317  = byte_buf_cnt;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          (* full_case = 32'd1 *)
+          if (\$171 ) begin
+            \$317  = 2'h0;
+          end else begin
+            \$317  = \$175 [1:0];
+          end
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          (* full_case = 32'd1 *)
+          if (\$269 ) begin
+            \$317  = 2'h0;
+          end else begin
+            \$317  = \$275 [1:0];
+          end
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          (* full_case = 32'd1 *)
+          if (\$289 ) begin
+            \$317  = 2'h0;
+          end else begin
+            \$317  = \$294 [1:0];
+          end
+    endcase
+    if (rst) begin
+      \$317  = 2'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$318  = result_gt;
+    if (rst) begin
+      \$318  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$319  = defl_bits;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$319  = 32'd0;
+          end
+      5'h0d:
+          if (\$106 ) begin
+            \$319  = \$110 ;
+          end else if (\$107 ) begin
+          end else if (\$109 ) begin
+            \$319  = \$114 [31:0];
+          end
+      5'h0f:
+          if (\$119 ) begin
+            \$319  = \$145 ;
+          end else if (\$124 ) begin
+            \$319  = \$153 ;
+          end else if (\$129 ) begin
+            \$319  = \$159 ;
+          end else if (\$134 ) begin
+          end else if (\$139 ) begin
+            \$319  = \$163 ;
+          end else if (\$140 ) begin
+          end else if (\$141 ) begin
+          end else if (\$143 ) begin
+            \$319  = \$166 [31:0];
+          end
+      5'h12:
+          /* empty */;
+      5'h11:
+          if (\$176 ) begin
+            casez (len_extra_needed)
+              4'h0:
+                  /* empty */;
+              4'h1:
+                  \$319  = \$183 ;
+              4'h2:
+                  \$319  = \$187 ;
+              4'h3:
+                  \$319  = \$191 ;
+              4'h4:
+                  \$319  = \$195 ;
+              4'h5:
+                  \$319  = \$199 ;
+            endcase
+          end else if (\$177 ) begin
+          end else if (\$179 ) begin
+            \$319  = \$202 [31:0];
+          end
+      5'h13:
+          if (\$205 ) begin
+            \$319  = \$209 ;
+          end else if (\$206 ) begin
+          end else if (\$208 ) begin
+            \$319  = \$213 [31:0];
+          end
+      5'h14:
+          if (\$216 ) begin
+            casez (dist_extra_needed)
+              4'h0:
+                  /* empty */;
+              4'h1:
+                  \$319  = \$223 ;
+              4'h2:
+                  \$319  = \$227 ;
+              4'h3:
+                  \$319  = \$231 ;
+              4'h4:
+                  \$319  = \$235 ;
+              4'h5:
+                  \$319  = \$239 ;
+              4'h6:
+                  \$319  = \$243 ;
+              4'h7:
+                  \$319  = \$247 ;
+              4'h8:
+                  \$319  = \$251 ;
+              4'h9:
+                  \$319  = \$255 ;
+            endcase
+          end else if (\$217 ) begin
+          end else if (\$219 ) begin
+            \$319  = \$258 [31:0];
+          end
+    endcase
+    if (rst) begin
+      \$319  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$320  = defl_bit_cnt;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$320  = 6'h00;
+          end
+      5'h0d:
+          if (\$106 ) begin
+            \$320  = \$111 [5:0];
+          end else if (\$107 ) begin
+          end else if (\$109 ) begin
+            \$320  = \$115 [5:0];
+          end
+      5'h0f:
+          if (\$119 ) begin
+            \$320  = \$146 [5:0];
+          end else if (\$124 ) begin
+            \$320  = \$154 [5:0];
+          end else if (\$129 ) begin
+            \$320  = \$160 [5:0];
+          end else if (\$134 ) begin
+          end else if (\$139 ) begin
+            \$320  = \$164 [5:0];
+          end else if (\$140 ) begin
+          end else if (\$141 ) begin
+          end else if (\$143 ) begin
+            \$320  = \$167 [5:0];
+          end
+      5'h12:
+          /* empty */;
+      5'h11:
+          if (\$176 ) begin
+            casez (len_extra_needed)
+              4'h0:
+                  /* empty */;
+              4'h1:
+                  \$320  = \$184 [5:0];
+              4'h2:
+                  \$320  = \$188 [5:0];
+              4'h3:
+                  \$320  = \$192 [5:0];
+              4'h4:
+                  \$320  = \$196 [5:0];
+              4'h5:
+                  \$320  = \$200 [5:0];
+            endcase
+          end else if (\$177 ) begin
+          end else if (\$179 ) begin
+            \$320  = \$203 [5:0];
+          end
+      5'h13:
+          if (\$205 ) begin
+            \$320  = \$210 [5:0];
+          end else if (\$206 ) begin
+          end else if (\$208 ) begin
+            \$320  = \$214 [5:0];
+          end
+      5'h14:
+          if (\$216 ) begin
+            casez (dist_extra_needed)
+              4'h0:
+                  /* empty */;
+              4'h1:
+                  \$320  = \$224 [5:0];
+              4'h2:
+                  \$320  = \$228 [5:0];
+              4'h3:
+                  \$320  = \$232 [5:0];
+              4'h4:
+                  \$320  = \$236 [5:0];
+              4'h5:
+                  \$320  = \$240 [5:0];
+              4'h6:
+                  \$320  = \$244 [5:0];
+              4'h7:
+                  \$320  = \$248 [5:0];
+              4'h8:
+                  \$320  = \$252 [5:0];
+              4'h9:
+                  \$320  = \$256 [5:0];
+            endcase
+          end else if (\$217 ) begin
+          end else if (\$219 ) begin
+            \$320  = \$259 [5:0];
+          end
+    endcase
+    if (rst) begin
+      \$320  = 6'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$321  = defl_bfinal;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          if (\$106 ) begin
+            \$321  = defl_bits[0];
+          end
+    endcase
+    if (rst) begin
+      \$321  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$322  = defl_symbol;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          if (\$119 ) begin
+            \$322  = \$144 [8:0];
+          end else if (\$124 ) begin
+            \$322  = \$152 ;
+          end else if (\$129 ) begin
+            \$322  = \$156 [8:0];
+          end else if (\$134 ) begin
+          end else if (\$139 ) begin
+            \$322  = \$162 [8:0];
+          end
+    endcase
+    if (rst) begin
+      \$322  = 9'h000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$323  = defl_copy_len;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          if (\$176 ) begin
+            casez (len_extra_needed)
+              4'h0:
+                  \$323  = \$180 ;
+              4'h1:
+                  \$323  = \$182 [8:0];
+              4'h2:
+                  \$323  = \$186 [8:0];
+              4'h3:
+                  \$323  = \$190 [8:0];
+              4'h4:
+                  \$323  = \$194 [8:0];
+              4'h5:
+                  \$323  = \$198 [8:0];
+            endcase
+          end
+    endcase
+    if (rst) begin
+      \$323  = 9'h000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$324  = defl_copy_dist;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          if (\$216 ) begin
+            casez (dist_extra_needed)
+              4'h0:
+                  \$324  = \$220 [11:0];
+              4'h1:
+                  \$324  = \$222 [11:0];
+              4'h2:
+                  \$324  = \$226 [11:0];
+              4'h3:
+                  \$324  = \$230 [11:0];
+              4'h4:
+                  \$324  = \$234 [11:0];
+              4'h5:
+                  \$324  = \$238 [11:0];
+              4'h6:
+                  \$324  = \$242 [11:0];
+              4'h7:
+                  \$324  = \$246 [11:0];
+              4'h8:
+                  \$324  = \$250 [11:0];
+              4'h9:
+                  \$324  = \$254 [11:0];
+            endcase
+          end
+    endcase
+    if (rst) begin
+      \$324  = 12'h000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$325  = defl_copy_idx;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          if (\$216 ) begin
+            \$325  = 9'h000;
+          end
+      5'h15:
+          /* empty */;
+      5'h16:
+          \$325  = \$268 [8:0];
+    endcase
+    if (rst) begin
+      \$325  = 9'h000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$326  = defl_win_pos;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$326  = 11'h000;
+          end
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          \$326  = \$169 [10:0];
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          \$326  = \$266 [10:0];
+    endcase
+    if (rst) begin
+      \$326  = 11'h000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$327  = defl_len_idx;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          if (\$119 ) begin
+            (* full_case = 32'd1 *)
+            if (\$147 ) begin
+            end else begin
+              \$327  = \$151 [4:0];
+            end
+          end else if (\$124 ) begin
+          end else if (\$129 ) begin
+            \$327  = \$158 [4:0];
+          end
+    endcase
+    if (rst) begin
+      \$327  = 5'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$328  = defl_dist_code;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          if (\$205 ) begin
+            \$328  = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4] };
+          end
+    endcase
+    if (rst) begin
+      \$328  = 5'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$329  = rle_count;
+    if (rst) begin
+      \$329  = 8'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$330  = rle_literal;
+    if (rst) begin
+      \$330  = 8'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$331  = rle_remaining;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          /* empty */;
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          /* empty */;
+      5'h10:
+          /* empty */;
+      5'h0e:
+          /* empty */;
+      5'h17:
+          /* empty */;
+      5'h18:
+          \$331  = \$288 [7:0];
+    endcase
+    if (rst) begin
+      \$331  = 8'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$332  = outform_state;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          if (\$82 ) begin
+            \$332  = 5'h02;
+          end
+      5'h02:
+          /* empty */;
+      5'h03:
+          (* full_case = 32'd1 *)
+          if (\$86 ) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h05;
+          end
+      5'h05:
+          (* full_case = 32'd1 *)
+          if (flags_reg[3]) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h06;
+          end
+      5'h06:
+          (* full_case = 32'd1 *)
+          if (\$87 ) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h07;
+          end
+      5'h07:
+          (* full_case = 32'd1 *)
+          if (\$93 ) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h08;
+          end
+      5'h08:
+          /* empty */;
+      5'h09:
+          if (\$94 ) begin
+            \$332  = 5'h0a;
+          end
+      5'h0a:
+          if (\$96 ) begin
+            \$332  = 5'h0b;
+          end
+      5'h0b:
+          (* full_case = 32'd1 *)
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$332  = 5'h0d;
+          end else if (\$100 ) begin
+            \$332  = 5'h0e;
+          end else begin
+            \$332  = 5'h04;
+          end
+      5'h0d:
+          if (\$106 ) begin
+            (* full_case = 32'd1 *)
+            if (\$112 ) begin
+              \$332  = 5'h0f;
+            end else begin
+              \$332  = 5'h04;
+            end
+          end else if (\$107 ) begin
+            \$332  = 5'h04;
+          end
+      5'h0f:
+          if (\$119 ) begin
+            (* full_case = 32'd1 *)
+            if (\$147 ) begin
+              (* full_case = 32'd1 *)
+              if (defl_bfinal) begin
+                (* full_case = 32'd1 *)
+                if (\$150 ) begin
+                  \$332  = 5'h10;
+                end else begin
+                  \$332  = 5'h04;
+                end
+              end else begin
+                \$332  = 5'h0d;
+              end
+            end else begin
+              \$332  = 5'h11;
+            end
+          end else if (\$124 ) begin
+            \$332  = 5'h12;
+          end else if (\$129 ) begin
+            \$332  = 5'h11;
+          end else if (\$134 ) begin
+            \$332  = 5'h04;
+          end else if (\$139 ) begin
+            \$332  = 5'h12;
+          end else if (\$140 ) begin
+            \$332  = 5'h04;
+          end else if (\$141 ) begin
+            \$332  = 5'h04;
+          end
+      5'h12:
+          (* full_case = 32'd1 *)
+          if (\$171 ) begin
+            (* full_case = 32'd1 *)
+            if (\$174 ) begin
+              \$332  = 5'h10;
+            end else begin
+              \$332  = 5'h0f;
+            end
+          end else begin
+            \$332  = 5'h0f;
+          end
+      5'h11:
+          if (\$176 ) begin
+            \$332  = 5'h13;
+          end else if (\$177 ) begin
+            \$332  = 5'h04;
+          end
+      5'h13:
+          if (\$205 ) begin
+            (* full_case = 32'd1 *)
+            if (\$211 ) begin
+              \$332  = 5'h04;
+            end else begin
+              \$332  = 5'h14;
+            end
+          end else if (\$206 ) begin
+            \$332  = 5'h04;
+          end
+      5'h14:
+          if (\$216 ) begin
+            \$332  = 5'h15;
+          end else if (\$217 ) begin
+            \$332  = 5'h04;
+          end
+      5'h15:
+          (* full_case = 32'd1 *)
+          if (\$265 ) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h16;
+          end
+      5'h16:
+          (* full_case = 32'd1 *)
+          if (\$269 ) begin
+            (* full_case = 32'd1 *)
+            if (\$272 ) begin
+              \$332  = 5'h10;
+            end else if (\$274 ) begin
+              \$332  = 5'h0f;
+            end else begin
+              \$332  = 5'h15;
+            end
+          end else begin
+            (* full_case = 32'd1 *)
+            if (\$277 ) begin
+              \$332  = 5'h0f;
+            end else begin
+              \$332  = 5'h15;
+            end
+          end
+      5'h10:
+          if (\$278 ) begin
+            \$332  = 5'h0c;
+          end
+      5'h0e:
+          if (\$280 ) begin
+            (* full_case = 32'd1 *)
+            if (\$283 ) begin
+              \$332  = 5'h0c;
+            end else begin
+              \$332  = 5'h04;
+            end
+          end
+      5'h17:
+          if (\$285 ) begin
+            \$332  = 5'h04;
+          end
+      5'h18:
+          (* full_case = 32'd1 *)
+          if (\$289 ) begin
+            if (\$292 ) begin
+              \$332  = 5'h19;
+            end else if (\$293 ) begin
+              \$332  = 5'h0e;
+            end
+          end else begin
+            if (\$295 ) begin
+              \$332  = 5'h0e;
+            end
+          end
+      5'h19:
+          if (\$296 ) begin
+            \$332  = 5'h0c;
+          end
+      5'h0c:
+          (* full_case = 32'd1 *)
+          if (\$298 ) begin
+            \$332  = 5'h04;
+          end else begin
+            \$332  = 5'h1a;
+          end
+      5'h1a:
+          \$332  = 5'h1b;
+      5'h1b:
+          /* empty */;
+      5'h1c:
+          \$332  = 5'h00;
+      5'h04:
+          \$332  = 5'h00;
+    endcase
+    if (rst) begin
+      \$332  = 5'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$333  = outform_fault_type;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          if (\$86 ) begin
+            \$333  = 5'h11;
+          end
+      5'h05:
+          if (flags_reg[3]) begin
+            \$333  = 5'h12;
+          end
+      5'h06:
+          if (\$87 ) begin
+            \$333  = 5'h14;
+          end
+      5'h07:
+          if (\$93 ) begin
+            \$333  = 5'h14;
+          end
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          (* full_case = 32'd1 *)
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+          end else if (\$100 ) begin
+          end else begin
+            \$333  = 5'h13;
+          end
+      5'h0d:
+          if (\$106 ) begin
+            (* full_case = 32'd1 *)
+            if (\$112 ) begin
+            end else begin
+              \$333  = 5'h18;
+            end
+          end else if (\$107 ) begin
+            \$333  = 5'h18;
+          end
+      5'h0f:
+          if (\$119 ) begin
+            if (\$147 ) begin
+              if (defl_bfinal) begin
+                (* full_case = 32'd1 *)
+                if (\$150 ) begin
+                end else begin
+                  \$333  = 5'h18;
+                end
+              end
+            end
+          end else if (\$124 ) begin
+          end else if (\$129 ) begin
+          end else if (\$134 ) begin
+            \$333  = 5'h18;
+          end else if (\$139 ) begin
+          end else if (\$140 ) begin
+            \$333  = 5'h18;
+          end else if (\$141 ) begin
+            \$333  = 5'h18;
+          end
+      5'h12:
+          /* empty */;
+      5'h11:
+          if (\$176 ) begin
+          end else if (\$177 ) begin
+            \$333  = 5'h18;
+          end
+      5'h13:
+          if (\$205 ) begin
+            if (\$211 ) begin
+              \$333  = 5'h19;
+            end
+          end else if (\$206 ) begin
+            \$333  = 5'h18;
+          end
+      5'h14:
+          if (\$216 ) begin
+          end else if (\$217 ) begin
+            \$333  = 5'h18;
+          end
+      5'h15:
+          if (\$265 ) begin
+            \$333  = 5'h19;
+          end
+      5'h16:
+          /* empty */;
+      5'h10:
+          /* empty */;
+      5'h0e:
+          if (\$280 ) begin
+            (* full_case = 32'd1 *)
+            if (\$283 ) begin
+            end else begin
+              \$333  = 5'h1a;
+            end
+          end
+      5'h17:
+          if (\$285 ) begin
+            \$333  = 5'h1a;
+          end
+      5'h18:
+          /* empty */;
+      5'h19:
+          /* empty */;
+      5'h0c:
+          if (\$298 ) begin
+            \$333  = 5'h15;
+          end
+    endcase
+    if (rst) begin
+      \$333  = 5'h00;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$334  = mint_base;
+    if (rst) begin
+      \$334  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$335  = defl_bytes_out;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$335  = 32'd0;
+          end
+      5'h0d:
+          /* empty */;
+      5'h0f:
+          /* empty */;
+      5'h12:
+          \$335  = \$170 [31:0];
+      5'h11:
+          /* empty */;
+      5'h13:
+          /* empty */;
+      5'h14:
+          /* empty */;
+      5'h15:
+          /* empty */;
+      5'h16:
+          \$335  = \$267 [31:0];
+    endcase
+    if (rst) begin
+      \$335  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$336  = defl_rx_count;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+            \$336  = 32'd0;
+          end
+      5'h0d:
+          if (\$106 ) begin
+          end else if (\$107 ) begin
+          end else if (\$109 ) begin
+            \$336  = \$116 [31:0];
+          end
+      5'h0f:
+          if (\$119 ) begin
+          end else if (\$124 ) begin
+          end else if (\$129 ) begin
+          end else if (\$134 ) begin
+          end else if (\$139 ) begin
+          end else if (\$140 ) begin
+          end else if (\$141 ) begin
+          end else if (\$143 ) begin
+            \$336  = \$168 [31:0];
+          end
+      5'h12:
+          /* empty */;
+      5'h11:
+          if (\$176 ) begin
+          end else if (\$177 ) begin
+          end else if (\$179 ) begin
+            \$336  = \$204 [31:0];
+          end
+      5'h13:
+          if (\$205 ) begin
+          end else if (\$206 ) begin
+          end else if (\$208 ) begin
+            \$336  = \$215 [31:0];
+          end
+      5'h14:
+          if (\$216 ) begin
+          end else if (\$217 ) begin
+          end else if (\$219 ) begin
+            \$336  = \$260 [31:0];
+          end
+    endcase
+    if (rst) begin
+      \$336  = 32'd0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$47 ) begin end
+    \$337  = rle_rx_count;
+    casez (outform_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h05:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0b:
+          if (\$98 ) begin
+          end else if (\$99 ) begin
+          end else if (\$100 ) begin
+            \$337  = 32'd0;
+          end
+    endcase
+    if (rst) begin
+      \$337  = 32'd0;
     end
   end
   assign rx_data = 8'h00;
   assign crc_next = _cs7;
+  assign code7_rev = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6] };
+  assign code8_rev = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7] };
+  assign code9_rev = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4], defl_bits[5], defl_bits[6], defl_bits[7], defl_bits[8] };
+  assign dist5_rev = { defl_bits[0], defl_bits[1], defl_bits[2], defl_bits[3], defl_bits[4] };
   assign gt_raw = 32'd0;
   assign slot_id = 16'h0000;
   assign inflate_word = { 8'h00, byte_buf };
@@ -19573,28 +25315,48 @@ module \top.u_outform (rst, tx_byte, outform_busy, tx_valid, mem_wr_addr, mem_wr
   assign mint_fault = 1'h0;
   assign mint_done = 1'h0;
   assign mint_result_gt = 32'd0;
-  assign mem_wr_en = 1'h0;
-  assign mem_wr_data = 32'd0;
-  assign mem_wr_addr = 32'd0;
-  assign _cxb0 = crc_acc[0];
   assign \$1  = { 1'h0, crc_acc[31:1] };
-  assign _cxb1 = _cs0[0];
   assign \$3  = { 1'h0, _cs0[31:1] };
-  assign _cxb2 = _cs1[0];
   assign \$5  = { 1'h0, _cs1[31:1] };
-  assign _cxb3 = _cs2[0];
   assign \$7  = { 1'h0, _cs2[31:1] };
-  assign _cxb4 = _cs3[0];
   assign \$9  = { 1'h0, _cs3[31:1] };
-  assign _cxb5 = _cs4[0];
   assign \$11  = { 1'h0, _cs4[31:1] };
-  assign _cxb6 = _cs5[0];
   assign \$13  = { 1'h0, _cs5[31:1] };
-  assign _cxb7 = _cs6[0];
   assign \$15  = { 1'h0, _cs6[31:1] };
-  assign \$25  = { 1'h0, wr_word_cnt, 2'h0 };
-  assign \$27  = \$auto$rtlil.cc:2739:Not$2 ;
-  assign \$52  = { 2'h0, ucomp_size_reg[31:2] };
+  assign \$26  = { 1'h0, wr_word_cnt, 2'h0 };
+  assign \$31  = 1'h0;
+  assign \$33  = { 1'h0, wr_word_cnt, 2'h0 };
+  assign \$45 [12:11] = 2'h0;
+  assign \$45 [10:0] = \$44 [10:0];
+  assign \$47  = { 1'h0, wr_word_cnt, 2'h0 };
+  assign \$50  = { 1'h0, wr_word_cnt, 2'h0 };
+  assign \$52  = \$auto$rtlil.cc:2739:Not$2 ;
+  assign \$88  = { 2'h0, ucomp_size_reg[31:2] };
+  assign \$109  = 1'h0;
+  assign \$110  = { 3'h0, defl_bits[31:3] };
+  assign \$143  = 1'h0;
+  assign \$145  = { 7'h00, defl_bits[31:7] };
+  assign \$153  = { 8'h00, defl_bits[31:8] };
+  assign \$159  = { 8'h00, defl_bits[31:8] };
+  assign \$163  = { 9'h000, defl_bits[31:9] };
+  assign \$179  = 1'h0;
+  assign \$183  = { 1'h0, defl_bits[31:1] };
+  assign \$187  = { 2'h0, defl_bits[31:2] };
+  assign \$191  = { 3'h0, defl_bits[31:3] };
+  assign \$195  = { 4'h0, defl_bits[31:4] };
+  assign \$199  = { 5'h00, defl_bits[31:5] };
+  assign \$208  = 1'h0;
+  assign \$209  = { 5'h00, defl_bits[31:5] };
+  assign \$219  = 1'h0;
+  assign \$223  = { 1'h0, defl_bits[31:1] };
+  assign \$227  = { 2'h0, defl_bits[31:2] };
+  assign \$231  = { 3'h0, defl_bits[31:3] };
+  assign \$235  = { 4'h0, defl_bits[31:4] };
+  assign \$239  = { 5'h00, defl_bits[31:5] };
+  assign \$243  = { 6'h00, defl_bits[31:6] };
+  assign \$247  = { 7'h00, defl_bits[31:7] };
+  assign \$251  = { 8'h00, defl_bits[31:8] };
+  assign \$255  = { 9'h000, defl_bits[31:9] };
 endmodule
 
 (* src = "/home/runner/workspace/hardware/perm_check.py:38" *)
