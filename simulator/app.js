@@ -10674,6 +10674,7 @@ function closeSettings() {
 
 function showReleaseHistory() {
     const history = [
+        { date: '2026-04-11 19:30 UTC', title: 'Cryptographic Build Signatures', changes: ['HMAC-SHA256 build signatures replace single-byte build tag', 'Server-side signature verification with constant-time comparison', '17-byte call-home packet with 4-byte HMAC field', 'Official/Custom Build badges (green/amber) in Devices view', 'MTBF gate: maxSteps runs count as failed; editor input clears history', 'Quick-start docs improved with toolbar icon reference and DigiKey link'] },
         { date: '2026-03-29 22:15 UTC', title: 'Consistency & Hardware Updates', changes: ['Consistency audits completed', 'Simulator GT type mapping fixed (Inform/Outform/Abstract)', 'Hardware deployment plan for Efinix Ti60 F225 created', 'Settings button order corrected', 'Lump size specification unified (64-word minimum)'] },
         { date: '2026-03-24 00:00 UTC', title: 'Locator & Docs', changes: ['Locator rename completed', 'Namespace docs refreshed', 'CLOOMC++ tutorials updated'] }
     ];
