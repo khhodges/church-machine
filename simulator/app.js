@@ -109,6 +109,7 @@ let previousView = null;
 let lastAssembledWords = null;
 let lastAssembledCapabilities = null;
 let lastMethodTableSize = 0;
+let _lumpManifests = {};
 let abstractionRegistry = null;
 let systemAbstractions = null;
 let deviceAbstractions = null;
@@ -1033,7 +1034,8 @@ function renderCListEntryDetail(nsIdx, entry) {
                     h += '</div>';
                     // Always show all cw slots so the user sees the code region layout.
                     // Empty slots (word=0) are shown dimmed; loaded instructions are bright.
-                    let codeHtml = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th></tr></thead><tbody>';
+                    const _clBase = (cc > 0) ? (loc + lumpSize - cc) : 0;
+                    let codeHtml = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th><th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
                     for (let w = 0; w < cw; w++) {
                         const addr = loc + 1 + w;
                         if (addr >= sim.memory.length) break;
@@ -1041,12 +1043,15 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const decoded = word === 0 ? 'HALT' : asm.disassemble(word);
                         const isPC   = sim.bootComplete && (addr === (sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                        const pcMark = isPC ? ' class="code-pc-row"' : '';
-                        codeHtml += `<tr${pcMark}${dimmed}>`;
+                        const _dc = _decompileWord(word, addr, nsIdx, _clBase);
+                        const _dcCls = _dc ? (_dc.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
+                        const rowCls = isPC ? 'code-pc-row' : (_dc && _dc.compiler ? 'code-row-compiler' : '');
+                        codeHtml += `<tr class="${rowCls}"${dimmed}>`;
                         codeHtml += `<td class="cr-idx">+${w + 1}</td>`;
                         codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
                         codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
                         codeHtml += `<td class="code-disasm">${decoded}</td>`;
+                        codeHtml += `<td class="code-decompiled ${_dcCls}">${_dc ? _dc.desc : ''}</td>`;
                         codeHtml += '</tr>';
                     }
                     codeHtml += '</tbody></table>';
@@ -1102,17 +1107,22 @@ function renderCListEntryDetail(nsIdx, entry) {
             h += '</div>';
             if (clistStart2 > 0) {
                 const asm2 = new ChurchAssembler();
-                let codeHtml2 = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th></tr></thead><tbody>';
+                const _clBase2 = (cc2 > 0) ? (loc + allocSize2 - cc2) : 0;
+                let codeHtml2 = '<table class="cr-table code-view-table"><thead><tr><th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th><th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
                 for (let w = 0; w < clistStart2; w++) {
                     const addr = loc + w;
                     if (addr >= sim.memory.length) break;
                     const word = sim.memory[addr] >>> 0;
                     const decoded = word === 0 ? 'HALT' : asm2.disassemble(word);
                     const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                    codeHtml2 += `<tr${dimmed}><td class="cr-idx">+${w}</td>`;
+                    const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2);
+                    const _dc2Cls = _dc2 ? (_dc2.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
+                    const rowCls2 = _dc2 && _dc2.compiler ? ' class="code-row-compiler"' : '';
+                    codeHtml2 += `<tr${rowCls2}${dimmed}><td class="cr-idx">+${w}</td>`;
                     codeHtml2 += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
                     codeHtml2 += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-                    codeHtml2 += `<td class="code-disasm">${decoded}</td></tr>`;
+                    codeHtml2 += `<td class="code-disasm">${decoded}</td>`;
+                    codeHtml2 += `<td class="code-decompiled ${_dc2Cls}">${_dc2 ? _dc2.desc : ''}</td></tr>`;
                 }
                 codeHtml2 += '</tbody></table>';
                 h += codeHtml2;
@@ -1576,6 +1586,8 @@ function injectCRCode(logEl) {
     const newWords = result.words || [];
     const newCW = newWords.length;
 
+    delete _lumpManifests[nsIdx];
+
     const hdrWord = (baseLoc < sim.memory.length) ? (sim.memory[baseLoc] >>> 0) : 0;
     const lumpHdr = sim.parseLumpHeader(hdrWord);
     if (!lumpHdr.valid) {
@@ -1986,6 +1998,102 @@ document.addEventListener('click', function(e) {
     }
 });
 
+function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
+    const annot = {};
+    let methodTableSize = methods.length;
+    for (let mi = 0; mi < methods.length; mi++) {
+        annot[baseLoc + 1 + mi] = { desc: `method-table[${mi}] \u2192 ${methods[mi].name}`, compiler: true };
+    }
+    const commentsByMethod = {};
+    if (manifest) {
+        for (const entry of manifest) {
+            const comments = {};
+            if (entry.mapping) {
+                let seqIdx = 0;
+                for (const m of entry.mapping) {
+                    if (m.comment !== undefined) {
+                        comments[seqIdx++] = { desc: m.comment, compiler: !!m.auto };
+                    } else if (m.addr !== undefined && m.desc) {
+                        comments[m.addr] = { desc: m.desc, compiler: /^LOAD CR\d+.*\(/.test(m.desc) };
+                    }
+                }
+            }
+            commentsByMethod[entry.name] = comments;
+        }
+    }
+    let wordAddr = baseLoc + 1 + methodTableSize;
+    for (const m of methods) {
+        const mc = commentsByMethod[m.name] || {};
+        for (let i = 0; i < (m.code || []).length; i++) {
+            if (mc[i]) {
+                annot[wordAddr] = mc[i];
+            }
+            wordAddr++;
+        }
+    }
+    if (capabilities && capabilities.length > 0) {
+        annot._caps = capabilities.slice();
+    }
+    _lumpManifests[nsIdx] = annot;
+}
+
+function _decompileWord(word, addr, nsIdx, clistBase) {
+    word = word >>> 0;
+    if (word === 0) return null;
+    const stored = _lumpManifests[nsIdx];
+    if (stored && stored[addr]) {
+        const s = stored[addr];
+        return { desc: _escDecomp(s.desc), compiler: s.compiler };
+    }
+    const opcode = (word >>> 27) & 0x1F;
+    const crDst = (word >>> 19) & 0xF;
+    const crSrc = (word >>> 15) & 0xF;
+    const imm = word & 0x7FFF;
+    if (opcode === 0 && crSrc === 6 && sim) {
+        if (clistBase > 0 && (clistBase + imm) < sim.memory.length) {
+            const gtWord = sim.memory[clistBase + imm] >>> 0;
+            if (gtWord !== 0) {
+                const parsed = sim.parseGT(gtWord);
+                const label = (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
+                return { desc: _escDecomp(`load ${label.toLowerCase()}`), compiler: true };
+            }
+        }
+        const caps = stored && stored._caps;
+        if (caps && imm > 0 && imm <= caps.length) {
+            return { desc: _escDecomp(`load ${caps[imm - 1].toLowerCase()}`), compiler: true };
+        }
+    }
+    if (opcode === 2) {
+        if (crDst === 6) return { desc: 'recall self', compiler: false };
+        const crNames = { 0: 'result', 1: 'arg1' };
+        if (crNames[crDst]) return { desc: `call ${crNames[crDst]}`, compiler: false };
+    }
+    if (opcode === 8) {
+        if (clistBase > 0 && (clistBase + imm) < sim.memory.length) {
+            const gtWord = sim.memory[clistBase + imm] >>> 0;
+            if (gtWord !== 0) {
+                const parsed = sim.parseGT(gtWord);
+                const label = (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
+                return { desc: _escDecomp(`eloadcall ${label.toLowerCase()}`), compiler: true };
+            }
+        }
+    }
+    if (opcode === 10 || opcode === 11) {
+        const devNames = { 12: 'led', 11: 'uart', 13: 'button', 14: 'timer' };
+        const nsOfCR = sim.parseGT(sim.cr[crSrc] ? sim.cr[crSrc].word0 : 0);
+        const devName = devNames[nsOfCR.index];
+        if (devName) {
+            return { desc: `${opcode === 10 ? 'read' : 'write'} ${devName}[${imm}]`, compiler: false };
+        }
+    }
+    if (opcode === 3) return { desc: 'return', compiler: false };
+    return null;
+}
+
+function _escDecomp(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function updateCRDetail() {
     if (selectedCR === null) return;
     const titleEl = document.getElementById('crDetailTitle');
@@ -2083,53 +2191,71 @@ function updateCRDetail() {
         const limitVal  = cr.limit17;
         const asm       = new ChurchAssembler();
 
-        // Check if word 0 at baseLoc is a lump header (magic = 0x1F in top 5 bits).
-        // If so, render it as a distinct header row and scan instructions from word +1.
         const word0 = (baseLoc < sim.memory.length) ? (sim.memory[baseLoc] >>> 0) : 0;
         const lumpHdr = sim.parseLumpHeader(word0);
 
-        let codeStart = baseLoc;           // first instruction address
-        let codeLimit = limitVal + 1;      // max words to scan (relative to codeStart)
+        let codeStart = baseLoc;
+        let codeLimit = limitVal + 1;
+
+        let _lumpClistBase = 0;
+        if (lumpHdr.valid && lumpHdr.cc > 0) {
+            _lumpClistBase = baseLoc + lumpHdr.lumpSize - lumpHdr.cc;
+        } else {
+            const _nsE = sim.readNSEntry(nsIdx);
+            if (_nsE) {
+                const _nsLim = sim.parseNSWord1(_nsE.word1_limit);
+                if (_nsLim.clistCount > 0) {
+                    _lumpClistBase = (_nsE.word0_location >>> 0) + (_nsLim.limit + 1) - _nsLim.clistCount;
+                }
+            }
+        }
 
         let codeHtml = '<table class="cr-table code-view-table"><thead><tr>';
-        codeHtml += '<th>Addr</th><th>Hex</th><th>Instruction</th>';
+        codeHtml += '<th>Addr</th><th>Hex</th><th>Instruction</th><th class="code-decompiled-hdr">Decompiled</th>';
         codeHtml += '</tr></thead><tbody>';
 
         if (lumpHdr.valid) {
-            // Show the header word as a special non-instruction row
             const typNames  = ['lump', 'data', 'thread', 'outform'];
             const typStr    = typNames[lumpHdr.typ] || String(lumpHdr.typ);
             const hdrDisasm = `.header ${typStr} n\u22126=${lumpHdr.n_minus_6}\u2192${lumpHdr.lumpSize}w`
                             + ` cw=${lumpHdr.cw} cc=${lumpHdr.cc}`;
-            codeHtml += `<tr style="opacity:0.55;font-style:italic;">`;
+            codeHtml += `<tr class="code-row-infra">`;
             codeHtml += `<td class="cr-idx">0x${baseLoc.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word0.toString(16).toUpperCase().padStart(8,'0')}</td>`;
             codeHtml += `<td class="code-disasm" style="color:var(--text-secondary);">${hdrDisasm}</td>`;
+            codeHtml += `<td class="code-decompiled code-decompiled-infra">lump header</td>`;
             codeHtml += '</tr>';
-            // Instructions start at word +1, run for cw words
             codeStart = baseLoc + 1;
             codeLimit = lumpHdr.cw;
         }
 
-        let hasCodeData = lumpHdr.valid;  // header row counts as "something shown"
+        let hasCodeData = lumpHdr.valid;
         for (let w = 0; w < codeLimit; w++) {
             const addr = codeStart + w;
             if (addr >= sim.memory.length) break;
             const word = sim.memory[addr] >>> 0;
             if (word === 0 && !hasCodeData) continue;
             hasCodeData = true;
-            // PC highlight: lump abstractions use word0+1+pc as fetch address
             const isPC    = lumpHdr.valid
                 ? (addr === baseLoc + 1 + sim.pc)
                 : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc));
             const isBP    = simBreakpoints.has(addr);
-            const rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : '');
+
+            const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase);
+            const isCompiler = decomp && decomp.compiler;
+            let rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : (isCompiler ? 'code-row-compiler' : ''));
+
             const decoded  = word === 0 ? 'NOP / HALT' : asm.disassemble(word);
             const bpDot    = isBP ? '<span class="bp-dot" title="Breakpoint">&#x25CF;</span> ' : '';
+            const decompTd = decomp
+                ? `<td class="code-decompiled ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}">${decomp.desc}</td>`
+                : '<td class="code-decompiled"></td>';
+
             codeHtml += `<tr class="${rowClass}" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="openBreakPopoverAt(${addr})">`;
             codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
             codeHtml += `<td class="code-disasm">${bpDot}${decoded}</td>`;
+            codeHtml += decompTd;
             codeHtml += '</tr>';
         }
         codeHtml += '</tbody></table>';
@@ -2140,8 +2266,7 @@ function updateCRDetail() {
                 (baseLoc + limitVal).toString(16).toUpperCase().padStart(4,'0') + ').</div>';
         } else {
             if (lumpHdr.valid && codeLimit === 0) {
-                // Header present but cw=0 — note it
-                codeHtml = codeHtml.replace('</tbody>', `<tr><td colspan="3" style="color:#555;font-style:italic;padding:0.3rem 0.5rem;">` +
+                codeHtml = codeHtml.replace('</tbody>', `<tr><td colspan="4" style="color:#555;font-style:italic;padding:0.3rem 0.5rem;">` +
                     `(cw=0 \u2014 no instruction words in this lump)</td></tr></tbody>`);
             }
             html += codeHtml;
@@ -13975,6 +14100,7 @@ function compileAndCreateAbstraction() {
     if (addResult.result) addResult.result.profile = profile;
 
     const r = addResult.result;
+    _storeLumpManifest(r.nsIndex, r.location, result.methods, result.manifest, result.capabilities);
     const freespace = r.allocSize - r.codeSize - r.clistCount;
     const clistStart = r.allocSize - r.clistCount;
     let listing = `Abstraction "${upload.abstraction}" created via Navana.Abstraction.Add:\n\n`;
