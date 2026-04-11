@@ -475,7 +475,7 @@ class ChurchOutform(Elaboratable):
                     with m.If(code7_rev == 0):
                         with m.If(defl_bfinal):
                             with m.If((wr_word_cnt == total_words) & (byte_buf_cnt == 0)):
-                                m.next = "CHECK_CRC32"
+                                m.next = "DEFL_DRAIN"
                             with m.Else():
                                 m.d.sync += self.outform_fault_type.eq(OUTFORM_FAULT_DEFL)
                                 m.next = "FAULT"
@@ -547,7 +547,7 @@ class ChurchOutform(Elaboratable):
                         byte_buf    .eq(0),
                     ]
                     with m.If(wr_word_cnt + 1 == total_words):
-                        m.next = "CHECK_CRC32"
+                        m.next = "DEFL_DRAIN"
                     with m.Else():
                         m.next = "DEFL_DECODE"
                 with m.Else():
@@ -694,7 +694,7 @@ class ChurchOutform(Elaboratable):
                         byte_buf    .eq(0),
                     ]
                     with m.If(wr_word_cnt + 1 == total_words):
-                        m.next = "CHECK_CRC32"
+                        m.next = "DEFL_DRAIN"
                     with m.Elif(defl_copy_idx + 1 >= defl_copy_len):
                         m.next = "DEFL_DECODE"
                     with m.Else():
@@ -709,6 +709,13 @@ class ChurchOutform(Elaboratable):
                         m.next = "DEFL_DECODE"
                     with m.Else():
                         m.next = "DEFL_COPY_RD"
+
+            with m.State("DEFL_DRAIN"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If(defl_rx_count >= comp_size_reg):
+                    m.next = "CHECK_CRC32"
+                with m.Elif(self.rx_valid):
+                    m.d.sync += defl_rx_count.eq(defl_rx_count + 1)
 
             # ── RLE sub-FSM (byte-pair: count + literal) ────────────────────
 
@@ -764,7 +771,7 @@ class ChurchOutform(Elaboratable):
                         byte_buf    .eq(0),
                     ]
                     with m.If(wr_word_cnt + 1 == total_words):
-                        m.next = "CHECK_CRC32"
+                        m.next = "RLE_DRAIN"
                     with m.Elif(rle_remaining <= 1):
                         m.next = "RLE_READ_COUNT"
                     with m.Else():
@@ -777,6 +784,13 @@ class ChurchOutform(Elaboratable):
                     m.d.sync += byte_buf_cnt.eq(byte_buf_cnt + 1)
                     with m.If(rle_remaining <= 1):
                         m.next = "RLE_READ_COUNT"
+
+            with m.State("RLE_DRAIN"):
+                m.d.comb += self.outform_busy.eq(1)
+                with m.If(rle_rx_count >= comp_size_reg):
+                    m.next = "CHECK_CRC32"
+                with m.Elif(self.rx_valid):
+                    m.d.sync += rle_rx_count.eq(rle_rx_count + 1)
 
             # ── Common tail states ──────────────────────────────────────────
 
