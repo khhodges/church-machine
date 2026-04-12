@@ -10424,6 +10424,7 @@ tr.itrace-fault td { color: #ff9999; }
 .dev-badge-iot { background: #1a3a4a; color: #4fc3f7; }
 .dev-badge-official { background: #2e4a1e; color: #66bb6a; border: 1px solid #4a7a2e; }
 .dev-badge-custom { background: #4a3a1a; color: #ffb74d; border: 1px solid #7a5a2e; }
+.dev-fault-badge { background: #5a1a1a; color: #ef5350; border: 1px solid #8a2222; border-radius: 4px; padding: 0 0.3rem; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem; }
 .dev-label-input {
     background: transparent;
     border: 1px solid #444;

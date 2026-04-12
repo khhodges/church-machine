@@ -2490,7 +2490,7 @@ function updateCRDetail() {
                 { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
                 { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Namespace (M=1, base=0x0000, perms=none)' },
                 { addr: 'B:02', desc: 'INIT_THRD',   decomp: 'CR12 \u2190 NS[1] Thread Identity (M=1, Inform, perms=none)' },
-                { addr: 'B:02\u00BD', desc: 'CALL_HOME',  decomp: 'UART \u2192 17-byte packet [0xCE11, board, FW, sig, UID] \u00b7 await ACK' },
+                { addr: 'B:02\u00BD', desc: 'CALL_HOME',  decomp: 'UART \u2192 19-byte packet [0xCE11, board, FW, sig, UID, reason, fault] \u00b7 await ACK' },
                 { addr: 'B:03', desc: 'INIT_ABSTR',  decomp: 'CR6 \u2190 NS[2] Boot Abstraction (M=1, E-type, transient)' },
                 { addr: 'B:04', desc: 'LOAD_NUC',    decomp: 'CR14(M=1, R+X) + CR6(M=1, L) \u2190 header \u00b7 push sentinel \u00b7 PC\u21900' },
                 { addr: 'B:05', desc: 'COMPLETE',    decomp: 'bootComplete \u2190 true \u00b7 new CRs get M=0 \u00b7 dispatch begins' },
@@ -11099,7 +11099,7 @@ function closeSettings() {
 
 function showReleaseHistory() {
     const history = [
-        { date: '2026-04-11 19:30 UTC', title: 'Cryptographic Build Signatures', changes: ['HMAC-SHA256 build signatures replace single-byte build tag', 'Server-side signature verification with constant-time comparison', '17-byte call-home packet with 4-byte HMAC field', 'Official/Custom Build badges (green/amber) in Devices view', 'MTBF gate: maxSteps runs count as failed; editor input clears history', 'Quick-start docs improved with toolbar icon reference and DigiKey link'] },
+        { date: '2026-04-11 19:30 UTC', title: 'Cryptographic Build Signatures', changes: ['HMAC-SHA256 build signatures replace single-byte build tag', 'Server-side signature verification with constant-time comparison', '19-byte call-home packet with 4-byte HMAC, boot_reason, last_fault fields', 'Official/Custom Build badges (green/amber) in Devices view', 'MTBF gate: maxSteps runs count as failed; editor input clears history', 'Quick-start docs improved with toolbar icon reference and DigiKey link'] },
         { date: '2026-03-29 22:15 UTC', title: 'Consistency & Hardware Updates', changes: ['Consistency audits completed', 'Simulator GT type mapping fixed (Inform/Outform/Abstract)', 'Hardware deployment plan for Efinix Ti60 F225 created', 'Settings button order corrected', 'Lump size specification unified (64-word minimum)'] },
         { date: '2026-03-24 00:00 UTC', title: 'Locator & Docs', changes: ['Locator rename completed', 'Namespace docs refreshed', 'CLOOMC++ tutorials updated'] }
     ];
@@ -11474,8 +11474,8 @@ const WHATS_NEW_FEATURES = [
         title: "FPGA call-home",
         html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4E1; FPGA call-home &mdash; boards register automatically</div>` +
             `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
-            `When a Tang Nano 20K boots with the current bitstream, it sends a 13-byte call-home packet ` +
-            `over UART. The bridge detects this, sends an acknowledgment, and registers the board with the IDE. ` +
+            `When a Tang Nano 20K boots with the current bitstream, it sends a 19-byte call-home packet ` +
+            `over UART (including boot reason and last fault code). The bridge detects this, sends an acknowledgment, and registers the board with the IDE. ` +
             `A 60-second heartbeat keeps the board marked as online.</p>` +
             `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
             `No manual registration needed &mdash; plug in, flash, run bridge, done.</p>`
@@ -16369,6 +16369,19 @@ function loadDeviceList() {
                 const isOnline = dev.status === 'online';
                 const profileClass = dev.profile === 'IoT' ? 'dev-badge-iot' : 'dev-badge-full';
                 const lastSeen = dev.last_seen ? new Date(dev.last_seen * 1000).toLocaleString() : 'never';
+                const _bootReasonNames = {0: 'Cold', 1: 'Warm', 2: 'Fault'};
+                const _faultNames = {
+                    0:'None',1:'PERM_R',2:'PERM_W',3:'PERM_X',4:'PERM_L',5:'PERM_S',
+                    6:'PERM_E',7:'NULL_CAP',8:'BOUNDS',9:'VERSION',10:'SEAL',
+                    11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
+                    15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
+                    18:'STACK_CORRUPT',19:'STACK_UNDERFLOW'
+                };
+                const bootReasonStr = _bootReasonNames[dev.boot_reason] || ('0x' + (dev.boot_reason || 0).toString(16));
+                const faultStr = dev.last_fault ? (_faultNames[dev.last_fault] || ('0x' + dev.last_fault.toString(16))) : '';
+                const faultBadge = dev.boot_reason === 2 && dev.last_fault
+                    ? ' <span class="dev-fault-badge">' + _escHtml(faultStr) + '</span>'
+                    : '';
                 const card = document.createElement('div');
                 card.className = 'dev-card';
                 card.id = 'devCard_' + dev.id;
@@ -16380,6 +16393,7 @@ function loadDeviceList() {
                             '<span>UID: ' + _escHtml(dev.device_uid) + '</span>' +
                             '<span>FW: ' + _escHtml(dev.fw_version) + '</span>' +
                             '<span>Boots: ' + dev.boot_count + '</span>' +
+                            '<span>Boot: ' + _escHtml(bootReasonStr) + faultBadge + '</span>' +
                             '<span>Seen: ' + _escHtml(lastSeen) + '</span>' +
                         '</div>' +
                         '<div class="dev-deploy-status" style="display:none;"></div>' +

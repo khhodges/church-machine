@@ -479,6 +479,9 @@ class ChurchTangNano20K(Elaboratable):
         fault_byte = Signal(8)
         m.d.comb += fault_byte.eq(FAULT_MSG[fault_msg_idx])
 
+        boot_reason = Signal(8, init=0x00)
+        last_fault_code = Signal(8, init=0x00)
+
         step_nia = Signal(32)
         step_fault = Signal(4)
         step_had_fault = Signal()
@@ -528,7 +531,23 @@ class ChurchTangNano20K(Elaboratable):
                         ]
                         m.d.sync += callhome_idx.eq(callhome_idx + 1)
                     with m.Else():
-                        m.next = "DUMP_NIA"
+                        m.next = "CALL_HOME_DYN0"
+
+            with m.State("CALL_HOME_DYN0"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        fsm_byte_data.eq(boot_reason),
+                        fsm_send_byte.eq(1),
+                    ]
+                    m.next = "CALL_HOME_DYN1"
+
+            with m.State("CALL_HOME_DYN1"):
+                with m.If(~debug.busy):
+                    m.d.comb += [
+                        fsm_byte_data.eq(last_fault_code),
+                        fsm_send_byte.eq(1),
+                    ]
+                    m.next = "DUMP_NIA"
 
             with m.State("DUMP_NIA"):
                 with m.If(~debug.busy):
@@ -603,6 +622,8 @@ class ChurchTangNano20K(Elaboratable):
                         step_fault.eq(core.fault),
                         step_had_fault.eq(1),
                         fault_msg_idx.eq(0),
+                        last_fault_code.eq(core.fault),
+                        boot_reason.eq(0x02),
                     ]
                     m.next = "STEP_FAULT_LABEL"
 
@@ -615,6 +636,11 @@ class ChurchTangNano20K(Elaboratable):
                         step_had_fault.eq(core.fault_valid),
                         step_idx.eq(0),
                     ]
+                    with m.If(core.fault_valid):
+                        m.d.sync += [
+                            last_fault_code.eq(core.fault),
+                            boot_reason.eq(0x02),
+                        ]
                     m.next = "STEP_LABEL"
 
             with m.State("STEP_LABEL"):

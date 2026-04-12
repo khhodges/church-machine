@@ -39,7 +39,7 @@ _rx_lock   = threading.Lock()
 _reader_running = False
 
 CALLHOME_MAGIC = bytes([0xCE, 0x11])
-CALLHOME_PKT_LEN = 17
+CALLHOME_PKT_LEN = 19
 CALLHOME_ACK = bytes([0xCE, 0x22])
 
 _IDE_SERVER_URL = None
@@ -63,10 +63,15 @@ def _handle_callhome(pkt):
     build_sig = list(pkt[5:9])
     uid_bytes = pkt[9:17]
     uid_hex = uid_bytes.hex()
+    boot_reason = pkt[17] if len(pkt) > 17 else 0
+    last_fault = pkt[18] if len(pkt) > 18 else 0
     _device_uid = uid_hex
     board_name, profile = BOARD_TYPES.get(board_type, (f"Unknown-0x{board_type:02X}", "Full"))
     sig_hex = bytes(build_sig).hex()
-    print(f'  [CALL HOME] Board: {board_name}  FW: {fw_major}.{fw_minor}  Sig: {sig_hex}  UID: {uid_hex}')
+    reason_names = {0x00: "cold", 0x01: "warm", 0x02: "fault"}
+    reason_str = reason_names.get(boot_reason, f"0x{boot_reason:02X}")
+    fault_str = f"  LastFault: 0x{last_fault:02X}" if last_fault else ""
+    print(f'  [CALL HOME] Board: {board_name}  FW: {fw_major}.{fw_minor}  Sig: {sig_hex}  UID: {uid_hex}  Reason: {reason_str}{fault_str}')
 
     with _ser_lock:
         s = _ser
@@ -78,14 +83,14 @@ def _handle_callhome(pkt):
             print(f'  [CALL HOME] ACK send failed: {e}')
 
     if _IDE_SERVER_URL:
-        _register_with_ide(uid_hex, board_type, board_name, profile, fw_major, fw_minor, build_sig)
+        _register_with_ide(uid_hex, board_type, board_name, profile, fw_major, fw_minor, build_sig, boot_reason, last_fault)
         if not _heartbeat_running:
             _heartbeat_running = True
             hb = threading.Thread(target=_heartbeat_thread, daemon=True)
             hb.start()
 
 
-def _register_with_ide(uid, board_type, board_name, profile, fw_major, fw_minor, build_sig=None):
+def _register_with_ide(uid, board_type, board_name, profile, fw_major, fw_minor, build_sig=None, boot_reason=0, last_fault=0):
     import socket
     try:
         import urllib.request
@@ -96,6 +101,8 @@ def _register_with_ide(uid, board_type, board_name, profile, fw_major, fw_minor,
             "fw_major": fw_major,
             "fw_minor": fw_minor,
             "build_sig": bytes(build_sig or [0,0,0,0]).hex(),
+            "boot_reason": boot_reason,
+            "last_fault": last_fault,
             "bridge_host": socket.gethostname(),
             "bridge_port": HTTP_PORT,
             "bridge_scheme": _BRIDGE_SCHEME,

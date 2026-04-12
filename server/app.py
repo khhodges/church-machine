@@ -1251,6 +1251,14 @@ def device_register():
     build_sig_hex = data.get("build_sig", "00000000")
     profile = data.get("profile", "Full")
     build_verified = _verify_build_sig(board_type, fw_major, fw_minor, build_sig_hex)
+    try:
+        boot_reason = max(0, min(255, int(data.get("boot_reason", 0))))
+    except (ValueError, TypeError):
+        boot_reason = 0
+    try:
+        last_fault = max(0, min(255, int(data.get("last_fault", 0))))
+    except (ValueError, TypeError):
+        last_fault = 0
     bridge_host = data.get("bridge_host", "")
     bridge_port = int(data.get("bridge_port", 0))
     bridge_scheme = data.get("bridge_scheme", "http")
@@ -1267,6 +1275,8 @@ def device_register():
         dev.fw_minor = fw_minor
         dev.build_sig = build_sig_hex
         dev.build_verified = 1 if build_verified else 0
+        dev.boot_reason = boot_reason
+        dev.last_fault = last_fault
         dev.bridge_host = bridge_host
         dev.bridge_port = bridge_port
         dev.bridge_scheme = bridge_scheme
@@ -1284,6 +1294,8 @@ def device_register():
             fw_minor=fw_minor,
             build_sig=build_sig_hex,
             build_verified=1 if build_verified else 0,
+            boot_reason=boot_reason,
+            last_fault=last_fault,
             bridge_host=bridge_host,
             bridge_port=bridge_port,
             bridge_scheme=bridge_scheme,
@@ -1343,6 +1355,8 @@ def device_list():
             "boot_count": d.boot_count,
             "build_verified": bool(getattr(d, 'build_verified', 0)),
             "official": bool(getattr(d, 'build_verified', 0)),
+            "boot_reason": getattr(d, 'boot_reason', 0) or 0,
+            "last_fault": getattr(d, 'last_fault', 0) or 0,
             "label": d.label or "",
         })
     db.session.commit()
@@ -1453,6 +1467,14 @@ with app.app_context():
         db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN bridge_scheme VARCHAR(8) DEFAULT 'http'"))
         db.session.commit()
         logging.info("Migrated: added bridge_scheme column to devices table")
+    if "boot_reason" not in _existing_cols:
+        db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN boot_reason INTEGER DEFAULT 0"))
+        db.session.commit()
+        logging.info("Migrated: added boot_reason column to devices table")
+    if "last_fault" not in _existing_cols:
+        db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN last_fault INTEGER DEFAULT 0"))
+        db.session.commit()
+        logging.info("Migrated: added last_fault column to devices table")
 
     logging.info("Database tables created")
 
