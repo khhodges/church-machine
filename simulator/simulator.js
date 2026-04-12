@@ -3322,6 +3322,22 @@ class ChurchSimulator {
         const hdr = this.parseLumpHeader(hdrWord);
         const lumpSize = hdr.lumpSize;   // 64 for n_minus_6=0
 
+        // Validate that the payload is consistent with the declared header size.
+        // The server must return exactly lumpSize words; reject truncated or oversized payloads.
+        if (lumpWords.length < lumpSize) {
+            this.awaitingLump = null;
+            this.fault('LUMP_SIZE', `receiveLump: payload is ${lumpWords.length} words, header declares ${lumpSize} (truncated)`);
+            return { ok: false, message: 'truncated lump payload' };
+        }
+        // cw (code words) and cc (c-list slots) must fit within the declared lump size.
+        const cw_check = hdr.cw;
+        const cc_check = hdr.cc;
+        if (cw_check + cc_check >= lumpSize) {
+            this.awaitingLump = null;
+            this.fault('LUMP_LAYOUT', `receiveLump: cw=${cw_check}+cc=${cc_check} >= lumpSize=${lumpSize} (layout overflow)`);
+            return { ok: false, message: 'lump layout overflow' };
+        }
+
         // Find the next aligned free slot (above all resident NS lumps).
         const freeBase = this._findFreeSlot(lumpSize);
         if (freeBase + lumpSize > this.NS_TABLE_BASE) {
