@@ -2868,6 +2868,10 @@ function updateCRDetail() {
     } else {
         contentEl.classList.remove('crd-content-thread');
     }
+    requestAnimationFrame(() => {
+        const pcRow = contentEl.querySelector('.code-pc-row');
+        if (pcRow) pcRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 }
 
 function updateDRDisplay() {
