@@ -1223,7 +1223,7 @@ class ChurchSimulator {
         const token = this._outformToken96(entry);
         const label = this.nsLabels[targetIdx] || 'entry_' + targetIdx;
         this.awaitingLump = { nsIndex: targetIdx, retryPC: this.pc, d, token };
-        this.output += `\u27F3 ${instrName}: Slot ${targetIdx} (${label}) is Outform — suspending, token=0x${token}\n`;
+        this.output += `\u27F3 Fetching lump: Slot ${targetIdx} (${label}) [${instrName}] — token=0x${token}\n`;
         return { absent: true, nsIndex: targetIdx, token, label };
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -3323,7 +3323,7 @@ class ChurchSimulator {
         const lumpSize = hdr.lumpSize;   // 64 for n_minus_6=0
 
         // Validate that the payload is consistent with the declared header size.
-        // The server must return exactly lumpSize words; reject truncated or oversized payloads.
+        // Truncated payloads (fewer words than declared) are rejected; extra words are ignored.
         if (lumpWords.length < lumpSize) {
             this.awaitingLump = null;
             this.fault('LUMP_SIZE', `receiveLump: payload is ${lumpWords.length} words, header declares ${lumpSize} (truncated)`);
@@ -3360,7 +3360,7 @@ class ChurchSimulator {
         this.writeNSEntry(nsIndex, freeBase, limit17, 0, 0, 0, 0, 1 /*gtType=Inform*/, 0, cc);
 
         const label = this.nsLabels[nsIndex] || 'entry_' + nsIndex;
-        this.output += `\u2713 Lazy loaded: Slot ${nsIndex} (${label}) — ${lumpSize} words at 0x${freeBase.toString(16)}\n`;
+        this.output += `\u2713 Installed: ${label} — ${lumpSize} words @ 0x${freeBase.toString(16)} [Slot ${nsIndex}]\n`;
 
         // Restore PC to the retry instruction and clear the suspend state.
         this.pc = retryPC;
