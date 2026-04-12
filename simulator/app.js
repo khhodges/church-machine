@@ -2277,7 +2277,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
                 if (ledNow !== null) {
                     const willBe = drV & 1 ? 'ON' : 'OFF';
                     const was = ledNow ? 'ON' : 'OFF';
-                    const transition = (ledNow & 1) === (drV & 1) ? `stays ${willBe}` : `${was} \u2192 ${willBe}`;
+                    const transition = (ledNow & 1) === (drV & 1) ? `turns ${willBe}` : `${was} \u2192 ${willBe}`;
                     valStr = ` (LED${imm}: ${transition})`;
                 } else {
                     valStr = ` (=${drV} \u2192 LED${imm} ${drV & 1 ? 'ON' : 'OFF'})`;
