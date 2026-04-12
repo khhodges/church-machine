@@ -16485,6 +16485,13 @@ function showDeviceFaultLog(deviceUid) {
             if (niaKeys.length === 0) {
                 html += '<div class="fault-log-empty">No fault events recorded.</div>';
             } else {
+                niaKeys.sort(function(a, b) {
+                    var ia = mtbfMap[a], ib = mtbfMap[b];
+                    var ma = ia.mtbf !== null ? ia.mtbf : Infinity;
+                    var mb = ib.mtbf !== null ? ib.mtbf : Infinity;
+                    if (ma !== mb) return ma - mb;
+                    return ib.count - ia.count;
+                });
                 html += '<table class="fault-mtbf-table"><thead><tr>' +
                     '<th>Address</th><th>Location</th><th>Faults</th><th>MTBF</th>' +
                     '</tr></thead><tbody>';
