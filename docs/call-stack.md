@@ -127,11 +127,12 @@ The CHANGE instruction performs thread context switching by modifying the thread
 | **Mnemonic** | `CHANGE CRs` |
 | **Required Permission** | E (Enter) on source CR |
 | **Operation** | Full atomic thread swap via thread table |
-| **Context Saved** | DR0-DR15, CR0-CR12, CR14, CR15, STO, PC, FLAGS, LAMBDA state |
-| **Context Loaded** | Incoming thread's DR0-DR15, CR0-CR12, CR14, CR15, STO, PC, FLAGS, LAMBDA state; CR5 re-installed from incoming Zone ④ bounds |
-| **CR13 — Unchanged** | IRQ handler — system-wide, shared by all threads |
+| **Context Saved** | DR0-DR15, CR0-CR11, CR14, CR15, STO, PC, FLAGS, LAMBDA state |
+| **Context Loaded** | Incoming thread's DR0-DR15, CR0-CR11, CR14, CR15, STO, PC, FLAGS, LAMBDA state; CR5 re-installed from incoming Zone ④ bounds |
+| **CR12 — Unchanged** | Data fault handler — system-wide, shared by all threads |
+| **CR13 — Unchanged** | Interrupt handler — system-wide, shared by all threads |
 
-CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, CR0–CR12 (including CR12 Thread Identity), CR14 (code register), CR15 (namespace root), the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. Only CR13 (IRQ handler) is system-wide and is never touched by CHANGE. To write CR13, code must use SWITCH — the explicit privilege gate — presenting the correct PassKey.
+CHANGE performs a full atomic swap of per-thread state: data registers DR0–DR15, the 12 programmer-accessible capability registers CR0–CR11, CR14 (code register), CR15 (namespace root), the hidden STO (Stack Top Offset), PC, condition FLAGS, and LAMBDA state. CR5 (Heap GT) is re-installed automatically from the incoming thread's Zone ④ bounds. CR12 (data fault handler) and CR13 (interrupt handler) are system-wide and are never touched by CHANGE. To write CR13, code must use SWITCH — the explicit privilege gate — presenting the correct PassKey.
 
 ### THREAD_HDR — Hidden Per-Thread Machine Register
 
@@ -159,7 +160,7 @@ This "restore-only from an immutable source" pattern eliminates the save path en
 
 ## SWITCH: The Privilege Gate
 
-SWITCH is the sole mechanism for writing to the two system-wide registers **CR13** (IRQ Thread) and **CR15** (Namespace root). CR12 (Thread Identity) is managed automatically by CHANGE and cannot be written by user instructions. CR14 (transient code-view) is re-derived by cLoad on every CALL and is equally off-limits.
+SWITCH is the sole mechanism for writing to the two system-wide registers **CR13** (IRQ Thread) and **CR15** (Namespace root). CR12 (data fault handler) is a system-wide register that cannot be written by user instructions. CR14 (transient code-view) is re-derived by cLoad on every CALL and is equally off-limits.
 
 | Aspect | Detail |
 |--------|--------|
@@ -179,7 +180,7 @@ SWITCH enforces two mandatory checks on the source register **CRs** before insta
 
 The sentinel values occupy the top of the 32-bit Abstract Address Space — a range no real RAM lump can occupy — so there is no ambiguity between a PassKey and a live capability. Presenting a CR13 PassKey to the CR15 target (or vice versa) is a sentinel mismatch and faults immediately.
 
-Only code that already holds the appropriate PassKey in an instruction-addressable register (CR0–CR7) can install it into a system register. This makes SWITCH a one-way privilege gate: without the right PassKey, no code can overwrite a live system register regardless of what other permissions it holds.
+Only code that already holds the appropriate PassKey in an instruction-addressable register (CR0–CR11) can install it into a system register. This makes SWITCH a one-way privilege gate: without the right PassKey, no code can overwrite a live system register regardless of what other permissions it holds.
 
 ### SWITCH PassKeys as Abstract GT I/O Tokens
 

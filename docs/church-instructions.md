@@ -145,37 +145,36 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 ### 5. CHANGE — Change Thread Context
 
-**Purpose**: Create or set a new thread identity by writing to CR8 (Thread register). This is the mechanism for context switching between threads.
+**Purpose**: Suspend the current thread and activate another — full atomic context swap. CHANGE indexes a Thread Abstraction GT from a C-List and performs the complete per-thread state exchange.
 
-**Validation Path**: Routes through mLoad — full validation with G-bit reset.
+**Validation Path**: Indexes CRd at offset idx; verifies E permission on the Thread Abstraction GT.
 
 **Operation**:
-1. Obtain source capability
-2. Write to CR8 (Thread identity)
-3. Reset G=0 on accessed namespace entries
-4. Advance the PC
+1. Index CRd at offset idx; verify the GT has E permission — FAULT on fail
+2. Suspend outgoing thread: save per-thread state (DR0–DR15, CR0–CR11, CR14, CR15, STO, PC, FLAGS) into its thread lump
+3. Activate incoming thread: restore per-thread state from its thread lump
+4. The suspended thread resumes exactly where it left off
 
-**Mnemonic**: `CHANGE CRs`
+**Mnemonic**: `CHANGE CRd, idx`
 
 | Aspect | Detail |
 |--------|--------|
-| **Permission Check** | E (Enter) on source CR |
-| **Target** | CR8 (Thread) — full atomic thread swap |
+| **Permission Check** | E (Enter) on Thread Abstraction GT at CRd[idx] |
+| **Per-Thread Saved/Restored** | DR0–DR15, CR0–CR11, CR14 (code), CR15 (namespace root), STO, PC, FLAGS |
+| **System-Wide Unchanged** | CR12 (data fault handler), CR13 (interrupt handler) |
 | **G-bit Reset** | Yes — on accessed namespace entries |
-| **Save Side** | Saves data registers and PC to thread table (CRs always current via mLoad shadow) |
-| **Restore Side** | CRs restored from thread table via mLoad revalidation; data registers restored directly |
 
 ---
 
 ### 6. SWITCH — Install PassKey into System Register
 
-**Purpose**: Write a PassKey capability into system register CR13 (IRQ Thread) or CR15 (Namespace root). This is the only instruction that can modify these system-wide registers, making it the privilege gate for namespace and interrupt management. CR12 (Thread Identity) and CR14 (transient code-view) cannot be SWITCH targets.
+**Purpose**: Write a PassKey capability into system register CR13 (IRQ Thread) or CR15 (Namespace root). This is the only instruction that can modify these system-wide registers, making it the privilege gate for namespace and interrupt management. CR12 (data fault handler) and CR14 (transient code-view) cannot be SWITCH targets.
 
 **Validation Path**: Two mandatory hardware checks before the write; namespace access via mLoad with G-bit reset.
 
 **Operation**:
 1. Decode the 3-bit `Tgt` field; FAULT if Tgt is not CR13 (101₂) or CR15 (111₂)
-2. Check source register is CR0–CR7 (3-bit encoding); FAULT if out of range
+2. Check source register is CR0–CR11 (4-bit encoding); FAULT if out of range
 3. **PassKey type check** — CRs.word0_gt.gt_type must equal `11₂` (Abstract GT); FAULT if not
 4. **Sentinel address check** — CRs.word1_location must equal the reserved hardware sentinel for the chosen target; FAULT on mismatch:
    - Tgt = CR13: sentinel = `0xFFFFFFFE` (all-1s − 1)
@@ -192,7 +191,7 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **Sentinel for CR15** | CRs.word1_location == `0xFFFFFFFF` (all-1s) |
 | **Sentinel mismatch** | CRs sentinel does not match chosen target → FAULT |
 | **G-bit Reset** | Yes — via mLoad on namespace access |
-| **Not writable by SWITCH** | CR12 (Thread Identity, managed by CHANGE), CR14 (transient cLoad output) |
+| **Not writable by SWITCH** | CR12 (data fault handler, system-wide), CR14 (transient cLoad output) |
 
 ---
 

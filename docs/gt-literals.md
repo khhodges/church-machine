@@ -260,6 +260,8 @@ A proposal to alias a range of capability registers to a range of data registers
 - Aliasing risks security gaps if capability state leaks through the data register interface
 - The clean separation is preserved better without aliasing
 
+This proposal is inapplicable: CR12–CR15 are defined as the privileged system register range (CR12 = data fault handler, CR13 = interrupt handler, CR14 = code register, CR15 = namespace root). Hardware faults on any instruction that encodes values 12–15 in a register field, with the sole exception of DREAD/DWRITE which may use CR14 as a source. Aliasing them to data registers is architecturally incompatible with this privilege model.
+
 ---
 
 ## Summary: Clean Architecture, Secure Defaults

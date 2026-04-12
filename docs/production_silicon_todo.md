@@ -16,8 +16,8 @@ This document tracks requirements for synthesizing the Church Machine Verilog to
 **Architecture notes**:
 - CR12: Data fault handler capability (system-wide, unchanged by CHANGE)
 - CR13: Interrupt handler capability (system-wide, unchanged by CHANGE)
-- CR14: Code register — transient, re-derived by cLoad on the next CALL (unchanged by CHANGE)
-- CR15: Namespace root (system-wide, unchanged by CHANGE)
+- CR14: Code register — per-thread, saved/restored by CHANGE; re-derived by cLoad on every CALL
+- CR15: Namespace root — per-thread, saved/restored by CHANGE
 - Note: Current implementation writes GT (Word 0) only; full capability writes via mLoad path
 
 ### 2. Memory Latency Handling for I=1 Mode

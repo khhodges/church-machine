@@ -13078,12 +13078,12 @@ const INSTRUCTION_DATA = [
           + '  3. Activate incoming thread: restore per-thread state from its thread lump.\n\n'
           + 'Per-thread registers saved and restored:\n'
           + '  CR0\u2013CR11  (programmer-accessible capability registers)\n'
-          + '  CR12      (Thread Identity \u2014 privileged, per-thread)\n'
           + '  CR14      (code register \u2014 privileged, per-thread)\n'
           + '  CR15      (namespace root \u2014 privileged, per-thread)\n'
           + '  STO       (stack-top-offset hidden register \u2014 per-thread)\n'
           + '  DR0\u2013DR15, PC, flags\n\n'
-          + 'System-wide register unchanged during CHANGE:\n'
+          + 'System-wide registers unchanged during CHANGE:\n'
+          + '  CR12 (data fault handler) \u2014 shared across all threads\n'
           + '  CR13 (interrupt handler) \u2014 shared across all threads\n\n'
           + 'The suspended thread resumes exactly where it left off.',
         example: 'CHANGE CR6, 3        ; Activate Thread Abstraction at c-list offset 3 in CR6',
@@ -13776,10 +13776,10 @@ Slots:
   CR11  General purpose
 
 Privileged zone (CR12–CR15) — hardware FAULT if used in most instructions:
-  CR12  Thread identity (priv, zero-perm, Inform-type)
-  CR13  Kernel reserved
-  CR14  Code region (X-only, set by CALL)
-  CR15  Stack / boot anchor
+  CR12  Data fault handler (system-wide, unchanged by CHANGE)
+  CR13  Interrupt handler (system-wide, unchanged by CHANGE)
+  CR14  Code region (X-only, set by CALL; per-thread, saved/restored by CHANGE)
+  CR15  Namespace root (per-thread, saved/restored by CHANGE)
 
 The C-List is loaded at boot via mLoad(NS Slot 1, B-perm check).
 CALL updates CR6 and CR14. CHANGE swaps the full context.`,
