@@ -6522,7 +6522,6 @@ function slowBoot() {
 }
 
 function runSim() {
-    switchView('dashboard');
     while (!sim.bootComplete && !sim.halted) {
         try {
             sim._bootStep();
