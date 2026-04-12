@@ -262,12 +262,6 @@ class ChurchAssembler {
             }
             case 2: {
                 crDst = this._parseCR(parts[1], lineNum);
-                if (parts[2]) {
-                    crSrc = this._parseCR(parts[2], lineNum);
-                }
-                if (parts[3]) {
-                    imm = this._parseImm(parts[3], lineNum);
-                }
                 break;
             }
             case 3: {
@@ -513,11 +507,7 @@ class ChurchAssembler {
         switch (opcode) {
             case 0: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
             case 1: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-            case 2: {
-                if (imm !== 0) return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-                if (crSrc !== 0) return `${mnemonic} CR${crDst}, CR${crSrc}`;
-                return `${mnemonic} CR${crDst}`;
-            }
+            case 2: return `${mnemonic} CR${crDst}`;
             case 3: {
                 const retMask = imm & 0xFFF;
                 return retMask ? `${mnemonic} 0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;

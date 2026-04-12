@@ -1691,58 +1691,6 @@ class ChurchSimulator {
     }
 
     _execCall(d) {
-        // If crSrc is specified, load the capability from crSrc's c-list[imm]
-        // into crDst first, then call what's in crDst.
-        if (d.crSrc !== 0) {
-            const clistGT = this.cr[d.crSrc].word0;
-            if (clistGT === 0) {
-                this.fault('NULL_CAP', `CALL: CR${d.crSrc} (source) is NULL`);
-                return null;
-            }
-            let clistLoc, clistSize;
-            if (d.crSrc === 6) {
-                clistLoc = this.cr[6].word1;
-                clistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
-            } else {
-                const lumpBase = this.cr[d.crSrc].word1;
-                const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `CALL CR${d.crSrc} lump-hdr`);
-                if (!hdrRead.ok) { this.fault(hdrRead.fault, hdrRead.message); return null; }
-                const hdr = this.parseLumpHeader(hdrRead.value);
-                clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
-                clistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
-            }
-            const absAddr = (clistLoc + d.imm) >>> 0;
-            const clistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
-            const loadCheck = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc, absAddr, clistRange);
-            if (!loadCheck.ok) {
-                this.fault(loadCheck.fault, `CALL load: CR${d.crSrc}: ${loadCheck.message}`);
-                return null;
-            }
-            const slotGT = this.memory[clistLoc + d.imm] || 0;
-            if (slotGT === 0) {
-                this.fault('NULL_CAP', `CALL: c-list[${d.imm}] via CR${d.crSrc} is empty`);
-                return null;
-            }
-            const slotParsed = this.parseGT(slotGT);
-            const targetIdx = slotParsed.index;
-            if (targetIdx >= this.nsCount || !this.isNSEntryValid(targetIdx)) {
-                this.fault('BOUNDS', `CALL: namespace index ${targetIdx} out of bounds`);
-                return null;
-            }
-            const loadEntry = this.readNSEntry(targetIdx);
-            if (!loadEntry) {
-                this.fault('BOUNDS', `CALL: entry ${targetIdx} is null`);
-                return null;
-            }
-            const absentCheck = this._absentLumpIntercept(loadEntry, targetIdx, d, 'CALL');
-            if (absentCheck) return absentCheck;
-            if (!this.validateMAC(loadEntry)) {
-                this.fault('SEAL', `CALL: entry ${targetIdx} seal failed`);
-                return null;
-            }
-            if (!this._writeCR(d.crDst, slotGT, loadEntry)) return null;
-        }
-
         const sourceGT = this.cr[d.crDst].word0;
         if (sourceGT === 0) {
             this.fault('NULL_CAP', `CALL: CR${d.crDst} is NULL`);
