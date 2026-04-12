@@ -2273,7 +2273,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
         if (drV !== null) {
             const nsCheckIdx = sim.cr && sim.cr[crSrc] ? sim.parseGT(sim.cr[crSrc].word0).index : -1;
             if (nsCheckIdx === 12) {
-                const ledNow = (sim.ledBits !== undefined && opcode === 11) ? (sim.ledBits >> imm) & 1 : null;
+                const ledNow = (opcode === 11 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> imm) & 1 : null;
                 const nowStr = ledNow !== null ? ` · LED${imm} now ${ledNow ? 'ON' : 'OFF'}` : '';
                 valStr = ` (=${drV} → LED${imm} ${drV & 1 ? 'ON' : 'OFF'}${nowStr})`;
             } else if (nsCheckIdx === 11) {
