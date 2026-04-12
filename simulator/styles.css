@@ -1469,6 +1469,14 @@ header h1 {
 
 .btn-walk:hover { background: #5b21b6; }
 
+.btn-lazy {
+    background: #0f2a1a;
+    border-color: #34d399;
+    color: #34d399;
+}
+
+.btn-lazy:hover { background: #064e3b; }
+
 .btn-deploy {
     background: #1e3a5f;
     border-color: var(--church-blue);

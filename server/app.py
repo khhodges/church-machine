@@ -1221,6 +1221,51 @@ def bitstream_list():
     return jsonify({"ok": True, "bitstreams": result})
 
 
+# ── Lazy-load lump endpoint ────────────────────────────────────────────────────
+# The simulator calls GET /api/lump/<token_hex> when it encounters an Outform NS
+# entry (gtType=2).  For the end-to-end lazy-load test a single pre-built 64-word
+# raw lump (METHOD_STORE, no compression) is served for token 0xDEAD0003.
+# The lump format matches the Church Machine LUMP_HEADER_LAYOUT:
+#   word 0 : header  — magic=0x1F, n_minus_6=0 (lumpSize=64), cw=1, typ=0, cc=1
+#   word 1 : code    — NOP / HALT (0x00000000)
+#   words 2-62 : freespace (all zeros)
+#   word 63  : c-list slot 0 (NULL GT, filled at runtime)
+LAZY_LUMPS = {}
+
+def _build_lazy_lumps():
+    import struct
+    magic      = 0x1F
+    n_minus_6  = 0          # lumpSize = 2^(0+6) = 64 words
+    cw         = 1          # 1 code word (NOP/HALT at word[1])
+    typ        = 0          # object type: lump
+    cc         = 1          # 1 c-list slot (at word[63])
+    header     = ((magic & 0x1F) << 27) | ((n_minus_6 & 0xF) << 23) | \
+                 ((cw & 0x1FFF) << 10) | ((typ & 0x3) << 8) | (cc & 0xFF)
+    words      = [0] * 64
+    words[0]   = header     # lump header
+    words[1]   = 0          # NOP / HALT instruction
+    words[63]  = 0          # c-list slot 0 — NULL GT (placeholder)
+    # Pack as 64 big-endian uint32 values
+    data = struct.pack('>64I', *words)
+    LAZY_LUMPS['dead0003'] = data   # token for Math.Add (matches simulator MATH_ADD_TOKEN)
+
+_build_lazy_lumps()
+
+@app.route("/api/lump/<token_hex>")
+def get_lump(token_hex):
+    """Serve a pre-built raw lump binary for the simulator lazy-load test."""
+    key = token_hex.lower().lstrip('0') or '0'
+    # Also try with zero-padding to 8 chars
+    key8 = token_hex.lower().zfill(8)
+    data = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
+    if data is None:
+        return jsonify({"error": f"Unknown lump token: {token_hex}"}), 404
+    from flask import Response
+    return Response(data, mimetype='application/octet-stream',
+                    headers={'Content-Length': str(len(data))})
+# ──────────────────────────────────────────────────────────────────────────────
+
+
 import time as _time
 import hmac as _hmac
 import hashlib as _hashlib

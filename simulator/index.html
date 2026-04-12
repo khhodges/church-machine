@@ -133,6 +133,7 @@
                         </div>
                     </div>
                     <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence">&#x21BA;</button>
+                    <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
                     <button class="btn fpga-conn-btn" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">&#x26AC; FPGA</button>
                     <button class="btn fpga-conn-btn fpga-bridge-btn" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">&#x1F310; Bridge</button>
                     <button class="btn fpga-conn-btn fpga-readbram-btn" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">&#x1F4C4; BRAM</button>

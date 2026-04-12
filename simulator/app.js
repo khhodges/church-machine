@@ -6226,6 +6226,26 @@ function stepSim() {
         openCRDetail(14);
         return;
     }
+    if (result && result.absent) {
+        // Absent-lump: simulator suspended waiting for a lazy-load fetch.
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            con.textContent += `\n⟳ Absent lump — fetching Slot ${result.nsIndex} (${result.label}) token=0x${result.token}`;
+            con.scrollTop = con.scrollHeight;
+        }
+        updateDashboard();
+        switchView('dashboard');
+        openCRDetail(14);
+        triggerLazyLoad(result);
+        return;
+    }
+    if (result && result.suspended) {
+        // Already waiting for a fetch — don't do anything.
+        updateDashboard();
+        switchView('dashboard');
+        openCRDetail(14);
+        return;
+    }
     if (result) {
         const con = document.getElementById('editorConsole');
         if (con) {
@@ -6621,6 +6641,22 @@ function runSim() {
                 con.scrollTop = con.scrollHeight;
             }
 
+            // Absent-lump: sim suspended mid-run waiting for a lazy fetch.
+            if (sim.awaitingLump) {
+                if (runBtn) { runBtn.disabled = false; runBtn.style.opacity = ''; }
+                if (con) {
+                    const al = sim.awaitingLump;
+                    const lines = con.textContent.split('\n');
+                    lines[lines.length - 1] = `⟳ Absent lump — fetching Slot ${al.nsIndex} token=0x${al.token}  (${totalSteps} steps)`;
+                    con.textContent = lines.join('\n');
+                    con.scrollTop = con.scrollHeight;
+                }
+                updateDashboard();
+                switchView('dashboard');
+                openCRDetail(14);
+                triggerLazyLoad({ token: sim.awaitingLump.token, nsIndex: sim.awaitingLump.nsIndex, label: sim.nsLabels[sim.awaitingLump.nsIndex] || 'entry_'+sim.awaitingLump.nsIndex });
+                return;
+            }
             if (result.stopReason !== 'maxSteps') {
                 finishRun(result.stopReason, result.breakpointAddr);
             } else if (totalSteps >= MAX_STEPS) {
@@ -7273,6 +7309,90 @@ function faultModalClearAndDismiss() {
     _lastFault = null;
     faultAlertOff();
 }
+
+// ── Lazy-load lump fetch ──────────────────────────────────────────────────────
+// Called when the simulator returns { absent: true } from step() or stops a
+// run() batch with sim.awaitingLump set.  Fetches the lump from the IDE server,
+// validates the magic, writes it into simulator memory via sim.receiveLump(),
+// and resumes execution from the retry PC.
+async function triggerLazyLoad(absentResult) {
+    const token = absentResult.token;
+    const label = absentResult.label || ('Slot ' + absentResult.nsIndex);
+    const con   = document.getElementById('editorConsole');
+    try {
+        const resp = await fetch(`/api/lump/${token}`);
+        if (!resp.ok) {
+            const msg = `Lazy load failed: server returned ${resp.status} for token 0x${token}`;
+            if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
+            console.error('[lazyLoad]', msg);
+            return;
+        }
+        const buf     = await resp.arrayBuffer();
+        const numWords = Math.floor(buf.byteLength / 4);
+        const view    = new DataView(buf);
+        const words   = [];
+        for (let i = 0; i < numWords; i++) {
+            words.push(view.getUint32(i * 4, false));  // big-endian
+        }
+        const result = sim.receiveLump(words);
+        if (!result.ok) {
+            const msg = `Lazy load failed: ${result.message}`;
+            if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
+            console.error('[lazyLoad]', msg);
+        } else {
+            const msg = `\u2713 Lazy loaded: ${label} — ${result.lumpSize} words at 0x${result.freeBase.toString(16)}`;
+            if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
+            console.log('[lazyLoad]', msg);
+        }
+    } catch (e) {
+        const msg = `Lazy load fetch error: ${e.message}`;
+        if (con) { con.textContent += '\n' + msg; con.scrollTop = con.scrollHeight; }
+        console.error('[lazyLoad]', e);
+    }
+    updateDashboard();
+    switchView('dashboard');
+    openCRDetail(14);
+}
+
+// Load the lazy-load test program into the editor and run it.
+// Test: LOAD CR3, CR6, 3  →  HALT
+// The LOAD targets NS slot 3 (Math.Add, Outform) via Boot.Abstr c-list.
+// On first execution the simulator suspends and fetches the absent lump;
+// after installation it retries the LOAD, succeeds, then executes HALT.
+function runLazyLoadTest() {
+    // Ensure boot is complete before injecting the test program.
+    while (!sim.bootComplete && !sim.halted) {
+        sim._bootStep();
+    }
+    if (sim.halted && !sim.bootComplete) {
+        const con = document.getElementById('editorConsole');
+        if (con) con.textContent += '\n[LazyTest] Boot failed — cannot run test.';
+        return;
+    }
+    _autoLoadDefaultProgram();
+
+    // LOAD CR3, CR6, 3  = (opcode=0, cond=14=AL, crDst=3, crSrc=6, imm=3)
+    // Bits: [31:27]=0, [26:23]=14=0b1110, [22:19]=3, [18:15]=6, [14:0]=3
+    // (14<<23)|(3<<19)|(6<<15)|3 = 0x07000000|0x00180000|0x00030000|0x3 = 0x071B0003
+    const LOAD_CR3_CR6_3 = (14 << 23) | (3 << 19) | (6 << 15) | 3;   // 0x071B0003
+    const HALT           = 0x00000000;
+    sim.loadProgram([LOAD_CR3_CR6_3, HALT], 0);
+
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.textContent += '\n[LazyTest] Loaded: LOAD CR3,CR6,3 → HALT';
+        con.textContent += '\n[LazyTest] Running step-by-step…';
+        con.scrollTop = con.scrollHeight;
+    }
+    // Inject the source text into the editor for visibility
+    const ed = document.getElementById('codeEditor');
+    if (ed) {
+        ed.value = '; Lazy load test — absent Math.Add lump\nLOAD CR3, CR6, 3\n';
+    }
+    // Execute first step (should trigger the absent-lump fetch)
+    stepSim();
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function resetSim() {
     switchView('dashboard');

@@ -153,6 +153,7 @@ class ChurchSimulator {
         this.ledMode = 'boot';
         this.lastCapability = null;
         this.auditLog = [];
+        this.awaitingLump = null;
 
         this._initNamespaceTable();
         this.output += '--- HARD RESET: all registers zeroed ---\n';
@@ -379,9 +380,17 @@ class ChurchSimulator {
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
             if (i === 3) {
-                this.writeNSEntry(i, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-                this.nsLabels[i] = a.label;
-                clistGTs.push(0);
+                // Math.Add — Outform slot: lump is absent and will be fetched on demand.
+                // Token (word0) is the 32-bit key sent to GET /api/lump/<token_hex>.
+                // gtType=2 (Outform), F-bit=1 (Far/remote), clistCount=1.
+                // writeNSEntry computes a valid MAC from (token, limit17=0) so
+                // validateMAC would technically pass, but the Outform intercept in
+                // _execLoad fires before the MAC check — this is intentional.
+                const MATH_ADD_TOKEN = 0xDEAD0003;
+                this.writeNSEntry(i, MATH_ADD_TOKEN, 0, 0, 1 /*fFlag*/, 0, 0, 2 /*gtType=Outform*/, 0, 1 /*clistCount=1*/);
+                this.nsLabels[i] = 'Math.Add';
+                const gtWord = this.createGT(0, i, {R:0, W:0, X:0, L:0, S:0, E:1}, 1);
+                clistGTs.push(gtWord);
                 clistChildren.push(i);
                 continue;
             }
@@ -1431,6 +1440,12 @@ class ChurchSimulator {
     }
 
     step() {
+        // If we are suspended waiting for an absent-lump fetch, don't execute
+        // anything — return a suspended sentinel.  app.js drives the async fetch
+        // and calls receiveLump() to resume, so this should rarely be hit.
+        if (this.awaitingLump) {
+            return { suspended: true, awaitingLump: this.awaitingLump };
+        }
         if (this.halted) return null;
         this.auditLog = [];
 
@@ -1571,6 +1586,22 @@ class ChurchSimulator {
             this.fault('BOUNDS', `LOAD: entry ${targetIdx} is null`);
             return null;
         }
+
+        // ── Absent-lump intercept ─────────────────────────────────────────────
+        // If the NS entry is Outform (gtType=2) the lump is not yet resident.
+        // Suspend execution and fire a fetch from GET /api/lump/<token_hex>.
+        // The fetch is driven asynchronously from app.js triggerLazyLoad().
+        // Once the lump is installed and NS entry promoted to Inform (gtType=0),
+        // app.js calls sim.receiveLump() then re-steps from the saved retry PC.
+        if (entry.gtType === 2) {
+            const token = (entry.word0_location >>> 0).toString(16).padStart(8, '0');
+            const label = this.nsLabels[targetIdx] || 'entry_' + targetIdx;
+            this.awaitingLump = { nsIndex: targetIdx, retryPC: this.pc, d, token };
+            this.output += `\u27F3 Fetching lump: Slot ${targetIdx} (${label}) token=0x${token}\n`;
+            return { absent: true, nsIndex: targetIdx, token, label };
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         if (!this.validateMAC(entry)) {
             this.fault('SEAL', `LOAD: entry ${targetIdx} seal failed`);
             return null;
@@ -3224,7 +3255,7 @@ class ChurchSimulator {
         let steps = 0;
         let stopReason = 'stopped';
         let breakpointAddr = null;
-        while (this.running && !this.halted && this.bootComplete && steps < maxSteps) {
+        while (this.running && !this.halted && !this.awaitingLump && this.bootComplete && steps < maxSteps) {
             // Stop-before-execute breakpoint check: compute the physical address of the NEXT
             // instruction to be fetched (from this.pc + CR14 lump base) and compare against
             // the breakpoint set.  Skip on the very first step so we advance past any BP the
@@ -3249,6 +3280,92 @@ class ChurchSimulator {
         this.running = false;
         return { steps, stopReason, breakpointAddr };
     }
+
+    // ── Lazy-load lump installation ───────────────────────────────────────────
+    // Called by app.js after a successful GET /api/lump/<token_hex>.
+    // lumpWords: Uint32Array or plain Array of 32-bit words (big-endian native).
+    // Returns { ok, freeBase?, lumpSize?, message? }.
+    receiveLump(lumpWords) {
+        if (!this.awaitingLump) {
+            return { ok: false, message: 'not awaiting a lump' };
+        }
+        const { nsIndex, retryPC } = this.awaitingLump;
+
+        // Validate magic byte in lump header word0.
+        const hdrWord = (lumpWords[0] >>> 0);
+        if ((hdrWord >>> 27) !== 0x1F) {
+            this.awaitingLump = null;
+            this.fault('LUMP_MAGIC', `receiveLump: bad magic 0x${((hdrWord>>>27)&0x1F).toString(16)} in fetched lump for Slot ${nsIndex}`);
+            return { ok: false, message: 'invalid lump magic' };
+        }
+
+        const hdr = this.parseLumpHeader(hdrWord);
+        const lumpSize = hdr.lumpSize;   // 64 for n_minus_6=0
+
+        // Find the next aligned free slot (above all resident NS lumps).
+        const freeBase = this._findFreeSlot(lumpSize);
+        if (freeBase + lumpSize > this.NS_TABLE_BASE) {
+            this.awaitingLump = null;
+            this.fault('LUMP_OOM', `receiveLump: no free space for ${lumpSize}-word lump (high-water would hit NS table)`);
+            return { ok: false, message: 'out of lump space' };
+        }
+
+        // Write lump words into memory.
+        for (let i = 0; i < Math.min(lumpWords.length, lumpSize); i++) {
+            this.memory[freeBase + i] = (lumpWords[i] >>> 0);
+        }
+
+        // Promote NS entry from Outform (gtType=2) → Inform (gtType=0).
+        // limit17 = lumpSize - cc - 1  (valid code range 0..limit17 inclusive).
+        const cc      = hdr.cc;
+        const cw      = hdr.cw;
+        const limit17 = lumpSize - cc - 1;
+        this.writeNSEntry(nsIndex, freeBase, limit17, 0, 0, 0, 0, 0 /*gtType=Inform*/, 0, cc);
+
+        const label = this.nsLabels[nsIndex] || 'entry_' + nsIndex;
+        this.output += `\u2713 Lazy loaded: Slot ${nsIndex} (${label}) — ${lumpSize} words at 0x${freeBase.toString(16)}\n`;
+
+        // Restore PC to the retry instruction and clear the suspend state.
+        this.pc = retryPC;
+        this.awaitingLump = null;
+
+        return { ok: true, freeBase, lumpSize };
+    }
+
+    // Find the lowest aligned slot address above all resident NS lumps.
+    // Skips slot 0 (Boot.NS — covers entire memory, not a physical lump),
+    // and Outform entries (gtType=2 — no physical backing yet).
+    // Uses the lump header's actual lumpSize rather than the NS limit17 field,
+    // because limit17 encodes the code-region limit, not the full slot size.
+    _findFreeSlot(lumpSize) {
+        let highWater = 0;
+        for (let i = 1; i < this.nsCount; i++) {   // skip slot 0 (namespace descriptor)
+            const entry = this.readNSEntry(i);
+            if (!entry) continue;
+            const entryW1 = this.parseNSWord1(entry.word1_limit);
+            if (entryW1.gtType === 2) continue;    // Outform: no physical backing
+            const base = entry.word0_location >>> 0;
+            if (base === 0 || base >= this.NS_TABLE_BASE) continue;  // sanity guard
+            // Prefer reading the lump header for the true slot size.
+            let lumpTop;
+            const hdrWord = this.memory[base] >>> 0;
+            const hdr     = this.parseLumpHeader(hdrWord);
+            if (hdr.valid) {
+                lumpTop = base + hdr.lumpSize;
+            } else {
+                // No valid lump header: assume at least SLOT_SIZE words allocated.
+                // This is a safe overestimate that handles device-register NS entries
+                // (which have small limit17 values that don't reflect their 64-word slot).
+                lumpTop = base + this.SLOT_SIZE;
+            }
+            if (lumpTop > highWater) highWater = lumpTop;
+        }
+        // Align upward to lumpSize (always a power of 2).
+        const mask    = lumpSize - 1;
+        const aligned = (highWater + mask) & ~mask;
+        return aligned >>> 0;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     getState() {
         return {
