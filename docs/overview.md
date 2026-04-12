@@ -61,5 +61,5 @@ The Church Machine enforces these core security invariants:
 +-- hardware/               Amaranth HDL hardware implementation (Tang Nano 20K)
 +-- ctmm_amaranth/          Amaranth HDL hardware implementation
 +-- verilog/                SystemVerilog hardware implementation
-+-- CTMM/                   Haskell console simulator
++-- haskell-sim/            Haskell console simulator
 ```

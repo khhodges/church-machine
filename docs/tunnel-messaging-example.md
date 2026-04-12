@@ -422,8 +422,8 @@ TUNNEL PAYLOAD (encrypted):
 │   num_args:     4 (number of argument slots used)   │
 │   num_rets:     0 (request) or 2 (response)         │
 │   flags:        0x00 (no overflow, no wide values)  │
-│   sender_arch:  0x01 (CTMM_64)                      │
-│   target_arch:  0x02 (RV32_CAP)                     │
+│   sender_arch:  0x01 (ChurchMachine_64)              │
+│   target_arch:  0x02 (IoT_32)                       │
 │   reserved:     0x0000                              │
 ├─────────────────────────────────────────────────────┤
 │ Argument Payload (8 bytes per slot, canonical)      │

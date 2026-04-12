@@ -14769,10 +14769,11 @@ function loadCLOOMCExample(name) {
 // state themselves. Instance state lives in CR5,
 // the private instance data register.
 //
-// CR5 is NOT saved/restored by CALL or RETURN —
-// the callee inherits whatever CR5 the caller had.
-// Each abstraction loads its own instance data
-// into CR5 at entry from its c-list.
+// CR5 IS saved/restored by CALL/RETURN — hardware
+// pushes CR5 to cr5_stack on CALL and restores it
+// on RETURN. Each thread carries its own cr5_stack,
+// so calling into another abstraction never clobbers
+// the caller's instance data.
 //
 // CR5 points to a region where this instance keeps
 // its bookkeeping (here: the current heap offset).
@@ -14829,11 +14830,11 @@ abstraction Memory {
 // reach Memory at all — hardware enforces this.
 //
 // Mint's own CR5 holds its private instance data.
-// When Mint calls Memory.Allocate, CR5 is NOT saved
-// by hardware — Memory.Allocate loads its own
-// instance data from its c-list at entry. After
-// RETURN, Mint reloads its CR5 if needed. Neither
-// abstraction touches the other's private data.
+// When Mint calls Memory.Allocate, hardware saves
+// Mint's CR5 to cr5_stack and restores it on RETURN.
+// Memory.Allocate sees its own CR5 (from its c-list),
+// not Mint's. Neither abstraction can touch the
+// other's private instance data — hardware enforces it.
 
 abstraction Mint {
     capabilities {
