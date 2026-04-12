@@ -95,17 +95,13 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-> **Hardware status**: The MASK field is defined in the encoding but **not yet implemented** in hardware (`ret.py`). Current hardware ignores the mask bits. See [HARDWARE-DEVIATIONS.md](HARDWARE-DEVIATIONS.md) D-2 and Task #8.
-
 `mask` is a 12-bit literal in bits [11:0]. Bit N = 1 clears CR_N to NULL after the frame is restored. Bit 6 is reserved (must be 0 — CR6 is always restored from the frame E-GT). Bare `RETURN` (mask=0) is the no-op default and is fully backward-compatible.
 
-**Execution order** (current hardware behavior):
+**Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore CR5 from cr5_stack (pushed by CALL)
 4. Restore PC from NIA and machine indicators from Word 1
-
-**Planned extension** (mask, Task #8):
 5. Apply mask — all marked CRs written to NULL in **one parallel clock edge** (mask bits fan into CR register-file write enables; zero overhead regardless of how many bits are set)
 
 **Why the mask is programmer-declared**: GTs are first-class values — a callee may legitimately return a GT in CR0. Only the programmer knows which CRs carry return values vs. internal working state. The mask is emitted as a compile-time literal by the [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) compiler from a `clear:` annotation.

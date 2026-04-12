@@ -113,17 +113,13 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 **Frame structure**: CALL pushes 2 words. RETURN pops them. The caller's E-GT in Word 0 is revalidated by mLoad — this catches use-after-free (version mismatch → FAULT) and resets the G-bit for GC liveness tracking.
 
-> **Hardware status**: The MASK field (step 7) is defined in the encoding but **not yet implemented** in hardware. Current hardware ignores the mask bits. See [HARDWARE-DEVIATIONS.md](HARDWARE-DEVIATIONS.md) D-2 and Task #8.
-
-**Operation** (current hardware behavior, steps 1–6):
+**Operation**:
 1. Check that a frame exists on the call stack → FAULT if empty
 2. Pop Word 0 (caller's E-GT) and Word 1 (NIA | machine indicators)
 3. mLoad the caller's E-GT: version check + MAC + G-bit reset → FAULT on failure
 4. Re-run NS split on caller's NS entry → re-derive CR6 (caller c-list) and CR14 (caller code)
-5. Restore CR5 from cr5_stack (pushed by CALL; see [HARDWARE-DEVIATIONS.md](HARDWARE-DEVIATIONS.md) D-8)
+5. Restore CR5 from cr5_stack (pushed by CALL)
 6. Restore PC from NIA (Word 1); restore machine indicators from Word 1
-
-**Planned extension** (mask, Task #8):
 7. Apply mask[11:0]: all CRs with mask bit set written to NULL in one parallel clock edge
 
 **Mnemonic**: `RETURN [mask]` — mask is a 12-bit literal in instruction bits [11:0]; mask=0 is the no-op default (`RETURN` with no argument)
@@ -136,10 +132,12 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **CR5 Restore** | Popped from cr5_stack (pushed by CALL) |
 | **PC Restore** | NIA from Word 1 |
 | **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, stackSpace, etc.) |
-| **Mask** | *Not yet implemented in hardware (Task #8).* Design: bits [11:0], bit N=1 → CR_N to NULL. Bit 6 reserved (CR6 always restored from E-GT). One parallel clock edge — zero overhead. |
+| **Mask** | bits [11:0], bit N=1 → CR_N to NULL after frame restoration. Bit 6 reserved (CR6 always restored from E-GT). All marked CRs cleared in one parallel clock edge — zero overhead. mask=0 → bare `RETURN`, no scrub. |
 | **Unchanged** | DR0–DR15 and non-masked CRs retain callee values |
 | **Stack Underflow** | FAULT: no saved context |
 | **Stack Indicators** | stackFrames and stackSpace updated |
+
+**Why the mask is programmer-declared**: GTs are first-class values — a callee may legitimately return a GT in CR0. Only the programmer knows which CRs carry return values vs. internal working state. The CLOOMC compiler emits the mask as a compile-time literal from a `clear:` annotation. The hardware enforces it in the instruction.
 
 ---
 
