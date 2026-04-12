@@ -6173,7 +6173,6 @@ function _bootNIARows(bootStep) {
 }
 
 function stepSim() {
-    switchView('dashboard');
     if (!sim.bootComplete) {
         sim.auditLog = [];
         try {
