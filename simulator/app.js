@@ -447,7 +447,9 @@ function closeEditorActions() {
     if (dd) dd.style.display = 'none';
 }
 
+let _viewLocked = false;
 function switchView(viewId) {
+    if (_viewLocked) return;
     if (viewId !== currentView) previousView = currentView;
     currentView = viewId;
     window.location.hash = viewId;
