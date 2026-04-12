@@ -737,11 +737,11 @@ class CLOOMCCompiler {
 
         for (const ref of labelRefs) {
             const target = labels[ref.label];
-            if (target === undefined) {
+            if (target === undefined || target === -1) {
                 errors.push({ line: ref.lineNum, message: `Undefined label: ${ref.label}` });
             } else {
-                const offset = target & 0x7FFF;
-                code[ref.addr] = (code[ref.addr] & ~0x7FFF) | offset;
+                const relOffset = target - ref.addr;
+                code[ref.addr] = (code[ref.addr] & ~0x7FFF) | (relOffset & 0x7FFF);
                 code[ref.addr] = code[ref.addr] >>> 0;
             }
         }
@@ -784,18 +784,23 @@ class CLOOMCCompiler {
         if (numMatch) {
             const val = parseInt(numMatch[1]);
             const dr = this._allocTemp(locals);
-            if (val <= 0x7FFF) {
-                code.push(this.encode(this.opcodes.IADD, 14, dr, 0, val));
+            if (val === 0) {
+                code.push(this.encode(this.opcodes.IADD, 14, dr, 0, 0));
+            } else if (val <= 0x3FFF) {
+                code.push(this.encode(this.opcodes.IADD, 14, dr, 0, val | 0x4000));
             } else {
-                code.push(this.encode(this.opcodes.IADD, 14, dr, 0, val & 0x7FFF));
-                if (val > 0x7FFF) {
-                    const hi = (val >>> 15) & 0x7FFF;
-                    if (hi > 0) {
-                        const t2 = dr === this.DR_TEMP_START ? this.DR_TEMP_START + 1 : this.DR_TEMP_START;
-                        code.push(this.encode(this.opcodes.IADD, 14, t2, 0, hi));
-                        code.push(this.encode(this.opcodes.SHL, 14, t2, t2, 15));
-                        code.push(this.encode(this.opcodes.IADD, 14, dr, dr, 0));
+                const low = val & 0x3FFF;
+                code.push(this.encode(this.opcodes.IADD, 14, dr, 0, low | 0x4000));
+                const hi = val >>> 14;
+                if (hi > 0) {
+                    const t2 = dr === this.DR_TEMP_START ? this.DR_TEMP_START + 1 : this.DR_TEMP_START;
+                    if (hi <= 0x3FFF) {
+                        code.push(this.encode(this.opcodes.IADD, 14, t2, 0, hi | 0x4000));
+                    } else {
+                        code.push(this.encode(this.opcodes.IADD, 14, t2, 0, (hi & 0x3FFF) | 0x4000));
                     }
+                    code.push(this.encode(this.opcodes.SHL, 14, t2, t2, 14));
+                    code.push(this.encode(this.opcodes.IADD, 14, dr, dr, t2));
                 }
             }
             return dr;
@@ -812,14 +817,18 @@ class CLOOMCCompiler {
             const rightNum = rightExpr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
             if (rightNum) {
                 const val = parseInt(rightNum[1]);
-                const dr = this._allocTemp(locals);
-                code.push(this.encode(this.opcodes.IADD, 14, dr, leftDR, val & 0x7FFF));
-                return dr;
+                if (val === 0) {
+                    return leftDR;
+                }
+                if (val <= 0x3FFF) {
+                    const dr = this._allocTemp(locals);
+                    code.push(this.encode(this.opcodes.IADD, 14, dr, leftDR, val | 0x4000));
+                    return dr;
+                }
             }
             const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
             const dr = this._allocTemp(locals);
-            code.push(this.encode(this.opcodes.IADD, 14, dr, leftDR, 0));
-            code.push(this.encode(this.opcodes.IADD, 14, dr, dr, 0));
+            code.push(this.encode(this.opcodes.IADD, 14, dr, leftDR, rightDR));
             return dr;
         }
 
@@ -830,13 +839,18 @@ class CLOOMCCompiler {
             const rightNum = rightExpr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
             if (rightNum) {
                 const val = parseInt(rightNum[1]);
-                const dr = this._allocTemp(locals);
-                code.push(this.encode(this.opcodes.ISUB, 14, dr, leftDR, val & 0x7FFF));
-                return dr;
+                if (val === 0) {
+                    return leftDR;
+                }
+                if (val <= 0x3FFF) {
+                    const dr = this._allocTemp(locals);
+                    code.push(this.encode(this.opcodes.ISUB, 14, dr, leftDR, val | 0x4000));
+                    return dr;
+                }
             }
             const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
             const dr = this._allocTemp(locals);
-            code.push(this.encode(this.opcodes.ISUB, 14, dr, leftDR, 0));
+            code.push(this.encode(this.opcodes.ISUB, 14, dr, leftDR, rightDR));
             return dr;
         }
 
@@ -850,15 +864,17 @@ class CLOOMCCompiler {
             const oneDR = this._allocTemp(locals);
             code.push(this.encode(this.opcodes.IADD, 14, accDR, 0, 0));
             code.push(this.encode(this.opcodes.IADD, 14, cntDR, rightDR, 0));
-            code.push(this.encode(this.opcodes.IADD, 14, oneDR, 0, 1));
+            code.push(this.encode(this.opcodes.IADD, 14, oneDR, 0, 0x4001));
             const loopStart = code.length;
             code.push(this.encode(this.opcodes.MCMP, 14, cntDR, 0, 0));
             const branchIdx = code.length;
             code.push(this.encode(this.opcodes.BRANCH, 0, 0, 0, 0));
             code.push(this.encode(this.opcodes.IADD, 14, accDR, accDR, leftDR));
             code.push(this.encode(this.opcodes.ISUB, 14, cntDR, cntDR, oneDR));
-            code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, loopStart & 0x7FFF));
-            code[branchIdx] = this.encode(this.opcodes.BRANCH, 0, 0, 0, code.length & 0x7FFF);
+            const backOff = loopStart - code.length;
+            code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, backOff & 0x7FFF));
+            const fwdOff = code.length - branchIdx;
+            code[branchIdx] = this.encode(this.opcodes.BRANCH, 0, 0, 0, fwdOff & 0x7FFF);
             return accDR;
         }
 
@@ -1064,16 +1080,32 @@ class CLOOMCCompiler {
         }
 
         if (text === '}') {
+            const pendingWhile = Object.keys(labels).filter(l => l.startsWith('__while_end_') && labels[l] === -1);
             const pendingElse = Object.keys(labels).filter(l => l.startsWith('__endelse_') && labels[l] === -1);
-            if (pendingElse.length > 0) {
-                const label = pendingElse[pendingElse.length - 1];
-                labels[label] = code.length;
-                return;
-            }
-            const pendingLabels = Object.keys(labels).filter(l => l.startsWith('__endif_') && labels[l] === -1);
-            if (pendingLabels.length > 0) {
-                const label = pendingLabels[pendingLabels.length - 1];
-                labels[label] = code.length;
+            const pendingIf = Object.keys(labels).filter(l => l.startsWith('__endif_') && labels[l] === -1);
+
+            const candidates = [
+                ...pendingWhile.map(l => ({ label: l, type: 'while', idx: parseInt(l.replace('__while_end_', '')) })),
+                ...pendingElse.map(l => ({ label: l, type: 'else', idx: parseInt(l.replace('__endelse_', '')) })),
+                ...pendingIf.map(l => ({ label: l, type: 'if', idx: parseInt(l.replace('__endif_', '')) })),
+            ];
+
+            if (candidates.length > 0) {
+                candidates.sort((a, b) => b.idx - a.idx);
+                const innermost = candidates[0];
+
+                if (innermost.type === 'while') {
+                    const loopIdx = innermost.label.replace('__while_end_', '');
+                    const loopStart = labels['__while_loop_' + loopIdx];
+                    if (loopStart !== undefined) {
+                        const backOffset = loopStart - code.length;
+                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, backOffset & 0x7FFF));
+                        manifest.push({ src: stmt.lineNum, addr: code.length - 1, desc: 'loop back to while' });
+                    }
+                    labels[innermost.label] = code.length;
+                } else {
+                    labels[innermost.label] = code.length;
+                }
             }
             return;
         }

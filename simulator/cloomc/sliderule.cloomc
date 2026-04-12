@@ -1,22 +1,16 @@
 abstraction SlideRule {
     capabilities { Constants }
 
-    method Add(a, b) {
-        result = a + b
-        return(result)
-    }
-
-    method Sub(a, b) {
-        result = a - b
-        return(result)
-    }
-
-    method Mul(a, b) {
+    method Multiply(a, b) {
         acc = 0
         sign = 0
         if (b < 0) {
             b = 0 - b
-            sign = 1
+            sign = sign + 1
+        }
+        if (a < 0) {
+            a = 0 - a
+            sign = sign + 1
         }
         while (b > 0) {
             low = bfext(b, 0, 1)
@@ -32,7 +26,7 @@ abstraction SlideRule {
         return(acc)
     }
 
-    method Div(a, b) {
+    method Divide(a, b) {
         if (b == 0) {
             return(0)
         }
@@ -63,48 +57,1057 @@ abstraction SlideRule {
         if (n == 1) {
             return(1)
         }
-        guess = n >> 1
-        i = 0
-        while (i < 20) {
-            q = 0
-            rem = n
-            while (rem >= guess) {
-                rem = rem - guess
-                q = q + 1
+        res = 0
+        bit = 16384
+        while (bit > 0) {
+            test = res + bit
+            if (n >= test) {
+                n = n - test
+                res = res >> 1
+                res = res + bit
+            } else {
+                res = res >> 1
             }
-            next = guess + q
-            next = next >> 1
-            guess = next
-            i = i + 1
+            bit = bit >> 2
         }
-        return(guess)
+        return(res)
     }
 
-    method Pow(base, exp) {
-        result = 1
-        while (exp > 0) {
-            acc = 0
-            m = base
-            r = result
-            while (r > 0) {
-                low = bfext(r, 0, 1)
-                if (low == 1) {
-                    acc = acc + m
-                }
-                m = m << 1
-                r = r >> 1
-            }
-            result = acc
-            exp = exp - 1
+    method Mod(a, b) {
+        if (b == 0) {
+            return(0)
+        }
+        sign = 0
+        if (a < 0) {
+            a = 0 - a
+            sign = 1
+        }
+        if (b < 0) {
+            b = 0 - b
+        }
+        while (a >= b) {
+            a = a - b
+        }
+        if (sign == 1) {
+            a = 0 - a
+        }
+        return(a)
+    }
+
+    method Sin(angle) {
+        neg = 0
+        if (angle < 0) {
+            angle = 0 - angle
+            neg = 1
+        }
+        pi2 = 102944
+        pi = 205887
+        while (angle >= pi2) {
+            angle = angle - pi2
+        }
+        x = 39797
+        y = 0
+        z = angle
+        dx = y
+        dy = x
+        if (z >= 0) {
+            x = x - dy
+            y = y + dx
+            z = z - 51472
+        } else {
+            x = x + dy
+            y = y - dx
+            z = z + 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        }
+        if (neg == 1) {
+            y = 0 - y
+        }
+        return(y)
+    }
+
+    method Cos(angle) {
+        if (angle < 0) {
+            angle = 0 - angle
+        }
+        pi2 = 102944
+        while (angle >= pi2) {
+            angle = angle - pi2
+        }
+        x = 39797
+        y = 0
+        z = angle
+        dx = y
+        dy = x
+        if (z >= 0) {
+            x = x - dy
+            y = y + dx
+            z = z - 51472
+        } else {
+            x = x + dy
+            y = y - dx
+            z = z + 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        }
+        return(x)
+    }
+
+    method Tan(angle) {
+        neg = 0
+        if (angle < 0) {
+            angle = 0 - angle
+            neg = 1
+        }
+        pi2 = 102944
+        while (angle >= pi2) {
+            angle = angle - pi2
+        }
+        x = 39797
+        y = 0
+        z = angle
+        dx = y
+        dy = x
+        if (z >= 0) {
+            x = x - dy
+            y = y + dx
+            z = z - 51472
+        } else {
+            x = x + dy
+            y = y - dx
+            z = z + 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (z >= 0) {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        } else {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        }
+        if (x == 0) {
+            return(0)
+        }
+        sinv = y
+        cosv = x
+        sign = 0
+        if (sinv < 0) {
+            sinv = 0 - sinv
+            sign = sign + 1
+        }
+        if (cosv < 0) {
+            cosv = 0 - cosv
+            sign = sign + 1
+        }
+        sinv = sinv << 8
+        quot = 0
+        while (sinv >= cosv) {
+            sinv = sinv - cosv
+            quot = quot + 1
+        }
+        quot = quot << 8
+        if (sign == 1) {
+            quot = 0 - quot
+        }
+        if (neg == 1) {
+            quot = 0 - quot
+        }
+        return(quot)
+    }
+
+    method Asin(val) {
+        neg = 0
+        if (val < 0) {
+            val = 0 - val
+            neg = 1
+        }
+        cosv = 65536
+        sinv = val
+        x = cosv
+        y = sinv
+        z = 0
+        dx = y
+        dy = x
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 51472
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        }
+        if (neg == 1) {
+            z = 0 - z
+        }
+        return(z)
+    }
+
+    method Acos(val) {
+        halfpi = 25736
+        neg = 0
+        if (val < 0) {
+            val = 0 - val
+            neg = 1
+        }
+        cosv = 65536
+        sinv = val
+        x = cosv
+        y = sinv
+        z = 0
+        dx = y
+        dy = x
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 51472
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        }
+        asinv = z
+        if (neg == 1) {
+            result = halfpi + asinv
+        } else {
+            result = halfpi - asinv
         }
         return(result)
     }
 
+    method Atan(val) {
+        neg = 0
+        if (val < 0) {
+            val = 0 - val
+            neg = 1
+        }
+        x = 65536
+        y = val
+        z = 0
+        dx = y
+        dy = x
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 51472
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        }
+        if (neg == 1) {
+            z = 0 - z
+        }
+        return(z)
+    }
+
     method ToDegrees(radians) {
-        return(radians)
+        sign = 0
+        if (radians < 0) {
+            radians = 0 - radians
+            sign = 1
+        }
+        acc = 0
+        r = 57
+        while (r > 0) {
+            low = bfext(r, 0, 1)
+            if (low == 1) {
+                acc = acc + radians
+            }
+            radians = radians << 1
+            r = r >> 1
+        }
+        acc = acc >> 16
+        if (sign == 1) {
+            acc = 0 - acc
+        }
+        return(acc)
     }
 
     method ToRadians(degrees) {
-        return(degrees)
+        sign = 0
+        if (degrees < 0) {
+            degrees = 0 - degrees
+            sign = 1
+        }
+        acc = 0
+        r = 1144
+        while (r > 0) {
+            low = bfext(r, 0, 1)
+            if (low == 1) {
+                acc = acc + degrees
+            }
+            degrees = degrees << 1
+            r = r >> 1
+        }
+        if (sign == 1) {
+            acc = 0 - acc
+        }
+        return(acc)
+    }
+
+    method Bernoulli(n) {
+        if (n == 0) {
+            return(1, 1)
+        }
+        if (n == 1) {
+            num = 0 - 1
+            return(num, 2)
+        }
+        odd = bfext(n, 0, 1)
+        if (odd == 1) {
+            return(0, 1)
+        }
+        if (n == 2) {
+            return(1, 6)
+        }
+        if (n == 4) {
+            num = 0 - 1
+            return(num, 30)
+        }
+        if (n == 6) {
+            return(1, 42)
+        }
+        if (n == 8) {
+            num = 0 - 1
+            return(num, 30)
+        }
+        if (n == 10) {
+            return(5, 66)
+        }
+        if (n == 12) {
+            num = 0 - 691
+            return(num, 2730)
+        }
+        if (n == 14) {
+            return(7, 6)
+        }
+        if (n == 16) {
+            num = 0 - 3617
+            return(num, 510)
+        }
+        if (n == 18) {
+            return(43867, 798)
+        }
+        if (n == 20) {
+            num = 0 - 174611
+            return(num, 330)
+        }
+        return(0, 1)
     }
 }
