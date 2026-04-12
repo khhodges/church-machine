@@ -1,0 +1,118 @@
+[
+  {
+    "token": "00001000",
+    "abstraction": "SlideRule",
+    "ns_slot": 16,
+    "lump_size": 256,
+    "cw": 153,
+    "cc": 1,
+    "methods": [
+      {
+        "name": "Add",
+        "offset": 0,
+        "length": 5
+      },
+      {
+        "name": "Sub",
+        "offset": 5,
+        "length": 4
+      },
+      {
+        "name": "Mul",
+        "offset": 9,
+        "length": 35
+      },
+      {
+        "name": "Div",
+        "offset": 44,
+        "length": 40
+      },
+      {
+        "name": "Sqrt",
+        "offset": 84,
+        "length": 38
+      },
+      {
+        "name": "Pow",
+        "offset": 122,
+        "length": 29
+      },
+      {
+        "name": "ToDegrees",
+        "offset": 151,
+        "length": 1
+      },
+      {
+        "name": "ToRadians",
+        "offset": 152,
+        "length": 1
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "00001001",
+    "abstraction": "SlideRuleHS",
+    "ns_slot": 16,
+    "lump_size": 256,
+    "cw": 137,
+    "cc": 1,
+    "methods": [
+      {
+        "name": "Add",
+        "offset": 0,
+        "length": 4
+      },
+      {
+        "name": "Sub",
+        "offset": 4,
+        "length": 3
+      },
+      {
+        "name": "Mul",
+        "offset": 7,
+        "length": 8
+      },
+      {
+        "name": "Sqrt",
+        "offset": 15,
+        "length": 27
+      },
+      {
+        "name": "Pow2",
+        "offset": 42,
+        "length": 19
+      },
+      {
+        "name": "Abs",
+        "offset": 61,
+        "length": 13
+      },
+      {
+        "name": "Signum",
+        "offset": 74,
+        "length": 25
+      },
+      {
+        "name": "Max",
+        "offset": 99,
+        "length": 10
+      },
+      {
+        "name": "Min",
+        "offset": 109,
+        "length": 10
+      },
+      {
+        "name": "Clamp",
+        "offset": 119,
+        "length": 18
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  }
+]

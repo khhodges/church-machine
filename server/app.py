@@ -1261,6 +1261,35 @@ def _build_lazy_lumps():
 
 _build_lazy_lumps()
 
+# ── Bundled lump loader ──────────────────────────────────────────────────────────
+# Scans server/lumps/*.lump and pre-loads every binary into LAZY_LUMPS at startup.
+# Bundled lumps take priority over the single hardcoded stub and are served before
+# the GitHub Mum Tunnel Library is consulted, making the server self-contained in
+# production environments where GitHub may not be reachable.
+def _load_bundled_lumps():
+    import glob as _glob
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    if not os.path.isdir(lumps_dir):
+        return
+    for path in sorted(_glob.glob(os.path.join(lumps_dir, '*.lump'))):
+        stem = os.path.splitext(os.path.basename(path))[0].lower()
+        token8 = stem.zfill(8)[:8]
+        try:
+            with open(path, 'rb') as fh:
+                data = fh.read()
+            if len(data) < 4:
+                continue
+            hdr = _struct.unpack('>I', data[:4])[0]
+            if (hdr >> 27) & 0x1F != 0x1F:
+                print(f'[lumps] skip {path}: bad magic', flush=True)
+                continue
+            LAZY_LUMPS[token8] = data
+            LAZY_LUMPS[stem.lstrip('0') or '0'] = data
+        except Exception as exc:
+            print(f'[lumps] error loading {path}: {exc}', flush=True)
+
+_load_bundled_lumps()
+
 # ── Mum Tunnel Library fallback ─────────────────────────────────────────────────
 def _fetch_lump_from_library(token_hex):
     """Search the Mum Tunnel Library (GitHub) for an abstraction whose token matches.
@@ -1358,6 +1387,56 @@ def get_lump(token_hex):
     resp = Response(data, mimetype='application/octet-stream',
                     headers={'Content-Length': str(len(data)),
                              'X-Lump-Source': source})
+    return resp
+
+
+@app.route("/api/lumps/bundle.zip")
+def get_lump_bundle():
+    """Stream all pre-built lumps as a ZIP archive for offline / FPGA deployment.
+
+    The archive contains:
+      <token8>.lump  — raw big-endian binary for each bundled abstraction
+      manifest.json  — JSON array describing each lump (token, name, cw, cc, methods)
+    """
+    import io as _io
+    import zipfile as _zipfile
+    from flask import Response as _Response
+
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    buf = _io.BytesIO()
+    manifest_path = os.path.join(lumps_dir, 'manifest.json') if os.path.isdir(lumps_dir) else None
+
+    with _zipfile.ZipFile(buf, 'w', compression=_zipfile.ZIP_DEFLATED) as zf:
+        n_lumps = 0
+        if os.path.isdir(lumps_dir):
+            import glob as _glob
+            for path in sorted(_glob.glob(os.path.join(lumps_dir, '*.lump'))):
+                arcname = os.path.basename(path)
+                zf.write(path, arcname)
+                n_lumps += 1
+            if manifest_path and os.path.isfile(manifest_path):
+                zf.write(manifest_path, 'manifest.json')
+
+        if n_lumps == 0:
+            inline_manifest = json.dumps(
+                [{'token': k, 'abstraction': 'stub', 'lump_size': len(v) // 4,
+                  'cw': 1, 'cc': 1}
+                 for k, v in LAZY_LUMPS.items()],
+                indent=2)
+            for token_key, lump_bytes in LAZY_LUMPS.items():
+                if len(token_key) == 8:
+                    zf.writestr(f'{token_key}.lump', lump_bytes)
+                    n_lumps += 1
+            zf.writestr('manifest.json', inline_manifest)
+
+    buf.seek(0)
+    resp = _Response(
+        buf.read(),
+        mimetype='application/zip',
+        headers={
+            'Content-Disposition': 'attachment; filename="cloomc_lumps.zip"',
+            'X-Lump-Count': str(n_lumps),
+        })
     return resp
 # ──────────────────────────────────────────────────────────────────────────────
 

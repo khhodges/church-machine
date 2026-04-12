@@ -1,5 +1,7 @@
 {
   "abstraction": "SlideRule",
+  "token": "00001000",
+  "ns_slot": 16,
   "type": "abstraction",
   "grants": [
     "E"
