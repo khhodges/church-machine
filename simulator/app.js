@@ -6236,14 +6236,17 @@ function stepSim() {
         updateDashboard();
         // Stay on the current view (editor/console if from runLazyLoadTest).
         // triggerLazyLoad() will switch to editor/console when finished.
-        triggerLazyLoad(result);
+        triggerLazyLoad(result, 'step');
         return;
     }
     if (result && result.suspended) {
-        // Already waiting for a fetch — don't do anything.
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            const al = result.awaitingLump;
+            con.textContent += `\n⟳ Still fetching lump for Slot ${al ? al.nsIndex : '?'} — please wait…`;
+            con.scrollTop = con.scrollHeight;
+        }
         updateDashboard();
-        switchView('dashboard');
-        openCRDetail(14);
         return;
     }
     if (result) {
@@ -7313,7 +7316,7 @@ function faultModalClearAndDismiss() {
 // run() batch with sim.awaitingLump set.  Fetches the lump from the IDE server,
 // validates the magic, writes it into simulator memory via sim.receiveLump(),
 // and resumes execution from the retry PC.
-async function triggerLazyLoad(absentResult) {
+async function triggerLazyLoad(absentResult, mode) {
     const token = absentResult.token;
     const label = absentResult.label || ('Slot ' + absentResult.nsIndex);
     const con   = document.getElementById('editorConsole');
@@ -7396,6 +7399,12 @@ async function triggerLazyLoad(absentResult) {
         updateDashboard(); switchView('editor'); switchCodeTab('console');
         return;
     }
+    if (mode === 'step') {
+        log(`↪ Retry LOAD succeeded — stepped.`);
+        updateDashboard(); switchView('dashboard'); openCRDetail(14);
+        return;
+    }
+
     log(`↪ Retry LOAD succeeded — continuing…`);
 
     // ── 4. Run to HALT / breakpoint (up to 10 000 steps) ────────────────────
@@ -7484,9 +7493,17 @@ function runLazyLoadTest() {
     if (ed) ed.value = '; Lazy-load test — absent Math.Add (Outform token=0xDEAD0003)\nLOAD CR3, CR6, 3   ; triggers fetch if absent\nHALT               ; machine stops after retry succeeds\n';
 
     // 5. Run first step — should trigger the absent-lump intercept.
-    stepSim();   // returns {absent:true} → stepSim calls triggerLazyLoad(result)
-    // triggerLazyLoad() handles the rest asynchronously (fetch → install → retry → HALT).
-    // When complete, triggerLazyLoad switches back to editor/console to show results.
+    //    Call sim.step() directly and invoke triggerLazyLoad in 'run' mode
+    //    so it auto-runs to HALT after the retry (stepSim uses 'step' mode).
+    const result = sim.step();
+    if (result && result.absent) {
+        log(`[LazyTest] ⟳ Absent lump — fetching Slot ${result.nsIndex} (${result.label}) token=0x${result.token}`);
+        updateDashboard();
+        triggerLazyLoad(result, 'run');
+    } else {
+        log('[LazyTest] ⊿ Expected absent-lump intercept, but step returned: ' + JSON.stringify(result));
+        updateDashboard();
+    }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
