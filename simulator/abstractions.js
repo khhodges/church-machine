@@ -245,7 +245,7 @@ class AbstractionRegistry {
 
         this.createAbstraction(16, 'SlideRule', 3,
             ['Multiply', 'Divide', 'Sqrt', 'Mod', 'Sin', 'Cos', 'Tan', 'Asin', 'Acos', 'Atan', 'ToDegrees', 'ToRadians', 'Bernoulli', 'Abs', 'Pow', 'Min', 'Max', 'GCD', 'Factorial', 'Log2', 'Atan2', 'Signum'],
-            'Integer arithmetic, trigonometry, angle functions, and Bernoulli numbers — DR3 selects method',
+            'Arithmetic, trigonometry, angle functions, and Bernoulli numbers — DR3 selects method',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
 
         this.createAbstraction(17, 'Abacus', 3,
