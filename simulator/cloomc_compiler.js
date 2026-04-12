@@ -2140,7 +2140,7 @@ class CLOOMCCompiler {
             manifest.push({ line: 0, instr: `IADD DR${dr}, DR0, #${value}`, comment: `load constant ${value}` });
         };
 
-        const slideRuleMethodIndex = { Multiply: 0, Divide: 1, Sqrt: 2, Mod: 3, Bernoulli: 12 };
+        const slideRuleMethodIndex = { Multiply: 0, Divide: 1, Sqrt: 2, Mod: 3, Bernoulli: 12, Abs: 13, Pow: 14, Min: 15, Max: 16, GCD: 17, Factorial: 18, Log2: 19, Atan2: 20, Signum: 21 };
 
         const emitExpr = (expr, dstDR, lineNum) => {
             expr = expr.trim();

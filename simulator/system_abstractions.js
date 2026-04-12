@@ -112,6 +112,7 @@ class SystemAbstractions {
         this._bindSlideRuleArithmetic();
         this._bindSlideRuleTrig();
         this._bindSlideRuleBernoulli();
+        this._bindSlideRuleExtended();
     }
 
     _bindSalvation() {
@@ -1398,6 +1399,73 @@ class SystemAbstractions {
 
             const [rn, rd] = simplify(bNum[n], bDen[n]);
             return { ok: true, result: rn, result2: rd, message: `SlideRule.Bernoulli(${n}) = ${rn}/${rd}` };
+        });
+    }
+
+    _bindSlideRuleExtended() {
+        this.registry.bindMethod(16, 'Abs', function(sim, args) {
+            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const result = Math.abs(n);
+            return { ok: true, result: result, message: `SlideRule.Abs(${n}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'Pow', function(sim, args) {
+            const base = args.dr0 !== undefined ? args.dr0 : 0;
+            const exp = args.dr1 !== undefined ? args.dr1 : 0;
+            if (exp < 0) {
+                return { ok: true, result: 0, message: `SlideRule.Pow(${base}, ${exp}) = 0 (negative exponent)` };
+            }
+            const result = Math.trunc(Math.pow(base, exp));
+            return { ok: true, result: result, message: `SlideRule.Pow(${base}, ${exp}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'Min', function(sim, args) {
+            const a = args.dr0 !== undefined ? args.dr0 : 0;
+            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const result = Math.min(a, b);
+            return { ok: true, result: result, message: `SlideRule.Min(${a}, ${b}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'Max', function(sim, args) {
+            const a = args.dr0 !== undefined ? args.dr0 : 0;
+            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const result = Math.max(a, b);
+            return { ok: true, result: result, message: `SlideRule.Max(${a}, ${b}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'GCD', function(sim, args) {
+            let a = Math.abs(args.dr0 !== undefined ? args.dr0 : 0);
+            let b = Math.abs(args.dr1 !== undefined ? args.dr1 : 0);
+            while (b) { [a, b] = [b, a % b]; }
+            return { ok: true, result: a, message: `SlideRule.GCD(${args.dr0}, ${args.dr1}) = ${a}` };
+        });
+
+        this.registry.bindMethod(16, 'Factorial', function(sim, args) {
+            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            if (n < 0) return { ok: true, result: 0, message: `SlideRule.Factorial(${n}) = 0 (negative)` };
+            let result = 1;
+            for (let i = 2; i <= n; i++) result *= i;
+            return { ok: true, result: Math.trunc(result), message: `SlideRule.Factorial(${n}) = ${Math.trunc(result)}` };
+        });
+
+        this.registry.bindMethod(16, 'Log2', function(sim, args) {
+            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            if (n < 1) return { ok: true, result: 0, message: `SlideRule.Log2(${n}) = 0` };
+            const result = Math.floor(Math.log2(n));
+            return { ok: true, result: result, message: `SlideRule.Log2(${n}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'Atan2', function(sim, args) {
+            const y = args.dr0 !== undefined ? args.dr0 : 0;
+            const x = args.dr1 !== undefined ? args.dr1 : 0;
+            const result = Math.atan2(y, x);
+            return { ok: true, result: result, message: `SlideRule.Atan2(${y}, ${x}) = ${result}` };
+        });
+
+        this.registry.bindMethod(16, 'Signum', function(sim, args) {
+            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const result = n > 0 ? 1 : n < 0 ? -1 : 0;
+            return { ok: true, result: result, message: `SlideRule.Signum(${n}) = ${result}` };
         });
     }
 }

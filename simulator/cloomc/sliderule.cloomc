@@ -1110,4 +1110,283 @@ abstraction SlideRule {
         }
         return(0, 1)
     }
+
+    method Abs(n) {
+        if (n < 0) {
+            n = 0 - n
+        }
+        return(n)
+    }
+
+    method Pow(base, exp) {
+        if (exp == 0) {
+            return(1)
+        }
+        result = 1
+        neg = 0
+        if (exp < 0) {
+            return(0)
+        }
+        if (base < 0) {
+            odd = bfext(exp, 0, 1)
+            if (odd == 1) {
+                neg = 1
+            }
+            base = 0 - base
+        }
+        while (exp > 0) {
+            acc = 0
+            b = base
+            r = result
+            while (r > 0) {
+                low = bfext(r, 0, 1)
+                if (low == 1) {
+                    acc = acc + b
+                }
+                b = b << 1
+                r = r >> 1
+            }
+            result = acc
+            exp = exp - 1
+        }
+        if (neg == 1) {
+            result = 0 - result
+        }
+        return(result)
+    }
+
+    method Min(a, b) {
+        if (a < b) {
+            return(a)
+        }
+        return(b)
+    }
+
+    method Max(a, b) {
+        if (a > b) {
+            return(a)
+        }
+        return(b)
+    }
+
+    method GCD(a, b) {
+        if (a < 0) {
+            a = 0 - a
+        }
+        if (b < 0) {
+            b = 0 - b
+        }
+        while (b > 0) {
+            rem = a
+            while (rem >= b) {
+                rem = rem - b
+            }
+            a = b
+            b = rem
+        }
+        return(a)
+    }
+
+    method Factorial(n) {
+        if (n < 0) {
+            return(0)
+        }
+        if (n == 0) {
+            return(1)
+        }
+        result = 1
+        while (n > 1) {
+            acc = 0
+            b = result
+            r = n
+            while (r > 0) {
+                low = bfext(r, 0, 1)
+                if (low == 1) {
+                    acc = acc + b
+                }
+                b = b << 1
+                r = r >> 1
+            }
+            result = acc
+            n = n - 1
+        }
+        return(result)
+    }
+
+    method Log2(n) {
+        if (n < 1) {
+            return(0)
+        }
+        result = 0
+        while (n > 1) {
+            n = n >> 1
+            result = result + 1
+        }
+        return(result)
+    }
+
+    method Atan2(y, x) {
+        neg = 0
+        if (y < 0) {
+            y = 0 - y
+            neg = 1
+        }
+        swap = 0
+        if (x < 0) {
+            x = 0 - x
+            swap = 1
+        }
+        z = 0
+        dx = y
+        dy = x
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 51472
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 51472
+        }
+        dx = y >> 1
+        dy = x >> 1
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 30386
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 30386
+        }
+        dx = y >> 2
+        dy = x >> 2
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 16055
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 16055
+        }
+        dx = y >> 3
+        dy = x >> 3
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 8150
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 8150
+        }
+        dx = y >> 4
+        dy = x >> 4
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 4091
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 4091
+        }
+        dx = y >> 5
+        dy = x >> 5
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 2047
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 2047
+        }
+        dx = y >> 6
+        dy = x >> 6
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 1024
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 1024
+        }
+        dx = y >> 7
+        dy = x >> 7
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 512
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 512
+        }
+        dx = y >> 8
+        dy = x >> 8
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 256
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 256
+        }
+        dx = y >> 9
+        dy = x >> 9
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 128
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 128
+        }
+        dx = y >> 10
+        dy = x >> 10
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 64
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 64
+        }
+        dx = y >> 11
+        dy = x >> 11
+        if (y >= 0) {
+            x = x + dx
+            y = y - dy
+            z = z + 32
+        } else {
+            x = x - dx
+            y = y + dy
+            z = z - 32
+        }
+        if (swap == 1) {
+            pival = 102944
+            z = pival - z
+        }
+        if (neg == 1) {
+            z = 0 - z
+        }
+        return(z)
+    }
+
+    method Signum(n) {
+        if (n > 0) {
+            return(1)
+        }
+        if (n < 0) {
+            result = 0 - 1
+            return(result)
+        }
+        return(0)
+    }
 }
