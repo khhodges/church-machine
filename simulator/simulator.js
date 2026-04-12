@@ -1206,16 +1206,21 @@ class ChurchSimulator {
     }
 
 
-    // ── Absent-lump intercept (shared by LOAD, ELOADCALL, XLOADLAMBDA) ────────
-    // Called after readNSEntry() and bounds checks, before validateMAC().
-    // If the NS entry is Outform (gtType=2) the lump is not yet resident:
-    //   - suspends execution via this.awaitingLump
-    //   - returns {absent:true, nsIndex, token, label} so the instruction
-    //     handler can propagate the sentinel back through step()
-    // Returns null if the entry is not Outform (normal execution continues).
+    // ── Absent-lump helpers (shared by LOAD, ELOADCALL, XLOADLAMBDA) ───────────
+    // _outformToken96: build the 96-bit IDE token from the three NS words of an
+    // Outform entry (word0_location || word1_limit || word2_seals), returned as
+    // 24 lowercase hex chars.  Matches the CTMM IDE token width (3 × 32 bits).
+    _outformToken96(entry) {
+        const w0 = (entry.word0_location >>> 0).toString(16).padStart(8, '0');
+        const w1 = (entry.word1_limit    >>> 0).toString(16).padStart(8, '0');
+        const w2 = (entry.word2_seals    >>> 0).toString(16).padStart(8, '0');
+        return `${w0}${w1}${w2}`;   // 24-char hex = 96 bits
+    }
+
     _absentLumpIntercept(entry, targetIdx, d, instrName) {
         if (!entry || entry.gtType !== 2) return null;
-        const token = (entry.word0_location >>> 0).toString(16).padStart(8, '0');
+        // Use full 96-bit IDE token (3 × 32-bit NS words) for the fetch URL.
+        const token = this._outformToken96(entry);
         const label = this.nsLabels[targetIdx] || 'entry_' + targetIdx;
         this.awaitingLump = { nsIndex: targetIdx, retryPC: this.pc, d, token };
         this.output += `\u27F3 ${instrName}: Slot ${targetIdx} (${label}) is Outform — suspending, token=0x${token}\n`;
@@ -3330,12 +3335,13 @@ class ChurchSimulator {
             this.memory[freeBase + i] = (lumpWords[i] >>> 0);
         }
 
-        // Promote NS entry from Outform (gtType=2) → Inform (gtType=0).
+        // Promote NS entry from Outform (gtType=2) → Inform (gtType=1).
+        // GT type semantics: 0=NULL, 1=Inform, 2=Outform, 3=Abstract.
         // limit17 = lumpSize - cc - 1  (valid code range 0..limit17 inclusive).
         const cc      = hdr.cc;
         const cw      = hdr.cw;
         const limit17 = lumpSize - cc - 1;
-        this.writeNSEntry(nsIndex, freeBase, limit17, 0, 0, 0, 0, 0 /*gtType=Inform*/, 0, cc);
+        this.writeNSEntry(nsIndex, freeBase, limit17, 0, 0, 0, 0, 1 /*gtType=Inform*/, 0, cc);
 
         const label = this.nsLabels[nsIndex] || 'entry_' + nsIndex;
         this.output += `\u2713 Lazy loaded: Slot ${nsIndex} (${label}) — ${lumpSize} words at 0x${freeBase.toString(16)}\n`;

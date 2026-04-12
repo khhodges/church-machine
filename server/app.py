@@ -1271,8 +1271,11 @@ def _fetch_lump_from_library(token_hex):
     if not GITHUB_TOKEN or not GITHUB_LIBRARY_REPO:
         return None, None
 
-    token_norm = token_hex.lower().lstrip('0') or '0'
-    token_8    = token_hex.lower().zfill(8)
+    # Accept 96-bit (24-hex) tokens: compare against word0_location (first 8 chars).
+    raw_token  = token_hex.lower()
+    lump_id    = raw_token[:8] if len(raw_token) >= 8 else raw_token
+    token_norm = lump_id.lstrip('0') or '0'
+    token_8    = lump_id.zfill(8)
 
     # Browse the library root for language directories
     index_data, err = github_api("GET", "/contents/library")
@@ -1323,10 +1326,20 @@ def _fetch_lump_from_library(token_hex):
 
 @app.route("/api/lump/<token_hex>")
 def get_lump(token_hex):
-    """Serve a raw lump binary — local stubs first, then Mum Tunnel Library."""
+    """Serve a raw lump binary — local stubs first, then Mum Tunnel Library.
+
+    Accepts both 8-hex (32-bit) and 24-hex (96-bit IDE) tokens.  For 96-bit
+    tokens the first 8 hex chars encode word0_location (the lump identity);
+    the remaining 16 chars carry word1_limit and word2_seals from the NS entry
+    and are used only for cross-validation in the library fallback.
+    """
     from flask import Response
-    key  = token_hex.lower().lstrip('0') or '0'
-    key8 = token_hex.lower().zfill(8)
+    # 96-bit IDE token = 24 hex chars (word0||word1||word2 of NS Outform entry).
+    # Extract word0_location (first 8 chars) as the canonical lump identity key.
+    raw    = token_hex.lower()
+    lump_id = raw[:8] if len(raw) >= 8 else raw
+    key    = lump_id.lstrip('0') or '0'
+    key8   = lump_id.zfill(8)
 
     data   = LAZY_LUMPS.get(key) or LAZY_LUMPS.get(key8)
     source = 'local'
