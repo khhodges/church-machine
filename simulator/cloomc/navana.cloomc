@@ -1,24 +1,101 @@
+// Navana — the permanent system supervisor.  NS slot 0.
+//
+// Navana is invoked by Salvation after the capability pipeline is validated.
+// It never terminates: once Init() returns, the hardware scheduler loops
+// Navana.Add / Navana.Remove to manage the live namespace.
+//
+// Capabilities:
+//   c-list[0] (CR7) = Memory abstraction    — allocation of physical pages
+//   c-list[1] (CR8) = Mint abstraction      — creation of typed GTs
+
 abstraction Navana {
     capabilities {
         Memory
         Mint
     }
+
+    // Init() — boot-time namespace initialisation.
+    //
+    // Called once by Salvation after hardware self-test passes.
+    // Claims physical memory for every software abstraction that must be
+    // resident at boot, then returns 1 to signal success.
+    //
+    // Memory layout claimed (all sizes in bytes, 256-byte aligned):
+    //
+    //   Layer 3 — fixed-point mathematics library
+    //     SlideRule  : 16 384 bytes  (4 096-word lump, 22 methods)
+    //     Constants  :    256 bytes  (  64-word lump,  5 constants)
+    //
+    //   Layer 1 — kernel primitives
+    //     Scheduler  :  1 024 bytes  (round-robin run queue)
+    //     Stack      :    512 bytes  (per-thread call stack)
+    //     DijkstraFlag:   256 bytes  (binary semaphore block)
+    //
+    //   Layer 2 — hardware driver working buffers
+    //     LED        :     64 bytes  (6-LED register shadow)
+    //     UART       :    512 bytes  (TX/RX ring buffers)
+    //
+    // Hardware-backed Layer 2 abstractions (LED, UART, Button, Timer)
+    // already have Abstract GTs provisioned by the FPGA NS initialiser;
+    // only their working-memory buffers are claimed here.
+    //
     method Init() {
+        // Layer 3 — fixed-point math library
+        srBase    = call(Memory.Allocate(16384))
+        constBase = call(Memory.Allocate(256))
+
+        // Layer 1 — kernel primitives
+        schedBase = call(Memory.Allocate(1024))
+        stackBase = call(Memory.Allocate(512))
+        flagBase  = call(Memory.Allocate(256))
+
+        // Layer 2 — hardware driver working buffers
+        ledBuf  = call(Memory.Allocate(64))
+        uartBuf = call(Memory.Allocate(512))
+
+        // Create enter-capable GTs for the two resident software lumps
+        // so the scheduler can CALL into them once they are loaded.
+        srGT    = call(Mint.Create(16384, 5))
+        constGT = call(Mint.Create(256, 5))
+
+        // Signal successful boot to Salvation (non-zero = OK).
         return(1)
     }
+
+    // Add(location, limit) — register a new abstraction in the live NS.
+    // location : physical base address of the lump
+    // limit    : byte size of the lump region
+    // Returns the NS index assigned, or 0 on failure.
     method Add(location, limit) {
         return(location)
     }
+
+    // Remove(index) — unregister an abstraction from the NS.
+    // index : NS slot to vacate
+    // Returns 0.
     method Remove(index) {
         return(0)
     }
+
+    // AbstractionAdd(location, limit, clistCount) — allocate and install
+    // a new abstraction lump that carries its own c-list.
+    // clistCount : number of GT entries in the lump's c-list region.
+    // Returns the base address of the newly allocated region.
     method AbstractionAdd(location, limit, clistCount) {
         result = call(Memory.Allocate(limit))
         return(result)
     }
+
+    // AbstractionUpdate(index) — signal that the lump at NS slot index
+    // has been rewritten in place and any cached state should be flushed.
+    // Returns index.
     method AbstractionUpdate(index) {
         return(index)
     }
+
+    // AbstractionRemove(index) — free the lump at NS slot index and
+    // zero the NS entry so it can be reused.
+    // Returns 0.
     method AbstractionRemove(index) {
         return(0)
     }

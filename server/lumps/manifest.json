@@ -38,6 +38,39 @@
     ]
   },
   {
+    "token": "00000c00",
+    "abstraction": "LED",
+    "ns_slot": 12,
+    "lump_size": 256,
+    "cw": 144,
+    "cc": 0,
+    "methods": [
+      {
+        "name": "Set",
+        "offset": 0,
+        "length": 33
+      },
+      {
+        "name": "Clear",
+        "offset": 33,
+        "length": 33
+      },
+      {
+        "name": "Toggle",
+        "offset": 66,
+        "length": 57
+      },
+      {
+        "name": "Pattern",
+        "offset": 123,
+        "length": 21
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
     "token": "00001000",
     "abstraction": "SlideRule",
     "ns_slot": 16,

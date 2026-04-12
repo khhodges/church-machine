@@ -1,0 +1,121 @@
+// LED abstraction — NS slot 12, token 00000C00
+// Controls 6 onboard status LEDs on Tang Nano 20K.
+//
+// Hardware: active-low GPIO connected to FPGA pins.
+//   Bit written 1 in simulator model = LED ON.
+//   On real silicon, the GPIO driver inverts so 0 drives pin LOW (LED ON).
+//
+// CR7 = LED register-file capability (R+W, hardware-backed MMIO at 0xFE1000).
+//   DWRITE CR7, offset N, 1  → LED N ON
+//   DWRITE CR7, offset N, 0  → LED N OFF
+//   DREAD  CR7, offset N     → current state of LED N (0 or 1)
+//
+// Permissions granted to callers: E (enter/call only).
+// C-list slot 0 (CR7): hardware LED device GT — provisioned at boot by
+//   the FPGA NS initialiser; not stored in this lump's cc region.
+
+abstraction LED {
+    capabilities {
+    }
+
+    // Set(n) — turn LED n ON  (n ∈ 0..5)
+    method Set(n) {
+        if (n == 0) {
+            write(CR7, 0, 1)
+        }
+        if (n == 1) {
+            write(CR7, 1, 1)
+        }
+        if (n == 2) {
+            write(CR7, 2, 1)
+        }
+        if (n == 3) {
+            write(CR7, 3, 1)
+        }
+        if (n == 4) {
+            write(CR7, 4, 1)
+        }
+        if (n == 5) {
+            write(CR7, 5, 1)
+        }
+        return(0)
+    }
+
+    // Clear(n) — turn LED n OFF  (n ∈ 0..5)
+    method Clear(n) {
+        if (n == 0) {
+            write(CR7, 0, 0)
+        }
+        if (n == 1) {
+            write(CR7, 1, 0)
+        }
+        if (n == 2) {
+            write(CR7, 2, 0)
+        }
+        if (n == 3) {
+            write(CR7, 3, 0)
+        }
+        if (n == 4) {
+            write(CR7, 4, 0)
+        }
+        if (n == 5) {
+            write(CR7, 5, 0)
+        }
+        return(0)
+    }
+
+    // Toggle(n) — flip the current state of LED n  (n ∈ 0..5)
+    // Uses 1 - current to invert without XOR.
+    method Toggle(n) {
+        if (n == 0) {
+            cur = read(CR7, 0)
+            nv = 1 - cur
+            write(CR7, 0, nv)
+        }
+        if (n == 1) {
+            cur = read(CR7, 1)
+            nv = 1 - cur
+            write(CR7, 1, nv)
+        }
+        if (n == 2) {
+            cur = read(CR7, 2)
+            nv = 1 - cur
+            write(CR7, 2, nv)
+        }
+        if (n == 3) {
+            cur = read(CR7, 3)
+            nv = 1 - cur
+            write(CR7, 3, nv)
+        }
+        if (n == 4) {
+            cur = read(CR7, 4)
+            nv = 1 - cur
+            write(CR7, 4, nv)
+        }
+        if (n == 5) {
+            cur = read(CR7, 5)
+            nv = 1 - cur
+            write(CR7, 5, nv)
+        }
+        return(0)
+    }
+
+    // Pattern(bits) — write a 6-bit mask to all LEDs simultaneously.
+    // bits[0] → LED 0, bits[1] → LED 1, … bits[5] → LED 5.
+    // Example: Pattern(0b101010) lights LEDs 1, 3, 5.
+    method Pattern(bits) {
+        b0 = bfext(bits, 0, 1)
+        b1 = bfext(bits, 1, 1)
+        b2 = bfext(bits, 2, 1)
+        b3 = bfext(bits, 3, 1)
+        b4 = bfext(bits, 4, 1)
+        b5 = bfext(bits, 5, 1)
+        write(CR7, 0, b0)
+        write(CR7, 1, b1)
+        write(CR7, 2, b2)
+        write(CR7, 3, b3)
+        write(CR7, 4, b4)
+        write(CR7, 5, b5)
+        return(0)
+    }
+}
