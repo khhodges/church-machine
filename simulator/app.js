@@ -6373,6 +6373,8 @@ function addBreakpointFromInput() {
     inp.style.borderColor = '';
     inp.value = '';
     addBreakpoint(addr);
+    const pop = document.getElementById('breakPopover');
+    if (pop) pop.style.display = 'none';
 }
 
 // Close breakpoint popover when clicking outside it
