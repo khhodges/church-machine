@@ -2205,7 +2205,7 @@ class ChurchSimulator {
                 argDR2 = this.dr[2];
             }
             const desc = isClistIndexedNav
-                ? `CALL CR${d.crDst}, CR${d.crSrc}, #${d.imm} -> ${label}.${methodName} [method=${d.crDst}]`
+                ? `CALL ${d.crDst}, CR${d.crSrc}, #${d.imm} -> ${label}.${methodName} [method=${d.crDst}]`
                 : `CALL CR${d.crDst} -> ${label}.${methodName} [abstraction dispatch]`;
             this.output += desc + '\n';
 
@@ -2270,8 +2270,8 @@ class ChurchSimulator {
             argDR2 = this.dr[2];
             const methodLabel = abstraction.methods[methodIndex] || abstraction.methods[0] || 'Apply';
             desc = (d.crDst === 15)
-                ? `CALL CR15, CR${d.crSrc}, #${d.imm} -> ${label}.${methodLabel} [escape: DR3=${methodIndex}]`
-                : `CALL CR${d.crDst}, CR${d.crSrc}, #${d.imm} -> ${label}.${methodLabel} [method=${methodIndex}]`;
+                ? `CALL 15, CR${d.crSrc}, #${d.imm} -> ${label}.${methodLabel} [escape: DR3=${methodIndex}]`
+                : `CALL ${d.crDst}, CR${d.crSrc}, #${d.imm} -> ${label}.${methodLabel} [method=${methodIndex}]`;
         } else {
             methodIndex = this.dr[3] || 0;
             encodedDstReg = null;

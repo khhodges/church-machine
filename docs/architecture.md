@@ -367,19 +367,30 @@ CALL supports three method dispatch modes, determined by the instruction's `imm`
 | Mode | Encoding | Method selector | Use case |
 |------|----------|----------------|----------|
 | **Legacy** | `CALL CRn` (imm=0) | DR3 | Standard call — set DR3 before CALL |
-| **C-list indexed** | `CALL CRd, CRs, #imm` (imm≠0, bit 14 clear) | CRd (0–14) | Direct method select via instruction field |
-| **C-list indexed + escape** | `CALL CR15, CRs, #imm` (CRd=15) | DR3 | Extended method select for >15 methods |
+| **C-list indexed** | `CALL d, CRs, #imm` (imm≠0, bit 14 clear) | d (0–14) | Direct method select via instruction field |
+| **C-list indexed + escape** | `CALL 15, CRs, #imm` (d=15) | DR3 | Extended method select for >15 methods |
 | **Packed** | imm bit 14 set | imm\[13:8\] (6-bit) | Single-instruction operand + dispatch |
 
-**CRd=15 escape convention**: When a c-list indexed CALL encodes CRd=15, the hardware reads DR3 as the method selector instead of using literal 15. This allows abstractions with more than 15 methods (such as SlideRule with 22 methods) to be fully addressed via c-list indexed calls. Methods 0–14 use the fast CRd path; method 15 and above use the DR3 escape.
+In the c-list indexed form `CALL d, CRs, #imm`, the first operand `d` is a **method selector** (a plain number 0–15), not a capability register. Only `CRs` (the c-list source) is a capability register.
+
+**Escape convention (d=15)**: When the method selector is 15, the hardware reads DR3 as the extended method selector instead. This allows abstractions with more than 15 methods (such as SlideRule with 22 methods) to be fully addressed. Methods 0–14 use the fast path; method 15 and above use the DR3 escape.
 
 Example — calling SlideRule.Factorial (method index 18) via c-list indexed CALL:
 
 ```
 IADD  DR3, DR0, #18       ; Method selector: Factorial (index 18)
 IADD  DR1, DR0, #10       ; Argument: compute 10!
-CALL  CR15, CR6, #3       ; Load SlideRule from CR6 c-list[3], dispatch via DR3
-                           ; Result in DR1
+CALL  15, CR6, #3          ; Load SlideRule from CR6 c-list[3], dispatch via DR3
+                            ; Result in DR1
+```
+
+Example — calling SlideRule.Multiply (method index 0) directly:
+
+```
+IADD  DR1, DR0, #7        ; Left operand
+IADD  DR2, DR0, #6        ; Right operand
+CALL  0, CR6, #3           ; Load SlideRule from CR6 c-list[3], method 0 = Multiply
+                            ; Result in DR1
 ```
 
 ## LAMBDA

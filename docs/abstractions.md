@@ -365,7 +365,7 @@ Integer and fixed-point arithmetic with full trigonometry, combinatorics, and nu
 - **Number theory** (12): Bernoulli (exact rational B(n), numerator in DR1, denominator in DR2)
 - **Extended** (13–21): Abs, Pow, Min, Max, GCD, Factorial, Log2, Atan2, Signum
 
-SlideRule has more than 15 methods, so c-list indexed calls use the **CRd=15 escape convention**: set DR3 to the method index, then `CALL CR15, CRs, #imm`. Methods 0–14 can also be addressed directly via CRd. See [Architecture: Method Dispatch Modes](architecture.md#method-dispatch-modes) for details.
+SlideRule has more than 15 methods, so c-list indexed calls use the **escape convention**: set DR3 to the method index, then `CALL 15, CRs, #imm`. Methods 0–14 can be addressed directly (e.g. `CALL 0, CR6, #3` for Multiply). See [Architecture: Method Dispatch Modes](architecture.md#method-dispatch-modes) for details.
 
 ### 17 — Abacus
 
