@@ -2,9 +2,10 @@
 
 ## Goal
 
-Abstractions load on demand — triggered by a capability fault on an
-empty NS slot — instead of being pre-loaded at boot. The child never
-knows the abstraction was absent. It just works.
+Abstractions load on demand — triggered by a CODE_NOT_RESIDENT fault
+when the lump header shows cw=0 — instead of being pre-loaded at boot.
+The GT (NS entry) is always preserved; only code words are evicted.
+The child never knows the code was absent. It just works.
 
 ## New Abstraction
 
@@ -14,13 +15,13 @@ knows the abstraction was absent. It just works.
 
 | Method | Description |
 |--------|-------------|
-| **Load** | Fault-driven load. Catches NULL_CAP fault, looks up the manifest, fetches the lump, installs it, retries the faulting CALL. |
+| **Load** | Fault-driven load. Catches CODE_NOT_RESIDENT fault (lump header cw=0), looks up the manifest, fetches the lump code, installs it into the existing GT's memory region, retries the faulting CALL. GT and c-list are untouched. |
 | **Prefetch** | Hint-driven load. A caller requests future loading of a slot without blocking. Returns immediately. |
-| **Evict** | Unloads a cold abstraction to reclaim memory. Clears the NS slot. Next access triggers Load again. |
+| **Evict** | Unloads a warm/cold abstraction's code to reclaim memory. Zeroes code words and sets lump header cw=0. GT (NS entry) and c-list are preserved. Next access triggers Load again. |
 
 **Capability requirements**: Loader holds GTs for Navana (E), Memory
-(E), Mint (E), Locator (E), and UART (R/W) — everything needed to
-fetch, allocate, install, and mint.
+(E), Locator (E), and UART (R/W) — everything needed to fetch and
+install code. Mint is NOT needed because the GT already exists from boot.
 
 ## Dependencies (existing abstractions)
 
@@ -28,7 +29,7 @@ fetch, allocate, install, and mint.
 |-------------|------|--------------------------|
 | Navana | 5 | Navana.Abstraction.Add — install lump into NS table |
 | Memory | 7 | Memory.Allocate — allocate power-of-2 block for the lump |
-| Mint | 6 | Mint.Create — create the GT for the loaded abstraction |
+| Mint | 6 | Not needed — GT already exists from boot |
 | Locator | — | Locator.Parse — read ZIP header, derive lump size and header word |
 | UART | 11 | Fetch lump bytes from bridge / storage device |
 
@@ -49,21 +50,21 @@ manifest[slot] = {
 ```
 
 - **hot**: loaded at boot (current behaviour — Navana.Init)
-- **warm**: loaded on first CALL (lazy load)
-- **cold**: loaded only on explicit request, evictable
+- **warm**: GT exists from boot, code evicted at init; loaded on first CALL (lazy load)
+- **cold**: GT exists from boot, code loaded only on explicit request, evictable
 
 ### Fault Vector Integration
 
 The FAULT handler (hardware or simulator) must be extended:
 
 ```
-On FAULT NULL_CAP:
-    faulting_slot = extract NS slot from the faulting GT
-    if manifest[faulting_slot] exists:
-        Loader.Load(faulting_slot)
+On CALL/LOAD to a valid NS entry:
+    read lump header at word0_location
+    if lump_header.cw == 0 and manifest[slot] exists:
+        FAULT CODE_NOT_RESIDENT
+        Loader.Load(slot)    -- writes code words, updates lump header cw
         retry faulting instruction
-    else:
-        raise FAULT NULL_CAP (genuine missing capability)
+    (GT and c-list are never destroyed — only code residency changes)
 ```
 
 ## Implementation Steps
@@ -73,7 +74,7 @@ On FAULT NULL_CAP:
 - Define the manifest JSON format
 - Extend Navana.Init to read the manifest and tag slots as hot/warm/cold
 - Hot slots load at boot (existing behaviour)
-- Warm/cold slots get NULL entries with a manifest reference
+- Warm/cold slots: GT preserved, code words zeroed, lump header set to cw=0
 
 ### Step 2: Loader abstraction — CLOOMC++ source
 
@@ -86,24 +87,26 @@ On FAULT NULL_CAP:
 
 ### Step 3: Fault handler extension
 
-- Simulator: extend `handleFault()` in app.js to detect NULL_CAP on a
-  manifest-registered slot and dispatch to Loader.Load
-- Hardware: extend the FAULT FSM in Amaranth HDL to vector to Loader's
-  NS slot on NULL_CAP if the manifest flag is set
+- Simulator: in _execLoad/_execCall, after resolving a valid NS entry,
+  read the lump header. If cw=0 and manifest entry exists, dispatch
+  CODE_NOT_RESIDENT fault to Loader.Load
+- Hardware: extend the CALL/LOAD FSM in Amaranth HDL to check lump
+  header cw field before dispatch; vector to Loader if cw=0
 
 ### Step 4: Eviction and memory pressure
 
-- Loader.Evict: clear the NS entry, free the memory block, NULL the GT
+- Loader.Evict: zero code words in the lump, set lump header cw=0.
+  GT (NS entry) and c-list are preserved — ownership is never destroyed.
 - Track access frequency per slot (simple counter in the manifest)
 - On Memory.Allocate failure: Loader.Evict the coldest warm slot, retry
 
 ### Step 5: Simulator testing
 
 - Tag SlideRule as "warm" in the manifest
-- Boot the simulator — SlideRule slot is NULL
-- Call SlideRule.Sin — FAULT → Loader.Load → SlideRule installs → Sin runs
-- Verify: no visible difference from pre-loaded behaviour
-- Test eviction: Loader.Evict(SlideRule) → next call re-loads
+- Boot the simulator — SlideRule GT exists, lump header cw=0 (code not resident)
+- Call SlideRule.Sin — CODE_NOT_RESIDENT → Loader.Load → code installed → Sin runs
+- Verify: GT, c-list, and seals unchanged across load cycle
+- Test eviction: Loader.Evict(SlideRule) → code cleared, GT preserved → next call re-loads
 
 ## Memory Budget
 
@@ -118,8 +121,9 @@ only the active set needs to be resident.
 
 ## Success Criteria
 
-1. Boot with SlideRule tagged as "warm" — slot is NULL at boot
-2. `CALL SlideRule.Sin` triggers FAULT → Loader.Load → Sin executes
+1. Boot with SlideRule tagged as "warm" — GT exists, code not resident (cw=0)
+2. `CALL SlideRule.Sin` triggers CODE_NOT_RESIDENT → Loader.Load → Sin executes
 3. No visible difference to the caller — transparent lazy loading
-4. Loader.Evict frees the slot — next call re-loads
-5. MTBF = ∞ for Loader itself — zero faults in the load path
+4. GT, c-list, and seals are preserved across all load/evict cycles
+5. Loader.Evict clears code (cw=0) — GT stays, next call re-loads
+6. MTBF = ∞ for Loader itself — zero faults in the load path

@@ -88,6 +88,13 @@ corrupting state.
 32 bits total. No spare bits. No dead fields. `code_base = base + 4` always.
 `PC = 1` always.
 
+> **Lazy-load convention:** For callable lumps (`typ=00`), `cw=0` signals
+> "code not resident." The GT (NS entry) and c-list remain valid, but the
+> code region is empty. CALL/LOAD to such a lump triggers a
+> `CODE_NOT_RESIDENT` fault, which the Loader intercepts to fetch and
+> install the code words and update `cw` to the real count. Eviction
+> reverses this: code words are zeroed and `cw` is set back to 0.
+
 ### Example Header Words
 
 Encoding formula: `(0x1F << 27) | ((n-6) << 23) | (cw << 10) | (typ << 8) | cc`

@@ -4,14 +4,13 @@ Items to clean up in a future batch. None are blocking.
 
 ---
 
-### P001: Warm-slot tooltip positioning
-- **Source**: Task #101 code review
-- **Area**: `simulator/app.js` — `showNSEntryTooltip()` warm-slot branch
-- **Issue**: Warm-slot tooltips use raw `evt.pageX`/`evt.pageY` coordinates instead of the shared `_positionNSTooltip()` helper, which can drift during scroll.
-- **Fix**: Route warm-slot tooltip positioning through the same helper used by loaded-slot tooltips.
+### ~~P001: Warm-slot tooltip positioning~~ — RESOLVED by Task #102
+- **Resolved**: Task #102 rewrote warm-slot tooltip to use the same code path
+  as loaded-slot tooltips. The separate warm-slot branch that used raw page
+  coordinates was removed.
 
-### P002: Warm-slot type label clarity
-- **Source**: Task #101 code review
-- **Area**: `simulator/app.js` — `updateNamespace()` warm-slot branch
-- **Issue**: The type column shows the priority tag ("Warm") but could also include "Unloaded" for extra clarity (e.g., "Warm / Unloaded").
-- **Fix**: Append " / Unloaded" to the priority tag when `manifest.loaded === false`.
+### ~~P002: Warm-slot type label clarity~~ — RESOLVED by Task #102
+- **Resolved**: Task #102 changed warm-slot rendering. Warm slots now display
+  their real GT type (e.g., "Inform") plus a "(Warm)" tag when code is not
+  resident. The separate fallback rendering path was removed because GTs are
+  now preserved and readNSEntry() returns real data for warm slots.

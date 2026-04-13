@@ -379,7 +379,7 @@ Read-only mathematical constants. Returns pre-computed values with full precisio
 
 **Methods**: Load, Prefetch, Evict
 
-Lazy load — fault-driven on-demand abstraction loading. Catches NULL_CAP on manifest-registered slots, fetches and installs the lump, retries the faulting CALL transparently. The Loader is always resident (hot priority) and holds GTs for Navana, Mint, Memory, and UART. Critical for the Tang Nano 20K where 64 KB of BRAM cannot hold all abstractions simultaneously.
+Lazy load — fault-driven on-demand code loading. Detects CODE_NOT_RESIDENT (lump header cw=0) on manifest-registered slots, fetches and installs the code words, updates the lump header cw, and retries the faulting CALL transparently. The GT (NS entry) and c-list are always preserved — only code residency changes. The Loader is always resident (hot priority) and holds GTs for Navana, Memory, Locator, and UART. Critical for the Tang Nano 20K where 64 KB of BRAM cannot hold all abstractions simultaneously.
 
 ### 46 — Circle
 

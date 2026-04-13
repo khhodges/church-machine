@@ -123,12 +123,16 @@ class ChurchSimulator {
                     entry.allocBase = nsEntry.word0_location;
                     entry.allocSize = entry.size || this.SLOT_SIZE;
                     const loc = nsEntry.word0_location;
-                    const lim = entry.allocSize;
-                    for (let i = 0; i < lim; i++) {
+                    const hdr = this.parseLumpHeader(this.memory[loc]);
+                    const cw = hdr.valid ? hdr.cw : 0;
+                    const cc = hdr.valid ? hdr.cc : 0;
+                    for (let i = 1; i < (1 + cw); i++) {
                         this.memory[loc + i] = 0;
                     }
+                    const lumpSize = entry.allocSize;
+                    const nMinus6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
+                    this.memory[loc] = this.packLumpHeader(nMinus6, 0, cc, 0);
                 }
-                this.writeNSEntry(slot, 0, 0, 0, 0, 0, 0, 0, 0, 0);
                 entry.loaded = false;
                 entry.loadCount = 0;
             } else if (entry.priority === 'cold') {
@@ -140,7 +144,7 @@ class ChurchSimulator {
         if (warmCount + coldCount > 0) {
             this.output += `[LOADER] Lazy load manifest: ${hotCount} hot, ${warmCount} warm, ${coldCount} cold slots registered\n`;
             if (warmCount > 0) {
-                this.output += `[LOADER] ${warmCount} warm slot(s) NULLed — will lazy-load on first CALL\n`;
+                this.output += `[LOADER] ${warmCount} warm slot(s) code evicted (GT preserved) — will lazy-load on first CALL\n`;
             }
         }
     }
@@ -193,26 +197,14 @@ class ChurchSimulator {
             offset += code.length;
         }
 
+        const oldHdr = this.parseLumpHeader(this.memory[loc]);
+        const cc = oldHdr.valid ? oldHdr.cc : (bootUpload.capabilities || []).length;
         const nMinus6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
-        const cc = (bootUpload.capabilities || []).length;
         this.memory[loc] = this.packLumpHeader(nMinus6, totalCodeWords, cc, 0);
-
-        if (cc > 0 && bootUpload.capabilities) {
-            const clistStart = lumpSize - cc;
-            for (let i = 0; i < cc; i++) {
-                const cap = bootUpload.capabilities[i];
-                const capGT = this.createGT(0, cap.target, { E: 1 }, 1);
-                this.memory[loc + clistStart + i] = capGT;
-            }
-        }
-
-        const lim17 = lumpSize - 1;
-        this.writeNSEntry(slotIndex, loc, lim17, 0, 0, 0, 0, 1, 0, 0);
-        this.nsLabels[slotIndex] = label;
 
         entry.loaded = true;
         entry.loadCount = (entry.loadCount || 0) + 1;
-        this.output += `[LOADER] ${label} installed at 0x${loc.toString(16)} (${lumpSize} words, ${totalCodeWords} code words, load #${entry.loadCount})\n`;
+        this.output += `[LOADER] ${label} code installed at 0x${loc.toString(16)} (${lumpSize} words, ${totalCodeWords} code words, load #${entry.loadCount}) — GT preserved\n`;
 
         this.auditLog.push({
             gate: 'Loader.Load',
@@ -245,16 +237,20 @@ class ChurchSimulator {
         const nsEntry = this.readNSEntry(slotIndex);
         if (nsEntry && nsEntry.word0_location > 0) {
             const loc = nsEntry.word0_location;
-            const allocSize = entry.allocSize || this.SLOT_SIZE;
-            for (let i = 0; i < allocSize; i++) {
-                this.memory[loc + i] = 0;
+            const hdr = this.parseLumpHeader(this.memory[loc]);
+            if (hdr.valid && hdr.cw > 0) {
+                for (let i = 1; i < (1 + hdr.cw); i++) {
+                    this.memory[loc + i] = 0;
+                }
             }
+            const lumpSize = entry.allocSize || this.SLOT_SIZE;
+            const nMinus6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
+            const cc = hdr.valid ? hdr.cc : 0;
+            this.memory[loc] = this.packLumpHeader(nMinus6, 0, cc, 0);
         }
 
-        this.writeNSEntry(slotIndex, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
         entry.loaded = false;
-        this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — memory freed, slot NULL\n`;
+        this.output += `[LOADER] Evicted ${label} (slot ${slotIndex}) — code cleared, GT preserved\n`;
 
         this.auditLog.push({
             gate: 'Loader.Evict',
@@ -1782,8 +1778,18 @@ class ChurchSimulator {
         const targetIdx = slotParsed.index;
         this._lastLoadTargetSlot = targetIdx;
         if (targetIdx >= this.nsCount || !this.isNSEntryValid(targetIdx)) {
-            if (this.lazyManifest[targetIdx] && !this.lazyManifest[targetIdx].loaded) {
-                this.output += `[LOADER] LOAD: NS[${targetIdx}] is NULL — manifest entry found, dispatching to Loader...\n`;
+            this.fault('BOUNDS', `LOAD: namespace index ${targetIdx} out of bounds`);
+            return null;
+        }
+        const entry = this.readNSEntry(targetIdx);
+        if (!entry) {
+            this.fault('BOUNDS', `LOAD: entry ${targetIdx} is null`);
+            return null;
+        }
+        if (this.lazyManifest[targetIdx] && !this.lazyManifest[targetIdx].loaded) {
+            const lumpHdr = this.parseLumpHeader(this.memory[entry.word0_location]);
+            if (!lumpHdr.valid || lumpHdr.cw === 0) {
+                this.output += `[LOADER] LOAD: NS[${targetIdx}] code not resident (cw=0) — dispatching Loader...\n`;
                 const loaded = this._dispatchLoaderLoad(targetIdx);
                 if (loaded) {
                     const freshEntry = this.readNSEntry(targetIdx);
@@ -1794,14 +1800,9 @@ class ChurchSimulator {
                     this.pc++;
                     return { pc: this.pc - 1, instr: d, desc };
                 }
+                this.fault('CODE_NOT_RESIDENT', `LOAD: slot ${targetIdx} lazy load failed`);
+                return null;
             }
-            this.fault('BOUNDS', `LOAD: namespace index ${targetIdx} out of bounds`);
-            return null;
-        }
-        const entry = this.readNSEntry(targetIdx);
-        if (!entry) {
-            this.fault('BOUNDS', `LOAD: entry ${targetIdx} is null`);
-            return null;
         }
 
         // ── Absent-lump intercept ─────────────────────────────────────────────
@@ -1902,16 +1903,18 @@ class ChurchSimulator {
         }
         const callTargetIdx = srcParsed.index;
         if (this.lazyManifest[callTargetIdx] && !this.lazyManifest[callTargetIdx].loaded) {
-            if (!this.isNSEntryValid(callTargetIdx)) {
-                this.output += `[LOADER] CALL: NS[${callTargetIdx}] is NULL — manifest entry found, dispatching to Loader...\n`;
-                const loaded = this._dispatchLoaderLoad(callTargetIdx);
-                if (!loaded) {
-                    this.fault('NULL_CAP', `CALL: CR${d.crDst} lazy load failed for slot ${callTargetIdx}`);
-                    return null;
+            const callNsEntry = this.readNSEntry(callTargetIdx);
+            if (callNsEntry && callNsEntry.word0_location > 0) {
+                const callLumpHdr = this.parseLumpHeader(this.memory[callNsEntry.word0_location]);
+                if (!callLumpHdr.valid || callLumpHdr.cw === 0) {
+                    this.output += `[LOADER] CALL: NS[${callTargetIdx}] code not resident (cw=0) — dispatching Loader...\n`;
+                    const loaded = this._dispatchLoaderLoad(callTargetIdx);
+                    if (!loaded) {
+                        this.fault('CODE_NOT_RESIDENT', `CALL: CR${d.crDst} lazy load failed for slot ${callTargetIdx}`);
+                        return null;
+                    }
+                    this.output += `[LOADER] CALL: slot ${callTargetIdx} code loaded, proceeding with CALL CR${d.crDst}\n`;
                 }
-                const freshEntry = this.readNSEntry(callTargetIdx);
-                this._writeCR(d.crDst, sourceGT, freshEntry);
-                this.output += `[LOADER] CALL: slot ${callTargetIdx} loaded, proceeding with CALL CR${d.crDst}\n`;
             }
         }
         const check = this.mLoad(sourceGT, 'E', d.crDst);

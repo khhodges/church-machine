@@ -3468,42 +3468,39 @@ function updateNamespace() {
     const typeNames = ['NULL','Inform','Outform','Abstract'];
     for (let i = 0; i < sim.nsCount; i++) {
         const e = sim.readNSEntry(i);
+        if (!e) continue;
         const manifest = sim.lazyManifest ? sim.lazyManifest[i] : null;
-        if (!e && !manifest) continue;
-        if (!e && manifest) {
-            const label = manifest.label || sim.nsLabels[i] || '-';
-            const isExpanded = (nsExpandedSlot === i);
-            const warmStyle = 'color:#f0a040;font-style:italic;';
-            const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
-            html += `<tr class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;opacity:0.7;">`;
-            html += `<td>${i}</td>`;
-            html += `<td class="ns-label" style="${warmStyle}" onmouseenter="showNSEntryTooltip(event,${i})" onmouseleave="hideNSEntryTooltip()">${label}</td>`;
-            html += `<td style="${warmStyle}">\u2014</td>`;
-            html += `<td style="${warmStyle}">${priorityTag}</td>`;
-            html += `<td class="ns-flag" style="${warmStyle}">0</td>`;
-            html += `<td class="ns-flag" style="${warmStyle}">0</td>`;
-            html += `<td style="${warmStyle}">\u2014</td>`;
-            html += `<td style="${warmStyle}">0</td>`;
-            html += `<td style="${warmStyle}">\u2014</td>`;
-            html += `<td class="ns-entry-actions"><span style="${warmStyle}">lazy load</span></td>`;
-            html += '</tr>';
-            continue;
+        let codeNotResident = false;
+        if (manifest && !manifest.loaded && e.word0_location > 0) {
+            const hdr = sim.parseLumpHeader(sim.memory[e.word0_location]);
+            if (!hdr.valid || hdr.cw === 0) codeNotResident = true;
         }
         const lim = sim.parseNSWord1(e.word1_limit);
         const ver = (e.word2_seals >>> 25) & 0x7F;
         const seal = e.word2_seals & 0xFFFF;
         const isExpanded = (nsExpandedSlot === i);
-        html += `<tr class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;">`;
+        const warmStyle = codeNotResident ? 'color:#f0a040;font-style:italic;' : '';
+        const rowOpacity = codeNotResident ? 'opacity:0.8;' : '';
+        html += `<tr class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;${rowOpacity}">`;
         html += `<td>${i}</td>`;
-        html += `<td class="ns-label" onmouseenter="showNSEntryTooltip(event,${i})" onmouseleave="hideNSEntryTooltip()">${e.label || '-'}</td>`;
-        html += `<td>0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
-        html += `<td>${typeNames[e.gtType] || '?'}</td>`;
-        html += `<td class="ns-flag">${lim.f}</td>`;
-        html += `<td class="ns-flag">${e.gBit}</td>`;
-        html += `<td>0x${lim.limit.toString(16).toUpperCase().padStart(5, '0')}</td>`;
-        html += `<td>${ver}</td>`;
-        html += `<td>0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
-        html += `<td class="ns-entry-actions"><button class="btn btn-primary btn-xs" onclick="event.stopPropagation();exportEntryMemory(${i})">Export</button> <button class="btn btn-xs" onclick="event.stopPropagation();importEntryMemory(${i})" style="background:#3a86ff;color:#fff;border:none;">Import</button></td>`;
+        html += `<td class="ns-label" style="${warmStyle}" onmouseenter="showNSEntryTooltip(event,${i})" onmouseleave="hideNSEntryTooltip()">${e.label || '-'}</td>`;
+        html += `<td style="${warmStyle}">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        if (codeNotResident) {
+            const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
+            html += `<td style="${warmStyle}">${typeNames[e.gtType] || '?'} <span style="font-size:0.7rem;">(${priorityTag})</span></td>`;
+        } else {
+            html += `<td>${typeNames[e.gtType] || '?'}</td>`;
+        }
+        html += `<td class="ns-flag" style="${warmStyle}">${lim.f}</td>`;
+        html += `<td class="ns-flag" style="${warmStyle}">${e.gBit}</td>`;
+        html += `<td style="${warmStyle}">0x${lim.limit.toString(16).toUpperCase().padStart(5, '0')}</td>`;
+        html += `<td style="${warmStyle}">${ver}</td>`;
+        html += `<td style="${warmStyle}">0x${seal.toString(16).toUpperCase().padStart(4, '0')}</td>`;
+        if (codeNotResident) {
+            html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span></td>`;
+        } else {
+            html += `<td class="ns-entry-actions"><button class="btn btn-primary btn-xs" onclick="event.stopPropagation();exportEntryMemory(${i})">Export</button> <button class="btn btn-xs" onclick="event.stopPropagation();importEntryMemory(${i})" style="background:#3a86ff;color:#fff;border:none;">Import</button></td>`;
+        }
         html += '</tr>';
         if (isExpanded) {
             html += `<tr class="ns-detail-row"><td colspan="10">`;
@@ -3531,24 +3528,13 @@ function _getNSEntryTooltipEl() {
 function showNSEntryTooltip(evt, idx) {
     const tt = _getNSEntryTooltipEl();
     const e = sim.readNSEntry(idx);
-    const manifest = sim.lazyManifest ? sim.lazyManifest[idx] : null;
-    if (!e && !manifest) { tt.classList.remove('visible'); return; }
+    if (!e) { tt.classList.remove('visible'); return; }
 
-    if (!e && manifest) {
-        const label = manifest.label || sim.nsLabels[idx] || '';
-        const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
-        let html = `<div class="ns-tt-header">Slot ${idx}<span class="ns-tt-badge" style="background:#f0a040;color:#1a1a2e;">${priorityTag}</span></div>`;
-        if (label) html += `<div class="ns-tt-label">"${label}"</div>`;
-        html += `<div style="color:#f0a040;font-size:0.75rem;margin-top:0.25rem;">Unloaded \u2014 will lazy-load on first CALL</div>`;
-        if (manifest.bootUpload && manifest.bootUpload.methods) {
-            const mNames = manifest.bootUpload.methods.map(m => m.name || '?');
-            html += `<div style="color:#9ca3af;font-size:0.72rem;margin-top:0.15rem;">Methods: ${mNames.join(', ')}</div>`;
-        }
-        tt.innerHTML = html;
-        tt.style.left = (evt.pageX + 12) + 'px';
-        tt.style.top = (evt.pageY - 10) + 'px';
-        tt.classList.add('visible');
-        return;
+    const manifest = sim.lazyManifest ? sim.lazyManifest[idx] : null;
+    let codeNotResident = false;
+    if (manifest && !manifest.loaded && e.word0_location > 0) {
+        const hdr = sim.parseLumpHeader(sim.memory[e.word0_location]);
+        if (!hdr.valid || hdr.cw === 0) codeNotResident = true;
     }
 
     const lim = sim.parseNSWord1(e.word1_limit);
@@ -3567,6 +3553,10 @@ function showNSEntryTooltip(evt, idx) {
 
     let html = `<div class="ns-tt-header">Slot ${idx}<span class="ns-tt-badge ${badgeClass[lim.gtType]}">${typeName}</span></div>`;
     if (e.label) html += `<div class="ns-tt-label">"${e.label}"</div>`;
+    if (codeNotResident) {
+        const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
+        html += `<div style="color:#f0a040;font-size:0.75rem;margin-top:0.25rem;margin-bottom:0.25rem;"><b>${priorityTag}</b> — code not resident, will lazy-load on first CALL</div>`;
+    }
     if (absMatch) {
         const absName = absMatch.name || '';
         const absLayer = absMatch.layer != null ? ` · Layer ${absMatch.layer}` : '';
