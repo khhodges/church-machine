@@ -2842,48 +2842,10 @@ class CLOOMCCompiler {
             return neededCaps[nsSlot].offset;
         };
 
-        const OP_TABLE = {
-            '+': { abs: 'Abacus', nsSlot: 17, method: 'Add', methodIndex: 0 },
-            '-': { abs: 'Abacus', nsSlot: 17, method: 'Sub', methodIndex: 1 },
-            '*': { abs: 'SlideRule', nsSlot: 16, method: 'Multiply', methodIndex: 0 },
-            '/': { abs: 'SlideRule', nsSlot: 16, method: 'Divide', methodIndex: 1 },
-            '%': { abs: 'SlideRule', nsSlot: 16, method: 'Mod', methodIndex: 3 },
-        };
-
-        const FUNC_TABLE = {
-            'sqrt':       { abs: 'SlideRule', nsSlot: 16, methodIndex: 2, args: 1 },
-            'mod':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 3, args: 2 },
-            'sin':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 4, args: 1 },
-            'cos':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 5, args: 1 },
-            'tan':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 6, args: 1 },
-            'asin':       { abs: 'SlideRule', nsSlot: 16, methodIndex: 7, args: 1 },
-            'acos':       { abs: 'SlideRule', nsSlot: 16, methodIndex: 8, args: 1 },
-            'atan':       { abs: 'SlideRule', nsSlot: 16, methodIndex: 9, args: 1 },
-            'todegrees':  { abs: 'SlideRule', nsSlot: 16, methodIndex: 10, args: 1 },
-            'toradians':  { abs: 'SlideRule', nsSlot: 16, methodIndex: 11, args: 1 },
-            'bernoulli':  { abs: 'SlideRule', nsSlot: 16, methodIndex: 12, args: 1 },
-            'abs':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 13, args: 1 },
-            'pow':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 14, args: 2 },
-            'min':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 15, args: 2 },
-            'max':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 16, args: 2 },
-            'gcd':        { abs: 'SlideRule', nsSlot: 16, methodIndex: 17, args: 2 },
-            'factorial':  { abs: 'SlideRule', nsSlot: 16, methodIndex: 18, args: 1 },
-            'log2':       { abs: 'SlideRule', nsSlot: 16, methodIndex: 19, args: 1 },
-            'atan2':      { abs: 'SlideRule', nsSlot: 16, methodIndex: 20, args: 2 },
-            'signum':     { abs: 'SlideRule', nsSlot: 16, methodIndex: 21, args: 1 },
-            'add':        { abs: 'Abacus', nsSlot: 17, methodIndex: 0, args: 2 },
-            'sub':        { abs: 'Abacus', nsSlot: 17, methodIndex: 1, args: 2 },
-            'mul':        { abs: 'Abacus', nsSlot: 17, methodIndex: 2, args: 2 },
-            'div':        { abs: 'Abacus', nsSlot: 17, methodIndex: 3, args: 2 },
-            'multiply':   { abs: 'SlideRule', nsSlot: 16, methodIndex: 0, args: 2 },
-            'divide':     { abs: 'SlideRule', nsSlot: 16, methodIndex: 1, args: 2 },
-        };
-
-        const FUNC_NAMES = Object.keys(FUNC_TABLE)
-            .filter(k => k[0] === k[0].toLowerCase())
-            .map(k => k.charAt(0).toUpperCase() + k.slice(1))
-            .filter((v, i, a) => a.indexOf(v) === i)
-            .join(', ');
+        const tables = CLOOMCCompiler._buildPetNameTables();
+        const OP_TABLE = tables.opTable;
+        const FUNC_TABLE = tables.funcTable;
+        const FUNC_NAMES = tables.funcNames;
 
         const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH|SHL|SHR|HALT|NOP)\b/i;
 
@@ -3047,27 +3009,41 @@ class CLOOMCCompiler {
             });
         };
 
+        let asmBlock = [];
+        let asmBlockSrcLines = [];
+
+        const flushAsmBlock = () => {
+            if (asmBlock.length === 0) return;
+            const combined = asmBlock.join('\n');
+            const asmObj = new ChurchAssembler();
+            const asmResult = asmObj.assemble(combined);
+            if (asmResult.errors && asmResult.errors.length > 0) {
+                for (const e of asmResult.errors) {
+                    const srcLine = asmBlockSrcLines[e.line !== undefined ? e.line : 0] || asmBlockSrcLines[0];
+                    errors.push({ line: srcLine, message: e.message });
+                }
+            } else if (asmResult.words && asmResult.words.length > 0) {
+                manifest.push({ src: asmBlockSrcLines[0], addr: code.length, desc: asmBlock[0] + (asmBlock.length > 1 ? ` (+${asmBlock.length - 1} lines)` : '') });
+                for (const w of asmResult.words) {
+                    code.push(w);
+                }
+            }
+            asmBlock = [];
+            asmBlockSrcLines = [];
+        };
+
         for (let i = 0; i < lines.length; i++) {
             const raw = lines[i];
             const t = raw.trim();
             if (!t || t.startsWith(';') || t.startsWith('//') || t.startsWith('--')) continue;
 
-            if (asmMnemonics.test(t)) {
-                const substituted = substitutePetNames(t);
-                const asmObj = new ChurchAssembler();
-                const asmResult = asmObj.assemble(substituted);
-                if (asmResult.errors && asmResult.errors.length > 0) {
-                    for (const e of asmResult.errors) {
-                        errors.push({ line: i, message: e.message });
-                    }
-                } else if (asmResult.words && asmResult.words.length > 0) {
-                    manifest.push({ src: i, addr: code.length, desc: t });
-                    for (const w of asmResult.words) {
-                        code.push(w);
-                    }
-                }
+            if (asmMnemonics.test(t) || (asmBlock.length > 0 && /^\s*\w+:/.test(t))) {
+                asmBlock.push(substitutePetNames(t));
+                asmBlockSrcLines.push(i);
                 continue;
             }
+
+            flushAsmBlock();
 
             const bareFunc = t.match(/^([A-Za-z_]\w*)\s*\((.*)\)$/);
             if (bareFunc && !t.match(/^[A-Za-z_]\w*\s*=/)) {
@@ -3104,6 +3080,8 @@ class CLOOMCCompiler {
 
             errors.push({ line: i, message: `Cannot parse pet-name expression: "${t}"` });
         }
+
+        flushAsmBlock();
 
         if (code.length === 0 || (code[code.length - 1] !== 0)) {
             code.push(0);
@@ -3158,5 +3136,82 @@ class CLOOMCCompiler {
             }
         }
         return bestPos;
+    }
+
+    static _buildPetNameTables() {
+        const opTable = {};
+        const funcTable = {};
+        const opMapping = { '+': 'Add', '-': 'Sub', '*': 'Multiply', '/': 'Divide', '%': 'Mod' };
+        const opAbsPreference = { '+': 'Abacus', '-': 'Abacus', '*': 'SlideRule', '/': 'SlideRule', '%': 'SlideRule' };
+
+        const regConv = (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') ? METHOD_REGISTER_CONVENTIONS : {};
+        const bootUploads = (typeof BOOT_UPLOADS !== 'undefined') ? BOOT_UPLOADS : [];
+
+        const nsSlotMap = {};
+        for (const upload of bootUploads) {
+            if (upload.index !== undefined && upload.abstraction) {
+                nsSlotMap[upload.abstraction] = upload.index;
+            }
+        }
+
+        const countArgs = (inputStr) => {
+            if (!inputStr) return 0;
+            return (inputStr.match(/DR\d+/g) || []).length;
+        };
+
+        for (const [absName, methods] of Object.entries(regConv)) {
+            const nsSlot = nsSlotMap[absName];
+            if (nsSlot === undefined) continue;
+            for (const [methodName, conv] of Object.entries(methods)) {
+                const args = countArgs(conv.input);
+                funcTable[methodName.toLowerCase()] = {
+                    abs: absName, nsSlot, methodIndex: conv.index, args
+                };
+            }
+        }
+
+        for (const upload of bootUploads) {
+            if (!upload.methods || !upload.methods.length) continue;
+            const absName = upload.abstraction;
+            const nsSlot = upload.index;
+            if (regConv[absName]) continue;
+            for (let mi = 0; mi < upload.methods.length; mi++) {
+                const m = upload.methods[mi];
+                const key = m.name.toLowerCase();
+                if (!funcTable[key]) {
+                    const args = (absName === 'Abacus' && (key === 'add' || key === 'sub' || key === 'mul' || key === 'div' || key === 'mod')) ? 2
+                        : (absName === 'Abacus' && key === 'abs') ? 1 : 1;
+                    funcTable[key] = { abs: absName, nsSlot, methodIndex: mi, args };
+                }
+            }
+        }
+
+        for (const [op, methodName] of Object.entries(opMapping)) {
+            const prefAbs = opAbsPreference[op];
+            const key = methodName.toLowerCase();
+            const entry = funcTable[key];
+            if (entry) {
+                opTable[op] = { abs: entry.abs, nsSlot: entry.nsSlot, method: methodName, methodIndex: entry.methodIndex };
+                if (entry.abs !== prefAbs) {
+                    const alt = Object.entries(funcTable).find(([k, v]) => k === key && v.abs === prefAbs);
+                    if (alt) {
+                        opTable[op] = { abs: alt[1].abs, nsSlot: alt[1].nsSlot, method: methodName, methodIndex: alt[1].methodIndex };
+                    }
+                }
+            }
+        }
+
+        if (!opTable['+']) opTable['+'] = { abs: 'Abacus', nsSlot: 17, method: 'Add', methodIndex: 0 };
+        if (!opTable['-']) opTable['-'] = { abs: 'Abacus', nsSlot: 17, method: 'Sub', methodIndex: 1 };
+        if (!opTable['*']) opTable['*'] = { abs: 'SlideRule', nsSlot: 16, method: 'Multiply', methodIndex: 0 };
+        if (!opTable['/']) opTable['/'] = { abs: 'SlideRule', nsSlot: 16, method: 'Divide', methodIndex: 1 };
+        if (!opTable['%']) opTable['%'] = { abs: 'SlideRule', nsSlot: 16, method: 'Mod', methodIndex: 3 };
+
+        const funcNames = Object.keys(funcTable)
+            .map(k => k.charAt(0).toUpperCase() + k.slice(1))
+            .filter((v, i, a) => a.indexOf(v) === i)
+            .join(', ');
+
+        return { opTable, funcTable, funcNames };
     }
 }
