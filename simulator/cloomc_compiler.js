@@ -971,7 +971,7 @@ class CLOOMCCompiler {
             return;
         }
 
-        const callClistMatch = text.match(/^CALL\s+CR(\d+)\s*,\s*CR(\d+)\s*,\s*#(\d+)$/i);
+        const callClistMatch = text.match(/^CALL\s+(?:CR)?(\d+)\s*,\s*CR(\d+)\s*,\s*#(\d+)$/i);
         if (callClistMatch) {
             const methodIdx = parseInt(callClistMatch[1]) & 0xF;
             const srcCR = parseInt(callClistMatch[2]) & 0xF;
