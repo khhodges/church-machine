@@ -2802,26 +2802,29 @@ class CLOOMCCompiler {
     }
 
     _detectPetName(source) {
-        const lines = source.split('\n');
-        let petNameScore = 0;
-        const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH|SHL|SHR|HALT|NOP)\b/i;
-        const assignPattern = /^\s*[A-Za-z_]\w*\s*=\s*.+/;
-        const funcCallPattern = /^\s*(?:[A-Za-z_]\w*\s*=\s*)?(?:Sqrt|GCD|Factorial|Log2|Abs|Min|Max|Pow|Sin|Cos|Tan|Asin|Acos|Atan|Atan2|ToDegrees|ToRadians|Bernoulli|Signum|Mod)\s*\(/i;
-        const operatorPattern = /^\s*[A-Za-z_]\w*\s*=\s*[A-Za-z_\d]\S*\s*[\+\-\*\/%]\s*/;
-        let asmLines = 0;
-        let exprLines = 0;
-        for (const line of lines) {
-            const t = line.trim();
-            if (!t || t.startsWith(';') || t.startsWith('//') || t.startsWith('--')) continue;
-            if (asmMnemonics.test(t)) { asmLines++; continue; }
-            if (funcCallPattern.test(t)) { petNameScore += 3; exprLines++; continue; }
-            if (operatorPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
-            if (assignPattern.test(t)) { petNameScore += 1; exprLines++; continue; }
-        }
+        if (/[;{}]/.test(source)) return false;
+        if (/\b(var|let|const|function|return|if|else|for|while|switch|class|import|export|require|console)\b/.test(source)) return false;
+        if (/===|!==|&&|\|\||=>/.test(source)) return false;
         if (this._detectEnglish(source)) return false;
         if (/^\s*abstraction\s+\w+/m.test(source)) return false;
         if (/^\s*method\s+\w+/m.test(source)) return false;
         if (/^\s*(?:create|define|make)\s+(?:an?\s+)?abstraction/im.test(source)) return false;
+
+        const lines = source.split('\n');
+        let petNameScore = 0;
+        const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH|SHL|SHR|HALT|NOP)\b/i;
+        const funcCallPattern = /^\s*(?:[A-Za-z_]\w*\s*=\s*)?(?:Sqrt|GCD|Factorial|Log2|Abs|Min|Max|Pow|Sin|Cos|Tan|Asin|Acos|Atan|Atan2|ToDegrees|ToRadians|Bernoulli|Signum|Mod)\s*\(/i;
+        const operatorPattern = /^\s*[A-Za-z_]\w*\s*=\s*[A-Za-z_\d]\S*\s*[\+\-\*\/%]\s*/;
+        const assignPattern = /^\s*[A-Za-z_]\w*\s*=\s*.+/;
+        let exprLines = 0;
+        for (const line of lines) {
+            const t = line.trim();
+            if (!t || t.startsWith(';') || t.startsWith('//') || t.startsWith('--')) continue;
+            if (asmMnemonics.test(t)) continue;
+            if (funcCallPattern.test(t)) { petNameScore += 3; exprLines++; continue; }
+            if (operatorPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
+            if (assignPattern.test(t)) { petNameScore += 1; exprLines++; continue; }
+        }
         return petNameScore >= 2 && exprLines >= 1;
     }
 
