@@ -228,7 +228,12 @@ BOOK_CHAPTERS = [
         "tang-nano-20k.md",
         "production_silicon_todo.md",
     ]),
-    ("Part X: Patents & Proposals", [
+    ("Part XI: Implementation Plans", [
+        "plan-lazy-load.md",
+        "plan-call-mum.md",
+        "plan-browser.md",
+    ]),
+    ("Part XII: Patents & Proposals", [
         "patent-church-machine-claims.md",
         "patent-church-machine-email.md",
         "patent-cloomc-universal-target.md",
