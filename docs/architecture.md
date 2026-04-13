@@ -440,7 +440,8 @@ The c-list is the compiler's symbol table for external references. The Resident 
 
 | Registers | Purpose | Saved by |
 |-----------|---------|----------|
-| DR0-DR3 | Arguments / return values | Caller |
+| DR0 | Hardwired zero | — |
+| DR1-DR3 | Arguments / return values | Caller |
 | DR4-DR11 | Local variables | Callee |
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
 
@@ -477,8 +478,9 @@ Both languages prove the Church Machine is a universal computation target — th
 
 | Registers | Purpose | Saved by |
 |-----------|---------|----------|
-| DR0-DR3 | Arguments / return values | Caller |
+| DR0 | Hardwired zero | — |
+| DR1-DR3 | Arguments / return values | Caller |
 | DR4-DR11 | Local variables | Callee |
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
 
-DR0 is hardwired to zero when not used for argument passing.
+DR0 is hardwired to zero — it reads as 0 unconditionally after every instruction.

@@ -180,7 +180,7 @@ returnEQ                     ; return to caller — skipped if Z=0
 ; --- catch path (NE suffix = fires only when Z=0) ---
 ; Execution reaches here ONLY if TPERM set Z=0.
 ; Every EQ instruction above was silently skipped by hardware.
-MOVNE  DR0, #0               ; set error code (0 = failed)
+MOVNE  DR1, #0               ; set error code (0 = failed)
 returnNE                      ; return error to caller
 ```
 

@@ -1323,13 +1323,13 @@ The NoteG abstraction above preserves Ada's original 25-operation
 algorithm for historical fidelity. For production use, the SlideRule
 abstraction provides `Bernoulli(n)` as a single CALL instruction
 that computes any Bernoulli number B(n) and returns the result as a
-fraction (numerator in DR0, denominator in DR1):
+fraction (numerator in DR1, denominator in DR2):
 
 ```
 -- Production: compute B7 in one instruction
-LOAD DR0, 7
+IADD DR1, DR0, #7
 CALL SlideRule.Bernoulli
--- DR0 = -1, DR1 = 30 → B7 = -1/30
+-- DR1 = -1, DR2 = 30 → B7 = -1/30
 ```
 
 Both approaches produce the same mathematical result. The difference

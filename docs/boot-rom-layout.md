@@ -103,12 +103,12 @@ BRANCH EQ, +offset_1   ; jump to Sub body
 
 | Index | Method | Words | Description |
 |-------|--------|-------|-------------|
-| 0 | Add | 5 | DR0 + DR1 → DR0 |
-| 1 | Sub | 4 | DR0 − DR1 → DR0 |
-| 2 | Mul | 35 | DR0 × DR1 → DR0 (shift-add) |
-| 3 | Div | 40 | DR0 ÷ DR1 → DR0 (long division) |
-| 4 | Sqrt | 38 | √DR0 → DR0 (Newton's method, 20 iterations) |
-| 5 | Pow | 29 | DR0 ^ DR1 → DR0 (square-and-multiply) |
+| 0 | Add | 5 | DR1 + DR2 → DR1 |
+| 1 | Sub | 4 | DR1 − DR2 → DR1 |
+| 2 | Mul | 35 | DR1 × DR2 → DR1 (shift-add) |
+| 3 | Div | 40 | DR1 ÷ DR2 → DR1 (long division) |
+| 4 | Sqrt | 38 | √DR1 → DR1 (Newton's method, 20 iterations) |
+| 5 | Pow | 29 | DR1 ^ DR2 → DR1 (square-and-multiply) |
 | 6 | ToDegrees | 1 | Stub (RETURN) |
 | 7 | ToRadians | 1 | Stub (RETURN) |
 

@@ -442,8 +442,8 @@ class SystemAbstractions {
                 return { ok: false, fault: 'NOT_INIT', message: 'Navana.CallLEDDriver: Navana not initialized' };
             }
 
-            const dr0 = args.dr0 !== undefined ? args.dr0 : 0;
             const dr1 = args.dr1 !== undefined ? args.dr1 : 0;
+            const dr2 = args.dr2 !== undefined ? args.dr2 : 0;
             const callerGT = args.callerGT || 0;
 
             let permMask = 0;
@@ -474,23 +474,23 @@ class SystemAbstractions {
                 return { ok: false, fault: 'NO_DRIVER', message: 'Navana.CallLEDDriver: LED driver not initialized' };
             }
 
-            const methodSelector = (dr0 >>> 24) & 0xFF;
+            const methodSelector = (dr1 >>> 24) & 0xFF;
             let method, ledNum, colour, pattern;
             if (methodSelector > 0 && methodSelector <= 3) {
                 method = methodSelector;
-                ledNum = dr0 & 0xFF;
-                colour = dr1 & 0xFF;
-                pattern = dr0 & 0x3F;
-            } else if (dr1 > 0) {
+                ledNum = dr1 & 0xFF;
+                colour = dr2 & 0xFF;
+                pattern = dr1 & 0x3F;
+            } else if (dr2 > 0) {
                 method = 0;
-                ledNum = dr0 & 0xFF;
-                colour = dr1 & 0xFF;
+                ledNum = dr1 & 0xFF;
+                colour = dr2 & 0xFF;
                 pattern = 0;
             } else {
                 method = 2;
                 ledNum = 0;
                 colour = 0;
-                pattern = dr0 & 0x3F;
+                pattern = dr1 & 0x3F;
             }
 
             const driverResult = navanaState.ledDriverAbstraction.call(sim, (method << 24) | (ledNum & 0xFF), colour, permMask);
@@ -503,8 +503,8 @@ class SystemAbstractions {
                 passKeyId: passKeyId,
                 device: 'LED',
                 method: methodName,
-                dr0: dr0,
                 dr1: dr1,
+                dr2: dr2,
                 permMask: permMask,
                 action: 'CALL',
                 result: driverResult.ok ? 'OK' : driverResult.fault
@@ -522,8 +522,8 @@ class SystemAbstractions {
                     permmask: { pass: driverResult.ok, perm: `0x${permMask.toString(16)}` }
                 },
                 passKeyId: passKeyId,
-                dr0: dr0,
                 dr1: dr1,
+                dr2: dr2,
                 b: 0, f: 0,
                 result: driverResult.ok ? 'pass' : 'fail'
             });
@@ -1262,7 +1262,7 @@ class SystemAbstractions {
 
     _bindLoader() {
         this.registry.bindMethod(19, 'Load', function(sim, args) {
-            const targetSlot = args.dr0 !== undefined ? args.dr0 : 0;
+            const targetSlot = args.dr1 !== undefined ? args.dr1 : 0;
             if (!sim.lazyManifest || !sim.lazyManifest[targetSlot]) {
                 return {
                     ok: false,
@@ -1289,7 +1289,7 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(19, 'Prefetch', function(sim, args) {
-            const targetSlot = args.dr0 !== undefined ? args.dr0 : 0;
+            const targetSlot = args.dr1 !== undefined ? args.dr1 : 0;
             if (!sim.lazyManifest || !sim.lazyManifest[targetSlot]) {
                 return {
                     ok: true,
@@ -1316,7 +1316,7 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(19, 'Evict', function(sim, args) {
-            const targetSlot = args.dr0 !== undefined ? args.dr0 : 0;
+            const targetSlot = args.dr1 !== undefined ? args.dr1 : 0;
             if (!sim.lazyManifest || !sim.lazyManifest[targetSlot]) {
                 return {
                     ok: false,
@@ -1345,15 +1345,15 @@ class SystemAbstractions {
 
     _bindSlideRuleArithmetic() {
         this.registry.bindMethod(16, 'Multiply', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
-            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
+            const b = args.dr2 !== undefined ? args.dr2 : 0;
             const result = a * b;
             return { ok: true, result: result, message: `SlideRule.Multiply(${a}, ${b}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Divide', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
-            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
+            const b = args.dr2 !== undefined ? args.dr2 : 0;
             if (b === 0) {
                 return { ok: true, result: 0, fault: 'DIV0', message: `SlideRule.Divide(${a}, ${b}) = 0 (division by zero)` };
             }
@@ -1362,14 +1362,14 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(16, 'Sqrt', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
             const result = Math.floor(Math.sqrt(a));
             return { ok: true, result: result, message: `SlideRule.Sqrt(${a}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Mod', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
-            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
+            const b = args.dr2 !== undefined ? args.dr2 : 0;
             if (b === 0) {
                 return { ok: true, result: 0, fault: 'DIV0', message: `SlideRule.Mod(${a}, ${b}) = 0 (division by zero)` };
             }
@@ -1380,49 +1380,49 @@ class SystemAbstractions {
 
     _bindSlideRuleTrig() {
         this.registry.bindMethod(16, 'Sin', function(sim, args) {
-            const angle = args.angle !== undefined ? args.angle : (args.dr0 !== undefined ? args.dr0 : 0);
+            const angle = args.angle !== undefined ? args.angle : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.sin(angle);
             return { ok: true, result: result, message: `SlideRule.Sin(${angle}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Cos', function(sim, args) {
-            const angle = args.angle !== undefined ? args.angle : (args.dr0 !== undefined ? args.dr0 : 0);
+            const angle = args.angle !== undefined ? args.angle : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.cos(angle);
             return { ok: true, result: result, message: `SlideRule.Cos(${angle}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Tan', function(sim, args) {
-            const angle = args.angle !== undefined ? args.angle : (args.dr0 !== undefined ? args.dr0 : 0);
+            const angle = args.angle !== undefined ? args.angle : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.tan(angle);
             return { ok: true, result: result, message: `SlideRule.Tan(${angle}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Asin', function(sim, args) {
-            const value = args.value !== undefined ? args.value : (args.dr0 !== undefined ? args.dr0 : 0);
+            const value = args.value !== undefined ? args.value : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.asin(value);
             return { ok: true, result: result, message: `SlideRule.Asin(${value}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Acos', function(sim, args) {
-            const value = args.value !== undefined ? args.value : (args.dr0 !== undefined ? args.dr0 : 0);
+            const value = args.value !== undefined ? args.value : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.acos(value);
             return { ok: true, result: result, message: `SlideRule.Acos(${value}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Atan', function(sim, args) {
-            const value = args.value !== undefined ? args.value : (args.dr0 !== undefined ? args.dr0 : 0);
+            const value = args.value !== undefined ? args.value : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = Math.atan(value);
             return { ok: true, result: result, message: `SlideRule.Atan(${value}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'ToDegrees', function(sim, args) {
-            const radians = args.radians !== undefined ? args.radians : (args.dr0 !== undefined ? args.dr0 : 0);
+            const radians = args.radians !== undefined ? args.radians : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = radians * (180 / Math.PI);
             return { ok: true, result: result, message: `SlideRule.ToDegrees(${radians}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'ToRadians', function(sim, args) {
-            const degrees = args.degrees !== undefined ? args.degrees : (args.dr0 !== undefined ? args.dr0 : 0);
+            const degrees = args.degrees !== undefined ? args.degrees : (args.dr1 !== undefined ? args.dr1 : 0);
             const result = degrees * (Math.PI / 180);
             return { ok: true, result: result, message: `SlideRule.ToRadians(${degrees}) = ${result}` };
         });
@@ -1430,7 +1430,7 @@ class SystemAbstractions {
 
     _bindSlideRuleBernoulli() {
         this.registry.bindMethod(16, 'Bernoulli', function(sim, args) {
-            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const n = args.dr1 !== undefined ? args.dr1 : 0;
             if (n < 0 || !Number.isInteger(n)) {
                 return { ok: true, result: 0, result2: 1, message: `SlideRule.Bernoulli(${n}) = 0/1 (invalid index)` };
             }
@@ -1488,14 +1488,14 @@ class SystemAbstractions {
 
     _bindSlideRuleExtended() {
         this.registry.bindMethod(16, 'Abs', function(sim, args) {
-            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const n = args.dr1 !== undefined ? args.dr1 : 0;
             const result = Math.abs(n);
             return { ok: true, result: result, message: `SlideRule.Abs(${n}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Pow', function(sim, args) {
-            const base = args.dr0 !== undefined ? args.dr0 : 0;
-            const exp = args.dr1 !== undefined ? args.dr1 : 0;
+            const base = args.dr1 !== undefined ? args.dr1 : 0;
+            const exp = args.dr2 !== undefined ? args.dr2 : 0;
             if (exp < 0) {
                 return { ok: true, result: 0, message: `SlideRule.Pow(${base}, ${exp}) = 0 (negative exponent)` };
             }
@@ -1504,28 +1504,28 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(16, 'Min', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
-            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
+            const b = args.dr2 !== undefined ? args.dr2 : 0;
             const result = Math.min(a, b);
             return { ok: true, result: result, message: `SlideRule.Min(${a}, ${b}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Max', function(sim, args) {
-            const a = args.dr0 !== undefined ? args.dr0 : 0;
-            const b = args.dr1 !== undefined ? args.dr1 : 0;
+            const a = args.dr1 !== undefined ? args.dr1 : 0;
+            const b = args.dr2 !== undefined ? args.dr2 : 0;
             const result = Math.max(a, b);
             return { ok: true, result: result, message: `SlideRule.Max(${a}, ${b}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'GCD', function(sim, args) {
-            let a = Math.abs(args.dr0 !== undefined ? args.dr0 : 0);
-            let b = Math.abs(args.dr1 !== undefined ? args.dr1 : 0);
+            let a = Math.abs(args.dr1 !== undefined ? args.dr1 : 0);
+            let b = Math.abs(args.dr2 !== undefined ? args.dr2 : 0);
             while (b) { [a, b] = [b, a % b]; }
-            return { ok: true, result: a, message: `SlideRule.GCD(${args.dr0}, ${args.dr1}) = ${a}` };
+            return { ok: true, result: a, message: `SlideRule.GCD(${args.dr1}, ${args.dr2}) = ${a}` };
         });
 
         this.registry.bindMethod(16, 'Factorial', function(sim, args) {
-            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const n = args.dr1 !== undefined ? args.dr1 : 0;
             if (n < 0) return { ok: true, result: 0, message: `SlideRule.Factorial(${n}) = 0 (negative)` };
             let result = 1;
             for (let i = 2; i <= n; i++) result *= i;
@@ -1533,21 +1533,21 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(16, 'Log2', function(sim, args) {
-            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const n = args.dr1 !== undefined ? args.dr1 : 0;
             if (n < 1) return { ok: true, result: 0, message: `SlideRule.Log2(${n}) = 0` };
             const result = Math.floor(Math.log2(n));
             return { ok: true, result: result, message: `SlideRule.Log2(${n}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Atan2', function(sim, args) {
-            const y = args.dr0 !== undefined ? args.dr0 : 0;
-            const x = args.dr1 !== undefined ? args.dr1 : 0;
+            const y = args.dr1 !== undefined ? args.dr1 : 0;
+            const x = args.dr2 !== undefined ? args.dr2 : 0;
             const result = Math.atan2(y, x);
             return { ok: true, result: result, message: `SlideRule.Atan2(${y}, ${x}) = ${result}` };
         });
 
         this.registry.bindMethod(16, 'Signum', function(sim, args) {
-            const n = args.dr0 !== undefined ? args.dr0 : 0;
+            const n = args.dr1 !== undefined ? args.dr1 : 0;
             const result = n > 0 ? 1 : n < 0 ? -1 : 0;
             return { ok: true, result: result, message: `SlideRule.Signum(${n}) = ${result}` };
         });

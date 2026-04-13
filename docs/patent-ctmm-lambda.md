@@ -651,7 +651,7 @@ Mint — the operation that creates new Golden Tokens — is a method of the Nam
 GT_MINT(access, type, size) → new GT in CR0
 ```
 
-Where DR0 = access rights (domain-pure: Turing [RWX] or Church [LSE], never both), DR1 = object type, DR2 = size. The returned GT respects domain separation — a Mint call cannot create a GT that mixes Turing and Church permissions.
+Where DR1 = access rights (domain-pure: Turing [RWX] or Church [LSE], never both), DR2 = object type, DR3 = size. The returned GT respects domain separation — a Mint call cannot create a GT that mixes Turing and Church permissions.
 
 #### 13.2 Abstraction Nesting
 

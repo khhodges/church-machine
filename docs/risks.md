@@ -122,7 +122,7 @@ with sufficient permissions. Every risk below is tracked to resolution.
   but DR5 is also used by the calling convention to pass arguments to a CALL, the value
   is silently corrupted. No fault — just wrong computation.
 - **Fix**: Define a fixed calling convention:
-  - DR0-DR3: argument passing / return values (caller-saved)
+  - DR0: hardwired zero; DR1-DR3: argument passing / return values (caller-saved)
   - DR4-DR11: local variables (callee-saved)
   - DR12-DR15: temporaries (compiler scratch, caller-saved)
   - Document this in docs/architecture.md

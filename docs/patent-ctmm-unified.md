@@ -712,7 +712,7 @@ The processor of Claim 17, further comprising a hardware I/O mediator module tha
 
 The processor of Claim 17, further comprising a method-selector dispatch mechanism wherein:
 
-(a) a method selector value is converted to a Church numeral by applying the Church successor function DR0 times to Church zero using the LAMBDA instruction;
+(a) a method selector value is converted to a Church numeral by applying the Church successor function DR1 times to Church zero using the LAMBDA instruction;
 
 (b) the resulting Church numeral indexes into the abstraction's C-List to obtain the corresponding method GT;
 
@@ -892,7 +892,7 @@ State machine: IDLE → FAULT_RST (all CRs to NULL) → LOAD_NS → INIT_THRD �
 
 ### Figure 16: Church Numeral Method Dispatch
 
-Flow showing DR0 → Church numeral conversion via SUCC/ZERO → C-List indexing → TPERM → LAMBDA — zero branch instructions.
+Flow showing DR1 → Church numeral conversion via SUCC/ZERO → C-List indexing → TPERM → LAMBDA — zero branch instructions.
 
 ### Figure 17: DATA Objects — Church/Turing Bridge
 

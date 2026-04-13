@@ -72,7 +72,7 @@
 
   <rect x="200" y="60" width="600" height="90" rx="10" fill="#0f1a2a" stroke="#2ecc71" stroke-width="2.5" stroke-dasharray="0"/>
   <text class="code" x="500" y="90" font-size="18" fill="#2ecc71" font-weight="700">CALL(Thread.Mint(type, size, access))</text>
-  <text class="ls" x="500" y="118">DR0 = access rights &bull; DR1 = object type &bull; DR2 = size &bull; Returns new GT in CR0</text>
+  <text class="ls" x="500" y="118">DR1 = access rights &bull; DR2 = object type &bull; DR3 = size &bull; Returns new GT in CR0</text>
 
   <!-- Arrow down -->
   <line x1="500" y1="150" x2="500" y2="195" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
@@ -114,7 +114,7 @@
   <!-- Domain purity check box -->
   <rect x="500" y="425" width="380" height="100" rx="8" fill="#141e30" stroke="#c39bd3" stroke-width="1.5" stroke-dasharray="6,3"/>
   <text class="col-hdr" x="690" y="445" fill="#c39bd3">DOMAIN PURITY CHECK</text>
-  <text class="code-sm" x="515" y="468" fill="#c39bd3">if (has_turing(DR0) AND has_church(DR0))</text>
+  <text class="code-sm" x="515" y="468" fill="#c39bd3">if (has_turing(DR1) AND has_church(DR1))</text>
   <text class="code-sm" x="530" y="486" fill="#c39bd3">  &rarr; FAULT (domain violation)</text>
   <text class="code-sm" x="515" y="506" fill="#a0b0c0">Turing [RWX] xor Church [LSE]</text>
 
@@ -164,7 +164,7 @@
   <!-- ========== SECTION 4: DOMAIN PURITY — DETAILED ========== -->
 
   <text class="ph" x="500" y="820" text-anchor="middle" fill="#f5c842">DOMAIN PURITY: OIL AND WATER</text>
-  <text class="ls" x="500" y="842">DR0 access rights must be domain-pure. Turing permissions OR Church permissions. Never both.</text>
+  <text class="ls" x="500" y="842">DR1 access rights must be domain-pure. Turing permissions OR Church permissions. Never both.</text>
 
   <!-- Turing domain -->
   <rect x="80" y="860" width="380" height="200" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
@@ -209,16 +209,16 @@
 
   <!-- Crossed-out examples -->
   <rect x="200" y="1075" width="280" height="55" rx="6" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3"/>
-  <text class="code-sm" x="215" y="1095" fill="#e74c3c">DR0 = RWX | LSE &rarr; FAULT</text>
-  <text class="code-sm" x="215" y="1115" fill="#e74c3c">DR0 = RW | E   &rarr; FAULT</text>
+  <text class="code-sm" x="215" y="1095" fill="#e74c3c">DR1 = RWX | LSE &rarr; FAULT</text>
+  <text class="code-sm" x="215" y="1115" fill="#e74c3c">DR1 = RW | E   &rarr; FAULT</text>
 
   <!-- X over invalid -->
   <line x1="200" y1="1075" x2="480" y2="1130" stroke="#e74c3c" stroke-width="2" opacity="0.4"/>
   <line x1="480" y1="1075" x2="200" y2="1130" stroke="#e74c3c" stroke-width="2" opacity="0.4"/>
 
   <rect x="530" y="1075" width="280" height="55" rx="6" fill="#0a1a0a" stroke="#2ecc71" stroke-width="1.5"/>
-  <text class="code-sm" x="545" y="1095" fill="#2ecc71">DR0 = RWX       &rarr; Turing GT</text>
-  <text class="code-sm" x="545" y="1115" fill="#2ecc71">DR0 = LSE       &rarr; Church GT</text>
+  <text class="code-sm" x="545" y="1095" fill="#2ecc71">DR1 = RWX       &rarr; Turing GT</text>
+  <text class="code-sm" x="545" y="1115" fill="#2ecc71">DR1 = LSE       &rarr; Church GT</text>
 
   <!-- ========== SECTION 5: GT_MINT API ========== -->
 
@@ -236,21 +236,21 @@
   <rect x="500" y="1215" width="340" height="30" rx="4" fill="#1a2a3a"/>
   <text class="cell-b" x="670" y="1230" fill="#f5c842">Constraint</text>
 
-  <!-- DR0 -->
+  <!-- DR1 -->
   <rect x="160" y="1252" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
-  <text class="cell" x="220" y="1265" fill="#5dade2">DR0</text>
+  <text class="cell" x="220" y="1265" fill="#5dade2">DR1</text>
   <text class="lt" x="295" y="1265" fill="#c8d6e5">Access rights</text>
   <text class="lt" x="505" y="1265" fill="#c39bd3">Domain-pure: [RWX] xor [LSE]</text>
 
   <!-- DR1 -->
   <rect x="160" y="1285" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
-  <text class="cell" x="220" y="1298" fill="#5dade2">DR1</text>
+  <text class="cell" x="220" y="1298" fill="#5dade2">DR2</text>
   <text class="lt" x="295" y="1298" fill="#c8d6e5">Object type</text>
   <text class="lt" x="505" y="1298" fill="#a0b0c0">Inform, Outform, or user-defined</text>
 
-  <!-- DR2 -->
+  <!-- DR3 -->
   <rect x="160" y="1318" width="120" height="26" rx="3" fill="#141e30" stroke="#5dade2" stroke-width="1"/>
-  <text class="cell" x="220" y="1331" fill="#5dade2">DR2</text>
+  <text class="cell" x="220" y="1331" fill="#5dade2">DR3</text>
   <text class="lt" x="295" y="1331" fill="#c8d6e5">Size (words)</text>
   <text class="lt" x="505" y="1331" fill="#a0b0c0">Must fit within thread budget</text>
 

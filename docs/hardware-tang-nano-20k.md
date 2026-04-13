@@ -366,11 +366,11 @@ uart_wait:
   DREAD  DR1, [CR_uart + 1]
   ANDI   DR1, DR1, #1
   BEQ    uart_wait
-  MOVI   DR0, #0x41           ; 'A'
-  DWRITE DR0, [CR_uart + 0]
+  MOVI   DR1, #0x41           ; 'A'
+  DWRITE DR1, [CR_uart + 0]
 
 ; Receive byte
-  DREAD  DR0, [CR_uart + 2]
+  DREAD  DR1, [CR_uart + 2]
 ```
 
 The MMIO TX path shares the physical UART with the debug FSM. The debug FSM takes
@@ -413,10 +413,10 @@ The debouncer is a 3-stage synchroniser; the register reflects the debounced lev
 **Edge-detect pattern:**
 ```
 btn_poll:
-  DREAD DR0, [CR_btn + 0]
-  ; compare DR0[0] with saved DR1[0]
-  ; rising edge  = DR0[0]==1 and DR1[0]==0  (press)
-  ; falling edge = DR0[0]==0 and DR1[0]==1  (release)
+  DREAD DR1, [CR_btn + 0]
+  ; compare DR1[0] with saved DR2[0]
+  ; rising edge  = DR1[0]==1 and DR2[0]==0  (press)
+  ; falling edge = DR1[0]==0 and DR2[0]==1  (release)
 ```
 
 DWRITE against this GT faults with `PERMISSION`.
@@ -456,21 +456,21 @@ current_unix = TOD_EPOCH + (TICKS_LO_now - TICKS_LO_at_boot) / 27_000_000
 
 **Elapsed-time pattern:**
 ```
-DREAD DR0, [CR_timer + 0]   ; TICKS_LO start
-DREAD DR1, [CR_timer + 1]   ; TICKS_HI start
+DREAD DR1, [CR_timer + 0]   ; TICKS_LO start
+DREAD DR2, [CR_timer + 1]   ; TICKS_HI start
 ; ... work ...
-DREAD DR2, [CR_timer + 0]   ; TICKS_LO end
-DREAD DR3, [CR_timer + 1]   ; TICKS_HI end
-; elapsed = DR2 - DR0 (32-bit, handles wrap)
+DREAD DR3, [CR_timer + 0]   ; TICKS_LO end
+DREAD DR4, [CR_timer + 1]   ; TICKS_HI end
+; elapsed = DR3 - DR1 (32-bit, handles wrap)
 ```
 
 **Alarm pattern:**
 ```
-DREAD  DR0, [CR_timer + 0]      ; read current TICKS_LO
-ADDI   DR0, DR0, #delay_ticks   ; target = now + delay
-DWRITE DR0, [CR_timer + 3]      ; set ALARM_CMP
-MOVI   DR1, #0x01
-DWRITE DR1, [CR_timer + 4]      ; arm
+DREAD  DR1, [CR_timer + 0]      ; read current TICKS_LO
+ADDI   DR1, DR1, #delay_ticks   ; target = now + delay
+DWRITE DR1, [CR_timer + 3]      ; set ALARM_CMP
+MOVI   DR2, #0x01
+DWRITE DR2, [CR_timer + 4]      ; arm
 alarm_poll:
   DREAD  DR2, [CR_timer + 4]
   ANDI   DR2, DR2, #0x02         ; test fired bit

@@ -122,10 +122,11 @@ The permissions are not copied from the source GT. They are not read from the NS
 - **Capability calls:** `call(target, method, args)` — compiles to LOAD + CALL
 - **Memory access:** `read(cr, offset)` → DREAD, `write(cr, offset, val)` → DWRITE
 - **Bitfield operations:** `bfext(val, pos, width)` → BFEXT, `bfins(val, pos, width, insert)` → BFINS
-- **Return:** `return(val)` — places result in DR0 and emits RETURN
+- **Return:** `return(val)` — places result in DR1 and emits RETURN
 
 **Register allocation** follows the calling convention:
-- DR0–DR3: arguments and return values (caller-saved)
+- DR0: hardwired zero (reads as 0 after every instruction)
+- DR1–DR3: arguments and return values (caller-saved)
 - DR4–DR11: local variables (callee-saved by the compiler)
 - DR12–DR15: temporaries (compiler scratch, caller-saved)
 
@@ -285,7 +286,7 @@ Mint still forges the GT (that is Mint's unique role — only Mint can create ne
 
 **Solution:** Updated four files:
 
-- **docs/architecture.md** — Enhanced CALL/RETURN section with lump layout details, added Navana.Abstraction.Add validation description, added Calling Convention section (DR0-3 args, DR4-11 locals callee-saved, DR12-15 temps caller-saved)
+- **docs/architecture.md** — Enhanced CALL/RETURN section with lump layout details, added Navana.Abstraction.Add validation description, added Calling Convention section (DR0 hardwired zero, DR1-3 args, DR4-11 locals callee-saved, DR12-15 temps caller-saved)
 - **docs/abstractions.md** — Updated namespace entry description to reflect single-lump model with clistCount split, added Lump Structure subsection with ASCII layout diagram, updated Navana's Abstraction.Add with validation rules
 - **replit.md** — Added Lump Layout subsection, updated [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ Compiler section with auto-detection and calling convention details, added Navana.Abstraction.Add validation parameters
 - **simulator/app.js** — Updated Reference tab content with CALL lump-split semantics and example

@@ -94,7 +94,7 @@ All computation is performed through Church-encoded lambda calculus:
 
 **Recursion**: The Y-combinator (Y = λf. (λx. f(x x))(λx. f(x x))) enables recursive computation without loop instructions or goto. The SlideRule's SQRT uses Y-combinator-driven Newton iteration; LOG uses Y-combinator-driven iterative division.
 
-**Method dispatch**: The method selector (DR0) is converted to a Church numeral by applying SUCC DR0 times to ZERO (= FALSE), then used to index into the abstraction's C-List. No jump table or branch instruction is required.
+**Method dispatch**: The method selector (DR1) is converted to a Church numeral by applying SUCC DR1 times to ZERO (= FALSE), then used to index into the abstraction's C-List. No jump table or branch instruction is required.
 
 ### The I/O Mediator
 
@@ -232,7 +232,7 @@ The processor of Claim 17, further comprising a hardware I/O mediator module tha
 
 The processor of Claim 17, further comprising a method-selector dispatch mechanism wherein:
 
-(a) a method selector value (DR0) is converted to a Church numeral by applying the Church successor function (GT_CHURCH_SUCC) DR0 times to Church zero (GT_FALSE), using the LAMBDA instruction;
+(a) a method selector value (DR1) is converted to a Church numeral by applying the Church successor function (GT_CHURCH_SUCC) DR1 times to Church zero (GT_FALSE), using the LAMBDA instruction;
 
 (b) the resulting Church numeral is used to index into the abstraction's C-List to obtain the corresponding method GT;
 
@@ -307,7 +307,7 @@ Three-block architecture: Lambda Reducer (LOAD, SAVE, CALL, RETURN, LAMBDA, TPER
 
 ### Figure 18: Church Numeral Method Dispatch Flow
 
-Flowchart: DR0 (method selector) → Enter Lambda scope (CALL) → Load SUCC and FALSE/ZERO → Apply SUCC DR0 times (LAMBDA) → Return to abstraction scope → Load indexed C-List slot → TPERM verify X → LAMBDA apply → RETURN result. No branch or jump instruction at any step.
+Flowchart: DR1 (method selector) → Enter Lambda scope (CALL) → Load SUCC and FALSE/ZERO → Apply SUCC DR1 times (LAMBDA) → Return to abstraction scope → Load indexed C-List slot → TPERM verify X → LAMBDA apply → RETURN result. No branch or jump instruction at any step.
 
 ### Figure 19: Vulnerability Elimination by Construction
 

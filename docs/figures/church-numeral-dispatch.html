@@ -79,14 +79,14 @@
   <!-- MAIN FLOW (top to bottom)                                   -->
   <!-- ════════════════════════════════════════════════════════════ -->
   <text x="550" y="25" class="title-lg" fill="#333">Church Numeral Dispatch Flow</text>
-  <text x="550" y="45" class="label-s">DR0 value becomes the dispatch mechanism itself &mdash; no branch instructions anywhere in the pipeline</text>
+  <text x="550" y="45" class="label-s">DR1 value becomes the dispatch mechanism itself &mdash; no branch instructions anywhere in the pipeline</text>
 
-  <!-- ─── STEP 1: DR0 (input) ─── -->
+  <!-- ─── STEP 1: DR1 (input) ─── -->
   <rect x="370" y="65" width="360" height="70" rx="12" fill="#f0f0f0" stroke="#555" stroke-width="2"/>
   <circle cx="405" cy="100" r="16" fill="#555"/>
   <text x="405" y="100" class="hdr" style="font-size:11px">1</text>
-  <text x="570" y="88" class="title-sm" fill="#333">DR0 = method index</text>
-  <text x="570" y="108" class="mono" fill="#555">e.g. DR0 = 3 (select method #3)</text>
+  <text x="570" y="88" class="title-sm" fill="#333">DR1 = method index</text>
+  <text x="570" y="108" class="mono" fill="#555">e.g. DR1 = 3 (select method #3)</text>
   <text x="570" y="124" class="label-s" fill="#777">Integer in data register, from caller</text>
 
   <!-- Arrow down -->
@@ -100,7 +100,7 @@
   <text x="285" y="192" class="mono-b" fill="#2a6db5">2</text>
   <text x="565" y="192" class="hdr" style="font-size:14px">Church Numeral Conversion (SUCC / ZERO)</text>
 
-  <text x="550" y="225" class="title-xs" fill="#2a6db5">DR0 = 3 becomes SUCC(SUCC(SUCC(ZERO)))</text>
+  <text x="550" y="225" class="title-xs" fill="#2a6db5">DR1 = 3 becomes SUCC(SUCC(SUCC(ZERO)))</text>
 
   <rect x="290" y="242" width="120" height="30" rx="6" fill="#dce9f5" stroke="#2a6db5" stroke-width="1"/>
   <text x="350" y="257" class="mono-b" fill="#2a6db5">ZERO</text>
@@ -163,7 +163,7 @@
 
   <!-- Selection arrow -->
   <line x1="635" y1="410" x2="635" y2="418" stroke="#cc3333" stroke-width="2" marker-end="url(#ah-r)"/>
-  <text x="635" y="404" class="mono-b" fill="#cc3333">DR0=3</text>
+  <text x="635" y="404" class="mono-b" fill="#cc3333">DR1=3</text>
 
   <text x="550" y="497" class="label-s" fill="#27864a">SUCC(SUCC(SUCC(ZERO))) applies SUCC three times to the base &mdash; walks to slot 3 with zero comparisons</text>
 
@@ -201,7 +201,7 @@
 
   <!-- ─── RESULT ─── -->
   <rect x="370" y="815" width="360" height="50" rx="12" fill="#e0f7f7" stroke="#1a7a7a" stroke-width="2"/>
-  <text x="550" y="835" class="title-sm" fill="#1a7a7a">Result in DR0</text>
+  <text x="550" y="835" class="title-sm" fill="#1a7a7a">Result in DR1</text>
   <text x="550" y="853" class="label-s" fill="#1a7a7a">Method executed and returned, zero branches used</text>
 
   <!-- ════════════════════════════════════════════════════════════ -->
@@ -254,7 +254,7 @@
 </svg>
 
 <div class="legend">
-  <div class="legend-item"><div class="legend-swatch" style="background:#555;"></div> DR0 input (method index)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#555;"></div> DR1 input (method index)</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Church numeral conversion</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> C-list indexing</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#c07020;"></div> TPERM (permission grant)</div>

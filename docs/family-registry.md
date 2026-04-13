@@ -53,9 +53,9 @@ CALL(FamilyRegistry.Register(me, target_endpoint, relationship_type))
 ```
 
 **Arguments** (in data registers):
-- `DR0` / `x10`: relationship_type (e.g., 0x01 = PARENT, 0x02 = CHILD, 0x03 = SIBLING)
-- `DR1` / `x11`: target_endpoint_hash — a cryptographic hash of the remote machine's public endpoint identifier
-- `DR2` / `x12`: key_strength — requested tunnel key size (128, 192, or 256 bits)
+- `DR1` / `x10`: relationship_type (e.g., 0x01 = PARENT, 0x02 = CHILD, 0x03 = SIBLING)
+- `DR2` / `x11`: target_endpoint_hash — a cryptographic hash of the remote machine's public endpoint identifier
+- `DR3` / `x12`: key_strength — requested tunnel key size (128, 192, or 256 bits)
 
 **Capability arguments** (in CRs):
 - `CR8`: me — the caller's thread identity (always present)
@@ -63,8 +63,8 @@ CALL(FamilyRegistry.Register(me, target_endpoint, relationship_type))
 
 **Returns**:
 - `CR0`: the new Outform+Far GT referencing the remote relationship entry
-- `DR0` / `x10`: status code (0 = success, nonzero = specific error)
-- `DR1` / `x11`: namespace index of the created entry
+- `DR1` / `x10`: status code (0 = success, nonzero = specific error)
+- `DR2` / `x11`: namespace index of the created entry
 
 ---
 
@@ -127,8 +127,8 @@ STEP 5: REMOTE PROVISIONING
 
 STEP 6: RETURN
   CR0 ← GT for the new Outform+Far entry (mymother)
-  DR0 ← 0 (success)
-  DR1 ← namespace index of the new entry
+  DR1 ← 0 (success)
+  DR2 ← namespace index of the new entry
 ```
 
 ### The Introduction Entry

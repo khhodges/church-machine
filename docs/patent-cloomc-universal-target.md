@@ -130,7 +130,7 @@ The JavaScript front-end parses a subset of JavaScript sufficient for system pro
 | `write(cr, offset, val)` | DWRITE DRx, CRy, #offset |
 | `bfext(val, pos, width)` | BFEXT DRz, DRx, #pos, #width |
 | `bfins(dst, val, pos, width)` | BFINS DRz, DRx, #pos, #width |
-| `return(val)` | Move result to DR0 + RETURN |
+| `return(val)` | Move result to DR1 + RETURN |
 
 **Haskell Front-End** (functional paradigm):
 
@@ -174,7 +174,8 @@ The compiler enforces a fixed register convention across all source languages:
 
 | Registers | Role | Saved By |
 |-----------|------|----------|
-| DR0-DR3 | Arguments and return values | Caller |
+| DR0 | Hardwired zero | — |
+| DR1-DR3 | Arguments and return values | Caller |
 | DR4-DR11 | Local variables | Callee |
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
 

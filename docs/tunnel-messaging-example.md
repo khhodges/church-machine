@@ -253,20 +253,20 @@ ABI Descriptor for mymother's architecture:
   num_ret_slots:  4                   (max return values per invocation)
 
   arg_map[0..7]:                      (how local registers map to remote)
-    slot 0: local DR0[31:0]  → remote x10     (first argument)
-    slot 1: local DR1[31:0]  → remote x11     (second argument)
-    slot 2: local DR2[31:0]  → remote x12     (third argument)
-    slot 3: local DR3[31:0]  → remote x13     (fourth argument)
-    slot 4: local DR4[31:0]  → remote x14     (fifth argument)
-    slot 5: local DR5[31:0]  → remote x15     (sixth argument)
-    slot 6: local DR6[31:0]  → remote x16     (seventh argument)
-    slot 7: local DR7[31:0]  → remote x17     (eighth argument)
+    slot 0: local DR1[31:0]  → remote x10     (first argument)
+    slot 1: local DR2[31:0]  → remote x11     (second argument)
+    slot 2: local DR3[31:0]  → remote x12     (third argument)
+    slot 3: local DR4[31:0]  → remote x13     (fourth argument)
+    slot 4: local DR5[31:0]  → remote x14     (fifth argument)
+    slot 5: local DR6[31:0]  → remote x15     (sixth argument)
+    slot 6: local DR7[31:0]  → remote x16     (seventh argument)
+    slot 7: local DR8[31:0]  → remote x17     (eighth argument)
 
   ret_map[0..3]:                      (how remote return values map back)
-    slot 0: remote x10 → local DR0[31:0], DR0[63:32] = 0  (zero-extend)
-    slot 1: remote x11 → local DR1[31:0], DR1[63:32] = 0
-    slot 2: remote x12 → local DR2[31:0], DR2[63:32] = 0
-    slot 3: remote x13 → local DR3[31:0], DR3[63:32] = 0
+    slot 0: remote x10 → local DR1[31:0], DR1[63:32] = 0  (zero-extend)
+    slot 1: remote x11 → local DR2[31:0], DR2[63:32] = 0
+    slot 2: remote x12 → local DR3[31:0], DR3[63:32] = 0
+    slot 3: remote x13 → local DR4[31:0], DR4[63:32] = 0
 
   wide_value_policy: TRUNCATE_WITH_FLAG
     When a 64-bit value must cross to a 32-bit machine:

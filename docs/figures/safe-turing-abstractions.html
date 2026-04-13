@@ -203,13 +203,13 @@
   <text x="300" y="655" class="title-sm" fill="#27864a">Caller's View (Church Only)</text>
 
   <rect x="110" y="672" width="380" height="24" rx="4" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
-  <text x="300" y="684" class="mono" fill="#27864a">CALL Abacus.add(DR0=5, DR1=3)</text>
+  <text x="300" y="684" class="mono" fill="#27864a">CALL Abacus.add(DR1=5, DR2=3)</text>
 
   <rect x="110" y="702" width="380" height="24" rx="4" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
   <text x="300" y="714" class="mono" fill="#27864a">... abstraction executes (opaque) ...</text>
 
   <rect x="110" y="732" width="380" height="24" rx="4" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
-  <text x="300" y="744" class="mono" fill="#27864a">RETURN &#x2192; DR0 = 8 (result)</text>
+  <text x="300" y="744" class="mono" fill="#27864a">RETURN &#x2192; DR1 = 8 (result)</text>
 
   <text x="300" y="784" class="label-s" fill="#27864a">Caller cannot inspect, modify, or bypass the implementation</text>
   <text x="300" y="800" class="label-s" fill="#27864a">No DREAD, IADD, BRANCH visible &mdash; domain purity enforced</text>
@@ -222,10 +222,10 @@
   <text x="800" y="684" class="mono" fill="#2a6db5">DREAD DR2, [data_ptr]  ; load operand</text>
 
   <rect x="610" y="702" width="380" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
-  <text x="800" y="714" class="mono" fill="#2a6db5">IADD DR0, DR0, DR1     ; compute sum</text>
+  <text x="800" y="714" class="mono" fill="#2a6db5">IADD DR1, DR1, DR2     ; compute sum</text>
 
   <rect x="610" y="732" width="380" height="24" rx="4" fill="#c8ddf0" stroke="#2a6db5" stroke-width="0.5"/>
-  <text x="800" y="744" class="mono" fill="#2a6db5">DWRITE [result_ptr], DR0 ; store</text>
+  <text x="800" y="744" class="mono" fill="#2a6db5">DWRITE [result_ptr], DR1 ; store</text>
 
   <rect x="610" y="762" width="380" height="24" rx="4" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
   <text x="800" y="774" class="mono" fill="#27864a">RETURN                  ; exit to Church</text>

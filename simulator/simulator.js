@@ -271,7 +271,7 @@ class ChurchSimulator {
             const loaderAbs = this.abstractionRegistry.getAbstraction(this._loaderSlot);
             if (loaderAbs && loaderAbs.dispatch && loaderAbs.dispatch['LOAD']) {
                 this.output += `[LOADER] Dispatching Loader.Load(${targetSlot}) via NS[${this._loaderSlot}]\n`;
-                const result = loaderAbs.dispatch['LOAD'](this, { dr0: targetSlot });
+                const result = loaderAbs.dispatch['LOAD'](this, { dr1: targetSlot });
                 return result && result.ok;
             }
         }
@@ -2144,29 +2144,29 @@ class ChurchSimulator {
                 }
             }
 
-            let methodName, argDR0, argDR1, encodedDstReg = null;
+            let methodName, argDR1, argDR2, encodedDstReg = null;
             if (d.imm & 0x4000) {
                 const packed = d.imm & 0x3FFF;
                 const methodIdx = (packed >> 8) & 0x3F;
                 const leftReg = (packed >> 4) & 0xF;
                 const rightReg = packed & 0xF;
                 encodedDstReg = d.crSrc;
-                argDR0 = this.dr[leftReg];
-                argDR1 = this.dr[rightReg];
+                argDR1 = this.dr[leftReg];
+                argDR2 = this.dr[rightReg];
                 methodName = (methodIdx >= 0 && methodIdx < abstraction.methods.length)
                     ? abstraction.methods[methodIdx]
                     : (abstraction.methods[0] || 'Apply');
             } else {
                 methodName = this._selectNavanaMethod(d) || abstraction.methods[0] || 'Apply';
-                argDR0 = this.dr[0];
                 argDR1 = this.dr[1];
+                argDR2 = this.dr[2];
             }
             const desc = `CALL CR${d.crDst} -> ${label}.${methodName} [abstraction dispatch]`;
             this.output += desc + '\n';
 
             if (this.abstractionRegistry) {
                 const result = this.abstractionRegistry.dispatchMethod(check.index, methodName, this, {
-                    dr0: argDR0, dr1: argDR1
+                    dr1: argDR1, dr2: argDR2
                 });
                 if (result && result.message) {
                     this.output += `  ${result.message}\n`;
@@ -2175,7 +2175,7 @@ class ChurchSimulator {
                     if (encodedDstReg !== null) {
                         this.dr[encodedDstReg] = result.result;
                     } else {
-                        this.dr[0] = result.result;
+                        this.dr[1] = result.result;
                     }
                 }
                 if (result && !result.ok && result.fault) {
@@ -2197,20 +2197,20 @@ class ChurchSimulator {
             ]};
         }
 
-        let methodIndex, argDR0, argDR1, desc, encodedDstReg;
+        let methodIndex, argDR1, argDR2, desc, encodedDstReg;
         // ISA extension: encoded CALL mode (imm bit 14 set)
         // Packs method index, source operand registers, and destination DR into CALL instruction
         // fields (imm[13:8]=method, imm[7:4]=leftDR, imm[3:0]=rightDR, crSrc=dstDR).
         // Result is written directly to dstDR, bypassing DR0 zero-register enforcement.
-        // Legacy mode (imm bit 14 clear) uses DR3 as method selector with DR0/DR1 operands.
+        // Legacy mode (imm bit 14 clear) uses DR3 as method selector with DR1/DR2 operands.
         if (d.imm & 0x4000) {
             const packed = d.imm & 0x3FFF;
             methodIndex = (packed >> 8) & 0x3F;
             const leftReg = (packed >> 4) & 0xF;
             const rightReg = packed & 0xF;
             encodedDstReg = d.crSrc;
-            argDR0 = this.dr[leftReg];
-            argDR1 = this.dr[rightReg];
+            argDR1 = this.dr[leftReg];
+            argDR2 = this.dr[rightReg];
             const methodName2 = (methodIndex >= 0 && methodIndex < abstraction.methods.length)
                 ? abstraction.methods[methodIndex]
                 : (abstraction.methods[0] || 'Apply');
@@ -2218,8 +2218,8 @@ class ChurchSimulator {
         } else {
             methodIndex = this.dr[3] || 0;
             encodedDstReg = null;
-            argDR0 = this.dr[0];
             argDR1 = this.dr[1];
+            argDR2 = this.dr[2];
             desc = `CALL CR${d.crDst} -> ${label}.${abstraction.methods[methodIndex] || 'Apply'} [DR3=${methodIndex}]`;
         }
         const methodName = (methodIndex >= 0 && methodIndex < abstraction.methods.length)
@@ -2229,7 +2229,7 @@ class ChurchSimulator {
 
         if (this.abstractionRegistry) {
             const result = this.abstractionRegistry.dispatchMethod(check.index, methodName, this, {
-                dr0: argDR0, dr1: argDR1
+                dr1: argDR1, dr2: argDR2
             });
             if (result && result.message) {
                 this.output += `  ${result.message}\n`;
@@ -2238,10 +2238,10 @@ class ChurchSimulator {
                 if (encodedDstReg !== null) {
                     this.dr[encodedDstReg] = result.result;
                 } else {
-                    this.dr[0] = result.result;
+                    this.dr[1] = result.result;
                 }
                 if (result.result2 !== undefined && typeof result.result2 === 'number') {
-                    const secondReg = encodedDstReg !== null && encodedDstReg < 15 ? encodedDstReg + 1 : 1;
+                    const secondReg = encodedDstReg !== null && encodedDstReg < 15 ? encodedDstReg + 1 : 2;
                     this.dr[secondReg] = result.result2;
                 }
             }
@@ -2265,13 +2265,13 @@ class ChurchSimulator {
     }
 
     _selectNavanaMethod(d) {
-        const dr0 = this.dr[0];
-        if (dr0 === 0) return 'Init';
-        if (dr0 === 1) return 'Manage';
-        if (dr0 === 2) return 'Monitor';
-        if (dr0 === 3) return 'IDS';
-        if (dr0 === 4) return 'MintPassKey';
-        if (dr0 === 5) return 'GetPassKeyAuditLog';
+        const dr1 = this.dr[1];
+        if (dr1 === 0) return 'Init';
+        if (dr1 === 1) return 'Manage';
+        if (dr1 === 2) return 'Monitor';
+        if (dr1 === 3) return 'IDS';
+        if (dr1 === 4) return 'MintPassKey';
+        if (dr1 === 5) return 'GetPassKeyAuditLog';
         return null;
     }
 
@@ -2298,24 +2298,24 @@ class ChurchSimulator {
                 const desc = `CALL CR${d.crDst} -> ${label} [LED driver E-perm abstraction]`;
                 this.output += desc + '\n';
 
-                const dr0 = this.dr[0];
                 const dr1 = this.dr[1];
+                const dr2 = this.dr[2];
                 const callerGT = this.cr[d.crDst].word0;
 
                 if (this.abstractionRegistry) {
                     const result = this.abstractionRegistry.dispatchMethod(5, 'CallLEDDriver', this, {
                         callerGT: callerGT,
-                        dr0: dr0,
-                        dr1: dr1
+                        dr1: dr1,
+                        dr2: dr2
                     });
 
                     if (result && result.ok) {
                         this.output += `  ${result.message}\n`;
                         if (result.result && result.result.state !== undefined) {
-                            this.dr[0] = result.result.state;
+                            this.dr[1] = result.result.state;
                         }
                         if (result.result && result.result.led !== undefined) {
-                            this.dr[0] = result.result.state || 0;
+                            this.dr[1] = result.result.state || 0;
                         }
                     } else {
                         this.output += `  ${result ? result.message : 'LED driver call failed'}\n`;
@@ -2326,11 +2326,11 @@ class ChurchSimulator {
 
                 this.pc++;
                 const methodNames = ['Set', 'Clear', 'Pattern', 'Get'];
-                const methodSelector = (dr0 >>> 24) & 0xFF;
+                const methodSelector = (dr1 >>> 24) & 0xFF;
                 let dispatchMethod;
                 if (methodSelector > 0 && methodSelector <= 3) {
                     dispatchMethod = methodSelector;
-                } else if (dr1 > 0) {
+                } else if (dr2 > 0) {
                     dispatchMethod = 0;
                 } else {
                     dispatchMethod = 2;
@@ -2338,7 +2338,7 @@ class ChurchSimulator {
                 const methodName = methodNames[dispatchMethod] || 'Set';
                 return { pc: this.pc - 1, instr: d, desc, pipeline: [
                     { stage: 'CALL', desc: `Enter LED driver`, perm: 'E', status: 'pass' },
-                    { stage: 'DISPATCH', desc: `LED.${methodName}(DR0=0x${dr0.toString(16)}, DR1=0x${dr1.toString(16)})`, status: 'pass' },
+                    { stage: 'DISPATCH', desc: `LED.${methodName}(DR1=0x${dr1.toString(16)}, DR2=0x${dr2.toString(16)})`, status: 'pass' },
                     { stage: 'DEVICE', desc: `Hardware write at 0xFE10`, status: 'pass' },
                     { stage: 'RETURN', desc: `Exit LED driver`, status: 'pass' },
                 ]};

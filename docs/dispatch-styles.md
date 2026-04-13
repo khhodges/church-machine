@@ -86,10 +86,10 @@ The compute abstractions use LAMBDA for their methods:
 ; SlideRule.Multiply using LAMBDA
 ; CR2 holds GT with X permission pointing to multiply body
 
-MV    DR0, <operand_a>
-MV    DR1, <operand_b>
-LAMBDA CR2, DR0         ; jump to multiply body (2-3 cycles)
-; DR0 now holds result
+MV    DR1, <operand_a>
+MV    DR2, <operand_b>
+LAMBDA CR2, DR1         ; jump to multiply body (2-3 cycles)
+; DR1 now holds result
 ```
 
 Code exists once in memory. Each invocation costs 2-3 cycles. No stack frame. Macro-like speed with function-like code reuse.
@@ -129,8 +129,8 @@ The default Access.asm example uses traditional binary dispatch:
 
 entry:
     ; Standard instruction execution
-    MOV DR0, 42
-    ADD DR0, DR0, DR1
+    MOV DR1, 42
+    ADD DR1, DR1, DR2
     ; ...
 ```
 

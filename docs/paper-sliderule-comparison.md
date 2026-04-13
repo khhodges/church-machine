@@ -168,11 +168,12 @@ The Church Machine provides 16 data registers (DR0-DR15), allocated by conventio
 
 | Registers | Purpose | Saved by |
 |-----------|---------|----------|
-| DR0-DR3 | Arguments and return values | Caller |
+| DR0 | Hardwired zero | — |
+| DR1-DR3 | Arguments and return values | Caller |
 | DR4-DR11 | Local variables | Callee |
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
 
-The compiler uses a simple linear allocation strategy: parameters map to DR0-DR3, local variables are assigned sequentially from DR4 upward, and expressions use DR12-DR15 as scratch space.
+The compiler uses a simple linear allocation strategy: parameters map to DR1-DR3, local variables are assigned sequentially from DR4 upward, and expressions use DR12-DR15 as scratch space. DR0 is hardwired to zero and cannot hold data across instructions.
 
 ### 3.4 Upload Format
 
@@ -411,19 +412,18 @@ The Haskell version provides 37.5% more methods in 1.3% less code. However, the 
 
 JavaScript `Add(a, b)` compiles to 5 instructions:
 ```
-0: IADD.AL  DR12, DR0, #0     ; DR12 = a (load param)
-1: IADD.AL  DR12, DR12, #0    ; DR12 += b (add param)
+0: IADD.AL  DR12, DR1, #0     ; DR12 = a (load param)
+1: IADD.AL  DR12, DR12, DR2   ; DR12 += b (add param)
 2: IADD.AL  DR4, DR12, #0     ; result = DR12 (store to local)
-3: IADD.AL  DR0, DR4, #0      ; DR0 = result (return value)
+3: IADD.AL  DR1, DR4, #0      ; DR1 = result (return value)
 4: RETURN.AL                   ; return
 ```
 
 Haskell `Add(a, b) = a + b` compiles to 4 instructions:
 ```
-0: IADD.AL  DR12, DR0, #0     ; DR12 = a
-1: IADD.AL  DR12, DR0, #0     ; DR12 = a + b
-2: IADD.AL  DR0, DR12, #0     ; DR0 = result
-3: RETURN.AL                   ; return
+0: IADD.AL  DR12, DR1, DR2    ; DR12 = a + b
+1: IADD.AL  DR1, DR12, #0     ; DR1 = result
+2: RETURN.AL                   ; return
 ```
 
 The Haskell version saves one instruction because it does not allocate an explicit local variable (`result`). The functional compiler knows that the expression `a + b` yields the return value directly.
@@ -434,13 +434,13 @@ JavaScript's Mul is 35 instructions: an explicit shift-and-add loop with sign ha
 
 Haskell's `a * b` is 8 instructions:
 ```
-0: IADD.AL  DR12, DR0, #0     ; DR12 = a (accumulator)
-1: MCMP.AL  DR1, DR0, #0      ; compare b to 0
+0: IADD.AL  DR12, DR1, #0     ; DR12 = a (accumulator)
+1: MCMP.AL  DR2, DR0, #0      ; compare b to 0
 2: BRANCH.EQ  #6              ; if b == 0, jump to return
-3: IADD.AL  DR12, DR12, #0    ; acc += a (add step)
-4: ISUB.AL  DR1, DR1, #1      ; b -= 1 (decrement counter)
+3: IADD.AL  DR12, DR12, DR1   ; acc += a (add step)
+4: ISUB.AL  DR2, DR2, #1      ; b -= 1 (decrement counter)
 5: BRANCH.AL  #1              ; loop back
-6: IADD.AL  DR0, DR12, #0     ; DR0 = result
+6: IADD.AL  DR1, DR12, #0     ; DR1 = result
 7: RETURN.AL                   ; return
 ```
 
@@ -451,23 +451,23 @@ The Haskell compiler recognises `a * b` as multiplication and emits a compact re
 The Haskell expression `if x < lo then lo else if x > hi then hi else x` compiles to 18 instructions using chained MCMP + BRANCH patterns:
 
 ```
- 0: MCMP.AL  DR0, DR1, #0      ; compare x to lo
+ 0: MCMP.AL  DR1, DR2, #0      ; compare x to lo
  1: IADD.LT  DR12, DR0, #1     ; flag = 1 if x < lo
  2: IADD.GE  DR12, DR0, #0     ; flag = 0 if x >= lo
  3: MCMP.AL  DR12, DR0, #0     ; test flag
  4: BRANCH.EQ  #7              ; if not less, check upper bound
- 5: IADD.AL  DR12, DR1, #0     ; result = lo
+ 5: IADD.AL  DR12, DR2, #0     ; result = lo
  6: BRANCH.AL  #16             ; jump to return
- 7: MCMP.AL  DR0, DR2, #0      ; compare x to hi
+ 7: MCMP.AL  DR1, DR3, #0      ; compare x to hi
  8: IADD.GT  DR12, DR0, #1     ; flag = 1 if x > hi
  9: IADD.LE  DR12, DR0, #0     ; flag = 0 if x <= hi
 10: MCMP.AL  DR12, DR0, #0     ; test flag
 11: BRANCH.EQ  #14             ; if not greater, use x
-12: IADD.AL  DR12, DR2, #0     ; result = hi
+12: IADD.AL  DR12, DR3, #0     ; result = hi
 13: BRANCH.AL  #15             ; jump to return
-14: IADD.AL  DR12, DR0, #0     ; result = x
+14: IADD.AL  DR12, DR1, #0     ; result = x
 15: IADD.AL  DR12, DR12, #0    ; (identity move)
-16: IADD.AL  DR0, DR12, #0     ; DR0 = result
+16: IADD.AL  DR1, DR12, #0     ; DR1 = result
 17: RETURN.AL                   ; return
 ```
 

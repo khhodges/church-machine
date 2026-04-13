@@ -91,7 +91,7 @@ execute) is `AL = 14`; when AL is used the suffix is omitted entirely.
 
 Aliases accepted by the assembler: `HS` → 2, `LO` → 3.
 
-Example: `IADDLT DR0, DR1, DR2` encodes opcode=0x0F, cond=11.
+Example: `IADDLT DR4, DR1, DR2` encodes opcode=0x0F, cond=11.
 
 ---
 
@@ -147,8 +147,8 @@ always zero.
 The assembler distinguishes register vs. immediate via the third operand's syntax:
 
 ```
-IADD DR0, DR1, DR2      ; register form  — third operand is a DR number
-IADD DR0, DR1, #42      ; immediate form — third operand is a signed literal
+IADD DR4, DR1, DR2      ; register form  — third operand is a DR number
+IADD DR4, DR1, #42      ; immediate form — third operand is a signed literal
 ```
 
 - **Register form**: `imm15 = DR_src2_index` (4 bits, 0–15 in imm15[3:0]; bits [14:4] = 0).

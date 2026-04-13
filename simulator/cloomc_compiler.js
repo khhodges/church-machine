@@ -56,7 +56,7 @@ class CLOOMCCompiler {
             HI: 8, LS: 9, GE: 10, LT: 11,
             GT: 12, LE: 13, AL: 14, NV: 15,
         };
-        this.DR_ARGS_START = 0;
+        this.DR_ARGS_START = 1;
         this.DR_ARGS_END = 3;
         this.DR_LOCALS_START = 4;
         this.DR_LOCALS_END = 11;
@@ -530,8 +530,8 @@ class CLOOMCCompiler {
         let nextLocal = this.DR_LOCALS_START;
 
         for (let pi = 0; pi < method.params.length; pi++) {
-            if (pi <= this.DR_ARGS_END) {
-                locals[method.params[pi]] = pi;
+            if (pi + this.DR_ARGS_START <= this.DR_ARGS_END) {
+                locals[method.params[pi]] = pi + this.DR_ARGS_START;
             } else {
                 if (nextLocal > this.DR_LOCALS_END) {
                     errors.push({ line: method.startLine, message: 'Too many parameters' });
@@ -548,8 +548,8 @@ class CLOOMCCompiler {
             return { code: [], errors, manifest: [] };
         }
 
-        if (resultReg !== 0) {
-            code.push(this.encode(this.opcodes.IADD, 14, 0, resultReg, 0));
+        if (resultReg !== this.DR_ARGS_START) {
+            code.push(this.encode(this.opcodes.IADD, 14, this.DR_ARGS_START, resultReg, 0));
         }
         manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
         code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
@@ -708,11 +708,11 @@ class CLOOMCCompiler {
 
         for (const param of method.params) {
             const paramIdx = method.params.indexOf(param);
-            if (paramIdx <= this.DR_ARGS_END) {
-                locals[param] = paramIdx;
+            if (paramIdx + this.DR_ARGS_START <= this.DR_ARGS_END) {
+                locals[param] = paramIdx + this.DR_ARGS_START;
             } else {
                 if (nextLocal > this.DR_LOCALS_END) {
-                    errors.push({ line: method.startLine, message: `Too many parameters — max ${this.DR_LOCALS_END - this.DR_LOCALS_START + 1 + this.DR_ARGS_END + 1}` });
+                    errors.push({ line: method.startLine, message: `Too many parameters — max ${this.DR_LOCALS_END - this.DR_LOCALS_START + 1 + this.DR_ARGS_END - this.DR_ARGS_START + 1}` });
                     return { code: [], errors, manifest: [] };
                 }
                 locals[param] = nextLocal++;
@@ -936,10 +936,11 @@ class CLOOMCCompiler {
         if (returnMatch) {
             if (returnMatch[1]) {
                 const parts = returnMatch[1].split(',').map(s => s.trim());
-                for (let i = 0; i < parts.length && i <= this.DR_ARGS_END; i++) {
+                for (let i = 0; i < parts.length && i + this.DR_ARGS_START <= this.DR_ARGS_END; i++) {
+                    const targetDR = i + this.DR_ARGS_START;
                     const valDR = this._resolveExpr(parts[i], code, locals, rom, errors, stmt.lineNum, method);
-                    if (valDR !== i) {
-                        code.push(this.encode(this.opcodes.IADD, 14, i, valDR, 0));
+                    if (valDR !== targetDR) {
+                        code.push(this.encode(this.opcodes.IADD, 14, targetDR, valDR, 0));
                     }
                 }
             }
@@ -976,10 +977,11 @@ class CLOOMCCompiler {
             const argStr = recallMatch[1];
             if (argStr) {
                 const args = argStr.split(',').map(s => s.trim()).filter(Boolean);
-                for (let a = 0; a < args.length && a <= this.DR_ARGS_END; a++) {
+                for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
+                    const targetDR = a + this.DR_ARGS_START;
                     const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method);
-                    if (argDR !== a) {
-                        code.push(this.encode(this.opcodes.IADD, 14, a, argDR, 0));
+                    if (argDR !== targetDR) {
+                        code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                     }
                 }
             }
@@ -1003,10 +1005,11 @@ class CLOOMCCompiler {
 
             if (argStr) {
                 const args = argStr.split(',').map(s => s.trim());
-                for (let a = 0; a < args.length && a <= this.DR_ARGS_END; a++) {
+                for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
+                    const targetDR = a + this.DR_ARGS_START;
                     const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method);
-                    if (argDR !== a) {
-                        code.push(this.encode(this.opcodes.IADD, 14, a, argDR, 0));
+                    if (argDR !== targetDR) {
+                        code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                     }
                 }
             }
@@ -1018,8 +1021,8 @@ class CLOOMCCompiler {
 
             if (resultVar) {
                 const dr = this._allocLocal(resultVar, locals, errors, stmt.lineNum);
-                if (dr !== 0) {
-                    code.push(this.encode(this.opcodes.IADD, 14, dr, 0, 0));
+                if (dr !== this.DR_ARGS_START) {
+                    code.push(this.encode(this.opcodes.IADD, 14, dr, this.DR_ARGS_START, 0));
                 }
             }
             return;
@@ -1538,8 +1541,8 @@ class CLOOMCCompiler {
         let nextLocal = this.DR_LOCALS_START;
 
         for (let pi = 0; pi < method.params.length; pi++) {
-            if (pi <= this.DR_ARGS_END) {
-                locals[method.params[pi]] = pi;
+            if (pi + this.DR_ARGS_START <= this.DR_ARGS_END) {
+                locals[method.params[pi]] = pi + this.DR_ARGS_START;
             } else {
                 if (nextLocal > this.DR_LOCALS_END) {
                     errors.push({ line: method.startLine, message: 'Too many parameters' });
@@ -1556,8 +1559,8 @@ class CLOOMCCompiler {
             return { code: [], errors, manifest: [] };
         }
 
-        if (resultReg !== 0) {
-            code.push(this.encode(this.opcodes.IADD, 14, 0, resultReg, 0));
+        if (resultReg !== this.DR_ARGS_START) {
+            code.push(this.encode(this.opcodes.IADD, 14, this.DR_ARGS_START, resultReg, 0));
         }
         manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
         code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
@@ -1596,8 +1599,8 @@ class CLOOMCCompiler {
             case 'lambda': {
                 const lambdaLocals = { ...locals };
                 for (let pi = 0; pi < node.params.length; pi++) {
-                    if (pi <= this.DR_ARGS_END) {
-                        lambdaLocals[node.params[pi]] = pi;
+                    if (pi + this.DR_ARGS_START <= this.DR_ARGS_END) {
+                        lambdaLocals[node.params[pi]] = pi + this.DR_ARGS_START;
                     } else {
                         lambdaLocals[node.params[pi]] = this._allocLocal(node.params[pi], lambdaLocals, errors, lineNum);
                     }
@@ -1608,8 +1611,8 @@ class CLOOMCCompiler {
 
                 const resultReg = this._emitHaskellExpr(node.body, code, lambdaLocals, rom, capNames, errors, manifest, lineNum);
 
-                if (resultReg !== 0) {
-                    code.push(this.encode(this.opcodes.IADD, 14, 0, resultReg, 0));
+                if (resultReg !== this.DR_ARGS_START) {
+                    code.push(this.encode(this.opcodes.IADD, 14, this.DR_ARGS_START, resultReg, 0));
                 }
 
                 manifest.push({ src: lineNum, addr: code.length, desc: 'RETURN (lambda end)' });
@@ -2093,8 +2096,8 @@ class CLOOMCCompiler {
 
         for (const param of method.params) {
             const paramIdx = method.params.indexOf(param);
-            if (paramIdx <= this.DR_ARGS_END) {
-                vars[param] = paramIdx;
+            if (paramIdx + this.DR_ARGS_START <= this.DR_ARGS_END) {
+                vars[param] = paramIdx + this.DR_ARGS_START;
             }
         }
 
