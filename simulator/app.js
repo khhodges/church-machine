@@ -16452,6 +16452,18 @@ function renderMarkdown(md) {
     return result.join('\n');
 }
 
+var _nextStepsHidden = false;
+
+function toggleNextSteps() {
+    _nextStepsHidden = !_nextStepsHidden;
+    const box = document.getElementById('nextStepsBox');
+    if (!box) return;
+    const body = box.querySelector('.next-steps-body');
+    const arrow = box.querySelector('.next-steps-arrow');
+    if (body) body.style.display = _nextStepsHidden ? 'none' : '';
+    if (arrow) arrow.textContent = _nextStepsHidden ? '▶' : '▼';
+}
+
 function showNextSteps(context) {
     const box = document.getElementById('nextStepsBox');
     if (!box) return;
@@ -16459,7 +16471,6 @@ function showNextSteps(context) {
     const link = (label, view) => `<a class="next-step-link" href="#" onclick="event.preventDefault();switchView('${view}')">${label}</a>`;
     const steps = {
         'compiled': `
-            <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li>${link('Name this abstract idea', 'abstractions')} — does the abstraction name describe what it does?</li>
                 <li>${link('Check the Namespace', 'namespace')} — see where your abstraction will live once created.</li>
@@ -16467,7 +16478,6 @@ function showNextSteps(context) {
                 <li><strong>Create Abstraction</strong> — when you are ready, click the green button to give your idea a Body in the Church Machine.</li>
             </ul>`,
         'assembled': `
-            <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li><strong>Step through it</strong> — click <strong>Step</strong> to execute one instruction at a time and watch the registers change.</li>
                 <li><strong>Run it</strong> — click <strong>Run</strong> to execute all instructions until halt or fault.</li>
@@ -16475,7 +16485,6 @@ function showNextSteps(context) {
                 <li>${link('View the Pipeline', 'pipeline')} — watch instructions flow through the mLoad pipeline.</li>
             </ul>`,
         'created': `
-            <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li>${link('Check the Namespace', 'namespace')} — see your new abstraction\'s entry in the namespace table.</li>
                 <li>${link('Inspect it in Abstractions', 'abstractions')} — see the lump layout, c-list, and Golden Token.</li>
@@ -16483,7 +16492,6 @@ function showNextSteps(context) {
                 <li>${link('Read the Reference', 'reference')} — look up instructions and permission bits.</li>
             </ul>`,
         'error': `
-            <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li><strong>Read the error</strong> — the line number tells you where to look.</li>
                 <li><strong>Check your syntax</strong> — does every <code>{</code> have a matching <code>}</code>?</li>
@@ -16491,7 +16499,6 @@ function showNextSteps(context) {
                 <li>${link('Read the Reference', 'reference')} — look up instruction formats and examples.</li>
             </ul>`,
         'draft': `
-            <div class="next-steps-label">Next Steps</div>
             <ul>
                 <li>${link('Check the Namespace', 'namespace')} — see where your abstraction will be placed.</li>
                 <li>${link('Inspect Abstractions', 'abstractions')} — review existing abstractions and their layouts.</li>
@@ -16500,7 +16507,12 @@ function showNextSteps(context) {
             </ul>`
     };
 
-    box.innerHTML = steps[context] || '';
+    const bodyHTML = steps[context] || '';
+    if (!bodyHTML) { box.innerHTML = ''; return; }
+
+    const arrowChar = _nextStepsHidden ? '▶' : '▼';
+    const bodyDisplay = _nextStepsHidden ? 'display:none' : '';
+    box.innerHTML = `<div class="next-steps-header" onclick="toggleNextSteps()"><span class="next-steps-arrow">${arrowChar}</span><span class="next-steps-label">Next Steps</span></div><div class="next-steps-body" style="${bodyDisplay}">${bodyHTML}</div>`;
 }
 
 function initConsoleAutoSwitch() {

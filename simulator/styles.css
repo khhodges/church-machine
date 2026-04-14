@@ -1527,6 +1527,28 @@ header h1 {
     display: none;
 }
 
+.next-steps-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.next-steps-header:hover .next-steps-label {
+    color: var(--church-gold);
+}
+
+.next-steps-arrow {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    transition: color 0.15s;
+}
+
+.next-steps-header:hover .next-steps-arrow {
+    color: var(--church-gold);
+}
+
 .led-strip {
     display: flex;
     align-items: center;
@@ -1710,7 +1732,7 @@ header h1 {
     letter-spacing: 1px;
     color: var(--church-gold);
     font-weight: 700;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0;
 }
 
 a.next-step-link {
