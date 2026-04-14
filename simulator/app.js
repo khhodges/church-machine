@@ -102,6 +102,7 @@ let threadTutorial = null;
 let abstrTutorial = null;
 let nsTutorial = null;
 let secureBootTutorial = null;
+let englishLoopsTutorial = null;
 let activeTutorial = 'sliderule';
 let cloomcCompiler = null;
 let currentView = 'dashboard';
@@ -512,6 +513,8 @@ function switchView(viewId) {
             nsTutorial.render('tutorialView');
         } else if (activeTutorial === 'secureboot' && secureBootTutorial) {
             secureBootTutorial.render('tutorialView');
+        } else if (activeTutorial === 'englishloops' && englishLoopsTutorial) {
+            englishLoopsTutorial.render('tutorialView');
         } else if (churchTutorial) {
             churchTutorial.render('tutorialView');
         }
@@ -662,6 +665,8 @@ function selectTutorial(which) {
         nsTutorial.render('tutorialView');
     } else if (which === 'secureboot' && secureBootTutorial) {
         secureBootTutorial.render('tutorialView');
+    } else if (which === 'englishloops' && englishLoopsTutorial) {
+        englishLoopsTutorial.render('tutorialView');
     } else if (churchTutorial) {
         churchTutorial.render('tutorialView');
     }
@@ -703,6 +708,10 @@ function _ensureTutorialObjects() {
     if (!secureBootTutorial && typeof SecureBootTutorial !== 'undefined') {
         secureBootTutorial = new SecureBootTutorial();
         window.secureBootTutorial = secureBootTutorial;
+    }
+    if (!englishLoopsTutorial && typeof EnglishLoopsTutorial !== 'undefined') {
+        englishLoopsTutorial = new EnglishLoopsTutorial();
+        window.englishLoopsTutorial = englishLoopsTutorial;
     }
 }
 
