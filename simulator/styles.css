@@ -6544,7 +6544,8 @@ pre:hover .code-copy-btn {
 
 .sr-comp-side-panel.open {
     padding: 0.6rem 0.75rem;
-    max-height: 400px;
+    max-height: 800px;
+    overflow-y: auto;
     opacity: 1;
 }
 
