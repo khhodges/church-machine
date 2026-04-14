@@ -6638,8 +6638,8 @@ function assembleAndLoad() {
                 const saved = totalCompiledBranch - totalChurchBranch;
                 if (saved > 0) {
                     listing += '    \u2192 Church eliminates ' + saved + ' branch instruction(s) using CALL selectors\n';
-                    listing += '    \u2192 No pipeline stalls, no branch misprediction\n';
-                    listing += '    \u2192 Constant execution time (selection by CALL, not BRANCH)\n';
+                    listing += '    \u2192 Avoids branch misprediction risk\n';
+                    listing += '    \u2192 More predictable control-flow timing (selection by CALL, not BRANCH)\n';
                 }
                 listing += '\n';
             }
@@ -15750,7 +15750,8 @@ abstraction ChurchNumerals {
 --     TRUE  = \u03BBx.\u03BBy.x  \u2192 CALL TRUE(a)(b) returns a
 --     FALSE = \u03BBx.\u03BBy.y  \u2192 CALL FALSE(a)(b) returns b
 --   Selection is two CALL instructions \u2014 no compare, no branch.
---   The pipeline never stalls; execution time is constant.
+--   Avoids branch misprediction; more predictable control flow.
+--   (Arithmetic still uses SlideRule / hardware FPU when needed.)
 --
 -- Each pair solves the same problem:
 --   compiled_X uses if/then/else  \u2192 MCMP + BRANCH
