@@ -537,7 +537,7 @@ class ChurchAssembler {
         switch (opcode) {
             case 0: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
             case 1: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-            case 2: return !(imm & 0x4000) ? `${mnemonic} ${crDst}, CR${crSrc}, #${imm}` : `${mnemonic} CR${crDst}`;
+            case 2: return !(imm & 0x4000) ? `${mnemonic} CR${crDst}, CR${crSrc}, #${imm}` : `${mnemonic} CR${crDst}`;
             case 3: {
                 const retMask = imm & 0xFFF;
                 return retMask ? `${mnemonic} 0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;
