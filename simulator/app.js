@@ -6593,52 +6593,53 @@ function assembleAndLoad() {
             listing += '\n';
         }
         if (result.abstractionName === 'ChurchVsCompiled' && methods.length > 0) {
-            listing += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            listing += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
             listing += '  INSTRUCTION COUNT COMPARISON\n';
-            listing += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
+            listing += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
             const compiledMethods = methods.filter(m => m.name.startsWith('compiled_'));
             const churchMethods = methods.filter(m => m.name.startsWith('church_'));
             const countInstrs = (codeArr) => {
                 let branches = 0, calls = 0, mcmps = 0, total = codeArr.length;
                 for (const w of codeArr) {
-                    const op = (w >>> 26) & 0x3F;
+                    const op = (w >>> 27) & 0x1F;
                     if (op === 17) branches++;
-                    if (op === 6) calls++;
-                    if (op === 13) mcmps++;
+                    if (op === 2) calls++;
+                    if (op === 14) mcmps++;
                 }
                 return { branches, calls, mcmps, total };
             };
             let totalCompiledBranch = 0, totalCompiledInstr = 0;
-            let totalChurchBranch = 0, totalChurchInstr = 0;
+            let totalChurchBranch = 0, totalChurchInstr = 0, totalChurchCall = 0;
             if (compiledMethods.length > 0) {
-                listing += '  COMPILED (if/then/else → CMP + BRANCH):\n';
+                listing += '  COMPILED (if/then/else \u2192 CMP + BRANCH):\n';
                 for (const m of compiledMethods) {
                     const s = countInstrs(m.code || []);
                     totalCompiledBranch += s.branches;
                     totalCompiledInstr += s.total;
-                    listing += `    ${m.name}: ${s.total} instructions, ${s.branches} BRANCH, ${s.mcmps} MCMP\n`;
+                    listing += '    ' + m.name + ': ' + s.total + ' instructions, ' + s.branches + ' BRANCH, ' + s.mcmps + ' MCMP\n';
                 }
                 listing += '\n';
             }
             if (churchMethods.length > 0) {
-                listing += '  CHURCH (boolean IS the selector → pure CALL):\n';
+                listing += '  DIRECT (pure arithmetic \u2192 no MCMP, no BRANCH):\n';
                 for (const m of churchMethods) {
                     const s = countInstrs(m.code || []);
                     totalChurchBranch += s.branches;
+                    totalChurchCall += s.calls;
                     totalChurchInstr += s.total;
-                    listing += `    ${m.name}: ${s.total} instructions, ${s.branches} BRANCH, ${s.calls} CALL\n`;
+                    listing += '    ' + m.name + ': ' + s.total + ' instructions, ' + s.branches + ' BRANCH, ' + s.calls + ' CALL\n';
                 }
                 listing += '\n';
             }
             if (compiledMethods.length > 0 && churchMethods.length > 0) {
-                listing += '  ── SUMMARY ──\n';
-                listing += `    Compiled path: ${totalCompiledInstr} total instructions, ${totalCompiledBranch} branches\n`;
-                listing += `    Church path:   ${totalChurchInstr} total instructions, ${totalChurchBranch} branches\n`;
+                listing += '  \u2500\u2500 SUMMARY \u2500\u2500\n';
+                listing += '    Compiled path: ' + totalCompiledInstr + ' total instructions, ' + totalCompiledBranch + ' branches\n';
+                listing += '    Direct path:   ' + totalChurchInstr + ' total instructions, ' + totalChurchBranch + ' branches\n';
                 const saved = totalCompiledBranch - totalChurchBranch;
                 if (saved > 0) {
-                    listing += `    → Church eliminates ${saved} branch instruction(s)\n`;
-                    listing += `    → No pipeline stalls, no branch misprediction\n`;
-                    listing += `    → Zero memory touched for boolean selection\n`;
+                    listing += '    \u2192 Direct path eliminates ' + saved + ' branch instruction(s)\n';
+                    listing += '    \u2192 No pipeline stalls, no branch misprediction\n';
+                    listing += '    \u2192 Constant execution time (no data-dependent branches)\n';
                 }
                 listing += '\n';
             }
@@ -15736,79 +15737,78 @@ abstraction ChurchNumerals {
     method isZero(n) = if n == 0 then 1 else 0
 }`,
         'lambda_church_vs_compiled': `-- LAMBDA CALCULUS
--- Church vs Compiled — side-by-side control flow comparison
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Compiled vs Direct \u2014 when branches cost more than they save
+-- \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 --
--- THE HYBRID ADVANTAGE:
---   Church booleans for control flow → pure CALL, no branches
---   SlideRule for arithmetic         → hardware FPU, one CALL
+-- Each pair of methods produces IDENTICAL results.
+-- The "compiled" version guards with if/then/else,
+-- generating MCMP + BRANCH instructions (7+ per guard).
+-- The "church" version uses direct arithmetic \u2014
+-- the math already handles edge cases correctly,
+-- so branches are unnecessary overhead.
 --
--- COMPILED PATH (if/then/else):
---   Each conditional compiles to:
---     MCMP (compare) → BRANCH (skip-then) → then-body → MOV →
---     BRANCH (skip-else) → else-body → MOV
---   = 7+ instructions per conditional, with branch misprediction risk
+-- COMPILED: if n == 0 then 0 else n + n
+--   \u2192 MCMP, BRANCH, ADD, MOV, BRANCH, LITERAL, MOV, RETURN
+--   = 8 instructions, 2 branches, 1 compare
 --
--- CHURCH PATH (boolean selectors):
---   A Church boolean IS the selector — CALL it with (a, b) and
---   it returns the right one. No MCMP, no BRANCH, no pipeline stall.
---   The "if" disappears: the boolean already knows the answer.
+-- DIRECT:   n + n
+--   \u2192 ADD, RETURN
+--   = 2 instructions, 0 branches, 0 compares
+--   (0 + 0 = 0 already, the guard was pointless)
 --
---   TRUE  = λx.λy.x  → CALL TRUE(a, b)  returns a
---   FALSE = λx.λy.y  → CALL FALSE(a, b) returns b
+-- Press Assemble to see the instruction-count comparison!
 --
--- WHY NOT USE CHURCH NUMERALS FOR MATH?
---   Church numeral 200 = apply f 200 times = 200 CALLs.
---   SlideRule.Multiply(100, 200) = 1 CALL, hardware FPU.
---   Use the right tool for the job.
---
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
 
 abstraction ChurchVsCompiled {
-    capabilities { SlideRule }
+    capabilities { }
 
-    -- ── COMPILED PATH ──────────────────────────────
-    -- "select" via if/then/else → CMP + BRANCH
-    -- Given a flag, return either a or b
-    method compiled_select(flag, a, b) =
-        if flag == 0 then b else a
+    -- \u2500\u2500 COMPILED PATH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    -- Each method guards with if/then/else, producing
+    -- MCMP + BRANCH instructions even when unnecessary.
 
-    -- "guarded multiply" — multiply only if flag is nonzero
-    method compiled_guard(flag, x, y) =
-        if flag == 0 then 0 else x * y
+    -- Double n, but guard against zero
+    -- (pointless: 0+0 = 0 anyway)
+    method compiled_double(n) =
+        if n == 0 then 0 else n + n
 
-    -- "clamp" — return x bounded to [lo, hi]
-    method compiled_clamp(x, lo, hi) =
-        if x < lo then lo
-        else if x > hi then hi
-        else x
+    -- Add a and b, but guard against a being zero
+    -- (pointless: 0+b = b anyway)
+    method compiled_add(a, b) =
+        if a == 0 then b else a + b
 
-    -- "abs" — absolute value via conditional
-    method compiled_abs(n) =
-        if n < 0 then 0 - n else n
+    -- Triple sum, guarded against all-zero
+    -- (pointless: 0+0+0 = 0 anyway)
+    method compiled_sum3(a, b, c) =
+        if a == 0 then
+            if b == 0 then c
+            else b + c
+        else a + b + c
 
-    -- ── CHURCH PATH ────────────────────────────────
-    -- The boolean IS the selector function.
-    -- TRUE  = λx.λy.x  (first argument)
-    -- FALSE = λx.λy.y  (second argument)
-    -- No comparison, no branch — just CALL the boolean.
+    -- Subtract with zero guard
+    -- (pointless: a-0 = a anyway)
+    method compiled_sub(a, b) =
+        if b == 0 then a else a - b
 
-    -- "select" via Church boolean — flag is the selector
-    -- When flag=TRUE:  CALL flag(a, b) → a
-    -- When flag=FALSE: CALL flag(a, b) → b
-    method church_select(flag, a, b) = flag
+    -- \u2500\u2500 DIRECT PATH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    -- Same computations, same results, zero branches.
+    -- The arithmetic already handles every edge case.
 
-    -- "and" — Church AND: λp.λq. p q p
-    -- If p is TRUE, result is q; if p is FALSE, result is p
-    method church_and(p, q) = p
+    -- Double n: n+n is always correct (including n=0)
+    method church_double(n) =
+        n + n
 
-    -- "or" — Church OR: λp.λq. p p q
-    -- If p is TRUE, result is p; if p is FALSE, result is q
-    method church_or(p, q) = p
+    -- Add a and b: always correct (including a=0)
+    method church_add(a, b) =
+        a + b
 
-    -- "not" — Church NOT: λp. p FALSE TRUE
-    -- Apply p to (FALSE, TRUE) — swaps the selector
-    method church_not(p) = p
+    -- Triple sum: always correct (including all zeros)
+    method church_sum3(a, b, c) =
+        a + b + c
+
+    -- Subtract: always correct (including b=0)
+    method church_sub(a, b) =
+        a - b
 }`,
         'lambda_booleans': `-- LAMBDA CALCULUS
 -- Church Booleans \u2014 logic as pure functions
