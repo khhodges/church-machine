@@ -2821,10 +2821,13 @@ class CLOOMCCompiler {
         const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH|SHL|SHR|HALT|NOP)\b/i;
         const operatorPattern = /^\s*[A-Za-z_]\w*\s*=\s*[A-Za-z_\d]\S*\s*[\+\-\*\/%]\s*/;
         const assignPattern = /^\s*[A-Za-z_]\w*\s*=\s*.+/;
+        const petLoadPattern = /^\s*LOAD\s+([A-Za-z_]\w*)\s*$/i;
         let exprLines = 0;
         for (const line of lines) {
             const t = line.trim();
             if (!t || t.startsWith(';') || t.startsWith('//') || t.startsWith('--')) continue;
+            const petLoad = t.match(petLoadPattern);
+            if (petLoad && !/^(CR\d+|DR\d+)$/i.test(petLoad[1])) { petNameScore += 3; exprLines++; continue; }
             if (asmMnemonics.test(t)) continue;
             if (funcPattern.test(t)) { petNameScore += 3; exprLines++; continue; }
             if (operatorPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
