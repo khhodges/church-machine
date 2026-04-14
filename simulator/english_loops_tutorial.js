@@ -291,3 +291,6 @@ Apply lambda with n, total</pre>
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = EnglishLoopsTutorial;
 }
+if (typeof window !== 'undefined') {
+    window.EnglishLoopsTutorial = EnglishLoopsTutorial;
+}

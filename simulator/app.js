@@ -709,9 +709,14 @@ function _ensureTutorialObjects() {
         secureBootTutorial = new SecureBootTutorial();
         window.secureBootTutorial = secureBootTutorial;
     }
-    if (!englishLoopsTutorial && typeof EnglishLoopsTutorial !== 'undefined') {
-        englishLoopsTutorial = new EnglishLoopsTutorial();
-        window.englishLoopsTutorial = englishLoopsTutorial;
+    if (!englishLoopsTutorial) {
+        if (typeof EnglishLoopsTutorial !== 'undefined') {
+            englishLoopsTutorial = new EnglishLoopsTutorial();
+            window.englishLoopsTutorial = englishLoopsTutorial;
+        } else if (typeof window !== 'undefined' && window.EnglishLoopsTutorial) {
+            englishLoopsTutorial = new window.EnglishLoopsTutorial();
+            window.englishLoopsTutorial = englishLoopsTutorial;
+        }
     }
 }
 
