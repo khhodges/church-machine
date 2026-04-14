@@ -1850,11 +1850,20 @@ function _updateMtbfIndicator() {
 }
 
 function patchSimulator() {
+    _runStopped = true;
+    sim.running = false;
+
     const ed = document.getElementById('asmEditor');
     const srcHash = ed ? _quickHash(ed.value) : '';
     const logEl = document.getElementById('crInjectLog');
     if (logEl) { logEl.style.display = 'block'; logEl.textContent = ''; }
-    const result = injectCRCode(logEl);
+    let result;
+    try {
+        result = injectCRCode(logEl);
+    } catch (e) {
+        console.error('patchSimulator error:', e);
+        if (logEl) logEl.textContent += '\nError: ' + (e.message || e);
+    }
     const logText = logEl ? logEl.textContent.trim() : '';
     showPatchModal(!!result, 'Patch Simulator', logText);
     if (result) {
@@ -6306,6 +6315,9 @@ function assembleAndLoad() {
     if (!editor) return;
     const source = editor.value;
     saveEditorState();
+
+    _runStopped = true;
+    sim.running = false;
 
     const con = document.getElementById('editorConsole');
 
@@ -14680,17 +14692,18 @@ function onLangChange(restoring) {
 
 function smartCompile() {
     if (!requirePermission('compile', 'Compile Programs')) return;
+
+    _runStopped = true;
+
     const sel = document.getElementById('langSelector');
     let lang = sel ? sel.value : 'assembly';
 
-    // In personal mode, use the active tab's stored language for compilation
     if (lang === 'personal' && activeUserTabId) {
         const activeTab = userTabs.find(t => t.id === activeUserTabId);
         if (activeTab && activeTab.lang) lang = activeTab.lang;
         else lang = 'javascript';
     }
 
-    // Auto-detect CLOOMC++ when code has abstraction/method keywords
     if (lang === 'assembly') {
         const src = (document.getElementById('asmEditor') || {}).value || '';
         if (/^\s*abstraction\s+\w+/m.test(src) || /^\s*method\s+\w+/m.test(src)) {
@@ -14700,10 +14713,17 @@ function smartCompile() {
         }
     }
 
-    if (lang === 'assembly') {
-        assembleAndLoad();
-    } else {
-        compileCLOOMC();
+    try {
+        if (lang === 'assembly') {
+            assembleAndLoad();
+        } else {
+            compileCLOOMC();
+        }
+    } catch (e) {
+        console.error('smartCompile error:', e);
+        const con = document.getElementById('editorConsole');
+        if (con) con.textContent = 'Compile error: ' + (e.message || e);
+        showNextSteps('error');
     }
 }
 
@@ -14904,6 +14924,9 @@ function compileCLOOMC() {
     const source = editor.value;
     const con = document.getElementById('editorConsole');
     switchCodeTab('console');
+
+    _runStopped = true;
+    sim.running = false;
 
     const capabilities = [];
     const result = cloomcCompiler.compile(source, capabilities);
