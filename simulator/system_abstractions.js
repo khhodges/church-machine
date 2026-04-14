@@ -114,6 +114,7 @@ class SystemAbstractions {
         this._bindSlideRuleTrig();
         this._bindSlideRuleBernoulli();
         this._bindSlideRuleExtended();
+        this._bindConstants();
     }
 
     _bindSalvation() {
@@ -1550,6 +1551,40 @@ class SystemAbstractions {
             const n = args.dr1 !== undefined ? args.dr1 : 0;
             const result = n > 0 ? 1 : n < 0 ? -1 : 0;
             return { ok: true, result: result, message: `SlideRule.Signum(${n}) = ${result}` };
+        });
+    }
+
+    _bindConstants() {
+        const buf = new ArrayBuffer(4);
+        const f32 = new Float32Array(buf);
+        const u32 = new Uint32Array(buf);
+        const toIEEE754 = (v) => { f32[0] = v; return u32[0]; };
+
+        const PI_BITS  = toIEEE754(Math.PI);
+        const E_BITS   = toIEEE754(Math.E);
+        const PHI_BITS = toIEEE754((1 + Math.sqrt(5)) / 2);
+        const ZERO_BITS = 0x00000000;
+        const ONE_BITS  = toIEEE754(1.0);
+
+        this.registry.bindMethod(18, 'Pi', function(sim, args) {
+            return { ok: true, result: PI_BITS, message: `Constants.Pi() = 0x${PI_BITS.toString(16).toUpperCase().padStart(8, '0')} (\u03c0 \u2248 ${Math.PI.toFixed(6)})` };
+        });
+
+        this.registry.bindMethod(18, 'E', function(sim, args) {
+            return { ok: true, result: E_BITS, message: `Constants.E() = 0x${E_BITS.toString(16).toUpperCase().padStart(8, '0')} (e \u2248 ${Math.E.toFixed(6)})` };
+        });
+
+        this.registry.bindMethod(18, 'Phi', function(sim, args) {
+            const phi = (1 + Math.sqrt(5)) / 2;
+            return { ok: true, result: PHI_BITS, message: `Constants.Phi() = 0x${PHI_BITS.toString(16).toUpperCase().padStart(8, '0')} (\u03c6 \u2248 ${phi.toFixed(6)})` };
+        });
+
+        this.registry.bindMethod(18, 'Zero', function(sim, args) {
+            return { ok: true, result: ZERO_BITS, message: `Constants.Zero() = 0x00000000 (0.0)` };
+        });
+
+        this.registry.bindMethod(18, 'One', function(sim, args) {
+            return { ok: true, result: ONE_BITS, message: `Constants.One() = 0x${ONE_BITS.toString(16).toUpperCase().padStart(8, '0')} (1.0)` };
         });
     }
 }
