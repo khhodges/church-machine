@@ -2445,6 +2445,9 @@ class CLOOMCCompiler {
             if (t.match(/^(set|store|put|assign)\s+/)) englishScore++;
             if (t.match(/^(return|give back|send back)\s+(the\s+)?/)) englishScore++;
             if (t.match(/^(if|when)\s+.+\s+(is|equals|is equal to|is greater than|is less than|is not)\s+/)) englishScore++;
+            if (t.match(/^(while|repeat while|loop while)\s+.+\s+(is|equals|is equal to|is greater than|is less than|is not)\s+/)) englishScore++;
+            if (t.match(/^(end while|end loop)$/)) englishScore++;
+            if (t.match(/^(repeat|recurse|recall|call self|call again)\s+(with\s+)?/)) englishScore++;
             if (t.match(/^(it needs|it uses|it requires|using)\s+/)) englishScore++;
             if (t.match(/\b(plus|minus|times|divided by|multiplied by|added to|subtracted from)\b/)) englishScore++;
             if (t.match(/^(read|write|load|save)\s+(from|to|the value)\s+/)) englishScore++;
@@ -2776,6 +2779,32 @@ class CLOOMCCompiler {
 
         if (lo === 'otherwise') {
             return '} else {';
+        }
+
+        const whileMatch = lo.match(/^(?:while|repeat while|loop while)\s+(\w+)\s+(is greater than|is less than|is equal to|is not|equals|is|==|!=|<|>|<=|>=)\s+(\w+)/);
+        if (whileMatch) {
+            let op;
+            switch (whileMatch[2]) {
+                case 'is equal to': case 'equals': case 'is': case '==': op = '=='; break;
+                case 'is not': case '!=': op = '!='; break;
+                case 'is greater than': case '>': op = '>'; break;
+                case 'is less than': case '<': op = '<'; break;
+                case '>=': op = '>='; break;
+                case '<=': op = '<='; break;
+                default: op = '=='; break;
+            }
+            return `while (${whileMatch[1]} ${op} ${whileMatch[3]}) {`;
+        }
+
+        if (lo === 'end while' || lo === 'end loop') {
+            return '}';
+        }
+
+        const repeatMatch = lo.match(/^(?:repeat|recurse|recall|call self|call again)\s+(?:with\s+)?(.+)/);
+        if (repeatMatch) {
+            const argsExpr = this._translateEnglishExpr(repeatMatch[1]);
+            const args = argsExpr.split(',').map(s => s.trim()).join(', ');
+            return `recall(${args})`;
         }
 
         if (lo === 'end if' || lo === 'end' || lo === '}') {

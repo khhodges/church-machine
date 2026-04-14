@@ -6593,6 +6593,40 @@ function assembleAndLoad() {
             }
             listing += '\n';
         }
+        if (result.abstractionName === 'EnglishLoops' && methods.length > 0) {
+            listing += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
+            listing += '  LOOP STYLE COMPARISON\n';
+            listing += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+            const countInstrs = (codeArr) => {
+                let branches = 0, calls = 0, mcmps = 0, total = codeArr.length;
+                for (const w of codeArr) {
+                    const op = (w >>> 27) & 0x1F;
+                    if (op === 17) branches++;
+                    if (op === 2) calls++;
+                    if (op === 14) mcmps++;
+                }
+                return { branches, calls, mcmps, total };
+            };
+            for (const m of methods) {
+                const s = countInstrs(m.code || []);
+                const style = m.name === 'WhileSum' ? 'WHILE LOOP (MCMP + BRANCH)' : 'RECURSIVE REPEAT (CALL CR6)';
+                listing += '  ' + m.name + ' \u2014 ' + style + ':\n';
+                listing += '    ' + s.total + ' instructions, ' + s.branches + ' BRANCH, ' + s.calls + ' CALL, ' + s.mcmps + ' MCMP\n\n';
+            }
+            const whileM = methods.find(m => m.name === 'WhileSum');
+            const recurseM = methods.find(m => m.name === 'RecurseSum');
+            if (whileM && recurseM) {
+                const ws = countInstrs(whileM.code || []);
+                const rs = countInstrs(recurseM.code || []);
+                listing += '  \u2500\u2500 TRADEOFF \u2500\u2500\n';
+                listing += '    While loop:  ' + ws.branches + ' BRANCH per iteration (compare + loop-back)\n';
+                listing += '    Recursive:   ' + rs.calls + ' CALL per iteration (self-invocation via CR6)\n';
+                listing += '    \u2192 While is compact but branches can stall the pipeline\n';
+                listing += '    \u2192 Recursive uses CALL \u2014 capability-checked, predictable timing\n';
+                listing += '    \u2192 Both produce identical results: n + (n-1) + ... + 1\n';
+                listing += '\n';
+            }
+        }
         if (result.abstractionName === 'ChurchVsCompiled' && methods.length > 0) {
             listing += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n';
             listing += '  INSTRUCTION COUNT COMPARISON\n';
@@ -14875,7 +14909,7 @@ function onLangChange(restoring) {
     if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !lastAssembledWords);
 
     const langExampleGroups = {
-        english: ['cloomc_english_hello', 'cloomc_english_counter'],
+        english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_loops'],
         assembly: ['ada_note_g', 'selftest', 'load_save', 'bernoulli', 'conditional', 'gc_test', 'turing_test', 'led_blink', 'salvation', 'perm_attack', 'bind_attack', 'tperm_halt'],
         javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
@@ -15700,6 +15734,57 @@ abstraction Heap {
         'sliderule_hs': `-- SlideRule — Haskell front-end\n-- Integer arithmetic on Church Machine hardware\n-- Proves both languages compile to the same 20-instruction target\n\nabstraction SlideRuleHS {\n    capabilities { Constants }\n\n    -- Basic arithmetic\n    method Add(a, b) = a + b\n\n    method Sub(a, b) = a - b\n\n    method Mul(a, b) = a * b\n\n    -- Integer square root via conditional lookup (floor)\n    method Sqrt(n) = if n < 1 then 0 else if n < 4 then 1 else if n < 9 then 2 else if n < 16 then 3 else if n < 25 then 4 else if n < 36 then 5 else if n < 49 then 6 else if n < 64 then 7 else if n < 81 then 8 else if n < 100 then 9 else 10\n\n    -- Power of 2 via conditional lookup\n    method Pow2(exp) = if exp == 0 then 1 else if exp == 1 then 2 else if exp == 2 then 4 else if exp == 3 then 8 else if exp == 4 then 16 else if exp == 5 then 32 else if exp == 6 then 64 else if exp == 7 then 128 else 256\n\n    -- Absolute value\n    method Abs(n) = if n < 0 then 0 - n else n\n\n    -- Signum: -1, 0, or 1\n    method Signum(n) = if n == 0 then 0 else if n > 0 then 1 else 0 - 1\n\n    -- Max of two values\n    method Max(a, b) = if a > b then a else b\n\n    -- Min of two values\n    method Min(a, b) = if a < b then a else b\n\n    -- Clamp value between lo and hi\n    method Clamp(x, lo, hi) = if x < lo then lo else if x > hi then hi else x\n}`,
         'english_hello': `Create an abstraction called Hello\n\nAdd a method called Greet that takes who\nSet result to who plus 1\nReturn the result`,
         'english_counter': `Create an abstraction called Counter\n\nAdd a method called Increment that takes value\nSet result to value plus 1\nReturn the result\n\nAdd a method called Add that takes a and b\nSet result to a plus b\nReturn the result\n\nAdd a method called Double that takes x\nSet result to x plus x\nReturn the result`,
+        'english_loops': `-- ENGLISH: Loops — Two Ways to Iterate
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--
+-- The Church Machine offers TWO loop styles in English:
+--
+-- 1. WHILE LOOPS (compiled path):
+--    "While x is greater than 0" / "End while"
+--    Compiles to: MCMP + BRANCH (traditional loop)
+--    Familiar, efficient for tight inner loops.
+--
+-- 2. RECURSIVE REPEAT (Church path):
+--    "Repeat with x minus 1"
+--    Compiles to: CALL CR6 (re-invoke self)
+--    No branch instructions — constant-time control flow.
+--    Each iteration goes through the capability system.
+--
+-- Both produce the same result. The While loop uses
+-- branches (pipeline stalls possible). The Repeat uses
+-- function calls (predictable, capability-checked).
+--
+-- This is what makes the Church Machine unique:
+-- you choose your control flow tradeoff in plain English.
+--
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an abstraction called EnglishLoops
+
+-- ── WHILE LOOP (compiled, uses BRANCH) ────────────
+-- Counts down from n to 0, accumulating n + (n-1) + ... + 1
+-- Uses a traditional while loop with compare-and-branch.
+
+Add a method called WhileSum that takes n
+Set total to 0
+While n is greater than 0
+    Set total to total plus n
+    Set n to n minus 1
+End while
+Return total
+
+-- ── RECURSIVE REPEAT (Church, uses CALL) ──────────
+-- Same computation: n + (n-1) + ... + 1
+-- Uses self-invocation instead of looping.
+-- No BRANCH — each "iteration" is a CALL through CR6.
+
+Add a method called RecurseSum that takes n and total
+If n is equal to 0
+    Return total
+End if
+Set total to total plus n
+Set n to n minus 1
+Repeat with n, total`,
         'lambda_church': `-- LAMBDA CALCULUS
 -- Church Numerals \u2014 numbers as pure functions
 -- \u03BBf.\u03BBx.x = 0, \u03BBf.\u03BBx.f x = 1, \u03BBf.\u03BBx.f (f x) = 2 ...
@@ -16162,7 +16247,7 @@ abstraction Feedback {
     if (sel) {
         const isHaskell = ['church_math','church_pair','church_case','church_lambda','sliderule_hs'].includes(name);
         const isSymbolic = ['ada_note_g', 'bernoulli_numbers'].includes(name);
-        const isEnglish = ['english_hello','english_counter'].includes(name);
+        const isEnglish = ['english_hello','english_counter','english_loops'].includes(name);
         const isLambda = ['lambda_church','lambda_booleans','lambda_pairs','lambda_ycomb','lambda_sliderule','lambda_fixedpoint','lambda_rational','lambda_church_vs_compiled'].includes(name);
         sel.value = isLambda ? 'lambda' : isEnglish ? 'english' : isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
     }
