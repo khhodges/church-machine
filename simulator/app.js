@@ -6380,6 +6380,23 @@ function assembleAndLoad() {
         sim.programLabels = labels;
         sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
         if (pipelineViz) pipelineViz.setNIA(null);
+        const manifestByMethod = {};
+        if (result.manifest) {
+            for (const entry of result.manifest) {
+                const comments = {};
+                if (entry.mapping) {
+                    let seqIdx = 0;
+                    for (const m of entry.mapping) {
+                        if (m.comment !== undefined) {
+                            comments[seqIdx++] = m.comment;
+                        } else if (m.addr !== undefined && m.desc) {
+                            comments[m.addr] = m.desc;
+                        }
+                    }
+                }
+                manifestByMethod[entry.name] = comments;
+            }
+        }
         let listing = `Assembled ${words.length} words (CLOOMC++ "${result.abstractionName || ''}", ${methods.length} method(s)):\n\n`;
         let wordIdx = 0;
         for (let mi = 0; mi < methods.length; mi++) {
@@ -6389,9 +6406,13 @@ function assembleAndLoad() {
         wordIdx = methodTableSize;
         for (const m of methods) {
             listing += `  method ${m.name}: ${(m.code || []).length} instruction(s)\n`;
+            const comments = manifestByMethod[m.name] || {};
             for (let i = 0; i < (m.code || []).length; i++) {
                 const w = m.code[i];
-                listing += `    ${wordIdx.toString().padStart(4)}: 0x${w.toString(16).padStart(8, '0')}  ${assembler.disassemble(w)}\n`;
+                const disasm = assembler.disassemble(w);
+                const comment = comments[i];
+                const line = `    ${wordIdx.toString().padStart(4)}: 0x${w.toString(16).padStart(8, '0')}  ${disasm}`;
+                listing += comment ? `${line.padEnd(55)}; ${comment}\n` : `${line}\n`;
                 wordIdx++;
             }
             listing += '\n';
