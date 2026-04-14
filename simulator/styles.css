@@ -4591,6 +4591,16 @@ a.next-step-link:hover {
 #cr-hover-popup .zdp-lbl { color: #93c5fd; font-style: italic; }
 #cr-hover-popup .zdp-empty { color: #374151; font-style: italic; }
 
+.cr-hover-target {
+    cursor: help;
+    border-bottom: 1px dotted rgba(244,185,66,0.4);
+    transition: color 0.15s;
+}
+.cr-hover-target:hover {
+    color: #f4b942;
+    border-bottom-color: #f4b942;
+}
+
 .crd-action-group {
     display: inline-flex;
     align-items: center;

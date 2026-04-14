@@ -1057,7 +1057,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const addr = loc + 1 + w;
                         if (addr >= sim.memory.length) break;
                         const word = _cw1[w];
-                        const decoded = word === 0 ? 'HALT' : asm.disassemble(word);
+                        const decoded = word === 0 ? 'HALT' : _wrapCRHover(asm.disassemble(word));
                         const isPC   = sim.bootComplete && (addr === (sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                         const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
@@ -1069,7 +1069,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
                         codeHtml += `<td class="code-disasm">${decoded}</td>`;
                         if (_ba1.hasBranches) codeHtml += `<td class="br-arrow-col">${_ba1.html[w]}</td>`;
-                        codeHtml += `<td class="code-decompiled ${_dcCls}">${_dc ? _dc.desc : ''}</td>`;
+                        codeHtml += `<td class="code-decompiled ${_dcCls}">${_dc ? _wrapCRHover(_dc.desc) : ''}</td>`;
                         codeHtml += '</tr>';
                     }
                     codeHtml += '</tbody></table>';
@@ -1141,7 +1141,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     const addr = loc + w;
                     if (addr >= sim.memory.length) break;
                     const word = _cw2[w];
-                    const decoded = word === 0 ? 'HALT' : asm2.disassemble(word);
+                    const decoded = word === 0 ? 'HALT' : _wrapCRHover(asm2.disassemble(word));
                     const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                     const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2, _crPets2);
                     const _dc2Cls = _dc2 ? (_dc2.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
@@ -1152,7 +1152,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     codeHtml2 += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
                     codeHtml2 += `<td class="code-disasm">${decoded}</td>`;
                     if (_ba2.hasBranches) codeHtml2 += `<td class="br-arrow-col">${_ba2.html[w]}</td>`;
-                    codeHtml2 += `<td class="code-decompiled ${_dc2Cls}">${_dc2 ? _dc2.desc : ''}</td></tr>`;
+                    codeHtml2 += `<td class="code-decompiled ${_dc2Cls}">${_dc2 ? _wrapCRHover(_dc2.desc) : ''}</td></tr>`;
                 }
                 codeHtml2 += '</tbody></table>';
                 h += codeHtml2;
@@ -2344,6 +2344,13 @@ function _regName(pet, offset) {
     return (regs && offset >= 0 && offset < regs.length) ? regs[offset] : null;
 }
 
+function _wrapCRHover(html) {
+    return html.replace(/\bCR(1[0-5]|[0-9])\b/g, function(m, d) {
+        const n = parseInt(d, 10);
+        return `<span class="cr-hover-target" onmouseenter="showCRPopup(event,${n})" onmouseleave="hideCRPopup()">${m}</span>`;
+    });
+}
+
 function _crTag(crNum, crPets) {
     const pet = crPets && crPets[crNum];
     return pet ? `${pet.toLowerCase()}(CR${crNum})` : `CR${crNum}`;
@@ -2805,10 +2812,10 @@ function updateCRDetail() {
             const isCompiler = decomp && decomp.compiler;
             let rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : (isCompiler ? 'code-row-compiler' : ''));
 
-            const decoded  = word === 0 ? 'NOP / HALT' : asm.disassemble(word);
+            const decoded  = word === 0 ? 'NOP / HALT' : _wrapCRHover(asm.disassemble(word));
             const bpDot    = isBP ? '<span class="bp-dot" title="Breakpoint">&#x25CF;</span> ' : '';
             const decompTd = decomp
-                ? `<td class="code-decompiled ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}">${decomp.desc}</td>`
+                ? `<td class="code-decompiled ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}">${_wrapCRHover(decomp.desc)}</td>`
                 : '<td class="code-decompiled"></td>';
 
             codeHtml += `<tr class="${rowClass}" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="openBreakPopoverAt(${addr})">`;
