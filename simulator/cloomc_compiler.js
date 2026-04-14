@@ -2816,6 +2816,11 @@ class CLOOMCCompiler {
             ? new RegExp('^\\s*(?:[A-Za-z_]\\w*\\s*=\\s*)?(?:' + builtFuncNames.join('|') + ')\\s*\\(', 'i')
             : /^\s*(?:[A-Za-z_]\w*\s*=\s*)?(?:Sqrt|GCD|Factorial|Log2|Abs|Min|Max|Pow|Sin|Cos|Tan)\s*\(/i;
 
+        const constNames = CLOOMCCompiler._getPetNameConstNames();
+        const constPattern = constNames.length > 0
+            ? new RegExp('^\\s*[A-Za-z_]\\w*\\s*=\\s*(?:' + constNames.join('|') + ')\\s*$', 'i')
+            : null;
+
         const lines = source.split('\n');
         let petNameScore = 0;
         const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH\w*|SHL|SHR|HALT|NOP)\b/i;
@@ -2830,6 +2835,7 @@ class CLOOMCCompiler {
             if (petLoad && !/^(CR\d+|DR\d+)$/i.test(petLoad[1])) { petNameScore += 3; exprLines++; continue; }
             if (asmMnemonics.test(t)) continue;
             if (funcPattern.test(t)) { petNameScore += 3; exprLines++; continue; }
+            if (constPattern && constPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
             if (operatorPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
             if (assignPattern.test(t)) { petNameScore += 1; exprLines++; continue; }
         }
@@ -3272,6 +3278,16 @@ class CLOOMCCompiler {
             .map(k => k.charAt(0).toUpperCase() + k.slice(1))
             .filter((v, i, a) => a.indexOf(v) === i);
         return CLOOMCCompiler._cachedFuncNames;
+    }
+
+    static _getPetNameConstNames() {
+        if (CLOOMCCompiler._cachedConstNames) return CLOOMCCompiler._cachedConstNames;
+        const tables = CLOOMCCompiler._buildPetNameTables();
+        CLOOMCCompiler._cachedConstNames = Object.entries(tables.funcTable)
+            .filter(([, v]) => v.args === 0)
+            .map(([k]) => k.charAt(0).toUpperCase() + k.slice(1))
+            .filter((v, i, a) => a.indexOf(v) === i);
+        return CLOOMCCompiler._cachedConstNames;
     }
 
     static _buildPetNameTables() {
