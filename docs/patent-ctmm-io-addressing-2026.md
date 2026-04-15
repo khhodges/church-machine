@@ -627,6 +627,26 @@ An extension of Claim 3 wherein access to local peripherals (UART, GPIO, Timer, 
 
 ---
 
+## FIGURES (Proposed)
+
+### Figure A1: Abstract GT Address Space
+
+Diagram of the 32-bit address space showing the namespace region (0x00000000–0xFDFFFFFF) for Inform GTs managed by Navana, the IDE-controlled peripheral I/O range (0xFE000000–0xFEFFFFFF), the Home Base Tunnel sentinel at 0xFF000000, and the reserved IDE system resource range (0xFF000001–0xFFFFFFFF). Annotations show the Abstract GT format (gt_type = 11₂, word1 holds sentinel address) and the hardware routing path that bypasses namespace lookup entirely. Callout boxes enumerate what the architecture eliminates: no device drivers, no I/O subsystem, no protocol stacks.
+
+### Figure A2: Home Base Tunnel
+
+Architecture diagram showing the single outbound network gateway at address 0xFF000000. Local abstractions holding Outform GTs (F-bit set) route all network traffic through the Home Base Tunnel to the IDE, which forwards to remote namespaces. The tunnel word format is annotated: Word 0 (primary sentinel 0xFF000000), Word 1 (version/seal MAC), Word 2–3 (programmer-defined backup IDE addresses for fault-tolerant connectivity). Security properties are highlighted: no second outbound path, no address forgery.
+
+### Figure A3: MTBF Qualification Tiers
+
+Three-tier progression diagram showing how hardware-tracked Mean Time Between Failures gates abstraction distribution. Tier 1 (Isolated): MTBF below user threshold, locked to local namespace, suitable for new/untested abstractions. Tier 2 (User-regulated): MTBF between user and namespace thresholds, individual distribution permitted. Tier 3 (Namespace-regulated): MTBF above namespace threshold, full namespace access granted. Hardware enforcement callouts: MTBF counters are unforgeable hardware registers, tier transitions are automatic, FAULT resets the counter, software cannot override qualification.
+
+### Figure A4: Local Peripheral Autonomy
+
+Boot-time peripheral discovery diagram. During Phase 5, the CTMM probes IDE address range (0xFE______) for locally attached hardware (UART, GPIO, SPI, Timer, Display). Present peripherals receive valid Abstract GTs; absent ones receive NULL GTs (accessing NULL triggers FAULT). Side-by-side comparison of Connected mode (IDE provisions Home Base Tunnel, remote namespaces accessible), Air-gapped mode (no IDE, Home Base = NULL, local peripherals still work), and Security guarantee (no outbound data leakage possible). The peripheral access model: abstraction holds Abstract GT in c-list → CALL routes to peripheral hardware → TPERM checks permissions → direct register access. No device driver, no kernel, no system call.
+
+---
+
 ## CONCLUSION
 
 The Abstract Golden Token I/O and Network Addressing architecture represents a fundamental shift in how computer systems integrate I/O, network access, and service provisioning. By making these capabilities unforgeable, hardware-routed, and locally autonomous (for peripherals) or IDE-provisioned-at-boot (for network), the architecture enables:

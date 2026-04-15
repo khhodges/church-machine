@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 800px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 800px; }
 </style>
 </head>
 <body>
@@ -40,15 +40,15 @@
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
-    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
-    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#333333; text-anchor:start; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .tag { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .atk { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; font-weight:700; fill:#e74c3c; text-anchor:middle; dominant-baseline:central; }
     .zero-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; font-weight:700; fill:#0a0e17; text-anchor:middle; dominant-baseline:central; }
@@ -59,320 +59,320 @@
   <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">ARCHITECTURAL COMPARISON</text>
 
   <!-- ===== LEFT: Conventional Architecture ===== -->
-  <rect x="20" y="45" width="500" height="580" rx="12" fill="#1a0f0f" stroke="#e74c3c" stroke-width="2"/>
-  <rect x="20" y="45" width="500" height="50" rx="12" fill="#2a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="20" y="45" width="500" height="580" rx="12" fill="#fdf0f0" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="20" y="45" width="500" height="50" rx="12" fill="#fce8e8" stroke="#e74c3c" stroke-width="2"/>
   <text class="ph" x="270" y="65" text-anchor="middle" fill="#e74c3c">CONVENTIONAL ARCHITECTURE</text>
   <text class="ls" x="270" y="82" fill="#e74c3c">Unix / Linux / Windows / macOS</text>
 
   <!-- Layer 1: User processes -->
-  <rect x="45" y="110" width="450" height="50" rx="6" fill="#141a28" stroke="#5dade2" stroke-width="1"/>
+  <rect x="45" y="110" width="450" height="50" rx="6" fill="#f0f4f8" stroke="#5dade2" stroke-width="1"/>
   <text class="cell-b" x="270" y="128" fill="#5dade2">User Processes</text>
-  <text class="ls" x="270" y="145" fill="#8899aa">Run in Ring 3 (unprivileged)</text>
+  <text class="ls" x="270" y="145" fill="#666666">Run in Ring 3 (unprivileged)</text>
 
   <!-- Attack surface 1: Privilege escalation arrow -->
   <rect x="390" y="115" width="95" height="18" rx="3" fill="#e74c3c"/>
   <text class="atk" x="437" y="124" fill="#fff">ESCALATION</text>
 
   <!-- Layer 2: Syscall boundary -->
-  <rect x="45" y="165" width="450" height="28" rx="4" fill="#2a1a1a" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <rect x="45" y="165" width="450" height="28" rx="4" fill="#f8e8e8" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="6,3"/>
   <text class="cell-b" x="270" y="179" fill="#e74c3c">&#9888; Syscall Boundary (trap to kernel)</text>
 
   <!-- Layer 3: OS Kernel -->
-  <rect x="45" y="198" width="450" height="80" rx="6" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="45" y="198" width="450" height="80" rx="6" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="cell-b" x="270" y="218" fill="#e74c3c">OS Kernel (Ring 0)</text>
-  <text class="lt" x="60" y="240" fill="#c8d6e5" font-size="11">&#x2022; Monolithic: millions of lines of trusted code</text>
-  <text class="lt" x="60" y="258" fill="#c8d6e5" font-size="11">&#x2022; Full hardware access, unrestricted I/O</text>
-  <text class="lt" x="60" y="276" fill="#c8d6e5" font-size="11">&#x2022; Single vulnerability = total system compromise</text>
+  <text class="lt" x="60" y="240" fill="#333333" font-size="11">&#x2022; Monolithic: millions of lines of trusted code</text>
+  <text class="lt" x="60" y="258" fill="#333333" font-size="11">&#x2022; Full hardware access, unrestricted I/O</text>
+  <text class="lt" x="60" y="276" fill="#333333" font-size="11">&#x2022; Single vulnerability = total system compromise</text>
 
   <rect x="390" y="205" width="95" height="18" rx="3" fill="#e74c3c"/>
   <text class="atk" x="437" y="214" fill="#fff">ATTACK &#9312;</text>
 
   <!-- Layer 4: Virtual Memory -->
-  <rect x="45" y="288" width="450" height="68" rx="6" fill="#1a1a0f" stroke="#f39c12" stroke-width="1.5"/>
+  <rect x="45" y="288" width="450" height="68" rx="6" fill="#f8f8f0" stroke="#f39c12" stroke-width="1.5"/>
   <text class="cell-b" x="270" y="308" fill="#f39c12">Virtual Memory (Page Tables)</text>
-  <text class="lt" x="60" y="328" fill="#c8d6e5" font-size="11">&#x2022; Hardware page table walker in kernel space</text>
-  <text class="lt" x="60" y="346" fill="#c8d6e5" font-size="11">&#x2022; Shared pages enable side-channel attacks (Spectre, Meltdown)</text>
+  <text class="lt" x="60" y="328" fill="#333333" font-size="11">&#x2022; Hardware page table walker in kernel space</text>
+  <text class="lt" x="60" y="346" fill="#333333" font-size="11">&#x2022; Shared pages enable side-channel attacks (Spectre, Meltdown)</text>
 
   <rect x="390" y="295" width="95" height="18" rx="3" fill="#e74c3c"/>
   <text class="atk" x="437" y="304" fill="#fff">ATTACK &#9313;</text>
 
   <!-- Layer 5: Privilege Rings -->
-  <rect x="45" y="366" width="450" height="68" rx="6" fill="#1a0f1a" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="45" y="366" width="450" height="68" rx="6" fill="#f8f0f8" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="cell-b" x="270" y="386" fill="#c39bd3">Privilege Rings (Ring 0/1/2/3)</text>
-  <text class="lt" x="60" y="406" fill="#c8d6e5" font-size="11">&#x2022; Escalation from Ring 3 to Ring 0 = total compromise</text>
-  <text class="lt" x="60" y="424" fill="#c8d6e5" font-size="11">&#x2022; Hypervisor (Ring -1) adds yet another attack surface</text>
+  <text class="lt" x="60" y="406" fill="#333333" font-size="11">&#x2022; Escalation from Ring 3 to Ring 0 = total compromise</text>
+  <text class="lt" x="60" y="424" fill="#333333" font-size="11">&#x2022; Hypervisor (Ring -1) adds yet another attack surface</text>
 
   <rect x="390" y="373" width="95" height="18" rx="3" fill="#e74c3c"/>
   <text class="atk" x="437" y="382" fill="#fff">ATTACK &#9314;</text>
 
   <!-- Layer 6: Superuser -->
-  <rect x="45" y="444" width="450" height="68" rx="6" fill="#2a0a0a" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="45" y="444" width="450" height="68" rx="6" fill="#fce8e8" stroke="#e74c3c" stroke-width="2"/>
   <text class="cell-b" x="270" y="464" fill="#e74c3c">Superuser (root)</text>
-  <text class="lt" x="60" y="484" fill="#c8d6e5" font-size="11">&#x2022; Can read, modify, or delete anything on the system</text>
-  <text class="lt" x="60" y="502" fill="#c8d6e5" font-size="11">&#x2022; Single compromised root account = game over</text>
+  <text class="lt" x="60" y="484" fill="#333333" font-size="11">&#x2022; Can read, modify, or delete anything on the system</text>
+  <text class="lt" x="60" y="502" fill="#333333" font-size="11">&#x2022; Single compromised root account = game over</text>
 
   <rect x="390" y="451" width="95" height="18" rx="3" fill="#e74c3c"/>
   <text class="atk" x="437" y="460" fill="#fff">ATTACK &#9315;</text>
 
   <!-- Total attack surfaces -->
-  <rect x="45" y="525" width="450" height="45" rx="6" fill="#3a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="45" y="525" width="450" height="45" rx="6" fill="#fce0e0" stroke="#e74c3c" stroke-width="2"/>
   <text class="cell-b" x="270" y="542" fill="#e74c3c" font-size="16">4 STRUCTURAL ATTACK SURFACES</text>
   <text class="ls" x="270" y="560" fill="#e74c3c">Each one exploitable by malware, ransomware, AI breakout</text>
 
   <!-- Threat arrows -->
-  <rect x="60" y="580" width="100" height="22" rx="4" fill="#3a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="60" y="580" width="100" height="22" rx="4" fill="#fce0e0" stroke="#e74c3c" stroke-width="1"/>
   <text class="atk" x="110" y="591" fill="#e74c3c">Malware</text>
-  <rect x="180" y="580" width="100" height="22" rx="4" fill="#3a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="180" y="580" width="100" height="22" rx="4" fill="#fce0e0" stroke="#e74c3c" stroke-width="1"/>
   <text class="atk" x="230" y="591" fill="#e74c3c">Ransomware</text>
-  <rect x="300" y="580" width="100" height="22" rx="4" fill="#3a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="300" y="580" width="100" height="22" rx="4" fill="#fce0e0" stroke="#e74c3c" stroke-width="1"/>
   <text class="atk" x="350" y="591" fill="#e74c3c">AI Breakout</text>
-  <rect x="420" y="580" width="65" height="22" rx="4" fill="#3a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="420" y="580" width="65" height="22" rx="4" fill="#fce0e0" stroke="#e74c3c" stroke-width="1"/>
   <text class="atk" x="452" y="591" fill="#e74c3c">APTs</text>
 
   <!-- ===== RIGHT: CTMM Architecture ===== -->
-  <rect x="580" y="45" width="500" height="580" rx="12" fill="#0f1a15" stroke="#2ecc71" stroke-width="2"/>
-  <rect x="580" y="45" width="500" height="50" rx="12" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="580" y="45" width="500" height="580" rx="12" fill="#f0f8f5" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="580" y="45" width="500" height="50" rx="12" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="ph" x="830" y="65" text-anchor="middle" fill="#2ecc71">CTMM ARCHITECTURE</text>
   <text class="ls" x="830" y="82" fill="#2ecc71">Capability-Based Meta Machine</text>
 
   <!-- Atomic Abstractions -->
-  <rect x="605" y="110" width="450" height="68" rx="6" fill="#141a28" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="605" y="110" width="450" height="68" rx="6" fill="#f0f4f8" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="cell-b" x="830" y="128" fill="#2ecc71">Atomic Abstractions</text>
-  <text class="lt" x="620" y="148" fill="#c8d6e5" font-size="11">&#x2022; Each service is a self-contained abstraction</text>
-  <text class="lt" x="620" y="166" fill="#c8d6e5" font-size="11">&#x2022; No OS — all services accessed via Golden Tokens</text>
+  <text class="lt" x="620" y="148" fill="#333333" font-size="11">&#x2022; Each service is a self-contained abstraction</text>
+  <text class="lt" x="620" y="166" fill="#333333" font-size="11">&#x2022; No OS — all services accessed via Golden Tokens</text>
 
-  <rect x="945" y="115" width="95" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="945" y="115" width="95" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="992" y="124" fill="#2ecc71">NO KERNEL</text>
 
   <!-- Namespace Entries -->
-  <rect x="605" y="188" width="450" height="68" rx="6" fill="#0f1a2a" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="605" y="188" width="450" height="68" rx="6" fill="#f0f5fa" stroke="#f5c842" stroke-width="1.5"/>
   <text class="cell-b" x="830" y="208" fill="#f5c842">Namespace Entries (3-word descriptors)</text>
-  <text class="lt" x="620" y="228" fill="#c8d6e5" font-size="11">&#x2022; Location + Limit + Seals (MAC, version, G-bit)</text>
-  <text class="lt" x="620" y="246" fill="#c8d6e5" font-size="11">&#x2022; Replace virtual memory — no page tables, no TLB</text>
+  <text class="lt" x="620" y="228" fill="#333333" font-size="11">&#x2022; Location + Limit + Seals (MAC, version, G-bit)</text>
+  <text class="lt" x="620" y="246" fill="#333333" font-size="11">&#x2022; Replace virtual memory — no page tables, no TLB</text>
 
-  <rect x="945" y="195" width="95" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="945" y="195" width="95" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="992" y="204" fill="#2ecc71">NO VM</text>
 
   <!-- mLoad Trusted Gate -->
-  <rect x="605" y="266" width="450" height="80" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="605" y="266" width="450" height="80" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="cell-b" x="830" y="286" fill="#2ecc71">mLoad — Single Trusted Gate</text>
   <text class="lt" x="620" y="306" fill="#2ecc71" font-size="11" font-weight="bold">&#x2022; EVERY namespace access goes through mLoad</text>
-  <text class="lt" x="620" y="324" fill="#c8d6e5" font-size="11">&#x2022; Permission &#8594; Bounds &#8594; MAC &#8594; G-bit &#8594; Shadow</text>
-  <text class="lt" x="620" y="342" fill="#c8d6e5" font-size="11">&#x2022; Nobody bypasses it — not even the Nucleus</text>
+  <text class="lt" x="620" y="324" fill="#333333" font-size="11">&#x2022; Permission &#8594; Bounds &#8594; MAC &#8594; G-bit &#8594; Shadow</text>
+  <text class="lt" x="620" y="342" fill="#333333" font-size="11">&#x2022; Nobody bypasses it — not even the Nucleus</text>
 
-  <rect x="945" y="273" width="95" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="945" y="273" width="95" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="992" y="282" fill="#2ecc71">NO RINGS</text>
 
   <!-- Golden Tokens -->
-  <rect x="605" y="356" width="450" height="80" rx="6" fill="#141a28" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="605" y="356" width="450" height="80" rx="6" fill="#f0f4f8" stroke="#f5c842" stroke-width="1.5"/>
   <text class="cell-b" x="830" y="376" fill="#f5c842">Golden Tokens (6-bit permissions)</text>
-  <text class="lt" x="620" y="396" fill="#c8d6e5" font-size="11">&#x2022; R, W, X (Turing) | L, S (Church) | E (Lambda)</text>
-  <text class="lt" x="620" y="414" fill="#c8d6e5" font-size="11">&#x2022; M is transient on CR only — never stored in GT</text>
-  <text class="lt" x="620" y="432" fill="#c8d6e5" font-size="11">&#x2022; Hardware-enforced: cannot forge, cannot escalate</text>
+  <text class="lt" x="620" y="396" fill="#333333" font-size="11">&#x2022; R, W, X (Turing) | L, S (Church) | E (Lambda)</text>
+  <text class="lt" x="620" y="414" fill="#333333" font-size="11">&#x2022; M is transient on CR only — never stored in GT</text>
+  <text class="lt" x="620" y="432" fill="#333333" font-size="11">&#x2022; Hardware-enforced: cannot forge, cannot escalate</text>
 
-  <rect x="945" y="363" width="95" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="945" y="363" width="95" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="992" y="372" fill="#2ecc71">NO ROOT</text>
 
   <!-- Total attack surfaces -->
-  <rect x="605" y="446" width="450" height="45" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="605" y="446" width="450" height="45" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="cell-b" x="830" y="463" fill="#2ecc71" font-size="16">ZERO ATTACK SURFACES</text>
   <text class="ls" x="830" y="481" fill="#2ecc71">Escalation paths structurally absent, not patched</text>
 
   <!-- Eliminated threats -->
-  <rect x="620" y="500" width="100" height="22" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="620" y="500" width="100" height="22" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="670" y="511" fill="#2ecc71">&#x2716; Malware</text>
-  <rect x="740" y="500" width="110" height="22" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="740" y="500" width="110" height="22" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="795" y="511" fill="#2ecc71">&#x2716; Ransomware</text>
-  <rect x="870" y="500" width="110" height="22" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="870" y="500" width="110" height="22" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="925" y="511" fill="#2ecc71">&#x2716; AI Breakout</text>
 
   <!-- Why -->
-  <rect x="605" y="535" width="450" height="75" rx="6" fill="#0a1015" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="605" y="535" width="450" height="75" rx="6" fill="#f5f5f5" stroke="#bbbbbb" stroke-width="1"/>
   <text class="lt" x="620" y="553" fill="#2ecc71" font-size="11" font-weight="bold">Why these attacks cannot exist:</text>
-  <text class="lt" x="620" y="573" fill="#c8d6e5" font-size="11">No kernel to compromise. No pages to leak. No ring</text>
-  <text class="lt" x="620" y="591" fill="#c8d6e5" font-size="11">to escalate. No root to hijack. Intelligence does not forge GTs.</text>
+  <text class="lt" x="620" y="573" fill="#333333" font-size="11">No kernel to compromise. No pages to leak. No ring</text>
+  <text class="lt" x="620" y="591" fill="#333333" font-size="11">to escalate. No root to hijack. Intelligence does not forge GTs.</text>
 
   <!-- ========== ATTACK SURFACE MAPPING ========== -->
 
   <text class="ph" x="550" y="660" text-anchor="middle" fill="#f5c842">ATTACK SURFACE MAPPING: HOW EACH VECTOR IS ELIMINATED</text>
 
   <!-- Table header -->
-  <rect x="20" y="678" width="60" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="20" y="678" width="60" height="32" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="50" y="694" fill="#f5c842">#</text>
 
-  <rect x="80" y="678" width="240" height="32" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="80" y="678" width="240" height="32" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="200" y="694" fill="#e74c3c">Conventional Component</text>
 
-  <rect x="320" y="678" width="230" height="32" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="320" y="678" width="230" height="32" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="435" y="694" fill="#e74c3c">Attack Vector</text>
 
-  <rect x="550" y="678" width="270" height="32" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="550" y="678" width="270" height="32" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="685" y="694" fill="#2ecc71">CTMM Replacement</text>
 
-  <rect x="820" y="678" width="260" height="32" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="820" y="678" width="260" height="32" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="950" y="694" fill="#2ecc71">Why Attack Fails</text>
 
   <!-- Row 1: OS Kernel -->
-  <rect x="20" y="714" width="60" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="714" width="60" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="50" y="743" fill="#e74c3c">1</text>
 
-  <rect x="80" y="714" width="240" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="80" y="714" width="240" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="200" y="733" fill="#e74c3c">OS Kernel</text>
-  <text class="ls" x="200" y="753" fill="#8899aa">Millions of lines, Ring 0</text>
+  <text class="ls" x="200" y="753" fill="#666666">Millions of lines, Ring 0</text>
 
-  <rect x="320" y="714" width="230" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="435" y="733" fill="#c8d6e5">Kernel exploit gives</text>
-  <text class="cell" x="435" y="753" fill="#c8d6e5">total system control</text>
+  <rect x="320" y="714" width="230" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="435" y="733" fill="#333333">Kernel exploit gives</text>
+  <text class="cell" x="435" y="753" fill="#333333">total system control</text>
 
-  <rect x="550" y="714" width="270" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="550" y="714" width="270" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="685" y="733" fill="#2ecc71">Atomic Abstractions</text>
   <text class="cell" x="685" y="753" fill="#2ecc71">(no central kernel)</text>
 
-  <rect x="820" y="714" width="260" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="950" y="733" fill="#c8d6e5">No kernel exists to</text>
-  <text class="cell" x="950" y="753" fill="#c8d6e5">exploit</text>
+  <rect x="820" y="714" width="260" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="950" y="733" fill="#333333">No kernel exists to</text>
+  <text class="cell" x="950" y="753" fill="#333333">exploit</text>
 
   <!-- Row 2: Virtual Memory -->
-  <rect x="20" y="772" width="60" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="772" width="60" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="50" y="801" fill="#e74c3c">2</text>
 
-  <rect x="80" y="772" width="240" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="80" y="772" width="240" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="200" y="791" fill="#f39c12">Virtual Memory</text>
-  <text class="ls" x="200" y="811" fill="#8899aa">Page tables, TLB, shared pages</text>
+  <text class="ls" x="200" y="811" fill="#666666">Page tables, TLB, shared pages</text>
 
-  <rect x="320" y="772" width="230" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="435" y="791" fill="#c8d6e5">Side-channels (Spectre,</text>
-  <text class="cell" x="435" y="811" fill="#c8d6e5">Meltdown, Rowhammer)</text>
+  <rect x="320" y="772" width="230" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="435" y="791" fill="#333333">Side-channels (Spectre,</text>
+  <text class="cell" x="435" y="811" fill="#333333">Meltdown, Rowhammer)</text>
 
-  <rect x="550" y="772" width="270" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="550" y="772" width="270" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="685" y="791" fill="#2ecc71">Namespace Entries</text>
   <text class="cell" x="685" y="811" fill="#2ecc71">(3-word descriptors + MAC)</text>
 
-  <rect x="820" y="772" width="260" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="950" y="791" fill="#c8d6e5">No pages to share,</text>
-  <text class="cell" x="950" y="811" fill="#c8d6e5">no TLB to flush-race</text>
+  <rect x="820" y="772" width="260" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="950" y="791" fill="#333333">No pages to share,</text>
+  <text class="cell" x="950" y="811" fill="#333333">no TLB to flush-race</text>
 
   <!-- Row 3: Privilege Rings -->
-  <rect x="20" y="830" width="60" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="830" width="60" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="50" y="859" fill="#e74c3c">3</text>
 
-  <rect x="80" y="830" width="240" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="80" y="830" width="240" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="200" y="849" fill="#c39bd3">Privilege Rings</text>
-  <text class="ls" x="200" y="869" fill="#8899aa">Ring 0/1/2/3, hypervisor</text>
+  <text class="ls" x="200" y="869" fill="#666666">Ring 0/1/2/3, hypervisor</text>
 
-  <rect x="320" y="830" width="230" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="435" y="849" fill="#c8d6e5">Ring escalation gives</text>
-  <text class="cell" x="435" y="869" fill="#c8d6e5">higher-privilege access</text>
+  <rect x="320" y="830" width="230" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="435" y="849" fill="#333333">Ring escalation gives</text>
+  <text class="cell" x="435" y="869" fill="#333333">higher-privilege access</text>
 
-  <rect x="550" y="830" width="270" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="550" y="830" width="270" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="685" y="849" fill="#2ecc71">mLoad Trusted Gate</text>
   <text class="cell" x="685" y="869" fill="#2ecc71">(flat, no privilege levels)</text>
 
-  <rect x="820" y="830" width="260" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="950" y="849" fill="#c8d6e5">No rings to escalate —</text>
-  <text class="cell" x="950" y="869" fill="#c8d6e5">mLoad is the only gate</text>
+  <rect x="820" y="830" width="260" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="950" y="849" fill="#333333">No rings to escalate —</text>
+  <text class="cell" x="950" y="869" fill="#333333">mLoad is the only gate</text>
 
   <!-- Row 4: Superuser -->
-  <rect x="20" y="888" width="60" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="888" width="60" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="50" y="917" fill="#e74c3c">4</text>
 
-  <rect x="80" y="888" width="240" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="80" y="888" width="240" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell-b" x="200" y="907" fill="#e74c3c">Superuser (root)</text>
-  <text class="ls" x="200" y="927" fill="#8899aa">Unrestricted access to all data</text>
+  <text class="ls" x="200" y="927" fill="#666666">Unrestricted access to all data</text>
 
-  <rect x="320" y="888" width="230" height="58" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="435" y="907" fill="#c8d6e5">Compromised root =</text>
-  <text class="cell" x="435" y="927" fill="#c8d6e5">total data breach</text>
+  <rect x="320" y="888" width="230" height="58" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="435" y="907" fill="#333333">Compromised root =</text>
+  <text class="cell" x="435" y="927" fill="#333333">total data breach</text>
 
-  <rect x="550" y="888" width="270" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="550" y="888" width="270" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="685" y="907" fill="#2ecc71">Golden Tokens</text>
   <text class="cell" x="685" y="927" fill="#2ecc71">(per-object capability access)</text>
 
-  <rect x="820" y="888" width="260" height="58" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="950" y="907" fill="#c8d6e5">No superuser role — GTs</text>
-  <text class="cell" x="950" y="927" fill="#c8d6e5">are unforgeable by hardware</text>
+  <rect x="820" y="888" width="260" height="58" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="950" y="907" fill="#333333">No superuser role — GTs</text>
+  <text class="cell" x="950" y="927" fill="#333333">are unforgeable by hardware</text>
 
   <!-- ========== THE 7 ZEROES ========== -->
 
   <text class="ph" x="550" y="985" text-anchor="middle" fill="#f5c842">THE SEVEN ZEROES</text>
-  <text class="ls" x="550" y="1003" fill="#8899aa">Each zero represents an attack vector that is structurally absent from CTMM</text>
+  <text class="ls" x="550" y="1003" fill="#666666">Each zero represents an attack vector that is structurally absent from CTMM</text>
 
-  <rect x="20" y="1018" width="1060" height="410" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="20" y="1018" width="1060" height="410" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
 
   <!-- Zero 1 -->
-  <rect x="45" y="1035" width="490" height="48" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="45" y="1035" width="490" height="48" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="65" cy="1059" r="14" fill="#2ecc71"/>
   <text class="zero-num" x="65" y="1059">1</text>
   <text class="cell-b" x="120" y="1049" fill="#2ecc71" text-anchor="start">Zero OS</text>
-  <text class="lt" x="120" y="1067" fill="#a0b0c0">No operating system — all services are atomic abstractions</text>
+  <text class="lt" x="120" y="1067" fill="#555555">No operating system — all services are atomic abstractions</text>
 
   <!-- Zero 2 -->
-  <rect x="555" y="1035" width="500" height="48" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="555" y="1035" width="500" height="48" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="575" cy="1059" r="14" fill="#2ecc71"/>
   <text class="zero-num" x="575" y="1059">2</text>
   <text class="cell-b" x="630" y="1049" fill="#2ecc71" text-anchor="start">Zero VM</text>
-  <text class="lt" x="630" y="1067" fill="#a0b0c0">No virtual memory — namespace entries are the memory model</text>
+  <text class="lt" x="630" y="1067" fill="#555555">No virtual memory — namespace entries are the memory model</text>
 
   <!-- Zero 3 -->
-  <rect x="45" y="1093" width="490" height="48" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="45" y="1093" width="490" height="48" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="65" cy="1117" r="14" fill="#2ecc71"/>
   <text class="zero-num" x="65" y="1117">3</text>
   <text class="cell-b" x="120" y="1107" fill="#2ecc71" text-anchor="start">Zero Privilege</text>
-  <text class="lt" x="120" y="1125" fill="#a0b0c0">No privilege rings — mLoad is the single flat trusted gate</text>
+  <text class="lt" x="120" y="1125" fill="#555555">No privilege rings — mLoad is the single flat trusted gate</text>
 
   <!-- Zero 4 -->
-  <rect x="555" y="1093" width="500" height="48" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="555" y="1093" width="500" height="48" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="575" cy="1117" r="14" fill="#2ecc71"/>
   <text class="zero-num" x="575" y="1117">4</text>
   <text class="cell-b" x="630" y="1107" fill="#2ecc71" text-anchor="start">Zero Superuser</text>
-  <text class="lt" x="630" y="1125" fill="#a0b0c0">No root — nobody bypasses mLoad, not even the Nucleus</text>
+  <text class="lt" x="630" y="1125" fill="#555555">No root — nobody bypasses mLoad, not even the Nucleus</text>
 
   <!-- Zero 5 -->
-  <rect x="45" y="1151" width="490" height="64" rx="6" fill="#0a1a15" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="45" y="1151" width="490" height="64" rx="6" fill="#f0f8f0" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="65" cy="1175" r="14" fill="#f5c842"/>
   <text class="zero-num" x="65" y="1175">5</text>
   <text class="cell-b" x="120" y="1165" fill="#f5c842" text-anchor="start">Zero Unauthorized Code Execution</text>
-  <text class="lt" x="120" y="1183" fill="#a0b0c0">Cannot execute outside granted X permission on GT</text>
+  <text class="lt" x="120" y="1183" fill="#555555">Cannot execute outside granted X permission on GT</text>
   <text class="lt" x="120" y="1199" fill="#e74c3c" font-size="10" font-weight="bold">Malware escalation path eliminated</text>
 
   <!-- Zero 6 -->
-  <rect x="555" y="1151" width="500" height="64" rx="6" fill="#0a1a15" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="555" y="1151" width="500" height="64" rx="6" fill="#f0f8f0" stroke="#2ecc71" stroke-width="1.5"/>
   <circle cx="575" cy="1175" r="14" fill="#f5c842"/>
   <text class="zero-num" x="575" y="1175">6</text>
   <text class="cell-b" x="630" y="1165" fill="#f5c842" text-anchor="start">Zero Unauthorized Data Access</text>
-  <text class="lt" x="630" y="1183" fill="#a0b0c0">Cannot write without W permission on specific GT</text>
+  <text class="lt" x="630" y="1183" fill="#555555">Cannot write without W permission on specific GT</text>
   <text class="lt" x="630" y="1199" fill="#e74c3c" font-size="10" font-weight="bold">Ransomware escalation path eliminated</text>
 
   <!-- Zero 7 -->
-  <rect x="250" y="1225" width="500" height="64" rx="6" fill="#0a1520" stroke="#f5c842" stroke-width="2"/>
+  <rect x="250" y="1225" width="500" height="64" rx="6" fill="#f0f5fa" stroke="#f5c842" stroke-width="2"/>
   <circle cx="270" cy="1249" r="14" fill="#f5c842"/>
   <text class="zero-num" x="270" y="1249">7</text>
   <text class="cell-b" x="325" y="1239" fill="#f5c842" text-anchor="start">Zero Containment Escape</text>
-  <text class="lt" x="325" y="1257" fill="#a0b0c0">AI confined by capability boundary — intelligence does not forge GTs</text>
+  <text class="lt" x="325" y="1257" fill="#555555">AI confined by capability boundary — intelligence does not forge GTs</text>
   <text class="lt" x="325" y="1273" fill="#e74c3c" font-size="10" font-weight="bold">AI breakout path eliminated</text>
 
   <!-- Summary equation -->
-  <rect x="150" y="1310" width="700" height="100" rx="10" fill="#0a1015" stroke="#f5c842" stroke-width="2"/>
+  <rect x="150" y="1310" width="700" height="100" rx="10" fill="#f5f5f5" stroke="#f5c842" stroke-width="2"/>
   <text class="ph" x="500" y="1335" text-anchor="middle" fill="#f5c842" font-size="14">THE EQUATION</text>
   <text class="cell-b mono" x="500" y="1365" fill="#2ecc71" font-size="14">CALL(CONNECT(me, mymother))</text>
   <text class="ls" x="500" y="1390" fill="#f5c842">= 1 Church instruction + 3 Golden Tokens + 7 Zeroes</text>
 
   <!-- ========== KEY INSIGHTS ========== -->
 
-  <rect x="20" y="1440" width="1060" height="240" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="20" y="1440" width="1060" height="240" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="550" y="1465" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
 
   <text class="lt" x="50" y="1495" fill="#e74c3c" font-size="13" font-weight="bold">Conventional security is patching, not architecture:</text>
-  <text class="lt" x="50" y="1515" fill="#a0b0c0" font-size="12">Every CVE is a patch on top of structurally flawed components. The kernel, VM, rings, and superuser exist</text>
-  <text class="lt" x="50" y="1533" fill="#a0b0c0" font-size="12">because von Neumann assumed a single trusted operator. That assumption is 78 years obsolete.</text>
+  <text class="lt" x="50" y="1515" fill="#555555" font-size="12">Every CVE is a patch on top of structurally flawed components. The kernel, VM, rings, and superuser exist</text>
+  <text class="lt" x="50" y="1533" fill="#555555" font-size="12">because von Neumann assumed a single trusted operator. That assumption is 78 years obsolete.</text>
 
   <text class="lt" x="50" y="1563" fill="#2ecc71" font-size="13" font-weight="bold">CTMM security is architectural absence, not patching:</text>
-  <text class="lt" x="50" y="1583" fill="#a0b0c0" font-size="12">You cannot exploit what does not exist. There is no kernel to compromise, no page to leak, no ring to</text>
-  <text class="lt" x="50" y="1601" fill="#a0b0c0" font-size="12">escalate, no root to hijack. mLoad is the single gate — validated by hardware at every access.</text>
+  <text class="lt" x="50" y="1583" fill="#555555" font-size="12">You cannot exploit what does not exist. There is no kernel to compromise, no page to leak, no ring to</text>
+  <text class="lt" x="50" y="1601" fill="#555555" font-size="12">escalate, no root to hijack. mLoad is the single gate — validated by hardware at every access.</text>
 
   <text class="lt" x="50" y="1631" fill="#f5c842" font-size="13" font-weight="bold">Intelligence does not forge Golden Tokens:</text>
-  <text class="lt" x="50" y="1651" fill="#a0b0c0" font-size="12">An AI confined by capability boundaries cannot escape regardless of intelligence. GTs are hardware-enforced</text>
-  <text class="lt" x="50" y="1669" fill="#a0b0c0" font-size="12">unforgeable tokens — no amount of computation produces a valid GT without the hardware's MAC secret.</text>
+  <text class="lt" x="50" y="1651" fill="#555555" font-size="12">An AI confined by capability boundaries cannot escape regardless of intelligence. GTs are hardware-enforced</text>
+  <text class="lt" x="50" y="1669" fill="#555555" font-size="12">unforgeable tokens — no amount of computation produces a valid GT without the hardware's MAC secret.</text>
 
 </svg>
 

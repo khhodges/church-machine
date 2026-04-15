@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 780px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 780px; }
 </style>
 </head>
 <body>
@@ -40,21 +40,21 @@
       <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
     </marker>
     <marker id="ah-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#ecf0f1"/>
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333333"/>
     </marker>
   </defs>
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
-    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .step-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; fill:#0a0e17; text-anchor:middle; dominant-baseline:central; }
-    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#333333; text-anchor:start; dominant-baseline:central; }
     .pass { font-family:'Consolas',monospace; font-size:10px; fill:#2ecc71; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .fail { font-family:'Consolas',monospace; font-size:10px; fill:#e74c3c; font-weight:700; text-anchor:middle; dominant-baseline:central; }
   </style>
@@ -64,146 +64,146 @@
   <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">mLoad: THE SINGLE TRUSTED PATH FOR ALL NAMESPACE ACCESS</text>
 
   <!-- Entry: any Church instruction -->
-  <rect x="320" y="45" width="460" height="55" rx="10" fill="#141a28" stroke="#f5c842" stroke-width="2"/>
+  <rect x="320" y="45" width="460" height="55" rx="10" fill="#f0f4f8" stroke="#f5c842" stroke-width="2"/>
   <text class="cell-b" x="550" y="62" fill="#f5c842">Church Instruction Triggers mLoad</text>
-  <text class="ls" x="550" y="82" fill="#8899aa">CAP.LOAD | CAP.SAVE | CALL | CHANGE | GC scan | Boot phases 3-4</text>
+  <text class="ls" x="550" y="82" fill="#666666">CAP.LOAD | CAP.SAVE | CALL | CHANGE | GC scan | Boot phases 3-4</text>
 
   <!-- Input annotations -->
-  <rect x="100" y="50" width="200" height="40" rx="6" fill="#0f1520" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="115" y="65" fill="#c8d6e5" font-size="11">Input: GT from CR</text>
-  <text class="lt" x="115" y="82" fill="#8899aa" font-size="10">index, version, permissions</text>
+  <rect x="100" y="50" width="200" height="40" rx="6" fill="#f5f8fc" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="115" y="65" fill="#333333" font-size="11">Input: GT from CR</text>
+  <text class="lt" x="115" y="82" fill="#666666" font-size="10">index, version, permissions</text>
 
-  <rect x="800" y="50" width="200" height="40" rx="6" fill="#0f1520" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="815" y="65" fill="#c8d6e5" font-size="11">Target: Namespace entry</text>
-  <text class="lt" x="815" y="82" fill="#8899aa" font-size="10">Location, Limit, Seals</text>
+  <rect x="800" y="50" width="200" height="40" rx="6" fill="#f5f8fc" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="815" y="65" fill="#333333" font-size="11">Target: Namespace entry</text>
+  <text class="lt" x="815" y="82" fill="#666666" font-size="10">Location, Limit, Seals</text>
 
   <!-- Arrow down into pipeline -->
-  <line x1="550" y1="100" x2="550" y2="130" stroke="#ecf0f1" stroke-width="2" marker-end="url(#ah-w)"/>
+  <line x1="550" y1="100" x2="550" y2="130" stroke="#333333" stroke-width="2" marker-end="url(#ah-w)"/>
 
   <!-- ========== PIPELINE ========== -->
 
   <!-- Pipeline container -->
-  <rect x="50" y="135" width="1000" height="830" rx="12" fill="#0a1015" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="50" y="135" width="1000" height="830" rx="12" fill="#f5f5f5" stroke="#2ecc71" stroke-width="2"/>
   <text class="ph" x="550" y="160" text-anchor="middle" fill="#2ecc71">VALIDATION PIPELINE (strictly sequential)</text>
 
   <!-- ===== Stage 1: Permission Check ===== -->
-  <rect x="100" y="180" width="600" height="130" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="100" y="180" width="600" height="130" rx="10" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <circle cx="125" cy="205" r="16" fill="#5dade2"/>
   <text class="step-num" x="125" y="205">1</text>
   <text class="ph" x="200" y="205" text-anchor="start" fill="#5dade2">PERMISSION CHECK</text>
 
-  <text class="lt" x="120" y="235" fill="#c8d6e5">Read the GT's 6-bit permission field: R W X L S E</text>
-  <text class="lt" x="120" y="255" fill="#c8d6e5">Compare requested operation against GT permissions:</text>
+  <text class="lt" x="120" y="235" fill="#333333">Read the GT's 6-bit permission field: R W X L S E</text>
+  <text class="lt" x="120" y="255" fill="#333333">Compare requested operation against GT permissions:</text>
 
-  <rect x="120" y="268" width="125" height="22" rx="3" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="120" y="268" width="125" height="22" rx="3" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="inst" x="130" y="279" fill="#5dade2">CAP.LOAD &#8594; R</text>
-  <rect x="255" y="268" width="125" height="22" rx="3" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="255" y="268" width="125" height="22" rx="3" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="inst" x="265" y="279" fill="#5dade2">CAP.SAVE &#8594; W</text>
-  <rect x="390" y="268" width="125" height="22" rx="3" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="390" y="268" width="125" height="22" rx="3" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="inst" x="400" y="279" fill="#5dade2">CALL &#8594; E</text>
-  <rect x="525" y="268" width="145" height="22" rx="3" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="525" y="268" width="145" height="22" rx="3" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="inst" x="535" y="279" fill="#5dade2">LAMBDA &#8594; X</text>
 
-  <text class="lt" x="120" y="300" fill="#8899aa" font-size="10">M is elevated on the CR by microcode, never checked from the GT itself</text>
+  <text class="lt" x="120" y="300" fill="#666666" font-size="10">M is elevated on the CR by microcode, never checked from the GT itself</text>
 
   <!-- FAULT arrow from stage 1 -->
-  <rect x="720" y="195" width="80" height="25" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="720" y="195" width="80" height="25" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="fail" x="760" y="207">FAULT</text>
   <line x1="700" y1="207" x2="720" y2="207" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#ah-r)"/>
   <text class="ls" x="770" y="230" fill="#e74c3c" font-size="9">permission denied</text>
 
   <!-- Pass arrow down -->
-  <rect x="520" y="310" width="60" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="520" y="310" width="60" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="550" y="319">PASS</text>
   <line x1="550" y1="310" x2="550" y2="330" stroke="#2ecc71" stroke-width="2"/>
   <line x1="550" y1="330" x2="550" y2="348" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
   <!-- ===== Stage 2: Bounds Check ===== -->
-  <rect x="100" y="350" width="600" height="120" rx="10" fill="#0f1a15" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="100" y="350" width="600" height="120" rx="10" fill="#f0f8f5" stroke="#2ecc71" stroke-width="2"/>
   <circle cx="125" cy="375" r="16" fill="#2ecc71"/>
   <text class="step-num" x="125" y="375">2</text>
   <text class="ph" x="200" y="375" text-anchor="start" fill="#2ecc71">BOUNDS CHECK</text>
 
-  <text class="lt" x="120" y="405" fill="#c8d6e5">Read namespace entry's Location (base addr) and Limit (length)</text>
-  <text class="lt" x="120" y="425" fill="#c8d6e5">Verify: access offset &lt; Limit</text>
+  <text class="lt" x="120" y="405" fill="#333333">Read namespace entry's Location (base addr) and Limit (length)</text>
+  <text class="lt" x="120" y="425" fill="#333333">Verify: access offset &lt; Limit</text>
 
-  <rect x="120" y="440" width="550" height="22" rx="3" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="120" y="440" width="550" height="22" rx="3" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="inst" x="130" y="451" fill="#2ecc71">if (GT.index &gt;= namespace_size || offset &gt;= entry.Limit) &#8594; FAULT</text>
 
   <!-- FAULT arrow from stage 2 -->
-  <rect x="720" y="365" width="80" height="25" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="720" y="365" width="80" height="25" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="fail" x="760" y="377">FAULT</text>
   <line x1="700" y1="377" x2="720" y2="377" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#ah-r)"/>
   <text class="ls" x="770" y="400" fill="#e74c3c" font-size="9">out of bounds</text>
 
   <!-- Pass arrow down -->
-  <rect x="520" y="470" width="60" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="520" y="470" width="60" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="550" y="479">PASS</text>
   <line x1="550" y1="470" x2="550" y2="490" stroke="#2ecc71" stroke-width="2"/>
   <line x1="550" y1="490" x2="550" y2="508" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
   <!-- ===== Stage 3: MAC Validation ===== -->
-  <rect x="100" y="510" width="600" height="155" rx="10" fill="#1a1a0f" stroke="#f5c842" stroke-width="2"/>
+  <rect x="100" y="510" width="600" height="155" rx="10" fill="#f8f8f0" stroke="#f5c842" stroke-width="2"/>
   <circle cx="125" cy="535" r="16" fill="#f5c842"/>
   <text class="step-num" x="125" y="535">3</text>
   <text class="ph" x="200" y="535" text-anchor="start" fill="#f5c842">MAC VALIDATION (FNV Hash)</text>
 
-  <text class="lt" x="120" y="565" fill="#c8d6e5">Recompute MAC from namespace entry fields using hardware secret key</text>
+  <text class="lt" x="120" y="565" fill="#333333">Recompute MAC from namespace entry fields using hardware secret key</text>
 
-  <rect x="120" y="582" width="550" height="55" rx="6" fill="#141a28" stroke="#f39c12" stroke-width="1"/>
+  <rect x="120" y="582" width="550" height="55" rx="6" fill="#f0f4f8" stroke="#f39c12" stroke-width="1"/>
   <text class="inst" x="130" y="597" fill="#f5c842">MAC = FNV_hash(secret, index, Location, Limit, version)</text>
-  <text class="inst" x="130" y="617" fill="#c8d6e5">Compare: computed MAC == stored MAC in Seals word</text>
-  <text class="inst" x="130" y="632" fill="#8899aa" font-size="10">Also verifies: GT.version == entry.version (version mismatch = forged/revoked)</text>
+  <text class="inst" x="130" y="617" fill="#333333">Compare: computed MAC == stored MAC in Seals word</text>
+  <text class="inst" x="130" y="632" fill="#666666" font-size="10">Also verifies: GT.version == entry.version (version mismatch = forged/revoked)</text>
 
   <text class="lt" x="120" y="655" fill="#f39c12" font-size="10" font-weight="bold">FNV (Fowler-Noll-Vo) hash: fast, non-cryptographic, hardware-friendly</text>
 
   <!-- FAULT arrow from stage 3 -->
-  <rect x="720" y="525" width="80" height="25" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="720" y="525" width="80" height="25" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="fail" x="760" y="537">FAULT</text>
   <line x1="700" y1="537" x2="720" y2="537" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#ah-r)"/>
   <text class="ls" x="770" y="558" fill="#e74c3c" font-size="9">forged / revoked</text>
   <text class="ls" x="770" y="570" fill="#e74c3c" font-size="9">version mismatch</text>
 
   <!-- Pass arrow down -->
-  <rect x="520" y="665" width="60" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="520" y="665" width="60" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="550" y="674">PASS</text>
   <line x1="550" y1="665" x2="550" y2="685" stroke="#2ecc71" stroke-width="2"/>
   <line x1="550" y1="685" x2="550" y2="703" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
   <!-- ===== Stage 4: G-bit Reset ===== -->
-  <rect x="100" y="705" width="600" height="110" rx="10" fill="#0f1520" stroke="#c39bd3" stroke-width="2"/>
+  <rect x="100" y="705" width="600" height="110" rx="10" fill="#f5f8fc" stroke="#c39bd3" stroke-width="2"/>
   <circle cx="125" cy="730" r="16" fill="#c39bd3"/>
   <text class="step-num" x="125" y="730">4</text>
   <text class="ph" x="200" y="730" text-anchor="start" fill="#c39bd3">G-BIT RESET</text>
 
-  <text class="lt" x="120" y="760" fill="#c8d6e5">Reset the G (Garbage) bit on the namespace entry to 0</text>
-  <text class="lt" x="120" y="780" fill="#c8d6e5">This marks the entry as "reachable" — it was accessed, so GC won't collect it</text>
+  <text class="lt" x="120" y="760" fill="#333333">Reset the G (Garbage) bit on the namespace entry to 0</text>
+  <text class="lt" x="120" y="780" fill="#333333">This marks the entry as "reachable" — it was accessed, so GC won't collect it</text>
 
   <rect x="120" y="793" width="550" height="15" rx="2" fill="none" stroke="none"/>
   <text class="lt" x="120" y="800" fill="#c39bd3" font-size="10" font-weight="bold">GC integration: Mark phase sets G=1 on all entries. Every mLoad resets G=0. Sweep collects G=1 entries.</text>
 
   <!-- No FAULT from stage 4 — it always succeeds -->
-  <rect x="720" y="730" width="110" height="25" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="720" y="730" width="110" height="25" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="775" y="742">always succeeds</text>
 
   <!-- Pass arrow down -->
-  <rect x="520" y="815" width="60" height="18" rx="3" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="520" y="815" width="60" height="18" rx="3" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="550" y="824">PASS</text>
   <line x1="550" y1="815" x2="550" y2="835" stroke="#2ecc71" stroke-width="2"/>
   <line x1="550" y1="835" x2="550" y2="853" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
   <!-- ===== Stage 5: Thread Shadow Update ===== -->
-  <rect x="100" y="855" width="600" height="100" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="100" y="855" width="600" height="100" rx="10" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <circle cx="125" cy="880" r="16" fill="#5dade2"/>
   <text class="step-num" x="125" y="880">5</text>
   <text class="ph" x="200" y="880" text-anchor="start" fill="#5dade2">THREAD SHADOW UPDATE</text>
 
-  <text class="lt" x="120" y="910" fill="#c8d6e5">Update the thread table's shadow copy of CR0-CR7</text>
-  <text class="lt" x="120" y="930" fill="#c8d6e5">Shadow tracks only instruction-addressable capability registers</text>
+  <text class="lt" x="120" y="910" fill="#333333">Update the thread table's shadow copy of CR0-CR7</text>
+  <text class="lt" x="120" y="930" fill="#333333">Shadow tracks only instruction-addressable capability registers</text>
   <text class="lt" x="120" y="948" fill="#5dade2" font-size="10" font-weight="bold">Required for context switch: thread table must reflect current CR state at all times</text>
 
   <!-- No FAULT from stage 5 — it always succeeds -->
-  <rect x="720" y="880" width="110" height="25" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="720" y="880" width="110" height="25" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="pass" x="775" y="892">always succeeds</text>
 
   <!-- ========== FAULT HANDLER ========== -->
@@ -217,10 +217,10 @@
   <line x1="900" y1="537" x2="900" y2="600" stroke="#e74c3c" stroke-width="2"/>
 
   <!-- Single FAULT handler box -->
-  <rect x="830" y="605" width="200" height="95" rx="10" fill="#3a0f0f" stroke="#e74c3c" stroke-width="3"/>
+  <rect x="830" y="605" width="200" height="95" rx="10" fill="#fce0e0" stroke="#e74c3c" stroke-width="3"/>
   <text class="ph" x="930" y="630" text-anchor="middle" fill="#e74c3c">&#9888; SINGLE FAULT</text>
   <text class="ph" x="930" y="648" text-anchor="middle" fill="#e74c3c">HANDLER</text>
-  <text class="ls" x="930" y="672" fill="#c8d6e5">Execution stops</text>
+  <text class="ls" x="930" y="672" fill="#333333">Execution stops</text>
   <text class="ls" x="930" y="688" fill="#e74c3c">No recovery. No retry.</text>
 
   <line x1="900" y1="600" x2="900" y2="605" stroke="#e74c3c" stroke-width="2" marker-end="url(#ah-r)"/>
@@ -230,7 +230,7 @@
   <!-- Pass output from pipeline -->
   <line x1="550" y1="960" x2="550" y2="995" stroke="#2ecc71" stroke-width="3" marker-end="url(#ah-g)"/>
 
-  <rect x="350" y="1000" width="400" height="55" rx="10" fill="#0f2620" stroke="#2ecc71" stroke-width="2.5"/>
+  <rect x="350" y="1000" width="400" height="55" rx="10" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2.5"/>
   <text class="cell-b" x="550" y="1020" fill="#2ecc71">&#x2714; VALIDATED — Capability Loaded</text>
   <text class="ls" x="550" y="1040" fill="#2ecc71">GT placed into destination CR. Operation proceeds.</text>
 
@@ -238,51 +238,51 @@
 
   <text class="ph" x="550" y="1090" text-anchor="middle" fill="#f5c842">PIPELINE PROPERTIES</text>
 
-  <rect x="30" y="1108" width="1040" height="170" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="30" y="1108" width="1040" height="170" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
 
   <!-- Property grid: 2x3 -->
-  <rect x="55" y="1125" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="55" y="1125" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="215" y="1143" fill="#e74c3c">No Partial State</text>
-  <text class="lt" x="70" y="1163" fill="#a0b0c0">If any check fails, no CR is modified.</text>
-  <text class="lt" x="70" y="1179" fill="#a0b0c0">The machine state before mLoad is unchanged.</text>
+  <text class="lt" x="70" y="1163" fill="#555555">If any check fails, no CR is modified.</text>
+  <text class="lt" x="70" y="1179" fill="#555555">The machine state before mLoad is unchanged.</text>
 
-  <rect x="395" y="1125" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="395" y="1125" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="555" y="1143" fill="#e74c3c">No Silent Fallback</text>
-  <text class="lt" x="410" y="1163" fill="#a0b0c0">A failed check does not return NULL or a</text>
-  <text class="lt" x="410" y="1179" fill="#a0b0c0">default value. It FAULTs. Period.</text>
+  <text class="lt" x="410" y="1163" fill="#555555">A failed check does not return NULL or a</text>
+  <text class="lt" x="410" y="1179" fill="#555555">default value. It FAULTs. Period.</text>
 
-  <rect x="735" y="1125" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="735" y="1125" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="895" y="1143" fill="#e74c3c">No Recovery</text>
-  <text class="lt" x="750" y="1163" fill="#a0b0c0">FAULT is unrecoverable. Execution stops.</text>
-  <text class="lt" x="750" y="1179" fill="#a0b0c0">The thread is terminated.</text>
+  <text class="lt" x="750" y="1163" fill="#555555">FAULT is unrecoverable. Execution stops.</text>
+  <text class="lt" x="750" y="1179" fill="#555555">The thread is terminated.</text>
 
-  <rect x="55" y="1200" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="55" y="1200" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="215" y="1218" fill="#2ecc71">Strictly Sequential</text>
-  <text class="lt" x="70" y="1238" fill="#a0b0c0">Each check depends on the previous passing.</text>
-  <text class="lt" x="70" y="1254" fill="#a0b0c0">No out-of-order execution of validation.</text>
+  <text class="lt" x="70" y="1238" fill="#555555">Each check depends on the previous passing.</text>
+  <text class="lt" x="70" y="1254" fill="#555555">No out-of-order execution of validation.</text>
 
-  <rect x="395" y="1200" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="395" y="1200" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="555" y="1218" fill="#2ecc71">Single Code Path</text>
-  <text class="lt" x="410" y="1238" fill="#a0b0c0">Every namespace access — LOAD, SAVE, CALL,</text>
-  <text class="lt" x="410" y="1254" fill="#a0b0c0">CHANGE, GC, Boot — goes through this path.</text>
+  <text class="lt" x="410" y="1238" fill="#555555">Every namespace access — LOAD, SAVE, CALL,</text>
+  <text class="lt" x="410" y="1254" fill="#555555">CHANGE, GC, Boot — goes through this path.</text>
 
-  <rect x="735" y="1200" width="320" height="65" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="735" y="1200" width="320" height="65" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="895" y="1218" fill="#2ecc71">Hardware-Enforced</text>
-  <text class="lt" x="750" y="1238" fill="#a0b0c0">Implemented in microcode / HDL.</text>
-  <text class="lt" x="750" y="1254" fill="#a0b0c0">Software cannot bypass or intercept.</text>
+  <text class="lt" x="750" y="1238" fill="#555555">Implemented in microcode / HDL.</text>
+  <text class="lt" x="750" y="1254" fill="#555555">Software cannot bypass or intercept.</text>
 
   <!-- ========== KEY INSIGHTS ========== -->
 
-  <rect x="30" y="1300" width="1040" height="165" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="30" y="1300" width="1040" height="165" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="550" y="1325" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
 
   <text class="lt" x="60" y="1355" fill="#2ecc71" font-size="13" font-weight="bold">mLoad is the Golden Rule of CTMM:</text>
-  <text class="lt" x="60" y="1375" fill="#a0b0c0" font-size="12">Every capability register write in the entire machine passes through mLoad. No exception — not the</text>
-  <text class="lt" x="60" y="1393" fill="#a0b0c0" font-size="12">Nucleus, not Boot (except CR15 hardwired), not GC, not any abstraction. One gate, five checks, zero bypass.</text>
+  <text class="lt" x="60" y="1375" fill="#555555" font-size="12">Every capability register write in the entire machine passes through mLoad. No exception — not the</text>
+  <text class="lt" x="60" y="1393" fill="#555555" font-size="12">Nucleus, not Boot (except CR15 hardwired), not GC, not any abstraction. One gate, five checks, zero bypass.</text>
 
   <text class="lt" x="60" y="1418" fill="#f5c842" font-size="13" font-weight="bold">GC is built into the pipeline, not bolted on:</text>
-  <text class="lt" x="60" y="1438" fill="#a0b0c0" font-size="12">Stage 4 (G-bit reset) means every successful access automatically marks the entry as reachable. GC's</text>
-  <text class="lt" x="60" y="1456" fill="#a0b0c0" font-size="12">scan phase is just "access everything reachable" — mLoad does the marking. No separate reachability graph.</text>
+  <text class="lt" x="60" y="1438" fill="#555555" font-size="12">Stage 4 (G-bit reset) means every successful access automatically marks the entry as reachable. GC's</text>
+  <text class="lt" x="60" y="1456" fill="#555555" font-size="12">scan phase is just "access everything reachable" — mLoad does the marking. No separate reachability graph.</text>
 
 </svg>
 

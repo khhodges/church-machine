@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 800px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 800px; }
 </style>
 </head>
 <body>
@@ -49,15 +49,15 @@
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
-    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
-    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:11px; fill:#333333; text-anchor:start; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .step-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#0a0e17; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .tag { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
   </style>
@@ -66,7 +66,7 @@
 
   <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">CALLER PERSPECTIVE — IDENTICAL IN ALL THREE CASES</text>
 
-  <rect x="250" y="40" width="600" height="60" rx="10" fill="#141a28" stroke="#f5c842" stroke-width="2"/>
+  <rect x="250" y="40" width="600" height="60" rx="10" fill="#f0f4f8" stroke="#f5c842" stroke-width="2"/>
   <text class="cell-b mono" x="550" y="62" fill="#f5c842" font-size="15">CALL( Abstraction.Method( args ) )</text>
   <text class="ls" x="550" y="82" fill="#f5c842">Caller cannot tell which dispatch style the abstraction uses</text>
 
@@ -76,12 +76,12 @@
   <line x1="900" y1="100" x2="900" y2="130" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <!-- Common CALL ceremony -->
-  <rect x="100" y="108" width="200" height="18" rx="3" fill="#141a28" stroke="none"/>
-  <text class="ls" x="200" y="117" fill="#8899aa">CR6 &#8594; C-List</text>
-  <rect x="450" y="108" width="200" height="18" rx="3" fill="#141a28" stroke="none"/>
-  <text class="ls" x="550" y="117" fill="#8899aa">CR6 &#8594; C-List</text>
-  <rect x="800" y="108" width="200" height="18" rx="3" fill="#141a28" stroke="none"/>
-  <text class="ls" x="900" y="117" fill="#8899aa">CR6 &#8594; C-List</text>
+  <rect x="100" y="108" width="200" height="18" rx="3" fill="#f0f4f8" stroke="none"/>
+  <text class="ls" x="200" y="117" fill="#666666">CR6 &#8594; C-List</text>
+  <rect x="450" y="108" width="200" height="18" rx="3" fill="#f0f4f8" stroke="none"/>
+  <text class="ls" x="550" y="117" fill="#666666">CR6 &#8594; C-List</text>
+  <rect x="800" y="108" width="200" height="18" rx="3" fill="#f0f4f8" stroke="none"/>
+  <text class="ls" x="900" y="117" fill="#666666">CR6 &#8594; C-List</text>
 
   <!-- ========== THREE COLUMNS ========== -->
 
@@ -89,121 +89,121 @@
   <!-- Col A: 25-355, Col B: 375-705, Col C: 725-1055 -->
 
   <!-- ===== COLUMN A: Symbolic Resolver ===== -->
-  <rect x="25" y="135" width="330" height="840" rx="10" fill="#1a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="25" y="135" width="330" height="840" rx="10" fill="#fdf0f0" stroke="#e74c3c" stroke-width="2"/>
 
   <!-- Header -->
-  <rect x="25" y="135" width="330" height="55" rx="10" fill="#2a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="25" y="135" width="330" height="55" rx="10" fill="#fce8e8" stroke="#e74c3c" stroke-width="2"/>
   <text class="ph" x="190" y="155" text-anchor="middle" fill="#e74c3c">(a) Symbolic Resolver</text>
   <text class="ls" x="190" y="175" fill="#e74c3c">Maximum isolation &bull; Runtime symbol lookup</text>
 
   <!-- Security badge -->
-  <rect x="45" y="200" width="290" height="26" rx="4" fill="#2a1a1a" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="45" y="200" width="290" height="26" rx="4" fill="#f8e8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="tag" x="100" y="213" fill="#e74c3c">SECURITY</text>
   <text class="cell-b" x="240" y="213" fill="#e74c3c">&#9608;&#9608;&#9608;&#9608;&#9608; HIGHEST</text>
 
   <!-- CR6 and CR14 -->
-  <rect x="45" y="235" width="290" height="55" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="45" y="235" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="190" y="252" fill="#f39c12">CR6 (Active C-List)</text>
-  <text class="inst" x="60" y="272" fill="#c8d6e5">Symbolic entries: "Mint", "GC", "Lookup"</text>
+  <text class="inst" x="60" y="272" fill="#333333">Symbolic entries: "Mint", "GC", "Lookup"</text>
 
-  <rect x="45" y="298" width="290" height="55" rx="6" fill="#141a28" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="45" y="298" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="190" y="315" fill="#e74c3c">CR14 (Active Nucleus)</text>
   <text class="inst" x="60" y="335" fill="#e74c3c">Dispatcher / Resolver code</text>
 
   <!-- Flow steps -->
-  <text class="ph" x="190" y="375" text-anchor="middle" fill="#8899aa">DISPATCH FLOW</text>
+  <text class="ph" x="190" y="375" text-anchor="middle" fill="#666666">DISPATCH FLOW</text>
 
   <!-- Step 1 -->
   <circle cx="55" cy="398" r="10" fill="#e74c3c"/>
   <text class="step-num" x="55" y="398">1</text>
-  <text class="lt" x="72" y="398" fill="#c8d6e5" font-size="11">Read method index from CALL</text>
+  <text class="lt" x="72" y="398" fill="#333333" font-size="11">Read method index from CALL</text>
 
   <!-- Step 2 -->
   <circle cx="55" cy="425" r="10" fill="#e74c3c"/>
   <text class="step-num" x="55" y="425">2</text>
-  <text class="lt" x="72" y="425" fill="#c8d6e5" font-size="11">Look up symbolic name in CR6</text>
+  <text class="lt" x="72" y="425" fill="#333333" font-size="11">Look up symbolic name in CR6</text>
 
   <!-- Step 3 -->
   <circle cx="55" cy="452" r="10" fill="#e74c3c"/>
   <text class="step-num" x="55" y="452">3</text>
-  <text class="lt" x="72" y="452" fill="#c8d6e5" font-size="11">Resolve symbol to code block</text>
-  <text class="lt" x="72" y="467" fill="#8899aa" font-size="10">(internal jump table)</text>
+  <text class="lt" x="72" y="452" fill="#333333" font-size="11">Resolve symbol to code block</text>
+  <text class="lt" x="72" y="467" fill="#666666" font-size="10">(internal jump table)</text>
 
   <!-- Step 4 -->
   <circle cx="55" cy="490" r="10" fill="#e74c3c"/>
   <text class="step-num" x="55" y="490">4</text>
-  <text class="lt" x="72" y="490" fill="#c8d6e5" font-size="11">Execute code block on DRs</text>
+  <text class="lt" x="72" y="490" fill="#333333" font-size="11">Execute code block on DRs</text>
 
   <!-- Step 5 -->
   <circle cx="55" cy="517" r="10" fill="#e74c3c"/>
   <text class="step-num" x="55" y="517">5</text>
-  <text class="lt" x="72" y="517" fill="#c8d6e5" font-size="11">RETURN &#8594; full stack unwind</text>
-  <text class="lt" x="72" y="532" fill="#8899aa" font-size="10">(mLoad revalidates CR5/CR6/CR14)</text>
+  <text class="lt" x="72" y="517" fill="#333333" font-size="11">RETURN &#8594; full stack unwind</text>
+  <text class="lt" x="72" y="532" fill="#666666" font-size="10">(mLoad revalidates CR5/CR6/CR14)</text>
 
   <!-- Code example -->
-  <rect x="45" y="550" width="290" height="145" rx="6" fill="#0a1015" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="45" y="550" width="290" height="145" rx="6" fill="#f5f5f5" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="190" y="568" fill="#e74c3c">Example: Thread.Mint</text>
 
-  <text class="inst" x="55" y="590" fill="#8899aa">; Caller:</text>
-  <text class="inst" x="55" y="607" fill="#c8d6e5">CALL(Thread.Mint(type,sz,acc))</text>
-  <text class="inst" x="55" y="630" fill="#8899aa">; CR14 dispatcher internally:</text>
+  <text class="inst" x="55" y="590" fill="#666666">; Caller:</text>
+  <text class="inst" x="55" y="607" fill="#333333">CALL(Thread.Mint(type,sz,acc))</text>
+  <text class="inst" x="55" y="630" fill="#666666">; CR14 dispatcher internally:</text>
   <text class="inst" x="55" y="647" fill="#e74c3c">  resolve "Mint" from CR6</text>
   <text class="inst" x="55" y="664" fill="#e74c3c">  check budget, delegate</text>
   <text class="inst" x="55" y="681" fill="#e74c3c">  &#8594; Namespace.Mint()</text>
 
   <!-- Metrics -->
-  <rect x="45" y="705" width="290" height="120" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="45" y="705" width="290" height="120" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="190" y="723" fill="#f5c842">METRICS</text>
 
-  <text class="lt" x="60" y="745" fill="#a0b0c0">Cycles per dispatch:</text>
+  <text class="lt" x="60" y="745" fill="#555555">Cycles per dispatch:</text>
   <text class="lr" x="320" y="745" fill="#f39c12" font-weight="bold" font-family="Consolas,monospace">8-15</text>
 
-  <text class="lt" x="60" y="765" fill="#a0b0c0">Stack accesses:</text>
+  <text class="lt" x="60" y="765" fill="#555555">Stack accesses:</text>
   <text class="lr" x="320" y="765" fill="#e74c3c" font-weight="bold" font-family="Consolas,monospace">2 (push+pop)</text>
 
-  <text class="lt" x="60" y="785" fill="#a0b0c0">mLoad calls on RETURN:</text>
+  <text class="lt" x="60" y="785" fill="#555555">mLoad calls on RETURN:</text>
   <text class="lr" x="320" y="785" fill="#e74c3c" font-weight="bold" font-family="Consolas,monospace">3 (CR5+CR6+CR14)</text>
 
-  <text class="lt" x="60" y="805" fill="#a0b0c0">Caller visibility:</text>
+  <text class="lt" x="60" y="805" fill="#555555">Caller visibility:</text>
   <text class="lr" x="320" y="805" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">Zero &#x2714;</text>
 
   <!-- Use cases -->
-  <rect x="45" y="835" width="290" height="122" rx="6" fill="#2a1a1a" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="45" y="835" width="290" height="122" rx="6" fill="#f8e8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="190" y="855" fill="#e74c3c">USE CASES</text>
-  <text class="lt" x="60" y="877" fill="#c8d6e5" font-size="11">&#x2022; System services (Mint, GC)</text>
-  <text class="lt" x="60" y="897" fill="#c8d6e5" font-size="11">&#x2022; Security-critical abstractions</text>
-  <text class="lt" x="60" y="917" fill="#c8d6e5" font-size="11">&#x2022; Crypto / key management</text>
-  <text class="lt" x="60" y="937" fill="#c8d6e5" font-size="11">&#x2022; Hello Mum messaging</text>
+  <text class="lt" x="60" y="877" fill="#333333" font-size="11">&#x2022; System services (Mint, GC)</text>
+  <text class="lt" x="60" y="897" fill="#333333" font-size="11">&#x2022; Security-critical abstractions</text>
+  <text class="lt" x="60" y="917" fill="#333333" font-size="11">&#x2022; Crypto / key management</text>
+  <text class="lt" x="60" y="937" fill="#333333" font-size="11">&#x2022; Hello Mum messaging</text>
 
   <!-- ===== COLUMN B: LAMBDA Fast-Path ===== -->
-  <rect x="375" y="135" width="330" height="840" rx="10" fill="#0f1a15" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="375" y="135" width="330" height="840" rx="10" fill="#f0f8f5" stroke="#2ecc71" stroke-width="2"/>
 
   <!-- Header -->
-  <rect x="375" y="135" width="330" height="55" rx="10" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="375" y="135" width="330" height="55" rx="10" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="ph" x="540" y="155" text-anchor="middle" fill="#2ecc71">(b) LAMBDA Fast-Path</text>
   <text class="ls" x="540" y="175" fill="#2ecc71">Zero stack access &bull; Machine-status registers</text>
 
   <!-- Security badge -->
-  <rect x="395" y="200" width="290" height="26" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="395" y="200" width="290" height="26" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="tag" x="450" y="213" fill="#2ecc71">SECURITY</text>
   <text class="cell-b" x="590" y="213" fill="#2ecc71">&#9608;&#9608;&#9608;&#9608;&#9601; MEDIUM</text>
 
   <!-- CR6 and CR14 -->
-  <rect x="395" y="235" width="290" height="55" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="395" y="235" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="540" y="252" fill="#f39c12">CR6 (Active C-List)</text>
-  <text class="inst" x="410" y="272" fill="#c8d6e5">Method GTs with X permission</text>
+  <text class="inst" x="410" y="272" fill="#333333">Method GTs with X permission</text>
 
-  <rect x="395" y="298" width="290" height="55" rx="6" fill="#141a28" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="395" y="298" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="540" y="315" fill="#2ecc71">CR14 (Active Nucleus)</text>
   <text class="inst" x="410" y="335" fill="#2ecc71">Code with LAMBDA instructions</text>
 
   <!-- Flow steps -->
-  <text class="ph" x="540" y="375" text-anchor="middle" fill="#8899aa">DISPATCH FLOW</text>
+  <text class="ph" x="540" y="375" text-anchor="middle" fill="#666666">DISPATCH FLOW</text>
 
   <!-- Step 1 -->
   <circle cx="405" cy="398" r="10" fill="#2ecc71"/>
   <text class="step-num" x="405" y="398">1</text>
-  <text class="lt" x="422" y="398" fill="#c8d6e5" font-size="11">Load method GT from CR6</text>
+  <text class="lt" x="422" y="398" fill="#333333" font-size="11">Load method GT from CR6</text>
 
   <!-- Step 2 -->
   <circle cx="405" cy="425" r="10" fill="#2ecc71"/>
@@ -213,19 +213,19 @@
   <!-- Step 3 -->
   <circle cx="405" cy="452" r="10" fill="#2ecc71"/>
   <text class="step-num" x="405" y="452">3</text>
-  <text class="lt" x="422" y="452" fill="#c8d6e5" font-size="11">Check X permission on GT</text>
-  <text class="lt" x="422" y="467" fill="#8899aa" font-size="10">(no domain crossing)</text>
+  <text class="lt" x="422" y="452" fill="#333333" font-size="11">Check X permission on GT</text>
+  <text class="lt" x="422" y="467" fill="#666666" font-size="10">(no domain crossing)</text>
 
   <!-- Step 4 -->
   <circle cx="405" cy="490" r="10" fill="#2ecc71"/>
   <text class="step-num" x="405" y="490">4</text>
-  <text class="lt" x="422" y="490" fill="#c8d6e5" font-size="11">Save PC+4 to machine-status</text>
+  <text class="lt" x="422" y="490" fill="#333333" font-size="11">Save PC+4 to machine-status</text>
   <text class="lt" x="422" y="505" fill="#2ecc71" font-size="10" font-weight="bold">(NOT stack!)</text>
 
   <!-- Step 5 -->
   <circle cx="405" cy="525" r="10" fill="#2ecc71"/>
   <text class="step-num" x="405" y="525">5</text>
-  <text class="lt" x="422" y="525" fill="#c8d6e5" font-size="11">Execute method body on DRs</text>
+  <text class="lt" x="422" y="525" fill="#333333" font-size="11">Execute method body on DRs</text>
 
   <!-- Step 6 -->
   <circle cx="405" cy="550" r="10" fill="#2ecc71"/>
@@ -234,238 +234,238 @@
   <text class="lt" x="422" y="565" fill="#2ecc71" font-size="10">restore PC, clear flag, zero stack</text>
 
   <!-- Code example -->
-  <rect x="395" y="580" width="290" height="115" rx="6" fill="#0a1015" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="395" y="580" width="290" height="115" rx="6" fill="#f5f5f5" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="540" y="598" fill="#2ecc71">Example: SlideRule.Multiply</text>
 
-  <text class="inst" x="405" y="620" fill="#8899aa">; CR2 has GT with X perm</text>
-  <text class="inst" x="405" y="637" fill="#c8d6e5">MOV  DR1, &lt;operand_a&gt;</text>
-  <text class="inst" x="405" y="654" fill="#c8d6e5">MOV  DR2, &lt;operand_b&gt;</text>
+  <text class="inst" x="405" y="620" fill="#666666">; CR2 has GT with X perm</text>
+  <text class="inst" x="405" y="637" fill="#333333">MOV  DR1, &lt;operand_a&gt;</text>
+  <text class="inst" x="405" y="654" fill="#333333">MOV  DR2, &lt;operand_b&gt;</text>
   <text class="inst" x="405" y="671" fill="#2ecc71">LAMBDA CR2, multiply</text>
-  <text class="inst" x="405" y="688" fill="#8899aa">; DR1 = result (2-3 cyc)</text>
+  <text class="inst" x="405" y="688" fill="#666666">; DR1 = result (2-3 cyc)</text>
 
   <!-- Metrics -->
-  <rect x="395" y="705" width="290" height="120" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="395" y="705" width="290" height="120" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="540" y="723" fill="#f5c842">METRICS</text>
 
-  <text class="lt" x="410" y="745" fill="#a0b0c0">Cycles per dispatch:</text>
+  <text class="lt" x="410" y="745" fill="#555555">Cycles per dispatch:</text>
   <text class="lr" x="670" y="745" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">2-3 &#9733;</text>
 
-  <text class="lt" x="410" y="765" fill="#a0b0c0">Stack accesses:</text>
+  <text class="lt" x="410" y="765" fill="#555555">Stack accesses:</text>
   <text class="lr" x="670" y="765" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">0 (zero!) &#9733;</text>
 
-  <text class="lt" x="410" y="785" fill="#a0b0c0">mLoad calls on RETURN:</text>
+  <text class="lt" x="410" y="785" fill="#555555">mLoad calls on RETURN:</text>
   <text class="lr" x="670" y="785" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">0 (fast path)</text>
 
-  <text class="lt" x="410" y="805" fill="#a0b0c0">Caller visibility:</text>
+  <text class="lt" x="410" y="805" fill="#555555">Caller visibility:</text>
   <text class="lr" x="670" y="805" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">Zero &#x2714;</text>
 
   <!-- Use cases -->
-  <rect x="395" y="835" width="290" height="122" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="395" y="835" width="290" height="122" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="540" y="855" fill="#2ecc71">USE CASES</text>
-  <text class="lt" x="410" y="877" fill="#c8d6e5" font-size="11">&#x2022; Arithmetic (SlideRule, Abacus)</text>
-  <text class="lt" x="410" y="897" fill="#c8d6e5" font-size="11">&#x2022; Geometry (Circle)</text>
-  <text class="lt" x="410" y="917" fill="#c8d6e5" font-size="11">&#x2022; Utility / helper functions</text>
-  <text class="lt" x="410" y="937" fill="#c8d6e5" font-size="11">&#x2022; Clamp / macro-like reuse</text>
+  <text class="lt" x="410" y="877" fill="#333333" font-size="11">&#x2022; Arithmetic (SlideRule, Abacus)</text>
+  <text class="lt" x="410" y="897" fill="#333333" font-size="11">&#x2022; Geometry (Circle)</text>
+  <text class="lt" x="410" y="917" fill="#333333" font-size="11">&#x2022; Utility / helper functions</text>
+  <text class="lt" x="410" y="937" fill="#333333" font-size="11">&#x2022; Clamp / macro-like reuse</text>
 
   <!-- ===== COLUMN C: Traditional Compiled Binary ===== -->
-  <rect x="725" y="135" width="330" height="840" rx="10" fill="#0f1520" stroke="#5dade2" stroke-width="2"/>
+  <rect x="725" y="135" width="330" height="840" rx="10" fill="#f5f8fc" stroke="#5dade2" stroke-width="2"/>
 
   <!-- Header -->
-  <rect x="725" y="135" width="330" height="55" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="725" y="135" width="330" height="55" rx="10" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <text class="ph" x="890" y="155" text-anchor="middle" fill="#5dade2">(c) Traditional Binary</text>
   <text class="ls" x="890" y="175" fill="#5dade2">Familiar model &bull; Direct offset dispatch</text>
 
   <!-- Security badge -->
-  <rect x="745" y="200" width="290" height="26" rx="4" fill="#0f1a2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="745" y="200" width="290" height="26" rx="4" fill="#f0f5fa" stroke="#5dade2" stroke-width="1"/>
   <text class="tag" x="800" y="213" fill="#5dade2">SECURITY</text>
   <text class="cell-b" x="940" y="213" fill="#5dade2">&#9608;&#9608;&#9608;&#9601;&#9601; STANDARD</text>
 
   <!-- CR6 and CR14 -->
-  <rect x="745" y="235" width="290" height="55" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="745" y="235" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="890" y="252" fill="#f39c12">CR6 (Active C-List)</text>
-  <text class="inst" x="760" y="272" fill="#c8d6e5">Method entries (data / metadata)</text>
+  <text class="inst" x="760" y="272" fill="#333333">Method entries (data / metadata)</text>
 
-  <rect x="745" y="298" width="290" height="55" rx="6" fill="#141a28" stroke="#5dade2" stroke-width="1"/>
+  <rect x="745" y="298" width="290" height="55" rx="6" fill="#f0f4f8" stroke="#5dade2" stroke-width="1"/>
   <text class="col-hdr" x="890" y="315" fill="#5dade2">CR14 (Active Nucleus)</text>
   <text class="inst" x="760" y="335" fill="#5dade2">Compiled binary (offset table)</text>
 
   <!-- Flow steps -->
-  <text class="ph" x="890" y="375" text-anchor="middle" fill="#8899aa">DISPATCH FLOW</text>
+  <text class="ph" x="890" y="375" text-anchor="middle" fill="#666666">DISPATCH FLOW</text>
 
   <!-- Step 1 -->
   <circle cx="755" cy="398" r="10" fill="#5dade2"/>
   <text class="step-num" x="755" y="398">1</text>
-  <text class="lt" x="772" y="398" fill="#c8d6e5" font-size="11">Read method index from CALL</text>
+  <text class="lt" x="772" y="398" fill="#333333" font-size="11">Read method index from CALL</text>
 
   <!-- Step 2 -->
   <circle cx="755" cy="425" r="10" fill="#5dade2"/>
   <text class="step-num" x="755" y="425">2</text>
-  <text class="lt" x="772" y="425" fill="#c8d6e5" font-size="11">Compute offset from base addr</text>
+  <text class="lt" x="772" y="425" fill="#333333" font-size="11">Compute offset from base addr</text>
 
   <!-- Step 3 -->
   <circle cx="755" cy="452" r="10" fill="#5dade2"/>
   <text class="step-num" x="755" y="452">3</text>
-  <text class="lt" x="772" y="452" fill="#c8d6e5" font-size="11">Direct jump to method code</text>
-  <text class="lt" x="772" y="467" fill="#8899aa" font-size="10">(no symbol resolution)</text>
+  <text class="lt" x="772" y="452" fill="#333333" font-size="11">Direct jump to method code</text>
+  <text class="lt" x="772" y="467" fill="#666666" font-size="10">(no symbol resolution)</text>
 
   <!-- Step 4 -->
   <circle cx="755" cy="490" r="10" fill="#5dade2"/>
   <text class="step-num" x="755" y="490">4</text>
-  <text class="lt" x="772" y="490" fill="#c8d6e5" font-size="11">Execute method body on DRs</text>
+  <text class="lt" x="772" y="490" fill="#333333" font-size="11">Execute method body on DRs</text>
 
   <!-- Step 5 -->
   <circle cx="755" cy="517" r="10" fill="#5dade2"/>
   <text class="step-num" x="755" y="517">5</text>
-  <text class="lt" x="772" y="517" fill="#c8d6e5" font-size="11">RETURN &#8594; full stack unwind</text>
-  <text class="lt" x="772" y="532" fill="#8899aa" font-size="10">(mLoad revalidates CR5/CR6/CR14)</text>
+  <text class="lt" x="772" y="517" fill="#333333" font-size="11">RETURN &#8594; full stack unwind</text>
+  <text class="lt" x="772" y="532" fill="#666666" font-size="10">(mLoad revalidates CR5/CR6/CR14)</text>
 
   <!-- Code example -->
-  <rect x="745" y="550" width="290" height="145" rx="6" fill="#0a1015" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="745" y="550" width="290" height="145" rx="6" fill="#f5f5f5" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="890" y="568" fill="#5dade2">Example: Access.asm</text>
 
-  <text class="inst" x="755" y="590" fill="#8899aa">; CR14 = compiled code object</text>
-  <text class="inst" x="755" y="607" fill="#8899aa">; Methods at known offsets</text>
+  <text class="inst" x="755" y="590" fill="#666666">; CR14 = compiled code object</text>
+  <text class="inst" x="755" y="607" fill="#666666">; Methods at known offsets</text>
   <text class="inst" x="755" y="630" fill="#5dade2">entry:</text>
-  <text class="inst" x="755" y="647" fill="#c8d6e5">  MOV  DR1, 42</text>
-  <text class="inst" x="755" y="664" fill="#c8d6e5">  ADD  DR1, DR1, DR2</text>
-  <text class="inst" x="755" y="681" fill="#c8d6e5">  ...</text>
+  <text class="inst" x="755" y="647" fill="#333333">  MOV  DR1, 42</text>
+  <text class="inst" x="755" y="664" fill="#333333">  ADD  DR1, DR1, DR2</text>
+  <text class="inst" x="755" y="681" fill="#333333">  ...</text>
 
   <!-- Metrics -->
-  <rect x="745" y="705" width="290" height="120" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="745" y="705" width="290" height="120" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="890" y="723" fill="#f5c842">METRICS</text>
 
-  <text class="lt" x="760" y="745" fill="#a0b0c0">Cycles per dispatch:</text>
+  <text class="lt" x="760" y="745" fill="#555555">Cycles per dispatch:</text>
   <text class="lr" x="1020" y="745" fill="#5dade2" font-weight="bold" font-family="Consolas,monospace">5-8</text>
 
-  <text class="lt" x="760" y="765" fill="#a0b0c0">Stack accesses:</text>
+  <text class="lt" x="760" y="765" fill="#555555">Stack accesses:</text>
   <text class="lr" x="1020" y="765" fill="#f39c12" font-weight="bold" font-family="Consolas,monospace">2 (push+pop)</text>
 
-  <text class="lt" x="760" y="785" fill="#a0b0c0">mLoad calls on RETURN:</text>
+  <text class="lt" x="760" y="785" fill="#555555">mLoad calls on RETURN:</text>
   <text class="lr" x="1020" y="785" fill="#f39c12" font-weight="bold" font-family="Consolas,monospace">3 (CR5+CR6+CR14)</text>
 
-  <text class="lt" x="760" y="805" fill="#a0b0c0">Caller visibility:</text>
+  <text class="lt" x="760" y="805" fill="#555555">Caller visibility:</text>
   <text class="lr" x="1020" y="805" fill="#2ecc71" font-weight="bold" font-family="Consolas,monospace">Zero &#x2714;</text>
 
   <!-- Use cases -->
-  <rect x="745" y="835" width="290" height="122" rx="6" fill="#0f1a2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="745" y="835" width="290" height="122" rx="6" fill="#f0f5fa" stroke="#5dade2" stroke-width="1"/>
   <text class="col-hdr" x="890" y="855" fill="#5dade2">USE CASES</text>
-  <text class="lt" x="760" y="877" fill="#c8d6e5" font-size="11">&#x2022; General application code</text>
-  <text class="lt" x="760" y="897" fill="#c8d6e5" font-size="11">&#x2022; Familiar C/Rust-style binaries</text>
-  <text class="lt" x="760" y="917" fill="#c8d6e5" font-size="11">&#x2022; Legacy code wrapping</text>
-  <text class="lt" x="760" y="937" fill="#c8d6e5" font-size="11">&#x2022; Access.asm default example</text>
+  <text class="lt" x="760" y="877" fill="#333333" font-size="11">&#x2022; General application code</text>
+  <text class="lt" x="760" y="897" fill="#333333" font-size="11">&#x2022; Familiar C/Rust-style binaries</text>
+  <text class="lt" x="760" y="917" fill="#333333" font-size="11">&#x2022; Legacy code wrapping</text>
+  <text class="lt" x="760" y="937" fill="#333333" font-size="11">&#x2022; Access.asm default example</text>
 
   <!-- ========== COMPARISON TABLE ========== -->
 
   <text class="ph" x="550" y="1005" text-anchor="middle" fill="#f5c842">SIDE-BY-SIDE COMPARISON</text>
 
   <!-- Table header row -->
-  <rect x="25" y="1020" width="170" height="28" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="25" y="1020" width="170" height="28" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="110" y="1034" fill="#f5c842">Property</text>
 
-  <rect x="205" y="1020" width="270" height="28" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="205" y="1020" width="270" height="28" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="340" y="1034" fill="#e74c3c">Symbolic Resolver</text>
 
-  <rect x="485" y="1020" width="270" height="28" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="485" y="1020" width="270" height="28" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="620" y="1034" fill="#2ecc71">LAMBDA Fast-Path</text>
 
-  <rect x="765" y="1020" width="270" height="28" rx="4" fill="#0f1a2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="765" y="1020" width="270" height="28" rx="4" fill="#f0f5fa" stroke="#5dade2" stroke-width="1"/>
   <text class="col-hdr" x="900" y="1034" fill="#5dade2">Traditional Binary</text>
 
   <!-- Row 1: CR14 contains -->
-  <rect x="25" y="1052" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1066" fill="#c8d6e5" font-size="11">CR14 contains</text>
+  <rect x="25" y="1052" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1066" fill="#333333" font-size="11">CR14 contains</text>
 
-  <rect x="205" y="1052" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="205" y="1052" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="340" y="1066" fill="#e74c3c">Dispatcher / resolver code</text>
 
-  <rect x="485" y="1052" width="270" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="485" y="1052" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="620" y="1066" fill="#2ecc71">Code with LAMBDA instrs</text>
 
-  <rect x="765" y="1052" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="765" y="1052" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="900" y="1066" fill="#5dade2">Compiled binary</text>
 
   <!-- Row 2: Resolution method -->
-  <rect x="25" y="1080" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1094" fill="#c8d6e5" font-size="11">Resolution</text>
+  <rect x="25" y="1080" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1094" fill="#333333" font-size="11">Resolution</text>
 
-  <rect x="205" y="1080" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="340" y="1094" fill="#c8d6e5">Runtime symbol lookup</text>
+  <rect x="205" y="1080" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="340" y="1094" fill="#333333">Runtime symbol lookup</text>
 
-  <rect x="485" y="1080" width="270" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="620" y="1094" fill="#c8d6e5">X-permission jump</text>
+  <rect x="485" y="1080" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="620" y="1094" fill="#333333">X-permission jump</text>
 
-  <rect x="765" y="1080" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="cell" x="900" y="1094" fill="#c8d6e5">Offset from base addr</text>
+  <rect x="765" y="1080" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="cell" x="900" y="1094" fill="#333333">Offset from base addr</text>
 
   <!-- Row 3: Cycles -->
-  <rect x="25" y="1108" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1122" fill="#c8d6e5" font-size="11">Cycles</text>
+  <rect x="25" y="1108" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1122" fill="#333333" font-size="11">Cycles</text>
 
-  <rect x="205" y="1108" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="205" y="1108" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="340" y="1122" fill="#f39c12" font-weight="bold">8-15</text>
 
-  <rect x="485" y="1108" width="270" height="28" rx="0" fill="#0d1a15" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="485" y="1108" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell mono" x="620" y="1122" fill="#2ecc71" font-weight="bold">2-3 &#9733;</text>
 
-  <rect x="765" y="1108" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="765" y="1108" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="900" y="1122" fill="#5dade2" font-weight="bold">5-8</text>
 
   <!-- Row 4: Stack -->
-  <rect x="25" y="1136" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1150" fill="#c8d6e5" font-size="11">Stack usage</text>
+  <rect x="25" y="1136" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1150" fill="#333333" font-size="11">Stack usage</text>
 
-  <rect x="205" y="1136" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="205" y="1136" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="340" y="1150" fill="#e74c3c">Full CALL ceremony</text>
 
-  <rect x="485" y="1136" width="270" height="28" rx="0" fill="#0d1a15" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="485" y="1136" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell mono" x="620" y="1150" fill="#2ecc71" font-weight="bold">Zero &#9733;</text>
 
-  <rect x="765" y="1136" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="765" y="1136" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="900" y="1150" fill="#5dade2">Standard call/return</text>
 
   <!-- Row 5: Permission used -->
-  <rect x="25" y="1164" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1178" fill="#c8d6e5" font-size="11">Permission</text>
+  <rect x="25" y="1164" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1178" fill="#333333" font-size="11">Permission</text>
 
-  <rect x="205" y="1164" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="205" y="1164" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="340" y="1178" fill="#c39bd3" font-weight="bold">E (Enter)</text>
 
-  <rect x="485" y="1164" width="270" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="485" y="1164" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="620" y="1178" fill="#2ecc71" font-weight="bold">X (Execute)</text>
 
-  <rect x="765" y="1164" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="765" y="1164" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell mono" x="900" y="1178" fill="#c39bd3" font-weight="bold">E (Enter)</text>
 
   <!-- Row 6: Domain crossing -->
-  <rect x="25" y="1192" width="170" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="lt" x="35" y="1206" fill="#c8d6e5" font-size="11">Domain crossing</text>
+  <rect x="25" y="1192" width="170" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="lt" x="35" y="1206" fill="#333333" font-size="11">Domain crossing</text>
 
-  <rect x="205" y="1192" width="270" height="28" rx="0" fill="#1a0f0f" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="205" y="1192" width="270" height="28" rx="0" fill="#fdf0f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="340" y="1206" fill="#e74c3c">Yes (new CR6+CR14)</text>
 
-  <rect x="485" y="1192" width="270" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="485" y="1192" width="270" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="620" y="1206" fill="#2ecc71">No (same domain)</text>
 
-  <rect x="765" y="1192" width="270" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="765" y="1192" width="270" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
   <text class="cell" x="900" y="1206" fill="#5dade2">Yes (new CR6+CR14)</text>
 
   <!-- ========== KEY INSIGHT ========== -->
 
-  <rect x="25" y="1240" width="1050" height="260" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="25" y="1240" width="1050" height="260" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="550" y="1265" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
 
   <text class="lt" x="50" y="1295" fill="#f5c842" font-size="13" font-weight="bold">Same caller interface, three internal mechanisms:</text>
-  <text class="lt" x="50" y="1315" fill="#a0b0c0" font-size="12">The caller always writes CALL(Abstraction.Method(args)). The CALL ceremony switches CR6 and CR14 identically</text>
-  <text class="lt" x="50" y="1333" fill="#a0b0c0" font-size="12">in all three cases. What differs is how CR14 resolves the method name to executable code. The caller never</text>
-  <text class="lt" x="50" y="1351" fill="#a0b0c0" font-size="12">knows which style is used — that's the power of encapsulation through capabilities.</text>
+  <text class="lt" x="50" y="1315" fill="#555555" font-size="12">The caller always writes CALL(Abstraction.Method(args)). The CALL ceremony switches CR6 and CR14 identically</text>
+  <text class="lt" x="50" y="1333" fill="#555555" font-size="12">in all three cases. What differs is how CR14 resolves the method name to executable code. The caller never</text>
+  <text class="lt" x="50" y="1351" fill="#555555" font-size="12">knows which style is used — that's the power of encapsulation through capabilities.</text>
 
   <text class="lt" x="50" y="1381" fill="#2ecc71" font-size="13" font-weight="bold">LAMBDA is unique — it eliminates the CALL/RETURN overhead within a domain:</text>
-  <text class="lt" x="50" y="1401" fill="#a0b0c0" font-size="12">While (a) and (c) both use the full CALL ceremony (stack push, mLoad revalidation on RETURN), LAMBDA</text>
-  <text class="lt" x="50" y="1419" fill="#a0b0c0" font-size="12">saves the return address to a machine-status register and restores it in 1 cycle. Zero stack, zero mLoad.</text>
+  <text class="lt" x="50" y="1401" fill="#555555" font-size="12">While (a) and (c) both use the full CALL ceremony (stack push, mLoad revalidation on RETURN), LAMBDA</text>
+  <text class="lt" x="50" y="1419" fill="#555555" font-size="12">saves the return address to a machine-status register and restores it in 1 cycle. Zero stack, zero mLoad.</text>
 
   <text class="lt" x="50" y="1449" fill="#c39bd3" font-size="13" font-weight="bold">Abstraction creator chooses the tradeoff:</text>
-  <text class="lt" x="50" y="1469" fill="#a0b0c0" font-size="12">High-security services (Mint, crypto) use symbolic dispatch for maximum isolation. Compute utilities use</text>
-  <text class="lt" x="50" y="1487" fill="#a0b0c0" font-size="12">LAMBDA for speed. General code uses traditional binaries. Different abstractions in the same system can mix styles.</text>
+  <text class="lt" x="50" y="1469" fill="#555555" font-size="12">High-security services (Mint, crypto) use symbolic dispatch for maximum isolation. Compute utilities use</text>
+  <text class="lt" x="50" y="1487" fill="#555555" font-size="12">LAMBDA for speed. General code uses traditional binaries. Different abstractions in the same system can mix styles.</text>
 
 </svg>
 

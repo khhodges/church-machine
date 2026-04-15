@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 1: LAMBDA CR6 Idempotent Self-Invocation Flow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 1 &mdash; LAMBDA CR6 Idempotent Self-Invocation Flow</h1>
+<p class="subtitle">CALL enters the method and splits the lump, establishing CR6 as the c-list self-reference. LAMBDA CR6 re-enters the method body without gate re-validation. The return address is invariant &mdash; repeated LAMBDA CR6 writes the same value to the same register. Two RETURNs total: one clears the flag (base case), the second pops the CALL frame.</p>
+
+<svg viewBox="0 0 1100 1050" width="1100" height="1050" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c07020"/>
+    </marker>
+    <marker id="ah-p" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#8855aa"/>
+    </marker>
+  </defs>
+
+  <style>
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .label-c { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .title { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; fill:#b8860b; text-anchor:middle; }
+    .title-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:700; text-anchor:start; }
+    .code { font-family:'Consolas',monospace; font-size:11px; fill:#2a6db5; text-anchor:start; dominant-baseline:central; }
+    .hw { font-family:'Consolas',monospace; font-size:11px; fill:#8855aa; text-anchor:start; dominant-baseline:central; }
+    .note { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <rect x="250" y="20" width="600" height="55" rx="10" fill="#f0f5fa" stroke="#2a6db5" stroke-width="2"/>
+  <text class="label-c" x="550" y="40" fill="#2a6db5" font-weight="bold" font-size="14">CALL enters method (lump split)</text>
+  <text class="label-c" x="550" y="60" fill="#555">CR14 &#8592; code region (X-only) | CR6 &#8592; c-list region (L-only)</text>
+
+  <line x1="550" y1="75" x2="550" y2="105" stroke="#2a6db5" stroke-width="2" marker-end="url(#ah-b)"/>
+
+  <rect x="100" y="110" width="400" height="35" rx="6" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="hw" x="120" y="128">lambda_active = 0</text>
+  <text class="note" x="330" y="128">initial state</text>
+
+  <rect x="600" y="110" width="400" height="35" rx="6" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="hw" x="620" y="128">lambda_pc = undefined</text>
+  <text class="note" x="830" y="128">not yet set</text>
+
+  <line x1="550" y1="145" x2="550" y2="175" stroke="#555" stroke-width="2" marker-end="url(#ah-b)"/>
+
+  <rect x="150" y="180" width="800" height="50" rx="10" fill="#f8f8fc" stroke="#999" stroke-width="1"/>
+  <text class="label-c" x="550" y="200" fill="#333">Method body executes ... software counts down (n = 5, 4, 3, 2, 1)</text>
+  <text class="label-c" x="550" y="218" fill="#555" font-size="11">Data registers track the recursion argument. Hardware tracks nothing.</text>
+
+  <line x1="550" y1="230" x2="550" y2="260" stroke="#555" stroke-width="2" marker-end="url(#ah-o)"/>
+
+  <rect x="200" y="265" width="700" height="80" rx="10" fill="#f5f0e8" stroke="#c07020" stroke-width="2"/>
+  <text class="title-l" x="220" y="290" fill="#c07020">LAMBDA CR6 &mdash; self-invocation</text>
+  <text class="code" x="220" y="310">if !lambda_active: lambda_active &#8592; 1</text>
+  <text class="code" x="220" y="330">lambda_pc &#8592; PC+4 (idempotent &mdash; same value each time)</text>
+
+  <rect x="650" y="275" width="230" height="55" rx="6" fill="#f0e8f5" stroke="#8855aa" stroke-width="1.5"/>
+  <text class="hw" x="670" y="295">lambda_active = 1</text>
+  <text class="hw" x="670" y="315">lambda_pc = addr_after</text>
+
+  <path d="M 550 345 L 550 375 L 250 375 L 250 285 L 200 285" stroke="#c07020" stroke-width="2" fill="none" marker-end="url(#ah-o)"/>
+  <text class="label" x="300" y="390" fill="#c07020" font-weight="bold">Branch to method entry (re-enter)</text>
+  <text class="note" x="300" y="405">Same method, same domain, same capabilities &mdash; no gate re-validation needed</text>
+
+  <rect x="100" y="430" width="900" height="240" rx="12" fill="#f8fcf8" stroke="#27864a" stroke-width="2"/>
+  <text class="title" x="550" y="460">RECURSION ITERATIONS (n times)</text>
+
+  <text class="label" x="130" y="490" fill="#333" font-weight="bold">Each iteration:</text>
+  <text class="code" x="130" y="515">1. Method body re-executes with decremented argument</text>
+  <text class="code" x="130" y="535">2. LAMBDA CR6 fires again &mdash; lambda_active ALREADY 1</text>
+  <text class="code" x="130" y="555">3. lambda_pc &#8592; PC+4 (SAME value overwrites SAME register = idempotent)</text>
+  <text class="code" x="130" y="575">4. Branch to method entry again</text>
+
+  <rect x="600" y="490" width="370" height="80" rx="8" fill="#e8f5e8" stroke="#27864a" stroke-width="1.5"/>
+  <text class="label-c" x="785" y="512" fill="#27864a" font-weight="bold">Why idempotent?</text>
+  <text class="note" x="620" y="535" fill="#333">lambda_active is already 1 &#8594; no change</text>
+  <text class="note" x="620" y="555" fill="#333">lambda_pc = same addr &#8594; same value overwrites</text>
+
+  <text class="label" x="130" y="610" fill="#555">Stack growth: ZERO frames per iteration. Hardware state: 1 bit + 1 PC register.</text>
+  <text class="label" x="130" y="630" fill="#cc3333" font-weight="bold">O(1) hardware cost regardless of recursion depth</text>
+  <text class="label" x="130" y="650" fill="#555">Compare: CALL CR6 would push 2N stack words, re-validate gate N times &mdash; O(N) cost, zero security benefit</text>
+
+  <line x1="550" y1="670" x2="550" y2="700" stroke="#cc3333" stroke-width="2" marker-end="url(#ah-r)"/>
+
+  <rect x="200" y="705" width="700" height="65" rx="10" fill="#fce8e8" stroke="#cc3333" stroke-width="2"/>
+  <text class="title-l" x="220" y="725" fill="#cc3333">RETURN #1 (base case: n = 0)</text>
+  <text class="code" x="220" y="750" fill="#cc3333">lambda_active = 1 &#8594; PC &#8592; lambda_pc (addr_after_lambda)</text>
+  <text class="hw" x="660" y="750">lambda_active &#8592; 0</text>
+
+  <line x1="550" y1="770" x2="550" y2="800" stroke="#8855aa" stroke-width="2" marker-end="url(#ah-p)"/>
+
+  <rect x="250" y="805" width="600" height="50" rx="10" fill="#f8f8fc" stroke="#999" stroke-width="1"/>
+  <text class="label-c" x="550" y="825" fill="#333">Execution resumes at addr_after_lambda</text>
+  <text class="label-c" x="550" y="843" fill="#555" font-size="11">lambda_active = 0 now. Machine is back to normal CALL context.</text>
+
+  <line x1="550" y1="855" x2="550" y2="885" stroke="#8855aa" stroke-width="2" marker-end="url(#ah-p)"/>
+
+  <rect x="200" y="890" width="700" height="50" rx="10" fill="#f0e8f5" stroke="#8855aa" stroke-width="2"/>
+  <text class="title-l" x="220" y="910" fill="#8855aa">RETURN #2 (real return)</text>
+  <text class="code" x="220" y="930" fill="#8855aa">lambda_active = 0 &#8594; real RETURN. Pop CALL frame from initial entry.</text>
+
+  <line x1="550" y1="940" x2="550" y2="965" stroke="#27864a" stroke-width="2" marker-end="url(#ah-g)"/>
+
+  <rect x="300" y="970" width="500" height="55" rx="10" fill="#e8f5e8" stroke="#27864a" stroke-width="2.5"/>
+  <text class="label-c" x="550" y="990" fill="#27864a" font-weight="bold" font-size="14">&#10004; DONE</text>
+  <text class="label-c" x="550" y="1010" fill="#27864a">Two RETURNs total, regardless of recursion depth</text>
+
+</svg>
+
+</body>
+</html>

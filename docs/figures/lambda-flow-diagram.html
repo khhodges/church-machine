@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -18,14 +18,14 @@
   }
   h1 {
     font-size: 22px;
-    color: #f5c842;
+    color: #b8860b;
     margin-bottom: 6px;
     text-align: center;
     letter-spacing: 0.5px;
   }
   .subtitle {
     font-size: 13px;
-    color: #8899aa;
+    color: #555555;
     margin-bottom: 30px;
     text-align: center;
   }
@@ -41,7 +41,7 @@
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: #8899aa;
+    color: #555555;
   }
   .legend-swatch {
     width: 28px;
@@ -70,8 +70,8 @@
 
   <style>
     .R8 { rx:8; ry:8; stroke-width:2; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
     .lb-b { font-weight:700; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:15px; font-weight:700; dominant-baseline:hanging; }
     .br { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; }
@@ -81,36 +81,36 @@
   <!-- ========== PHASE BACKGROUNDS ========== -->
 
   <!-- LAMBDA Entry Phase -->
-  <rect class="R8" x="30" y="15" width="860" height="420" fill="none" stroke="#2a5a8a" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
+  <rect class="R8" x="30" y="15" width="860" height="420" fill="none" stroke="#88aacc" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
   <text class="ph" x="50" y="28" fill="#5dade2">LAMBDA ENTRY</text>
   <text class="ls" x="50" y="46" text-anchor="start" fill="#5dade2">~2 cycles</text>
 
   <!-- Body Phase -->
-  <rect class="R8" x="30" y="450" width="860" height="80" fill="none" stroke="#5a5a8a" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
+  <rect class="R8" x="30" y="450" width="860" height="80" fill="none" stroke="#9999cc" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
   <text class="ph" x="50" y="463" fill="#9b59b6">BODY EXECUTION</text>
   <text class="ls" x="50" y="481" text-anchor="start" fill="#9b59b6">N cycles</text>
 
   <!-- RETURN Phase -->
-  <rect class="R8" x="30" y="545" width="860" height="530" fill="none" stroke="#5a8a5a" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
+  <rect class="R8" x="30" y="545" width="860" height="530" fill="none" stroke="#88cc88" stroke-width="1" stroke-dasharray="4,4" rx="12"/>
   <text class="ph" x="50" y="558" fill="#2ecc71">RETURN</text>
   <text class="ls" x="50" y="576" text-anchor="start" fill="#2ecc71">1 cycle (fast) / 5+ cycles (stack)</text>
 
   <!-- ========== LAMBDA ENTRY FLOW ========== -->
 
   <!-- LAMBDA CRn, x instruction -->
-  <rect class="R8" x="340" y="60" width="240" height="40" fill="#0f2640" stroke="#5dade2"/>
+  <rect class="R8" x="340" y="60" width="240" height="40" fill="#e8f0fa" stroke="#5dade2"/>
   <text class="lb lb-b" x="460" y="80">LAMBDA CRn, x</text>
 
   <!-- Arrow down -->
   <line x1="460" y1="100" x2="460" y2="125" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <!-- Decision 1: Type = Inform? -->
-  <polygon points="460,130 565,168 460,206 355,168" fill="#2a1a0f" stroke="#f39c12" stroke-width="2"/>
+  <polygon points="460,130 565,168 460,206 355,168" fill="#f8f0e8" stroke="#f39c12" stroke-width="2"/>
   <text class="lb" x="460" y="163">CRn.Type =</text>
   <text class="lb" x="460" y="178">Inform (00)?</text>
 
   <!-- FAULT box -->
-  <rect class="R8" x="710" y="148" width="130" height="40" fill="#2a0f0f" stroke="#e74c3c"/>
+  <rect class="R8" x="710" y="148" width="130" height="40" fill="#fce8e8" stroke="#e74c3c"/>
   <text class="lb lb-b" x="775" y="168" fill="#e74c3c">FAULT</text>
 
   <!-- Arrow: Type check → FAULT (No) -->
@@ -122,7 +122,7 @@
   <text class="br" x="478" y="222" fill="#2ecc71">Yes</text>
 
   <!-- Decision 2: X permission? -->
-  <polygon points="460,235 555,268 460,301 365,268" fill="#2a1a0f" stroke="#f39c12" stroke-width="2"/>
+  <polygon points="460,235 555,268 460,301 365,268" fill="#f8f0e8" stroke="#f39c12" stroke-width="2"/>
   <text class="lb" x="460" y="264">X perm</text>
   <text class="lb" x="460" y="279">set?</text>
 
@@ -135,7 +135,7 @@
   <text class="br" x="478" y="317" fill="#2ecc71">Yes</text>
 
   <!-- Decision 3: LAMBDA-active already set? -->
-  <polygon points="460,330 575,368 460,406 345,368" fill="#2a1a0f" stroke="#f39c12" stroke-width="2"/>
+  <polygon points="460,330 575,368 460,406 345,368" fill="#f8f0e8" stroke="#f39c12" stroke-width="2"/>
   <text class="lb" x="460" y="362">LAMBDA-active</text>
   <text class="lb" x="460" y="378">already set?</text>
 
@@ -151,20 +151,20 @@
   <!-- Left: Save PC+4 -->
   <line x1="460" y1="425" x2="165" y2="425" stroke="#5dade2" stroke-width="2"/>
   <line x1="165" y1="425" x2="165" y2="440" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="70" y="445" width="190" height="50" fill="#0f2620" stroke="#2ecc71"/>
+  <rect class="R8" x="70" y="445" width="190" height="50" fill="#eaf5ee" stroke="#2ecc71"/>
   <text class="lb" x="165" y="463">Save PC+4 to</text>
   <text class="lb lb-b" x="165" y="480">LAMBDA_PC reg</text>
 
   <!-- Center: Set flag -->
   <line x1="460" y1="425" x2="460" y2="440" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="365" y="445" width="190" height="50" fill="#0f2620" stroke="#2ecc71"/>
+  <rect class="R8" x="365" y="445" width="190" height="50" fill="#eaf5ee" stroke="#2ecc71"/>
   <text class="lb" x="460" y="463">Set</text>
   <text class="lb lb-b" x="460" y="480">LAMBDA-active = 1</text>
 
   <!-- Right: Branch to code -->
   <line x1="460" y1="425" x2="745" y2="425" stroke="#5dade2" stroke-width="2"/>
   <line x1="745" y1="425" x2="745" y2="440" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="650" y="445" width="190" height="50" fill="#0f2620" stroke="#2ecc71"/>
+  <rect class="R8" x="650" y="445" width="190" height="50" fill="#eaf5ee" stroke="#2ecc71"/>
   <text class="lb" x="745" y="463">Branch to</text>
   <text class="lb lb-b" x="745" y="480">CRn entry point</text>
 
@@ -173,7 +173,7 @@
   <line x1="460" y1="495" x2="460" y2="510" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <rect class="R8" x="280" y="462" width="0" height="0" fill="none" stroke="none"/>
-  <rect class="R8" x="280" y="515" width="360" height="45" fill="#1a1a2a" stroke="#9b59b6"/>
+  <rect class="R8" x="280" y="515" width="360" height="45" fill="#f0f0fa" stroke="#9b59b6"/>
   <text class="lb" x="460" y="530">Body executes: args/results in DRs</text>
   <text class="ls" x="460" y="548">CR6, CR14 unchanged &mdash; same protection domain</text>
 
@@ -182,14 +182,14 @@
   <line x1="460" y1="560" x2="460" y2="590" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <!-- RETURN instruction -->
-  <rect class="R8" x="365" y="595" width="190" height="40" fill="#0f2640" stroke="#5dade2"/>
+  <rect class="R8" x="365" y="595" width="190" height="40" fill="#e8f0fa" stroke="#5dade2"/>
   <text class="lb lb-b" x="460" y="615">RETURN</text>
 
   <!-- Arrow down to decision -->
   <line x1="460" y1="635" x2="460" y2="660" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <!-- Decision: LAMBDA-active flag set? -->
-  <polygon points="460,665 575,705 460,745 345,705" fill="#2a1a0f" stroke="#f39c12" stroke-width="2"/>
+  <polygon points="460,665 575,705 460,745 345,705" fill="#f8f0e8" stroke="#f39c12" stroke-width="2"/>
   <text class="lb" x="460" y="699">LAMBDA-active</text>
   <text class="lb" x="460" y="715">flag set?</text>
 
@@ -198,23 +198,23 @@
   <text class="br" x="278" y="697" fill="#2ecc71">Yes</text>
 
   <!-- Fast path header -->
-  <rect class="R8" x="75" y="685" width="140" height="40" fill="#0f3a1a" stroke="#2ecc71"/>
+  <rect class="R8" x="75" y="685" width="140" height="40" fill="#e5f5e8" stroke="#2ecc71"/>
   <text class="lb lb-b" x="145" y="705" fill="#2ecc71">FAST PATH</text>
 
   <!-- Step 1: Restore PC -->
   <line x1="145" y1="725" x2="145" y2="755" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="55" y="760" width="180" height="44" fill="#0f2620" stroke="#2ecc71"/>
+  <rect class="R8" x="55" y="760" width="180" height="44" fill="#eaf5ee" stroke="#2ecc71"/>
   <text class="lb" x="145" y="775">Restore PC from</text>
   <text class="lb lb-b" x="145" y="792">LAMBDA_PC</text>
 
   <!-- Step 2: Clear flag -->
   <line x1="145" y1="804" x2="145" y2="825" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="55" y="830" width="180" height="36" fill="#0f2620" stroke="#2ecc71"/>
+  <rect class="R8" x="55" y="830" width="180" height="36" fill="#eaf5ee" stroke="#2ecc71"/>
   <text class="lb" x="145" y="848">Clear LAMBDA-active</text>
 
   <!-- Done (fast path) -->
   <line x1="145" y1="866" x2="145" y2="890" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="65" y="895" width="160" height="50" fill="#0f3a1a" stroke="#2ecc71"/>
+  <rect class="R8" x="65" y="895" width="160" height="50" fill="#e5f5e8" stroke="#2ecc71"/>
   <text class="lb lb-b" x="145" y="913" fill="#2ecc71">DONE</text>
   <text class="ls" x="145" y="932" fill="#2ecc71">Zero stack access</text>
   <text class="cy" x="145" y="958">~1 cycle total</text>
@@ -224,17 +224,17 @@
   <text class="br" x="635" y="697" fill="#e74c3c">No</text>
 
   <!-- Stack path header -->
-  <rect class="R8" x="695" y="685" width="150" height="40" fill="#2a1a2a" stroke="#c39bd3"/>
+  <rect class="R8" x="695" y="685" width="150" height="40" fill="#f0e8f8" stroke="#c39bd3"/>
   <text class="lb lb-b" x="770" y="705" fill="#c39bd3">STACK PATH</text>
 
   <!-- Step 1: Pop frame -->
   <line x1="770" y1="725" x2="770" y2="755" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="685" y="760" width="170" height="36" fill="#2a1a2a" stroke="#c39bd3"/>
+  <rect class="R8" x="685" y="760" width="170" height="36" fill="#f0e8f8" stroke="#c39bd3"/>
   <text class="lb" x="770" y="778">Pop stack frame</text>
 
   <!-- Step 2: Check tag -->
   <line x1="770" y1="796" x2="770" y2="818" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <polygon points="770,823 845,855 770,887 695,855" fill="#2a1a0f" stroke="#f39c12" stroke-width="2"/>
+  <polygon points="770,823 845,855 770,887 695,855" fill="#f8f0e8" stroke="#f39c12" stroke-width="2"/>
   <text class="lb" x="770" y="850">Tag</text>
   <text class="lb" x="770" y="866">bit?</text>
 
@@ -242,14 +242,14 @@
   <line x1="695" y1="855" x2="550" y2="855" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
   <text class="ls" x="622" y="845">Tag = 0</text>
 
-  <rect class="R8" x="355" y="832" width="200" height="60" fill="#2a1a2a" stroke="#c39bd3"/>
+  <rect class="R8" x="355" y="832" width="200" height="60" fill="#f0e8f8" stroke="#c39bd3"/>
   <text class="lb lb-b" x="455" y="850" fill="#c39bd3">CALL frame</text>
   <text class="ls" x="455" y="867">Restore CR5, CR6, CR14</text>
   <text class="ls" x="455" y="882">via mLoad revalidation</text>
 
   <!-- Done (CALL frame) -->
   <line x1="455" y1="892" x2="455" y2="920" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
-  <rect class="R8" x="380" y="925" width="150" height="50" fill="#2a1a2a" stroke="#c39bd3"/>
+  <rect class="R8" x="380" y="925" width="150" height="50" fill="#f0e8f8" stroke="#c39bd3"/>
   <text class="lb lb-b" x="455" y="943" fill="#c39bd3">DONE</text>
   <text class="ls" x="455" y="962" fill="#c39bd3">Full domain restore</text>
   <text class="cy" x="455" y="988">5+ cycles total</text>
@@ -259,7 +259,7 @@
   <line x1="870" y1="855" x2="870" y2="920" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
   <text class="ls" x="868" y="845">Tag = 1</text>
 
-  <rect class="R8" x="800" y="925" width="140" height="50" fill="#2a1a2a" stroke="#c39bd3"/>
+  <rect class="R8" x="800" y="925" width="140" height="50" fill="#f0e8f8" stroke="#c39bd3"/>
   <text class="ls" x="870" y="943" fill="#c39bd3">LAMBDA frame</text>
   <text class="ls" x="870" y="960" fill="#c39bd3">Restore PC only</text>
   <text class="cy" x="870" y="988">~2 cycles</text>
@@ -267,11 +267,11 @@
   <!-- ========== ANNOTATIONS ========== -->
 
   <!-- Annotation: no CRs written -->
-  <rect class="R8" x="70" y="340" width="200" height="28" fill="#0a0e17" stroke="#3a5a3a" stroke-dasharray="3,3"/>
+  <rect class="R8" x="70" y="340" width="200" height="28" fill="#ffffff" stroke="#aaddaa" stroke-dasharray="3,3"/>
   <text class="ls" x="170" y="354" fill="#6aaa6a">No CR writes. No mLoad.</text>
 
   <!-- Annotation: fast path highlight -->
-  <rect class="R8" x="55" y="750" width="200" height="126" fill="none" stroke="#2ecc71" stroke-width="1" stroke-dasharray="6,3" rx="10" opacity="0.3"/>
+  <rect class="R8" x="55" y="750" width="200" height="126" fill="none" stroke="#2ecc71" stroke-width="1" stroke-dasharray="6,3" rx="10" opacity="0.2"/>
 
 </svg>
 

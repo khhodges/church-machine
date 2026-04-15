@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 750px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 750px; }
 </style>
 </head>
 <body>
@@ -40,16 +40,16 @@
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .inst { font-family:'Consolas',monospace; font-size:12px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:12px; fill:#333333; text-anchor:start; dominant-baseline:central; }
     .comment { font-family:'Consolas',monospace; font-size:11px; fill:#6a8a6a; text-anchor:start; dominant-baseline:central; }
     .cyc { font-family:'Consolas',monospace; font-size:12px; fill:#f39c12; text-anchor:end; dominant-baseline:central; font-weight:700; }
-    .cyc-t { font-family:'Consolas',monospace; font-size:11px; fill:#8899aa; text-anchor:end; dominant-baseline:central; }
+    .cyc-t { font-family:'Consolas',monospace; font-size:11px; fill:#666666; text-anchor:end; dominant-baseline:central; }
     .flag-on { font-family:'Consolas',monospace; font-size:11px; fill:#2ecc71; font-weight:700; text-anchor:center; dominant-baseline:central; }
     .flag-off { font-family:'Consolas',monospace; font-size:11px; fill:#e74c3c; font-weight:700; text-anchor:center; dominant-baseline:central; }
   </style>
@@ -57,10 +57,10 @@
   <!-- ========== CODE MEMORY LAYOUT ========== -->
 
   <text class="ph" x="500" y="25" text-anchor="middle" fill="#f5c842">CODE MEMORY LAYOUT</text>
-  <text class="ls" x="500" y="43" fill="#8899aa">Clamp function exists exactly once — three invocations share the same code</text>
+  <text class="ls" x="500" y="43" fill="#666666">Clamp function exists exactly once — three invocations share the same code</text>
 
   <!-- Memory block: clamp function -->
-  <rect x="550" y="60" width="400" height="120" rx="8" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="550" y="60" width="400" height="120" rx="8" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="col-hdr" x="750" y="80" fill="#2ecc71">clamp: (exists once at CR2+offset)</text>
 
   <text class="inst" x="570" y="100">CMP  DR1, #0</text>
@@ -75,7 +75,7 @@
   <text class="comment" x="730" y="172">; fast path back (1 cycle)</text>
 
   <!-- Caller block -->
-  <rect x="50" y="60" width="440" height="120" rx="8" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="50" y="60" width="440" height="120" rx="8" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <text class="col-hdr" x="270" y="80" fill="#5dade2">Caller: RGB Processing</text>
 
   <text class="inst" x="70" y="100" fill="#e74c3c">MOV  DR1, DR5</text>
@@ -84,7 +84,7 @@
   <text class="comment" x="250" y="118">; clamp R (invocation 1)</text>
   <text class="inst" x="70" y="136" fill="#3498db">MOV  DR5, DR1</text>
   <text class="comment" x="250" y="136">; store clamped R</text>
-  <text class="ls" x="270" y="158" fill="#555">... (continues below in detail)</text>
+  <text class="ls" x="270" y="158" fill="#666666">... (continues below in detail)</text>
 
   <!-- Arrows: 3 invocations pointing to same code -->
   <line x1="250" y1="118" x2="550" y2="100" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ah-g)"/>
@@ -99,30 +99,30 @@
   <text class="ph" x="500" y="215" text-anchor="middle" fill="#f5c842">ANNOTATED INSTRUCTION SEQUENCE</text>
 
   <!-- Column headers -->
-  <rect x="30" y="230" width="940" height="32" rx="6" fill="#141a28" stroke="#2a3a4a" stroke-width="1"/>
+  <rect x="30" y="230" width="940" height="32" rx="6" fill="#f0f4f8" stroke="#cccccc" stroke-width="1"/>
   <text class="col-hdr" x="55" y="246" fill="#f5c842" text-anchor="start">Addr</text>
   <text class="col-hdr" x="140" y="246" fill="#5dade2">Instruction</text>
-  <text class="col-hdr" x="420" y="246" fill="#8899aa">Purpose</text>
+  <text class="col-hdr" x="420" y="246" fill="#666666">Purpose</text>
   <text class="col-hdr" x="630" y="246" fill="#f39c12">Cycles</text>
   <text class="col-hdr" x="730" y="246" fill="#2ecc71">LAMBDA flag</text>
   <text class="col-hdr" x="870" y="246" fill="#c39bd3">Stack</text>
 
   <!-- ===== R CHANNEL (red) ===== -->
-  <rect x="30" y="265" width="940" height="22" rx="0" fill="#1a0f0f" stroke="none"/>
+  <rect x="30" y="265" width="940" height="22" rx="0" fill="#fdf0f0" stroke="none"/>
   <text class="col-hdr" x="500" y="276" fill="#e74c3c">&#9632; R CHANNEL</text>
 
   <!-- Line 1: MOV DR1, DR5 -->
-  <rect x="30" y="290" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="304" fill="#666">0x00</text>
+  <rect x="30" y="290" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="304" fill="#666666">0x00</text>
   <text class="inst" x="100" y="304" fill="#e74c3c">MOV  DR1, DR5</text>
-  <text class="lt" x="340" y="304" fill="#a0b0c0">Load R channel value into argument register</text>
+  <text class="lt" x="340" y="304" fill="#555555">Load R channel value into argument register</text>
   <text class="cyc" x="650" y="304">1</text>
   <text class="flag-off" x="730" y="304">0</text>
-  <text class="ls" x="870" y="304" fill="#555">empty</text>
+  <text class="ls" x="870" y="304" fill="#666666">empty</text>
 
   <!-- Line 2: LAMBDA CR2, clamp -->
-  <rect x="30" y="318" width="940" height="28" rx="0" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
-  <text class="inst" x="50" y="332" fill="#666">0x04</text>
+  <rect x="30" y="318" width="940" height="28" rx="0" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
+  <text class="inst" x="50" y="332" fill="#666666">0x04</text>
   <text class="inst" x="100" y="332" fill="#2ecc71">LAMBDA CR2, clamp</text>
   <text class="lt" x="340" y="332" fill="#2ecc71">Apply clamp code via X permission on CR2</text>
   <text class="cyc" x="650" y="332">1</text>
@@ -130,41 +130,41 @@
   <text class="ls" x="870" y="332" fill="#2ecc71">none!</text>
 
   <!-- Indented: clamp body -->
-  <rect x="30" y="346" width="940" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="360" fill="#555">+0</text>
-  <text class="inst" x="120" y="360" fill="#8899aa">CMP  DR1, #0</text>
-  <text class="lt" x="340" y="360" fill="#8899aa">Compare with minimum (0)</text>
+  <rect x="30" y="346" width="940" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="360" fill="#666666">+0</text>
+  <text class="inst" x="120" y="360" fill="#666666">CMP  DR1, #0</text>
+  <text class="lt" x="340" y="360" fill="#666666">Compare with minimum (0)</text>
   <text class="cyc" x="650" y="360">1</text>
   <text class="flag-on" x="730" y="360">1</text>
-  <text class="ls" x="870" y="360" fill="#555">&#8212;</text>
+  <text class="ls" x="870" y="360" fill="#666666">&#8212;</text>
 
-  <rect x="30" y="374" width="940" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="388" fill="#555">+4</text>
-  <text class="inst" x="120" y="388" fill="#8899aa">MOVLT DR1, #0</text>
-  <text class="lt" x="340" y="388" fill="#8899aa">Conditional: set 0 if below minimum</text>
+  <rect x="30" y="374" width="940" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="388" fill="#666666">+4</text>
+  <text class="inst" x="120" y="388" fill="#666666">MOVLT DR1, #0</text>
+  <text class="lt" x="340" y="388" fill="#666666">Conditional: set 0 if below minimum</text>
   <text class="cyc" x="650" y="388">1</text>
   <text class="flag-on" x="730" y="388">1</text>
-  <text class="ls" x="870" y="388" fill="#555">&#8212;</text>
+  <text class="ls" x="870" y="388" fill="#666666">&#8212;</text>
 
-  <rect x="30" y="402" width="940" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="416" fill="#555">+8</text>
-  <text class="inst" x="120" y="416" fill="#8899aa">CMP  DR1, #255</text>
-  <text class="lt" x="340" y="416" fill="#8899aa">Compare with maximum (255)</text>
+  <rect x="30" y="402" width="940" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="416" fill="#666666">+8</text>
+  <text class="inst" x="120" y="416" fill="#666666">CMP  DR1, #255</text>
+  <text class="lt" x="340" y="416" fill="#666666">Compare with maximum (255)</text>
   <text class="cyc" x="650" y="416">1</text>
   <text class="flag-on" x="730" y="416">1</text>
-  <text class="ls" x="870" y="416" fill="#555">&#8212;</text>
+  <text class="ls" x="870" y="416" fill="#666666">&#8212;</text>
 
-  <rect x="30" y="430" width="940" height="28" rx="0" fill="#0d1a15" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="444" fill="#555">+C</text>
-  <text class="inst" x="120" y="444" fill="#8899aa">MOVGT DR1, #255</text>
-  <text class="lt" x="340" y="444" fill="#8899aa">Conditional: set 255 if above maximum</text>
+  <rect x="30" y="430" width="940" height="28" rx="0" fill="#f0f8f0" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="444" fill="#666666">+C</text>
+  <text class="inst" x="120" y="444" fill="#666666">MOVGT DR1, #255</text>
+  <text class="lt" x="340" y="444" fill="#666666">Conditional: set 255 if above maximum</text>
   <text class="cyc" x="650" y="444">1</text>
   <text class="flag-on" x="730" y="444">1</text>
-  <text class="ls" x="870" y="444" fill="#555">&#8212;</text>
+  <text class="ls" x="870" y="444" fill="#666666">&#8212;</text>
 
   <!-- RETURN (fast path) -->
-  <rect x="30" y="458" width="940" height="28" rx="0" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
-  <text class="inst" x="50" y="472" fill="#555">+10</text>
+  <rect x="30" y="458" width="940" height="28" rx="0" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
+  <text class="inst" x="50" y="472" fill="#666666">+10</text>
   <text class="inst" x="120" y="472" fill="#2ecc71">RETURN</text>
   <text class="lt" x="340" y="472" fill="#2ecc71">Fast path: flag=1 &#8594; restore PC from status, clear flag</text>
   <text class="cyc" x="650" y="472">1</text>
@@ -172,161 +172,161 @@
   <text class="ls" x="870" y="472" fill="#2ecc71">no pop!</text>
 
   <!-- Store R result -->
-  <rect x="30" y="486" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="500" fill="#666">0x08</text>
+  <rect x="30" y="486" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="500" fill="#666666">0x08</text>
   <text class="inst" x="100" y="500" fill="#e74c3c">MOV  DR5, DR1</text>
-  <text class="lt" x="340" y="500" fill="#a0b0c0">Store clamped R back</text>
+  <text class="lt" x="340" y="500" fill="#555555">Store clamped R back</text>
   <text class="cyc" x="650" y="500">1</text>
   <text class="flag-off" x="730" y="500">0</text>
-  <text class="ls" x="870" y="500" fill="#555">empty</text>
+  <text class="ls" x="870" y="500" fill="#666666">empty</text>
 
   <!-- R subtotal -->
-  <rect x="580" y="514" width="120" height="22" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="580" y="514" width="120" height="22" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="col-hdr" x="640" y="525" fill="#e74c3c">R total: 8 cycles</text>
 
   <!-- ===== G CHANNEL (green) ===== -->
-  <rect x="30" y="542" width="940" height="22" rx="0" fill="#0f1a0f" stroke="none"/>
+  <rect x="30" y="542" width="940" height="22" rx="0" fill="#f0f8f0" stroke="none"/>
   <text class="col-hdr" x="500" y="553" fill="#2ecc71">&#9632; G CHANNEL</text>
 
-  <rect x="30" y="567" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="581" fill="#666">0x0C</text>
+  <rect x="30" y="567" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="581" fill="#666666">0x0C</text>
   <text class="inst" x="100" y="581" fill="#2ecc71">MOV  DR1, DR6</text>
-  <text class="lt" x="340" y="581" fill="#a0b0c0">Load G channel value into argument register</text>
+  <text class="lt" x="340" y="581" fill="#555555">Load G channel value into argument register</text>
   <text class="cyc" x="650" y="581">1</text>
   <text class="flag-off" x="730" y="581">0</text>
-  <text class="ls" x="870" y="581" fill="#555">empty</text>
+  <text class="ls" x="870" y="581" fill="#666666">empty</text>
 
-  <rect x="30" y="595" width="940" height="28" rx="0" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
-  <text class="inst" x="50" y="609" fill="#666">0x10</text>
+  <rect x="30" y="595" width="940" height="28" rx="0" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
+  <text class="inst" x="50" y="609" fill="#666666">0x10</text>
   <text class="inst" x="100" y="609" fill="#2ecc71">LAMBDA CR2, clamp</text>
   <text class="lt" x="340" y="609" fill="#2ecc71">Same code, same GT, second invocation</text>
   <text class="cyc" x="650" y="609">1</text>
   <text class="flag-on" x="730" y="609">1 (SET)</text>
   <text class="ls" x="870" y="609" fill="#2ecc71">none!</text>
 
-  <rect x="30" y="623" width="940" height="22" rx="0" fill="#0d1a15" stroke="none"/>
-  <text class="lt" x="120" y="634" fill="#555" font-style="italic">... clamp body (4 instructions) + RETURN fast path ...</text>
+  <rect x="30" y="623" width="940" height="22" rx="0" fill="#f0f8f0" stroke="none"/>
+  <text class="lt" x="120" y="634" fill="#666666" font-style="italic">... clamp body (4 instructions) + RETURN fast path ...</text>
   <text class="cyc" x="650" y="634">6</text>
   <text class="flag-on" x="730" y="634">1&#8594;0</text>
   <text class="ls" x="870" y="634" fill="#2ecc71">no pop!</text>
 
-  <rect x="30" y="645" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="659" fill="#666">0x14</text>
+  <rect x="30" y="645" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="659" fill="#666666">0x14</text>
   <text class="inst" x="100" y="659" fill="#2ecc71">MOV  DR6, DR1</text>
-  <text class="lt" x="340" y="659" fill="#a0b0c0">Store clamped G back</text>
+  <text class="lt" x="340" y="659" fill="#555555">Store clamped G back</text>
   <text class="cyc" x="650" y="659">1</text>
   <text class="flag-off" x="730" y="659">0</text>
-  <text class="ls" x="870" y="659" fill="#555">empty</text>
+  <text class="ls" x="870" y="659" fill="#666666">empty</text>
 
-  <rect x="580" y="673" width="120" height="22" rx="4" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="580" y="673" width="120" height="22" rx="4" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="640" y="684" fill="#2ecc71">G total: 8 cycles</text>
 
   <!-- ===== B CHANNEL (blue) ===== -->
-  <rect x="30" y="701" width="940" height="22" rx="0" fill="#0f0f1a" stroke="none"/>
+  <rect x="30" y="701" width="940" height="22" rx="0" fill="#f0f0fa" stroke="none"/>
   <text class="col-hdr" x="500" y="712" fill="#5dade2">&#9632; B CHANNEL</text>
 
-  <rect x="30" y="726" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="740" fill="#666">0x18</text>
+  <rect x="30" y="726" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="740" fill="#666666">0x18</text>
   <text class="inst" x="100" y="740" fill="#5dade2">MOV  DR1, DR7</text>
-  <text class="lt" x="340" y="740" fill="#a0b0c0">Load B channel value into argument register</text>
+  <text class="lt" x="340" y="740" fill="#555555">Load B channel value into argument register</text>
   <text class="cyc" x="650" y="740">1</text>
   <text class="flag-off" x="730" y="740">0</text>
-  <text class="ls" x="870" y="740" fill="#555">empty</text>
+  <text class="ls" x="870" y="740" fill="#666666">empty</text>
 
-  <rect x="30" y="754" width="940" height="28" rx="0" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
-  <text class="inst" x="50" y="768" fill="#666">0x1C</text>
+  <rect x="30" y="754" width="940" height="28" rx="0" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
+  <text class="inst" x="50" y="768" fill="#666666">0x1C</text>
   <text class="inst" x="100" y="768" fill="#2ecc71">LAMBDA CR2, clamp</text>
   <text class="lt" x="340" y="768" fill="#2ecc71">Same code, same GT, third invocation</text>
   <text class="cyc" x="650" y="768">1</text>
   <text class="flag-on" x="730" y="768">1 (SET)</text>
   <text class="ls" x="870" y="768" fill="#2ecc71">none!</text>
 
-  <rect x="30" y="782" width="940" height="22" rx="0" fill="#0d1a15" stroke="none"/>
-  <text class="lt" x="120" y="793" fill="#555" font-style="italic">... clamp body (4 instructions) + RETURN fast path ...</text>
+  <rect x="30" y="782" width="940" height="22" rx="0" fill="#f0f8f0" stroke="none"/>
+  <text class="lt" x="120" y="793" fill="#666666" font-style="italic">... clamp body (4 instructions) + RETURN fast path ...</text>
   <text class="cyc" x="650" y="793">6</text>
   <text class="flag-on" x="730" y="793">1&#8594;0</text>
   <text class="ls" x="870" y="793" fill="#2ecc71">no pop!</text>
 
-  <rect x="30" y="804" width="940" height="28" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
-  <text class="inst" x="50" y="818" fill="#666">0x20</text>
+  <rect x="30" y="804" width="940" height="28" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
+  <text class="inst" x="50" y="818" fill="#666666">0x20</text>
   <text class="inst" x="100" y="818" fill="#5dade2">MOV  DR7, DR1</text>
-  <text class="lt" x="340" y="818" fill="#a0b0c0">Store clamped B back</text>
+  <text class="lt" x="340" y="818" fill="#555555">Store clamped B back</text>
   <text class="cyc" x="650" y="818">1</text>
   <text class="flag-off" x="730" y="818">0</text>
-  <text class="ls" x="870" y="818" fill="#555">empty</text>
+  <text class="ls" x="870" y="818" fill="#666666">empty</text>
 
-  <rect x="580" y="832" width="120" height="22" rx="4" fill="#0f0f2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="580" y="832" width="120" height="22" rx="4" fill="#f0f0fa" stroke="#5dade2" stroke-width="1"/>
   <text class="col-hdr" x="640" y="843" fill="#5dade2">B total: 8 cycles</text>
 
   <!-- ========== TOTALS AND COMPARISON ========== -->
 
-  <rect x="30" y="875" width="940" height="180" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="30" y="875" width="940" height="180" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="500" y="900" text-anchor="middle" fill="#f5c842">PERFORMANCE SUMMARY</text>
 
   <!-- LAMBDA approach -->
-  <rect x="55" y="915" width="420" height="120" rx="8" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="55" y="915" width="420" height="120" rx="8" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="col-hdr" x="265" y="935" fill="#2ecc71">LAMBDA Approach</text>
 
-  <text class="lt" x="75" y="958" fill="#c8d6e5" font-size="12">Total cycles (3 channels):</text>
+  <text class="lt" x="75" y="958" fill="#333333" font-size="12">Total cycles (3 channels):</text>
   <text class="lr" x="440" y="958" fill="#2ecc71" font-size="14" font-weight="bold" font-family="Consolas,monospace">24 cycles</text>
 
-  <text class="lt" x="75" y="978" fill="#c8d6e5" font-size="12">Stack accesses:</text>
+  <text class="lt" x="75" y="978" fill="#333333" font-size="12">Stack accesses:</text>
   <text class="lr" x="440" y="978" fill="#2ecc71" font-size="14" font-weight="bold" font-family="Consolas,monospace">0 (zero)</text>
 
-  <text class="lt" x="75" y="998" fill="#c8d6e5" font-size="12">Code copies in memory:</text>
+  <text class="lt" x="75" y="998" fill="#333333" font-size="12">Code copies in memory:</text>
   <text class="lr" x="440" y="998" fill="#2ecc71" font-size="14" font-weight="bold" font-family="Consolas,monospace">1</text>
 
-  <text class="lt" x="75" y="1018" fill="#c8d6e5" font-size="12">Domain crossings:</text>
+  <text class="lt" x="75" y="1018" fill="#333333" font-size="12">Domain crossings:</text>
   <text class="lr" x="440" y="1018" fill="#2ecc71" font-size="14" font-weight="bold" font-family="Consolas,monospace">0 (same domain)</text>
 
   <!-- CALL approach (comparison) -->
-  <rect x="510" y="915" width="440" height="120" rx="8" fill="#1a1a2a" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <rect x="510" y="915" width="440" height="120" rx="8" fill="#f0f0fa" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
   <text class="col-hdr" x="730" y="935" fill="#e74c3c">If CALL Were Used Instead</text>
 
-  <text class="lt" x="530" y="958" fill="#c8d6e5" font-size="12">Total cycles (3 channels):</text>
+  <text class="lt" x="530" y="958" fill="#333333" font-size="12">Total cycles (3 channels):</text>
   <text class="lr" x="920" y="958" fill="#e74c3c" font-size="14" font-weight="bold" font-family="Consolas,monospace">~48+ cycles</text>
 
-  <text class="lt" x="530" y="978" fill="#c8d6e5" font-size="12">Stack accesses:</text>
+  <text class="lt" x="530" y="978" fill="#333333" font-size="12">Stack accesses:</text>
   <text class="lr" x="920" y="978" fill="#e74c3c" font-size="14" font-weight="bold" font-family="Consolas,monospace">6 (push+pop &#215;3)</text>
 
-  <text class="lt" x="530" y="998" fill="#c8d6e5" font-size="12">Code copies in memory:</text>
-  <text class="lr" x="920" y="998" fill="#8899aa" font-size="14" font-family="Consolas,monospace">1 (same)</text>
+  <text class="lt" x="530" y="998" fill="#333333" font-size="12">Code copies in memory:</text>
+  <text class="lr" x="920" y="998" fill="#666666" font-size="14" font-family="Consolas,monospace">1 (same)</text>
 
-  <text class="lt" x="530" y="1018" fill="#c8d6e5" font-size="12">mLoad revalidations:</text>
+  <text class="lt" x="530" y="1018" fill="#333333" font-size="12">mLoad revalidations:</text>
   <text class="lr" x="920" y="1018" fill="#e74c3c" font-size="14" font-weight="bold" font-family="Consolas,monospace">9 (CR5+CR6+CR14 &#215;3)</text>
 
   <!-- ========== KEY INSIGHT ========== -->
 
-  <rect x="30" y="1075" width="940" height="200" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="30" y="1075" width="940" height="200" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="500" y="1100" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
 
   <text class="lt" x="60" y="1130" fill="#2ecc71" font-size="13" font-weight="bold">Macro-like reuse without duplication:</text>
-  <text class="lt" x="60" y="1150" fill="#a0b0c0" font-size="12">The clamp code exists once in memory. LAMBDA jumps to it via X permission on the GT.</text>
-  <text class="lt" x="60" y="1168" fill="#a0b0c0" font-size="12">Unlike a macro, the code is not copied at each call site. Unlike CALL, there is no stack overhead.</text>
+  <text class="lt" x="60" y="1150" fill="#555555" font-size="12">The clamp code exists once in memory. LAMBDA jumps to it via X permission on the GT.</text>
+  <text class="lt" x="60" y="1168" fill="#555555" font-size="12">Unlike a macro, the code is not copied at each call site. Unlike CALL, there is no stack overhead.</text>
 
   <text class="lt" x="60" y="1198" fill="#5dade2" font-size="13" font-weight="bold">Machine-status fast path:</text>
-  <text class="lt" x="60" y="1218" fill="#a0b0c0" font-size="12">LAMBDA saves PC+4 to a machine-status register (not the stack). RETURN checks the LAMBDA-active</text>
-  <text class="lt" x="60" y="1236" fill="#a0b0c0" font-size="12">flag and restores directly — zero memory access. Three invocations = zero stack operations.</text>
+  <text class="lt" x="60" y="1218" fill="#555555" font-size="12">LAMBDA saves PC+4 to a machine-status register (not the stack). RETURN checks the LAMBDA-active</text>
+  <text class="lt" x="60" y="1236" fill="#555555" font-size="12">flag and restores directly — zero memory access. Three invocations = zero stack operations.</text>
 
   <text class="lt" x="60" y="1260" fill="#c39bd3" font-size="13" font-weight="bold">Security preserved:</text>
-  <text class="lt" x="60" y="1278" fill="#a0b0c0" font-size="12">Each invocation still checks X permission on CR2. The GT governs access — no bypass, no escalation.</text>
+  <text class="lt" x="60" y="1278" fill="#555555" font-size="12">Each invocation still checks X permission on CR2. The GT governs access — no bypass, no escalation.</text>
 
   <!-- visual: 3 arrows pointing to one code block -->
-  <rect x="700" y="1120" width="250" height="130" rx="8" fill="#0a0e17" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="ls" x="825" y="1138" fill="#8899aa">3 invocations &#8594; 1 code block</text>
+  <rect x="700" y="1120" width="250" height="130" rx="8" fill="#ffffff" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="ls" x="825" y="1138" fill="#666666">3 invocations &#8594; 1 code block</text>
 
-  <rect x="720" y="1150" width="30" height="22" rx="4" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="720" y="1150" width="30" height="22" rx="4" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="735" y="1161" fill="#e74c3c">R</text>
 
-  <rect x="720" y="1178" width="30" height="22" rx="4" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="720" y="1178" width="30" height="22" rx="4" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="735" y="1189" fill="#2ecc71">G</text>
 
-  <rect x="720" y="1206" width="30" height="22" rx="4" fill="#0f0f2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="720" y="1206" width="30" height="22" rx="4" fill="#f0f0fa" stroke="#5dade2" stroke-width="1"/>
   <text class="ls" x="735" y="1217" fill="#5dade2">B</text>
 
-  <rect x="830" y="1155" width="100" height="68" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="830" y="1155" width="100" height="68" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="880" y="1180" fill="#2ecc71">clamp</text>
-  <text class="ls" x="880" y="1196" fill="#8899aa">5 instr</text>
+  <text class="ls" x="880" y="1196" fill="#666666">5 instr</text>
 
   <line x1="750" y1="1161" x2="830" y2="1175" stroke="#e74c3c" stroke-width="1.5" marker-end="url(#ah-g)"/>
   <line x1="750" y1="1189" x2="830" y2="1189" stroke="#2ecc71" stroke-width="1.5" marker-end="url(#ah-g)"/>

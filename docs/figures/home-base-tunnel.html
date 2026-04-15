@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure A2: Home Base Tunnel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure A2 &mdash; Home Base Tunnel</h1>
+<p class="subtitle">The single outbound network gateway at address 0xFF000000. All CTMM network connectivity flows through this one tunnel. The IDE provisions the tunnel with optional programmer-defined backup addresses (Word 2/3). No software can bypass, redirect, or create additional outbound paths.</p>
+
+<svg viewBox="0 0 1100 800" width="1100" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-o" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#c07020"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+  </defs>
+
+  <style>
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .label-c { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .title { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; fill:#b8860b; text-anchor:middle; }
+    .title-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:700; text-anchor:start; }
+    .code { font-family:'Consolas',monospace; font-size:11px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .note { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <rect x="50" y="30" width="280" height="350" rx="12" fill="#f0f5fa" stroke="#2a6db5" stroke-width="2"/>
+  <text class="title" x="190" y="60" fill="#2a6db5">CTMM</text>
+  <text class="label-c" x="190" y="80" fill="#555">Local machine</text>
+
+  <rect x="80" y="100" width="220" height="40" rx="6" fill="#e8f0fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="label-c" x="190" y="115" fill="#2a6db5" font-weight="bold">Abstraction A</text>
+  <text class="note" x="110" y="133" fill="#555">holds Outform GT (F-bit set)</text>
+
+  <rect x="80" y="160" width="220" height="40" rx="6" fill="#e8f0fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="label-c" x="190" y="175" fill="#2a6db5" font-weight="bold">Abstraction B</text>
+  <text class="note" x="110" y="193" fill="#555">holds Outform GT (F-bit set)</text>
+
+  <rect x="80" y="220" width="220" height="40" rx="6" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="label-c" x="190" y="235" fill="#c07020" font-weight="bold">Abstraction C</text>
+  <text class="note" x="110" y="253" fill="#555">local only (no F-bit)</text>
+
+  <rect x="80" y="290" width="220" height="70" rx="8" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="label-c" x="190" y="310" fill="#b8860b" font-weight="bold">Home Base Tunnel</text>
+  <text class="code" x="100" y="330" fill="#c07020">0xFF000000</text>
+  <text class="note" x="200" y="330">Abstract GT</text>
+  <text class="note" x="100" y="348" fill="#555">single outbound gateway</text>
+
+  <line x1="190" y1="140" x2="190" y2="290" stroke="#2a6db5" stroke-width="1" stroke-dasharray="4"/>
+
+  <line x1="300" y1="325" x2="440" y2="325" stroke="#c07020" stroke-width="3" marker-end="url(#ah-o)"/>
+  <text class="label-c" x="370" y="310" fill="#c07020" font-weight="bold">ALL traffic</text>
+
+  <rect x="450" y="250" width="200" height="160" rx="12" fill="#f5f0e8" stroke="#c07020" stroke-width="2"/>
+  <text class="title" x="550" y="280" fill="#c07020">IDE</text>
+  <text class="label-c" x="550" y="300" fill="#555">Provisioning authority</text>
+
+  <rect x="470" y="315" width="160" height="70" rx="6" fill="#fff8f0" stroke="#c07020" stroke-width="1"/>
+  <text class="code" x="485" y="335" fill="#c07020">W0: 0xFF000000 (primary)</text>
+  <text class="code" x="485" y="355" fill="#c07020">W2: backup IDE addr 1</text>
+  <text class="code" x="485" y="375" fill="#c07020">W3: backup IDE addr 2</text>
+
+  <line x1="650" y1="325" x2="750" y2="325" stroke="#27864a" stroke-width="2" marker-end="url(#ah-g)"/>
+
+  <rect x="760" y="100" width="300" height="310" rx="12" fill="#f8fcf8" stroke="#27864a" stroke-width="2"/>
+  <text class="title" x="910" y="130" fill="#27864a">REMOTE NETWORK</text>
+
+  <rect x="790" y="155" width="240" height="40" rx="6" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="label-c" x="910" y="170" fill="#27864a" font-weight="bold">Remote Namespace 1</text>
+  <text class="note" x="810" y="188" fill="#555">accessed via Outform GT from A</text>
+
+  <rect x="790" y="210" width="240" height="40" rx="6" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="label-c" x="910" y="225" fill="#27864a" font-weight="bold">Remote Namespace 2</text>
+  <text class="note" x="810" y="243" fill="#555">accessed via Outform GT from B</text>
+
+  <rect x="790" y="280" width="240" height="100" rx="6" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text class="label-c" x="910" y="305" fill="#555">Remote services are</text>
+  <text class="label-c" x="910" y="325" fill="#555">structurally scoped by</text>
+  <text class="label-c" x="910" y="345" fill="#555">GT provisioning</text>
+  <text class="label-c" x="910" y="365" fill="#cc3333" font-size="10">No bypass path exists</text>
+
+  <rect x="50" y="430" width="1010" height="120" rx="10" fill="#fce8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text class="title" x="555" y="460" fill="#cc3333">SECURITY PROPERTIES</text>
+
+  <text class="label" x="80" y="490" fill="#cc3333" font-weight="bold">&#10007; No second outbound path</text>
+  <text class="label" x="80" y="510" fill="#333">&mdash; ALL network traffic goes through 0xFF000000. Software cannot create alternative routes.</text>
+
+  <text class="label" x="80" y="535" fill="#cc3333" font-weight="bold">&#10007; No address forgery</text>
+  <text class="label" x="80" y="555" fill="#333">&mdash; Abstract GT addresses are hardware-routed. Software cannot redirect tunnel traffic.</text>
+
+  <rect x="50" y="570" width="1010" height="210" rx="10" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="title" x="555" y="600">TUNNEL WORD FORMAT</text>
+
+  <rect x="80" y="620" width="950" height="35" rx="4" fill="#f0f5fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="code" x="100" y="638" fill="#2a6db5">Word 0 (primary):   0xFF000000 &mdash; hardwired sentinel, always the Home Base IDE</text>
+
+  <rect x="80" y="665" width="950" height="35" rx="4" fill="#f8f8fc" stroke="#999" stroke-width="1"/>
+  <text class="code" x="100" y="683">Word 1 (seals):     version(7) | seal(25) &mdash; MAC integrity check</text>
+
+  <rect x="80" y="710" width="450" height="35" rx="4" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="code" x="100" y="728" fill="#c07020">Word 2 (backup 1):  programmer-defined IDE address</text>
+
+  <rect x="550" y="710" width="480" height="35" rx="4" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="code" x="570" y="728" fill="#c07020">Word 3 (backup 2):  programmer-defined IDE address</text>
+
+  <text class="note" x="80" y="765" fill="#555">Backup addresses allow fault-tolerant IDE connectivity. Primary always routes to 0xFF000000.</text>
+
+</svg>
+
+</body>
+</html>

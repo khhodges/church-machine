@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure A4: Local Peripheral Autonomy</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure A4 &mdash; Local Peripheral Autonomy</h1>
+<p class="subtitle">CTMMs identify and secure locally attached hardware (UART, GPIO, Timer, Display) without any IDE connection. Abstract GTs in the IDE address range (0xFE______) are probed at boot. Present peripherals get valid Abstract GTs; absent ones get NULL. Air-gapped and offline operation is fully supported.</p>
+
+<svg viewBox="0 0 1100 850" width="1100" height="850" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-b" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2a6db5"/>
+    </marker>
+    <marker id="ah-g" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#27864a"/>
+    </marker>
+    <marker id="ah-r" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#cc3333"/>
+    </marker>
+  </defs>
+
+  <style>
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .label-c { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .title { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; text-anchor:middle; }
+    .title-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:700; text-anchor:start; }
+    .code { font-family:'Consolas',monospace; font-size:11px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .note { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <rect x="50" y="20" width="480" height="380" rx="12" fill="#f0f5fa" stroke="#2a6db5" stroke-width="2"/>
+  <text class="title" x="290" y="50" fill="#2a6db5">CTMM BOOT &mdash; PERIPHERAL PROBE</text>
+
+  <rect x="80" y="70" width="420" height="40" rx="6" fill="#e8f0fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="label-c" x="290" y="85" fill="#2a6db5" font-weight="bold">Phase 5: Peripheral Discovery</text>
+  <text class="note" x="290" y="103" fill="#555" text-anchor="middle">After namespace and nucleus are loaded</text>
+
+  <rect x="80" y="125" width="420" height="250" rx="8" fill="#f8f8fc" stroke="#ddd" stroke-width="1"/>
+  <text class="title-l" x="100" y="150" fill="#333" font-size="12">Probe sequence (IDE address range):</text>
+
+  <rect x="100" y="165" width="380" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="115" y="180" fill="#27864a">0xFE000001  UART    &#8594; PRESENT  &#8594; Abstract GT created</text>
+
+  <rect x="100" y="205" width="380" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="115" y="220" fill="#27864a">0xFE000002  GPIO    &#8594; PRESENT  &#8594; Abstract GT created</text>
+
+  <rect x="100" y="245" width="380" height="30" rx="4" fill="#fce8e8" stroke="#cc3333" stroke-width="1"/>
+  <text class="code" x="115" y="260" fill="#cc3333">0xFE000003  SPI     &#8594; ABSENT   &#8594; NULL GT</text>
+
+  <rect x="100" y="285" width="380" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="115" y="300" fill="#27864a">0xFE000004  Timer   &#8594; PRESENT  &#8594; Abstract GT created</text>
+
+  <rect x="100" y="325" width="380" height="30" rx="4" fill="#fce8e8" stroke="#cc3333" stroke-width="1"/>
+  <text class="code" x="115" y="340" fill="#cc3333">0xFE000005  Display &#8594; ABSENT   &#8594; NULL GT</text>
+
+  <rect x="580" y="20" width="480" height="380" rx="12" fill="#f8fcf8" stroke="#27864a" stroke-width="2"/>
+  <text class="title" x="820" y="50" fill="#27864a">RESULTING PERIPHERAL TABLE</text>
+
+  <rect x="610" y="75" width="420" height="30" rx="4" fill="#e8f0fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="code" x="625" y="90" fill="#555" font-weight="bold">Address         Device    Status     GT</text>
+
+  <rect x="610" y="115" width="420" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="625" y="130" fill="#333">0xFE000001    UART      &#10004; active   valid</text>
+
+  <rect x="610" y="155" width="420" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="625" y="170" fill="#333">0xFE000002    GPIO      &#10004; active   valid</text>
+
+  <rect x="610" y="195" width="420" height="30" rx="4" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text class="code" x="625" y="210" fill="#999">0xFE000003    SPI       &#10007; absent   NULL</text>
+
+  <rect x="610" y="235" width="420" height="30" rx="4" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="code" x="625" y="250" fill="#333">0xFE000004    Timer     &#10004; active   valid</text>
+
+  <rect x="610" y="275" width="420" height="30" rx="4" fill="#f5f5f0" stroke="#999" stroke-width="1"/>
+  <text class="code" x="625" y="290" fill="#999">0xFE000005    Display   &#10007; absent   NULL</text>
+
+  <rect x="610" y="325" width="420" height="55" rx="6" fill="#f5f5f0" stroke="#b8860b" stroke-width="1"/>
+  <text class="label-c" x="820" y="345" fill="#b8860b" font-weight="bold">Accessing NULL GT &#8594; FAULT</text>
+  <text class="note" x="640" y="370" fill="#555">Software cannot accidentally use an absent peripheral.</text>
+
+  <rect x="50" y="425" width="1010" height="180" rx="12" fill="#f5f5f0" stroke="#b8860b" stroke-width="2"/>
+  <text class="title" x="555" y="455" fill="#b8860b">AIR-GAPPED OPERATION</text>
+
+  <rect x="80" y="475" width="300" height="110" rx="8" fill="#e8f5e8" stroke="#27864a" stroke-width="1.5"/>
+  <text class="title-l" x="100" y="500" fill="#27864a">Connected mode</text>
+  <text class="label" x="100" y="525" fill="#333">&#8226; IDE provisions Home Base Tunnel</text>
+  <text class="label" x="100" y="545" fill="#333">&#8226; Network via 0xFF000000</text>
+  <text class="label" x="100" y="565" fill="#333">&#8226; Remote namespaces accessible</text>
+
+  <rect x="410" y="475" width="300" height="110" rx="8" fill="#f5f0e8" stroke="#c07020" stroke-width="1.5"/>
+  <text class="title-l" x="430" y="500" fill="#c07020">Air-gapped mode</text>
+  <text class="label" x="430" y="525" fill="#333">&#8226; No IDE connection</text>
+  <text class="label" x="430" y="545" fill="#333">&#8226; Home Base Tunnel = NULL GT</text>
+  <text class="label" x="430" y="565" fill="#333">&#8226; Local peripherals still work</text>
+
+  <rect x="740" y="475" width="290" height="110" rx="8" fill="#fce8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text class="title-l" x="760" y="500" fill="#cc3333">Security guarantee</text>
+  <text class="label" x="760" y="525" fill="#333">&#8226; No outbound data leakage</text>
+  <text class="label" x="760" y="545" fill="#333">&#8226; No network = no exfiltration</text>
+  <text class="label" x="760" y="565" fill="#333">&#8226; Hardware-enforced isolation</text>
+
+  <rect x="50" y="630" width="1010" height="200" rx="12" fill="#f8f8fc" stroke="#2a6db5" stroke-width="1.5"/>
+  <text class="title" x="555" y="660" fill="#2a6db5">PERIPHERAL ACCESS MODEL</text>
+
+  <text class="label" x="80" y="695" fill="#333">1. Abstraction holds Abstract GT for UART (0xFE000001) in its c-list</text>
+  <text class="label" x="80" y="720" fill="#333">2. CALL with UART GT &#8594; hardware routes to UART peripheral (no namespace lookup)</text>
+  <text class="label" x="80" y="745" fill="#333">3. TPERM checks GT permissions (R/W) before granting access</text>
+  <text class="label" x="80" y="770" fill="#333">4. Read/write operations execute directly on peripheral registers</text>
+
+  <text class="label" x="80" y="800" fill="#cc3333" font-weight="bold">No device driver. No kernel. No system call.</text>
+  <text class="label" x="450" y="800" fill="#555">The GT IS the driver. The hardware IS the protection.</text>
+
+</svg>
+
+</body>
+</html>

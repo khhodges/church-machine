@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 750px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 750px; }
 </style>
 </head>
 <body>
@@ -49,15 +49,15 @@
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .inst { font-family:'Consolas',monospace; font-size:12px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
-    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
-    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .inst { font-family:'Consolas',monospace; font-size:12px; fill:#333333; text-anchor:start; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; font-weight:700; text-anchor:middle; dominant-baseline:central; }
   </style>
 
   <!-- ========== TWO META MACHINES ========== -->
@@ -65,95 +65,95 @@
   <text class="ph" x="530" y="25" text-anchor="middle" fill="#f5c842">TWO META MACHINES WITH MATCHING KEY MATERIAL</text>
 
   <!-- ===== Machine A (Kenneth / CTMM) ===== -->
-  <rect x="30" y="45" width="460" height="380" rx="12" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="30" y="45" width="460" height="380" rx="12" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <text class="ph" x="260" y="70" text-anchor="middle" fill="#5dade2">META MACHINE A (Kenneth)</text>
   <text class="ls" x="260" y="88" fill="#5dade2">CTMM Sim-64 &bull; Custom ISA</text>
 
   <!-- Thread registers -->
-  <rect x="50" y="105" width="200" height="105" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="col-hdr" x="150" y="122" fill="#8899aa">Thread Registers</text>
+  <rect x="50" y="105" width="200" height="105" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="col-hdr" x="150" y="122" fill="#666666">Thread Registers</text>
 
-  <rect x="60" y="132" width="60" height="22" rx="3" fill="#1a2a3a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="60" y="132" width="60" height="22" rx="3" fill="#e8f0f8" stroke="#5dade2" stroke-width="1"/>
   <text class="cell" x="90" y="143" fill="#5dade2">CR8</text>
-  <text class="lt" x="125" y="143" fill="#a0b0c0">me (Thread identity)</text>
+  <text class="lt" x="125" y="143" fill="#555555">me (Thread identity)</text>
 
-  <rect x="60" y="158" width="60" height="22" rx="3" fill="#1a2a3a" stroke="#c39bd3" stroke-width="1"/>
+  <rect x="60" y="158" width="60" height="22" rx="3" fill="#e8f0f8" stroke="#c39bd3" stroke-width="1"/>
   <text class="cell" x="90" y="169" fill="#c39bd3">CR1</text>
-  <text class="lt" x="125" y="169" fill="#a0b0c0">mymother (Outform, E)</text>
+  <text class="lt" x="125" y="169" fill="#555555">mymother (Outform, E)</text>
 
-  <rect x="60" y="184" width="60" height="22" rx="3" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="60" y="184" width="60" height="22" rx="3" fill="#e8f0f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="90" y="195" fill="#2ecc71">CR0</text>
-  <text class="lt" x="125" y="195" fill="#a0b0c0">tunnel key (Inform, R)</text>
+  <text class="lt" x="125" y="195" fill="#555555">tunnel key (Inform, R)</text>
 
   <!-- Namespace entry for tunnel key (Machine A) -->
-  <rect x="50" y="220" width="420" height="190" rx="6" fill="#0a1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="50" y="220" width="420" height="190" rx="6" fill="#f0f5fa" stroke="#f5c842" stroke-width="1.5"/>
   <text class="col-hdr" x="260" y="240" fill="#f5c842">Namespace Entry: tunnel_key (index 7)</text>
 
   <!-- 3-word descriptor -->
-  <rect x="70" y="255" width="380" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="70" y="255" width="380" height="32" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="110" y="271" fill="#f39c12" font-size="10">Word 0</text>
   <text class="cell-b" x="260" y="271" fill="#f5c842">Location: crypto key data ptr</text>
 
-  <rect x="70" y="291" width="380" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="70" y="291" width="380" height="32" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="110" y="307" fill="#f39c12" font-size="10">Word 1</text>
   <text class="cell-b" x="260" y="307" fill="#f5c842">Limit: key length (256-bit)</text>
 
-  <rect x="70" y="327" width="380" height="32" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
+  <rect x="70" y="327" width="380" height="32" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
   <text class="col-hdr" x="110" y="343" fill="#f39c12" font-size="10">Word 2</text>
-  <text class="cell" x="205" y="343" fill="#c8d6e5">Seals:</text>
+  <text class="cell" x="205" y="343" fill="#333333">Seals:</text>
   <text class="cell mono" x="280" y="343" fill="#2ecc71">MAC</text>
-  <text class="cell" x="310" y="343" fill="#c8d6e5">|</text>
-  <text class="cell mono" x="340" y="343" fill="#e8b86d">ver=3</text>
-  <text class="cell" x="370" y="343" fill="#c8d6e5">|</text>
+  <text class="cell" x="310" y="343" fill="#333333">|</text>
+  <text class="cell mono" x="340" y="343" fill="#b8860b">ver=3</text>
+  <text class="cell" x="370" y="343" fill="#333333">|</text>
   <text class="cell mono" x="400" y="343" fill="#2ecc71">G=0</text>
 
   <!-- Access path annotation -->
-  <rect x="70" y="370" width="380" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="70" y="370" width="380" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="260" y="385" fill="#2ecc71">Accessed via CAP.LOAD CR0, #7 (R permission)</text>
 
   <!-- ===== Machine B (Priscilla / RV32-Cap) ===== -->
-  <rect x="570" y="45" width="460" height="380" rx="12" fill="#1a0f2a" stroke="#c39bd3" stroke-width="2"/>
+  <rect x="570" y="45" width="460" height="380" rx="12" fill="#f0e8fa" stroke="#c39bd3" stroke-width="2"/>
   <text class="ph" x="800" y="70" text-anchor="middle" fill="#c39bd3">META MACHINE B (Priscilla)</text>
   <text class="ls" x="800" y="88" fill="#c39bd3">RV32-Cap &bull; RISC-V base ISA</text>
 
   <!-- Thread registers -->
-  <rect x="590" y="105" width="200" height="105" rx="6" fill="#1a1428" stroke="#3a3a4a" stroke-width="1"/>
-  <text class="col-hdr" x="690" y="122" fill="#8899aa">Thread Registers</text>
+  <rect x="590" y="105" width="200" height="105" rx="6" fill="#f0f0fa" stroke="#3a3a4a" stroke-width="1"/>
+  <text class="col-hdr" x="690" y="122" fill="#666666">Thread Registers</text>
 
-  <rect x="600" y="132" width="60" height="22" rx="3" fill="#2a1a2a" stroke="#c39bd3" stroke-width="1"/>
+  <rect x="600" y="132" width="60" height="22" rx="3" fill="#f0e8f8" stroke="#c39bd3" stroke-width="1"/>
   <text class="cell" x="630" y="143" fill="#c39bd3">CR8</text>
-  <text class="lt" x="665" y="143" fill="#a0b0c0">me (Priscilla)</text>
+  <text class="lt" x="665" y="143" fill="#555555">me (Priscilla)</text>
 
-  <rect x="600" y="158" width="60" height="22" rx="3" fill="#2a1a2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="600" y="158" width="60" height="22" rx="3" fill="#f0e8f8" stroke="#5dade2" stroke-width="1"/>
   <text class="cell" x="630" y="169" fill="#5dade2">CR1</text>
-  <text class="lt" x="665" y="169" fill="#a0b0c0">myson (Outform, E)</text>
+  <text class="lt" x="665" y="169" fill="#555555">myson (Outform, E)</text>
 
-  <rect x="600" y="184" width="60" height="22" rx="3" fill="#2a1a2a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="600" y="184" width="60" height="22" rx="3" fill="#f0e8f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="630" y="195" fill="#2ecc71">CR0</text>
-  <text class="lt" x="665" y="195" fill="#a0b0c0">tunnel key (Inform, R)</text>
+  <text class="lt" x="665" y="195" fill="#555555">tunnel key (Inform, R)</text>
 
   <!-- Namespace entry for tunnel key (Machine B) — matching key material -->
-  <rect x="590" y="220" width="420" height="190" rx="6" fill="#1a0a20" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="590" y="220" width="420" height="190" rx="6" fill="#f5e8fa" stroke="#f5c842" stroke-width="1.5"/>
   <text class="col-hdr" x="800" y="240" fill="#f5c842">Namespace Entry: tunnel_key (index 4)</text>
 
-  <rect x="610" y="255" width="380" height="32" rx="4" fill="#1a1428" stroke="#3a3a4a" stroke-width="1"/>
+  <rect x="610" y="255" width="380" height="32" rx="4" fill="#f0f0fa" stroke="#3a3a4a" stroke-width="1"/>
   <text class="col-hdr" x="650" y="271" fill="#f39c12" font-size="10">Word 0</text>
   <text class="cell-b" x="800" y="271" fill="#f5c842">Location: crypto key data ptr</text>
 
-  <rect x="610" y="291" width="380" height="32" rx="4" fill="#1a1428" stroke="#3a3a4a" stroke-width="1"/>
+  <rect x="610" y="291" width="380" height="32" rx="4" fill="#f0f0fa" stroke="#3a3a4a" stroke-width="1"/>
   <text class="col-hdr" x="650" y="307" fill="#f39c12" font-size="10">Word 1</text>
   <text class="cell-b" x="800" y="307" fill="#f5c842">Limit: key length (256-bit)</text>
 
-  <rect x="610" y="327" width="380" height="32" rx="4" fill="#1a1428" stroke="#3a3a4a" stroke-width="1"/>
+  <rect x="610" y="327" width="380" height="32" rx="4" fill="#f0f0fa" stroke="#3a3a4a" stroke-width="1"/>
   <text class="col-hdr" x="650" y="343" fill="#f39c12" font-size="10">Word 2</text>
-  <text class="cell" x="745" y="343" fill="#c8d6e5">Seals:</text>
+  <text class="cell" x="745" y="343" fill="#333333">Seals:</text>
   <text class="cell mono" x="820" y="343" fill="#2ecc71">MAC</text>
-  <text class="cell" x="850" y="343" fill="#c8d6e5">|</text>
-  <text class="cell mono" x="880" y="343" fill="#e8b86d">ver=3</text>
-  <text class="cell" x="910" y="343" fill="#c8d6e5">|</text>
+  <text class="cell" x="850" y="343" fill="#333333">|</text>
+  <text class="cell mono" x="880" y="343" fill="#b8860b">ver=3</text>
+  <text class="cell" x="910" y="343" fill="#333333">|</text>
   <text class="cell mono" x="940" y="343" fill="#2ecc71">G=0</text>
 
-  <rect x="610" y="370" width="380" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="610" y="370" width="380" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="800" y="385" fill="#2ecc71">Accessed via CAP.LOAD CR0, #4 (R permission)</text>
 
   <!-- ===== Matching key material highlight ===== -->
@@ -168,140 +168,140 @@
   <text class="ph" x="530" y="455" text-anchor="middle" fill="#f5c842">ENCRYPTED TUNNEL — CALL SEQUENCE</text>
 
   <!-- Tunnel visualization -->
-  <rect x="120" y="470" width="820" height="270" rx="10" fill="#0a1015" stroke="#2a3a4a" stroke-width="1"/>
+  <rect x="120" y="470" width="820" height="270" rx="10" fill="#f5f5f5" stroke="#cccccc" stroke-width="1"/>
 
   <!-- Step 1: CAP.LOAD reads key -->
-  <rect x="140" y="485" width="300" height="50" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="140" y="485" width="300" height="50" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="col-hdr" x="290" y="503" fill="#2ecc71">1. CAP.LOAD CR0, #7</text>
   <text class="ls" x="290" y="520" fill="#2ecc71">R permission &#8594; reads tunnel key from namespace</text>
 
   <line x1="440" y1="510" x2="470" y2="510" stroke="#2ecc71" stroke-width="1.5" marker-end="url(#ah-g)"/>
 
   <!-- mLoad validation -->
-  <rect x="475" y="485" width="200" height="50" rx="6" fill="#141a28" stroke="#f39c12" stroke-width="1.5"/>
+  <rect x="475" y="485" width="200" height="50" rx="6" fill="#f0f4f8" stroke="#f39c12" stroke-width="1.5"/>
   <text class="col-hdr" x="575" y="503" fill="#f39c12">mLoad validates</text>
   <text class="ls" x="575" y="520" fill="#f39c12">perm &#8594; bounds &#8594; MAC &#8594; G &#8594; shadow</text>
 
   <line x1="675" y1="510" x2="705" y2="510" stroke="#f39c12" stroke-width="1.5" marker-end="url(#ah-o)"/>
 
   <!-- Key loaded -->
-  <rect x="710" y="490" width="200" height="38" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="710" y="490" width="200" height="38" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell-b" x="810" y="509" fill="#2ecc71">Key material in CR0</text>
 
   <!-- Step 2: CALL with Outform GT -->
-  <rect x="140" y="550" width="300" height="50" rx="6" fill="#1a1a2a" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="140" y="550" width="300" height="50" rx="6" fill="#f0f0fa" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="col-hdr" x="290" y="568" fill="#c39bd3">2. CALL CR1 (mymother)</text>
   <text class="ls" x="290" y="585" fill="#c39bd3">E permission on Outform GT &#8594; RPC tunnel</text>
 
   <line x1="440" y1="575" x2="470" y2="575" stroke="#c39bd3" stroke-width="1.5" marker-end="url(#ah-p)"/>
 
   <!-- Encryption -->
-  <rect x="475" y="550" width="200" height="50" rx="6" fill="#1a2a0f" stroke="#e8b86d" stroke-width="1.5"/>
-  <text class="col-hdr" x="575" y="568" fill="#e8b86d">Encrypt payload</text>
-  <text class="ls" x="575" y="585" fill="#e8b86d">AES-256 with key from CR0</text>
+  <rect x="475" y="550" width="200" height="50" rx="6" fill="#f0f5e8" stroke="#e8b86d" stroke-width="1.5"/>
+  <text class="col-hdr" x="575" y="568" fill="#b8860b">Encrypt payload</text>
+  <text class="ls" x="575" y="585" fill="#b8860b">AES-256 with key from CR0</text>
 
   <line x1="675" y1="575" x2="705" y2="575" stroke="#e8b86d" stroke-width="1.5" marker-end="url(#ah-y)"/>
 
   <!-- Tunnel -->
-  <rect x="710" y="555" width="200" height="38" rx="6" fill="#0f1a2a" stroke="#5dade2" stroke-width="1.5"/>
+  <rect x="710" y="555" width="200" height="38" rx="6" fill="#f0f5fa" stroke="#5dade2" stroke-width="1.5"/>
   <text class="cell-b" x="810" y="575" fill="#5dade2">&#x1F512; Encrypted RPC</text>
 
   <!-- Step 3: Network transit -->
-  <rect x="300" y="615" width="460" height="45" rx="25" fill="#0a1a2a" stroke="#5dade2" stroke-width="2" stroke-dasharray="8,4"/>
+  <rect x="300" y="615" width="460" height="45" rx="25" fill="#e8f0fa" stroke="#5dade2" stroke-width="2" stroke-dasharray="8,4"/>
   <text class="cell-b" x="530" y="632" fill="#5dade2">&#x2550;&#x2550;&#x2550; Encrypted Point-to-Point Tunnel &#x2550;&#x2550;&#x2550;</text>
   <text class="ls" x="530" y="648" fill="#5dade2">HTTPS / capability protocol</text>
 
   <!-- Arrow left -->
-  <rect x="160" y="622" width="130" height="30" rx="6" fill="#0f1a2a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="160" y="622" width="130" height="30" rx="6" fill="#f0f5fa" stroke="#5dade2" stroke-width="1"/>
   <text class="cell" x="225" y="637" fill="#5dade2">Machine A &#x25B6;</text>
   <line x1="290" y1="637" x2="300" y2="637" stroke="#5dade2" stroke-width="2" marker-end="url(#ah)"/>
 
   <!-- Arrow right -->
   <line x1="760" y1="637" x2="770" y2="637" stroke="#c39bd3" stroke-width="2" marker-end="url(#ah-p)"/>
-  <rect x="775" y="622" width="130" height="30" rx="6" fill="#1a0a20" stroke="#c39bd3" stroke-width="1"/>
+  <rect x="775" y="622" width="130" height="30" rx="6" fill="#f5e8fa" stroke="#c39bd3" stroke-width="1"/>
   <text class="cell" x="840" y="637" fill="#c39bd3">&#x25C0; Machine B</text>
 
   <!-- Step 4: Receive and decrypt -->
-  <rect x="250" y="675" width="560" height="50" rx="6" fill="#1a0a20" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="250" y="675" width="560" height="50" rx="6" fill="#f5e8fa" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="col-hdr" x="530" y="693" fill="#c39bd3">3. Machine B receives &#8594; mLoad validates Outform GT on myson</text>
   <text class="ls" x="530" y="710" fill="#c39bd3">Decrypts with matching key from own namespace entry &#8594; delivers to Priscilla's thread</text>
 
   <!-- ========== GC SWEEP REVOCATION ========== -->
 
   <text class="ph" x="530" y="775" text-anchor="middle" fill="#e74c3c">GC SWEEP REVOCATION PATH</text>
-  <text class="ls" x="530" y="793" fill="#8899aa">Deterministic garbage collection kills the tunnel by version bump</text>
+  <text class="ls" x="530" y="793" fill="#666666">Deterministic garbage collection kills the tunnel by version bump</text>
 
-  <rect x="30" y="810" width="1000" height="320" rx="10" fill="#0f1015" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="30" y="810" width="1000" height="320" rx="10" fill="#f5f5f8" stroke="#e74c3c" stroke-width="1.5"/>
 
   <!-- Phase 1: Mark -->
-  <rect x="55" y="830" width="290" height="90" rx="8" fill="#1a1a0f" stroke="#f39c12" stroke-width="1.5"/>
+  <rect x="55" y="830" width="290" height="90" rx="8" fill="#f8f8f0" stroke="#f39c12" stroke-width="1.5"/>
   <text class="col-hdr" x="200" y="850" fill="#f39c12">Phase 1: MARK</text>
-  <text class="lt" x="70" y="872" fill="#c8d6e5" font-size="11">GC sets G=1 on all namespace entries</text>
-  <text class="lt" x="70" y="890" fill="#c8d6e5" font-size="11">including tunnel_key entry</text>
+  <text class="lt" x="70" y="872" fill="#333333" font-size="11">GC sets G=1 on all namespace entries</text>
+  <text class="lt" x="70" y="890" fill="#333333" font-size="11">including tunnel_key entry</text>
 
-  <rect x="90" y="900" width="220" height="22" rx="3" fill="#141a28" stroke="#f39c12" stroke-width="1"/>
+  <rect x="90" y="900" width="220" height="22" rx="3" fill="#f0f4f8" stroke="#f39c12" stroke-width="1"/>
   <text class="cell mono" x="200" y="911" fill="#f39c12">tunnel_key: G=1 (marked)</text>
 
   <line x1="345" y1="880" x2="385" y2="880" stroke="#f39c12" stroke-width="2" marker-end="url(#ah-o)"/>
 
   <!-- Phase 2: Scan -->
-  <rect x="390" y="830" width="290" height="90" rx="8" fill="#0f1a15" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="390" y="830" width="290" height="90" rx="8" fill="#f0f8f5" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="col-hdr" x="535" y="850" fill="#2ecc71">Phase 2: SCAN</text>
-  <text class="lt" x="405" y="872" fill="#c8d6e5" font-size="11">Walk DNA tree via mLoad</text>
-  <text class="lt" x="405" y="890" fill="#c8d6e5" font-size="11">Reachable entries: reset G=0</text>
+  <text class="lt" x="405" y="872" fill="#333333" font-size="11">Walk DNA tree via mLoad</text>
+  <text class="lt" x="405" y="890" fill="#333333" font-size="11">Reachable entries: reset G=0</text>
 
-  <rect x="420" y="900" width="230" height="22" rx="3" fill="#141a28" stroke="#8899aa" stroke-width="1"/>
-  <text class="cell mono" x="535" y="911" fill="#8899aa">If reachable: G=0 (alive)</text>
+  <rect x="420" y="900" width="230" height="22" rx="3" fill="#f0f4f8" stroke="#8899aa" stroke-width="1"/>
+  <text class="cell mono" x="535" y="911" fill="#666666">If reachable: G=0 (alive)</text>
 
   <line x1="680" y1="880" x2="720" y2="880" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
   <!-- Phase 3: Sweep — the revocation -->
-  <rect x="725" y="830" width="290" height="90" rx="8" fill="#2a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="725" y="830" width="290" height="90" rx="8" fill="#fce8e8" stroke="#e74c3c" stroke-width="2"/>
   <text class="col-hdr" x="870" y="850" fill="#e74c3c">Phase 3: SWEEP</text>
-  <text class="lt" x="740" y="872" fill="#c8d6e5" font-size="11">Entries still G=1 = garbage</text>
+  <text class="lt" x="740" y="872" fill="#333333" font-size="11">Entries still G=1 = garbage</text>
   <text class="lt" x="740" y="890" fill="#e74c3c" font-size="11" font-weight="bold">Version bump invalidates GT</text>
 
-  <rect x="755" y="900" width="230" height="22" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="755" y="900" width="230" height="22" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="cell mono" x="870" y="911" fill="#e74c3c">tunnel_key: ver 3 &#8594; 4 &#x2620;</text>
 
   <!-- Revocation cascade -->
   <text class="ph" x="530" y="950" text-anchor="middle" fill="#e74c3c">REVOCATION CASCADE</text>
 
   <!-- Before: GT matches -->
-  <rect x="80" y="965" width="400" height="60" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="80" y="965" width="400" height="60" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="280" y="983" fill="#2ecc71">BEFORE: GT version matches namespace entry</text>
-  <text class="lt" x="100" y="1005" fill="#c8d6e5" font-size="11">GT in CR0: index=7, ver=3 &mdash; Entry: ver=3 &#x2714; MAC valid &#x2714;</text>
+  <text class="lt" x="100" y="1005" fill="#333333" font-size="11">GT in CR0: index=7, ver=3 &mdash; Entry: ver=3 &#x2714; MAC valid &#x2714;</text>
 
   <line x1="480" y1="995" x2="530" y2="995" stroke="#e74c3c" stroke-width="2" marker-end="url(#ah-r)"/>
   <text class="ls" x="505" y="980" fill="#e74c3c">sweep</text>
 
   <!-- After: GT mismatches -->
-  <rect x="535" y="965" width="430" height="60" rx="6" fill="#2a0f0f" stroke="#e74c3c" stroke-width="2"/>
+  <rect x="535" y="965" width="430" height="60" rx="6" fill="#fce8e8" stroke="#e74c3c" stroke-width="2"/>
   <text class="col-hdr" x="750" y="983" fill="#e74c3c">AFTER: GT version mismatch &#8594; FAULT</text>
-  <text class="lt" x="555" y="1005" fill="#c8d6e5" font-size="11">GT in CR0: index=7, ver=3 &mdash; Entry: ver=4 &#x2716; MAC invalid &#x2716;</text>
+  <text class="lt" x="555" y="1005" fill="#333333" font-size="11">GT in CR0: index=7, ver=3 &mdash; Entry: ver=4 &#x2716; MAC invalid &#x2716;</text>
 
   <!-- Consequence -->
-  <rect x="200" y="1040" width="660" height="70" rx="8" fill="#1a0f0f" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="200" y="1040" width="660" height="70" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="col-hdr" x="530" y="1060" fill="#e74c3c">Tunnel killed: next CAP.LOAD or CALL using this GT &#8594; FAULT</text>
-  <text class="lt" x="220" y="1082" fill="#a0b0c0" font-size="11">&#x2022; mLoad detects version mismatch (GT says 3, entry says 4) &#8594; MAC recomputation fails</text>
-  <text class="lt" x="220" y="1098" fill="#a0b0c0" font-size="11">&#x2022; Both machines must renegotiate — old key material is garbage collected and overwritten</text>
+  <text class="lt" x="220" y="1082" fill="#555555" font-size="11">&#x2022; mLoad detects version mismatch (GT says 3, entry says 4) &#8594; MAC recomputation fails</text>
+  <text class="lt" x="220" y="1098" fill="#555555" font-size="11">&#x2022; Both machines must renegotiate — old key material is garbage collected and overwritten</text>
 
   <!-- ========== KEY INSIGHT ========== -->
 
-  <rect x="30" y="1150" width="1000" height="210" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="30" y="1150" width="1000" height="210" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="530" y="1175" text-anchor="middle" fill="#f5c842">KEY INSIGHTS</text>
 
   <text class="lt" x="60" y="1205" fill="#2ecc71" font-size="13" font-weight="bold">Tunnel key is a standard namespace entry:</text>
-  <text class="lt" x="60" y="1223" fill="#a0b0c0" font-size="12">No special-case cryptographic subsystem. The tunnel key is a 3-word namespace descriptor (Location, Limit, Seals)</text>
-  <text class="lt" x="60" y="1239" fill="#a0b0c0" font-size="12">accessed via the same mLoad path as any other resource. R permission on the GT grants read access to the key data.</text>
+  <text class="lt" x="60" y="1223" fill="#555555" font-size="12">No special-case cryptographic subsystem. The tunnel key is a 3-word namespace descriptor (Location, Limit, Seals)</text>
+  <text class="lt" x="60" y="1239" fill="#555555" font-size="12">accessed via the same mLoad path as any other resource. R permission on the GT grants read access to the key data.</text>
 
   <text class="lt" x="60" y="1265" fill="#5dade2" font-size="13" font-weight="bold">Revocation is deterministic and total:</text>
-  <text class="lt" x="60" y="1283" fill="#a0b0c0" font-size="12">GC sweep bumps the version on unreachable entries. Every GT referencing the old version becomes invalid. The tunnel</text>
-  <text class="lt" x="60" y="1299" fill="#a0b0c0" font-size="12">dies instantly — no "revocation list" to distribute, no race condition, no stale reference. One version bump = total kill.</text>
+  <text class="lt" x="60" y="1283" fill="#555555" font-size="12">GC sweep bumps the version on unreachable entries. Every GT referencing the old version becomes invalid. The tunnel</text>
+  <text class="lt" x="60" y="1299" fill="#555555" font-size="12">dies instantly — no "revocation list" to distribute, no race condition, no stale reference. One version bump = total kill.</text>
 
   <text class="lt" x="60" y="1325" fill="#c39bd3" font-size="13" font-weight="bold">Cross-architecture transparency:</text>
-  <text class="lt" x="60" y="1343" fill="#a0b0c0" font-size="12">Machine A (CTMM, 64-bit) and Machine B (RV32-Cap, 32-bit) use the same capability protocol. The ABI descriptor</text>
-  <text class="lt" x="60" y="1359" fill="#a0b0c0" font-size="12">in each namespace entry maps registers between architectures. Network cost (~10ms) dwarfs ABI translation (~50ns).</text>
+  <text class="lt" x="60" y="1343" fill="#555555" font-size="12">Machine A (CTMM, 64-bit) and Machine B (RV32-Cap, 32-bit) use the same capability protocol. The ABI descriptor</text>
+  <text class="lt" x="60" y="1359" fill="#555555" font-size="12">in each namespace entry maps registers between architectures. Network cost (~10ms) dwarfs ABI translation (~50ns).</text>
 
 </svg>
 

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure 21: Ada Lovelace Programming Model — Bernoulli Sum-of-Squares</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure 21 &mdash; Ada Lovelace Programming Model</h1>
+<p class="subtitle">The Church Computer executes a step-by-step Bernoulli sum-of-squares computation following Lovelace's Note G style. Conventional mathematical notation is the programming interface. Every operation translates to pure Church-domain lambda calculus underneath. Turing instructions (ADD, MUL, POW) do not exist &mdash; the symbolic operators map to Church-encoded abstractions accessed via Golden Tokens.</p>
+
+<svg viewBox="0 0 1100 1100" width="1100" height="1100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="ah-k" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+  </defs>
+  <style>
+    .mono { font-family:'Consolas','Courier New',monospace; }
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .label-c { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .title { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; fill:#b8860b; text-anchor:middle; }
+    .title-l { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; font-weight:700; fill:#b8860b; text-anchor:start; }
+    .code { font-family:'Consolas',monospace; font-size:11px; fill:#2a6db5; text-anchor:start; dominant-baseline:central; }
+    .result { font-family:'Consolas',monospace; font-size:11px; fill:#27864a; text-anchor:start; dominant-baseline:central; }
+    .annot { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#8855aa; text-anchor:start; dominant-baseline:central; font-style:italic; }
+    .step { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#999; text-anchor:end; dominant-baseline:central; }
+    .hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555; font-weight:700; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <text class="title" x="550" y="25">PROGRAMMER'S MATHEMATICAL NOTATION</text>
+  <text class="label-c" x="550" y="45" fill="#555">The programmer writes symbolic mathematics. The REPL translates to Church-domain operations.</text>
+
+  <rect x="30" y="60" width="520" height="680" rx="10" fill="#f8f8fc" stroke="#2a6db5" stroke-width="1.5"/>
+  <text class="title-l" x="50" y="85">Programmer Input (Note G style)</text>
+
+  <text class="hdr" x="50" y="115">Step</text>
+  <text class="hdr" x="100" y="115">Binding</text>
+  <line x1="40" y1="125" x2="540" y2="125" stroke="#ddd" stroke-width="1"/>
+
+  <text class="step" x="70" y="145">1</text>
+  <text class="code" x="100" y="145">let n = 4</text>
+  <text class="annot" x="340" y="145">Church numeral &#955;f.&#955;x. f(f(f(f x)))</text>
+
+  <text class="step" x="70" y="170">2</text>
+  <text class="code" x="100" y="170">let one_sq = 1 ^ 2</text>
+  <text class="annot" x="340" y="170">&#955;-POW applied to SUCC(ZERO)</text>
+
+  <text class="step" x="70" y="195">3</text>
+  <text class="code" x="100" y="195">let two_sq = 2 ^ 2</text>
+  <text class="annot" x="340" y="195">= 4</text>
+
+  <text class="step" x="70" y="220">4</text>
+  <text class="code" x="100" y="220">let three_sq = 3 ^ 2</text>
+  <text class="annot" x="340" y="220">= 9</text>
+
+  <text class="step" x="70" y="245">5</text>
+  <text class="code" x="100" y="245">let four_sq = 4 ^ 2</text>
+  <text class="annot" x="340" y="245">= 16</text>
+
+  <text class="step" x="70" y="275">6</text>
+  <text class="code" x="100" y="275">let direct_sum = one_sq + two_sq + three_sq + four_sq</text>
+
+  <text class="step" x="70" y="305">7</text>
+  <text class="code" x="100" y="305">let n_plus_1 = n + 1</text>
+  <text class="annot" x="340" y="305">= 5</text>
+
+  <text class="step" x="70" y="330">8</text>
+  <text class="code" x="100" y="330">let two_n_plus_1 = 2 * n + 1</text>
+  <text class="annot" x="340" y="330">= 9</text>
+
+  <text class="step" x="70" y="355">9</text>
+  <text class="code" x="100" y="355">let product = n * n_plus_1</text>
+  <text class="annot" x="340" y="355">= 20</text>
+
+  <text class="step" x="70" y="380">10</text>
+  <text class="code" x="100" y="380">let triple = product * two_n_plus_1</text>
+  <text class="annot" x="340" y="380">= 180</text>
+
+  <text class="step" x="70" y="405">11</text>
+  <text class="code" x="100" y="405">let formula = triple / 6</text>
+  <text class="annot" x="340" y="405">= 30 (closed form)</text>
+
+  <line x1="50" y1="425" x2="540" y2="425" stroke="#b8860b" stroke-width="2"/>
+  <text class="step" x="70" y="445">12</text>
+  <text class="code" x="100" y="445" fill="#cc3333" font-weight="bold">assert direct_sum == formula</text>
+  <text class="annot" x="340" y="445" fill="#27864a">&#10004; TRUE &mdash; both = 30</text>
+
+  <text class="label" x="50" y="485" fill="#555">Formula: n(n+1)(2n+1)/6 = 1&#178; + 2&#178; + 3&#178; + 4&#178;</text>
+
+  <text class="title-l" x="50" y="530">Annotations</text>
+  <rect x="50" y="545" width="15" height="15" rx="2" fill="#e8e8f5" stroke="#2a6db5" stroke-width="1"/>
+  <text class="label" x="75" y="553">(a) Conventional mathematical notation IS the programming interface</text>
+
+  <rect x="50" y="570" width="15" height="15" rx="2" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="label" x="75" y="578">(b) Every operation translates to pure Church-domain &#955;-calculus</text>
+
+  <rect x="50" y="595" width="15" height="15" rx="2" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="label" x="75" y="603">(c) Variables reference previous results by name (SSA style)</text>
+
+  <rect x="50" y="620" width="15" height="15" rx="2" fill="#f5e8e8" stroke="#cc3333" stroke-width="1"/>
+  <text class="label" x="75" y="628">(d) Turing instructions do NOT exist &mdash; +, *, ^ map to Church abstractions</text>
+
+  <rect x="50" y="650" width="15" height="15" rx="2" fill="#f0e8f5" stroke="#8855aa" stroke-width="1"/>
+  <text class="label" x="75" y="658">(e) 17 named variable bindings &mdash; Lovelace's tabular method</text>
+
+  <rect x="570" y="60" width="510" height="680" rx="10" fill="#f8fcf8" stroke="#27864a" stroke-width="1.5"/>
+  <text class="title-l" x="590" y="85">Church Computer REPL Output</text>
+
+  <text class="hdr" x="590" y="115">Church-Domain Translation</text>
+  <line x1="580" y1="125" x2="1070" y2="125" stroke="#ddd" stroke-width="1"/>
+
+  <text class="result" x="590" y="145">=&gt; LOAD GT[FOUR]           </text>
+  <text class="annot" x="850" y="145">Golden Token for numeral 4</text>
+
+  <text class="result" x="590" y="170">=&gt; Call(Lambda.POW, 1, 2)   </text>
+  <text class="annot" x="850" y="170">&#955;-POW abstraction</text>
+
+  <text class="result" x="590" y="195">=&gt; Call(Lambda.POW, 2, 2)   </text>
+  <text class="annot" x="850" y="195">= Church numeral 4</text>
+
+  <text class="result" x="590" y="220">=&gt; Call(Lambda.POW, 3, 2)   </text>
+  <text class="annot" x="850" y="220">= Church numeral 9</text>
+
+  <text class="result" x="590" y="245">=&gt; Call(Lambda.POW, 4, 2)   </text>
+  <text class="annot" x="850" y="245">= Church numeral 16</text>
+
+  <text class="result" x="590" y="275">=&gt; Call(Lambda.ADD, 1, 4, 9, 16)</text>
+  <text class="annot" x="880" y="275">= 30</text>
+
+  <text class="result" x="590" y="305">=&gt; Call(Lambda.ADD, 4, 1)   </text>
+  <text class="annot" x="850" y="305">SUCC applied</text>
+
+  <text class="result" x="590" y="330">=&gt; Call(Lambda.ADD, Call(Lambda.MUL, 2, 4), 1)</text>
+
+  <text class="result" x="590" y="355">=&gt; Call(Lambda.MUL, 4, 5)   </text>
+  <text class="annot" x="850" y="355">= 20</text>
+
+  <text class="result" x="590" y="380">=&gt; Call(Lambda.MUL, 20, 9)  </text>
+  <text class="annot" x="850" y="380">= 180</text>
+
+  <text class="result" x="590" y="405">=&gt; Call(Lambda.DIV, 180, 6) </text>
+  <text class="annot" x="850" y="405">= 30</text>
+
+  <line x1="580" y1="425" x2="1070" y2="425" stroke="#b8860b" stroke-width="2"/>
+  <text class="result" x="590" y="445" fill="#27864a" font-weight="bold">=&gt; Call(Lambda.EQ, 30, 30) = TRUE &#10004;</text>
+
+  <text class="label" x="590" y="485" fill="#555">All operations: LOAD, CALL, RETURN, LAMBDA, TPERM</text>
+  <text class="label" x="590" y="505" fill="#555">No ADD, MUL, POW, DIV hardware &mdash; all are &#955;-abstractions</text>
+
+  <text class="title-l" x="590" y="545">Golden Token Access</text>
+  <line x1="580" y1="555" x2="1070" y2="555" stroke="#ddd" stroke-width="1"/>
+
+  <text class="result" x="590" y="575">GT[ADD]  &#8594; c-list slot 0  &#8594; Lambda.ADD abstraction</text>
+  <text class="result" x="590" y="595">GT[MUL]  &#8594; c-list slot 1  &#8594; Lambda.MUL abstraction</text>
+  <text class="result" x="590" y="615">GT[POW]  &#8594; c-list slot 2  &#8594; Lambda.POW abstraction</text>
+  <text class="result" x="590" y="635">GT[DIV]  &#8594; c-list slot 3  &#8594; Lambda.DIV abstraction</text>
+  <text class="result" x="590" y="655">GT[EQ]   &#8594; c-list slot 4  &#8594; Lambda.EQ abstraction</text>
+  <text class="result" x="590" y="675">GT[SUCC] &#8594; c-list slot 5  &#8594; Lambda.SUCC abstraction</text>
+  <text class="result" x="590" y="695">GT[ZERO] &#8594; c-list slot 6  &#8594; Church numeral &#955;f.&#955;x. x</text>
+
+  <rect x="30" y="760" width="1050" height="70" rx="10" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="title" x="555" y="785">LOVELACE'S INSIGHT, REALIZED IN HARDWARE</text>
+  <text class="label-c" x="555" y="810" fill="#333">"The Analytical Engine weaves algebraical patterns just as the Jacquard loom weaves flowers and leaves."</text>
+  <text class="label-c" x="555" y="825" fill="#555" font-size="11">The Church Computer weaves lambda-calculus patterns. The programmer writes mathematics. The hardware executes capabilities.</text>
+
+  <rect x="30" y="850" width="1050" height="230" rx="10" fill="#f8f8fc" stroke="#2a6db5" stroke-width="1.5"/>
+  <text class="title" x="555" y="880">COMPUTATION TRACE: Step 2 &mdash; let one_sq = 1 ^ 2</text>
+
+  <rect x="60" y="900" width="200" height="35" rx="6" fill="#e8e8f5" stroke="#2a6db5" stroke-width="1"/>
+  <text class="label-c" x="160" y="918" fill="#2a6db5" font-weight="bold">LOAD GT[POW]</text>
+  <line x1="260" y1="918" x2="290" y2="918" stroke="#555" stroke-width="1" marker-end="url(#ah-k)"/>
+
+  <rect x="295" y="900" width="200" height="35" rx="6" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="label-c" x="395" y="918" fill="#c07020" font-weight="bold">TPERM verify E</text>
+  <line x1="495" y1="918" x2="525" y2="918" stroke="#555" stroke-width="1" marker-end="url(#ah-k)"/>
+
+  <rect x="530" y="900" width="200" height="35" rx="6" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="label-c" x="630" y="918" fill="#27864a" font-weight="bold">CALL Lambda.POW</text>
+  <line x1="730" y1="918" x2="760" y2="918" stroke="#555" stroke-width="1" marker-end="url(#ah-k)"/>
+
+  <rect x="765" y="900" width="200" height="35" rx="6" fill="#f0e8f5" stroke="#8855aa" stroke-width="1"/>
+  <text class="label-c" x="865" y="918" fill="#8855aa" font-weight="bold">LAMBDA apply</text>
+
+  <line x1="865" y1="935" x2="865" y2="960" stroke="#555" stroke-width="1" marker-end="url(#ah-k)"/>
+
+  <rect x="695" y="960" width="340" height="35" rx="6" fill="#e8f5e8" stroke="#27864a" stroke-width="1"/>
+  <text class="label-c" x="865" y="978" fill="#27864a" font-weight="bold">RETURN Church numeral 1 (= 1^2 = 1)</text>
+
+  <text class="label" x="60" y="1020" fill="#555">Gate path: mLoad validates GT[POW] &#8594; namespace lookup &#8594; lump split &#8594; CR14/CR6 set &#8594; method executes</text>
+  <text class="label" x="60" y="1040" fill="#555">Arguments: Church numerals 1 and 2 passed as GT references in capability registers</text>
+  <text class="label" x="60" y="1060" fill="#cc3333">No arithmetic hardware used. POW is a &#955;-abstraction: &#955;b.&#955;e. e b = apply exponent to base.</text>
+
+</svg>
+
+</body>
+</html>

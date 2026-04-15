@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Figure A1: Abstract GT Address Space</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #ffffff;
+    color: #1a1a1a;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+  }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 960px; }
+  .nav { position: fixed; top: 10px; left: 10px; z-index: 100; }
+  .nav a {
+    background: #f0f0f0; color: #333; text-decoration: none; padding: 6px 14px;
+    border-radius: 4px; font-size: 13px; border: 1px solid #ccc;
+  }
+  .nav a:hover { background: #e0e0e0; color: #000; }
+  @media print { .nav { display: none; } }
+</style>
+</head>
+<body>
+
+<div class="nav"><a href="/church/">&#8592; Church Machine</a></div>
+
+<h1>Figure A1 &mdash; Abstract GT Address Space</h1>
+<p class="subtitle">The 32-bit address space reserved for Abstract Golden Tokens (gt_type = 11&#x2082;). The range 0xFE000000&ndash;0xFFFFFFFF is controlled exclusively by the IDE for I/O peripherals, network tunnels, and system resources. Hardware routes operations on Abstract GTs directly to the IDE &mdash; no namespace lookup, no lump split.</p>
+
+<svg viewBox="0 0 1100 750" width="1100" height="750" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .label { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .label-c { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .title { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; fill:#b8860b; text-anchor:middle; }
+    .addr { font-family:'Consolas',monospace; font-size:11px; fill:#333; text-anchor:start; dominant-baseline:central; }
+    .addr-c { font-family:'Consolas',monospace; font-size:11px; fill:#333; text-anchor:middle; dominant-baseline:central; }
+    .note { font-family:'Segoe UI',system-ui,sans-serif; font-size:10px; fill:#555; text-anchor:start; dominant-baseline:central; }
+  </style>
+
+  <text class="title" x="550" y="30">32-BIT ABSTRACT ADDRESS SPACE</text>
+
+  <rect x="100" y="50" width="200" height="580" rx="0" fill="#f0f5fa" stroke="#2a6db5" stroke-width="2"/>
+  <text class="addr" x="30" y="60" fill="#555">0x00000000</text>
+
+  <rect x="100" y="50" width="200" height="350" rx="0" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+  <text class="label-c" x="200" y="220" fill="#999">Namespace address space</text>
+  <text class="label-c" x="200" y="240" fill="#999">(Inform GTs, gt_type = 01)</text>
+  <text class="label-c" x="200" y="260" fill="#999">managed by Navana</text>
+
+  <text class="addr" x="30" y="400" fill="#cc3333" font-weight="bold">0xFE000000</text>
+  <line x1="100" y1="400" x2="300" y2="400" stroke="#cc3333" stroke-width="3"/>
+
+  <rect x="100" y="400" width="200" height="100" rx="0" fill="#e8f0fa" stroke="#2a6db5" stroke-width="2"/>
+  <text class="label-c" x="200" y="440" fill="#2a6db5" font-weight="bold">IDE-Controlled</text>
+  <text class="label-c" x="200" y="460" fill="#2a6db5">Peripheral I/O</text>
+  <text class="label-c" x="200" y="480" fill="#555" font-size="10">(UART, GPIO, Timer, Display)</text>
+
+  <text class="addr" x="30" y="500" fill="#c07020">0xFF000000</text>
+  <line x1="100" y1="500" x2="300" y2="500" stroke="#c07020" stroke-width="2"/>
+
+  <rect x="100" y="500" width="200" height="70" rx="0" fill="#f5f0e8" stroke="#c07020" stroke-width="2"/>
+  <text class="label-c" x="200" y="525" fill="#c07020" font-weight="bold">Home Base Tunnel</text>
+  <text class="label-c" x="200" y="545" fill="#c07020" font-size="10">Network gateway</text>
+  <text class="label-c" x="200" y="560" fill="#555" font-size="10">(single outbound path)</text>
+
+  <rect x="100" y="570" width="200" height="60" rx="0" fill="#f0e8f5" stroke="#8855aa" stroke-width="2"/>
+  <text class="label-c" x="200" y="595" fill="#8855aa" font-weight="bold">System Resources</text>
+  <text class="label-c" x="200" y="612" fill="#555" font-size="10">(reserved for IDE)</text>
+
+  <text class="addr" x="30" y="630" fill="#555">0xFFFFFFFF</text>
+
+  <rect x="380" y="60" width="350" height="130" rx="10" fill="#f8f8fc" stroke="#2a6db5" stroke-width="1.5"/>
+  <text class="label" x="400" y="85" fill="#2a6db5" font-weight="bold" font-size="13">GT Format (Abstract type)</text>
+  <line x1="390" y1="95" x2="720" y2="95" stroke="#ddd" stroke-width="1"/>
+  <text class="addr" x="400" y="115">word0: version(7) | index(17) | perms(6) | 11</text>
+  <text class="note" x="400" y="135">type = 11&#x2082; (Abstract) &mdash; value IS the GT itself</text>
+  <text class="addr" x="400" y="155">word1: sentinel address (0xFE______)</text>
+  <text class="note" x="400" y="175">Hardware-routed to IDE, not namespace</text>
+
+  <rect x="380" y="210" width="350" height="120" rx="10" fill="#e8f5e8" stroke="#27864a" stroke-width="1.5"/>
+  <text class="label" x="400" y="235" fill="#27864a" font-weight="bold" font-size="13">Hardware Routing</text>
+  <line x1="390" y1="245" x2="720" y2="245" stroke="#ddd" stroke-width="1"/>
+  <text class="label" x="400" y="268" fill="#333">1. Instruction references Abstract GT</text>
+  <text class="label" x="400" y="288" fill="#333">2. Hardware reads gt_type = 11</text>
+  <text class="label" x="400" y="308" fill="#333">3. Routes to IDE (no mLoad pipeline)</text>
+
+  <rect x="380" y="350" width="350" height="100" rx="10" fill="#fce8e8" stroke="#cc3333" stroke-width="1.5"/>
+  <text class="label" x="400" y="375" fill="#cc3333" font-weight="bold" font-size="13">What it eliminates</text>
+  <line x1="390" y1="385" x2="720" y2="385" stroke="#ddd" stroke-width="1"/>
+  <text class="label" x="400" y="408" fill="#333">&#10007; No device drivers</text>
+  <text class="label" x="400" y="428" fill="#333">&#10007; No I/O subsystem</text>
+  <text class="label" x="400" y="448" fill="#333">&#10007; No protocol stacks</text>
+
+  <rect x="380" y="480" width="680" height="250" rx="10" fill="#f5f5f0" stroke="#b8860b" stroke-width="1.5"/>
+  <text class="title" x="720" y="510">ADDRESS RANGE ALLOCATION</text>
+
+  <rect x="400" y="530" width="640" height="30" rx="4" fill="#f0f0f0" stroke="#999" stroke-width="1"/>
+  <text class="addr" x="415" y="545">0x00000000 &mdash; 0xFDFFFFFF</text>
+  <text class="label" x="700" y="545" fill="#555">Namespace (Inform GTs)</text>
+
+  <rect x="400" y="570" width="640" height="30" rx="4" fill="#e8f0fa" stroke="#2a6db5" stroke-width="1"/>
+  <text class="addr" x="415" y="585" fill="#2a6db5">0xFE000000 &mdash; 0xFEFFFFFF</text>
+  <text class="label" x="700" y="585" fill="#2a6db5">IDE I/O peripherals</text>
+
+  <rect x="400" y="610" width="640" height="30" rx="4" fill="#f5f0e8" stroke="#c07020" stroke-width="1"/>
+  <text class="addr" x="415" y="625" fill="#c07020">0xFF000000</text>
+  <text class="label" x="700" y="625" fill="#c07020">Home Base Tunnel (network)</text>
+
+  <rect x="400" y="650" width="640" height="30" rx="4" fill="#f0e8f5" stroke="#8855aa" stroke-width="1"/>
+  <text class="addr" x="415" y="665" fill="#8855aa">0xFF000001 &mdash; 0xFFFFFFFF</text>
+  <text class="label" x="700" y="665" fill="#8855aa">Reserved (IDE system resources)</text>
+
+  <text class="note" x="400" y="705" fill="#555">All Abstract GT addresses bypass namespace lookup. The IDE is the sole authority.</text>
+  <text class="note" x="400" y="720" fill="#555">No software can forge, redirect, or intercept Abstract GT routing.</text>
+
+</svg>
+
+</body>
+</html>

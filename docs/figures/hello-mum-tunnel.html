@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,8 +16,8 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 800px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 800px; }
 </style>
 </head>
 <body>
@@ -46,27 +46,27 @@
       <polygon points="0 0, 10 3.5, 0 7" fill="#f39c12"/>
     </marker>
     <marker id="ah-w" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#e8e8e8"/>
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1a1a1a"/>
     </marker>
     <linearGradient id="tunnel-grad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#5dade2" stop-opacity="0.3"/>
-      <stop offset="50%" stop-color="#f5c842" stop-opacity="0.15"/>
-      <stop offset="100%" stop-color="#2ecc71" stop-opacity="0.3"/>
+      <stop offset="0%" stop-color="#5dade2" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#f5c842" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#2ecc71" stop-opacity="0.15"/>
     </linearGradient>
   </defs>
 
   <style>
     .mono { font-family:'Consolas','Courier New',monospace; }
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .col-hdr { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; font-weight:700; text-anchor:middle; dominant-baseline:central; }
-    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#c8d6e5; text-anchor:middle; dominant-baseline:central; }
-    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#e8e8e8; font-weight:700; text-anchor:middle; dominant-baseline:central; }
+    .cell { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#333333; text-anchor:middle; dominant-baseline:central; }
+    .cell-b { font-family:'Segoe UI',system-ui,sans-serif; font-size:12px; fill:#1a1a1a; font-weight:700; text-anchor:middle; dominant-baseline:central; }
     .code { font-family:'Consolas',monospace; font-size:13px; fill:#2ecc71; text-anchor:middle; dominant-baseline:central; }
-    .code-sm { font-family:'Consolas',monospace; font-size:11px; fill:#c8d6e5; text-anchor:start; dominant-baseline:central; }
+    .code-sm { font-family:'Consolas',monospace; font-size:11px; fill:#333333; text-anchor:start; dominant-baseline:central; }
     .zero-label { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#e74c3c; font-weight:700; text-anchor:middle; dominant-baseline:central; }
   </style>
 
@@ -74,7 +74,7 @@
 
   <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">THE SINGLE CHURCH INSTRUCTION</text>
 
-  <rect x="250" y="40" width="600" height="70" rx="10" fill="#0f1a2a" stroke="#2ecc71" stroke-width="2.5"/>
+  <rect x="250" y="40" width="600" height="70" rx="10" fill="#f0f5fa" stroke="#2ecc71" stroke-width="2.5"/>
   <text class="code" x="550" y="65" font-size="20" fill="#2ecc71" font-weight="700">CALL( CONNECT( me, mymother ) )</text>
   <text class="ls" x="550" y="95">1 Church instruction = complete secure cross-machine communication</text>
 
@@ -83,105 +83,105 @@
   <text class="ph" x="550" y="140" text-anchor="middle" fill="#f5c842">TWO HETEROGENEOUS META MACHINES</text>
 
   <!-- ===== Machine A: Kenneth / CTMM Sim-64 ===== -->
-  <rect x="30" y="160" width="480" height="440" rx="14" fill="#0c1220" stroke="#5dade2" stroke-width="2.5"/>
+  <rect x="30" y="160" width="480" height="440" rx="14" fill="#f0f5fa" stroke="#5dade2" stroke-width="2.5"/>
   <text class="ph" x="270" y="185" text-anchor="middle" fill="#5dade2">KENNETH &mdash; CTMM Sim-64</text>
   <text class="ls" x="270" y="203" fill="#5dade2">Custom ISA &bull; 64-bit Golden Tokens &bull; DR0-DR15</text>
 
   <!-- Kenneth's registers -->
-  <rect x="55" y="220" width="430" height="155" rx="8" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="col-hdr" x="270" y="240" fill="#8899aa">Thread Registers</text>
+  <rect x="55" y="220" width="430" height="155" rx="8" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="col-hdr" x="270" y="240" fill="#666666">Thread Registers</text>
 
   <!-- CR8 me -->
-  <rect x="70" y="252" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="70" y="252" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#5dade2" stroke-width="1"/>
   <text class="cell" x="105" y="264" fill="#5dade2">CR8</text>
-  <text class="lt" x="150" y="264" fill="#e8e8e8">me</text>
-  <text class="lt" x="200" y="264" fill="#a0b0c0">(Thread identity &mdash; Kenneth)</text>
+  <text class="lt" x="150" y="264" fill="#1a1a1a">me</text>
+  <text class="lt" x="200" y="264" fill="#555555">(Thread identity &mdash; Kenneth)</text>
 
   <!-- CR5 Services -->
-  <rect x="70" y="282" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#f39c12" stroke-width="1"/>
+  <rect x="70" y="282" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#f39c12" stroke-width="1"/>
   <text class="cell" x="105" y="294" fill="#f39c12">CR5</text>
-  <text class="lt" x="150" y="294" fill="#e8e8e8">Services C-List [E]</text>
+  <text class="lt" x="150" y="294" fill="#1a1a1a">Services C-List [E]</text>
 
   <!-- CR6 Active C-List -->
-  <rect x="70" y="312" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#c39bd3" stroke-width="1"/>
+  <rect x="70" y="312" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#c39bd3" stroke-width="1"/>
   <text class="cell" x="105" y="324" fill="#c39bd3">CR6</text>
-  <text class="lt" x="150" y="324" fill="#e8e8e8">Active C-List [E]</text>
-  <text class="lt" x="340" y="324" fill="#a0b0c0">has CONNECT</text>
+  <text class="lt" x="150" y="324" fill="#1a1a1a">Active C-List [E]</text>
+  <text class="lt" x="340" y="324" fill="#555555">has CONNECT</text>
 
   <!-- CR14 Active Nucleus -->
-  <rect x="70" y="342" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="70" y="342" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="105" y="354" fill="#2ecc71">CR14</text>
-  <text class="lt" x="150" y="354" fill="#e8e8e8">Active Nucleus [X]</text>
+  <text class="lt" x="150" y="354" fill="#1a1a1a">Active Nucleus [X]</text>
 
   <!-- CR15 Namespace -->
-  <rect x="260" y="252" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#f5c842" stroke-width="1"/>
+  <rect x="260" y="252" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#f5c842" stroke-width="1"/>
   <text class="cell" x="295" y="264" fill="#f5c842">CR15</text>
-  <text class="lt" x="340" y="264" fill="#a0b0c0">Namespace root</text>
+  <text class="lt" x="340" y="264" fill="#555555">Namespace root</text>
 
   <!-- Kenneth's namespace entry for tunnel -->
-  <rect x="55" y="385" width="430" height="70" rx="6" fill="#141e30" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="55" y="385" width="430" height="70" rx="6" fill="#f0f4f8" stroke="#f5c842" stroke-width="1.5"/>
   <text class="col-hdr" x="270" y="402" fill="#f5c842">Namespace Entry: mymother (Outform GT)</text>
-  <text class="code-sm" x="70" y="422" fill="#a0b0c0">Location: remote endpoint   Limit: session bound   Seals: MAC (FNV hash)</text>
+  <text class="code-sm" x="70" y="422" fill="#555555">Location: remote endpoint   Limit: session bound   Seals: MAC (FNV hash)</text>
   <text class="code-sm" x="70" y="440" fill="#c39bd3">Cryptographic key: standard namespace entry, accessed via CAP.LOAD [R]</text>
 
   <!-- No-OS annotations for Kenneth -->
-  <rect x="55" y="465" width="430" height="60" rx="6" fill="#0a0a15" stroke="#e74c3c" stroke-width="1" stroke-dasharray="5,3"/>
+  <rect x="55" y="465" width="430" height="60" rx="6" fill="#f5f5f5" stroke="#e74c3c" stroke-width="1" stroke-dasharray="5,3"/>
   <text class="zero-label" x="270" y="482">AT EVERY LAYER ON THIS MACHINE:</text>
   <text class="code-sm" x="70" y="500" fill="#e74c3c">No OS kernel &bull; No virtual memory &bull; No privilege rings &bull; No superuser</text>
-  <text class="code-sm" x="70" y="516" fill="#a0b0c0">Only atomic abstractions, namespace entries, mLoad gate, Golden Tokens</text>
+  <text class="code-sm" x="70" y="516" fill="#555555">Only atomic abstractions, namespace entries, mLoad gate, Golden Tokens</text>
 
   <!-- ===== Machine B: Priscilla / RV32-Cap ===== -->
-  <rect x="590" y="160" width="480" height="440" rx="14" fill="#0c1220" stroke="#2ecc71" stroke-width="2.5"/>
+  <rect x="590" y="160" width="480" height="440" rx="14" fill="#f0f5fa" stroke="#2ecc71" stroke-width="2.5"/>
   <text class="ph" x="830" y="185" text-anchor="middle" fill="#2ecc71">PRISCILLA &mdash; RV32-Cap Sim-32</text>
   <text class="ls" x="830" y="203" fill="#2ecc71">RISC-V RV32I &bull; 32-bit Golden Tokens &bull; x0-x31</text>
 
   <!-- Priscilla's registers -->
-  <rect x="615" y="220" width="430" height="155" rx="8" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="col-hdr" x="830" y="240" fill="#8899aa">Thread Registers</text>
+  <rect x="615" y="220" width="430" height="155" rx="8" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="col-hdr" x="830" y="240" fill="#666666">Thread Registers</text>
 
   <!-- CR8 me -->
-  <rect x="630" y="252" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="630" y="252" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="665" y="264" fill="#2ecc71">CR8</text>
-  <text class="lt" x="710" y="264" fill="#e8e8e8">me</text>
-  <text class="lt" x="760" y="264" fill="#a0b0c0">(Thread identity &mdash; Priscilla)</text>
+  <text class="lt" x="710" y="264" fill="#1a1a1a">me</text>
+  <text class="lt" x="760" y="264" fill="#555555">(Thread identity &mdash; Priscilla)</text>
 
   <!-- CR5 Services -->
-  <rect x="630" y="282" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#f39c12" stroke-width="1"/>
+  <rect x="630" y="282" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#f39c12" stroke-width="1"/>
   <text class="cell" x="665" y="294" fill="#f39c12">CR5</text>
-  <text class="lt" x="710" y="294" fill="#e8e8e8">Services C-List [E]</text>
+  <text class="lt" x="710" y="294" fill="#1a1a1a">Services C-List [E]</text>
 
   <!-- CR6 Active C-List -->
-  <rect x="630" y="312" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#c39bd3" stroke-width="1"/>
+  <rect x="630" y="312" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#c39bd3" stroke-width="1"/>
   <text class="cell" x="665" y="324" fill="#c39bd3">CR6</text>
-  <text class="lt" x="710" y="324" fill="#e8e8e8">Active C-List [E]</text>
-  <text class="lt" x="900" y="324" fill="#a0b0c0">has LISTEN</text>
+  <text class="lt" x="710" y="324" fill="#1a1a1a">Active C-List [E]</text>
+  <text class="lt" x="900" y="324" fill="#555555">has LISTEN</text>
 
   <!-- CR14 Active Nucleus -->
-  <rect x="630" y="342" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="630" y="342" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell" x="665" y="354" fill="#2ecc71">CR14</text>
-  <text class="lt" x="710" y="354" fill="#e8e8e8">Active Nucleus [X]</text>
+  <text class="lt" x="710" y="354" fill="#1a1a1a">Active Nucleus [X]</text>
 
   <!-- CR15 Namespace -->
-  <rect x="820" y="252" width="70" height="24" rx="4" fill="#1a2a3a" stroke="#f5c842" stroke-width="1"/>
+  <rect x="820" y="252" width="70" height="24" rx="4" fill="#e8f0f8" stroke="#f5c842" stroke-width="1"/>
   <text class="cell" x="855" y="264" fill="#f5c842">CR15</text>
-  <text class="lt" x="900" y="264" fill="#a0b0c0">Namespace root</text>
+  <text class="lt" x="900" y="264" fill="#555555">Namespace root</text>
 
   <!-- Priscilla's namespace entry for tunnel -->
-  <rect x="615" y="385" width="430" height="70" rx="6" fill="#141e30" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="615" y="385" width="430" height="70" rx="6" fill="#f0f4f8" stroke="#f5c842" stroke-width="1.5"/>
   <text class="col-hdr" x="830" y="402" fill="#f5c842">Namespace Entry: myson (Outform GT)</text>
-  <text class="code-sm" x="630" y="422" fill="#a0b0c0">Location: remote endpoint   Limit: session bound   Seals: MAC (FNV hash)</text>
+  <text class="code-sm" x="630" y="422" fill="#555555">Location: remote endpoint   Limit: session bound   Seals: MAC (FNV hash)</text>
   <text class="code-sm" x="630" y="440" fill="#c39bd3">Matching cryptographic key: same key material as Kenneth's entry</text>
 
   <!-- No-OS annotations for Priscilla -->
-  <rect x="615" y="465" width="430" height="60" rx="6" fill="#0a0a15" stroke="#e74c3c" stroke-width="1" stroke-dasharray="5,3"/>
+  <rect x="615" y="465" width="430" height="60" rx="6" fill="#f5f5f5" stroke="#e74c3c" stroke-width="1" stroke-dasharray="5,3"/>
   <text class="zero-label" x="830" y="482">AT EVERY LAYER ON THIS MACHINE:</text>
   <text class="code-sm" x="630" y="500" fill="#e74c3c">No OS kernel &bull; No virtual memory &bull; No privilege rings &bull; No superuser</text>
-  <text class="code-sm" x="630" y="516" fill="#a0b0c0">Only atomic abstractions, namespace entries, mLoad gate, Golden Tokens</text>
+  <text class="code-sm" x="630" y="516" fill="#555555">Only atomic abstractions, namespace entries, mLoad gate, Golden Tokens</text>
 
   <!-- ========== ABI DESCRIPTOR ========== -->
-  <rect x="370" y="540" width="360" height="50" rx="8" fill="#121e2e" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="370" y="540" width="360" height="50" rx="8" fill="#f0f5fa" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="col-hdr" x="550" y="558" fill="#c39bd3">ABI Descriptor (cached in namespace entry)</text>
-  <text class="ls" x="550" y="576" fill="#a0b0c0">Maps DR0-DR15 (64-bit) &harr; x0-x31 (32-bit)</text>
+  <text class="ls" x="550" y="576" fill="#555555">Maps DR0-DR15 (64-bit) &harr; x0-x31 (32-bit)</text>
 
   <!-- ========== ENCRYPTED TUNNEL ========== -->
 
@@ -189,10 +189,10 @@
   <text class="ph" x="550" y="635" text-anchor="middle" fill="#f5c842">ENCRYPTED CAPABILITY TUNNEL (Standard HTTPS)</text>
 
   <!-- Tunnel internals -->
-  <rect x="140" y="650" width="250" height="35" rx="5" fill="#1a2a3a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="140" y="650" width="250" height="35" rx="5" fill="#e8f0f8" stroke="#5dade2" stroke-width="1"/>
   <text class="cell-b" x="265" y="668" fill="#5dade2">Kenneth encrypts via CAP.LOAD [R]</text>
 
-  <rect x="710" y="650" width="250" height="35" rx="5" fill="#1a2a3a" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="710" y="650" width="250" height="35" rx="5" fill="#e8f0f8" stroke="#2ecc71" stroke-width="1"/>
   <text class="cell-b" x="835" y="668" fill="#2ecc71">Priscilla decrypts via CAP.LOAD [R]</text>
 
   <!-- Tunnel arrows -->
@@ -212,33 +212,33 @@
   <text class="ls" x="550" y="790">Every token validated by mLoad. No bypass. No shortcut. No exception.</text>
 
   <!-- GT 1: me -->
-  <rect x="60" y="810" width="300" height="110" rx="10" fill="#0f1a2a" stroke="#5dade2" stroke-width="2"/>
+  <rect x="60" y="810" width="300" height="110" rx="10" fill="#f0f5fa" stroke="#5dade2" stroke-width="2"/>
   <rect x="70" y="818" width="30" height="22" rx="11" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="829" fill="#0a0e17">1</text>
+  <text class="cell-b" x="85" y="829" fill="#ffffff">1</text>
   <text class="ph" x="110" y="830" text-anchor="start" fill="#5dade2">me</text>
-  <text class="lt" x="75" y="852" fill="#e8e8e8">CR8 &mdash; Thread identity (Kenneth)</text>
-  <text class="lt" x="75" y="870" fill="#a0b0c0">Identifies the caller. Proves who is</text>
-  <text class="lt" x="75" y="886" fill="#a0b0c0">speaking. MAC-validated, unforgeable.</text>
+  <text class="lt" x="75" y="852" fill="#1a1a1a">CR8 &mdash; Thread identity (Kenneth)</text>
+  <text class="lt" x="75" y="870" fill="#555555">Identifies the caller. Proves who is</text>
+  <text class="lt" x="75" y="886" fill="#555555">speaking. MAC-validated, unforgeable.</text>
   <text class="lr" x="345" y="905" fill="#5dade2">Permissions: M (transient)</text>
 
   <!-- GT 2: mymother -->
-  <rect x="400" y="810" width="300" height="110" rx="10" fill="#0f1a2a" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="400" y="810" width="300" height="110" rx="10" fill="#f0f5fa" stroke="#2ecc71" stroke-width="2"/>
   <rect x="410" y="818" width="30" height="22" rx="11" fill="#2ecc71"/>
-  <text class="cell-b" x="425" y="829" fill="#0a0e17">2</text>
+  <text class="cell-b" x="425" y="829" fill="#ffffff">2</text>
   <text class="ph" x="450" y="830" text-anchor="start" fill="#2ecc71">mymother</text>
-  <text class="lt" x="415" y="852" fill="#e8e8e8">Outform GT &mdash; Priscilla's endpoint</text>
-  <text class="lt" x="415" y="870" fill="#a0b0c0">References remote resource. Contains</text>
-  <text class="lt" x="415" y="886" fill="#a0b0c0">tunnel key index. MAC-validated.</text>
+  <text class="lt" x="415" y="852" fill="#1a1a1a">Outform GT &mdash; Priscilla's endpoint</text>
+  <text class="lt" x="415" y="870" fill="#555555">References remote resource. Contains</text>
+  <text class="lt" x="415" y="886" fill="#555555">tunnel key index. MAC-validated.</text>
   <text class="lr" x="685" y="905" fill="#2ecc71">Permissions: E (Enter)</text>
 
   <!-- GT 3: CONNECT -->
-  <rect x="740" y="810" width="300" height="110" rx="10" fill="#0f1a2a" stroke="#f5c842" stroke-width="2"/>
+  <rect x="740" y="810" width="300" height="110" rx="10" fill="#f0f5fa" stroke="#f5c842" stroke-width="2"/>
   <rect x="750" y="818" width="30" height="22" rx="11" fill="#f5c842"/>
-  <text class="cell-b" x="765" y="829" fill="#0a0e17">3</text>
+  <text class="cell-b" x="765" y="829" fill="#ffffff">3</text>
   <text class="ph" x="790" y="830" text-anchor="start" fill="#f5c842">CONNECT</text>
-  <text class="lt" x="755" y="852" fill="#e8e8e8">Method in Active C-List (CR6)</text>
-  <text class="lt" x="755" y="870" fill="#a0b0c0">Symbolic name resolved by CR14 to</text>
-  <text class="lt" x="755" y="886" fill="#a0b0c0">executable tunnel code. MAC-validated.</text>
+  <text class="lt" x="755" y="852" fill="#1a1a1a">Method in Active C-List (CR6)</text>
+  <text class="lt" x="755" y="870" fill="#555555">Symbolic name resolved by CR14 to</text>
+  <text class="lt" x="755" y="886" fill="#555555">executable tunnel code. MAC-validated.</text>
   <text class="lr" x="1025" y="905" fill="#f5c842">Permissions: E &rarr; X (resolved)</text>
 
   <!-- ========== THE 7 ZEROES ========== -->
@@ -247,55 +247,55 @@
   <text class="ls" x="550" y="980">Escalation paths exploited by malware, ransomware, and AI breakout are structurally eliminated.</text>
 
   <!-- Zero boxes - row 1 -->
-  <rect x="60" y="1000" width="230" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="60" y="1000" width="230" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="70" y="1008" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="83" y="1019" fill="#0a0e17">0</text>
+  <text class="cell-b" x="83" y="1019" fill="#ffffff">0</text>
   <text class="ph" x="105" y="1018" text-anchor="start" fill="#e74c3c" font-size="12">Zero OS</text>
-  <text class="lt" x="75" y="1040" fill="#a0b0c0">No operating system kernel.</text>
-  <text class="lt" x="75" y="1056" fill="#a0b0c0">No monolithic trusted base.</text>
+  <text class="lt" x="75" y="1040" fill="#555555">No operating system kernel.</text>
+  <text class="lt" x="75" y="1056" fill="#555555">No monolithic trusted base.</text>
 
-  <rect x="310" y="1000" width="230" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="310" y="1000" width="230" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="320" y="1008" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="333" y="1019" fill="#0a0e17">0</text>
+  <text class="cell-b" x="333" y="1019" fill="#ffffff">0</text>
   <text class="ph" x="355" y="1018" text-anchor="start" fill="#e74c3c" font-size="12">Zero VM</text>
-  <text class="lt" x="325" y="1040" fill="#a0b0c0">No virtual memory system.</text>
-  <text class="lt" x="325" y="1056" fill="#a0b0c0">No page tables to corrupt.</text>
+  <text class="lt" x="325" y="1040" fill="#555555">No virtual memory system.</text>
+  <text class="lt" x="325" y="1056" fill="#555555">No page tables to corrupt.</text>
 
-  <rect x="560" y="1000" width="230" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="560" y="1000" width="230" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="570" y="1008" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="583" y="1019" fill="#0a0e17">0</text>
+  <text class="cell-b" x="583" y="1019" fill="#ffffff">0</text>
   <text class="ph" x="605" y="1018" text-anchor="start" fill="#e74c3c" font-size="12">Zero Privilege</text>
-  <text class="lt" x="575" y="1040" fill="#a0b0c0">No privilege rings or modes.</text>
-  <text class="lt" x="575" y="1056" fill="#a0b0c0">No ring-0/ring-3 boundary.</text>
+  <text class="lt" x="575" y="1040" fill="#555555">No privilege rings or modes.</text>
+  <text class="lt" x="575" y="1056" fill="#555555">No ring-0/ring-3 boundary.</text>
 
-  <rect x="810" y="1000" width="230" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="810" y="1000" width="230" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="820" y="1008" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="833" y="1019" fill="#0a0e17">0</text>
+  <text class="cell-b" x="833" y="1019" fill="#ffffff">0</text>
   <text class="ph" x="855" y="1018" text-anchor="start" fill="#e74c3c" font-size="12">Zero Superuser</text>
-  <text class="lt" x="825" y="1040" fill="#a0b0c0">No root. No admin. No god mode.</text>
-  <text class="lt" x="825" y="1056" fill="#a0b0c0">Nobody can bypass mLoad.</text>
+  <text class="lt" x="825" y="1040" fill="#555555">No root. No admin. No god mode.</text>
+  <text class="lt" x="825" y="1056" fill="#555555">Nobody can bypass mLoad.</text>
 
   <!-- Zero boxes - row 2 -->
-  <rect x="120" y="1090" width="260" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="120" y="1090" width="260" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="130" y="1098" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="143" y="1109" fill="#0a0e17">0</text>
+  <text class="cell-b" x="143" y="1109" fill="#ffffff">0</text>
   <text class="ph" x="165" y="1108" text-anchor="start" fill="#e74c3c" font-size="12">Zero Unauthorized Code Execution</text>
-  <text class="lt" x="135" y="1130" fill="#a0b0c0">X permission required on GT. mLoad</text>
-  <text class="lt" x="135" y="1146" fill="#a0b0c0">validates before any code runs.</text>
+  <text class="lt" x="135" y="1130" fill="#555555">X permission required on GT. mLoad</text>
+  <text class="lt" x="135" y="1146" fill="#555555">validates before any code runs.</text>
 
-  <rect x="420" y="1090" width="260" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="420" y="1090" width="260" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="430" y="1098" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="443" y="1109" fill="#0a0e17">0</text>
+  <text class="cell-b" x="443" y="1109" fill="#ffffff">0</text>
   <text class="ph" x="465" y="1108" text-anchor="start" fill="#e74c3c" font-size="12">Zero Unauthorized Data Access</text>
-  <text class="lt" x="435" y="1130" fill="#a0b0c0">R/W permissions on GT. Bounds check.</text>
-  <text class="lt" x="435" y="1146" fill="#a0b0c0">MAC validation. No wild pointers.</text>
+  <text class="lt" x="435" y="1130" fill="#555555">R/W permissions on GT. Bounds check.</text>
+  <text class="lt" x="435" y="1146" fill="#555555">MAC validation. No wild pointers.</text>
 
-  <rect x="720" y="1090" width="260" height="75" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="720" y="1090" width="260" height="75" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <rect x="730" y="1098" width="26" height="22" rx="4" fill="#e74c3c"/>
-  <text class="cell-b" x="743" y="1109" fill="#0a0e17">0</text>
+  <text class="cell-b" x="743" y="1109" fill="#ffffff">0</text>
   <text class="ph" x="765" y="1108" text-anchor="start" fill="#e74c3c" font-size="12">Zero Containment Escape</text>
-  <text class="lt" x="735" y="1130" fill="#a0b0c0">Golden Tokens define boundaries.</text>
-  <text class="lt" x="735" y="1146" fill="#a0b0c0">No way out except through mLoad.</text>
+  <text class="lt" x="735" y="1130" fill="#555555">Golden Tokens define boundaries.</text>
+  <text class="lt" x="735" y="1146" fill="#555555">No way out except through mLoad.</text>
 
   <!-- ========== INSTRUCTION FLOW ========== -->
 
@@ -303,70 +303,70 @@
 
   <!-- Step 1 -->
   <rect x="60" y="1230" width="50" height="30" rx="15" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="1245" fill="#0a0e17">1</text>
-  <rect x="120" y="1230" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="135" y="1245" fill="#e8e8e8">CR6 (Active C-List) contains symbolic name</text>
+  <text class="cell-b" x="85" y="1245" fill="#ffffff">1</text>
+  <rect x="120" y="1230" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="135" y="1245" fill="#1a1a1a">CR6 (Active C-List) contains symbolic name</text>
   <text class="mono" x="430" y="1245" fill="#2ecc71" font-size="12">CONNECT</text>
-  <text class="lt" x="520" y="1245" fill="#a0b0c0">&mdash; CR14 (Nucleus) resolves it to executable code via mLoad</text>
+  <text class="lt" x="520" y="1245" fill="#555555">&mdash; CR14 (Nucleus) resolves it to executable code via mLoad</text>
 
   <!-- Step 2 -->
   <rect x="60" y="1270" width="50" height="30" rx="15" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="1285" fill="#0a0e17">2</text>
-  <rect x="120" y="1270" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="135" y="1285" fill="#e8e8e8">CALL pushes 2-word frame [E-GT &middot; machine word]; re-derives CR5/CR6/CR14 via mLoad on RETURN</text>
+  <text class="cell-b" x="85" y="1285" fill="#ffffff">2</text>
+  <rect x="120" y="1270" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="135" y="1285" fill="#1a1a1a">CALL pushes 2-word frame [E-GT &middot; machine word]; re-derives CR5/CR6/CR14 via mLoad on RETURN</text>
 
   <!-- Step 3 -->
   <rect x="60" y="1310" width="50" height="30" rx="15" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="1325" fill="#0a0e17">3</text>
-  <rect x="120" y="1310" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="135" y="1325" fill="#e8e8e8">CONNECT code reads</text>
+  <text class="cell-b" x="85" y="1325" fill="#ffffff">3</text>
+  <rect x="120" y="1310" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="135" y="1325" fill="#1a1a1a">CONNECT code reads</text>
   <text class="mono" x="310" y="1325" fill="#5dade2" font-size="12">me</text>
-  <text class="lt" x="340" y="1325" fill="#a0b0c0">(CR8) and</text>
+  <text class="lt" x="340" y="1325" fill="#555555">(CR8) and</text>
   <text class="mono" x="410" y="1325" fill="#2ecc71" font-size="12">mymother</text>
-  <text class="lt" x="500" y="1325" fill="#a0b0c0">(Outform GT) &mdash; both validated by mLoad</text>
+  <text class="lt" x="500" y="1325" fill="#555555">(Outform GT) &mdash; both validated by mLoad</text>
 
   <!-- Step 4 -->
   <rect x="60" y="1350" width="50" height="30" rx="15" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="1365" fill="#0a0e17">4</text>
-  <rect x="120" y="1350" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="135" y="1365" fill="#e8e8e8">CAP.LOAD [R] fetches cryptographic key from namespace entry &mdash; mLoad validates permissions + MAC</text>
+  <text class="cell-b" x="85" y="1365" fill="#ffffff">4</text>
+  <rect x="120" y="1350" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="135" y="1365" fill="#1a1a1a">CAP.LOAD [R] fetches cryptographic key from namespace entry &mdash; mLoad validates permissions + MAC</text>
 
   <!-- Step 5 -->
   <rect x="60" y="1390" width="50" height="30" rx="15" fill="#5dade2"/>
-  <text class="cell-b" x="85" y="1405" fill="#0a0e17">5</text>
-  <rect x="120" y="1390" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lt" x="135" y="1405" fill="#e8e8e8">Message encrypted, sent via HTTPS tunnel &mdash; ABI descriptor maps 64-bit &harr; 32-bit registers</text>
+  <text class="cell-b" x="85" y="1405" fill="#ffffff">5</text>
+  <rect x="120" y="1390" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lt" x="135" y="1405" fill="#1a1a1a">Message encrypted, sent via HTTPS tunnel &mdash; ABI descriptor maps 64-bit &harr; 32-bit registers</text>
 
   <!-- Step 6 -->
   <rect x="60" y="1430" width="50" height="30" rx="15" fill="#2ecc71"/>
-  <text class="cell-b" x="85" y="1445" fill="#0a0e17">6</text>
-  <rect x="120" y="1430" width="920" height="30" rx="6" fill="#0f1a2a" stroke="#2ecc71" stroke-width="1"/>
+  <text class="cell-b" x="85" y="1445" fill="#ffffff">6</text>
+  <rect x="120" y="1430" width="920" height="30" rx="6" fill="#f0f5fa" stroke="#2ecc71" stroke-width="1"/>
   <text class="lt" x="135" y="1445" fill="#2ecc71">Priscilla's mLoad validates incoming &mdash; decrypts &mdash; delivers to her thread &mdash; replies "Hello Son"</text>
 
   <!-- ========== REVOCATION PATH ========== -->
 
-  <rect x="130" y="1480" width="840" height="50" rx="8" fill="#121e2e" stroke="#c39bd3" stroke-width="1.5" stroke-dasharray="6,3"/>
+  <rect x="130" y="1480" width="840" height="50" rx="8" fill="#f0f5fa" stroke="#c39bd3" stroke-width="1.5" stroke-dasharray="6,3"/>
   <text class="col-hdr" x="550" y="1498" fill="#c39bd3">GC REVOCATION: Version bump on either namespace entry instantly invalidates all GTs</text>
-  <text class="ls" x="550" y="1518" fill="#a0b0c0">Unreachable entries in Mark-Scan-Sweep &rarr; version incremented &rarr; all outstanding GTs become NULL</text>
+  <text class="ls" x="550" y="1518" fill="#555555">Unreachable entries in Mark-Scan-Sweep &rarr; version incremented &rarr; all outstanding GTs become NULL</text>
 
   <!-- ========== CONVENTIONAL COMPARISON ========== -->
 
-  <rect x="100" y="1550" width="400" height="80" rx="8" fill="#1a0a0a" stroke="#e74c3c" stroke-width="1.5"/>
+  <rect x="100" y="1550" width="400" height="80" rx="8" fill="#fdf0f0" stroke="#e74c3c" stroke-width="1.5"/>
   <text class="col-hdr" x="300" y="1570" fill="#e74c3c">CONVENTIONAL: "Hello World"</text>
-  <text class="lt" x="115" y="1590" fill="#a0b0c0">Requires: OS, TCP/IP stack, DNS, TLS library,</text>
-  <text class="lt" x="115" y="1608" fill="#a0b0c0">privilege escalation, root certs, firewall rules...</text>
+  <text class="lt" x="115" y="1590" fill="#555555">Requires: OS, TCP/IP stack, DNS, TLS library,</text>
+  <text class="lt" x="115" y="1608" fill="#555555">privilege escalation, root certs, firewall rules...</text>
 
-  <rect x="600" y="1550" width="400" height="80" rx="8" fill="#0a1a0a" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="600" y="1550" width="400" height="80" rx="8" fill="#f0f8f0" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="col-hdr" x="800" y="1570" fill="#2ecc71">CTMM: "Hello Mum"</text>
-  <text class="lt" x="615" y="1590" fill="#e8e8e8">Requires: 1 instruction, 3 Golden Tokens,</text>
-  <text class="lt" x="615" y="1608" fill="#e8e8e8">7 Zeroes. Nothing else. Ever.</text>
+  <text class="lt" x="615" y="1590" fill="#1a1a1a">Requires: 1 instruction, 3 Golden Tokens,</text>
+  <text class="lt" x="615" y="1608" fill="#1a1a1a">7 Zeroes. Nothing else. Ever.</text>
 
   <!-- Versus -->
   <text class="ph" x="550" y="1590" text-anchor="middle" fill="#f5c842" font-size="16">vs</text>
 
   <!-- ========== BOTTOM INSIGHT ========== -->
 
-  <rect x="100" y="1660" width="900" height="50" rx="8" fill="#1a1400" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="100" y="1660" width="900" height="50" rx="8" fill="#fdf8e8" stroke="#f5c842" stroke-width="1.5"/>
   <text class="cell-b" x="550" y="1680" fill="#f5c842">mLoad is the single trusted gate. Nobody bypasses it. Not the OS (there is none).</text>
   <text class="cell-b" x="550" y="1698" fill="#f5c842">Not the superuser (there is none). Not the VM (there is none). Not privilege hardware (there is none).</text>
 

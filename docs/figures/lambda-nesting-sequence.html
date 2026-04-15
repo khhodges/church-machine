@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #0a0e17;
-    color: #c8d6e5;
+    background: #ffffff;
+    color: #333333;
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     display: flex;
@@ -16,13 +16,13 @@
     align-items: center;
     padding: 30px 20px;
   }
-  h1 { font-size: 22px; color: #f5c842; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; color: #8899aa; margin-bottom: 30px; text-align: center; max-width: 700px; }
+  h1 { font-size: 22px; color: #b8860b; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; color: #555555; margin-bottom: 30px; text-align: center; max-width: 700px; }
   .legend {
     margin-top: 28px;
     display: flex; gap: 24px; flex-wrap: wrap; justify-content: center;
   }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8899aa; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #555555; }
   .legend-swatch { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); }
 </style>
 </head>
@@ -51,10 +51,10 @@
   </defs>
 
   <style>
-    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#e8e8e8; text-anchor:middle; dominant-baseline:central; }
-    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:middle; dominant-baseline:central; }
-    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:start; dominant-baseline:central; }
-    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#a0b0c0; text-anchor:end; dominant-baseline:central; }
+    .lb { font-family:'Segoe UI',system-ui,sans-serif; font-size:13px; fill:#1a1a1a; text-anchor:middle; dominant-baseline:central; }
+    .ls { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:middle; dominant-baseline:central; }
+    .lt { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:start; dominant-baseline:central; }
+    .lr { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; fill:#555555; text-anchor:end; dominant-baseline:central; }
     .lb-b { font-weight:700; }
     .ph { font-family:'Segoe UI',system-ui,sans-serif; font-size:14px; font-weight:700; }
     .mono { font-family:'Consolas','Courier New',monospace; }
@@ -67,112 +67,112 @@
   <!-- Step | Instruction | Caller Domain | Called Domain | Flag | Stack | Notes -->
 
   <!-- Header bar -->
-  <rect x="20" y="10" width="1010" height="36" rx="6" fill="#141a28" stroke="#2a3a4a" stroke-width="1"/>
+  <rect x="20" y="10" width="1010" height="36" rx="6" fill="#f0f4f8" stroke="#cccccc" stroke-width="1"/>
   <text class="ph" x="55" y="28" text-anchor="middle" fill="#f5c842">Step</text>
   <text class="ph" x="195" y="28" text-anchor="middle" fill="#5dade2">Instruction</text>
   <text class="ph" x="390" y="28" text-anchor="middle" fill="#2ecc71">Caller Domain A</text>
   <text class="ph" x="580" y="28" text-anchor="middle" fill="#c39bd3">Called Domain B</text>
   <text class="ph" x="735" y="28" text-anchor="middle" fill="#f39c12">LAMBDA-active</text>
-  <text class="ph" x="870" y="28" text-anchor="middle" fill="#8899aa">Stack</text>
-  <text class="ph" x="985" y="28" text-anchor="middle" fill="#8899aa">Notes</text>
+  <text class="ph" x="870" y="28" text-anchor="middle" fill="#666666">Stack</text>
+  <text class="ph" x="985" y="28" text-anchor="middle" fill="#666666">Notes</text>
 
   <!-- Vertical lifelines -->
-  <line x1="390" y1="55" x2="390" y2="1100" stroke="#2ecc71" stroke-width="1" stroke-dasharray="6,4" opacity="0.3"/>
-  <line x1="580" y1="55" x2="580" y2="1100" stroke="#c39bd3" stroke-width="1" stroke-dasharray="6,4" opacity="0.3"/>
+  <line x1="390" y1="55" x2="390" y2="1100" stroke="#2ecc71" stroke-width="1" stroke-dasharray="6,4" opacity="0.2"/>
+  <line x1="580" y1="55" x2="580" y2="1100" stroke="#c39bd3" stroke-width="1" stroke-dasharray="6,4" opacity="0.2"/>
 
   <!-- ========== STEP 0: Initial State ========== -->
-  <rect x="20" y="55" width="1010" height="60" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="55" width="1010" height="60" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="78">0</text>
 
-  <rect x="120" y="65" width="150" height="30" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lb" x="195" y="80" fill="#8899aa">(initial state)</text>
+  <rect x="120" y="65" width="150" height="30" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lb" x="195" y="80" fill="#666666">(initial state)</text>
 
-  <rect x="340" y="65" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="65" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="80" fill="#2ecc71">Active</text>
 
-  <text class="ls" x="580" y="80" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="80" fill="#666666">&mdash;</text>
 
   <text class="flag-off" x="735" y="80">0 (clear)</text>
 
-  <text class="ls" x="870" y="80" fill="#555">empty</text>
+  <text class="ls" x="870" y="80" fill="#666666">empty</text>
 
-  <text class="lt" x="935" y="80" fill="#6a8a6a" font-size="10">No LAMBDA</text>
-  <text class="lt" x="935" y="94" fill="#6a8a6a" font-size="10">in progress</text>
+  <text class="lt" x="935" y="80" fill="#448844" font-size="10">No LAMBDA</text>
+  <text class="lt" x="935" y="94" fill="#448844" font-size="10">in progress</text>
 
   <!-- ========== STEP 1: LAMBDA CR2, x ========== -->
-  <rect x="20" y="120" width="1010" height="80" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="120" width="1010" height="80" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="155">1</text>
 
-  <rect x="105" y="135" width="180" height="36" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="105" y="135" width="180" height="36" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="148" fill="#2ecc71" font-size="12">LAMBDA CR2, x</text>
   <text class="ls" x="195" y="166" fill="#2ecc71">X perm verified</text>
 
   <!-- Arrow: caller activates -->
   <line x1="285" y1="153" x2="340" y2="153" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
 
-  <rect x="340" y="138" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="138" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="153" fill="#2ecc71">Executing</text>
 
-  <text class="ls" x="580" y="153" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="153" fill="#666666">&mdash;</text>
 
   <text class="flag-on" x="735" y="148">1 (SET)</text>
   <text class="ls" x="735" y="166" fill="#2ecc71">PC+4 → LAMBDA_PC</text>
 
-  <text class="ls" x="870" y="153" fill="#555">empty</text>
+  <text class="ls" x="870" y="153" fill="#666666">empty</text>
 
-  <text class="lt" x="935" y="148" fill="#6a8a6a" font-size="10">Save return PC</text>
-  <text class="lt" x="935" y="162" fill="#6a8a6a" font-size="10">to machine status</text>
-  <text class="lt" x="935" y="176" fill="#6a8a6a" font-size="10">No stack push</text>
+  <text class="lt" x="935" y="148" fill="#448844" font-size="10">Save return PC</text>
+  <text class="lt" x="935" y="162" fill="#448844" font-size="10">to machine status</text>
+  <text class="lt" x="935" y="176" fill="#448844" font-size="10">No stack push</text>
 
   <!-- ========== STEP 2: LAMBDA body executes ========== -->
-  <rect x="20" y="205" width="1010" height="65" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="205" width="1010" height="65" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="235">2</text>
 
-  <rect x="120" y="218" width="150" height="30" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lb" x="195" y="233" fill="#8899aa">body executes</text>
+  <rect x="120" y="218" width="150" height="30" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lb" x="195" y="233" fill="#666666">body executes</text>
 
-  <rect x="340" y="218" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="218" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="233" fill="#2ecc71">Body A</text>
 
-  <text class="ls" x="580" y="233" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="233" fill="#666666">&mdash;</text>
 
   <text class="flag-on" x="735" y="233">1 (SET)</text>
 
-  <text class="ls" x="870" y="233" fill="#555">empty</text>
+  <text class="ls" x="870" y="233" fill="#666666">empty</text>
 
-  <text class="lt" x="935" y="228" fill="#6a8a6a" font-size="10">DRs hold args</text>
-  <text class="lt" x="935" y="242" fill="#6a8a6a" font-size="10">CR6,CR14 unchanged</text>
+  <text class="lt" x="935" y="228" fill="#448844" font-size="10">DRs hold args</text>
+  <text class="lt" x="935" y="242" fill="#448844" font-size="10">CR6,CR14 unchanged</text>
 
   <!-- ========== STEP 2.5: Second LAMBDA would FAULT ========== -->
-  <rect x="20" y="275" width="1010" height="60" rx="0" fill="#1a0f0f" stroke="#3a1a1a" stroke-width="0.5"/>
+  <rect x="20" y="275" width="1010" height="60" rx="0" fill="#fdf0f0" stroke="#fce0e0" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="302" fill="#e74c3c">!</text>
 
-  <rect x="105" y="285" width="180" height="30" rx="6" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <rect x="105" y="285" width="180" height="30" rx="6" fill="#fce8e8" stroke="#e74c3c" stroke-width="1.5" stroke-dasharray="4,3"/>
   <text class="lb mono" x="195" y="300" fill="#e74c3c" font-size="12">LAMBDA CR3, y</text>
 
   <text class="ls" x="390" y="300" fill="#e74c3c">FAULT!</text>
 
-  <text class="ls" x="580" y="300" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="300" fill="#666666">&mdash;</text>
 
   <text class="flag-on" x="735" y="295">1 (SET)</text>
   <text class="ls" x="735" y="312" fill="#e74c3c">already active!</text>
 
-  <text class="ls" x="870" y="300" fill="#555">&mdash;</text>
+  <text class="ls" x="870" y="300" fill="#666666">&mdash;</text>
 
   <text class="lt" x="935" y="295" fill="#e74c3c" font-size="10">Non-nestable!</text>
   <text class="lt" x="935" y="309" fill="#e74c3c" font-size="10">Second LAMBDA</text>
   <text class="lt" x="935" y="323" fill="#e74c3c" font-size="10">while active = FAULT</text>
 
   <!-- ========== STEP 3: CALL CR5 (domain crossing) ========== -->
-  <rect x="20" y="340" width="1010" height="100" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="340" width="1010" height="100" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="385">3</text>
 
-  <rect x="110" y="355" width="170" height="36" rx="6" fill="#1a1a2a" stroke="#c39bd3" stroke-width="2"/>
+  <rect x="110" y="355" width="170" height="36" rx="6" fill="#f0f0fa" stroke="#c39bd3" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="368" fill="#c39bd3" font-size="12">CALL CR5</text>
   <text class="ls" x="195" y="386" fill="#c39bd3">E perm verified</text>
 
@@ -180,32 +180,32 @@
   <line x1="280" y1="373" x2="530" y2="373" stroke="#c39bd3" stroke-width="2" marker-end="url(#ah-p)"/>
   <text class="ls" x="405" y="362" fill="#c39bd3">domain crossing</text>
 
-  <rect x="340" y="400" width="100" height="26" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="ls" x="390" y="413" fill="#8899aa">Suspended</text>
+  <rect x="340" y="400" width="100" height="26" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="ls" x="390" y="413" fill="#666666">Suspended</text>
 
-  <rect x="530" y="360" width="100" height="30" rx="4" fill="#2a1a2a" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="530" y="360" width="100" height="30" rx="4" fill="#f0e8f8" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="ls" x="580" y="375" fill="#c39bd3">Active</text>
 
   <text class="flag-off" x="735" y="368">0 (CLEARED)</text>
   <text class="ls" x="735" y="386" fill="#f39c12">CALL clears flag</text>
 
-  <rect x="820" y="355" width="90" height="50" rx="4" fill="#1a2a3a" stroke="#5dade2" stroke-width="1"/>
+  <rect x="820" y="355" width="90" height="50" rx="4" fill="#e8f0f8" stroke="#5dade2" stroke-width="1"/>
   <text class="ls" x="865" y="370" fill="#5dade2">Push frame</text>
   <text class="ls" x="865" y="384" fill="#5dade2">Tag=0</text>
   <text class="ls" x="865" y="398" fill="#5dade2">+LAMBDA st</text>
 
-  <text class="lt" x="935" y="360" fill="#6a8a6a" font-size="10">CALL saves:</text>
-  <text class="lt" x="935" y="374" fill="#6a8a6a" font-size="10">CR5,CR6,CR14</text>
-  <text class="lt" x="935" y="388" fill="#6a8a6a" font-size="10">PC, LAMBDA_PC</text>
-  <text class="lt" x="935" y="402" fill="#6a8a6a" font-size="10">LAMBDA-active=1</text>
-  <text class="lt" x="935" y="416" fill="#6a8a6a" font-size="10">Then clears flag</text>
+  <text class="lt" x="935" y="360" fill="#448844" font-size="10">CALL saves:</text>
+  <text class="lt" x="935" y="374" fill="#448844" font-size="10">CR5,CR6,CR14</text>
+  <text class="lt" x="935" y="388" fill="#448844" font-size="10">PC, LAMBDA_PC</text>
+  <text class="lt" x="935" y="402" fill="#448844" font-size="10">LAMBDA-active=1</text>
+  <text class="lt" x="935" y="416" fill="#448844" font-size="10">Then clears flag</text>
 
   <!-- ========== STEP 4: Nested LAMBDA in domain B ========== -->
-  <rect x="20" y="445" width="1010" height="80" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="445" width="1010" height="80" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="480">4</text>
 
-  <rect x="110" y="460" width="170" height="36" rx="6" fill="#0f2620" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="110" y="460" width="170" height="36" rx="6" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="473" fill="#2ecc71" font-size="12">LAMBDA CR3, y</text>
   <text class="ls" x="195" y="491" fill="#2ecc71">X perm verified</text>
 
@@ -213,9 +213,9 @@
   <line x1="280" y1="478" x2="530" y2="478" stroke="#2ecc71" stroke-width="2" marker-end="url(#ah-g)"/>
   <text class="ls" x="405" y="468" fill="#2ecc71">permitted!</text>
 
-  <text class="ls" x="390" y="478" fill="#555">&mdash;</text>
+  <text class="ls" x="390" y="478" fill="#666666">&mdash;</text>
 
-  <rect x="530" y="465" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="530" y="465" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="580" y="480" fill="#2ecc71">Body B</text>
 
   <text class="flag-on" x="735" y="473">1 (SET)</text>
@@ -223,43 +223,43 @@
 
   <text class="ls" x="870" y="478" fill="#5dade2">1 frame</text>
 
-  <text class="lt" x="935" y="468" fill="#6a8a6a" font-size="10">Flag was cleared</text>
-  <text class="lt" x="935" y="482" fill="#6a8a6a" font-size="10">by CALL → nested</text>
-  <text class="lt" x="935" y="496" fill="#6a8a6a" font-size="10">LAMBDA permitted</text>
+  <text class="lt" x="935" y="468" fill="#448844" font-size="10">Flag was cleared</text>
+  <text class="lt" x="935" y="482" fill="#448844" font-size="10">by CALL → nested</text>
+  <text class="lt" x="935" y="496" fill="#448844" font-size="10">LAMBDA permitted</text>
 
   <!-- ========== STEP 5: Nested LAMBDA body executes ========== -->
-  <rect x="20" y="530" width="1010" height="60" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="530" width="1010" height="60" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="558">5</text>
 
-  <rect x="120" y="543" width="150" height="30" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lb" x="195" y="558" fill="#8899aa">body executes</text>
+  <rect x="120" y="543" width="150" height="30" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lb" x="195" y="558" fill="#666666">body executes</text>
 
-  <text class="ls" x="390" y="558" fill="#555">&mdash;</text>
+  <text class="ls" x="390" y="558" fill="#666666">&mdash;</text>
 
-  <rect x="530" y="543" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="530" y="543" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="580" y="558" fill="#2ecc71">Body B</text>
 
   <text class="flag-on" x="735" y="558">1 (SET)</text>
 
   <text class="ls" x="870" y="558" fill="#5dade2">1 frame</text>
 
-  <text class="lt" x="935" y="553" fill="#6a8a6a" font-size="10">Nested LAMBDA</text>
-  <text class="lt" x="935" y="567" fill="#6a8a6a" font-size="10">body runs in B</text>
+  <text class="lt" x="935" y="553" fill="#448844" font-size="10">Nested LAMBDA</text>
+  <text class="lt" x="935" y="567" fill="#448844" font-size="10">body runs in B</text>
 
   <!-- ========== STEP 6: RETURN from nested LAMBDA (fast path) ========== -->
-  <rect x="20" y="595" width="1010" height="85" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="595" width="1010" height="85" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="633">6</text>
 
-  <rect x="110" y="610" width="170" height="36" rx="6" fill="#0f3a1a" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="110" y="610" width="170" height="36" rx="6" fill="#e5f5e8" stroke="#2ecc71" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="623" fill="#2ecc71" font-size="12">RETURN</text>
   <text class="ls" x="195" y="641" fill="#2ecc71">fast path</text>
 
   <!-- Arrow shows fast path -->
-  <text class="ls" x="390" y="633" fill="#555">&mdash;</text>
+  <text class="ls" x="390" y="633" fill="#666666">&mdash;</text>
 
-  <rect x="530" y="618" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="530" y="618" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="580" y="633" fill="#2ecc71">Continues B</text>
 
   <text class="flag-off" x="735" y="623">0 (CLEARED)</text>
@@ -270,37 +270,37 @@
   <text class="ls" x="870" y="650" fill="#2ecc71">no pop!</text>
 
   <text class="lt" x="935" y="618" fill="#2ecc71" font-size="10">FAST PATH</text>
-  <text class="lt" x="935" y="632" fill="#6a8a6a" font-size="10">LAMBDA-active=1</text>
-  <text class="lt" x="935" y="646" fill="#6a8a6a" font-size="10">→ restore from</text>
-  <text class="lt" x="935" y="660" fill="#6a8a6a" font-size="10">machine status</text>
-  <text class="lt" x="935" y="674" fill="#6a8a6a" font-size="10">Zero stack access</text>
+  <text class="lt" x="935" y="632" fill="#448844" font-size="10">LAMBDA-active=1</text>
+  <text class="lt" x="935" y="646" fill="#448844" font-size="10">→ restore from</text>
+  <text class="lt" x="935" y="660" fill="#448844" font-size="10">machine status</text>
+  <text class="lt" x="935" y="674" fill="#448844" font-size="10">Zero stack access</text>
 
   <!-- ========== STEP 7: Domain B continues, then RETURN from CALL ========== -->
-  <rect x="20" y="685" width="1010" height="60" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="685" width="1010" height="60" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="713">7</text>
 
-  <rect x="120" y="698" width="150" height="30" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lb" x="195" y="713" fill="#8899aa">B continues</text>
+  <rect x="120" y="698" width="150" height="30" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lb" x="195" y="713" fill="#666666">B continues</text>
 
-  <text class="ls" x="390" y="713" fill="#555">&mdash;</text>
+  <text class="ls" x="390" y="713" fill="#666666">&mdash;</text>
 
-  <rect x="530" y="698" width="100" height="30" rx="4" fill="#2a1a2a" stroke="#c39bd3" stroke-width="1.5"/>
+  <rect x="530" y="698" width="100" height="30" rx="4" fill="#f0e8f8" stroke="#c39bd3" stroke-width="1.5"/>
   <text class="ls" x="580" y="713" fill="#c39bd3">Active B</text>
 
   <text class="flag-off" x="735" y="713">0 (clear)</text>
 
   <text class="ls" x="870" y="713" fill="#5dade2">1 frame</text>
 
-  <text class="lt" x="935" y="708" fill="#6a8a6a" font-size="10">Domain B code</text>
-  <text class="lt" x="935" y="722" fill="#6a8a6a" font-size="10">after nested LAMBDA</text>
+  <text class="lt" x="935" y="708" fill="#448844" font-size="10">Domain B code</text>
+  <text class="lt" x="935" y="722" fill="#448844" font-size="10">after nested LAMBDA</text>
 
   <!-- ========== STEP 8: RETURN from CALL (pops frame, restores LAMBDA state) ========== -->
-  <rect x="20" y="750" width="1010" height="105" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="750" width="1010" height="105" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="798">8</text>
 
-  <rect x="110" y="770" width="170" height="36" rx="6" fill="#1a1a2a" stroke="#f39c12" stroke-width="2"/>
+  <rect x="110" y="770" width="170" height="36" rx="6" fill="#f0f0fa" stroke="#f39c12" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="783" fill="#f39c12" font-size="12">RETURN</text>
   <text class="ls" x="195" y="801" fill="#f39c12">stack path (tag=0)</text>
 
@@ -308,136 +308,136 @@
   <line x1="530" y1="788" x2="440" y2="788" stroke="#f39c12" stroke-width="2" marker-end="url(#ah-o)"/>
   <text class="ls" x="485" y="778" fill="#f39c12">returns to A</text>
 
-  <rect x="340" y="775" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="775" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="790" fill="#2ecc71">Resumed A</text>
 
-  <rect x="530" y="813" width="100" height="26" rx="4" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="ls" x="580" y="826" fill="#555">Done</text>
+  <rect x="530" y="813" width="100" height="26" rx="4" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="ls" x="580" y="826" fill="#666666">Done</text>
 
   <text class="flag-on" x="735" y="783">1 (RESTORED)</text>
   <text class="ls" x="735" y="801" fill="#f39c12">from stack frame</text>
   <text class="ls" x="735" y="817" fill="#f39c12">LAMBDA_PC restored</text>
   <text class="ls" x="735" y="833" fill="#f39c12">flag re-set to 1</text>
 
-  <rect x="820" y="775" width="90" height="40" rx="4" fill="#2a1a0f" stroke="#f39c12" stroke-width="1"/>
+  <rect x="820" y="775" width="90" height="40" rx="4" fill="#f8f0e8" stroke="#f39c12" stroke-width="1"/>
   <text class="ls" x="865" y="788" fill="#f39c12">Pop frame</text>
   <text class="ls" x="865" y="802" fill="#f39c12">Tag=0</text>
 
-  <text class="lt" x="935" y="770" fill="#6a8a6a" font-size="10">STACK PATH</text>
-  <text class="lt" x="935" y="784" fill="#6a8a6a" font-size="10">Pop CALL frame</text>
-  <text class="lt" x="935" y="798" fill="#6a8a6a" font-size="10">Tag=0 → full</text>
-  <text class="lt" x="935" y="812" fill="#6a8a6a" font-size="10">Restore CR5,6,7</text>
-  <text class="lt" x="935" y="826" fill="#6a8a6a" font-size="10">via mLoad</text>
-  <text class="lt" x="935" y="840" fill="#6a8a6a" font-size="10">Restore LAMBDA st</text>
+  <text class="lt" x="935" y="770" fill="#448844" font-size="10">STACK PATH</text>
+  <text class="lt" x="935" y="784" fill="#448844" font-size="10">Pop CALL frame</text>
+  <text class="lt" x="935" y="798" fill="#448844" font-size="10">Tag=0 → full</text>
+  <text class="lt" x="935" y="812" fill="#448844" font-size="10">Restore CR5,6,7</text>
+  <text class="lt" x="935" y="826" fill="#448844" font-size="10">via mLoad</text>
+  <text class="lt" x="935" y="840" fill="#448844" font-size="10">Restore LAMBDA st</text>
 
   <!-- ========== STEP 9: Outer LAMBDA body continues ========== -->
-  <rect x="20" y="860" width="1010" height="60" rx="0" fill="#0f1520" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="860" width="1010" height="60" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="888">9</text>
 
-  <rect x="120" y="873" width="150" height="30" rx="6" fill="#141a28" stroke="#3a4a5a" stroke-width="1"/>
-  <text class="lb" x="195" y="888" fill="#8899aa">body A continues</text>
+  <rect x="120" y="873" width="150" height="30" rx="6" fill="#f0f4f8" stroke="#bbbbbb" stroke-width="1"/>
+  <text class="lb" x="195" y="888" fill="#666666">body A continues</text>
 
-  <rect x="340" y="873" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="873" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="888" fill="#2ecc71">Body A</text>
 
-  <text class="ls" x="580" y="888" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="888" fill="#666666">&mdash;</text>
 
   <text class="flag-on" x="735" y="888">1 (SET)</text>
 
-  <text class="ls" x="870" y="888" fill="#555">empty</text>
+  <text class="ls" x="870" y="888" fill="#666666">empty</text>
 
-  <text class="lt" x="935" y="883" fill="#6a8a6a" font-size="10">Outer LAMBDA</text>
-  <text class="lt" x="935" y="897" fill="#6a8a6a" font-size="10">body resumes</text>
+  <text class="lt" x="935" y="883" fill="#448844" font-size="10">Outer LAMBDA</text>
+  <text class="lt" x="935" y="897" fill="#448844" font-size="10">body resumes</text>
 
   <!-- ========== STEP 10: RETURN from outer LAMBDA (fast path) ========== -->
-  <rect x="20" y="925" width="1010" height="85" rx="0" fill="#0d1220" stroke="#1a2a3a" stroke-width="0.5"/>
+  <rect x="20" y="925" width="1010" height="85" rx="0" fill="#f5f8fc" stroke="#e8f0f8" stroke-width="0.5"/>
 
   <text class="step-num" x="55" y="963">10</text>
 
-  <rect x="110" y="940" width="170" height="36" rx="6" fill="#0f3a1a" stroke="#2ecc71" stroke-width="2"/>
+  <rect x="110" y="940" width="170" height="36" rx="6" fill="#e5f5e8" stroke="#2ecc71" stroke-width="2"/>
   <text class="lb lb-b mono" x="195" y="953" fill="#2ecc71" font-size="12">RETURN</text>
   <text class="ls" x="195" y="971" fill="#2ecc71">fast path</text>
 
-  <rect x="340" y="948" width="100" height="30" rx="4" fill="#0f2620" stroke="#2ecc71" stroke-width="1.5"/>
+  <rect x="340" y="948" width="100" height="30" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1.5"/>
   <text class="ls" x="390" y="963" fill="#2ecc71">Caller</text>
 
-  <text class="ls" x="580" y="963" fill="#555">&mdash;</text>
+  <text class="ls" x="580" y="963" fill="#666666">&mdash;</text>
 
   <text class="flag-off" x="735" y="953">0 (CLEARED)</text>
   <text class="ls" x="735" y="971" fill="#2ecc71">PC ← LAMBDA_PC</text>
   <text class="ls" x="735" y="987" fill="#2ecc71">flag cleared</text>
 
-  <text class="ls" x="870" y="963" fill="#555">empty</text>
+  <text class="ls" x="870" y="963" fill="#666666">empty</text>
   <text class="ls" x="870" y="980" fill="#2ecc71">no pop!</text>
 
   <text class="lt" x="935" y="948" fill="#2ecc71" font-size="10">FAST PATH</text>
-  <text class="lt" x="935" y="962" fill="#6a8a6a" font-size="10">LAMBDA-active=1</text>
-  <text class="lt" x="935" y="976" fill="#6a8a6a" font-size="10">→ restore PC from</text>
-  <text class="lt" x="935" y="990" fill="#6a8a6a" font-size="10">machine status</text>
-  <text class="lt" x="935" y="1004" fill="#6a8a6a" font-size="10">Zero stack access</text>
+  <text class="lt" x="935" y="962" fill="#448844" font-size="10">LAMBDA-active=1</text>
+  <text class="lt" x="935" y="976" fill="#448844" font-size="10">→ restore PC from</text>
+  <text class="lt" x="935" y="990" fill="#448844" font-size="10">machine status</text>
+  <text class="lt" x="935" y="1004" fill="#448844" font-size="10">Zero stack access</text>
 
   <!-- ========== FLAG STATE SUMMARY ========== -->
 
-  <rect x="20" y="1030" width="1010" height="190" rx="10" fill="#0f1520" stroke="#f5c842" stroke-width="1.5"/>
+  <rect x="20" y="1030" width="1010" height="190" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
   <text class="ph" x="525" y="1055" text-anchor="middle" fill="#f5c842">LAMBDA-ACTIVE FLAG TRACE</text>
 
   <!-- Timeline bar -->
-  <text class="ls" x="70" y="1080" text-anchor="start" fill="#8899aa">Step:</text>
-  <text class="ls" x="160" y="1080" fill="#8899aa">0</text>
-  <text class="ls" x="230" y="1080" fill="#8899aa">1</text>
-  <text class="ls" x="300" y="1080" fill="#8899aa">2</text>
+  <text class="ls" x="70" y="1080" text-anchor="start" fill="#666666">Step:</text>
+  <text class="ls" x="160" y="1080" fill="#666666">0</text>
+  <text class="ls" x="230" y="1080" fill="#666666">1</text>
+  <text class="ls" x="300" y="1080" fill="#666666">2</text>
   <text class="ls" x="370" y="1080" fill="#e74c3c">!</text>
-  <text class="ls" x="440" y="1080" fill="#8899aa">3</text>
-  <text class="ls" x="510" y="1080" fill="#8899aa">4</text>
-  <text class="ls" x="580" y="1080" fill="#8899aa">5</text>
-  <text class="ls" x="650" y="1080" fill="#8899aa">6</text>
-  <text class="ls" x="720" y="1080" fill="#8899aa">7</text>
-  <text class="ls" x="790" y="1080" fill="#8899aa">8</text>
-  <text class="ls" x="860" y="1080" fill="#8899aa">9</text>
-  <text class="ls" x="930" y="1080" fill="#8899aa">10</text>
+  <text class="ls" x="440" y="1080" fill="#666666">3</text>
+  <text class="ls" x="510" y="1080" fill="#666666">4</text>
+  <text class="ls" x="580" y="1080" fill="#666666">5</text>
+  <text class="ls" x="650" y="1080" fill="#666666">6</text>
+  <text class="ls" x="720" y="1080" fill="#666666">7</text>
+  <text class="ls" x="790" y="1080" fill="#666666">8</text>
+  <text class="ls" x="860" y="1080" fill="#666666">9</text>
+  <text class="ls" x="930" y="1080" fill="#666666">10</text>
 
-  <text class="ls" x="70" y="1100" text-anchor="start" fill="#8899aa">Flag:</text>
+  <text class="ls" x="70" y="1100" text-anchor="start" fill="#666666">Flag:</text>
 
   <!-- Flag states as colored blocks -->
-  <rect x="145" y="1090" width="30" height="20" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="145" y="1090" width="30" height="20" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="160" y="1100" fill="#e74c3c">0</text>
 
-  <rect x="215" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="215" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="230" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="285" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="285" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="300" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="355" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="355" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="370" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="425" y="1090" width="30" height="20" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="425" y="1090" width="30" height="20" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="440" y="1100" fill="#e74c3c">0</text>
 
-  <rect x="495" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="495" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="510" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="565" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="565" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="580" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="635" y="1090" width="30" height="20" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="635" y="1090" width="30" height="20" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="650" y="1100" fill="#e74c3c">0</text>
 
-  <rect x="705" y="1090" width="30" height="20" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="705" y="1090" width="30" height="20" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="720" y="1100" fill="#e74c3c">0</text>
 
-  <rect x="775" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="775" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="790" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="845" y="1090" width="30" height="20" rx="3" fill="#0f2a0f" stroke="#2ecc71" stroke-width="1"/>
+  <rect x="845" y="1090" width="30" height="20" rx="3" fill="#eaf5ea" stroke="#2ecc71" stroke-width="1"/>
   <text class="ls" x="860" y="1100" fill="#2ecc71">1</text>
 
-  <rect x="915" y="1090" width="30" height="20" rx="3" fill="#2a0f0f" stroke="#e74c3c" stroke-width="1"/>
+  <rect x="915" y="1090" width="30" height="20" rx="3" fill="#fce8e8" stroke="#e74c3c" stroke-width="1"/>
   <text class="ls" x="930" y="1100" fill="#e74c3c">0</text>
 
   <!-- Annotations -->
-  <text class="lt" x="70" y="1130" fill="#8899aa" font-size="11">Event:</text>
+  <text class="lt" x="70" y="1130" fill="#666666" font-size="11">Event:</text>
   <text class="lt" x="215" y="1130" fill="#2ecc71" font-size="10">LAMBDA sets</text>
   <text class="lt" x="425" y="1130" fill="#f39c12" font-size="10">CALL clears</text>
   <text class="lt" x="495" y="1130" fill="#2ecc71" font-size="10">nested LAMBDA</text>
