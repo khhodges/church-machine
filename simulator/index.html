@@ -26,7 +26,7 @@
     })();
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="styles.css?v=20260416c">
+    <link rel="stylesheet" href="styles.css?v=20260416d">
     <style>
         .app-loading {
             position: fixed; inset: 0; z-index: 99999;
@@ -90,7 +90,7 @@
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Test</div>
-                                <button class="ham-item" id="hamItem-dashboard" onclick="switchView('dashboard');switchDashTab('cr');closeHamburger()">Simulator</button>
+                                <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Simulator</button>
                                 <button class="ham-item" id="hamItem-dashboard-dr" onclick="switchView('dashboard');switchDashTab('dr');closeHamburger()">Data Registers</button>
                                 <button class="ham-item" id="hamItem-dashboard-gatelog" onclick="switchView('dashboard');switchDashTab('gatelog');closeHamburger()">Gate Log</button>
                                 <button class="ham-item" id="hamItem-dashboard-state" onclick="switchView('dashboard');switchDashTab('state');closeHamburger()">Machine State</button>
@@ -212,6 +212,10 @@
                 <span class="hw-led-hint">← DWRITE CR3[0]</span>
             </div>
             <div id="flagsDisplay" class="flags-bar"></div>
+            <label class="sim-autoboot-label" id="autoBootLabel" title="When checked, opening Simulator from the menu runs the boot sequence automatically">
+                <input type="checkbox" id="autoBootChk" onchange="saveAutoBootPref()">
+                Auto-boot on open
+            </label>
         </div>
         <div id="dashPanel-cr" class="dash-panel active">
             <div class="panel">

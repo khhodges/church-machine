@@ -432,6 +432,26 @@ function closeHamburger() {
     if (dd) dd.classList.remove('ham-open');
 }
 
+function openSimulatorFromMenu() {
+    switchView('dashboard');
+    switchDashTab('cr');
+    closeHamburger();
+    const chk = document.getElementById('autoBootChk');
+    if (chk && chk.checked) resetSim();
+}
+
+function saveAutoBootPref() {
+    const chk = document.getElementById('autoBootChk');
+    if (!chk) return;
+    try { localStorage.setItem('churchMachine_autoBootOnOpen', chk.checked ? '1' : '0'); } catch(e) {}
+}
+
+function restoreAutoBootPref() {
+    const chk = document.getElementById('autoBootChk');
+    if (!chk) return;
+    try { chk.checked = localStorage.getItem('churchMachine_autoBootOnOpen') === '1'; } catch(e) {}
+}
+
 document.addEventListener('click', function(e) {
     const wrap = document.getElementById('hamWrap');
     if (wrap && !wrap.contains(e.target)) closeHamburger();
@@ -468,7 +488,7 @@ function switchView(viewId) {
     const activeHamItem = document.getElementById('hamItem-' + viewId);
     if (activeHamItem) activeHamItem.classList.add('ham-active');
 
-    if (viewId === 'dashboard') updateDashboard();
+    if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
     if (viewId === 'namespace') updateNamespace();
     if (viewId === 'abstractions') renderAbstractions();

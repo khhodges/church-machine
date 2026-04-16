@@ -605,6 +605,28 @@ header h1 {
     margin-bottom: 0;
 }
 
+.sim-autoboot-label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+}
+
+.sim-autoboot-label:hover {
+    opacity: 1;
+    color: var(--text-primary);
+}
+
 .flags-bar {
     display: flex;
     align-items: center;
