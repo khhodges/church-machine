@@ -449,6 +449,13 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: `CR${idx} is too big! Capability registers go from CR0 to CR15.` });
             return 0;
         }
+        const hexMatch = token.match(/^0X([0-9A-F]+)$/);
+        if (hexMatch) {
+            const idx = parseInt(hexMatch[1], 16);
+            if (idx >= 0 && idx <= 15) return idx;
+            this.errors.push({ line: lineNum, message: `Method selector 0x${hexMatch[1]} (=${idx}) is too big — must be 0–15 (0x0–0xF).` });
+            return 0;
+        }
         const bareMatch = token.match(/^(\d+)$/);
         if (bareMatch) {
             const idx = parseInt(bareMatch[1]);
