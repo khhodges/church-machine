@@ -1647,14 +1647,18 @@ function showDRPopup(evt, drIdx) {
             }
         }
 
-        if (assembler && assembler.labels && sim.getFormattedCR) {
-            const _sCR14 = sim.getFormattedCR(14);
-            const _sBase = (_sCR14 && !_sCR14.isNull) ? (_sCR14.word1_location >>> 0) : null;
-            if (_sBase !== null) {
-                for (const [symName, symOff] of Object.entries(assembler.labels)) {
-                    if ((_sBase + 1 + symOff) === val) {
-                        html += `<tr><td colspan="2" style="color:#34d399;padding-top:0.3rem;">&#x22B9; Symbol: .${symName}</td></tr>`;
-                        break;
+        {
+            const _symStore = window._assemblerSymbols || (assembler && assembler.labels ? { labels: assembler.labels, lumpName: '' } : null);
+            if (_symStore && sim.getFormattedCR) {
+                const _sCR14 = sim.getFormattedCR(14);
+                const _sBase = (_sCR14 && !_sCR14.isNull) ? (_sCR14.word1_location >>> 0) : null;
+                if (_sBase !== null) {
+                    for (const [symName, symOff] of Object.entries(_symStore.labels)) {
+                        if ((_sBase + 1 + symOff) === val) {
+                            const _lumpCtx = _symStore.lumpName ? ` in ${_symStore.lumpName}` : '';
+                            html += `<tr><td colspan="2" style="color:#34d399;padding-top:0.3rem;">&#x22B9; Symbol: .${symName}${_lumpCtx}</td></tr>`;
+                            break;
+                        }
                     }
                 }
             }
@@ -7489,6 +7493,7 @@ function assembleAndLoad() {
         if (result.errors.length > 0) {
             const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
             if (con) con.textContent = `CLOOMC++ errors:\n${errText}`;
+            window._assemblerSymbols = null;
             showNextSteps('error');
             return;
         }
@@ -7534,6 +7539,7 @@ function assembleAndLoad() {
         sim.programBaseAddr = progBase;
         sim.programLabels = labels;
         sim.programName = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
+        window._assemblerSymbols = { labels, lumpName: sim.programName };
         if (pipelineViz) pipelineViz.setNIA(null);
         const manifestByMethod = {};
         if (result.manifest) {
@@ -7682,6 +7688,7 @@ function assembleAndLoad() {
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
         if (con) con.textContent = `Assembly errors:\n${errText}`;
+        window._assemblerSymbols = null;
         showNextSteps('error');
         return;
     }
@@ -7696,6 +7703,7 @@ function assembleAndLoad() {
     sim.programLabels = result.labels || {};
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
     sim.programName = entryLabel || (Object.keys(result.labels || {})[0]) || 'prog';
+    window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     if (pipelineViz) pipelineViz.setNIA(null);
 
     let listing = `Assembled ${result.words.length} instructions:\n`;
