@@ -1598,17 +1598,29 @@ function showDRPopup(evt, drIdx) {
         if (petName) html += `<tr><td>Pet name</td><td class="zdp-note">${petName}</td></tr>`;
         if (archName && !petName) html += `<tr><td>Role</td><td class="zdp-note">${archName}</td></tr>`;
 
-        if (sim.getFormattedCR) {
-            for (let i = 0; i < 16; i++) {
-                const cr = sim.getFormattedCR(i);
-                if (!cr || cr.isNull) continue;
-                if ((cr.word1_location >>> 0) === val) {
-                    const nsLbl = (sim.nsLabels && sim.nsLabels[cr.gtIndex]) || '';
-                    html += `<tr><td colspan="2" style="color:#f4b942;padding-top:0.3rem;">&#x25C6; Base of CR${i} (${cr.gtTypeName})</td></tr>`;
-                    html += `<tr><td>NS Slot</td><td class="zdp-val">${cr.gtIndex}${nsLbl ? ' <span class="zdp-lbl">('+nsLbl+')</span>' : ''}</td></tr>`;
-                    html += `<tr><td>Perms</td><td class="zdp-val">[${cr.perms}]</td></tr>`;
-                    break;
+        {
+            let _nsMatch = null;
+            if (sim.readNSEntry && sim.nsCount > 0) {
+                for (let _si = 0; _si < sim.nsCount; _si++) {
+                    const _nse = sim.readNSEntry(_si);
+                    if (_nse && (_nse.word0_location >>> 0) === val) {
+                        _nsMatch = { slot: _si, label: _nse.label };
+                        break;
+                    }
                 }
+            }
+            if (!_nsMatch && sim.getFormattedCR) {
+                for (let i = 0; i < 16; i++) {
+                    const _cr = sim.getFormattedCR(i);
+                    if (!_cr || _cr.isNull) continue;
+                    if ((_cr.word1_location >>> 0) === val) {
+                        _nsMatch = { slot: _cr.gtIndex, label: (sim.nsLabels && sim.nsLabels[_cr.gtIndex]) || '' };
+                        break;
+                    }
+                }
+            }
+            if (_nsMatch) {
+                html += `<tr><td colspan="2" style="color:#f4b942;padding-top:0.3rem;">&#x25C6; NS slot ${_nsMatch.slot}${_nsMatch.label ? ' <span class="zdp-lbl">('+_nsMatch.label+')</span>' : ''} base</td></tr>`;
             }
         }
 
