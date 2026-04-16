@@ -4572,7 +4572,10 @@ function renderLumps() {
                 const profile = lump.profile || '';
                 const mtbf = lump.mtbf || {};
                 const mtbfStatus = mtbf.status || 'unknown';
-                const mtbfClass = mtbfStatus === 'green' ? 'mtbf-green' : mtbfStatus === 'amber' ? 'mtbf-amber' : 'mtbf-red';
+                const mtbfClass = mtbfStatus === 'green' ? 'mtbf-green'
+                                : mtbfStatus === 'amber'  ? 'mtbf-amber'
+                                : (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'mtbf-unknown'
+                                : 'mtbf-red';
                 const isActive = _selectedLumpToken === token;
 
                 const safeToken = _escHtml(token);
@@ -4586,7 +4589,8 @@ function renderLumps() {
                 if (isNamespace) html += `<span class="ns-type-badge">NS</span>`;
                 html += `</span>`;
                 if (mtbf.status) {
-                    html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge">${_escHtml(mtbfStatus.toUpperCase())}</span>`;
+                    const mtbfLabel = (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'UNKNOWN' : mtbfStatus.toUpperCase();
+                    html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge" title="${(mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'MTBF unknown — needs testing before deployment' : ''}">${_escHtml(mtbfLabel)}</span>`;
                 }
                 html += `</div>`;
                 html += `<div class="lump-item-meta">`;
@@ -4716,13 +4720,19 @@ function showLumpDetail(token) {
     }
 
     const mtbf = lump.mtbf || {};
-    if (mtbf.status) {
-        const mtbfClass = mtbf.status === 'green' ? 'mtbf-green' : mtbf.status === 'amber' ? 'mtbf-amber' : 'mtbf-red';
+    {
+        const mtbfSt = mtbf.status || 'unknown';
+        const isUnknown = mtbfSt === 'unknown' || mtbfSt === 'untested';
+        const mtbfClass = mtbfSt === 'green' ? 'mtbf-green'
+                        : mtbfSt === 'amber'  ? 'mtbf-amber'
+                        : isUnknown           ? 'mtbf-unknown'
+                        : 'mtbf-red';
+        const mtbfLabel = isUnknown ? 'UNKNOWN' : mtbfSt.toUpperCase();
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">MTBF Reliability</div>';
         html += '<table class="lump-detail-table"><tbody>';
-        html += `<tr><td>Status</td><td><span class="mtbf-badge ${mtbfClass}">${e(mtbf.status.toUpperCase())}</span></td></tr>`;
-        html += `<tr><td>Clean Runs</td><td>${parseInt(mtbf.consecutive_clean) || 0}</td></tr>`;
+        html += `<tr><td>Status</td><td><span class="mtbf-badge ${mtbfClass}">${e(mtbfLabel)}</span>${isUnknown ? ' <span style="color:#6b7280;font-size:0.72rem;">— needs testing</span>' : ''}</td></tr>`;
+        html += `<tr><td>Clean Runs</td><td>${parseInt(mtbf.consecutive_clean) || 0}${isUnknown ? ' <span style="color:#6b7280;font-size:0.72rem;">(run in simulator to qualify)</span>' : ''}</td></tr>`;
         html += `<tr><td>Total Runs</td><td>${parseInt(mtbf.total_runs) || 0}</td></tr>`;
         if (mtbf.source_hash) html += `<tr><td>Source Hash</td><td><code>${e(mtbf.source_hash)}</code></td></tr>`;
         html += '</tbody></table>';
@@ -16143,7 +16153,7 @@ function buildAndDownloadLump() {
 
     const mtbfClean = _getConsecutiveCleanRuns();
     const mtbfTotal = _simRunHash ? _simRunHistory.filter(r => r.hash === _simRunHash).length : 0;
-    const mtbfStatus = mtbfTotal === 0 ? 'untested' : (mtbfClean >= 5 ? 'green' : mtbfClean >= 3 ? 'amber' : 'red');
+    const mtbfStatus = mtbfTotal === 0 ? 'unknown' : (mtbfClean >= 5 ? 'green' : mtbfClean >= 3 ? 'amber' : 'red');
 
     const methodMeta = [];
     let mOff = 0;
@@ -16203,7 +16213,19 @@ function buildAndDownloadLump() {
         body: JSON.stringify(savePayload)
     }).then(r => r.json()).then(resp => {
         if (resp.ok) {
-            appendOutput(`Saved to server: lumps/${resp.lump} + ${resp.sidecar} (token 0x${resp.token})`, 'info');
+            appendOutput(`Saved to library: lumps/${resp.lump} — token 0x${resp.token} · MTBF: UNKNOWN (needs testing)`, 'info');
+            renderLumps();
+            const savedToken = resp.token;
+            setTimeout(() => {
+                const listEl = document.getElementById('lumpsListContent');
+                if (listEl && savedToken) {
+                    const item = listEl.querySelector(`.lump-item[data-token="${savedToken}"]`);
+                    if (item) {
+                        item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        showLumpDetail(savedToken);
+                    }
+                }
+            }, 400);
         } else {
             appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
         }
@@ -16255,7 +16277,7 @@ function buildAndDownloadLump() {
     listing += `\n  Deployment:\n`;
     listing += `    Target Board: Efinix Ti60 F225\n`;
     listing += `    Profile:      ${profile}\n`;
-    listing += `    MTBF Status:  ${mtbfStatus.toUpperCase()}${mtbfClean >= 5 ? ' (deployment-ready)' : mtbfTotal === 0 ? ' (not yet tested)' : ' (needs more clean runs)'}\n`;
+    listing += `    MTBF Status:  ${mtbfStatus.toUpperCase()}${mtbfClean >= 5 ? ' (deployment-ready)' : mtbfTotal === 0 ? ' (unknown — needs testing)' : ' (needs more clean runs)'}\n`;
 
     listing += `\n  Lump Layout:\n`;
     listing += `    ┌─────────────────────────────────────────────┐\n`;

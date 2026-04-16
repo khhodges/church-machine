@@ -10853,9 +10853,10 @@ tr.itrace-fault td { color: #ff9999; }
     white-space: nowrap;
     font-family: 'JetBrains Mono', monospace;
 }
-.mtbf-red   { background: #3a1111; color: #f87171; border: 1px solid #7f1d1d; }
-.mtbf-amber { background: #3a2a0a; color: #fbbf24; border: 1px solid #78350f; }
-.mtbf-green { background: #0a3a1a; color: #4ade80; border: 1px solid #14532d; }
+.mtbf-red     { background: #3a1111; color: #f87171; border: 1px solid #7f1d1d; }
+.mtbf-amber   { background: #3a2a0a; color: #fbbf24; border: 1px solid #78350f; }
+.mtbf-green   { background: #0a3a1a; color: #4ade80; border: 1px solid #14532d; }
+.mtbf-unknown { background: #1c1c2a; color: #9ca3af; border: 1px solid #374151; }
 @media (max-width: 768px) {
     .gh-repos-row, .gh-section-grid, .gh-actions-row { grid-template-columns: 1fr; }
 }
