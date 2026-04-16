@@ -12324,10 +12324,15 @@ function getSelectedBoard() {
 
 function setSelectedBoard(board) {
     localStorage.setItem('fpga_board_target', board);
+    const sel = document.getElementById('hardwareBoardSel');
+    if (sel) sel.value = board;
+    const settingSel = document.getElementById('settingFPGABoard');
+    if (settingSel) settingSel.value = board;
 }
 
 function getBoardLabel(board) {
     if (board === 'ti60-f225') return 'Efinix Ti60 F225';
+    if (board === 'tang-nano-20k-iot') return 'Sipeed Tang Nano 20K IoT';
     return 'Sipeed Tang Nano 20K';
 }
 
