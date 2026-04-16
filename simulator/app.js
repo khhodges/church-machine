@@ -103,6 +103,7 @@ let abstrTutorial = null;
 let nsTutorial = null;
 let secureBootTutorial = null;
 let englishLoopsTutorial = null;
+let englishStringTutorial = null;
 let activeTutorial = 'sliderule';
 let cloomcCompiler = null;
 let currentView = 'dashboard';
@@ -516,6 +517,8 @@ function switchView(viewId) {
             secureBootTutorial.render('tutorialView');
         } else if (activeTutorial === 'englishloops' && englishLoopsTutorial) {
             englishLoopsTutorial.render('tutorialView');
+        } else if (activeTutorial === 'englishstring' && englishStringTutorial) {
+            englishStringTutorial.render('tutorialView');
         } else if (churchTutorial) {
             churchTutorial.render('tutorialView');
         }
@@ -668,6 +671,8 @@ function selectTutorial(which) {
         secureBootTutorial.render('tutorialView');
     } else if (which === 'englishloops' && englishLoopsTutorial) {
         englishLoopsTutorial.render('tutorialView');
+    } else if (which === 'englishstring' && englishStringTutorial) {
+        englishStringTutorial.render('tutorialView');
     } else if (churchTutorial) {
         churchTutorial.render('tutorialView');
     }
@@ -717,6 +722,15 @@ function _ensureTutorialObjects() {
         } else if (typeof window !== 'undefined' && window.EnglishLoopsTutorial) {
             englishLoopsTutorial = new window.EnglishLoopsTutorial();
             window.englishLoopsTutorial = englishLoopsTutorial;
+        }
+    }
+    if (!englishStringTutorial) {
+        if (typeof EnglishStringTutorial !== 'undefined') {
+            englishStringTutorial = new EnglishStringTutorial();
+            window.englishStringTutorial = englishStringTutorial;
+        } else if (typeof window !== 'undefined' && window.EnglishStringTutorial) {
+            englishStringTutorial = new window.EnglishStringTutorial();
+            window.englishStringTutorial = englishStringTutorial;
         }
     }
 }
