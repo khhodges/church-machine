@@ -1,0 +1,196 @@
+// Contacts — contact list managed by name and tunnel, with text fallback.
+//
+// Each contact is identified by an index (0..3).  Names are bound to
+// indices at provisioning time: the IDE assigns a human-readable name
+// to each C-list tunnel slot so name → index is fixed at boot and
+// sealed into the namespace entry by the FamilyRegistry.
+//
+// C-list layout (cc = 5):
+//   slot 0 (CR7 ) : TextSink — UART peripheral GT (R+W, 0xFE1001).
+//                   Always reachable; used for text fallback output.
+//   slot 1 (CR8 ) : Contact[0] — Abstract tunnel channel GT (R+W+E).
+//                   word1_location ∈ 0xFF000001..0xFF0000FE (IDE-assigned).
+//                   word2_backup1 / word3_backup2 may encode alternate
+//                   IDE addresses for hardware-level tunnel failover.
+//                   NULL (0x00000000 location) if contact is unprovisioned.
+//   slot 2 (CR9 ) : Contact[1] — same structure as Contact[0].
+//   slot 3 (CR10) : Contact[2] — same structure as Contact[0].
+//   slot 4 (CR11) : Contact[3] — same structure as Contact[0].
+//
+// Text fallback policy:
+//   · If idx is out of range (>3), Send/Call immediately uses TextSink.
+//   · If the contact tunnel GT is live, DWRITE / CALL routes to the
+//     encrypted tunnel.  Hardware automatically tries word2/word3 backup
+//     addresses before raising TUNNEL_UNAVAILABLE.
+//   · On TUNNEL_UNAVAILABLE the thread's IRQ handler should invoke
+//     TextSend(idx, data) as the recovery action — the IRQ path is the
+//     correct place to catch hardware-level tunnel faults.
+//   · TextSend is also available as a direct call whenever the caller
+//     knows a contact should receive a plain-text record (e.g., for
+//     contacts that have never exchanged tunnel credentials).
+//
+// Permissions granted to callers: E (enter/call only).
+// Lump size hint: 256 words (n-6 = 2).
+
+abstraction Contacts {
+    capabilities {
+        TextSink    // CR7  — UART peripheral; text-only fallback path
+        Contact0    // CR8  — tunnel channel GT for contact 0
+        Contact1    // CR9  — tunnel channel GT for contact 1
+        Contact2    // CR10 — tunnel channel GT for contact 2
+        Contact3    // CR11 — tunnel channel GT for contact 3
+    }
+
+    // Send(idx, data) — deliver data to contact[idx] via their tunnel GT.
+    //
+    // For idx in 0..3 the method issues a DWRITE to the corresponding
+    // Abstract tunnel channel GT.  The hardware tries word2/word3 backup
+    // IDE addresses transparently before failing.
+    //
+    // For idx outside 0..3 (contact unprovisioned or out of range) the
+    // method falls back to TextSink immediately, writing the idx and
+    // data words so the caller can identify the destination.
+    //
+    // Returns: 0 = delivered via tunnel, 1 = delivered via TextSink.
+    method Send(idx, data) {
+        if (idx == 0) {
+            write(CR8, 0, data)
+            return(0)
+        }
+        if (idx == 1) {
+            write(CR9, 0, data)
+            return(0)
+        }
+        if (idx == 2) {
+            write(CR10, 0, data)
+            return(0)
+        }
+        if (idx == 3) {
+            write(CR11, 0, data)
+            return(0)
+        }
+        write(CR7, 0, idx)
+        write(CR7, 1, data)
+        return(1)
+    }
+
+    // TextSend(idx, data) — always write to TextSink regardless of tunnel state.
+    //
+    // This is the explicit text-only delivery path.  Use it:
+    //   · When the caller catches a TUNNEL_UNAVAILABLE IRQ and wants to
+    //     preserve the message as a local text record.
+    //   · For contacts that have no tunnel GT (unprovisioned slots).
+    //   · For diagnostic / audit logging of every outbound message.
+    //
+    // TextSink offset layout (UART frame convention):
+    //   offset 0 : contact index  (identifies the intended recipient)
+    //   offset 1 : payload word   (the data to deliver)
+    //   offset 2 : marker 0xFFFF  (end-of-record sentinel for the UART reader)
+    //
+    // Returns: 0 always (TextSink is always reachable).
+    method TextSend(idx, data) {
+        write(CR7, 0, idx)
+        write(CR7, 1, data)
+        write(CR7, 2, 0xFFFF)
+        return(0)
+    }
+
+    // Call(idx) — invoke contact[idx] via an encrypted E-call on the tunnel GT.
+    //
+    // Uses CALL (Enter permission) on the Abstract tunnel channel GT, which
+    // performs an encrypted RPC to the remote service registered under that
+    // channel address.  Hardware backup addresses (word2/word3) are tried
+    // automatically before TUNNEL_UNAVAILABLE is raised.
+    //
+    // For idx outside 0..3, writes a text notification to TextSink instead
+    // (marker word 0xFFFE distinguishes a call-attempt log from a data record).
+    //
+    // Returns: 0 = called via tunnel, 1 = logged via TextSink (no call made).
+    method Call(idx) {
+        if (idx == 0) {
+            call(CR8, 0)
+            return(0)
+        }
+        if (idx == 1) {
+            call(CR9, 0)
+            return(0)
+        }
+        if (idx == 2) {
+            call(CR10, 0)
+            return(0)
+        }
+        if (idx == 3) {
+            call(CR11, 0)
+            return(0)
+        }
+        write(CR7, 0, idx)
+        write(CR7, 2, 0xFFFE)
+        return(1)
+    }
+
+    // Status(idx) — read the presence word from contact[idx]'s tunnel GT.
+    //
+    // Issues DREAD to the Abstract tunnel channel GT (R permission).  The
+    // remote service is expected to return a 32-bit presence/status word:
+    //   0x00000000 — offline or no tunnel credential held
+    //   0x00000001 — online and reachable
+    //   other      — service-defined availability flags
+    //
+    // Hardware tunnel failover applies as for Send and Call.
+    //
+    // For idx outside 0..3 returns 0 immediately (treated as offline)
+    // without touching the TextSink — Status is a non-destructive probe.
+    //
+    // Returns: presence word from the tunnel, or 0 if idx is out of range.
+    method Status(idx) {
+        if (idx == 0) {
+            result = read(CR8, 0)
+            return(result)
+        }
+        if (idx == 1) {
+            result = read(CR9, 0)
+            return(result)
+        }
+        if (idx == 2) {
+            result = read(CR10, 0)
+            return(result)
+        }
+        if (idx == 3) {
+            result = read(CR11, 0)
+            return(result)
+        }
+        return(0)
+    }
+
+    // Broadcast(data) — deliver data to all four contact slots.
+    //
+    // Attempts DWRITE to Contact[0..3] in sequence.  Each slot is tried
+    // independently: a failure (unprovisioned slot, idx out of range) for
+    // one contact does not prevent delivery to the others.
+    //
+    // Unprovisioned contacts (idx delivered via TextSink with marker 0xFFFD
+    // at offset 2) are counted as text-only deliveries.
+    //
+    // Note: TUNNEL_UNAVAILABLE traps from individual slots propagate to the
+    // IRQ thread.  The IRQ handler should call TextSend for any failed slot
+    // and then resume Broadcast at the next slot index (or restart the call).
+    //
+    // Returns: number of contacts reached via tunnel (0..4).
+    method Broadcast(data) {
+        reached = 0
+
+        write(CR8, 0, data)
+        reached = reached + 1
+
+        write(CR9, 0, data)
+        reached = reached + 1
+
+        write(CR10, 0, data)
+        reached = reached + 1
+
+        write(CR11, 0, data)
+        reached = reached + 1
+
+        return(reached)
+    }
+}
