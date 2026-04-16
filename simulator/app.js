@@ -7558,23 +7558,19 @@ function assembleAndLoad() {
                 manifestByMethod[entry.name] = comments;
             }
         }
-        let listing = `Assembled ${words.length} words (CLOOMC++ "${result.abstractionName || ''}", ${methods.length} method(s)):\n\n`;
-        let wordIdx = 0;
+        let listing = `; Assembled ${words.length} word${words.length !== 1 ? 's' : ''} — ${result.abstractionName || 'CLOOMC++'} (${methods.length} method${methods.length !== 1 ? 's' : ''})\n\n`;
         for (let mi = 0; mi < methods.length; mi++) {
-            listing += `  [method table] ${mi}: offset ${methodTableEntries[mi]}\n`;
+            listing += `; [method table] ${mi}: offset ${methodTableEntries[mi]}\n`;
         }
         listing += '\n';
-        wordIdx = methodTableSize;
         for (const m of methods) {
-            listing += `  method ${m.name}: ${(m.code || []).length} instruction(s)\n`;
+            listing += `; method ${m.name}\n`;
             const comments = manifestByMethod[m.name] || {};
             for (let i = 0; i < (m.code || []).length; i++) {
                 const w = m.code[i];
-                const disasm = assembler.disassemble(w);
+                const mnem = w === 0 ? 'NOP' : assembler.disassemble(w);
                 const comment = comments[i];
-                const line = `    ${wordIdx.toString().padStart(4)}: 0x${w.toString(16).padStart(8, '0')}  ${disasm}`;
-                listing += comment ? `${line.padEnd(55)}; ${comment}\n` : `${line}\n`;
-                wordIdx++;
+                listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
             }
             listing += '\n';
         }
@@ -7706,9 +7702,28 @@ function assembleAndLoad() {
     window._assemblerSymbols = { labels: result.labels || {}, lumpName: sim.programName };
     if (pipelineViz) pipelineViz.setNIA(null);
 
-    let listing = `Assembled ${result.words.length} instructions:\n`;
+    const _srcComments = (() => {
+        const out = [];
+        for (const rawLine of source.split('\n')) {
+            const semi = rawLine.indexOf(';');
+            const code = (semi >= 0 ? rawLine.slice(0, semi) : rawLine).trim();
+            const cmt  = semi >= 0 ? rawLine.slice(semi + 1).trim() : '';
+            let rest = code;
+            const colonIdx = code.search(/\w+\s*:/);
+            if (colonIdx >= 0) rest = code.slice(code.indexOf(':') + 1).trim();
+            if (!rest) continue;
+            const padM = rest.match(/^PAD\s+(\d+)/i);
+            if (padM) { const n = parseInt(padM[1]); for (let j = 0; j < n; j++) out.push(''); continue; }
+            out.push(cmt);
+        }
+        return out;
+    })();
+
+    let listing = `; Assembled ${result.words.length} instruction${result.words.length !== 1 ? 's' : ''}\n`;
     for (let i = 0; i < result.words.length; i++) {
-        listing += `  ${i.toString().padStart(4)}: 0x${result.words[i].toString(16).padStart(8, '0')}  ${assembler.disassemble(result.words[i])}\n`;
+        const mnem = result.words[i] === 0 ? 'NOP' : assembler.disassemble(result.words[i]);
+        const cmt  = _srcComments[i] || '';
+        listing += cmt ? `${mnem.padEnd(40)}; ${cmt}\n` : `${mnem}\n`;
     }
     if (con) con.textContent = listing;
     showNextSteps('assembled');
@@ -16471,7 +16486,7 @@ function compileCLOOMC() {
 
     const langNames2 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
     const lang = langNames2[result.language] || 'JavaScript';
-    let listing = `CLOOMC++ [${lang}] compiled "${result.abstractionName}" — ${result.methods.length} method(s):\n\n`;
+    let listing = `; CLOOMC++ [${lang}] compiled "${result.abstractionName}" — ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}\n\n`;
 
     const manifestByMethod = {};
     if (result.manifest) {
@@ -16492,14 +16507,13 @@ function compileCLOOMC() {
     }
 
     for (const m of result.methods) {
-        listing += `  method ${m.name}: ${m.code.length} instruction(s)\n`;
+        listing += `; method ${m.name}\n`;
         const comments = manifestByMethod[m.name] || {};
         for (let i = 0; i < m.code.length; i++) {
             const word = m.code[i];
-            const disasm = assembler.disassemble(word);
+            const mnem = word === 0 ? 'NOP' : assembler.disassemble(word);
             const comment = comments[i];
-            const line = `    ${i.toString().padStart(4)}: 0x${word.toString(16).padStart(8, '0')}  ${disasm}`;
-            listing += comment ? `${line.padEnd(60)}; ${comment}\n` : `${line}\n`;
+            listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
         }
         listing += '\n';
     }
