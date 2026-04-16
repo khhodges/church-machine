@@ -4367,26 +4367,30 @@ function renderLumps() {
                 const mtbfClass = mtbfStatus === 'green' ? 'mtbf-green' : mtbfStatus === 'amber' ? 'mtbf-amber' : 'mtbf-red';
                 const isActive = _selectedLumpToken === token;
 
-                html += `<div class="lump-item${isActive ? ' active' : ''}" onclick="showLumpDetail('${token}')">`;
+                const safeToken = _escHtml(token);
+                const safeName = _escHtml(name);
+                const safeLang = _escHtml(lang);
+                const safeProfile = _escHtml(profile);
+                html += `<div class="lump-item${isActive ? ' active' : ''}" onclick="showLumpDetail('${safeToken}')">`;
                 html += `<div class="lump-item-header">`;
-                html += `<span class="lump-item-name">${name}</span>`;
+                html += `<span class="lump-item-name">${safeName}</span>`;
                 if (mtbf.status) {
-                    html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge">${mtbfStatus.toUpperCase()}</span>`;
+                    html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge">${_escHtml(mtbfStatus.toUpperCase())}</span>`;
                 }
                 html += `</div>`;
                 html += `<div class="lump-item-meta">`;
-                html += `<span class="lump-token">0x${token}</span>`;
+                html += `<span class="lump-token">0x${safeToken}</span>`;
                 html += `<span class="lump-size">${size}w</span>`;
                 html += `<span class="lump-methods">${methods.length} method${methods.length !== 1 ? 's' : ''}</span>`;
-                if (lang) html += `<span class="lump-lang">${lang}</span>`;
-                if (profile) html += `<span class="lump-profile">${profile}</span>`;
+                if (lang) html += `<span class="lump-lang">${safeLang}</span>`;
+                if (profile) html += `<span class="lump-profile">${safeProfile}</span>`;
                 html += `</div>`;
                 html += `</div>`;
             }
             listEl.innerHTML = html;
         })
         .catch(err => {
-            listEl.innerHTML = `<div class="lumps-placeholder">Error loading lumps: ${err.message}</div>`;
+            listEl.innerHTML = `<div class="lumps-placeholder">Error loading lumps: ${_escHtml(err.message)}</div>`;
         });
 }
 
@@ -4411,17 +4415,18 @@ function showLumpDetail(token) {
 
     let html = '<div class="lump-detail-sections">';
 
+    const e = _escHtml;
     html += '<div class="lump-detail-section">';
     html += '<table class="lump-detail-table"><tbody>';
-    html += `<tr><td>Token</td><td>0x${lump.token}</td></tr>`;
-    if (lump.ns_slot !== null && lump.ns_slot !== undefined) html += `<tr><td>NS Slot</td><td>${lump.ns_slot}</td></tr>`;
-    html += `<tr><td>Lump Size</td><td>${lump.lump_size} words (${lump.lump_size * 4} bytes)</td></tr>`;
-    html += `<tr><td>Code Words</td><td>${lump.cw || 0}</td></tr>`;
-    html += `<tr><td>C-List Slots</td><td>${lump.cc || 0}</td></tr>`;
-    if (lump.language) html += `<tr><td>Language</td><td>${lump.language}</td></tr>`;
-    if (lump.profile) html += `<tr><td>Profile</td><td>${lump.profile}</td></tr>`;
+    html += `<tr><td>Token</td><td>0x${e(lump.token)}</td></tr>`;
+    if (lump.ns_slot !== null && lump.ns_slot !== undefined) html += `<tr><td>NS Slot</td><td>${parseInt(lump.ns_slot) || 0}</td></tr>`;
+    html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
+    html += `<tr><td>Code Words</td><td>${parseInt(lump.cw) || 0}</td></tr>`;
+    html += `<tr><td>C-List Slots</td><td>${parseInt(lump.cc) || 0}</td></tr>`;
+    if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
+    if (lump.profile) html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
     const grants = lump.grants || [];
-    if (grants.length > 0) html += `<tr><td>Grants</td><td>[${grants.join(', ')}]</td></tr>`;
+    if (grants.length > 0) html += `<tr><td>Grants</td><td>[${grants.map(g => e(g)).join(', ')}]</td></tr>`;
     html += '</tbody></table>';
     html += '</div>';
 
@@ -4432,7 +4437,7 @@ function showLumpDetail(token) {
         html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>Offset</th><th>Length</th></tr></thead><tbody>';
         for (let i = 0; i < methods.length; i++) {
             const m = methods[i];
-            html += `<tr><td>${i}</td><td>${m.name}</td><td>${m.offset}</td><td>${m.length}</td></tr>`;
+            html += `<tr><td>${i}</td><td>${e(m.name)}</td><td>${parseInt(m.offset) || 0}</td><td>${parseInt(m.length) || 0}</td></tr>`;
         }
         html += '</tbody></table>';
         html += '</div>';
@@ -4447,10 +4452,10 @@ function showLumpDetail(token) {
         html += '<div class="lump-section-title">Pet Names</div>';
         html += '<table class="lump-detail-table"><thead><tr><th>Register</th><th>Name</th></tr></thead><tbody>';
         for (const [reg, name] of Object.entries(drNames)) {
-            html += `<tr><td>${reg}</td><td>${name}</td></tr>`;
+            html += `<tr><td>${e(reg)}</td><td>${e(name)}</td></tr>`;
         }
         for (const [reg, name] of Object.entries(crNames)) {
-            html += `<tr><td>${reg}</td><td>${name}</td></tr>`;
+            html += `<tr><td>${e(reg)}</td><td>${e(name)}</td></tr>`;
         }
         html += '</tbody></table>';
         html += '</div>';
@@ -4462,10 +4467,10 @@ function showLumpDetail(token) {
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">MTBF Reliability</div>';
         html += '<table class="lump-detail-table"><tbody>';
-        html += `<tr><td>Status</td><td><span class="mtbf-badge ${mtbfClass}">${mtbf.status.toUpperCase()}</span></td></tr>`;
-        html += `<tr><td>Clean Runs</td><td>${mtbf.consecutive_clean || 0}</td></tr>`;
-        html += `<tr><td>Total Runs</td><td>${mtbf.total_runs || 0}</td></tr>`;
-        if (mtbf.source_hash) html += `<tr><td>Source Hash</td><td><code>${mtbf.source_hash}</code></td></tr>`;
+        html += `<tr><td>Status</td><td><span class="mtbf-badge ${mtbfClass}">${e(mtbf.status.toUpperCase())}</span></td></tr>`;
+        html += `<tr><td>Clean Runs</td><td>${parseInt(mtbf.consecutive_clean) || 0}</td></tr>`;
+        html += `<tr><td>Total Runs</td><td>${parseInt(mtbf.total_runs) || 0}</td></tr>`;
+        if (mtbf.source_hash) html += `<tr><td>Source Hash</td><td><code>${e(mtbf.source_hash)}</code></td></tr>`;
         html += '</tbody></table>';
         html += '</div>';
     }
@@ -4475,13 +4480,13 @@ function showLumpDetail(token) {
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Deployment</div>';
         html += '<table class="lump-detail-table"><tbody>';
-        if (deploy.target_board) html += `<tr><td>Target Board</td><td>${deploy.target_board}</td></tr>`;
-        if (deploy.profile) html += `<tr><td>Profile</td><td>${deploy.profile}</td></tr>`;
+        if (deploy.target_board) html += `<tr><td>Target Board</td><td>${e(deploy.target_board)}</td></tr>`;
+        if (deploy.profile) html += `<tr><td>Profile</td><td>${e(deploy.profile)}</td></tr>`;
         if (deploy.built_at) {
             const d = new Date(deploy.built_at);
-            html += `<tr><td>Built At</td><td>${d.toLocaleString()}</td></tr>`;
+            html += `<tr><td>Built At</td><td>${e(d.toLocaleString())}</td></tr>`;
         }
-        if (deploy.builder) html += `<tr><td>Builder</td><td>${deploy.builder}</td></tr>`;
+        if (deploy.builder) html += `<tr><td>Builder</td><td>${e(deploy.builder)}</td></tr>`;
         html += '</tbody></table>';
         html += '</div>';
     }
@@ -4494,14 +4499,14 @@ function showLumpDetail(token) {
         for (let i = 0; i < caps.length; i++) {
             const c = caps[i];
             const nsStr = (c.nsIndex !== undefined && c.nsIndex >= 0) ? `NS[${c.nsIndex}]` : 'unresolved';
-            html += `<tr><td>${i}</td><td>${c.name}</td><td>${nsStr}</td></tr>`;
+            html += `<tr><td>${i}</td><td>${e(c.name)}</td><td>${nsStr}</td></tr>`;
         }
         html += '</tbody></table>';
         html += '</div>';
     }
 
     html += '<div class="lump-detail-actions">';
-    html += `<button class="btn lump-delete-btn" onclick="deleteLump('${token}')">Delete Lump</button>`;
+    html += `<button class="btn lump-delete-btn" onclick="deleteLump('${e(token)}')">Delete Lump</button>`;
     html += '</div>';
 
     html += '</div>';

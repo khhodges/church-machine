@@ -1592,7 +1592,6 @@ def save_lump():
 @app.route("/api/lumps/list")
 def list_lumps():
     """Return JSON array of all saved lumps with full sidecar metadata."""
-    import glob as _glob
     lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
