@@ -76,25 +76,39 @@
                     <div class="ham-wrap" id="hamWrap">
                         <button class="btn btn-view ham-btn" id="hamBtn" onclick="toggleHamburger()" data-tooltip="Menu — Browse all views">&#9776;</button>
                         <div class="ham-dropdown" id="hamDropdown" style="display:none;">
+                            <div class="ham-group-title">Develop</div>
+                            <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Create</button>
+                            <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math</button>
+                            <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Test</div>
                             <button class="ham-item" id="hamItem-dashboard" onclick="switchView('dashboard');switchDashTab('cr');closeHamburger()">Ti60 255 IDE</button>
                             <button class="ham-item" id="hamItem-dashboard-dr" onclick="switchView('dashboard');switchDashTab('dr');closeHamburger()">Data Registers</button>
                             <button class="ham-item" id="hamItem-dashboard-gatelog" onclick="switchView('dashboard');switchDashTab('gatelog');closeHamburger()">Gate Log</button>
                             <button class="ham-item" id="hamItem-dashboard-state" onclick="switchView('dashboard');switchDashTab('state');closeHamburger()">Machine State</button>
-                            <div class="ham-divider"></div>
-                            <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math</button>
-                            <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Create</button>
-                            <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
-                            <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace</button>
-                            <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Abstractions</button>
                             <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline</button>
                             <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace</button>
-                            <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference</button>
-                            <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder</button>
-                            <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');closeHamburger()">Docs</button>
                             <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC</button>
-                            <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Review</div>
+                            <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Abstractions</button>
+                            <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
+                            <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference</button>
+                            <button class="ham-item" id="hamItem-docs" onclick="switchView('docs');closeHamburger()">Docs</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Hardware</div>
+                            <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
+                            <button class="ham-item" id="hamItem-hw-tang20k" onclick="setSelectedBoard('tang-nano-20k');switchView('builder');closeHamburger()">Tang Nano 20K</button>
+                            <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K IoT</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Configure</div>
                             <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');closeHamburger()">Devices</button>
+                            <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub</button>
+                            <div class="ham-divider"></div>
+                            <div class="ham-group-title">Install</div>
+                            <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder</button>
                             <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">Lumps</button>
+                            <button class="ham-item" id="hamItem-bitstreams" onclick="switchView('builder');switchBuilderViewTab('cyberspace');closeHamburger()">Bitstreams</button>
                         </div>
                     </div>
                     <button class="btn btn-view cr-cycle-btn" id="crCycleBtn"
