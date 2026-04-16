@@ -15327,6 +15327,76 @@ function buildAndDownloadLump() {
     const freespace = lumpSize - 1 - cw - cc;
     const sizeBytes = lumpSize * 4;
 
+    const mtbfClean = _getConsecutiveCleanRuns();
+    const mtbfTotal = _simRunHash ? _simRunHistory.filter(r => r.hash === _simRunHash).length : 0;
+    const mtbfStatus = mtbfTotal === 0 ? 'untested' : (mtbfClean >= 5 ? 'green' : mtbfClean >= 3 ? 'amber' : 'red');
+
+    const methodMeta = [];
+    let mOff = numMethods;
+    for (let i = 0; i < result.methods.length; i++) {
+        const m = result.methods[i];
+        const len = (m.code || []).length;
+        methodMeta.push({ name: m.name, offset: mOff, length: len });
+        mOff += len;
+    }
+
+    const drPetNames = {};
+    for (const [k, v] of Object.entries(_petNameDRMap)) {
+        drPetNames[`DR${k}`] = v;
+    }
+    const crPetNames = {};
+    for (const [k, v] of Object.entries(_petNameCRMap)) {
+        crPetNames[`CR${k}`] = v;
+    }
+
+    let resolvedNsSlot = null;
+    if (sim && sim.abstractionRegistry) {
+        const allAbs = sim.abstractionRegistry.abstractions || [];
+        for (let j = 0; j < allAbs.length; j++) {
+            if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === absName.toUpperCase()) {
+                resolvedNsSlot = j;
+                break;
+            }
+        }
+    }
+
+    const lumpWordsArray = Array.from(lumpWords);
+    const savePayload = {
+        binary: lumpWordsArray,
+        metadata: {
+            abstraction:    absName,
+            ns_slot:        resolvedNsSlot,
+            cw:             cw,
+            cc:             cc,
+            profile:        profile,
+            language:       result.language || 'javascript',
+            methods:        methodMeta,
+            capabilities:   resolvedCaps.map(rc => ({ name: rc.name, nsIndex: rc.nsIndex })),
+            pet_names_dr:   drPetNames,
+            pet_names_cr:   crPetNames,
+            mtbf_clean_runs: mtbfClean,
+            mtbf_total_runs: mtbfTotal,
+            mtbf_status:     mtbfStatus,
+            source_hash:     _simRunHash || _currentEditorHash(),
+            target_board:   'ti60-f225',
+            grants:         ['E']
+        }
+    };
+
+    fetch('/api/lumps/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(savePayload)
+    }).then(r => r.json()).then(resp => {
+        if (resp.ok) {
+            appendOutput(`Saved to server: lumps/${resp.lump} + ${resp.sidecar} (token 0x${resp.token})`, 'info');
+        } else {
+            appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
+        }
+    }).catch(err => {
+        appendOutput(`Server save error: ${err.message}`, 'error');
+    });
+
     let listing = `═══════════════════════════════════════════════════\n`;
     listing += `  LUMP BUILT — "${absName}" [${langLabel}]\n`;
     listing += `═══════════════════════════════════════════════════\n\n`;
@@ -15336,6 +15406,17 @@ function buildAndDownloadLump() {
     listing += `  C-List:    ${cc} slot${cc !== 1 ? 's' : ''} (cc)\n`;
     listing += `  Freespace: ${freespace} words\n`;
     listing += `  Profile:   ${profile}\n`;
+    listing += `  MTBF:      ${mtbfClean}/${mtbfTotal} clean runs (${mtbfStatus})\n`;
+
+    if (Object.keys(drPetNames).length > 0 || Object.keys(crPetNames).length > 0) {
+        listing += `\n  Pet Names:\n`;
+        for (const [reg, name] of Object.entries(drPetNames)) {
+            listing += `    ${reg} = ${name}\n`;
+        }
+        for (const [reg, name] of Object.entries(crPetNames)) {
+            listing += `    ${reg} = ${name}\n`;
+        }
+    }
 
     if (cc > 0) {
         listing += `\n  Capabilities (C-List):\n`;
@@ -15352,13 +15433,15 @@ function buildAndDownloadLump() {
     }
 
     listing += `\n  Methods:\n`;
-    let methodOffset = numMethods;
-    for (let i = 0; i < result.methods.length; i++) {
-        const m = result.methods[i];
-        const len = (m.code || []).length;
-        listing += `    [${i}] ${m.name.padEnd(20)} offset=${methodOffset.toString().padStart(4)}  length=${len}\n`;
-        methodOffset += len;
+    for (let i = 0; i < methodMeta.length; i++) {
+        const m = methodMeta[i];
+        listing += `    [${i}] ${m.name.padEnd(20)} offset=${m.offset.toString().padStart(4)}  length=${m.length}\n`;
     }
+
+    listing += `\n  Deployment:\n`;
+    listing += `    Target Board: Efinix Ti60 F225\n`;
+    listing += `    Profile:      ${profile}\n`;
+    listing += `    MTBF Status:  ${mtbfStatus.toUpperCase()}${mtbfClean >= 5 ? ' (deployment-ready)' : mtbfTotal === 0 ? ' (not yet tested)' : ' (needs more clean runs)'}\n`;
 
     listing += `\n  Lump Layout:\n`;
     listing += `    ┌─────────────────────────────────────────────┐\n`;
@@ -15372,6 +15455,7 @@ function buildAndDownloadLump() {
     listing += `    Total: ${lumpSize} words = ${sizeBytes} bytes\n`;
 
     listing += `\n  Downloaded: ${absName}.lump (${sizeBytes} bytes)\n`;
+    listing += `  Saved to: server/lumps/ (binary + metadata sidecar)\n`;
 
     if (con) { con.textContent = listing; con.scrollTop = 0; }
     trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });

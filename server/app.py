@@ -1468,6 +1468,127 @@ def get_lump_bundle():
             'X-Lump-Count': str(n_lumps),
         })
     return resp
+
+
+@app.route("/api/lumps/save", methods=["POST"])
+def save_lump():
+    """Save a compiled LUMP binary + metadata sidecar to server/lumps/.
+
+    Expects JSON body with:
+      binary   — array of uint32 words (big-endian will be packed server-side)
+      metadata — object with abstraction name, methods, pet names, MTBF,
+                 deployment info, capabilities, etc.
+    Returns the token and saved file paths.
+    """
+    import datetime as _dt
+    payload = request.get_json(force=True, silent=True)
+    if not payload:
+        return jsonify({"error": "Invalid JSON payload"}), 400
+
+    words    = payload.get("binary", [])
+    metadata = payload.get("metadata", {})
+
+    if not words or len(words) < 2:
+        return jsonify({"error": "Binary must contain at least a header and one code word"}), 400
+
+    hdr = int(words[0]) & 0xFFFFFFFF
+    if (hdr >> 27) & 0x1F != 0x1F:
+        return jsonify({"error": "Bad lump magic in header word"}), 400
+
+    abs_name   = metadata.get("abstraction", "Unnamed")
+    ns_slot    = metadata.get("ns_slot", None)
+    token_hint = metadata.get("token", None)
+
+    if token_hint:
+        token8 = str(token_hint).lower().zfill(8)[:8]
+    elif ns_slot is not None:
+        token8 = f"{int(ns_slot) << 8:08x}"
+    else:
+        import hashlib as _hl
+        digest = _hl.sha256(abs_name.encode('utf-8')).hexdigest()[:8]
+        token8 = digest
+
+    lumps_dir = os.path.join(os.path.dirname(__file__), 'lumps')
+    os.makedirs(lumps_dir, exist_ok=True)
+
+    lump_path = os.path.join(lumps_dir, f'{token8}.lump')
+    lump_bytes = _struct.pack(f'>{len(words)}I',
+                              *[int(w) & 0xFFFFFFFF for w in words])
+    with open(lump_path, 'wb') as fh:
+        fh.write(lump_bytes)
+
+    LAZY_LUMPS[token8] = lump_bytes
+    LAZY_LUMPS[token8.lstrip('0') or '0'] = lump_bytes
+
+    sidecar = {
+        "token":       token8,
+        "abstraction": abs_name,
+        "ns_slot":     ns_slot,
+        "lump_size":   len(words),
+        "cw":          metadata.get("cw", 0),
+        "cc":          metadata.get("cc", 0),
+        "profile":     metadata.get("profile", "IoT"),
+        "language":    metadata.get("language", "unknown"),
+        "methods":     metadata.get("methods", []),
+        "capabilities": metadata.get("capabilities", []),
+        "pet_names": {
+            "DR": metadata.get("pet_names_dr", {}),
+            "CR": metadata.get("pet_names_cr", {})
+        },
+        "mtbf": {
+            "consecutive_clean": metadata.get("mtbf_clean_runs", 0),
+            "total_runs":        metadata.get("mtbf_total_runs", 0),
+            "status":            metadata.get("mtbf_status", "unknown"),
+            "source_hash":       metadata.get("source_hash", "")
+        },
+        "deployment": {
+            "target_board": metadata.get("target_board", "ti60-f225"),
+            "profile":      metadata.get("profile", "IoT"),
+            "built_at":     _dt.datetime.utcnow().isoformat() + "Z",
+            "builder":      "CLOOMC++ IDE v1.0"
+        },
+        "grants": metadata.get("grants", ["E"])
+    }
+
+    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
+    with open(sidecar_path, 'w') as fh:
+        json.dump(sidecar, fh, indent=2)
+
+    manifest_path = os.path.join(lumps_dir, 'manifest.json')
+    manifest = []
+    if os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path, 'r') as fh:
+                manifest = json.load(fh)
+        except Exception:
+            manifest = []
+
+    manifest = [e for e in manifest if e.get('token') != token8]
+
+    manifest.append({
+        "token":       token8,
+        "abstraction": abs_name,
+        "ns_slot":     ns_slot,
+        "lump_size":   len(words),
+        "cw":          sidecar["cw"],
+        "cc":          sidecar["cc"],
+        "methods":     sidecar["methods"],
+        "grants":      sidecar["grants"]
+    })
+
+    with open(manifest_path, 'w') as fh:
+        json.dump(manifest, fh, indent=2)
+
+    print(f'[lumps] Saved {token8}.lump ({len(lump_bytes)} bytes) + {token8}.json', flush=True)
+
+    return jsonify({
+        "ok":     True,
+        "token":  token8,
+        "lump":   f'{token8}.lump',
+        "sidecar": f'{token8}.json',
+        "size_bytes": len(lump_bytes)
+    })
+
 # ──────────────────────────────────────────────────────────────────────────────
 
 

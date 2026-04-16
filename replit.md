@@ -37,3 +37,11 @@ The system employs a scale-free abstraction model with 47 abstractions across 9 
 - **localStorage:** Client-side state persistence.
 - **oss-cad-suite:** FPGA toolchain (yosys, nextpnr-gowin, gowin_pack, openFPGALoader).
 - **GitHub:** Integrated for the Mum Tunnel shared abstraction library and community features.
+
+## Build LUMP System
+
+The "Build LUMP" button compiles any CLOOMC++ abstraction and produces a deployable `.lump` binary. The binary is both downloaded to the browser and saved to `server/lumps/` via `POST /api/lumps/save`. Each save produces two files:
+- `<token8>.lump` — raw big-endian binary (header + code + freespace + c-list)
+- `<token8>.json` — metadata sidecar with: method table (name/offset/length), pet name mappings (DR and CR aliases), MTBF data (clean runs, total runs, status), deployment info (target board, profile, build timestamp), capability list with NS resolution, language, and grants.
+
+Token assignment: from provided token hint, or `ns_slot << 8`, or SHA-256 hash of abstraction name. The manifest (`server/lumps/manifest.json`) is auto-updated on each save. Saved lumps are also loaded into `LAZY_LUMPS` in-memory for immediate serving via `GET /api/lump/<token>`.
