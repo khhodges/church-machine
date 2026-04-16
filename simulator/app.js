@@ -18567,8 +18567,9 @@ function loadDeviceList() {
                         '<button class="dev-action-btn' + (isOnline ? '' : ' dev-action-disabled') + '" onclick="deviceDeploy(' + dev.id + ')" title="Deploy bitstream to this device"' + (isOnline ? '' : ' disabled') + '>Deploy</button>' +
                     '</div>';
 
+                detail.style.display = 'none';
                 row.addEventListener('click', function() {
-                    const isOpen = detail.style.display !== 'none';
+                    const isOpen = row.classList.contains('dev-row-open');
                     document.querySelectorAll('.dev-detail').forEach(d => { d.style.display = 'none'; });
                     document.querySelectorAll('.dev-row').forEach(r => r.classList.remove('dev-row-open'));
                     if (!isOpen) {
