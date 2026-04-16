@@ -424,7 +424,7 @@ class ChurchAssembler {
 
     _parseCR(token, lineNum) {
         if (!token) {
-            this.errors.push({ line: lineNum, message: 'A capability register (like CR0, CR6, CR14, or hex 0x0–0xF) is needed here, but nothing was given.' });
+            this.errors.push({ line: lineNum, message: 'A capability register (like CR0, CR6, CR14, 6, or hex 0x0–0xF) is needed here, but nothing was given.' });
             return 0;
         }
         token = token.toUpperCase().replace(/,/g, '');
@@ -442,7 +442,14 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: `0x${hexMatch[1]} (=${idx}) is out of range for a capability register — must be 0x0–0xF (CR0–CR15).` });
             return 0;
         }
-        this.errors.push({ line: lineNum, message: `Expected a capability register like CR0, CR6, or hex 0x6, but got "${token}". Capability registers are CR0–CR15 (or 0x0–0xF).` });
+        const bareMatch = token.match(/^(\d+)$/);
+        if (bareMatch) {
+            const idx = parseInt(bareMatch[1]);
+            if (idx >= 0 && idx <= 15) return idx;
+            this.errors.push({ line: lineNum, message: `${idx} is out of range for a capability register — must be 0–15 (CR0–CR15).` });
+            return 0;
+        }
+        this.errors.push({ line: lineNum, message: `Expected a capability register like CR0, CR6, 6, or hex 0x6, but got "${token}". Capability registers are CR0–CR15 (or 0–15, or 0x0–0xF).` });
         return 0;
     }
 
@@ -476,7 +483,7 @@ class ChurchAssembler {
 
     _parseDR(token, lineNum) {
         if (!token) {
-            this.errors.push({ line: lineNum, message: 'A data register (like DR0, DR1, or hex 0x0–0xF) is needed here, but nothing was given.' });
+            this.errors.push({ line: lineNum, message: 'A data register (like DR0, DR1, 1, or hex 0x0–0xF) is needed here, but nothing was given.' });
             return 0;
         }
         token = token.toUpperCase().replace(/,/g, '');
@@ -494,7 +501,14 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: `0x${hexMatch[1]} (=${idx}) is out of range for a data register — must be 0x0–0xF (DR0–DR15).` });
             return 0;
         }
-        this.errors.push({ line: lineNum, message: `Expected a data register like DR0, DR1, or hex 0x1, but got "${token}". Data registers are DR0–DR15 (or 0x0–0xF).` });
+        const bareMatch = token.match(/^(\d+)$/);
+        if (bareMatch) {
+            const idx = parseInt(bareMatch[1]);
+            if (idx >= 0 && idx <= 15) return idx;
+            this.errors.push({ line: lineNum, message: `${idx} is out of range for a data register — must be 0–15 (DR0–DR15).` });
+            return 0;
+        }
+        this.errors.push({ line: lineNum, message: `Expected a data register like DR0, DR1, 1, or hex 0x1, but got "${token}". Data registers are DR0–DR15 (or 0–15, or 0x0–0xF).` });
         return 0;
     }
 
