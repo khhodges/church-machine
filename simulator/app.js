@@ -12025,6 +12025,7 @@ function closeSettings() {
 
 function showReleaseHistory() {
     const history = [
+        { date: '2026-04-16 UTC', title: 'English String Abstraction', changes: ['EN: String example — 14 methods for packed 4-char-per-word string operations written in plain English', 'Pack4/Unpack, IsLetter/IsDigit/IsUpper/IsLower/IsSpace, ToUpper/ToLower, CharToDigit/DigitToChar, ReverseWord, CompareWords, CountLetters', 'Byte extraction via shift-and-subtract (no bfext needed) — pure English front-end, zero hardware dependencies', 'New EN: String tab in CLOOMC++ IDE with category-organized source and ASCII reference header'] },
         { date: '2026-04-15 UTC', title: 'Patent Portfolio & Figure Audit', changes: ['Browsable /patents/ page: 8 PDFs with color-coded badges (FULL/BASE/CIP/COVER), 45 HTML figures with category filters and live search', 'Figure audit complete: 14 dark-background figures converted to white, 5 missing figures created (HP-35 opcode chart, Ada Lovelace model, 3 Lambda Recursion CIP figures), 4 new I/O Addressing figures', 'Consolidated patent document (2,818 lines): cover letter + Part I base patent + Addendum A (CLOOMC++) + Addendum B (Abstract GT I/O) + Addendum C (Lambda Recursion)', 'Lambda Recursion CIP finalized: 7 patent claims — CR6 self-invocation, idempotent re-entry, O(1) trifecta, two-RETURN exit, three loop styles, English NL compilation, pet-name constants', 'All patent PDFs regenerated with fpdf2: Unicode support, letter-size pages, multi-line table cells, page numbering', 'Server routes added: /patents/, /patents/files/, /figures/ for browsing patent portfolio'] },
         { date: '2026-04-12 UTC', title: 'SlideRule Abstraction, LED MMIO & Doc Review', changes: ['SlideRule abstraction complete (NS slot 16): 22 methods in CLOOMC++ source — 13 core (Add, Sub, Mul, Div, Mod, Sqrt, Pow, Sin, Cos, Tan, ASin, ACos, ATan2) + 9 extended (Sinh, Cosh, Exp, Log, Log2, Log10, ToDegrees, ToRadians, Bernoulli)', 'CLOOMC++ compiler bugs fixed: multi-word method bodies, semicolon handling, capability block parsing', '4 lumps build cleanly: Constants, LED, SlideRule, SlideRuleHS (token=00001000, cw=2602, methods=22)', 'LED abstraction (NS slot 12): FPGA MMIO bindings for Efinix Ti60 F225 (NS slot 12)', 'Navana.Init boot sequence: ordered capability grants, slot pre-population on boot ROM start', 'IntegerOps (Clamp+Abs) and PackedString (Pack4+Unpack+IsLetter+ToUpper) JS examples in IDE tabs', 'CR5 instance-data convention clarified: hardware pushes CR5 to cr5_stack on CALL, restores on RETURN', 'Branding cleanup: CTMM_64 → ChurchMachine_64, RV32_CAP → IoT_32 throughout docs', 'Doc review (9 fixes): GT type table, register count, GT width, patent dates, network-transparency status, TSB line count (329 → ~300), Results row in prologue property table'] },
         { date: '2026-04-11 19:30 UTC', title: 'Cryptographic Build Signatures', changes: ['HMAC-SHA256 build signatures replace single-byte build tag', 'Server-side signature verification with constant-time comparison', '23-byte call-home packet with 4-byte HMAC, boot_reason, last_fault, fault_nia fields', 'Official/Custom Build badges (green/amber) in Devices view', 'MTBF gate: maxSteps runs count as failed; editor input clears history', 'Quick-start docs improved with toolbar icon reference and DigiKey link'] },
@@ -14935,7 +14936,7 @@ function onLangChange(restoring) {
     if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !lastAssembledWords);
 
     const langExampleGroups = {
-        english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_loops'],
+        english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_string', 'cloomc_english_loops'],
         assembly: ['ada_note_g', 'selftest', 'load_save', 'bernoulli', 'conditional', 'gc_test', 'turing_test', 'led_blink', 'salvation', 'perm_attack', 'bind_attack', 'tperm_halt'],
         javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
@@ -15826,6 +15827,271 @@ End if
 Set total to total plus n
 Set n to n minus 1
 Apply lambda with n, total`,
+        'english_string': `-- ENGLISH: String Operations
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--
+-- The Church Machine has no string type. Every register
+-- holds a 32-bit integer. To work with text, we pack
+-- four ASCII characters into one word:
+--
+--   Bits [31:24] = char 0 (leftmost)
+--   Bits [23:16] = char 1
+--   Bits [15:8]  = char 2
+--   Bits [7:0]   = char 3 (rightmost)
+--
+-- For example, "HELL" = H(72)<<24 + E(69)<<16 + L(76)<<8 + L(76)
+--
+-- This abstraction provides 14 methods for packing,
+-- unpacking, classifying, converting, and comparing
+-- characters and packed words — all in plain English.
+--
+-- ASCII reference:
+--   Space=32  0-9=48-57  A-Z=65-90  a-z=97-122
+--
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an abstraction called StringOps
+
+-- ── PACKING & UNPACKING ───────────────────────────────
+
+-- Pack4: pack four ASCII codes into one 32-bit word.
+-- ch0 is leftmost (bits 31:24), ch3 is rightmost (bits 7:0).
+
+Add a method called Pack4 that takes ch0 and ch1 and ch2 and ch3
+Set a to ch0 shifted left by 24
+Set b to ch1 shifted left by 16
+Set c to ch2 shifted left by 8
+Set word to a plus b
+Set word to word plus c
+Set word to word plus ch3
+Return word
+
+-- Unpack: extract one character by position (0-3).
+-- pos=0 gives bits 31:24, pos=1 gives bits 23:16,
+-- pos=2 gives bits 15:8, pos=3 gives bits 7:0.
+-- Each position is extracted using shift and subtract.
+
+Add a method called Unpack that takes word and pos
+If pos is equal to 0
+    Set ch to word shifted right by 24
+    Return ch
+End if
+If pos is equal to 1
+    Set hi to word shifted right by 24
+    Set top to hi shifted left by 8
+    Set raw to word shifted right by 16
+    Set ch to raw minus top
+    Return ch
+End if
+If pos is equal to 2
+    Set raw to word shifted right by 8
+    Set hi to word shifted right by 16
+    Set top to hi shifted left by 8
+    Set ch to raw minus top
+    Return ch
+End if
+Set hi to word shifted right by 8
+Set top to hi shifted left by 8
+Set ch to word minus top
+Return ch
+
+-- ── CHARACTER CLASSIFICATION ──────────────────────────
+
+-- IsLetter: return 1 if ch is A-Z or a-z, else 0.
+
+Add a method called IsLetter that takes ch
+If ch is greater than 64
+    If ch is less than 91
+        Return 1
+    End if
+End if
+If ch is greater than 96
+    If ch is less than 123
+        Return 1
+    End if
+End if
+Return 0
+
+-- IsDigit: return 1 if ch is 0-9 (ASCII 48-57), else 0.
+
+Add a method called IsDigit that takes ch
+If ch is greater than 47
+    If ch is less than 58
+        Return 1
+    End if
+End if
+Return 0
+
+-- IsUpper: return 1 if ch is A-Z (ASCII 65-90), else 0.
+
+Add a method called IsUpper that takes ch
+If ch is greater than 64
+    If ch is less than 91
+        Return 1
+    End if
+End if
+Return 0
+
+-- IsLower: return 1 if ch is a-z (ASCII 97-122), else 0.
+
+Add a method called IsLower that takes ch
+If ch is greater than 96
+    If ch is less than 123
+        Return 1
+    End if
+End if
+Return 0
+
+-- IsSpace: return 1 if ch is space (ASCII 32), else 0.
+
+Add a method called IsSpace that takes ch
+If ch is equal to 32
+    Return 1
+End if
+Return 0
+
+-- ── CASE CONVERSION ───────────────────────────────────
+
+-- ToUpper: convert lowercase a-z to uppercase A-Z.
+-- Uppercase and non-letters pass through unchanged.
+
+Add a method called ToUpper that takes ch
+If ch is greater than 96
+    If ch is less than 123
+        Set result to ch minus 32
+        Return result
+    End if
+End if
+Return ch
+
+-- ToLower: convert uppercase A-Z to lowercase a-z.
+-- Lowercase and non-letters pass through unchanged.
+
+Add a method called ToLower that takes ch
+If ch is greater than 64
+    If ch is less than 91
+        Set result to ch plus 32
+        Return result
+    End if
+End if
+Return ch
+
+-- ── CHARACTER ARITHMETIC ──────────────────────────────
+
+-- CharToDigit: convert ASCII '0'-'9' to integer 0-9.
+-- Returns the digit value, or 0 if not a digit.
+
+Add a method called CharToDigit that takes ch
+If ch is greater than 47
+    If ch is less than 58
+        Set result to ch minus 48
+        Return result
+    End if
+End if
+Return 0
+
+-- DigitToChar: convert integer 0-9 to ASCII '0'-'9'.
+
+Add a method called DigitToChar that takes digit
+Set result to digit plus 48
+Return result
+
+-- ── WORD OPERATIONS ───────────────────────────────────
+
+-- ReverseWord: reverse the 4 characters in a packed word.
+-- "ABCD" becomes "DCBA".
+
+Add a method called ReverseWord that takes word
+Set ch0 to word shifted right by 24
+Set hi to ch0
+Set top to hi shifted left by 8
+Set raw to word shifted right by 16
+Set ch1 to raw minus top
+Set hi to word shifted right by 16
+Set top to hi shifted left by 8
+Set raw to word shifted right by 8
+Set ch2 to raw minus top
+Set hi to word shifted right by 8
+Set top to hi shifted left by 8
+Set ch3 to word minus top
+Set a to ch3 shifted left by 24
+Set b to ch2 shifted left by 16
+Set c to ch1 shifted left by 8
+Set result to a plus b
+Set result to result plus c
+Set result to result plus ch0
+Return result
+
+-- CompareWords: compare two packed words.
+-- Returns 0 if equal, 1 if a is greater, or the difference.
+
+Add a method called CompareWords that takes a and b
+If a is equal to b
+    Return 0
+End if
+If a is greater than b
+    Return 1
+End if
+Set result to a minus b
+Return result
+
+-- CountLetters: count how many of the 4 chars are letters.
+-- Extracts each byte and checks if it is A-Z or a-z.
+
+Add a method called CountLetters that takes word
+Set count to 0
+Set ch0 to word shifted right by 24
+If ch0 is greater than 64
+    If ch0 is less than 91
+        Set count to count plus 1
+    End if
+End if
+If ch0 is greater than 96
+    If ch0 is less than 123
+        Set count to count plus 1
+    End if
+End if
+Set top to ch0 shifted left by 8
+Set raw to word shifted right by 16
+Set ch1 to raw minus top
+If ch1 is greater than 64
+    If ch1 is less than 91
+        Set count to count plus 1
+    End if
+End if
+If ch1 is greater than 96
+    If ch1 is less than 123
+        Set count to count plus 1
+    End if
+End if
+Set hi to word shifted right by 16
+Set top to hi shifted left by 8
+Set raw to word shifted right by 8
+Set ch2 to raw minus top
+If ch2 is greater than 64
+    If ch2 is less than 91
+        Set count to count plus 1
+    End if
+End if
+If ch2 is greater than 96
+    If ch2 is less than 123
+        Set count to count plus 1
+    End if
+End if
+Set hi to word shifted right by 8
+Set top to hi shifted left by 8
+Set ch3 to word minus top
+If ch3 is greater than 64
+    If ch3 is less than 91
+        Set count to count plus 1
+    End if
+End if
+If ch3 is greater than 96
+    If ch3 is less than 123
+        Set count to count plus 1
+    End if
+End if
+Return count`,
         'lambda_church': `-- LAMBDA CALCULUS
 -- Church Numerals \u2014 numbers as pure functions
 -- \u03BBf.\u03BBx.x = 0, \u03BBf.\u03BBx.f x = 1, \u03BBf.\u03BBx.f (f x) = 2 ...
@@ -16288,7 +16554,7 @@ abstraction Feedback {
     if (sel) {
         const isHaskell = ['church_math','church_pair','church_case','church_lambda','sliderule_hs'].includes(name);
         const isSymbolic = ['ada_note_g', 'bernoulli_numbers'].includes(name);
-        const isEnglish = ['english_hello','english_counter','english_loops'].includes(name);
+        const isEnglish = ['english_hello','english_counter','english_string','english_loops'].includes(name);
         const isLambda = ['lambda_church','lambda_booleans','lambda_pairs','lambda_ycomb','lambda_sliderule','lambda_fixedpoint','lambda_rational','lambda_church_vs_compiled'].includes(name);
         sel.value = isLambda ? 'lambda' : isEnglish ? 'english' : isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
     }
