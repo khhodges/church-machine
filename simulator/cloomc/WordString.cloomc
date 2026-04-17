@@ -1,5 +1,6 @@
 abstraction WordString {
   // M00 — dispatch table (14 data words) + routing instructions (14 words)
+  // DR0=method
   method Dispatch [RAW ISA] {
     0x0000000E 0x0000001C 0x00000045 0x0000005A 0x00000045 0x0000004E
     0x00000063 0x00000069 0x00000074 0x0000007E 0x00000088 0x0000008C
@@ -9,12 +10,14 @@ abstraction WordString {
   }
 
   // M01 — return number of words in the string object
+  // DR0=str
   method GetWordCount [RAW ISA] {
     0x7F600000 0x77160000 0x88800005 0x9F608018 0x7F260000 0x7F0A0000
     0x1F000000
   }
 
   // M02 — return character count (UTF-8 decoded length)
+  // DR0=str
   method GetCharCount [RAW ISA] {
     0x7F604001 0x77160000 0x8880000B 0x9F608018 0x7F2E0000 0x97628008
     0x7F360000 0x9F608010 0x7F3E0000 0x87638006 0x7F260000 0x7F0A0000
@@ -22,6 +25,7 @@ abstraction WordString {
   }
 
   // M03 — return raw byte count
+  // DR0=str
   method GetByteCount [RAW ISA] {
     0x7F604002 0x77160000 0x8880000B 0x9F608008 0x7F3E0000 0x9F608010
     0x7F2E0000 0x97628008 0x7F360000 0x87638006 0x7F260000 0x7F0A0000
@@ -29,18 +33,21 @@ abstraction WordString {
   }
 
   // M04 — return byte value at character index
+  // DR0=str, DR1=idx
   method GetCharByte [RAW ISA] {
     0x9F608008 0x7F2E0000 0x97628008 0x7F360000 0x87608006 0x7F260000
     0x7F0A0000 0x1F000000
   }
 
   // M05 — return 1 if ASCII char in DR0 is uppercase (A-Z), else 0
+  // DR0=c
   method IsUppercase [RAW ISA] {
     0x7F604040 0x770E0000 0x8E800007 0x7F60405B 0x770E0000 0x8D000004
     0x7F604001 0x7F0E0000 0x1F000000
   }
 
   // M06 — return 1 if ASCII char in DR0 is lowercase (a-z), else 0
+  // DR0=c
   method IsLowercase [RAW ISA] {
     0x7F604060 0x770E0000 0x8E800007 0x7F60407B 0x770E0000 0x8D000004
     0x7F604001 0x7F0E0000 0x1F000000
@@ -52,6 +59,7 @@ abstraction WordString {
   }
 
   // M08 — return 1 if ASCII char in DR0 is a decimal digit (0-9), else 0
+  // DR0=c
   method IsDigit [RAW ISA] {
     0x7F60402F 0x770E0000 0x8E800007 0x7F60403A 0x770E0000 0x8D000004
     0x7F604001 0x7F0E0000 0x1F000000
@@ -73,6 +81,7 @@ abstraction WordString {
   method IsSymbol = aliasOf ReturnFalse;
 
   // M14 — return 1 if ASCII char in DR0 is whitespace, else 0
+  // DR0=c
   method IsSpace [RAW ISA] {
     0x7F604020 0x770E0000 0x88800004 0x7F604001 0x7F0E0000 0x1F000000
   }
@@ -81,6 +90,7 @@ abstraction WordString {
   method IsAlphaNum = aliasOf ReturnFalse;
 
   // M16 — convert ASCII char in DR0 to uppercase in-place
+  // DR0=c
   method ToUppercase [RAW ISA] {
     0x7F604060 0x770E0000 0x8E800008 0x7F60407B 0x770E0000 0x8D000005
     0x8760C020 0x7F260000 0x7F0A0000 0x1F000000
@@ -92,6 +102,7 @@ abstraction WordString {
   }
 
   // M18 — convert ASCII char in DR0 to lowercase in-place
+  // DR0=c
   method ToLowercase [RAW ISA] {
     0x7F604040 0x770E0000 0x8E800008 0x7F60405B 0x770E0000 0x8D000005
     0x7F60C020 0x7F260000 0x7F0A0000 0x1F000000
@@ -101,6 +112,7 @@ abstraction WordString {
   method StubExt = aliasOf Stub;
 
   // M20 — normalise digit character to numeric value
+  // DR0=c
   method NormaliseDigit [RAW ISA] {
     0x7F60402F 0x770E0000 0x8E800008 0x7F60403A 0x770E0000 0x8D000005
     0x8760C030 0x7F260000 0x7F0A0000 0x1F000000
@@ -110,11 +122,13 @@ abstraction WordString {
   method IsHex = aliasOf ReturnFalse;
 
   // M22 — compute byte offset for character index
+  // DR0=c
   method Offset [RAW ISA] {
     0x7F60C030 0x7F260000 0x7F0A0000 0x1F000000
   }
 
   // M23 — general string operation: copy/move/fill
+  // DR0=src, DR1=dst, DR2=len
   method StringOp [RAW ISA] {
     0x9F608018 0x7F260000 0x7F2A0000 0x97628008 0x7F360000 0x9F608010
     0x7F3E0000 0x87638006 0x7F460000 0x9F608010 0x7F2E0000 0x97628008
@@ -126,21 +140,25 @@ abstraction WordString {
   }
 
   // M24 — assert DR0 != 0, fault if zero
+  // DR0=val
   method CheckNonZero [RAW ISA] {
     0x77090000 0x88800004 0x7F600000 0x7F0E0000 0x1F000000
   }
 
   // M25 — assert DR0 > 0, fault if non-positive
+  // DR0=val
   method CheckPositive [RAW ISA] {
     0x77090000 0x8E800004 0x7F604001 0x7F0E0000 0x1F000000
   }
 
   // M26 — compute base address of string data region
+  // DR0=c
   method ComputeBase [RAW ISA] {
     0x87608002 0x7F260000 0x7F0A0000 0x1F000000
   }
 
   // M27 — full character classification entry point
+  // DR0=c
   method Classify [RAW ISA] {
     0x7F600000 0x7F260000 0x9F608018 0x7F2E0000 0x7F604040 0x772E0000
     0x8E800006 0x7F60405B 0x772E0000 0x8D000003 0x7F624001 0x7F260000
