@@ -5725,30 +5725,149 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     const cw        = parseInt(lump.cw)        || 0;
     const cc        = parseInt(lump.cc)        || 0;
     const lumpSize  = parseInt(lump.lump_size) || words.length;
+    const abstName  = lump.abstraction || 'Lump';
+
+    // Build method boundary map (word index → name).
+    // If no manifest methods, auto-detect by scanning for HALT (word=0)
+    // or RETURN (opcode 3) followed by a non-zero word within the code region.
     const mb = {};
-    for (const m of methods) mb[1 + (parseInt(m.offset) || 0)] = m.name;
+    const autoDetected = methods.length === 0;
+    if (!autoDetected) {
+        for (const m of methods) mb[1 + (parseInt(m.offset) || 0)] = m.name;
+    } else if (cw > 0) {
+        mb[1] = `${abstName}.Method_0`;
+        let mIdx = 0;
+        const scanEnd = Math.min(cw, words.length - 2);
+        for (let i = 1; i <= scanEnd; i++) {
+            const w = words[i] >>> 0;
+            const opcode = (w >>> 27) & 0x1F;
+            const isHalt   = w === 0;
+            const isReturn = opcode === 3;
+            if (isHalt || isReturn) {
+                // Peek ahead: skip over consecutive HALTs/padding to find next code word
+                let j = i + 1;
+                while (j <= cw && words[j] === 0) j++;
+                if (j <= cw && j < words.length) {
+                    mIdx++;
+                    mb[j] = `${abstName}.Method_${mIdx}`;
+                    i = j - 1;  // resume scanning from next method start
+                }
+            }
+        }
+    }
+
     const dis = w => {
         if (typeof assembler !== 'undefined' && assembler) {
             try { return assembler.disassemble(w >>> 0); } catch (_) {}
         }
         return `0x${(w >>> 0).toString(16).padStart(8, '0').toUpperCase()}`;
     };
-    const effEnd = Math.min(cw + 1, lumpSize - cc, words.length);
+
+    // C-list token → known abstraction name lookup
+    const _clistName = tok => {
+        if (!_lumpsCache || !_lumpsCache.length) return '';
+        const h = tok.toString(16).padStart(8, '0');
+        const lm = _lumpsCache.find(l => {
+            const t = (l.token || '').toLowerCase();
+            return t === h || t.replace(/^0+/, '') === h.replace(/^0+/, '');
+        });
+        return lm ? (lm.abstraction || '') : '';
+    };
+
+    // Pre-parse c-list slots so we can resolve names during disassembly
+    const clistSlotName = {};   // slot index (0-based) → human name
+    const clistStart = lumpSize - cc;
+    for (let s = 0; s < cc; s++) {
+        const wIdx = clistStart + s;
+        const wVal = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
+        const resolved = wVal ? _clistName(wVal) : '';
+        clistSlotName[s] = resolved || `0x${wVal.toString(16).padStart(8, '0')}`;
+    }
+
+    const effEnd = Math.min(cw + 1, lumpSize - cc > 0 ? lumpSize - cc : cw + 1, words.length);
     let html = '<div class="lump-content-code">';
     if (effEnd <= 1) {
         html += '<div class="lumps-placeholder">No code words in this lump.</div>';
     } else {
+        // Live CR alias map: tracks which cap-register holds which c-list slot
+        const crAlias = {};  // crNum → slot index (int)
         for (let i = 1; i < effEnd; i++) {
-            if (mb[i] !== undefined) html += `<div class="lump-code-method-label">\u25c6 ${e(mb[i])}</div>`;
+            // Method boundary → reset per-method register aliases
+            if (mb[i] !== undefined) {
+                const auto = autoDetected ? ' <span class="lump-meth-auto" title="Auto-detected boundary">[~]</span>' : '';
+                html += `<div class="lump-code-method-label">\u25c6 ${e(mb[i])}${auto}</div>`;
+                for (const k of Object.keys(crAlias)) delete crAlias[k];
+            }
+
+            const w    = words[i] >>> 0;
+            const op   = (w >>> 27) & 0x1F;
+            const crDst = (w >>> 19) & 0xF;
+            const crSrc = (w >>> 15) & 0xF;
+            const imm   = w & 0x7FFF;
+
+            // Track LOAD/CHANGE from CR6 (active c-list) into a capability register
+            if ((op === 0 || op === 4) && crSrc === 6 && cc > 0) {
+                crAlias[crDst] = imm;   // slot index
+            }
+            // SWITCH can swap aliases
+            if (op === 5) {
+                const swOther = imm & 0xF;
+                const tmp = crAlias[crSrc];
+                if (crAlias[swOther] !== undefined) crAlias[crSrc] = crAlias[swOther];
+                else delete crAlias[crSrc];
+                if (tmp !== undefined) crAlias[swOther] = tmp;
+                else delete crAlias[swOther];
+            }
+
+            // Build symbolic annotation
+            let ann = '';
+            if ((op === 0 || op === 4) && crSrc === 6 && cc > 0) {
+                // LOAD/CHANGE CR?, CR6[slot] — note what was loaded
+                const nm = clistSlotName[imm];
+                if (nm) ann = `<span class="lump-sym-ann">\u2190 ${e(nm)}</span>`;
+            } else if (op === 2 && crAlias[crDst] !== undefined && cc > 0) {
+                // CALL CRd — annotate with what CRd holds
+                const slot = crAlias[crDst];
+                const nm = clistSlotName[slot];
+                if (nm) ann = `<span class="lump-sym-ann">\u2192 ${e(nm)}</span>`;
+            } else if ((op === 8 || op === 9) && crSrc === 6 && cc > 0) {
+                // ELOADCALL / XLOADLAMBDA CR?, CR6[slot]
+                const nm = clistSlotName[imm];
+                if (nm) ann = `<span class="lump-sym-ann">\u21D2 ${e(nm)}</span>`;
+            }
+
             const addr = (i * 4).toString(16).toUpperCase().padStart(4, '0');
-            const hex  = (words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            const hex  = (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
             html += `<div class="lump-code-row">` +
                     `<span class="lump-code-addr">0x${addr}</span>` +
                     `<span class="lump-code-hex">${hex}</span>` +
-                    `<span class="lump-code-instr">${e(dis(words[i]))}</span></div>`;
+                    `<span class="lump-code-instr">${e(dis(w))}${ann ? ' ' + ann : ''}</span></div>`;
+
+            // RETURN or HALT → clear aliases (next code is a new method scope)
+            if (w === 0 || op === 3) {
+                for (const k of Object.keys(crAlias)) delete crAlias[k];
+            }
         }
     }
     html += '</div>';
+
+    // C-list viewer
+    if (cc > 0) {
+        html += `<div class="lump-clist-section"><div class="lump-clist-title">C-List — ${cc} entr${cc === 1 ? 'y' : 'ies'}</div><div class="lump-clist-table">`;
+        for (let s = 0; s < cc; s++) {
+            const wIdx = clistStart + s;
+            const wVal = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
+            const hexTok = wVal.toString(16).padStart(8, '0');
+            const resolved = wVal ? _clistName(wVal) : '';
+            html += `<div class="lump-clist-row">` +
+                    `<span class="lump-clist-idx">[${s}]</span>` +
+                    `<span class="lump-clist-tok">0x${hexTok}</span>` +
+                    `<span class="lump-clist-name">${resolved ? e(resolved) : '<span class="lump-clist-null">—</span>'}</span>` +
+                    `</div>`;
+        }
+        html += '</div></div>';
+    }
+
     bodyEl.innerHTML = html;
     bodyEl.className = '';
 }
