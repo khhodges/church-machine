@@ -544,12 +544,12 @@ class ChurchAssembler {
         if (word === 0) return 'HALT';
 
         const opcode = (word >>> 27) & 0x1F;
-        const cond = (word >>> 23) & 0xF;
-        const crDst = (word >>> 19) & 0xF;
-        const crSrc = (word >>> 15) & 0xF;
-        const imm = word & 0x7FFF;
+        const cond   = (word >>> 23) & 0xF;
+        const crDst  = (word >>> 19) & 0xF;
+        const crSrc  = (word >>> 15) & 0xF;
+        const imm    = word & 0x7FFF;
 
-        const opNames = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
+        const opNames   = ['LOAD','SAVE','CALL','RETURN','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE','BFEXT','BFINS','MCMP','IADD','ISUB','BRANCH','SHL','SHR'];
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
 
         // Lump header: magic=0x1F in top 5 bits — format: magic(5)|n_minus_6(4)|cw(13)|typ(2)|cc(8)
@@ -566,59 +566,82 @@ class ChurchAssembler {
 
         if (opcode > 19) return `??? 0x${word.toString(16).padStart(8, '0')}`;
 
-        const op = opNames[opcode];
-        const condStr = cond === 14 ? '' : condNames[cond];
+        const op       = opNames[opcode];
+        const condStr  = cond === 14 ? '' : condNames[cond];
         const mnemonic = op + condStr;
 
+        // Format a 15-bit offset as a zero-padded hex string with bracket notation
+        const hexOff = n => `0x${n.toString(16).toUpperCase().padStart(4, '0')}`;
+
         switch (opcode) {
-            case 0: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-            case 1: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
+            // LOAD CRd, CRs[offset]  — load GT from c-list
+            case 0: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // SAVE CRd, CRs[offset]  — save GT to c-list
+            case 1: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // CALL CRd[, sel[, #extra]]  — invoke capability
             case 2: {
-                if (imm & 0x4000) return `${mnemonic} CR${crDst}`;
-                if (imm) return `${mnemonic} CR${crDst}, ${crSrc}, #${imm}`;
-                return `${mnemonic} CR${crDst}, ${crSrc}`;
+                if (imm & 0x4000) return `${mnemonic}  CR${crDst}`;
+                if (imm) return `${mnemonic}  CR${crDst}, sel=${crSrc}, #${imm}`;
+                return crSrc ? `${mnemonic}  CR${crDst}, sel=${crSrc}` : `${mnemonic}  CR${crDst}`;
             }
+            // RETURN [mask]  — unwind call frame, optional register scrub
             case 3: {
                 const retMask = imm & 0xFFF;
-                return retMask ? `${mnemonic} 0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;
+                return retMask ? `${mnemonic}  0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;
             }
-            case 4: return `${mnemonic} CR${crDst}, ${imm}`;
-            case 5: return `${mnemonic} CR${crSrc}, ${imm & 7}`;
+            // CHANGE CRd, CRs[idx]  — load GT via c-list capability into CRd
+            case 4: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // SWITCH CRa, CRb  — atomically swap two CRs
+            case 5: return `${mnemonic}  CR${crSrc}, CR${imm & 0x7}`;
+            // TPERM CRd, preset[B]  — assert/attenuate permission
             case 6: {
                 const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV','RSV','RSV','RSV','RSV','RSV'];
-                const bFlag = (imm >>> 4) & 1;
-                const baseName = presetNames[imm & 0xF];
-                return `${mnemonic} CR${crDst}, ${baseName}${bFlag ? 'B' : ''}`;
+                const bFlag    = (imm >>> 4) & 1;
+                const baseName = presetNames[imm & 0xF] || 'RSV';
+                return `${mnemonic}  CR${crDst}, ${baseName}${bFlag ? 'B' : ''}`;
             }
-            case 7: return `${mnemonic} CR${crDst}`;
-            case 8: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-            case 9: return `${mnemonic} CR${crDst}, CR${crSrc}, ${imm}`;
-            case 10: return `${mnemonic} DR${crDst}, CR${crSrc}, ${imm}`;
-            case 11: return `${mnemonic} DR${crDst}, CR${crSrc}, ${imm}`;
+            // LAMBDA CRd  — create closure from template
+            case 7: return `${mnemonic}  CR${crDst}`;
+            // ELOADCALL CRd, CRs[offset]  — fused load + call
+            case 8: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // XLOADLAMBDA CRd, CRs[offset]  — fused load + lambda
+            case 9: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // DREAD DRd, CRs[offset]  — read data word from capability
+            case 10: return `${mnemonic}  DR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // DWRITE DRd, CRs[offset]  — write data word via capability
+            case 11: return `${mnemonic}  DR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+            // BFEXT DRd, CRs, pos, w  — bit-field extract
             case 12: {
-                const pos = (imm >>> 5) & 0x1F;
+                const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic} DR${crDst}, CR${crSrc}, ${pos}, ${width}`;
+                return `${mnemonic}  DR${crDst}, CR${crSrc}, pos=${pos}, w=${width}`;
             }
+            // BFINS DRd, CRs, pos, w  — bit-field insert
             case 13: {
-                const pos = (imm >>> 5) & 0x1F;
+                const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${mnemonic} DR${crDst}, CR${crSrc}, ${pos}, ${width}`;
+                return `${mnemonic}  DR${crDst}, CR${crSrc}, pos=${pos}, w=${width}`;
             }
-            case 14: return `${mnemonic} DR${crDst}, DR${crSrc}`;
-            case 15: return (imm & 0x4000) ? `${mnemonic} DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic} DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
-            case 16: return (imm & 0x4000) ? `${mnemonic} DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic} DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
+            // MCMP DRd, DRs  — compare, update condition flags
+            case 14: return `${mnemonic}  DR${crDst}, DR${crSrc}`;
+            // IADD DRd, DRs, DRm | #imm
+            case 15: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
+            // ISUB DRd, DRs, DRm | #imm
+            case 16: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
+            // BRANCH soff  — PC-relative conditional jump
             case 17: {
                 const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
-                return `${mnemonic} ${soff}`;
+                return `${mnemonic}  ${soff >= 0 ? '+' : ''}${soff}`;
             }
-            case 18: return `${mnemonic} DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
+            // SHL DRd, DRs, shamt
+            case 18: return `${mnemonic}  DR${crDst}, DR${crSrc}, ${imm & 0x1F}`;
+            // SHR DRd, DRs, shamt [ASR]
             case 19: {
                 const arith = (imm >>> 5) & 1;
                 const shamt = imm & 0x1F;
-                return `${mnemonic} DR${crDst}, DR${crSrc}, ${shamt}${arith ? ' ASR' : ''}`;
+                return `${mnemonic}  DR${crDst}, DR${crSrc}, ${shamt}${arith ? ' ASR' : ''}`;
             }
-            default: return `??? 0x${word.toString(16)}`;
+            default: return `??? 0x${word.toString(16).padStart(8, '0')}`;
         }
     }
 }
