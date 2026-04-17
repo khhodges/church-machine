@@ -5662,7 +5662,9 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
         let startX = 0;
         let startLeftPx = 0;
         const DIVIDER_PX = 6;
-        const LS_KEY = 'lump-edit-split-ratio';
+        const LS_KEY_GLOBAL = 'lump-edit-split-ratio';
+        const contentType = (lump && lump.content_type) ? lump.content_type.toLowerCase() : '';
+        const LS_KEY = contentType ? `lump-edit-split-ratio:${contentType}` : LS_KEY_GLOBAL;
 
         function applyColumns(leftPx) {
             const totalPx = splitPane.offsetWidth - DIVIDER_PX;
@@ -5700,7 +5702,10 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
 
         return function restoreRatio() {
             try {
-                const saved = localStorage.getItem(LS_KEY);
+                let saved = localStorage.getItem(LS_KEY);
+                if (saved === null && LS_KEY !== LS_KEY_GLOBAL) {
+                    saved = localStorage.getItem(LS_KEY_GLOBAL);
+                }
                 if (saved !== null) {
                     const ratio = parseFloat(saved);
                     if (isFinite(ratio) && ratio > 0 && ratio < 1) {
