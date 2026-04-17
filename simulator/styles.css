@@ -5731,16 +5731,25 @@ a.next-step-link:hover {
     grid-template-columns: 340px 1fr;
     gap: 1rem;
     height: calc(100vh - 70px);
-    overflow: hidden;
+    overflow: visible;
 }
 
 .lumps-list-panel {
-    overflow-y: auto;
     padding-right: 0.25rem;
+    overflow: visible;
 }
 
 .lumps-list-panel .panel {
     height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+#lumpsListContent {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .lumps-detail-panel {
