@@ -5807,7 +5807,7 @@ async function _loadLumpContent(token, lump) {
         const ct  = (lump.content_type || '').toLowerCase();
         const typ = lump.typ;
         const dataWords = words.slice(1);
-        if (ct === 'code' || typ === 0) {
+        if (ct === 'code' || typ === 0 || (typ === undefined && lump.cw > 0)) {
             _renderLumpCodeContent(bodyEl, lump, words);
         } else if (ct === 'text') {
             const text = _pack4Decode(dataWords);
