@@ -1,0 +1,91 @@
+// WordString abstraction — token ab1e86af
+// String and character-classification utility for Church Machine.
+//
+// 20 capability slots (0–19).  No outgoing capabilities (cc=0) — all
+// operations are pure computation on register values; no external GTs needed.
+//
+// NOTE: The canonical build source is WordString.json.  This .cloomc file is
+// the high-level reference document.  Methods marked [RAW ISA] cannot yet be
+// expressed in the CLOOMC++ high-level language and are stored as pre-assembled
+// hex code arrays in the JSON.  Methods marked [CLOOMC] describe the semantics
+// in compilable CLOOMC++ notation.
+//
+// Capability map:
+//   0  Dispatch        — internal jump table (14 entries × 28 words) [RAW ISA]
+//   1  GetWordCount    — extract word count field from descriptor     [CLOOMC approx]
+//   2  GetCharCount    — extract char count (version A)              [CLOOMC approx]
+//   3  GetByteCount    — extract byte count (version B)              [CLOOMC approx]
+//   4  GetCharByte     — extract one character byte                  [CLOOMC approx]
+//   5  IsUppercase     — 1 if A–Z, else 0                           [CLOOMC]
+//   6  IsLowercase     — 1 if a–z, else 0                           [CLOOMC]
+//   7  ReturnFalse     — always returns 0                           [CLOOMC]
+//   8  IsDigit         — 1 if 0–9, else 0                           [CLOOMC]
+//   9  IsSpace         — 1 if ASCII space (0x20), else 0            [CLOOMC approx]
+//  10  ToUppercase     — convert a–z → A–Z, others unchanged        [CLOOMC approx]
+//  11  Stub            — bare return (unimplemented placeholder)     [CLOOMC]
+//  12  ToLowercase     — convert A–Z → a–z, others unchanged        [CLOOMC approx]
+//  13  NormaliseDigit  — convert 0–9 char → 0–9 integer, others 0  [CLOOMC approx]
+//  14  Offset          — compute character class offset              [RAW ISA]
+//  15  StringOp        — multi-field string operation (37w)         [RAW ISA]
+//  16  CheckNonZero    — 1 if operand is zero, else 0 (inverted)    [CLOOMC approx]
+//  17  CheckPositive   — 1 if operand > 0, else 0                   [CLOOMC approx]
+//  18  ComputeBase     — compute classification base offset         [RAW ISA]
+//  19  Classify        — full character classification (90w)        [RAW ISA]
+
+abstraction WordString {
+    capabilities { }
+
+    // ── Slot 5: IsUppercase ──────────────────────────────────────────────────
+    // Returns 1 if c is an ASCII uppercase letter (A–Z), 0 otherwise.
+    method IsUppercase(c) {
+        if (c > 64) {
+            if (c < 91) {
+                return(1)
+            }
+        }
+        return(0)
+    }
+
+    // ── Slot 6: IsLowercase ──────────────────────────────────────────────────
+    // Returns 1 if c is an ASCII lowercase letter (a–z), 0 otherwise.
+    method IsLowercase(c) {
+        if (c > 96) {
+            if (c < 123) {
+                return(1)
+            }
+        }
+        return(0)
+    }
+
+    // ── Slot 7: ReturnFalse ──────────────────────────────────────────────────
+    // Always returns 0.  Used as the null/unimplemented-capability stub.
+    method ReturnFalse() {
+        return(0)
+    }
+
+    // ── Slot 8: IsDigit ──────────────────────────────────────────────────────
+    // Returns 1 if c is an ASCII decimal digit (0–9), 0 otherwise.
+    method IsDigit(c) {
+        if (c > 47) {
+            if (c < 58) {
+                return(1)
+            }
+        }
+        return(0)
+    }
+
+    // ── Slot 9: IsSpace ──────────────────────────────────────────────────────
+    // Returns 1 if c equals ASCII space (0x20 = 32), 0 otherwise.
+    method IsSpace(c) {
+        if (c == 32) {
+            return(1)
+        }
+        return(0)
+    }
+
+    // ── Slot 11: Stub ────────────────────────────────────────────────────────
+    // Bare return — unimplemented capability placeholder.
+    method Stub() {
+        return(0)
+    }
+}

@@ -6,11 +6,112 @@
   "typ": 0,
   "content_type": "code",
   "lump_type": "code",
-  "cw": 315,
+  "cw": 281,
   "cc": 0,
   "profile": "IoT",
-  "language": "imported",
-  "methods": [],
+  "language": "json",
+  "methods": [
+    {
+      "name": "Dispatch",
+      "offset": 0,
+      "length": 28
+    },
+    {
+      "name": "GetWordCount",
+      "offset": 28,
+      "length": 7
+    },
+    {
+      "name": "GetCharCount",
+      "offset": 35,
+      "length": 13
+    },
+    {
+      "name": "GetByteCount",
+      "offset": 48,
+      "length": 13
+    },
+    {
+      "name": "GetCharByte",
+      "offset": 61,
+      "length": 8
+    },
+    {
+      "name": "IsUppercase",
+      "offset": 69,
+      "length": 9
+    },
+    {
+      "name": "IsLowercase",
+      "offset": 78,
+      "length": 9
+    },
+    {
+      "name": "ReturnFalse",
+      "offset": 87,
+      "length": 3
+    },
+    {
+      "name": "IsDigit",
+      "offset": 90,
+      "length": 9
+    },
+    {
+      "name": "IsSpace",
+      "offset": 99,
+      "length": 6
+    },
+    {
+      "name": "ToUppercase",
+      "offset": 105,
+      "length": 10
+    },
+    {
+      "name": "Stub",
+      "offset": 115,
+      "length": 1
+    },
+    {
+      "name": "ToLowercase",
+      "offset": 116,
+      "length": 10
+    },
+    {
+      "name": "NormaliseDigit",
+      "offset": 126,
+      "length": 10
+    },
+    {
+      "name": "Offset",
+      "offset": 136,
+      "length": 4
+    },
+    {
+      "name": "StringOp",
+      "offset": 140,
+      "length": 37
+    },
+    {
+      "name": "CheckNonZero",
+      "offset": 177,
+      "length": 5
+    },
+    {
+      "name": "CheckPositive",
+      "offset": 182,
+      "length": 5
+    },
+    {
+      "name": "ComputeBase",
+      "offset": 187,
+      "length": 4
+    },
+    {
+      "name": "Classify",
+      "offset": 191,
+      "length": 90
+    }
+  ],
   "capabilities": [],
   "pet_names": {
     "DR": {},
@@ -25,8 +126,8 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-04-17T14:12:37.042947Z",
-    "builder": "IDE LUMP Upload"
+    "built_at": "2026-04-17T16:10:40.933740Z",
+    "builder": "build_lumps.py (deduplicated from imported binary)"
   },
   "grants": [
     "E"

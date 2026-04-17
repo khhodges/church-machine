@@ -116,11 +116,18 @@ def build_lump(payload, verbose=False):
 
     all_code     = []
     method_table = []
+    seen_bodies  = {}
 
     for m in methods:
         words = parse_code(m)
         if not words:
             words = [0x1F000000]
+        body_key = tuple(words)
+        if body_key in seen_bodies:
+            print(f'  WARNING {name}: method "{m.get("name","?")}" has identical compiled code '
+                  f'as "{seen_bodies[body_key]}" — consider removing the duplicate')
+        else:
+            seen_bodies[body_key] = m.get('name', '?')
         offset = len(all_code)
         all_code.extend(words)
         method_table.append({

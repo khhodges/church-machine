@@ -157,6 +157,18 @@ class CLOOMCCompiler {
             }
         }
 
+        if (errors.length === 0) {
+            const _bodyIndex = new Map();
+            for (const m of methods) {
+                const fp = m.code.join(',');
+                if (_bodyIndex.has(fp)) {
+                    errors.push({ line: 0, message: `Method "${m.name}" compiles to identical machine code as "${_bodyIndex.get(fp)}" — each method must have a distinct implementation` });
+                } else {
+                    _bodyIndex.set(fp, m.name);
+                }
+            }
+        }
+
         return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'javascript' };
     }
 
@@ -192,6 +204,18 @@ class CLOOMCCompiler {
             } else {
                 methods.push({ name: method.name, code: result.code });
                 manifest.push({ name: method.name, mapping: result.manifest });
+            }
+        }
+
+        if (errors.length === 0) {
+            const _bodyIndex = new Map();
+            for (const m of methods) {
+                const fp = m.code.join(',');
+                if (_bodyIndex.has(fp)) {
+                    errors.push({ line: 0, message: `Method "${m.name}" compiles to identical machine code as "${_bodyIndex.get(fp)}" — each method must have a distinct implementation` });
+                } else {
+                    _bodyIndex.set(fp, m.name);
+                }
             }
         }
 
@@ -1202,6 +1226,18 @@ class CLOOMCCompiler {
             } else {
                 methods.push({ name: method.name, code: result.code });
                 manifest.push({ name: method.name, mapping: result.manifest });
+            }
+        }
+
+        if (errors.length === 0) {
+            const _bodyIndex = new Map();
+            for (const m of methods) {
+                const fp = m.code.join(',');
+                if (_bodyIndex.has(fp)) {
+                    errors.push({ line: 0, message: `Method "${m.name}" compiles to identical machine code as "${_bodyIndex.get(fp)}" — each method must have a distinct implementation` });
+                } else {
+                    _bodyIndex.set(fp, m.name);
+                }
             }
         }
 
@@ -2499,6 +2535,18 @@ class CLOOMCCompiler {
             } else {
                 methods.push({ name: method.name, code: result.code });
                 manifest.push({ name: method.name, mapping: result.manifest });
+            }
+        }
+
+        if (errors.length === 0) {
+            const _bodyIndex = new Map();
+            for (const m of methods) {
+                const fp = m.code.join(',');
+                if (_bodyIndex.has(fp)) {
+                    errors.push({ line: 0, message: `Method "${m.name}" compiles to identical machine code as "${_bodyIndex.get(fp)}" — each method must have a distinct implementation` });
+                } else {
+                    _bodyIndex.set(fp, m.name);
+                }
             }
         }
 
