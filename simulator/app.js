@@ -4834,11 +4834,15 @@ async function renderLumps() {
     }
 }
 
-function _buildNsDepGraph(nsMeta, lump) {
+function _buildNsDepGraph(nsMeta, lump, showNull) {
     const e = _escHtml;
     const allEntries = nsMeta.entries || [];
-    const active = allEntries.filter(ent => ent.state && ent.state !== 'null');
-    if (active.length === 0) return '';
+    const nullEntries = allEntries.filter(ent => !ent.state || ent.state === 'null');
+    const active = showNull
+        ? allEntries
+        : allEntries.filter(ent => ent.state && ent.state !== 'null');
+    if (active.length === 0 && nullEntries.length === 0) return '';
+    if (active.length === 0 && !showNull) return '';
 
     const SVG_W = 660;
     const ROW_H = 52;
@@ -4860,6 +4864,7 @@ function _buildNsDepGraph(nsMeta, lump) {
       <marker id="nsdg-arr-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#4ade80"/></marker>
       <marker id="nsdg-arr-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,1 L9,5 L0,9 z" fill="#a78bfa"/></marker>
     </defs>`;
+    svg += `<g class="nsdg-inner">`;
 
     const nsLabel = (lump.abstraction || 'Namespace').substring(0, 14);
     const nsToken = (lump.token || '').substring(0, 12);
@@ -4875,18 +4880,24 @@ function _buildNsDepGraph(nsMeta, lump) {
         const ent = active[i];
         const rowCY = PAD_T + i * ROW_H + ROW_H / 2;
 
+        const isNullSlot = !ent.state || ent.state === 'null';
         const ex1 = nsX + NS_W, ey1 = nsCY;
         const ex2 = slotX, ey2 = rowCY;
         const cBx = ex1 + (ex2 - ex1) * 0.45;
-        svg += `<path d="M${ex1},${ey1} C${cBx},${ey1} ${cBx},${ey2} ${ex2},${ey2}" fill="none" stroke="#4a7aab" stroke-width="1.2" marker-end="url(#nsdg-arr-blue)"/>`;
+        const connStroke = isNullSlot ? '#2a3040' : '#4a7aab';
+        const connOpacity = isNullSlot ? '0.4' : '1';
+        svg += `<path d="M${ex1},${ey1} C${cBx},${ey1} ${cBx},${ey2} ${ex2},${ey2}" fill="none" stroke="${connStroke}" stroke-width="1" stroke-opacity="${connOpacity}" ${isNullSlot ? '' : 'marker-end="url(#nsdg-arr-blue)"'}/>`;
 
-        const stateCol = ent.state === 'bundled' ? '#60a5fa'
+        const stateCol = isNullSlot ? '#3a3a4a'
+                       : ent.state === 'bundled' ? '#60a5fa'
                        : ent.state === 'live'    ? '#4ade80'
                        :                           '#a78bfa';
+        const slotTextCol = isNullSlot ? '#3a3a5a' : stateCol;
+        const slotBodyCol = isNullSlot ? '#0a0a12' : '#081828';
         const slotLabel = (ent.label || `slot ${ent.slot}`).substring(0, 20);
 
         const slotTipKey = `${_tipPfx}_s${i}`;
-        let slotTipHtml = `<div class="nsdg-tip-title">[${parseInt(ent.slot)}] ${e((ent.state || '').toUpperCase())}</div>`;
+        let slotTipHtml = `<div class="nsdg-tip-title">[${parseInt(ent.slot)}] ${e((ent.state || 'null').toUpperCase())}</div>`;
         slotTipHtml += `<div class="nsdg-tip-row"><span class="nsdg-tip-lbl">Label</span><span class="nsdg-tip-val">${e(ent.label || `slot ${ent.slot}`)}</span></div>`;
         if (ent.flags !== undefined && ent.flags !== null) {
             const _fb = ent.flags >>> 0;
@@ -4904,9 +4915,9 @@ function _buildNsDepGraph(nsMeta, lump) {
         _nsdgTooltipData[slotTipKey] = { html: slotTipHtml };
 
         svg += `<g onmouseenter="showNsdgTooltip(event,'${slotTipKey}')" onmouseleave="hideNsdgTooltip()">`;
-        svg += `<rect x="${slotX}" y="${rowCY - SLOT_H / 2}" width="${SLOT_W}" height="${SLOT_H}" rx="4" fill="#081828" stroke="${stateCol}" stroke-width="1.2"/>`;
-        svg += `<text x="${slotX + 6}" y="${rowCY - 5}" font-size="7" font-weight="bold" fill="${stateCol}" font-family="monospace">[${parseInt(ent.slot)}] ${e((ent.state || '').toUpperCase())}</text>`;
-        svg += `<text x="${slotX + 6}" y="${rowCY + 8}" font-size="9" fill="#dde8f0" font-family="monospace">${e(slotLabel)}</text>`;
+        svg += `<rect x="${slotX}" y="${rowCY - SLOT_H / 2}" width="${SLOT_W}" height="${SLOT_H}" rx="4" fill="${slotBodyCol}" stroke="${stateCol}" stroke-width="${isNullSlot ? '0.6' : '1.2'}" stroke-dasharray="${isNullSlot ? '3 2' : 'none'}"/>`;
+        svg += `<text x="${slotX + 6}" y="${rowCY - 5}" font-size="7" font-weight="bold" fill="${slotTextCol}" font-family="monospace" opacity="${isNullSlot ? '0.5' : '1'}">[${parseInt(ent.slot)}] ${e((ent.state || 'null').toUpperCase())}</text>`;
+        svg += `<text x="${slotX + 6}" y="${rowCY + 8}" font-size="9" fill="${isNullSlot ? '#3a3a5a' : '#dde8f0'}" font-family="monospace" opacity="${isNullSlot ? '0.5' : '1'}">${e(slotLabel)}</text>`;
         svg += `</g>`;
 
         const isOutform = ent.state === 'outform';
@@ -4973,8 +4984,187 @@ function _buildNsDepGraph(nsMeta, lump) {
 
     const legY = svgH - 6;
     svg += `<text x="8" y="${legY}" font-size="7" fill="#4a6a6a" font-family="monospace">bundled/live &#9632;  outform &#9670;  click a lump node to navigate</text>`;
-    svg += `</svg>`;
-    return svg;
+    svg += `</g></svg>`;
+    return { svg, nullCount: nullEntries.length };
+}
+
+const _nsdgState = {};
+
+function _initNsDepGraphPanZoom(wrapId) {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    const svg = wrap.querySelector('svg.ns-dep-graph-svg');
+    if (!svg) return;
+    const inner = svg.querySelector('g.nsdg-inner');
+    if (!inner) return;
+
+    const st = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0, pinchDist: 0 };
+    _nsdgState[wrapId] = st;
+
+    function applyTransform() {
+        inner.setAttribute('transform', `translate(${st.tx},${st.ty}) scale(${st.scale})`);
+    }
+
+    function clampTranslate() {
+        const svgW = parseFloat(svg.getAttribute('viewBox').split(' ')[2]) || 660;
+        const svgH = parseFloat(svg.getAttribute('viewBox').split(' ')[3]) || 300;
+        const maxTx = svgW * (st.scale - 1) * 0.8;
+        const maxTy = svgH * (st.scale - 1) * 0.8;
+        if (st.scale <= 1) { st.tx = 0; st.ty = 0; return; }
+        st.tx = Math.max(-maxTx, Math.min(maxTx, st.tx));
+        st.ty = Math.max(-maxTy, Math.min(maxTy, st.ty));
+    }
+
+    svg.addEventListener('wheel', ev => {
+        ev.preventDefault();
+        const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+        const svgW = vb[2], svgH = vb[3];
+        const mx = ((ev.clientX - rect.left) / rect.width) * svgW;
+        const my = ((ev.clientY - rect.top) / rect.height) * svgH;
+        const newScale = Math.max(0.25, Math.min(8, st.scale * factor));
+        st.tx = mx + newScale / st.scale * (st.tx - mx);
+        st.ty = my + newScale / st.scale * (st.ty - my);
+        st.scale = newScale;
+        clampTranslate();
+        applyTransform();
+    }, { passive: false });
+
+    svg.addEventListener('mousedown', ev => {
+        if (ev.button !== 0) return;
+        st.dragging = true;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+        const scaleX = vb[2] / rect.width;
+        const scaleY = vb[3] / rect.height;
+        st.startX = ev.clientX * scaleX;
+        st.startY = ev.clientY * scaleY;
+        st.startTx = st.tx;
+        st.startTy = st.ty;
+        svg.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', ev => {
+        if (!st.dragging) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+        const scaleX = vb[2] / rect.width;
+        const scaleY = vb[3] / rect.height;
+        st.tx = st.startTx + (ev.clientX * scaleX - st.startX);
+        st.ty = st.startTy + (ev.clientY * scaleY - st.startY);
+        clampTranslate();
+        applyTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (st.dragging) { st.dragging = false; svg.style.cursor = ''; }
+    });
+
+    svg.addEventListener('touchstart', ev => {
+        if (ev.touches.length === 2) {
+            const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+            const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+            st.pinchDist = Math.hypot(dx, dy);
+        } else if (ev.touches.length === 1) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+            st.dragging = true;
+            st.startX = ev.touches[0].clientX * (vb[2] / rect.width);
+            st.startY = ev.touches[0].clientY * (vb[3] / rect.height);
+            st.startTx = st.tx; st.startTy = st.ty;
+        }
+    }, { passive: true });
+
+    svg.addEventListener('touchmove', ev => {
+        ev.preventDefault();
+        if (ev.touches.length === 2) {
+            const dx = ev.touches[0].clientX - ev.touches[1].clientX;
+            const dy = ev.touches[0].clientY - ev.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            if (st.pinchDist > 0) {
+                const factor = dist / st.pinchDist;
+                st.scale = Math.max(0.25, Math.min(8, st.scale * factor));
+                clampTranslate();
+                applyTransform();
+            }
+            st.pinchDist = dist;
+        } else if (ev.touches.length === 1 && st.dragging) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+            st.tx = st.startTx + (ev.touches[0].clientX * (vb[2] / rect.width) - st.startX);
+            st.ty = st.startTy + (ev.touches[0].clientY * (vb[3] / rect.height) - st.startY);
+            clampTranslate();
+            applyTransform();
+        }
+    }, { passive: false });
+
+    svg.addEventListener('touchend', () => { st.dragging = false; st.pinchDist = 0; });
+    svg.style.cursor = 'grab';
+}
+
+function _nsdgZoom(wrapId, factor) {
+    const st = _nsdgState[wrapId];
+    const wrap = document.getElementById(wrapId);
+    if (!st || !wrap) return;
+    const svg = wrap.querySelector('svg.ns-dep-graph-svg');
+    const inner = svg && svg.querySelector('g.nsdg-inner');
+    if (!inner) return;
+    const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+    const cx = vb[2] / 2, cy = vb[3] / 2;
+    const newScale = Math.max(0.25, Math.min(8, st.scale * factor));
+    st.tx = cx + newScale / st.scale * (st.tx - cx);
+    st.ty = cy + newScale / st.scale * (st.ty - cy);
+    st.scale = newScale;
+    const maxT = Math.max(vb[2], vb[3]) * (st.scale - 1) * 0.8;
+    if (st.scale <= 1) { st.tx = 0; st.ty = 0; } else {
+        st.tx = Math.max(-maxT, Math.min(maxT, st.tx));
+        st.ty = Math.max(-maxT, Math.min(maxT, st.ty));
+    }
+    inner.setAttribute('transform', `translate(${st.tx},${st.ty}) scale(${st.scale})`);
+}
+
+function _nsdgReset(wrapId) {
+    const st = _nsdgState[wrapId];
+    const wrap = document.getElementById(wrapId);
+    if (!st || !wrap) return;
+    const svg = wrap.querySelector('svg.ns-dep-graph-svg');
+    const inner = svg && svg.querySelector('g.nsdg-inner');
+    if (!inner) return;
+    st.scale = 1; st.tx = 0; st.ty = 0;
+    inner.setAttribute('transform', '');
+}
+
+function _nsdgToggleNull(tk) {
+    const btn = document.getElementById(`nsdg-null-btn-${tk}`);
+    const wrapId = `nsdg-wrap-${tk}`;
+    const wrap = document.getElementById(wrapId);
+    if (!wrap || !btn) return;
+
+    const lump = _lumpsCache.find(l => l.token === tk || l.token.replace(/[^a-z0-9]/gi, '') === tk);
+    if (!lump) return;
+    const nsMeta = lump.namespace_meta || {};
+
+    const showing = btn.dataset.showingNull === '1';
+    const result = _buildNsDepGraph(nsMeta, lump, !showing);
+
+    delete _nsdgState[wrapId];
+    if (result) {
+        wrap.innerHTML = result.svg;
+        _initNsDepGraphPanZoom(wrapId);
+    } else {
+        const allEntries = nsMeta.entries || [];
+        const nullCount = allEntries.filter(e => !e.state || e.state === 'null').length;
+        wrap.innerHTML = '';
+        wrap.style.cssText = 'min-height:2.5rem;display:flex;align-items:center;padding:0.5rem 0.75rem;color:#4a4a6a;font-size:0.78rem;';
+        wrap.textContent = `All ${nullCount} slot${nullCount !== 1 ? 's are' : ' is'} empty \u2014 click to reveal`;
+    }
+
+    btn.dataset.showingNull = showing ? '0' : '1';
+    const nc = parseInt(btn.dataset.nullCount) || 0;
+    btn.textContent = showing
+        ? `Show ${nc} null slot${nc !== 1 ? 's' : ''}`
+        : `Hide null slots`;
 }
 
 function showNsdgTooltip(evt, key) {
@@ -5054,11 +5244,31 @@ function showLumpDetail(token) {
         html += '</tbody></table>';
         html += '</div>';
 
-        const graphSvg = _buildNsDepGraph(nsMeta, lump);
-        if (graphSvg) {
+        const _graphTk = _tk;
+        const _nsAllEntries = nsMeta.entries || [];
+        const _nsNullCount = _nsAllEntries.filter(ent => !ent.state || ent.state === 'null').length;
+        const _nsActiveCount = _nsAllEntries.length - _nsNullCount;
+        const graphResult = _buildNsDepGraph(nsMeta, lump, false);
+        if (graphResult || (_nsNullCount > 0 && _nsActiveCount === 0)) {
+            const wrapId = `nsdg-wrap-${_graphTk}`;
             html += '<div class="lump-detail-section">';
             html += '<div class="lump-section-title">Dependency Graph</div>';
-            html += '<div class="ns-dep-graph-wrap">' + graphSvg + '</div>';
+            html += `<div class="ns-dep-graph-toolbar">`;
+            if (graphResult) {
+                html += `<button class="ns-dep-graph-btn" onclick="_nsdgZoom('${wrapId}', 1.25)" title="Zoom in">+</button>`;
+                html += `<button class="ns-dep-graph-btn" onclick="_nsdgZoom('${wrapId}', 0.8)" title="Zoom out">\u2212</button>`;
+                html += `<button class="ns-dep-graph-btn" onclick="_nsdgReset('${wrapId}')" title="Reset zoom">\u21ba</button>`;
+            }
+            const nullCount = graphResult ? graphResult.nullCount : _nsNullCount;
+            if (nullCount > 0) {
+                html += `<button class="ns-dep-graph-btn ns-dep-graph-null-btn" id="nsdg-null-btn-${_graphTk}" data-null-count="${nullCount}" onclick="_nsdgToggleNull('${_graphTk}')" title="Show/hide empty slots">Show ${nullCount} null slot${nullCount !== 1 ? 's' : ''}</button>`;
+            }
+            html += `</div>`;
+            if (graphResult) {
+                html += `<div class="ns-dep-graph-wrap" id="${wrapId}">${graphResult.svg}</div>`;
+            } else {
+                html += `<div class="ns-dep-graph-wrap" id="${wrapId}" style="min-height:2.5rem;display:flex;align-items:center;padding:0.5rem 0.75rem;color:#4a4a6a;font-size:0.78rem;">All ${nullCount} slot${nullCount !== 1 ? 's are' : ' is'} empty \u2014 click to reveal</div>`;
+            }
             html += '</div>';
         }
 
@@ -5198,6 +5408,8 @@ function showLumpDetail(token) {
     const delBtn = contentEl.querySelector('.lump-delete-btn[data-delete-token]');
     if (delBtn) delBtn.addEventListener('click', () => deleteLump(delBtn.dataset.deleteToken));
     _lumpActiveTab[_tk] = 'overview';
+    const nsdgWrap = contentEl.querySelector('.ns-dep-graph-wrap[id]');
+    if (nsdgWrap) _initNsDepGraphPanZoom(nsdgWrap.id);
 }
 
 async function _fetchAndShowLumpBinary(token, lump) {

@@ -6324,12 +6324,45 @@ a.next-step-link:hover {
     margin-top: 0.4rem;
 }
 
+.ns-dep-graph-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.3rem;
+}
+
+.ns-dep-graph-btn {
+    font-size: 0.72rem;
+    font-family: monospace;
+    padding: 0.18rem 0.5rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(100, 160, 255, 0.22);
+    border-radius: 4px;
+    color: var(--text-secondary, #9ca3af);
+    cursor: pointer;
+    line-height: 1;
+    transition: background 0.12s, color 0.12s;
+}
+
+.ns-dep-graph-btn:hover {
+    background: rgba(100, 160, 255, 0.14);
+    color: var(--text-primary, #e5e7eb);
+}
+
+.ns-dep-graph-null-btn {
+    margin-left: 0.4rem;
+    color: #7a7a9a;
+    font-size: 0.68rem;
+}
+
 .ns-dep-graph-wrap {
-    overflow-x: auto;
+    overflow: hidden;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 6px;
     border: 1px solid rgba(100, 160, 255, 0.10);
     padding: 4px 2px;
+    max-height: 420px;
+    position: relative;
 }
 
 .ns-dep-graph-svg {
@@ -6337,6 +6370,11 @@ a.next-step-link:hover {
     width: 100%;
     max-width: 660px;
     height: auto;
+    cursor: grab;
+}
+
+.ns-dep-graph-svg:active {
+    cursor: grabbing;
 }
 
 .ns-dep-graph-svg text {
