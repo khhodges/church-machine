@@ -4,45 +4,46 @@
     "abstraction": "Constants",
     "ns_slot": 18,
     "lump_size": 64,
-    "cw": 27,
+    "cw": 5,
+    "dw": 5,
     "cc": 0,
     "methods": [
       {
         "name": "Pi",
         "offset": 0,
-        "length": 7,
+        "length": 1,
         "pet_names": {
           "DR": {}
         }
       },
       {
         "name": "E",
-        "offset": 7,
-        "length": 7,
+        "offset": 1,
+        "length": 1,
         "pet_names": {
           "DR": {}
         }
       },
       {
         "name": "Phi",
-        "offset": 14,
-        "length": 7,
+        "offset": 2,
+        "length": 1,
         "pet_names": {
           "DR": {}
         }
       },
       {
         "name": "Zero",
-        "offset": 21,
-        "length": 2,
+        "offset": 3,
+        "length": 1,
         "pet_names": {
           "DR": {}
         }
       },
       {
         "name": "One",
-        "offset": 23,
-        "length": 4,
+        "offset": 4,
+        "length": 1,
         "pet_names": {
           "DR": {}
         }
@@ -50,6 +51,14 @@
     ],
     "grants": [
       "E"
+    ],
+    "data_offset": 6,
+    "data_word_names": [
+      "Pi",
+      "E",
+      "Phi",
+      "Zero",
+      "One"
     ]
   },
   {
@@ -58,6 +67,7 @@
     "ns_slot": 12,
     "lump_size": 256,
     "cw": 144,
+    "dw": 0,
     "cc": 0,
     "methods": [
       {
@@ -91,6 +101,7 @@
     "ns_slot": 16,
     "lump_size": 4096,
     "cw": 2602,
+    "dw": 0,
     "cc": 1,
     "methods": [
       {
@@ -214,6 +225,7 @@
     "ns_slot": 16,
     "lump_size": 256,
     "cw": 137,
+    "dw": 0,
     "cc": 1,
     "methods": [
       {
@@ -277,6 +289,7 @@
     "ns_slot": null,
     "lump_size": 512,
     "cw": 281,
+    "dw": 0,
     "cc": 0,
     "methods": [
       {

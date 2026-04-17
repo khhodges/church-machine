@@ -197,6 +197,12 @@ class ChurchSimulator {
             offset += code.length;
         }
 
+        const dataWords = bootUpload.data_words || [];
+        for (let i = 0; i < dataWords.length; i++) {
+            this.memory[loc + offset + i] = dataWords[i] >>> 0;
+        }
+        const totalDataWords = dataWords.length;
+
         const oldHdr = this.parseLumpHeader(this.memory[loc]);
         const cc = oldHdr.valid ? oldHdr.cc : (bootUpload.capabilities || []).length;
         const nMinus6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
@@ -204,7 +210,8 @@ class ChurchSimulator {
 
         entry.loaded = true;
         entry.loadCount = (entry.loadCount || 0) + 1;
-        this.output += `[LOADER] ${label} code installed at 0x${loc.toString(16)} (${lumpSize} words, ${totalCodeWords} code words, load #${entry.loadCount}) — GT preserved\n`;
+        const dataNote = totalDataWords > 0 ? `, ${totalDataWords} data words` : '';
+        this.output += `[LOADER] ${label} code installed at 0x${loc.toString(16)} (${lumpSize} words, ${totalCodeWords} code words${dataNote}, load #${entry.loadCount}) — GT preserved\n`;
 
         this.auditLog.push({
             gate: 'Loader.Load',

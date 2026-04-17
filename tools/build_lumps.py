@@ -114,6 +114,16 @@ def build_lump(payload, verbose=False):
     capabilities = payload.get('capabilities', [])
     cc = len(capabilities)
 
+    raw_dw = payload.get('data_words', [])
+    data_words = []
+    for item in raw_dw:
+        if isinstance(item, str):
+            data_words.append(int(item, 16))
+        else:
+            data_words.append(int(item) & 0xFFFFFFFF)
+    dw = len(data_words)
+    data_word_names = payload.get('data_word_names', [])
+
     all_code          = []
     method_table      = []
     canonical_offsets = {}   # method name -> code-region offset, for aliasOf resolution
@@ -162,15 +172,15 @@ def build_lump(payload, verbose=False):
             method_table.append(entry)
 
     cw = len(all_code)
-    lump_size = next_pow2_ge64(1 + cw + cc)
+    lump_size = next_pow2_ge64(1 + cw + dw + cc)
 
-    if cw + cc >= lump_size:
+    if cw + dw + cc >= lump_size:
         raise ValueError(
-            f'{name}: cw={cw} + cc={cc} >= lump_size={lump_size} — too large')
+            f'{name}: cw={cw} + dw={dw} + cc={cc} >= lump_size={lump_size} — too large')
 
     header = pack_lump_header(cw, cc, typ=0, lump_size=lump_size)
 
-    words_out = [header] + all_code
+    words_out = [header] + all_code + data_words
     binary = words_to_binary(words_out, lump_size)
 
     manifest_entry = {
@@ -179,10 +189,14 @@ def build_lump(payload, verbose=False):
         'ns_slot'    : payload.get('ns_slot'),
         'lump_size'  : lump_size,
         'cw'         : cw,
+        'dw'         : dw,
         'cc'         : cc,
         'methods'    : method_table,
         'grants'     : payload.get('grants', []),
     }
+    if dw > 0:
+        manifest_entry['data_offset'] = 1 + cw
+        manifest_entry['data_word_names'] = data_word_names
 
     if verbose:
         print(f'  {name:<20} token={token8}  lump_size={lump_size:4d}  '

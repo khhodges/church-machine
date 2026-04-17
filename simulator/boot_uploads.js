@@ -332,12 +332,19 @@ const BOOT_UPLOADS = [
         index: 18,
         grants: ['E'],
         capabilities: [],
+        data_words: [
+            0x40490FDB,
+            0x402DF854,
+            0x3FCF1BBD,
+            0x00000000,
+            0x3F800000
+        ],
         methods: [
-            { name: 'Pi',   code: [0x87000000, 0x7f004404, 0x9700400e, 0x7f00643f, 0x97004006, 0x7f00401b, 0x1f000000] },
-            { name: 'E',    code: [0x87000000, 0x7f004402, 0x9700400e, 0x7f0077e1, 0x97004006, 0x7f004014, 0x1f000000] },
-            { name: 'Phi',  code: [0x87000000, 0x7f0043fc, 0x9700400e, 0x7f007c6e, 0x97004006, 0x7f00403d, 0x1f000000] },
-            { name: 'Zero', code: [0x87000000, 0x1f000000] },
-            { name: 'One',  code: [0x87000000, 0x7f004fe0, 0x97004012, 0x1f000000] }
+            { name: 'Pi',   code: [0x1f000000] },
+            { name: 'E',    code: [0x1f000000] },
+            { name: 'Phi',  code: [0x1f000000] },
+            { name: 'Zero', code: [0x1f000000] },
+            { name: 'One',  code: [0x1f000000] }
         ]
     }
 ];

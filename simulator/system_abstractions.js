@@ -1555,36 +1555,27 @@ class SystemAbstractions {
     }
 
     _bindConstants() {
-        const buf = new ArrayBuffer(4);
-        const f32 = new Float32Array(buf);
-        const u32 = new Uint32Array(buf);
-        const toIEEE754 = (v) => { f32[0] = v; return u32[0]; };
+        const NS_SLOT = 18;
+        const DATA_NAMES   = ['Pi', 'E', 'Phi', 'Zero', 'One'];
+        const DATA_SYMBOLS = ['\u03c0', 'e', '\u03c6', '0.0', '1.0'];
+        const DATA_APPROX  = [Math.PI, Math.E, (1 + Math.sqrt(5)) / 2, 0, 1.0];
 
-        const PI_BITS  = toIEEE754(Math.PI);
-        const E_BITS   = toIEEE754(Math.E);
-        const PHI_BITS = toIEEE754((1 + Math.sqrt(5)) / 2);
-        const ZERO_BITS = 0x00000000;
-        const ONE_BITS  = toIEEE754(1.0);
-
-        this.registry.bindMethod(18, 'Pi', function(sim, args) {
-            return { ok: true, result: PI_BITS, message: `Constants.Pi() = 0x${PI_BITS.toString(16).toUpperCase().padStart(8, '0')} (\u03c0 \u2248 ${Math.PI.toFixed(6)})` };
-        });
-
-        this.registry.bindMethod(18, 'E', function(sim, args) {
-            return { ok: true, result: E_BITS, message: `Constants.E() = 0x${E_BITS.toString(16).toUpperCase().padStart(8, '0')} (e \u2248 ${Math.E.toFixed(6)})` };
-        });
-
-        this.registry.bindMethod(18, 'Phi', function(sim, args) {
-            const phi = (1 + Math.sqrt(5)) / 2;
-            return { ok: true, result: PHI_BITS, message: `Constants.Phi() = 0x${PHI_BITS.toString(16).toUpperCase().padStart(8, '0')} (\u03c6 \u2248 ${phi.toFixed(6)})` };
-        });
-
-        this.registry.bindMethod(18, 'Zero', function(sim, args) {
-            return { ok: true, result: ZERO_BITS, message: `Constants.Zero() = 0x00000000 (0.0)` };
-        });
-
-        this.registry.bindMethod(18, 'One', function(sim, args) {
-            return { ok: true, result: ONE_BITS, message: `Constants.One() = 0x${ONE_BITS.toString(16).toUpperCase().padStart(8, '0')} (1.0)` };
+        DATA_NAMES.forEach((name, idx) => {
+            const sym   = DATA_SYMBOLS[idx];
+            const approx = DATA_APPROX[idx];
+            this.registry.bindMethod(NS_SLOT, name, function(sim, args) {
+                const nsBase  = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
+                const lumpBase = sim.memory[nsBase];
+                const hdr     = sim.parseLumpHeader(sim.memory[lumpBase]);
+                const dataBase = hdr.valid ? (lumpBase + 1 + hdr.cw) : -1;
+                const val = (dataBase >= 0) ? (sim.memory[dataBase + idx] >>> 0) : 0;
+                const hex = val.toString(16).toUpperCase().padStart(8, '0');
+                return {
+                    ok: true,
+                    result: val,
+                    message: `Constants.${name}() = 0x${hex} (${sym} \u2248 ${approx.toFixed(6)})`
+                };
+            });
         });
     }
 }
