@@ -449,7 +449,7 @@
                         <div class="ham-wrap" id="lumpsActionsWrap">
                             <button class="btn ham-btn" id="lumpsActionsBtn" onclick="toggleLumpsActions()" data-tooltip="Actions — Namespace · Refresh">&#9776;</button>
                             <div class="ham-dropdown lumps-actions-dropdown" id="lumpsActionsDropdown" style="display:none;">
-                                <button class="ham-item" onclick="showNamespaceBuilder();closeLumpsActions()">+ Namespace</button>
+                                <button class="ham-item" onclick="showLumpTypeSelector();closeLumpsActions()">+ LUMP</button>
                                 <button class="ham-item" onclick="renderLumps();closeLumpsActions()">Refresh</button>
                             </div>
                         </div>
@@ -1250,6 +1250,41 @@
     <script async src="english_string_tutorial.js"></script>
     <script async src="builder.js"></script>
     <script src="app.js"></script>
+<div id="lumpTypeSelectorModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeLumpTypeSelector()">
+    <div class="modal-dialog lump-type-selector-dialog">
+        <div class="modal-title">Add LUMP — Choose Type</div>
+        <div class="lump-type-grid">
+            <button class="lump-type-card" onclick="selectLumpType('code')">
+                <span class="lump-type-icon">⚙</span>
+                <span class="lump-type-name">Code</span>
+                <span class="lump-type-desc">Abstraction with methods — built from the editor via Build LUMP</span>
+            </button>
+            <button class="lump-type-card" onclick="selectLumpType('data')">
+                <span class="lump-type-icon">▦</span>
+                <span class="lump-type-name">Data</span>
+                <span class="lump-type-desc">Raw data block — constants, tables, packed strings (typ=01)</span>
+            </button>
+            <button class="lump-type-card" onclick="selectLumpType('thread')">
+                <span class="lump-type-icon">⇄</span>
+                <span class="lump-type-name">Thread</span>
+                <span class="lump-type-desc">Concurrent thread instance with its own c-list (typ=10)</span>
+            </button>
+            <button class="lump-type-card" onclick="selectLumpType('outform')">
+                <span class="lump-type-icon">↗</span>
+                <span class="lump-type-name">Outform</span>
+                <span class="lump-type-desc">Remote outform reference — capability to a far abstraction (typ=11)</span>
+            </button>
+            <button class="lump-type-card lump-type-card-ns" onclick="selectLumpType('namespace')">
+                <span class="lump-type-icon">⊞</span>
+                <span class="lump-type-name">Namespace</span>
+                <span class="lump-type-desc">Capability namespace table — maps slots to lumps with locators</span>
+            </button>
+        </div>
+        <div class="lump-type-cancel-row">
+            <button class="btn" onclick="closeLumpTypeSelector()">Cancel</button>
+        </div>
+    </div>
+</div>
 <div id="zone-data-popup" onmouseenter="cancelHideZonePopup()" onmouseleave="hideZonePopup()"></div>
 <div id="cr-hover-popup" onmouseenter="cancelHideCRPopup()" onmouseleave="hideCRPopup()"></div>
 <div id="version-tag"></div>

@@ -486,6 +486,46 @@ function closeLumpsActions() {
     if (dd) dd.style.display = 'none';
 }
 
+function showLumpTypeSelector() {
+    const m = document.getElementById('lumpTypeSelectorModal');
+    if (m) m.style.display = 'flex';
+}
+
+function closeLumpTypeSelector() {
+    const m = document.getElementById('lumpTypeSelectorModal');
+    if (m) m.style.display = 'none';
+}
+
+function selectLumpType(type) {
+    closeLumpTypeSelector();
+
+    const titleEl = document.getElementById('lumpsDetailTitle');
+    const contentEl = document.getElementById('lumpsDetailContent');
+    const listEl = document.getElementById('lumpsListContent');
+
+    if (type === 'namespace') {
+        showNamespaceBuilder();
+        return;
+    }
+
+    _selectedLumpToken = null;
+    if (listEl) listEl.querySelectorAll('.lump-item').forEach(el => el.classList.remove('active'));
+
+    const labels = { code: 'Code Lump (typ=00)', data: 'Data Lump (typ=01)', thread: 'Thread Lump (typ=10)', outform: 'Outform Lump (typ=11)' };
+    const notes = {
+        code:    'Code lumps contain abstraction methods and are built from CLOOMC++ or Assembly source in the Editor. Use <strong>Build LUMP ↓</strong> in the Editor toolbar to compile and download a deployable .lump binary.',
+        data:    'Data lumps store raw word arrays — constants, lookup tables, Pack4-encoded strings, or binary blobs. Data lump authoring via the IDE is coming in a future release.',
+        thread:  'Thread lumps encapsulate a concurrent thread instance with its own capability c-list. Thread authoring via the IDE is coming in a future release.',
+        outform: 'Outform lumps represent remote capability references to abstractions on other nodes. Outform authoring via the IDE is coming in a future release.',
+    };
+
+    if (titleEl) titleEl.textContent = `New ${labels[type] || type}`;
+    if (contentEl) contentEl.innerHTML = `<div class="lumps-placeholder" style="text-align:left;padding:1.5rem 1rem;">
+        <div style="font-size:0.95rem;font-weight:600;color:var(--church-gold);margin-bottom:0.6rem;">${labels[type] || type}</div>
+        <div style="font-size:0.82rem;line-height:1.65;color:var(--text-secondary);">${notes[type] || ''}</div>
+    </div>`;
+}
+
 let _viewLocked = false;
 function switchView(viewId) {
     if (_viewLocked) return;

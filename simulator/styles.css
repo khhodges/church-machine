@@ -6156,6 +6156,73 @@ a.next-step-link:hover {
     cursor: not-allowed;
 }
 
+.lump-type-selector-dialog {
+    max-width: 560px;
+    width: 100%;
+}
+
+.lump-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.lump-type-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.8rem 0.9rem;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.lump-type-card:hover {
+    border-color: var(--church-gold);
+    background: rgba(200,155,60,0.07);
+}
+
+.lump-type-card-ns {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.lump-type-card-ns .lump-type-desc {
+    flex: 1;
+}
+
+.lump-type-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--church-gold);
+}
+
+.lump-type-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+}
+
+.lump-type-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.lump-type-cancel-row {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.25rem;
+}
+
 @media (max-width: 768px) {
     header {
         flex-wrap: wrap;
