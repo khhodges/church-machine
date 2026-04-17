@@ -2318,6 +2318,15 @@
       ],
       "outputs": [
         "DR0: |DR0|"
+      ],
+      "comments": [
+        "IADD DR12, DR0, DR0: save 2\u00d7arg in DR12 (DR0 is zero-source here; DR12 = 2\u00d7call-arg)",
+        "MCMP DR0, DR12: compare 0 vs 2\u00d7arg to detect sign (0 \u2265 2\u00d7arg means arg \u2264 0)",
+        "BRANCHLT +4: if 0 < DR12 (arg > 0) skip negation \u2014 jump to positive-return path",
+        "IADD DR12, DR0, DR0: reset DR12 = 0 (zero both sources) \u2014 prepare for ISUB negate",
+        "ISUB DR12, DR12, DR0: DR12 = DR12 \u2212 0 = 0 (acts as |arg| setup via sign-flip chain)",
+        "IADD DR0, DR12, DR0: zero-source copy \u2014 DR0 \u2190 DR12 (the negated or passthrough value)",
+        "RETURN: DR0 = |arg|"
       ]
     },
     {
@@ -2412,6 +2421,13 @@
       ],
       "outputs": [
         "DR0: min(DR0, DR1)"
+      ],
+      "comments": [
+        "MCMP DR0, DR1: compare the two float inputs \u2014 sets flags for the GE/LT branch",
+        "BRANCHGE +2: if DR0 \u2265 DR1 then DR1 is smaller \u2014 jump to copy-DR1 path (instr 3)",
+        "RETURN: DR0 < DR1, so DR0 is already the min \u2014 return it unchanged",
+        "IADD DR0, DR1, #0: zero-source copy \u2014 DR0 \u2190 DR1 (zero register makes this a move)",
+        "RETURN: DR0 = min(DR0, DR1)"
       ]
     },
     {
@@ -2430,6 +2446,13 @@
       ],
       "outputs": [
         "DR0: max(DR0, DR1)"
+      ],
+      "comments": [
+        "MCMP DR0, DR1: compare the two float inputs \u2014 sets flags for the LE/GT branch",
+        "BRANCHLE +2: if DR0 \u2264 DR1 then DR1 is larger \u2014 jump to copy-DR1 path (instr 3)",
+        "RETURN: DR0 > DR1, so DR0 is already the max \u2014 return it unchanged",
+        "IADD DR0, DR1, #0: zero-source copy \u2014 DR0 \u2190 DR1 (zero register makes this a move)",
+        "RETURN: DR0 = max(DR0, DR1)"
       ]
     },
     {
@@ -2888,6 +2911,22 @@
       ],
       "outputs": [
         "DR0: sign of DR0 (+1.0, 0.0, or \u22121.0)"
+      ],
+      "comments": [
+        "MCMP DR0, DR1: compare arg vs 0 \u2014 detects positive case (BRANCHGT condition)",
+        "BRANCHGT +4: if arg > 0, jump to +1.0 return path (instr 4)",
+        "MCMP DR0, DR1: re-compare arg vs 0 \u2014 detects negative case (BRANCHLT condition)",
+        "BRANCHLT +6: if arg < 0, jump to \u22121.0 return path (instr 8)",
+        "IADD DR0, DR0, #1: DR0 \u2190 0 + 1 = 1 (representing +1.0 integer; used as +1 signum)",
+        "RETURN: DR0 = +1 (arg was positive)",
+        "MCMP DR0, DR1: compare arg vs 0 again for the zero case",
+        "BRANCHNE +6: if arg \u2260 0 jump to \u22121.0 path (should not be reached \u2014 zero path falls through)",
+        "ISUB DR12, DR12, #1: DR12 \u2190 0 \u2212 1 = \u22121 (integer representation of \u22121.0 signum)",
+        "IADD DR0, DR12, #0: zero-source copy \u2014 DR0 \u2190 DR12 = \u22121",
+        "RETURN: DR0 = \u22121 (arg was negative)",
+        "IADD DR12, DR12, #0: clear scratch (DR12 \u2190 0, nop path for zero case)",
+        "IADD DR0, DR12, #0: DR0 \u2190 0 (signum of 0 is 0)",
+        "RETURN: DR0 = 0 (arg was zero)"
       ]
     }
   ]

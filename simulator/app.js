@@ -5910,7 +5910,6 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     const methodDRPetNames = {};  // method name → { drNum: "label" }
     const topLevelDR = ((lump.pet_names || {}).DR) || {};
     for (const m of methods) {
-        if (!m.code) continue;
         const own = ((m.pet_names || {}).DR) || {};
         if (Object.keys(own).length > 0) {
             const numMap = {};
@@ -5936,7 +5935,11 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     const autoDetected = methods.length === 0;
     if (!autoDetected) {
         for (const m of methods) {
-            if (!m.code) continue;
+            // Manifest methods have numeric `offset`; source-JSON methods have `code`.
+            // Both are valid — key on offset when present, otherwise skip.
+            const hasOffset = m.offset !== undefined && m.offset !== null;
+            const hasCode   = Array.isArray(m.code) || typeof m.code === 'string';
+            if (!hasOffset && !hasCode) continue;
             const wi = 1 + (parseInt(m.offset) || 0);
             mb[wi]    = m.name;
             mbObj[wi] = m;
