@@ -6106,7 +6106,9 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                     `<span class="lump-clist-name">${stateSpan}</span>` +
                     `</div>`;
         }
-        html += `<div class="lump-clist-row" style="font-size:0.7rem;color:var(--text-secondary,#888);padding:2px 4px">bitmap 0x${bitmap.toString(16).toUpperCase().padStart(4,'0')} \u2022 ${(bitmap === 0 ? 'all free' : `${poolSize - (poolSize - bitmap.toString(2).split('1').length + 1)}/${poolSize} free`)} </div>`;
+        const occupiedCount = bitmap === 0 ? 0 : bitmap.toString(2).split('').filter(b => b === '1').length;
+        const freeCount = poolSize - occupiedCount;
+        html += `<div class="lump-clist-row" style="font-size:0.7rem;color:var(--text-secondary,#888);padding:2px 4px">bitmap 0x${bitmap.toString(16).toUpperCase().padStart(4,'0')} \u2022 ${freeCount}/${poolSize} free</div>`;
         html += '</div></div>';
     }
 

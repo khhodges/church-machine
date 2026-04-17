@@ -1622,8 +1622,9 @@ class SystemAbstractions {
                 return { ok: false, fault: 'FAULT', message: `Constants.Add: NS[${poolNsSlot}] not initialised` };
             }
 
-            // Construct a read-only Abstract GT pointing to this pool slot
-            const abstractGT = sim.createGT(0, poolNsSlot, { R:1, W:0, X:0, L:0, S:0, E:0 }, 1);
+            // Construct a read-only Abstract GT (type=3) pointing to this pool slot.
+            // type=3 signals that this capability is a sealed value token, not a code lump.
+            const abstractGT = sim.createGT(0, poolNsSlot, { R:1, W:0, X:0, L:0, S:0, E:0 }, 3);
 
             // Write GT directly into CR0 (no DR side-effect; result.result left undefined)
             sim.cr[0] = {
