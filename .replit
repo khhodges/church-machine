@@ -40,7 +40,7 @@ localPort = 5904
 externalPort = 3000
 
 [deployment]
-deploymentTarget = "vm"
+deploymentTarget = "autoscale"
 run = ["gunicorn", "-c", "gunicorn_config.py", "server.app:app"]
 build = ["pip", "install", "-r", "requirements.txt"]
 
