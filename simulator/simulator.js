@@ -208,17 +208,16 @@ class ChurchSimulator {
         const nMinus6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
         this.memory[loc] = this.packLumpHeader(nMinus6, totalCodeWords, cc, 0);
 
-        // ── C-list GT setup for computed capabilities ─────────────────────────────
-        // Some capability types carry GTs whose values depend on the runtime lump
-        // base address.  We write them into the lump's c-list words here, right
-        // after the lump header has been committed to memory.
+        // ── C-list GT setup for self-data-R capability ───────────────────────────
+        // self-data-R GTs depend on the runtime lump base address, so they cannot
+        // be pre-computed in the binary.  After the lump header is written we
+        // synthesise the GT here and store it at lumpBase + (lumpSize - cc + idx).
         //
-        // Convention: data-alias NS slots are allocated at 200 + ns_slot so that
-        // Constants (slot 18) gets its data alias at slot 218, etc.
+        // Convention: data-alias NS slots live at 200 + ns_slot, so Constants
+        // (slot 18) gets its data alias at NS slot 218, etc.
         if (cc > 0) {
             const capsList = bootUpload.capabilities || [];
             const selfDataRIdx = capsList.findIndex(c => c && c.type === 'self-data-R');
-            const codeRXIdx    = capsList.findIndex(c => c && c.type === 'code-RX');
 
             if (selfDataRIdx >= 0) {
                 const dataBase   = (loc + 1 + totalCodeWords) >>> 0;
@@ -229,14 +228,6 @@ class ChurchSimulator {
                 const dataGT = this.createGT(0, dataNsSlot, {R:1,W:0,X:0,L:0,S:0,E:0}, 1);
                 this.memory[(loc + lumpSize - cc + selfDataRIdx) >>> 0] = dataGT;
                 this.output += `[LOADER] ${label}: self-data-R → NS[${dataNsSlot}] base=0x${dataBase.toString(16).toUpperCase()} limit=${dataLimit} GT@lump+${lumpSize - cc + selfDataRIdx}\n`;
-            }
-
-            if (codeRXIdx >= 0) {
-                const codeNsEntry = this.readNSEntry(slotIndex);
-                const gt_seq = codeNsEntry ? ((codeNsEntry.word2_seals >>> 25) & 0x7F) : 0;
-                const codeGT = this.createGT(gt_seq, slotIndex, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-                this.memory[(loc + lumpSize - cc + codeRXIdx) >>> 0] = codeGT;
-                this.output += `[LOADER] ${label}: code-RX → NS[${slotIndex}] seq=${gt_seq} GT@lump+${lumpSize - cc + codeRXIdx}\n`;
             }
         }
 

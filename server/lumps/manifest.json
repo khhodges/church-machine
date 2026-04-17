@@ -6,7 +6,7 @@
     "lump_size": 64,
     "cw": 15,
     "dw": 5,
-    "cc": 2,
+    "cc": 1,
     "methods": [
       {
         "name": "Pi",
@@ -60,8 +60,7 @@
       "Zero",
       "One"
     ],
-    "self_data_r": true,
-    "code_rx": true
+    "self_data_r": true
   },
   {
     "token": "00000c00",
