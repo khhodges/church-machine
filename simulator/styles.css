@@ -6413,6 +6413,14 @@ a.next-step-link:hover {
     font-family: inherit;
     resize: vertical;
 }
+.lump-import-row select {
+    background: #1a1a2e;
+    color: #e0e0f0;
+}
+.lump-import-row select option {
+    background: #1a1a2e;
+    color: #e0e0f0;
+}
 .lump-import-row textarea { min-height: 80px; }
 .lump-import-img-pair { display: flex; gap: 0.5rem; }
 .lump-import-img-pair input { flex: 1; }

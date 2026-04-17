@@ -255,5 +255,17 @@
     "grants": [
       "E"
     ]
+  },
+  {
+    "token": "ab1e86af",
+    "abstraction": "WordString",
+    "ns_slot": null,
+    "lump_size": 512,
+    "cw": 315,
+    "cc": 0,
+    "methods": [],
+    "grants": [
+      "E"
+    ]
   }
 ]

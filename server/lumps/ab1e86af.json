@@ -1,0 +1,34 @@
+{
+  "token": "ab1e86af",
+  "abstraction": "WordString",
+  "ns_slot": null,
+  "lump_size": 512,
+  "typ": 0,
+  "content_type": "code",
+  "lump_type": "code",
+  "cw": 315,
+  "cc": 0,
+  "profile": "IoT",
+  "language": "imported",
+  "methods": [],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": ""
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-04-17T14:08:59.449621Z",
+    "builder": "IDE LUMP Upload"
+  },
+  "grants": [
+    "E"
+  ]
+}
