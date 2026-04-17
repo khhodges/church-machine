@@ -9,18 +9,20 @@ class ChurchDecoder(Elaboratable):
     """Church Machine decoder — clean 32-bit instruction format.
 
     Instruction format (32 bits) — matches patent Section 14:
-        [31:27]  opcode    — 5 bits (10 Church opcodes + 2 Turing + 20 reserved)
+        [31:27]  opcode    — 5 bits (10 Church opcodes + 10 Turing + 12 reserved)
         [26:23]  condition — 4 bits (ARM-style conditional execution)
-        [22:19]  cr_dst    — 4 bits (destination CR / DR index for Turing ops)
-        [18:15]  cr_src    — 4 bits (source capability register)
+        [22:19]  cr_dst    — 4 bits (destination CR for Church ops; DR index for Turing ops)
+        [18:15]  cr_src    — 4 bits (source CR for Church ops; DR index for Turing ops)
         [14:0]   immediate — 15 bits (index / preset / mask / target / word offset)
 
     No RISC-V encoding. No wasted bits. Every field at a fixed position.
 
     Turing ops implemented: DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB,
     BRANCH, SHL, SHR.
-    For Turing ops, cr_dst field is a DR index (0-15); cr_src is the CR
-    holding the data GT or a second DR index; immediate meaning varies by op.
+    For all Turing ops except DREAD/DWRITE, cr_dst and cr_src are both DR
+    indices (0-15) — pure data-register operations with no capability access.
+    DREAD/DWRITE are the only Turing ops that use cr_src as a CR index (the
+    GT covering the data object); immediate meaning varies by op.
 
     When iot_profile=True, LAMBDA, CHANGE, SWITCH, ELOADCALL, and XLOADLAMBDA
     opcodes are treated as invalid (FAULT_OPCODE).
