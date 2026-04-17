@@ -6080,6 +6080,7 @@ a.next-step-link:hover {
 .lump-ct-img    { background: #3a1e4a; color: #e07eff; }
 .lump-ct-thread { background: #1e3a3a; color: #7effea; }
 .lump-ct-outform{ background: #4a3a1e; color: #ffe07e; }
+.lump-ct-doc    { background: #2a2a4a; color: #b0b8ff; }
 
 /* ── LUMP detail tab bar ───────────────────────────────── */
 .lump-tabs-bar {

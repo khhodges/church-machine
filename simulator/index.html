@@ -1309,8 +1309,10 @@
             <select id="lumpImportType" onchange="_lumpImportToggleUI(this.value)">
                 <option value="text">Text (Plain)</option>
                 <option value="markdown">Markdown</option>
-                <option value="image">Image (RGBA raw / PNG)</option>
-                <option value="data">Data (binary blob)</option>
+                <option value="image">Image (PNG / JPEG / RGBA raw)</option>
+                <option value="grayscale">Image — Grayscale (1 byte/px)</option>
+                <option value="binary">Binary (arbitrary bytes)</option>
+                <option value="doc">Document (binary doc / PDF)</option>
             </select>
         </div>
         <div class="lump-import-row" id="lumpImportPasteRow">

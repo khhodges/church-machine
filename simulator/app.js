@@ -4733,67 +4733,66 @@ function toggleAbsLayer(layer) {
 let _lumpsCache = [];
 let _selectedLumpToken = null;
 
-function renderLumps() {
+async function renderLumps() {
     const listEl = document.getElementById('lumpsListContent');
     if (!listEl) return;
     listEl.innerHTML = '<div class="lumps-loading">Loading lumps...</div>';
 
-    fetch('/api/lumps/list')
-        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-        .then(lumps => {
-            _lumpsCache = lumps;
-            if (!lumps || lumps.length === 0) {
-                listEl.innerHTML = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
-                return;
-            }
-            let html = '';
-            for (const lump of lumps) {
-                const token = lump.token || '????????';
-                const name = lump.abstraction || 'Unknown';
-                const size = lump.lump_size || 0;
-                const methods = lump.methods || [];
-                const lang = lump.language || '';
-                const profile = lump.profile || '';
-                const mtbf = lump.mtbf || {};
-                const mtbfStatus = mtbf.status || 'unknown';
-                const mtbfClass = mtbfStatus === 'green' ? 'mtbf-green'
-                                : mtbfStatus === 'amber'  ? 'mtbf-amber'
-                                : (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'mtbf-unknown'
-                                : 'mtbf-red';
-                const isActive = _selectedLumpToken === token;
+    try {
+        const r = await fetch('/api/lumps/list');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const lumps = await r.json();
+        _lumpsCache = lumps;
+        if (!lumps || lumps.length === 0) {
+            listEl.innerHTML = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
+            return;
+        }
+        let html = '';
+        for (const lump of lumps) {
+            const token = lump.token || '????????';
+            const name = lump.abstraction || 'Unknown';
+            const size = lump.lump_size || 0;
+            const methods = lump.methods || [];
+            const lang = lump.language || '';
+            const profile = lump.profile || '';
+            const mtbf = lump.mtbf || {};
+            const mtbfStatus = mtbf.status || 'unknown';
+            const mtbfClass = mtbfStatus === 'green' ? 'mtbf-green'
+                            : mtbfStatus === 'amber'  ? 'mtbf-amber'
+                            : (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'mtbf-unknown'
+                            : 'mtbf-red';
+            const isActive = _selectedLumpToken === token;
 
-                const safeToken = _escHtml(token);
-                const safeName = _escHtml(name);
-                const safeLang = _escHtml(lang);
-                const safeProfile = _escHtml(profile);
-                html += `<div class="lump-item${isActive ? ' active' : ''}" data-token="${safeToken}">`;
-                const isNamespace = lump.lump_type === 'namespace' || lump.typ === 10;
-                html += `<div class="lump-item-header">`;
-                html += `<span class="lump-item-name">${safeName}`;
-                html += _lumpTypeBadge(lump);
-                html += `</span>`;
-                if (mtbf.status) {
-                    const mtbfLabel = (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'UNKNOWN' : mtbfStatus.toUpperCase();
-                    html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge" title="${(mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'MTBF unknown — needs testing before deployment' : ''}">${_escHtml(mtbfLabel)}</span>`;
-                }
-                html += `</div>`;
-                html += `<div class="lump-item-meta">`;
-                html += `<span class="lump-token">0x${safeToken}</span>`;
-                html += `<span class="lump-size">${size}w</span>`;
-                html += `<span class="lump-methods">${methods.length} method${methods.length !== 1 ? 's' : ''}</span>`;
-                if (lang) html += `<span class="lump-lang">${safeLang}</span>`;
-                if (profile) html += `<span class="lump-profile">${safeProfile}</span>`;
-                html += `</div>`;
-                html += `</div>`;
+            const safeToken = _escHtml(token);
+            const safeName = _escHtml(name);
+            const safeLang = _escHtml(lang);
+            const safeProfile = _escHtml(profile);
+            html += `<div class="lump-item${isActive ? ' active' : ''}" data-token="${safeToken}">`;
+            html += `<div class="lump-item-header">`;
+            html += `<span class="lump-item-name">${safeName}`;
+            html += _lumpTypeBadge(lump);
+            html += `</span>`;
+            if (mtbf.status) {
+                const mtbfLabel = (mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'UNKNOWN' : mtbfStatus.toUpperCase();
+                html += `<span class="mtbf-badge ${mtbfClass} lump-mtbf-badge" title="${(mtbfStatus === 'unknown' || mtbfStatus === 'untested') ? 'MTBF unknown — needs testing before deployment' : ''}">${_escHtml(mtbfLabel)}</span>`;
             }
-            listEl.innerHTML = html;
-            listEl.querySelectorAll('.lump-item[data-token]').forEach(el => {
-                el.addEventListener('click', () => showLumpDetail(el.dataset.token));
-            });
-        })
-        .catch(err => {
-            listEl.innerHTML = `<div class="lumps-placeholder">Error loading lumps: ${_escHtml(err.message)}</div>`;
+            html += `</div>`;
+            html += `<div class="lump-item-meta">`;
+            html += `<span class="lump-token">0x${safeToken}</span>`;
+            html += `<span class="lump-size">${size}w</span>`;
+            html += `<span class="lump-methods">${methods.length} method${methods.length !== 1 ? 's' : ''}</span>`;
+            if (lang) html += `<span class="lump-lang">${safeLang}</span>`;
+            if (profile) html += `<span class="lump-profile">${safeProfile}</span>`;
+            html += `</div>`;
+            html += `</div>`;
+        }
+        listEl.innerHTML = html;
+        listEl.querySelectorAll('.lump-item[data-token]').forEach(el => {
+            el.addEventListener('click', () => showLumpDetail(el.dataset.token));
         });
+    } catch (err) {
+        listEl.innerHTML = `<div class="lumps-placeholder">Error loading lumps: ${_escHtml(err.message)}</div>`;
+    }
 }
 
 function showLumpDetail(token) {
@@ -5063,13 +5062,16 @@ function _lumpContentTypeLabel(lump) {
     const ct = (lump.content_type || '').toLowerCase();
     const lt = (lump.lump_type   || '').toLowerCase();
     const typ = lump.typ;
-    if (lt === 'namespace') return 'Namespace';
-    if (ct === 'text')      return 'Text';
-    if (ct === 'markdown')  return 'Markdown';
-    if (ct === 'image')     return 'Image';
-    if (ct === 'thread' || typ === 2) return 'Thread';
-    if (ct === 'code'   || typ === 0) return 'Code';
-    if (ct === 'data'   || ct === 'binary' || typ === 1) return 'Data';
+    if (lt === 'namespace')               return 'Namespace';
+    if (ct === 'text')                    return 'Text';
+    if (ct === 'markdown')                return 'Markdown';
+    if (ct === 'image')                   return 'Image';
+    if (ct === 'grayscale')               return 'Grayscale Image';
+    if (ct === 'doc')                     return 'Document';
+    if (ct === 'thread' || typ === 2)     return 'Thread';
+    if (ct === 'outform' || typ === 3)    return 'Outform';
+    if (ct === 'code'    || typ === 0)    return 'Code';
+    if (ct === 'data' || ct === 'binary' || typ === 1) return 'Data';
     return 'LUMP';
 }
 
@@ -5081,6 +5083,8 @@ function _lumpTypeBadge(lump) {
     if (ct === 'text')                                 return '<span class="lump-ct-badge lump-ct-text">TXT</span>';
     if (ct === 'markdown')                             return '<span class="lump-ct-badge lump-ct-md">MD</span>';
     if (ct === 'image')                                return '<span class="lump-ct-badge lump-ct-img">IMG</span>';
+    if (ct === 'grayscale')                            return '<span class="lump-ct-badge lump-ct-img">GS</span>';
+    if (ct === 'doc')                                  return '<span class="lump-ct-badge lump-ct-doc">DOC</span>';
     if (ct === 'thread' || typ === 2)                  return '<span class="lump-ct-badge lump-ct-thread">THR</span>';
     if (typ === 3 || ct === 'outform')                 return '<span class="lump-ct-badge lump-ct-outform">OTF</span>';
     if (ct === 'code'   || typ === 0)                  return '<span class="lump-ct-badge lump-ct-code">CODE</span>';
@@ -5152,10 +5156,17 @@ async function _loadLumpContent(token, lump) {
             bodyEl.innerHTML = '';
             bodyEl.className = 'lump-content-markdown';
             bodyEl.innerHTML = renderMarkdown(text || '');
-        } else if (ct === 'image') {
+        } else if (ct === 'image' || ct === 'grayscale') {
             _renderLumpImageContent(bodyEl, lump, dataWords);
         } else if (ct === 'thread' || typ === 2) {
             _renderLumpThreadContent(bodyEl, lump, words);
+        } else if (ct === 'doc' || ct === 'binary') {
+            bodyEl.innerHTML = '';
+            bodyEl.className = '';
+            const info = document.createElement('div');
+            info.style.cssText = 'color:var(--text-secondary);font-size:0.75rem;padding:0.4rem 0;';
+            info.textContent = `${ct.toUpperCase()} — ${dataWords.length * 4} bytes stored. Switch to Hex Dump tab to inspect raw words.`;
+            bodyEl.appendChild(info);
         } else {
             const text = _pack4Decode(dataWords);
             bodyEl.innerHTML = '';
@@ -5248,11 +5259,34 @@ function _renderLumpImageContent(bodyEl, lump, dataWords) {
         return;
     }
 
-    // Fall back to raw RGBA canvas render
     const w = parseInt(lump.image_width)  || 0;
     const h = parseInt(lump.image_height) || 0;
+    const ct = (lump.content_type || '').toLowerCase();
+
+    // Grayscale path — 1 byte per pixel, metadata-driven
+    if (ct === 'grayscale' && w > 0 && h > 0) {
+        info.textContent = `${w} \u00d7 ${h} px \u00b7 Grayscale \u00b7 ${bytes.length} bytes`;
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.style.cssText = 'max-width:100%;image-rendering:pixelated;border-radius:4px;display:block;';
+        const ctx     = canvas.getContext('2d');
+        const imgData = ctx.createImageData(w, h);
+        for (let i = 0, p = 0; i < bytes.length && p < imgData.data.length; i++, p += 4) {
+            imgData.data[p]     = bytes[i];
+            imgData.data[p + 1] = bytes[i];
+            imgData.data[p + 2] = bytes[i];
+            imgData.data[p + 3] = 255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+        bodyEl.appendChild(info);
+        bodyEl.appendChild(canvas);
+        return;
+    }
+
+    // Raw RGBA canvas render — metadata-driven
     if (!w || !h) {
-        bodyEl.innerHTML = '<div class="lumps-placeholder">Unknown image format. For raw RGBA, re-import and specify width \u00d7 height.</div>';
+        bodyEl.innerHTML = '<div class="lumps-placeholder">Unknown image format. For raw RGBA or Grayscale, re-import and specify width \u00d7 height.</div>';
         return;
     }
     info.textContent = `${w} \u00d7 ${h} px \u00b7 RGBA \u00b7 ${bytes.length} bytes`;
@@ -5312,11 +5346,11 @@ function closeLumpImportModal() {
 function _lumpImportToggleUI(ct) {
     const modal = document.getElementById('lumpImportModal');
     if (!modal) return;
-    const isText  = ct === 'text' || ct === 'markdown';
-    const isImage = ct === 'image';
+    const isText    = ct === 'text' || ct === 'markdown';
+    const isRawImg  = ct === 'image' || ct === 'grayscale';
     modal.querySelector('#lumpImportPasteRow').style.display = isText ? '' : 'none';
     modal.querySelector('#lumpImportFileRow' ).style.display = '';
-    modal.querySelector('#lumpImportImgRow'  ).style.display = isImage ? '' : 'none';
+    modal.querySelector('#lumpImportImgRow'  ).style.display = isRawImg ? '' : 'none';
     const fileLabel = modal.querySelector('#lumpImportFileLabel');
     if (fileLabel) fileLabel.textContent = isText ? 'File (optional — overrides paste)' : 'File';
 }
@@ -5369,7 +5403,7 @@ async function _submitLumpImport() {
         if (!resp.ok || !result.ok) throw new Error(result.error || `HTTP ${resp.status}`);
         closeLumpImportModal();
         await renderLumps();
-        setTimeout(() => showLumpDetail(result.token), 300);
+        showLumpDetail(result.token);
     } catch (err) {
         errEl.textContent = `Import failed: ${err.message}`;
     } finally {
