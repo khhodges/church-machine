@@ -3414,7 +3414,6 @@ class CLOOMCCompiler {
             code.push(0);
         }
 
-        const methods = [{ name: 'run', code: code }];
         const capsArray = Object.values(neededCaps).sort((a, b) => a.capIndex - b.capIndex);
         const drMap = {};
         for (const [name, reg] of Object.entries(locals)) {
@@ -3424,6 +3423,15 @@ class CLOOMCCompiler {
         for (const [name, reg] of Object.entries(crLocals)) {
             crMap[reg] = name;
         }
+        const drPetNamesNumeric = {};
+        for (const [reg, name] of Object.entries(drMap)) drPetNamesNumeric[reg] = name;
+        const crPetNamesNumeric = {};
+        for (const [reg, name] of Object.entries(crMap)) crPetNamesNumeric[reg] = name;
+        const methods = [{
+            name: 'run',
+            code: code,
+            pet_names: { DR: drPetNamesNumeric, CR: crPetNamesNumeric }
+        }];
         return {
             methods,
             errors,

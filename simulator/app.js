@@ -2841,6 +2841,29 @@ function _drTag(drNum) {
     return pet ? `${pet}(DR${drNum})` : `DR${drNum}`;
 }
 
+/**
+ * Post-process a disassembly string to replace "DRN" tokens with
+ * "petName(DRN)" using per-method pet_names first, falling back to the
+ * global _petNameDRMap.  Returns the input string unchanged when no names
+ * are available.
+ */
+function _applyMethodDRNames(text, methodObj) {
+    const own = (((methodObj && methodObj.pet_names) || {}).DR) || {};
+    let drMap;
+    if (Object.keys(own).length > 0) {
+        drMap = {};
+        for (const [k, v] of Object.entries(own)) drMap[parseInt(k)] = v;
+    } else if (Object.keys(_petNameDRMap).length > 0) {
+        drMap = _petNameDRMap;
+    } else {
+        return text;
+    }
+    return text.replace(/\bDR(\d+)\b/g, (match, numStr) => {
+        const pet = drMap[parseInt(numStr)];
+        return pet ? `${pet}(DR${numStr})` : match;
+    });
+}
+
 function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
     word = word >>> 0;
     if (word === 0) return null;
@@ -5883,6 +5906,28 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     const lumpSize  = parseInt(lump.lump_size) || words.length;
     const abstName  = lump.abstraction || 'Lump';
 
+    // Build per-method DR pet-name lookup (numeric key → label).
+    // Keys in pet_names.DR are stored as numeric strings ("0", "1", ...).
+    const methodDRPetNames = {};  // method name → { drNum: "label" }
+    const topLevelDR = ((lump.pet_names || {}).DR) || {};
+    for (const m of methods) {
+        const own = ((m.pet_names || {}).DR) || {};
+        if (Object.keys(own).length > 0) {
+            const numMap = {};
+            for (const [k, v] of Object.entries(own)) numMap[parseInt(k)] = v;
+            methodDRPetNames[m.name] = numMap;
+        } else if (Object.keys(topLevelDR).length > 0) {
+            // Fall back to top-level pet_names.DR (prefix stripped: "DR0" → 0)
+            const numMap = {};
+            for (const [k, v] of Object.entries(topLevelDR)) {
+                const n = k.startsWith('DR') ? parseInt(k.slice(2)) : parseInt(k);
+                numMap[n] = v;
+            }
+            methodDRPetNames[m.name] = numMap;
+        }
+    }
+    let _curMethodDRMap = {};  // active during the instruction render loop
+
     // Build method boundary map (word index → name).
     // If no manifest methods, auto-detect by scanning for HALT (word=0)
     // or RETURN (opcode 3) followed by a non-zero word within the code region.
@@ -5948,11 +5993,12 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
         // Live CR alias map: tracks which cap-register holds which c-list slot
         const crAlias = {};  // crNum → slot index (int)
         for (let i = 1; i < effEnd; i++) {
-            // Method boundary → reset per-method register aliases
+            // Method boundary → reset per-method register aliases and update DR pet names
             if (mb[i] !== undefined) {
                 const auto = autoDetected ? ' <span class="lump-meth-auto" title="Auto-detected boundary">[~]</span>' : '';
                 html += `<div class="lump-code-method-label">\u25c6 ${e(mb[i])}${auto}</div>`;
                 for (const k of Object.keys(crAlias)) delete crAlias[k];
+                _curMethodDRMap = methodDRPetNames[mb[i]] || {};
             }
 
             const w    = words[i] >>> 0;
@@ -5994,10 +6040,17 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
 
             const addr = (i * 4).toString(16).toUpperCase().padStart(4, '0');
             const hex  = (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
+            let disText = dis(w);
+            if (Object.keys(_curMethodDRMap).length > 0) {
+                disText = disText.replace(/\bDR(\d+)\b/g, (match, numStr) => {
+                    const pet = _curMethodDRMap[parseInt(numStr)];
+                    return pet ? `${pet}(DR${numStr})` : match;
+                });
+            }
             html += `<div class="lump-code-row">` +
                     `<span class="lump-code-addr">0x${addr}</span>` +
                     `<span class="lump-code-hex">${hex}</span>` +
-                    `<span class="lump-code-instr">${e(dis(w))}${ann ? ' ' + ann : ''}</span></div>`;
+                    `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}</span></div>`;
 
             // RETURN or HALT → clear aliases (next code is a new method scope)
             if (w === 0 || op === 3) {
@@ -8789,7 +8842,7 @@ function assembleAndLoad() {
             const comments = manifestByMethod[m.name] || {};
             for (let i = 0; i < mCode.length; i++) {
                 const w = mCode[i];
-                const mnem = w === 0 ? 'NOP' : assembler.disassemble(w);
+                const mnem = _applyMethodDRNames(w === 0 ? 'NOP' : assembler.disassemble(w), m);
                 const comment = comments[i];
                 listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
             }
@@ -17455,7 +17508,7 @@ function compileDraft() {
         const comments = draftManifest[m.name] || {};
         for (let i = 0; i < mCode.length; i++) {
             const word = mCode[i];
-            const disasm = assembler.disassemble(word);
+            const disasm = _applyMethodDRNames(assembler.disassemble(word), m);
             const comment = comments[i];
             const line = `    ${i.toString().padStart(4)}: 0x${word.toString(16).padStart(8, '0')}  ${disasm}`;
             draft += comment ? `${line.padEnd(60)}; ${comment}\n` : `${line}\n`;
@@ -17787,7 +17840,7 @@ function compileCLOOMC() {
         const comments = manifestByMethod[m.name] || {};
         for (let i = 0; i < mCode.length; i++) {
             const word = mCode[i];
-            const mnem = word === 0 ? 'NOP' : assembler.disassemble(word);
+            const mnem = _applyMethodDRNames(word === 0 ? 'NOP' : assembler.disassemble(word), m);
             const comment = comments[i];
             listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
         }
