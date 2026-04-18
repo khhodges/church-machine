@@ -473,28 +473,21 @@ class SystemAbstractions {
                 return { ok: false, fault: 'NO_DRIVER', message: 'Navana.CallLEDDriver: LED driver not initialized' };
             }
 
+            // New encoding: DR1[31:24] = method (0=Set,1=Clear,2=Toggle,3=State)
+            //               DR1[5:0]  = LED index (capability offset 0–5)
+            // DR2 is no longer used for method routing (old Pattern/DR2 path removed).
             const methodSelector = (dr1 >>> 24) & 0xFF;
-            let method, ledNum, colour, pattern;
-            if (methodSelector > 0 && methodSelector <= 3) {
-                method = methodSelector;
-                ledNum = dr1 & 0xFF;
-                colour = dr2 & 0xFF;
-                pattern = dr1 & 0x3F;
-            } else if (dr2 > 0) {
-                method = 0;
-                ledNum = dr1 & 0xFF;
-                colour = dr2 & 0xFF;
-                pattern = 0;
-            } else {
-                method = 2;
-                ledNum = 0;
-                colour = 0;
-                pattern = dr1 & 0x3F;
-            }
+            const ledIndex = dr1 & 0x3F;   // LED capability offset 0–5
+            const method   = methodSelector <= 3 ? methodSelector : 0;
 
-            const driverResult = navanaState.ledDriverAbstraction.call(sim, (method << 24) | (ledNum & 0xFF), colour, permMask);
+            const driverResult = navanaState.ledDriverAbstraction.call(
+                sim,
+                (method << 24) | (ledIndex & 0x3F),  // dr0: [31:24]=method, [5:0]=ledIndex
+                0,                                     // dr1 unused in capability-offset API
+                permMask
+            );
 
-            const methodNames = ['Set', 'Clear', 'Pattern', 'Get'];
+            const methodNames = ['Set', 'Clear', 'Toggle', 'State'];
             const methodName = methodNames[method] || 'Set';
 
             navanaState.passKeyAuditLog.push({

@@ -2347,7 +2347,8 @@ class ChurchSimulator {
             const LED_CLIST_BASE = 8;
             let ledIndex = 0;
             if (check.index === LED_ABS_IDX && isClistIndexed) {
-                ledIndex = Math.max(0, Math.min(5, d.imm - LED_CLIST_BASE));
+                // Pass raw offset; handler validates range and returns -1 for out-of-range.
+                ledIndex = d.imm - LED_CLIST_BASE;
             }
             const result = this.abstractionRegistry.dispatchMethod(check.index, methodName, this, {
                 dr1: argDR1, dr2: argDR2, ledIndex
@@ -2419,47 +2420,38 @@ class ChurchSimulator {
                 const desc = `CALL CR${d.crDst} -> ${label} [LED driver E-perm abstraction]`;
                 this.output += desc + '\n';
 
+                // DR1 encoding: [31:24]=method(0-3), [5:0]=LED capability offset (0-5)
                 const dr1 = this.dr[1];
-                const dr2 = this.dr[2];
                 const callerGT = this.cr[d.crDst].word0;
 
                 if (this.abstractionRegistry) {
                     const result = this.abstractionRegistry.dispatchMethod(5, 'CallLEDDriver', this, {
                         callerGT: callerGT,
                         dr1: dr1,
-                        dr2: dr2
+                        dr2: 0
                     });
 
-                    if (result && result.ok) {
+                    if (result && result.message) {
                         this.output += `  ${result.message}\n`;
-                        if (result.result && result.result.state !== undefined) {
-                            this.dr[1] = result.result.state;
-                        }
-                        if (result.result && result.result.led !== undefined) {
-                            this.dr[1] = result.result.state || 0;
-                        }
-                    } else {
-                        this.output += `  ${result ? result.message : 'LED driver call failed'}\n`;
-                        this.fault('PERM', `LED driver: ${result ? result.message : 'unknown error'}`);
+                    }
+                    // Signed-return: write numeric result to DR0 (≥0 success, <0 fault)
+                    if (result && result.result !== undefined && typeof result.result === 'number') {
+                        this.dr[0] = result.result;
+                    }
+                    if (result && !result.ok && result.fault) {
+                        this.fault(result.fault, `LED driver: ${result.message}`);
                         return null;
                     }
                 }
 
                 this.pc++;
-                const methodNames = ['Set', 'Clear', 'Pattern', 'Get'];
-                const methodSelector = (dr1 >>> 24) & 0xFF;
-                let dispatchMethod;
-                if (methodSelector > 0 && methodSelector <= 3) {
-                    dispatchMethod = methodSelector;
-                } else if (dr2 > 0) {
-                    dispatchMethod = 0;
-                } else {
-                    dispatchMethod = 2;
-                }
-                const methodName = methodNames[dispatchMethod] || 'Set';
+                const ledMethodNames = ['Set', 'Clear', 'Toggle', 'State'];
+                const ledMethodSel = (dr1 >>> 24) & 0xFF;
+                const ledMethodName = ledMethodNames[ledMethodSel <= 3 ? ledMethodSel : 0] || 'Set';
+                const ledOffsetDisp = dr1 & 0x3F;
                 return { pc: this.pc - 1, instr: d, desc, pipeline: [
                     { stage: 'CALL', desc: `Enter LED driver`, perm: 'E', status: 'pass' },
-                    { stage: 'DISPATCH', desc: `LED.${methodName}(DR1=0x${dr1.toString(16)}, DR2=0x${dr2.toString(16)})`, status: 'pass' },
+                    { stage: 'DISPATCH', desc: `LED.${ledMethodName}(offset=${ledOffsetDisp}) — DR0 signed return`, status: 'pass' },
                     { stage: 'DEVICE', desc: `Hardware write at 0xFE10`, status: 'pass' },
                     { stage: 'RETURN', desc: `Exit LED driver`, status: 'pass' },
                 ]};
