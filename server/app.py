@@ -202,7 +202,113 @@ DEFAULT_BOOT_CONFIG = {
         "threadLumpWords": 256,
         "abstractionLumpWords": 256,
     },
+    # Step 2 (Task #215): per-lump resident/lazy decision. Empty list =
+    # historical default (all catalog lumps lazy-loaded on first CALL).
+    "step2": {
+        "lumps": []
+    },
 }
+
+# Slots reserved for foundational lumps (Step 1) and device MMIO regions —
+# the programmer cannot place an additional resident lump body here. Slots
+# 0–2 are foundational lumps; 11–15 are device register windows (UART, LED,
+# Button, Timer, Display) backed by hardware MMIO not by lump memory.
+RESERVED_NS_SLOTS = set(range(0, 3)) | set(range(11, 16))
+LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "lumps", "manifest.json")
+
+def _load_lump_catalog():
+    """Return the subset of server/lumps/manifest.json suitable for Step 2.
+
+    Drops entries with no `ns_slot` (utility lumps without a fixed namespace
+    home) and entries that target reserved slots (foundational + device
+    MMIO). The rest is what the programmer can choose to bake in.
+    """
+    try:
+        with open(LUMPS_MANIFEST_PATH, "r") as f:
+            raw = json.load(f)
+    except Exception:
+        return []
+    out = []
+    for entry in raw if isinstance(raw, list) else []:
+        slot = entry.get("ns_slot")
+        if not isinstance(slot, int):
+            continue
+        if slot in RESERVED_NS_SLOTS:
+            continue
+        out.append({
+            "abstraction": entry.get("abstraction"),
+            "nsSlot": slot,
+            "lumpSize": entry.get("lump_size"),
+            "token": entry.get("token"),
+        })
+    # Stable ordering: by ns_slot, then abstraction name.
+    out.sort(key=lambda e: (e["nsSlot"], e["abstraction"] or ""))
+    return out
+
+def _validate_step2(step2, step1, target_board):
+    """Validate the optional Step 2 (resident lumps) section.
+
+    `step2.lumps` is a list of {nsSlot, resident, physAddr?, lumpSize?}.
+    Lazy entries (resident=False) need only nsSlot; resident entries must
+    specify a physAddr inside the usable region and not collide with
+    another resident lump or with the foundational layout.
+    """
+    if step2 is None:
+        return None
+    if not isinstance(step2, dict):
+        return "step2 must be an object"
+    lumps = step2.get("lumps") or []
+    if not isinstance(lumps, list):
+        return "step2.lumps must be a list"
+    catalog = {e["nsSlot"]: e for e in _load_lump_catalog()}
+    NS_TABLE_RESERVE = 0x300  # keep in sync with simulator.js
+    total = step1["totalNamespaceWords"]
+    foundation_end = (step1["namespaceLumpWords"] +
+                      step1["threadLumpWords"] +
+                      step1["abstractionLumpWords"])
+    usable_end = total - NS_TABLE_RESERVE
+    seen_slots = set()
+    occupied = []  # list of (start, end_exclusive, label) for resident lumps
+    for entry in lumps:
+        if not isinstance(entry, dict):
+            return "each step2.lumps entry must be an object"
+        slot = entry.get("nsSlot")
+        if not isinstance(slot, int) or slot < 0 or slot >= 256:
+            return f"step2.lumps entry has invalid nsSlot: {slot!r}"
+        if slot in RESERVED_NS_SLOTS:
+            return (f"NS slot {slot} is reserved (foundational lump or device "
+                    f"MMIO) and cannot host a resident lump")
+        if slot in seen_slots:
+            return f"duplicate step2.lumps entry for NS slot {slot}"
+        seen_slots.add(slot)
+        if slot not in catalog:
+            return f"NS slot {slot} is not present in the lump catalog"
+        resident = bool(entry.get("resident"))
+        if not resident:
+            continue
+        cat = catalog[slot]
+        lump_size = entry.get("lumpSize") or cat.get("lumpSize")
+        if not isinstance(lump_size, int) or lump_size <= 0:
+            return f"resident lump for NS slot {slot} has invalid lumpSize"
+        phys = entry.get("physAddr")
+        if not isinstance(phys, int) or phys < 0:
+            return (f"resident lump for NS slot {slot} ({cat.get('abstraction')}) "
+                    f"requires a non-negative integer physAddr")
+        if phys < foundation_end:
+            return (f"resident lump {cat.get('abstraction')} (NS slot {slot}) "
+                    f"physAddr {phys} overlaps the foundational lump region "
+                    f"(0..{foundation_end-1})")
+        if phys + lump_size > usable_end:
+            return (f"resident lump {cat.get('abstraction')} (NS slot {slot}) "
+                    f"of {lump_size} words at physAddr {phys} would extend past "
+                    f"the usable region (ends at {usable_end})")
+        for (s, e, lbl) in occupied:
+            if not (phys + lump_size <= s or phys >= e):
+                return (f"resident lump {cat.get('abstraction')} (NS slot {slot}) "
+                        f"at {phys}..{phys+lump_size-1} overlaps {lbl}")
+        occupied.append((phys, phys + lump_size, f"{cat.get('abstraction')} (NS {slot})"))
+    return None
 
 def _is_pow2(n):
     return isinstance(n, int) and n > 0 and (n & (n - 1)) == 0
@@ -269,10 +375,17 @@ def boot_config_get():
         if (not isinstance(cfg, dict)
             or _validate_step1(cfg.get("targetBoard"), s1 or {}) is not None):
             cfg = None  # corrupt/stale file — fall through to "no config"
+        else:
+            # Step 2 is optional; if present in the file it must validate. If
+            # it doesn't, drop it rather than discarding the whole config.
+            s2 = cfg.get("step2")
+            if s2 is not None and _validate_step2(s2, s1, cfg.get("targetBoard")) is not None:
+                cfg.pop("step2", None)
     return jsonify({
         "config": cfg,
         "defaults": DEFAULT_BOOT_CONFIG,
         "profiles": HARDWARE_PROFILES,
+        "lumpCatalog": _load_lump_catalog(),
     })
 
 @app.route("/api/boot-config", methods=["POST"])
@@ -283,6 +396,10 @@ def boot_config_post():
     err = _validate_step1(target_board, step1)
     if err:
         return jsonify({"ok": False, "error": err}), 400
+    step2 = data.get("step2")
+    err2 = _validate_step2(step2, step1, target_board)
+    if err2:
+        return jsonify({"ok": False, "error": err2}), 400
     cfg = {
         "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
         "targetBoard": target_board,
@@ -293,6 +410,18 @@ def boot_config_post():
             "abstractionLumpWords": int(step1["abstractionLumpWords"]),
         },
     }
+    if step2 is not None:
+        norm = []
+        for e in (step2.get("lumps") or []):
+            row = {"nsSlot": int(e["nsSlot"]),
+                   "resident": bool(e.get("resident"))}
+            if row["resident"]:
+                row["physAddr"] = int(e["physAddr"])
+                if e.get("lumpSize") is not None:
+                    row["lumpSize"] = int(e["lumpSize"])
+            cfg.setdefault("step2", {"lumps": []})
+            norm.append(row)
+        cfg["step2"] = {"lumps": norm}
     try:
         with open(BOOT_CONFIG_PATH, "w") as f:
             json.dump(cfg, f, indent=2)

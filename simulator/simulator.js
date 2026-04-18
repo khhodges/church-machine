@@ -123,6 +123,27 @@ class ChurchSimulator {
         this.deviceAbstractions = deviceAbs;
     }
 
+    // Eagerly install a lazy-manifest entry's body at boot time, optionally
+    // overriding its NS-entry location word (used by Boot Image Designer
+    // Step 2 — Task #215 — to bake "resident" lumps into the boot image).
+    // Returns true on success. Idempotent: safe to call when the entry is
+    // already loaded (just refreshes allocBase if physAddr is provided).
+    eagerInstallResident(slotIndex, physAddr) {
+        const entry = this.lazyManifest && this.lazyManifest[slotIndex];
+        if (!entry) return false;
+        if (Number.isFinite(physAddr) && physAddr > 0) {
+            const nsBase = this.NS_TABLE_BASE + slotIndex * this.NS_ENTRY_WORDS;
+            this.memory[nsBase] = physAddr >>> 0;
+            entry.allocBase = physAddr;
+        }
+        // Re-arm the lazy loader so it will install code even though the
+        // entry was registered as 'hot' (which normally implies the body is
+        // already in memory). For programmer-declared resident lumps we
+        // still need lazyLoad() to write the actual code words once.
+        entry.loaded = false;
+        return this.lazyLoad(slotIndex);
+    }
+
     initLazyManifest(manifest) {
         this.lazyManifest = manifest || {};
         let warmCount = 0, coldCount = 0, hotCount = 0;

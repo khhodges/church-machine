@@ -4221,6 +4221,10 @@ function renderMemoryDump(location, limit, nsIndex) {
 // See docs/foundation-lump-design.md §4 for the design rationale.
 // ===========================================================================
 let _hardwareProfiles = null;
+let _lumpCatalog = [];          // [{abstraction, nsSlot, lumpSize, token}]
+// In-memory mirror of the Step 2 lump grid while the modal is open.
+// Keyed by nsSlot → {resident, physAddr, lumpSize, abstraction}.
+let _bdStep2State = {};
 
 function _bdIsPow2(n) { return Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0; }
 
@@ -4233,6 +4237,7 @@ function _loadBootConfig() {
         .then(data => {
             window.bootConfig = (data && data.config) || null;
             _hardwareProfiles = (data && data.profiles) || {};
+            _lumpCatalog      = (data && data.lumpCatalog) || [];
             return data;
         })
         .catch(err => {
@@ -4271,7 +4276,92 @@ function openBootDesigner() {
             const el = document.getElementById(id);
             if (el) el.oninput = _bdValidate;
         });
+        _bdInitStep2(cfg);
     });
+}
+
+// ---------------------------------------------------------------------------
+// Step 2 (resident lumps) — table render + state
+// ---------------------------------------------------------------------------
+function _bdInitStep2(cfg) {
+    _bdStep2State = {};
+    const savedLumps = ((cfg && cfg.step2 && cfg.step2.lumps) || []);
+    const savedMap = {};
+    for (const e of savedLumps) savedMap[e.nsSlot] = e;
+    // Suggested default phys addresses grow upward from the foundational
+    // region; each row falls back to a sensible default if the user toggles
+    // resident without picking an address.
+    let cursor = (parseInt(document.getElementById('bdNs').value, 10) || 0)
+               + (parseInt(document.getElementById('bdThread').value, 10) || 0)
+               + (parseInt(document.getElementById('bdAbstr').value, 10) || 0);
+    for (const cat of _lumpCatalog) {
+        const saved = savedMap[cat.nsSlot];
+        const resident = !!(saved && saved.resident);
+        const physAddr = (saved && Number.isFinite(saved.physAddr))
+                          ? saved.physAddr : cursor;
+        if (resident) cursor = physAddr + (cat.lumpSize || 0);
+        _bdStep2State[cat.nsSlot] = {
+            resident, physAddr,
+            lumpSize: cat.lumpSize,
+            abstraction: cat.abstraction,
+        };
+    }
+    _bdRenderStep2();
+}
+
+function _bdRenderStep2() {
+    const tbody = document.getElementById('bdLumpTbody');
+    const empty = document.getElementById('bdLumpEmpty');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!_lumpCatalog.length) {
+        empty.textContent = 'No catalog lumps available (server/lumps/manifest.json is empty).';
+        return;
+    }
+    empty.textContent = '';
+    for (const cat of _lumpCatalog) {
+        const st = _bdStep2State[cat.nsSlot] || {};
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #2a2a2a';
+        const residentChecked = st.resident ? 'checked' : '';
+        const physVal = (st.physAddr != null) ? st.physAddr : '';
+        const physDisabled = st.resident ? '' : 'disabled';
+        const physStyle = st.resident ? '' : 'opacity:0.4;';
+        tr.innerHTML =
+            `<td style="padding:5px 4px;color:#ddd;">${cat.abstraction || '?'}</td>` +
+            `<td style="padding:5px 4px;color:#aaa;">${cat.nsSlot}</td>` +
+            `<td style="padding:5px 4px;color:#aaa;">${cat.lumpSize || '?'}</td>` +
+            `<td style="padding:5px 4px;">` +
+              `<label style="cursor:pointer;color:${st.resident?'#9c9':'#aaa'};">` +
+                `<input type="checkbox" data-bd-slot="${cat.nsSlot}" data-bd-field="resident" ${residentChecked}> ` +
+                `${st.resident ? 'Resident' : 'Lazy'}` +
+              `</label>` +
+            `</td>` +
+            `<td style="padding:5px 4px;">` +
+              `<input type="number" min="0" step="1" data-bd-slot="${cat.nsSlot}" data-bd-field="physAddr" ` +
+                     `value="${physVal}" ${physDisabled} ` +
+                     `style="width:120px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;${physStyle}">` +
+            `</td>`;
+        tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('input[data-bd-slot]').forEach(inp => {
+        inp.oninput = inp.onchange = _bdOnStep2Change;
+    });
+}
+
+function _bdOnStep2Change(ev) {
+    const slot = parseInt(ev.target.getAttribute('data-bd-slot'), 10);
+    const field = ev.target.getAttribute('data-bd-field');
+    const st = _bdStep2State[slot] || {};
+    if (field === 'resident') {
+        st.resident = !!ev.target.checked;
+    } else if (field === 'physAddr') {
+        const v = ev.target.value;
+        st.physAddr = (v === '' ? null : parseInt(v, 10));
+    }
+    _bdStep2State[slot] = st;
+    _bdRenderStep2();
+    _bdValidate();
 }
 
 function closeBootDesigner() {
@@ -4328,6 +4418,37 @@ function _bdValidate() {
         err = `Foundational lumps (${sum} words) exceed the ${usable}-word usable space ` +
               `(total ${total} minus ${NS_TABLE_RESERVE} reserved for the namespace table).`;
     }
+    // Step 2 — validate resident lump placements: each phys addr must sit
+    // after the foundational region, before the NS-table reserve, and not
+    // overlap any other resident lump.
+    if (!err) {
+        const occ = []; // [{start, end, label}]
+        for (const slotStr of Object.keys(_bdStep2State)) {
+            const st = _bdStep2State[slotStr];
+            if (!st.resident) continue;
+            const lbl = `${st.abstraction} (NS ${slotStr})`;
+            if (!Number.isFinite(st.physAddr) || st.physAddr < 0) {
+                err = `${lbl}: physAddr is required for resident lumps.`; break;
+            }
+            const sz = st.lumpSize || 0;
+            if (sz <= 0) { err = `${lbl}: missing lumpSize.`; break; }
+            if (st.physAddr < sum) {
+                err = `${lbl}: physAddr ${st.physAddr} overlaps the foundational region (0..${sum-1}).`;
+                break;
+            }
+            if (st.physAddr + sz > usable) {
+                err = `${lbl}: ${sz}-word lump at ${st.physAddr} extends past usable region (ends at ${usable}).`;
+                break;
+            }
+            for (const o of occ) {
+                if (!(st.physAddr + sz <= o.start || st.physAddr >= o.end)) {
+                    err = `${lbl}: overlaps ${o.label}.`; break;
+                }
+            }
+            if (err) break;
+            occ.push({start: st.physAddr, end: st.physAddr + sz, label: lbl});
+        }
+    }
     errEl.textContent = err;
     saveBtn.disabled = !!err;
     saveBtn.style.opacity = err ? '0.5' : '1';
@@ -4342,6 +4463,16 @@ function _bdValidate() {
 
 function saveBootDesigner() {
     if (!_bdValidate()) return;
+    const step2Lumps = [];
+    for (const slotStr of Object.keys(_bdStep2State)) {
+        const st = _bdStep2State[slotStr];
+        const row = { nsSlot: parseInt(slotStr, 10), resident: !!st.resident };
+        if (st.resident) {
+            row.physAddr = st.physAddr;
+            if (st.lumpSize) row.lumpSize = st.lumpSize;
+        }
+        step2Lumps.push(row);
+    }
     const payload = {
         targetBoard: document.getElementById('bdTargetBoard').value,
         step1: {
@@ -4349,7 +4480,8 @@ function saveBootDesigner() {
             namespaceLumpWords:   parseInt(document.getElementById('bdNs').value, 10),
             threadLumpWords:      parseInt(document.getElementById('bdThread').value, 10),
             abstractionLumpWords: parseInt(document.getElementById('bdAbstr').value, 10),
-        }
+        },
+        step2: { lumps: step2Lumps },
     };
     const status = document.getElementById('bdStatus');
     const errEl = document.getElementById('bdError');
@@ -4846,11 +4978,22 @@ function _absMethodsSave() {
 
 function _initLazyLoadManifest() {
     if (!sim) return;
+    // Step 2 (Task #215): consult the saved boot config to decide which
+    // catalog lumps are baked in (resident → priority='hot', body installed
+    // eagerly) vs lazy (priority='warm', cw=0 sentinel — current default).
+    const step2Lumps = (window.bootConfig && window.bootConfig.step2
+                        && window.bootConfig.step2.lumps) || [];
+    const residentMap = {};   // nsSlot → {resident, physAddr}
+    for (const e of step2Lumps) residentMap[e.nsSlot] = e;
+
     const manifest = {};
+    const residentSlots = [];
     if (typeof BOOT_UPLOADS !== 'undefined') {
         for (const upload of BOOT_UPLOADS) {
             if (upload.methods && upload.methods.length > 0 && upload.index >= 16) {
-                const isHot = (upload.index === 19);
+                const cfg = residentMap[upload.index];
+                const isResident = !!(cfg && cfg.resident);
+                const isHot = (upload.index === 19) || isResident;
                 let codeWords = 0;
                 for (const m of upload.methods) {
                     if (m.code && m.code.length > 0) codeWords += m.code.length;
@@ -4869,10 +5012,27 @@ function _initLazyLoadManifest() {
                     loadCount: 0,
                     bootUpload: upload
                 };
+                if (isResident) residentSlots.push({slot: upload.index, cfg});
             }
         }
     }
     sim.initLazyManifest(manifest);
+
+    // For programmer-declared resident lumps, install the body now (and
+    // honour any physAddr override). Note on layering: NS entries are
+    // built first by simulator._initNamespaceTable() using the runningOffset
+    // layout; this pass then patches the NS location for resident lumps that
+    // override their address and writes the actual code words. Doing this
+    // post-init keeps simulator.js agnostic of the boot-config schema and
+    // confines all programmer-controlled boot-image policy to app.js +
+    // server/app.py.
+    for (const {slot, cfg} of residentSlots) {
+        try {
+            sim.eagerInstallResident(slot, cfg.physAddr);
+        } catch (e) {
+            console.warn(`[bootConfig] resident install failed for slot ${slot}:`, e);
+        }
+    }
 }
 
 function _absMethodsLoad() {

@@ -424,7 +424,7 @@
     <div id="bootDesignerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
         <div style="background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:6px;width:min(720px,92vw);max-height:90vh;overflow:auto;padding:18px 22px;font-family:inherit;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <h2 style="margin:0;font-size:1.1rem;color:#fff;">Boot Image Designer — Step 1 of 3: Memory Allocation</h2>
+                <h2 style="margin:0;font-size:1.1rem;color:#fff;">Boot Image Designer — Steps 1 &amp; 2 of 3: Memory + Resident Lumps</h2>
                 <button onclick="closeBootDesigner()" style="background:transparent;color:#ccc;border:none;font-size:1.4rem;cursor:pointer;">×</button>
             </div>
             <div style="font-size:0.85rem;color:#aaa;margin-bottom:14px;">
@@ -465,7 +465,28 @@
             </table>
 
             <div id="bdSummary" style="margin-top:12px;font-size:0.85rem;color:#aaa;"></div>
-            <div id="bdError" style="margin-top:8px;font-size:0.85rem;color:#f55;min-height:1.2em;"></div>
+
+            <h3 style="margin:18px 0 6px;font-size:0.95rem;color:#fff;border-top:1px solid #333;padding-top:14px;">Step 2: Resident Lumps</h3>
+            <div style="font-size:0.82rem;color:#aaa;margin-bottom:8px;">
+                Pick which catalog lumps are baked into the boot image (Resident — body present at reset)
+                and which are fetched on first <code>CALL</code> (Lazy). Resident lumps need a physical
+                address inside the usable region (after the foundational lumps, before the NS table).
+            </div>
+            <table id="bdLumpTable" style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                <thead>
+                    <tr style="text-align:left;color:#aaa;border-bottom:1px solid #333;">
+                        <th style="padding:6px 4px;">Lump</th>
+                        <th style="padding:6px 4px;width:60px;">NS</th>
+                        <th style="padding:6px 4px;width:80px;">Size (w)</th>
+                        <th style="padding:6px 4px;width:90px;">Mode</th>
+                        <th style="padding:6px 4px;">Phys addr (resident)</th>
+                    </tr>
+                </thead>
+                <tbody id="bdLumpTbody"></tbody>
+            </table>
+            <div id="bdLumpEmpty" style="font-size:0.82rem;color:#888;margin-top:6px;"></div>
+
+            <div id="bdError" style="margin-top:12px;font-size:0.85rem;color:#f55;min-height:1.2em;"></div>
 
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
                 <button class="btn btn-sm" onclick="closeBootDesigner()" style="background:#333;color:#ddd;border:1px solid #555;">Cancel</button>
