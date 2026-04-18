@@ -1,4 +1,5 @@
 import os
+import sys
 import io
 import json
 import logging
@@ -11,6 +12,13 @@ import tempfile
 import gzip as _gzip
 import requests as http_requests
 from flask import Flask, jsonify, send_from_directory, send_file, redirect, make_response, request
+
+# Ensure the server/ directory is on sys.path so local modules (boot_image, etc.)
+# are importable whether the app is started as `python3 server/app.py` (dev) or
+# `gunicorn server.app:app` from the workspace root (production).
+_SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SERVER_DIR not in sys.path:
+    sys.path.insert(0, _SERVER_DIR)
 
 import boot_image as _boot_image_gen
 from flask_sqlalchemy import SQLAlchemy
