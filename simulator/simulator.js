@@ -349,6 +349,7 @@ class ChurchSimulator {
         }
 
         this.dr = new Array(16).fill(0);
+        this._preserveDR0 = false;  // set by device CALL paths that return signed DR0
 
         this.pc = 0;
         this.physicalPC = 0;
@@ -1781,7 +1782,13 @@ class ChurchSimulator {
         }
 
         if (result) {
-            this.dr[0] = 0;
+            // DR0 is the zero register; device CALL paths that use the signed-return
+            // convention set _preserveDR0=true so the caller can branch on DR0 once.
+            if (this._preserveDR0) {
+                this._preserveDR0 = false;
+            } else {
+                this.dr[0] = 0;
+            }
             result.physicalPC = this.physicalPC;
             result.auditPipeline = this._auditPipeline();
             this.emit('step', result);
@@ -2012,6 +2019,12 @@ class ChurchSimulator {
         if (!check.ok) {
             this.fault(check.fault, `CALL: ${callCrLabel}: ${check.message}`);
             return null;
+        }
+        // For LED abstraction (NS 12): the GT's gt_seq field encodes the LED identity (0–5).
+        // The boot mints one LED GT per LED; gt_seq=0 → LED 0, gt_seq=1 → LED 1, etc.
+        // This replaces the old hardcoded c-list slot arithmetic (d.imm - 8).
+        if (check.index === 12) {
+            check.ledIndex = srcParsed.gt_seq & 0x7;
         }
         const nsEntry = check.entry;
         const word1 = this.parseNSWord1(nsEntry.word1_limit);
@@ -2340,16 +2353,12 @@ class ChurchSimulator {
         this.output += desc + '\n';
 
         if (this.abstractionRegistry) {
-            // For LED (NS 12): derive capability offset from c-list slot so the
-            // method handler receives args.ledIndex without any DR register input.
-            // CALL method, CR6, #(LED_CLIST_BASE + led_num) → ledIndex = led_num (0–5).
-            const LED_ABS_IDX   = 12;
-            const LED_CLIST_BASE = 8;
-            let ledIndex = 0;
-            if (check.index === LED_ABS_IDX && isClistIndexed) {
-                // Pass raw offset; handler validates range and returns -1 for out-of-range.
-                ledIndex = d.imm - LED_CLIST_BASE;
-            }
+            // For LED (NS 12): ledIndex comes from the GT's gt_seq field, set on check
+            // by _execCall after mLoad. The boot mints one GT per LED with gt_seq=led_num.
+            const LED_ABS_IDX = 12;
+            const ledIndex = (check.index === LED_ABS_IDX && check.ledIndex !== undefined)
+                ? check.ledIndex
+                : 0;
             const result = this.abstractionRegistry.dispatchMethod(check.index, methodName, this, {
                 dr1: argDR1, dr2: argDR2, ledIndex
             });
@@ -2357,7 +2366,12 @@ class ChurchSimulator {
                 this.output += `  ${result.message}\n`;
             }
             if (result && result.result !== undefined && typeof result.result === 'number') {
-                if (encodedDstReg !== null) {
+                if (check.index === LED_ABS_IDX) {
+                    // LED signed-return convention: result goes to DR0 (zero register bypassed
+                    // for one instruction so caller can branch on DR0's sign via BGE/BLT).
+                    this.dr[0] = result.result;
+                    this._preserveDR0 = true;
+                } else if (encodedDstReg !== null) {
                     this.dr[encodedDstReg] = result.result;
                 } else {
                     this.dr[1] = result.result;
@@ -2434,9 +2448,12 @@ class ChurchSimulator {
                     if (result && result.message) {
                         this.output += `  ${result.message}\n`;
                     }
-                    // Signed-return: write numeric result to DR0 (≥0 success, <0 fault)
+                    // Signed-return: write numeric result to DR0 (≥0 success, <0 fault).
+                    // Set _preserveDR0 so step() skips the zero-register wipe for one cycle,
+                    // allowing the caller to branch on DR0 via BGE/BLT.
                     if (result && result.result !== undefined && typeof result.result === 'number') {
                         this.dr[0] = result.result;
+                        this._preserveDR0 = true;
                     }
                     if (result && !result.ok && result.fault) {
                         this.fault(result.fault, `LED driver: ${result.message}`);
