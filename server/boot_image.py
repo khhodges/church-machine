@@ -244,11 +244,27 @@ def generate_boot_image(cfg, lumps_dir):
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
+    # Foundational slots (NS, Thread, Boot.Abstr director, Boot.Entry) and
+    # MMIO device-register windows must not be overridden by caller-supplied
+    # physAddr values, even when generate_boot_image() is called directly
+    # (bypassing the app-layer _validate_step2 guard).
+    _FOUNDATIONAL_SLOTS = set(range(0, BOOT_ENTRY_NS_SLOT + 1))  # slots 0..3
+    _DEVICE_REG_SLOTS   = set(range(11, 16))                      # slots 11..15
+    _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
+
     phys_override = {}
     for e in step2_lumps:
-        if (isinstance(e, dict) and e.get("resident")
+        if not isinstance(e, dict):
+            continue
+        ns_slot = e.get("nsSlot")
+        if isinstance(ns_slot, int) and ns_slot in _RESERVED_SLOTS:
+            raise ValueError(
+                f"generate_boot_image: NS slot {ns_slot} is reserved "
+                f"(foundational lump or device MMIO); physAddr override rejected"
+            )
+        if (e.get("resident")
                 and isinstance(e.get("physAddr"), int) and e["physAddr"] > 0):
-            phys_override[int(e["nsSlot"])] = int(e["physAddr"])
+            phys_override[int(ns_slot)] = int(e["physAddr"])
 
     catalog = DEFAULT_ABSTRACTION_CATALOG
     slot_sizes = {

@@ -178,14 +178,19 @@ indices 0–3 only) used exclusively by B:04 to perform the indirection.
 | 5 | E | 5 | Navana | Namespace controller |
 | 6 | E | 6 | Mint | Capability minting |
 | 7 | E | 7 | Memory | Memory management |
-| 8 | R\|W | 12 | LED | MMIO, b_flag=1 |
-| 9 | R\|W | 11 | UART | MMIO, b_flag=1 |
-| 10 | R | 13 | Button | MMIO, b_flag=1 |
-| 11 | R\|W | 14 | Timer | MMIO, b_flag=1 |
-| 12–16 | — | — | (reserved) | Zeros; available for future hardware GTs |
+| 8  | R\|W | 12 | LED[0]  | MMIO, b_flag=1 |
+| 9  | R\|W | 12 | LED[1]  | MMIO, b_flag=1 |
+| 10 | R\|W | 12 | LED[2]  | MMIO, b_flag=1 |
+| 11 | R\|W | 12 | LED[3]  | MMIO, b_flag=1 |
+| 12 | R\|W | 12 | LED[4]  | MMIO, b_flag=1 |
+| 13 | R\|W | 12 | LED[5]  | MMIO, b_flag=1 |
+| 14 | R\|W | 11 | UART    | MMIO, b_flag=1 (3 regs) |
+| 15 | R    | 13 | Button  | MMIO, b_flag=1 (1 reg) |
+| 16 | R\|W | 14 | Timer   | MMIO, b_flag=1 (5 regs) |
 
 Indices 0–3 are boot-internal (used by BOOT_PROGRAM firmware only).
-Indices 4–11 are the user-visible c-list (hardware device GTs).
+Indices 4–7 are user abstraction GTs (Salvation, Navana, Mint, Memory).
+Indices 8–16 are hardware device GTs (6 LED channels, UART, Button, Timer).
 
 Boot.Abstr director c-list (4 entries, separate from the above):
 
