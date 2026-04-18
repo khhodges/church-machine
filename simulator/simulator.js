@@ -123,23 +123,24 @@ class ChurchSimulator {
         this.deviceAbstractions = deviceAbs;
     }
 
-    // Eagerly install a lazy-manifest entry's body at boot time, optionally
-    // overriding its NS-entry location word (used by Boot Image Designer
-    // Step 2 — Task #215 — to bake "resident" lumps into the boot image).
-    // Returns true on success. Idempotent: safe to call when the entry is
-    // already loaded (just refreshes allocBase if physAddr is provided).
-    eagerInstallResident(slotIndex, physAddr) {
+    // Install a lazy-manifest entry's code body now (used by Boot Image
+    // Designer Step 2 — Task #215 — to bake "resident" lumps into the
+    // boot image). The NS entry's location word is already written by
+    // _initNamespaceTable (honouring any physAddr override from
+    // window.bootConfig.step2); this method just forces the lazy loader
+    // to copy the actual code words in immediately. Idempotent.
+    eagerInstallResident(slotIndex) {
         const entry = this.lazyManifest && this.lazyManifest[slotIndex];
         if (!entry) return false;
-        if (Number.isFinite(physAddr) && physAddr > 0) {
-            const nsBase = this.NS_TABLE_BASE + slotIndex * this.NS_ENTRY_WORDS;
-            this.memory[nsBase] = physAddr >>> 0;
-            entry.allocBase = physAddr;
+        // Sync allocBase to the NS-entry location written at init time so
+        // lazyLoad places the body at the programmer-chosen address.
+        const nsEntry = this.readNSEntry(slotIndex);
+        if (nsEntry && nsEntry.word0_location > 0) {
+            entry.allocBase = nsEntry.word0_location;
         }
-        // Re-arm the lazy loader so it will install code even though the
-        // entry was registered as 'hot' (which normally implies the body is
-        // already in memory). For programmer-declared resident lumps we
-        // still need lazyLoad() to write the actual code words once.
+        // Re-arm the loader: a 'hot' entry was marked loaded=true by
+        // initLazyManifest, but we still need lazyLoad() to actually write
+        // the code words once.
         entry.loaded = false;
         return this.lazyLoad(slotIndex);
     }
@@ -660,6 +661,23 @@ class ChurchSimulator {
         slotSizes[1] = THREAD_LUMP_SIZE;
         slotSizes[2] = BOOT_ABSTR_LUMP_SIZE;
 
+        // Boot Image Designer Step 2 (Task #215): per-slot physAddr overrides
+        // for programmer-declared resident lumps. NS entries for those slots
+        // are written with the chosen location directly, so the NS table is
+        // correct from the moment _initNamespaceTable returns (no post-init
+        // patching of NS words). Non-resident catalog slots and slots not
+        // mentioned in step2 fall back to the historical runningOffset
+        // layout, preserving compatibility with the existing demo.
+        const _bcStep2Lumps = (typeof window !== 'undefined' && window.bootConfig
+                               && window.bootConfig.step2
+                               && window.bootConfig.step2.lumps) || [];
+        const physAddrOverride = {};   // nsSlot → physAddr
+        for (const e of _bcStep2Lumps) {
+            if (e && e.resident && Number.isFinite(e.physAddr) && e.physAddr > 0) {
+                physAddrOverride[e.nsSlot] = e.physAddr;
+            }
+        }
+
         let runningOffset = 0;
         for (let i = 0; i < abstractions.length; i++) {
             const a = abstractions[i];
@@ -678,13 +696,20 @@ class ChurchSimulator {
                 clistChildren.push(i);
                 continue;
             }
-            const loc = (i === 0) ? 0 : runningOffset;
+            // Step 2 physAddr override (if any) replaces the runningOffset
+            // location for this slot, but does not advance runningOffset —
+            // resident lumps are placed in the usable region (after the
+            // foundational layout) which is disjoint from the runningOffset
+            // path, so subsequent foundational slots are unaffected.
+            const overrideLoc = physAddrOverride[i];
+            const loc = (i === 0) ? 0
+                      : (overrideLoc !== undefined ? overrideLoc : runningOffset);
             const mySize = slotSizes[i] || this.SLOT_SIZE;
             // Slot 0 is the namespace physical-memory descriptor; the
             // namespace lump it anchors reserves NS_LUMP_SIZE words so
             // subsequent slots start after it (Task #214 Step 1).
-            if (i > 0) runningOffset += mySize;
-            else runningOffset = NS_LUMP_SIZE;
+            if (i > 0 && overrideLoc === undefined) runningOffset += mySize;
+            else if (i === 0) runningOffset = NS_LUMP_SIZE;
             const lim17 = (i === 0) ? (this.memory.length - 1)
                         : (DEVICE_REG_LIMITS[i] !== undefined ? DEVICE_REG_LIMITS[i]
                         : (mySize - 1));

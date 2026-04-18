@@ -5018,17 +5018,13 @@ function _initLazyLoadManifest() {
     }
     sim.initLazyManifest(manifest);
 
-    // For programmer-declared resident lumps, install the body now (and
-    // honour any physAddr override). Note on layering: NS entries are
-    // built first by simulator._initNamespaceTable() using the runningOffset
-    // layout; this pass then patches the NS location for resident lumps that
-    // override their address and writes the actual code words. Doing this
-    // post-init keeps simulator.js agnostic of the boot-config schema and
-    // confines all programmer-controlled boot-image policy to app.js +
-    // server/app.py.
-    for (const {slot, cfg} of residentSlots) {
+    // simulator._initNamespaceTable() already wrote each resident slot's NS
+    // entry at the programmer-chosen physAddr (it reads window.bootConfig
+    // directly). Here we just install the actual code body now so it's
+    // present at reset, instead of waiting for first-CALL lazy load.
+    for (const {slot} of residentSlots) {
         try {
-            sim.eagerInstallResident(slot, cfg.physAddr);
+            sim.eagerInstallResident(slot);
         } catch (e) {
             console.warn(`[bootConfig] resident install failed for slot ${slot}:`, e);
         }
