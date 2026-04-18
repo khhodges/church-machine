@@ -8,3 +8,4 @@ dist-newstyle/
 *.cabal.sandbox
 cabal.sandbox.config
 .ghc.environment.*
+server/boot-config.json

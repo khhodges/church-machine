@@ -126,8 +126,10 @@ class ChurchSimulator {
     //
     // Bytes longer than the memory window are truncated (defensive); a
     // shorter image leaves the tail untouched. nsCount is recomputed by
-    // scanning the resulting NS table for non-zero entries so the
-    // dashboard reflects whatever the binary describes.
+    // (a) scanning the resulting NS table for non-zero entries, then
+    // (b) extending the count to include Step 3 reserved-but-empty slots
+    //     from window.bootConfig so empty slots remain addressable in
+    //     the dashboard and through the runtime nsCount.
     loadBootImage(arrayBuffer) {
         if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
         const src = new Uint32Array(arrayBuffer);
@@ -142,6 +144,17 @@ class ChurchSimulator {
                 count = i + 1;
             }
         }
+        // Honour Step 3 empty-slot reservations from the saved boot config:
+        // those NS entries are intentionally zeroed in the binary but must
+        // still count toward nsCount so the namespace exposes the reserved
+        // capacity to the runtime.
+        const cfg = (typeof window !== 'undefined') ? window.bootConfig : null;
+        const baseNamed = (cfg && cfg.step3 && Number.isInteger(cfg.step3.baseNamedNsCount))
+            ? cfg.step3.baseNamedNsCount : 0;
+        const empty = (cfg && cfg.step3 && Number.isInteger(cfg.step3.emptySlotCount))
+            ? cfg.step3.emptySlotCount : 0;
+        const reserved = Math.min(maxEntries, baseNamed + empty);
+        if (reserved > count) count = reserved;
         this.nsCount = count;
         this.output += `[BOOTIMG] Loaded ${n}-word boot image; ${count} NS entries active.\n`;
         this.emit('stateChange', this.getState());
