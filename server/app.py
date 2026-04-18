@@ -297,7 +297,7 @@ def boot_config_post():
         with open(BOOT_CONFIG_PATH, "w") as f:
             json.dump(cfg, f, indent=2)
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to write boot_config.json: {e}"}), 500
+        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
     return jsonify({"ok": True, "config": cfg})
 
 @app.route("/simulator/")

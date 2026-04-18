@@ -4331,11 +4331,12 @@ function _bdValidate() {
     errEl.textContent = err;
     saveBtn.disabled = !!err;
     saveBtn.style.opacity = err ? '0.5' : '1';
-    const free = total - sum;
+    const free = (total||0) - NS_TABLE_RESERVE - sum;
     sumEl.innerHTML =
         `Foundational lumps total: <strong>${sum}</strong> words. ` +
         `Free for resident lumps + reserved slots (Steps 2 & 3): ` +
-        `<strong>${free >= 0 ? free : 0}</strong> words.`;
+        `<strong>${free >= 0 ? free : 0}</strong> words ` +
+        `<span style="color:#888;">(total ${total||0} − ${NS_TABLE_RESERVE} NS table − ${sum} foundational)</span>.`;
     return !err;
 }
 
