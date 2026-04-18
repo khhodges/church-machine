@@ -904,7 +904,7 @@ function updateLedStrip() {
 
 function copyLedAssembly() {
     const bits = (sim && typeof sim.ledBits === 'number') ? sim.ledBits : 0;
-    const asm = `; LED.Pattern — set all 6 LEDs at once\nLOAD   CR1, NS[12]      ; Load LED device GT [L,S,E]\nDWRITE DR1, #${bits}${' '.repeat(Math.max(1, 12 - bits.toString().length))}; Pattern 0b${bits.toString(2).padStart(6,'0')}\nSAVE   CR1, CR6, 12     ; Write pattern to all LEDs`;
+    const asm = `; LED.Set — turn on each lit LED (no DR args; LED identity = C-list offset)\n${Array.from({length:6},(_,i)=>((bits>>i)&1)?`CALL   0, CR6, #${8+i}  ; LED.Set on LED ${i} (C-list offset ${8+i})`:null).filter(Boolean).join('\n') || `; (no LEDs lit — all 0)`}`;
     navigator.clipboard.writeText(asm).then(() => {
         const btn = document.querySelector('.led-copy-btn');
         if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => { btn.textContent = '↗ Copy assembly'; }, 1600); }
@@ -7172,6 +7172,12 @@ function absDeleteMethod(absIdx) {
 }
 
 const METHOD_REGISTER_CONVENTIONS = {
+    'LED': {
+        'Set':    { index: 0, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 0, CR6, #(8+led)', note: 'C-list slot 8 = LED 0, 9 = LED 1, \u2026 13 = LED 5. No DR arg needed.' },
+        'Clear':  { index: 1, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 1, CR6, #(8+led)' },
+        'Toggle': { index: 2, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'CALL 2, CR6, #(8+led)' },
+        'State':  { index: 3, input: 'none (LED = capability offset 0\u20135 in C-list slot)', output: 'DR0 = 1 (on), DR0 = 0 (off), DR0 = -1 (fault)',   dispatch: 'CALL 3, CR6, #(8+led)', note: 'Signed return: \u22650 success, <0 fault. Caller checks BGE/BLT on DR0.' },
+    },
     'SlideRule': {
         'Multiply':  { index: 0,  input: 'DR1 (a), DR2 (b)', output: 'DR1 = a * b',  dispatch: 'CALL 0, CRs, #imm' },
         'Divide':    { index: 1,  input: 'DR1 (a), DR2 (b)', output: 'DR1 = a / b',  dispatch: 'CALL 1, CRs, #imm' },
@@ -7209,7 +7215,7 @@ function getMethodPurposes(abs) {
         'Stack': { 'Push': 'Stack.Push(value) — DWRITE to stack location, increment depth', 'Pop': 'Stack.Pop() — decrement depth, DREAD from stack location', 'Peek': 'Stack.Peek() — DREAD top without decrementing', 'Depth': 'Stack.Depth() — return current entry count' },
         'DijkstraFlag': { 'Wait': 'DijkstraFlag.Wait() — P() operation: block if unsignaled', 'Signal': 'DijkstraFlag.Signal() — V() operation: wake one waiter or set flag', 'Reset': 'DijkstraFlag.Reset() — clear flag to unsignaled state', 'Test': 'DijkstraFlag.Test() — non-blocking read of flag state' },
         'UART': { 'Send': 'UART.Send(byte) — SAVE byte to device (S perm)', 'Receive': 'UART.Receive() — LOAD byte from device (L perm)', 'SetBaud': 'UART.SetBaud(rate) — configure via CALL (E perm)' },
-        'LED': { 'Set': 'LED.Set(num, state) — SAVE on-state to device (S perm)', 'Clear': 'LED.Clear(num) — SAVE off-state to device (S perm)', 'Toggle': 'LED.Toggle(num) — LOAD state, invert, SAVE (L+S perm)', 'Pattern': 'LED.Pattern(bits) — SAVE 6-bit pattern to all LEDs (S perm)' },
+        'LED': { 'Set': 'LED.Set \u2014 turn on the LED identified by the capability offset (0\u20135). No DR args. DR0 \u22650 success, <0 fault.', 'Clear': 'LED.Clear \u2014 turn off the LED identified by the capability offset (0\u20135). No DR args. DR0 \u22650 success, <0 fault.', 'Toggle': 'LED.Toggle \u2014 flip the LED identified by the capability offset. No DR args. DR0 \u22650 success, <0 fault.', 'State': 'LED.State \u2014 read the on/off state of the LED at the capability offset. Returns DR0=1 (on), DR0=0 (off), DR0<0 (fault).' },
         'Button': { 'Read': 'Button.Read() — LOAD state from device (L perm)', 'WaitPress': 'Button.WaitPress() — block via Scheduler until press (E perm)', 'OnEvent': 'Button.OnEvent() — dequeue press/release event (E perm)' },
         'Timer': { 'Start': 'Timer.Start(channel) — SAVE start command to device (S perm)', 'Stop': 'Timer.Stop(channel) — SAVE stop command (S perm)', 'Read': 'Timer.Read() — LOAD elapsed ticks from device (L perm)', 'SetAlarm': 'Timer.SetAlarm(ticks) — SAVE threshold to device (S perm)' },
         'Display': { 'Write': 'Display.Write(char) — SAVE character to device (S perm)', 'Clear': 'Display.Clear() — SAVE clear command (S perm)', 'Scroll': 'Display.Scroll(lines) — SAVE scroll command (S perm)' },
@@ -7416,29 +7422,25 @@ CALL   CR1                ; LED.Set via E-perm driver:
 ; Gate Log shows full chain of custody:
 ;   PassKey presented -> Navana validated ->
 ;   LED.Set(3,1) called -> device write committed`,
-            'CallLEDDriver': `; LED via Navana PassKey — two calling modes
+            'CallLEDDriver': `; LED via Navana PassKey — capability-offset API
 ;
 ; Assumes PassKey already validated (Step 1-2 done)
 ; CR1 holds E-perm LED driver GT from Navana
+; LED identity = C-list slot offset (8=LED0 ... 13=LED5)
+; No DR argument needed — capability IS the LED
 
-; ---- Mode 1: LED.Set(LED#, colour) ----
-; When DR2 > 0, routes to LED.Set automatically
-DWRITE DR1, #3            ; DR1 = LED number (0-5)
-DWRITE DR2, #1            ; DR2 = colour (non-zero -> Set mode)
-CALL   CR1                ; LED.Set via E-perm driver
+; ---- LED.Set on LED 2 (C-list offset 10) ----
+CALL   0, CR6, #10        ; Set LED 2; DR0 <- 1 (ok) or -1 (fault)
+BGE    DR0, #0, .ok       ; branch if non-negative (success)
+; handle fault (DR0 < 0)
 
-; ---- Mode 2: LED.Pattern(6-bit pattern) ----
-; When DR2 = 0 and DR1 is a 6-bit value, routes to LED.Pattern
-DWRITE DR1, #0b00101010  ; DR1 = 6-bit pattern (alternating)
-DWRITE DR2, #0            ; DR2 = 0 -> Pattern mode
-CALL   CR1                ; LED.Pattern via E-perm driver:
-;   1. Reads DR1[5:0] as 6-bit pattern
-;   2. Writes pattern atomically to all 6 LEDs
-;   3. Pins 15-20 driven active-low
-;   4. DR1 <- new LED state
-; Gate Log shows full chain of custody:
-;   Grant validated -> LED.Pattern called ->
-;   device write committed`,
+.ok:
+; ---- LED.State on LED 2 ----
+CALL   3, CR6, #10        ; Read LED 2 state; DR0 = 1(on) / 0(off) / -1(fault)
+BGE    DR0, #0, .got_state
+; handle fault
+.got_state:
+; DR0 = current on/off state`,
             'MintPassKey': `; Navana.MintPassKey — create a new PassKey
 ; PRIVILEGED: requires M-elevation (boot/kernel only)
 ; Unprivileged callers get PERM fault.
@@ -7832,32 +7834,30 @@ CALL   CR1              ; UART.SetBaud via E perm:
         'LED': {
             'Set': `; LED.Set — turn LED on via S (Save) permission
 ; Tang Nano 20K: 6 LEDs on pins 15-20 (active-low)
-LOAD   CR1, NS[12]      ; Load LED GT [L,S,E]
-DWRITE DR1, #3          ; LED number (0-5)
-DWRITE DR2, #1          ; State: 1=on
-SAVE   CR1, DR1         ; S perm: save state to device
-                         ;   Church domain capability gate
-                         ;   No ambient access — must hold GT`,
-            'Clear': `; LED.Clear — turn LED off via S perm
-LOAD   CR1, NS[12]      ; Load LED GT [L,S,E]
-DWRITE DR1, #3          ; LED number
-DWRITE DR2, #0          ; State: 0=off
-SAVE   CR1, DR1         ; S perm: save to device`,
-            'Toggle': `; LED.Toggle — flip LED state
-LOAD   CR1, NS[12]      ; Load LED GT [L,S,E]
-DWRITE DR1, #3          ; LED number
-
-CALL   CR1              ; LED.Toggle via E perm:
-;   1. L perm: read current state from device
-;   2. Invert state
-;   3. S perm: write new state to device`,
-            'Pattern': `; LED.Pattern — set all 6 LEDs at once
-LOAD   CR1, NS[12]      ; Load LED GT [L,S,E]
-DWRITE DR1, #0b101010   ; Pattern: alternating on/off
-                         ; Bit 0=LED0, Bit 5=LED5
-SAVE   CR1, DR1         ; S perm: save pattern to device
-; All 6 LEDs updated atomically
-; Pins 15-20 driven active-low`,
+; LED identity = C-list slot offset (8=LED0, 9=LED1 ... 13=LED5)
+; No DR arg needed — the capability selects the LED.
+CALL   0, CR6, #11      ; LED.Set LED 3 (C-list offset 11)
+;   DR0 <- 1 (success), or DR0 <- -1 (invalid offset)
+BGE    DR0, #0, .ok     ; non-negative = success
+.ok:`,
+            'Clear': `; LED.Clear — turn LED off (no DR arg)
+; LED identity from C-list slot: offset 8=LED0, 9=LED1 ... 13=LED5
+CALL   1, CR6, #11      ; LED.Clear LED 3 (C-list offset 11)
+;   DR0 <- 1 (success), DR0 <- -1 (fault)
+BGE    DR0, #0, .ok     ; check sign
+.ok:`,
+            'Toggle': `; LED.Toggle — flip LED state (no DR arg)
+; LED identity from C-list slot: offset 8=LED0, 9=LED1 ... 13=LED5
+CALL   2, CR6, #11      ; LED.Toggle LED 3 (C-list offset 11)
+;   DR0 <- 1 (success), DR0 <- -1 (fault)`,
+            'State': `; LED.State — read on/off state (no DR arg)
+; LED identity from C-list slot: offset 8=LED0, 9=LED1 ... 13=LED5
+CALL   3, CR6, #11      ; LED.State LED 3 (C-list offset 11)
+;   DR0 = 1 (on), DR0 = 0 (off), DR0 = -1 (fault)
+BGE    DR0, #0, .got_state
+; DR0 < 0: capability fault
+.got_state:
+; DR0 = current LED state (0 or 1)`,
         },
         'Button': {
             'Read': `; Button.Read — read button state via L perm

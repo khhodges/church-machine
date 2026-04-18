@@ -150,16 +150,15 @@ class DeviceAbstractions {
             const check = self._validateDeviceAccess(sim, self.IO_SEGMENT | 0x10, 'S');
             if (!check.ok) return check;
 
-            const led = args.led;
-            if (led === undefined || led < 0 || led >= dev.count) {
-                return { ok: false, fault: 'ARGS', message: `LED.Set: led must be 0-${dev.count - 1}` };
+            const ledIdx = args.ledIndex !== undefined ? args.ledIndex : 0;
+            if (ledIdx < 0 || ledIdx >= dev.count) {
+                return { ok: true, result: -1, message: `LED.Set: invalid capability offset ${ledIdx} (valid: 0\u2013${dev.count - 1})` };
             }
-            dev.state |= (1 << led);
-
+            dev.state |= (1 << ledIdx);
             return {
                 ok: true,
-                result: { led: led, state: dev.state },
-                message: `LED.Set: LED ${led} ON (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
+                result: 1,
+                message: `LED.Set: offset ${ledIdx} ON (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
             };
         });
 
@@ -167,16 +166,15 @@ class DeviceAbstractions {
             const check = self._validateDeviceAccess(sim, self.IO_SEGMENT | 0x10, 'S');
             if (!check.ok) return check;
 
-            const led = args.led;
-            if (led === undefined || led < 0 || led >= dev.count) {
-                return { ok: false, fault: 'ARGS', message: `LED.Clear: led must be 0-${dev.count - 1}` };
+            const ledIdx = args.ledIndex !== undefined ? args.ledIndex : 0;
+            if (ledIdx < 0 || ledIdx >= dev.count) {
+                return { ok: true, result: -1, message: `LED.Clear: invalid capability offset ${ledIdx} (valid: 0\u2013${dev.count - 1})` };
             }
-            dev.state &= ~(1 << led);
-
+            dev.state &= ~(1 << ledIdx);
             return {
                 ok: true,
-                result: { led: led, state: dev.state },
-                message: `LED.Clear: LED ${led} OFF (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
+                result: 1,
+                message: `LED.Clear: offset ${ledIdx} OFF (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
             };
         });
 
@@ -184,31 +182,32 @@ class DeviceAbstractions {
             const check = self._validateDeviceAccess(sim, self.IO_SEGMENT | 0x10, 'S');
             if (!check.ok) return check;
 
-            const led = args.led;
-            if (led === undefined || led < 0 || led >= dev.count) {
-                return { ok: false, fault: 'ARGS', message: `LED.Toggle: led must be 0-${dev.count - 1}` };
+            const ledIdx = args.ledIndex !== undefined ? args.ledIndex : 0;
+            if (ledIdx < 0 || ledIdx >= dev.count) {
+                return { ok: true, result: -1, message: `LED.Toggle: invalid capability offset ${ledIdx} (valid: 0\u2013${dev.count - 1})` };
             }
-            dev.state ^= (1 << led);
-            const isOn = (dev.state >> led) & 1;
-
+            dev.state ^= (1 << ledIdx);
+            const isOn = (dev.state >> ledIdx) & 1;
             return {
                 ok: true,
-                result: { led: led, on: isOn, state: dev.state },
-                message: `LED.Toggle: LED ${led} ${isOn ? 'ON' : 'OFF'} (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
+                result: 1,
+                message: `LED.Toggle: offset ${ledIdx} \u2192 ${isOn ? 'ON' : 'OFF'} (state=0b${dev.state.toString(2).padStart(dev.count, '0')})`
             };
         });
 
-        this.registry.bindMethod(12, 'Pattern', function(sim, args) {
-            const check = self._validateDeviceAccess(sim, self.IO_SEGMENT | 0x10, 'S');
+        this.registry.bindMethod(12, 'State', function(sim, args) {
+            const check = self._validateDeviceAccess(sim, self.IO_SEGMENT | 0x10, 'L');
             if (!check.ok) return check;
 
-            const pattern = args.pattern & ((1 << dev.count) - 1);
-            dev.state = pattern;
-
+            const ledIdx = args.ledIndex !== undefined ? args.ledIndex : 0;
+            if (ledIdx < 0 || ledIdx >= dev.count) {
+                return { ok: true, result: -1, message: `LED.State: invalid capability offset ${ledIdx} (valid: 0\u2013${dev.count - 1})` };
+            }
+            const isOn = (dev.state >> ledIdx) & 1;
             return {
                 ok: true,
-                result: { state: dev.state },
-                message: `LED.Pattern: set to 0b${dev.state.toString(2).padStart(dev.count, '0')}`
+                result: isOn,
+                message: `LED.State: offset ${ledIdx} is ${isOn ? 'ON' : 'OFF'} (1=on, 0=off, <0=fault)`
             };
         });
     }

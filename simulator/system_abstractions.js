@@ -139,11 +139,11 @@ class SystemAbstractions {
     _bindNavana() {
         const DEVICE_NS_SLOTS = { UART: 11, LED: 12, Button: 13, Timer: 14, Display: 15 };
         const PASSKEY_DEVICE_SELECTORS = { LED: 0x01, UART: 0x02, Button: 0x03, Timer: 0x04, Display: 0x05 };
-        const PASSKEY_PERM_SET   = 0x01;
-        const PASSKEY_PERM_CLEAR = 0x02;
-        const PASSKEY_PERM_PATTERN = 0x04;
-        const PASSKEY_PERM_GET   = 0x08;
-        const PASSKEY_PERM_ALL   = 0x0F;
+        const PASSKEY_PERM_SET    = 0x01;
+        const PASSKEY_PERM_CLEAR  = 0x02;
+        const PASSKEY_PERM_TOGGLE = 0x04;
+        const PASSKEY_PERM_STATE  = 0x08;
+        const PASSKEY_PERM_ALL    = 0x0F;
 
         let passKeyCounter = 0;
 
@@ -221,39 +221,37 @@ class SystemAbstractions {
         }
 
         function createLEDDriverAbstraction(sim) {
-            const deviceState = sim.deviceAbstractions ? sim.deviceAbstractions._deviceState.led : null;
             const driver = {
                 nsIndex: DEVICE_NS_SLOTS.LED,
                 device: 'LED',
-                methods: ['Set', 'Clear', 'Pattern', 'Get'],
+                methods: ['Set', 'Clear', 'Toggle', 'State'],
                 call: function(sim, dr0, dr1, permMask) {
-                    const method = dr0 >>> 24;
-                    const ledNum = dr0 & 0xFF;
-                    const colour = dr1 & 0xFF;
-                    const pattern = dr0 & 0x3F;
+                    // dr0[31:24] = method selector (0=Set,1=Clear,2=Toggle,3=State)
+                    // dr0[5:0]   = LED index (0-5); capability offset encoded in caller's C-list slot
+                    const method   = dr0 >>> 24;
+                    const ledIndex = dr0 & 0x3F;
 
                     let result;
                     if (method === 0 || method === undefined) {
                         if (!(permMask & PASSKEY_PERM_SET)) {
                             return { ok: false, fault: 'PERM', message: 'LED.Set not permitted by PassKey' };
                         }
-                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Set', sim, { led: ledNum, colour: colour });
+                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Set', sim, { ledIndex });
                     } else if (method === 1) {
                         if (!(permMask & PASSKEY_PERM_CLEAR)) {
                             return { ok: false, fault: 'PERM', message: 'LED.Clear not permitted by PassKey' };
                         }
-                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Clear', sim, { led: ledNum });
+                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Clear', sim, { ledIndex });
                     } else if (method === 2) {
-                        if (!(permMask & PASSKEY_PERM_PATTERN)) {
-                            return { ok: false, fault: 'PERM', message: 'LED.Pattern not permitted by PassKey' };
+                        if (!(permMask & PASSKEY_PERM_TOGGLE)) {
+                            return { ok: false, fault: 'PERM', message: 'LED.Toggle not permitted by PassKey' };
                         }
-                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Pattern', sim, { pattern: pattern });
+                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'Toggle', sim, { ledIndex });
                     } else if (method === 3) {
-                        if (!(permMask & PASSKEY_PERM_GET)) {
-                            return { ok: false, fault: 'PERM', message: 'LED.Get not permitted by PassKey' };
+                        if (!(permMask & PASSKEY_PERM_STATE)) {
+                            return { ok: false, fault: 'PERM', message: 'LED.State not permitted by PassKey' };
                         }
-                        const state = deviceState ? deviceState.state : 0;
-                        result = { ok: true, result: { state: state }, message: `LED.Get: state=0b${state.toString(2).padStart(6, '0')}` };
+                        result = sim.abstractionRegistry.dispatchMethod(DEVICE_NS_SLOTS.LED, 'State', sim, { ledIndex });
                     } else {
                         return { ok: false, fault: 'METHOD', message: `LED driver: unknown method selector ${method}` };
                     }

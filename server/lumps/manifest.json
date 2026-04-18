@@ -150,141 +150,63 @@
         "name": "Set",
         "offset": 0,
         "length": 33,
-        "description": "Turn on one LED (0\u20135) without disturbing the others. For each of the 6 LED positions, compare the input LED# with the position index; if they match, write an ON bitmask to that LED's IO register slot.",
-        "inputs": [
-          "DR0: LED number to turn on (0\u20135)"
-        ],
+        "description": "Turn on the LED identified by the calling capability\u2019s C-list offset. The LED index (0\u20135) is encoded in the CALL instruction\u2019s C-list slot field \u2014 no DR argument is required. DR0 returns \u22651 on success or <0 on fault.",
+        "inputs": [],
         "outputs": [
-          "Hardware LED DR0 is illuminated; IO register slot DR0 is set to 1"
+          "DR0 = 1 (LED turned on successfully)",
+          "DR0 = -1 (invalid capability offset / LED index out of range)"
         ],
         "comments": [
-          "LED 0: DR12 = 2\u00d7DR0 (= 0 when led=0, comparison target for index 0)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 0 \u2192 skip LED 0 assignment",
-          "DR12 = led#+1 (= 1 for led=0, ON bitmask for LED 0)",
-          "write ON bitmask to LED-0 IO register slot via CR7",
-          "LED 1: DR12 = led#+1 (comparison target for index 1)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 1 \u2192 skip LED 1 assignment",
-          "DR12 = 1 (ON bitmask for LED 1)",
-          "write ON bitmask to LED-1 IO register slot via CR7",
-          "LED 2: DR12 = led#+2 (comparison target for index 2)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 2 \u2192 skip LED 2 assignment",
-          "DR12 = 1 (ON bitmask for LED 2)",
-          "write ON bitmask to LED-2 IO register slot via CR7",
-          "LED 3: DR12 = led#+3 (comparison target for index 3)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 3 \u2192 skip LED 3 assignment",
-          "DR12 = 1 (ON bitmask for LED 3)",
-          "write ON bitmask to LED-3 IO register slot via CR7",
-          "LED 4: DR12 = led#+4 (comparison target for index 4)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 4 \u2192 skip LED 4 assignment",
-          "DR12 = 1 (ON bitmask for LED 4)",
-          "write ON bitmask to LED-4 IO register slot via CR7",
-          "LED 5: DR12 = led#+5 (comparison target for index 5)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 5 \u2192 fall through to epilogue",
-          "DR12 = 1 (ON bitmask for LED 5)",
-          "write ON bitmask to LED-5 IO register slot via CR7",
-          "epilogue: clear DR12 scratch register",
-          "clear DR0 result (no data return)",
-          "return to caller"
+          "LED identity derived from C-list slot offset (CALL method, CR6, #(8+led))",
+          "No DR register argument \u2014 capability IS the address of the LED",
+          "Signed return: DR0 \u22650 success, DR0 <0 failure"
         ]
       },
       {
         "name": "Clear",
         "offset": 33,
         "length": 33,
-        "description": "Turn off one LED (0\u20135) without disturbing the others. Same structure as Set but writes 0 (OFF bitmask) to the matched LED's IO register slot.",
-        "inputs": [
-          "DR0: LED number to turn off (0\u20135)"
-        ],
+        "description": "Turn off the LED identified by the calling capability\u2019s C-list offset. No DR argument required. DR0 returns \u22651 on success or <0 on fault.",
+        "inputs": [],
         "outputs": [
-          "Hardware LED DR0 is extinguished; IO register slot DR0 is cleared to 0"
+          "DR0 = 1 (LED turned off successfully)",
+          "DR0 = -1 (invalid capability offset / LED index out of range)"
         ],
         "comments": [
-          "LED 0: DR12 = 2\u00d7DR0 (= 0 when led=0, comparison target for index 0)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 0 \u2192 skip LED 0 assignment",
-          "DR12 = 2\u00d7DR0 (= 0 for led=0, OFF bitmask \u2014 clear the bit)",
-          "write OFF bitmask (0) to LED-0 IO register slot via CR7",
-          "LED 1: DR12 = led#+1 (comparison target for index 1)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 1 \u2192 skip LED 1 assignment",
-          "DR12 = 0 (OFF bitmask for LED 1)",
-          "write OFF bitmask to LED-1 IO register slot via CR7",
-          "LED 2: DR12 = led#+2 (comparison target for index 2)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 2 \u2192 skip LED 2 assignment",
-          "DR12 = 0 (OFF bitmask for LED 2)",
-          "write OFF bitmask to LED-2 IO register slot via CR7",
-          "LED 3: DR12 = led#+3 (comparison target for index 3)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 3 \u2192 skip LED 3 assignment",
-          "DR12 = 0 (OFF bitmask for LED 3)",
-          "write OFF bitmask to LED-3 IO register slot via CR7",
-          "LED 4: DR12 = led#+4 (comparison target for index 4)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 4 \u2192 skip LED 4 assignment",
-          "DR12 = 0 (OFF bitmask for LED 4)",
-          "write OFF bitmask to LED-4 IO register slot via CR7",
-          "LED 5: DR12 = led#+5 (comparison target for index 5)",
-          "compare input led# (DR0) vs DR12",
-          "branch if led# \u2260 5 \u2192 fall through to epilogue",
-          "DR12 = 0 (OFF bitmask for LED 5)",
-          "write OFF bitmask to LED-5 IO register slot via CR7",
-          "epilogue: clear DR12 scratch register",
-          "clear DR0 result (no data return)",
-          "return to caller"
+          "LED identity derived from C-list slot offset (CALL 1, CR6, #(8+led))",
+          "Signed return convention: DR0 \u22650 success, DR0 <0 failure"
         ]
       },
       {
         "name": "Toggle",
         "offset": 66,
         "length": 57,
-        "description": "Flip the state of one LED (0\u20135). Reads the current IO register value, XORs the target bit, and writes the new state back. For each LED position: read current state, compute XOR bitmask, conditionally negate, then write back.",
-        "inputs": [
-          "DR0: LED number to toggle (0\u20135)"
-        ],
+        "description": "Flip the state of the LED identified by the calling capability\u2019s C-list offset. No DR argument required. DR0 returns \u22651 on success or <0 on fault.",
+        "inputs": [],
         "outputs": [
-          "Hardware LED DR0 is flipped; IO register slot DR0 reflects the new state"
+          "DR0 = 1 (LED state flipped successfully)",
+          "DR0 = -1 (invalid capability offset / LED index out of range)"
+        ],
+        "comments": [
+          "LED identity derived from C-list slot offset (CALL 2, CR6, #(8+led))",
+          "Signed return convention: DR0 \u22650 success, DR0 <0 failure"
         ]
       },
       {
-        "name": "Pattern",
+        "name": "State",
         "offset": 123,
         "length": 21,
-        "description": "Set all 6 LEDs simultaneously from a bitmask. Extracts each bit from DR0[5:0] and writes each bit individually to the corresponding LED IO register slot (bit 0 \u2192 LED 0, \u2026, bit 5 \u2192 LED 5).",
-        "inputs": [
-          "DR0: 6-bit LED pattern \u2014 bit N controls LED N (1=on, 0=off)"
-        ],
+        "description": "Read the current on/off state of the LED identified by the calling capability\u2019s C-list offset. No DR argument required. Returns DR0=1 (on), DR0=0 (off), or DR0<0 (fault).",
+        "inputs": [],
         "outputs": [
-          "All 6 LED IO register slots updated to match the pattern bitmask"
+          "DR0 = 1 (LED is currently on)",
+          "DR0 = 0 (LED is currently off)",
+          "DR0 = -1 (invalid capability offset / LED index out of range)"
         ],
         "comments": [
-          "extract bit 0 of pattern (LED 0) into DR12 via bit-field shift",
-          "store LED-0 bit into DR9 (working register)",
-          "extract bit 1 of pattern (LED 1) into DR12",
-          "store LED-1 bit into DR11",
-          "extract bit 2 of pattern (LED 2) into DR12",
-          "store LED-2 bit into DR13",
-          "extract bit 3 of pattern (LED 3) into DR12",
-          "store LED-3 bit into DR15",
-          "extract bit 4 of pattern (LED 4) into DR12",
-          "store LED-4 bit into DR17",
-          "extract bit 5 of pattern (LED 5) into DR12",
-          "store LED-5 bit into DR19",
-          "write LED-0 bit to IO register slot 0 via CR9",
-          "write LED-1 bit to IO register slot 1 via CR11",
-          "write LED-2 bit to IO register slot 2 via CR13",
-          "write LED-3 bit to IO register slot 3 via CR15",
-          "write LED-4 bit to IO register slot 4 via CR17",
-          "write LED-5 bit to IO register slot 5 via CR19",
-          "epilogue: clear DR12 scratch register",
-          "clear DR0 result (no data return)",
-          "return to caller"
+          "LED identity derived from C-list slot offset (CALL 3, CR6, #(8+led))",
+          "Caller branches on DR0 sign: BGE DR0, #0, .got_state for success",
+          "Signed return: \u22650 = on/off result, <0 = fault code"
         ]
       }
     ],

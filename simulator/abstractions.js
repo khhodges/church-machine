@@ -224,8 +224,8 @@ class AbstractionRegistry {
             { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(12, 'LED', 2,
-            ['Set', 'Clear', 'Toggle', 'Pattern'],
-            '6 onboard LEDs — visual output for children\'s programs',
+            ['Set', 'Clear', 'Toggle', 'State'],
+            '6 onboard LEDs — visual output for children\'s programs. LED identity is the capability offset (0\u20135) in the C-list; no DR arguments. DR0 return: \u22650 success, <0 failure.',
             { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(13, 'Button', 2,

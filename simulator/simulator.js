@@ -2340,13 +2340,22 @@ class ChurchSimulator {
         this.output += desc + '\n';
 
         if (this.abstractionRegistry) {
+            // For LED (NS 12): derive capability offset from c-list slot so the
+            // method handler receives args.ledIndex without any DR register input.
+            // CALL method, CR6, #(LED_CLIST_BASE + led_num) → ledIndex = led_num (0–5).
+            const LED_ABS_IDX   = 12;
+            const LED_CLIST_BASE = 8;
+            let ledIndex = 0;
+            if (check.index === LED_ABS_IDX && isClistIndexed) {
+                ledIndex = Math.max(0, Math.min(5, d.imm - LED_CLIST_BASE));
+            }
             const result = this.abstractionRegistry.dispatchMethod(check.index, methodName, this, {
-                dr1: argDR1, dr2: argDR2
+                dr1: argDR1, dr2: argDR2, ledIndex
             });
             if (result && result.message) {
                 this.output += `  ${result.message}\n`;
             }
-            if (result && result.ok && result.result !== undefined && typeof result.result === 'number') {
+            if (result && result.result !== undefined && typeof result.result === 'number') {
                 if (encodedDstReg !== null) {
                     this.dr[encodedDstReg] = result.result;
                 } else {
