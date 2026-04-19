@@ -9,3 +9,6 @@ dist-newstyle/
 cabal.sandbox.config
 .ghc.environment.*
 server/boot-config.json
+# Generated VCD simulation traces and build artifacts
+build/*.vcd
+/tmp/*.vcd
