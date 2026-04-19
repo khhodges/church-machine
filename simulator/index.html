@@ -87,6 +87,7 @@
                                 <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Create</button>
                                 <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math</button>
                                 <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace</button>
+                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Test</div>
@@ -424,6 +425,27 @@
                 <input type="file" id="nsImportFile" style="display:none;" accept=".json,.bin" onchange="handleNSImport(event)">
             </div>
             <div id="namespaceTable"></div>
+        </div>
+    </div>
+
+    <div id="memory" class="view">
+        <div class="panel">
+            <div class="panel-title">Memory — Word-Addressed Dump</div>
+            <div class="ns-toolbar" style="gap:0.5rem;align-items:center;">
+                <label style="color:#9ca3af;font-size:0.78rem;font-family:monospace;">Address</label>
+                <input id="memAddrInput" class="modal-input" type="text" value="0x0000"
+                       style="width:7rem;font-family:monospace;font-size:0.82rem;"
+                       onchange="jumpToMemory(parseInt(this.value,16))"
+                       onkeydown="if(event.key==='Enter')jumpToMemory(parseInt(this.value,16))">
+                <label style="color:#9ca3af;font-size:0.78rem;font-family:monospace;">Words</label>
+                <input id="memCountInput" class="modal-input" type="text" value="256"
+                       style="width:4.5rem;font-family:monospace;font-size:0.82rem;"
+                       onchange="renderMemoryView()" onkeydown="if(event.key==='Enter')renderMemoryView()">
+                <button class="btn btn-sm" onclick="jumpToMemory((window.memoryViewAddr||0)-parseInt(document.getElementById('memCountInput').value,10)||256)" style="font-family:monospace;">◀ Prev</button>
+                <button class="btn btn-sm" onclick="jumpToMemory((window.memoryViewAddr||0)+parseInt(document.getElementById('memCountInput').value,10)||256)" style="font-family:monospace;">Next ▶</button>
+                <button class="btn btn-primary btn-sm" onclick="switchView('namespace')" style="margin-left:auto;">← Back to NS Table</button>
+            </div>
+            <div id="memoryViewTable" style="margin-top:0.5rem;overflow-x:auto;"></div>
         </div>
     </div>
 

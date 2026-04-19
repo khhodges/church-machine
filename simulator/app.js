@@ -601,6 +601,7 @@ function switchView(viewId) {
     if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
     if (viewId === 'namespace') updateNamespace();
+    if (viewId === 'memory')    renderMemoryView();
     if (viewId === 'abstractions') renderAbstractions();
     if (viewId === 'lumps') renderLumps();
     if (viewId === 'pipeline') pipelineViz.render();
@@ -4677,7 +4678,7 @@ function updateNamespace() {
         html += `<tr class="ns-row${isExpanded ? ' ns-row-active' : ''}" onclick="toggleNSDetail(${i})" style="cursor:pointer;${rowOpacity}">`;
         html += `<td>${i}</td>`;
         html += `<td class="ns-label" style="${warmStyle}" onmouseenter="showNSEntryTooltip(event,${i})" onmouseleave="hideNSEntryTooltip()">${e.label || '-'}</td>`;
-        html += `<td style="${warmStyle}">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
+        html += `<td style="${warmStyle}cursor:pointer;text-decoration:underline dotted;color:#4ec9b0;" title="Open memory view at this address" onclick="event.stopPropagation();jumpToMemory(${e.word0_location})">0x${e.word0_location.toString(16).toUpperCase().padStart(8, '0')}</td>`;
         if (codeNotResident) {
             const priorityTag = manifest.priority === 'hot' ? 'Hot' : (manifest.priority === 'cold' ? 'Cold' : 'Warm');
             html += `<td style="${warmStyle}">${typeNames[e.gtType] || '?'} <span style="font-size:0.7rem;">(${priorityTag})</span></td>`;
@@ -4703,6 +4704,69 @@ function updateNamespace() {
             html += `</div></td></tr>`;
         }
     }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// ── Memory dump view ──────────────────────────────────────────────────────────
+
+window.memoryViewAddr = 0;
+
+function jumpToMemory(addr) {
+    if (isNaN(addr) || addr < 0) addr = 0;
+    addr = addr >>> 0;
+    window.memoryViewAddr = addr;
+    const inp = document.getElementById('memAddrInput');
+    if (inp) inp.value = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+    switchView('memory');
+}
+
+function renderMemoryView() {
+    const container = document.getElementById('memoryViewTable');
+    if (!container) return;
+
+    const addr  = (window.memoryViewAddr || 0) >>> 0;
+    const countEl = document.getElementById('memCountInput');
+    const count = Math.max(16, Math.min(4096, parseInt(countEl ? countEl.value : '256', 10) || 256));
+    const COLS  = 8;   // words per row
+
+    // Sync address input
+    const inp = document.getElementById('memAddrInput');
+    if (inp) inp.value = '0x' + addr.toString(16).toUpperCase().padStart(4, '0');
+
+    // Build annotation map: ns slot physical addresses
+    const nsAnnot = {};
+    if (sim && sim.nsCount) {
+        for (let i = 0; i < sim.nsCount; i++) {
+            const e = sim.readNSEntry(i);
+            if (e && e.word0_location > 0) {
+                nsAnnot[e.word0_location] = `← Slot ${i} (${e.label || '?'}) lump start`;
+            }
+        }
+        if (sim.NS_TABLE_BASE) nsAnnot[sim.NS_TABLE_BASE] = '← NS_TABLE_BASE';
+    }
+
+    let html = '<table class="ns-mem-table" style="font-family:monospace;font-size:0.76rem;min-width:100%;">';
+    html += '<thead><tr><th style="min-width:5rem;">Addr</th>';
+    for (let c = 0; c < COLS; c++) html += `<th>+${c}</th>`;
+    html += '<th style="padding-left:0.5rem;">Annotation</th></tr></thead><tbody>';
+
+    for (let row = 0; row < count; row += COLS) {
+        const rowAddr = addr + row;
+        const annot   = nsAnnot[rowAddr] || '';
+        const rowStyle = annot ? ' style="background:rgba(200,155,60,0.07);"' : '';
+        html += `<tr${rowStyle}>`;
+        html += `<td style="color:#6b7280;padding-right:0.5rem;">0x${rowAddr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
+        for (let c = 0; c < COLS; c++) {
+            const a = rowAddr + c;
+            const w = (sim && a < sim.memory.length) ? (sim.memory[a] >>> 0) : 0;
+            const style = w ? '' : ' style="color:#3a3a4a;"';
+            html += `<td${style}>${w ? ('0x' + w.toString(16).toUpperCase().padStart(8,'0')) : '00000000'}</td>`;
+        }
+        html += `<td style="color:#c89b3c;padding-left:0.5rem;font-size:0.7rem;">${annot}</td>`;
+        html += '</tr>';
+    }
+
     html += '</tbody></table>';
     container.innerHTML = html;
 }
