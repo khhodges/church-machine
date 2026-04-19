@@ -9031,8 +9031,8 @@ LOAD   CR1, NS[31]        ; Load Tunnel E-GT
 DWRITE DR1, #0xA0000000   ; Type tag: log output
 DWRITE DR2, #3             ; 3 payload words
 DWRITE DR3, #0x48656C6C   ; "Hell"
-DWRITE DR4, #0x6F20576F   ; "o Wo"
-DWRITE DR5, #0x726C6400   ; "rld\0"
+DWRITE DR4, #0x6F204D75   ; "o Mu"
+DWRITE DR5, #0x6D000000   ; "m\0\0\0"
 CALL   CR1                 ; Tunnel.Send:
 ;   1. Frame: [type_tag · word_count · DR3..DR5]
 ;   2. Transmit framed packet over UART
