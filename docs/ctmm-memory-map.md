@@ -109,7 +109,7 @@ Lump addresses in this table are identical in both the 65 536-word and the
 |-----:|:-------------|:---------------|:-------------|------:|---:|:-:|:------|
 |   0  | Boot.NS      | `0x00000000`   | `0x245E3FFF` | 16383 | 47 | 1 | NS root; location=0 |
 |   1  | Boot.Thread  | `0x00000040`   | `0x240000FF` |   255 |  0 | 1 | Thread lump |
-|   2  | Boot.Abstr   | `0x00000140`   | `0x2408003B` |    59 |  4 | 1 | Director (cw=0, cc=4) |
+|   2  | (free/null)  | `0x00000140`   | `0x00000000` |     — |  — | 0 | Free slot — Boot.Abstr director eliminated (Task #247) |
 |   3  | Boot.Entry   | `0x00000180`   | `0x242200EE` |   238 | 17 | 1 | Boot ROM code; cw=17, cc=17 |
 |   4  | Salvation    | `0x00000280`   | `0x0400003F` |    63 |  0 | 0 | Lazy |
 |   5  | Navana       | `0x000002C0`   | `0x0400003F` |    63 |  0 | 0 | Lazy |
@@ -196,18 +196,12 @@ The NS root lump occupies the first 64 words of memory (`0x0000–0x003F`).
 This is by design: the NS root lump is a descriptor region, not a code or
 data lump.  Its NS entry uses `limit = totalNamespaceWords − 1 = 16383`.
 
-### 4.2 Boot.Abstr director — Slot 2 (base `0x0140`)
+### 4.2 Free/null — Slot 2 (`0x0140`–`0x017F`) *(Task #247)*
 
-Header: `0xF8000004` — `magic=0x1F`, `n_minus_6=0` → 64w, `cw=0`, `typ=0`, `cc=4`.
-
-```
- 0x0140   Header: 0xF8000004
- 0x0141–0x017B  Free space (60 words)
- 0x017C   C-list[0] = 0x06800000  → slot 0 Boot.NS   [RW]
- 0x017D   C-list[1] = 0x00800001  → slot 1 Boot.Thread  [ ]
- 0x017E   C-list[2] = 0x40800002  → slot 2 Boot.Abstr   [E]  (self)
- 0x017F   C-list[3] = 0x40800003  → slot 3 Boot.Entry   [E]
-```
+Slot 2 is a free/null NS entry.  The Boot.Abstr director that previously
+occupied this range has been eliminated.  The 64 words at `0x0140`–`0x017F`
+are available to the heap allocator; the NS entry for slot 2 is all-zero
+(no valid lump header, no c-list).
 
 ### 4.3 Thread lump — Slot 1, Boot.Thread (base `0x0040`)
 
@@ -241,7 +235,7 @@ sp_max = THREAD_CAPS_OFFSET − 1  = 243
 
 | Offset | Value        | Meaning |
 |-------:|:-------------|:--------|
-| +242   | `0x40800002` | Saved CR15 in sentinel frame (E-GT for slot 2 Boot.Abstr) |
+| +242   | `0x40800003` | Saved CR15 in sentinel frame (E-GT for slot 3 Boot.Entry) |
 | +243   | `0x0FFFF0F3` | CALL sentinel frame word (guard value; a stray RETURN reboots) |
 
 ### 4.4 Boot.Entry lump — Slot 3 (base `0x0180`)
@@ -305,7 +299,7 @@ Per-slot interval listing (sorted by start address, 16 384-word profile):
 | Slot | Name         | Start    | End      | Words |
 |-----:|:-------------|:--------:|:--------:|------:|
 |   1  | Boot.Thread  | `0x0040` | `0x013F` |   256 |
-|   2  | Boot.Abstr   | `0x0140` | `0x017F` |    64 |
+|   2  | (free/null)  | `0x0140` | `0x017F` |    64 | *(Task #247 — heap-available)* |
 |   3  | Boot.Entry   | `0x0180` | `0x027F` |   256 |
 |   4  | Salvation    | `0x0280` | `0x02BF` |    64 |
 |   5  | Navana       | `0x02C0` | `0x02FF` |    64 |
@@ -368,7 +362,7 @@ Status taxonomy:
 |-----:|:-------------|:-------------|:------------|:--------:|---:|---:|----:|:------|
 |   0  | Boot.NS      | —            | **ABSENT**  | —        |  — |  — |  —  | location=0; NS root; no standard lump header by design |
 |   1  | Boot.Thread  | `0xF9008240` | **VALID**   | 256      | 32 | 64 |  2  | Thread-type; cw = data-zone size, not code count |
-|   2  | Boot.Abstr   | `0xF8000004` | **VALID**   |  64      |  0 |  4 |  0  | Director; cw=0 (no code) |
+|   2  | (free/null)  | `0x00000000` | **ABSENT**  |  —       |  — |  — |  —  | Free slot; no lump written (Task #247) |
 |   3  | Boot.Entry   | `0xF9004411` | **VALID**   | 256      | 17 | 17 |  0  | Boot ROM; 13 live instructions |
 |   4  | Salvation    | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
 |   5  | Navana       | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
@@ -460,9 +454,12 @@ fetches instructions from here.
 | +31    | `0x005F`| `00000000` | HALT (empty/zero)     | Heap slot 14 |
 | +32    | `0x0060`| `00000000` | HALT (empty/zero)     | Heap slot 15 |
 
-### 8.2 Slot 2 — Boot.Abstr director (base `0x0140`, cw=0)
+### 8.2 Slot 2 — free/null (Task #247)
 
-No code words.  The lump has only a header (+0) and a c-list (+60…+63).
+No lump written.  The Boot.Abstr director indirection has been eliminated.
+The 64 words at `0x0140`–`0x017F` are free heap space.  The NS entry for
+slot 2 is all-zeros.  B:03 is now INIT_ENTRY (loads Boot.Entry slot 3
+directly); B:04 LOAD_NUC no longer performs a director hop.
 
 ### 8.3 Slot 3 — Boot.Entry (base `0x0180`, cw=17)
 
@@ -494,7 +491,7 @@ No code words.  The lump has only a header (+0) and a c-list (+60…+63).
 |------:|:--------|:-------------|-----:|:------|:-----|
 |  0    | `0x026F`| `0x06800000` |   0  | RW    | Boot.NS |
 |  1    | `0x0270`| `0x00800001` |   1  | —     | Boot.Thread |
-|  2    | `0x0271`| `0x40800002` |   2  | E     | Boot.Abstr |
+|  2    | `0x0271`| `0x00000000` |   —  | —     | *(free/null — Task #247)* |
 |  3    | `0x0272`| `0x40800003` |   3  | E     | Boot.Entry (self) |
 |  4    | `0x0273`| `0x40800004` |   4  | E     | Salvation |
 |  5    | `0x0274`| `0x40800005` |   5  | E     | Navana |

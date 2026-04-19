@@ -46,14 +46,12 @@ SLOT_SIZE        = 0x40         # 64 words
 # DEVICE_REG_LIMITS and hardware/boot_rom.py _MMIO_ENTRIES).
 DEVICE_REG_LIMITS = {11: 2, 12: 5, 13: 0, 14: 4}
 
-BOOT_ENTRY_NS_SLOT   = 3   # NS slot holding the real boot execution lump (Boot.Entry)
-BOOT_ENTRY_CLIST_IDX = 3   # index in Boot.Abstr director c-list that holds the boot entry E-GT
-DIRECTOR_CLIST_SIZE  = 4   # Boot.Abstr director c-list size (indices 0..3)
+BOOT_ENTRY_NS_SLOT   = 3   # NS slot holding the boot execution lump (Boot.Entry)
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
-# can reject stale binaries that pre-date the Boot.Entry indirection layout.
-# Increment whenever the binary format changes incompatibly.
-BOOT_IMAGE_FORMAT_TAG = 0xB0070229  # "BOOT 0229" — must match simulator.js
+# can reject stale binaries. Bumped to 0x247 (Task #247) when Boot.Abstr
+# director was eliminated: slot 2 is now a free/null NS entry.
+BOOT_IMAGE_FORMAT_TAG = 0xB0070247  # "BOOT 0247" — must match simulator.js
 
 # Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 # (Task #237). Written into Boot.Entry lump code region so the binary matches
@@ -81,7 +79,7 @@ BOOT_ROM_WORDS = [
 DEFAULT_ABSTRACTION_CATALOG = [
     ("Boot.NS",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     ("Boot.Thread",   {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
-    ("Boot.Abstr",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
+    None,                                                            # Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
     ("Boot.Entry",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Salvation",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Navana",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
@@ -268,10 +266,12 @@ def generate_boot_image(cfg, lumps_dir):
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
-    # Foundational slots (NS, Thread, Boot.Abstr director, Boot.Entry) and
+    # Foundational slots (NS, Thread, free/null slot 2, Boot.Entry) and
     # MMIO device-register windows must not be overridden by caller-supplied
     # physAddr values, even when generate_boot_image() is called directly
     # (bypassing the app-layer _validate_step2 guard).
+    # Slot 2 is a free/null entry (Boot.Abstr eliminated — Task #247) but is
+    # still guarded so no external caller can claim it at boot time.
     _FOUNDATIONAL_SLOTS = set(range(0, BOOT_ENTRY_NS_SLOT + 1))  # slots 0..3
     _DEVICE_REG_SLOTS   = set(range(11, 16))                      # slots 11..15
     _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
@@ -294,7 +294,8 @@ def generate_boot_image(cfg, lumps_dir):
     slot_sizes = {
         0: ns_size,
         1: thread_size,
-        2: SLOT_SIZE,      # Boot.Abstr director: always 64 words (minimum)
+        # Slot 2 is free/null (Boot.Abstr eliminated — Task #247);
+        # it uses the default SLOT_SIZE=64 so runningOffset advances normally.
         BOOT_ENTRY_NS_SLOT: abstr_size,  # Boot.Entry: abstractionLumpWords
     }
 
@@ -302,8 +303,19 @@ def generate_boot_image(cfg, lumps_dir):
     clist_gts = []
     running_offset = 0
     locations = {}                              # idx -> location word
-    for i, (label, perms, chainable) in enumerate(catalog):
+    for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
+
+        if entry is None:
+            # Free/null slot (slot 2, Task #247): advance offset but leave NS entry all-zeros.
+            if i == 0:
+                running_offset = ns_size
+            else:
+                running_offset += my_size
+            clist_gts.append(0)              # null GT in c-list at this position
+            continue
+
+        label, perms, chainable = entry
         override = phys_override.get(i)
         if i == 0:
             loc = 0
@@ -374,11 +386,6 @@ def generate_boot_image(cfg, lumps_dir):
     for off, (ns_idx, perms) in enumerate(hw_slots):
         clist_gts[8 + off] = create_gt(0, ns_idx, perms, 1)
 
-    # c-list[BOOT_ENTRY_CLIST_IDX]: E-GT to Boot.Entry — the boot indirection pointer.
-    # Goes into both Boot.Abstr director c-list[BOOT_ENTRY_CLIST_IDX] (B:04 follows it)
-    # and Boot.Entry's own c-list[BOOT_ENTRY_CLIST_IDX] (a self-reference).
-    clist_gts[BOOT_ENTRY_CLIST_IDX] = create_gt(0, BOOT_ENTRY_NS_SLOT, {"E":1}, 1)
-
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
@@ -387,20 +394,8 @@ def generate_boot_image(cfg, lumps_dir):
     # simulator-only and not part of the boot ROM image).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
-    # ----- Boot.Abstr director (NS slot 2) --------------------------------
-    # Thin "boot director" shim: lumpSize=SLOT_SIZE=64, cw=0 (no code),
-    # cc=DIRECTOR_CLIST_SIZE=4. c-list[3] = E-GT to Boot.Entry; B:04 follows it.
-    boot_abstr_loc  = locations[2]
-    dir_lump_size   = SLOT_SIZE                        # 64 words (always minimum)
-    dir_clist_start = dir_lump_size - DIRECTOR_CLIST_SIZE  # = 60
-    mem[boot_abstr_loc] = pack_lump_header(0, 0, DIRECTOR_CLIST_SIZE, 0)  # n_minus_6=0, cw=0, cc=4
-    for i in range(DIRECTOR_CLIST_SIZE):
-        mem[boot_abstr_loc + dir_clist_start + i] = clist_gts[i] & 0xFFFFFFFF
-    mem[boot_abstr_loc + dir_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF   # c-list[0] = memory-manager GT
-    dir_code_limit  = dir_lump_size - DIRECTOR_CLIST_SIZE - 1              # = 59
-    dir_ns_base     = ns_table_base + 2 * NS_ENTRY_WORDS
-    mem[dir_ns_base + 1] = pack_ns_word1(dir_code_limit, 0, 0, 0, 0, 1, DIRECTOR_CLIST_SIZE)
-    mem[dir_ns_base + 2] = make_version_seals(0, boot_abstr_loc, dir_code_limit)
+    # Slot 2 is a free/null NS entry (Boot.Abstr director eliminated — Task #247).
+    # No lump is written; 64 words at locations[2] (0x0140–0x017F) are heap-available.
 
     # ----- Boot.Entry lump (NS slot 3) ------------------------------------
     # Real boot execution lump: inherits what Boot.Abstr used to have.
