@@ -540,7 +540,7 @@ class ChurchSimulator {
      * @param {Object|null} extras Optional metadata (e.g. {ledIndex}).
      */
     _recordSignedReturn(absIndex, methodName, signed, extras) {
-        this.dr[0] = signed;
+        this._writeDR(0, signed);
         this._preserveDR0 = true;
         this.lastSignedReturn = Object.assign(
             { absIndex: absIndex, methodName: methodName, dr0: signed },
@@ -1170,21 +1170,19 @@ class ChurchSimulator {
                 // Both tokens reference Boot.Entry's NS slot (not slot 2). This is the
                 // CALL-microcode derivation applied to the indirected target lump.
                 const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
-                const cr14Word1 = this.packNSWord1(cw - 1, 0, 0, 0, 0, 1, 0);
                 this.cr[14] = {
                     word0: cr14GT,
                     word1: base,                    // physical base of Boot.Entry lump
-                    word2: cr14Word1,
+                    word2: entryNSEntry.word1_limit >>> 0,
                     word3: entryNSEntry.word2_seals,
                     m: this.mElevation ? 1 : 0
                 };
 
                 const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);   // E-perm c-list token
-                const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);
                 this.cr[6] = {
                     word0: cr6GT,
                     word1: (base + clistStart) >>> 0,
-                    word2: cr6Word1,
+                    word2: entryNSEntry.word1_limit >>> 0,
                     word3: entryNSEntry.word2_seals,
                     m: this.mElevation ? 1 : 0
                 };
@@ -1751,6 +1749,20 @@ class ChurchSimulator {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    _writeDR(drIdx, value) {
+        this.dr[drIdx] = value >>> 0;
+        if (drIdx < 16) {
+            const cr12 = this.cr[12];
+            const threadBase = cr12 && cr12.word1;
+            if (threadBase) {
+                const homeAddr = (threadBase + 1 + drIdx) >>> 0;
+                if (homeAddr < this.memory.length) {
+                    this.memory[homeAddr] = value >>> 0;
+                }
+            }
+        }
+    }
+
     _writeCR(crIdx, gt32, entry) {
         this.cr[crIdx].word0 = gt32;
         this.cr[crIdx].word1 = entry.word0_location >>> 0;
@@ -2076,7 +2088,7 @@ class ChurchSimulator {
             if (this._preserveDR0) {
                 this._preserveDR0 = false;
             } else {
-                this.dr[0] = 0;
+                this._writeDR(0, 0);
             }
             result.physicalPC = this.physicalPC;
             result.auditPipeline = this._auditPipeline();
@@ -2096,7 +2108,7 @@ class ChurchSimulator {
         let clistSize;
         if (d.crSrc === 6) {
             clistLoc = this.cr[d.crSrc].word1;
-            clistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
+            clistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `LOAD CR${d.crSrc} lump-hdr`);
@@ -2195,7 +2207,7 @@ class ChurchSimulator {
         let clistSize;
         if (d.crSrc === 6) {
             clistLoc = this.cr[d.crSrc].word1;
-            clistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
+            clistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `SAVE CR${d.crSrc} lump-hdr`);
@@ -2250,7 +2262,7 @@ class ChurchSimulator {
             let clistLoc, clistSize;
             if (d.crSrc === 6) {
                 clistLoc = this.cr[d.crSrc].word1;
-                clistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
+                clistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
             } else {
                 const lumpBase = this.cr[d.crSrc].word1;
                 const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `CALL CR${d.crSrc} lump-hdr`);
@@ -2423,11 +2435,10 @@ class ChurchSimulator {
             // CR14 (code, RX, M=1) and CR6 (c-list, E+M=1) set simultaneously from single lump header read.
             // M=1 on both: CALL Phase 1 mLoad is always M-elevated (call.py: mload_m_elevated = 1).
             const cr14GT = this.createGT(srcParsed.gt_seq, check.index, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-            const cr14Word1 = this.packNSWord1(cw - 1, 0, 0, 0, 0, 1, 0);
             this.cr[14] = {
                 word0: cr14GT,
                 word1: base,
-                word2: cr14Word1,
+                word2: nsEntry.word1_limit >>> 0,
                 word3: nsEntry.word2_seals,
                 m: 1    // CALL Phase 1 mLoad is always M-elevated
             };
@@ -2437,11 +2448,10 @@ class ChurchSimulator {
             // Matches boot LOAD_NUC convention (line 624): CR6 always carries E perm.
             // M is recorded in cr.m = 1 (not in the GT perms field).
             const cr6GT = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:0,S:0,E:1}, srcParsed.type);
-            const cr6Word1 = this.packNSWord1(cc - 1, 0, 0, 0, 0, 1, 0);
             this.cr[6] = {
                 word0: cr6GT,                       // E-only (recursive CALL via CR6; matches boot LOAD_NUC CR6)
                 word1: (base + clistStart) >>> 0,
-                word2: cr6Word1,
+                word2: nsEntry.word1_limit >>> 0,
                 word3: nsEntry.word2_seals,
                 m: 1    // M set (CALL Phase 1 mLoad always M-elevated; call.py: mload_m_elevated = 1)
             };
@@ -2521,7 +2531,7 @@ class ChurchSimulator {
                             this.fault('PERM', 'CALL Navana: no driver GT in validation result');
                             return null;
                         }
-                        this.dr[1] = result.result.permMask || 0;
+                        this._writeDR(1, result.result.permMask || 0);
                     } else {
                         this.output += `  ${result ? result.message : 'Navana.ValidatePassKey failed'}\n`;
                         this.fault('PERM', `CALL Navana: PassKey validation failed — ${result ? result.message : 'unknown error'}`);
@@ -2577,9 +2587,9 @@ class ChurchSimulator {
                 }
                 if (result && result.ok && result.result !== undefined && typeof result.result === 'number') {
                     if (encodedDstReg !== null) {
-                        this.dr[encodedDstReg] = result.result;
+                        this._writeDR(encodedDstReg, result.result);
                     } else {
-                        this.dr[1] = result.result;
+                        this._writeDR(1, result.result);
                     }
                 }
                 if (result && !result.ok && result.fault) {
@@ -2666,13 +2676,13 @@ class ChurchSimulator {
                     const tag = (check.index === LED_ABS_IDX) ? ` index=${ledIndex}` : '';
                     this.output += `DR0 = ${result.result}  [${label}.${methodName}${tag}]\n`;
                 } else if (encodedDstReg !== null) {
-                    this.dr[encodedDstReg] = result.result;
+                    this._writeDR(encodedDstReg, result.result);
                 } else {
-                    this.dr[1] = result.result;
+                    this._writeDR(1, result.result);
                 }
                 if (result.result2 !== undefined && typeof result.result2 === 'number') {
                     const secondReg = encodedDstReg !== null && encodedDstReg < 15 ? encodedDstReg + 1 : 2;
-                    this.dr[secondReg] = result.result2;
+                    this._writeDR(secondReg, result.result2);
                 }
             }
             if (result && !result.ok && result.fault) {
@@ -2803,7 +2813,11 @@ class ChurchSimulator {
                 }
             }
         }
-        if (frame.savedDRs) this.dr = [...frame.savedDRs];
+        if (frame.savedDRs) {
+            for (let di = 0; di < 16; di++) {
+                this._writeDR(di, frame.savedDRs[di]);
+            }
+        }
         if (frame.savedFlags) this.flags = {...frame.savedFlags};
         if (typeof frame.savedSTO === 'number') this.sto = frame.savedSTO;
         const clearedCRs = [];
@@ -3018,7 +3032,7 @@ class ChurchSimulator {
         let ecClistSize;
         if (d.crSrc === 6) {
             srcLoc = this.cr[d.crSrc].word1;
-            ecClistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
+            ecClistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `ELOADCALL CR${d.crSrc} lump-hdr`);
@@ -3139,7 +3153,7 @@ class ChurchSimulator {
         let xlClistSize;
         if (d.crSrc === 6) {
             srcLoc = this.cr[d.crSrc].word1;
-            xlClistSize = this.parseNSWord1(this.cr[6].word2).limit + 1;
+            xlClistSize = this.parseNSWord1(this.cr[6].word2).clistCount;
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
             const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `XLOADLAMBDA CR${d.crSrc} lump-hdr`);
@@ -3211,8 +3225,15 @@ class ChurchSimulator {
             this.fault(check.fault, `DREAD: CR${d.crSrc}: ${check.message}`);
             return null;
         }
+        if (drIdx < 16) {
+            const dr12 = this.cr[12];
+            if (!dr12 || !dr12.word1) {
+                this.fault('NULL_CAP', `DREAD: CR12 is null — cannot sync DR${drIdx} to thread lump DR zone`);
+                return null;
+            }
+        }
         const value = this.memory[loc + offset];
-        this.dr[drIdx] = value >>> 0;
+        this._writeDR(drIdx, value);
         const label = this.nsLabels[check.index] || 'data';
         const devNsIdx = check.index;
         const readTag = devNsIdx === 12 ? ` [LED${offset} = ${value & 1 ? 'ON' : 'OFF'}]`
@@ -3245,7 +3266,24 @@ class ChurchSimulator {
             return null;
         }
         const value = this.dr[drIdx] >>> 0;
+        let dwHomeAddr = -1;
+        if (drIdx < 16) {
+            const dw12 = this.cr[12];
+            const dwThreadBase = dw12 && dw12.word1;
+            if (!dwThreadBase) {
+                this.fault('NULL_CAP', `DWRITE: CR12 is null — cannot sync DR${drIdx} to thread lump DR zone`);
+                return null;
+            }
+            dwHomeAddr = (dwThreadBase + 1 + drIdx) >>> 0;
+            if (dwHomeAddr >= this.memory.length) {
+                this.fault('BOUNDS', `DWRITE: DR${drIdx} home address 0x${dwHomeAddr.toString(16)} out of memory`);
+                return null;
+            }
+        }
         this.memory[loc + offset] = value;
+        if (dwHomeAddr >= 0) {
+            this.memory[dwHomeAddr] = value;
+        }
 
         // Route device writes to simulated hardware peripherals
         const devNsIdx = check.index;
@@ -3315,7 +3353,7 @@ class ChurchSimulator {
         const mask = ((1 << width) - 1) >>> 0;
         const value = (word >>> pos) & mask;
         const drIdx = d.crDst;
-        this.dr[drIdx] = value >>> 0;
+        this._writeDR(drIdx, value);
         const desc = `BFEXT DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} -> 0x${value.toString(16).toUpperCase()}`;
         this.output += desc + '\n';
         this.pc++;
@@ -3336,7 +3374,7 @@ class ChurchSimulator {
         const mask = (((1 << width) - 1) << pos) >>> 0;
         const oldWord = this.dr[drIdx] >>> 0;
         const newWord = ((oldWord & ~mask) | ((insertVal << pos) & mask)) >>> 0;
-        this.dr[drIdx] = newWord;
+        this._writeDR(drIdx, newWord);
         const desc = `BFINS DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} <- 0x${(insertVal & ((1 << width) - 1)).toString(16).toUpperCase()}`;
         this.output += desc + '\n';
         this.pc++;
@@ -3371,7 +3409,7 @@ class ChurchSimulator {
         }
         const result = a + b;
         this._setAddFlags(a, b, result);
-        this.dr[d.crDst] = result >>> 0;
+        this._writeDR(d.crDst, result);
         const desc = `IADD DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} + ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
@@ -3394,7 +3432,7 @@ class ChurchSimulator {
         }
         const result = a - b;
         this._setSubFlags(a, b, result);
-        this.dr[d.crDst] = result >>> 0;
+        this._writeDR(d.crDst, result);
         const desc = `ISUB DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} - ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
@@ -3428,7 +3466,7 @@ class ChurchSimulator {
         this.flags.N = ((result >>> 31) & 1) === 1;
         this.flags.C = lastBitOut === 1;
         this.flags.V = false;
-        this.dr[d.crDst] = result;
+        this._writeDR(d.crDst, result);
         const desc = `SHL DR${d.crDst}, DR${drSrc}, ${shamt} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
@@ -3454,7 +3492,7 @@ class ChurchSimulator {
         this.flags.N = ((result >>> 31) & 1) === 1;
         this.flags.C = lastBitOut === 1;
         this.flags.V = false;
-        this.dr[d.crDst] = result;
+        this._writeDR(d.crDst, result);
         const shType = arith ? 'ASR' : 'LSR';
         const desc = `SHR DR${d.crDst}, DR${drSrc}, ${shamt} ${shType} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
@@ -4054,7 +4092,9 @@ class ChurchSimulator {
             };
         }
         const parsed = this.parseGT(cr.word0);
-        const lim = this.parseNSWord1(cr.word2);
+        const nsEntry = this.readNSEntry(parsed.index);
+        const nsWord1 = nsEntry ? nsEntry.word1_limit : cr.word2;
+        const lim = this.parseNSWord1(nsWord1);
         const sealGtSeq = (cr.word3 >>> 25) & 0x7F;
         const sealCRC = cr.word3 & 0xFFFF;
         const permStr = (parsed.permissions.B ? 'B' : '-') +
@@ -4073,7 +4113,7 @@ class ChurchSimulator {
             gtType: parsed.type,
             gtTypeName: parsed.typeName,
             word1_location: cr.word1,
-            word2_limit_raw: cr.word2,
+            word2_limit_raw: nsWord1,
             limitB: parsed.permissions.B,
             limitF: lim.f,
             limit17: lim.limit,

@@ -214,6 +214,34 @@ for (const lh of lumpHeaders) {
 const threadEntry = nsEntries.find(e => e.slot === 1);
 const threadBase  = threadEntry ? threadEntry.location : null;
 
+// ── 6b. DR zone assertion — memory[threadBase+1..+16] must match this.dr[] ───
+// After boot (and after any DREAD/DWRITE), the DR home slots in the thread lump
+// must be bit-for-bit equal to the simulator's this.dr[] register file.
+// This is the CTMM invariant: the machine is defined by the memory.
+const drZoneAssertions = [];
+if (threadBase !== null) {
+    for (let di = 0; di < 16; di++) {
+        const memVal = sim.memory[threadBase + 1 + di] >>> 0;
+        const regVal = sim.dr[di] >>> 0;
+        drZoneAssertions.push({
+            drIdx: di,
+            memAddr: threadBase + 1 + di,
+            memVal,
+            regVal,
+            match: memVal === regVal,
+        });
+    }
+}
+const drZoneAllMatch = drZoneAssertions.every(a => a.match);
+if (!drZoneAllMatch) {
+    const failures = drZoneAssertions.filter(a => !a.match);
+    process.stderr.write(`CTMM INVARIANT VIOLATION: DR zone in memory does not match this.dr[] after boot.\n`);
+    for (const f of failures) {
+        process.stderr.write(`  DR${f.drIdx} @ mem[0x${f.memAddr.toString(16).toUpperCase()}]: memory=0x${f.memVal.toString(16).padStart(8,'0')} != dr=0x${f.regVal.toString(16).padStart(8,'0')}\n`);
+    }
+    process.exit(1);
+}
+
 // ── 7. Simulator state audit ──────────────────────────────────────────────────
 // Enumerate all own properties of the sim that are set by reset() / constructor()
 // and classify them.
@@ -223,6 +251,8 @@ const stateAudit = {
         { prop: 'memory[0 .. NS_TABLE_BASE-2]', desc: 'Object lumps (lump area)' },
         { prop: 'memory[NS_TABLE_BASE-1]', desc: 'Boot image format tag (0xB0070229)' },
         { prop: 'memory[NS_TABLE_BASE .. NS_TABLE_BASE+NS_TABLE_RESERVE-1]', desc: 'NS table (3 words × up to 256 entries)' },
+        { prop: 'memory[threadBase+1 .. threadBase+16]', desc: 'DR zone — DR0–DR15 home slots in thread lump (FIXED: DREAD/DWRITE now write-through; RETURN syncs back)' },
+        { prop: 'cr[i].word2 = nsEntry.word1_limit', desc: 'CR limit/meta field now stores raw NS entry word1 verbatim (FIXED: boot and CALL paths no longer pack cw−1/cc−1)' },
     ],
     hardwareRegisters: [
         { prop: 'this.pc',       desc: 'Program counter — hardware register, not in DMEM by design' },
@@ -232,20 +262,7 @@ const stateAudit = {
         { prop: 'this.running',  desc: 'Execution state machine (running/halted/stepping) — hardware control' },
         { prop: 'this.halted',   desc: 'HALT latch — hardware control' },
     ],
-    gapsNotInMemory: [
-        {
-            prop: 'this.dr[0..15]',
-            desc: 'Data registers DR0–DR15',
-            gap: 'Thread lump spec says +1..+16 are DR0–DR15, but DREAD/DWRITE never read or write those addresses. The DR array is only in this.dr[].',
-            expectedAddr: 'threadBase+1 .. threadBase+16',
-        },
-        {
-            prop: 'this.cr[i].word1 / .word2 / .word3',
-            desc: 'CR location, limit, and seal fields',
-            gap: 'CALL microcode packs cw−1 into cr.word2 at call time; getFormattedCR() reads the cache. But the NS table (memory[NS_TABLE_BASE + slot*3 + 1]) stores the full NS W1 limit (lumpSize−cc−1). Both should agree because the memory is the ground truth. CRs 0–11 persist only their GT (word0) in the thread lump caps zone; word1/2/3 should be derived from the NS entry on demand.',
-            expectedAddr: 'readNSEntry(cr.gtIndex) for word1/word2/word3',
-        },
-    ],
+    gapsNotInMemory: [],
     ideMetadata: [
         { prop: 'this.nsLabels',       desc: 'Symbolic names for NS slots — IDE display aid, not CTMM state' },
         { prop: 'this.nsClistMap',     desc: 'Cached c-list relationships — IDE display aid' },
@@ -286,6 +303,8 @@ const report = {
     lumpHeaders,
     conflicts,
     disassembly,
+    drZoneAllMatch,
+    drZoneAssertions,
     stateAudit,
 };
 
