@@ -1670,23 +1670,29 @@ function hideCRPopup(immediate) {
     }, 80);
 }
 
-function _positionPopup(pop, evt) {
-    const rect = evt.currentTarget.getBoundingClientRect();
+function _positionPopup(pop, evt, anchorEl) {
+    const row  = evt.currentTarget;
+    const col3 = anchorEl || (row && row.querySelectorAll ? row.querySelectorAll('td')[2] : null);
+    const rect = col3 ? col3.getBoundingClientRect() : row.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     pop.style.left = '-9999px'; pop.style.top = '-9999px';
     const pw = pop.offsetWidth || 260;
     const ph = pop.offsetHeight || 160;
+    // Anchor to left edge of column 3; open to the left, fall back right
+    const margin = 8;
+    let left = rect.left - pw - margin;
+    if (left < 8) left = rect.right + margin;
+    if (left + pw > vw - 8) left = vw - pw - 8;
     const spaceBelow = vh - rect.bottom - 8;
     const spaceAbove = rect.top - 8;
     let top;
     if (spaceBelow >= ph || spaceBelow >= spaceAbove) {
-        top = rect.bottom + 6;
+        top = rect.top;
     } else {
-        top = Math.max(8, rect.top - ph - 6);
+        top = Math.max(8, rect.bottom - ph);
     }
-    let left = rect.left;
-    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
+    if (top + ph > vh - 8) top = vh - ph - 8;
     pop.style.left = left + 'px';
     pop.style.top = top + 'px';
 }
