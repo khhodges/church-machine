@@ -55,6 +55,25 @@ DIRECTOR_CLIST_SIZE  = 4   # Boot.Abstr director c-list size (indices 0..3)
 # Increment whenever the binary format changes incompatibly.
 BOOT_IMAGE_FORMAT_TAG = 0xB0070229  # "BOOT 0229" — must match simulator.js
 
+# Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
+# (Task #237). Written into Boot.Entry lump code region so the binary matches
+# the CLOOMC listing. Must stay in sync with simulator.js BOOT_ROM_WORDS.
+BOOT_ROM_WORDS = [
+    0x27660001, # [0]  CHANGE AL, CR12, CR12, #1
+    0x070B0000, # [1]  LOAD   AL, CR1,  CR6[0]
+    0x07130001, # [2]  LOAD   AL, CR2,  CR6[1]
+    0x37100003, # [3]  TPERM  AL, CR2,  #X
+    0x3F100000, # [4]  LAMBDA AL, CR2
+    0x07030004, # [5]  LOAD   AL, CR0,  CR6[4]
+    0x37000008, # [6]  TPERM  AL, CR0,  #E
+    0x17000000, # [7]  CALL   AL, CR0,  CR0
+    0x073B0001, # [8]  LOAD   AL, CR7,  CR6[1]
+    0x37380003, # [9]  TPERM  AL, CR7,  #X
+    0x3F380000, # [10] LAMBDA AL, CR7
+    0x1F028000, # [11] RETURN AL, CR5
+    0x0F308002, # [12] SAVE   AL, CR6,  CR1, #2
+]
+
 # Default abstraction catalog — ports simulator.js _getAbstractionCatalog()
 # fallback list (used when no abstractionRegistry is wired in). The boot
 # image is produced from this canonical list so server and simulator
@@ -395,6 +414,9 @@ def generate_boot_image(cfg, lumps_dir):
     entry_clist_start  = entry_lump_size - DEMO_CLIST_SIZE
     mem[boot_entry_loc] = pack_lump_header(
         _ns_n_minus_6(abstr_size), NUC_CODE_WORDS, DEMO_CLIST_SIZE, 0)
+    # Write BOOT_PROGRAM instruction words into the code region (words 1..NUC_CODE_WORDS).
+    for i, word in enumerate(BOOT_ROM_WORDS[:NUC_CODE_WORDS]):
+        mem[boot_entry_loc + 1 + i] = word & 0xFFFFFFFF
     for i, gt in enumerate(clist_gts):
         mem[boot_entry_loc + entry_clist_start + i] = gt & 0xFFFFFFFF
     mem[boot_entry_loc + entry_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF  # c-list[0] = memory-manager GT
