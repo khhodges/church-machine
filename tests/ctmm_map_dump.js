@@ -100,8 +100,8 @@ for (let i = 0; i < sim.nsCount; i++) {
 const slotExpectedSize = {};
 slotExpectedSize[0] = SLOT_SIZE;   // Boot.NS (64w; location=0 → ABSENT)
 slotExpectedSize[1] = 256;         // Boot.Thread
-slotExpectedSize[2] = SLOT_SIZE;   // Boot.Abstr director
-slotExpectedSize[3] = 256;         // Boot.Entry
+slotExpectedSize[2] = SLOT_SIZE;   // free/null slot (Task #247)
+slotExpectedSize[3] = 256;         // Boot.Abstr
 // Slots 4+ default to SLOT_SIZE (64)
 
 const lumpHeaders = [];

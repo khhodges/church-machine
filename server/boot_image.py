@@ -24,8 +24,8 @@ Layout (all words 32-bit little-endian):
     [0 .. NS_LUMP_SIZE)                      Namespace lump body (header @0)
     [NS_LUMP_SIZE .. +THREAD_LUMP_SIZE)      Thread lump body    (header @0)
     [.. +SLOT_SIZE)                          Boot.Abstr director (header @0,
-                                              c-list[3]=E-GT→Boot.Entry)
-    [.. +ABSTR_LUMP_SIZE)                    Boot.Entry body     (header @0,
+                                              free/null slot 2)
+    [.. +ABSTR_LUMP_SIZE)                    Boot.Abstr body     (header @0,
                                               code + c-list at physical end)
     [resident lump bodies at programmer
      -chosen physAddr]
@@ -46,7 +46,7 @@ SLOT_SIZE        = 0x40         # 64 words
 # DEVICE_REG_LIMITS and hardware/boot_rom.py _MMIO_ENTRIES).
 DEVICE_REG_LIMITS = {11: 2, 12: 5, 13: 0, 14: 4}
 
-BOOT_ENTRY_NS_SLOT   = 3   # NS slot holding the boot execution lump (Boot.Entry)
+BOOT_ABSTR_NS_SLOT   = 3   # NS slot holding the Boot Abstraction lump (Boot.Abstr)
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries. Bumped to 0x247 (Task #247) when Boot.Abstr
@@ -54,7 +54,7 @@ BOOT_ENTRY_NS_SLOT   = 3   # NS slot holding the boot execution lump (Boot.Entry
 BOOT_IMAGE_FORMAT_TAG = 0xB0070247  # "BOOT 0247" — must match simulator.js
 
 # Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
-# (Task #237). Written into Boot.Entry lump code region so the binary matches
+# (Task #237). Written into Boot.Abstr lump code region so the binary matches
 # the CLOOMC listing. Must stay in sync with simulator.js BOOT_ROM_WORDS.
 BOOT_ROM_WORDS = [
     0x27660001, # [0]  CHANGE AL, CR12, CR12, #1
@@ -80,7 +80,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("Boot.NS",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     ("Boot.Thread",   {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     None,                                                            # Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
-    ("Boot.Entry",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
+    ("Boot.Abstr",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Salvation",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Navana",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Mint",          {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
@@ -266,13 +266,13 @@ def generate_boot_image(cfg, lumps_dir):
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
-    # Foundational slots (NS, Thread, free/null slot 2, Boot.Entry) and
+    # Foundational slots (NS, Thread, free/null slot 2, Boot.Abstr) and
     # MMIO device-register windows must not be overridden by caller-supplied
     # physAddr values, even when generate_boot_image() is called directly
     # (bypassing the app-layer _validate_step2 guard).
     # Slot 2 is a free/null entry (Boot.Abstr eliminated — Task #247) but is
     # still guarded so no external caller can claim it at boot time.
-    _FOUNDATIONAL_SLOTS = set(range(0, BOOT_ENTRY_NS_SLOT + 1))  # slots 0..3
+    _FOUNDATIONAL_SLOTS = set(range(0, BOOT_ABSTR_NS_SLOT + 1))  # slots 0..3
     _DEVICE_REG_SLOTS   = set(range(11, 16))                      # slots 11..15
     _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
 
@@ -296,7 +296,7 @@ def generate_boot_image(cfg, lumps_dir):
         1: thread_size,
         # Slot 2 is free/null (Boot.Abstr eliminated — Task #247);
         # it uses the default SLOT_SIZE=64 so runningOffset advances normally.
-        BOOT_ENTRY_NS_SLOT: abstr_size,  # Boot.Entry: abstractionLumpWords
+        BOOT_ABSTR_NS_SLOT: abstr_size,  # Boot.Abstr: abstractionLumpWords
     }
 
     # ----- NS entries ----------------------------------------------------
@@ -397,14 +397,14 @@ def generate_boot_image(cfg, lumps_dir):
     # Slot 2 is a free/null NS entry (Boot.Abstr director eliminated — Task #247).
     # No lump is written; 64 words at locations[2] (0x0140–0x017F) are heap-available.
 
-    # ----- Boot.Entry lump (NS slot 3) ------------------------------------
-    # Real boot execution lump: inherits what Boot.Abstr used to have.
+    # ----- Boot.Abstr lump (NS slot 3) ------------------------------------
+    # The Boot Abstraction: directly loaded by B:03/B:04 (no director hop).
     #   Word  0:      Lump header (n_minus_6, cw=NUC_CODE_WORDS, cc=DEMO_CLIST_SIZE)
     #   Words 1–17:   Code region (loaded by the boot program loader)
     #   Words 18..(end-DEMO_CLIST_SIZE-1): Freespace
     #   Words (end-DEMO_CLIST_SIZE)..(end-1): C-list (17 GTs at physical end)
     # B:04 derives CR14 (R+X) and CR6 (E) from this lump's header.
-    boot_entry_loc     = locations[BOOT_ENTRY_NS_SLOT]
+    boot_entry_loc     = locations[BOOT_ABSTR_NS_SLOT]
     entry_lump_size    = abstr_size
     entry_clist_start  = entry_lump_size - DEMO_CLIST_SIZE
     mem[boot_entry_loc] = pack_lump_header(
@@ -416,7 +416,7 @@ def generate_boot_image(cfg, lumps_dir):
         mem[boot_entry_loc + entry_clist_start + i] = gt & 0xFFFFFFFF
     mem[boot_entry_loc + entry_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF  # c-list[0] = memory-manager GT
     entry_cr_limit     = entry_lump_size - DEMO_CLIST_SIZE - 1
-    entry_ns_base      = ns_table_base + BOOT_ENTRY_NS_SLOT * NS_ENTRY_WORDS
+    entry_ns_base      = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
     mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 0, 1, DEMO_CLIST_SIZE)
     mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
 

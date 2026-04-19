@@ -239,14 +239,14 @@ BASE_NAMED_NS_COUNT = 47
 
 # Slots reserved for foundational lumps (Step 1) and device MMIO regions —
 # the programmer cannot place an additional resident lump body here. Slots
-# 0–3 are foundational lumps (NS, Thread, Boot.Abstr director, Boot.Entry);
+# 0–3 are foundational lumps (NS, Thread, free/null slot 2, Boot.Abstr);
 # 11–15 are device register windows (UART, LED, Button, Timer, Display)
 # backed by hardware MMIO not by lump memory.
 RESERVED_NS_SLOTS = set(range(0, 4)) | set(range(11, 16))
 
-# Boot.Abstr director is always the minimum slot size (64 words).
-# Added to foundational footprint calculations after Task #229.
-BOOT_ABSTR_DIRECTOR_SIZE = 64  # keep in sync with simulator.js SLOT_SIZE and boot_image.py
+# Slot 2 is a free/null region (64 words) after Boot.Abstr director elimination (Task #247).
+# Still counted in the foundational footprint so Boot.Abstr (slot 3) stays at 0x0180.
+FREE_SLOT_SIZE = 64  # keep in sync with simulator.js SLOT_SIZE and boot_image.py
 LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    "lumps", "manifest.json")
 
@@ -299,8 +299,8 @@ def _validate_step2(step2, step1, target_board):
     total = step1["totalNamespaceWords"]
     foundation_end = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      BOOT_ABSTR_DIRECTOR_SIZE +    # Boot.Abstr director (fixed 64 words)
-                      step1["abstractionLumpWords"])  # Boot.Entry
+                      FREE_SLOT_SIZE +              # free/null slot 2 (64 words — Task #247)
+                      step1["abstractionLumpWords"])  # Boot.Abstr (slot 3)
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
@@ -395,8 +395,8 @@ def _validate_step1(target_board, step1):
             return f"step1.{f} must be at least 64 words (FPGA minimum slot)"
     foundation_sum = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      BOOT_ABSTR_DIRECTOR_SIZE +    # Boot.Abstr director (fixed 64 words)
-                      step1["abstractionLumpWords"])  # Boot.Entry
+                      FREE_SLOT_SIZE +              # free/null slot 2 (64 words — Task #247)
+                      step1["abstractionLumpWords"])  # Boot.Abstr (slot 3)
     if foundation_sum > total:
         return (f"Sum of foundational lump sizes ({foundation_sum}) exceeds "
                 f"totalNamespaceWords ({total})")

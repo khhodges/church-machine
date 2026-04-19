@@ -110,7 +110,7 @@ Lump addresses in this table are identical in both the 65 536-word and the
 |   0  | Boot.NS      | `0x00000000`   | `0x245E3FFF` | 16383 | 47 | 1 | NS root; location=0 |
 |   1  | Boot.Thread  | `0x00000040`   | `0x240000FF` |   255 |  0 | 1 | Thread lump |
 |   2  | (free/null)  | `0x00000140`   | `0x00000000` |     — |  — | 0 | Free slot — Boot.Abstr director eliminated (Task #247) |
-|   3  | Boot.Entry   | `0x00000180`   | `0x242200EE` |   238 | 17 | 1 | Boot ROM code; cw=17, cc=17 |
+|   3  | Boot.Abstr   | `0x00000180`   | `0x242200EE` |   238 | 17 | 1 | Boot ROM code; cw=17, cc=17 |
 |   4  | Salvation    | `0x00000280`   | `0x0400003F` |    63 |  0 | 0 | Lazy |
 |   5  | Navana       | `0x000002C0`   | `0x0400003F` |    63 |  0 | 0 | Lazy |
 |   6  | Mint         | `0x00000300`   | `0x0400003F` |    63 |  0 | 0 | Lazy |
@@ -235,10 +235,10 @@ sp_max = THREAD_CAPS_OFFSET − 1  = 243
 
 | Offset | Value        | Meaning |
 |-------:|:-------------|:--------|
-| +242   | `0x40800003` | Saved CR15 in sentinel frame (E-GT for slot 3 Boot.Entry) |
+| +242   | `0x40800003` | Saved CR15 in sentinel frame (E-GT for slot 3 Boot.Abstr) |
 | +243   | `0x0FFFF0F3` | CALL sentinel frame word (guard value; a stray RETURN reboots) |
 
-### 4.4 Boot.Entry lump — Slot 3 (base `0x0180`)
+### 4.4 Boot.Abstr lump — Slot 3 (base `0x0180`)
 
 Header: `0xF9004411` — `n_minus_6=2` → 256w, `cw=17`, `typ=0` (lump), `cc=17`.
 
@@ -300,7 +300,7 @@ Per-slot interval listing (sorted by start address, 16 384-word profile):
 |-----:|:-------------|:--------:|:--------:|------:|
 |   1  | Boot.Thread  | `0x0040` | `0x013F` |   256 |
 |   2  | (free/null)  | `0x0140` | `0x017F` |    64 | *(Task #247 — heap-available)* |
-|   3  | Boot.Entry   | `0x0180` | `0x027F` |   256 |
+|   3  | Boot.Abstr   | `0x0180` | `0x027F` |   256 |
 |   4  | Salvation    | `0x0280` | `0x02BF` |    64 |
 |   5  | Navana       | `0x02C0` | `0x02FF` |    64 |
 |   6  | Mint         | `0x0300` | `0x033F` |    64 |
@@ -363,7 +363,7 @@ Status taxonomy:
 |   0  | Boot.NS      | —            | **ABSENT**  | —        |  — |  — |  —  | location=0; NS root; no standard lump header by design |
 |   1  | Boot.Thread  | `0xF9008240` | **VALID**   | 256      | 32 | 64 |  2  | Thread-type; cw = data-zone size, not code count |
 |   2  | (free/null)  | `0x00000000` | **ABSENT**  |  —       |  — |  — |  —  | Free slot; no lump written (Task #247) |
-|   3  | Boot.Entry   | `0xF9004411` | **VALID**   | 256      | 17 | 17 |  0  | Boot ROM; 13 live instructions |
+|   3  | Boot.Abstr   | `0xF9004411` | **VALID**   | 256      | 17 | 17 |  0  | Boot ROM; 13 live instructions |
 |   4  | Salvation    | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
 |   5  | Navana       | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
 |   6  | Mint         | `0x00000000` | **INVALID** | —        |  — |  — |  —  | magic=0x0; lump body not yet loaded |
@@ -458,10 +458,10 @@ fetches instructions from here.
 
 No lump written.  The Boot.Abstr director indirection has been eliminated.
 The 64 words at `0x0140`–`0x017F` are free heap space.  The NS entry for
-slot 2 is all-zeros.  B:03 is now INIT_ENTRY (loads Boot.Entry slot 3
-directly); B:04 LOAD_NUC no longer performs a director hop.
+slot 2 is all-zeros.  B:03 INIT_ABSTR loads Boot.Abstr (slot 3)
+directly; B:04 LOAD_NUC no longer performs a director hop.
 
-### 8.3 Slot 3 — Boot.Entry (base `0x0180`, cw=17)
+### 8.3 Slot 3 — Boot.Abstr (base `0x0180`, cw=17)
 
 13 live instructions followed by 4 empty (word=0) slots.
 
@@ -485,14 +485,14 @@ directly); B:04 LOAD_NUC no longer performs a director hop.
 | +16    | `0x0190`| `00000000` | HALT (empty/zero) | empty |
 | +17    | `0x0191`| `00000000` | HALT (empty/zero) | empty |
 
-### 8.4 Boot.Entry c-list (base `0x026F`, cc=17)
+### 8.4 Boot.Abstr c-list (base `0x026F`, cc=17)
 
 | Index | Addr    | GT word      | Slot | Perms | Name |
 |------:|:--------|:-------------|-----:|:------|:-----|
 |  0    | `0x026F`| `0x06800000` |   0  | RW    | Boot.NS |
 |  1    | `0x0270`| `0x00800001` |   1  | —     | Boot.Thread |
 |  2    | `0x0271`| `0x00000000` |   —  | —     | *(free/null — Task #247)* |
-|  3    | `0x0272`| `0x40800003` |   3  | E     | Boot.Entry (self) |
+|  3    | `0x0272`| `0x40800003` |   3  | E     | Boot.Abstr (self) |
 |  4    | `0x0273`| `0x40800004` |   4  | E     | Salvation |
 |  5    | `0x0274`| `0x40800005` |   5  | E     | Navana |
 |  6    | `0x0275`| `0x40800006` |   6  | E     | Mint |
@@ -513,7 +513,7 @@ directly); B:04 LOAD_NUC no longer performs a director hop.
 
 | CR   | GT word      | Slot | Perms | word1 (location) | word2 (limit word) | m | Role |
 |-----:|:-------------|-----:|:------|:-----------------|:-------------------|:-:|:-----|
-| CR6  | `0x40800003` |   3  | E     | `0x0000026F`     | `0x04000010`       | 1 | C-list root → Boot.Entry c-list base |
+| CR6  | `0x40800003` |   3  | E     | `0x0000026F`     | `0x04000010`       | 1 | C-list root → Boot.Abstr c-list base |
 | CR12 | `0x00800001` |   1  | —     | `0x00000040`     | `0x040000FF`       | 1 | Thread identity (privileged) |
 | CR14 | `0x0A800003` |   3  | RX    | `0x00000180`     | `0x04000010`       | 1 | Code fence (privileged) |
 | CR15 | `0x00800000` |   0  | —     | `0x00000000`     | `0x045E3FFF`       | 1 | NS root (privileged) |
@@ -575,7 +575,7 @@ and `memory[NS_TABLE_BASE + slot × 3 + 2]`.
 `cr[14].word2` and `cc − 1` into `cr[6].word2`, rather than copying the NS
 entry's word1.
 
-**Concrete numbers (Boot.Entry, slot 3):**
+**Concrete numbers (Boot.Abstr, slot 3):**
 
 | Source | Value | limit field | Encoding |
 |:-------|:------|------------:|:---------|

@@ -144,8 +144,8 @@ Each NS entry is 3 words: `word0_location`, `word1_w2` (limit + gt_seq),
 |------|------|-------|----------|-------|
 | 0 | Boot.NS | R\|W | NS_TABLE_BASE | NS root, 64 words |
 | 1 | Boot.Thread | R\|W | 0x0100 | Thread lump, threadLumpWords |
-| 2 | Boot.Abstr (director) | E | follows Thread | Thin boot director, always 64 words; c-list[3] holds E-GT → Boot.Entry |
-| 3 | Boot.Entry | E | follows Boot.Abstr | Real boot execution lump, abstractionLumpWords (default 256) |
+| 2 | (free/null) | — | follows Thread | Free heap region, 64 words; Boot.Abstr director eliminated (Task #247) |
+| 3 | Boot.Abstr | E | follows slot 2 | Boot Abstraction lump, abstractionLumpWords (default 256) |
 | 4 | Salvation | E | 0x03FC | NUC_PROGRAM, 64 words |
 | 5 | Navana | E | 0x0500 | Namespace controller |
 | 6 | Mint | E | 0x0600 | Capability minting |
@@ -162,18 +162,18 @@ Each NS entry is 3 words: `word0_location`, `word1_w2` (limit + gt_seq),
 | 17 | (empty) | — | — | Reserved |
 | 18 | Constants | R | 0x1200 | Read-only math constants |
 
-### DEMO_CLIST  (17 Golden Tokens at physical end of Boot.Entry)
+### DEMO_CLIST  (17 Golden Tokens at physical end of Boot.Abstr)
 
-Initial c-list for Boot.Entry (NS Slot 3).  CR6 points here after boot.
-Boot.Abstr director (NS Slot 2) has its own smaller c-list (4 entries,
-indices 0–3 only) used exclusively by B:04 to perform the indirection.
+Initial c-list for Boot.Abstr (NS Slot 3).  CR6 points here after boot.
+Slot 2 (free/null) has no c-list; the Boot.Abstr director indirection
+was eliminated in Task #247 — B:04 LOAD_NUC loads slot 3 directly.
 
 | Idx | Perms | Slot | Name | Notes |
 |-----|-------|------|------|-------|
 | 0 | R\|W | 0 | — | Boot-internal: memory-manager GT (NS slot 0) |
 | 1 | — | 1 | — | Boot-internal: Boot.Thread GT |
-| 2 | E | 2 | — | Boot-internal: Boot.Abstr director E-GT |
-| 3 | E | 3 | — | Boot-internal: Boot.Entry self-reference E-GT (same slot) |
+| 2 | — | — | — | *(free/null — Task #247)* |
+| 3 | E | 3 | — | Boot-internal: Boot.Abstr self-reference E-GT (same slot) |
 | 4 | E | 4 | Salvation | First user abstraction |
 | 5 | E | 5 | Navana | Namespace controller |
 | 6 | E | 6 | Mint | Capability minting |
@@ -192,14 +192,9 @@ Indices 0–3 are boot-internal (used by BOOT_PROGRAM firmware only).
 Indices 4–7 are user abstraction GTs (Salvation, Navana, Mint, Memory).
 Indices 8–16 are hardware device GTs (6 LED channels, UART, Button, Timer).
 
-Boot.Abstr director c-list (4 entries, separate from the above):
-
-| Idx | Perms | Slot | Notes |
-|-----|-------|------|-------|
-| 0 | R\|W | 0 | Memory-manager GT |
-| 1 | — | 1 | Boot.Thread GT |
-| 2 | E | 2 | Boot.Abstr self-reference |
-| 3 | E | 3 | **Boot.Entry E-GT** — B:04 reads this to follow the boot indirection |
+Slot 2 has no c-list (free/null — Task #247).  The boot indirection via a
+director c-list[3] E-GT has been eliminated; B:04 loads Boot.Abstr (slot 3)
+directly.
 
 The `b_flag=1` on device GTs marks them as IDE-bound to a physical
 peripheral. The b_flag bit is excluded from the CRC seal input so the
