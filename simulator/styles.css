@@ -4749,64 +4749,6 @@ a.next-step-link:hover {
     background: rgba(168,85,247,0.08);
 }
 
-.crd-action-group {
-    display: inline-flex;
-    align-items: center;
-    position: relative;
-}
-
-.crd-action-info-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.35rem;
-    height: 1.35rem;
-    margin-left: 2px;
-    padding: 0;
-    font-size: 0.78rem;
-    background: #1b2d45;
-    color: #5ba4f5;
-    border: 1px solid #2a4a6a;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-.crd-action-info-btn:hover {
-    background: #3a86ff;
-    color: white;
-    border-color: #3a86ff;
-}
-.crd-action-info-btn-fpga {
-    color: #5ba4f5;
-    border-color: #2a4a6a;
-}
-
-.crd-info-pop {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    z-index: 200;
-    background: #0d1b2a;
-    border: 1px solid #3a86ff;
-    border-radius: 7px;
-    padding: 0.75rem 1rem;
-    min-width: 260px;
-    max-width: 340px;
-    font-size: 0.8rem;
-    color: #c8d8e8;
-    line-height: 1.55;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.6);
-}
-.crd-info-pop code {
-    background: #1b2d45;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.78rem;
-    color: #7dd3fc;
-}
-
 .patch-toast {
     position: fixed;
     bottom: 1.5rem;

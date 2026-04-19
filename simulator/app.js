@@ -2705,19 +2705,6 @@ function showPatchModal(ok, opName, logText) {
     document.body.appendChild(toast);
 }
 
-function toggleCrdInfoPop(id) {
-    const pop = document.getElementById(id);
-    if (!pop) return;
-    const isOpen = pop.style.display !== 'none';
-    document.querySelectorAll('.crd-info-pop').forEach(p => { p.style.display = 'none'; });
-    if (!isOpen) pop.style.display = 'block';
-}
-
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.crd-action-group')) {
-        document.querySelectorAll('.crd-info-pop').forEach(p => { p.style.display = 'none'; });
-    }
-});
 
 function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
     const annot = {};
@@ -3236,32 +3223,12 @@ function updateCRDetail() {
         html += `</span>`;
     }
     if (showEditButton) {
-        html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" title="Load this code lump into the assembly editor">&#x270E; Edit</button>`;
-        html += `<span class="crd-action-group">`;
-        html += `<button class="crd-tab crd-tab-action" onclick="patchSimulator()" title="Assemble editor code and patch simulator memory">&#x21A9; Patch</button>`;
-        html += `<button class="crd-action-info-btn" onclick="toggleCrdInfoPop('patchSimInfoPop')" title="What does Patch do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="patchSimInfoPop" style="display:none;"><b>Patch Simulator</b><br><br>Assembles the code currently in the abstraction creator and writes the resulting machine words directly into simulator memory at this lump\u2019s base address.<br><br>If the instruction count changed the lump header <code>cw</code> field, the NS entry <code>limit17</code>, and the CRC seal are all updated automatically so capability checks remain valid.</div>`;
-        html += `</span>`;
-        html += `<span class="crd-action-group">`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" title="Patch simulator then upload to FPGA over UART">&#x21A9; Patch FPGA</button>`;
-        html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('patchFPGAInfoPop')" title="What does Patch FPGA do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="patchFPGAInfoPop" style="display:none;"><b>Patch FPGA</b><br><br>Runs <b>Patch Simulator</b> first, then uploads the updated code lump to the connected Efinix Ti60 F225 FPGA over WebSerial (UART).<br><br>If the instruction count changed, the full NS table is re-uploaded before the code lump. Requires an active WebSerial connection to the hardware.</div>`;
-        html += `</span>`;
-        html += `<span class="crd-action-group">`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportPatchFile()" title="Export compiled patch as .patch file for command-line flashing">&#x2B73; Export Patch</button>`;
-        html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('exportPatchInfoPop')" title="What does Export Patch do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="exportPatchInfoPop" style="display:none;"><b>Export Patch</b><br><br>Assembles the code and downloads a <code>.patch</code> file containing complete UART frames with tags, CRC, and RUN sentinel. Flash it to the FPGA with:<br><code>python3 patch_fpga.py /dev/ttyUSB1 file.patch</code><br><br>No bridge or browser connection needed &mdash; just one terminal command.</div>`;
-        html += `</span>`;
-        html += `<span class="crd-action-group">`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportLumpAsPatch()" title="Convert a pre-built .lump binary into a .patch file for FPGA flashing">&#x2B73; Lump&#x2192;Patch</button>`;
-        html += `<button class="crd-action-info-btn crd-action-info-btn-fpga" onclick="toggleCrdInfoPop('lumpToPatchInfoPop')" title="What does Lump→Patch do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="lumpToPatchInfoPop" style="display:none;"><b>Lump&#x2192;Patch</b><br><br>Picks a pre-built <code>.lump</code> binary file, validates the header (magic 0x1F, size, cw, cc), and wraps all words into a <code>.patch</code> UART frame file.<br><br>Words are byte-swapped from big-endian (.lump spec) to little-endian (FPGA UART protocol) automatically.<br><br>Flash with:<br><code>python3 tools/patch_fpga.py /dev/ttyUSB1 file.patch</code></div>`;
-        html += `</span>`;
-        html += `<span class="crd-action-group">`;
-        html += `<button class="crd-tab crd-tab-action" onclick="publishToLibrary()" title="Publish this abstraction to the Mum Tunnel Library" style="background:#4a7a2e;">&#x21E1; Publish</button>`;
-        html += `<button class="crd-action-info-btn" onclick="toggleCrdInfoPop('publishInfoPop')" title="What does Publish do?">&#x2139;</button>`;
-        html += `<div class="crd-info-pop" id="publishInfoPop" style="display:none;"><b>Publish to Library</b><br><br>Compiles your code and publishes the abstraction to the Mum Tunnel Library on GitHub. Other Church Machine users worldwide can browse, search, and import your abstraction directly into their namespace.<br><br>Includes: compiled machine words, capability list, source code, and metadata.</div>`;
-        html += `</span>`;
+        html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" data-tooltip="Edit — Load this code lump into the assembly editor">&#x270E; Edit</button>`;
+        html += `<button class="crd-tab crd-tab-action" onclick="patchSimulator()" data-tooltip="Patch — Assemble editor code and write it directly into simulator memory at this lump\u2019s base address. Updates lump header, NS limit, and CRC automatically.">&#x21A9; Patch</button>`;
+        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" data-tooltip="Patch FPGA — Runs Patch Simulator first, then uploads the updated lump to the Ti60 F225 over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
+        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportPatchFile()" data-tooltip="Export Patch — Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
+        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportLumpAsPatch()" data-tooltip="Lump\u2192Patch — Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump&#x2192;Patch</button>`;
+        html += `<button class="crd-tab crd-tab-action" onclick="publishToLibrary()" data-tooltip="Publish — Compile and publish this abstraction to the Mum Tunnel Library on GitHub, including machine words, c-list, source, and metadata." style="background:#4a7a2e;">&#x21E1; Publish</button>`;
     }
     html += '</div>';
 
