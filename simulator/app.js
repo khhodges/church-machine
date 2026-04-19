@@ -7794,7 +7794,7 @@ function getMethodPurposes(abs) {
             'Register': 'Tunnel.Register(boot_reason, last_fault, fault_NIA) — send the 23-byte call-home identification packet [0xCE11 · board · FW · HMAC(4B) · UID(8B) · reason · fault · NIA(4B)] and await ACK. Replaces the hardwired B:02\u00BD boot step. DR0 \u2190 1 (IDE connected) | 0 (offline).',
             'Send': 'Tunnel.Send(type_tag, word_count, payload\u2026) — transmit a tagged message to the IDE host over UART. DR1 = type tag, DR2 = word count (1\u201313), DR3\u2026 = payload words. Fire-and-forget; no ACK. DR0 \u2190 0 = queued | 0x01 = TX overrun.',
             'Receive': 'Tunnel.Receive(timeout_steps) — block until the IDE host sends a message or timeout expires. DR1 = timeout in steps (0 = wait forever). DR0 \u2190 word count (0 = timeout), DR1 \u2190 type tag, DR2\u2026 = payload.',
-            'Fault': 'Tunnel.Fault(fault_code, NIA) — report a hardware fault to the IDE immediately (bypasses the send queue). DR1 = fault code, DR2 = faulting NIA. IDE logs the event in the Devices view. Fire-and-forget.',
+            'Fault': 'Tunnel.Fault(fault_code, ns_idx, thread_gt, abstr_idx, method_idx, instr_offset) — report a fault with full semantic location. DR1 = fault_code, DR2 = ns_idx (active namespace slot), DR3 = thread_gt (NS index of faulting thread), DR4 = abstr_idx (NS slot of executing abstraction), DR5 = method_idx, DR6 = instr_offset. Bypasses send queue. IDE logs full location in Devices view. Fire-and-forget.',
             'Fetch': 'Tunnel.Fetch(token, expected_words, mem_GT) — request a lump binary from the IDE by NS slot token. CR2 = Memory W-GT for the write destination. DR1 = slot token, DR2 = expected size in words. Validates header (magic, CRC) before writing. DR0 \u2190 0 = installed | error code.',
         },
         'Negotiate': { 'Propose': 'Negotiate.Propose(cap_GT) — request special grant (dual-approval)', 'Approve': 'Negotiate.Approve(proposal_id) — parent or teacher approves', 'Reject': 'Negotiate.Reject(proposal_id) — reject proposal', 'Status': 'Negotiate.Status(proposal_id) — query proposal state' },
@@ -9056,21 +9056,29 @@ CALL   CR1                 ; Tunnel.Receive:
 ;   3. Read header → DR1 = type_tag, DR0 = word_count
 ;   4. Read up to 13 payload words into DR2..DR14
 ;   5. Caller dispatches on DR1 type_tag`,
-            'Fault': `; Tunnel.Fault — report a fault event to the IDE
-; High-priority, bypasses the normal send queue.
+            'Fault': `; Tunnel.Fault — report a fault with full semantic location
+; High-priority: bypasses the normal send queue.
 ; Called by the fault handler before any recovery action.
-; IDE logs the entry in the Devices view for this board.
+; IDE logs the full location in the Devices view for this board.
 ;
-; DR1 = fault code (e.g. 0x10=PERM, 0x42=RANGE, 0x80=VERSION)
-; DR2 = NIA — address of the faulting instruction
+; DR1 = fault_code   (e.g. 0x10=PERM, 0x42=RANGE, 0x80=VERSION)
+; DR2 = ns_idx       — active namespace slot
+; DR3 = thread_gt    — NS index of the faulting thread
+; DR4 = abstr_idx    — NS slot of the executing abstraction
+; DR5 = method_idx   — method index within the abstraction
+; DR6 = instr_offset — instruction offset within the method
 
 LOAD   CR1, NS[31]        ; Load Tunnel E-GT
 DWRITE DR1, #0x42          ; Fault code: RANGE violation
-DWRITE DR2, #0x00000120   ; Faulting NIA
+DWRITE DR2, #0x0000        ; Namespace: NS[0] (boot namespace)
+DWRITE DR3, #0x0001        ; Thread:    NS[1] (boot thread)
+DWRITE DR4, #0x0013        ; Abstraction: NS[19] — Loader
+DWRITE DR5, #0x0000        ; Method: 0 (Load)
+DWRITE DR6, #0x0003        ; Instruction offset: 3
 CALL   CR1                 ; Tunnel.Fault:
-;   1. Compose fault packet: [0xFA17 · fault_code · NIA]
-;   2. Transmit immediately (pre-empts TX queue)
-;   3. IDE records fault code + NIA in Devices view
+;   1. Compose fault packet: [0xFA17 · fault_code · ns_idx · thread_gt · abstr_idx · method_idx · instr_offset]
+;   2. Transmit immediately (pre-empts TX queue — high priority)
+;   3. IDE records full fault location in Devices view
 ;   4. Fire-and-forget — RETURN, caller handles recovery`,
             'Fetch': `; Tunnel.Fetch — request and receive a lump from the IDE
 ; Called by Loader when a NULL_CAP fault hits a cold slot.
