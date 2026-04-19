@@ -43,7 +43,7 @@ class ChurchMLoad(Elaboratable):
         self.sub_busy = Signal()
         self.sub_done = Signal()
         self.sub_fault = Signal()
-        self.sub_fault_type = Signal(4)
+        self.sub_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
@@ -77,8 +77,9 @@ class ChurchMLoad(Elaboratable):
         self.outform_slot_id    = Signal(16) # slot_id from the Outform GT
         self.outform_clist_addr = Signal(32) # byte address of the c-list slot (Mint write-back)
         # Inputs from outform FSM
-        self.outform_done_in    = Signal()
-        self.outform_fault_in   = Signal()
+        self.outform_done_in      = Signal()
+        self.outform_fault_in     = Signal()
+        self.outform_fault_type_in = Signal(5)  # specific outform fault code from outform_iot
 
     def elaborate(self, platform):
         m = Module()
@@ -94,7 +95,7 @@ class ChurchMLoad(Elaboratable):
         direct_gt_reg = Signal(32)
         src_cap = Signal(CAP_REG_LAYOUT)
         result_cap = Signal(CAP_REG_LAYOUT)
-        fault_type_reg = Signal(4)
+        fault_type_reg = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         src_view = View(CAP_REG_LAYOUT, src_cap)
         result_view = View(CAP_REG_LAYOUT, result_cap)
@@ -280,7 +281,12 @@ class ChurchMLoad(Elaboratable):
 
             with m.State("WAIT_OUTFORM"):
                 with m.If(self.outform_fault_in):
-                    m.d.sync += fault_type_reg.eq(FaultType.ABSENT_OUTFORM)
+                    # Propagate the specific outform fault code so the fault
+                    # register shows CRC/alloc/mint/hdr rather than the generic
+                    # ABSENT_OUTFORM sentinel.  ABSENT_OUTFORM is used only when
+                    # mLoad detects the absent GT itself (before the outform unit
+                    # is started).
+                    m.d.sync += fault_type_reg.eq(self.outform_fault_type_in)
                     m.next = "FAULT"
                 with m.Elif(self.outform_done_in):
                     # Mint has installed the lump and patched the c-list slot.

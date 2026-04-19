@@ -186,6 +186,10 @@ class FaultType(IntEnum):
     ABSENT_OUTFORM  = 0x11   # mLoad: outform absent — SW trap downloads code, reissues CALL
     STACK_CORRUPT   = 0x12   # CALL stack pointer above sp_max (STO corrupted or header wrong)
     STACK_UNDERFLOW = 0x13   # RETURN with no caller frame — popped past sentinel (NIA=0x7FFF)
+    OUTFORM_CRC     = 0x15   # Outform download: CRC-32 mismatch in received lump
+    OUTFORM_ALLOC   = 0x16   # Outform download: memory allocator rejected the lump size
+    OUTFORM_MINT    = 0x17   # Outform download: Mint capability-minting step failed
+    OUTFORM_HDR     = 0x18   # Outform download: header validation failed (bad length/alignment)
 
 
 class BootState(IntEnum):

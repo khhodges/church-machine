@@ -12,7 +12,7 @@ class ChurchReturn(Elaboratable):
         self.busy = Signal()
         self.complete = Signal()
         self.fault_valid = Signal()
-        self.fault_type = Signal(4)
+        self.fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
         self.reboot_request = Signal()
 
         self.cr_rd_addr = Signal(4)
@@ -34,7 +34,7 @@ class ChurchReturn(Elaboratable):
 
         self.mload_done = Signal()
         self.mload_fault = Signal()
-        self.mload_fault_type = Signal(4)
+        self.mload_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         self.saved_cr5_gt = Signal(32)
 
@@ -143,7 +143,7 @@ class ChurchReturn(Elaboratable):
         sub_done_latched  = Signal()
         sub_fault_latched = Signal()
         fault_flag        = Signal()
-        fault_latched     = Signal(4)
+        fault_latched     = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         with m.FSM(name="ret") as fsm:
 

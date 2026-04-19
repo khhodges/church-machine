@@ -1149,6 +1149,7 @@ class ChurchCore(Elaboratable):
             u_outform.tx_ack.eq(self.outform_tx_ack),
             u_shared_mload.outform_done_in.eq(u_outform.outform_done),
             u_shared_mload.outform_fault_in.eq(u_outform.outform_fault),
+            u_shared_mload.outform_fault_type_in.eq(u_outform.outform_fault_type),
         ]
 
         if self.iot_profile:

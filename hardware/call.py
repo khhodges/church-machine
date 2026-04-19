@@ -37,7 +37,7 @@ class ChurchCall(Elaboratable):
 
         self.mload_done = Signal()
         self.mload_fault = Signal()
-        self.mload_fault_type = Signal(4)
+        self.mload_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         self.nia_set = Signal()
         self.nia_value = Signal(32)

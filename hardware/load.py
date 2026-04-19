@@ -12,7 +12,7 @@ class ChurchLoad(Elaboratable):
         self.load_busy = Signal()
         self.load_complete = Signal()
         self.load_fault = Signal()
-        self.fault_type = Signal(4)
+        self.fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
         self.mload_start = Signal()
         self.mload_cr_src = Signal(4)
@@ -25,7 +25,7 @@ class ChurchLoad(Elaboratable):
         self.mload_busy = Signal()
         self.mload_done = Signal()
         self.mload_fault = Signal()
-        self.mload_fault_type = Signal(4)
+        self.mload_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
     def elaborate(self, platform):
         m = Module()
