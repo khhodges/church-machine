@@ -14,10 +14,10 @@
 //   MP3_  0x4D503320   audio file
 //   ...                (add new tags without changing this lump)
 //
-// Hardware registers (DEVICE_REG_LIMITS = {11: 2}):
-//   CR7 offset 0 (TX)  write = enqueue byte for UART TX
+// UART hardware registers (DEVICE_REG_LIMITS = {11: 2}):
+//   CR7 offset 0 (TX)  write = enqueue word for UART TX
 //                      read  = TX queue status (0 = OK, 1 = overrun)
-//   CR7 offset 1 (RX)  read  = next received byte (-1 if empty)
+//   CR7 offset 1 (RX)  read  = next received word (−1 if empty / timeout)
 //
 // C-list:
 //   CR6[0] (slot 0, target NS 11) = UART capability (E-only)
@@ -33,21 +33,29 @@ abstraction Tunnel {
     // Send the call-home identification packet and await ACK from the
     // IDE bridge.  Replaces the hardwired B:02½ boot step.
     //
-    // Packet: [boot_reason · last_fault · fault_NIA]  (3 words)
+    // Packet written to TX: [boot_reason · last_fault · fault_NIA]  (3 words)
     //
-    // Offline-safe: if the IDE is absent the RX register returns -1;
+    // Offline-safe: if the IDE is absent the RX register returns −1;
     // the caller should treat DR0 ≤ 0 as "offline, boot continues".
+    //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT from c-list slot 0 → CR7
+    //   DWRITE DR1, CR7[0]       ; TX: boot_reason
+    //   DWRITE DR2, CR7[0]       ; TX: last_fault
+    //   DWRITE DR3, CR7[0]       ; TX: fault_NIA
+    //   DREAD  DR0, CR7[1]       ; RX: IDE ACK (1=connected, ≤0=offline)
+    //   RETURN AL, CR5
     //
     // Inputs:  DR1 = boot_reason  (0=cold, 1=warm, 2=fault-recovery)
     //          DR2 = last_fault   (0 if none)
     //          DR3 = fault_NIA    (NIA of faulting instruction, 0 if none)
     // Outputs: DR0 = 1 (IDE ACK received) | ≤0 (offline / timeout)
     method Register(boot_reason, last_fault, fault_NIA) {
-        uart = load(CR6, 0)             // UART GT → CR7
-        write(uart, 0, boot_reason)     // send call-home word 0
-        write(uart, 0, last_fault)      // send call-home word 1
-        write(uart, 0, fault_NIA)       // send call-home word 2
-        ack = read(uart, 1)             // block for ACK on RX
+        uart = load(CR6, 0)
+        write(uart, 0, boot_reason)
+        write(uart, 0, last_fault)
+        write(uart, 0, fault_NIA)
+        ack = read(uart, 1)
         return(ack)
     }
 
@@ -55,20 +63,26 @@ abstraction Tunnel {
     // Transmit a self-identifying media packet to the IDE host.
     // FourCC tag is an open registry — new types need no dispatch changes.
     //
+    // Packet written to TX: [tag · count · payload]  (3 words)
+    //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT → CR7
+    //   DWRITE DR1, CR7[0]       ; TX: FourCC tag word
+    //   DWRITE DR2, CR7[0]       ; TX: payload word count
+    //   DWRITE DR3, CR7[0]       ; TX: first payload word
+    //   DREAD  DR0, CR7[0]       ; TX queue status → DR0 (0=OK, 1=overrun)
+    //   RETURN AL, CR5
+    //
     // Inputs:  DR1 = FourCC type tag  (TEXT=0x54455854  LUMP=0x4C554D50 …)
     //          DR2 = payload word count  (1–13)
     //          DR3 = first payload word
     // Outputs: DR0 = 0 (queued OK) | 1 (TX buffer overrun)
-    //
-    // Fire-and-forget; for multi-word payloads the caller loops Send
-    // once per word after the first (count field stays 0 on continuation
-    // words, or the UART framing handles it transparently in hardware).
-    method Send(tag, count) {
+    method Send(tag, count, payload) {
         uart = load(CR6, 0)
-        write(uart, 0, tag)             // FourCC header word
-        write(uart, 0, count)           // payload word count
-        write(uart, 0, DR3)             // first payload word (verbatim)
-        status = read(uart, 0)          // TX queue status
+        write(uart, 0, tag)
+        write(uart, 0, count)
+        write(uart, 0, payload)
+        status = read(uart, 0)
         return(status)
     }
 
@@ -76,23 +90,48 @@ abstraction Tunnel {
     // Block until the IDE sends a self-identifying media packet or the
     // timeout expires.  Caller dispatches on the returned FourCC tag.
     //
+    // Three consecutive DREAD instructions read the next three words from
+    // the RX register into DR0, DR1, DR2 in order.  All three are visible
+    // to the caller after RETURN (none are cleared by RETURN).
+    //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT → CR7
+    //   DWRITE DR1, CR7[0]       ; TX: timeout hint
+    //   DREAD  DR0, CR7[1]       ; RX word 0 → DR0 (word count; 0=timeout)
+    //   DREAD  DR1, CR7[1]       ; RX word 1 → DR1 (FourCC tag)
+    //   DREAD  DR2, CR7[1]       ; RX word 2 → DR2 (first payload word)
+    //   RETURN AL, CR5
+    //
     // Inputs:  DR1 = timeout in CPU steps (0 = wait forever)
     // Outputs: DR0 = received word count (0 = timeout)
     //          DR1 = FourCC type tag
     //          DR2 = first payload word
     method Receive(timeout) {
         uart = load(CR6, 0)
-        write(uart, 0, timeout)         // set timeout hint in TX
-        count = read(uart, 1)           // receive word count from RX
-        tag   = read(uart, 1)           // receive FourCC tag from RX
-        word0 = read(uart, 1)           // receive first payload word
-        return(count)                   // DR1 and DR2 are side-effect results
+        write(uart, 0, timeout)
+        count = read(uart, 1)
+        tag   = read(uart, 1)
+        word0 = read(uart, 1)
+        return(count)
     }
 
     // ── Fault ─────────────────────────────────────────────────────────────
     // Report a hardware fault with full semantic location to the IDE.
     // High-priority: bypasses the normal send queue.
-    // Packet: [fault_code · ns_idx · thread_gt · abstr_idx · method_idx · instr_offset]
+    //
+    // Packet written to TX: [fault_code · ns_idx · thread_gt ·
+    //                         abstr_idx · method_idx · instr_offset]  (6 words)
+    //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT → CR7
+    //   DWRITE DR1, CR7[0]       ; TX: fault_code
+    //   DWRITE DR2, CR7[0]       ; TX: ns_idx
+    //   DWRITE DR3, CR7[0]       ; TX: thread_gt
+    //   DWRITE DR4, CR7[0]       ; TX: abstr_idx
+    //   DWRITE DR5, CR7[0]       ; TX: method_idx
+    //   DWRITE DR6, CR7[0]       ; TX: instr_offset
+    //   DREAD  DR0, CR7[0]       ; TX queue status → DR0 (0=OK)
+    //   RETURN AL, CR5
     //
     // Inputs:  DR1 = fault_code    (0x10=PERM, 0x42=RANGE, 0x80=VERSION …)
     //          DR2 = ns_idx        active namespace slot
@@ -115,9 +154,18 @@ abstraction Tunnel {
 
     // ── Fetch ─────────────────────────────────────────────────────────────
     // Request and receive a lump binary from the IDE by NS slot token.
-    // Validates the incoming lump before writing to memory via the caller-
-    // supplied write-perm buffer capability (CR2).  Called by Loader when
-    // a NULL_CAP fault hits a cold slot.
+    // Validates the incoming lump before installing.  Called by Loader
+    // when a NULL_CAP fault hits a cold slot.
+    //
+    // Packet written to TX: [token · expected_words]  (2 words)
+    // IDE responds by streaming the lump; hardware writes it via CR2.
+    //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT → CR7
+    //   DWRITE DR1, CR7[0]       ; TX: slot token request
+    //   DWRITE DR2, CR7[0]       ; TX: expected word count
+    //   DREAD  DR0, CR7[1]       ; RX: 0=installed, non-zero=error
+    //   RETURN AL, CR5
     //
     // Inputs:  CR2 = Memory write-GT  (write-perm buffer ≥ expected_words)
     //          DR1 = NS slot token    (identifies the requested abstraction)
@@ -125,29 +173,33 @@ abstraction Tunnel {
     // Outputs: DR0 = 0 (lump installed) | non-zero (timeout / CRC / size error)
     method Fetch(token, expected_words) {
         uart = load(CR6, 0)
-        write(uart, 0, token)           // request: send slot token
-        write(uart, 0, expected_words)  // request: send expected size
-        result = read(uart, 1)          // 0 = installed, non-zero = error
+        write(uart, 0, token)
+        write(uart, 0, expected_words)
+        result = read(uart, 1)
         return(result)
     }
 
     // ── Call ──────────────────────────────────────────────────────────────
     // Forward a CALL through the tunnel to a remote capability.
-    // Encodes the GT in CR2 as a GTKN packet (FourCC = 0x47544B4E),
-    // transmits it, and blocks awaiting the far-end RETURN.
-    //
     // This is the "Hello Mum" primitive:
     //   CALL( CONNECT(me, mymother) )
     // From the caller's view this is one Church instruction applied
     // across two machines.
     //
+    // Compiled instructions:
+    //   LOAD  AL, CR7, CR6[0]   ; UART GT → CR7
+    //   TPERM AL, CR2, #E        ; restrict remote GT to E-only before CALL
+    //   CALL  AL, CR2, CR2       ; invoke remote abstraction via tunnel
+    //   DREAD  DR0, CR7[1]       ; RX: far-end return value → DR0
+    //   RETURN AL, CR5
+    //
     // Inputs:  CR2 = remote GT  (Outform type, F-bit set — far-end abstraction)
     // Outputs: DR0 = far-end return value | non-zero (error / timeout)
     method Call(remote_gt) {
-        uart = load(CR6, 0)             // UART GT → CR7
-        tperm(CR2, E)                   // restrict remote GT to E-only
-        call(CR2)                       // invoke remote via tunnel
-        result = read(uart, 1)          // far-end RETURN value from RX
+        uart = load(CR6, 0)
+        tperm(remote_gt, E)
+        call(remote_gt)
+        result = read(uart, 1)
         return(result)
     }
 }
