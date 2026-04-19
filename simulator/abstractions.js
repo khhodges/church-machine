@@ -297,10 +297,10 @@ class AbstractionRegistry {
             'Peer-to-peer capability sharing, parent-gated',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
-        this.createAbstraction(31, 'Tunnel', 5,
-            ['Connect', 'Send', 'Receive', 'Close'],
-            'Outform GT encrypted tunnel (F-bit networking)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+        this.createAbstraction(31, 'Tunnel', 1,
+            ['Register', 'Send', 'Receive', 'Fault', 'Fetch'],
+            'Resident I/O channel — FPGA\u2194IDE host over UART; Register replaces the hardwired call-home boot step (B:02\u00BD); all ongoing host communication (logs, uploads, fault reports, lazy-load fetch) goes through this abstraction',
+            { perms: { R: 0, W: 0, X: 0, L: 0, S: 1, E: 1 } });
 
         this.createAbstraction(32, 'Negotiate', 5,
             ['Propose', 'Approve', 'Reject', 'Status'],

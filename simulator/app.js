@@ -3277,13 +3277,13 @@ function updateCRDetail() {
         codeHtml += '<th class="code-decompiled-hdr">Decompiled</th>';
         codeHtml += '</tr></thead><tbody>';
 
-        if (nsIdx === 2) {
+        if (nsIdx === 3) {
             const _bootPreamble = [
                 { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
                 { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Namespace (M=1, base=0x0000, perms=none)' },
                 { addr: 'B:02', desc: 'INIT_THRD',   decomp: 'CR12 \u2190 NS[1] Thread Identity (M=1, Inform, perms=none)' },
-                { addr: 'B:02\u00BD', desc: 'CALL_HOME',  decomp: 'UART \u2192 23-byte packet [0xCE11, board, FW, sig, UID, reason, fault, NIA] \u00b7 await ACK' },
-                { addr: 'B:03', desc: 'INIT_ABSTR',  decomp: 'CR6 \u2190 NS[2] Boot Abstraction (M=1, E-type, transient)' },
+                { addr: 'B:02\u00BD', desc: 'CALL_HOME',  decomp: 'Tunnel.Register \u2192 23-byte packet [0xCE11, board, FW, HMAC(4), UID(8), reason, fault, NIA(4)] \u00b7 await ACK' },
+                { addr: 'B:03', desc: 'INIT_ABSTR',  decomp: 'CR6 \u2190 NS[3] Boot Abstraction (M=1, E-type, transient)' },
                 { addr: 'B:04', desc: 'LOAD_NUC',    decomp: 'CR14(M=1, R+X) + CR6(M=1, L) \u2190 header \u00b7 push sentinel \u00b7 PC\u21900' },
                 { addr: 'B:05', desc: 'COMPLETE',    decomp: 'bootComplete \u2190 true \u00b7 new CRs get M=0 \u00b7 dispatch begins' },
             ];
@@ -7790,7 +7790,13 @@ function getMethodPurposes(abs) {
         'Family': { 'Register': 'Family.Register(parent_GT, child_GT) — bind parent-child in c-list', 'Hello': 'Family.Hello(target_GT) — send greeting to any family member via their GT', 'Oversight': 'Family.Oversight(child_GT) — parent queries child activity' },
         'Schoolroom': { 'Join': 'Schoolroom.Join(class_GT) — student enters class', 'Lesson': 'Schoolroom.Lesson(class_GT, content_GT) — teacher posts lesson', 'Submit': 'Schoolroom.Submit(work_GT) — student submits work', 'Grade': 'Schoolroom.Grade(work_GT, score) — teacher grades work' },
         'Friends': { 'Request': 'Friends.Request(peer_GT) — send friend request (needs parent approval)', 'Accept': 'Friends.Accept(requester_GT) — accept request', 'Share': 'Friends.Share(friend_GT, cap_GT) — share capability', 'Revoke': 'Friends.Revoke(cap_GT) — revoke shared capability' },
-        'Tunnel': { 'Connect': 'Tunnel.Connect(remote_GT) — establish encrypted tunnel (F-bit)', 'Send': 'Tunnel.Send(remote_GT, data) — send via tunnel', 'Receive': 'Tunnel.Receive() — receive from tunnel', 'Close': 'Tunnel.Close(remote_GT) — close tunnel, clear F-bit' },
+        'Tunnel': {
+            'Register': 'Tunnel.Register(boot_reason, last_fault, fault_NIA) — send the 23-byte call-home identification packet [0xCE11 · board · FW · HMAC(4B) · UID(8B) · reason · fault · NIA(4B)] and await ACK. Replaces the hardwired B:02\u00BD boot step. DR0 \u2190 1 (IDE connected) | 0 (offline).',
+            'Send': 'Tunnel.Send(type_tag, word_count, payload\u2026) — transmit a tagged message to the IDE host over UART. DR1 = type tag, DR2 = word count (1\u201313), DR3\u2026 = payload words. Fire-and-forget; no ACK. DR0 \u2190 0 = queued | 0x01 = TX overrun.',
+            'Receive': 'Tunnel.Receive(timeout_steps) — block until the IDE host sends a message or timeout expires. DR1 = timeout in steps (0 = wait forever). DR0 \u2190 word count (0 = timeout), DR1 \u2190 type tag, DR2\u2026 = payload.',
+            'Fault': 'Tunnel.Fault(fault_code, NIA) — report a hardware fault to the IDE immediately (bypasses the send queue). DR1 = fault code, DR2 = faulting NIA. IDE logs the event in the Devices view. Fire-and-forget.',
+            'Fetch': 'Tunnel.Fetch(token, expected_words, mem_GT) — request a lump binary from the IDE by NS slot token. CR2 = Memory W-GT for the write destination. DR1 = slot token, DR2 = expected size in words. Validates header (magic, CRC) before writing. DR0 \u2190 0 = installed | error code.',
+        },
         'Negotiate': { 'Propose': 'Negotiate.Propose(cap_GT) — request special grant (dual-approval)', 'Approve': 'Negotiate.Approve(proposal_id) — parent or teacher approves', 'Reject': 'Negotiate.Reject(proposal_id) — reject proposal', 'Status': 'Negotiate.Status(proposal_id) — query proposal state' },
         'Editor': { 'Open': 'Editor.Open(file_GT) — load DATA object into editor buffer', 'Save': 'Editor.Save() — DWRITE buffer to NS slot, recompute seal', 'Load': 'Editor.Load(nsIndex) — DREAD source from slot into buffer', 'Undo': 'Editor.Undo() — pop previous state from undo stack' },
         'Assembler': { 'Assemble': 'Assembler.Assemble(source_GT) — parse + encode to 32-bit instructions', 'Disassemble': 'Assembler.Disassemble(binary_GT) — decode instructions to text', 'Validate': 'Assembler.Validate(source_GT) — check syntax + register refs' },
@@ -8988,47 +8994,105 @@ CALL   CR1              ; Friends.Revoke:
 ;   3. Friend's next mLoad hits version mismatch -> FAULT`,
         },
         'Tunnel': {
-            'Connect': `; Tunnel.Connect — establish encrypted capability tunnel
-; F-bit (Far) on NS entries routes through tunnels
-LOAD   CR1, NS[31]      ; Load Tunnel E-GT
-LOAD   CR2, NS[55]      ; Remote endpoint GT
-                         ;   This GT has F-bit=1 in its NS entry
-                         ;   word1[30] = 1 (Far/Foreign)
+            'Register': `; Tunnel.Register — identify this board to the IDE host
+; Replaces the hardwired B:02½ CALL_HOME boot step.
+; Sends the 23-byte call-home packet and awaits ACK.
+;
+; Packet layout (23 bytes):
+;   [0xCE11(2B) · board_type(1B) · fw_version(1B) ·
+;    HMAC-SHA256(4B) · UID(8B) ·
+;    boot_reason(1B) · last_fault(1B) · fault_NIA(4B)]
+;
+; DR1 = boot_reason  (0=cold, 1=warm, 2=fault-recovery)
+; DR2 = last_fault   (0 if no prior fault)
+; DR3 = fault_NIA    (0 if no prior fault)
+; DR0 ← 1 (IDE connected + ACK received) | 0 (offline)
 
-CALL   CR1              ; Tunnel.Connect:
-;   1. Verify remote GT has F-bit set
-;   2. Establish encrypted channel to remote namespace
-;   3. GT type becomes Outform (type=10) for remote
-;   4. All future LOAD/SAVE on this GT route through tunnel
-;   5. mLoad step 6 detects F-bit, redirects to tunnel`,
-            'Send': `; Tunnel.Send — send data via encrypted tunnel
-LOAD   CR1, NS[31]      ; Load Tunnel E-GT
-LOAD   CR2, NS[55]      ; Connected remote GT (F-bit=1)
-DWRITE DR1, #0x48656C6C ; Payload data ("Hell")
+LOAD   CR1, NS[31]       ; Load Tunnel E-GT (resident, layer 1)
+DWRITE DR1, #0            ; boot_reason = 0 (cold boot)
+DWRITE DR2, #0            ; last_fault  = 0 (none)
+DWRITE DR3, #0x00000000   ; fault_NIA   = 0 (none)
+CALL   CR1                ; Tunnel.Register:
+;   1. Compose 23-byte packet from board ROM + DR args
+;   2. Transmit over UART to IDE bridge
+;   3. Await ACK frame within ≈500 ms timeout
+;   4. If ACK: IDE confirms UID + HMAC valid → DR0 ← 1
+;   5. If timeout: offline mode → DR0 ← 0, boot continues`,
+            'Send': `; Tunnel.Send — push a message to the IDE host
+; Transmits a tagged, framed packet over the UART channel.
+; Used for log output, status events, and debug data.
+;
+; DR1 = message type tag  (e.g. 0xA0000000 = log)
+; DR2 = payload word count (1–13)
+; DR3..DR(2+count) = payload words
+; DR0 ← 0 = queued · 0x01 = TX buffer overrun
 
-CALL   CR1              ; Tunnel.Send:
-;   1. Encrypt payload with tunnel key
-;   2. Pack as capability-addressed message
-;   3. Transmit via UART/network to remote node
-;   4. Remote node validates GT on their end`,
-            'Receive': `; Tunnel.Receive — receive via encrypted tunnel
-LOAD   CR1, NS[31]      ; Load Tunnel E-GT
+LOAD   CR1, NS[31]        ; Load Tunnel E-GT
+DWRITE DR1, #0xA0000000   ; Type tag: log output
+DWRITE DR2, #3             ; 3 payload words
+DWRITE DR3, #0x48656C6C   ; "Hell"
+DWRITE DR4, #0x6F20576F   ; "o Wo"
+DWRITE DR5, #0x726C6400   ; "rld\0"
+CALL   CR1                 ; Tunnel.Send:
+;   1. Frame: [type_tag · word_count · DR3..DR5]
+;   2. Transmit framed packet over UART
+;   3. Fire-and-forget — no ACK required
+; DR0 ← 0 = sent · 0x01 = overrun (drop this packet)`,
+            'Receive': `; Tunnel.Receive — wait for a message from the IDE host
+; Blocks the calling thread until data arrives or timeout.
+; Navana calls this in its main event loop to receive
+; upload commands, patch requests, and configuration data.
+;
+; DR1 = timeout in CPU steps (0 = wait forever)
+; DR0 ← received word count (0 = timeout, no data)
+; DR1 ← message type tag
+; DR2..DR(n+1) ← payload words
 
-CALL   CR1              ; Tunnel.Receive:
-;   1. Decrypt incoming message
-;   2. Verify source GT matches tunnel endpoint
-;   3. Deliver payload to caller
-; DR1 <- received data
-; If no data pending: Scheduler.Wait on tunnel event`,
-            'Close': `; Tunnel.Close — close encrypted tunnel
-LOAD   CR1, NS[31]      ; Load Tunnel E-GT
-LOAD   CR2, NS[55]      ; Remote endpoint GT
+LOAD   CR1, NS[31]        ; Load Tunnel E-GT
+DWRITE DR1, #5000          ; Timeout: 5 000 steps
+CALL   CR1                 ; Tunnel.Receive:
+;   1. Poll UART RX for an incoming framed packet
+;   2. On timeout: DR0 ← 0, RETURN
+;   3. Read header → DR1 = type_tag, DR0 = word_count
+;   4. Read up to 13 payload words into DR2..DR14
+;   5. Caller dispatches on DR1 type_tag`,
+            'Fault': `; Tunnel.Fault — report a fault event to the IDE
+; High-priority, bypasses the normal send queue.
+; Called by the fault handler before any recovery action.
+; IDE logs the entry in the Devices view for this board.
+;
+; DR1 = fault code (e.g. 0x10=PERM, 0x42=RANGE, 0x80=VERSION)
+; DR2 = NIA — address of the faulting instruction
 
-CALL   CR1              ; Tunnel.Close:
-;   1. Send close notification to remote
-;   2. Clear F-bit on NS entry (word1[30] = 0)
-;   3. Destroy tunnel key material
-;   4. Future LOAD/SAVE on this GT fails (no tunnel)`,
+LOAD   CR1, NS[31]        ; Load Tunnel E-GT
+DWRITE DR1, #0x42          ; Fault code: RANGE violation
+DWRITE DR2, #0x00000120   ; Faulting NIA
+CALL   CR1                 ; Tunnel.Fault:
+;   1. Compose fault packet: [0xFA17 · fault_code · NIA]
+;   2. Transmit immediately (pre-empts TX queue)
+;   3. IDE records fault code + NIA in Devices view
+;   4. Fire-and-forget — RETURN, caller handles recovery`,
+            'Fetch': `; Tunnel.Fetch — request and receive a lump from the IDE
+; Called by Loader when a NULL_CAP fault hits a cold slot.
+; Validates the incoming lump (magic, size, CRC) before
+; writing it to memory and updating the NS entry.
+;
+; CR2 = Memory W-GT (write-perm buffer ≥ expected_words)
+; DR1 = NS slot token (index of requested abstraction)
+; DR2 = expected lump size in words
+; DR0 ← 0 = installed · non-zero = error code
+
+LOAD   CR1, NS[31]        ; Load Tunnel E-GT
+LOAD   CR2, NS[7]          ; Load Memory W-GT (write destination)
+DWRITE DR1, #0x0025        ; Token: NS[37] — Browser abstraction
+DWRITE DR2, #64             ; Expected: 64 words (one slot)
+CALL   CR1                  ; Tunnel.Fetch:
+;   1. Transmit fetch request: [0xFE7C · token · expected_words]
+;   2. Await IDE response: lump header + data words (≤500 ms)
+;   3. Validate: magic=0x1F · size=DR2 · CRC-16 over all words
+;   4. Write validated words to CR2 base via mSave (W-perm)
+;   5. Update NS entry: base, limit, version, seal
+; DR0 ← 0 = lump installed · non-zero = error (timeout/CRC/size)`,
         },
         'Negotiate': {
             'Propose': `; Negotiate.Propose — request special grant
