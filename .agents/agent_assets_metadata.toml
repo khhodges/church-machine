@@ -102,3 +102,9 @@ id = "Qe0OOz1k8wDcFgi0vbVz_"
 uri = "file://docs/patents/patent-church-machine-email.pdf"
 type = "pdf"
 title = "Attorney Cover Email"
+
+[[outputs]]
+id = "eiYBntSt3zQIyTEnzBhkP"
+uri = "file://six-laws-review.pdf"
+type = "pdf"
+title = "The Six Laws of CLOOMC — Broadsheet PDF"

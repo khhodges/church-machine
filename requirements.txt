@@ -9,3 +9,4 @@ Werkzeug==3.1.5
 markdown
 waitress
 weasyprint
+fpdf2
