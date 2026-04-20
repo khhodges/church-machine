@@ -37,7 +37,10 @@ from amaranth.lib.data import View
 from amaranth.lib.memory import Memory as LibMemory
 from amaranth.sim import Simulator, Tick
 
-from hardware.outform_iot import ChurchOutformIoT, TUNNEL_REQ_LEN, IOT_HDR_LEN
+from hardware.outform_iot import (
+    ChurchOutformIoT, TUNNEL_REQ_LEN, IOT_HDR_LEN,
+    OUTFORM_FAULT_HDR, OUTFORM_FAULT_CRC32, OUTFORM_FAULT_ALLOC, OUTFORM_FAULT_MINT,
+)
 from hardware.hw_types import GT_TYPE_INFORM, CRC16_POLY, CRC16_INIT
 from hardware.layouts import LUMP_HEADER_LAYOUT
 
@@ -856,8 +859,192 @@ def test_iot_lazy_load_toplevel():
     print("PASS: test_iot_lazy_load_toplevel")
 
 
+# ── Fault-path helpers ────────────────────────────────────────────────────────
+
+def respond_alloc_fault_iot(dut):
+    """Wait for alloc_req, then assert alloc_fault for one cycle."""
+    for _ in range(MAX_TICKS):
+        yield Tick()
+        if (yield dut.alloc_req):
+            yield dut.alloc_fault.eq(1)
+            yield Tick()
+            yield dut.alloc_fault.eq(0)
+            return
+    raise AssertionError("respond_alloc_fault_iot: timed out waiting for alloc_req")
+
+
+def respond_mint_fault_iot(dut):
+    """Wait for mint_call, then assert mint_fault in MINT_WAIT state."""
+    for _ in range(MAX_TICKS):
+        yield Tick()
+        if (yield dut.mint_call):
+            yield dut.mint_fault.eq(1)
+            yield Tick()
+            yield dut.mint_fault.eq(0)
+            return
+    raise AssertionError("respond_mint_fault_iot: timed out waiting for mint_call")
+
+
+def run_to_derive_n(dut, payload_len: int, crc32_val: int):
+    """Common prefix: start outform, drain tunnel TX, send connect + lean header.
+
+    payload_len and crc32_val are written verbatim into the 8-byte lean header;
+    no correctness is assumed here — callers supply whatever they need to trigger
+    the desired fault path.
+    """
+    yield dut.outform_start.eq(1)
+    yield Tick()
+    yield dut.outform_start.eq(0)
+
+    yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
+    yield from send_bytes(dut, b"\xAC")
+
+    lean_hdr = struct.pack("<II", payload_len & 0xFFFFFFFF, crc32_val & 0xFFFFFFFF)
+    yield from send_bytes(dut, lean_hdr)
+
+
+# ── Fault test 1: payload_len not 4-byte aligned → OUTFORM_FAULT_HDR ─────────
+
+def test_iot_hdr_fault():
+    """payload_len=257 (low 2 bits != 0) triggers OUTFORM_FAULT_HDR in DERIVE_N."""
+    dut = ChurchOutformIoT()
+
+    def process():
+        yield from run_to_derive_n(dut, payload_len=257, crc32_val=0)
+
+        done, fault, ftype, _ = yield from wait_done(dut)
+        assert fault == 1,                   f"expected fault, got done={done}"
+        assert ftype == OUTFORM_FAULT_HDR,   f"fault_type=0x{ftype:02X}"
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_sync_process(process)
+    with sim.write_vcd("/tmp/outform_iot_hdr_fault.vcd"):
+        sim.run()
+    print("PASS: test_iot_hdr_fault")
+
+
+# ── Fault test 2: payload_len=260 (not power-of-2 word count) → OUTFORM_FAULT_HDR
+
+def test_iot_bad_n():
+    """payload_len=260 → 65 words, not a power of 2 → OUTFORM_FAULT_HDR."""
+    dut = ChurchOutformIoT()
+
+    def process():
+        yield from run_to_derive_n(dut, payload_len=260, crc32_val=0)
+
+        done, fault, ftype, _ = yield from wait_done(dut)
+        assert fault == 1,                   f"expected fault, got done={done}"
+        assert ftype == OUTFORM_FAULT_HDR,   f"fault_type=0x{ftype:02X}"
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_sync_process(process)
+    with sim.write_vcd("/tmp/outform_iot_bad_n.vcd"):
+        sim.run()
+    print("PASS: test_iot_bad_n")
+
+
+# ── Fault test 3: correct header but wrong stored CRC → OUTFORM_FAULT_CRC32 ──
+
+def test_iot_crc_mismatch():
+    """Valid payload_len=256, but stored CRC differs from computed CRC → OUTFORM_FAULT_CRC32."""
+    payload  = build_lump_payload()
+    bad_crc  = 0xDEADC0DE
+    dut      = ChurchOutformIoT()
+
+    def process():
+        yield from run_to_derive_n(dut, payload_len=256, crc32_val=bad_crc)
+
+        yield from wait_alloc_req(dut)
+        yield from respond_alloc(dut, 0x400)
+        yield from send_bytes(dut, payload)
+
+        done, fault, ftype, _ = yield from wait_done(dut)
+        assert fault == 1,                    f"expected fault, got done={done}"
+        assert ftype == OUTFORM_FAULT_CRC32,  f"fault_type=0x{ftype:02X}"
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_sync_process(process)
+    with sim.write_vcd("/tmp/outform_iot_crc_mismatch.vcd"):
+        sim.run()
+    print("PASS: test_iot_crc_mismatch")
+
+
+# ── Fault test 4: alloc_fault asserted → OUTFORM_FAULT_ALLOC ─────────────────
+
+def test_iot_alloc_fault():
+    """alloc_fault asserted in ALLOC state → OUTFORM_FAULT_ALLOC."""
+    payload  = build_lump_payload()
+    lean_hdr = build_lean_header(payload)
+    dut      = ChurchOutformIoT()
+
+    def process():
+        yield dut.outform_start.eq(1)
+        yield Tick()
+        yield dut.outform_start.eq(0)
+
+        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
+        yield from send_bytes(dut, b"\xAC")
+        yield from send_bytes(dut, lean_hdr)
+
+        yield from respond_alloc_fault_iot(dut)
+
+        done, fault, ftype, _ = yield from wait_done(dut)
+        assert fault == 1,                    f"expected fault, got done={done}"
+        assert ftype == OUTFORM_FAULT_ALLOC,  f"fault_type=0x{ftype:02X}"
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_sync_process(process)
+    with sim.write_vcd("/tmp/outform_iot_alloc_fault.vcd"):
+        sim.run()
+    print("PASS: test_iot_alloc_fault")
+
+
+# ── Fault test 5: mint_fault asserted → OUTFORM_FAULT_MINT ───────────────────
+
+def test_iot_mint_fault():
+    """mint_fault asserted in MINT_WAIT state → OUTFORM_FAULT_MINT."""
+    payload  = build_lump_payload()
+    lean_hdr = build_lean_header(payload)
+    dut      = ChurchOutformIoT()
+
+    def process():
+        yield dut.outform_start.eq(1)
+        yield Tick()
+        yield dut.outform_start.eq(0)
+
+        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
+        yield from send_bytes(dut, b"\xAC")
+        yield from send_bytes(dut, lean_hdr)
+
+        yield from wait_alloc_req(dut)
+        yield from respond_alloc(dut, 0x400)
+        yield from send_bytes(dut, payload)
+
+        yield from respond_mint_fault_iot(dut)
+
+        done, fault, ftype, _ = yield from wait_done(dut)
+        assert fault == 1,                   f"expected fault, got done={done}"
+        assert ftype == OUTFORM_FAULT_MINT,  f"fault_type=0x{ftype:02X}"
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_sync_process(process)
+    with sim.write_vcd("/tmp/outform_iot_mint_fault.vcd"):
+        sim.run()
+    print("PASS: test_iot_mint_fault")
+
+
 if __name__ == "__main__":
     test_iot_lazy_load_golden()
     test_iot_lazy_load_integrated()
     test_iot_lazy_load_toplevel()
+    test_iot_hdr_fault()
+    test_iot_bad_n()
+    test_iot_crc_mismatch()
+    test_iot_alloc_fault()
+    test_iot_mint_fault()
     print("\nAll ChurchOutformIoT tests passed.")
