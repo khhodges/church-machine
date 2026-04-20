@@ -332,7 +332,7 @@ class ChurchCore(Elaboratable):
             with m.Case(ChurchOpcode.LOAD):
                 m.d.comb += required_perms.eq(Mux(cr_src == CR_CLIST, 0, PERM_MASK_L))
             with m.Case(ChurchOpcode.SAVE):
-                m.d.comb += required_perms.eq(PERM_MASK_S)
+                m.d.comb += required_perms.eq(0)
             with m.Case(ChurchOpcode.CALL):
                 m.d.comb += required_perms.eq(PERM_MASK_E)
             if not self.iot_profile:

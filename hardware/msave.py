@@ -104,6 +104,13 @@ class ChurchMSave(Elaboratable):
                     m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
                     m.next = "FAULT"
                 with m.Else():
+                    m.next = "CHECK_SRC_BOUND"
+
+            with m.State("CHECK_SRC_BOUND"):
+                with m.If(~src_gt_view.b_flag):
+                    m.d.sync += fault_type_reg.eq(FaultType.NULL_CAP)
+                    m.next = "FAULT"
+                with m.Else():
                     m.next = "FETCH_NS_LOC"
 
             with m.State("FETCH_NS_LOC"):
