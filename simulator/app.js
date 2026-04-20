@@ -10920,6 +10920,8 @@ const _FAULT_COLORS = {
     BOOT:         '#e05555', MATH_ERROR:  '#c0a030', DOMAIN_ERROR: '#c0a030',
     STACK_OVERFLOW:'#e05555', STACK_UNDERFLOW:'#e05555', TYPE: '#e05555',
     RANGE:        '#e05555',
+    OUTFORM_CRC:  '#c07020', OUTFORM_ALLOC:'#c07020', OUTFORM_MINT:'#c07020', OUTFORM_HDR:'#c07020',
+    LUMP_MAGIC:   '#c07020', LUMP_SIZE:   '#c07020', LUMP_LAYOUT:'#c07020', LUMP_OOM:   '#c07020',
 };
 
 // Numeric fault codes matching hw_types.py FaultType enum (5-bit UART field).
@@ -10929,10 +10931,26 @@ const _FAULT_CODES = {
     NULL_CAP:0x07, BOUNDS:0x08, VERSION:0x09, SEAL:0x0A, INVALID_OP:0x0B,
     TPERM_RSV:0x0C, DOMAIN_PURITY:0x0D, BIND:0x0E, F_BIT:0x0F,
     STACK_OVERFLOW:0x10, ABSENT_OUTFORM:0x11, STACK_CORRUPT:0x12, STACK_UNDERFLOW:0x13,
+    OUTFORM_CRC:0x15, OUTFORM_ALLOC:0x16, OUTFORM_MINT:0x17, OUTFORM_HDR:0x18,
     RANGE:        0x10,   // stack overflow manifests as RANGE violation on CR14 (same code)
     // Software-only (no hardware code):
     PERM:null, FAR:null, BOOT:null, MATH_ERROR:null,
     DOMAIN_ERROR:null, HANDLER:null, PERMISSION:null, TYPE:null,
+};
+
+// Human-readable descriptions for firmware download (outform) fault codes.
+const _OUTFORM_DESCRIPTIONS = {
+    OUTFORM_CRC:   'CRC-32 mismatch in the downloaded lump — the binary was corrupted in transit. Try re-downloading or re-flashing.',
+    OUTFORM_ALLOC: 'Memory allocator rejected the lump — not enough free lump space to install this abstraction. Evict unused lumps and retry.',
+    OUTFORM_MINT:  'Capability minting failed during lump install — the lump\u2019s GT could not be sealed. Check lump permissions and slot type.',
+    OUTFORM_HDR:   'Lump header validation failed — bad length or alignment in the downloaded binary. The lump file may be truncated or malformed.',
+};
+// Map simulator-internal LUMP_* fault names to their OUTFORM_* equivalents.
+const _LUMP_TO_OUTFORM = {
+    LUMP_MAGIC:  'OUTFORM_HDR',
+    LUMP_SIZE:   'OUTFORM_HDR',
+    LUMP_LAYOUT: 'OUTFORM_HDR',
+    LUMP_OOM:    'OUTFORM_ALLOC',
 };
 
 function showFaultModal(f) {
@@ -11041,6 +11059,22 @@ function showFaultModal(f) {
         }
     }
 
+    // ── Firmware download failure callout for OUTFORM_* / LUMP_* faults ──────
+    let outformSection = '';
+    {
+        const outformKey = _OUTFORM_DESCRIPTIONS[f.type]
+            ? f.type
+            : (_LUMP_TO_OUTFORM[f.type] || null);
+        if (outformKey) {
+            const desc = _OUTFORM_DESCRIPTIONS[outformKey];
+            outformSection = `
+        <div class="fault-scope-section">
+            <div class="fault-scope-label">&#x26A0; Firmware Download Failure</div>
+            <div class="fault-scope-detail">${desc}</div>
+        </div>`;
+        }
+    }
+
     const instrTrace = f.instrHistory || [];
     let instrTraceSection = '';
     if (instrTrace.length > 0) {
@@ -11104,6 +11138,7 @@ function showFaultModal(f) {
             </div>` : ''}
         </div>
         ${scopeSection}
+        ${outformSection}
         ${instrTraceSection}
         ${crSection}
         ${drSection}
@@ -11193,7 +11228,21 @@ async function triggerLazyLoad(absentResult, mode) {
     // ── 2. Install into simulator ────────────────────────────────────────────
     const installResult = sim.receiveLump(words);
     if (!installResult.ok) {
-        log(`⊿ Install failed: ${installResult.message}`);
+        // Check if there is a new OUTFORM_* or LUMP_* fault to surface a descriptive message.
+        const installFault = sim.faultLog && sim.faultLog.length
+            ? sim.faultLog[sim.faultLog.length - 1]
+            : null;
+        const outformKey = installFault
+            ? (_OUTFORM_DESCRIPTIONS[installFault.type]
+                ? installFault.type
+                : (_LUMP_TO_OUTFORM[installFault.type] || null))
+            : null;
+        if (outformKey) {
+            const desc = _OUTFORM_DESCRIPTIONS[outformKey];
+            log(`\u26a0 Firmware download failed [${outformKey}]: ${desc}`);
+        } else {
+            log(`\u22bf Install failed: ${installResult.message}`);
+        }
         updateDashboard(); switchView('editor'); switchCodeTab('console');
         return;
     }
@@ -11224,7 +11273,19 @@ async function triggerLazyLoad(absentResult, mode) {
         const fault = sim.faultLog && sim.faultLog.length
             ? sim.faultLog[sim.faultLog.length - 1]
             : null;
-        log(`⊿ Retry LOAD faulted: ${fault ? fault.type + ' — ' + fault.message : 'unknown fault'}`);
+        if (fault) {
+            const retryOutformKey = _OUTFORM_DESCRIPTIONS[fault.type]
+                ? fault.type
+                : (_LUMP_TO_OUTFORM[fault.type] || null);
+            if (retryOutformKey) {
+                const desc = _OUTFORM_DESCRIPTIONS[retryOutformKey];
+                log(`\u26a0 Firmware download failed [${retryOutformKey}]: ${desc}`);
+            } else {
+                log(`\u22bf Retry LOAD faulted: ${fault.type} \u2014 ${fault.message}`);
+            }
+        } else {
+            log(`\u22bf Retry LOAD faulted: unknown fault`);
+        }
         updateDashboard(); switchView('editor'); switchCodeTab('console');
         return;
     }
@@ -21272,7 +21333,8 @@ function loadDeviceList() {
                 6:'PERM_E',7:'NULL_CAP',8:'BOUNDS',9:'VERSION',10:'SEAL',
                 11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
                 15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
-                18:'STACK_CORRUPT',19:'STACK_UNDERFLOW'
+                18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',
+                21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR'
             };
             data.devices.forEach(dev => {
                 const isOnline = dev.status === 'online';
@@ -21397,7 +21459,8 @@ var _faultTypeNames = {
     6:'PERM_E',7:'NULL_CAP',8:'BOUNDS',9:'VERSION',10:'SEAL',
     11:'INVALID_OP',12:'TPERM_RSV',13:'DOMAIN_PURITY',14:'BIND',
     15:'F_BIT',16:'STACK_OVERFLOW',17:'ABSENT_OUTFORM',
-    18:'STACK_CORRUPT',19:'STACK_UNDERFLOW'
+    18:'STACK_CORRUPT',19:'STACK_UNDERFLOW',
+    21:'OUTFORM_CRC',22:'OUTFORM_ALLOC',23:'OUTFORM_MINT',24:'OUTFORM_HDR'
 };
 
 function showDeviceFaultLog(deviceUid) {
