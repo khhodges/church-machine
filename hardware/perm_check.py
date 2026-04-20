@@ -5,6 +5,19 @@ from .hw_types import *
 from .layouts import GT_LAYOUT
 
 
+def perm_bit(gt_signal, perm_idx: int):
+    """Return an Amaranth expression that is 1 iff gt_signal's perm bit at perm_idx is set.
+
+    Single source of truth for inline single-perm-bit extraction.
+    Use ChurchPermCheck for full checks (null GT, bounds, version, seal).
+
+    Args:
+        gt_signal: Raw GT word signal (GT_LAYOUT shape or compatible).
+        perm_idx:  Bit index into the perms field — one of PERM_E, PERM_L, PERM_X, etc.
+    """
+    return View(GT_LAYOUT, gt_signal).perms[perm_idx]
+
+
 class ChurchPermCheck(Elaboratable):
     def __init__(self):
         self.gt_in = Signal(GT_LAYOUT)

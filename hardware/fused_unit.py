@@ -4,6 +4,8 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 from .mload import ChurchMLoad
+from .perm_check import perm_bit
+from .mload_seq import mload_wait_body
 
 
 class ChurchELoadCall(Elaboratable):
@@ -66,7 +68,7 @@ class ChurchELoadCall(Elaboratable):
 
         loaded_view = View(CAP_REG_LAYOUT, loaded_cap)
         loaded_gt = View(GT_LAYOUT, loaded_view.word0_gt)
-        has_e_perm = loaded_gt.perms[PERM_E]
+        has_e_perm = perm_bit(loaded_view.word0_gt, PERM_E)
 
         src_in_range = Signal()
         m.d.comb += src_in_range.eq(self.cr_src <= MAX_SRC_REG)
@@ -157,19 +159,18 @@ class ChurchELoadCall(Elaboratable):
                     m.next = "LOAD_PHASE"
 
             with m.State("LOAD_PHASE"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(u_mload.sub_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [
-                        fault_latched.eq(1),
-                        fault_type_latched.eq(u_mload.sub_fault_type),
-                    ]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "LOAD_DONE"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=u_mload.sub_done,
+                    fault_sig=u_mload.sub_fault,
+                    fault_type_sig=u_mload.sub_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="LOAD_DONE",
+                )
 
             with m.State("LOAD_DONE"):
                 m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(self.cr_dst)]
@@ -198,19 +199,18 @@ class ChurchELoadCall(Elaboratable):
                 m.next = "CALL_P1"
 
             with m.State("CALL_P1"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(u_mload.sub_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [
-                        fault_latched.eq(1),
-                        fault_type_latched.eq(u_mload.sub_fault_type),
-                    ]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "CALL_P1_DONE"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=u_mload.sub_done,
+                    fault_sig=u_mload.sub_fault,
+                    fault_type_sig=u_mload.sub_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="CALL_P1_DONE",
+                )
 
             with m.State("CALL_P1_DONE"):
                 m.d.sync += [
@@ -220,19 +220,18 @@ class ChurchELoadCall(Elaboratable):
                 m.next = "CALL_P2"
 
             with m.State("CALL_P2"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(u_mload.sub_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [
-                        fault_latched.eq(1),
-                        fault_type_latched.eq(u_mload.sub_fault_type),
-                    ]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "COMPLETE"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=u_mload.sub_done,
+                    fault_sig=u_mload.sub_fault,
+                    fault_type_sig=u_mload.sub_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="COMPLETE",
+                )
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"
@@ -303,7 +302,7 @@ class ChurchXLoadLambda(Elaboratable):
 
         loaded_view = View(CAP_REG_LAYOUT, loaded_cap)
         loaded_gt = View(GT_LAYOUT, loaded_view.word0_gt)
-        has_x_perm = loaded_gt.perms[PERM_X]
+        has_x_perm = perm_bit(loaded_view.word0_gt, PERM_X)
         is_null = Signal()
         m.d.comb += is_null.eq(loaded_gt.gt_type == GT_TYPE_NULL)
 
@@ -348,19 +347,18 @@ class ChurchXLoadLambda(Elaboratable):
                     m.next = "LOAD_PHASE"
 
             with m.State("LOAD_PHASE"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(u_mload.sub_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [
-                        fault_latched.eq(1),
-                        fault_type_latched.eq(u_mload.sub_fault_type),
-                    ]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "LOAD_DONE"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=u_mload.sub_done,
+                    fault_sig=u_mload.sub_fault,
+                    fault_type_sig=u_mload.sub_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="LOAD_DONE",
+                )
 
             with m.State("LOAD_DONE"):
                 m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(self.cr_dst)]

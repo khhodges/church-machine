@@ -3,6 +3,9 @@ from amaranth.lib.data import View
 
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .perm_check import perm_bit
+from .mload_seq import mload_wait_body
+from .stack_frame import stack_slot_addr
 
 
 class ChurchReturn(Elaboratable):
@@ -65,7 +68,7 @@ class ChurchReturn(Elaboratable):
         ret_view   = View(CAP_REG_LAYOUT, return_cap)
         ret_gt     = View(GT_LAYOUT, ret_view.word0_gt)
 
-        has_e_perm = ret_gt.perms[PERM_E]
+        has_e_perm = perm_bit(ret_view.word0_gt, PERM_E)
         is_null_cap = Signal()
         m.d.comb += is_null_cap.eq(ret_gt.gt_type == GT_TYPE_NULL)
 
@@ -212,7 +215,7 @@ class ChurchReturn(Elaboratable):
 
             with m.State("READ_FRAME"):
                 m.d.comb += [
-                    local_mem_rd_addr.eq(thread_base_latched + ((sto_latched + 2) << 2)),
+                    local_mem_rd_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, 2)),
                     local_mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
@@ -229,7 +232,7 @@ class ChurchReturn(Elaboratable):
 
             with m.State("READ_EGT"):
                 m.d.comb += [
-                    local_mem_rd_addr.eq(thread_base_latched + ((sto_latched + 1) << 2)),
+                    local_mem_rd_addr.eq(stack_slot_addr(thread_base_latched, sto_latched, 1)),
                     local_mem_rd_en.eq(1),
                 ]
                 with m.If(self.mem_rd_valid):
@@ -240,16 +243,18 @@ class ChurchReturn(Elaboratable):
 
             with m.State("RESTORE_CR5"):
                 m.d.comb += self.mload_start.eq(sub_start_reg)
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(self.mload_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(self.mload_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [fault_flag.eq(1), fault_latched.eq(self.mload_fault_type)]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "POP_STACK"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=self.mload_done,
+                    fault_sig=self.mload_fault,
+                    fault_type_sig=self.mload_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_flag,
+                    fault_type_latched=fault_latched,
+                    done_next="POP_STACK",
+                )
 
             with m.State("POP_STACK"):
                 m.d.comb += [

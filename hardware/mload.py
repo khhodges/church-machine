@@ -3,6 +3,7 @@ from amaranth.lib.data import View
 
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, WORD2_LAYOUT
+from .perm_check import perm_bit
 from .ns_gate import ChurchNSGate
 
 
@@ -104,7 +105,7 @@ class ChurchMLoad(Elaboratable):
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
         result_gt = View(GT_LAYOUT, result_view.word0_gt)
 
-        has_l_perm = src_gt.perms[PERM_L]
+        has_l_perm = perm_bit(src_view.word0_gt, PERM_L)
         src_is_null = Signal()
         m.d.comb += src_is_null.eq(src_gt.gt_type == GT_TYPE_NULL)
 

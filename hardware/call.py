@@ -3,6 +3,9 @@ from amaranth.lib.data import View
 
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, LUMP_HEADER_LAYOUT
+from .perm_check import perm_bit
+from .mload_seq import mload_wait_body
+from .stack_frame import stack_slot_addr
 
 
 class ChurchCall(Elaboratable):
@@ -173,7 +176,7 @@ class ChurchCall(Elaboratable):
 
         src_view = View(CAP_REG_LAYOUT, src_reg_latched)
         src_gt = View(GT_LAYOUT, src_view.word0_gt)
-        src_has_e_perm = src_gt.perms[PERM_E]
+        src_has_e_perm = perm_bit(src_view.word0_gt, PERM_E)
 
         mload_src = Signal(4)
         mload_dst = Signal(4)
@@ -350,16 +353,18 @@ class ChurchCall(Elaboratable):
                     m.next = "PHASE1"
 
             with m.State("PHASE1"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(self.mload_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(self.mload_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(self.mload_fault_type)]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "PHASE1_DONE"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=self.mload_done,
+                    fault_sig=self.mload_fault,
+                    fault_type_sig=self.mload_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="PHASE1_DONE",
+                )
 
             with m.State("PHASE1_DONE"):
                 # Combinatorially read back CR6 — Phase 1 mLoad has just deposited
@@ -375,16 +380,18 @@ class ChurchCall(Elaboratable):
                 m.next = "PHASE2"
 
             with m.State("PHASE2"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(self.mload_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(self.mload_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(self.mload_fault_type)]
-                with m.If(sub_fault_latched):
-                    m.next = "FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "SET_M_READ"
+                mload_wait_body(
+                    m,
+                    sub_start_reg=sub_start_reg,
+                    done_sig=self.mload_done,
+                    fault_sig=self.mload_fault,
+                    fault_type_sig=self.mload_fault_type,
+                    sub_done_latched=sub_done_latched,
+                    sub_fault_latched=sub_fault_latched,
+                    fault_latched=fault_latched,
+                    fault_type_latched=fault_type_latched,
+                    done_next="SET_M_READ",
+                )
 
             with m.State("SET_M_READ"):
                 # Read CR14 so we can assert M=1 (PERM_X) on the code capability
@@ -511,7 +518,7 @@ class ChurchCall(Elaboratable):
                 # callee_egt_latched = CR6.word0_gt as read back in PHASE1_DONE.
                 # Byte address = thread_base + (STO-1)*4
                 m.d.comb += [
-                    local_mem_wr_addr.eq(self.thread_base + ((sp_latched - 1) << 2)),
+                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sp_latched, -1)),
                     local_mem_wr_data.eq(callee_egt_latched),
                     local_mem_wr_en.eq(1),
                 ]
@@ -522,7 +529,7 @@ class ChurchCall(Elaboratable):
                 # frame_word is a combinatorial signal computed above.
                 # Byte address = thread_base + STO*4
                 m.d.comb += [
-                    local_mem_wr_addr.eq(self.thread_base + (sp_latched << 2)),
+                    local_mem_wr_addr.eq(stack_slot_addr(self.thread_base, sp_latched, 0)),
                     local_mem_wr_data.eq(frame_word),
                     local_mem_wr_en.eq(1),
                 ]

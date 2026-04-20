@@ -10,7 +10,7 @@ from .boot_rom import (BootRom, FULL_ROM, DEMO_NAMESPACE, DEMO_CLIST,
                         SLIDERULE_SLOT, CONSTANTS_SLOT, NS_SLOT_COUNT)
 from .uart_tx import DebugPrinter
 from .uart_rx import UartRx
-from .crc16 import CRC16_CCITT
+from .uart_crc16 import CRC16_CCITT
 
 
 class ChurchTi60F225(Elaboratable):

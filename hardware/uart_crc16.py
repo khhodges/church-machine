@@ -5,6 +5,7 @@ class CRC16_CCITT(Elaboratable):
     """CRC-16/CCITT-FALSE calculator — processes one byte per clock.
 
     Polynomial: 0x1021, Init: 0xFFFF, MSB-first.
+    Used for UART patch-packet integrity verification.
 
     Interface:
         reset   : in  — pulse high to reset CRC to 0xFFFF

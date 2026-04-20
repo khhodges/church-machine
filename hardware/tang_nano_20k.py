@@ -9,7 +9,7 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, DEMO_NAMESPACE, DEMO_CLIST,
                         NUC_LUMP_HEADER, SLIDERULE_LUMP_HEADER)
 from .uart_tx import DebugPrinter, UartTx
 from .uart_rx import UartRx
-from .crc16 import CRC16_CCITT
+from .uart_crc16 import CRC16_CCITT
 
 
 class GowinBSRAM(Elaboratable):
