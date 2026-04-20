@@ -387,6 +387,42 @@ After eviction:
 
 ---
 
+---
+
+## Loader Modes — Summary
+
+The Locator (this document) is one component of lazy-object management. The
+broader **Loader** abstraction (NS[19]) has two distinct modes:
+
+### Mode 1 — Restore (Inform GT, warm-slot eviction)
+
+The lump was previously instantiated and granted a live NS entry. It was
+evicted to free memory — the entire lump (header + code + c-list) was zeroed,
+leaving the NS entry intact with `magic = 0x00 ≠ 0x1F` in memory.
+
+- Trigger: CALL/LOAD pre-check sees `!lumpHdr.valid` for an Inform GT in the lazy manifest.
+- Fault: `CODE_NOT_RESIDENT` → dispatches Loader Mode 1.
+- Action: Loader restores the lump at a valid address within the existing NS grant, updates `word0_location`, recomputes the seal. Type, limit, gt_seq unchanged — no new authority minted.
+- NS entry authority: **always preserved**.
+
+### Mode 2 — Construct (Abstract GT, never instantiated)
+
+The object type exists as an Abstract GT but has no Inform NS entry and no
+lump yet. This is the Outform/Locator protocol described in this document —
+the Absent event fires on `LOAD` against an Outform GT, the Locator fetches
+`lump.zip`, inflates and validates it, and calls `Mint.Lump()` to write a
+new Live NS entry.
+
+- Trigger: hardware Absent event on Outform GT (`typ=10`).
+- Action: Locator fetch → inflate → Mint.Lump() → Live NS slot.
+- NS entry: **newly minted** by Mint (Navana.Add delegation).
+
+The two modes are architecturally complementary: Mode 1 maintains objects
+that exist in the namespace but are temporarily absent from memory; Mode 2
+brings into existence objects that have never had a physical lump.
+
+---
+
 ## See Also
 
 - [json-information.md](json-information.md) — The abstraction definition format (informational reference).

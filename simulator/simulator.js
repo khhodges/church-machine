@@ -295,6 +295,13 @@ class ChurchSimulator {
             entry.allocBase = loc;
             entry.allocSize = lumpSize;
         }
+        // Mode 1 grant-interval invariant: loc must lie within the NS entry's
+        // existing grant (word0_location to word0_location + limit words).
+        // allocBase is derived from word0_location in initLazyManifest(), so the
+        // invariant is satisfied by construction in the current simulator.
+        // A future relocating Loader must validate explicitly:
+        //   loc >= nsEntry.word0_location  &&
+        //   loc + lumpSize - 1 <= nsEntry.word0_location + parsedW1.limit
 
         let totalCodeWords = 0;
         const methodCode = [];

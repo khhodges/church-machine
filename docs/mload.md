@@ -13,6 +13,7 @@ Every security property of the Church Machine is enforced in mLoad:
 | Property | Where enforced |
 |---|---|
 | Absent Outform objects are detected and trigger a lazy-load event | CHECK\_NS stage (type check on GT) |
+| Evicted warm-slot lumps (Inform GT, magic=0x00) trigger CODE\_NOT\_RESIDENT → Loader Mode 1 restore | CALL/LOAD pre-check (software, before mLoad fires) |
 | Only L-perm holders can unlock the permitted access right(s) to the object or resource defined by a GT in their posession | CHECK\_L stage |
 | No capability can be read beyond its index range | CHECK\_BOUNDS stage |
 | No revoked GT can be re-used | CHECK\_VERSION stage (gt\_seq match) |

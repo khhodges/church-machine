@@ -442,6 +442,16 @@ Navana (NS[5]) is the sole namespace entry writer. All NS table modifications go
 
 The one exception: boot writes Navana's own NS entry via mElevation (raw write). After boot, mElevation is dropped and Navana controls all subsequent writes. Mint.Create delegates NS entry creation to Navana.Add.
 
+### Loader Mode 1 — Restore (warm-slot eviction/reload)
+
+The **Loader** (NS[19]) manages warm-slot lazy loading. On resource-constrained hardware (Tang Nano 20K, 64 KB BRAM), not all abstraction lumps can be resident simultaneously. The Loader evicts and restores lumps without touching NS entry authority:
+
+- **Eviction**: The entire lump (header + code + c-list) is zeroed. The memory block is freed for alternative use. The NS entry (type, limit, gt_seq, seal) is **never changed** — it remains the live capability reference.
+- **Residency signal**: After eviction, `memory[word0_location] == 0`, so lump header `magic = 0x00 ≠ 0x1F`. CALL/LOAD reads this and raises `CODE_NOT_RESIDENT`.
+- **Restore**: The Loader writes the full lump (header + code + c-list) at a valid address within the existing NS grant, updates `word0_location`, and recomputes the seal. Type, limit, and gt_seq are never changed — no new authority is minted.
+
+This is distinct from the Outform/Locator protocol (Mode 2), which handles objects that were never instantiated and requires minting a new Inform NS entry from an Abstract capability grant.
+
 ### Upload Format
 
 ```json
