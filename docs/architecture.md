@@ -350,7 +350,7 @@ CALL performs:
 - Word 1: NIA (return offset into caller's code) | packed machine indicators
   (LAMBDA-active, condition flags, M-elevation, stackSpace, stackFrames, etc.)
 
-No DRs and no other CRs are pushed. The callee inherits DR0–DR15, CR0–CR5, CR7–CR11, CR13, CR15 from the caller unchanged.
+No DRs and no other CRs are pushed. The callee inherits DR0–DR15, CR0–CR5, CR7–CR13, CR15 from the caller unchanged. Exception: CR5 is simultaneously pushed to cr5_stack by CALL and restored from cr5_stack by RETURN — the caller's CR5 always survives regardless of callee behaviour.
 
 CR14 and CR6 permissions are architectural invariants — X-only for code, L-only for c-list. The E-GT grants Enter permission to reach the abstraction; CALL enforces the internal domain split. The lump layout places code (method table + instructions) at offset 0, freespace in the middle, and c-list GTs at `lumpSize-cc`. All lumps are allocated as power-of-2 blocks (minimum 64 words, i.e. `n_minus_6=0`).
 

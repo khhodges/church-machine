@@ -78,18 +78,14 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 ### D-7: SAVE Operand Roles — Hardware Mismatch in app.js INSTRUCTION_DATA
 
 - **Hardware mismatch**: `assembler.js` SAVE: fld_a = CRd (c-list, S perm), fld_b = CRs (source GT, B=1). `app.js` INSTRUCTION_DATA labels these fields with swapped CRd/CRs roles relative to assembler encoding.
-- **Docs**: `instruction-set.md` and `isa_encoding.md` now corrected (C-7). `app.js` INSTRUCTION_DATA needs code fix to match.
-- **Decision**: Should `app.js` INSTRUCTION_DATA be updated to align with assembler field assignments?
-- **Affected files**: `simulator/app.js`
-- **Pending task**: Task #6
+- **Resolution (C-6 / Task #6)**: `app.js` INSTRUCTION_DATA SAVE entry corrected — CRd = C-List (S permission), CRs = Source GT (B=1), mSave validates all. Now matches assembler field assignments.
+- **Status**: RESOLVED
 
 ### D-8: CR5 Instance-Data Behavior (Save/Restore via cr5_stack)
 
 - **Hardware**: `core.py` lines 1113–1148 implement a 256-entry `cr5_stack`. CALL pushes CR5's GT (`call.py` line 209: `saved_cr5_gt`). RETURN pops and re-derives CR5 via mLoad from the saved GT (`ret.py`: `RESTORE_CR5` state). CR5 is actively saved and restored — not passively inherited.
-- **Docs**: `architecture.md` line 351 says "The callee inherits DR0–DR15, CR0–CR5, CR7–CR11, CR13, CR15 from the caller unchanged." `lambda-instruction.md` now correctly notes CR5 restoration from cr5_stack (C-8), but `architecture.md` still implies CR5 is inherited unchanged.
-- **Decision**: Should `architecture.md` describe CR5 as "saved on CALL and restored on RETURN (transparent to callee)" or explicitly document the cr5_stack mechanism?
-- **Affected files**: `architecture.md`, `call-stack.md`, `lambda-instruction.md`
-- **Pending task**: Task #3 (CR5 instance-data behavior)
+- **Resolution (C-3 / Task #3)**: `architecture.md`, `call-stack.md`, and `garbage-collection.md` updated to correctly describe CR5 as pushed to cr5_stack by CALL and restored from cr5_stack by RETURN. The stale "inherited unchanged" language and the incorrect "mLoad revalidates CR5/CR6/CR7" text in garbage-collection.md are both fixed. `architecture.md` now also includes CR12 in the correct inherited-register range (CR7–CR13 instead of CR7–CR11, CR13).
+- **Status**: RESOLVED
 
 ### D-9: LAMBDA Recursion — Idempotent Re-Entry via CR6 (Revised Design)
 

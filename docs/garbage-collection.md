@@ -39,7 +39,7 @@ Step 7 is unconditional — it happens on every successful namespace access rega
 
 Steps 8-9 enforce the Golden Rule: mLoad is the sole path for all CR writes. Every CR write automatically updates the thread table shadow, keeping it continuously current. This eliminates the need for CHANGE to save CR state — only data registers and PC need saving during context switches.
 
-For RETURN, mLoad revalidates saved CR5/CR6/CR7 GTs against the namespace before restoring them. If a namespace entry was recycled during the call (version bumped by GC sweep), mLoad detects the version mismatch and faults — preventing use-after-free of recycled capabilities.
+For RETURN, mLoad revalidates the caller's E-GT (Word 0 of the frame) and resets its G-bit. The NS split then re-derives CR6 (c-list) and CR14 (code) from the caller's namespace entry — if the entry was recycled during the call (version bumped by a GC sweep), mLoad detects the version mismatch and faults, preventing use-after-free of recycled capabilities. CR5 is restored separately from cr5_stack (pushed by CALL) — it is not part of the mLoad path.
 
 For write-path instructions (SAVE), the G-bit reset is applied to the namespace entries accessed during the operation through the mSave validation subroutine.
 
