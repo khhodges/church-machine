@@ -1693,11 +1693,28 @@ def bitstream_list():
 #   1. LAZY_LUMPS dict  — pre-built local stubs (test lumps, cached library hits)
 #   2. Mum Tunnel Library (GitHub) — searched by token field in published JSON
 #
-# Lump binary format (Church Machine LUMP_HEADER_LAYOUT, big-endian uint32s):
-#   word 0 : header  — [31:27]=0x1F magic, [26:23]=n_minus_6, [22:10]=cw, [9:8]=typ, [7:0]=cc
-#   word 1..cw : code region
-#   word (lumpSize-cc)..(lumpSize-1) : c-list GTs
+# Lump binary format as served by /api/lump/ (big-endian uint32s):
+#   word 0 : CRC-32 of the lump payload (words 1..lumpSize) — big-endian uint32
+#   word 1 : lump header  — [31:27]=0x1F magic, [26:23]=n_minus_6, [22:10]=cw, [9:8]=typ, [7:0]=cc
+#   word 2..1+cw : code region
+#   word (1+lumpSize-cc)..(lumpSize) : c-list GTs
+#
+# The CRC-32 preamble word lets the simulator (and future tools) detect download
+# corruption the same way the hardware IoT unit does (OUTFORM_CRC = 0x15).
+# Algorithm: CRC-32/ISO-HDLC (poly=0xEDB88320, init=0xFFFFFFFF, xorout=0xFFFFFFFF)
+# — identical to Python's zlib.crc32().
 import struct as _struct
+import zlib as _zlib
+
+
+def _lump_with_crc(raw_lump_bytes):
+    """Prepend a big-endian CRC-32 word to *raw_lump_bytes* and return the result.
+
+    The CRC is computed over the raw lump payload bytes (the lump words themselves),
+    matching the hardware IoT unit's CRC-32/ISO-HDLC check (outform_iot.py).
+    """
+    crc = _zlib.crc32(raw_lump_bytes) & 0xFFFFFFFF
+    return _struct.pack('>I', crc) + raw_lump_bytes
 
 LAZY_LUMPS = {}    # token_hex_8 → bytes
 
@@ -1850,8 +1867,9 @@ def get_lump(token_hex):
                           ' (GitHub not configured — Mum Tunnel Library unavailable)'
             return jsonify({"error": f"Unknown lump token 0x{key8}{github_hint}"}), 404
 
-    resp = Response(data, mimetype='application/octet-stream',
-                    headers={'Content-Length': str(len(data)),
+    payload = _lump_with_crc(data)
+    resp = Response(payload, mimetype='application/octet-stream',
+                    headers={'Content-Length': str(len(payload)),
                              'X-Lump-Source': source})
     return resp
 

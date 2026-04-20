@@ -618,6 +618,23 @@ class ChurchSimulator {
         ) >>> 0;
     }
 
+    // ── CRC-32/ISO-HDLC (poly=0xEDB88320, init=0xFFFFFFFF, xorout=0xFFFFFFFF) ──
+    // Matches the hardware outform_iot.py CRC-32 check.
+    // Input: array of uint32 values whose big-endian bytes form the message.
+    _crc32Words(words) {
+        let crc = 0xFFFFFFFF;
+        for (let wi = 0; wi < words.length; wi++) {
+            const w = words[wi] >>> 0;
+            for (let shift = 24; shift >= 0; shift -= 8) {
+                crc ^= (w >>> shift) & 0xFF;
+                for (let b = 0; b < 8; b++) {
+                    crc = (crc & 1) ? ((crc >>> 1) ^ 0xEDB88320) : (crc >>> 1);
+                }
+            }
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
     parseLumpHeader(word) {
         word = word >>> 0;
         const magic     = (word >>> 27) & 0x1F;
@@ -3912,6 +3929,8 @@ class ChurchSimulator {
     // ── Lazy-load lump installation ───────────────────────────────────────────
     // Called by app.js after a successful GET /api/lump/<token_hex>.
     // lumpWords: Uint32Array or plain Array of 32-bit words (big-endian native).
+    //   word[0]     — CRC-32 preamble (computed by server over the lump payload bytes)
+    //   word[1..]   — actual lump binary (header + code + c-list)
     // Returns { ok, freeBase?, lumpSize?, message? }.
     receiveLump(lumpWords) {
         if (!this.awaitingLump) {
@@ -3919,8 +3938,29 @@ class ChurchSimulator {
         }
         const { nsIndex, retryPC } = this.awaitingLump;
 
-        // Validate magic byte in lump header word0.
-        const hdrWord = (lumpWords[0] >>> 0);
+        // ── CRC-32 verification ───────────────────────────────────────────────
+        // word[0] is the stored CRC-32 (prepended by the server).
+        // The CRC is computed over the raw lump payload bytes (words[1..]).
+        // Algorithm: CRC-32/ISO-HDLC — matches hardware outform_iot.py CHECK_CRC32.
+        if (lumpWords.length < 2) {
+            this.awaitingLump = null;
+            this.fault('LUMP_SIZE', `receiveLump: response too short (${lumpWords.length} words) for Slot ${nsIndex}`);
+            return { ok: false, message: 'lump response too short' };
+        }
+        const crcStored   = (lumpWords[0] >>> 0);
+        const lumpPayload = Array.isArray(lumpWords) ? lumpWords.slice(1) : Array.from(lumpWords).slice(1);
+        const crcComputed = this._crc32Words(lumpPayload);
+        if (crcComputed !== crcStored) {
+            this.awaitingLump = null;
+            this.fault('OUTFORM_CRC',
+                `receiveLump: CRC-32 mismatch for Slot ${nsIndex} — ` +
+                `stored=0x${crcStored.toString(16).padStart(8,'0')} ` +
+                `computed=0x${crcComputed.toString(16).padStart(8,'0')}`);
+            return { ok: false, message: 'CRC-32 mismatch' };
+        }
+
+        // Validate magic byte in lump header word0 (first word of the actual lump).
+        const hdrWord = (lumpPayload[0] >>> 0);
         if ((hdrWord >>> 27) !== 0x1F) {
             this.awaitingLump = null;
             this.fault('LUMP_MAGIC', `receiveLump: bad magic 0x${((hdrWord>>>27)&0x1F).toString(16)} in fetched lump for Slot ${nsIndex}`);
@@ -3932,9 +3972,9 @@ class ChurchSimulator {
 
         // Validate that the payload is consistent with the declared header size.
         // Truncated payloads (fewer words than declared) are rejected; extra words are ignored.
-        if (lumpWords.length < lumpSize) {
+        if (lumpPayload.length < lumpSize) {
             this.awaitingLump = null;
-            this.fault('LUMP_SIZE', `receiveLump: payload is ${lumpWords.length} words, header declares ${lumpSize} (truncated)`);
+            this.fault('LUMP_SIZE', `receiveLump: payload is ${lumpPayload.length} words, header declares ${lumpSize} (truncated)`);
             return { ok: false, message: 'truncated lump payload' };
         }
         // cw (code words) and cc (c-list slots) must fit within the declared lump size.
@@ -3955,8 +3995,8 @@ class ChurchSimulator {
         }
 
         // Write lump words into memory.
-        for (let i = 0; i < Math.min(lumpWords.length, lumpSize); i++) {
-            this.memory[freeBase + i] = (lumpWords[i] >>> 0);
+        for (let i = 0; i < Math.min(lumpPayload.length, lumpSize); i++) {
+            this.memory[freeBase + i] = (lumpPayload[i] >>> 0);
         }
 
         // Promote NS entry from Outform (gtType=2) → Inform (gtType=1).
