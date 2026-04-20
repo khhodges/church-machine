@@ -3,18 +3,18 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .registers import RV32CapRegisters
-from .decoder import RV32CapDecoder
-from .perm_check import RV32CapPermCheck
-from .gc_unit import RV32CapGCUnit
-from .lambda_unit import RV32CapLambda
-from .call import RV32CapCall
-from .ret import RV32CapReturn
-from .tperm import RV32CapTperm
-from .save import RV32CapSave
+from .registers import CTMMCapRegisters
+from .decoder import CTMMCapDecoder
+from .perm_check import CTMMCapPermCheck
+from .gc_unit import CTMMCapGCUnit
+from .lambda_unit import CTMMCapLambda
+from .call import CTMMCapCall
+from .ret import CTMMCapReturn
+from .tperm import CTMMCapTperm
+from .save import CTMMCapSave
 
 
-class RV32CapCore(Elaboratable):
+class CTMMCapCore(Elaboratable):
     def __init__(self):
         self.imem_addr = Signal(32)
         self.imem_data = Signal(32)
@@ -55,15 +55,15 @@ class RV32CapCore(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        u_regs = RV32CapRegisters()
-        u_decoder = RV32CapDecoder()
-        u_perm = RV32CapPermCheck()
-        u_gc = RV32CapGCUnit()
-        u_lambda = RV32CapLambda()
-        u_call = RV32CapCall()
-        u_return = RV32CapReturn()
-        u_tperm = RV32CapTperm()
-        u_save = RV32CapSave()
+        u_regs = CTMMCapRegisters()
+        u_decoder = CTMMCapDecoder()
+        u_perm = CTMMCapPermCheck()
+        u_gc = CTMMCapGCUnit()
+        u_lambda = CTMMCapLambda()
+        u_call = CTMMCapCall()
+        u_return = CTMMCapReturn()
+        u_tperm = CTMMCapTperm()
+        u_save = CTMMCapSave()
         m.submodules.u_registers = u_regs
         m.submodules.u_decoder = u_decoder
         m.submodules.u_perm_check = u_perm
@@ -108,7 +108,7 @@ class RV32CapCore(Elaboratable):
         ]
 
         is_church_op = u_decoder.is_church_op
-        is_rv32_op = u_decoder.is_rv32_op
+        is_ctmm_op = u_decoder.is_ctmm_op
         church_op = u_decoder.church_op
         cr_src = u_decoder.cr_src
         cr_dst = u_decoder.cr_dst
@@ -215,7 +215,7 @@ class RV32CapCore(Elaboratable):
         imm_b = u_decoder.imm_b
         imm_u = u_decoder.imm_u
         imm_j = u_decoder.imm_j
-        opcode = u_decoder.rv32_opcode
+        opcode = u_decoder.ctmm_opcode
         funct3 = u_decoder.funct3
         funct7 = u_decoder.funct7
         rd = u_decoder.rd
@@ -231,15 +231,15 @@ class RV32CapCore(Elaboratable):
         dmem_wr_en_sig = Signal()
         dmem_wr_data_sig = Signal(32)
 
-        with m.If(exec_enable & is_rv32_op):
+        with m.If(exec_enable & is_ctmm_op):
             with m.Switch(opcode):
-                with m.Case(RV32Opcode.LUI):
+                with m.Case(CTMMOpcode.LUI):
                     m.d.comb += [xr_wr_data.eq(imm_u), xr_wr_en.eq(1)]
 
-                with m.Case(RV32Opcode.AUIPC):
+                with m.Case(CTMMOpcode.AUIPC):
                     m.d.comb += [xr_wr_data.eq(nia_reg + imm_u), xr_wr_en.eq(1)]
 
-                with m.Case(RV32Opcode.JAL):
+                with m.Case(CTMMOpcode.JAL):
                     m.d.comb += [
                         xr_wr_data.eq(nia_reg + 4),
                         xr_wr_en.eq(1),
@@ -247,7 +247,7 @@ class RV32CapCore(Elaboratable):
                         jump_target.eq(nia_reg + imm_j),
                     ]
 
-                with m.Case(RV32Opcode.JALR):
+                with m.Case(CTMMOpcode.JALR):
                     m.d.comb += [
                         xr_wr_data.eq(nia_reg + 4),
                         xr_wr_en.eq(1),
@@ -255,68 +255,68 @@ class RV32CapCore(Elaboratable):
                         jump_target.eq((rs1_val + imm_i) & ~1),
                     ]
 
-                with m.Case(RV32Opcode.BRANCH):
+                with m.Case(CTMMOpcode.BRANCH):
                     m.d.comb += branch_target.eq(nia_reg + imm_b)
                     rs1_s = Signal(signed(32))
                     rs2_s = Signal(signed(32))
                     m.d.comb += [rs1_s.eq(rs1_val), rs2_s.eq(rs2_val)]
                     with m.Switch(funct3):
-                        with m.Case(RV32Funct3Branch.BEQ):
+                        with m.Case(CTMMFunct3Branch.BEQ):
                             m.d.comb += branch_taken.eq(rs1_val == rs2_val)
-                        with m.Case(RV32Funct3Branch.BNE):
+                        with m.Case(CTMMFunct3Branch.BNE):
                             m.d.comb += branch_taken.eq(rs1_val != rs2_val)
-                        with m.Case(RV32Funct3Branch.BLT):
+                        with m.Case(CTMMFunct3Branch.BLT):
                             m.d.comb += branch_taken.eq(rs1_s < rs2_s)
-                        with m.Case(RV32Funct3Branch.BGE):
+                        with m.Case(CTMMFunct3Branch.BGE):
                             m.d.comb += branch_taken.eq(rs1_s >= rs2_s)
-                        with m.Case(RV32Funct3Branch.BLTU):
+                        with m.Case(CTMMFunct3Branch.BLTU):
                             m.d.comb += branch_taken.eq(rs1_val < rs2_val)
-                        with m.Case(RV32Funct3Branch.BGEU):
+                        with m.Case(CTMMFunct3Branch.BGEU):
                             m.d.comb += branch_taken.eq(rs1_val >= rs2_val)
 
-                with m.Case(RV32Opcode.LOAD):
+                with m.Case(CTMMOpcode.LOAD):
                     m.d.comb += [
                         dmem_addr_computed.eq(rs1_val + imm_i),
                         dmem_rd_en_sig.eq(1),
                     ]
                     with m.Switch(funct3):
-                        with m.Case(RV32Funct3Load.LW):
+                        with m.Case(CTMMFunct3Load.LW):
                             m.d.comb += [xr_wr_data.eq(self.dmem_rd_data), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Load.LH):
+                        with m.Case(CTMMFunct3Load.LH):
                             half_val = Signal(signed(16))
                             sign_ext_h = Signal(signed(32))
                             m.d.comb += half_val.eq(self.dmem_rd_data[:16])
                             m.d.comb += sign_ext_h.eq(half_val)
                             m.d.comb += [xr_wr_data.eq(sign_ext_h), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Load.LB):
+                        with m.Case(CTMMFunct3Load.LB):
                             byte_val = Signal(signed(8))
                             sign_ext_b = Signal(signed(32))
                             m.d.comb += byte_val.eq(self.dmem_rd_data[:8])
                             m.d.comb += sign_ext_b.eq(byte_val)
                             m.d.comb += [xr_wr_data.eq(sign_ext_b), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Load.LHU):
+                        with m.Case(CTMMFunct3Load.LHU):
                             m.d.comb += [xr_wr_data.eq(self.dmem_rd_data[:16]), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Load.LBU):
+                        with m.Case(CTMMFunct3Load.LBU):
                             m.d.comb += [xr_wr_data.eq(self.dmem_rd_data[:8]), xr_wr_en.eq(1)]
 
-                with m.Case(RV32Opcode.STORE):
+                with m.Case(CTMMOpcode.STORE):
                     m.d.comb += [
                         dmem_addr_computed.eq(rs1_val + imm_s),
                         dmem_wr_en_sig.eq(1),
                     ]
                     with m.Switch(funct3):
-                        with m.Case(RV32Funct3Store.SW):
+                        with m.Case(CTMMFunct3Store.SW):
                             m.d.comb += dmem_wr_data_sig.eq(rs2_val)
-                        with m.Case(RV32Funct3Store.SH):
+                        with m.Case(CTMMFunct3Store.SH):
                             m.d.comb += dmem_wr_data_sig.eq(rs2_val[:16])
-                        with m.Case(RV32Funct3Store.SB):
+                        with m.Case(CTMMFunct3Store.SB):
                             m.d.comb += dmem_wr_data_sig.eq(rs2_val[:8])
 
-                with m.Case(RV32Opcode.ARITHI):
+                with m.Case(CTMMOpcode.ARITHI):
                     imm_ext = Signal(32)
                     m.d.comb += imm_ext.eq(imm_i)
                     with m.Switch(funct3):
-                        with m.Case(RV32Funct3ArithI.ADDI):
+                        with m.Case(CTMMFunct3ArithI.ADDI):
                             m.d.comb += alu_result.eq(rs1_val + imm_ext)
                             m.d.comb += [xr_wr_data.eq(alu_result[:32]), xr_wr_en.eq(1)]
                             m.d.comb += [
@@ -325,24 +325,24 @@ class RV32CapCore(Elaboratable):
                                 flags_in_view.C.eq(alu_result[32]),
                                 flags_wr_en.eq(1),
                             ]
-                        with m.Case(RV32Funct3ArithI.SLTI):
+                        with m.Case(CTMMFunct3ArithI.SLTI):
                             rs1_s_i = Signal(signed(32))
                             imm_s_i = Signal(signed(32))
                             m.d.comb += [rs1_s_i.eq(rs1_val), imm_s_i.eq(imm_ext)]
                             m.d.comb += [xr_wr_data.eq(Mux(rs1_s_i < imm_s_i, 1, 0)), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.SLTIU):
+                        with m.Case(CTMMFunct3ArithI.SLTIU):
                             m.d.comb += [xr_wr_data.eq(Mux(rs1_val < imm_ext, 1, 0)), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.XORI):
+                        with m.Case(CTMMFunct3ArithI.XORI):
                             m.d.comb += [xr_wr_data.eq(rs1_val ^ imm_ext), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.ORI):
+                        with m.Case(CTMMFunct3ArithI.ORI):
                             m.d.comb += [xr_wr_data.eq(rs1_val | imm_ext), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.ANDI):
+                        with m.Case(CTMMFunct3ArithI.ANDI):
                             m.d.comb += [xr_wr_data.eq(rs1_val & imm_ext), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.SLLI):
+                        with m.Case(CTMMFunct3ArithI.SLLI):
                             shamt = Signal(5)
                             m.d.comb += shamt.eq(imm_i[:5])
                             m.d.comb += [xr_wr_data.eq(rs1_val << shamt), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3ArithI.SRLI):
+                        with m.Case(CTMMFunct3ArithI.SRLI):
                             shamt_r = Signal(5)
                             m.d.comb += shamt_r.eq(imm_i[:5])
                             with m.If(funct7[5]):
@@ -352,9 +352,9 @@ class RV32CapCore(Elaboratable):
                             with m.Else():
                                 m.d.comb += [xr_wr_data.eq(rs1_val >> shamt_r), xr_wr_en.eq(1)]
 
-                with m.Case(RV32Opcode.ARITH):
+                with m.Case(CTMMOpcode.ARITH):
                     with m.Switch(funct3):
-                        with m.Case(RV32Funct3Arith.ADD):
+                        with m.Case(CTMMFunct3Arith.ADD):
                             with m.If(funct7[5]):
                                 m.d.comb += alu_result.eq(rs1_val - rs2_val)
                             with m.Else():
@@ -366,33 +366,33 @@ class RV32CapCore(Elaboratable):
                                 flags_in_view.C.eq(alu_result[32]),
                                 flags_wr_en.eq(1),
                             ]
-                        with m.Case(RV32Funct3Arith.SLL):
+                        with m.Case(CTMMFunct3Arith.SLL):
                             m.d.comb += [xr_wr_data.eq(rs1_val << rs2_val[:5]), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.SLT):
+                        with m.Case(CTMMFunct3Arith.SLT):
                             rs1_s_r = Signal(signed(32))
                             rs2_s_r = Signal(signed(32))
                             m.d.comb += [rs1_s_r.eq(rs1_val), rs2_s_r.eq(rs2_val)]
                             m.d.comb += [xr_wr_data.eq(Mux(rs1_s_r < rs2_s_r, 1, 0)), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.SLTU):
+                        with m.Case(CTMMFunct3Arith.SLTU):
                             m.d.comb += [xr_wr_data.eq(Mux(rs1_val < rs2_val, 1, 0)), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.XOR):
+                        with m.Case(CTMMFunct3Arith.XOR):
                             m.d.comb += [xr_wr_data.eq(rs1_val ^ rs2_val), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.SRL):
+                        with m.Case(CTMMFunct3Arith.SRL):
                             with m.If(funct7[5]):
                                 rs1_sr = Signal(signed(32))
                                 m.d.comb += rs1_sr.eq(rs1_val)
                                 m.d.comb += [xr_wr_data.eq(rs1_sr >> rs2_val[:5]), xr_wr_en.eq(1)]
                             with m.Else():
                                 m.d.comb += [xr_wr_data.eq(rs1_val >> rs2_val[:5]), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.OR):
+                        with m.Case(CTMMFunct3Arith.OR):
                             m.d.comb += [xr_wr_data.eq(rs1_val | rs2_val), xr_wr_en.eq(1)]
-                        with m.Case(RV32Funct3Arith.AND):
+                        with m.Case(CTMMFunct3Arith.AND):
                             m.d.comb += [xr_wr_data.eq(rs1_val & rs2_val), xr_wr_en.eq(1)]
 
-                with m.Case(RV32Opcode.FENCE):
+                with m.Case(CTMMOpcode.FENCE):
                     pass
 
-                with m.Case(RV32Opcode.SYSTEM):
+                with m.Case(CTMMOpcode.SYSTEM):
                     pass
 
         m.d.comb += [

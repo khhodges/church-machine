@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
-from .msave import RV32CapMSave
+from .msave import CTMMCapMSave
 
 
-class RV32CapSave(Elaboratable):
+class CTMMCapSave(Elaboratable):
     def __init__(self):
         self.save_start = Signal()
         self.cr_src = Signal(4)
@@ -32,7 +32,7 @@ class RV32CapSave(Elaboratable):
 
         MAX_CLIST_REG = 6
 
-        u_msave = RV32CapMSave()
+        u_msave = CTMMCapMSave()
         m.submodules.u_msave = u_msave
 
         dst_reg_latched = Signal(CAP_REG_LAYOUT)

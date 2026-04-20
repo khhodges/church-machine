@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT
 
 
-class RV32CapPermCheck(Elaboratable):
+class CTMMCapPermCheck(Elaboratable):
     def __init__(self):
         self.gt_in = Signal(GT_LAYOUT)
         self.required_perms = Signal(6)

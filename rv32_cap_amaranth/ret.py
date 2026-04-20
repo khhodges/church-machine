@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
-from .mload import RV32CapMLoad
+from .mload import CTMMCapMLoad
 
 
-class RV32CapReturn(Elaboratable):
+class CTMMCapReturn(Elaboratable):
     def __init__(self):
         self.return_start = Signal()
         self.cr_src = Signal(3)
@@ -43,7 +43,7 @@ class RV32CapReturn(Elaboratable):
         CR6_CLIST = 6
         CR7_NUCLEUS = 7
 
-        u_mload = RV32CapMLoad()
+        u_mload = CTMMCapMLoad()
         m.submodules.u_mload = u_mload
 
         return_cap = Signal(CAP_REG_LAYOUT)

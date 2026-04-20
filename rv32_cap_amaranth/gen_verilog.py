@@ -5,8 +5,8 @@ import argparse
 
 from amaranth.back.verilog import convert
 
-from .fpga_top import RV32CapFPGATop
-from .core import RV32CapCore
+from .fpga_top import CTMMCapFPGATop
+from .core import CTMMCapCore
 
 
 def _flatten_port(sig):
@@ -21,7 +21,7 @@ def _flatten_port(sig):
 
 
 def generate_core_verilog(output_dir):
-    core = RV32CapCore()
+    core = CTMMCapCore()
     raw_ports = [
         core.imem_addr, core.imem_data, core.imem_valid,
         core.dmem_addr, core.dmem_rd_en, core.dmem_rd_data,
@@ -39,8 +39,8 @@ def generate_core_verilog(output_dir):
     for p in raw_ports:
         ports.extend(_flatten_port(p))
 
-    verilog_text = convert(core, name="rv32_cap_core", ports=ports)
-    path = os.path.join(output_dir, "rv32_cap_core.v")
+    verilog_text = convert(core, name="ctmm_cap_core", ports=ports)
+    path = os.path.join(output_dir, "ctmm_cap_core.v")
     with open(path, "w") as f:
         f.write(verilog_text)
     print(f"  Core Verilog written to {path}")
@@ -48,11 +48,11 @@ def generate_core_verilog(output_dir):
 
 
 def generate_top_verilog(output_dir, uart_divisor=868):
-    top = RV32CapFPGATop(uart_divisor=uart_divisor)
+    top = CTMMCapFPGATop(uart_divisor=uart_divisor)
     ports = [top.uart_tx, top.leds]
 
-    verilog_text = convert(top, name="rv32_cap_fpga_top", ports=ports)
-    path = os.path.join(output_dir, "rv32_cap_fpga_top.v")
+    verilog_text = convert(top, name="ctmm_cap_fpga_top", ports=ports)
+    path = os.path.join(output_dir, "ctmm_cap_fpga_top.v")
     with open(path, "w") as f:
         f.write(verilog_text)
     print(f"  FPGA top Verilog written to {path}")
@@ -60,7 +60,7 @@ def generate_top_verilog(output_dir, uart_divisor=868):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate Verilog from RV32-Cap Amaranth HDL")
+    parser = argparse.ArgumentParser(description="Generate Verilog from CTMMCap Amaranth HDL")
     parser.add_argument("-o", "--output-dir", default="fpga_output",
                         help="Output directory for generated files (default: fpga_output)")
     parser.add_argument("--uart-divisor", type=int, default=868,
@@ -71,7 +71,7 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    print("RV32-Cap Verilog Generation")
+    print("CTMMCap Verilog Generation")
     print("=" * 50)
 
     print("\n[1/2] Generating core Verilog...")

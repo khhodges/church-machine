@@ -3,7 +3,7 @@ from amaranth.sim import Simulator
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .core import RV32CapCore
+from .core import CTMMCapCore
 
 
 def build_gt(index, perms, gt_type=GT_TYPE_INFORM, version=0):
@@ -14,12 +14,12 @@ def build_null_gt():
     return build_gt(0, 0, gt_type=GT_TYPE_NULL)
 
 
-def encode_rv32_r(funct7, rs2, rs1, funct3, rd, opcode):
+def encode_ctmm_r(funct7, rs2, rs1, funct3, rd, opcode):
     return ((funct7 & 0x7F) << 25) | ((rs2 & 0x1F) << 20) | ((rs1 & 0x1F) << 15) | \
            ((funct3 & 0x7) << 12) | ((rd & 0x1F) << 7) | (opcode & 0x7F)
 
 
-def encode_rv32_i(imm, rs1, funct3, rd, opcode):
+def encode_ctmm_i(imm, rs1, funct3, rd, opcode):
     return ((imm & 0xFFF) << 20) | ((rs1 & 0x1F) << 15) | \
            ((funct3 & 0x7) << 12) | ((rd & 0x1F) << 7) | (opcode & 0x7F)
 
@@ -34,18 +34,18 @@ def encode_church(church_op, cr_dst=0, cr_src=0, index=0):
 
 
 def run_testbench():
-    dut = RV32CapCore()
+    dut = CTMMCapCore()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
 
     imem = [0] * 256
 
-    imem[0] = encode_rv32_i(42, 0, int(RV32Funct3ArithI.ADDI), 1, int(RV32Opcode.ARITHI))
-    imem[1] = encode_rv32_r(0, 1, 1, int(RV32Funct3Arith.ADD), 2, int(RV32Opcode.ARITH))
+    imem[0] = encode_ctmm_i(42, 0, int(CTMMFunct3ArithI.ADDI), 1, int(CTMMOpcode.ARITHI))
+    imem[1] = encode_ctmm_r(0, 1, 1, int(CTMMFunct3Arith.ADD), 2, int(CTMMOpcode.ARITH))
 
     async def testbench(ctx):
         print("=" * 60)
-        print("RV32-Cap Amaranth Testbench — Design Validation")
+        print("CTMMCap Amaranth Testbench — Design Validation")
         print("=" * 60)
 
         print("\n[TEST 1] Boot Sequence & CR Permissions")
@@ -191,7 +191,7 @@ def run_testbench():
         assert rsv2_mask == 0, f"RSV2 should be reserved (0), got 0x{rsv2_mask:04x}"
         print("  PASS: RSV0/RSV1/RSV2 presets are reserved (domain purity violation)")
 
-        print("\n[TEST 8] RV32I Instructions (ADDI, ADD)")
+        print("\n[TEST 8] Sim-32 Instructions (ADDI, ADD)")
         print("-" * 50)
 
         for cycle in range(10):
@@ -232,7 +232,7 @@ def run_testbench():
         print("  PASS: GC sweep bumps version, sets NULL type")
 
         print("\n" + "=" * 60)
-        print("RV32-Cap Amaranth Testbench — All Tests Complete")
+        print("CTMMCap Amaranth Testbench — All Tests Complete")
         print("=" * 60)
 
     sim.add_testbench(testbench)

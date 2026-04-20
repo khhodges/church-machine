@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, SEALS_LAYOUT
 
 
-class RV32CapMLoad(Elaboratable):
+class CTMMCapMLoad(Elaboratable):
     def __init__(self):
         self.sub_start = Signal()
         self.sub_cr_src = Signal(4)

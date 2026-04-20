@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .mload import RV32CapMLoad
+from .mload import CTMMCapMLoad
 
 
-class RV32CapChange(Elaboratable):
+class CTMMCapChange(Elaboratable):
     def __init__(self):
         self.change_start = Signal()
         self.cr_src = Signal(4)
@@ -49,7 +49,7 @@ class RV32CapChange(Elaboratable):
 
         RESERVED_MASK = 0b1000_0001_1000_0000
 
-        u_mload = RV32CapMLoad()
+        u_mload = CTMMCapMLoad()
         m.submodules.u_mload = u_mload
 
         cr_index = Signal(4)

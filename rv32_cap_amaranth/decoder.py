@@ -5,12 +5,12 @@ from .types import *
 from .layouts import COND_FLAGS_LAYOUT
 
 
-class RV32CapDecoder(Elaboratable):
+class CTMMCapDecoder(Elaboratable):
     def __init__(self):
         self.instruction = Signal(32)
         self.instr_valid = Signal()
 
-        self.rv32_opcode = Signal(7)
+        self.ctmm_opcode = Signal(7)
         self.rd = Signal(5)
         self.rs1 = Signal(5)
         self.rs2 = Signal(5)
@@ -22,7 +22,7 @@ class RV32CapDecoder(Elaboratable):
         self.imm_u = Signal(signed(32))
         self.imm_j = Signal(signed(21))
 
-        self.is_rv32_op = Signal()
+        self.is_ctmm_op = Signal()
         self.is_church_op = Signal()
         self.church_op = Signal(3)
         self.cr_dst = Signal(4)
@@ -41,7 +41,7 @@ class RV32CapDecoder(Elaboratable):
         instr = self.instruction
 
         m.d.comb += [
-            self.rv32_opcode.eq(instr[0:7]),
+            self.ctmm_opcode.eq(instr[0:7]),
             self.rd.eq(instr[7:12]),
             self.funct3.eq(instr[12:15]),
             self.rs1.eq(instr[15:20]),
@@ -67,28 +67,28 @@ class RV32CapDecoder(Elaboratable):
             instr[31],
         ))
 
-        opcode = self.rv32_opcode
+        opcode = self.ctmm_opcode
 
-        is_standard_rv32 = Signal()
-        m.d.comb += is_standard_rv32.eq(
-            (opcode == RV32Opcode.LUI) |
-            (opcode == RV32Opcode.AUIPC) |
-            (opcode == RV32Opcode.JAL) |
-            (opcode == RV32Opcode.JALR) |
-            (opcode == RV32Opcode.BRANCH) |
-            (opcode == RV32Opcode.LOAD) |
-            (opcode == RV32Opcode.STORE) |
-            (opcode == RV32Opcode.ARITHI) |
-            (opcode == RV32Opcode.ARITH) |
-            (opcode == RV32Opcode.FENCE) |
-            (opcode == RV32Opcode.SYSTEM)
+        is_standard_ctmm = Signal()
+        m.d.comb += is_standard_ctmm.eq(
+            (opcode == CTMMOpcode.LUI) |
+            (opcode == CTMMOpcode.AUIPC) |
+            (opcode == CTMMOpcode.JAL) |
+            (opcode == CTMMOpcode.JALR) |
+            (opcode == CTMMOpcode.BRANCH) |
+            (opcode == CTMMOpcode.LOAD) |
+            (opcode == CTMMOpcode.STORE) |
+            (opcode == CTMMOpcode.ARITHI) |
+            (opcode == CTMMOpcode.ARITH) |
+            (opcode == CTMMOpcode.FENCE) |
+            (opcode == CTMMOpcode.SYSTEM)
         )
 
         is_custom0 = Signal()
         m.d.comb += is_custom0.eq(opcode == CHURCH_CUSTOM0)
 
         m.d.comb += [
-            self.is_rv32_op.eq(is_standard_rv32 & self.instr_valid),
+            self.is_ctmm_op.eq(is_standard_ctmm & self.instr_valid),
             self.is_church_op.eq(is_custom0 & self.instr_valid),
         ]
 
@@ -108,7 +108,7 @@ class RV32CapDecoder(Elaboratable):
         ]
 
         with m.If(self.instr_valid):
-            with m.If(~is_standard_rv32 & ~is_custom0):
+            with m.If(~is_standard_ctmm & ~is_custom0):
                 m.d.comb += [
                     self.fault_valid.eq(1),
                     self.fault.eq(FaultType.INVALID_OP),
