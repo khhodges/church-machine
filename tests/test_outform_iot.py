@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from amaranth import *
 from amaranth.lib.data import View
 from amaranth.lib.memory import Memory as LibMemory
-from amaranth.sim import Simulator, Tick
+from amaranth.sim import Simulator
 
 from hardware.outform_iot import (
     ChurchOutformIoT, TUNNEL_REQ_LEN, IOT_HDR_LEN,
@@ -101,77 +101,84 @@ def ref_crc16(e_gt: int, base: int, w2: int) -> int:
 
 # ── Simulation helpers (shared by both tests) ─────────────────────────────────
 
-def send_bytes(dut, data: bytes):
+async def send_bytes(ctx, dut, data: bytes):
     for b in data:
-        yield dut.rx_valid.eq(1)
-        yield dut.rx_data.eq(int(b))
-        yield Tick()
-        yield dut.rx_valid.eq(0)
-        yield Tick()
+        ctx.set(dut.rx_valid, 1)
+        ctx.set(dut.rx_data, int(b))
+        await ctx.tick()
+        ctx.set(dut.rx_valid, 0)
+        await ctx.tick()
 
 
-def ack_tx_bytes(dut, count: int):
+async def ack_tx_bytes(ctx, dut, count: int):
     for _ in range(count):
-        yield dut.tx_ack.eq(1)
-        yield Tick()
-        yield dut.tx_ack.eq(0)
-        yield Tick()
+        ctx.set(dut.tx_ack, 1)
+        await ctx.tick()
+        ctx.set(dut.tx_ack, 0)
+        await ctx.tick()
 
 
-def wait_alloc_req(dut):
+async def wait_alloc_req(ctx, dut):
     for _ in range(MAX_TICKS):
-        yield Tick()
-        if (yield dut.alloc_req):
+        await ctx.tick()
+        if ctx.get(dut.alloc_req):
             return
     raise AssertionError("wait_alloc_req: timed out")
 
 
-def respond_alloc(dut, alloc_base: int):
-    yield dut.alloc_base.eq(alloc_base)
-    yield dut.alloc_done.eq(1)
-    yield Tick()
-    yield dut.alloc_done.eq(0)
-    yield dut.alloc_base.eq(0)
+async def respond_alloc(ctx, dut, alloc_base: int):
+    ctx.set(dut.alloc_base, alloc_base)
+    ctx.set(dut.alloc_done, 1)
+    await ctx.tick()
+    ctx.set(dut.alloc_done, 0)
+    ctx.set(dut.alloc_base, 0)
     for _ in range(4):
-        yield Tick()
+        await ctx.tick()
 
 
-def wait_mint_call(dut):
-    for _ in range(MAX_TICKS):
-        yield Tick()
-        if (yield dut.mint_call):
-            return (yield dut.mint_base), (yield dut.mint_n)
+async def wait_mint_call(ctx, dut):
+    for _ in range(MAX_TICKS + 1):
+        if ctx.get(dut.mint_call):
+            return ctx.get(dut.mint_base), ctx.get(dut.mint_n)
+        await ctx.tick()
     raise AssertionError("wait_mint_call: timed out")
 
 
-def respond_mint(dut, result_gt: int):
-    yield dut.mint_result_gt.eq(result_gt)
-    yield dut.mint_done.eq(1)
-    yield Tick()
-    yield dut.mint_done.eq(0)
-    yield dut.mint_result_gt.eq(0)
+async def respond_mint(ctx, dut, result_gt: int):
+    ctx.set(dut.mint_result_gt, result_gt)
+    ctx.set(dut.mint_done, 1)
+    await ctx.tick()  # FSM: MINT → MINT_WAIT (mint_done=1 held)
+    await ctx.tick()  # FSM: MINT_WAIT → COMPLETE (mint_done=1 visible)
+    ctx.set(dut.mint_done, 0)
+    ctx.set(dut.mint_result_gt, 0)
 
 
-def wait_done(dut):
-    for _ in range(MAX_TICKS):
-        yield Tick()
-        done  = yield dut.outform_done
-        fault = yield dut.outform_fault
+async def wait_done(ctx, dut):
+    for _ in range(MAX_TICKS + 1):
+        done  = ctx.get(dut.outform_done)
+        fault = ctx.get(dut.outform_fault)
         if done or fault:
-            ftype = yield dut.outform_fault_type
-            rgt   = yield dut.result_gt
+            ftype = ctx.get(dut.outform_fault_type)
+            rgt   = ctx.get(dut.result_gt)
             return done, fault, ftype, rgt
+        await ctx.tick()
     raise AssertionError("wait_done: timed out")
 
 
-def wait_alloc_done(dut):
-    """Poll alloc_done_out until it pulses, then yield one extra Tick so the
-    FSM enters RECV_PAYLOAD before the caller starts sending payload bytes."""
-    for _ in range(MAX_TICKS):
-        yield Tick()
-        if (yield dut.alloc_done_out):
-            yield Tick()   # one more tick: ALLOC → RECV_PAYLOAD transition
+async def wait_alloc_done(ctx, dut):
+    """Poll alloc_done_out until it pulses, then yield one extra tick so the
+    FSM enters RECV_PAYLOAD before the caller starts sending payload bytes.
+
+    Checks BEFORE the first tick because when the harness wires alloc_done
+    combinatorially, it may fire in the same clock that the FSM enters ALLOC
+    (i.e., while send_bytes is still running), making the pulse invisible to
+    a tick-first poll.
+    """
+    for _ in range(MAX_TICKS + 1):
+        if ctx.get(dut.alloc_done_out):
+            await ctx.tick()   # one more tick: ALLOC → RECV_PAYLOAD transition
             return
+        await ctx.tick()
     raise AssertionError("wait_alloc_done: timed out")
 
 
@@ -535,36 +542,36 @@ def test_iot_lazy_load_golden():
     dut = ChurchOutformIoT()
     captured = {}
 
-    def process():
-        yield dut.gt_raw.eq(GT_RAW)
-        yield dut.slot_id.eq(SLOT_ID)
-        yield dut.outform_start.eq(1)
-        yield Tick()
-        yield dut.outform_start.eq(0)
+    async def process(ctx):
+        ctx.set(dut.gt_raw, GT_RAW)
+        ctx.set(dut.slot_id, SLOT_ID)
+        ctx.set(dut.outform_start, 1)
+        await ctx.tick()
+        ctx.set(dut.outform_start, 0)
 
-        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
-        yield from send_bytes(dut, b"\xAC")          # connect byte
-        yield from send_bytes(dut, lean_hdr)
+        await ack_tx_bytes(ctx, dut, TUNNEL_REQ_LEN)
+        await send_bytes(ctx, dut, b"\xAC")          # connect byte
+        await send_bytes(ctx, dut, lean_hdr)
 
-        yield from wait_alloc_req(dut)
-        yield from respond_alloc(dut, ALLOC_BASE)
-        yield from send_bytes(dut, payload)
+        await wait_alloc_req(ctx, dut)
+        await respond_alloc(ctx, dut, ALLOC_BASE)
+        await send_bytes(ctx, dut, payload)
 
-        mb, mn = yield from wait_mint_call(dut)
+        mb, mn = await wait_mint_call(ctx, dut)
         captured["mint_base"] = mb
         captured["mint_n"]    = mn
 
         e_gt = ref_e_gt(SLOT_ID)
-        yield from respond_mint(dut, e_gt)
+        await respond_mint(ctx, dut, e_gt)
 
-        done, fault, ftype, rgt = yield from wait_done(dut)
+        done, fault, ftype, rgt = await wait_done(ctx, dut)
         assert done  == 1, f"expected outform_done: done={done} fault={fault} ft=0x{ftype:02X}"
         assert fault == 0, f"unexpected fault ft=0x{ftype:02X}"
         assert rgt == e_gt, f"result_gt=0x{rgt:08X} expected=0x{e_gt:08X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_golden.vcd"):
         sim.run()
 
@@ -610,26 +617,26 @@ def test_iot_lazy_load_integrated():
     ALLOC_BASE_BYTES = OutformIoTHarness.WATERMARK_INIT * 4   # = 0x400
     LUMP_WORDS       = 64
 
-    def process():
-        yield dut.outform_start.eq(1)
-        yield Tick()
-        yield dut.outform_start.eq(0)
+    async def process(ctx):
+        ctx.set(dut.outform_start, 1)
+        await ctx.tick()
+        ctx.set(dut.outform_start, 0)
 
-        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
-        yield from send_bytes(dut, b"\xAC")          # connect byte
-        yield from send_bytes(dut, lean_hdr)
+        await ack_tx_bytes(ctx, dut, TUNNEL_REQ_LEN)
+        await send_bytes(ctx, dut, b"\xAC")          # connect byte
+        await send_bytes(ctx, dut, lean_hdr)
         # Wait for the automatic allocator to fire (DERIVE_N → ALLOC → done),
         # then send the full payload in RECV_PAYLOAD state.
-        yield from wait_alloc_done(dut)
-        yield from send_bytes(dut, payload)
+        await wait_alloc_done(ctx, dut)
+        await send_bytes(ctx, dut, payload)
 
-        done, fault, ftype, rgt = yield from wait_done(dut)
+        done, fault, ftype, rgt = await wait_done(ctx, dut)
         assert done  == 1, f"expected outform_done: done={done} fault={fault} ft=0x{ftype:02X}"
         assert fault == 0, f"unexpected fault ft=0x{ftype:02X}"
 
         # Let memory writes settle (Mint FSM writes happen before DONE pulse)
         for _ in range(4):
-            yield Tick()
+            await ctx.tick()
 
         # ── Read NS memory ────────────────────────────────────────────────────
         # NS entry base: slot_id * 12 bytes = slot_id * 3 words
@@ -637,22 +644,22 @@ def test_iot_lazy_load_integrated():
         ns_word1_idx = (OutformIoTHarness.NS_BASE + SLOT_ID * 12 + 4) >> 2
         ns_word2_idx = (OutformIoTHarness.NS_BASE + SLOT_ID * 12 + 8) >> 2
 
-        yield dut.ns_rd_addr.eq(ns_word0_idx)
-        yield Tick()
-        ns_word0 = yield dut.ns_rd_data
+        ctx.set(dut.ns_rd_addr, ns_word0_idx)
+        await ctx.tick()
+        ns_word0 = ctx.get(dut.ns_rd_data)
 
-        yield dut.ns_rd_addr.eq(ns_word1_idx)
-        yield Tick()
-        ns_word1 = yield dut.ns_rd_data
+        ctx.set(dut.ns_rd_addr, ns_word1_idx)
+        await ctx.tick()
+        ns_word1 = ctx.get(dut.ns_rd_data)
 
-        yield dut.ns_rd_addr.eq(ns_word2_idx)
-        yield Tick()
-        ns_word2 = yield dut.ns_rd_data
+        ctx.set(dut.ns_rd_addr, ns_word2_idx)
+        await ctx.tick()
+        ns_word2 = ctx.get(dut.ns_rd_data)
 
         # ── Read clist memory ─────────────────────────────────────────────────
-        yield dut.clist_rd_addr.eq(CLIST_BADDR >> 2)
-        yield Tick()
-        clist_e_gt = yield dut.clist_rd_data
+        ctx.set(dut.clist_rd_addr, CLIST_BADDR >> 2)
+        await ctx.tick()
+        clist_e_gt = ctx.get(dut.clist_rd_data)
 
         # ── Compute reference values ──────────────────────────────────────────
         exp_ns0  = ALLOC_BASE_BYTES
@@ -697,7 +704,7 @@ def test_iot_lazy_load_integrated():
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_integrated.vcd"):
         sim.run()
     print("PASS: test_iot_lazy_load_integrated")
@@ -733,22 +740,22 @@ def test_iot_lazy_load_toplevel():
     lean_hdr  = build_lean_header(payload)
 
     # ── UART helpers ──────────────────────────────────────────────────────
-    def uart_send_byte(dut, byte):
+    async def uart_send_byte(ctx, dut, byte):
         """Drive dut.uart_rx with one 8N1 UART byte at CPB cycles per bit."""
-        yield dut.uart_rx.eq(0)           # start bit
+        ctx.set(dut.uart_rx, 0)           # start bit
         for _ in range(CPB):
-            yield Tick()
+            await ctx.tick()
         for bit in range(8):              # data bits LSB-first
-            yield dut.uart_rx.eq((byte >> bit) & 1)
+            ctx.set(dut.uart_rx, (byte >> bit) & 1)
             for _ in range(CPB):
-                yield Tick()
-        yield dut.uart_rx.eq(1)           # stop bit
+                await ctx.tick()
+        ctx.set(dut.uart_rx, 1)           # stop bit
         for _ in range(CPB):
-            yield Tick()
+            await ctx.tick()
 
-    def uart_send_bytes(dut, data):
+    async def uart_send_bytes(ctx, dut, data):
         for b in data:
-            yield from uart_send_byte(dut, b)
+            await uart_send_byte(ctx, dut, b)
 
     dut = ChurchTangNano20K(
         clk_freq=16,
@@ -758,28 +765,28 @@ def test_iot_lazy_load_toplevel():
         test_mode=True,
     )
 
-    def process():
+    async def process(ctx):
         # Idle RX line high; configure test injection context.
-        yield dut.uart_rx.eq(1)
-        yield dut.test_outform_slot_id.eq(SLOT_ID)
-        yield dut.test_outform_clist_addr.eq(CLIST_ADDR)
-        yield dut.test_outform_gt_raw.eq(0)
-        yield Tick()
+        ctx.set(dut.uart_rx, 1)
+        ctx.set(dut.test_outform_slot_id, SLOT_ID)
+        ctx.set(dut.test_outform_clist_addr, CLIST_ADDR)
+        ctx.set(dut.test_outform_gt_raw, 0)
+        await ctx.tick()
 
         # Pulse outform_start for one cycle to bypass the CPU mLoad path.
-        yield dut.test_outform_start.eq(1)
-        yield Tick()
-        yield dut.test_outform_start.eq(0)
+        ctx.set(dut.test_outform_start, 1)
+        await ctx.tick()
+        ctx.set(dut.test_outform_start, 0)
 
         # Wait for TUNNEL_REQ (6 bytes × 160 cycles/byte) to finish.
         # The outform then enters TUNNEL_CONNECT waiting for any RX byte.
         for _ in range(CPB * 10 * 6 + CPB * 5):   # 960 + 80 margin = 1040 cycles
-            yield Tick()
+            await ctx.tick()
 
         # ── Connect byte → lean header → payload ──────────────────────────
-        yield from uart_send_byte(dut, CONNECT_BYTE)
-        yield from uart_send_bytes(dut, lean_hdr)
-        yield from uart_send_bytes(dut, payload)
+        await uart_send_byte(ctx, dut, CONNECT_BYTE)
+        await uart_send_bytes(ctx, dut, lean_hdr)
+        await uart_send_bytes(ctx, dut, payload)
 
         # ── Wait for Mint FSM to complete and accumulate NS/clist writes ──
         ns_writes    = {}
@@ -787,16 +794,16 @@ def test_iot_lazy_load_toplevel():
         MAX_POST   = 500
 
         for _ in range(MAX_POST):
-            yield Tick()
-            if (yield dut.dbg_ns_wr_en):
-                addr = (yield dut.dbg_ns_wr_addr)
-                data = (yield dut.dbg_ns_wr_data)
+            await ctx.tick()
+            if ctx.get(dut.dbg_ns_wr_en):
+                addr = ctx.get(dut.dbg_ns_wr_addr)
+                data = ctx.get(dut.dbg_ns_wr_data)
                 ns_writes[addr] = data
-            if (yield dut.dbg_clist_wr_en):
-                addr = (yield dut.dbg_clist_wr_addr)
-                data = (yield dut.dbg_clist_wr_data)
+            if ctx.get(dut.dbg_clist_wr_en):
+                addr = ctx.get(dut.dbg_clist_wr_addr)
+                data = ctx.get(dut.dbg_clist_wr_data)
                 clist_writes[addr] = data
-            if not (yield dut.dbg_outform_busy):
+            if not ctx.get(dut.dbg_outform_busy):
                 break
         else:
             raise AssertionError(
@@ -853,7 +860,7 @@ def test_iot_lazy_load_toplevel():
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_toplevel.vcd"):
         sim.run()
     print("PASS: test_iot_lazy_load_toplevel")
@@ -861,46 +868,47 @@ def test_iot_lazy_load_toplevel():
 
 # ── Fault-path helpers ────────────────────────────────────────────────────────
 
-def respond_alloc_fault_iot(dut):
+async def respond_alloc_fault_iot(ctx, dut):
     """Wait for alloc_req, then assert alloc_fault for one cycle."""
     for _ in range(MAX_TICKS):
-        yield Tick()
-        if (yield dut.alloc_req):
-            yield dut.alloc_fault.eq(1)
-            yield Tick()
-            yield dut.alloc_fault.eq(0)
+        await ctx.tick()
+        if ctx.get(dut.alloc_req):
+            ctx.set(dut.alloc_fault, 1)
+            await ctx.tick()
+            ctx.set(dut.alloc_fault, 0)
             return
     raise AssertionError("respond_alloc_fault_iot: timed out waiting for alloc_req")
 
 
-def respond_mint_fault_iot(dut):
+async def respond_mint_fault_iot(ctx, dut):
     """Wait for mint_call, then assert mint_fault in MINT_WAIT state."""
-    for _ in range(MAX_TICKS):
-        yield Tick()
-        if (yield dut.mint_call):
-            yield dut.mint_fault.eq(1)
-            yield Tick()
-            yield dut.mint_fault.eq(0)
+    for _ in range(MAX_TICKS + 1):
+        if ctx.get(dut.mint_call):
+            ctx.set(dut.mint_fault, 1)
+            await ctx.tick()  # FSM: MINT → MINT_WAIT (mint_fault=1 held)
+            await ctx.tick()  # FSM: MINT_WAIT → FAULT (mint_fault=1 visible)
+            ctx.set(dut.mint_fault, 0)
             return
+        await ctx.tick()
     raise AssertionError("respond_mint_fault_iot: timed out waiting for mint_call")
 
 
-def run_to_derive_n(dut, payload_len: int, crc32_val: int):
+async def run_to_derive_n(ctx, dut, payload_len: int, crc32_val: int):
     """Common prefix: start outform, drain tunnel TX, send connect + lean header.
 
     payload_len and crc32_val are written verbatim into the 8-byte lean header;
     no correctness is assumed here — callers supply whatever they need to trigger
     the desired fault path.
     """
-    yield dut.outform_start.eq(1)
-    yield Tick()
-    yield dut.outform_start.eq(0)
+    ctx.set(dut.outform_start, 1)
+    await ctx.tick()
+    ctx.set(dut.outform_start, 0)
 
-    yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
-    yield from send_bytes(dut, b"\xAC")
+    await ack_tx_bytes(ctx, dut, TUNNEL_REQ_LEN)
+    await send_bytes(ctx, dut, b"\xAC")
 
     lean_hdr = struct.pack("<II", payload_len & 0xFFFFFFFF, crc32_val & 0xFFFFFFFF)
-    yield from send_bytes(dut, lean_hdr)
+    await send_bytes(ctx, dut, lean_hdr)
 
 
 # ── Fault test 1: payload_len not 4-byte aligned → OUTFORM_FAULT_HDR ─────────
@@ -909,16 +917,16 @@ def test_iot_hdr_fault():
     """payload_len=257 (low 2 bits != 0) triggers OUTFORM_FAULT_HDR in DERIVE_N."""
     dut = ChurchOutformIoT()
 
-    def process():
-        yield from run_to_derive_n(dut, payload_len=257, crc32_val=0)
+    async def process(ctx):
+        await run_to_derive_n(ctx, dut, payload_len=257, crc32_val=0)
 
-        done, fault, ftype, _ = yield from wait_done(dut)
+        done, fault, ftype, _ = await wait_done(ctx, dut)
         assert fault == 1,                   f"expected fault, got done={done}"
         assert ftype == OUTFORM_FAULT_HDR,   f"fault_type=0x{ftype:02X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_hdr_fault.vcd"):
         sim.run()
     print("PASS: test_iot_hdr_fault")
@@ -930,16 +938,16 @@ def test_iot_bad_n():
     """payload_len=260 → 65 words, not a power of 2 → OUTFORM_FAULT_HDR."""
     dut = ChurchOutformIoT()
 
-    def process():
-        yield from run_to_derive_n(dut, payload_len=260, crc32_val=0)
+    async def process(ctx):
+        await run_to_derive_n(ctx, dut, payload_len=260, crc32_val=0)
 
-        done, fault, ftype, _ = yield from wait_done(dut)
+        done, fault, ftype, _ = await wait_done(ctx, dut)
         assert fault == 1,                   f"expected fault, got done={done}"
         assert ftype == OUTFORM_FAULT_HDR,   f"fault_type=0x{ftype:02X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_bad_n.vcd"):
         sim.run()
     print("PASS: test_iot_bad_n")
@@ -953,20 +961,20 @@ def test_iot_crc_mismatch():
     bad_crc  = 0xDEADC0DE
     dut      = ChurchOutformIoT()
 
-    def process():
-        yield from run_to_derive_n(dut, payload_len=256, crc32_val=bad_crc)
+    async def process(ctx):
+        await run_to_derive_n(ctx, dut, payload_len=256, crc32_val=bad_crc)
 
-        yield from wait_alloc_req(dut)
-        yield from respond_alloc(dut, 0x400)
-        yield from send_bytes(dut, payload)
+        await wait_alloc_req(ctx, dut)
+        await respond_alloc(ctx, dut, 0x400)
+        await send_bytes(ctx, dut, payload)
 
-        done, fault, ftype, _ = yield from wait_done(dut)
+        done, fault, ftype, _ = await wait_done(ctx, dut)
         assert fault == 1,                    f"expected fault, got done={done}"
         assert ftype == OUTFORM_FAULT_CRC32,  f"fault_type=0x{ftype:02X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_crc_mismatch.vcd"):
         sim.run()
     print("PASS: test_iot_crc_mismatch")
@@ -980,24 +988,24 @@ def test_iot_alloc_fault():
     lean_hdr = build_lean_header(payload)
     dut      = ChurchOutformIoT()
 
-    def process():
-        yield dut.outform_start.eq(1)
-        yield Tick()
-        yield dut.outform_start.eq(0)
+    async def process(ctx):
+        ctx.set(dut.outform_start, 1)
+        await ctx.tick()
+        ctx.set(dut.outform_start, 0)
 
-        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
-        yield from send_bytes(dut, b"\xAC")
-        yield from send_bytes(dut, lean_hdr)
+        await ack_tx_bytes(ctx, dut, TUNNEL_REQ_LEN)
+        await send_bytes(ctx, dut, b"\xAC")
+        await send_bytes(ctx, dut, lean_hdr)
 
-        yield from respond_alloc_fault_iot(dut)
+        await respond_alloc_fault_iot(ctx, dut)
 
-        done, fault, ftype, _ = yield from wait_done(dut)
+        done, fault, ftype, _ = await wait_done(ctx, dut)
         assert fault == 1,                    f"expected fault, got done={done}"
         assert ftype == OUTFORM_FAULT_ALLOC,  f"fault_type=0x{ftype:02X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_alloc_fault.vcd"):
         sim.run()
     print("PASS: test_iot_alloc_fault")
@@ -1011,28 +1019,28 @@ def test_iot_mint_fault():
     lean_hdr = build_lean_header(payload)
     dut      = ChurchOutformIoT()
 
-    def process():
-        yield dut.outform_start.eq(1)
-        yield Tick()
-        yield dut.outform_start.eq(0)
+    async def process(ctx):
+        ctx.set(dut.outform_start, 1)
+        await ctx.tick()
+        ctx.set(dut.outform_start, 0)
 
-        yield from ack_tx_bytes(dut, TUNNEL_REQ_LEN)
-        yield from send_bytes(dut, b"\xAC")
-        yield from send_bytes(dut, lean_hdr)
+        await ack_tx_bytes(ctx, dut, TUNNEL_REQ_LEN)
+        await send_bytes(ctx, dut, b"\xAC")
+        await send_bytes(ctx, dut, lean_hdr)
 
-        yield from wait_alloc_req(dut)
-        yield from respond_alloc(dut, 0x400)
-        yield from send_bytes(dut, payload)
+        await wait_alloc_req(ctx, dut)
+        await respond_alloc(ctx, dut, 0x400)
+        await send_bytes(ctx, dut, payload)
 
-        yield from respond_mint_fault_iot(dut)
+        await respond_mint_fault_iot(ctx, dut)
 
-        done, fault, ftype, _ = yield from wait_done(dut)
+        done, fault, ftype, _ = await wait_done(ctx, dut)
         assert fault == 1,                   f"expected fault, got done={done}"
         assert ftype == OUTFORM_FAULT_MINT,  f"fault_type=0x{ftype:02X}"
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_sync_process(process)
+    sim.add_testbench(process)
     with sim.write_vcd("/tmp/outform_iot_mint_fault.vcd"):
         sim.run()
     print("PASS: test_iot_mint_fault")

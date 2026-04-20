@@ -32,11 +32,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from amaranth import *
 from amaranth.lib.data import View
-from amaranth.sim import Simulator, Tick
+from amaranth.sim import Simulator
 
 from hardware.call import ChurchCall
 from hardware.hw_types import (
-    FaultType, PERM_MASK_E, PERM_MASK_X, GT_TYPE_INFORM,
+    FaultType, PERM_MASK_E, PERM_MASK_X, PERM_MASK_R, PERM_MASK_W,
+    GT_TYPE_INFORM,
     PERM_E,
 )
 from hardware.layouts import GT_LAYOUT, CAP_REG_LAYOUT
@@ -96,7 +97,8 @@ def _run_scenario(initial_sto, expect_fault=None):
     cr6_cap    = CALLEE_EGT
     ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
     code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=0x9004)
-    cr5_cap    = _build_cap(slot_id=5, perms=0, location=SP_STORE_ADDR)
+    cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
+    cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
 
     # Callee lump header (for FETCH_LUMP, callee ns entry word3):
     callee_lump_hdr = _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5)
@@ -107,25 +109,27 @@ def _run_scenario(initial_sto, expect_fault=None):
 
     wr_ops = []
 
-    def process():
-        yield dut.caller_pc.eq(CALLER_PC)
-        yield dut.thread_base.eq(THREAD_BASE)
-        yield dut.cr5_heap.eq(cr5_cap)
-        yield dut.cr15_namespace.eq(ns_cap)
-        yield dut.cr14_code.eq(code_cap)
-        yield dut.mask.eq(0)
-        yield dut.index.eq(0)
-        yield dut.cr_src.eq(0)
-        yield dut.mload_done.eq(0)
-        yield dut.mload_fault.eq(0)
-        yield dut.mload_fault_type.eq(0)
-        yield dut.mem_rd_valid.eq(0)
-        yield dut.mem_rd_data.eq(0)
-        yield dut.cr_rd_data.eq(callee_cap)
+    async def process(ctx):
+        ctx.set(dut.caller_pc, CALLER_PC)
+        ctx.set(dut.thread_base, THREAD_BASE)
+        ctx.set(dut.cr5_heap.as_value(), cr5_cap)
+        ctx.set(dut.cr12_thread.as_value(), cr12_cap)
+        ctx.set(dut.cr15_namespace.as_value(), ns_cap)
+        ctx.set(dut.cr14_code.as_value(), code_cap)
+        ctx.set(dut.thread_hdr, thr_hdr)
+        ctx.set(dut.mask, 0)
+        ctx.set(dut.index, 0)
+        ctx.set(dut.cr_src, 0)
+        ctx.set(dut.mload_done, 0)
+        ctx.set(dut.mload_fault, 0)
+        ctx.set(dut.mload_fault_type, 0)
+        ctx.set(dut.mem_rd_valid, 0)
+        ctx.set(dut.mem_rd_data, 0)
+        ctx.set(dut.cr_rd_data.as_value(), callee_cap)
 
-        yield dut.call_start.eq(1)
-        yield Tick()
-        yield dut.call_start.eq(0)
+        ctx.set(dut.call_start, 1)
+        await ctx.tick()
+        ctx.set(dut.call_start, 0)
 
         phase1_done = False
         mload_ack_pending = False
@@ -134,53 +138,53 @@ def _run_scenario(initial_sto, expect_fault=None):
 
         MAX_TICKS = 140
         for t in range(MAX_TICKS):
-            busy      = yield dut.call_busy
-            comp      = yield dut.call_complete
-            fault     = yield dut.call_fault
-            ftype     = yield dut.fault_type
-            rd_en     = yield dut.mem_rd_en
-            rd_addr   = yield dut.mem_rd_addr
-            wr_en     = yield dut.mem_wr_en
-            wr_addr   = yield dut.mem_wr_addr
-            wr_data   = yield dut.mem_wr_data
-            ml_start  = yield dut.mload_start
+            busy      = ctx.get(dut.call_busy)
+            comp      = ctx.get(dut.call_complete)
+            fault     = ctx.get(dut.call_fault)
+            ftype     = ctx.get(dut.fault_type)
+            rd_en     = ctx.get(dut.mem_rd_en)
+            rd_addr   = ctx.get(dut.mem_rd_addr)
+            wr_en     = ctx.get(dut.mem_wr_en)
+            wr_addr   = ctx.get(dut.mem_wr_addr)
+            wr_data   = ctx.get(dut.mem_wr_data)
+            ml_start  = ctx.get(dut.mload_start)
 
             if wr_en:
                 wr_ops.append((wr_addr, wr_data))
 
             if mload_ack_pending:
-                yield dut.mload_done.eq(0)
+                ctx.set(dut.mload_done, 0)
                 mload_ack_pending = False
                 if not phase1_done:
-                    yield dut.cr_rd_data.eq(cr6_cap)
+                    ctx.set(dut.cr_rd_data.as_value(), cr6_cap)
                     phase1_done = True
                 else:
-                    yield dut.cr_rd_data.eq(code_cap)
+                    ctx.set(dut.cr_rd_data.as_value(), code_cap)
 
             if ml_start:
-                yield dut.mload_done.eq(1)
+                ctx.set(dut.mload_done, 1)
                 mload_ack_pending = True
 
             # Respond to memory reads by address:
             if rd_en:
                 if rd_addr == THREAD_BASE and not thread_hdr_served:
                     # FETCH_THREAD_HDR: thread's own lump header at word 0
-                    yield dut.mem_rd_data.eq(thr_hdr)
-                    yield dut.mem_rd_valid.eq(1)
+                    ctx.set(dut.mem_rd_data, thr_hdr)
+                    ctx.set(dut.mem_rd_valid, 1)
                     thread_hdr_served = True
                 elif not callee_lump_served and rd_addr != SP_STORE_ADDR and rd_addr != THREAD_BASE:
                     # FETCH_LUMP: callee lump header from NS entry word3
-                    yield dut.mem_rd_data.eq(callee_lump_hdr)
-                    yield dut.mem_rd_valid.eq(1)
+                    ctx.set(dut.mem_rd_data, callee_lump_hdr)
+                    ctx.set(dut.mem_rd_valid, 1)
                     callee_lump_served = True
                 elif rd_addr == SP_STORE_ADDR:
                     # STACK_READ_SP: STO value
-                    yield dut.mem_rd_data.eq(initial_sto)
-                    yield dut.mem_rd_valid.eq(1)
+                    ctx.set(dut.mem_rd_data, initial_sto)
+                    ctx.set(dut.mem_rd_valid, 1)
                 else:
-                    yield dut.mem_rd_valid.eq(0)
+                    ctx.set(dut.mem_rd_valid, 0)
             else:
-                yield dut.mem_rd_valid.eq(0)
+                ctx.set(dut.mem_rd_valid, 0)
 
             if comp or fault:
                 if expect_fault is not None:
@@ -199,13 +203,13 @@ def _run_scenario(initial_sto, expect_fault=None):
                     )
                 break
 
-            yield Tick()
+            await ctx.tick()
         else:
             errors.append(f"FSM did not complete within {MAX_TICKS} ticks")
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
-    sim.add_process(process)
+    sim.add_testbench(process)
     sim.run()
 
     if errors:
@@ -303,28 +307,31 @@ def test_sw_parametrized():
             callee_cap = _build_cap(slot_id=1, perms=PERM_MASK_E, location=0x2000)
             ns_cap     = _build_cap(slot_id=0, perms=0, location=0x8000)
             code_cap   = _build_cap(slot_id=2, perms=PERM_MASK_E, location=0x9004)
-            cr5_cap    = _build_cap(slot_id=5, perms=0, location=SP_STORE_ADDR)
+            cr5_cap    = _build_cap(slot_id=5, perms=PERM_MASK_R | PERM_MASK_W, location=SP_STORE_ADDR)
+            cr12_cap   = _build_cap(slot_id=12, perms=0, location=THREAD_BASE)
             callee_lump_hdr = _build_lump_hdr(n_minus_6=0, cc=4, cw=8, magic=0x5)
 
-            def proc():
-                yield dut2.caller_pc.eq(CALLER_PC)
-                yield dut2.thread_base.eq(THREAD_BASE)
-                yield dut2.cr5_heap.eq(cr5_cap)
-                yield dut2.cr15_namespace.eq(ns_cap)
-                yield dut2.cr14_code.eq(code_cap)
-                yield dut2.mask.eq(0)
-                yield dut2.index.eq(0)
-                yield dut2.cr_src.eq(0)
-                yield dut2.mload_done.eq(0)
-                yield dut2.mload_fault.eq(0)
-                yield dut2.mload_fault_type.eq(0)
-                yield dut2.mem_rd_valid.eq(0)
-                yield dut2.mem_rd_data.eq(0)
-                yield dut2.cr_rd_data.eq(callee_cap)
+            async def proc(ctx):
+                ctx.set(dut2.caller_pc, CALLER_PC)
+                ctx.set(dut2.thread_base, THREAD_BASE)
+                ctx.set(dut2.cr5_heap.as_value(), cr5_cap)
+                ctx.set(dut2.cr12_thread.as_value(), cr12_cap)
+                ctx.set(dut2.cr15_namespace.as_value(), ns_cap)
+                ctx.set(dut2.cr14_code.as_value(), code_cap)
+                ctx.set(dut2.thread_hdr, thr_hdr_val)
+                ctx.set(dut2.mask, 0)
+                ctx.set(dut2.index, 0)
+                ctx.set(dut2.cr_src, 0)
+                ctx.set(dut2.mload_done, 0)
+                ctx.set(dut2.mload_fault, 0)
+                ctx.set(dut2.mload_fault_type, 0)
+                ctx.set(dut2.mem_rd_valid, 0)
+                ctx.set(dut2.mem_rd_data, 0)
+                ctx.set(dut2.cr_rd_data.as_value(), callee_cap)
 
-                yield dut2.call_start.eq(1)
-                yield Tick()
-                yield dut2.call_start.eq(0)
+                ctx.set(dut2.call_start, 1)
+                await ctx.tick()
+                ctx.set(dut2.call_start, 0)
 
                 phase1_done = False
                 mload_ack = False
@@ -332,42 +339,42 @@ def test_sw_parametrized():
                 thr_served = False
 
                 for _ in range(150):
-                    comp   = yield dut2.call_complete
-                    fault  = yield dut2.call_fault
-                    ftype  = yield dut2.fault_type
-                    rd_en  = yield dut2.mem_rd_en
-                    rd_addr= yield dut2.mem_rd_addr
-                    ml_start = yield dut2.mload_start
+                    comp   = ctx.get(dut2.call_complete)
+                    fault  = ctx.get(dut2.call_fault)
+                    ftype  = ctx.get(dut2.fault_type)
+                    rd_en  = ctx.get(dut2.mem_rd_en)
+                    rd_addr= ctx.get(dut2.mem_rd_addr)
+                    ml_start = ctx.get(dut2.mload_start)
 
                     if mload_ack:
-                        yield dut2.mload_done.eq(0)
+                        ctx.set(dut2.mload_done, 0)
                         mload_ack = False
                         if not phase1_done:
-                            yield dut2.cr_rd_data.eq(CALLEE_EGT)
+                            ctx.set(dut2.cr_rd_data.as_value(), CALLEE_EGT)
                             phase1_done = True
                         else:
-                            yield dut2.cr_rd_data.eq(code_cap)
+                            ctx.set(dut2.cr_rd_data.as_value(), code_cap)
 
                     if ml_start:
-                        yield dut2.mload_done.eq(1)
+                        ctx.set(dut2.mload_done, 1)
                         mload_ack = True
 
                     if rd_en:
                         if rd_addr == THREAD_BASE and not thr_served:
-                            yield dut2.mem_rd_data.eq(thr_hdr_val)
-                            yield dut2.mem_rd_valid.eq(1)
+                            ctx.set(dut2.mem_rd_data, thr_hdr_val)
+                            ctx.set(dut2.mem_rd_valid, 1)
                             thr_served = True
                         elif not callee_served and rd_addr != SP_STORE_ADDR and rd_addr != THREAD_BASE:
-                            yield dut2.mem_rd_data.eq(callee_lump_hdr)
-                            yield dut2.mem_rd_valid.eq(1)
+                            ctx.set(dut2.mem_rd_data, callee_lump_hdr)
+                            ctx.set(dut2.mem_rd_valid, 1)
                             callee_served = True
                         elif rd_addr == SP_STORE_ADDR:
-                            yield dut2.mem_rd_data.eq(sto_val)
-                            yield dut2.mem_rd_valid.eq(1)
+                            ctx.set(dut2.mem_rd_data, sto_val)
+                            ctx.set(dut2.mem_rd_valid, 1)
                         else:
-                            yield dut2.mem_rd_valid.eq(0)
+                            ctx.set(dut2.mem_rd_valid, 0)
                     else:
-                        yield dut2.mem_rd_valid.eq(0)
+                        ctx.set(dut2.mem_rd_valid, 0)
 
                     if comp or fault:
                         if exp_fault is not None:
@@ -381,13 +388,13 @@ def test_sw_parametrized():
                                 f"sw={sw} STO={sto_val}: unexpected fault 0x{ftype:x}"
                             )
                         break
-                    yield Tick()
+                    await ctx.tick()
                 else:
                     local_errors.append(f"sw={sw} STO={sto_val}: FSM did not complete")
 
             sim2 = Simulator(dut2)
             sim2.add_clock(1e-6)
-            sim2.add_process(proc)
+            sim2.add_testbench(proc)
             sim2.run()
 
             errors.extend(local_errors)
