@@ -31,20 +31,24 @@ LUMP_HEADER_LAYOUT = StructLayout({
 })
 
 # 4-word Namespace Entry layout (stride = slot_id << 4, i.e. 16 bytes per entry):
-#   word0_location (+0):  lump base byte address (32-bit pointer)
-#   word1_authority (+4): WORD2_LAYOUT — limit_offset[20:0] | gt_seq[6:0] | g_bit[28] | spare[31:29]
-#                         Identical bit layout to CR W2.  g_bit[28] may be set by GC without
-#                         invalidating W2 (integrity32 masks g_bit before computing the check).
-#   word2_integrity (+8): integrity32(W0, W1 with g_bit cleared) — 32-bit parallel check.
-#   word3_pad      (+12): reserved (zero), absorbs future fields without a stride change.
+#   word0_location    (+0):  lump base byte address (32-bit pointer)
+#   word1_authority   (+4):  WORD2_LAYOUT — limit_offset[20:0] | gt_seq[6:0] | g_bit[28] | spare[31:29]
+#                            Identical bit layout to CR W2.  g_bit[28] may be set by GC without
+#                            invalidating W2 (integrity32 masks g_bit before computing the check).
+#   word2_integrity   (+8):  integrity32(W0, W1 with g_bit cleared) — 32-bit parallel check.
+#   word3_abstract_gt (+12): Abstract GT — advisory annotation for the NS abstraction only.
+#                            Encodes the permission profile expected for this slot (perms[30:25];
+#                            slot_id, gt_seq, gt_type, b_flag are all zero in this word).
+#                            NOT covered by integrity32 (advisory; NS abstraction trusts it,
+#                            user-mode LOAD cannot observe it — ChurchMLoad gates on M-bit).
 #
 # The lump header (LUMP_HEADER_LAYOUT) lives at word 0 of the lump itself (at word0_location),
 # not in the NS table.  Hardware reads it via a separate memory fetch from word0_location.
 NS_ENTRY_LAYOUT = StructLayout({
-    "word0_location":  unsigned(32),
-    "word1_authority": unsigned(32),
-    "word2_integrity": unsigned(32),
-    "word3_pad":       unsigned(32),
+    "word0_location":    unsigned(32),
+    "word1_authority":   unsigned(32),
+    "word2_integrity":   unsigned(32),
+    "word3_abstract_gt": GT_LAYOUT,
 })
 
 COND_FLAGS_LAYOUT = StructLayout({

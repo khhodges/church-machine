@@ -82,6 +82,8 @@ class ChurchMLoad(Elaboratable):
         self.outform_fault_in     = Signal()
         self.outform_fault_type_in = Signal(5)  # specific outform fault code from outform_iot
 
+        self.ns_abstract_gt = Signal(32)  # NS W3 abstract GT, gated: 0 when ~m_elevated
+
     def elaborate(self, platform):
         m = Module()
 
@@ -94,6 +96,7 @@ class ChurchMLoad(Elaboratable):
         index_reg = Signal(16)
         direct_mode = Signal()
         direct_gt_reg = Signal(32)
+        m_elevated_reg = Signal()
         src_cap = Signal(CAP_REG_LAYOUT)
         result_cap = Signal(CAP_REG_LAYOUT)
         fault_type_reg = Signal(5)  # 5 bits: FaultType values up to 0x18
@@ -160,6 +163,7 @@ class ChurchMLoad(Elaboratable):
                         index_reg.eq(self.sub_index),
                         direct_mode.eq(self.sub_direct),
                         direct_gt_reg.eq(self.sub_direct_gt),
+                        m_elevated_reg.eq(self.sub_m_elevated),
                         result_cap.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
                     ]
@@ -296,6 +300,7 @@ class ChurchMLoad(Elaboratable):
             self.outform_gt_raw.eq(outform_gt_raw_reg),
             self.outform_slot_id.eq(outform_slot_id_reg),
             self.outform_clist_addr.eq(outform_clist_addr_reg),
+            self.ns_abstract_gt.eq(Mux(m_elevated_reg, u_ns_gate.raw_w3, 0)),
         ]
 
         return m

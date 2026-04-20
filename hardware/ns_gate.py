@@ -14,26 +14,27 @@ class ChurchNSGate(Elaboratable):
     acting on a Golden Token.
 
     NS entry layout (16-byte stride, slot_id << 4):
-        W0 (+0)  location   — lump base byte address
-        W1 (+4)  authority  — identical layout to CR W2 (WORD2_LAYOUT)
-                             g_bit at [28]; masked out before integrity check
-        W2 (+8)  integrity  — integrity32(W0, W1 with g_bit cleared)
-        W3 (+12) pad        — reserved; not read
+        W0 (+0)  location      — lump base byte address
+        W1 (+4)  authority     — identical layout to CR W2 (WORD2_LAYOUT)
+                                 g_bit at [28]; masked out before integrity check
+        W2 (+8)  integrity     — integrity32(W0, W1 with g_bit cleared)
+        W3 (+12) abstract_gt   — advisory permission-profile annotation; fetched
+                                 and latched into raw_w3 (ChurchMLoad gates on M-bit)
 
     FSM (seal-check enabled)
     ────────────────────────
-        IDLE → FETCH_LOC → FETCH_W1 → FETCH_W2 → CHECK_INTEGRITY → DONE
+        IDLE → FETCH_LOC → FETCH_W1 → FETCH_W2 → CHECK_INTEGRITY → FETCH_W3 → DONE
                                                                    → FAULT
 
     FSM (seal-check disabled)
     ─────────────────────────
-        IDLE → FETCH_LOC → FETCH_W1 → CHECK_VERSION → DONE → FAULT
+        IDLE → FETCH_LOC → FETCH_W1 → CHECK_VERSION → FETCH_W3 → DONE → FAULT
 
     Outputs
     ───────
         raw_base          NS W0  lump base byte address
         raw_w2            NS W1  authority (identical layout to CR W2)
-        raw_w3            0 (kept for interface compat; unused by callers)
+        raw_w3            NS W3  abstract GT annotation (M-bit gated in mLoad)
         ns_entry_addr_out byte address of the NS entry (CR15 base + slot_id << 4)
 
     All outputs are valid while ns_gate_done is asserted and remain
@@ -84,6 +85,7 @@ class ChurchNSGate(Elaboratable):
 
         raw_base_reg = Signal(32)
         raw_w2_reg   = Signal(32)
+        raw_w3_reg   = Signal(32)
 
         ns_view       = View(CAP_REG_LAYOUT, self.cr15_namespace)
         ns_entry_addr = Signal(32)
@@ -112,6 +114,7 @@ class ChurchNSGate(Elaboratable):
                         gt_latched.eq(self.gt_word0),
                         raw_base_reg.eq(0),
                         raw_w2_reg.eq(0),
+                        raw_w3_reg.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
                     ]
                     if self.enable_seal_check:
@@ -157,9 +160,18 @@ class ChurchNSGate(Elaboratable):
                         m.d.sync += fault_type_reg.eq(FaultType.SEAL)
                         m.next = "FAULT"
                     with m.Else():
-                        m.next = "DONE"
+                        m.next = "FETCH_W3"
             else:
                 with m.State("CHECK_VERSION"):
+                    m.next = "FETCH_W3"
+
+            with m.State("FETCH_W3"):
+                m.d.comb += [
+                    self.mem_addr.eq(ns_entry_addr + 12),
+                    self.mem_rd_en.eq(1),
+                ]
+                with m.If(self.mem_rd_valid):
+                    m.d.sync += raw_w3_reg.eq(self.mem_rd_data)
                     m.next = "DONE"
 
             with m.State("DONE"):
@@ -175,7 +187,7 @@ class ChurchNSGate(Elaboratable):
             self.ns_gate_fault_type.eq(fault_type_reg),
             self.raw_base.eq(raw_base_reg),
             self.raw_w2.eq(raw_w2_reg),
-            self.raw_w3.eq(0),
+            self.raw_w3.eq(raw_w3_reg),
             self.ns_entry_addr_out.eq(ns_entry_addr),
         ]
 
