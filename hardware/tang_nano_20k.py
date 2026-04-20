@@ -24,9 +24,9 @@ class GowinBSRAM(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        mem = Memory(width=32, depth=self.depth, init=[0] * self.depth)
+        mem = LibMemory(shape=unsigned(32), depth=self.depth, init=[0] * self.depth)
         m.submodules.mem = mem
-        rd_port = mem.read_port(transparent=True)
+        rd_port = mem.read_port(domain="comb")
         wr_port = mem.write_port()
 
         m.d.comb += [

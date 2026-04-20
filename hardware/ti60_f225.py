@@ -1,5 +1,6 @@
 from amaranth import *
 from amaranth.lib.data import View
+from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
@@ -92,9 +93,9 @@ class ChurchTi60F225(Elaboratable):
 
         dmem_init[511] = SLIDERULE_LUMP_HEADER
 
-        dmem = Memory(width=32, depth=2048, init=dmem_init)
+        dmem = LibMemory(shape=unsigned(32), depth=2048, init=dmem_init)
         m.submodules.dmem = dmem
-        dmem_rd = dmem.read_port(transparent=True)
+        dmem_rd = dmem.read_port(domain="comb")
         dmem_wr = dmem.write_port()
 
         mem_addr = Signal(11)
@@ -908,7 +909,7 @@ class ChurchTi60F225(Elaboratable):
 
             with m.State("RB_READ"):
                 # Assert rb_rd_en so mem_addr → rb_cur_addr (comb).
-                # BRAM has 1-cycle registered read latency even with transparent=True,
+                # BRAM has 1-cycle registered read latency even with domain="comb",
                 # so hold the address for one more cycle before latching data.
                 m.d.comb += rb_rd_en.eq(1)
                 m.next = "RB_LATCH"
