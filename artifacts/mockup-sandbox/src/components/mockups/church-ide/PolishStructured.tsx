@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Menu, Play, FastForward, RotateCcw, AlertTriangle, Zap, Footprints } from 'lucide-react';
 
 const MENU_GROUPS = [
@@ -36,6 +36,12 @@ export function PolishStructured() {
   const hoverTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeGroupData = MENU_GROUPS.find(g => g.name === activeGroup);
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
+  }, []);
 
   const handleBtnMouseEnter = () => {
     if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
