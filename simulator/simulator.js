@@ -3024,17 +3024,23 @@ class ChurchSimulator {
         }
 
         const parsed = this.parseGT(gt);
+        const required = presetMasks[presetCode];
 
-        // X⊕LSE domain-purity check: a well-formed GT must not combine X with
-        // any of L/S/E.  This mirrors the hardware tperm.py result_perms check
-        // that faults TPERM_RSV when X and (L|S|E) are both present.
-        const perms = parsed.permissions;
-        if (perms['X'] && (perms['L'] || perms['S'] || perms['E'])) {
-            this.fault('TPERM_RSV', `TPERM CR${d.crDst}: malformed GT — X may not combine with L/S/E`);
+        // X⊕LSE domain-purity check on the TPERM result permissions.
+        // Mirrors hardware tperm.py: result_perms = new_perms & target_gt.perms
+        // (i.e. only permissions present in BOTH the preset AND the GT survive).
+        // Faults TPERM_RSV if the result would combine X with any of L/S/E.
+        // No built-in preset triggers this (pressets are disjoint in X vs. L/S/E)
+        // but the check exists as a safety net, matching hardware.
+        const resultX   = required.includes('X') && !!parsed.permissions['X'];
+        const resultL   = required.includes('L') && !!parsed.permissions['L'];
+        const resultS   = required.includes('S') && !!parsed.permissions['S'];
+        const resultE   = required.includes('E') && !!parsed.permissions['E'];
+        if (resultX && (resultL || resultS || resultE)) {
+            this.fault('TPERM_RSV', `TPERM CR${d.crDst}: result would combine X with L/S/E — Church Hardware Address Range domain-purity violation`);
             return null;
         }
 
-        const required = presetMasks[presetCode];
         const hasAll = required.every(p => parsed.permissions[p] === 1);
 
         if (bSet && hasAll) {

@@ -406,17 +406,31 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #   Slot 17: (empty)
 #   Slot 18: Constants (R)  — Layer 3 read-only constants
 #
-# Church Hardware Address Range capability slots:
-# (These caps are restricted to Thread Manager and IRQ Manager C-lists only.)
+# Church Hardware Address Range capability slots (slots 19–22).
+#
+# These S-perm authority caps govern privileged CR12/CR13 writes.
+# They are deliberately NOT included in DEMO_CLIST: the Thread Manager
+# and IRQ Manager abstractions (future work) are the only permitted
+# recipients. Distributing them into those manager C-lists is covered
+# by a separate task.
+#
+# Until that task is complete, these NS entries exist so the capability
+# objects are present in the namespace and the simulator/hardware can
+# validate authority during CHANGE CR12/CR13; they are simply unreachable
+# from user-space because no DEMO_CLIST entry grants them.
 #
 #   Slot 19: CR12_PORT_CAP  — 0xFFFFFF0C, S-perm, limit=0
 #             Authority to CHANGE CR12 (thread stack).
+#             Intended recipient: Thread Manager C-list only.
 #   Slot 20: CR13_PORT_CAP  — 0xFFFFFF0D, S-perm, limit=0
 #             Authority to CHANGE CR13 (interrupt handler).
+#             Intended recipient: IRQ Manager C-list only.
 #   Slot 21: CR12_MBIT_CAP  — 0xFFFFFF1C, S-perm, limit=0
 #             Authority to set the M bit on a GT installed into CR12.
+#             Intended recipient: Thread Manager C-list only.
 #   Slot 22: CR13_MBIT_CAP  — 0xFFFFFF1D, S-perm, limit=0
 #             Authority to set the M bit on a GT installed into CR13.
+#             Intended recipient: IRQ Manager C-list only.
 #
 # Physical LED mapping (R bit = bit 0 of each word):
 #   Ti60 F225 (4 LEDs active-HIGH):

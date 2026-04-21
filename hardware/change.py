@@ -190,7 +190,7 @@ class ChurchChange(Elaboratable):
             with m.State("LATCH_CRN"):
                 m.d.sync += crn_reg_latched.eq(self.cr_rd_data)
                 m.d.comb += self.cr_rd_addr.eq(self.cr_src)
-                with m.If(self.cr_dst <= 13):
+                with m.If((self.cr_dst == 12) | (self.cr_dst == 13)):
                     # CR12/CR13 system-wide: authority check happens in next state
                     # (crn_reg_latched will be valid there)
                     m.next = "CHECK_CR12_AUTH"
