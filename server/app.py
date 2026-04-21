@@ -607,19 +607,6 @@ _RV32_ALLOWED_EXTENSIONS = {
     ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot",
 }
 
-@app.route("/rv32/")
-def rv32_index():
-    index_path = os.path.join(RISCV_CAP_DIR, "index.html")
-    if os.path.isfile(index_path):
-        return send_from_directory(RISCV_CAP_DIR, "index.html")
-    return make_response("Capability simulator not found", 404)
-
-@app.route("/rv32/<path:path>")
-def rv32_static(path):
-    ext = os.path.splitext(path)[1].lower()
-    if ext not in _RV32_ALLOWED_EXTENSIONS:
-        return make_response("Not found", 404)
-    return send_from_directory(RISCV_CAP_DIR, path)
 
 @app.route("/ctmm/")
 def ctmm_index():
@@ -709,13 +696,6 @@ def church_sim_index():
 def church_sim_static(path):
     return send_from_directory(CHURCH_SIM_DIR, path)
 
-@app.route("/test-harness/")
-def test_harness_index():
-    return send_from_directory(TEST_HARNESS_DIR, "index.html")
-
-@app.route("/test-harness/<path:path>")
-def test_harness_static(path):
-    return send_from_directory(TEST_HARNESS_DIR, path)
 
 @app.route("/business/plan.html")
 def business_plan():
