@@ -373,7 +373,7 @@ function init() {
     updateLineNumbers();
     loadNamespaceState();
     checkBootId();
-    const views = ['repl','editor','tutorial','dashboard','namespace','abstractions','lumps','pipeline','trace','reference','docs','builder'];
+    const views = ['repl','editor','tutorial','dashboard','namespace','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap'];
     const hash = window.location.hash.replace('#', '');
     let startView = views.includes(hash) ? hash : null;
     if (!startView) {

@@ -697,6 +697,38 @@ def figures_html(path):
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+CHURCH_SIM_DIR = os.path.join(BASE_DIR, "church_sim")
+TEST_HARNESS_DIR = os.path.join(BASE_DIR, "test_harness")
+BUSINESS_DIR = os.path.join(DOCS_DIR, "business")
+
+@app.route("/church-sim/")
+def church_sim_index():
+    return send_from_directory(CHURCH_SIM_DIR, "index.html")
+
+@app.route("/church-sim/<path:path>")
+def church_sim_static(path):
+    return send_from_directory(CHURCH_SIM_DIR, path)
+
+@app.route("/test-harness/")
+def test_harness_index():
+    return send_from_directory(TEST_HARNESS_DIR, "index.html")
+
+@app.route("/test-harness/<path:path>")
+def test_harness_static(path):
+    return send_from_directory(TEST_HARNESS_DIR, path)
+
+@app.route("/business/plan.html")
+def business_plan():
+    return send_from_directory(BUSINESS_DIR, "plan.html")
+
+@app.route("/business/deck.html")
+def business_deck():
+    return send_from_directory(BUSINESS_DIR, "deck.html")
+
+@app.route("/docs/patent-unified.html")
+def patent_unified():
+    return send_from_directory(DOCS_DIR, "patent-ctmm-unified.html")
+
 BOOK_CHAPTERS = [
     ("Getting Started", [
         "quick-start.md",
