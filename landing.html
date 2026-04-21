@@ -45,7 +45,6 @@
             border: 1px solid #1e2a3a;
             border-radius: 10px;
             padding: 18px 16px;
-            text-decoration: none;
             color: inherit;
             transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
             display: flex;
@@ -86,13 +85,20 @@
             background: rgba(59, 130, 246, 0.1);
             color: #60a5fa;
             border: 1px solid rgba(59, 130, 246, 0.2);
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s;
         }
+        .card .feature:hover { background: rgba(59, 130, 246, 0.22); }
         .card .arrow {
             margin-top: 12px;
             font-size: 0.78rem;
             color: #3b82f6;
             font-weight: 500;
+            text-decoration: none;
+            display: block;
         }
+        .card .arrow:hover { text-decoration: underline; }
         footer {
             margin-top: 20px;
             font-size: 0.75rem;
@@ -110,7 +116,9 @@
         Golden Tokens enforce the Church-Turing security model with clean domain separation.
     </p>
     <div class="cards">
-        <a href="/ctmm/" class="card card-ctmm">
+
+        <!-- CTMM Introduction -->
+        <div class="card card-ctmm">
             <h2>CTMM Introduction</h2>
             <div class="tag">Sim-64 &middot; Custom ISA &middot; 32-bit Golden Tokens</div>
             <p>
@@ -119,16 +127,18 @@
                 interactive tutorials. Full authentication and state persistence.
             </p>
             <div class="features">
-                <span class="feature">Custom ISA</span>
-                <span class="feature">32-bit GTs</span>
-                <span class="feature">Namespace Browser</span>
-                <span class="feature">Assembly Editor</span>
-                <span class="feature">Tutorials</span>
-                <span class="feature">Auth &amp; Save</span>
+                <a class="feature" href="/ctmm/#instructions" target="_blank" rel="noopener">Custom ISA</a>
+                <a class="feature" href="/ctmm/#capabilities" target="_blank" rel="noopener">32-bit GTs</a>
+                <a class="feature" href="/ctmm/#namespace" target="_blank" rel="noopener">Namespace Browser</a>
+                <a class="feature" href="/ctmm/#editor" target="_blank" rel="noopener">Assembly Editor</a>
+                <a class="feature" href="/ctmm/#tutorial" target="_blank" rel="noopener">Tutorials</a>
+                <a class="feature" href="/ctmm/#dashboard" target="_blank" rel="noopener">Auth &amp; Save</a>
             </div>
-            <div class="arrow">Open CTMM Simulator &rarr;</div>
-        </a>
-        <a href="/simulator/" class="card" style="background: linear-gradient(135deg, #1a2e1e 0%, #0e1a28 100%); border-color: #4ade80;">
+            <a class="arrow" href="/ctmm/" target="_blank" rel="noopener">Open CTMM Simulator &rarr;</a>
+        </div>
+
+        <!-- Church Machine IDE -->
+        <div class="card" style="background: linear-gradient(135deg, #1a2e1e 0%, #0e1a28 100%); border-color: #4ade80;">
             <h2>Church Machine</h2>
             <div class="tag" style="color: #4ade80;">Pure Church &middot; 8 Opcodes &middot; Zero Turing Instructions</div>
             <p>
@@ -138,15 +148,17 @@
                 calculus is all you need.
             </p>
             <div class="features">
-                <span class="feature" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">8 Opcodes</span>
-                <span class="feature" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Pipeline Viz</span>
-                <span class="feature" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">REPL</span>
-                <span class="feature" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Bernoulli Tutorial</span>
-                <span class="feature" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Assembler</span>
+                <a class="feature" href="/simulator/#reference" target="_blank" rel="noopener" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">8 Opcodes</a>
+                <a class="feature" href="/simulator/#pipeline" target="_blank" rel="noopener" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Pipeline Viz</a>
+                <a class="feature" href="/simulator/#repl" target="_blank" rel="noopener" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">REPL</a>
+                <a class="feature" href="/simulator/#tutorial" target="_blank" rel="noopener" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Bernoulli Tutorial</a>
+                <a class="feature" href="/simulator/#editor" target="_blank" rel="noopener" style="background: rgba(74,222,128,0.1); color: #4ade80; border-color: rgba(74,222,128,0.2);">Assembler</a>
             </div>
-            <div class="arrow" style="color: #4ade80;">Open Church Machine &rarr;</div>
-        </a>
-        <a href="/patents/" class="card" style="background: linear-gradient(135deg, #1a1e2e 0%, #2a1a28 100%); border-color: #f472b6;">
+            <a class="arrow" href="/simulator/" target="_blank" rel="noopener" style="color: #4ade80;">Open Church Machine &rarr;</a>
+        </div>
+
+        <!-- Patent Portfolio -->
+        <div class="card" style="background: linear-gradient(135deg, #1a1e2e 0%, #2a1a28 100%); border-color: #f472b6;">
             <h2>Patent Portfolio</h2>
             <div class="tag" style="color: #f472b6;">8 PDFs &middot; 45 Figures &middot; April 2026</div>
             <p>
@@ -155,14 +167,16 @@
                 print-ready PDFs on white backgrounds.
             </p>
             <div class="features">
-                <span class="feature" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">8 PDFs</span>
-                <span class="feature" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">45 Figures</span>
-                <span class="feature" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">Searchable</span>
-                <span class="feature" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">Print-Ready</span>
+                <a class="feature" href="/patents/" target="_blank" rel="noopener" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">8 PDFs</a>
+                <a class="feature" href="/patents/" target="_blank" rel="noopener" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">45 Figures</a>
+                <a class="feature" href="/patents/" target="_blank" rel="noopener" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">Searchable</a>
+                <a class="feature" href="/patents/" target="_blank" rel="noopener" style="background: rgba(244,114,182,0.1); color: #f472b6; border-color: rgba(244,114,182,0.2);">Print-Ready</a>
             </div>
-            <div class="arrow" style="color: #f472b6;">Browse Patents &rarr;</div>
-        </a>
-        <a href="/six-laws/" class="card" style="background: linear-gradient(135deg, #1e2a1a 0%, #0e1e2a 100%); border-color: #f59e0b;">
+            <a class="arrow" href="/patents/" target="_blank" rel="noopener" style="color: #f472b6;">Browse Patents &rarr;</a>
+        </div>
+
+        <!-- Six Laws Review -->
+        <div class="card" style="background: linear-gradient(135deg, #1e2a1a 0%, #0e1e2a 100%); border-color: #f59e0b;">
             <h2>Six Laws Review</h2>
             <div class="tag" style="color: #f59e0b;">Broadsheet &middot; PDF &middot; Downloadable</div>
             <p>
@@ -171,12 +185,13 @@
                 Meta-Machine and Golden Token architecture.
             </p>
             <div class="features">
-                <span class="feature" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">Broadsheet</span>
-                <span class="feature" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">Print-Ready</span>
-                <span class="feature" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">PDF</span>
+                <a class="feature" href="/six-laws/" target="_blank" rel="noopener" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">Broadsheet</a>
+                <a class="feature" href="/six-laws/" target="_blank" rel="noopener" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">Print-Ready</a>
+                <a class="feature" href="/six-laws-review.pdf" download="six-laws-review.pdf" style="background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.2);">PDF</a>
             </div>
-            <div class="arrow" style="color: #f59e0b;">View Broadsheet &rarr;</div>
-        </a>
+            <a class="arrow" href="/six-laws/" target="_blank" rel="noopener" style="color: #f59e0b;">View Broadsheet &rarr;</a>
+        </div>
+
     </div>
     <footer>
         <p>Church-Turing Meta-Machine &middot; <a href="https://sipantic.com" target="_blank" rel="noopener">SIPantic.com</a></p>

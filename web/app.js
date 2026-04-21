@@ -179,6 +179,8 @@ function switchView(viewId) {
             updateEditorRegisters();
         }
     }
+    window.location.hash = viewId;
+    try { localStorage.setItem('ctmm_lastView', viewId); } catch(e) {}
 }
 
 function switchCapView(section) {
@@ -1522,6 +1524,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loadFromStorage();
     updateDisplay();
     updateCapabilityExplorer();
+    const _ctmmViews = ['dashboard','namespace','editor','capabilities','abstractionZoom','hp35calc','instructions','tutorial','code'];
+    const _ctmmHash = window.location.hash.replace('#', '');
+    let _ctmmStart = _ctmmViews.includes(_ctmmHash) ? _ctmmHash : null;
+    if (!_ctmmStart) { try { const s = localStorage.getItem('ctmm_lastView'); if (s && _ctmmViews.includes(s)) _ctmmStart = s; } catch(e) {} }
+    if (_ctmmStart) switchView(_ctmmStart);
     log('CTMM Simulator Ready', 'info');
     
     // CR7 click handler - switch to Assembly Editor
