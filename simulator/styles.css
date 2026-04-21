@@ -49,6 +49,17 @@ header h1 {
     letter-spacing: 1px;
 }
 
+header h1 a {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+header h1 a:hover {
+    opacity: 0.75;
+}
+
 .btn-swap-sim {
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
