@@ -155,13 +155,13 @@
                         </p>
                         <p>
                             CLOOMC is designed for the <strong>32-bit clean-start CTMM</strong> — an architecture that replaces 
-                            the legacy von Neumann model with ten hardware-enforced Church instructions, each operating 
+                            the legacy von Neumann model with eleven hardware-enforced Church instructions, each operating 
                             exclusively on Golden Tokens rather than raw memory addresses.
                         </p>
                     </div>
                     
                     <div class="church-instructions-section">
-                        <h2>The 10 Church Machine Instructions</h2>
+                        <h2>The Church Machine Instruction Set</h2>
                         <p>The CTMM Church instruction set governs all capability and object access. Every instruction operates on Golden Tokens — never on raw addresses.</p>
                         <table class="church-instr-table">
                             <thead>
@@ -210,6 +210,10 @@
                                 <tr>
                                     <td><code>SWITCH</code></td>
                                     <td>Load a capability into any system register (Thread, Interrupt, Fault, or Namespace)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>TPERM</code></td>
+                                    <td>Test GT permissions and bounds — verify that a Golden Token carries the required permission bits before use</td>
                                 </tr>
                             </tbody>
                         </table>
