@@ -45,6 +45,7 @@ db.init_app(app)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIMULATOR_DIR = os.path.join(BASE_DIR, "simulator")
 DOCS_DIR = os.path.join(BASE_DIR, "docs")
+WEB_DIR = os.path.join(BASE_DIR, "web")
 
 BOOT_ID = str(uuid.uuid4())
 
@@ -599,6 +600,25 @@ def simulator_index():
 def simulator_static(path):
     filepath = os.path.join(SIMULATOR_DIR, path)
     return _serve_file(filepath, os.path.basename(path))
+
+@app.route("/ctmm/")
+def ctmm_index():
+    filepath = os.path.join(WEB_DIR, "index.html")
+    if os.path.isfile(filepath):
+        return _serve_file(filepath, "index.html")
+    return make_response("CTMM simulator not found", 404)
+
+_CTMM_ALLOWED_EXTENSIONS = {
+    ".html", ".js", ".css", ".json", ".png", ".jpg", ".jpeg",
+    ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot",
+}
+
+@app.route("/ctmm/<path:path>")
+def ctmm_static(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in _CTMM_ALLOWED_EXTENSIONS:
+        return make_response("Not found", 404)
+    return send_from_directory(WEB_DIR, path)
 
 @app.route("/docs/figures/<path:path>")
 def docs_figures(path):
