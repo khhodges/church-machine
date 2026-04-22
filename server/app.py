@@ -589,6 +589,55 @@ def boot_image_binary():
         return jsonify({"error": "boot-image.bin not generated yet"}), 404
     return send_file(BOOT_IMAGE_PATH, mimetype="application/octet-stream")
 
+@app.route("/api/boot-image/upload", methods=["POST"])
+def boot_image_upload():
+    """Accept an externally-supplied boot image binary, validate it, and save.
+
+    Request body (JSON):
+        { "data_b64": "<base64-encoded raw boot-image bytes>" }
+
+    Validates the image with validate_boot_image() before writing to disk.
+    Returns 400 with a descriptive error if the image is invalid (e.g. a
+    zeroed mandatory NS slot that would cause a BOOT fault at runtime).
+    """
+    import base64 as _b64
+    payload = request.get_json(force=True, silent=True)
+    if not payload:
+        return jsonify({"ok": False, "error": "Invalid JSON body"}), 400
+
+    data_b64 = payload.get("data_b64") or ""
+    if not data_b64:
+        return jsonify({"ok": False, "error": "Missing 'data_b64' field"}), 400
+
+    try:
+        image_bytes = _b64.b64decode(data_b64, validate=True)
+    except Exception:
+        return jsonify({"ok": False, "error": "Invalid base64 data"}), 400
+
+    if len(image_bytes) == 0:
+        return jsonify({"ok": False, "error": "Boot image is empty"}), 400
+    if len(image_bytes) % 4 != 0:
+        return jsonify({"ok": False, "error": "Boot image size must be a multiple of 4 bytes"}), 400
+
+    try:
+        _boot_image_gen.validate_boot_image(image_bytes)
+    except ValueError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+
+    try:
+        with open(BOOT_IMAGE_PATH, "wb") as f:
+            f.write(image_bytes)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Failed to write boot-image.bin: {e}"}), 500
+
+    return jsonify({
+        "ok": True,
+        "bytes": len(image_bytes),
+        "words": len(image_bytes) // 4,
+        "downloadUrl": "/api/boot-image/download",
+        "binaryUrl": "/api/boot-image/binary",
+    })
+
 @app.route("/six-laws-review.pdf")
 def six_laws_pdf():
     pdf_path = os.path.join(BASE_DIR, "six-laws-review.pdf")
