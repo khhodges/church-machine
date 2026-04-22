@@ -1072,7 +1072,17 @@ function updateGateLog() {
         // (i.e. fault came from a runtime step(), not a boot-phase _bootStep()).
         if (!pass && a.stepCtx) {
             const ctx = a.stepCtx;
-            const instrStr = `${ctx.opName}&nbsp;CR${ctx.crDst},&nbsp;CR${ctx.crSrc},&nbsp;#${ctx.imm}`;
+            let instrStr;
+            if (ctx.instrWord != null) {
+                const disasm = (assembler || new ChurchAssembler()).disassemble(ctx.instrWord);
+                if (disasm.startsWith('???')) {
+                    instrStr = `${ctx.opName}&nbsp;CR${ctx.crDst},&nbsp;CR${ctx.crSrc},&nbsp;#${ctx.imm}`;
+                } else {
+                    instrStr = disasm.replace(/ /g, '&nbsp;');
+                }
+            } else {
+                instrStr = `${ctx.opName}&nbsp;CR${ctx.crDst},&nbsp;CR${ctx.crSrc},&nbsp;#${ctx.imm}`;
+            }
             html += `<div class="gate-location">`;
             html += `<span class="gate-loc-step">Step&nbsp;#${ctx.step}</span>`;
             html += `<span class="gate-loc-sep">&middot;</span>`;
