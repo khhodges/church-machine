@@ -1271,15 +1271,18 @@ class ChurchSimulator {
                 // BOOT_ROM_WORDS[7] CALL via c-list[4]) under M-elevation so the
                 // pre-checks always run even if Boot.Thread lacks S-perm.
                 if (this.abstractionRegistry) {
-                    this.abstractionRegistry.dispatchMethod(STARTUP_CONFIG_NS_SLOT, 'Execute', this, {});
+                    const _scResult = this.abstractionRegistry.dispatchMethod(STARTUP_CONFIG_NS_SLOT, 'Execute', this, {});
+                    if (_scResult && _scResult.ok === false) {
+                        // Execute() already set ledBits = fault_count & 0x3F; preserve it.
+                        this.output += `[BOOT] STARTUP_CONFIG FAILED — ${_scResult.message || _scResult.fault || 'unknown'}. Halting.\n`;
+                        this.fault('BOOT', `Startup.Config.Execute failed: ${_scResult.message || _scResult.fault || 'unknown'}`);
+                        break;  // halt — do not set bootComplete
+                    }
                 }
 
                 this.mElevation = false;            // drop M-elevation: normal capability checks now apply to all subsequent instructions
                 this.bootComplete = true;           // signal the step-loop to stop calling _bootStep and start dispatching instructions
-                if (!(this.ledBits === 0x3F)) {
-                    // Execute() may have set ledBits to a fault code; only override on success path
-                    this.ledBits = 0b111111;
-                }
+                this.ledBits = 0b111111;            // Execute() already set ledBits=0x3F on success; keep all LEDs on
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
                 this.output += '[BOOT] COMPLETE — M-Elevation OFF. All Layer 0–1 abstractions initialized. Boot complete.\n';
                 break;

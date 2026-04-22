@@ -395,3 +395,42 @@ def test_boot_integration_gate_log_bootStepName():
     entry = _bh()["startupConfigEntry"]
     assert entry is not None
     assert entry.get("bootStepName") == "STARTUP_CONFIG"
+
+
+def test_boot_integration_execute_failure_halts_boot():
+    """If Startup.Config flags are corrupt, Execute() fails and boot halts without bootComplete."""
+    result = subprocess.run(
+        ["node", "-e", r"""
+global.window = { bootConfig: { step1: {
+    totalNamespaceWords: 16384, namespaceLumpWords: 64,
+    threadLumpWords: 256, abstractionLumpWords: 256 } } };
+const ChurchSimulator     = require('./simulator/simulator.js');
+const AbstractionRegistry = require('./simulator/abstractions.js');
+const SystemAbstractions  = require('./simulator/system_abstractions.js');
+const sim = new ChurchSimulator();
+const registry = new AbstractionRegistry();
+const sys = new SystemAbstractions(registry);
+sim.initAbstractions(registry, sys, null);
+// Corrupt the flags word (data[2]) in the Startup.Config lump so Execute() fails BAD_FLAGS.
+const scLoc = sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS];
+sim.memory[scLoc + 3] = 0xDEAD;  // data[2] = flags (must be 0)
+// Drive boot — B:05a should detect failure and halt.
+for (let i = 0; i < 32 && !sim.bootComplete && !sim.halted; i++) sim._bootStep();
+const out = {
+    bootComplete: sim.bootComplete === true,
+    halted: sim.halted === true,
+    hasFault: (sim.faultLog || []).length > 0,
+    ledBits: sim.ledBits | 0,
+};
+process.stdout.write(JSON.stringify(out) + '\n');
+"""],
+        capture_output=True,
+        timeout=30,
+        cwd=ROOT,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    data = json.loads(result.stdout.decode().strip())
+    assert data["bootComplete"] is False, "boot should NOT complete if Execute() fails"
+    assert data["halted"] is True, "simulator should halt on Execute() failure"
+    assert data["hasFault"] is True, "faultLog should be non-empty"
+    assert data["ledBits"] != 0x3F, "ledBits should encode fault count, not success"
