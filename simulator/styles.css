@@ -9240,6 +9240,12 @@ pre:hover .code-copy-btn {
     border: 1px solid rgba(160, 100, 220, 0.35);
 }
 
+.gate-lump {
+    background: rgba(150, 80, 10, 0.35);
+    color: #e8a840;
+    border: 1px solid rgba(200, 130, 30, 0.4);
+}
+
 .gate-label {
     color: #e8e0d0;
     font-weight: 500;

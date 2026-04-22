@@ -994,9 +994,15 @@ function updateGateLog() {
         const pass = a.result === 'pass';
         const isMSave = a.gate === 'mSave';
         const isNavana = a.gate.startsWith('Navana.');
+        const isLumpHdr = a.gate === 'Lump.Header';
+        let badgeClass;
+        if (isNavana)      badgeClass = 'gate-navana';
+        else if (isMSave)  badgeClass = 'gate-msave';
+        else if (isLumpHdr) badgeClass = 'gate-lump';
+        else               badgeClass = 'gate-mload';
         html += `<div class="audit-gate ${pass ? 'gate-pass' : 'gate-fail'}">`;
         html += `<div class="gate-header">`;
-        html += `<span class="gate-type-badge ${isNavana ? 'gate-navana' : (isMSave ? 'gate-msave' : 'gate-mload')}">${a.gate}</span>`;
+        html += `<span class="gate-type-badge ${badgeClass}">${a.gate}</span>`;
         html += `<span class="gate-label">NS[${a.nsIndex}] &ldquo;${a.label}&rdquo;</span>`;
         if (a.requiredPerm) html += `<span class="gate-perm-req">requires&nbsp;<b>${a.requiredPerm}</b></span>`;
         html += `<span class="gate-result ${pass ? 'result-pass' : 'result-fail'}">${pass ? '\u2713 PASS' : '\u2717 FAULT'}</span>`;
@@ -1004,7 +1010,13 @@ function updateGateLog() {
         html += `<div class="gate-checks">`;
         for (const [k, v] of Object.entries(a.checks)) {
             let label;
-            if (k === 'perm' && v.perm) {
+            if (k === 'magic') {
+                label = v.pass
+                    ? 'MAGIC'
+                    : `MAGIC&nbsp;(0x${v.rawMagic.toString(16)}&nbsp;&#x2192;&nbsp;0x1F)`;
+            } else if (k === 'cc') {
+                label = 'CC&nbsp;&gt;&nbsp;0';
+            } else if (k === 'perm' && v.perm) {
                 label = `PERM&nbsp;(${v.perm})`;
             } else if (k === 'range') {
                 if (v.address !== undefined) {
@@ -1028,7 +1040,9 @@ function updateGateLog() {
         if (!pass && isDReadWrite && !a.checks.range) {
             html += `<span class="gate-check check-skipped" title="Perm check failed before scope could be verified">&mdash;&nbsp;SCOPE&nbsp;(not&nbsp;checked)</span>`;
         }
-        html += `<span class="gate-flag">B=${a.b}</span><span class="gate-flag">F=${a.f}</span>`;
+        if (!isLumpHdr) {
+            html += `<span class="gate-flag">B=${a.b}</span><span class="gate-flag">F=${a.f}</span>`;
+        }
         html += `</div>`;
         html += `</div>`;
     }

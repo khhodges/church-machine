@@ -1168,6 +1168,24 @@ class ChurchSimulator {
                 const base     = entryNSEntry.word0_location;                       // physical base of Boot.Abstr lump
                 const hdrWord  = this.memory[base] >>> 0;                           // raw 32-bit lump header word
                 const hdr      = this.parseLumpHeader(hdrWord);                     // decode {magic, cc, cw, lumpSize, valid}
+
+                // ── Audit: record lump-header check in Gate Log ────────────────────────
+                {
+                    const magicPass = hdr.valid;
+                    const ccPass    = magicPass && (hdr.cc > 0);
+                    const lumpChecks = { magic: { pass: magicPass, rawMagic: hdr.magic } };
+                    if (magicPass) lumpChecks.cc = { pass: ccPass };
+                    this.auditLog.push({
+                        gate: 'Lump.Header',
+                        label: _b4Label,
+                        nsIndex: this.bootEntrySlot,
+                        requiredPerm: null,
+                        checks: lumpChecks,
+                        b: null, f: null,
+                        result: (magicPass && ccPass) ? 'pass' : 'fail',
+                    });
+                }
+
                 if (!hdr.valid) {
                     this.fault('LUMP_MAGIC', `LOAD_NUC: ${_b4Label} lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F) — lump not installed or memory zeroed`);
                     return false;
