@@ -131,7 +131,7 @@ are 32-bit unsigned integers.
 
 | Word | Name             | Default | Description |
 |------|------------------|---------|-------------|
-| 0    | `entry_slot`     | 3       | NS slot of the main abstraction that Execute calls. Default 3 (Boot.Abstr, a safe re-entrant default). Production systems set this to the application entry, e.g. 4 (LED flash) or 5 (Salvation). |
+| 0    | `entry_slot`     | 4       | NS slot of the main abstraction that Execute calls. Default 4 (LED flash — the first user abstraction). Must not be set to 3 (Boot.Abstr) or 2 (Startup.Config itself) as those would produce a recursive boot loop. |
 | 1    | `config_version` | *const* | Must equal `STARTUP_CONFIG_VERSION`. A mismatch causes Execute's pre-check to fault with `VERSION_MISMATCH`. |
 | 2    | `flags`          | 0       | Reserved; must be zero. |
 | 3–N  | `params[0–N-3]`  | 0       | User-defined startup parameters. params[0] at word 3 is **reserved as the fault counter** (incremented on each failed Execute pre-check, cleared by `Reset`). params[1] onwards are free. |
@@ -195,12 +195,13 @@ Return `data[0]` (the configured entry NS slot).
 
 ### SetEntry
 
-Validate the requested slot (in bounds; NS[slot] non-null), then write it to
-`data[0]`.  Takes effect on the next call to Execute (or the next restart).
+Validate the requested slot (in bounds; NS[slot] non-null; slot ≠ 2 and
+slot ≠ 3 to prevent recursive boot loops), then write it to `data[0]`.
+Takes effect on the next call to Execute (or the next restart).
 
 | DR1 in | DR2 in | DR0 out |
 |---|---|---|
-| slot (u32) | — | 0=ok, 1=OUT_OF_RANGE, 2=ENTRY_NULL |
+| slot (u32) | — | 0=ok, 1=OUT_OF_RANGE, 2=ENTRY_NULL, 3=RECURSIVE_SLOT |
 
 ### ReadParam
 
@@ -243,8 +244,9 @@ invoking Execute, e.g. after patching Startup.Config.
 
 ### Reset
 
-Restore factory defaults: `entry_slot` ← 3, `flags` ← 0, fault counter
-(`params[0]`) ← 0, all other params ← 0.  Does not modify `config_version`.
+Restore factory defaults: `entry_slot` ← 4 (LED flash), `flags` ← 0, fault
+counter (`params[0]`) ← 0, all other params ← 0.  Does not modify
+`config_version`.
 Does not clear the LED display; a subsequent successful Execute restores
 `ledBits = 0b111111`.
 
@@ -339,7 +341,7 @@ in a backward-incompatible way.
 Add `_bindStartupConfig()` called from `_bindAll()`.  Register 8 methods at
 NS slot 2 via `this.registry.bindMethod(2, name, fn)`.  Keep a module-local
 `startupConfigState` object with fields:
-`entry_slot` (default 3), `config_version` (= STARTUP_CONFIG_VERSION),
+`entry_slot` (default 4), `config_version` (= STARTUP_CONFIG_VERSION),
 `flags` (0), `data` (64-element array, data[3] = fault_count, data[4+] = user
 params, all initially 0).
 
@@ -347,10 +349,16 @@ params, all initially 0).
 then dispatch to NS[entry_slot].  On fail: `state.data[3]++`,
 `sim.ledBits = state.data[3] & 0x3F`, then `sim.fault('SELF_TEST', faultCode)`.
 
+`SetEntry`: reject slot 2 (Startup.Config) and slot 3 (Boot.Abstr) with error
+code 3 (`RECURSIVE_SLOT`) in addition to the out-of-range and null checks.
+
 `ReadParam(k)`: return `state.data[k]` for k = 0–63; 0xFFFFFFFF for k ≥ 64.
 
 `WriteParam(k, v)`: write `state.data[k]` only for k = 3–63; error 2 for
 k = 0–2; error 1 for k ≥ 64.
+
+`Reset`: set `state.data[0] = 4`, `state.data[2] = 0`, `state.data[3] = 0`,
+`state.data[4..63] = 0`.  Leave `state.data[1]` (config_version) unchanged.
 
 `Validate`: check `sim.memory[sim.NS_TABLE_BASE + N * sim.NS_ENTRY_WORDS]`
 for N = 0–3; return bitmask.
@@ -365,7 +373,7 @@ Add `STARTUP_CONFIG_NS_SLOT = 2` and `STARTUP_CONFIG_VERSION = 0x00000001`.
 Update `_MANDATORY_NS_SLOTS` to include slot 2.
 
 In `generate_boot_image()`: allocate a 64-word lump for slot 2, write the
-data region header (word 0 = 3, word 1 = STARTUP_CONFIG_VERSION, word 2 = 0,
+data region header (word 0 = 4, word 1 = STARTUP_CONFIG_VERSION, word 2 = 0,
 words 3–63 = 0), populate a non-zero NS entry at slot 2.
 
 In the Boot.Abstr lump build: set c-list[4] to the Startup.Config GT
