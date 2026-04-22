@@ -175,9 +175,10 @@ class AbstractionRegistry {
             'Thread stack for the boot thread (loaded into CR12, privileged)',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
-        this.createAbstraction(2, '(free)', 0, [],
-            'Free/null slot — Boot.Abstr director eliminated (Task #247)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
+        this.createAbstraction(2, 'Startup.Config', 0,
+            ['Execute', 'GetEntry', 'SetEntry', 'ReadParam', 'WriteParam', 'Validate', 'Version', 'Reset'],
+            'Startup configuration — patchable boot target seam; Boot.Abstr calls Execute() on every reset (Task #396)',
+            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(3, 'LED flash', 0, [],
             'LED flash — combined code (CR14) + c-list (CR6) in one slot',

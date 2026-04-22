@@ -188,10 +188,10 @@ class ChurchSimulator {
         if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
         const src = new Uint32Array(arrayBuffer);
 
-        // Format-version guard: reject binaries generated before Task #355
-        // (boot-entry metadata word at NS_TABLE_BASE - 2 introduced).
+        // Format-version guard: reject binaries generated before Task #396
+        // (Startup.Config at NS slot 2; Boot.Abstr c-list[4] wired to it).
         // Tag written by boot_image.py at mem[NS_TABLE_BASE - 1].
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0070355;  // must match boot_image.py
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0070396;  // must match boot_image.py
         const tagIdx = src.length - this.NS_TABLE_RESERVE - 1;
         if (tagIdx >= 0 && tagIdx < src.length) {
             if ((src[tagIdx] >>> 0) !== BOOT_IMAGE_FORMAT_TAG) {
@@ -770,7 +770,7 @@ class ChurchSimulator {
         return [
             { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
             { label: 'Boot.Thread',   perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
-            null,                                                                            // Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
+            { label: 'Startup.Config', perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false }, // Slot 2: Startup.Config (Task #396)
             { label: 'LED flash',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Salvation',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Navana',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
@@ -846,12 +846,11 @@ class ChurchSimulator {
         const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)      || 256;
         const BOOT_ABSTR_LUMP_SIZE = (_bcStep1 && _bcStep1.abstractionLumpWords) || 256;
         const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords)   || this.SLOT_SIZE;
-        // BOOT_ABSTR_NS_SLOT — module-level constant; slot 2 is a free/null entry (Task #247).
+        // BOOT_ABSTR_NS_SLOT — module-level constant; slot 2 is Startup.Config (Task #396).
         const slotSizes = {};
         slotSizes[0] = NS_LUMP_SIZE;
         slotSizes[1] = THREAD_LUMP_SIZE;
-        // Slot 2 (free/null) uses default SLOT_SIZE=64 so runningOffset advances normally,
-        // leaving 64 words of free heap at 0x0140-0x017F.  No NS entry is written for it.
+        // Slot 2 (Startup.Config) uses the default SLOT_SIZE=64 — no override needed.
         slotSizes[BOOT_ABSTR_NS_SLOT] = BOOT_ABSTR_LUMP_SIZE;  // Boot.Abstr: abstractionLumpWords
 
         // Boot Image Designer Step 2 (Task #215): per-slot physAddr overrides
@@ -992,9 +991,6 @@ class ChurchSimulator {
         // Memory-manager GT at c-list[0]: covers full namespace memory (NS slot 0).
         const memMgrGT = this.createGT(0, 0, {R:1, W:1, X:0, L:0, S:0, E:0}, 1);
 
-        // Slot 2 is a free/null NS entry (Boot.Abstr director eliminated — Task #247).
-        // No lump is written; the 64 free words at 0x0140-0x017F are available to the heap allocator.
-
         // ── Boot.Abstr lump (NS Slot 3) ────────────────────────────────────────────
         // The Boot Abstraction: directly loaded by B:03/B:04 (no director hop).
         //   Word  0:          Lump header (n_minus_6, cw=NUC_CODE_WORDS, cc=DEMO_CLIST_SIZE)
@@ -1015,21 +1011,40 @@ class ChurchSimulator {
             this.memory[bootEntryLoc + entryClistStart + i] = clistGTs[i];
         }
         this.memory[bootEntryLoc + entryClistStart + 0] = memMgrGT; // c-list[0] = memory-manager GT
+        // c-list[4] must point to Startup.Config (NS slot 2) so BOOT_ROM_WORDS[7] CALL
+        // dispatches to Startup.Config.Execute() on every reset (Task #396).
+        this.memory[bootEntryLoc + entryClistStart + 4] = clistGTs[2]; // c-list[4] = Startup.Config GT
         const entryCRLimit     = entryLumpSize - DEMO_CLIST_SIZE - 1;
         const entryNSBase      = this.NS_TABLE_BASE + BOOT_ABSTR_NS_SLOT * this.NS_ENTRY_WORDS;
         this.memory[entryNSBase + 1] = this.packNSWord1(entryCRLimit, 0, 0, 0, 0, 1, DEMO_CLIST_SIZE);
         this.memory[entryNSBase + 2] = this.makeVersionSeals(0, bootEntryLoc, entryCRLimit);
         this.nsClistMap[BOOT_ABSTR_NS_SLOT] = clistChildren;         // Boot.Abstr owns full capability list
 
+        // ── Startup.Config lump (NS slot 2) ───────────────────────────────────────
+        // 64-word data-only lump (no code region, no c-list).
+        // Data region layout (lump words 1-63):
+        //   word 1 (data[0]): entry_slot = 4  (NS[4] Salvation, the default boot target)
+        //   word 2 (data[1]): config_version = STARTUP_CONFIG_VERSION_INIT
+        //   word 3 (data[2]): flags = 0
+        //   word 4 (data[3]): fault_count = 0
+        //   words 5-63 (data[4-62]): user params = 0 (already zero-initialized)
+        const STARTUP_CONFIG_VERSION_INIT = 0x00000001;
+        const STARTUP_CONFIG_DEFAULT_ENTRY = 4;
+        const startupConfigLoc = this.memory[this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS];
+        this.memory[startupConfigLoc + 0] = this.packLumpHeader(0, 0, 0, 0); // 64-word lump header
+        this.memory[startupConfigLoc + 1] = STARTUP_CONFIG_DEFAULT_ENTRY;    // data[0]: entry_slot
+        this.memory[startupConfigLoc + 2] = STARTUP_CONFIG_VERSION_INIT;     // data[1]: config_version
+        // data[2..62] remain 0 (memory is zero-initialized)
+
         // Boot-entry slot: written at NS_TABLE_BASE - 2 (mirrors boot_image.py).
         // loadBootImage() reads this word and restores bootEntrySlot from the image.
         this.memory[this.NS_TABLE_BASE - 2] = this.bootEntrySlot >>> 0;
         // Format-version tag: written immediately before the NS table (at
         // NS_TABLE_BASE - 1) so that loadBootImage() can detect and reject
-        // stale binaries. Bumped to 0x355 (Task #355) — boot-entry metadata
-        // word added at NS_TABLE_BASE - 2.
+        // stale binaries. Bumped to 0x396 (Task #396) — Startup.Config at slot 2,
+        // Boot.Abstr c-list[4] rewired to Startup.Config GT.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070355;
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070396;
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 

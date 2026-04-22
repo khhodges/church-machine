@@ -47,16 +47,18 @@ SLOT_SIZE        = 0x40         # 64 words
 DEVICE_REG_LIMITS = {11: 2, 12: 5, 13: 0, 14: 4}
 
 BOOT_ABSTR_NS_SLOT   = 3   # NS slot holding the Boot Abstraction lump (Boot.Abstr)
+STARTUP_CONFIG_NS_SLOT = 2   # NS slot holding Startup.Config (Task #396)
+STARTUP_CONFIG_VERSION = 0x00000001  # data[1] schema version — bumped on breaking data-region changes
 
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
-# Slot 2 is intentionally null/free (Boot.Abstr director eliminated — Task #247)
-# and is therefore excluded from this set.
-_MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 3
+# All four foundational slots (Boot.NS, Boot.Thread, Startup.Config, Boot.Abstr)
+# are required since Task #396; Startup.Config joins the foundational quad.
+_MANDATORY_NS_SLOTS = (0, 1, STARTUP_CONFIG_NS_SLOT, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 2, 3
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
-# can reject stale binaries. Bumped to 0x247 (Task #247) when Boot.Abstr
-# director was eliminated: slot 2 is now a free/null NS entry.
-BOOT_IMAGE_FORMAT_TAG = 0xB0070355  # "BOOT 0355" — must match simulator.js; bumped Task #355 (boot-entry metadata word)
+# can reject stale binaries. Bumped to 0x396 (Task #396) when Startup.Config
+# was added at NS slot 2 and Boot.Abstr's c-list[4] was rewired to it.
+BOOT_IMAGE_FORMAT_TAG = 0xB0070396  # "BOOT 0396" — must match simulator.js; bumped Task #396
 
 # Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 # (Task #237). Written into Boot.Abstr lump code region so the binary matches
@@ -102,7 +104,7 @@ def _abstract_gt_word(perms_dict):
 DEFAULT_ABSTRACTION_CATALOG = [
     ("Boot.NS",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     ("Boot.Thread",   {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
-    None,                                                            # Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
+    ("Startup.Config", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),  # Slot 2: Startup.Config (Task #396)
     ("LED flash",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Salvation",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Navana",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
@@ -242,8 +244,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     the explicit value from the config dict when available so the check is
     exact even if the image has trailing padding.
 
-    Slot 2 is intentionally null/free (Boot.Abstr director eliminated —
-    Task #247) and is not checked.
+    All four foundational quad slots (0, 1, 2=Startup.Config, 3=Boot.Abstr)
+    are checked since Task #396.
 
     Raises:
         ValueError: if the format-version tag is wrong, any mandatory slot
@@ -390,8 +392,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     slot_sizes = {
         0: ns_size,
         1: thread_size,
-        # Slot 2 is free/null (Boot.Abstr eliminated — Task #247);
-        # it uses the default SLOT_SIZE=64 so runningOffset advances normally.
+        # Slot 2 (Startup.Config) uses the default SLOT_SIZE=64 (no override needed).
         BOOT_ABSTR_NS_SLOT: abstr_size,  # Boot.Abstr: abstractionLumpWords
     }
 
@@ -403,7 +404,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
 
         if entry is None:
-            # Free/null slot (slot 2, Task #247): advance offset but leave NS entry all-zeros.
+            # Free/null slot: advance offset but leave NS entry all-zeros.
             if i == 0:
                 running_offset = ns_size
             else:
@@ -491,9 +492,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # simulator-only and not part of the boot ROM image).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
-    # Slot 2 is a free/null NS entry (Boot.Abstr director eliminated — Task #247).
-    # No lump is written; 64 words at locations[2] (0x0140–0x017F) are heap-available.
-
     # ----- Boot.Abstr lump (NS slot 3) ------------------------------------
     # The Boot Abstraction: directly loaded by B:03/B:04 (no director hop).
     #   Word  0:      Lump header (n_minus_6, cw=NUC_CODE_WORDS, cc=DEMO_CLIST_SIZE)
@@ -512,10 +510,28 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     for i, gt in enumerate(clist_gts):
         mem[boot_entry_loc + entry_clist_start + i] = gt & 0xFFFFFFFF
     mem[boot_entry_loc + entry_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF  # c-list[0] = memory-manager GT
+    # c-list[4] must point to Startup.Config (NS slot 2) so BOOT_ROM_WORDS[7] CALL
+    # dispatches to Startup.Config.Execute() on every reset (Task #396).
+    # clist_gts[2] is the Startup.Config GT built by the for-loop above.
+    mem[boot_entry_loc + entry_clist_start + 4] = clist_gts[STARTUP_CONFIG_NS_SLOT] & 0xFFFFFFFF
     entry_cr_limit     = entry_lump_size - DEMO_CLIST_SIZE - 1
     entry_ns_base      = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
     mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 0, 1, DEMO_CLIST_SIZE)
     mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+
+    # ----- Startup.Config lump (NS slot 2) --------------------------------
+    # 64-word data-only lump (no code region, no c-list).
+    # Data region layout (lump words 1-63):
+    #   word 1 (data[0]): entry_slot = 4  (NS[4] Salvation, the default boot target)
+    #   word 2 (data[1]): config_version = STARTUP_CONFIG_VERSION
+    #   word 3 (data[2]): flags = 0
+    #   word 4 (data[3]): fault_count = 0
+    #   words 5-63 (data[4-62]): user params = 0
+    startup_config_loc = locations[STARTUP_CONFIG_NS_SLOT]
+    mem[startup_config_loc + 0] = pack_lump_header(0, 0, 0, 0)  # 64-word lump header
+    mem[startup_config_loc + 1] = 4                              # data[0]: entry_slot = 4
+    mem[startup_config_loc + 2] = STARTUP_CONFIG_VERSION         # data[1]: config_version
+    # data[2..62] remain 0 (mem is zero-initialized)
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.

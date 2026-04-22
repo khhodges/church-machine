@@ -111,13 +111,14 @@ def test_validate_boot_image_infers_total_from_length():
     validate_boot_image(image)
 
 
-def test_validate_boot_image_slot2_null_is_accepted():
-    """Slot 2 is a free/null entry — zeroing it must NOT raise."""
+def test_validate_boot_image_slot2_mandatory():
+    """Slot 2 is Startup.Config (mandatory since Task #396) — zeroing it MUST raise."""
     cfg = _default_cfg()
     image = generate_boot_image(cfg, LUMPS_DIR)
     null_image = _zero_ns_slot(image, cfg, 2)
     total = int(cfg["step1"]["totalNamespaceWords"])
-    validate_boot_image(null_image, total)
+    with pytest.raises(ValueError, match=r"mandatory NS slot 2"):
+        validate_boot_image(null_image, total)
 
 
 def test_validate_boot_image_error_message_is_descriptive():

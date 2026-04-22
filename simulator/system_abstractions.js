@@ -102,6 +102,7 @@ class SystemAbstractions {
     }
 
     _bindAll() {
+        this._bindStartupConfig();
         this._bindSalvation();
         this._bindNavana();
         this._bindMint();
@@ -115,6 +116,161 @@ class SystemAbstractions {
         this._bindSlideRuleBernoulli();
         this._bindSlideRuleExtended();
         this._bindConstants();
+    }
+
+    _bindStartupConfig() {
+        const STARTUP_CONFIG_VERSION = 0x00000001;
+        const STARTUP_CONFIG_DEFAULT_ENTRY = 4;
+
+        const state = {
+            data: new Uint32Array(64)
+        };
+        state.data[0] = STARTUP_CONFIG_DEFAULT_ENTRY; // data[0]: entry_slot = 4
+        state.data[1] = STARTUP_CONFIG_VERSION;        // data[1]: config_version
+        // data[2] = flags = 0
+        // data[3] = fault_count = 0
+        // data[4..63] = user params = 0
+
+        this.registry.bindMethod(2, 'Execute', function(sim, args) {
+            // Pre-check 1: config_version must match compiled-in constant
+            if (state.data[1] !== STARTUP_CONFIG_VERSION) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 1, fault: 'VERSION_MISMATCH',
+                         message: 'Startup.Config.Execute: VERSION_MISMATCH' };
+            }
+            // Pre-check 2: flags must be zero
+            if (state.data[2] !== 0) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 2, fault: 'BAD_FLAGS',
+                         message: 'Startup.Config.Execute: BAD_FLAGS' };
+            }
+            // Pre-check 3: entry_slot in bounds
+            const entrySlot = state.data[0];
+            if (entrySlot >= ((sim.nsCount || 0) >>> 0)) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 3, fault: 'ENTRY_OOB',
+                         message: `Startup.Config.Execute: ENTRY_OOB (slot ${entrySlot})` };
+            }
+            // Pre-check 4: NS[entry_slot] non-null
+            const entryBase = sim.NS_TABLE_BASE + entrySlot * sim.NS_ENTRY_WORDS;
+            if (!(sim.memory[entryBase] >>> 0) && !(sim.memory[entryBase + 1] >>> 0)) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 4, fault: 'ENTRY_NULL',
+                         message: `Startup.Config.Execute: ENTRY_NULL (NS[${entrySlot}])` };
+            }
+            // Pre-check 5: NS[0] non-null (word0=0 is valid for Boot.NS; check word1 too)
+            const base0 = sim.NS_TABLE_BASE + 0 * sim.NS_ENTRY_WORDS;
+            if (!(sim.memory[base0] >>> 0) && !(sim.memory[base0 + 1] >>> 0)) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 5, fault: 'NS0_MISSING',
+                         message: 'Startup.Config.Execute: NS0_MISSING' };
+            }
+            // Pre-check 6: NS[1] non-null
+            const base1 = sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS;
+            if (!(sim.memory[base1] >>> 0) && !(sim.memory[base1 + 1] >>> 0)) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 6, fault: 'NS1_MISSING',
+                         message: 'Startup.Config.Execute: NS1_MISSING' };
+            }
+            // Pre-check 7: NS[3] non-null
+            const base3 = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
+            if (!(sim.memory[base3] >>> 0) && !(sim.memory[base3 + 1] >>> 0)) {
+                state.data[3] = (state.data[3] + 1) >>> 0;
+                sim.ledBits = state.data[3] & 0x3F;
+                return { ok: false, result: 7, fault: 'NS3_MISSING',
+                         message: 'Startup.Config.Execute: NS3_MISSING' };
+            }
+            // All pre-checks passed — dispatch to configured entry slot
+            sim.ledBits = 0x3F;
+            const entryLabel = (sim.nsLabels && sim.nsLabels[entrySlot]) || `NS[${entrySlot}]`;
+            if (sim.abstractionRegistry) {
+                sim.abstractionRegistry.dispatchMethod(entrySlot, 'Execute', sim, args);
+            }
+            return { ok: true, result: 0,
+                     message: `Startup.Config.Execute → ${entryLabel}` };
+        });
+
+        this.registry.bindMethod(2, 'GetEntry', function(sim, args) {
+            return { ok: true, result: state.data[0] >>> 0,
+                     message: `Startup.Config.GetEntry → ${state.data[0]}` };
+        });
+
+        this.registry.bindMethod(2, 'SetEntry', function(sim, args) {
+            const slot = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
+            if (slot === 2 || slot === 3) {
+                return { ok: false, result: 3,
+                         message: `Startup.Config.SetEntry: RECURSIVE_SLOT (slot ${slot})` };
+            }
+            if (slot >= ((sim.nsCount || 0) >>> 0)) {
+                return { ok: false, result: 1,
+                         message: `Startup.Config.SetEntry: OUT_OF_RANGE (slot ${slot})` };
+            }
+            const base = sim.NS_TABLE_BASE + slot * sim.NS_ENTRY_WORDS;
+            if (!(sim.memory[base] >>> 0) && !(sim.memory[base + 1] >>> 0)) {
+                return { ok: false, result: 2,
+                         message: `Startup.Config.SetEntry: ENTRY_NULL (NS[${slot}])` };
+            }
+            state.data[0] = slot >>> 0;
+            return { ok: true, result: 0,
+                     message: `Startup.Config.SetEntry(${slot}) → ok` };
+        });
+
+        this.registry.bindMethod(2, 'ReadParam', function(sim, args) {
+            const key = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
+            if (key >= 64) {
+                return { ok: true, result: 0xFFFFFFFF,
+                         message: 'Startup.Config.ReadParam: KEY_OOB' };
+            }
+            return { ok: true, result: state.data[key] >>> 0,
+                     message: `Startup.Config.ReadParam(${key}) → ${state.data[key]}` };
+        });
+
+        this.registry.bindMethod(2, 'WriteParam', function(sim, args) {
+            const key   = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
+            const value = (args && args.dr2 !== undefined) ? (args.dr2 >>> 0) : 0;
+            if (key < 3) {
+                return { ok: false, result: 2,
+                         message: `Startup.Config.WriteParam: READ_ONLY (key ${key})` };
+            }
+            if (key >= 64) {
+                return { ok: false, result: 1,
+                         message: 'Startup.Config.WriteParam: KEY_OOB' };
+            }
+            state.data[key] = value >>> 0;
+            return { ok: true, result: 0,
+                     message: `Startup.Config.WriteParam(${key}, ${value}) → ok` };
+        });
+
+        this.registry.bindMethod(2, 'Validate', function(sim, args) {
+            let bitmask = 0;
+            for (let n = 0; n <= 3; n++) {
+                const base = sim.NS_TABLE_BASE + n * sim.NS_ENTRY_WORDS;
+                const w0 = sim.memory[base] >>> 0;
+                const w1 = sim.memory[base + 1] >>> 0;
+                if (w0 !== 0 || w1 !== 0) bitmask |= (1 << n);
+            }
+            return { ok: true, result: bitmask >>> 0,
+                     message: `Startup.Config.Validate → 0x${bitmask.toString(16)}` };
+        });
+
+        this.registry.bindMethod(2, 'Version', function(sim, args) {
+            return { ok: true, result: STARTUP_CONFIG_VERSION >>> 0,
+                     message: `Startup.Config.Version → 0x${STARTUP_CONFIG_VERSION.toString(16)}` };
+        });
+
+        this.registry.bindMethod(2, 'Reset', function(sim, args) {
+            state.data[0] = STARTUP_CONFIG_DEFAULT_ENTRY; // entry_slot = 4
+            state.data[2] = 0;                             // flags = 0
+            for (let k = 3; k < 64; k++) state.data[k] = 0; // fault_count + params = 0
+            // data[1] (config_version) is intentionally preserved
+            return { ok: true, result: 0, message: 'Startup.Config.Reset → ok' };
+        });
     }
 
     _bindSalvation() {
