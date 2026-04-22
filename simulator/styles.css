@@ -11824,7 +11824,16 @@ tr.itrace-fault td { color: #ff9999; }
     border-radius: 3px;
     white-space: nowrap;
     vertical-align: middle;
+    cursor: pointer;
     animation: trace-fault-label-fade 5s ease-out forwards;
+}
+.trace-fault-label:hover {
+    background: rgba(220, 80, 80, 0.22);
+    border-color: rgba(220, 80, 80, 0.7);
+}
+.trace-fault-label:hover::after {
+    content: ' \00d7';
+    font-weight: bold;
 }
 @keyframes trace-fault-label-fade {
     0%   { opacity: 1; }

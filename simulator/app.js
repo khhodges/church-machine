@@ -21627,6 +21627,8 @@ function jumpToTraceStep(stepNum, faultType) {
             const faultLabel = document.createElement('span');
             faultLabel.className = 'trace-fault-label';
             faultLabel.textContent = faultType;
+            faultLabel.title = 'Click to dismiss';
+            faultLabel.addEventListener('click', function() { faultLabel.remove(); });
             firstTd.insertBefore(faultLabel, firstTd.firstChild);
         }
         const backBtn = document.createElement('button');
