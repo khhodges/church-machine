@@ -5293,6 +5293,30 @@ a.next-step-link:hover {
     box-shadow: 0 0 8px rgba(251, 191, 36, 0.15);
 }
 
+.abs-item-idx {
+    font-family: 'Courier New', monospace;
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    min-width: 1.4rem;
+    text-align: center;
+    border-radius: 3px;
+    padding: 1px 3px;
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.abs-item-idx:hover {
+    color: #fbbf24;
+    background: rgba(251,191,36,0.12);
+}
+.abs-item-idx.boot-entry-active {
+    color: #fbbf24;
+    font-size: 0.8rem;
+    background: rgba(251,191,36,0.18);
+    box-shadow: 0 0 6px rgba(251,191,36,0.4);
+}
+
 .abs-item-name {
     font-family: 'Courier New', monospace;
     font-weight: 700;

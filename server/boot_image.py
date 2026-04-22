@@ -262,13 +262,19 @@ def _load_catalog_token_map(manifest_path):
     return out
 
 
-def generate_boot_image(cfg, lumps_dir):
+def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     """Produce the binary boot image bytes for the given config dict.
 
     `cfg` must already be Step-1 valid (target board + step1 fields).
     Step 2 / Step 3 are optional. Returns a `bytes` object whose length
     is `step1.totalNamespaceWords * 4`.
+
+    `boot_entry_slot` – NS slot the boot ROM will jump to (default: BOOT_ABSTR_NS_SLOT=3).
+    The layout always places the LED-flash lump at BOOT_ABSTR_NS_SLOT; this parameter
+    records which slot the hardware / simulator should treat as the boot entry point.
     """
+    if boot_entry_slot is None:
+        boot_entry_slot = BOOT_ABSTR_NS_SLOT
     step1 = cfg["step1"]
     total       = int(step1["totalNamespaceWords"])
     ns_size     = int(step1["namespaceLumpWords"])

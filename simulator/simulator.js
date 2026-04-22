@@ -149,6 +149,12 @@ class ChurchSimulator {
         this.systemAbstractions = null;
         this.deviceAbstractions = null;
 
+        // Which NS slot the boot sequence jumps to at B:03/B:04.
+        // Defaults to BOOT_ABSTR_NS_SLOT (3 = LED flash); overridden by app.js
+        // when the user selects a different boot-entry abstraction.
+        // Intentionally NOT reset by reset() — persists across soft resets.
+        this.bootEntrySlot = BOOT_ABSTR_NS_SLOT;
+
         this.reset();
     }
 
@@ -1093,14 +1099,16 @@ class ChurchSimulator {
             // saved to the sentinel call frame in the thread stack.
             // ════════════════════════════════════════════════════════════════════
             case 3: {
-                const gt6 = this.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for Boot.Abstr (slot 3)
-                const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates Boot.Abstr NS entry
+                const gt6 = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
+                const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
                 if (!check6.ok) {
-                    this.fault('BOOT', `INIT_ABSTR mLoad(LED flash) failed: ${check6.message}`);
+                    const _entryLabel = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
+                    this.fault('BOOT', `INIT_ABSTR mLoad(${_entryLabel}) failed: ${check6.message}`);
                     return false;
                 }
-                this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for Boot.Abstr (saved to sentinel frame in B:04)
-                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${BOOT_ABSTR_NS_SLOT}) LED flash (E, M-elevation)\n`;
+                this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:04)
+                const _initLabel = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
+                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_initLabel}) (E, M-elevation)\n`;
                 this.bootStep++;                  // advance state machine → B:04
                 this.ledBits = 0b001111;          // LED bit 3 ON = INIT_ABSTR complete
                 // ↓ fall through — B:03 and B:04 always execute together in one Step
@@ -1123,24 +1131,25 @@ class ChurchSimulator {
             //   6. Drop M-elevation and mark boot complete.
             // ════════════════════════════════════════════════════════════════════
             case 4: {
-                // ── Step 1: Direct E-perm mLoad of Boot.Abstr (NS Slot 3) ────────────
-                const bootEntryGT = this.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for Boot.Abstr
+                // ── Step 1: Direct E-perm mLoad of boot entry abstraction ────────────
+                const _b4Label    = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
+                const bootEntryGT = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
                 const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
                 if (!entryCheck.ok) {
-                    this.fault('BOOT', `LOAD_NUC mLoad(LED flash) failed: ${entryCheck.message}`);
+                    this.fault('BOOT', `LOAD_NUC mLoad(${_b4Label}) failed: ${entryCheck.message}`);
                     return false;
                 }
                 if (entryCheck.parsed.type !== 1) {                                                        // must be Inform (type=1)
-                    this.fault('BOOT', `LOAD_NUC: LED flash type is ${entryCheck.parsed.typeName}, must be Inform`);
+                    this.fault('BOOT', `LOAD_NUC: ${_b4Label} type is ${entryCheck.parsed.typeName}, must be Inform`);
                     return false;
                 }
-                const entryNSEntry  = entryCheck.entry;                             // NS entry for Boot.Abstr (slot 3)
+                const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
                 const entryNSParsed = this.parseNSWord1(entryNSEntry.word1_limit);
                 if (entryNSParsed.f === 1) {                                        // Far-lumps not supported at boot
-                    this.fault('BOOT', 'LOAD_NUC: LED flash has F-bit set (Far) — FAULT');
+                    this.fault('BOOT', `LOAD_NUC: ${_b4Label} has F-bit set (Far) — FAULT`);
                     return false;
                 }
-                const bootEntrySlot = BOOT_ABSTR_NS_SLOT;                          // = 3
+                const bootEntrySlot = this.bootEntrySlot;
 
                 // ── Step 2: Read Boot.Abstr lump header (word 0) ──────────────────────
                 const base     = entryNSEntry.word0_location;                       // physical base of Boot.Abstr lump

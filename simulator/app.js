@@ -282,6 +282,7 @@ function confirmNewTab() {
 
 function init() {
     sim = new ChurchSimulator();
+    sim.bootEntrySlot = bootEntrySlot;  // apply user-selected boot entry before first reset
     assembler = new ChurchAssembler();
     pipelineViz = new PipelineVisualizer('pipelineContainer');
     pipelineViz.setNIAProvider(() => {
@@ -3287,13 +3288,14 @@ function updateCRDetail() {
         codeHtml += '<th class="code-decompiled-hdr">Decompiled</th>';
         codeHtml += '</tr></thead><tbody>';
 
-        if (nsIdx === 3) {
+        if (nsIdx === bootEntrySlot) {
+            const _beLabel = (sim.nsLabels && sim.nsLabels[bootEntrySlot]) || `Slot ${bootEntrySlot}`;
             const _bootPreamble = [
                 { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
                 { addr: 'B:01', desc: 'LOAD_NS',     decomp: 'CR15 \u2190 NS[0] Namespace (M=1, base=0x0000, perms=none)' },
                 { addr: 'B:02', desc: 'INIT_THRD',   decomp: 'CR12 \u2190 NS[1] thread stack GT (M=1, Inform, perms=none)' },
                 { addr: 'B:02\u00BD', desc: 'CALL_HOME',  decomp: 'Tunnel.Register \u2192 23-byte packet [0xCE11, board, FW, HMAC(4), UID(8), reason, fault, NIA(4)] \u00b7 await ACK' },
-                { addr: 'B:03', desc: 'INIT_ABSTR',  decomp: 'CR6 \u2190 NS[3] Boot Abstraction (M=1, E-type, transient)' },
+                { addr: 'B:03', desc: 'INIT_ABSTR',  decomp: `CR6 \u2190 NS[${bootEntrySlot}] \u26a1 ${_beLabel} (M=1, E-type, transient)` },
                 { addr: 'B:04', desc: 'LOAD_NUC',    decomp: 'CR14(M=1, R+X) + CR6(M=1, L) \u2190 header \u00b7 push sentinel \u00b7 PC\u21900' },
                 { addr: 'B:05', desc: 'COMPLETE',    decomp: 'bootComplete \u2190 true \u00b7 new CRs get M=0 \u00b7 dispatch begins' },
             ];
@@ -3857,8 +3859,8 @@ function renderBootNSImage() {
     }
     html += '</tbody></table>';
 
-    // ── Section 3: Boot.Abstr C-list ──────────────────────────────────────
-    const bootAbstrEntry = sim.readNSEntry(3);
+    // ── Section 3: Boot-entry C-list ──────────────────────────────────────
+    const bootAbstrEntry = sim.readNSEntry(bootEntrySlot);
     if (bootAbstrEntry) {
         // Derive layout from lump header at word 0 (hardware-accurate)
         const s2loc      = bootAbstrEntry.word0_location;
@@ -3869,7 +3871,8 @@ function renderBootNSImage() {
         const lumpSzB    = s2hdr.valid ? s2hdr.lumpSize : (sim.SLOT_SIZE || 64);
         const clistStart = lumpSzB - clistCount;  // c-list at physical end
         const clistBase  = s2loc + clistStart;
-        html += `<div class="boot-section-label">③ LED flash C-list &nbsp;<span class="boot-section-note">at 0x${clistBase.toString(16).toUpperCase().padStart(4,'0')} · ${clistCount} capability entries · one GT per NS slot</span></div>`;
+        const _beLabel3 = (sim.nsLabels && sim.nsLabels[bootEntrySlot]) || `Slot ${bootEntrySlot}`;
+        html += `<div class="boot-section-label">③ \u26a1 ${_beLabel3} C-list &nbsp;<span class="boot-section-note">at 0x${clistBase.toString(16).toUpperCase().padStart(4,'0')} · ${clistCount} capability entries · one GT per NS slot</span></div>`;
         html += '<table class="ns-mem-table boot-clist-table"><thead><tr>';
         html += '<th>#</th><th>Addr</th><th>GT Word (32-bit)</th><th>Slot</th><th>Label</th><th>Perms</th><th>Type</th>';
         html += '</tr></thead><tbody>';
@@ -4597,7 +4600,11 @@ function generateBootImage() {
     if (result) result.textContent = 'Generating…';
     if (errEl)  errEl.textContent  = '';
     if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-    fetch('/api/boot-image/generate', { method: 'POST' })
+    fetch('/api/boot-image/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entrySlot: bootEntrySlot }),
+    })
         .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
         .then(({ ok, body }) => {
             if (!ok || body.ok === false) {
@@ -4881,6 +4888,7 @@ function hideNSEntryTooltip() {
 
 let selectedAbsIndex = null;
 let absCollapsedLayers = {};
+let bootEntrySlot = parseInt(localStorage.getItem('bootEntrySlot') || '3', 10);
 let userMethodData = {};
 let userMethodLists = {};
 
@@ -5298,10 +5306,11 @@ function renderAbstractions() {
                 const best = _implStatusBest(abs);
                 const dotColor = IMPL_STATUS_COLORS[best] || '#9ca3af';
                 const dotTitle = IMPL_STATUS_LABELS[best] || best;
+                const isBootEntry = abs.index === bootEntrySlot;
                 html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})">`;
                 const absProfile = _getAbstractionProfile(abs);
                 const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : 'profile-badge-iot';
-                html += `<span class="abs-item-idx">${abs.index}</span>`;
+                html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index})" title="${isBootEntry ? 'Boot entry (click to remove)' : 'Set as boot entry'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
                 html += `<span class="abs-item-name">${abs.name}</span>`;
                 html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile — ${absProfile === 'Full' ? 'Ti60 F225 only' : 'runs on both boards'}">${absProfile}</span>`;
                 html += `<span class="abs-item-dot" style="background:${dotColor};box-shadow:0 0 4px ${dotColor}80" title="${dotTitle}"></span>`;
@@ -5319,6 +5328,13 @@ function renderAbstractions() {
 
 function toggleAbsLayer(layer) {
     absCollapsedLayers[layer] = !absCollapsedLayers[layer];
+    renderAbstractions();
+}
+
+function setBootEntrySlot(idx) {
+    bootEntrySlot = idx;
+    localStorage.setItem('bootEntrySlot', String(idx));
+    if (sim) sim.bootEntrySlot = idx;
     renderAbstractions();
 }
 

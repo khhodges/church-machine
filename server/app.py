@@ -550,8 +550,15 @@ def boot_image_generate():
     cfg, err = _read_saved_boot_config()
     if err:
         return jsonify({"ok": False, "error": err}), 400
+    body = request.get_json(silent=True) or {}
+    entry_slot = body.get("entrySlot", None)
+    if entry_slot is not None:
+        try:
+            entry_slot = int(entry_slot)
+        except (TypeError, ValueError):
+            entry_slot = None
     try:
-        blob = _boot_image_gen.generate_boot_image(cfg, LUMPS_DIR)
+        blob = _boot_image_gen.generate_boot_image(cfg, LUMPS_DIR, boot_entry_slot=entry_slot)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Generator failed: {e}"}), 500
     try:
