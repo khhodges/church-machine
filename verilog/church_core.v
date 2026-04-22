@@ -338,19 +338,19 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
   wire [15:0] \boot_cr6_wr_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/core.py:312" *)
-  reg boot_cr7_wr_en;
+  reg boot_cr14_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  reg [31:0] boot_cr7_wr_gt;
+  reg [31:0] boot_cr14_wr_gt;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  wire \boot_cr7_wr_gt.b_flag ;
+  wire \boot_cr14_wr_gt.b_flag ;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  wire [6:0] \boot_cr7_wr_gt.gt_seq ;
+  wire [6:0] \boot_cr14_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  wire [1:0] \boot_cr7_wr_gt.gt_type ;
+  wire [1:0] \boot_cr14_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  wire [5:0] \boot_cr7_wr_gt.perms ;
+  wire [5:0] \boot_cr14_wr_gt.perms ;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
-  wire [15:0] \boot_cr7_wr_gt.slot_id ;
+  wire [15:0] \boot_cr14_wr_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/core.py:312" *)
   reg boot_cr8_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:313" *)
@@ -2007,19 +2007,19 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
   wire [15:0] \rt_cr6_wr_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/core.py:366" *)
-  wire rt_cr7_wr_en;
+  wire rt_cr14_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire [31:0] rt_cr7_wr_gt;
+  wire [31:0] rt_cr14_wr_gt;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire \rt_cr7_wr_gt.b_flag ;
+  wire \rt_cr14_wr_gt.b_flag ;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire [6:0] \rt_cr7_wr_gt.gt_seq ;
+  wire [6:0] \rt_cr14_wr_gt.gt_seq ;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire [1:0] \rt_cr7_wr_gt.gt_type ;
+  wire [1:0] \rt_cr14_wr_gt.gt_type ;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire [5:0] \rt_cr7_wr_gt.perms ;
+  wire [5:0] \rt_cr14_wr_gt.perms ;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
-  wire [15:0] \rt_cr7_wr_gt.slot_id ;
+  wire [15:0] \rt_cr14_wr_gt.slot_id ;
   (* src = "/home/runner/workspace/hardware/core.py:366" *)
   reg rt_cr8_wr_en;
   (* src = "/home/runner/workspace/hardware/core.py:367" *)
@@ -2503,7 +2503,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \$62  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:383" *) 3'h6;
   assign \$63  = effective_target == (* src = "/home/runner/workspace/hardware/core.py:383" *) 3'h7;
   assign cr6_gt_wr_data = boot_cr6_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:389" *) boot_cr6_wr_gt : 32'd0;
-  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:389" *) boot_cr7_wr_gt : 32'd0;
+  assign cr7_gt_wr_data = boot_cr14_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:389" *) boot_cr14_wr_gt : 32'd0;
   assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/hardware/core.py:388" *) rt_cr8_wr_en;
   assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/hardware/core.py:389" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
   assign cr15_gt_wr_en = boot_cr15_wr_en | (* src = "/home/runner/workspace/hardware/core.py:388" *) rt_cr15_wr_en;
@@ -3070,7 +3070,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
-    boot_cr7_wr_en = 1'h0;
+    boot_cr14_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
           /* empty */;
@@ -3079,12 +3079,12 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
       3'h4:
           /* empty */;
       3'h5:
-          boot_cr7_wr_en = 1'h1;
+          boot_cr14_wr_en = 1'h1;
     endcase
   end
   always @* begin
     if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
-    boot_cr7_wr_gt = 32'd0;
+    boot_cr14_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
           /* empty */;
@@ -3093,7 +3093,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
       3'h4:
           /* empty */;
       3'h5:
-          boot_cr7_wr_gt = cr7_gt;
+          boot_cr14_wr_gt = cr7_gt;
     endcase
   end
   always @* begin
@@ -3632,8 +3632,8 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign boot_cr5_wr_gt = 32'd0;
   assign rt_cr6_wr_en = 1'h0;
   assign rt_cr6_wr_gt = 32'd0;
-  assign rt_cr7_wr_en = 1'h0;
-  assign rt_cr7_wr_gt = 32'd0;
+  assign rt_cr14_wr_en = 1'h0;
+  assign rt_cr14_wr_gt = 32'd0;
   assign boot_cr9_wr_en = 1'h0;
   assign boot_cr9_wr_gt = 32'd0;
   assign boot_cr10_wr_en = 1'h0;
@@ -3921,11 +3921,11 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr7_gt.gt_type  = cr7_gt[24:23];
   assign \cr7_gt.perms  = cr7_gt[30:25];
   assign \cr7_gt.b_flag  = cr7_gt[31];
-  assign \boot_cr7_wr_gt.slot_id  = boot_cr7_wr_gt[15:0];
-  assign \boot_cr7_wr_gt.gt_seq  = boot_cr7_wr_gt[22:16];
-  assign \boot_cr7_wr_gt.gt_type  = boot_cr7_wr_gt[24:23];
-  assign \boot_cr7_wr_gt.perms  = boot_cr7_wr_gt[30:25];
-  assign \boot_cr7_wr_gt.b_flag  = boot_cr7_wr_gt[31];
+  assign \boot_cr14_wr_gt.slot_id  = boot_cr14_wr_gt[15:0];
+  assign \boot_cr14_wr_gt.gt_seq  = boot_cr14_wr_gt[22:16];
+  assign \boot_cr14_wr_gt.gt_type  = boot_cr14_wr_gt[24:23];
+  assign \boot_cr14_wr_gt.perms  = boot_cr14_wr_gt[30:25];
+  assign \boot_cr14_wr_gt.b_flag  = boot_cr14_wr_gt[31];
   assign \switch_src_gt.slot_id  = cr_rd_data[15:0];
   assign \switch_src_gt.gt_seq  = cr_rd_data[22:16];
   assign \switch_src_gt.gt_type  = cr_rd_data[24:23];
@@ -4076,11 +4076,11 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign \cr7_gt_wr_data.gt_type  = cr7_gt_wr_data[24:23];
   assign \cr7_gt_wr_data.perms  = cr7_gt_wr_data[30:25];
   assign \cr7_gt_wr_data.b_flag  = cr7_gt_wr_data[31];
-  assign \rt_cr7_wr_gt.slot_id  = 16'h0000;
-  assign \rt_cr7_wr_gt.gt_seq  = 7'h00;
-  assign \rt_cr7_wr_gt.gt_type  = 2'h0;
-  assign \rt_cr7_wr_gt.perms  = 6'h00;
-  assign \rt_cr7_wr_gt.b_flag  = 1'h0;
+  assign \rt_cr14_wr_gt.slot_id  = 16'h0000;
+  assign \rt_cr14_wr_gt.gt_seq  = 7'h00;
+  assign \rt_cr14_wr_gt.gt_type  = 2'h0;
+  assign \rt_cr14_wr_gt.perms  = 6'h00;
+  assign \rt_cr14_wr_gt.b_flag  = 1'h0;
   assign \cr8_gt_wr_data.slot_id  = cr8_gt_wr_data[15:0];
   assign \cr8_gt_wr_data.gt_seq  = cr8_gt_wr_data[22:16];
   assign \cr8_gt_wr_data.gt_type  = cr8_gt_wr_data[24:23];
@@ -4349,7 +4349,7 @@ module top(imem_valid, dmem_rd_data, boot_start, gc_start, clk, rst, imem_addr, 
   assign cr5_gt_wr_en = 1'h0;
   assign cr5_gt_wr_data = 32'd0;
   assign cr6_gt_wr_en = boot_cr6_wr_en;
-  assign cr7_gt_wr_en = boot_cr7_wr_en;
+  assign cr7_gt_wr_en = boot_cr14_wr_en;
   assign cr9_gt_wr_en = rt_cr9_wr_en;
   assign cr9_gt_wr_data = rt_cr9_wr_gt;
   assign cr10_gt_wr_en = rt_cr10_wr_en;
