@@ -9246,6 +9246,12 @@ pre:hover .code-copy-btn {
     border: 1px solid rgba(200, 130, 30, 0.4);
 }
 
+.gate-nstype {
+    background: rgba(30, 110, 80, 0.35);
+    color: #60d4a8;
+    border: 1px solid rgba(60, 180, 120, 0.4);
+}
+
 /* ── Gate Log panel title bar ───────────────────────────────────────────── */
 .gate-log-titlebar {
     display: flex;

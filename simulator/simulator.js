@@ -1154,7 +1154,9 @@ class ChurchSimulator {
                     this.fault('BOOT', `LOAD_NUC mLoad(${_b4Label}) failed: ${entryCheck.message}`);
                     return false;
                 }
-                if (entryCheck.parsed.type !== 1) {                                                        // must be Inform (type=1)
+                const _nsTypePass = entryCheck.parsed.type === 1;
+                this._auditNSType(this.bootEntrySlot, _b4Label, entryCheck.parsed.type, entryCheck.parsed.typeName);
+                if (!_nsTypePass) {                                                                         // must be Inform (type=1)
                     this.fault('TYPE', `LOAD_NUC: ${_b4Label} type is ${entryCheck.parsed.typeName}, must be Inform`);
                     return false;
                 }
@@ -3722,6 +3724,29 @@ class ChurchSimulator {
             { stage: 'PUSH',   desc: `Push 1-word frame (SZ=0): FLAGS|PC|SZ|STO`, status: 'pass' },
             { stage: 'LAMBDA', desc: `Church reduction via ${label}`, status: 'pass' },
         ];
+    }
+
+    // Push an NS.Type gate-log entry for the NS entry type check in _bootStep B:04.
+    // Called immediately after the mLoad succeeds so the outcome is always recorded,
+    // whether the type is correct (Inform, type=1) or not.
+    _auditNSType(nsIndex, label, actualType, actualTypeName) {
+        const typePass = actualType === 1;
+        this.auditLog.push({
+            gate: 'NS.Type',
+            label,
+            nsIndex,
+            requiredPerm: null,
+            checks: {
+                type: {
+                    pass: typePass,
+                    required: 'Inform',
+                    actual: actualTypeName,
+                },
+            },
+            b: null, f: null,
+            result: typePass ? 'pass' : 'fail',
+            stepCtx: this._currentInstrLabel || null,
+        });
     }
 
     // Push a Lump.Header gate-log entry for a lump header read in _bootStep B:04.

@@ -995,11 +995,13 @@ function updateGateLog() {
         const isMSave = a.gate === 'mSave';
         const isNavana = a.gate.startsWith('Navana.');
         const isLumpHdr = a.gate === 'Lump.Header';
+        const isNSType = a.gate === 'NS.Type';
         let badgeClass;
-        if (isNavana)      badgeClass = 'gate-navana';
-        else if (isMSave)  badgeClass = 'gate-msave';
+        if (isNavana)       badgeClass = 'gate-navana';
+        else if (isMSave)   badgeClass = 'gate-msave';
         else if (isLumpHdr) badgeClass = 'gate-lump';
-        else               badgeClass = 'gate-mload';
+        else if (isNSType)  badgeClass = 'gate-nstype';
+        else                badgeClass = 'gate-mload';
         html += `<div class="audit-gate ${pass ? 'gate-pass' : 'gate-fail'}">`;
         html += `<div class="gate-header">`;
         html += `<span class="gate-type-badge ${badgeClass}">${a.gate}</span>`;
@@ -1018,6 +1020,10 @@ function updateGateLog() {
                 label = 'CC';
             } else if (k === 'typ') {
                 label = 'TYPE';
+            } else if (k === 'type' && v.required !== undefined) {
+                label = v.pass
+                    ? `TYPE&nbsp;(${v.actual})`
+                    : `TYPE&nbsp;(${v.actual}&nbsp;&#x2192;&nbsp;${v.required})`;
             } else if (k === 'perm' && v.perm) {
                 label = `PERM&nbsp;(${v.perm})`;
             } else if (k === 'range') {
@@ -1042,7 +1048,7 @@ function updateGateLog() {
         if (!pass && isDReadWrite && !a.checks.range) {
             html += `<span class="gate-check check-skipped" title="Perm check failed before scope could be verified">&mdash;&nbsp;SCOPE&nbsp;(not&nbsp;checked)</span>`;
         }
-        if (!isLumpHdr) {
+        if (!isLumpHdr && !isNSType) {
             html += `<span class="gate-flag">B=${a.b}</span><span class="gate-flag">F=${a.f}</span>`;
         }
         html += `</div>`;
