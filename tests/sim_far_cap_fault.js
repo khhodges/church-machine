@@ -123,6 +123,68 @@ function fail(msg) { ERRORS.push(msg); }
                 code.toString(16).toUpperCase() + ' (correct hardware code)');
 })();
 
+// ─── Test 3: CALL instruction fires F_BIT at runtime (not just during boot) ──
+
+(function testCallFBitFaultRuntime() {
+    const sim = new ChurchSimulator();
+
+    // Boot the simulator completely so the runtime CALL path is reachable.
+    let steps = 0;
+    while (!sim.bootComplete && !sim.halted && steps < 200) {
+        sim._bootStep();
+        steps++;
+    }
+
+    if (!sim.bootComplete) {
+        fail('Boot did not complete for CALL runtime test: ' +
+             (sim.faultLog && sim.faultLog.length
+                 ? sim.faultLog[sim.faultLog.length - 1].message
+                 : '(no fault)'));
+        return;
+    }
+
+    // After boot, CR6.word0 is an E-perm GT (type=1 Inform) pointing to
+    // bootEntrySlot.  Flip the F-bit (bit 30) in that NS entry's word1.
+    // The CRC seal covers only (word0_location, limit17) — bit 30 is
+    // outside that range — so the seal stays valid, mLoad passes, and
+    // only the explicit F-bit check at simulator.js ~line 2372 fires.
+    const slotIdx = sim.bootEntrySlot;
+    const memBase = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
+    sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
+
+    // Encode a CALL CR6 instruction and write it at the fetch address for PC=0.
+    // Instruction layout: [31:27] opcode | [26:23] cond | [22:19] crDst | ...
+    //   CALL opcode = 2 (index in the simulator names array)
+    //   cond = 0xE (AL = Always)
+    //   crDst = 6  (CR6 holds the E-perm GT for bootEntrySlot)
+    const CALL_OPCODE = 2;
+    const codeBase = sim.cr[14].word1;
+    const instr = sim.encodeInstruction(CALL_OPCODE, 0xE, 6, 0, 0);
+    sim.memory[codeBase + 1] = instr >>> 0;
+
+    // Reset PC and clear halted state so step() executes our instruction.
+    sim.pc = 0;
+    sim.halted = false;
+
+    const faultsBefore = sim.faultLog.length;
+    sim.step();
+    const newFaults = sim.faultLog.slice(faultsBefore);
+
+    if (newFaults.length === 0) {
+        fail('No fault fired by CALL CR6 with F=1 in NS entry (runtime CALL path)');
+        return;
+    }
+
+    const fBitFault = newFaults.find(f => f.type === 'F_BIT');
+    if (!fBitFault) {
+        fail('Expected fault type F_BIT from runtime CALL, got: ' +
+             newFaults.map(f => f.type).join(', '));
+        return;
+    }
+
+    console.log('[PASS] CALL F_BIT runtime fault fired: "' + fBitFault.message + '"');
+})();
+
 // ─── Report ──────────────────────────────────────────────────────────────────
 
 if (ERRORS.length > 0) {

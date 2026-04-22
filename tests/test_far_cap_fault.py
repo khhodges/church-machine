@@ -1,4 +1,4 @@
-"""Simulator-level test for the Far-capability (F_BIT) fault path (Task #361).
+"""Simulator-level tests for the Far-capability (F_BIT) fault path.
 
 Exercises the JavaScript simulator via Node.js to verify:
 
@@ -6,12 +6,20 @@ Exercises the JavaScript simulator via Node.js to verify:
      the boot-entry NS slot has its F-bit set (word1 bit 30).  The CRC seal
      is computed from (location, limit17) only, so flipping bit 30 leaves
      the seal intact and allows the explicit F-bit check to be reached.
+     (Task #361)
 
   2. _FAULT_CODES['F_BIT'] in simulator/app.js resolves to 0x0F (not null),
      confirming that the hardware code is wired correctly end-to-end.
+     (Task #361)
 
-A regression in either the fault path or the code table would be caught
-here without requiring a full IDE boot.
+  3. The CALL instruction's runtime F_BIT check (simulator.js ~line 2372)
+     fires when a fully-booted simulator executes CALL CR6 and the target
+     NS entry has its F-bit set.  This covers the path that Task #361 did
+     not exercise: mLoad succeeds but the post-mLoad F-bit check in
+     _execCall halts with F_BIT.  (Task #362)
+
+A regression in any of these paths would be caught here without requiring
+a full IDE boot.
 """
 
 import os
