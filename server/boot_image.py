@@ -98,7 +98,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("Boot.NS",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     ("Boot.Thread",   {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False),
     None,                                                            # Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
-    ("Boot.Abstr",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
+    ("LED flash",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Salvation",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Navana",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Mint",          {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),

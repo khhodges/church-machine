@@ -179,8 +179,8 @@ class AbstractionRegistry {
             'Free/null slot — Boot.Abstr director eliminated (Task #247)',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
-        this.createAbstraction(3, 'Boot.Abstr', 0, [],
-            'Boot abstraction — combined code (CR14) + c-list (CR6) in one slot',
+        this.createAbstraction(3, 'LED flash', 0, [],
+            'LED flash — combined code (CR14) + c-list (CR6) in one slot',
             { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(4, 'Salvation', 1,

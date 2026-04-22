@@ -3859,7 +3859,7 @@ function renderBootNSImage() {
         const lumpSzB    = s2hdr.valid ? s2hdr.lumpSize : (sim.SLOT_SIZE || 64);
         const clistStart = lumpSzB - clistCount;  // c-list at physical end
         const clistBase  = s2loc + clistStart;
-        html += `<div class="boot-section-label">③ Boot.Abstr C-list &nbsp;<span class="boot-section-note">at 0x${clistBase.toString(16).toUpperCase().padStart(4,'0')} · ${clistCount} capability entries · one GT per NS slot</span></div>`;
+        html += `<div class="boot-section-label">③ LED flash C-list &nbsp;<span class="boot-section-note">at 0x${clistBase.toString(16).toUpperCase().padStart(4,'0')} · ${clistCount} capability entries · one GT per NS slot</span></div>`;
         html += '<table class="ns-mem-table boot-clist-table"><thead><tr>';
         html += '<th>#</th><th>Addr</th><th>GT Word (32-bit)</th><th>Slot</th><th>Label</th><th>Perms</th><th>Type</th>';
         html += '</tr></thead><tbody>';

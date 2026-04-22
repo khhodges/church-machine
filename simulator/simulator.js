@@ -753,7 +753,7 @@ class ChurchSimulator {
             { label: 'Boot.NS',      perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
             { label: 'Boot.Thread',   perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false },
             null,                                                                            // Slot 2: free/null (Boot.Abstr director eliminated — Task #247)
-            { label: 'Boot.Abstr',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { label: 'LED flash',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Salvation',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Navana',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Mint',          perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
@@ -1096,11 +1096,11 @@ class ChurchSimulator {
                 const gt6 = this.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for Boot.Abstr (slot 3)
                 const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates Boot.Abstr NS entry
                 if (!check6.ok) {
-                    this.fault('BOOT', `INIT_ABSTR mLoad(Boot.Abstr) failed: ${check6.message}`);
+                    this.fault('BOOT', `INIT_ABSTR mLoad(LED flash) failed: ${check6.message}`);
                     return false;
                 }
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for Boot.Abstr (saved to sentinel frame in B:04)
-                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${BOOT_ABSTR_NS_SLOT}) Boot.Abstr (E, M-elevation)\n`;
+                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${BOOT_ABSTR_NS_SLOT}) LED flash (E, M-elevation)\n`;
                 this.bootStep++;                  // advance state machine → B:04
                 this.ledBits = 0b001111;          // LED bit 3 ON = INIT_ABSTR complete
                 // ↓ fall through — B:03 and B:04 always execute together in one Step
@@ -1127,17 +1127,17 @@ class ChurchSimulator {
                 const bootEntryGT = this.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for Boot.Abstr
                 const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
                 if (!entryCheck.ok) {
-                    this.fault('BOOT', `LOAD_NUC mLoad(Boot.Abstr) failed: ${entryCheck.message}`);
+                    this.fault('BOOT', `LOAD_NUC mLoad(LED flash) failed: ${entryCheck.message}`);
                     return false;
                 }
                 if (entryCheck.parsed.type !== 1) {                                                        // must be Inform (type=1)
-                    this.fault('BOOT', `LOAD_NUC: Boot.Abstr type is ${entryCheck.parsed.typeName}, must be Inform`);
+                    this.fault('BOOT', `LOAD_NUC: LED flash type is ${entryCheck.parsed.typeName}, must be Inform`);
                     return false;
                 }
                 const entryNSEntry  = entryCheck.entry;                             // NS entry for Boot.Abstr (slot 3)
                 const entryNSParsed = this.parseNSWord1(entryNSEntry.word1_limit);
                 if (entryNSParsed.f === 1) {                                        // Far-lumps not supported at boot
-                    this.fault('BOOT', 'LOAD_NUC: Boot.Abstr has F-bit set (Far) — FAULT');
+                    this.fault('BOOT', 'LOAD_NUC: LED flash has F-bit set (Far) — FAULT');
                     return false;
                 }
                 const bootEntrySlot = BOOT_ABSTR_NS_SLOT;                          // = 3
@@ -1147,7 +1147,7 @@ class ChurchSimulator {
                 const hdrWord  = this.memory[base] >>> 0;                           // raw 32-bit lump header word
                 const hdr      = this.parseLumpHeader(hdrWord);                     // decode {magic, cc, cw, lumpSize, valid}
                 if (!hdr.valid) {
-                    this.fault('BOOT', `LOAD_NUC: Boot.Abstr lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F)`);
+                    this.fault('BOOT', `LOAD_NUC: LED flash lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F)`);
                     return false;
                 }
                 const cw         = hdr.cw;                                          // code-word count
@@ -1155,7 +1155,7 @@ class ChurchSimulator {
                 const lumpSz     = hdr.lumpSize;                                    // total lump size in 32-bit words
                 const clistStart = lumpSz - cc;                                     // c-list begins at physical end of lump
                 if (cc === 0) {
-                    this.fault('BOOT', 'LOAD_NUC: Boot.Abstr lump header cc=0 — no C-List');
+                    this.fault('BOOT', 'LOAD_NUC: LED flash lump header cc=0 — no C-List');
                     return false;
                 }
 
@@ -1204,7 +1204,7 @@ class ChurchSimulator {
 
                 // ── Step 5: Set PC and emit log ───────────────────────────────────────
                 this.pc = 0;
-                this.output += `[BOOT] LOAD_NUC — Boot.Abstr Slot ${bootEntrySlot} hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← Boot.Abstr lump header; CR14(X,cw=${cw},lim=0..${cw-1}) CR6(E,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
+                this.output += `[BOOT] LOAD_NUC — LED flash Slot ${bootEntrySlot} hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← LED flash lump header; CR14(X,cw=${cw},lim=0..${cw-1}) CR6(E,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
                 this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
 
                 // ── Step 6 (B:05): COMPLETE ───────────────────────────────────────────
@@ -3835,7 +3835,7 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== HARDWARE BINARY LOADED (Tang Nano 20K) ===\n';
         this.output += `Namespace: ${nsEntryCount} entries written to NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `Boot.Abstr: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `LED flash: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += `Boot ROM: ${hwProgram.length} instructions at code region 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}\n`;
         if (abstractions) {
             for (const abs of abstractions) {
@@ -3862,7 +3862,7 @@ class ChurchSimulator {
                            (p.permissions.E ? 'E':'');
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'------').padEnd(6)} -> idx ${p.index}\n`;
         }
-        this.output += `\n--- CLOOMC Code (Boot.Abstr code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+        this.output += `\n--- CLOOMC Code (LED flash code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
         for (let i = 0; i < hwProgram.length; i++) {
             const w = hwProgram[i] >>> 0;
             if (w === 0) continue;
@@ -3958,7 +3958,7 @@ class ChurchSimulator {
         this.output = '';
         this.output += '=== BINARY IMAGE LOADED ===\n';
         this.output += `Namespace: ${nsEntryCount} entries at NS_TABLE_BASE (0x${this.NS_TABLE_BASE.toString(16).toUpperCase()})\n`;
-        this.output += `Boot.Abstr: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
+        this.output += `LED flash: code at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}, C-List (${abstrClistCount} GTs) at 0x${(abstrLoc + abstrClistStart).toString(16).padStart(4,'0').toUpperCase()}\n`;
         this.output += '\n--- Namespace Entries ---\n';
         for (let i = 0; i < nsEntryCount; i++) {
             const base = this.NS_TABLE_BASE + i * this.NS_ENTRY_WORDS;
@@ -3980,7 +3980,7 @@ class ChurchSimulator {
             this.output += `  [${i}] 0x${gt.toString(16).padStart(8,'0')} ${p.typeName.padEnd(8)} ${(permStr||'-------').padEnd(7)} -> idx ${p.index}\n`;
         }
         if (hwBoot) {
-            this.output += `\n--- CLOOMC Code (Boot.Abstr code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
+            this.output += `\n--- CLOOMC Code (LED flash code region, at 0x${abstrLoc.toString(16).padStart(4,'0').toUpperCase()}) ---\n`;
             for (let i = 0; i < hwBoot.length; i++) {
                 const w = hwBoot[i] >>> 0;
                 if (w === 0) continue;
