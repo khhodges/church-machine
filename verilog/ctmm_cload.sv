@@ -366,7 +366,7 @@ module ctmm_cload
             end
 
             CL_WRITE_CR14: begin
-                cr_wr_addr = CR_CODE;
+                cr_wr_addr = CR_CLOOMC;
                 cr_wr_data = cr14_out;
                 cr_wr_en   = 1'b1;
             end

@@ -133,7 +133,7 @@ module ctmm_registers
     
     // Special register outputs
     assign cr6_clist      = cap_regs[CR_CLIST];
-    assign cr7_cloomc     = cap_regs[CR_CLOOMC];
+    assign cr7_cloomc     = cap_regs[CR_NUCLEUS];
     assign cr8_thread     = cap_regs[CR_THREAD];
     assign cr12_cap       = cap_regs[12];
     assign cr15_namespace = cap_regs[CR_NAMESPACE];
@@ -162,7 +162,7 @@ module ctmm_registers
             // Special register GT writes (Word 0 only)
             // Used by boot sequence and SWITCH/CHANGE instructions
             if (cr6_wr_en)  cap_regs[CR_CLIST].word0_gt <= cr6_wr_data;
-            if (cr7_wr_en)  cap_regs[CR_CLOOMC].word0_gt <= cr7_wr_data;
+            if (cr7_wr_en)  cap_regs[CR_NUCLEUS].word0_gt <= cr7_wr_data;
             if (cr8_wr_en)  cap_regs[CR_THREAD].word0_gt <= cr8_wr_data;
             if (cr9_wr_en)  cap_regs[9].word0_gt <= cr9_wr_data;
             if (cr10_wr_en) cap_regs[10].word0_gt <= cr10_wr_data;
