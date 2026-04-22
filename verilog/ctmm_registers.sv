@@ -59,8 +59,6 @@ module ctmm_registers
     // Used by boot sequence and SWITCH/CHANGE instructions
     input  golden_token_t   cr6_wr_data,      // Write GT to CR6
     input  logic            cr6_wr_en,
-    input  golden_token_t   cr7_wr_data,      // Write GT to CR7
-    input  logic            cr7_wr_en,
     input  golden_token_t   cr8_wr_data,      // Write GT to CR8
     input  logic            cr8_wr_en,
     input  golden_token_t   cr9_wr_data,      // Write GT to CR9 (Interrupt)
@@ -73,7 +71,7 @@ module ctmm_registers
     input  logic            cr12_wr_en,
     input  golden_token_t   cr13_wr_data,     // Write GT to CR13 (reserved)
     input  logic            cr13_wr_en,
-    input  golden_token_t   cr14_wr_data,     // Write GT to CR14 (reserved)
+    input  golden_token_t   cr14_wr_data,     // Write GT to CR14 (CLOOMC Nucleus)
     input  logic            cr14_wr_en,
     input  golden_token_t   cr15_wr_data,     // Write GT to CR15
     input  logic            cr15_wr_en,
@@ -162,7 +160,6 @@ module ctmm_registers
             // Special register GT writes (Word 0 only)
             // Used by boot sequence and SWITCH/CHANGE instructions
             if (cr6_wr_en)  cap_regs[CR_CLIST].word0_gt <= cr6_wr_data;
-            if (cr7_wr_en)  cap_regs[CR_NUCLEUS].word0_gt <= cr7_wr_data;
             if (cr8_wr_en)  cap_regs[CR_THREAD].word0_gt <= cr8_wr_data;
             if (cr9_wr_en)  cap_regs[9].word0_gt <= cr9_wr_data;
             if (cr10_wr_en) cap_regs[10].word0_gt <= cr10_wr_data;

@@ -66,9 +66,9 @@ module ctmm_core
     logic        cr_wr_en;
     golden_token_t cr6_clist, cr14_cloomc, cr8_thread, cr15_namespace;
     capability_reg_t cr12_cap;  // Full CR12 for THREAD_HDR: word1_location = incoming thread lump base
-    golden_token_t cr6_wr_data, cr7_wr_data, cr8_wr_data, cr15_wr_data;
+    golden_token_t cr6_wr_data, cr8_wr_data, cr15_wr_data;
     golden_token_t cr9_wr_data, cr10_wr_data, cr11_wr_data, cr12_wr_data, cr13_wr_data, cr14_wr_data;
-    logic        cr6_wr_en, cr7_wr_en, cr8_wr_en, cr15_wr_en;
+    logic        cr6_wr_en, cr8_wr_en, cr15_wr_en;
     logic        cr9_wr_en, cr10_wr_en, cr11_wr_en, cr12_wr_en, cr13_wr_en, cr14_wr_en;
     
     logic [3:0]  dr_rd_addr1, dr_rd_addr2, dr_wr_addr;
@@ -156,8 +156,6 @@ module ctmm_core
         .cr12_cap       (cr12_cap),
         .cr6_wr_data    (cr6_wr_data),
         .cr6_wr_en      (cr6_wr_en),
-        .cr7_wr_data    (cr7_wr_data),
-        .cr7_wr_en      (cr7_wr_en),
         .cr8_wr_data    (cr8_wr_data),
         .cr8_wr_en      (cr8_wr_en),
         .cr9_wr_data    (cr9_wr_data),
@@ -367,7 +365,6 @@ module ctmm_core
     // Boot sequence register loading
     always_comb begin
         cr6_wr_en = 1'b0;  cr6_wr_data = GT_NULL;
-        cr7_wr_en = 1'b0;  cr7_wr_data = GT_NULL;
         cr8_wr_en = 1'b0;  cr8_wr_data = GT_NULL;
         cr9_wr_en = 1'b0;  cr9_wr_data = GT_NULL;
         cr10_wr_en = 1'b0; cr10_wr_data = GT_NULL;
