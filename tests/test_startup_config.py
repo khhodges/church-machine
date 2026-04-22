@@ -252,6 +252,37 @@ def test_method_Execute_passes_all_prechecks():
     assert _h()["Execute_ok"]["ok"] is True
 
 
+def test_method_Execute_fault_bad_flags_returns_error():
+    """Execute with non-zero flags returns ok=False, result=2 (BAD_FLAGS)."""
+    r = _h()["Execute_fault_bad_flags"]
+    assert r["ok"] is False
+    assert r["result"] == 2
+
+
+def test_method_Execute_fault_increments_fault_count_in_memory():
+    """Execute pre-check failure increments fault_count in the lump's data region."""
+    assert _h()["Execute_fault_count_incremented"] is True
+
+
+# ---------------------------------------------------------------------------
+# Gate log / audit trail tests
+# ---------------------------------------------------------------------------
+
+def test_execute_adds_entry_to_audit_log():
+    """Execute() writes a 'Startup.Config.Execute' gate entry to the simulator audit log."""
+    assert _h()["auditLog_has_startup_config"] is True
+
+
+def test_execute_audit_log_entry_dispatches_to_entry_slot():
+    """The audit log entry records the configured entry slot (default 4)."""
+    assert _h()["auditLog_entry_nsIndex"] == 4
+
+
+def test_execute_audit_log_entry_result_is_pass():
+    """The audit log entry has result='PASS' on a clean Execute."""
+    assert _h()["auditLog_entry_result"] == "PASS"
+
+
 # ---------------------------------------------------------------------------
 # Integration tests
 # ---------------------------------------------------------------------------

@@ -119,76 +119,102 @@ class SystemAbstractions {
     }
 
     _bindStartupConfig() {
+        // Startup.Config lump data layout (lump word = NS slot 2 physical location + offset):
+        //   lump[0]  : lump header (packLumpHeader result — 0 for data-only)
+        //   lump[1]  : data[0] = entry_slot  (default 4 = NS[4] LED flash, the first user abstraction)
+        //   lump[2]  : data[1] = config_version (STARTUP_CONFIG_VERSION = 0x00000001)
+        //   lump[3]  : data[2] = flags (reserved, must be 0)
+        //   lump[4]  : data[3] = fault_count (incremented on Execute pre-check failure)
+        //   lump[5..63] : data[4..62] = user params (R/W via ReadParam/WriteParam)
+        //
+        // Default entry_slot is 4 (NS[4] = LED flash), NOT 3 (Boot.Abstr).
+        // Slot 3 is rejected by SetEntry as RECURSIVE_SLOT because Boot.Abstr calls
+        // Startup.Config.Execute(), making slot 3 → Boot.Abstr → slot 2 → slot 3 recursive.
+        //
+        // All state is stored in sim.memory at the slot-2 lump location so that
+        // boot images loaded via loadBootImage() (which may have a different initial
+        // entry_slot or user params) are authoritative.  Methods read/write lump memory
+        // directly instead of keeping a separate closure array.
         const STARTUP_CONFIG_VERSION = 0x00000001;
         const STARTUP_CONFIG_DEFAULT_ENTRY = 4;
 
-        const state = {
-            data: new Uint32Array(64)
-        };
-        state.data[0] = STARTUP_CONFIG_DEFAULT_ENTRY; // data[0]: entry_slot = 4
-        state.data[1] = STARTUP_CONFIG_VERSION;        // data[1]: config_version
-        // data[2] = flags = 0
-        // data[3] = fault_count = 0
-        // data[4..63] = user params = 0
+        function lumpLoc(sim) {
+            return sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] >>> 0;
+        }
+        function getData(sim, key) {
+            return sim.memory[lumpLoc(sim) + 1 + key] >>> 0;
+        }
+        function setData(sim, key, value) {
+            sim.memory[lumpLoc(sim) + 1 + key] = value >>> 0;
+        }
+        function bumpFaultCount(sim) {
+            const fc = (getData(sim, 3) + 1) >>> 0;
+            setData(sim, 3, fc);
+            sim.ledBits = fc & 0x3F;
+            return fc;
+        }
 
         this.registry.bindMethod(2, 'Execute', function(sim, args) {
             // Pre-check 1: config_version must match compiled-in constant
-            if (state.data[1] !== STARTUP_CONFIG_VERSION) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+            if (getData(sim, 1) !== STARTUP_CONFIG_VERSION) {
+                bumpFaultCount(sim);
                 return { ok: false, result: 1, fault: 'VERSION_MISMATCH',
                          message: 'Startup.Config.Execute: VERSION_MISMATCH' };
             }
             // Pre-check 2: flags must be zero
-            if (state.data[2] !== 0) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+            if (getData(sim, 2) !== 0) {
+                bumpFaultCount(sim);
                 return { ok: false, result: 2, fault: 'BAD_FLAGS',
                          message: 'Startup.Config.Execute: BAD_FLAGS' };
             }
             // Pre-check 3: entry_slot in bounds
-            const entrySlot = state.data[0];
+            const entrySlot = getData(sim, 0);
             if (entrySlot >= ((sim.nsCount || 0) >>> 0)) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+                bumpFaultCount(sim);
                 return { ok: false, result: 3, fault: 'ENTRY_OOB',
                          message: `Startup.Config.Execute: ENTRY_OOB (slot ${entrySlot})` };
             }
             // Pre-check 4: NS[entry_slot] non-null
             const entryBase = sim.NS_TABLE_BASE + entrySlot * sim.NS_ENTRY_WORDS;
             if (!(sim.memory[entryBase] >>> 0) && !(sim.memory[entryBase + 1] >>> 0)) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+                bumpFaultCount(sim);
                 return { ok: false, result: 4, fault: 'ENTRY_NULL',
                          message: `Startup.Config.Execute: ENTRY_NULL (NS[${entrySlot}])` };
             }
-            // Pre-check 5: NS[0] non-null (word0=0 is valid for Boot.NS; check word1 too)
+            // Pre-check 5: NS[0] non-null (Boot.NS lives at address 0 so word0=0 is valid; check word1 too)
             const base0 = sim.NS_TABLE_BASE + 0 * sim.NS_ENTRY_WORDS;
             if (!(sim.memory[base0] >>> 0) && !(sim.memory[base0 + 1] >>> 0)) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+                bumpFaultCount(sim);
                 return { ok: false, result: 5, fault: 'NS0_MISSING',
                          message: 'Startup.Config.Execute: NS0_MISSING' };
             }
             // Pre-check 6: NS[1] non-null
             const base1 = sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS;
             if (!(sim.memory[base1] >>> 0) && !(sim.memory[base1 + 1] >>> 0)) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+                bumpFaultCount(sim);
                 return { ok: false, result: 6, fault: 'NS1_MISSING',
                          message: 'Startup.Config.Execute: NS1_MISSING' };
             }
             // Pre-check 7: NS[3] non-null
             const base3 = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
             if (!(sim.memory[base3] >>> 0) && !(sim.memory[base3 + 1] >>> 0)) {
-                state.data[3] = (state.data[3] + 1) >>> 0;
-                sim.ledBits = state.data[3] & 0x3F;
+                bumpFaultCount(sim);
                 return { ok: false, result: 7, fault: 'NS3_MISSING',
                          message: 'Startup.Config.Execute: NS3_MISSING' };
             }
             // All pre-checks passed — dispatch to configured entry slot
             sim.ledBits = 0x3F;
             const entryLabel = (sim.nsLabels && sim.nsLabels[entrySlot]) || `NS[${entrySlot}]`;
+            if (sim.auditLog) {
+                sim.auditLog.push({
+                    gate: 'Startup.Config.Execute',
+                    label: entryLabel,
+                    nsIndex: entrySlot,
+                    result: 'PASS',
+                    checks: null,
+                    bootStepName: 'STARTUP_CONFIG',
+                });
+            }
             if (sim.abstractionRegistry) {
                 sim.abstractionRegistry.dispatchMethod(entrySlot, 'Execute', sim, args);
             }
@@ -197,8 +223,9 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(2, 'GetEntry', function(sim, args) {
-            return { ok: true, result: state.data[0] >>> 0,
-                     message: `Startup.Config.GetEntry → ${state.data[0]}` };
+            const val = getData(sim, 0);
+            return { ok: true, result: val,
+                     message: `Startup.Config.GetEntry → ${val}` };
         });
 
         this.registry.bindMethod(2, 'SetEntry', function(sim, args) {
@@ -216,7 +243,7 @@ class SystemAbstractions {
                 return { ok: false, result: 2,
                          message: `Startup.Config.SetEntry: ENTRY_NULL (NS[${slot}])` };
             }
-            state.data[0] = slot >>> 0;
+            setData(sim, 0, slot);
             return { ok: true, result: 0,
                      message: `Startup.Config.SetEntry(${slot}) → ok` };
         });
@@ -227,8 +254,8 @@ class SystemAbstractions {
                 return { ok: true, result: 0xFFFFFFFF,
                          message: 'Startup.Config.ReadParam: KEY_OOB' };
             }
-            return { ok: true, result: state.data[key] >>> 0,
-                     message: `Startup.Config.ReadParam(${key}) → ${state.data[key]}` };
+            return { ok: true, result: getData(sim, key),
+                     message: `Startup.Config.ReadParam(${key}) → ${getData(sim, key)}` };
         });
 
         this.registry.bindMethod(2, 'WriteParam', function(sim, args) {
@@ -242,12 +269,15 @@ class SystemAbstractions {
                 return { ok: false, result: 1,
                          message: 'Startup.Config.WriteParam: KEY_OOB' };
             }
-            state.data[key] = value >>> 0;
+            setData(sim, key, value);
             return { ok: true, result: 0,
                      message: `Startup.Config.WriteParam(${key}, ${value}) → ok` };
         });
 
         this.registry.bindMethod(2, 'Validate', function(sim, args) {
+            // Returns a 4-bit bitmask for NS slots 0-3 (the foundational quad).
+            // Bit N is set iff NS[N] is non-null (word0 ≠ 0 OR word1 ≠ 0).
+            // Healthy boot image → all four slots present → 0xF.
             let bitmask = 0;
             for (let n = 0; n <= 3; n++) {
                 const base = sim.NS_TABLE_BASE + n * sim.NS_ENTRY_WORDS;
@@ -265,10 +295,10 @@ class SystemAbstractions {
         });
 
         this.registry.bindMethod(2, 'Reset', function(sim, args) {
-            state.data[0] = STARTUP_CONFIG_DEFAULT_ENTRY; // entry_slot = 4
-            state.data[2] = 0;                             // flags = 0
-            for (let k = 3; k < 64; k++) state.data[k] = 0; // fault_count + params = 0
-            // data[1] (config_version) is intentionally preserved
+            setData(sim, 0, STARTUP_CONFIG_DEFAULT_ENTRY); // entry_slot = 4 (LED flash, default)
+            setData(sim, 2, 0);                             // flags = 0
+            for (let k = 3; k < 64; k++) setData(sim, k, 0); // fault_count + user params = 0
+            // data[1] (config_version) is intentionally preserved across Reset
             return { ok: true, result: 0, message: 'Startup.Config.Reset → ok' };
         });
     }

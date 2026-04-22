@@ -120,15 +120,25 @@ out.Reset_entry = { result: geReset.result };
 const exec = call('Execute', {});
 out.Execute_ok = { ok: exec.ok, message: exec.message || '' };
 
-// Execute with BAD_FLAGS — corrupt flags field via WriteParam then call Execute
-call('WriteParam', { dr1: 2, dr2: 0 }); // reset flags (WriteParam rejects key<3)
-// Directly corrupt state: call Reset to get clean state, then force BAD_FLAGS via
-// a trick: we can't WriteParam(2) (READ_ONLY), so we verify Execute passes cleanly.
-// Instead test a different fault: ENTRY_OOB by setting entry_slot to an invalid value.
-// We can't SetEntry(2/3), so we use a large slot that is beyond nsCount.
-// The simulator's nsCount is 47; SetEntry(200) → OUT_OF_RANGE (result=1), no state change.
-// So we test Execute_fault by verifying it returns ok=true in the healthy state.
-out.Execute_fault_note = 'BAD_FLAGS requires direct state manipulation; Execute passes cleanly here';
+// Verify auditLog has a Startup.Config.Execute gate entry (the boot integration check)
+const scAuditEntry = (sim.auditLog || []).find(e => e.gate === 'Startup.Config.Execute');
+out.auditLog_has_startup_config = scAuditEntry !== undefined;
+out.auditLog_entry_label = scAuditEntry ? (scAuditEntry.label || '') : '';
+out.auditLog_entry_nsIndex = scAuditEntry ? (scAuditEntry.nsIndex | 0) : -1;
+out.auditLog_entry_result  = scAuditEntry ? (scAuditEntry.result || '') : '';
+
+// Execute with BAD_FLAGS — fault_count increments and Execute returns !ok
+// We can't WriteParam(2) directly (READ_ONLY), so we patch memory directly via lumpLoc.
+const sc_loc = sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] >>> 0;
+const prevFaultCount = sim.memory[sc_loc + 4]; // data[3] = lump[4]
+// Corrupt flags (lump[3] = data[2]) in simulator memory to trigger BAD_FLAGS
+sim.memory[sc_loc + 3] = 0xFF; // data[2] = flags = 0xFF (non-zero → BAD_FLAGS)
+const execFault = call('Execute', {});
+const newFaultCount = sim.memory[sc_loc + 4];
+out.Execute_fault_bad_flags = { ok: execFault.ok, result: execFault.result };
+out.Execute_fault_count_incremented = (newFaultCount === prevFaultCount + 1);
+// Restore: reset flags to 0
+sim.memory[sc_loc + 3] = 0;
 
 // NS label for slot 2
 out.nsLabel2 = sim.nsLabels[2] || '';
