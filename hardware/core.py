@@ -690,15 +690,15 @@ class ChurchCore(Elaboratable):
                     slot3_gt_view.perms.eq(PERM_MASK_E),
                 ]
 
-                cr7_gt = Signal(GT_LAYOUT)
-                cr7_gt_view = View(GT_LAYOUT, cr7_gt)
+                cr14_gt = Signal(GT_LAYOUT)
+                cr14_gt_view = View(GT_LAYOUT, cr14_gt)
                 m.d.comb += [
-                    cr7_gt_view.slot_id.eq(3),
-                    cr7_gt_view.gt_seq.eq(0),
-                    cr7_gt_view.gt_type.eq(GT_TYPE_INFORM),
-                    cr7_gt_view.perms.eq(PERM_MASK_X),
+                    cr14_gt_view.slot_id.eq(3),
+                    cr14_gt_view.gt_seq.eq(0),
+                    cr14_gt_view.gt_type.eq(GT_TYPE_INFORM),
+                    cr14_gt_view.perms.eq(PERM_MASK_X),
                 ]
-                m.d.comb += [boot_wr_en[7].eq(1), boot_wr_gt[7].eq(cr7_gt)]
+                m.d.comb += [boot_wr_en[14].eq(1), boot_wr_gt[14].eq(cr14_gt)]
 
                 # Boot fence: BOOT_PROGRAM occupies IMEM byte addresses [0, NUC_LUMP_BASE).
                 # NUC_LUMP_BASE is derived from len(BOOT_PROGRAM) in boot_rom.py —
