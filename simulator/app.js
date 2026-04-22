@@ -11153,7 +11153,7 @@ function showFaultModal(f) {
     const historyHtml = allFaults.length > 1
         ? allFaults.slice(-5).map((fl, i, arr) => {
             const isCurrent = (i === arr.length - 1);
-            return `<span class="fault-hist-item${isCurrent ? ' fault-hist-current' : ''}">[step ${fl.step}] ${fl.type}</span>`;
+            return `<span class="fault-hist-item${isCurrent ? ' fault-hist-current' : ''}"><button class="gate-loc-step-link fault-hist-step-link" onclick="faultModalDismiss();jumpToTraceStep(${fl.step})" title="Jump to step ${fl.step} in the Trace view">[step ${fl.step}]</button> ${fl.type}</span>`;
           }).join('')
         : '';
 
