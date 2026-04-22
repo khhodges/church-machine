@@ -217,3 +217,89 @@ def test_ns_type_gate_correct_type_produces_pass_entry():
     assert status.get("bootComplete") is True, (
         f"bootComplete should be True for correct-type boot; status={status}"
     )
+
+
+def test_b03_ns_type_audit_entry_wrong_type():
+    """Wrong gtType must be caught at B:03 (INIT_ABSTR), not only at B:04.
+
+    When the boot entry NS slot has the wrong type:
+    - The NS.Type fail entry must be present in the audit log.
+    - The fault that halts boot must originate from INIT_ABSTR (B:03), confirmed
+      by the fault message containing 'INIT_ABSTR'.
+    - Boot must not complete and a TYPE fault must appear in faultLog.
+    """
+    cfg   = _default_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR)
+    bad_image = _patch_ns_slot_gttype(image, cfg, BOOT_ABSTR_NS_SLOT, 2)  # Outform
+
+    status = _run_harness(cfg, bad_image)
+
+    audit = status.get("auditLog", [])
+    ns_type_entries = [e for e in audit if e.get("gate") == "NS.Type"]
+    assert ns_type_entries, (
+        "No NS.Type entry found in auditLog; expected B:03 to record one before faulting; "
+        f"auditLog={audit}"
+    )
+    assert ns_type_entries[0]["result"] == "fail", (
+        f"Expected the NS.Type entry from B:03 to have result='fail'; got {ns_type_entries[0]}"
+    )
+
+    # Confirm the fault was raised by INIT_ABSTR (B:03), not by LOAD_NUC (B:04).
+    fault_msgs = [f.get("message", "") for f in status.get("faultLog", [])]
+    assert any("INIT_ABSTR" in m for m in fault_msgs), (
+        "Expected a fault message containing 'INIT_ABSTR' (B:03 caught the wrong type), "
+        f"but faultLog messages were: {fault_msgs}"
+    )
+
+    fault_types = [f["type"] for f in status.get("faultLog", [])]
+    assert "TYPE" in fault_types, (
+        f"Expected a TYPE fault in faultLog but got: {status.get('faultLog')}"
+    )
+    assert status.get("bootComplete") is False, (
+        "bootComplete should be False when B:03 NS.Type check fails"
+    )
+
+
+def test_b03_ns_type_pass_entry_present_before_b04_entry():
+    """Correct Inform gtType → B:03 produces its own NS.Type pass entry before B:04's.
+
+    When the boot image is valid, both B:03 (INIT_ABSTR) and B:04 (LOAD_NUC) call
+    _auditNSType, producing two NS.Type entries in the audit log.  The first must
+    come from B:03 and must have result='pass'.
+    """
+    cfg   = _default_cfg()
+    image = generate_boot_image(cfg, LUMPS_DIR)
+
+    status = _run_harness(cfg, image)
+
+    audit = status.get("auditLog", [])
+    ns_type_entries = [e for e in audit if e.get("gate") == "NS.Type"]
+
+    assert len(ns_type_entries) >= 2, (
+        "Expected at least two NS.Type audit entries (one from B:03, one from B:04) "
+        f"for a valid boot image; got {len(ns_type_entries)}: {ns_type_entries}"
+    )
+
+    # First entry comes from B:03 and must pass.
+    b03_entry = ns_type_entries[0]
+    assert b03_entry["result"] == "pass", (
+        f"Expected first NS.Type entry (from B:03) to have result='pass'; got {b03_entry}"
+    )
+    assert b03_entry.get("nsIndex") == BOOT_ABSTR_NS_SLOT, (
+        f"Expected nsIndex={BOOT_ABSTR_NS_SLOT} in B:03 NS.Type entry; got {b03_entry}"
+    )
+
+    # Second entry comes from B:04 and must also pass.
+    b04_entry = ns_type_entries[1]
+    assert b04_entry["result"] == "pass", (
+        f"Expected second NS.Type entry (from B:04) to have result='pass'; got {b04_entry}"
+    )
+
+    # No TYPE fault and boot completes.
+    fault_types = [f["type"] for f in status.get("faultLog", [])]
+    assert "TYPE" not in fault_types, (
+        f"Unexpected TYPE fault for valid boot image; faultLog={status.get('faultLog')}"
+    )
+    assert status.get("bootComplete") is True, (
+        f"bootComplete should be True for valid boot image; status={status}"
+    )

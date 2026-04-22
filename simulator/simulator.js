@@ -1116,14 +1116,22 @@ class ChurchSimulator {
             case 3: {
                 const gt6 = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
                 const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
+                const _b3Label = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
                 if (!check6.ok) {
-                    const _entryLabel = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
-                    this.fault('BOOT', `INIT_ABSTR mLoad(${_entryLabel}) failed: ${check6.message}`);
+                    this.fault('BOOT', `INIT_ABSTR mLoad(${_b3Label}) failed: ${check6.message}`);
+                    return false;
+                }
+                const _b3ActualNSType     = check6.entry.gtType;
+                const _GT_TYPE_NAMES_B3   = ['NULL', 'Inform', 'Outform', 'Abstract'];
+                const _b3ActualNSTypeName = _GT_TYPE_NAMES_B3[_b3ActualNSType & 3] || 'Unknown';
+                const _b3NSTypePass       = _b3ActualNSType === 1;
+                this._auditNSType(this.bootEntrySlot, _b3Label, _b3ActualNSType, _b3ActualNSTypeName);
+                if (!_b3NSTypePass) {
+                    this.fault('TYPE', `INIT_ABSTR: ${_b3Label} type is ${_b3ActualNSTypeName}, must be Inform`);
                     return false;
                 }
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:04)
-                const _initLabel = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
-                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_initLabel}) (E, M-elevation)\n`;
+                this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation)\n`;
                 this.bootStep++;                  // advance state machine → B:04
                 this.ledBits = 0b001111;          // LED bit 3 ON = INIT_ABSTR complete
                 // ↓ fall through — B:03 and B:04 always execute together in one Step
@@ -3729,9 +3737,9 @@ class ChurchSimulator {
         ];
     }
 
-    // Push an NS.Type gate-log entry for the NS entry type check in _bootStep B:04.
-    // Called immediately after the mLoad succeeds so the outcome is always recorded,
-    // whether the type is correct (Inform, type=1) or not.
+    // Push an NS.Type gate-log entry for the NS entry type check in _bootStep B:03
+    // and B:04.  Called immediately after each mLoad succeeds so the outcome is always
+    // recorded, whether the type is correct (Inform, type=1) or not.
     _auditNSType(nsIndex, label, actualType, actualTypeName) {
         const typePass = actualType === 1;
         this.auditLog.push({
