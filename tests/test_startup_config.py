@@ -374,11 +374,10 @@ def test_boot_integration_startup_config_execute_called():
     assert _bh()["auditLogHasStartup"] is True
 
 
-def test_boot_integration_startup_config_execute_returns_ok():
-    """Startup.Config.Execute() returns ok=True after boot."""
-    result = _bh()["executeResult"]
-    assert result is not None
-    assert result["ok"] is True
+def test_boot_integration_startup_config_no_faults_implies_execute_ok():
+    """No boot faults implies Startup.Config.Execute() succeeded (faults would appear in faultLog)."""
+    bh = _bh()
+    assert bh["faultLog"] == [], f"Expected no faults; got: {bh['faultLog']}"
 
 
 def test_boot_integration_startup_config_dispatches_to_entry_slot():

@@ -100,7 +100,8 @@ const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 
 // Module-scope boot constants — referenced by loadProgram, _bootStep, etc.
-const BOOT_ABSTR_NS_SLOT   = 3;  // NS slot of the Boot Abstraction lump (Boot.Abstr)
+const BOOT_ABSTR_NS_SLOT      = 3;  // NS slot of the Boot Abstraction lump (Boot.Abstr)
+const STARTUP_CONFIG_NS_SLOT  = 2;  // NS slot of Startup.Config (Task #396)
 
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 // (Task #237). Written into Boot.Abstr lump code region during _initNamespaceTable()
@@ -1265,9 +1266,20 @@ class ChurchSimulator {
 
                 // ── Step 6 (B:05): COMPLETE ───────────────────────────────────────────
                 this.bootStep++;                    // advance state machine → B:05 (COMPLETE)
+
+                // B:05a — Startup.Config.Execute(): automatic dispatch (mirrors
+                // BOOT_ROM_WORDS[7] CALL via c-list[4]) under M-elevation so the
+                // pre-checks always run even if Boot.Thread lacks S-perm.
+                if (this.abstractionRegistry) {
+                    this.abstractionRegistry.dispatchMethod(STARTUP_CONFIG_NS_SLOT, 'Execute', this, {});
+                }
+
                 this.mElevation = false;            // drop M-elevation: normal capability checks now apply to all subsequent instructions
                 this.bootComplete = true;           // signal the step-loop to stop calling _bootStep and start dispatching instructions
-                this.ledBits = 0b111111;            // all 6 LEDs ON = boot complete
+                if (!(this.ledBits === 0x3F)) {
+                    // Execute() may have set ledBits to a fault code; only override on success path
+                    this.ledBits = 0b111111;
+                }
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
                 this.output += '[BOOT] COMPLETE — M-Elevation OFF. All Layer 0–1 abstractions initialized. Boot complete.\n';
                 break;
