@@ -135,12 +135,18 @@ class ChurchAssembler {
         };
         this.labels = {};
         this.errors = [];
-        this.nsSymbols = {};  // name → NS slot index (populated by setNamespace())
-        this.nsLoaded  = {};  // name → CR index      (updated during assembly)
+        // Inherit the class-level namespace so locally-created assembler instances
+        // (e.g. inside tutorials, builder, CLOOMC) automatically get symbol resolution
+        // without every call site needing to call setNamespace() individually.
+        this.nsSymbols = Object.assign({}, ChurchAssembler._sharedNsSymbols || {});
+        this.nsLoaded  = {};  // name → CR index (updated during assembly)
     }
 
     setNamespace(map) {
-        this.nsSymbols = Object.assign({}, map);
+        // Persist as a class-level default so any future ChurchAssembler() instance
+        // created anywhere in the app inherits the same namespace automatically.
+        ChurchAssembler._sharedNsSymbols = Object.assign({}, map);
+        this.nsSymbols = Object.assign({}, ChurchAssembler._sharedNsSymbols);
         this.nsLoaded  = {};   // clear stale CR assignments
     }
 
