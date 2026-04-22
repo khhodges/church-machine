@@ -4707,6 +4707,72 @@ function generateBootImage() {
         });
 }
 
+function handleBootImageUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    input.value = '';
+    const result  = document.getElementById('bdGenResult');
+    const errEl   = document.getElementById('bdError');
+    const upBtn   = document.getElementById('bdUploadBtn');
+    const genBtn  = document.getElementById('bdGenBtn');
+    if (result) result.textContent = 'Uploading…';
+    if (errEl)  errEl.textContent  = '';
+    if (upBtn)  { upBtn.disabled = true;  upBtn.style.opacity  = '0.6'; }
+    if (genBtn) { genBtn.disabled = true; genBtn.style.opacity = '0.6'; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const arrayBuf = e.target.result;
+        const bytes    = new Uint8Array(arrayBuf);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const data_b64 = btoa(binary);
+        fetch('/api/boot-image/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data_b64 }),
+        })
+            .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
+            .then(({ ok, body }) => {
+                if (!ok || body.ok === false) {
+                    if (result) result.textContent = '';
+                    if (errEl)  errEl.textContent  = (body && body.error) || 'Upload failed.';
+                    return;
+                }
+                const kib = (body.bytes / 1024).toFixed(1);
+                if (result) {
+                    result.innerHTML =
+                        `Uploaded <strong>${body.bytes.toLocaleString()}</strong> bytes ` +
+                        `(${body.words.toLocaleString()} words, ${kib} KiB) — ` +
+                        `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
+                        `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
+                        `Reset the simulator to apply this image at boot.`;
+                }
+                window.bootImageAvailable = true;
+                _probeBootImage().then(buf => {
+                    if (buf) {
+                        window.bootImage = buf;
+                        try { sim.loadBootImage(buf); _syncBootEntryFromSim(); } catch(e) { console.warn('[bootImage] apply failed:', e); }
+                    }
+                });
+            })
+            .catch(err => {
+                if (result) result.textContent = '';
+                if (errEl)  errEl.textContent  = 'Upload failed: ' + err;
+            })
+            .finally(() => {
+                if (upBtn)  { upBtn.disabled = false;  upBtn.style.opacity  = '1'; }
+                if (genBtn) { genBtn.disabled = false; genBtn.style.opacity = '1'; }
+            });
+    };
+    reader.onerror = function() {
+        if (result) result.textContent = '';
+        if (errEl)  errEl.textContent  = 'Failed to read file.';
+        if (upBtn)  { upBtn.disabled = false;  upBtn.style.opacity  = '1'; }
+        if (genBtn) { genBtn.disabled = false; genBtn.style.opacity = '1'; }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
 function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;

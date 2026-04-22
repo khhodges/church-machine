@@ -536,9 +536,11 @@
 
             <div id="bdError" style="margin-top:12px;font-size:0.85rem;color:#f55;min-height:1.2em;"></div>
 
+            <input type="file" id="bdUploadInput" accept=".bin,application/octet-stream" style="display:none;" onchange="handleBootImageUpload(this)">
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
                 <button class="btn btn-sm" onclick="closeBootDesigner()" style="background:#333;color:#ddd;border:1px solid #555;">Cancel</button>
                 <button class="btn btn-primary btn-sm" id="bdSaveBtn" onclick="saveBootDesigner()">Save boot config</button>
+                <button class="btn btn-sm" id="bdUploadBtn" onclick="document.getElementById('bdUploadInput').click()" style="background:#243;color:#cdc;border:1px solid #575;" data-tooltip="Upload a pre-built boot-image.bin from your computer">Upload boot image</button>
                 <button class="btn btn-sm" id="bdGenBtn" onclick="generateBootImage()" style="background:#234;color:#cdf;border:1px solid #557;" data-tooltip="Generate the binary boot image from the saved config and produce a downloadable .bin">Generate Boot Image</button>
             </div>
             <div id="bdStatus" style="margin-top:8px;font-size:0.8rem;color:#7c7;min-height:1em;"></div>
