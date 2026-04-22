@@ -1013,7 +1013,7 @@ function updateGateLog() {
             if (k === 'magic') {
                 label = v.pass
                     ? 'MAGIC'
-                    : `MAGIC&nbsp;(0x${v.rawMagic.toString(16)}&nbsp;&#x2192;&nbsp;0x1F)`;
+                    : `MAGIC&nbsp;(0x${v.rawMagic.toString(16).toUpperCase().padStart(2,'0')}&nbsp;&#x2192;&nbsp;0x1F)`;
             } else if (k === 'cc') {
                 label = 'CC';
             } else if (k === 'typ') {

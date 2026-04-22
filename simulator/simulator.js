@@ -1170,23 +1170,7 @@ class ChurchSimulator {
                 const hdr      = this.parseLumpHeader(hdrWord);                     // decode {magic, cc, cw, lumpSize, valid}
 
                 // ── Audit: record lump-header check in Gate Log ────────────────────────
-                {
-                    const magicPass = hdr.valid;
-                    const ccPass    = magicPass && (hdr.cc > 0);
-                    const typPass   = magicPass && (hdr.typ === 1);   // must be Inform (typ=1)
-                    const lumpChecks = { magic: { pass: magicPass, rawMagic: hdr.magic } };
-                    if (magicPass) lumpChecks.cc  = { pass: ccPass };
-                    if (magicPass) lumpChecks.typ = { pass: typPass, typVal: hdr.typ };
-                    this.auditLog.push({
-                        gate: 'Lump.Header',
-                        label: _b4Label,
-                        nsIndex: this.bootEntrySlot,
-                        requiredPerm: null,
-                        checks: lumpChecks,
-                        b: null, f: null,
-                        result: (magicPass && ccPass && typPass) ? 'pass' : 'fail',
-                    });
-                }
+                this._auditLumpHeader(this.bootEntrySlot, _b4Label, hdr);
 
                 if (!hdr.valid) {
                     this.fault('LUMP_MAGIC', `LOAD_NUC: ${_b4Label} lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F) — lump not installed or memory zeroed`);
@@ -3717,6 +3701,27 @@ class ChurchSimulator {
             { stage: 'PUSH',   desc: `Push 1-word frame (SZ=0): FLAGS|PC|SZ|STO`, status: 'pass' },
             { stage: 'LAMBDA', desc: `Church reduction via ${label}`, status: 'pass' },
         ];
+    }
+
+    // Push a Lump.Header gate-log entry for a lump header read in _bootStep B:04.
+    // Called immediately after parseLumpHeader() so the outcome is always recorded,
+    // whether the header is valid or not.
+    _auditLumpHeader(nsIndex, label, hdr) {
+        const magicPass = hdr.valid;
+        const ccPass    = magicPass && (hdr.cc > 0);
+        const typPass   = magicPass && (hdr.typ === 1);   // must be Inform (typ=1)
+        const checks = { magic: { pass: magicPass, rawMagic: hdr.magic } };
+        if (magicPass) checks.cc  = { pass: ccPass };
+        if (magicPass) checks.typ = { pass: typPass, typVal: hdr.typ };
+        this.auditLog.push({
+            gate: 'Lump.Header',
+            label,
+            nsIndex,
+            requiredPerm: null,
+            checks,
+            b: null, f: null,
+            result: (magicPass && ccPass && typPass) ? 'pass' : 'fail',
+        });
     }
 
     _auditPipeline() {
