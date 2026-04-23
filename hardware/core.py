@@ -25,6 +25,7 @@ from .dwrite import ChurchDWrite
 from .cload import ChurchCLoad
 from .outform import ChurchOutform
 from .outform_iot import ChurchOutformIoT
+from .church_outform import ChurchOutformFSM
 
 
 class ChurchCore(Elaboratable):
@@ -102,6 +103,32 @@ class ChurchCore(Elaboratable):
         self.outform_clist_addr_in = Signal(32)
         self.outform_gt_raw_in     = Signal(32)
 
+        # ── Simulation-only debug ports ──────────────────────────────────────
+        # These ports MUST be tied to 0 at the synthesis integration boundary
+        # (e.g., in ti60_f225.py).  They are never driven in production hardware;
+        # Amaranth synthesizes undriven inputs as constant 0, so they add no
+        # logic overhead, but the intent should be explicit.
+        #
+        # dbg_cr_wr_en/addr/data — direct CR write, absolute lowest priority in
+        #   the CR write mux.  Lets test harnesses set arbitrary cap-register
+        #   content without booting through instruction sequences.
+        self.dbg_cr_wr_en   = Signal()
+        self.dbg_cr_wr_addr = Signal(4)
+        self.dbg_cr_wr_data = Signal(CAP_REG_LAYOUT)
+
+        # dbg_outform_done_inject / dbg_outform_result_gt — fake a completed
+        #   Mode 2 outform download in test harnesses without driving the full
+        #   UART/IoT protocol.  Hold inject=1 for the WAIT_OUTFORM + PROMOTE_WRITE
+        #   cycles (2 cycles) so result_gt_in is stable during PROMOTE_WRITE.
+        #   Gate: injected done is ANDed with outform_mode2_active internally.
+        self.dbg_outform_done_inject    = Signal()
+        self.dbg_outform_result_gt      = Signal(32)
+
+        # outform_fsm_busy — combinatorial read of ChurchOutformFSM.busy.
+        #   Useful for integration tests to observe intercept FSM state without
+        #   relying on the download engine's outform_busy (which lags by 1 cycle).
+        self.outform_fsm_busy = Signal()   # Mode 2 intercept FSM busy (test/debug)
+
         # M-window (CR15 namespace M-flag latch + DR11-DR13 shadow) — Task #432
         # cr15_m_set: pulse to load DR11-DR14 from CR15 + integrity32 and set M-flag (test)
         # cr15_m_writeback_trigger: pulse to validate DR11/integrity and write back to CR15
@@ -165,6 +192,9 @@ class ChurchCore(Elaboratable):
         m.submodules.u_dwrite = u_dwrite
         m.submodules.u_cload = u_cload
         m.submodules.u_outform = u_outform
+
+        u_outform_fsm = ChurchOutformFSM()
+        m.submodules.u_outform_fsm = u_outform_fsm
 
         nia_reg = Signal(32)
 
@@ -290,7 +320,8 @@ class ChurchCore(Elaboratable):
             fence_pending_reg |
             u_outform.outform_busy |
             mint_busy |
-            mwin_busy
+            mwin_busy |
+            u_outform_fsm.busy
         )
         if not self.iot_profile:
             busy_expr = busy_expr | (
@@ -358,8 +389,11 @@ class ChurchCore(Elaboratable):
                 m.d.comb += required_perms.eq(0)
             with m.Case(ChurchOpcode.CALL):
                 # Abstract GTs bypass E-perm: the call FSM dispatches to M_FETCH_NS.
+                # Outform GTs bypass E-perm: the ChurchOutformFSM intercepts first
+                # to lazily install the lump, then promotes to Inform before the CALL.
                 hw_perm_gt_view = View(GT_LAYOUT, perm_gt_sig)
-                with m.If(hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT):
+                with m.If((hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT) |
+                          (hw_perm_gt_view.gt_type == GT_TYPE_OUTFORM)):
                     m.d.comb += required_perms.eq(0)
                 with m.Else():
                     m.d.comb += required_perms.eq(PERM_MASK_E)
@@ -553,6 +587,16 @@ class ChurchCore(Elaboratable):
             cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr, 0)
             cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data, 0)
             cr_wr_en_extra = u_cload.cr_wr_en
+        # ChurchOutformFSM (Mode 2 CALL intercept) adds a CR promote write.
+        # Wrap cr_wr_addr_inner/cr_wr_data_inner to give it lowest priority
+        # (it only fires during PROMOTE_WRITE, when all other units are idle).
+        cr_wr_addr_inner = Mux(u_outform_fsm.cr_wr_en, u_outform_fsm.cr_wr_addr, cr_wr_addr_inner)
+        cr_wr_data_inner = Mux(u_outform_fsm.cr_wr_en, u_outform_fsm.cr_wr_data, cr_wr_data_inner)
+        cr_wr_en_extra = cr_wr_en_extra | u_outform_fsm.cr_wr_en
+        # Debug CR write port — absolute lowest priority (simulation/test use only).
+        cr_wr_addr_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_addr, cr_wr_addr_inner)
+        cr_wr_data_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_data, cr_wr_data_inner)
+        cr_wr_en_extra = cr_wr_en_extra | self.dbg_cr_wr_en
         m.d.comb += [
             u_regs.cr_wr_addr.eq(
                 Mux(mwin_cr_wr_en, CR_NAMESPACE,
@@ -654,9 +698,15 @@ class ChurchCore(Elaboratable):
             # Gated by ~fetch_bounds_fault: if the *current* nia is already out-of-range
             # the BOUNDS fault is raised instead; nia must not advance further.
             m.d.sync += nia_reg.eq(nia_reg + Cat(C(0, 2), branch_sx32))
-        with m.Elif(self.boot_complete & u_decoder.instr_valid & ~any_unit_busy & ~fetch_bounds_fault):
+        with m.Elif(
+            self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
+            & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
+        ):
             # Advance PC for all instructions (including not-taken branches).
             # ~fetch_bounds_fault ensures nia never advances on a BOUNDS-fault cycle.
+            # ~u_outform_fsm.intercept_start holds the PC at the CALL instruction
+            # when a Mode 2 Outform intercept fires; the CALL is replayed once the
+            # FSM promotes the source CR and releases busy.
             m.d.sync += nia_reg.eq(nia_reg + 4)
 
         # Code fence management — separate priority chain from nia update.
@@ -819,9 +869,32 @@ class ChurchCore(Elaboratable):
                 u_regs.cr_gt_wr_data[i].eq(Mux(boot_wr_en[i], boot_wr_gt[i], runtime_wr_gt[i])),
             ]
 
-        m.d.comb += call_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) & ~any_unit_busy
+        # Detect Outform GT (type=0b10) in the source register at CALL decode time.
+        # When present, the ChurchOutformFSM intercepts before the CALL unit starts
+        # to lazily install the absent lump, then promotes the GT to Inform type.
+        _call_src_gt_view = View(GT_LAYOUT, perm_gt_sig)
+        _call_src_is_outform = Signal(name="call_src_is_outform")
+        m.d.comb += _call_src_is_outform.eq(
+            _call_src_gt_view.gt_type == GT_TYPE_OUTFORM
         )
+
+        # Suppress call_start while the source CR holds an Outform GT.
+        # After ChurchOutformFSM promotes it to Inform, the CALL retries normally.
+        m.d.comb += call_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
+            ~any_unit_busy & ~_call_src_is_outform
+        )
+
+        # Trigger the ChurchOutformFSM when a CALL sees an Outform source GT.
+        m.d.comb += [
+            u_outform_fsm.intercept_start.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
+                ~any_unit_busy & _call_src_is_outform
+            ),
+            u_outform_fsm.src_cr.eq(cr_src),
+            u_outform_fsm.src_cr_data.eq(u_regs.cr_rd_data),
+        ]
+
         m.d.comb += [
             u_call.call_start.eq(call_start_sig),
             u_call.cr_src.eq(cr_src),
@@ -1218,18 +1291,36 @@ class ChurchCore(Elaboratable):
             ]
 
         # ── outform wiring ───────────────────────────────────────────────────
-        # outform_start_in lets simulation tests trigger the outform without
-        # going through the CPU mLoad path (outform_start_in = 1 for 1 cycle).
+        # Three sources can trigger the outform download engine:
+        #   1. u_shared_mload.outform_start_out — mLoad intercepted Outform GT in c-list
+        #   2. self.outform_start_in            — test injection (bypasses CPU path)
+        #   3. u_outform_fsm.outform_start_out  — Mode 2: CALL source CR is Outform GT
         _outform_start = Signal()
-        m.d.comb += _outform_start.eq(u_shared_mload.outform_start_out | self.outform_start_in)
+        m.d.comb += _outform_start.eq(
+            u_shared_mload.outform_start_out |
+            self.outform_start_in |
+            u_outform_fsm.outform_start_out
+        )
+
+        # Track whether Mode 2 (ChurchOutformFSM) triggered the current download.
+        # This gates done/fault routing so each consumer only sees its own events.
+        outform_mode2_active = Signal(name="outform_mode2_active")
+        with m.If(u_outform_fsm.outform_start_out):
+            m.d.sync += outform_mode2_active.eq(1)
+        with m.Elif(u_outform.outform_done | u_outform.outform_fault):
+            m.d.sync += outform_mode2_active.eq(0)
 
         m.d.comb += [
             u_outform.outform_start.eq(_outform_start),
             u_outform.gt_raw.eq(
-                Mux(self.outform_start_in, self.outform_gt_raw_in, u_shared_mload.outform_gt_raw)
+                Mux(self.outform_start_in, self.outform_gt_raw_in,
+                    Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_gt_raw_out,
+                        u_shared_mload.outform_gt_raw))
             ),
             u_outform.slot_id.eq(
-                Mux(self.outform_start_in, self.outform_slot_id_in, u_shared_mload.outform_slot_id)
+                Mux(self.outform_start_in, self.outform_slot_id_in,
+                    Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_slot_id_out,
+                        u_shared_mload.outform_slot_id))
             ),
             u_outform.rx_valid.eq(self.outform_rx_valid),
             u_outform.rx_data.eq(self.outform_rx_data),
@@ -1237,24 +1328,48 @@ class ChurchCore(Elaboratable):
             self.outform_tx_data.eq(u_outform.tx_data),
             self.outform_result_gt.eq(u_outform.result_gt),
             self.outform_busy.eq(u_outform.outform_busy),
+            self.outform_fsm_busy.eq(u_outform_fsm.busy),
             u_outform.tx_ack.eq(self.outform_tx_ack),
-            u_shared_mload.outform_done_in.eq(u_outform.outform_done),
-            u_shared_mload.outform_fault_in.eq(u_outform.outform_fault),
+            # Route done/fault to mLoad (Mode 1) or to the intercept FSM (Mode 2)
+            u_shared_mload.outform_done_in.eq(u_outform.outform_done & ~outform_mode2_active),
+            u_shared_mload.outform_fault_in.eq(u_outform.outform_fault & ~outform_mode2_active),
             u_shared_mload.outform_fault_type_in.eq(u_outform.outform_fault_type),
+            u_outform_fsm.outform_done_in.eq(
+                (u_outform.outform_done | self.dbg_outform_done_inject) & outform_mode2_active
+            ),
+            u_outform_fsm.outform_fault_in.eq(u_outform.outform_fault & outform_mode2_active),
+            u_outform_fsm.outform_fault_type_in.eq(u_outform.outform_fault_type),
+            u_outform_fsm.result_gt_in.eq(
+                Mux(self.dbg_outform_done_inject, self.dbg_outform_result_gt, u_outform.result_gt)
+            ),
         ]
 
-        if self.iot_profile:
-            # Latch Mint context when mLoad or test injection fires outform_start
-            with m.If(_outform_start):
-                m.d.sync += [
-                    mint_slot_id_reg.eq(
-                        Mux(self.outform_start_in, self.outform_slot_id_in, u_shared_mload.outform_slot_id)
-                    ),
-                    mint_clist_addr_reg.eq(
-                        Mux(self.outform_start_in, self.outform_clist_addr_in, u_shared_mload.outform_clist_addr)
-                    ),
-                ]
+        # Latch Mint context (slot_id + clist_addr) whenever any source fires
+        # outform_start. This applies to both IoT and non-IoT profiles; the Mint
+        # FSM in each profile reads mint_slot_id_reg / mint_clist_addr_reg.
+        with m.If(_outform_start):
+            m.d.sync += [
+                mint_slot_id_reg.eq(
+                    Mux(self.outform_start_in, self.outform_slot_id_in,
+                        Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_slot_id_out,
+                            u_shared_mload.outform_slot_id))
+                ),
+                # For Mode 2 (ChurchOutformFSM), clist_addr is a dummy (0).
+                # The Mint WRITE_CLIST step writes an E-GT to clist[0].  This
+                # is architecturally safe: slot_id=0 is permanently reserved for
+                # the NULL GT type (gt_type=0b00), and no valid capref ever has
+                # slot_id=0.  Writing to clist[0] therefore never clobbers a live
+                # capability.  The promoted GT keeps the Outform GT's original
+                # slot_id (non-zero), so this dummy clist write is fully isolated
+                # from the CR promotion performed by ChurchOutformFSM.
+                mint_clist_addr_reg.eq(
+                    Mux(self.outform_start_in, self.outform_clist_addr_in,
+                        Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_clist_addr_out,
+                            u_shared_mload.outform_clist_addr))
+                ),
+            ]
 
+        if self.iot_profile:
             # ── Watermark allocator ───────────────────────────────────────────
             # NS(192 words) + clist(64 words) = 256 words; free space starts at 256.
             WATERMARK_INIT = 256
@@ -1484,14 +1599,216 @@ class ChurchCore(Elaboratable):
             ]
 
         else:
-            # Non-IoT stubs
+            # ── Non-IoT: same watermark allocator and Mint FSM as IoT profile ──
+            # The non-IoT ChurchOutform (outform.py) uses the same alloc/Mint
+            # interface as ChurchOutformIoT; the download mechanism differs but
+            # the allocator and Mint FSM are identical.
+            WATERMARK_INIT = 256
+            DMEM_WORDS     = 2048
+            watermark_reg   = Signal(32, init=WATERMARK_INIT, name="watermark_reg_noniot")
+            alloc_sz_w      = Signal(32, name="alloc_sz_w_noniot")
+            alloc_mask_w    = Signal(32, name="alloc_mask_w_noniot")
+            alloc_aligned_w = Signal(32, name="alloc_aligned_w_noniot")
+            alloc_new_wm_w  = Signal(33, name="alloc_new_wm_w_noniot")
+
+            m.d.comb += alloc_sz_w.eq(C(1, 32) << u_outform.alloc_n)
+            m.d.comb += alloc_mask_w.eq(alloc_sz_w - 1)
+            m.d.comb += alloc_aligned_w.eq(
+                (watermark_reg + alloc_mask_w) & ~alloc_mask_w
+            )
+            m.d.comb += alloc_new_wm_w.eq(
+                Cat(alloc_aligned_w, C(0, 1)) + Cat(alloc_sz_w, C(0, 1))
+            )
+            alloc_fits_ni  = Signal(name="alloc_fits_ni")
+            alloc_n_ok_ni  = Signal(name="alloc_n_ok_ni")
+            m.d.comb += alloc_fits_ni.eq(alloc_new_wm_w <= DMEM_WORDS)
+            m.d.comb += alloc_n_ok_ni.eq(
+                (u_outform.alloc_n >= 6) & (u_outform.alloc_n <= 14)
+            )
+
             m.d.comb += [
-                u_outform.alloc_done.eq(0),
-                u_outform.alloc_fault.eq(0),
-                u_outform.alloc_base.eq(0),
-                u_outform.mint_done.eq(0),
-                u_outform.mint_fault.eq(0),
-                u_outform.mint_result_gt.eq(0),
+                u_outform.alloc_done.eq(
+                    u_outform.alloc_req & alloc_fits_ni & alloc_n_ok_ni
+                ),
+                u_outform.alloc_fault.eq(
+                    u_outform.alloc_req & (~alloc_fits_ni | ~alloc_n_ok_ni)
+                ),
+                u_outform.alloc_base.eq(alloc_aligned_w << 2),
+            ]
+            with m.If(u_outform.alloc_req & alloc_fits_ni & alloc_n_ok_ni):
+                m.d.sync += watermark_reg.eq(alloc_new_wm_w[:32])
+
+            # ── Mint FSM (non-IoT) ────────────────────────────────────────────
+            mint_base_reg_ni      = Signal(32, name="mint_base_reg_ni")
+            mint_cw_reg_ni        = Signal(13, name="mint_cw_reg_ni")
+            mint_cc_reg_ni        = Signal(8,  name="mint_cc_reg_ni")
+            mint_scan_idx_reg_ni  = Signal(14, name="mint_scan_idx_reg_ni")
+            mint_copy_idx_reg_ni  = Signal(8,  name="mint_copy_idx_reg_ni")
+            mint_copy_data_reg_ni = Signal(32, name="mint_copy_data_reg_ni")
+            mint_hdr_reg_ni       = Signal(32, name="mint_hdr_reg_ni")
+
+            cr15_mint_view_ni     = View(CAP_REG_LAYOUT, u_regs.cr15_namespace)
+            mint_ns_entry_base_ni = Signal(32, name="mint_ns_entry_base_ni")
+            m.d.comb += mint_ns_entry_base_ni.eq(
+                cr15_mint_view_ni.word1_location + (mint_slot_id_reg << 4)
+            )
+
+            mint_clist_slot_base_ni = Signal(32, name="mint_clist_slot_base_ni")
+            m.d.comb += mint_clist_slot_base_ni.eq(
+                768 + (mint_slot_id_reg << 8)
+            )
+
+            m.d.comb += mint_e_gt_d.eq(
+                (1 << 30) | (GT_TYPE_INFORM << 23) | (1 << 16) | mint_slot_id_reg
+            )
+            mint_w2_ni = Signal(32, name="mint_w2_ni")
+            m.d.comb += mint_w2_ni.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
+
+            mint_integrity_ni = Signal(32, name="mint_integrity_ni")
+            integrity32_amaranth(m, mint_base_reg_ni, mint_w2_ni, mint_integrity_ni)
+
+            mint_done_comb_ni  = Signal(name="mint_done_comb_ni")
+            mint_fault_comb_ni = Signal(name="mint_fault_comb_ni")
+
+            with m.FSM(name="mint_noniot") as mint_fsm_ni:
+
+                with m.State("MINT_IDLE"):
+                    with m.If(u_outform.mint_call):
+                        m.d.sync += mint_base_reg_ni.eq(u_outform.mint_base)
+                        m.next = "MINT_READ_HDR"
+
+                with m.State("MINT_READ_HDR"):
+                    m.d.comb += [
+                        mint_dmem_rd_en.eq(1),
+                        mint_dmem_addr.eq(mint_base_reg_ni),
+                    ]
+                    m.d.sync += mint_hdr_reg_ni.eq(self.dmem_rd_data)
+                    m.next = "MINT_CHECK_HDR"
+
+                with m.State("MINT_CHECK_HDR"):
+                    hdr_v_ni = View(LUMP_HEADER_LAYOUT, mint_hdr_reg_ni)
+                    lsz_c_ni = Signal(15, name="lsz_c_ni")
+                    m.d.comb += lsz_c_ni.eq(1 << (hdr_v_ni.n_minus_6 + 6))
+                    with m.If(hdr_v_ni.magic != 0x1F):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.n_minus_6 > 8):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.cc > (lsz_c_ni - 2)):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.cw > (lsz_c_ni - hdr_v_ni.cc - 2)):
+                        m.next = "MINT_FAULT"
+                    with m.Else():
+                        m.d.sync += [
+                            mint_lump_size_reg.eq(lsz_c_ni),
+                            mint_cw_reg_ni.eq(hdr_v_ni.cw),
+                            mint_cc_reg_ni.eq(hdr_v_ni.cc),
+                            mint_scan_idx_reg_ni.eq(hdr_v_ni.cw + 1),
+                        ]
+                        m.next = "MINT_SCAN_FS"
+
+                with m.State("MINT_SCAN_FS"):
+                    scan_end_c_ni = Signal(15, name="scan_end_c_ni")
+                    m.d.comb += scan_end_c_ni.eq(mint_lump_size_reg - mint_cc_reg_ni - 1)
+                    with m.If(mint_scan_idx_reg_ni > scan_end_c_ni):
+                        m.d.sync += mint_copy_idx_reg_ni.eq(0)
+                        m.next = "MINT_WRITE_NS0"
+                    with m.Else():
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg_ni + (mint_scan_idx_reg_ni << 2)
+                            ),
+                        ]
+                        with m.If(self.dmem_rd_data != 0):
+                            m.next = "MINT_FAULT"
+                        with m.Else():
+                            m.d.sync += mint_scan_idx_reg_ni.eq(mint_scan_idx_reg_ni + 1)
+
+                with m.State("MINT_WRITE_NS0"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni),
+                        mint_ns_wr_data.eq(mint_base_reg_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS1"
+
+                with m.State("MINT_WRITE_NS1"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 4),
+                        mint_ns_wr_data.eq(mint_w2_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS2"
+
+                with m.State("MINT_WRITE_NS2"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 8),
+                        mint_ns_wr_data.eq(mint_integrity_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS3"
+
+                with m.State("MINT_WRITE_NS3"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 12),
+                        mint_ns_wr_data.eq(0),
+                    ]
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                with m.State("MINT_COPY_CLIST_RD"):
+                    with m.If(mint_copy_idx_reg_ni >= mint_cc_reg_ni):
+                        m.next = "MINT_WRITE_CLIST"
+                    with m.Else():
+                        cc_off_ni = Signal(15, name="cc_off_ni")
+                        m.d.comb += cc_off_ni.eq(
+                            mint_lump_size_reg - mint_cc_reg_ni
+                            + mint_copy_idx_reg_ni
+                        )
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg_ni + (cc_off_ni << 2)
+                            ),
+                        ]
+                        m.d.sync += mint_copy_data_reg_ni.eq(self.dmem_rd_data)
+                        m.next = "MINT_COPY_CLIST_WR"
+
+                with m.State("MINT_COPY_CLIST_WR"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(
+                            mint_clist_slot_base_ni
+                            + (mint_copy_idx_reg_ni << 2)
+                        ),
+                        mint_clist_wr_data_d.eq(mint_copy_data_reg_ni),
+                    ]
+                    m.d.sync += mint_copy_idx_reg_ni.eq(mint_copy_idx_reg_ni + 1)
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                with m.State("MINT_WRITE_CLIST"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(mint_clist_addr_reg),
+                        mint_clist_wr_data_d.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_DONE"
+
+                with m.State("MINT_DONE"):
+                    m.d.comb += [
+                        mint_done_comb_ni.eq(1),
+                        u_outform.mint_result_gt.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_IDLE"
+
+                with m.State("MINT_FAULT"):
+                    m.d.comb += mint_fault_comb_ni.eq(1)
+                    m.next = "MINT_IDLE"
+
+            m.d.comb += [
+                mint_busy.eq(~mint_fsm_ni.ongoing("MINT_IDLE")),
+                u_outform.mint_done.eq(mint_done_comb_ni),
+                u_outform.mint_fault.eq(mint_fault_comb_ni),
             ]
 
         # -----------------------------------------------------------------------
@@ -1670,8 +1987,10 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(u_dwrite.fault_type), self.fault_valid.eq(1)]
         with m.Elif(u_cload.cload_fault):
             m.d.comb += [self.fault.eq(u_cload.cload_fault_type), self.fault_valid.eq(1)]
-        with m.Elif(u_outform.outform_fault):
+        with m.Elif(u_outform.outform_fault & ~outform_mode2_active):
             m.d.comb += [self.fault.eq(u_outform.outform_fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_outform_fsm.fault):
+            m.d.comb += [self.fault.eq(u_outform_fsm.fault_type), self.fault_valid.eq(1)]
         with m.Elif(mwin_fault_valid):
             m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
         with m.Else():
@@ -1813,7 +2132,16 @@ class ChurchCore(Elaboratable):
                 u_gc.access_index.eq(0),
             ]
 
-            with m.If(u_gc.gc_busy):
+            # Non-IoT NS mux: Mint writes take priority over GC (Mint fires during
+            # instruction execution; GC has its own busy handshake).
+            with m.If(mint_ns_wr_en):
+                m.d.comb += [
+                    self.ns_addr.eq(mint_ns_addr),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 64))),
+                    self.ns_wr_en.eq(1),
+                ]
+            with m.Elif(u_gc.gc_busy):
                 m.d.comb += [
                     self.ns_addr.eq(u_gc.ns_addr),
                     self.ns_rd_en.eq(u_gc.ns_rd_en),

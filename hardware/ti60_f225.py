@@ -57,6 +57,10 @@ class ChurchTi60F225(Elaboratable):
 
         core = ChurchCore()
         m.submodules.core = core
+        # Simulation-only debug ports (dbg_cr_wr_en, dbg_outform_done_inject,
+        # dbg_outform_result_gt, outform_fsm_busy) are intentionally left
+        # undriven here — Amaranth synthesizes undriven inputs as constant 0,
+        # which is the correct production tie-off for these test-only signals.
 
         boot_rom = BootRom(FULL_ROM)
         m.submodules.boot_rom = boot_rom

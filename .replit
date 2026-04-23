@@ -66,12 +66,12 @@ isValidation = true
 name = "hardware-sim"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python -m ctmm_cap_amaranth.testbench && python -m hardware.test_mwin_seal"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m ctmm_cap_amaranth.testbench && python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2"
 
 [[workflows.workflow]]
 name = "boot-image-matches-sim"
