@@ -192,7 +192,7 @@ export function Notebook() {
                     <div className="flex items-center py-1 border-b border-slate-800/50">
                       <span className="w-10 text-[#e94560] font-semibold">CR1</span>
                       <span className="w-6 text-slate-500">V</span>
-                      <span className="flex-1 text-[#fbbf24] truncate" title="[GATE] Boot.NS -> 0x0400">[GATE] Boot.NS -> 0x0400</span>
+                      <span className="flex-1 text-[#fbbf24] truncate" title="[GATE] Boot.NS -> 0x0400">[GATE] Boot.NS {"->"} 0x0400</span>
                     </div>
                     <div className="flex items-center py-1 border-b border-slate-800/50 opacity-40">
                       <span className="w-10 text-[#e94560]">CR2</span>
@@ -287,7 +287,7 @@ export function Notebook() {
                     <div className="flex-1 grid grid-cols-4 gap-2">
                       <div className="bg-slate-800/50 text-slate-300 px-2 py-0.5 rounded border border-slate-700/50">0x0048: SETPRM</div>
                       <div className="bg-blue-900/20 text-blue-400 px-2 py-0.5 rounded border border-blue-900/50">SETLIM CR0...</div>
-                      <div className="bg-emerald-900/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-900/50">CR0 -> REG</div>
+                      <div className="bg-emerald-900/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-900/50">CR0 {"->"} REG</div>
                       <div className="bg-[#fbbf24]/10 text-[#fbbf24] px-2 py-0.5 rounded border border-[#fbbf24]/30">EX: LOADI</div>
                     </div>
                   </div>
