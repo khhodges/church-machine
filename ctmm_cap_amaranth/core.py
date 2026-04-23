@@ -33,6 +33,7 @@ class CTMMCapCore(Elaboratable):
         self.dbg_m_xr12               = Signal(32)
         self.dbg_m_xr13               = Signal(32)
         self.dbg_m_xr14               = Signal(32)
+        self.dbg_cr5_stack_depth      = Signal(8)   # CR5 stack depth (for testbench)
         # CHANGE M-flag restore (test-access; in hardware routed from u_change outputs)
         self.m_flag_restore_en        = Signal()
         self.m_flag_restore_val       = Signal()
@@ -625,7 +626,7 @@ class CTMMCapCore(Elaboratable):
 
         # -----------------------------------------------------------------------
         # M-window FSM
-        # Triggered when (call_complete | return_complete | cr15_m_writeback_trigger)
+        # Triggered when (call_normal_complete | return_complete | cr15_m_writeback_trigger)
         # AND cr15_m_flag=1.
         # Reads the latched XR11-XR14 (combinatorial) and validates the GT in XR11.
         # If valid → write XR11-XR14 to CR15 + clear M.
@@ -639,7 +640,7 @@ class CTMMCapCore(Elaboratable):
 
         m_trigger = Signal()
         m.d.comb += m_trigger.eq(
-            u_call.call_complete | u_return.complete | self.cr15_m_writeback_trigger
+            u_call.call_normal_complete | u_return.complete | self.cr15_m_writeback_trigger
         )
 
         # XR11 gt_type lives at bits [1:0] in the ctmm_cap_amaranth layout
@@ -763,11 +764,12 @@ class CTMMCapCore(Elaboratable):
             cr5_stack_rd.addr.eq(Mux(cr5_stack_ptr > 0, cr5_stack_ptr - 1, 0)),
             u_return.saved_cr5_gt.eq(Mux(cr5_stack_empty, 0, cr5_stack_rd.data)),
             cr5_stack_wr.addr.eq(0),
+            self.dbg_cr5_stack_depth.eq(cr5_stack_ptr),
             cr5_stack_wr.data.eq(0),
             cr5_stack_wr.en.eq(0),
         ]
 
-        with m.If(u_call.call_complete & ~u_call.call_fault & ~cr5_stack_full):
+        with m.If(u_call.call_normal_complete & ~u_call.call_fault & ~cr5_stack_full):
             m.d.comb += [
                 cr5_stack_wr.addr.eq(cr5_stack_ptr),
                 cr5_stack_wr.data.eq(u_call.saved_cr5_gt),

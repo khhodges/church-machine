@@ -13,7 +13,8 @@ class CTMMCapCall(Elaboratable):
         self.index = Signal(17)
         self.mask = Signal(11)
         self.call_busy = Signal()
-        self.call_complete = Signal()
+        self.call_complete = Signal()        # COMPLETE | M_FETCH_DONE (for exec advance only)
+        self.call_normal_complete = Signal() # COMPLETE only (for stack push)
         self.call_fault = Signal()
         self.fault_type = Signal(4)
 
@@ -299,6 +300,7 @@ class CTMMCapCall(Elaboratable):
         m.d.comb += [
             self.call_busy.eq(~fsm.ongoing("IDLE")),
             self.call_complete.eq(fsm.ongoing("COMPLETE") | fsm.ongoing("M_FETCH_DONE")),
+            self.call_normal_complete.eq(fsm.ongoing("COMPLETE")),
             self.call_fault.eq(fault_latched),
             self.fault_type.eq(fault_type_latched),
             self.nia_set.eq(fsm.ongoing("COMPLETE")),

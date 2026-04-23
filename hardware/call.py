@@ -15,7 +15,8 @@ class ChurchCall(Elaboratable):
         self.index = Signal(16)
         self.mask = Signal(16)   # bits [0:12] → null-GT write mask for CR0–CR11
         self.call_busy = Signal()
-        self.call_complete = Signal()
+        self.call_complete = Signal()        # COMPLETE | M_FETCH_DONE (for exec advance only)
+        self.call_normal_complete = Signal() # COMPLETE only (for stack push / code fence)
         self.call_fault = Signal()
         self.fault_type = Signal(5)      # 5 bits: FaultType 0x0–0x12
 
@@ -625,6 +626,7 @@ class ChurchCall(Elaboratable):
         m.d.comb += [
             self.call_busy.eq(~fsm.ongoing("IDLE")),
             self.call_complete.eq(fsm.ongoing("COMPLETE") | fsm.ongoing("M_FETCH_DONE")),
+            self.call_normal_complete.eq(fsm.ongoing("COMPLETE")),
             self.call_fault.eq(fault_latched),
             self.fault_type.eq(fault_type_latched),
             self.nia_set.eq(fsm.ongoing("COMPLETE")),

@@ -459,8 +459,40 @@ def run_testbench():
             f"12F: M should be cleared after NULL GT fault, got {m_flag_after_f}")
         print("  PASS 12F: NULL GT in XR11 → FAULT state → INVALID_OP, M cleared")
 
+        # ── 12G: Abstract-GT M-set + writeback must NOT push CR5 stack ──────
+        # After 12F, M=0 and CR5 stack depth=0. Re-set M via the test port
+        # (equivalent to mgt_set_trigger from M_FETCH_DONE). The CR5 stack push
+        # is gated on call_normal_complete (COMPLETE only, not M_FETCH_DONE).
+        # Verified by asserting dbg_cr5_stack_depth stays 0 through the full
+        # M-set → writeback cycle.
+        depth_before = ctx.get(dut.dbg_cr5_stack_depth)
+        assert depth_before == 0, (
+            f"12G: Expected CR5 stack depth=0 at start, got {depth_before}")
+
+        # Step 1: fire cr15_m_set (test port equivalent of mgt_set_trigger)
+        ctx.set(dut.cr15_m_set, 1)
+        await ctx.tick()     # M-set fires
+        ctx.set(dut.cr15_m_set, 0)
+        await ctx.tick()     # settle
+
+        depth_after_set = ctx.get(dut.dbg_cr5_stack_depth)
+        m_flag_g = ctx.get(dut.cr15_m_flag)
+        assert m_flag_g == 1, f"12G: M should be 1 after test-port M-set, got {m_flag_g}"
+        assert depth_after_set == 0, (
+            f"12G: CR5 stack must NOT be pushed by M-set, got depth={depth_after_set}")
+
+        # Step 2: trigger M-writeback and check stack still empty
+        ctx.set(dut.cr15_m_writeback_trigger, 1)
+        await ctx.tick()     # IDLE → WRITEBACK (integrity ok with boot defaults)
+        ctx.set(dut.cr15_m_writeback_trigger, 0)
+        await ctx.tick()     # WRITEBACK → IDLE, M cleared
+        depth_after_wb = ctx.get(dut.dbg_cr5_stack_depth)
+        assert depth_after_wb == 0, (
+            f"12G: CR5 stack must NOT be pushed by M-writeback, got depth={depth_after_wb}")
+        print("  PASS 12G: Abstract-GT M-set + writeback do NOT push CR5 stack (depth stays 0)")
+
         print("  PASS: All M-window lifecycle cases verified "
-              "(set / writeback / CHANGE / integrity-fault / restore / null-gt-fault)")
+              "(set / writeback / CHANGE / integrity-fault / restore / null-gt-fault / no-stack-push)")
 
         print("\n" + "=" * 60)
         print("CTMMCap Amaranth Testbench — All Tests Complete")

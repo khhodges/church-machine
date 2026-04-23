@@ -694,8 +694,9 @@ class ChurchCore(Elaboratable):
         if not self.iot_profile:
             with m.Elif(u_lambda.nia_set | u_eloadcall.nia_set | u_xloadlambda.nia_set):
                 m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
-        with m.Elif(u_call.call_complete):
-            # CALL completed — establish callee fence from CALL unit byte-address outputs.
+        with m.Elif(u_call.call_normal_complete):
+            # Normal CALL completed — establish callee fence from CALL unit byte-address outputs.
+            # Abstract-GT CALL (M_FETCH_DONE) does not update the code fence.
             m.d.sync += [
                 code_lo_reg.eq(u_call.code_lo_out),
                 code_hi_reg.eq(u_call.code_hi_out),
@@ -868,7 +869,7 @@ class ChurchCore(Elaboratable):
                 m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
             with m.Elif(u_return.lambda_clear):
                 m.d.sync += lambda_active_reg.eq(0)
-            with m.Elif(u_call.call_complete & ~u_call.call_fault):
+            with m.Elif(u_call.call_normal_complete & ~u_call.call_fault):
                 m.d.sync += lambda_active_reg.eq(0)
             with m.Elif(u_lambda.lambda_complete & ~u_lambda.lambda_fault):
                 m.d.sync += [lambda_active_reg.eq(1), lambda_pc_reg.eq(u_lambda.saved_nia)]
@@ -1501,7 +1502,7 @@ class ChurchCore(Elaboratable):
             cr5_stack_wr.en.eq(0),
         ]
 
-        with m.If(u_call.call_complete & ~u_call.call_fault & ~cr5_stack_full):
+        with m.If(u_call.call_normal_complete & ~u_call.call_fault & ~cr5_stack_full):
             m.d.comb += [
                 cr5_stack_wr.addr.eq(cr5_stack_ptr),
                 cr5_stack_wr.data.eq(u_call.saved_cr5_gt),
@@ -1535,10 +1536,12 @@ class ChurchCore(Elaboratable):
         # -----------------------------------------------------------------------
 
         # Combine all writeback triggers; gate the whole expression on M-flag active.
-        # CALL/RETURN auto-trigger ensures M is always cleared at call boundaries.
+        # Only normal CALL completion (not Abstract-GT M_FETCH_DONE) triggers M-writeback.
+        # Abstract-GT CALL sets M via mgt_set_trigger; its writeback fires at the next
+        # normal CALL or RETURN that clears the M-window boundary.
         mwin_trigger = Signal()
         m.d.comb += mwin_trigger.eq(
-            (u_call.call_complete | u_return.complete | self.cr15_m_writeback_trigger) &
+            (u_call.call_normal_complete | u_return.complete | self.cr15_m_writeback_trigger) &
             u_regs.cr15_m_flag
         )
 
