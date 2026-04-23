@@ -1943,24 +1943,79 @@ class ChurchSimulator {
     // DR11–DR15 back (completing the round-trip) and resets CRn.m = 0.
     // Only CR15 can hold M=1 (hardware enforces via single 4-input AND gate).
 
+    _integrity32(w0, w1) {
+        // ROL(w0, 7) XOR ROL(w1 & ~(1<<28), 13) XOR 0xDEADBEEF
+        // Matches hardware/integrity32.py: G-bit (bit 28) is masked from w1.
+        const rol32 = (x, n) => (((x << n) | (x >>> (32 - n))) >>> 0);
+        const w1m = (w1 & 0xEFFFFFFF) >>> 0;
+        return (rol32(w0 >>> 0, 7) ^ rol32(w1m, 13) ^ 0xDEADBEEF) >>> 0;
+    }
+
     _setMWindow(crIdx) {
         const cr = this.cr[crIdx];
         cr.m = 1;
         this.dr[11] = cr.word0 >>> 0;
         this.dr[12] = cr.word1 >>> 0;
         this.dr[13] = cr.word2 >>> 0;
-        this.dr[14] = cr.word3 >>> 0;
-        this.dr[15] = (cr.word4 !== undefined ? cr.word4 : 0) >>> 0;
+        this.dr[14] = this._integrity32(cr.word1, cr.word2);
+        this.dr[15] = cr.word3 >>> 0;
+    }
+
+    _mwinWriteback() {
+        // Validated M-window writeback gate.  Must fire at every normal CALL and
+        // RETURN boundary when CR15.m === 1.  Returns true if the operation may
+        // proceed; false if it was aborted (INVALID_OP faulted).
+        this._mwinWbFired = false;
+        if (!this.cr[15] || this.cr[15].m !== 1) return true;
+        this._mwinWbFired = true;
+        const dr11 = this.dr[11] >>> 0;
+        const dr12 = this.dr[12] >>> 0;
+        const dr13 = this.dr[13] >>> 0;
+        const dr14 = this.dr[14] >>> 0;
+        // Gate 1: DR11 must be non-NULL (bits[24:23] != 0b00).
+        const dr11Type = (dr11 >>> 23) & 0x3;
+        // Gate 2: integrity32(DR12, DR13) must equal DR14.
+        const computed = this._integrity32(dr12, dr13);
+        // Gate 3: gt_seq from DR11[22:16] must match DR13[27:21].
+        const seqDR11 = (dr11 >>> 16) & 0x7F;
+        const seqDR13 = (dr13 >>> 21) & 0x7F;
+        const pass = (dr11Type !== 0) && (computed === dr14) && (seqDR11 === seqDR13);
+        this.cr[15].m = 0;
+        if (pass) {
+            this.cr[15].word0 = dr11;
+            this.cr[15].word1 = dr12;
+            this.cr[15].word2 = dr13;
+            return true;
+        }
+        const why = dr11Type === 0 ? 'NULL DR11' :
+                    computed !== dr14 ? `integrity mismatch (got 0x${computed.toString(16).toUpperCase()} expected 0x${dr14.toString(16).toUpperCase()})` :
+                    `gt_seq mismatch (DR11[22:16]=${seqDR11} != DR13[27:21]=${seqDR13})`;
+        this.fault('INVALID_OP', `M-window writeback failed: ${why}`);
+        return false;
     }
 
     _clearMWindow(crIdx, writeBack = true) {
+        // DEPRECATED (writeBack=true path).
+        // Legacy unchecked round-trip: copies DR11–DR15 back to CRn (all 5 words).
+        // This path is no longer correct for any CR after Task #444 because DR14/DR15
+        // semantics changed: DR14 now carries the precomputed integrity token and
+        // DR15 carries the advisory seals word, so word3/word4 slots written below
+        // would contain stale integrity/seals data rather than the original capability
+        // words.  For CR15 specifically, commits MUST go through _mwinWriteback()
+        // (three-gate check; hardware/ret.py Task #440).  For other CRs the caller
+        // is responsible for knowing whether writeBack is still appropriate.
+        // All existing callers in this file use writeBack=false (they only need the
+        // M-bit cleared); the hard guard below prevents accidental CR15 misuse.
+        if (writeBack && crIdx === 15) {
+            throw new Error('[SIM] _clearMWindow(15, writeBack=true): CR15 commits must go through _mwinWriteback() — legacy unchecked path is not safe for CR15 after Task #444');
+        }
         const cr = this.cr[crIdx];
         if (writeBack) {
             cr.word0 = this.dr[11] >>> 0;
             cr.word1 = this.dr[12] >>> 0;
             cr.word2 = this.dr[13] >>> 0;
-            cr.word3 = this.dr[14] >>> 0;
-            cr.word4 = this.dr[15] >>> 0;
+            cr.word3 = this.dr[14] >>> 0;  // legacy: holds integrity token post-Task#444, not word3 slot
+            cr.word4 = this.dr[15] >>> 0;  // legacy: holds seals word post-Task#444, not word4 slot
         }
         cr.m = 0;
     }
@@ -2525,6 +2580,9 @@ class ChurchSimulator {
             this._resetAllMBits();
             return this._dispatchAbstractCall(d, sourceGT);
         }
+        // M-window writeback gate: Inform-type CALL path only.
+        // Fires before NS lookup and stack push; not called on Abstract-GT dispatch.
+        if (!this._mwinWriteback()) return null;
         const callTargetIdx = srcParsed.index;
         if (this.lazyManifest[callTargetIdx] && !this.lazyManifest[callTargetIdx].loaded) {
             // Mode 1 — Restore: NS entry is valid but lump header magic is 0x00
@@ -2566,6 +2624,9 @@ class ChurchSimulator {
             this._writeCR(6, sourceGT, nsEntry);
             const handlerResult = this._dispatchHandler(d, check, handler);
             this.cr[6] = savedCR6;
+            if (handlerResult && this._mwinWbFired && Array.isArray(handlerResult.pipeline)) {
+                handlerResult.pipeline.unshift({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
+            }
             return handlerResult;
         }
 
@@ -2577,6 +2638,9 @@ class ChurchSimulator {
                 this._writeCR(6, sourceGT, nsEntry);
                 const abstrResult = this._dispatchAbstraction(d, check, abstraction);
                 this.cr[6] = savedCR6;
+                if (abstrResult && this._mwinWbFired && Array.isArray(abstrResult.pipeline)) {
+                    abstrResult.pipeline.unshift({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
+                }
                 return abstrResult;
             }
         }
@@ -3015,6 +3079,8 @@ class ChurchSimulator {
             this.fault('STACK_UNDERFLOW', 'RETURN with no call frames — stack is empty (no sentinel pushed). Nothing to return to.');
             return null;
         }
+        // M-window writeback gate: must fire before frame pop and _resetAllMBits().
+        if (!this._mwinWriteback()) return null;
         const mask = d.imm & 0xFFF;
         const frame = this.callStack.pop();
 
@@ -4078,16 +4144,22 @@ class ChurchSimulator {
     }
 
     _callPipeline(d, label) {
-        return [
-            { stage: 'LOAD',  desc: `Read target GT from CR${d.crDst}`, perm: 'L', status: 'pass' },
-            { stage: 'TPERM', desc: `Verify E permission on target`, perm: 'E', status: 'pass' },
-            { stage: 'PUSH',  desc: `Push E-GT (word 0) + frame word (SZ=1): FLAGS|PC|SZ|STO`, status: 'pass' },
-            { stage: 'CALL',  desc: `Enter ${label}, CR6/CR14 derived, PC←0`, status: 'pass' },
-        ];
+        const stages = [];
+        if (this._mwinWbFired) {
+            stages.push({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
+        }
+        stages.push({ stage: 'LOAD',  desc: `Read target GT from CR${d.crDst}`, perm: 'L', status: 'pass' });
+        stages.push({ stage: 'TPERM', desc: `Verify E permission on target`, perm: 'E', status: 'pass' });
+        stages.push({ stage: 'PUSH',  desc: `Push E-GT (word 0) + frame word (SZ=1): FLAGS|PC|SZ|STO`, status: 'pass' });
+        stages.push({ stage: 'CALL',  desc: `Enter ${label}, CR6/CR14 derived, PC←0`, status: 'pass' });
+        return stages;
     }
 
     _returnPipeline(d, frame, mask) {
         const stages = [];
+        if (this._mwinWbFired) {
+            stages.push({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
+        }
         const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
         stages.push({ stage: 'POP', desc: `Pop ${frame.sz === 0 ? '1-word LAMBDA' : '2-word CALL'} frame; restore FLAGS, STO←${frame.savedSTO}`, status: 'pass' });
         if (frame.sz === 1) {

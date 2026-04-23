@@ -70,33 +70,30 @@ Assembler programs that emit CLOAD will fault or be rejected by the simulator. T
 ---
 
 ## GAP-03 — M-Window Writeback on RETURN: simulator drops it  
-**Severity**: SIGNIFICANT  
+**Severity**: SIGNIFICANT → **FIXED (Task #444)**  
 **Files**: `simulator/simulator.js` `_clearMWindow` vs `hardware/ret.py` (Task #440)
 
-### Simulator
-`_clearMWindow(crIdx, writeBack = true)` is the mechanism.  
-**RETURN calls it with `writeBack = false` at every exit path** (lines 3522–3720).  
-This means: DR11–DR15 values accumulated during the call scope are **silently discarded** on RETURN.
+### Status: FIXED
 
-```javascript
-_clearMWindow(crIdx, writeBack = true) {
-    const cr = this.cr[crIdx];
-    if (writeBack) {
-        cr.word0 = this.dr[11] >>> 0;  // 5-word shadow
-        cr.word1 = this.dr[12] >>> 0;
-        cr.word2 = this.dr[13] >>> 0;
-        cr.word3 = this.dr[14] >>> 0;
-        cr.word4 = this.dr[15] >>> 0;
-    }
-    cr.m = 0;  // always clear M
-}
-```
+Task #444 implemented the full validated writeback gate in the simulator, matching the hardware (`hardware/ret.py`) behavior introduced in Task #440.
+
+**Changes made:**
+- `_integrity32(w0, w1)` — JS helper: `ROL(w0,7) XOR ROL(w1 & ~(1<<28), 13) XOR 0xDEADBEEF`. Matches `hardware/integrity32.py`.
+- `_setMWindow(crIdx)` — now populates `DR14 = _integrity32(cr.word1, cr.word2)` (precomputed integrity token) and `DR15 = cr.word3` (seals word).
+- `_mwinWriteback()` — fires at every normal CALL and RETURN boundary when `CR15.m === 1`. Three-gate check: NULL/integrity/gt_seq. Pass commits `DR11→CR15.word0`, `DR12→CR15.word1`, `DR13→CR15.word2` and clears M. Failure faults `INVALID_OP` and clears M.
+- `_execReturn()` — calls `_mwinWriteback()` at the very start, before frame pop and `_resetAllMBits()`.
+- `_execCall()` (Inform-type path only) — calls `_mwinWriteback()` before NS lookup and stack push. Not called on Abstract-GT dispatch.
+- Audit pipeline includes a `MWIN_WB` stage entry when writeback fires.
+- `tests/test_mwin_writeback.py` and `tests/sim_mwin_writeback.js` added with five test scenarios.
+
+### Original Description
+
+`_clearMWindow(crIdx, writeBack = true)` is the mechanism.  
+**RETURN calls it with `writeBack = false` at every exit path**.  
+This means: DR11–DR15 values accumulated during the call scope are **silently discarded** on RETURN.
 
 ### Hardware (Task #440 — `hardware/ret.py`)
 Task #440 added `m_set_dr15` and the 5-word M-window shadow. The hardware performs a **validated mLoad-style writeback** of DR11–DR15 back to the capability's NS entry before clearing the M-bit. This writeback is integrity-checked before the scope closes.
-
-### Impact
-The simulator is currently one step behind Task #440 on RETURN semantics. Writes to DR11–DR15 during a call scope persist in hardware (written back through the NS gate) but are dropped in the simulator. This gap exists in any call that intentionally mutates the M-window and relies on those mutations surviving the RETURN.
 
 ---
 
@@ -238,7 +235,7 @@ These areas are confirmed consistent between simulator and hardware:
 | # | Gap | Action | Priority |
 |---|---|---|---|
 | 1 | Stale Verilog (missing m_set_dr15) | `python3 -m hardware.gen_verilog verilog` | **NOW** |
-| 2 | RETURN M-window writeback: simulator drops it | Implement `writeBack=true` path in simulator RETURN, matching hardware Task #440 validated writeback | **HIGH** |
+| 2 | RETURN M-window writeback: simulator drops it | ~~Implement `writeBack=true` path in simulator RETURN, matching hardware Task #440 validated writeback~~ **FIXED (Task #444)** | ~~**HIGH**~~ **DONE** |
 | 3 | SWITCH semantics: simple swap vs PassKey+mLoad upgrade | Decide: is simulator SWITCH intentionally simplified? Document or fix | **HIGH** |
 | 4 | GC G-bit: hardware auto-clears in mLoad | Add G-bit clear to simulator `_mLoad` on successful load | **MEDIUM** |
 | 5 | CLOAD missing from simulator opcode table | Add CLOAD opcode to simulator (or explicitly document as "handled implicitly by CALL") | **MEDIUM** |
