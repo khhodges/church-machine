@@ -329,8 +329,8 @@ def test_execute_audit_log_entry_dispatches_to_entry_slot():
 
 
 def test_execute_audit_log_entry_result_is_pass():
-    """The audit log entry has result='PASS' on a clean Execute."""
-    assert _h()["auditLog_entry_result"] == "PASS"
+    """The audit log entry has result='pass' on a clean Execute."""
+    assert _h()["auditLog_entry_result"] == "pass"
 
 
 # ---------------------------------------------------------------------------
