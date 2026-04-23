@@ -42,12 +42,13 @@ class CTMMCapCall(Elaboratable):
         self.cr_clear_mask = Signal(16)
 
         # M-GT dispatch outputs — pulsed for one cycle when M_FETCH_DONE fires.
-        # Signals core to load the M-window shadow (XR11-XR14) from these values.
+        # Loads M-window shadow (XR11-XR15) from the 4-word fetched NS entry.
         self.mgt_set_trigger  = Signal()
         self.mgt_gt_word      = Signal(32)   # raw 32-bit Abstract GT (src cap's word0_gt)
         self.mgt_ns_location  = Signal(32)   # NS entry word0_location
         self.mgt_ns_authority = Signal(32)   # NS entry word1_limit (authority)
         self.mgt_ns_integrity = Signal(32)   # NS entry word2_integrity
+        self.mgt_ns_seals     = Signal(32)   # NS entry word3_abstract_gt (advisory seals)
 
     def elaborate(self, platform):
         m = Module()
@@ -79,11 +80,12 @@ class CTMMCapCall(Elaboratable):
         b_clear_wr_data = Signal(CAP_REG_LAYOUT)
 
         # M-GT dispatch latches + direct memory read override
-        mgt_gt_lat  = Signal(32)
-        mgt_gt_view = View(GT_LAYOUT, mgt_gt_lat)
-        ns_loc_lat  = Signal(32)
-        ns_auth_lat = Signal(32)
-        ns_int_lat  = Signal(32)
+        mgt_gt_lat   = Signal(32)
+        mgt_gt_view  = View(GT_LAYOUT, mgt_gt_lat)
+        ns_loc_lat   = Signal(32)
+        ns_auth_lat  = Signal(32)
+        ns_int_lat   = Signal(32)
+        ns_seal_lat  = Signal(32)
 
         local_mem_rd_addr = Signal(32)
         local_mem_rd_en   = Signal()
@@ -290,6 +292,16 @@ class CTMMCapCall(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += ns_int_lat.eq(self.mem_rd_data)
+                    m.next = "M_FETCH_NS3"
+
+            with m.State("M_FETCH_NS3"):
+                # Fetch NS entry word3_abstract_gt (advisory seals annotation)
+                m.d.comb += [
+                    local_mem_rd_addr.eq(mgt_ns_entry_base + 12),
+                    local_mem_rd_en.eq(1),
+                ]
+                with m.If(self.mem_rd_valid):
+                    m.d.sync += ns_seal_lat.eq(self.mem_rd_data)
                     m.next = "M_FETCH_DONE"
 
             with m.State("M_FETCH_DONE"):
@@ -312,6 +324,7 @@ class CTMMCapCall(Elaboratable):
             self.mgt_ns_location.eq(ns_loc_lat),
             self.mgt_ns_authority.eq(ns_auth_lat),
             self.mgt_ns_integrity.eq(ns_int_lat),
+            self.mgt_ns_seals.eq(ns_seal_lat),
         ]
 
         return m

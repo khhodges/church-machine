@@ -226,14 +226,25 @@ History:
 
 The **M-window** grants a thread momentary write-access to its own namespace
 CR (CR15).  It is implemented entirely in hardware via a 1-bit M-flag latch
-and a 3-register shadow copy (DR11–DR13).
+and a **5-word shadow** (DR11–DR15 / XR11–XR15):
+
+| Shadow word | ctmm signal | hardware signal | Content |
+|-------------|-------------|-----------------|---------|
+| DR11 / XR11 | `m_xr11`    | `m_dr11`        | Abstract GT word (word0\_gt) |
+| DR12 / XR12 | `m_xr12`    | `m_dr12`        | NS entry word0\_location |
+| DR13 / XR13 | `m_xr13`    | `m_dr13`        | NS entry word1\_authority |
+| DR14 / XR14 | `m_xr14`    | `m_dr14`        | integrity32(DR12, DR13) |
+| DR15 / XR15 | `m_xr15`    | `m_dr15`        | NS entry word3\_seals (version + seal) |
+
+DR14 / XR14 holds a 32-bit integrity tag computed as `integrity32(location, authority)`.
+DR15 / XR15 holds the advisory seals word; writeback validates `GT.version == seals.version`.
 
 ### M-flag lifecycle
 
 | Event | M-flag before | Action | M-flag after |
 |-------|--------------|--------|--------------|
-| M-set (`cr15_m_set`) | 0 | Copy CR15 → DR11–DR13; set flag | **1** |
-| Valid writeback (`cr15_m_writeback_trigger`, DR11 non-NULL) | 1 | Pack DR11–DR13 → CR15 via `cr_wr`; clear flag | **0** |
+| M-set (`cr15_m_set`) | 0 | Copy CR15 → DR11–DR15; set flag | **1** |
+| Valid writeback (`cr15_m_writeback_trigger`, DR11 non-NULL, integrity + version ok) | 1 | Pack DR11–DR15 → CR15 via `cr_wr`; clear flag | **0** |
 | NULL GT writeback (`cr15_m_writeback_trigger`, DR11 NULL) | 1 | Raise `INVALID_OP` fault; clear flag | **0** |
 | CHANGE / cross-domain RETURN | 1 | No FSM trigger; flag preserved | **1** |
 | Global reset (`clear_all`) | any | Wipe all registers | **0** |
@@ -245,8 +256,10 @@ and a 3-register shadow copy (DR11–DR13).
 | `cr15_m_set` | in | 1 | Pulse to copy CR15 shadow + set M-flag |
 | `cr15_m_writeback_trigger` | in | 1 | Pulse to validate DR11 and initiate writeback |
 | `cr15_m_flag` | out | 1 | Current M-flag (combinatorial) |
-| `dbg_m_dr11/12/13` | out | 32 | Shadow DR reads for test inspection |
-| `m_set_en` (registers) | in | 1 | Enable CR15 → DR11–DR13 copy + set flag |
+| `dbg_m_dr11/12/13/14` | out | 32×4 | Shadow DR reads for test inspection (hardware) |
+| `dbg_m_xr11/12/13/14/15` | out | 32×5 | Shadow XR reads for test inspection (ctmm) |
+| `dbg_cap_wr_en/addr/data` | in | — | Debug cap-register write port (ctmm testbench) |
+| `m_set_en` (registers) | in | 1 | Enable CR15 → DR11–DR15 copy + set flag |
 | `m_clear_en` (registers) | in | 1 | Clear M-flag (no writeback) |
 
 ### FSM states
@@ -264,25 +277,32 @@ IDLE ──(trigger + valid DR11)──→ WRITEBACK ──→ IDLE
 
 `mwin_busy` is HIGH in WRITEBACK and FAULT only, stalling instruction fetch.
 
-### Validation (NULL GT check)
+### Validation (writeback guards)
 
-In the **Amaranth simulator** model (`ctmm_cap_amaranth`):
-- GT_TYPE_NULL = `0b10`; bits `[1:0]` of DR11 (word0_gt).
+WRITEBACK applies three checks in order; any failure raises `INVALID_OP` and clears M:
 
-In the **production hardware** (`hardware`):
-- GT_TYPE_NULL = `0b00`; bits `[24:23]` of DR11 (word0_gt gt_type field).
+1. **NULL GT**: DR11 `gt_type` field must be non-NULL.
+   - ctmm: GT_TYPE_NULL = `0b10`; bits `[1:0]` of XR11.
+   - hardware: GT_TYPE_NULL = `0b00`; bits `[24:23]` of DR11.
+2. **Integrity**: `integrity32(DR12, DR13) == DR14` (shadow consistency tag).
+3. **Version**: `GT.version == seals.version` — `DR11.version` (ctmm bits `[31:25]`) must
+   equal `DR15.version` (ctmm bits `[31:25]`); hardware compares `dr11.gt_seq` vs `dr13.gt_seq`.
+   This revocation check catches writes using a stale M-window from a reclaimed GT slot.
 
-A NULL GT in DR11 at writeback time raises `INVALID_OP` (0xB) and clears M.
+A valid writeback packs DR11–DR15 back into CR15 (all 4 words of `CAP_REG_LAYOUT`)
+and clears M.
 
 ### Implementation files
 
 | File | Role |
 |------|------|
-| `ctmm_cap_amaranth/registers.py` | M-flag latch, m_set_en/m_clear_en, m_xr11–14 |
-| `ctmm_cap_amaranth/core.py` | M-window FSM, test-injection ports, fault mux |
-| `hardware/registers.py` | Production register file: M-flag + DR11–DR13 shadow |
+| `ctmm_cap_amaranth/registers.py` | M-flag latch, m_set_en/m_clear_en, m_xr11–15 |
+| `ctmm_cap_amaranth/core.py` | M-window FSM, Abstract-GT CALL perm bypass, fault mux, dbg ports |
+| `ctmm_cap_amaranth/call.py` | M_FETCH_NS0–NS3 states, mgt_ns_seals, mgt_set_trigger |
+| `hardware/registers.py` | Production register file: M-flag + DR11–DR15 shadow |
 | `hardware/core.py` | Production M-window FSM, writeback priority in cr_wr mux |
-| `ctmm_cap_amaranth/testbench.py` | Test 12 A–D: M-set / writeback / CHANGE / fault |
+| `hardware/call.py` | M_FETCH_NS0–NS3 states (hardware), gt_seq revocation |
+| `ctmm_cap_amaranth/testbench.py` | Tests 12A–H: M-set / writeback / CHANGE / fault / real-CALL |
 
 ---
 
@@ -293,4 +313,4 @@ A NULL GT in DR11 at writeback time raises `INVALID_OP` (0xB) and clears M.
 | #406 | This task — Abstract GT encoding, LED c-list slots 8–13 |
 | #430 | Amaranth HDL core changes (FPGA synthesis) |
 | #431 | UART, Button, Timer as Abstract GTs |
-| #432 | CR15 M-window hardware: M-flag latch, DR11–DR13 shadow, FSM writeback |
+| #432 | CR15 M-window hardware: M-flag latch, 5-word DR11–DR15 shadow, FSM writeback with integrity + version check; M-GT auto-dispatch from CALL via M_FETCH_NS0–NS3 |

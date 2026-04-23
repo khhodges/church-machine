@@ -491,8 +491,92 @@ def run_testbench():
             f"12G: CR5 stack must NOT be pushed by M-writeback, got depth={depth_after_wb}")
         print("  PASS 12G: Abstract-GT M-set + writeback do NOT push CR5 stack (depth stays 0)")
 
+        # ── 12H: Real Abstract-GT CALL through ISA decoder and M_FETCH_NS0-NS3 ──
+        # End-to-end test: pre-load an Abstract GT in CR1 via the debug write port,
+        # issue a CALL cr1 instruction through the instruction decoder, and serve
+        # four sequential NS memory reads (NS0-NS3) via dmem_rd_data (mem_rd_valid
+        # is hardwired to 1, so each M_FETCH_NS state advances in one cycle).
+        # After M_FETCH_DONE fires mgt_set_trigger, verify XR11-XR15 hold the
+        # correct NS-fetch results and the CR5 stack is still empty.
+        print("  [12H] Real Abstract-GT CALL: ISA decoder → M_FETCH_NS0-NS3 → M-set")
+
+        # Abstract GT: index=7, version=5, type=ABSTRACT, perms=0
+        CALL_GT_INDEX   = 7
+        CALL_GT_VERSION = 5
+        call_gt_word = build_gt(CALL_GT_INDEX, 0, gt_type=GT_TYPE_ABSTRACT,
+                                version=CALL_GT_VERSION)
+
+        # Pre-load CR1 with the Abstract GT via the debug cap write port (one cycle).
+        ctx.set(dut.dbg_cap_wr_en,   1)
+        ctx.set(dut.dbg_cap_wr_addr, 1)
+        ctx.set(dut.dbg_cap_wr_data, {
+            "word0_gt":       {"gt_type": GT_TYPE_ABSTRACT, "perms": 0,
+                               "index": CALL_GT_INDEX, "version": CALL_GT_VERSION},
+            "word1_location": 0,
+            "word2_limit":    0,
+            "word3_seals":    0,
+        })
+        await ctx.tick()    # cap_regs[1] ← Abstract GT
+        ctx.set(dut.dbg_cap_wr_en, 0)
+
+        # NS entry sits at CR15.word1_location + (index<<4) = 0 + (7<<4) = 0x70.
+        # We feed all four words through dmem_rd_data (mem_rd_valid is always 1).
+        NS_LOC  = 0x5000
+        NS_AUTH = 0x00040010
+        NS_INT  = integrity32(NS_LOC, NS_AUTH)
+        NS_SEAL = (CALL_GT_VERSION << 25) | 0x1234
+
+        # Encode CALL cr1 and pulse imem_valid for one cycle.
+        CALL_INSTR = encode_church(ChurchOpcode.CALL, cr_dst=0, cr_src=1)
+        ctx.set(dut.dmem_rd_data, NS_LOC)    # pre-arm NS0 data for M_FETCH_NS0
+        ctx.set(dut.imem_data,    CALL_INSTR)
+        ctx.set(dut.imem_valid,   1)
+        await ctx.tick()                     # IDLE → CHECK_SRC (call_start fires)
+        ctx.set(dut.imem_valid, 0)           # freeze — prevent re-issue
+
+        await ctx.tick()    # CHECK_SRC  → READ_SRC
+        await ctx.tick()    # READ_SRC   → CHECK_PERM  (src_reg_latched ← cap_regs[1])
+        await ctx.tick()    # CHECK_PERM → M_FETCH_NS0 (detects Abstract GT)
+
+        # M_FETCH_NS0: mem_rd_valid=1 → ns_loc_lat ← dmem_rd_data=NS_LOC
+        await ctx.tick()    # M_FETCH_NS0 → M_FETCH_NS1
+        ctx.set(dut.dmem_rd_data, NS_AUTH)
+        await ctx.tick()    # M_FETCH_NS1 → M_FETCH_NS2  (ns_auth_lat ← NS_AUTH)
+        ctx.set(dut.dmem_rd_data, NS_INT)
+        await ctx.tick()    # M_FETCH_NS2 → M_FETCH_NS3  (ns_int_lat  ← NS_INT)
+        ctx.set(dut.dmem_rd_data, NS_SEAL)
+        await ctx.tick()    # M_FETCH_NS3 → M_FETCH_DONE (ns_seal_lat ← NS_SEAL)
+        await ctx.tick()    # M_FETCH_DONE→ IDLE (mgt_set_trigger fires; XR11-XR15 set)
+
+        m_flag_h  = ctx.get(dut.cr15_m_flag)
+        xr11_h    = ctx.get(dut.dbg_m_xr11)
+        xr12_h    = ctx.get(dut.dbg_m_xr12)
+        xr13_h    = ctx.get(dut.dbg_m_xr13)
+        xr14_h    = ctx.get(dut.dbg_m_xr14)
+        xr15_h    = ctx.get(dut.dbg_m_xr15)
+        depth_h   = ctx.get(dut.dbg_cr5_stack_depth)
+
+        assert m_flag_h == 1, (
+            f"12H: M-flag should be 1 after Abstract CALL, got {m_flag_h}")
+        assert xr11_h == call_gt_word, (
+            f"12H: XR11 should be Abstract GT {call_gt_word:#010x}, got {xr11_h:#010x}")
+        assert xr12_h == NS_LOC, (
+            f"12H: XR12 should be NS_LOC={NS_LOC:#010x}, got {xr12_h:#010x}")
+        assert xr13_h == NS_AUTH, (
+            f"12H: XR13 should be NS_AUTH={NS_AUTH:#010x}, got {xr13_h:#010x}")
+        assert xr14_h == NS_INT, (
+            f"12H: XR14 should be integrity32({NS_LOC:#x},{NS_AUTH:#x})={NS_INT:#010x}, "
+            f"got {xr14_h:#010x}")
+        assert xr15_h == NS_SEAL, (
+            f"12H: XR15 should be NS_SEAL={NS_SEAL:#010x}, got {xr15_h:#010x}")
+        assert depth_h == 0, (
+            f"12H: CR5 stack must be 0 after Abstract CALL, got depth={depth_h}")
+        print("  PASS 12H: Real Abstract-GT CALL → M_FETCH_NS0-NS3 → "
+              "XR11-XR15 populated, M-flag=1, CR5 stack empty")
+
         print("  PASS: All M-window lifecycle cases verified "
-              "(set / writeback / CHANGE / integrity-fault / restore / null-gt-fault / no-stack-push)")
+              "(set / writeback / CHANGE / integrity-fault / restore / "
+              "null-gt-fault / no-stack-push / real-call-path)")
 
         print("\n" + "=" * 60)
         print("CTMMCap Amaranth Testbench — All Tests Complete")

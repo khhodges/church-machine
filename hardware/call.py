@@ -97,13 +97,14 @@ class ChurchCall(Elaboratable):
         self.code_hi_out = Signal(32)
 
         # M-GT dispatch outputs — pulsed for one cycle when M_FETCH_DONE fires.
-        # Signals core to load the M-window shadow (DR11-DR14) from these values
+        # Signals core to load the M-window shadow (DR11-DR15) from these values
         # rather than executing the normal lump/stack pipeline.
         self.mgt_set_trigger  = Signal()
         self.mgt_gt_word      = Signal(32)   # raw 32-bit Abstract GT (src cap's word0_gt)
         self.mgt_ns_location  = Signal(32)   # NS entry word0_location
         self.mgt_ns_authority = Signal(32)   # NS entry word1_authority
         self.mgt_ns_integrity = Signal(32)   # NS entry word2_integrity
+        self.mgt_ns_seals     = Signal(32)   # NS entry word3_abstract_gt (advisory seals)
 
     def elaborate(self, platform):
         m = Module()
@@ -152,14 +153,15 @@ class ChurchCall(Elaboratable):
         # Latched in PHASE1_DONE (while cr_rd_addr == CR6, combinatorial read-back).
         callee_egt_latched = Signal(32)
 
-        # M-GT dispatch latches: populated during M_FETCH_NS0/1/2 states.
+        # M-GT dispatch latches: populated during M_FETCH_NS0/1/2/3 states.
         # mgt_gt_lat: raw Abstract GT word from src_reg_latched.word0_gt.
-        # ns_*_lat: 3 NS entry words fetched from Mem[CR15.loc + slot_id<<4 + N].
-        mgt_gt_lat  = Signal(32)
-        mgt_gt_view = View(GT_LAYOUT, mgt_gt_lat)
-        ns_loc_lat  = Signal(32)
-        ns_auth_lat = Signal(32)
-        ns_int_lat  = Signal(32)
+        # ns_*_lat: 4 NS entry words fetched from Mem[CR15.loc + slot_id<<4 + N].
+        mgt_gt_lat   = Signal(32)
+        mgt_gt_view  = View(GT_LAYOUT, mgt_gt_lat)
+        ns_loc_lat   = Signal(32)
+        ns_auth_lat  = Signal(32)
+        ns_int_lat   = Signal(32)
+        ns_seal_lat  = Signal(32)
 
         # CALL frame word (spec §"Zone ② — LIFO Stack"):
         #   bit[31]    = SZ = 1  (CALL frame tag)
@@ -615,6 +617,16 @@ class ChurchCall(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += ns_int_lat.eq(self.mem_rd_data)
+                    m.next = "M_FETCH_NS3"
+
+            with m.State("M_FETCH_NS3"):
+                # Fetch NS entry word3_abstract_gt (advisory seals annotation)
+                m.d.comb += [
+                    self.mem_rd_addr.eq(mgt_ns_entry_base + 12),
+                    self.mem_rd_en.eq(1),
+                ]
+                with m.If(self.mem_rd_valid):
+                    m.d.sync += ns_seal_lat.eq(self.mem_rd_data)
                     m.next = "M_FETCH_DONE"
 
             with m.State("M_FETCH_DONE"):
@@ -636,6 +648,7 @@ class ChurchCall(Elaboratable):
             self.mgt_ns_location.eq(ns_loc_lat),
             self.mgt_ns_authority.eq(ns_auth_lat),
             self.mgt_ns_integrity.eq(ns_int_lat),
+            self.mgt_ns_seals.eq(ns_seal_lat),
         ]
 
         return m

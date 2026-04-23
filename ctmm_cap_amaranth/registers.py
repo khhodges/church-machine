@@ -46,7 +46,7 @@ class CTMMCapRegisters(Elaboratable):
         self.clear_all = Signal()
 
         # M-window controls — CR15 M-flag
-        # m_set_en:         populate XR11-XR14 from m_set_dr11-14, XR15=0, set cr15_m_flag
+        # m_set_en:         populate XR11-XR15 from m_set_dr11-15, set cr15_m_flag
         # m_clear_en:       clear cr15_m_flag (no writeback; used on fault path)
         # m_flag_restore_en: CHANGE restore: set cr15_m_flag = m_flag_restore_val (no XR copy)
         self.m_set_en          = Signal()
@@ -54,17 +54,19 @@ class CTMMCapRegisters(Elaboratable):
         self.m_flag_restore_en  = Signal()
         self.m_flag_restore_val = Signal()
 
-        # Data sources for M-window shadow (XR11-XR14) — driven by core
+        # Data sources for M-window shadow (XR11-XR15) — driven by core
         self.m_set_dr11 = Signal(32)   # raw Abstract GT word (word0_gt of src cap)
         self.m_set_dr12 = Signal(32)   # NS entry word0_location
         self.m_set_dr13 = Signal(32)   # NS entry word1_limit (authority)
         self.m_set_dr14 = Signal(32)   # NS entry word2_integrity
+        self.m_set_dr15 = Signal(32)   # NS entry word3_abstract_gt (advisory seals)
 
         # Combinatorial read of the M-window XRs (always valid)
         self.m_xr11 = Signal(32)
         self.m_xr12 = Signal(32)
         self.m_xr13 = Signal(32)
         self.m_xr14 = Signal(32)
+        self.m_xr15 = Signal(32)
 
         # Current M-flag state (combinatorial from cr15_m_reg)
         self.cr15_m_flag = Signal()
@@ -98,12 +100,13 @@ class CTMMCapRegisters(Elaboratable):
             self.cr15_namespace.eq(cap_regs[CR_NAMESPACE]),
         ]
 
-        # M-window: combinatorial reads of XR11-XR14
+        # M-window: combinatorial reads of XR11-XR15
         m.d.comb += [
             self.m_xr11.eq(data_regs[11]),
             self.m_xr12.eq(data_regs[12]),
             self.m_xr13.eq(data_regs[13]),
             self.m_xr14.eq(data_regs[14]),
+            self.m_xr15.eq(data_regs[15]),
             self.cr15_m_flag.eq(cr15_m_reg),
         ]
 
@@ -135,11 +138,11 @@ class CTMMCapRegisters(Elaboratable):
                     cr_view = View(CAP_REG_LAYOUT, cap_regs[i])
                     m.d.sync += cr_view.word0_gt.eq(self.cr_gt_wr_data[i])
 
-            # Normal XR write (lower priority than m_set_en for XR11-XR14)
+            # Normal XR write (lower priority than m_set_en for XR11-XR15)
             with m.If(self.xr_wr_en & (self.xr_wr_addr != 0)):
                 m.d.sync += data_regs[self.xr_wr_addr].eq(self.xr_wr_data)
 
-            # M-set: populate XR11-XR14 from m_set_dr11-14 inputs, XR15=0, set flag.
+            # M-set: populate XR11-XR15 from m_set_dr11-15 inputs, set flag.
             # Placed AFTER xr_wr_en so m_set_en wins for XR11-XR15.
             with m.If(self.m_set_en):
                 m.d.sync += cr15_m_reg.eq(1)
@@ -147,7 +150,7 @@ class CTMMCapRegisters(Elaboratable):
                 m.d.sync += data_regs[12].eq(self.m_set_dr12)
                 m.d.sync += data_regs[13].eq(self.m_set_dr13)
                 m.d.sync += data_regs[14].eq(self.m_set_dr14)
-                m.d.sync += data_regs[15].eq(0)
+                m.d.sync += data_regs[15].eq(self.m_set_dr15)
             with m.Elif(self.m_clear_en):
                 m.d.sync += cr15_m_reg.eq(0)
             # CHANGE restore: set M-flag to saved value (no XR copy); lower priority

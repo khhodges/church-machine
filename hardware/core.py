@@ -106,7 +106,7 @@ class ChurchCore(Elaboratable):
         # cr15_m_set: pulse to load DR11-DR14 from CR15 + integrity32 and set M-flag (test)
         # cr15_m_writeback_trigger: pulse to validate DR11/integrity and write back to CR15
         # cr15_m_flag: current M-flag state (combinatorial read)
-        # dbg_m_dr11/12/13/14: combinatorial reads of DR11-DR14 for test inspection
+        # dbg_m_dr11..15: combinatorial reads of DR11-DR15 for test inspection
         self.cr15_m_set               = Signal()
         self.cr15_m_writeback_trigger = Signal()
         self.cr15_m_flag              = Signal()
@@ -114,6 +114,7 @@ class ChurchCore(Elaboratable):
         self.dbg_m_dr12               = Signal(32)
         self.dbg_m_dr13               = Signal(32)
         self.dbg_m_dr14               = Signal(32)
+        self.dbg_m_dr15               = Signal(32)
 
     def elaborate(self, platform):
         m = Module()
@@ -580,6 +581,7 @@ class ChurchCore(Elaboratable):
             self.dbg_m_dr12.eq(u_regs.m_dr12),
             self.dbg_m_dr13.eq(u_regs.m_dr13),
             self.dbg_m_dr14.eq(u_regs.m_dr14),
+            self.dbg_m_dr15.eq(u_regs.m_dr15),
         ]
 
         # CHANGE restore signals only exist on the full profile (not IoT)
@@ -617,6 +619,10 @@ class ChurchCore(Elaboratable):
             u_regs.m_set_dr14.eq(
                 Mux(u_call.mgt_set_trigger, u_call.mgt_ns_integrity,
                     cr15_m_set_integrity)
+            ),
+            u_regs.m_set_dr15.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_seals,
+                    0)   # cr15_m_set path: seals word not available; DR15=0
             ),
         ]
 
@@ -1545,11 +1551,12 @@ class ChurchCore(Elaboratable):
             u_regs.cr15_m_flag
         )
 
-        # Latched snapshot of DR11-DR14 captured in IDLE → {WRITEBACK|FAULT} transition
+        # Latched snapshot of DR11-DR15 captured in IDLE → {WRITEBACK|FAULT} transition
         mwin_dr11_lat = Signal(32)
         mwin_dr12_lat = Signal(32)
         mwin_dr13_lat = Signal(32)
         mwin_dr14_lat = Signal(32)
+        mwin_dr15_lat = Signal(32)
 
         # Combinatorial: decode DR11 gt_type (bits[24:23]) for NULL check.
         # In hardware, GT_TYPE_NULL = 0b00 at bits[24:23].
@@ -1561,6 +1568,17 @@ class ChurchCore(Elaboratable):
         integrity32_amaranth(m, mwin_dr12_lat, mwin_dr13_lat, mwin_integrity_computed)
         mwin_integrity_ok = Signal()
         m.d.comb += mwin_integrity_ok.eq(mwin_integrity_computed == mwin_dr14_lat)
+
+        # gt_seq revocation check — GT.gt_seq (DR11[22:16]) must match NS_auth.gt_seq (DR13[27:21]).
+        # Detects stale GTs revoked by GC since the M-window was set.
+        mwin_dr11_gt_seq = Signal(7)
+        mwin_dr13_gt_seq = Signal(7)
+        mwin_gtseq_ok    = Signal()
+        m.d.comb += [
+            mwin_dr11_gt_seq.eq(View(GT_LAYOUT, mwin_dr11_lat).gt_seq),
+            mwin_dr13_gt_seq.eq(View(WORD2_LAYOUT, mwin_dr13_lat).gt_seq),
+            mwin_gtseq_ok.eq(mwin_dr11_gt_seq == mwin_dr13_gt_seq),
+        ]
 
         with m.FSM(name="mwin"):
             with m.State("IDLE"):
@@ -1579,6 +1597,7 @@ class ChurchCore(Elaboratable):
                         mwin_dr12_lat.eq(u_regs.m_dr12),
                         mwin_dr13_lat.eq(u_regs.m_dr13),
                         mwin_dr14_lat.eq(u_regs.m_dr14),
+                        mwin_dr15_lat.eq(u_regs.m_dr15),
                     ]
                     with m.If(mwin_dr11_valid):
                         m.next = "WRITEBACK"
@@ -1587,13 +1606,16 @@ class ChurchCore(Elaboratable):
 
             with m.State("WRITEBACK"):
                 m.d.comb += mwin_busy.eq(1)
-                # Integrity check: reject the writeback if DR14 ≠ integrity32(DR12, DR13)
-                with m.If(mwin_integrity_ok):
+                # Full validation: integrity32(DR12,DR13)==DR14 AND GT.gt_seq==NS_auth.gt_seq.
+                # Both must pass to write back; either failure → INVALID_OP + M-clear.
+                with m.If(mwin_integrity_ok & mwin_gtseq_ok):
                     mwin_wr_view = View(CAP_REG_LAYOUT, mwin_cr_wr_data)
                     m.d.comb += [
                         mwin_wr_view.word0_gt.eq(mwin_dr11_lat),
                         mwin_wr_view.word1_location.eq(mwin_dr12_lat),
                         mwin_wr_view.word2_w2.eq(mwin_dr13_lat),
+                        # DR15 (NS word3/seals) is software-visible while M=1 but is not
+                        # written back to CR15 since the 3-word CAP_REG layout has no word3.
                         mwin_cr_wr_en.eq(1),
                         mwin_m_set_en.eq(0),
                         mwin_m_clear_en.eq(1),

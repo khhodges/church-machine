@@ -2,7 +2,7 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT, SEALS_LAYOUT
 from hardware.integrity32 import integrity32_amaranth, integrity32
 from .registers import CTMMCapRegisters
 from .decoder import CTMMCapDecoder
@@ -33,7 +33,14 @@ class CTMMCapCore(Elaboratable):
         self.dbg_m_xr12               = Signal(32)
         self.dbg_m_xr13               = Signal(32)
         self.dbg_m_xr14               = Signal(32)
+        self.dbg_m_xr15               = Signal(32)
         self.dbg_cr5_stack_depth      = Signal(8)   # CR5 stack depth (for testbench)
+
+        # Direct cap-register write port (testbench only — pre-load a cap register)
+        self.dbg_cap_wr_en   = Signal()
+        self.dbg_cap_wr_addr = Signal(4)
+        self.dbg_cap_wr_data = Signal(CAP_REG_LAYOUT)
+
         # CHANGE M-flag restore (test-access; in hardware routed from u_change outputs)
         self.m_flag_restore_en        = Signal()
         self.m_flag_restore_val       = Signal()
@@ -165,7 +172,12 @@ class CTMMCapCore(Elaboratable):
             with m.Case(ChurchOpcode.SAVE):
                 m.d.comb += required_perms.eq(PERM_MASK_S)
             with m.Case(ChurchOpcode.CALL):
-                m.d.comb += required_perms.eq(PERM_MASK_E)
+                # Abstract GTs bypass E-perm: the call FSM dispatches to M_FETCH_NS.
+                perm_gt_view = View(GT_LAYOUT, perm_gt_sig)
+                with m.If(perm_gt_view.gt_type == GT_TYPE_ABSTRACT):
+                    m.d.comb += required_perms.eq(0)
+                with m.Else():
+                    m.d.comb += required_perms.eq(PERM_MASK_E)
             with m.Case(ChurchOpcode.SWITCH):
                 m.d.comb += required_perms.eq(PERM_MASK_L)
             with m.Case(ChurchOpcode.CHANGE):
@@ -452,16 +464,19 @@ class CTMMCapCore(Elaboratable):
                 Mux(mwin_cr_wr_en, CR_NAMESPACE,
                     Mux(u_tperm.tperm_busy, u_tperm.cr_wr_addr,
                         Mux(u_call.call_busy, u_call.cr_wr_addr,
-                            Mux(u_return.busy, u_return.cr_wr_addr, 0))))
+                            Mux(u_return.busy, u_return.cr_wr_addr,
+                                Mux(self.dbg_cap_wr_en, self.dbg_cap_wr_addr, 0)))))
             ),
             u_regs.cr_wr_data.eq(
                 Mux(mwin_cr_wr_en, mwin_cr_wr_data,
                     Mux(u_tperm.tperm_busy, u_tperm.cr_wr_data,
                         Mux(u_call.call_busy, u_call.cr_wr_data,
-                            Mux(u_return.busy, u_return.cr_wr_data, 0))))
+                            Mux(u_return.busy, u_return.cr_wr_data,
+                                Mux(self.dbg_cap_wr_en, self.dbg_cap_wr_data, 0)))))
             ),
             u_regs.cr_wr_en.eq(
                 mwin_cr_wr_en | u_tperm.cr_wr_en | u_call.cr_wr_en | u_return.cr_wr_en
+                | self.dbg_cap_wr_en
             ),
         ]
 
@@ -637,6 +652,7 @@ class CTMMCapCore(Elaboratable):
         mwin_xr12_lat = Signal(32)
         mwin_xr13_lat = Signal(32)
         mwin_xr14_lat = Signal(32)
+        mwin_xr15_lat = Signal(32)
 
         m_trigger = Signal()
         m.d.comb += m_trigger.eq(
@@ -654,6 +670,18 @@ class CTMMCapCore(Elaboratable):
         mwin_integrity_ok = Signal()
         m.d.comb += mwin_integrity_ok.eq(mwin_integrity_computed == mwin_xr14_lat)
 
+        # Version revocation check — GT.version (XR11[31:25]) must match seals.version (XR15[31:25]).
+        # XR15 carries the NS entry word3_seals (SEALS_LAYOUT: seal[24:0] | version[31:25]).
+        # A mismatch means the GT was revoked by GC since the M-window was set.
+        mwin_gt_version    = Signal(7)
+        mwin_seal_version  = Signal(7)
+        mwin_version_ok    = Signal()
+        m.d.comb += [
+            mwin_gt_version.eq(View(GT_LAYOUT, mwin_xr11_lat).version),
+            mwin_seal_version.eq(View(SEALS_LAYOUT, mwin_xr15_lat).version),
+            mwin_version_ok.eq(mwin_gt_version == mwin_seal_version),
+        ]
+
         with m.FSM(name="mwin"):
             with m.State("IDLE"):
                 m.d.comb += mwin_busy.eq(0)
@@ -663,6 +691,7 @@ class CTMMCapCore(Elaboratable):
                         mwin_xr12_lat.eq(u_regs.m_xr12),
                         mwin_xr13_lat.eq(u_regs.m_xr13),
                         mwin_xr14_lat.eq(u_regs.m_xr14),
+                        mwin_xr15_lat.eq(u_regs.m_xr15),
                     ]
                     with m.If(xr11_valid):
                         m.next = "WRITEBACK"
@@ -671,14 +700,15 @@ class CTMMCapCore(Elaboratable):
 
             with m.State("WRITEBACK"):
                 m.d.comb += mwin_busy.eq(1)
-                # Integrity check: reject the writeback if XR14 ≠ integrity32(XR12, XR13)
-                with m.If(mwin_integrity_ok):
+                # Full validation: integrity32(XR12,XR13)==XR14 AND GT.version==seals.version.
+                # Both must pass; either failure → INVALID_OP + M-clear.
+                with m.If(mwin_integrity_ok & mwin_version_ok):
                     mwin_wr_view = View(CAP_REG_LAYOUT, mwin_cr_wr_data)
                     m.d.comb += [
                         mwin_wr_view.word0_gt.eq(mwin_xr11_lat),
                         mwin_wr_view.word1_location.eq(mwin_xr12_lat),
                         mwin_wr_view.word2_limit.eq(mwin_xr13_lat),
-                        mwin_wr_view.word3_seals.eq(0),   # integrity tag not written back
+                        mwin_wr_view.word3_seals.eq(mwin_xr15_lat),  # restore full 5-word shadow
                         mwin_cr_wr_en.eq(1),
                         mwin_m_clear_en.eq(1),
                     ]
@@ -738,6 +768,10 @@ class CTMMCapCore(Elaboratable):
                 Mux(u_call.mgt_set_trigger, u_call.mgt_ns_integrity,
                     cr15_m_set_integrity)
             ),
+            u_regs.m_set_dr15.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_seals,
+                    cr15_ns_mset_view.word3_seals)  # cr15_m_set: preserve word3_seals from CR15
+            ),
         ]
 
         # Expose M-window observability signals
@@ -747,6 +781,7 @@ class CTMMCapCore(Elaboratable):
             self.dbg_m_xr12.eq(u_regs.m_xr12),
             self.dbg_m_xr13.eq(u_regs.m_xr13),
             self.dbg_m_xr14.eq(u_regs.m_xr14),
+            self.dbg_m_xr15.eq(u_regs.m_xr15),
         ]
 
         CR5_STACK_DEPTH = 256
