@@ -346,6 +346,9 @@ class ChurchCall(Elaboratable):
 
             with m.State("CHECK_PERM"):
                 with m.If(src_gt.gt_type == GT_TYPE_ABSTRACT):
+                    # Stub: Abstract GTs have no lump to execute.  INVALID_OP is
+                    # the interim fault until the hardware Abstract Manager provides
+                    # an invoke path (Task #432 / full M-window hardware).
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
                     m.next = "FAULT"
                 with m.Elif(~src_has_e_perm):

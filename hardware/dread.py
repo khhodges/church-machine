@@ -90,6 +90,9 @@ class ChurchDRead(Elaboratable):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.NULL_CAP)]
                     m.next = "IDLE"
                 with m.Elif(cr_gt.gt_type == GT_TYPE_ABSTRACT):
+                    # Stub: Abstract GT has no addressable lump.  INVALID_OP is
+                    # the interim fault until the hardware Abstract Manager dispatch
+                    # path is implemented (Task #432 / full M-window hardware).
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.INVALID_OP)]
                     m.next = "IDLE"
                 with m.Elif(~has_r):

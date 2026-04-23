@@ -203,6 +203,10 @@ class ChurchMLoad(Elaboratable):
                 with m.If(self.mem_rd_valid):
                     m.d.sync += result_view.word0_gt.eq(self.mem_rd_data)
                     with m.If(self.mem_rd_data[23:25] == GT_TYPE_ABSTRACT):
+                        # Stub: Abstract GT in a c-list slot has no NS entry or lump.
+                        # INVALID_OP prevents ab_data[15:0] from being misinterpreted
+                        # as a slot_id in the NS table.  Replace with Abstract Manager
+                        # dispatch when the hardware path is implemented (Task #432).
                         m.d.sync += fault_type_reg.eq(FaultType.INVALID_OP)
                         m.next = "FAULT"
                     with m.Elif(self.mem_rd_data[23:25] == GT_TYPE_OUTFORM):
