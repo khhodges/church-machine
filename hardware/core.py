@@ -570,9 +570,11 @@ class ChurchCore(Elaboratable):
                 u_shared_mload.cr_wr_en | u_tperm.cr_wr_en | u_call.cr_wr_en |
                 u_return.cr_wr_en | cr_wr_en_extra
             ),
-            # M-window set/clear connect to u_regs controls
+            # M-window set/clear + CHANGE restore connect to u_regs controls
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
+            u_regs.m_flag_restore_en.eq(u_change.m_flag_restore_en),
+            u_regs.m_flag_restore_val.eq(u_change.m_flag_restore_val),
             # Expose M-flag and shadow DR reads
             self.cr15_m_flag.eq(u_regs.cr15_m_flag),
             self.dbg_m_dr11.eq(u_regs.m_dr11),
@@ -1113,6 +1115,9 @@ class ChurchCore(Elaboratable):
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.nia.eq(nia_reg),
                 u_change.flags.eq(u_regs.flags),
+                # M-flag save/restore (Task #432): pass current M-flag in; get restore
+                # enable/val out (wired below alongside other u_regs controls).
+                u_change.cr15_m_flag_in.eq(u_regs.cr15_m_flag),
             ]
 
             switch_start_sig = Signal()
@@ -1478,72 +1483,82 @@ class ChurchCore(Elaboratable):
 
         # -----------------------------------------------------------------------
         # M-window FSM — CR15 M-flag latch + DR11-DR13 shadow (Task #432)
-        # States: IDLE(0) → WRITEBACK(1) or FAULT(2) → IDLE
         #
-        # IDLE: default outputs low.  Two entry triggers (single-cycle pulses):
-        #   - cr15_m_set (test injection): fires mwin_m_set_en immediately (combinatorial
-        #     enable into u_regs, latched next cycle).  No FSM state change needed.
-        #   - cr15_m_writeback_trigger: validates DR11 gt_type; advances to WRITEBACK or
-        #     FAULT next cycle and holds mwin_busy high.
-        # WRITEBACK: drive mwin_cr_wr_en (pack DR11-DR13 → CR15) + mwin_m_clear_en,
-        #            then return to IDLE.
-        # FAULT: assert mwin_fault_valid + mwin_m_clear_en, then return to IDLE.
-        # mwin_busy is HIGH in WRITEBACK and FAULT states only (not IDLE).
+        # Triggered by: (call_complete | return_complete | cr15_m_writeback_trigger)
+        # AND cr15_m_flag == 1  (never fires when M is not active).
+        # cr15_m_set (test/microcode injection): single-cycle M-set, no FSM state change.
+        #
+        # IDLE  → latch DR11-DR13, validate DR11 gt_type bits[24:23]:
+        #           gt_type != NULL (0b00) → WRITEBACK
+        #           gt_type == NULL        → FAULT
+        # WRITEBACK (1 cycle): pack latched DR11-DR13 → CR15 + clear M → IDLE
+        # FAULT     (1 cycle): INVALID_OP fault + clear M → IDLE
+        # mwin_busy is HIGH in WRITEBACK and FAULT states only.
         # -----------------------------------------------------------------------
-        mwin_state_reg = Signal(2)   # 0=IDLE 1=WRITEBACK 2=FAULT
+
+        # Combine all writeback triggers; gate the whole expression on M-flag active.
+        # CALL/RETURN auto-trigger ensures M is always cleared at call boundaries.
+        mwin_trigger = Signal()
+        m.d.comb += mwin_trigger.eq(
+            (u_call.call_complete | u_return.complete | self.cr15_m_writeback_trigger) &
+            u_regs.cr15_m_flag
+        )
+
+        # Latched snapshot of DR11-DR13 captured in IDLE → {WRITEBACK|FAULT} transition
+        mwin_dr11_lat = Signal(32)
+        mwin_dr12_lat = Signal(32)
+        mwin_dr13_lat = Signal(32)
 
         # Combinatorial: decode DR11 gt_type (bits[24:23]) for NULL check.
         # In hardware, GT_TYPE_NULL = 0b00 at bits[24:23].
-        mwin_xr11_valid = Signal()
-        m.d.comb += mwin_xr11_valid.eq(u_regs.m_dr11[23:25] != GT_TYPE_NULL)
+        mwin_dr11_valid = Signal()
+        m.d.comb += mwin_dr11_valid.eq(u_regs.m_dr11[23:25] != GT_TYPE_NULL)
 
-        # Pack DR11-DR13 into a 3-word CAP_REG_LAYOUT for the CR writeback.
-        mwin_packed = Signal(CAP_REG_LAYOUT)
-        mwin_packed_view = View(CAP_REG_LAYOUT, mwin_packed)
-        m.d.comb += [
-            mwin_packed_view.word0_gt.eq(u_regs.m_dr11),
-            mwin_packed_view.word1_location.eq(u_regs.m_dr12),
-            mwin_packed_view.word2_w2.eq(u_regs.m_dr13),
-        ]
-
-        # Default: all M-window outputs low
-        m.d.comb += [
-            mwin_busy.eq(0),
-            mwin_cr_wr_en.eq(0),
-            mwin_cr_wr_data.eq(0),
-            mwin_m_set_en.eq(0),
-            mwin_m_clear_en.eq(0),
-            mwin_fault_valid.eq(0),
-        ]
-
-        with m.Switch(mwin_state_reg):
-            with m.Case(0):  # IDLE
-                # cr15_m_set: single-cycle M-set (drives u_regs.m_set_en; no FSM state change)
-                with m.If(self.cr15_m_set):
-                    m.d.comb += mwin_m_set_en.eq(1)
-                # cr15_m_writeback_trigger: validate DR11 and advance to WRITEBACK or FAULT
-                with m.If(self.cr15_m_writeback_trigger):
-                    with m.If(mwin_xr11_valid):
-                        m.d.sync += mwin_state_reg.eq(1)  # → WRITEBACK
+        with m.FSM(name="mwin"):
+            with m.State("IDLE"):
+                m.d.comb += [
+                    mwin_busy.eq(0),
+                    mwin_cr_wr_en.eq(0),
+                    mwin_cr_wr_data.eq(0),
+                    mwin_m_set_en.eq(self.cr15_m_set),
+                    mwin_m_clear_en.eq(0),
+                    mwin_fault_valid.eq(0),
+                ]
+                with m.If(mwin_trigger):
+                    m.d.sync += [
+                        mwin_dr11_lat.eq(u_regs.m_dr11),
+                        mwin_dr12_lat.eq(u_regs.m_dr12),
+                        mwin_dr13_lat.eq(u_regs.m_dr13),
+                    ]
+                    with m.If(mwin_dr11_valid):
+                        m.next = "WRITEBACK"
                     with m.Else():
-                        m.d.sync += mwin_state_reg.eq(2)  # → FAULT
+                        m.next = "FAULT"
 
-            with m.Case(1):  # WRITEBACK
+            with m.State("WRITEBACK"):
+                mwin_wr_view = View(CAP_REG_LAYOUT, mwin_cr_wr_data)
                 m.d.comb += [
                     mwin_busy.eq(1),
+                    mwin_wr_view.word0_gt.eq(mwin_dr11_lat),
+                    mwin_wr_view.word1_location.eq(mwin_dr12_lat),
+                    mwin_wr_view.word2_w2.eq(mwin_dr13_lat),
                     mwin_cr_wr_en.eq(1),
-                    mwin_cr_wr_data.eq(mwin_packed),
+                    mwin_m_set_en.eq(0),
                     mwin_m_clear_en.eq(1),
+                    mwin_fault_valid.eq(0),
                 ]
-                m.d.sync += mwin_state_reg.eq(0)  # → IDLE
+                m.next = "IDLE"
 
-            with m.Case(2):  # FAULT (NULL GT in DR11)
+            with m.State("FAULT"):
                 m.d.comb += [
                     mwin_busy.eq(1),
-                    mwin_fault_valid.eq(1),
+                    mwin_cr_wr_en.eq(0),
+                    mwin_cr_wr_data.eq(0),
+                    mwin_m_set_en.eq(0),
                     mwin_m_clear_en.eq(1),
+                    mwin_fault_valid.eq(1),
                 ]
-                m.d.sync += mwin_state_reg.eq(0)  # → IDLE
+                m.next = "IDLE"
 
         # fetch_bounds_fault: active when nia_reg escapes the active code fence.
         # Also drives cond_exec_enable low (via the declaration above) so that no

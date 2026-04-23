@@ -65,10 +65,13 @@ class ChurchRegisters(Elaboratable):
         self.cr_null_mask    = Signal(12)
 
         # M-window controls — CR15 M-flag
-        # m_set_en:   copy CR15 words → DR11-DR13 (3-word hardware CR), DR14=0, set flag
-        # m_clear_en: clear cr15_m_flag (no writeback; used on fault path)
-        self.m_set_en   = Signal()
-        self.m_clear_en = Signal()
+        # m_set_en:          copy CR15 words → DR11-DR13 (3-word hardware CR), DR14=0, set flag
+        # m_clear_en:        clear cr15_m_flag (no writeback; used on fault path)
+        # m_flag_restore_en: CHANGE restore: set cr15_m_flag = m_flag_restore_val (no DR copy)
+        self.m_set_en          = Signal()
+        self.m_clear_en        = Signal()
+        self.m_flag_restore_en  = Signal()
+        self.m_flag_restore_val = Signal()
 
         # Combinatorial reads of the M-window DRs (always valid)
         self.m_dr11 = Signal(32)
@@ -166,6 +169,10 @@ class ChurchRegisters(Elaboratable):
                 m.d.sync += data_regs[14].eq(0)
             with m.Elif(self.m_clear_en):
                 m.d.sync += cr15_m_reg.eq(0)
+            # CHANGE restore: set M-flag to saved value (no DR copy); lower priority
+            # than m_set_en/m_clear_en which come from the M-window FSM.
+            with m.Elif(self.m_flag_restore_en):
+                m.d.sync += cr15_m_reg.eq(self.m_flag_restore_val)
 
             with m.If(self.flags_wr_en):
                 m.d.sync += flags_reg.eq(self.flags_in)

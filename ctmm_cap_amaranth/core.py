@@ -32,6 +32,9 @@ class CTMMCapCore(Elaboratable):
         self.dbg_m_xr12               = Signal(32)
         self.dbg_m_xr13               = Signal(32)
         self.dbg_m_xr14               = Signal(32)
+        # CHANGE M-flag restore (test-access; in hardware routed from u_change outputs)
+        self.m_flag_restore_en        = Signal()
+        self.m_flag_restore_val       = Signal()
 
         self.dmem_addr = Signal(32)
         self.dmem_rd_en = Signal()
@@ -670,10 +673,14 @@ class CTMMCapCore(Elaboratable):
                 ]
                 m.next = "IDLE"
 
-        # Wire M-set and M-clear from the test-injection port and FSM
+        # Wire M-set, M-clear, and CHANGE M-flag restore to u_regs
         m.d.comb += [
             u_regs.m_set_en.eq(self.cr15_m_set),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
+            # m_flag_restore: in hardware driven by u_change outputs;
+            # exposed as a test port here for direct verification.
+            u_regs.m_flag_restore_en.eq(self.m_flag_restore_en),
+            u_regs.m_flag_restore_val.eq(self.m_flag_restore_val),
         ]
 
         # Expose M-window observability signals

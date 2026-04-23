@@ -53,6 +53,14 @@ class ChurchChange(Elaboratable):
         # directly, eliminating FETCH_THREAD_HDR from the CALL pipeline.
         self.thread_hdr_out = Signal(32)
 
+        # M-flag save/restore (Task #432)
+        # cr15_m_flag_in:   current thread's M-flag (from u_regs) — saved on switch-out
+        # m_flag_restore_en:  pulses 1 when new thread's M-flag is ready to restore
+        # m_flag_restore_val: the M-flag value for the incoming thread
+        self.cr15_m_flag_in     = Signal()
+        self.m_flag_restore_en  = Signal()
+        self.m_flag_restore_val = Signal()
+
     def elaborate(self, platform):
         m = Module()
 
@@ -115,6 +123,7 @@ class ChurchChange(Elaboratable):
 
         DR_OFFSET = 1
         PACKED_PC_OFFSET = 17
+        M_FLAG_OFFSET   = 18   # thread_base + 72: saved M-flag word (LSB = flag value)
 
         pc_offset = Signal(32)
         packed_pc_word = Signal(32)
@@ -143,12 +152,24 @@ class ChurchChange(Elaboratable):
         mem_wr_data_reg = Signal(32)
         mem_wr_en_reg = Signal()
 
+        # Direct memory-read path used by RESTORE_M_FLAG_RD (bypasses u_mload)
+        mflag_rd_active   = Signal()
+        mflag_rd_addr     = Signal(32)
+        mflag_val_latched = Signal()
+
         m.d.comb += [
             self.mem_wr_addr.eq(mem_wr_addr_reg),
             self.mem_wr_data.eq(mem_wr_data_reg),
             self.mem_wr_en.eq(mem_wr_en_reg),
-            self.mem_rd_addr.eq(Mux(fetch_thr_hdr_active, thread_base, u_mload.mem_addr)),
-            self.mem_rd_en.eq(fetch_thr_hdr_active | u_mload.mem_rd_en),
+            # Priority: mflag_rd_active > fetch_thr_hdr_active > u_mload
+            self.mem_rd_addr.eq(
+                Mux(mflag_rd_active, mflag_rd_addr,
+                    Mux(fetch_thr_hdr_active, thread_base, u_mload.mem_addr))
+            ),
+            self.mem_rd_en.eq(mflag_rd_active | fetch_thr_hdr_active | u_mload.mem_rd_en),
+            # Default m_flag_restore outputs low (overridden in RESTORE_M_FLAG_LATCH)
+            self.m_flag_restore_en.eq(0),
+            self.m_flag_restore_val.eq(0),
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
             self.cr_wr_data.eq(u_mload.cr_wr_data),
             self.cr_wr_en.eq(u_mload.cr_wr_en),
@@ -258,6 +279,17 @@ class ChurchChange(Elaboratable):
                     mem_wr_data_reg.eq(packed_pc_word),
                 ]
                 with m.If(self.mem_wr_done):
+                    m.next = "SAVE_M_FLAG"
+
+            with m.State("SAVE_M_FLAG"):
+                # Write current thread's M-flag to Mem[thread_base + M_FLAG_OFFSET * 4].
+                # thread_base here is still the OLD thread's base (before LOAD_THREAD).
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(thread_base + (M_FLAG_OFFSET << 2)),
+                    mem_wr_data_reg.eq(self.cr15_m_flag_in),
+                ]
+                with m.If(self.mem_wr_done):
                     m.next = "LOAD_THREAD"
 
             with m.State("LOAD_THREAD"):
@@ -289,7 +321,7 @@ class ChurchChange(Elaboratable):
                 with m.If(skip_current_cr):
                     m.d.sync += cr_index.eq(cr_index + 1)
                     with m.If(cr_index >= 14):
-                        m.next = "FETCH_THREAD_HDR"
+                        m.next = "RESTORE_M_FLAG_RD"
                 with m.Else():
                     m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                     m.d.sync += mload_start_reg.eq(1)
@@ -306,9 +338,29 @@ class ChurchChange(Elaboratable):
             with m.State("RESTORE_NEXT"):
                 m.d.sync += cr_index.eq(cr_index + 1)
                 with m.If(cr_index >= 14):
-                    m.next = "FETCH_THREAD_HDR"
+                    m.next = "RESTORE_M_FLAG_RD"
                 with m.Else():
                     m.next = "RESTORE_CALL"
+
+            with m.State("RESTORE_M_FLAG_RD"):
+                # Issue a direct memory read to Mem[thread_base + M_FLAG_OFFSET * 4].
+                # thread_base at this point is the INCOMING thread's base address
+                # (loaded during LOAD_THREAD).
+                m.d.comb += [
+                    mflag_rd_active.eq(1),
+                    mflag_rd_addr.eq(thread_base + (M_FLAG_OFFSET << 2)),
+                ]
+                with m.If(self.mem_rd_valid):
+                    m.d.sync += mflag_val_latched.eq(self.mem_rd_data[0])
+                    m.next = "RESTORE_M_FLAG_LATCH"
+
+            with m.State("RESTORE_M_FLAG_LATCH"):
+                # Pulse m_flag_restore_en for one cycle so u_regs latches the flag.
+                m.d.comb += [
+                    self.m_flag_restore_en.eq(1),
+                    self.m_flag_restore_val.eq(mflag_val_latched),
+                ]
+                m.next = "FETCH_THREAD_HDR"
 
             with m.State("FETCH_THREAD_HDR"):
                 # After RESTORE_CALL the incoming thread's CRs are all committed

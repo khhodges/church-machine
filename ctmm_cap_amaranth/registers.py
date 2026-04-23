@@ -46,10 +46,13 @@ class CTMMCapRegisters(Elaboratable):
         self.clear_all = Signal()
 
         # M-window controls — CR15 M-flag
-        # m_set_en:   copy CR15 words → XR11-XR14, XR15=0, set cr15_m_flag
-        # m_clear_en: clear cr15_m_flag (no writeback; used on fault path)
-        self.m_set_en   = Signal()
-        self.m_clear_en = Signal()
+        # m_set_en:         copy CR15 words → XR11-XR14, XR15=0, set cr15_m_flag
+        # m_clear_en:       clear cr15_m_flag (no writeback; used on fault path)
+        # m_flag_restore_en: CHANGE restore: set cr15_m_flag = m_flag_restore_val (no XR copy)
+        self.m_set_en          = Signal()
+        self.m_clear_en        = Signal()
+        self.m_flag_restore_en  = Signal()
+        self.m_flag_restore_val = Signal()
 
         # Combinatorial read of the M-window XRs (always valid)
         self.m_xr11 = Signal(32)
@@ -142,6 +145,10 @@ class CTMMCapRegisters(Elaboratable):
                 m.d.sync += data_regs[15].eq(0)
             with m.Elif(self.m_clear_en):
                 m.d.sync += cr15_m_reg.eq(0)
+            # CHANGE restore: set M-flag to saved value (no XR copy); lower priority
+            # than m_set_en/m_clear_en which come from the M-window FSM.
+            with m.Elif(self.m_flag_restore_en):
+                m.d.sync += cr15_m_reg.eq(self.m_flag_restore_val)
 
             with m.If(self.flags_wr_en):
                 m.d.sync += flags_reg.eq(self.flags_in)
