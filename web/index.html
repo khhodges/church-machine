@@ -28,6 +28,12 @@
                 <div class="header-right">
                     <button class="btn btn-tunnel-notify" id="btn-tunnel-notify" title="Tunnel Messages" style="display:none" onclick="showTunnelNotification()">&#x1F4E5; <span class="tunnel-badge" id="tunnel-badge">0</span></button>
                     <button id="tutorialBackToLanding" class="btn btn-back-to-landing" onclick="returnToLandingFromTutorial()" style="display: none;">← Back to Landing</button>
+                    <span id="authLoading" style="display:none;font-size:0.8em;opacity:0.7;">Loading...</span>
+                    <span id="authLoggedIn" style="display:none;align-items:center;gap:6px;">
+                        <img id="userAvatar" src="" alt="avatar" style="width:24px;height:24px;border-radius:50%;display:none;">
+                        <span id="userName" style="font-size:0.85em;"></span>
+                    </span>
+                    <span id="authLoggedOut" style="display:none;"></span>
                 </div>
             </nav>
         </header>

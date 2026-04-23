@@ -157,6 +157,78 @@ def boot_id():
     return jsonify({"bootId": BOOT_ID, "version": BUILD_VERSION})
 
 # ---------------------------------------------------------------------------
+# CTMM web app API stubs (used by web/app.js + web/index.html)
+# These endpoints are called by the CTMM simulator frontend served at /ctmm/.
+# The server does not run Replit Auth so auth always reports unauthenticated.
+# ---------------------------------------------------------------------------
+
+@app.route("/api/user")
+def api_user():
+    return jsonify({"authenticated": False})
+
+def _is_development_mode():
+    replit_deployment = os.environ.get("REPLIT_DEPLOYMENT")
+    if replit_deployment is None:
+        return os.environ.get("REPLIT_DEV_DOMAIN") is not None
+    return replit_deployment != "1"
+
+@app.route("/api/environment")
+def api_environment():
+    return jsonify({"is_development": _is_development_mode()})
+
+_LANDING_CONTENT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "landing_content.json"
+)
+
+@app.route("/api/landing-content", methods=["GET"])
+def api_landing_content_get():
+    if os.path.isfile(_LANDING_CONTENT_PATH):
+        try:
+            with open(_LANDING_CONTENT_PATH, "r") as f:
+                contents = json.load(f)
+            return jsonify({"contents": contents})
+        except Exception:
+            pass
+    return jsonify({"contents": {}})
+
+@app.route("/api/landing-content", methods=["POST"])
+def api_landing_content_post():
+    if not _is_development_mode():
+        return jsonify({"success": False, "error": "Editing disabled in production"}), 403
+    data = request.get_json(silent=True) or {}
+    section_key = data.get("section_key")
+    content = data.get("content")
+    if not section_key or content is None:
+        return jsonify({"success": False, "error": "Missing section_key or content"}), 400
+    contents = {}
+    if os.path.isfile(_LANDING_CONTENT_PATH):
+        try:
+            with open(_LANDING_CONTENT_PATH, "r") as f:
+                contents = json.load(f)
+        except Exception:
+            pass
+    contents[section_key] = content
+    with open(_LANDING_CONTENT_PATH, "w") as f:
+        json.dump(contents, f)
+    return jsonify({"success": True})
+
+@app.route("/api/state", methods=["GET"])
+def api_state_get():
+    return jsonify({"found": False})
+
+@app.route("/api/state", methods=["POST"])
+def api_state_post():
+    return jsonify({"success": False, "error": "Sign-in required"}), 401
+
+@app.route("/api/states", methods=["GET"])
+def api_states_get():
+    return jsonify({"states": []})
+
+@app.route("/api/state/<int:state_id>", methods=["DELETE"])
+def api_state_delete(state_id):
+    return jsonify({"success": False, "error": "Sign-in required"}), 401
+
+# ---------------------------------------------------------------------------
 # Boot Image Designer config (Task #214 — Step 1: memory allocation)
 # ---------------------------------------------------------------------------
 # Programmer-controlled boot-image config persisted as a single project-level
