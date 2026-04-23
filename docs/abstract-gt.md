@@ -289,8 +289,15 @@ WRITEBACK applies three checks in order; any failure raises `INVALID_OP` and cle
    equal `DR15.version` (ctmm bits `[31:25]`); hardware compares `dr11.gt_seq` vs `dr13.gt_seq`.
    This revocation check catches writes using a stale M-window from a reclaimed GT slot.
 
-A valid writeback packs DR11–DR15 back into CR15 (all 4 words of `CAP_REG_LAYOUT`)
-and clears M.
+A valid writeback packs DR11–DR14 back into CR15 and clears M.
+
+> **Hardware vs ctmm writeback asymmetry**: The production `hardware/` core uses a
+> 3-word `CAP_REG_LAYOUT` (word0\_gt + word1\_location + word2\_auth), so DR15 (the seals
+> word) is **advisory-only** in the hardware writeback path — it is used for the
+> version/revocation check but is not written back to `CR15`. The `ctmm_cap_amaranth/`
+> simulator uses a 4-word `CAP_REG_LAYOUT` (adds `word3_seals`) and **does** write XR15
+> back. This is intentional and internally consistent: the hardware validates seals at
+> dispatch time (NS gate) rather than persisting them in the cap register.
 
 ### Implementation files
 
