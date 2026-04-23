@@ -4,7 +4,7 @@
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:130" *)
 (* generator = "Amaranth" *)
 module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$9  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$11  = 0;
   wire \$1 ;
   wire \$2 ;
   wire \$3 ;
@@ -12,7 +12,7 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   wire \$5 ;
   reg [3:0] \$6 ;
   reg \$7 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:68" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:67" *)
   wire boot_complete;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:54" *)
   wire \boot_complete$41 ;
@@ -20,9 +20,9 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   reg [3:0] boot_delay = 4'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:190" *)
   reg boot_pulsed = 1'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:65" *)
   wire boot_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:60" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:59" *)
   wire [31:0] clist_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:178" *)
   wire [7:0] clist_mem_r_addr;
@@ -34,38 +34,38 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   wire [31:0] clist_mem_w_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:179" *)
   wire clist_mem_w_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
   wire [31:0] clist_rd_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
   wire [1:0] \clist_rd_data.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
   wire [16:0] \clist_rd_data.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
   wire [5:0] \clist_rd_data.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
   wire [6:0] \clist_rd_data.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [31:0] clist_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [1:0] \clist_wr_data.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [16:0] \clist_wr_data.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [5:0] \clist_wr_data.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [6:0] \clist_wr_data.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
   wire clist_wr_en;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
   wire clk;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:48" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:47" *)
   wire [31:0] dmem_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:150" *)
   wire [9:0] dmem_r_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:150" *)
   wire [31:0] dmem_r_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:50" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:49" *)
   wire [31:0] dmem_rd_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:151" *)
   wire [9:0] dmem_w_addr;
@@ -73,23 +73,23 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   wire [31:0] dmem_w_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:151" *)
   wire dmem_w_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:50" *)
   wire [31:0] dmem_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:52" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
   wire dmem_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:56" *)
   wire [3:0] fault;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:74" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:73" *)
   wire [3:0] \fault$45 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:55" *)
   wire fault_valid;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:74" *)
   wire \fault_valid$43 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:58" *)
   wire gc_busy;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:71" *)
-  wire \gc_busy$49 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:70" *)
+  wire \gc_busy$49 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:69" *)
   wire gc_start;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:20" *)
   wire [31:0] imem_addr;
@@ -106,9 +106,9 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   wire [3:0] leds;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:57" *)
   wire [31:0] nia;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:76" *)
   wire [31:0] \nia$47 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:54" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:53" *)
   wire [31:0] ns_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:164" *)
   wire [7:0] ns_mem_r_addr;
@@ -120,11 +120,11 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   wire [95:0] ns_mem_w_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:165" *)
   wire ns_mem_w_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:56" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:55" *)
   wire [95:0] ns_rd_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:57" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:56" *)
   wire [95:0] ns_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:58" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:57" *)
   wire ns_wr_en;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
@@ -2762,7 +2762,7 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
     .dmem_wr_data_sig(dmem_w_data),
     .dmem_wr_en_sig(dmem_w_en),
     .fault(fault),
-    .\fault_valid$347 (fault_valid),
+    .\fault_valid$342 (fault_valid),
     .gc_busy(gc_busy),
     .instruction(imem_data),
     .nia_reg(imem_addr),
@@ -2785,7 +2785,7 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
     .tx(uart_tx)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$9 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
     \$6  = boot_delay;
     if (\$3 ) begin
       \$6  = \$4 [3:0];
@@ -2795,7 +2795,7 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$9 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
     \$7  = boot_pulsed;
     if (\$3 ) begin
       if (\$5 ) begin
@@ -2848,47 +2848,30 @@ module ctmm_cap_fpga_top(rst, uart_tx, leds, clk);
   assign leds[0] = imem_valid;
 endmodule
 
-(* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:81" *)
+(* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:80" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_busy, instruction, dmem_rd_data, ns_rd_data, dmem_addr_computed, dmem_wr_en_sig, dmem_wr_data_sig, fault, \fault_valid$347 , ns_addr, ns_wr_data, ns_wr_en, nia_reg, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$10  = 0;
+module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_busy, instruction, dmem_rd_data, ns_rd_data, dmem_addr_computed, dmem_wr_en_sig, dmem_wr_data_sig, fault, \fault_valid$342 , ns_addr, ns_wr_data, ns_wr_en, nia_reg, clk);
+  reg \$auto$verilog_backend.cc:2355:dump_module$12  = 0;
   wire \$1 ;
   wire \$10 ;
   wire \$100 ;
-  wire \$101 ;
+  wire [31:0] \$101 ;
   wire \$102 ;
   wire \$103 ;
   wire \$104 ;
-  wire \$105 ;
+  wire [32:0] \$105 ;
   wire \$106 ;
-  wire \$107 ;
-  wire \$108 ;
-  wire \$109 ;
+  reg [2:0] \$107 ;
+  reg [31:0] \$108 ;
+  reg [31:0] \$109 ;
   wire \$11 ;
-  wire \$110 ;
-  wire [32:0] \$111 ;
-  wire \$112 ;
-  wire \$113 ;
-  wire \$114 ;
-  wire \$115 ;
-  wire \$116 ;
-  wire \$117 ;
-  wire \$118 ;
-  wire \$119 ;
+  reg [31:0] \$110 ;
+  reg [31:0] \$111 ;
+  reg [31:0] \$112 ;
+  reg [31:0] \$113 ;
+  reg [1:0] \$114 ;
   wire \$12 ;
-  wire \$120 ;
-  wire [8:0] \$121 ;
-  wire [8:0] \$122 ;
-  reg [2:0] \$123 ;
-  reg [31:0] \$124 ;
-  reg [31:0] \$125 ;
-  reg [31:0] \$126 ;
-  reg [31:0] \$127 ;
-  reg [31:0] \$128 ;
-  reg [31:0] \$129 ;
   wire \$13 ;
-  reg [1:0] \$130 ;
-  reg [7:0] \$131 ;
   wire [33:0] \$14 ;
   wire [32:0] \$15 ;
   wire [33:0] \$16 ;
@@ -2978,229 +2961,230 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire \$92 ;
   wire \$93 ;
   wire [31:0] \$94 ;
-  wire \$95 ;
-  wire [31:0] \$96 ;
-  wire \$97 ;
-  wire [8:0] \$98 ;
-  wire [8:0] \$99 ;
+  wire [31:0] \$95 ;
+  wire [56:0] \$96 ;
+  wire [56:0] \$97 ;
+  wire \$98 ;
+  wire \$99 ;
+  wire [23:0] \$auto$rtlil.cc:2739:Not$10 ;
   wire [23:0] \$auto$rtlil.cc:2739:Not$6 ;
-  wire [23:0] \$auto$rtlil.cc:2739:Not$8 ;
+  wire [13:0] \$auto$rtlil.cc:2739:Not$8 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:30" *)
   wire all_checks_pass;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:236" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:235" *)
   wire [31:0] alu_a;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:238" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:237" *)
   reg [32:0] alu_result;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:22" *)
   output boot_complete;
   wire boot_complete;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr0_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr0_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr0_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr0_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr0_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr0_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr10_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr10_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr10_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr10_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr10_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr10_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr11_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr11_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr11_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr11_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr11_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr11_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr12_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr12_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr12_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr12_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr12_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr12_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr13_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr13_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr13_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr13_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr13_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr13_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr14_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr14_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr14_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr14_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr14_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr14_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   reg boot_cr15_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   reg [31:0] boot_cr15_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr15_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr15_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr15_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr15_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr1_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr1_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr1_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr1_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr1_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr1_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr2_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr2_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr2_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr2_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr2_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr2_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr3_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr3_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr3_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr3_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr3_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr3_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr4_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr4_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr4_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr4_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr4_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr4_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   reg boot_cr5_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   reg [31:0] boot_cr5_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr5_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr5_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr5_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr5_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   reg boot_cr6_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   reg [31:0] boot_cr6_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr6_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr6_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr6_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr6_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   reg boot_cr7_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   reg [31:0] boot_cr7_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr7_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr7_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr7_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr7_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   reg boot_cr8_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
-  reg [31:0] boot_cr8_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
-  wire [1:0] \boot_cr8_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
-  wire [16:0] \boot_cr8_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
-  wire [5:0] \boot_cr8_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
-  wire [6:0] \boot_cr8_wr_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  reg [31:0] boot_cr8_wr_gt;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  wire [1:0] \boot_cr8_wr_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  wire [16:0] \boot_cr8_wr_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  wire [5:0] \boot_cr8_wr_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
+  wire [6:0] \boot_cr8_wr_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:503" *)
   wire boot_cr9_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [31:0] boot_cr9_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [1:0] \boot_cr9_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [16:0] \boot_cr9_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [5:0] \boot_cr9_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:505" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:504" *)
   wire [6:0] \boot_cr9_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:65" *)
   input boot_start;
   wire boot_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:67" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:66" *)
   reg [2:0] boot_state = 3'h0;
   (* init = 3'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:106" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:105" *)
   wire [2:0] boot_state_reg;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:255" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:254" *)
   reg branch_taken;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:256" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:255" *)
   reg [31:0] branch_target;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:13" *)
   wire busy;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:323" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:322" *)
   reg [7:0] byte_val;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:15" *)
   wire call_busy;
@@ -3212,7 +3196,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire call_normal_complete;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:11" *)
   wire call_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:153" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:152" *)
   wire call_start_sig;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:30" *)
   wire [11:0] cap_index;
@@ -3222,25 +3206,25 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire check_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:27" *)
   wire [2:0] church_op;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:107" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:106" *)
   wire clear_all;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:46" *)
   wire \clear_all$105 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:60" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:59" *)
   wire [31:0] clist_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:61" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:60" *)
   wire clist_rd_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [31:0] clist_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [1:0] \clist_wr_data.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [16:0] \clist_wr_data.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [5:0] \clist_wr_data.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:62" *)
   wire [6:0] \clist_wr_data.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:63" *)
   wire clist_wr_en;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
@@ -3333,11 +3317,11 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire cr15_gt_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:31" *)
   wire cr15_m_flag;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:72" *)
-  wire \cr15_m_flag$317 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:75" *)
+  wire \cr15_m_flag$323 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:29" *)
   wire cr15_m_set;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:747" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:787" *)
   wire [31:0] cr15_m_set_integrity;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:30" *)
   wire cr15_m_writeback_trigger;
@@ -3461,15 +3445,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [6:0] \cr4_gt_wr_data.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   wire cr4_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:549" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:548" *)
   reg [31:0] cr5_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:549" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:548" *)
   wire [1:0] \cr5_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:549" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:548" *)
   wire [16:0] \cr5_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:549" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:548" *)
   wire [5:0] \cr5_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:549" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:548" *)
   wire [6:0] \cr5_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   wire [31:0] cr5_gt_wr_data;
@@ -3483,31 +3467,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [6:0] \cr5_gt_wr_data.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   wire cr5_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:791" *)
-  wire cr5_stack_empty;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:792" *)
-  wire cr5_stack_full;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:790" *)
-  reg [7:0] cr5_stack_ptr = 8'h00;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:794" *)
-  wire [7:0] cr5_stack_r_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:794" *)
-  wire [31:0] cr5_stack_r_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:793" *)
-  reg [7:0] cr5_stack_w_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:793" *)
-  reg [31:0] cr5_stack_w_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:793" *)
-  reg cr5_stack_w_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:529" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:528" *)
   reg [31:0] cr6_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:529" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:528" *)
   wire [1:0] \cr6_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:529" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:528" *)
   wire [16:0] \cr6_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:529" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:528" *)
   wire [5:0] \cr6_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:529" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:528" *)
   wire [6:0] \cr6_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   wire [31:0] cr6_gt_wr_data;
@@ -3521,15 +3489,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [6:0] \cr6_gt_wr_data.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   wire cr6_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:539" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:538" *)
   reg [31:0] cr7_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:539" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:538" *)
   wire [1:0] \cr7_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:539" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:538" *)
   wire [16:0] \cr7_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:539" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:538" *)
   wire [5:0] \cr7_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:539" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:538" *)
   wire [6:0] \cr7_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   wire [31:0] cr7_gt_wr_data;
@@ -3691,15 +3659,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [31:0] \cr_rd_data.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:11" *)
   wire [31:0] \cr_rd_data.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:215" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:214" *)
   wire [31:0] cr_rd_data_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:215" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:214" *)
   wire [1:0] \cr_rd_data_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:215" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:214" *)
   wire [16:0] \cr_rd_data_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:215" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:214" *)
   wire [5:0] \cr_rd_data_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:215" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:214" *)
   wire [6:0] \cr_rd_data_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:29" *)
   wire [3:0] cr_src;
@@ -3803,31 +3771,28 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire \cr_wr_en$125 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:13" *)
   wire [6:0] ctmm_opcode;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
-  wire [3:0] dbg_cap_wr_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [127:0] dbg_cap_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [31:0] \dbg_cap_wr_data.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [1:0] \dbg_cap_wr_data.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [16:0] \dbg_cap_wr_data.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [5:0] \dbg_cap_wr_data.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [6:0] \dbg_cap_wr_data.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [31:0] \dbg_cap_wr_data.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [31:0] \dbg_cap_wr_data.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:42" *)
-  wire [31:0] \dbg_cap_wr_data.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:40" *)
+  wire [3:0] dbg_cap_wr_addr;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [127:0] dbg_cap_wr_data;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [31:0] \dbg_cap_wr_data.word0_gt ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [1:0] \dbg_cap_wr_data.word0_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [16:0] \dbg_cap_wr_data.word0_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [5:0] \dbg_cap_wr_data.word0_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [6:0] \dbg_cap_wr_data.word0_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [31:0] \dbg_cap_wr_data.word1_location ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [31:0] \dbg_cap_wr_data.word2_limit ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:41" *)
+  wire [31:0] \dbg_cap_wr_data.word3_seals ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:39" *)
   wire dbg_cap_wr_en;
-  (* init = 8'h00 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:37" *)
-  wire [7:0] dbg_cr5_stack_depth;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:32" *)
   wire [31:0] dbg_m_xr11;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:33" *)
@@ -3838,59 +3803,59 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [31:0] dbg_m_xr14;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:36" *)
   wire [31:0] dbg_m_xr15;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:48" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:47" *)
   wire [31:0] dmem_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:48" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:47" *)
   output [31:0] dmem_addr_computed;
   reg [31:0] dmem_addr_computed;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:31" *)
   input [31:0] dmem_rd_data;
   wire [31:0] dmem_rd_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:49" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:48" *)
   wire dmem_rd_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:261" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:260" *)
   reg dmem_rd_en_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:50" *)
   wire [31:0] dmem_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:50" *)
   output [31:0] dmem_wr_data_sig;
   reg [31:0] dmem_wr_data_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:52" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
   wire dmem_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:52" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:51" *)
   output dmem_wr_en_sig;
   reg dmem_wr_en_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:571" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:570" *)
   wire [2:0] effective_target;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:143" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:142" *)
   wire exec_enable;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:74" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:73" *)
   output [3:0] fault;
   reg [3:0] fault;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:35" *)
-  wire [3:0] \fault$346 ;
+  wire [3:0] \fault$341 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:31" *)
   wire [3:0] fault_type;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:15" *)
-  wire [3:0] \fault_type$349 ;
+  wire [3:0] \fault_type$344 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/tperm.py:17" *)
-  wire [3:0] \fault_type$350 ;
+  wire [3:0] \fault_type$345 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:19" *)
-  wire [3:0] \fault_type$351 ;
+  wire [3:0] \fault_type$346 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:16" *)
-  wire [3:0] \fault_type$352 ;
+  wire [3:0] \fault_type$347 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/save.py:18" *)
-  wire [3:0] \fault_type$353 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:15" *)
-  wire fault_valid;
+  wire [3:0] \fault_type$348 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:36" *)
-  wire \fault_valid$340 ;
+  wire fault_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:32" *)
-  wire \fault_valid$341 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:75" *)
-  output \fault_valid$347 ;
-  reg \fault_valid$347 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:78" *)
+  wire \fault_valid$334 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:15" *)
+  wire \fault_valid$338 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:74" *)
+  output \fault_valid$342 ;
+  reg \fault_valid$342 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
   wire [3:0] flags;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:42" *)
   wire [3:0] \flags$129 ;
@@ -3902,15 +3867,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire \flags$129.V ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:42" *)
   wire \flags$129.Z ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
   wire \flags.C ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
   wire \flags.N ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
   wire \flags.V ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
   wire \flags.Z ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
   reg [3:0] flags_in;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:43" *)
   wire [3:0] \flags_in$103 ;
@@ -3922,15 +3887,15 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire \flags_in$103.V ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:43" *)
   wire \flags_in$103.Z ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
   wire \flags_in.C ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
   wire \flags_in.N ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
   wire \flags_in.V ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
   wire \flags_in.Z ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:233" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:232" *)
   reg flags_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:44" *)
   wire \flags_wr_en$104 ;
@@ -3945,13 +3910,13 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire gc_busy;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:24" *)
   wire \gc_busy$41 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:72" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:71" *)
   wire [31:0] gc_garbage_count;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:22" *)
   wire gc_mark_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:21" *)
   wire gc_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:70" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:69" *)
   wire \gc_start$33 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:23" *)
   wire gc_sweep_en;
@@ -3965,7 +3930,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [5:0] \gt_in.perms ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:10" *)
   wire [6:0] \gt_in.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:317" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:316" *)
   reg [15:0] half_val;
   (* init = 32'd0 *)
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:20" *)
@@ -3976,7 +3941,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire imem_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:21" *)
   wire [12:0] imm_b;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:347" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:346" *)
   reg [31:0] imm_ext;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:19" *)
   wire [11:0] imm_i;
@@ -3984,7 +3949,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [20:0] imm_j;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:20" *)
   wire [11:0] imm_s;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:361" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:360" *)
   reg [31:0] imm_s_i;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:22" *)
   wire [31:0] imm_u;
@@ -4001,9 +3966,9 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire is_church_op;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:25" *)
   wire is_ctmm_op;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:257" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:256" *)
   reg jump_taken;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:258" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:257" *)
   reg [31:0] jump_target;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:12" *)
   wire lambda_busy;
@@ -4011,18 +3976,18 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire lambda_fault;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:10" *)
   wire lambda_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:147" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:146" *)
   wire lambda_start_sig;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:53" *)
   wire m_clear_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:54" *)
   wire m_flag_restore_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:45" *)
-  wire \m_flag_restore_en$299 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:44" *)
+  wire \m_flag_restore_en$305 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:55" *)
   wire m_flag_restore_val;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:46" *)
-  wire \m_flag_restore_val$301 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:45" *)
+  wire \m_flag_restore_val$307 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:58" *)
   wire [31:0] m_set_dr11;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:59" *)
@@ -4035,17 +4000,17 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [31:0] m_set_dr15;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:52" *)
   wire m_set_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:657" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:656" *)
   wire m_trigger;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:65" *)
-  wire [31:0] m_xr11;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:66" *)
-  wire [31:0] m_xr12;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:67" *)
-  wire [31:0] m_xr13;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:68" *)
-  wire [31:0] m_xr14;
+  wire [31:0] m_xr11;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:69" *)
+  wire [31:0] m_xr12;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:70" *)
+  wire [31:0] m_xr13;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:71" *)
+  wire [31:0] m_xr14;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:72" *)
   wire [31:0] m_xr15;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:14" *)
   wire [10:0] mask;
@@ -4059,359 +4024,371 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire \mem_rd_valid$254 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/save.py:26" *)
   wire mem_wr_done;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:47" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:45" *)
   wire [31:0] mgt_gt_word;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:49" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:47" *)
   wire [31:0] mgt_ns_authority;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:50" *)
-  wire [31:0] mgt_ns_integrity;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:48" *)
-  wire [31:0] mgt_ns_location;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:51" *)
-  wire [31:0] mgt_ns_seals;
+  wire [31:0] mgt_ns_integrity;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:46" *)
+  wire [31:0] mgt_ns_location;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:49" *)
+  wire [31:0] mgt_ns_seals;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:44" *)
   wire mgt_set_trigger;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:144" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:143" *)
   reg mwin_busy;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  reg [127:0] mwin_cr_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [31:0] \mwin_cr_wr_data.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [1:0] \mwin_cr_wr_data.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [16:0] \mwin_cr_wr_data.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [5:0] \mwin_cr_wr_data.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [6:0] \mwin_cr_wr_data.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [31:0] \mwin_cr_wr_data.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [31:0] \mwin_cr_wr_data.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
-  wire [31:0] \mwin_cr_wr_data.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  reg [127:0] mwin_cr_wr_data;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [31:0] \mwin_cr_wr_data.word0_gt ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [1:0] \mwin_cr_wr_data.word0_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [16:0] \mwin_cr_wr_data.word0_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [5:0] \mwin_cr_wr_data.word0_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [6:0] \mwin_cr_wr_data.word0_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [31:0] \mwin_cr_wr_data.word1_location ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [31:0] \mwin_cr_wr_data.word2_limit ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:446" *)
+  wire [31:0] \mwin_cr_wr_data.word3_seals ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:445" *)
   reg mwin_cr_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:449" *)
-  reg mwin_fault_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:450" *)
-  reg [3:0] mwin_fault_type;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:676" *)
-  wire [6:0] mwin_gt_version;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:668" *)
-  wire [31:0] mwin_integrity_computed;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:670" *)
-  wire mwin_integrity_ok;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:448" *)
+  reg mwin_fault_sig;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:449" *)
+  reg [3:0] mwin_fault_type;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:689" *)
+  wire [6:0] mwin_gt_gtseq;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:675" *)
+  wire [6:0] mwin_gt_version;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:691" *)
+  wire mwin_gtseq_ok;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:667" *)
+  wire [31:0] mwin_integrity_computed;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:669" *)
+  wire mwin_integrity_ok;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:447" *)
   reg mwin_m_clear_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:677" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:690" *)
+  wire [6:0] mwin_ns_gtseq;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:702" *)
+  wire [31:0] mwin_seal_computed;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:703" *)
+  wire [24:0] mwin_seal_masked;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:704" *)
+  wire mwin_seal_ok;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:676" *)
   wire [6:0] mwin_seal_version;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   reg [1:0] mwin_state = 2'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:678" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:677" *)
   wire mwin_version_ok;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:651" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:650" *)
   reg [31:0] mwin_xr11_lat = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:652" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:651" *)
   reg [31:0] mwin_xr12_lat = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:653" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:652" *)
   reg [31:0] mwin_xr13_lat = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:654" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:653" *)
   reg [31:0] mwin_xr14_lat = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:655" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:654" *)
   reg [31:0] mwin_xr15_lat = 32'd0;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:76" *)
   wire [31:0] nia;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:76" *)
   output [31:0] nia_reg;
   reg [31:0] nia_reg = 32'd0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:20" *)
   wire nia_set;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:24" *)
-  wire \nia_set$366 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:39" *)
-  wire \nia_set$367 ;
+  wire \nia_set$361 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
+  wire \nia_set$362 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:21" *)
   wire [31:0] nia_value;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:25" *)
-  wire [31:0] \nia_value$369 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:40" *)
-  wire [31:0] \nia_value$370 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:54" *)
+  wire [31:0] \nia_value$364 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:38" *)
+  wire [31:0] \nia_value$365 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:53" *)
   output [31:0] ns_addr;
   reg [31:0] ns_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:27" *)
-  wire [31:0] \ns_addr$355 ;
+  wire [31:0] \ns_addr$350 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:34" *)
   wire [16:0] ns_end_index;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:509" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:508" *)
   reg [31:0] ns_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:509" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:508" *)
   wire [1:0] \ns_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:509" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:508" *)
   wire [16:0] \ns_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:509" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:508" *)
   wire [5:0] \ns_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:509" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:508" *)
   wire [6:0] \ns_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:56" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:55" *)
   input [95:0] ns_rd_data;
   wire [95:0] ns_rd_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:56" *)
-  wire [95:0] \ns_rd_data$39 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:55" *)
+  wire [95:0] \ns_rd_data$39 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:54" *)
   reg ns_rd_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:28" *)
-  wire \ns_rd_en$357 ;
+  wire \ns_rd_en$352 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:33" *)
   wire [16:0] ns_start_index;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:57" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:56" *)
   output [95:0] ns_wr_data;
   reg [95:0] ns_wr_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:30" *)
-  wire [95:0] \ns_wr_data$359 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:58" *)
+  wire [95:0] \ns_wr_data$354 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:57" *)
   output ns_wr_en;
   reg ns_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:31" *)
-  wire \ns_wr_en$361 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  wire \ns_wr_en$356 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   output [31:0] perm_gt_sig;
   wire [31:0] perm_gt_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:165" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:164" *)
   wire [1:0] \perm_gt_sig.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:165" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:164" *)
   wire [16:0] \perm_gt_sig.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:165" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:164" *)
   wire [5:0] \perm_gt_sig.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:165" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:164" *)
   wire [6:0] \perm_gt_sig.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/tperm.py:12" *)
   wire [3:0] preset;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:14" *)
   wire [4:0] rd;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:168" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:167" *)
   reg [5:0] required_perms;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:11" *)
   wire [5:0] \required_perms$29 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:154" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:153" *)
   wire ret_start_sig;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:11" *)
   wire return_start;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:15" *)
   wire [4:0] rs1;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:291" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:290" *)
   reg [31:0] rs1_s;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:360" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:359" *)
   reg [31:0] rs1_s_i;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:403" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:402" *)
   reg [31:0] rs1_s_r;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:380" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:379" *)
   reg [31:0] rs1_signed;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:413" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:412" *)
   reg [31:0] rs1_sr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:16" *)
   wire [4:0] rs2;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:292" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:291" *)
   reg [31:0] rs2_s;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:404" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:403" *)
   reg [31:0] rs2_s_r;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr0_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr0_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr0_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr0_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr0_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr0_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr10_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr10_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr10_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr10_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr10_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr10_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr11_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr11_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr11_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr11_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr11_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr11_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr12_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr12_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr12_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr12_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr12_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr12_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr13_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr13_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr13_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr13_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr13_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr13_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr14_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr14_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr14_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr14_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr14_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr14_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr15_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr15_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr15_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr15_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr15_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr15_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr1_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr1_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr1_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr1_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr1_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr1_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr2_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr2_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr2_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr2_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr2_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr2_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr3_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr3_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr3_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr3_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr3_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr3_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr4_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr4_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr4_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr4_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr4_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr4_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr5_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr5_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr5_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr5_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr5_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr5_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr6_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr6_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr6_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr6_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr6_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr6_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   wire rt_cr7_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [31:0] rt_cr7_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr7_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr7_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr7_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr7_wr_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr8_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
-  reg [31:0] rt_cr8_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
-  wire [1:0] \rt_cr8_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
-  wire [16:0] \rt_cr8_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
-  wire [5:0] \rt_cr8_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
-  wire [6:0] \rt_cr8_wr_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  reg [31:0] rt_cr8_wr_gt;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  wire [1:0] \rt_cr8_wr_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  wire [16:0] \rt_cr8_wr_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  wire [5:0] \rt_cr8_wr_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
+  wire [6:0] \rt_cr8_wr_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:558" *)
   reg rt_cr9_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   reg [31:0] rt_cr9_wr_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [1:0] \rt_cr9_wr_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [16:0] \rt_cr9_wr_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [5:0] \rt_cr9_wr_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:560" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:559" *)
   wire [6:0] \rt_cr9_wr_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/save.py:15" *)
   wire save_busy;
@@ -4419,45 +4396,41 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire save_fault;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/save.py:11" *)
   wire save_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:628" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:627" *)
   wire save_start_sig;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:38" *)
-  wire [31:0] saved_cr5_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
-  wire [31:0] \saved_cr5_gt$339 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:22" *)
   wire [31:0] saved_nia;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:373" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:372" *)
   reg [4:0] shamt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:377" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:376" *)
   reg [4:0] shamt_r;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:324" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:323" *)
   reg [31:0] sign_ext_b;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:318" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:317" *)
   reg [31:0] sign_ext_h;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:562" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:561" *)
   wire switch_change_active;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   wire [31:0] switch_src_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   wire [1:0] \switch_src_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   wire [16:0] \switch_src_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   wire [5:0] \switch_src_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:568" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:567" *)
   wire [6:0] \switch_src_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:33" *)
   wire [3:0] switch_target;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:519" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:518" *)
   reg [31:0] thrd_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:519" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:518" *)
   wire [1:0] \thrd_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:519" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:518" *)
   wire [16:0] \thrd_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:519" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:518" *)
   wire [5:0] \thrd_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:519" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:518" *)
   wire [6:0] \thrd_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/tperm.py:14" *)
   wire tperm_busy;
@@ -4467,21 +4440,21 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [3:0] tperm_preset;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/tperm.py:10" *)
   wire tperm_start;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:152" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:151" *)
   wire tperm_start_sig;
   (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
   wire [31:0] w0_rot;
   (* src = "/home/runner/workspace/hardware/integrity32.py:58" *)
-  wire [31:0] \w0_rot$303 ;
+  wire [31:0] \w0_rot$309 ;
   (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
   wire [31:0] w1_masked;
   (* src = "/home/runner/workspace/hardware/integrity32.py:57" *)
-  wire [31:0] \w1_masked$302 ;
+  wire [31:0] \w1_masked$308 ;
   (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
   wire [31:0] w1_rot;
   (* src = "/home/runner/workspace/hardware/integrity32.py:59" *)
-  wire [31:0] \w1_rot$304 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:664" *)
+  wire [31:0] \w1_rot$310 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:663" *)
   wire xr11_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:34" *)
   wire [4:0] xr_rd_addr1;
@@ -4493,459 +4466,175 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   wire [31:0] xr_rd_data2;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:38" *)
   wire [4:0] xr_wr_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:230" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:229" *)
   reg [31:0] xr_wr_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:39" *)
   wire [31:0] \xr_wr_data$101 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:231" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:230" *)
   reg xr_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:40" *)
   wire \xr_wr_en$102 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:788" *)
-  reg [31:0] cr5_stack [255:0];
-  initial begin
-    cr5_stack[0] = 32'd0;
-    cr5_stack[1] = 32'd0;
-    cr5_stack[2] = 32'd0;
-    cr5_stack[3] = 32'd0;
-    cr5_stack[4] = 32'd0;
-    cr5_stack[5] = 32'd0;
-    cr5_stack[6] = 32'd0;
-    cr5_stack[7] = 32'd0;
-    cr5_stack[8] = 32'd0;
-    cr5_stack[9] = 32'd0;
-    cr5_stack[10] = 32'd0;
-    cr5_stack[11] = 32'd0;
-    cr5_stack[12] = 32'd0;
-    cr5_stack[13] = 32'd0;
-    cr5_stack[14] = 32'd0;
-    cr5_stack[15] = 32'd0;
-    cr5_stack[16] = 32'd0;
-    cr5_stack[17] = 32'd0;
-    cr5_stack[18] = 32'd0;
-    cr5_stack[19] = 32'd0;
-    cr5_stack[20] = 32'd0;
-    cr5_stack[21] = 32'd0;
-    cr5_stack[22] = 32'd0;
-    cr5_stack[23] = 32'd0;
-    cr5_stack[24] = 32'd0;
-    cr5_stack[25] = 32'd0;
-    cr5_stack[26] = 32'd0;
-    cr5_stack[27] = 32'd0;
-    cr5_stack[28] = 32'd0;
-    cr5_stack[29] = 32'd0;
-    cr5_stack[30] = 32'd0;
-    cr5_stack[31] = 32'd0;
-    cr5_stack[32] = 32'd0;
-    cr5_stack[33] = 32'd0;
-    cr5_stack[34] = 32'd0;
-    cr5_stack[35] = 32'd0;
-    cr5_stack[36] = 32'd0;
-    cr5_stack[37] = 32'd0;
-    cr5_stack[38] = 32'd0;
-    cr5_stack[39] = 32'd0;
-    cr5_stack[40] = 32'd0;
-    cr5_stack[41] = 32'd0;
-    cr5_stack[42] = 32'd0;
-    cr5_stack[43] = 32'd0;
-    cr5_stack[44] = 32'd0;
-    cr5_stack[45] = 32'd0;
-    cr5_stack[46] = 32'd0;
-    cr5_stack[47] = 32'd0;
-    cr5_stack[48] = 32'd0;
-    cr5_stack[49] = 32'd0;
-    cr5_stack[50] = 32'd0;
-    cr5_stack[51] = 32'd0;
-    cr5_stack[52] = 32'd0;
-    cr5_stack[53] = 32'd0;
-    cr5_stack[54] = 32'd0;
-    cr5_stack[55] = 32'd0;
-    cr5_stack[56] = 32'd0;
-    cr5_stack[57] = 32'd0;
-    cr5_stack[58] = 32'd0;
-    cr5_stack[59] = 32'd0;
-    cr5_stack[60] = 32'd0;
-    cr5_stack[61] = 32'd0;
-    cr5_stack[62] = 32'd0;
-    cr5_stack[63] = 32'd0;
-    cr5_stack[64] = 32'd0;
-    cr5_stack[65] = 32'd0;
-    cr5_stack[66] = 32'd0;
-    cr5_stack[67] = 32'd0;
-    cr5_stack[68] = 32'd0;
-    cr5_stack[69] = 32'd0;
-    cr5_stack[70] = 32'd0;
-    cr5_stack[71] = 32'd0;
-    cr5_stack[72] = 32'd0;
-    cr5_stack[73] = 32'd0;
-    cr5_stack[74] = 32'd0;
-    cr5_stack[75] = 32'd0;
-    cr5_stack[76] = 32'd0;
-    cr5_stack[77] = 32'd0;
-    cr5_stack[78] = 32'd0;
-    cr5_stack[79] = 32'd0;
-    cr5_stack[80] = 32'd0;
-    cr5_stack[81] = 32'd0;
-    cr5_stack[82] = 32'd0;
-    cr5_stack[83] = 32'd0;
-    cr5_stack[84] = 32'd0;
-    cr5_stack[85] = 32'd0;
-    cr5_stack[86] = 32'd0;
-    cr5_stack[87] = 32'd0;
-    cr5_stack[88] = 32'd0;
-    cr5_stack[89] = 32'd0;
-    cr5_stack[90] = 32'd0;
-    cr5_stack[91] = 32'd0;
-    cr5_stack[92] = 32'd0;
-    cr5_stack[93] = 32'd0;
-    cr5_stack[94] = 32'd0;
-    cr5_stack[95] = 32'd0;
-    cr5_stack[96] = 32'd0;
-    cr5_stack[97] = 32'd0;
-    cr5_stack[98] = 32'd0;
-    cr5_stack[99] = 32'd0;
-    cr5_stack[100] = 32'd0;
-    cr5_stack[101] = 32'd0;
-    cr5_stack[102] = 32'd0;
-    cr5_stack[103] = 32'd0;
-    cr5_stack[104] = 32'd0;
-    cr5_stack[105] = 32'd0;
-    cr5_stack[106] = 32'd0;
-    cr5_stack[107] = 32'd0;
-    cr5_stack[108] = 32'd0;
-    cr5_stack[109] = 32'd0;
-    cr5_stack[110] = 32'd0;
-    cr5_stack[111] = 32'd0;
-    cr5_stack[112] = 32'd0;
-    cr5_stack[113] = 32'd0;
-    cr5_stack[114] = 32'd0;
-    cr5_stack[115] = 32'd0;
-    cr5_stack[116] = 32'd0;
-    cr5_stack[117] = 32'd0;
-    cr5_stack[118] = 32'd0;
-    cr5_stack[119] = 32'd0;
-    cr5_stack[120] = 32'd0;
-    cr5_stack[121] = 32'd0;
-    cr5_stack[122] = 32'd0;
-    cr5_stack[123] = 32'd0;
-    cr5_stack[124] = 32'd0;
-    cr5_stack[125] = 32'd0;
-    cr5_stack[126] = 32'd0;
-    cr5_stack[127] = 32'd0;
-    cr5_stack[128] = 32'd0;
-    cr5_stack[129] = 32'd0;
-    cr5_stack[130] = 32'd0;
-    cr5_stack[131] = 32'd0;
-    cr5_stack[132] = 32'd0;
-    cr5_stack[133] = 32'd0;
-    cr5_stack[134] = 32'd0;
-    cr5_stack[135] = 32'd0;
-    cr5_stack[136] = 32'd0;
-    cr5_stack[137] = 32'd0;
-    cr5_stack[138] = 32'd0;
-    cr5_stack[139] = 32'd0;
-    cr5_stack[140] = 32'd0;
-    cr5_stack[141] = 32'd0;
-    cr5_stack[142] = 32'd0;
-    cr5_stack[143] = 32'd0;
-    cr5_stack[144] = 32'd0;
-    cr5_stack[145] = 32'd0;
-    cr5_stack[146] = 32'd0;
-    cr5_stack[147] = 32'd0;
-    cr5_stack[148] = 32'd0;
-    cr5_stack[149] = 32'd0;
-    cr5_stack[150] = 32'd0;
-    cr5_stack[151] = 32'd0;
-    cr5_stack[152] = 32'd0;
-    cr5_stack[153] = 32'd0;
-    cr5_stack[154] = 32'd0;
-    cr5_stack[155] = 32'd0;
-    cr5_stack[156] = 32'd0;
-    cr5_stack[157] = 32'd0;
-    cr5_stack[158] = 32'd0;
-    cr5_stack[159] = 32'd0;
-    cr5_stack[160] = 32'd0;
-    cr5_stack[161] = 32'd0;
-    cr5_stack[162] = 32'd0;
-    cr5_stack[163] = 32'd0;
-    cr5_stack[164] = 32'd0;
-    cr5_stack[165] = 32'd0;
-    cr5_stack[166] = 32'd0;
-    cr5_stack[167] = 32'd0;
-    cr5_stack[168] = 32'd0;
-    cr5_stack[169] = 32'd0;
-    cr5_stack[170] = 32'd0;
-    cr5_stack[171] = 32'd0;
-    cr5_stack[172] = 32'd0;
-    cr5_stack[173] = 32'd0;
-    cr5_stack[174] = 32'd0;
-    cr5_stack[175] = 32'd0;
-    cr5_stack[176] = 32'd0;
-    cr5_stack[177] = 32'd0;
-    cr5_stack[178] = 32'd0;
-    cr5_stack[179] = 32'd0;
-    cr5_stack[180] = 32'd0;
-    cr5_stack[181] = 32'd0;
-    cr5_stack[182] = 32'd0;
-    cr5_stack[183] = 32'd0;
-    cr5_stack[184] = 32'd0;
-    cr5_stack[185] = 32'd0;
-    cr5_stack[186] = 32'd0;
-    cr5_stack[187] = 32'd0;
-    cr5_stack[188] = 32'd0;
-    cr5_stack[189] = 32'd0;
-    cr5_stack[190] = 32'd0;
-    cr5_stack[191] = 32'd0;
-    cr5_stack[192] = 32'd0;
-    cr5_stack[193] = 32'd0;
-    cr5_stack[194] = 32'd0;
-    cr5_stack[195] = 32'd0;
-    cr5_stack[196] = 32'd0;
-    cr5_stack[197] = 32'd0;
-    cr5_stack[198] = 32'd0;
-    cr5_stack[199] = 32'd0;
-    cr5_stack[200] = 32'd0;
-    cr5_stack[201] = 32'd0;
-    cr5_stack[202] = 32'd0;
-    cr5_stack[203] = 32'd0;
-    cr5_stack[204] = 32'd0;
-    cr5_stack[205] = 32'd0;
-    cr5_stack[206] = 32'd0;
-    cr5_stack[207] = 32'd0;
-    cr5_stack[208] = 32'd0;
-    cr5_stack[209] = 32'd0;
-    cr5_stack[210] = 32'd0;
-    cr5_stack[211] = 32'd0;
-    cr5_stack[212] = 32'd0;
-    cr5_stack[213] = 32'd0;
-    cr5_stack[214] = 32'd0;
-    cr5_stack[215] = 32'd0;
-    cr5_stack[216] = 32'd0;
-    cr5_stack[217] = 32'd0;
-    cr5_stack[218] = 32'd0;
-    cr5_stack[219] = 32'd0;
-    cr5_stack[220] = 32'd0;
-    cr5_stack[221] = 32'd0;
-    cr5_stack[222] = 32'd0;
-    cr5_stack[223] = 32'd0;
-    cr5_stack[224] = 32'd0;
-    cr5_stack[225] = 32'd0;
-    cr5_stack[226] = 32'd0;
-    cr5_stack[227] = 32'd0;
-    cr5_stack[228] = 32'd0;
-    cr5_stack[229] = 32'd0;
-    cr5_stack[230] = 32'd0;
-    cr5_stack[231] = 32'd0;
-    cr5_stack[232] = 32'd0;
-    cr5_stack[233] = 32'd0;
-    cr5_stack[234] = 32'd0;
-    cr5_stack[235] = 32'd0;
-    cr5_stack[236] = 32'd0;
-    cr5_stack[237] = 32'd0;
-    cr5_stack[238] = 32'd0;
-    cr5_stack[239] = 32'd0;
-    cr5_stack[240] = 32'd0;
-    cr5_stack[241] = 32'd0;
-    cr5_stack[242] = 32'd0;
-    cr5_stack[243] = 32'd0;
-    cr5_stack[244] = 32'd0;
-    cr5_stack[245] = 32'd0;
-    cr5_stack[246] = 32'd0;
-    cr5_stack[247] = 32'd0;
-    cr5_stack[248] = 32'd0;
-    cr5_stack[249] = 32'd0;
-    cr5_stack[250] = 32'd0;
-    cr5_stack[251] = 32'd0;
-    cr5_stack[252] = 32'd0;
-    cr5_stack[253] = 32'd0;
-    cr5_stack[254] = 32'd0;
-    cr5_stack[255] = 32'd0;
-  end
-  always @(posedge clk) begin
-    if (cr5_stack_w_en)
-      cr5_stack[cr5_stack_w_addr] <= cr5_stack_w_data;
-  end
-  reg [7:0] _0_;
-  always @(posedge clk) begin
-    _0_ <= \$99 [7:0];
-  end
-  assign cr5_stack_r_data = cr5_stack[_0_];
-  assign boot_complete = boot_state == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:111" *) 3'h5;
-  assign clear_all = boot_state == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:112" *) 1'h1;
-  assign \$2  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:145" *) mwin_busy;
-  assign exec_enable = \$1  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:145" *) \$2 ;
-  assign \$3  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:149" *) is_church_op;
-  assign \$4  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:149" *) 3'h7;
-  assign lambda_start_sig = \$3  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:149" *) \$4 ;
-  assign \$5  = lambda_start_sig | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:157" *) lambda_busy;
-  assign \$6  = save_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:161" *) \cr_rd_addr$20  : instruction[18:15];
-  assign \$7  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:160" *) \cr_rd_addr$21  : \$6 ;
-  assign \$8  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:159" *) \cr_rd_addr$22  : \$7 ;
-  assign \$9  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:158" *) \cr_rd_addr$23  : \$8 ;
-  assign cr_rd_addr = \$5  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:157" *) \cr_rd_addr$24  : \$9 ;
-  assign \$10  = cr_rd_data[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:177" *) 2'h3;
-  assign check_valid = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:193" *) is_church_op;
-  assign \$11  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:195" *) is_church_op;
-  assign \$12  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:195" *) 3'h6;
-  assign check_domain_purity = \$11  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:195" *) \$12 ;
-  assign \$13  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:265" *) is_ctmm_op;
-  assign \$14  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:271" *) $signed({ instruction[31:12], 12'h000 });
-  assign \$15  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:275" *) 3'h4;
-  assign \$16  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:278" *) $signed({ instruction[31], instruction[19:12], instruction[20], instruction[30:21], 1'h0 });
-  assign \$17  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:283" *) 3'h4;
-  assign \$18  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:286" *) $signed(instruction[31:20]);
-  assign \$20  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:290" *) $signed({ instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'h0 });
-  assign \$21  = alu_a == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:296" *) xr_rd_data2;
-  assign \$22  = alu_a != (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:298" *) xr_rd_data2;
-  assign \$23  = $signed(rs1_s) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:300" *) $signed(rs2_s);
-  assign \$24  = $signed(rs1_s) >= (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:302" *) $signed(rs2_s);
-  assign \$25  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:304" *) xr_rd_data2;
-  assign \$26  = alu_a >= (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:306" *) xr_rd_data2;
-  assign \$27  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:310" *) $signed(instruction[31:20]);
-  assign \$28  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:335" *) $signed({ instruction[31:25], instruction[11:7] });
-  assign \$29  = alu_a + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:351" *) imm_ext;
-  assign \$30  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:355" *) alu_result[31:0];
-  assign \$31  = $signed(rs1_s_i) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:363" *) $signed(imm_s_i);
-  assign \$32  = \$31  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:363" *) 1'h1 : 1'h0;
-  assign \$33  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:365" *) imm_ext;
-  assign \$34  = \$33  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:365" *) 1'h1 : 1'h0;
-  assign \$35  = alu_a ^ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:367" *) imm_ext;
-  assign \$36  = alu_a | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:369" *) imm_ext;
-  assign \$37  = alu_a & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:371" *) imm_ext;
-  assign \$38  = alu_a << (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:375" *) shamt;
-  assign \$39  = $signed(rs1_signed) >>> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:382" *) shamt_r;
-  assign \$40  = alu_a >> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:384" *) shamt_r;
-  assign \$41  = alu_a - (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:390" *) xr_rd_data2;
-  assign \$42  = alu_a + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:392" *) xr_rd_data2;
-  assign \$43  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:396" *) alu_result[31:0];
-  assign \$44  = alu_a << (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:401" *) xr_rd_data2[4:0];
-  assign \$45  = $signed(rs1_s_r) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:406" *) $signed(rs2_s_r);
-  assign \$46  = \$45  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:406" *) 1'h1 : 1'h0;
-  assign \$47  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:408" *) xr_rd_data2;
-  assign \$48  = \$47  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:408" *) 1'h1 : 1'h0;
-  assign \$49  = alu_a ^ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:410" *) xr_rd_data2;
-  assign \$50  = $signed(rs1_sr) >>> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:415" *) xr_rd_data2[4:0];
-  assign \$51  = alu_a >> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:417" *) xr_rd_data2[4:0];
-  assign \$52  = alu_a | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:419" *) xr_rd_data2;
-  assign \$53  = alu_a & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:421" *) xr_rd_data2;
-  assign \$55  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:467" *) \cr_wr_addr$114  : 4'h0;
-  assign \$56  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:466" *) \cr_wr_addr$115  : \$55 ;
-  assign \$57  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:465" *) \cr_wr_addr$116  : \$56 ;
-  assign cr_wr_addr = mwin_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:464" *) 4'hf : \$57 ;
-  assign \$59  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:474" *) \cr_wr_data$119  : 128'h00000000000000000000000000000000;
-  assign \$60  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:473" *) \cr_wr_data$120  : \$59 ;
-  assign \$61  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:472" *) \cr_wr_data$121  : \$60 ;
-  assign cr_wr_data = mwin_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:471" *) mwin_cr_wr_data : \$61 ;
-  assign \$62  = mwin_cr_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:478" *) \cr_wr_en$123 ;
-  assign \$63  = \$62  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:478" *) \cr_wr_en$124 ;
-  assign \$64  = \$63  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:478" *) \cr_wr_en$125 ;
-  assign \$65  = boot_complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) exec_enable;
-  assign \$66  = \$65  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) is_church_op;
-  assign \$67  = \$66  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) all_checks_pass;
-  assign \$68  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:565" *) 3'h5;
-  assign \$69  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:565" *) 3'h4;
-  assign \$70  = \$68  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:565" *) \$69 ;
-  assign switch_change_active = \$67  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) \$70 ;
-  assign \$71  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:572" *) 3'h4;
-  assign effective_target = \$71  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:572" *) 3'h0 : instruction[22:20];
-  assign \$72  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) effective_target;
-  assign \$73  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 1'h1;
-  assign \$74  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 2'h2;
-  assign \$75  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 2'h3;
-  assign \$76  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 3'h4;
-  assign \$77  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 3'h5;
-  assign \$78  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 3'h6;
-  assign \$79  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:576" *) 3'h7;
-  assign cr5_gt_wr_data = boot_cr5_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:582" *) boot_cr5_wr_gt : 32'd0;
-  assign cr6_gt_wr_data = boot_cr6_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:582" *) boot_cr6_wr_gt : 32'd0;
-  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:582" *) boot_cr7_wr_gt : 32'd0;
-  assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) rt_cr8_wr_en;
-  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:582" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
-  assign cr15_gt_wr_en = boot_cr15_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) rt_cr15_wr_en;
-  assign cr15_gt_wr_data = boot_cr15_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:582" *) boot_cr15_wr_gt : rt_cr15_wr_gt;
-  assign \$80  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:586" *) is_church_op;
-  assign \$81  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:586" *) 2'h2;
-  assign \$82  = \$80  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:586" *) \$81 ;
-  assign call_start_sig = \$82  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:586" *) all_checks_pass;
-  assign \$83  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:600" *) is_church_op;
-  assign \$84  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:600" *) 2'h3;
-  assign \$85  = \$83  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:600" *) \$84 ;
-  assign ret_start_sig = \$85  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:600" *) all_checks_pass;
-  assign \$86  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:615" *) 3'h4;
-  assign \$87  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:619" *) is_church_op;
-  assign \$88  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:619" *) 3'h6;
-  assign \$89  = \$87  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:619" *) \$88 ;
-  assign tperm_start_sig = \$89  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:619" *) all_checks_pass;
-  assign \$90  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:630" *) is_church_op;
-  assign \$91  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:630" *) 1'h1;
-  assign \$92  = \$90  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:630" *) \$91 ;
-  assign save_start_sig = \$92  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:630" *) all_checks_pass;
-  assign \$93  = call_normal_complete | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:659" *) complete;
-  assign xr11_valid = m_xr11[1:0] != (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:665" *) 2'h2;
+  assign boot_complete = boot_state == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:110" *) 3'h5;
+  assign clear_all = boot_state == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:111" *) 1'h1;
+  assign \$2  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:144" *) mwin_busy;
+  assign exec_enable = \$1  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:144" *) \$2 ;
+  assign \$3  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:148" *) is_church_op;
+  assign \$4  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:148" *) 3'h7;
+  assign lambda_start_sig = \$3  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:148" *) \$4 ;
+  assign \$5  = lambda_start_sig | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:156" *) lambda_busy;
+  assign \$6  = save_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:160" *) \cr_rd_addr$20  : instruction[18:15];
+  assign \$7  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:159" *) \cr_rd_addr$21  : \$6 ;
+  assign \$8  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:158" *) \cr_rd_addr$22  : \$7 ;
+  assign \$9  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:157" *) \cr_rd_addr$23  : \$8 ;
+  assign cr_rd_addr = \$5  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:156" *) \cr_rd_addr$24  : \$9 ;
+  assign \$10  = cr_rd_data[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:176" *) 2'h3;
+  assign check_valid = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:192" *) is_church_op;
+  assign \$11  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:194" *) is_church_op;
+  assign \$12  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:194" *) 3'h6;
+  assign check_domain_purity = \$11  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:194" *) \$12 ;
+  assign \$13  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:264" *) is_ctmm_op;
+  assign \$14  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:270" *) $signed({ instruction[31:12], 12'h000 });
+  assign \$15  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:274" *) 3'h4;
+  assign \$16  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:277" *) $signed({ instruction[31], instruction[19:12], instruction[20], instruction[30:21], 1'h0 });
+  assign \$17  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:282" *) 3'h4;
+  assign \$18  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:285" *) $signed(instruction[31:20]);
+  assign \$20  = $signed({ 1'h0, nia_reg }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:289" *) $signed({ instruction[31], instruction[7], instruction[30:25], instruction[11:8], 1'h0 });
+  assign \$21  = alu_a == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:295" *) xr_rd_data2;
+  assign \$22  = alu_a != (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:297" *) xr_rd_data2;
+  assign \$23  = $signed(rs1_s) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:299" *) $signed(rs2_s);
+  assign \$24  = $signed(rs1_s) >= (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:301" *) $signed(rs2_s);
+  assign \$25  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:303" *) xr_rd_data2;
+  assign \$26  = alu_a >= (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:305" *) xr_rd_data2;
+  assign \$27  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:309" *) $signed(instruction[31:20]);
+  assign \$28  = $signed({ 1'h0, alu_a }) + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:334" *) $signed({ instruction[31:25], instruction[11:7] });
+  assign \$29  = alu_a + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:350" *) imm_ext;
+  assign \$30  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:354" *) alu_result[31:0];
+  assign \$31  = $signed(rs1_s_i) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:362" *) $signed(imm_s_i);
+  assign \$32  = \$31  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:362" *) 1'h1 : 1'h0;
+  assign \$33  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:364" *) imm_ext;
+  assign \$34  = \$33  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:364" *) 1'h1 : 1'h0;
+  assign \$35  = alu_a ^ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:366" *) imm_ext;
+  assign \$36  = alu_a | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:368" *) imm_ext;
+  assign \$37  = alu_a & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:370" *) imm_ext;
+  assign \$38  = alu_a << (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:374" *) shamt;
+  assign \$39  = $signed(rs1_signed) >>> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:381" *) shamt_r;
+  assign \$40  = alu_a >> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:383" *) shamt_r;
+  assign \$41  = alu_a - (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:389" *) xr_rd_data2;
+  assign \$42  = alu_a + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:391" *) xr_rd_data2;
+  assign \$43  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:395" *) alu_result[31:0];
+  assign \$44  = alu_a << (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:400" *) xr_rd_data2[4:0];
+  assign \$45  = $signed(rs1_s_r) < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:405" *) $signed(rs2_s_r);
+  assign \$46  = \$45  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:405" *) 1'h1 : 1'h0;
+  assign \$47  = alu_a < (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:407" *) xr_rd_data2;
+  assign \$48  = \$47  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:407" *) 1'h1 : 1'h0;
+  assign \$49  = alu_a ^ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:409" *) xr_rd_data2;
+  assign \$50  = $signed(rs1_sr) >>> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:414" *) xr_rd_data2[4:0];
+  assign \$51  = alu_a >> (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:416" *) xr_rd_data2[4:0];
+  assign \$52  = alu_a | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:418" *) xr_rd_data2;
+  assign \$53  = alu_a & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:420" *) xr_rd_data2;
+  assign \$55  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:466" *) \cr_wr_addr$114  : 4'h0;
+  assign \$56  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:465" *) \cr_wr_addr$115  : \$55 ;
+  assign \$57  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:464" *) \cr_wr_addr$116  : \$56 ;
+  assign cr_wr_addr = mwin_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:463" *) 4'hf : \$57 ;
+  assign \$59  = busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:473" *) \cr_wr_data$119  : 128'h00000000000000000000000000000000;
+  assign \$60  = call_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:472" *) \cr_wr_data$120  : \$59 ;
+  assign \$61  = tperm_busy ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:471" *) \cr_wr_data$121  : \$60 ;
+  assign cr_wr_data = mwin_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:470" *) mwin_cr_wr_data : \$61 ;
+  assign \$62  = mwin_cr_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:477" *) \cr_wr_en$123 ;
+  assign \$63  = \$62  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:477" *) \cr_wr_en$124 ;
+  assign \$64  = \$63  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:477" *) \cr_wr_en$125 ;
+  assign \$65  = boot_complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:563" *) exec_enable;
+  assign \$66  = \$65  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:563" *) is_church_op;
+  assign \$67  = \$66  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:563" *) all_checks_pass;
+  assign \$68  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) 3'h5;
+  assign \$69  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) 3'h4;
+  assign \$70  = \$68  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:564" *) \$69 ;
+  assign switch_change_active = \$67  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:563" *) \$70 ;
+  assign \$71  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:571" *) 3'h4;
+  assign effective_target = \$71  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:571" *) 3'h0 : instruction[22:20];
+  assign \$72  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) effective_target;
+  assign \$73  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 1'h1;
+  assign \$74  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 2'h2;
+  assign \$75  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 2'h3;
+  assign \$76  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 3'h4;
+  assign \$77  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 3'h5;
+  assign \$78  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 3'h6;
+  assign \$79  = effective_target == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:575" *) 3'h7;
+  assign cr5_gt_wr_data = boot_cr5_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) boot_cr5_wr_gt : 32'd0;
+  assign cr6_gt_wr_data = boot_cr6_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) boot_cr6_wr_gt : 32'd0;
+  assign cr7_gt_wr_data = boot_cr7_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) boot_cr7_wr_gt : 32'd0;
+  assign cr8_gt_wr_en = boot_cr8_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:580" *) rt_cr8_wr_en;
+  assign cr8_gt_wr_data = boot_cr8_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) boot_cr8_wr_gt : rt_cr8_wr_gt;
+  assign cr15_gt_wr_en = boot_cr15_wr_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:580" *) rt_cr15_wr_en;
+  assign cr15_gt_wr_data = boot_cr15_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:581" *) boot_cr15_wr_gt : rt_cr15_wr_gt;
+  assign \$80  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:585" *) is_church_op;
+  assign \$81  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:585" *) 2'h2;
+  assign \$82  = \$80  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:585" *) \$81 ;
+  assign call_start_sig = \$82  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:585" *) all_checks_pass;
+  assign \$83  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:599" *) is_church_op;
+  assign \$84  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:599" *) 2'h3;
+  assign \$85  = \$83  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:599" *) \$84 ;
+  assign ret_start_sig = \$85  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:599" *) all_checks_pass;
+  assign \$86  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:614" *) 3'h4;
+  assign \$87  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:618" *) is_church_op;
+  assign \$88  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:618" *) 3'h6;
+  assign \$89  = \$87  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:618" *) \$88 ;
+  assign tperm_start_sig = \$89  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:618" *) all_checks_pass;
+  assign \$90  = exec_enable & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:629" *) is_church_op;
+  assign \$91  = instruction[14:12] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:629" *) 1'h1;
+  assign \$92  = \$90  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:629" *) \$91 ;
+  assign save_start_sig = \$92  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:629" *) all_checks_pass;
+  assign \$93  = call_normal_complete | (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:658" *) complete;
+  assign xr11_valid = m_xr11[1:0] != (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:664" *) 2'h2;
   assign \$94  = { mwin_xr12_lat[24:0], mwin_xr12_lat[31:25] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { w1_masked[18:0], w1_masked[31:19] };
-  assign mwin_integrity_ok = mwin_integrity_computed == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:671" *) mwin_xr14_lat;
-  assign mwin_version_ok = mwin_xr11_lat[31:25] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:682" *) mwin_xr15_lat[31:25];
-  assign \$95  = mwin_integrity_ok & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:705" *) mwin_version_ok;
-  assign \$96  = { cr15_namespace[56:32], cr15_namespace[63:57] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { \w1_masked$302 [18:0], \w1_masked$302 [31:19] };
-  assign m_set_dr11 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:756" *) mgt_gt_word : cr15_namespace[31:0];
-  assign m_set_dr12 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:760" *) mgt_ns_location : cr15_namespace[63:32];
-  assign m_set_dr13 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:764" *) mgt_ns_authority : cr15_namespace[95:64];
-  assign m_set_dr14 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:768" *) mgt_ns_integrity : cr15_m_set_integrity;
-  assign m_set_dr15 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:772" *) mgt_ns_seals : cr15_namespace[127:96];
-  assign cr5_stack_empty = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:797" *) cr5_stack_ptr;
-  assign \$97  = cr5_stack_ptr > (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:799" *) 1'h0;
-  assign \$98  = cr5_stack_ptr - (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:799" *) 1'h1;
-  assign \$99  = \$97  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:799" *) \$98  : 9'h000;
-  assign saved_cr5_gt = cr5_stack_empty ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:800" *) 32'd0 : cr5_stack_r_data;
-  assign \$100  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:807" *) call_fault;
-  assign \$101  = call_normal_complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:807" *) \$100 ;
-  assign \$104  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) fault_valid;
-  assign \$105  = complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) \$104 ;
-  assign \$106  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) cr5_stack_empty;
-  assign \$107  = \$105  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) \$106 ;
-  assign \$108  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) mwin_state;
-  assign \$109  = mwin_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
-  assign \$110  = mwin_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
-  assign \$111  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:496" *) 3'h4;
-  assign \$112  = m_trigger & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:688" *) cr15_m_flag;
-  assign \$113  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:807" *) call_fault;
-  assign \$114  = call_normal_complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:807" *) \$113 ;
-  assign \$117  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) fault_valid;
-  assign \$118  = complete & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) \$117 ;
-  assign \$119  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) cr5_stack_empty;
-  assign \$120  = \$118  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:814" *) \$119 ;
-  assign \$121  = cr5_stack_ptr + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:813" *) 1'h1;
-  assign \$122  = cr5_stack_ptr - (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:815" *) 1'h1;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:106" *)
+  assign mwin_integrity_ok = mwin_integrity_computed == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:670" *) mwin_xr14_lat;
+  assign mwin_version_ok = mwin_xr11_lat[31:25] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:681" *) mwin_xr15_lat[31:25];
+  assign mwin_gtseq_ok = mwin_xr11_lat[22:16] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:695" *) mwin_xr13_lat[27:21];
+  assign \$96  = \$95  * (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:707" *) 25'h1000193;
+  assign \$97  = \$96  ^ (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:707" *) { 25'h0000000, mwin_xr13_lat };
+  assign mwin_seal_ok = \$97 [24:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:710" *) mwin_xr15_lat[24:0];
+  assign \$98  = mwin_integrity_ok & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:736" *) mwin_version_ok;
+  assign \$99  = \$98  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:736" *) mwin_gtseq_ok;
+  assign \$100  = \$99  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:736" *) mwin_seal_ok;
+  assign \$101  = { cr15_namespace[56:32], cr15_namespace[63:57] } ^ (* src = "/home/runner/workspace/hardware/integrity32.py:66" *) { \w1_masked$308 [18:0], \w1_masked$308 [31:19] };
+  assign m_set_dr11 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:796" *) mgt_gt_word : cr15_namespace[31:0];
+  assign m_set_dr12 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:800" *) mgt_ns_location : cr15_namespace[63:32];
+  assign m_set_dr13 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:804" *) mgt_ns_authority : cr15_namespace[95:64];
+  assign m_set_dr14 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:808" *) mgt_ns_integrity : cr15_m_set_integrity;
+  assign m_set_dr15 = mgt_set_trigger ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:812" *) mgt_ns_seals : 32'd0;
+  assign \$102  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) mwin_state;
+  assign \$103  = mwin_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
+  assign \$104  = mwin_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
+  assign \$105  = nia_reg + (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:495" *) 3'h4;
+  assign \$106  = m_trigger & (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:716" *) cr15_m_flag;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:105" *)
   always @(posedge clk)
-    boot_state <= \$123 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:102" *)
+    boot_state <= \$107 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:101" *)
   always @(posedge clk)
-    nia_reg <= \$124 ;
+    nia_reg <= \$108 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:650" *)
+  always @(posedge clk)
+    mwin_xr11_lat <= \$109 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:651" *)
   always @(posedge clk)
-    mwin_xr11_lat <= \$125 ;
+    mwin_xr12_lat <= \$110 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:652" *)
   always @(posedge clk)
-    mwin_xr12_lat <= \$126 ;
+    mwin_xr13_lat <= \$111 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:653" *)
   always @(posedge clk)
-    mwin_xr13_lat <= \$127 ;
+    mwin_xr14_lat <= \$112 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:654" *)
   always @(posedge clk)
-    mwin_xr14_lat <= \$128 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:655" *)
-  always @(posedge clk)
-    mwin_xr15_lat <= \$129 ;
+    mwin_xr15_lat <= \$113 ;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
-    mwin_state <= \$130 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:790" *)
-  always @(posedge clk)
-    cr5_stack_ptr <= \$131 ;
+    mwin_state <= \$114 ;
   assign \$auto$rtlil.cc:2739:Not$6  = ~ { \$94 [31:30], \$94 [28:25], \$94 [23], \$94 [21], \$94 [19:18], \$94 [16:15], \$94 [13:9], \$94 [7:5], \$94 [3:0] };
-  assign \$auto$rtlil.cc:2739:Not$8  = ~ { \$96 [31:30], \$96 [28:25], \$96 [23], \$96 [21], \$96 [19:18], \$96 [16:15], \$96 [13:9], \$96 [7:5], \$96 [3:0] };
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:97" *)
+  assign \$auto$rtlil.cc:2739:Not$8  = ~ { mwin_xr12_lat[31], mwin_xr12_lat[24], mwin_xr12_lat[20:18], mwin_xr12_lat[15], mwin_xr12_lat[12:10], mwin_xr12_lat[8:6], mwin_xr12_lat[2], mwin_xr12_lat[0] };
+  assign \$auto$rtlil.cc:2739:Not$10  = ~ { \$101 [31:30], \$101 [28:25], \$101 [23], \$101 [21], \$101 [19:18], \$101 [16:15], \$101 [13:9], \$101 [7:5], \$101 [3:0] };
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:96" *)
   \ctmm_cap_fpga_top.core.u_call  u_call (
     .call_busy(call_busy),
     .call_fault(call_fault),
@@ -4959,7 +4648,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .cr_wr_addr(\cr_wr_addr$115 ),
     .cr_wr_data(\cr_wr_data$120 ),
     .cr_wr_en(\cr_wr_en$124 ),
-    .fault_type(\fault_type$351 ),
+    .fault_type(\fault_type$346 ),
     .mem_rd_data(dmem_rd_data),
     .mgt_gt_lat(mgt_gt_word),
     .mgt_ns_authority(mgt_ns_authority),
@@ -4967,38 +4656,37 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .mgt_ns_location(mgt_ns_location),
     .mgt_ns_seals(mgt_ns_seals),
     .mgt_set_trigger(mgt_set_trigger),
-    .\port$1283$20 (instruction[31:20]),
-    .rst(rst),
-    .saved_cr5_gt(\saved_cr5_gt$339 )
+    .\port$1236$20 (instruction[31:20]),
+    .rst(rst)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:93" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:92" *)
   \ctmm_cap_fpga_top.core.u_decoder  u_decoder (
-    .fault(\fault$346 ),
-    .fault_valid(\fault_valid$340 ),
+    .fault(\fault$341 ),
+    .fault_valid(fault_valid),
     .instr_valid(instr_valid),
     .instruction(instruction),
     .is_church_op(is_church_op),
     .is_ctmm_op(is_ctmm_op)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:95" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:94" *)
   \ctmm_cap_fpga_top.core.u_gc_unit  u_gc_unit (
     .clk(clk),
     .garbage_count(gc_garbage_count),
     .gc_busy(gc_busy),
-    .ns_addr(\ns_addr$355 ),
+    .ns_addr(\ns_addr$350 ),
     .ns_rd_data(ns_rd_data),
-    .ns_rd_en(\ns_rd_en$357 ),
-    .ns_wr_data(\ns_wr_data$359 ),
-    .ns_wr_en(\ns_wr_en$361 ),
+    .ns_rd_en(\ns_rd_en$352 ),
+    .ns_wr_data(\ns_wr_data$354 ),
+    .ns_wr_en(\ns_wr_en$356 ),
     .rst(rst)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:96" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:95" *)
   \ctmm_cap_fpga_top.core.u_lambda  u_lambda (
     .clk(clk),
     .cr_rd_addr(\cr_rd_addr$24 ),
     .cr_rd_data(cr_rd_data),
     .cr_target(instruction[10:7]),
-    .fault_type(\fault_type$349 ),
+    .fault_type(\fault_type$344 ),
     .lambda_busy(lambda_busy),
     .lambda_fault(lambda_fault),
     .lambda_start(lambda_start_sig),
@@ -5006,17 +4694,17 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .nia_value(nia_value),
     .rst(rst)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:94" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:93" *)
   \ctmm_cap_fpga_top.core.u_perm_check  u_perm_check (
     .all_checks_pass(all_checks_pass),
     .check_domain_purity(check_domain_purity),
     .check_valid(check_valid),
     .fault_type(fault_type),
-    .fault_valid(\fault_valid$341 ),
+    .fault_valid(\fault_valid$334 ),
     .gt_in(cr_rd_data[31:0]),
     .required_perms(required_perms)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:92" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:91" *)
   \ctmm_cap_fpga_top.core.u_registers  u_registers (
     .clear_all(clear_all),
     .clk(clk),
@@ -5074,7 +4762,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .m_xr13(dbg_m_xr13),
     .m_xr14(dbg_m_xr14),
     .m_xr15(dbg_m_xr15),
-    .\port$1283$15 (instruction[24:15]),
+    .\port$1236$15 (instruction[24:15]),
     .rst(rst),
     .xr_rd_data1(alu_a),
     .xr_rd_data2(xr_rd_data2),
@@ -5082,7 +4770,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .xr_wr_data(xr_wr_data),
     .xr_wr_en(xr_wr_en)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:98" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:97" *)
   \ctmm_cap_fpga_top.core.u_return  u_return (
     .busy(busy),
     .clk(clk),
@@ -5094,30 +4782,29 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .cr_wr_addr(\cr_wr_addr$114 ),
     .cr_wr_data(\cr_wr_data$119 ),
     .cr_wr_en(\cr_wr_en$125 ),
-    .fault_type(\fault_type$352 ),
-    .fault_valid(fault_valid),
+    .fault_type(\fault_type$347 ),
+    .fault_valid(\fault_valid$338 ),
     .mem_rd_data(dmem_rd_data),
-    .nia_set(\nia_set$366 ),
-    .nia_value(\nia_value$369 ),
+    .nia_set(\nia_set$361 ),
+    .nia_value(\nia_value$364 ),
     .return_start(ret_start_sig),
-    .rst(rst),
-    .saved_cr5_gt(saved_cr5_gt)
+    .rst(rst)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:100" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:99" *)
   \ctmm_cap_fpga_top.core.u_save  u_save (
     .clk(clk),
     .cr_dst(instruction[10:7]),
     .cr_rd_addr(\cr_rd_addr$20 ),
     .cr_rd_data(cr_rd_data),
     .cr_src(instruction[18:15]),
-    .fault_type(\fault_type$353 ),
-    .\port$1283$20 (instruction[31:20]),
+    .fault_type(\fault_type$348 ),
+    .\port$1236$20 (instruction[31:20]),
     .rst(rst),
     .save_busy(save_busy),
     .save_fault(save_fault),
     .save_start(save_start_sig)
   );
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:99" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/core.py:98" *)
   \ctmm_cap_fpga_top.core.u_tperm  u_tperm (
     .clk(clk),
     .cr_rd_addr(\cr_rd_addr$23 ),
@@ -5126,7 +4813,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .cr_wr_addr(\cr_wr_addr$116 ),
     .cr_wr_data(\cr_wr_data$121 ),
     .cr_wr_en(\cr_wr_en$123 ),
-    .fault_type(\fault_type$350 ),
+    .fault_type(\fault_type$345 ),
     .preset(instruction[23:20]),
     .rst(rst),
     .tperm_busy(tperm_busy),
@@ -5134,7 +4821,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     .tperm_start(tperm_start_sig)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
     casez (instruction[14:12])
       3'h0:
@@ -5159,7 +4846,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     xr_wr_data = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5242,7 +4929,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     xr_wr_en = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5325,7 +5012,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     jump_taken = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5341,7 +5028,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     jump_target = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5357,7 +5044,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     branch_target = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5375,7 +5062,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs1_s = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5393,7 +5080,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs2_s = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5411,7 +5098,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     branch_taken = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5442,7 +5129,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     dmem_addr_computed = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5464,7 +5151,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     dmem_rd_en_sig = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5484,7 +5171,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     half_val = 16'h0000;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5509,7 +5196,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     sign_ext_h = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5534,7 +5221,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     byte_val = 8'h00;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5561,7 +5248,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     sign_ext_b = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5588,7 +5275,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     dmem_wr_en_sig = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5610,7 +5297,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     dmem_wr_data_sig = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5639,7 +5326,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     imm_ext = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5663,7 +5350,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     alu_result = 33'h000000000;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5700,7 +5387,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     flags_in[2:0] = 3'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5740,7 +5427,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     flags_wr_en = 1'h0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5772,7 +5459,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs1_s_i = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5801,7 +5488,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     imm_s_i = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5830,7 +5517,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     shamt = 5'h00;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5869,7 +5556,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     shamt_r = 5'h00;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5911,7 +5598,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs1_signed = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5955,7 +5642,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs1_s_r = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -5988,7 +5675,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs2_s_r = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -6021,7 +5708,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rs1_sr = 32'd0;
     if (\$13 ) begin
       casez (instruction[6:0])
@@ -6062,25 +5749,25 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_cr_wr_en = 1'h0;
     casez (mwin_state)
       2'h0:
           /* empty */;
       2'h1:
-          if (\$95 ) begin
+          if (\$100 ) begin
             mwin_cr_wr_en = 1'h1;
           end
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_cr_wr_data = 128'h00000000000000000000000000000000;
     casez (mwin_state)
       2'h0:
           /* empty */;
       2'h1:
-          if (\$95 ) begin
+          if (\$100 ) begin
             mwin_cr_wr_data[31:0] = mwin_xr11_lat;
             mwin_cr_wr_data[63:32] = mwin_xr12_lat;
             mwin_cr_wr_data[95:64] = mwin_xr13_lat;
@@ -6089,14 +5776,14 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_m_clear_en = 1'h0;
     casez (mwin_state)
       2'h0:
           /* empty */;
       2'h1:
           (* full_case = 32'd1 *)
-          if (\$95 ) begin
+          if (\$100 ) begin
             mwin_m_clear_en = 1'h1;
           end else begin
             mwin_m_clear_en = 1'h1;
@@ -6106,14 +5793,14 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_fault_sig = 1'h0;
     casez (mwin_state)
       2'h0:
           /* empty */;
       2'h1:
           (* full_case = 32'd1 *)
-          if (\$95 ) begin
+          if (\$100 ) begin
           end else begin
             mwin_fault_sig = 1'h1;
           end
@@ -6122,14 +5809,14 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_fault_type = 4'h0;
     casez (mwin_state)
       2'h0:
           /* empty */;
       2'h1:
           (* full_case = 32'd1 *)
-          if (\$95 ) begin
+          if (\$100 ) begin
           end else begin
             mwin_fault_type = 4'hb;
           end
@@ -6138,7 +5825,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     ns_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6151,7 +5838,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr15_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
@@ -6159,7 +5846,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr15_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6167,7 +5854,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     thrd_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6182,7 +5869,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr8_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
@@ -6192,7 +5879,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr8_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6202,7 +5889,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     cr6_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6219,7 +5906,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr6_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
@@ -6231,7 +5918,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr6_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6243,7 +5930,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     cr7_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6260,7 +5947,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr7_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
@@ -6272,7 +5959,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr7_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6284,7 +5971,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     cr5_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6301,7 +5988,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr5_wr_en = 1'h0;
     casez (boot_state)
       3'h2:
@@ -6313,7 +6000,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     boot_cr5_wr_gt = 32'd0;
     casez (boot_state)
       3'h2:
@@ -6325,7 +6012,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr8_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$72 ) begin
@@ -6334,7 +6021,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr8_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$72 ) begin
@@ -6343,7 +6030,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr9_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$73 ) begin
@@ -6352,7 +6039,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr9_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$73 ) begin
@@ -6361,7 +6048,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr10_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$74 ) begin
@@ -6370,7 +6057,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr10_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$74 ) begin
@@ -6379,7 +6066,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr11_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$75 ) begin
@@ -6388,7 +6075,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr11_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$75 ) begin
@@ -6397,7 +6084,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr12_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$76 ) begin
@@ -6406,7 +6093,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr12_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$76 ) begin
@@ -6415,7 +6102,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr13_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$77 ) begin
@@ -6424,7 +6111,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr13_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$77 ) begin
@@ -6433,7 +6120,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr14_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$78 ) begin
@@ -6442,7 +6129,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr14_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$78 ) begin
@@ -6451,7 +6138,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr15_wr_en = 1'h0;
     if (switch_change_active) begin
       if (\$79 ) begin
@@ -6460,7 +6147,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     rt_cr15_wr_gt = 32'd0;
     if (switch_change_active) begin
       if (\$79 ) begin
@@ -6469,7 +6156,7 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     mwin_busy = 1'h0;
     casez (mwin_state)
       2'h0:
@@ -6481,43 +6168,22 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    cr5_stack_w_addr = 8'h00;
-    if (\$103 ) begin
-      cr5_stack_w_addr = cr5_stack_ptr;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    cr5_stack_w_data = 32'd0;
-    if (\$103 ) begin
-      cr5_stack_w_data = \saved_cr5_gt$339 ;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    cr5_stack_w_en = 1'h0;
-    if (\$103 ) begin
-      cr5_stack_w_en = 1'h1;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
-    if (\fault_valid$340 ) begin
-      fault = \fault$346 ;
-    end else if (\fault_valid$341 ) begin
+    if (fault_valid) begin
+      fault = \fault$341 ;
+    end else if (\fault_valid$334 ) begin
       fault = fault_type;
     end else if (lambda_fault) begin
-      fault = \fault_type$349 ;
+      fault = \fault_type$344 ;
     end else if (tperm_fault) begin
-      fault = \fault_type$350 ;
+      fault = \fault_type$345 ;
     end else if (call_fault) begin
-      fault = \fault_type$351 ;
-    end else if (fault_valid) begin
-      fault = \fault_type$352 ;
+      fault = \fault_type$346 ;
+    end else if (\fault_valid$338 ) begin
+      fault = \fault_type$347 ;
     end else if (save_fault) begin
-      fault = \fault_type$353 ;
+      fault = \fault_type$348 ;
     end else if (mwin_fault_sig) begin
       fault = mwin_fault_type;
     end else begin
@@ -6525,206 +6191,194 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
-    if (\fault_valid$340 ) begin
-      \fault_valid$347  = 1'h1;
-    end else if (\fault_valid$341 ) begin
-      \fault_valid$347  = 1'h1;
+    if (fault_valid) begin
+      \fault_valid$342  = 1'h1;
+    end else if (\fault_valid$334 ) begin
+      \fault_valid$342  = 1'h1;
     end else if (lambda_fault) begin
-      \fault_valid$347  = 1'h1;
+      \fault_valid$342  = 1'h1;
     end else if (tperm_fault) begin
-      \fault_valid$347  = 1'h1;
+      \fault_valid$342  = 1'h1;
     end else if (call_fault) begin
-      \fault_valid$347  = 1'h1;
-    end else if (fault_valid) begin
-      \fault_valid$347  = 1'h1;
+      \fault_valid$342  = 1'h1;
+    end else if (\fault_valid$338 ) begin
+      \fault_valid$342  = 1'h1;
     end else if (save_fault) begin
-      \fault_valid$347  = 1'h1;
+      \fault_valid$342  = 1'h1;
     end else if (mwin_fault_sig) begin
-      \fault_valid$347  = 1'h1;
+      \fault_valid$342  = 1'h1;
     end else begin
-      \fault_valid$347  = 1'h0;
+      \fault_valid$342  = 1'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
     if (gc_busy) begin
-      ns_addr = \ns_addr$355 ;
+      ns_addr = \ns_addr$350 ;
     end else begin
       ns_addr = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
     if (gc_busy) begin
-      ns_rd_en = \ns_rd_en$357 ;
+      ns_rd_en = \ns_rd_en$352 ;
     end else begin
       ns_rd_en = 1'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
     if (gc_busy) begin
-      ns_wr_data = \ns_wr_data$359 ;
+      ns_wr_data = \ns_wr_data$354 ;
     end else begin
       ns_wr_data = 96'h000000000000000000000000;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
     (* full_case = 32'd1 *)
     if (gc_busy) begin
-      ns_wr_en = \ns_wr_en$361 ;
+      ns_wr_en = \ns_wr_en$356 ;
     end else begin
       ns_wr_en = 1'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$123  = boot_state;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$107  = boot_state;
     casez (boot_state)
       3'h0:
           if (boot_start) begin
-            \$123  = 3'h1;
+            \$107  = 3'h1;
           end
       3'h1:
-          \$123  = 3'h2;
+          \$107  = 3'h2;
       3'h2:
-          \$123  = 3'h3;
+          \$107  = 3'h3;
       3'h3:
-          \$123  = 3'h4;
+          \$107  = 3'h4;
       3'h4:
-          \$123  = 3'h5;
+          \$107  = 3'h5;
       3'h5:
-          \$123  = 3'h5;
+          \$107  = 3'h5;
     endcase
     if (rst) begin
-      \$123  = 3'h0;
+      \$107  = 3'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$124  = nia_reg;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$108  = nia_reg;
     if (clear_all) begin
-      \$124  = 32'd0;
+      \$108  = 32'd0;
     end else if (nia_set) begin
-      \$124  = nia_value;
-    end else if (\nia_set$366 ) begin
-      \$124  = \nia_value$369 ;
+      \$108  = nia_value;
+    end else if (\nia_set$361 ) begin
+      \$108  = \nia_value$364 ;
     end else if (call_normal_complete) begin
-      \$124  = 32'd0;
+      \$108  = 32'd0;
     end else if (jump_taken) begin
-      \$124  = jump_target;
+      \$108  = jump_target;
     end else if (branch_taken) begin
-      \$124  = branch_target;
+      \$108  = branch_target;
     end else if (exec_enable) begin
-      \$124  = \$111 [31:0];
+      \$108  = \$105 [31:0];
     end
     if (rst) begin
-      \$124  = 32'd0;
+      \$108  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$125  = mwin_xr11_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$109  = mwin_xr11_lat;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
-            \$125  = m_xr11;
+          if (\$106 ) begin
+            \$109  = m_xr11;
           end
     endcase
     if (rst) begin
-      \$125  = 32'd0;
+      \$109  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$126  = mwin_xr12_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$110  = mwin_xr12_lat;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
-            \$126  = dbg_m_xr12;
+          if (\$106 ) begin
+            \$110  = dbg_m_xr12;
           end
     endcase
     if (rst) begin
-      \$126  = 32'd0;
+      \$110  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$127  = mwin_xr13_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$111  = mwin_xr13_lat;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
-            \$127  = dbg_m_xr13;
+          if (\$106 ) begin
+            \$111  = dbg_m_xr13;
           end
     endcase
     if (rst) begin
-      \$127  = 32'd0;
+      \$111  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$128  = mwin_xr14_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$112  = mwin_xr14_lat;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
-            \$128  = dbg_m_xr14;
+          if (\$106 ) begin
+            \$112  = dbg_m_xr14;
           end
     endcase
     if (rst) begin
-      \$128  = 32'd0;
+      \$112  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$129  = mwin_xr15_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$113  = mwin_xr15_lat;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
-            \$129  = dbg_m_xr15;
+          if (\$106 ) begin
+            \$113  = dbg_m_xr15;
           end
     endcase
     if (rst) begin
-      \$129  = 32'd0;
+      \$113  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$130  = mwin_state;
+    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    \$114  = mwin_state;
     casez (mwin_state)
       2'h0:
-          if (\$112 ) begin
+          if (\$106 ) begin
             (* full_case = 32'd1 *)
             if (xr11_valid) begin
-              \$130  = 2'h1;
+              \$114  = 2'h1;
             end else begin
-              \$130  = 2'h2;
+              \$114  = 2'h2;
             end
           end
       2'h1:
-          \$130  = 2'h0;
+          \$114  = 2'h0;
       2'h2:
-          \$130  = 2'h0;
+          \$114  = 2'h0;
     endcase
     if (rst) begin
-      \$130  = 2'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$10 ) begin end
-    \$131  = cr5_stack_ptr;
-    if (\$116 ) begin
-      \$131  = \$121 [7:0];
-    end else if (\$120 ) begin
-      \$131  = \$122 [7:0];
-    end
-    if (rst) begin
-      \$131  = 8'h00;
+      \$114  = 2'h0;
     end
   end
   assign boot_state_reg = boot_state;
@@ -6856,24 +6510,26 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   assign w1_rot = { w1_masked[18:0], w1_masked[31:19] };
   assign mwin_gt_version = mwin_xr11_lat[31:25];
   assign mwin_seal_version = mwin_xr15_lat[31:25];
+  assign mwin_gt_gtseq = mwin_xr11_lat[22:16];
+  assign mwin_ns_gtseq = mwin_xr13_lat[27:21];
+  assign mwin_seal_computed = \$97 [31:0];
+  assign mwin_seal_masked = \$97 [24:0];
   assign cr15_m_set = 1'h0;
   assign m_clear_en = mwin_m_clear_en;
   assign m_flag_restore_en = 1'h0;
-  assign \m_flag_restore_en$299  = 1'h0;
+  assign \m_flag_restore_en$305  = 1'h0;
   assign m_flag_restore_val = 1'h0;
-  assign \m_flag_restore_val$301  = 1'h0;
-  assign \w0_rot$303  = { cr15_namespace[56:32], cr15_namespace[63:57] };
-  assign \w1_rot$304  = { \w1_masked$302 [18:0], \w1_masked$302 [31:19] };
-  assign \cr15_m_flag$317  = cr15_m_flag;
+  assign \m_flag_restore_val$307  = 1'h0;
+  assign \w0_rot$309  = { cr15_namespace[56:32], cr15_namespace[63:57] };
+  assign \w1_rot$310  = { \w1_masked$308 [18:0], \w1_masked$308 [31:19] };
+  assign \cr15_m_flag$323  = cr15_m_flag;
   assign dbg_m_xr11 = m_xr11;
   assign m_xr12 = dbg_m_xr12;
   assign m_xr13 = dbg_m_xr13;
   assign m_xr14 = dbg_m_xr14;
   assign m_xr15 = dbg_m_xr15;
-  assign cr5_stack_r_addr = \$99 [7:0];
-  assign dbg_cr5_stack_depth = cr5_stack_ptr;
-  assign \nia_set$367  = call_normal_complete;
-  assign \nia_value$370  = 32'd0;
+  assign \nia_set$362  = call_normal_complete;
+  assign \nia_value$365  = 32'd0;
   assign perm_gt_sig = cr_rd_data[31:0];
   assign \perm_gt_sig.gt_type  = cr_rd_data[1:0];
   assign \perm_gt_sig.perms  = cr_rd_data[7:2];
@@ -7290,28 +6946,25 @@ module \ctmm_cap_fpga_top.core (rst, boot_start, boot_complete, perm_gt_sig, gc_
   assign { w1_masked[31:29], w1_masked[27:0] } = { mwin_xr13_lat[31:29], mwin_xr13_lat[27:0] };
   assign { mwin_integrity_computed[29], mwin_integrity_computed[24], mwin_integrity_computed[22], mwin_integrity_computed[20], mwin_integrity_computed[17], mwin_integrity_computed[14], mwin_integrity_computed[8], mwin_integrity_computed[4] } = { \$94 [29], \$94 [24], \$94 [22], \$94 [20], \$94 [17], \$94 [14], \$94 [8], \$94 [4] };
   assign { mwin_integrity_computed[31:30], mwin_integrity_computed[28:25], mwin_integrity_computed[23], mwin_integrity_computed[21], mwin_integrity_computed[19:18], mwin_integrity_computed[16:15], mwin_integrity_computed[13:9], mwin_integrity_computed[7:5], mwin_integrity_computed[3:0] } = \$auto$rtlil.cc:2739:Not$6 ;
+  assign { \$95 [30:25], \$95 [23:21], \$95 [17:16], \$95 [14:13], \$95 [9], \$95 [5:3], \$95 [1] } = { mwin_xr12_lat[30:25], mwin_xr12_lat[23:21], mwin_xr12_lat[17:16], mwin_xr12_lat[14:13], mwin_xr12_lat[9], mwin_xr12_lat[5:3], mwin_xr12_lat[1] };
+  assign { \$95 [31], \$95 [24], \$95 [20:18], \$95 [15], \$95 [12:10], \$95 [8:6], \$95 [2], \$95 [0] } = \$auto$rtlil.cc:2739:Not$8 ;
   assign m_set_en = mgt_set_trigger;
-  assign \w1_masked$302 [28] = 1'h0;
-  assign { \w1_masked$302 [31:29], \w1_masked$302 [27:0] } = { cr15_namespace[95:93], cr15_namespace[91:64] };
-  assign { cr15_m_set_integrity[29], cr15_m_set_integrity[24], cr15_m_set_integrity[22], cr15_m_set_integrity[20], cr15_m_set_integrity[17], cr15_m_set_integrity[14], cr15_m_set_integrity[8], cr15_m_set_integrity[4] } = { \$96 [29], \$96 [24], \$96 [22], \$96 [20], \$96 [17], \$96 [14], \$96 [8], \$96 [4] };
-  assign { cr15_m_set_integrity[31:30], cr15_m_set_integrity[28:25], cr15_m_set_integrity[23], cr15_m_set_integrity[21], cr15_m_set_integrity[19:18], cr15_m_set_integrity[16:15], cr15_m_set_integrity[13:9], cr15_m_set_integrity[7:5], cr15_m_set_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$8 ;
-  assign cr5_stack_full = 1'h0;
-  assign \$102  = 1'h1;
-  assign \$103  = \$101 ;
-  assign \$115  = 1'h1;
-  assign \$116  = \$114 ;
+  assign \w1_masked$308 [28] = 1'h0;
+  assign { \w1_masked$308 [31:29], \w1_masked$308 [27:0] } = { cr15_namespace[95:93], cr15_namespace[91:64] };
+  assign { cr15_m_set_integrity[29], cr15_m_set_integrity[24], cr15_m_set_integrity[22], cr15_m_set_integrity[20], cr15_m_set_integrity[17], cr15_m_set_integrity[14], cr15_m_set_integrity[8], cr15_m_set_integrity[4] } = { \$101 [29], \$101 [24], \$101 [22], \$101 [20], \$101 [17], \$101 [14], \$101 [8], \$101 [4] };
+  assign { cr15_m_set_integrity[31:30], cr15_m_set_integrity[28:25], cr15_m_set_integrity[23], cr15_m_set_integrity[21], cr15_m_set_integrity[19:18], cr15_m_set_integrity[16:15], cr15_m_set_integrity[13:9], cr15_m_set_integrity[7:5], cr15_m_set_integrity[3:0] } = \$auto$rtlil.cc:2739:Not$10 ;
 endmodule
 
-(* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:54" *)
+(* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:52" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, cr_wr_data, cr_wr_en, cr_rd_addr, call_busy, call_normal_complete, mgt_set_trigger, cr_src, \port$1283$20 , mem_rd_data, cr15_namespace, call_fault, fault_type, mgt_gt_lat, saved_cr5_gt, mgt_ns_location, mgt_ns_authority, mgt_ns_integrity
-, mgt_ns_seals, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$11  = 0;
+module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, cr_wr_data, cr_wr_en, cr_rd_addr, call_busy, call_normal_complete, mgt_set_trigger, cr_src, \port$1236$20 , mem_rd_data, cr15_namespace, call_fault, fault_type, mgt_gt_lat, mgt_ns_location, mgt_ns_authority, mgt_ns_integrity, mgt_ns_seals
+, clk);
+  reg \$auto$verilog_backend.cc:2355:dump_module$13  = 0;
   wire [23:0] \$1 ;
   wire [32:0] \$10 ;
   wire [32:0] \$11 ;
-  wire [32:0] \$12 ;
-  wire [32:0] \$13 ;
+  wire \$12 ;
+  wire \$13 ;
   wire \$14 ;
   wire \$15 ;
   wire \$16 ;
@@ -7333,85 +6986,81 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire \$30 ;
   wire \$31 ;
   wire \$32 ;
-  wire \$33 ;
-  wire \$34 ;
-  wire \$35 ;
-  wire [3:0] \$36 ;
-  wire [3:0] \$37 ;
+  wire [3:0] \$33 ;
+  wire [3:0] \$34 ;
+  reg \$35 ;
+  reg \$36 ;
+  reg [3:0] \$37 ;
   reg \$38 ;
   reg \$39 ;
   wire [4:0] \$4 ;
-  reg [3:0] \$40 ;
-  reg \$41 ;
-  reg \$42 ;
-  reg [10:0] \$43 ;
-  reg [4:0] \$44 ;
-  reg [127:0] \$45 ;
-  reg [31:0] \$46 ;
+  reg [10:0] \$40 ;
+  reg [4:0] \$41 ;
+  reg [127:0] \$42 ;
+  reg [31:0] \$43 ;
+  reg \$44 ;
+  reg [2:0] \$45 ;
+  reg [127:0] \$46 ;
   reg [31:0] \$47 ;
-  reg \$48 ;
-  reg [2:0] \$49 ;
+  reg [31:0] \$48 ;
+  reg [31:0] \$49 ;
   wire [5:0] \$5 ;
-  reg [127:0] \$50 ;
-  reg [31:0] \$51 ;
-  reg [31:0] \$52 ;
-  reg [31:0] \$53 ;
-  reg [31:0] \$54 ;
+  reg [31:0] \$50 ;
   wire \$6 ;
   wire \$7 ;
-  wire \$8 ;
-  wire \$9 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:79" *)
+  wire [32:0] \$8 ;
+  wire [32:0] \$9 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
   reg [3:0] b_clear_wr_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  reg [127:0] b_clear_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [31:0] \b_clear_wr_data.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [1:0] \b_clear_wr_data.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [16:0] \b_clear_wr_data.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [5:0] \b_clear_wr_data.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [6:0] \b_clear_wr_data.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [31:0] \b_clear_wr_data.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [31:0] \b_clear_wr_data.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:80" *)
-  wire [31:0] \b_clear_wr_data.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
-  reg b_clear_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  reg [127:0] b_cr_data = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [31:0] \b_cr_data.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [1:0] \b_cr_data.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [16:0] \b_cr_data.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [5:0] \b_cr_data.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [6:0] \b_cr_data.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [31:0] \b_cr_data.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [31:0] \b_cr_data.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
-  wire [31:0] \b_cr_data.word3_seals ;
+  reg [127:0] b_clear_wr_data;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [31:0] \b_clear_wr_data.word0_gt ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [1:0] \b_clear_wr_data.word0_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [16:0] \b_clear_wr_data.word0_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [5:0] \b_clear_wr_data.word0_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [6:0] \b_clear_wr_data.word0_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [31:0] \b_clear_wr_data.word1_location ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [31:0] \b_clear_wr_data.word2_limit ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:78" *)
+  wire [31:0] \b_clear_wr_data.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:76" *)
+  reg b_clear_wr_en;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  reg [127:0] b_cr_data = 128'h00000000000000000000000000000000;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [31:0] \b_cr_data.word0_gt ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [1:0] \b_cr_data.word0_gt.gt_type ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [16:0] \b_cr_data.word0_gt.index ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [5:0] \b_cr_data.word0_gt.perms ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [6:0] \b_cr_data.word0_gt.version ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [31:0] \b_cr_data.word1_location ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [31:0] \b_cr_data.word2_limit ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  wire [31:0] \b_cr_data.word3_seals ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:74" *)
   reg [2:0] b_idx = 3'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:15" *)
   output call_busy;
   wire call_busy;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:16" *)
   wire call_complete;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
   output call_fault;
   reg call_fault = 1'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:39" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
   output call_normal_complete;
   wire call_normal_complete;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:11" *)
@@ -7419,7 +7068,7 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire call_start;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   reg [4:0] call_state = 5'h00;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:245" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:236" *)
   reg [31:0] cleared_limit;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
@@ -7461,9 +7110,9 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire [31:0] \cr15_namespace.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:26" *)
   wire [31:0] \cr15_namespace.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:148" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:146" *)
   wire [15:0] cr_clear_computed;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:42" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:40" *)
   wire [15:0] cr_clear_mask;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:21" *)
   output [3:0] cr_rd_addr;
@@ -7557,32 +7206,32 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire cr_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:27" *)
   wire \cr_wr_en$33 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:147" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:145" *)
   wire [15:0] dr_clear_computed;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:41" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:39" *)
   wire [15:0] dr_clear_mask;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
   wire fault_latched;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:67" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:65" *)
   output [3:0] fault_type;
   reg [3:0] fault_type = 4'h0;
   (* init = 4'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:67" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:65" *)
   wire [3:0] fault_type_latched;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:13" *)
   wire [16:0] index;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:74" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:72" *)
   reg [3:0] local_cr_rd_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:73" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:71" *)
   reg local_cr_rd_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:90" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:88" *)
   reg [31:0] local_mem_rd_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:91" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:89" *)
   reg local_mem_rd_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:14" *)
   wire [10:0] mask;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:65" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:63" *)
   reg [10:0] mask_latched = 11'h000;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:28" *)
   wire [31:0] mem_addr;
@@ -7601,80 +7250,77 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire mem_rd_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:31" *)
   wire \mem_rd_valid$24 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:47" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:45" *)
   output [31:0] mgt_gt_lat;
   reg [31:0] mgt_gt_lat = 32'd0;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:47" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:45" *)
   wire [31:0] mgt_gt_word;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:86" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:84" *)
   output [31:0] mgt_ns_authority;
   reg [31:0] mgt_ns_authority = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:94" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:92" *)
   wire [31:0] mgt_ns_entry_base;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:87" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:85" *)
   output [31:0] mgt_ns_integrity;
   reg [31:0] mgt_ns_integrity = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:85" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:83" *)
   output [31:0] mgt_ns_location;
   reg [31:0] mgt_ns_location = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:88" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:86" *)
   output [31:0] mgt_ns_seals;
   reg [31:0] mgt_ns_seals = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:44" *)
   output mgt_set_trigger;
   wire mgt_set_trigger;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:107" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:105" *)
   wire [3:0] mload_dst;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:108" *)
-  wire [16:0] mload_index;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:106" *)
+  wire [16:0] mload_index;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:104" *)
   wire [3:0] mload_src;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:39" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
   wire nia_set;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:40" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:38" *)
   wire [31:0] nia_value;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:86" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:84" *)
   wire [31:0] ns_auth_lat;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:87" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:85" *)
   wire [31:0] ns_int_lat;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:85" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:83" *)
   wire [31:0] ns_loc_lat;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:88" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:86" *)
   wire [31:0] ns_seal_lat;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:61" *)
   reg phase = 1'h0;
-  input [11:0] \port$1283$20 ;
-  wire [11:0] \port$1283$20 ;
+  input [11:0] \port$1236$20 ;
+  wire [11:0] \port$1236$20 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
-  output [31:0] saved_cr5_gt;
-  reg [31:0] saved_cr5_gt = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:99" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:97" *)
   wire src_in_range;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   reg [127:0] src_reg_latched = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [31:0] \src_reg_latched.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [1:0] \src_reg_latched.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [16:0] \src_reg_latched.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [5:0] \src_reg_latched.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [6:0] \src_reg_latched.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [31:0] \src_reg_latched.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [31:0] \src_reg_latched.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
   wire [31:0] \src_reg_latched.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:12" *)
   wire [3:0] sub_cr_dst;
@@ -7686,11 +7332,11 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire [31:0] sub_direct_gt;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:18" *)
   wire sub_done;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:70" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:68" *)
   reg sub_done_latched = 1'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:19" *)
   wire sub_fault;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:71" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:69" *)
   reg sub_fault_latched = 1'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:20" *)
   wire [3:0] sub_fault_type;
@@ -7701,10 +7347,10 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:10" *)
   reg sub_start = 1'h0;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:68" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:66" *)
   wire \sub_start$11 ;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:69" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:67" *)
   wire sub_start_reg;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:35" *)
   wire [31:0] thread_wr_data;
@@ -7718,108 +7364,102 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   wire [3:0] thread_wr_idx;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:37" *)
   wire [3:0] \thread_wr_idx$43 ;
-  assign \$31  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:164" *) src_in_range;
-  assign \$32  = src_reg_latched[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:176" *) 2'h3;
-  assign \$33  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:182" *) src_reg_latched[5];
-  assign \$34  = b_idx > (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:230" *) 3'h5;
-  assign \$35  = mask_latched[10:5] >> b_idx;
-  assign \$36  = b_idx + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:236" *) 1'h1;
-  assign \$37  = b_idx + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:256" *) 1'h1;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:63" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:61" *)
   always @(posedge clk)
-    phase <= \$38 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:66" *)
-  always @(posedge clk)
-    call_fault <= \$39 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:67" *)
-  always @(posedge clk)
-    fault_type <= \$40 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:70" *)
-  always @(posedge clk)
-    sub_done_latched <= \$41 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:71" *)
-  always @(posedge clk)
-    sub_fault_latched <= \$42 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:65" *)
-  always @(posedge clk)
-    mask_latched <= \$43 ;
-  (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
-  always @(posedge clk)
-    call_state <= \$44 ;
+    phase <= \$35 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:64" *)
   always @(posedge clk)
-    src_reg_latched <= \$45 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:83" *)
+    call_fault <= \$36 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:65" *)
   always @(posedge clk)
-    mgt_gt_lat <= \$46 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:37" *)
+    fault_type <= \$37 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:68" *)
   always @(posedge clk)
-    saved_cr5_gt <= \$47 ;
+    sub_done_latched <= \$38 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:69" *)
   always @(posedge clk)
-    sub_start <= \$48 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:76" *)
+    sub_fault_latched <= \$39 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:63" *)
   always @(posedge clk)
-    b_idx <= \$49 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:77" *)
+    mask_latched <= \$40 ;
+  (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
-    b_cr_data <= \$50 ;
+    call_state <= \$41 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:62" *)
+  always @(posedge clk)
+    src_reg_latched <= \$42 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:81" *)
+  always @(posedge clk)
+    mgt_gt_lat <= \$43 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:67" *)
+  always @(posedge clk)
+    sub_start <= \$44 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:74" *)
+  always @(posedge clk)
+    b_idx <= \$45 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:75" *)
+  always @(posedge clk)
+    b_cr_data <= \$46 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:83" *)
+  always @(posedge clk)
+    mgt_ns_location <= \$47 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:84" *)
+  always @(posedge clk)
+    mgt_ns_authority <= \$48 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:85" *)
   always @(posedge clk)
-    mgt_ns_location <= \$51 ;
+    mgt_ns_integrity <= \$49 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:86" *)
   always @(posedge clk)
-    mgt_ns_authority <= \$52 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:87" *)
-  always @(posedge clk)
-    mgt_ns_integrity <= \$53 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:88" *)
-  always @(posedge clk)
-    mgt_ns_seals <= \$54 ;
-  assign \$2  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:96" *) \$1 ;
-  assign src_in_range = cr_src <= (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:100" *) 3'h5;
-  assign mload_src = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:110" *) 4'h6 : cr_src;
-  assign \$3  = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:111" *) 3'h7 : 3'h6;
-  assign mload_index = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:112" *) 17'h00000 : { 5'h00, \port$1283$20  };
-  assign cr_wr_addr = b_clear_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:130" *) b_clear_wr_addr : \cr_wr_addr$27 ;
-  assign cr_wr_data = b_clear_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:131" *) b_clear_wr_data : \cr_wr_data$30 ;
-  assign cr_wr_en = \cr_wr_en$33  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:132" *) b_clear_wr_en;
-  assign mem_addr = local_mem_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:134" *) local_mem_rd_addr : \mem_addr$36 ;
-  assign mem_rd_en = local_mem_rd_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:135" *) \mem_rd_en$39 ;
-  assign cr_rd_addr = local_cr_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:141" *) local_cr_rd_addr : \cr_rd_addr$48 ;
-  assign \$4  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:150" *) mask_latched[4:0];
-  assign \$5  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:151" *) mask_latched[10:5];
-  assign \$6  = src_reg_latched[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:176" *) 2'h3;
-  assign \$7  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:182" *) src_reg_latched[5];
-  assign \$8  = b_idx > (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:230" *) 3'h5;
-  assign \$9  = mask_latched[10:5] >> b_idx;
-  assign \$11  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:281" *) 3'h4;
-  assign \$12  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:290" *) 4'h8;
-  assign \$13  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:300" *) 4'hc;
-  assign call_busy = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:313" *) \$14 ;
-  assign call_complete = call_normal_complete | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:314" *) mgt_set_trigger;
-  assign dr_clear_mask = call_normal_complete ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:320" *) { 10'h3ff, \$4 , 1'h0 } : 16'h0000;
-  assign cr_clear_mask = call_normal_complete ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:321" *) { 10'h000, \$5  } : 16'h0000;
-  assign \$14  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) call_state;
-  assign \$15  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
-  assign \$16  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
-  assign \$17  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
-  assign \$18  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
-  assign \$19  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
-  assign \$20  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
-  assign \$21  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
-  assign \$22  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
-  assign \$23  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
-  assign \$24  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
-  assign \$25  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hb;
-  assign call_normal_complete = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hc;
-  assign \$26  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hd;
-  assign \$27  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'he;
-  assign \$28  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hf;
-  assign \$29  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h10;
-  assign \$30  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h11;
-  assign mgt_set_trigger = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h12;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:61" *)
+    mgt_ns_seals <= \$50 ;
+  assign \$2  = cr15_namespace[63:32] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:94" *) \$1 ;
+  assign src_in_range = cr_src <= (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:98" *) 3'h5;
+  assign mload_src = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:108" *) 4'h6 : cr_src;
+  assign \$3  = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:109" *) 3'h7 : 3'h6;
+  assign mload_index = phase ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:110" *) 17'h00000 : { 5'h00, \port$1236$20  };
+  assign cr_wr_addr = b_clear_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:128" *) b_clear_wr_addr : \cr_wr_addr$27 ;
+  assign cr_wr_data = b_clear_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:129" *) b_clear_wr_data : \cr_wr_data$30 ;
+  assign cr_wr_en = \cr_wr_en$33  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:130" *) b_clear_wr_en;
+  assign mem_addr = local_mem_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:132" *) local_mem_rd_addr : \mem_addr$36 ;
+  assign mem_rd_en = local_mem_rd_en | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:133" *) \mem_rd_en$39 ;
+  assign cr_rd_addr = local_cr_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:139" *) local_cr_rd_addr : \cr_rd_addr$48 ;
+  assign \$4  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:148" *) mask_latched[4:0];
+  assign \$5  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:149" *) mask_latched[10:5];
+  assign \$6  = b_idx > (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:221" *) 3'h5;
+  assign \$7  = mask_latched[10:5] >> b_idx;
+  assign \$9  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:272" *) 3'h4;
+  assign \$10  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:281" *) 4'h8;
+  assign \$11  = \$2 [31:0] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:291" *) 4'hc;
+  assign call_busy = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:304" *) \$12 ;
+  assign call_complete = call_normal_complete | (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:305" *) mgt_set_trigger;
+  assign dr_clear_mask = call_normal_complete ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:311" *) { 10'h3ff, \$4 , 1'h0 } : 16'h0000;
+  assign cr_clear_mask = call_normal_complete ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:312" *) { 10'h000, \$5  } : 16'h0000;
+  assign \$12  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) call_state;
+  assign \$13  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
+  assign \$14  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
+  assign \$15  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h3;
+  assign \$16  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h4;
+  assign \$17  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h5;
+  assign \$18  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
+  assign \$19  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
+  assign \$20  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
+  assign \$21  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
+  assign \$22  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
+  assign call_normal_complete = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hb;
+  assign \$23  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hc;
+  assign \$24  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hd;
+  assign \$25  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'he;
+  assign \$26  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hf;
+  assign \$27  = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h10;
+  assign mgt_set_trigger = call_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 5'h11;
+  assign \$28  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:162" *) src_in_range;
+  assign \$29  = src_reg_latched[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:174" *) 2'h3;
+  assign \$30  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:180" *) src_reg_latched[5];
+  assign \$31  = b_idx > (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:221" *) 3'h5;
+  assign \$32  = mask_latched[10:5] >> b_idx;
+  assign \$33  = b_idx + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:227" *) 1'h1;
+  assign \$34  = b_idx + (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:247" *) 1'h1;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/call.py:59" *)
   \ctmm_cap_fpga_top.core.u_call.u_mload  u_mload (
     .clk(clk),
     .cr15_namespace(cr15_namespace),
@@ -7831,7 +7471,7 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
     .mem_addr(\mem_addr$36 ),
     .mem_rd_data(mem_rd_data),
     .mem_rd_en(\mem_rd_en$39 ),
-    .\port$798$0 (\$3 ),
+    .\port$775$0 (\$3 ),
     .rst(rst),
     .sub_cr_src(mload_src),
     .sub_done(sub_done),
@@ -7844,7 +7484,7 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
     .thread_wr_idx(thread_wr_idx)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     local_cr_rd_en = 1'h0;
     casez (call_state)
       5'h00:
@@ -7854,14 +7494,9 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h03:
           local_cr_rd_en = 1'h1;
       5'h04:
-          (* full_case = 32'd1 *)
-          if (\$6 ) begin
-          end else if (\$7 ) begin
-          end else begin
-            local_cr_rd_en = 1'h1;
-          end
+          /* empty */;
       5'h06:
-          local_cr_rd_en = 1'h1;
+          /* empty */;
       5'h07:
           /* empty */;
       5'h08:
@@ -7869,18 +7504,16 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h09:
           /* empty */;
       5'h0a:
-          /* empty */;
-      5'h0b:
-          if (\$8 ) begin
-          end else if (\$9 ) begin
+          if (\$6 ) begin
+          end else if (\$7 ) begin
             local_cr_rd_en = 1'h1;
           end
-      5'h0d:
+      5'h0c:
           local_cr_rd_en = 1'h1;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     local_cr_rd_addr = 4'h0;
     casez (call_state)
       5'h00:
@@ -7890,14 +7523,9 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h03:
           local_cr_rd_addr = cr_src;
       5'h04:
-          (* full_case = 32'd1 *)
-          if (\$6 ) begin
-          end else if (\$7 ) begin
-          end else begin
-            local_cr_rd_addr = 4'h5;
-          end
+          /* empty */;
       5'h06:
-          local_cr_rd_addr = 4'h5;
+          /* empty */;
       5'h07:
           /* empty */;
       5'h08:
@@ -7905,18 +7533,16 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h09:
           /* empty */;
       5'h0a:
-          /* empty */;
-      5'h0b:
-          if (\$8 ) begin
-          end else if (\$9 ) begin
+          if (\$6 ) begin
+          end else if (\$7 ) begin
             local_cr_rd_addr = { 1'h0, b_idx };
           end
-      5'h0d:
+      5'h0c:
           local_cr_rd_addr = { 1'h0, b_idx };
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     cleared_limit = 32'd0;
     casez (call_state)
       5'h00:
@@ -7937,16 +7563,14 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
-          /* empty */;
-      5'h0e:
-          cleared_limit = \$10 [31:0];
+          cleared_limit = \$8 [31:0];
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     b_clear_wr_data = 128'h00000000000000000000000000000000;
     casez (call_state)
       5'h00:
@@ -7967,11 +7591,9 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
-          /* empty */;
-      5'h0e:
         begin
           b_clear_wr_data[31:0] = b_cr_data[31:0];
           b_clear_wr_data[63:32] = b_cr_data[63:32];
@@ -7981,7 +7603,7 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     b_clear_wr_en = 1'h0;
     casez (call_state)
       5'h00:
@@ -8002,16 +7624,14 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
-          /* empty */;
-      5'h0e:
           b_clear_wr_en = 1'h1;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     b_clear_wr_addr = 4'h0;
     casez (call_state)
       5'h00:
@@ -8032,16 +7652,14 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
-          /* empty */;
-      5'h0e:
           b_clear_wr_addr = { 1'h0, b_idx };
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     local_mem_rd_addr = 32'd0;
     casez (call_state)
       5'h00:
@@ -8062,28 +7680,26 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
+      5'h0b:
           /* empty */;
       5'h02:
           /* empty */;
       5'h05:
           local_mem_rd_addr = \$2 [31:0];
+      5'h0e:
+          local_mem_rd_addr = \$9 [31:0];
       5'h0f:
-          local_mem_rd_addr = \$11 [31:0];
+          local_mem_rd_addr = \$10 [31:0];
       5'h10:
-          local_mem_rd_addr = \$12 [31:0];
-      5'h11:
-          local_mem_rd_addr = \$13 [31:0];
+          local_mem_rd_addr = \$11 [31:0];
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
     local_mem_rd_en = 1'h0;
     casez (call_state)
       5'h00:
@@ -8104,29 +7720,112 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
+      5'h0b:
           /* empty */;
       5'h02:
           /* empty */;
       5'h05:
           local_mem_rd_en = 1'h1;
+      5'h0e:
+          local_mem_rd_en = 1'h1;
       5'h0f:
           local_mem_rd_en = 1'h1;
       5'h10:
           local_mem_rd_en = 1'h1;
-      5'h11:
-          local_mem_rd_en = 1'h1;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$38  = phase;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$35  = phase;
+    casez (call_state)
+      5'h00:
+          \$35  = 1'h0;
+      5'h01:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h04:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          \$35  = 1'h1;
+    endcase
+    if (rst) begin
+      \$35  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$36  = call_fault;
+    casez (call_state)
+      5'h00:
+          \$36  = 1'h0;
+      5'h01:
+          if (\$28 ) begin
+            \$36  = 1'h1;
+          end
+      5'h03:
+          /* empty */;
+      5'h04:
+          if (\$29 ) begin
+          end else if (\$30 ) begin
+            \$36  = 1'h1;
+          end
+      5'h06:
+          if (sub_fault) begin
+            \$36  = 1'h1;
+          end
+      5'h07:
+          /* empty */;
+      5'h08:
+          if (sub_fault) begin
+            \$36  = 1'h1;
+          end
+    endcase
+    if (rst) begin
+      \$36  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$37  = fault_type;
+    casez (call_state)
+      5'h00:
+          \$37  = 4'h0;
+      5'h01:
+          if (\$28 ) begin
+            \$37  = 4'h4;
+          end
+      5'h03:
+          /* empty */;
+      5'h04:
+          if (\$29 ) begin
+          end else if (\$30 ) begin
+            \$37  = 4'h4;
+          end
+      5'h06:
+          if (sub_fault) begin
+            \$37  = sub_fault_type;
+          end
+      5'h07:
+          /* empty */;
+      5'h08:
+          if (sub_fault) begin
+            \$37  = sub_fault_type;
+          end
+    endcase
+    if (rst) begin
+      \$37  = 4'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$38  = sub_done_latched;
     casez (call_state)
       5'h00:
           \$38  = 1'h0;
@@ -8137,42 +7836,39 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h04:
           /* empty */;
       5'h06:
-          /* empty */;
+          if (sub_done) begin
+            \$38  = 1'h1;
+          end
       5'h07:
-          /* empty */;
+          \$38  = 1'h0;
       5'h08:
-          \$38  = 1'h1;
+          if (sub_done) begin
+            \$38  = 1'h1;
+          end
     endcase
     if (rst) begin
       \$38  = 1'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$39  = call_fault;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$39  = sub_fault_latched;
     casez (call_state)
       5'h00:
           \$39  = 1'h0;
       5'h01:
-          if (\$31 ) begin
-            \$39  = 1'h1;
-          end
+          /* empty */;
       5'h03:
           /* empty */;
       5'h04:
-          if (\$32 ) begin
-          end else if (\$33 ) begin
-            \$39  = 1'h1;
-          end
-      5'h06:
           /* empty */;
-      5'h07:
+      5'h06:
           if (sub_fault) begin
             \$39  = 1'h1;
           end
+      5'h07:
+          \$39  = 1'h0;
       5'h08:
-          /* empty */;
-      5'h09:
           if (sub_fault) begin
             \$39  = 1'h1;
           end
@@ -8182,201 +7878,107 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$40  = fault_type;
-    casez (call_state)
-      5'h00:
-          \$40  = 4'h0;
-      5'h01:
-          if (\$31 ) begin
-            \$40  = 4'h4;
-          end
-      5'h03:
-          /* empty */;
-      5'h04:
-          if (\$32 ) begin
-          end else if (\$33 ) begin
-            \$40  = 4'h4;
-          end
-      5'h06:
-          /* empty */;
-      5'h07:
-          if (sub_fault) begin
-            \$40  = sub_fault_type;
-          end
-      5'h08:
-          /* empty */;
-      5'h09:
-          if (sub_fault) begin
-            \$40  = sub_fault_type;
-          end
-    endcase
-    if (rst) begin
-      \$40  = 4'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$41  = sub_done_latched;
-    casez (call_state)
-      5'h00:
-          \$41  = 1'h0;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          if (sub_done) begin
-            \$41  = 1'h1;
-          end
-      5'h08:
-          \$41  = 1'h0;
-      5'h09:
-          if (sub_done) begin
-            \$41  = 1'h1;
-          end
-    endcase
-    if (rst) begin
-      \$41  = 1'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$42  = sub_fault_latched;
-    casez (call_state)
-      5'h00:
-          \$42  = 1'h0;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          if (sub_fault) begin
-            \$42  = 1'h1;
-          end
-      5'h08:
-          \$42  = 1'h0;
-      5'h09:
-          if (sub_fault) begin
-            \$42  = 1'h1;
-          end
-    endcase
-    if (rst) begin
-      \$42  = 1'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$43  = mask_latched;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$40  = mask_latched;
     casez (call_state)
       5'h00:
           if (call_start) begin
-            \$43  = \port$1283$20 [10:0];
+            \$40  = \port$1236$20 [10:0];
           end
     endcase
     if (rst) begin
-      \$43  = 11'h000;
+      \$40  = 11'h000;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$44  = call_state;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$41  = call_state;
     casez (call_state)
       5'h00:
           if (call_start) begin
-            \$44  = 5'h01;
+            \$41  = 5'h01;
           end
       5'h01:
           (* full_case = 32'd1 *)
-          if (\$31 ) begin
-            \$44  = 5'h02;
+          if (\$28 ) begin
+            \$41  = 5'h02;
           end else begin
-            \$44  = 5'h03;
+            \$41  = 5'h03;
           end
       5'h03:
-          \$44  = 5'h04;
+          \$41  = 5'h04;
       5'h04:
           (* full_case = 32'd1 *)
-          if (\$32 ) begin
-            \$44  = 5'h05;
-          end else if (\$33 ) begin
-            \$44  = 5'h02;
+          if (\$29 ) begin
+            \$41  = 5'h05;
+          end else if (\$30 ) begin
+            \$41  = 5'h02;
           end else begin
-            \$44  = 5'h06;
+            \$41  = 5'h06;
           end
       5'h06:
-          \$44  = 5'h07;
+          if (sub_fault_latched) begin
+            \$41  = 5'h02;
+          end else if (sub_done_latched) begin
+            \$41  = 5'h07;
+          end
       5'h07:
-          if (sub_fault_latched) begin
-            \$44  = 5'h02;
-          end else if (sub_done_latched) begin
-            \$44  = 5'h08;
-          end
+          \$41  = 5'h08;
       5'h08:
-          \$44  = 5'h09;
-      5'h09:
           if (sub_fault_latched) begin
-            \$44  = 5'h02;
+            \$41  = 5'h02;
           end else if (sub_done_latched) begin
-            \$44  = 5'h0a;
+            \$41  = 5'h09;
           end
+      5'h09:
+          \$41  = 5'h0a;
       5'h0a:
-          \$44  = 5'h0b;
-      5'h0b:
-          if (\$34 ) begin
-            \$44  = 5'h0c;
-          end else if (\$35 ) begin
-            \$44  = 5'h0d;
+          if (\$31 ) begin
+            \$41  = 5'h0b;
+          end else if (\$32 ) begin
+            \$41  = 5'h0c;
           end
-      5'h0d:
-          \$44  = 5'h0e;
-      5'h0e:
-          \$44  = 5'h0b;
       5'h0c:
-          \$44  = 5'h00;
+          \$41  = 5'h0d;
+      5'h0d:
+          \$41  = 5'h0a;
+      5'h0b:
+          \$41  = 5'h00;
       5'h02:
-          \$44  = 5'h00;
+          \$41  = 5'h00;
       5'h05:
-          \$44  = 5'h0f;
+          \$41  = 5'h0e;
+      5'h0e:
+          \$41  = 5'h0f;
       5'h0f:
-          \$44  = 5'h10;
+          \$41  = 5'h10;
       5'h10:
-          \$44  = 5'h11;
+          \$41  = 5'h11;
       5'h11:
-          \$44  = 5'h12;
-      5'h12:
-          \$44  = 5'h00;
+          \$41  = 5'h00;
     endcase
     if (rst) begin
-      \$44  = 5'h00;
+      \$41  = 5'h00;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$45  = src_reg_latched;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$42  = src_reg_latched;
     casez (call_state)
       5'h00:
           /* empty */;
       5'h01:
           /* empty */;
       5'h03:
-          \$45  = cr_rd_data;
+          \$42  = cr_rd_data;
     endcase
     if (rst) begin
-      \$45  = 128'h00000000000000000000000000000000;
+      \$42  = 128'h00000000000000000000000000000000;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$46  = mgt_gt_lat;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$43  = mgt_gt_lat;
     casez (call_state)
       5'h00:
           /* empty */;
@@ -8385,17 +7987,45 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h03:
           /* empty */;
       5'h04:
-          if (\$32 ) begin
-            \$46  = src_reg_latched[31:0];
+          if (\$29 ) begin
+            \$43  = src_reg_latched[31:0];
           end
     endcase
     if (rst) begin
-      \$46  = 32'd0;
+      \$43  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$47  = saved_cr5_gt;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$44  = sub_start;
+    casez (call_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h04:
+          (* full_case = 32'd1 *)
+          if (\$29 ) begin
+          end else if (\$30 ) begin
+          end else begin
+            \$44  = 1'h1;
+          end
+      5'h06:
+          \$44  = 1'h0;
+      5'h07:
+          \$44  = 1'h1;
+      5'h08:
+          \$44  = 1'h0;
+    endcase
+    if (rst) begin
+      \$44  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$45  = b_idx;
     casez (call_state)
       5'h00:
           /* empty */;
@@ -8406,40 +8036,98 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h04:
           /* empty */;
       5'h06:
-          \$47  = cr_rd_data[31:0];
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          \$45  = 3'h0;
+      5'h0a:
+          (* full_case = 32'd1 *)
+          if (\$31 ) begin
+          end else if (\$32 ) begin
+          end else begin
+            \$45  = \$33 [2:0];
+          end
+      5'h0c:
+          /* empty */;
+      5'h0d:
+          \$45  = \$34 [2:0];
+    endcase
+    if (rst) begin
+      \$45  = 3'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$46  = b_cr_data;
+    casez (call_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h04:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0c:
+          \$46  = cr_rd_data;
+    endcase
+    if (rst) begin
+      \$46  = 128'h00000000000000000000000000000000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$47  = mgt_ns_location;
+    casez (call_state)
+      5'h00:
+          /* empty */;
+      5'h01:
+          /* empty */;
+      5'h03:
+          /* empty */;
+      5'h04:
+          /* empty */;
+      5'h06:
+          /* empty */;
+      5'h07:
+          /* empty */;
+      5'h08:
+          /* empty */;
+      5'h09:
+          /* empty */;
+      5'h0a:
+          /* empty */;
+      5'h0c:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0b:
+          /* empty */;
+      5'h02:
+          /* empty */;
+      5'h05:
+          \$47  = mem_rd_data;
     endcase
     if (rst) begin
       \$47  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$48  = sub_start;
-    casez (call_state)
-      5'h00:
-          /* empty */;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          \$48  = 1'h1;
-      5'h07:
-          \$48  = 1'h0;
-      5'h08:
-          \$48  = 1'h1;
-      5'h09:
-          \$48  = 1'h0;
-    endcase
-    if (rst) begin
-      \$48  = 1'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$49  = b_idx;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$48  = mgt_ns_authority;
     casez (call_state)
       5'h00:
           /* empty */;
@@ -8458,96 +8146,27 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
       5'h09:
           /* empty */;
       5'h0a:
-          \$49  = 3'h0;
-      5'h0b:
-          (* full_case = 32'd1 *)
-          if (\$34 ) begin
-          end else if (\$35 ) begin
-          end else begin
-            \$49  = \$36 [2:0];
-          end
-      5'h0d:
-          /* empty */;
-      5'h0e:
-          \$49  = \$37 [2:0];
-    endcase
-    if (rst) begin
-      \$49  = 3'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$50  = b_cr_data;
-    casez (call_state)
-      5'h00:
-          /* empty */;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          /* empty */;
-      5'h08:
-          /* empty */;
-      5'h09:
-          /* empty */;
-      5'h0a:
-          /* empty */;
-      5'h0b:
-          /* empty */;
-      5'h0d:
-          \$50  = cr_rd_data;
-    endcase
-    if (rst) begin
-      \$50  = 128'h00000000000000000000000000000000;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$51  = mgt_ns_location;
-    casez (call_state)
-      5'h00:
-          /* empty */;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          /* empty */;
-      5'h08:
-          /* empty */;
-      5'h09:
-          /* empty */;
-      5'h0a:
-          /* empty */;
-      5'h0b:
-          /* empty */;
-      5'h0d:
-          /* empty */;
-      5'h0e:
           /* empty */;
       5'h0c:
+          /* empty */;
+      5'h0d:
+          /* empty */;
+      5'h0b:
           /* empty */;
       5'h02:
           /* empty */;
       5'h05:
-          \$51  = mem_rd_data;
+          /* empty */;
+      5'h0e:
+          \$48  = mem_rd_data;
     endcase
     if (rst) begin
-      \$51  = 32'd0;
+      \$48  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$52  = mgt_ns_authority;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$49  = mgt_ns_integrity;
     casez (call_state)
       5'h00:
           /* empty */;
@@ -8567,28 +8186,28 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
+      5'h0b:
           /* empty */;
       5'h02:
           /* empty */;
       5'h05:
+          /* empty */;
+      5'h0e:
           /* empty */;
       5'h0f:
-          \$52  = mem_rd_data;
+          \$49  = mem_rd_data;
     endcase
     if (rst) begin
-      \$52  = 32'd0;
+      \$49  = 32'd0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$53  = mgt_ns_integrity;
+    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    \$50  = mgt_ns_seals;
     casez (call_state)
       5'h00:
           /* empty */;
@@ -8608,75 +8227,30 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
           /* empty */;
       5'h0a:
           /* empty */;
-      5'h0b:
+      5'h0c:
           /* empty */;
       5'h0d:
           /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
+      5'h0b:
           /* empty */;
       5'h02:
           /* empty */;
       5'h05:
+          /* empty */;
+      5'h0e:
           /* empty */;
       5'h0f:
           /* empty */;
       5'h10:
-          \$53  = mem_rd_data;
+          \$50  = mem_rd_data;
     endcase
     if (rst) begin
-      \$53  = 32'd0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$11 ) begin end
-    \$54  = mgt_ns_seals;
-    casez (call_state)
-      5'h00:
-          /* empty */;
-      5'h01:
-          /* empty */;
-      5'h03:
-          /* empty */;
-      5'h04:
-          /* empty */;
-      5'h06:
-          /* empty */;
-      5'h07:
-          /* empty */;
-      5'h08:
-          /* empty */;
-      5'h09:
-          /* empty */;
-      5'h0a:
-          /* empty */;
-      5'h0b:
-          /* empty */;
-      5'h0d:
-          /* empty */;
-      5'h0e:
-          /* empty */;
-      5'h0c:
-          /* empty */;
-      5'h02:
-          /* empty */;
-      5'h05:
-          /* empty */;
-      5'h0f:
-          /* empty */;
-      5'h10:
-          /* empty */;
-      5'h11:
-          \$54  = mem_rd_data;
-    endcase
-    if (rst) begin
-      \$54  = 32'd0;
+      \$50  = 32'd0;
     end
   end
   assign mgt_ns_entry_base = \$2 [31:0];
   assign mload_dst = { 1'h0, \$3  };
-  assign index = { 5'h00, \port$1283$20  };
+  assign index = { 5'h00, \port$1236$20  };
   assign \sub_start$11  = sub_start;
   assign sub_cr_src = mload_src;
   assign sub_cr_dst = { 1'h0, \$3  };
@@ -8704,7 +8278,7 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   assign ns_auth_lat = mgt_ns_authority;
   assign ns_int_lat = mgt_ns_integrity;
   assign ns_seal_lat = mgt_ns_seals;
-  assign mask = \port$1283$20 [10:0];
+  assign mask = \port$1236$20 [10:0];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[1:0];
   assign \cr15_namespace.word0_gt.perms  = cr15_namespace[7:2];
@@ -8761,14 +8335,6 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   assign \b_clear_wr_data.word1_location  = b_clear_wr_data[63:32];
   assign \b_clear_wr_data.word2_limit  = b_clear_wr_data[95:64];
   assign \b_clear_wr_data.word3_seals  = b_clear_wr_data[127:96];
-  assign \src_reg_latched.word0_gt  = src_reg_latched[31:0];
-  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[1:0];
-  assign \src_reg_latched.word0_gt.perms  = src_reg_latched[7:2];
-  assign \src_reg_latched.word0_gt.index  = src_reg_latched[24:8];
-  assign \src_reg_latched.word0_gt.version  = src_reg_latched[31:25];
-  assign \src_reg_latched.word1_location  = src_reg_latched[63:32];
-  assign \src_reg_latched.word2_limit  = src_reg_latched[95:64];
-  assign \src_reg_latched.word3_seals  = src_reg_latched[127:96];
   assign \b_cr_data.word0_gt  = b_cr_data[31:0];
   assign \b_cr_data.word0_gt.gt_type  = b_cr_data[1:0];
   assign \b_cr_data.word0_gt.perms  = b_cr_data[7:2];
@@ -8777,16 +8343,24 @@ module \ctmm_cap_fpga_top.core.u_call (rst, call_start, cr_rd_data, cr_wr_addr, 
   assign \b_cr_data.word1_location  = b_cr_data[63:32];
   assign \b_cr_data.word2_limit  = b_cr_data[95:64];
   assign \b_cr_data.word3_seals  = b_cr_data[127:96];
+  assign \src_reg_latched.word0_gt  = src_reg_latched[31:0];
+  assign \src_reg_latched.word0_gt.gt_type  = src_reg_latched[1:0];
+  assign \src_reg_latched.word0_gt.perms  = src_reg_latched[7:2];
+  assign \src_reg_latched.word0_gt.index  = src_reg_latched[24:8];
+  assign \src_reg_latched.word0_gt.version  = src_reg_latched[31:25];
+  assign \src_reg_latched.word1_location  = src_reg_latched[63:32];
+  assign \src_reg_latched.word2_limit  = src_reg_latched[95:64];
+  assign \src_reg_latched.word3_seals  = src_reg_latched[127:96];
   assign \$1  = { 3'h0, mgt_gt_lat[24:8], 4'h0 };
-  assign \$10 [31] = 1'h0;
-  assign { \$10 [32], \$10 [30:0] } = { 1'h0, b_cr_data[94:64] };
+  assign \$8 [31] = 1'h0;
+  assign { \$8 [32], \$8 [30:0] } = { 1'h0, b_cr_data[94:64] };
 endmodule
 
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:44" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \port$798$0 , sub_index, sub_fault, sub_done, mem_rd_data, cr15_namespace, sub_start, cr_rd_addr, mem_addr, mem_rd_en, thread_wr_en, thread_wr_idx, thread_wr_data, cr_wr_addr, cr_wr_data, cr_wr_en, sub_fault_type, clk
+module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \port$775$0 , sub_index, sub_fault, sub_done, mem_rd_data, cr15_namespace, sub_start, cr_rd_addr, mem_addr, mem_rd_en, thread_wr_en, thread_wr_idx, thread_wr_data, cr_wr_addr, cr_wr_data, cr_wr_en, sub_fault_type, clk
 );
-  reg \$auto$verilog_backend.cc:2355:dump_module$12  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$14  = 0;
   wire [19:0] \$1 ;
   wire [32:0] \$10 ;
   wire \$11 ;
@@ -8934,8 +8508,8 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
   wire [31:0] ns_entry_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:92" *)
   wire ns_index_in_bounds;
-  input [2:0] \port$798$0 ;
-  wire [2:0] \port$798$0 ;
+  input [2:0] \port$775$0 ;
+  wire [2:0] \port$775$0 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:52" *)
   reg [127:0] result_cap = 128'h00000000000000000000000000000000;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:52" *)
@@ -9080,7 +8654,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     result_cap <= \$36 ;
   assign \$auto$rtlil.cc:2739:Not$4  = ~ { result_cap[63], result_cap[56], result_cap[52:50], result_cap[47], result_cap[44:42], result_cap[40:38], result_cap[34], result_cap[32] };
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$38  = mload_state;
     casez (mload_state)
       4'h0:
@@ -9148,7 +8722,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$39  = src_cap;
     casez (mload_state)
       4'h0:
@@ -9165,7 +8739,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     cr_rd_addr = 4'h0;
     casez (mload_state)
       4'h0:
@@ -9179,7 +8753,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     mem_addr = 32'd0;
     casez (mload_state)
       4'h0:
@@ -9205,7 +8779,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     mem_rd_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -9231,7 +8805,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     thread_wr_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -9263,7 +8837,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     thread_wr_idx = 4'h0;
     casez (mload_state)
       4'h0:
@@ -9295,7 +8869,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     thread_wr_data = 32'd0;
     casez (mload_state)
       4'h0:
@@ -9327,7 +8901,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     cr_wr_addr = 4'h0;
     casez (mload_state)
       4'h0:
@@ -9359,7 +8933,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     cr_wr_data = 128'h00000000000000000000000000000000;
     casez (mload_state)
       4'h0:
@@ -9391,7 +8965,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     cr_wr_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -9423,7 +8997,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$31  = cr_src_reg;
     casez (mload_state)
       4'h0:
@@ -9436,12 +9010,12 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$32  = cr_dst_reg;
     casez (mload_state)
       4'h0:
           if (sub_start) begin
-            \$32  = { 1'h0, \port$798$0  };
+            \$32  = { 1'h0, \port$775$0  };
           end
     endcase
     if (rst) begin
@@ -9449,7 +9023,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$33  = index_reg;
     casez (mload_state)
       4'h0:
@@ -9462,7 +9036,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$34  = direct_mode;
     casez (mload_state)
       4'h0:
@@ -9475,7 +9049,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$35  = direct_gt_reg;
     casez (mload_state)
       4'h0:
@@ -9488,7 +9062,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$36  = result_cap;
     casez (mload_state)
       4'h0:
@@ -9521,7 +9095,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$12 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
     \$37  = sub_fault_type;
     casez (mload_state)
       4'h0:
@@ -9570,7 +9144,7 @@ module \ctmm_cap_fpga_top.core.u_call.u_mload (rst, cr_rd_data, sub_cr_src, \por
   assign fnv_hash = \$7 [31:0];
   assign fnv_masked = \$7 [24:0];
   assign fault_type_reg = sub_fault_type;
-  assign sub_cr_dst = { 1'h0, \port$798$0  };
+  assign sub_cr_dst = { 1'h0, \port$775$0  };
   assign sub_direct = 1'h0;
   assign sub_direct_gt = 32'd0;
   assign sub_m_elevated = 1'h1;
@@ -9626,7 +9200,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:39" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_decoder (is_ctmm_op, is_church_op, instruction, fault_valid, fault, instr_valid);
-  reg \$auto$verilog_backend.cc:2355:dump_module$13  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$15  = 0;
   wire \$1 ;
   wire \$10 ;
   wire \$11 ;
@@ -9736,7 +9310,7 @@ module \ctmm_cap_fpga_top.core.u_decoder (is_ctmm_op, is_church_op, instruction,
   assign \$22  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:111" *) is_custom0;
   assign \$23  = \$21  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/decoder.py:111" *) \$22 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
     fault_valid = 1'h0;
     if (instr_valid) begin
       if (\$23 ) begin
@@ -9745,7 +9319,7 @@ module \ctmm_cap_fpga_top.core.u_decoder (is_ctmm_op, is_church_op, instruction,
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$13 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
     fault = 4'h0;
     if (instr_valid) begin
       if (\$23 ) begin
@@ -9776,7 +9350,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/gc_unit.py:44" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_rd_en, ns_wr_data, ns_wr_en, garbage_count, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$14  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$16  = 0;
   wire [7:0] \$1 ;
   wire \$10 ;
   wire \$11 ;
@@ -9901,7 +9475,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
   always @(posedge clk)
     latched_entry <= \$25 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     ns_addr = 32'd0;
     casez (gc_state)
       3'h0:
@@ -9919,7 +9493,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     ns_rd_en = 1'h0;
     casez (gc_state)
       3'h0:
@@ -9933,7 +9507,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     wr_entry = 96'h000000000000000000000000;
     casez (gc_state)
       3'h0:
@@ -9948,7 +9522,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     ns_wr_data = 96'h000000000000000000000000;
     casez (gc_state)
       3'h0:
@@ -9966,7 +9540,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     ns_wr_en = 1'h0;
     casez (gc_state)
       3'h0:
@@ -9984,7 +9558,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     swept_entry = 96'h000000000000000000000000;
     casez (gc_state)
       3'h0:
@@ -10006,7 +9580,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     \$21  = current_index;
     casez (gc_state)
       3'h0:
@@ -10040,7 +9614,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     \$22  = marked_count;
     casez (gc_state)
       3'h0:
@@ -10061,7 +9635,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     \$23  = garbage_count;
     casez (gc_state)
       3'h0:
@@ -10086,7 +9660,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     \$24  = gc_state;
     casez (gc_state)
       3'h0:
@@ -10133,7 +9707,7 @@ module \ctmm_cap_fpga_top.core.u_gc_unit (rst, gc_busy, ns_rd_data, ns_addr, ns_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$14 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
     \$25  = latched_entry;
     casez (gc_state)
       3'h0:
@@ -10166,7 +9740,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/lambda_unit.py:25" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_busy, cr_target, cr_rd_addr, nia_set, nia_value, lambda_fault, fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$15  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$17  = 0;
   wire \$1 ;
   reg [127:0] \$10 ;
   wire \$2 ;
@@ -10278,7 +9852,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
   always @(posedge clk)
     target_cap <= \$10 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     cr_rd_addr = 4'h0;
     casez (lambda_state)
       3'h0:
@@ -10290,7 +9864,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     nia_set = 1'h0;
     casez (lambda_state)
       3'h0:
@@ -10304,7 +9878,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     nia_value = 32'd0;
     casez (lambda_state)
       3'h0:
@@ -10318,7 +9892,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     \$7  = lambda_fault;
     casez (lambda_state)
       3'h0:
@@ -10337,7 +9911,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     \$8  = fault_type;
     casez (lambda_state)
       3'h0:
@@ -10356,7 +9930,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     \$9  = lambda_state;
     casez (lambda_state)
       3'h0:
@@ -10386,7 +9960,7 @@ module \ctmm_cap_fpga_top.core.u_lambda (rst, lambda_start, cr_rd_data, lambda_b
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$15 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
     \$10  = target_cap;
     casez (lambda_state)
       3'h0:
@@ -10421,7 +9995,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:38" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_perm_check (check_domain_purity, gt_in, all_checks_pass, required_perms, fault_valid, fault_type, check_valid);
-  reg \$auto$verilog_backend.cc:2355:dump_module$16  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$18  = 0;
   wire [5:0] \$1 ;
   wire \$10 ;
   wire \$11 ;
@@ -10569,7 +10143,7 @@ module \ctmm_cap_fpga_top.core.u_perm_check (check_domain_purity, gt_in, all_che
   assign \$36  = \$33  & (* src = "/home/runner/workspace/ctmm_cap_amaranth/perm_check.py:85" *) \$35 ;
   assign \$37  = | (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:551" *) \$36 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
     fault_valid = 1'h0;
     if (check_valid) begin
       if (is_null_gt) begin
@@ -10588,7 +10162,7 @@ module \ctmm_cap_fpga_top.core.u_perm_check (check_domain_purity, gt_in, all_che
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$16 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
     fault_type = 4'h0;
     if (check_valid) begin
       if (is_null_gt) begin
@@ -10683,13 +10257,13 @@ module \ctmm_cap_fpga_top.core.u_perm_check (check_domain_purity, gt_in, all_che
   assign \$49 [5] = gt_in[7];
 endmodule
 
-(* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:75" *)
+(* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_wr_en, cr0_gt_wr_en, cr0_gt_wr_data, cr1_gt_wr_en, cr1_gt_wr_data, cr2_gt_wr_en, cr2_gt_wr_data, cr3_gt_wr_en, cr3_gt_wr_data, cr4_gt_wr_en, cr4_gt_wr_data, cr5_gt_wr_en, cr5_gt_wr_data, cr6_gt_wr_en, cr6_gt_wr_data, cr7_gt_wr_en
 , cr7_gt_wr_data, cr8_gt_wr_en, cr8_gt_wr_data, cr9_gt_wr_en, cr9_gt_wr_data, cr10_gt_wr_en, cr10_gt_wr_data, cr11_gt_wr_en, cr11_gt_wr_data, cr12_gt_wr_en, cr12_gt_wr_data, cr13_gt_wr_en, cr13_gt_wr_data, cr14_gt_wr_en, cr14_gt_wr_data, cr15_gt_wr_en, cr15_gt_wr_data, m_set_en, m_set_dr11, m_set_dr12, m_set_dr13
-, m_set_dr14, m_set_dr15, cr_rd_data, xr_rd_data1, xr_rd_data2, xr_wr_addr, \port$1283$15 , xr_wr_data, xr_wr_en, flags_in, flags_wr_en, m_clear_en, cr15, m_xr11, m_xr12, m_xr13, m_xr14, m_xr15, flags, cr15_m_flag, clk
+, m_set_dr14, m_set_dr15, cr_rd_data, xr_rd_data1, xr_rd_data2, xr_wr_addr, \port$1236$15 , xr_wr_data, xr_wr_en, flags_in, flags_wr_en, m_clear_en, cr15, m_xr11, m_xr12, m_xr13, m_xr14, m_xr15, flags, cr15_m_flag, clk
 );
-  reg \$auto$verilog_backend.cc:2355:dump_module$17  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$19  = 0;
   wire [127:0] \$1 ;
   wire \$10 ;
   reg [127:0] \$11 ;
@@ -10756,23 +10330,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input clk;
   wire clk;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr0 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr0.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr0.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr0.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr0.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr0.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr0.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr0.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr0.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr0_gt_wr_data;
@@ -10788,41 +10362,41 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr0_gt_wr_en;
   wire cr0_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr1 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr1.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr1.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr1.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr1.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr1.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr1.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr1.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr1.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr10 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr10.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr10.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr10.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr10.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr10.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr10.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr10.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr10.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr10_gt_wr_data;
@@ -10838,23 +10412,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr10_gt_wr_en;
   wire cr10_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr11 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr11.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr11.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr11.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr11.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr11.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr11.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr11.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr11.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr11_gt_wr_data;
@@ -10870,23 +10444,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr11_gt_wr_en;
   wire cr11_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr12 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr12.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr12.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr12.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr12.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr12.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr12.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr12.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr12.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr12_gt_wr_data;
@@ -10902,23 +10476,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr12_gt_wr_en;
   wire cr12_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr13 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr13.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr13.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr13.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr13.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr13.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr13.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr13.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr13.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr13_gt_wr_data;
@@ -10934,23 +10508,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr13_gt_wr_en;
   wire cr13_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr14 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr14.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr14.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr14.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr14.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr14.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr14.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr14.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr14.word3_seals ;
   (* init = 128'h00000000000000000000000000000000 *)
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:27" *)
@@ -10988,21 +10562,21 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:29" *)
   output [127:0] cr15;
   reg [127:0] cr15 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr15.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr15.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr15.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr15.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr15.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr15.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr15.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr15.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr15_gt_wr_data;
@@ -11018,11 +10592,11 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr15_gt_wr_en;
   wire cr15_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:85" *)
   output cr15_m_flag;
   reg cr15_m_flag = 1'h0;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:85" *)
   wire cr15_m_reg;
   (* init = 128'h00000000000000000000000000000000 *)
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:29" *)
@@ -11057,23 +10631,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr1_gt_wr_en;
   wire cr1_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr2 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr2.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr2.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr2.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr2.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr2.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr2.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr2.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr2.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr2_gt_wr_data;
@@ -11089,23 +10663,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr2_gt_wr_en;
   wire cr2_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr3 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr3.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr3.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr3.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr3.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr3.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr3.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr3.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr3.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr3_gt_wr_data;
@@ -11121,23 +10695,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr3_gt_wr_en;
   wire cr3_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr4 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr4.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr4.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr4.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr4.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr4.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr4.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr4.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr4.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr4_gt_wr_data;
@@ -11153,23 +10727,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr4_gt_wr_en;
   wire cr4_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr5 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr5.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr5.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr5.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr5.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr5.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr5.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr5.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr5.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr5_gt_wr_data;
@@ -11185,23 +10759,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr5_gt_wr_en;
   wire cr5_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr6 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr6.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr6.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr6.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr6.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr6.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr6.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr6.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr6.word3_seals ;
   (* init = 128'h00000000000000000000000000000000 *)
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:26" *)
@@ -11236,23 +10810,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr6_gt_wr_en;
   wire cr6_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr7 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr7.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr7.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr7.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr7.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr7.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr7.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr7.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr7.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr7_gt_wr_data;
@@ -11268,23 +10842,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:32" *)
   input cr7_gt_wr_en;
   wire cr7_gt_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr8 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr8.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr8.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr8.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr8.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr8.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr8.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr8.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr8.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr8_gt_wr_data;
@@ -11319,23 +10893,23 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   wire [31:0] \cr8_thread.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:28" *)
   wire [31:0] \cr8_thread.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   reg [127:0] cr9 = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr9.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [1:0] \cr9.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [16:0] \cr9.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [5:0] \cr9.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [6:0] \cr9.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr9.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr9.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   wire [31:0] \cr9.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:31" *)
   input [31:0] cr9_gt_wr_data;
@@ -11412,7 +10986,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:15" *)
   input cr_wr_en;
   wire cr_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   output [3:0] flags;
   reg [3:0] flags = 4'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:42" *)
@@ -11435,15 +11009,15 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:43" *)
   wire \flags_in.Z ;
   (* init = 4'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   wire [3:0] flags_reg;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   wire \flags_reg.C ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   wire \flags_reg.N ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   wire \flags_reg.V ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   wire \flags_reg.Z ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:44" *)
   input flags_wr_en;
@@ -11473,94 +11047,94 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:52" *)
   input m_set_en;
   wire m_set_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   output [31:0] m_xr11;
   reg [31:0] m_xr11 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   output [31:0] m_xr12;
   reg [31:0] m_xr12 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   output [31:0] m_xr13;
   reg [31:0] m_xr13 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   output [31:0] m_xr14;
   reg [31:0] m_xr14 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   output [31:0] m_xr15;
   reg [31:0] m_xr15 = 32'd0;
-  input [9:0] \port$1283$15 ;
-  wire [9:0] \port$1283$15 ;
+  input [9:0] \port$1236$15 ;
+  wire [9:0] \port$1236$15 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x0 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x1 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x10 = 32'd0;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   wire [31:0] x11;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   wire [31:0] x12;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   wire [31:0] x13;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   wire [31:0] x14;
   (* init = 32'd0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   wire [31:0] x15;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x16 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x17 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x18 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x19 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x2 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x20 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x21 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x22 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x23 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x24 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x25 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x26 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x27 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x28 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x29 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x3 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x30 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x31 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x4 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x5 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x6 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x7 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x8 = 32'd0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   reg [31:0] x9 = 32'd0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:34" *)
   wire [4:0] xr_rd_addr1;
@@ -11581,164 +11155,164 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:40" *)
   input xr_wr_en;
   wire xr_wr_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr12 <= \$23 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr13 <= \$24 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr14 <= \$25 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr15 <= \$26 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x0 <= \$27 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x1 <= \$28 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x2 <= \$29 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x3 <= \$30 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x4 <= \$31 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x5 <= \$32 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x6 <= \$33 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x7 <= \$34 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x8 <= \$35 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x9 <= \$36 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x10 <= \$37 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     m_xr11 <= \$38 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     m_xr12 <= \$39 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     m_xr13 <= \$40 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     m_xr14 <= \$41 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     m_xr15 <= \$42 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x16 <= \$43 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x17 <= \$44 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x18 <= \$45 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x19 <= \$46 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x20 <= \$47 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x21 <= \$48 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x22 <= \$49 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x23 <= \$50 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x24 <= \$51 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x25 <= \$52 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x26 <= \$53 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x27 <= \$54 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x28 <= \$55 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x29 <= \$56 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x30 <= \$57 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:78" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:81" *)
   always @(posedge clk)
     x31 <= \$58 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:79" *)
-  always @(posedge clk)
-    flags <= \$59 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:82" *)
   always @(posedge clk)
+    flags <= \$59 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:85" *)
+  always @(posedge clk)
     cr15_m_flag <= \$60 ;
-  assign \$5  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:165" *) \port$1283$15 [4:0];
-  assign xr_rd_data1 = \$5  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:165" *) 32'd0 : \$6 ;
-  assign \$7  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:166" *) \port$1283$15 [9:5];
-  assign xr_rd_data2 = \$7  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:166" *) 32'd0 : \$8 ;
-  assign \$9  = | (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:142" *) xr_wr_addr;
-  assign \$10  = xr_wr_en & (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:142" *) \$9 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  assign \$5  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:168" *) \port$1236$15 [4:0];
+  assign xr_rd_data1 = \$5  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:168" *) 32'd0 : \$6 ;
+  assign \$7  = ! (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:169" *) \port$1236$15 [9:5];
+  assign xr_rd_data2 = \$7  ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:169" *) 32'd0 : \$8 ;
+  assign \$9  = | (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:145" *) xr_wr_addr;
+  assign \$10  = xr_wr_en & (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:145" *) \$9 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr0 <= \$11 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr1 <= \$12 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr2 <= \$13 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr3 <= \$14 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr4 <= \$15 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr5 <= \$16 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr6 <= \$17 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr7 <= \$18 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr8 <= \$19 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr9 <= \$20 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr10 <= \$21 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/registers.py:80" *)
   always @(posedge clk)
     cr11 <= \$22 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$24  = cr13;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11785,7 +11359,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$25  = cr14;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11834,7 +11408,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$26  = cr15;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11886,7 +11460,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$27  = x0;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11904,7 +11478,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$28  = x1;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11924,7 +11498,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$29  = x2;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11946,7 +11520,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$30  = x3;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11970,7 +11544,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$31  = x4;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -11996,7 +11570,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$32  = x5;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12024,7 +11598,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$33  = x6;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12054,7 +11628,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$34  = x7;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12086,7 +11660,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$35  = x8;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12120,7 +11694,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$36  = x9;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12156,7 +11730,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$37  = x10;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12194,7 +11768,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$38  = m_xr11;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12237,7 +11811,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$39  = m_xr12;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12282,7 +11856,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$40  = m_xr13;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12329,7 +11903,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$41  = m_xr14;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12378,7 +11952,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$42  = m_xr15;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12429,7 +12003,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$43  = x16;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12479,7 +12053,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$44  = x17;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12531,7 +12105,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$45  = x18;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12585,7 +12159,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$46  = x19;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12641,7 +12215,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$47  = x20;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12699,7 +12273,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$48  = x21;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12759,7 +12333,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$49  = x22;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12821,7 +12395,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$50  = x23;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12885,7 +12459,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$51  = x24;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -12951,7 +12525,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$52  = x25;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13019,7 +12593,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$53  = x26;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13089,7 +12663,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$54  = x27;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13161,7 +12735,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$55  = x28;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13235,7 +12809,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$56  = x29;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13311,7 +12885,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$57  = x30;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13389,7 +12963,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$58  = x31;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13470,7 +13044,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$59  = flags;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13485,7 +13059,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$60  = cr15_m_flag;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13502,7 +13076,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     (* full_case = 32'd1 *)
     casez (cr_rd_addr)
       4'h0:
@@ -13540,9 +13114,9 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     (* full_case = 32'd1 *)
-    casez (\port$1283$15 [4:0])
+    casez (\port$1236$15 [4:0])
       5'h00:
           \$6  = x0;
       5'h01:
@@ -13610,9 +13184,9 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     (* full_case = 32'd1 *)
-    casez (\port$1283$15 [9:5])
+    casez (\port$1236$15 [9:5])
       5'h00:
           \$8  = x0;
       5'h01:
@@ -13680,7 +13254,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$11  = cr0;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13701,7 +13275,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$12  = cr1;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13724,7 +13298,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$13  = cr2;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13749,7 +13323,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$14  = cr3;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13776,7 +13350,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$15  = cr4;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13805,7 +13379,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$16  = cr5;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13836,7 +13410,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$17  = cr6;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13869,7 +13443,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$18  = cr7;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13904,7 +13478,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$19  = cr8;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13941,7 +13515,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$20  = cr9;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -13980,7 +13554,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$21  = cr10;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -14021,7 +13595,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$22  = cr11;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -14064,7 +13638,7 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$17 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
     \$23  = cr12;
     (* full_case = 32'd1 *)
     if (clear_all) begin
@@ -14120,8 +13694,8 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   assign x14 = m_xr14;
   assign x15 = m_xr15;
   assign cr15_m_reg = cr15_m_flag;
-  assign xr_rd_addr1 = \port$1283$15 [4:0];
-  assign xr_rd_addr2 = \port$1283$15 [9:5];
+  assign xr_rd_addr1 = \port$1236$15 [4:0];
+  assign xr_rd_addr2 = \port$1236$15 [9:5];
   assign flags_reg = flags;
   assign cr_word_wr_en = 1'h0;
   assign cr_word_sel = 2'h0;
@@ -14388,27 +13962,24 @@ module \ctmm_cap_fpga_top.core.u_registers (rst, clear_all, cr_rd_addr, cr_wr_ad
   assign \$1  = cr0;
 endmodule
 
-(* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:41" *)
+(* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:39" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_data, cr_wr_addr, cr_wr_data, cr_wr_en, cr_rd_addr, busy, complete, cr_src, mem_rd_data, cr15_namespace, nia_set, nia_value, fault_valid, fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$18  = 0;
+module \ctmm_cap_fpga_top.core.u_return (rst, return_start, cr_rd_data, cr_wr_addr, cr_wr_data, cr_wr_en, cr_rd_addr, busy, complete, cr_src, mem_rd_data, cr15_namespace, nia_set, nia_value, fault_valid, fault_type, clk);
+  reg \$auto$verilog_backend.cc:2355:dump_module$20  = 0;
   wire [32:0] \$1 ;
   wire \$10 ;
   wire \$11 ;
   wire \$12 ;
-  wire \$13 ;
-  wire \$14 ;
-  wire \$15 ;
+  reg \$13 ;
+  reg [3:0] \$14 ;
+  reg [1:0] \$15 ;
   reg \$16 ;
-  reg [3:0] \$17 ;
-  reg [1:0] \$18 ;
-  reg \$19 ;
+  reg \$17 ;
+  reg [3:0] \$18 ;
+  reg [127:0] \$19 ;
   wire \$2 ;
   reg \$20 ;
-  reg [3:0] \$21 ;
-  reg [127:0] \$22 ;
-  reg \$23 ;
-  reg [127:0] \$24 ;
+  reg [127:0] \$21 ;
   wire \$3 ;
   wire \$4 ;
   wire \$5 ;
@@ -14429,23 +14000,23 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   input [127:0] cr15_namespace;
   wire [127:0] cr15_namespace;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [127:0] \cr15_namespace$17 ;
+  wire [127:0] \cr15_namespace$16 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [31:0] \cr15_namespace$17.word0_gt ;
+  wire [31:0] \cr15_namespace$16.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [1:0] \cr15_namespace$17.word0_gt.gt_type ;
+  wire [1:0] \cr15_namespace$16.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [16:0] \cr15_namespace$17.word0_gt.index ;
+  wire [16:0] \cr15_namespace$16.word0_gt.index ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [5:0] \cr15_namespace$17.word0_gt.perms ;
+  wire [5:0] \cr15_namespace$16.word0_gt.perms ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [6:0] \cr15_namespace$17.word0_gt.version ;
+  wire [6:0] \cr15_namespace$16.word0_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [31:0] \cr15_namespace$17.word1_location ;
+  wire [31:0] \cr15_namespace$16.word1_location ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [31:0] \cr15_namespace$17.word2_limit ;
+  wire [31:0] \cr15_namespace$16.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:27" *)
-  wire [31:0] \cr15_namespace$17.word3_seals ;
+  wire [31:0] \cr15_namespace$16.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:29" *)
   wire [31:0] \cr15_namespace.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:29" *)
@@ -14462,50 +14033,50 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   wire [31:0] \cr15_namespace.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:29" *)
   wire [31:0] \cr15_namespace.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   reg [127:0] cr6_latched = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [31:0] \cr6_latched.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [1:0] \cr6_latched.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [16:0] \cr6_latched.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [5:0] \cr6_latched.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [6:0] \cr6_latched.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [31:0] \cr6_latched.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [31:0] \cr6_latched.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
   wire [31:0] \cr6_latched.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:18" *)
   output [3:0] cr_rd_addr;
   wire [3:0] cr_rd_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:22" *)
-  wire [3:0] \cr_rd_addr$43 ;
+  wire [3:0] \cr_rd_addr$42 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
   input [127:0] cr_rd_data;
   wire [127:0] cr_rd_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [127:0] \cr_rd_data$15 ;
+  wire [127:0] \cr_rd_data$14 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [31:0] \cr_rd_data$15.word0_gt ;
+  wire [31:0] \cr_rd_data$14.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [1:0] \cr_rd_data$15.word0_gt.gt_type ;
+  wire [1:0] \cr_rd_data$14.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [16:0] \cr_rd_data$15.word0_gt.index ;
+  wire [16:0] \cr_rd_data$14.word0_gt.index ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [5:0] \cr_rd_data$15.word0_gt.perms ;
+  wire [5:0] \cr_rd_data$14.word0_gt.perms ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [6:0] \cr_rd_data$15.word0_gt.version ;
+  wire [6:0] \cr_rd_data$14.word0_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [31:0] \cr_rd_data$15.word1_location ;
+  wire [31:0] \cr_rd_data$14.word1_location ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [31:0] \cr_rd_data$15.word2_limit ;
+  wire [31:0] \cr_rd_data$14.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:19" *)
-  wire [31:0] \cr_rd_data$15.word3_seals ;
+  wire [31:0] \cr_rd_data$14.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:23" *)
   wire [31:0] \cr_rd_data.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:23" *)
@@ -14529,28 +14100,28 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   output [3:0] cr_wr_addr;
   wire [3:0] cr_wr_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:25" *)
-  wire [3:0] \cr_wr_addr$24 ;
+  wire [3:0] \cr_wr_addr$23 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:21" *)
   output [127:0] cr_wr_data;
   wire [127:0] cr_wr_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [127:0] \cr_wr_data$27 ;
+  wire [127:0] \cr_wr_data$26 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [31:0] \cr_wr_data$27.word0_gt ;
+  wire [31:0] \cr_wr_data$26.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [1:0] \cr_wr_data$27.word0_gt.gt_type ;
+  wire [1:0] \cr_wr_data$26.word0_gt.gt_type ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [16:0] \cr_wr_data$27.word0_gt.index ;
+  wire [16:0] \cr_wr_data$26.word0_gt.index ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [5:0] \cr_wr_data$27.word0_gt.perms ;
+  wire [5:0] \cr_wr_data$26.word0_gt.perms ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [6:0] \cr_wr_data$27.word0_gt.version ;
+  wire [6:0] \cr_wr_data$26.word0_gt.version ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [31:0] \cr_wr_data$27.word1_location ;
+  wire [31:0] \cr_wr_data$26.word1_location ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [31:0] \cr_wr_data$27.word2_limit ;
+  wire [31:0] \cr_wr_data$26.word2_limit ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:26" *)
-  wire [31:0] \cr_wr_data$27.word3_seals ;
+  wire [31:0] \cr_wr_data$26.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:21" *)
   wire [31:0] \cr_wr_data.word0_gt ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:21" *)
@@ -14571,65 +14142,65 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   output cr_wr_en;
   wire cr_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:27" *)
-  wire \cr_wr_en$30 ;
+  wire \cr_wr_en$29 ;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:62" *)
   wire fault_flag;
   (* init = 4'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:67" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:63" *)
   wire [3:0] fault_latched;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:67" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:63" *)
   output [3:0] fault_type;
   reg [3:0] fault_type = 4'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:66" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:62" *)
   output fault_valid;
   reg fault_valid = 1'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:51" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:49" *)
   wire is_null_cap;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:72" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:68" *)
   reg local_cr_rd_en;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:74" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:70" *)
   reg [3:0] local_cr_wr_addr;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   reg [127:0] local_cr_wr_data;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [31:0] \local_cr_wr_data.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [1:0] \local_cr_wr_data.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [16:0] \local_cr_wr_data.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [5:0] \local_cr_wr_data.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [6:0] \local_cr_wr_data.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [31:0] \local_cr_wr_data.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [31:0] \local_cr_wr_data.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:71" *)
   wire [31:0] \local_cr_wr_data.word3_seals ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:69" *)
   reg local_cr_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:29" *)
   wire [31:0] mem_addr;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:31" *)
-  wire [31:0] \mem_addr$32 ;
+  wire [31:0] \mem_addr$31 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:31" *)
   input [31:0] mem_rd_data;
   wire [31:0] mem_rd_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:31" *)
-  wire [31:0] \mem_rd_data$19 ;
+  wire [31:0] \mem_rd_data$18 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:30" *)
   wire mem_rd_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:32" *)
-  wire \mem_rd_en$34 ;
+  wire \mem_rd_en$33 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:34" *)
   wire mem_rd_valid;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:32" *)
-  wire \mem_rd_valid$21 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:80" *)
+  wire \mem_rd_valid$20 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:76" *)
   reg [31:0] mload_direct_gt;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:79" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:75" *)
   reg [3:0] mload_dst;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:24" *)
   output nia_set;
@@ -14637,27 +14208,27 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:25" *)
   output [31:0] nia_value;
   reg [31:0] nia_value;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:65" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:61" *)
   reg [1:0] phase = 2'h0;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   reg [3:0] ret_state = 4'h0;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   reg [127:0] return_cap = 128'h00000000000000000000000000000000;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [31:0] \return_cap.word0_gt ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [1:0] \return_cap.word0_gt.gt_type ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [16:0] \return_cap.word0_gt.index ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [5:0] \return_cap.word0_gt.perms ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [6:0] \return_cap.word0_gt.version ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [31:0] \return_cap.word1_location ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [31:0] \return_cap.word2_limit ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
   wire [31:0] \return_cap.word3_seals ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:11" *)
   input return_start;
@@ -14665,9 +14236,6 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:38" *)
-  input [31:0] saved_cr5_gt;
-  wire [31:0] saved_cr5_gt;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:12" *)
   wire [3:0] sub_cr_dst;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:11" *)
@@ -14678,11 +14246,11 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   wire [31:0] sub_direct_gt;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:18" *)
   wire sub_done;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:69" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:65" *)
   reg sub_done_latched = 1'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:19" *)
   wire sub_fault;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:70" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:66" *)
   reg sub_fault_latched = 1'h0;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:20" *)
   wire [3:0] sub_fault_type;
@@ -14693,27 +14261,27 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:10" *)
   reg sub_start = 1'h0;
   (* init = 1'h0 *)
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:68" *)
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:64" *)
   wire sub_start_reg;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:36" *)
   wire [31:0] thread_wr_data;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:38" *)
-  wire [31:0] \thread_wr_data$40 ;
+  wire [31:0] \thread_wr_data$39 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:34" *)
   wire thread_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:36" *)
-  wire \thread_wr_en$36 ;
+  wire \thread_wr_en$35 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:35" *)
   wire [3:0] thread_wr_idx;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:37" *)
-  wire [3:0] \thread_wr_idx$38 ;
-  assign is_null_cap = return_cap[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:52" *) 2'h2;
-  assign cr_wr_addr = local_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:113" *) local_cr_wr_addr : \cr_wr_addr$24 ;
-  assign cr_wr_data = local_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:114" *) local_cr_wr_data : \cr_wr_data$27 ;
-  assign cr_wr_en = \cr_wr_en$30  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:115" *) local_cr_wr_en;
-  assign cr_rd_addr = local_cr_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:124" *) { 1'h0, cr_src } : \cr_rd_addr$43 ;
-  assign \$1  = return_cap[63:32] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:221" *) 3'h4;
-  assign busy = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:232" *) \$2 ;
+  wire [3:0] \thread_wr_idx$37 ;
+  assign is_null_cap = return_cap[1:0] == (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:50" *) 2'h2;
+  assign cr_wr_addr = local_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:104" *) local_cr_wr_addr : \cr_wr_addr$23 ;
+  assign cr_wr_data = local_cr_wr_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:105" *) local_cr_wr_data : \cr_wr_data$26 ;
+  assign cr_wr_en = \cr_wr_en$29  | (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:106" *) local_cr_wr_en;
+  assign cr_rd_addr = local_cr_rd_en ? (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:115" *) { 1'h0, cr_src } : \cr_rd_addr$42 ;
+  assign \$1  = return_cap[63:32] + (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:186" *) 3'h4;
+  assign busy = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:197" *) \$2 ;
   assign \$2  = ! (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) ret_state;
   assign \$3  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 1'h1;
   assign \$4  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 2'h2;
@@ -14723,48 +14291,45 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   assign \$8  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h6;
   assign \$9  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 3'h7;
   assign \$10  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h8;
-  assign \$11  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
-  assign \$12  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'ha;
-  assign \$13  = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hb;
-  assign complete = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'hc;
-  assign \$14  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:143" *) return_cap[7];
-  assign \$15  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:176" *) return_cap[71];
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:66" *)
+  assign complete = ret_state == (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486" *) 4'h9;
+  assign \$11  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:134" *) return_cap[7];
+  assign \$12  = ~ (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:141" *) return_cap[71];
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:62" *)
   always @(posedge clk)
-    fault_valid <= \$16 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:67" *)
+    fault_valid <= \$13 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:63" *)
   always @(posedge clk)
-    fault_type <= \$17 ;
+    fault_type <= \$14 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:61" *)
+  always @(posedge clk)
+    phase <= \$15 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:65" *)
   always @(posedge clk)
-    phase <= \$18 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:69" *)
+    sub_done_latched <= \$16 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:66" *)
   always @(posedge clk)
-    sub_done_latched <= \$19 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:70" *)
-  always @(posedge clk)
-    sub_fault_latched <= \$20 ;
+    sub_fault_latched <= \$17 ;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   always @(posedge clk)
-    ret_state <= \$21 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:46" *)
-  always @(posedge clk)
-    return_cap <= \$22 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:68" *)
-  always @(posedge clk)
-    sub_start <= \$23 ;
-  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:77" *)
-  always @(posedge clk)
-    cr6_latched <= \$24 ;
+    ret_state <= \$18 ;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:44" *)
+  always @(posedge clk)
+    return_cap <= \$19 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:64" *)
+  always @(posedge clk)
+    sub_start <= \$20 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:73" *)
+  always @(posedge clk)
+    cr6_latched <= \$21 ;
+  (* src = "/home/runner/workspace/ctmm_cap_amaranth/ret.py:42" *)
   \ctmm_cap_fpga_top.core.u_return.u_mload  u_mload (
     .clk(clk),
     .cr15_namespace(cr15_namespace),
-    .cr_rd_addr(\cr_rd_addr$43 ),
+    .cr_rd_addr(\cr_rd_addr$42 ),
     .cr_rd_data(cr_rd_data),
-    .cr_wr_addr(\cr_wr_addr$24 ),
-    .cr_wr_data(\cr_wr_data$27 ),
-    .cr_wr_en(\cr_wr_en$30 ),
+    .cr_wr_addr(\cr_wr_addr$23 ),
+    .cr_wr_data(\cr_wr_data$26 ),
+    .cr_wr_en(\cr_wr_en$29 ),
     .mem_addr(mem_addr),
     .mem_rd_data(mem_rd_data),
     .mem_rd_en(mem_rd_en),
@@ -14780,11 +14345,9 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
     .thread_wr_idx(thread_wr_idx)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     (* full_case = 32'd1 *)
     casez (phase)
-      2'h0:
-          mload_dst = 4'h5;
       2'h1:
           mload_dst = 4'h6;
       default:
@@ -14792,11 +14355,9 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     (* full_case = 32'd1 *)
     casez (phase)
-      2'h0:
-          mload_direct_gt = saved_cr5_gt;
       2'h1:
           mload_direct_gt = return_cap[95:64];
       default:
@@ -14804,7 +14365,7 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     local_cr_rd_en = 1'h0;
     casez (ret_state)
       4'h0:
@@ -14814,7 +14375,7 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     local_cr_wr_en = 1'h0;
     casez (ret_state)
       4'h0:
@@ -14826,19 +14387,13 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h4:
           /* empty */;
       4'h5:
-          local_cr_wr_en = 1'h1;
+          /* empty */;
       4'h6:
-          /* empty */;
-      4'h7:
-          /* empty */;
-      4'h8:
-          /* empty */;
-      4'h9:
           local_cr_wr_en = 1'h1;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     local_cr_wr_addr = 4'h0;
     casez (ret_state)
       4'h0:
@@ -14850,19 +14405,13 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h4:
           /* empty */;
       4'h5:
-          local_cr_wr_addr = 4'h5;
+          /* empty */;
       4'h6:
-          /* empty */;
-      4'h7:
-          /* empty */;
-      4'h8:
-          /* empty */;
-      4'h9:
           local_cr_wr_addr = 4'h6;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     local_cr_wr_data = 128'h00000000000000000000000000000000;
     casez (ret_state)
       4'h0:
@@ -14874,19 +14423,13 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h4:
           /* empty */;
       4'h5:
-          local_cr_wr_data = 128'h00000000000000000000000000000000;
+          /* empty */;
       4'h6:
-          /* empty */;
-      4'h7:
-          /* empty */;
-      4'h8:
-          /* empty */;
-      4'h9:
           local_cr_wr_data = cr6_latched;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     nia_set = 1'h0;
     casez (ret_state)
       4'h0:
@@ -14904,17 +14447,11 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h7:
           /* empty */;
       4'h8:
-          /* empty */;
-      4'h9:
-          /* empty */;
-      4'ha:
-          /* empty */;
-      4'hb:
           nia_set = 1'h1;
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
     nia_value = 32'd0;
     casez (ret_state)
       4'h0:
@@ -14932,47 +14469,120 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h7:
           /* empty */;
       4'h8:
-          /* empty */;
-      4'h9:
-          /* empty */;
-      4'ha:
-          /* empty */;
-      4'hb:
           nia_value = \$1 [31:0];
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$16  = fault_valid;
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$13  = fault_valid;
+    casez (ret_state)
+      4'h0:
+          \$13  = 1'h0;
+      4'h1:
+          /* empty */;
+      4'h2:
+          if (is_null_cap) begin
+            \$13  = 1'h1;
+          end else if (\$11 ) begin
+            \$13  = 1'h1;
+          end
+      4'h4:
+          if (\$12 ) begin
+            \$13  = 1'h1;
+          end
+      4'h5:
+          if (sub_fault) begin
+            \$13  = 1'h1;
+          end
+      4'h6:
+          /* empty */;
+      4'h7:
+          if (sub_fault) begin
+            \$13  = 1'h1;
+          end
+    endcase
+    if (rst) begin
+      \$13  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$14  = fault_type;
+    casez (ret_state)
+      4'h0:
+          \$14  = 4'h0;
+      4'h1:
+          /* empty */;
+      4'h2:
+          if (is_null_cap) begin
+            \$14  = 4'h7;
+          end else if (\$11 ) begin
+            \$14  = 4'h6;
+          end
+      4'h4:
+          if (\$12 ) begin
+            \$14  = 4'h6;
+          end
+      4'h5:
+          if (sub_fault) begin
+            \$14  = sub_fault_type;
+          end
+      4'h6:
+          /* empty */;
+      4'h7:
+          if (sub_fault) begin
+            \$14  = sub_fault_type;
+          end
+    endcase
+    if (rst) begin
+      \$14  = 4'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$15  = phase;
+    casez (ret_state)
+      4'h0:
+          \$15  = 2'h1;
+      4'h1:
+          /* empty */;
+      4'h2:
+          /* empty */;
+      4'h4:
+          /* empty */;
+      4'h5:
+          /* empty */;
+      4'h6:
+          \$15  = 2'h2;
+    endcase
+    if (rst) begin
+      \$15  = 2'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$16  = sub_done_latched;
     casez (ret_state)
       4'h0:
           \$16  = 1'h0;
       4'h1:
           /* empty */;
       4'h2:
-          if (is_null_cap) begin
-            \$16  = 1'h1;
-          end else if (\$14 ) begin
-            \$16  = 1'h1;
-          end
+          /* empty */;
       4'h4:
-          /* empty */;
+          (* full_case = 32'd1 *)
+          if (\$12 ) begin
+          end else begin
+            \$16  = 1'h0;
+          end
       4'h5:
-          /* empty */;
+          if (sub_done) begin
+            \$16  = 1'h1;
+          end
       4'h6:
-          /* empty */;
+          \$16  = 1'h0;
       4'h7:
-          if (\$15 ) begin
-            \$16  = 1'h1;
-          end
-      4'h8:
-          if (sub_fault) begin
-            \$16  = 1'h1;
-          end
-      4'h9:
-          /* empty */;
-      4'ha:
-          if (sub_fault) begin
+          if (sub_done) begin
             \$16  = 1'h1;
           end
     endcase
@@ -14981,264 +14591,130 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$17  = fault_type;
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$17  = sub_fault_latched;
     casez (ret_state)
       4'h0:
-          \$17  = 4'h0;
+          \$17  = 1'h0;
       4'h1:
           /* empty */;
       4'h2:
+          /* empty */;
+      4'h4:
+          (* full_case = 32'd1 *)
+          if (\$12 ) begin
+          end else begin
+            \$17  = 1'h0;
+          end
+      4'h5:
+          if (sub_fault) begin
+            \$17  = 1'h1;
+          end
+      4'h6:
+          \$17  = 1'h0;
+      4'h7:
+          if (sub_fault) begin
+            \$17  = 1'h1;
+          end
+    endcase
+    if (rst) begin
+      \$17  = 1'h0;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$18  = ret_state;
+    casez (ret_state)
+      4'h0:
+          if (return_start) begin
+            \$18  = 4'h1;
+          end
+      4'h1:
+          \$18  = 4'h2;
+      4'h2:
+          (* full_case = 32'd1 *)
           if (is_null_cap) begin
-            \$17  = 4'h7;
-          end else if (\$14 ) begin
-            \$17  = 4'h6;
-          end
-      4'h4:
-          /* empty */;
-      4'h5:
-          /* empty */;
-      4'h6:
-          /* empty */;
-      4'h7:
-          if (\$15 ) begin
-            \$17  = 4'h6;
-          end
-      4'h8:
-          if (sub_fault) begin
-            \$17  = sub_fault_type;
-          end
-      4'h9:
-          /* empty */;
-      4'ha:
-          if (sub_fault) begin
-            \$17  = sub_fault_type;
-          end
-    endcase
-    if (rst) begin
-      \$17  = 4'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$18  = phase;
-    casez (ret_state)
-      4'h0:
-          \$18  = 2'h0;
-      4'h1:
-          /* empty */;
-      4'h2:
-          /* empty */;
-      4'h4:
-          /* empty */;
-      4'h5:
-          \$18  = 2'h1;
-      4'h6:
-          \$18  = 2'h1;
-      4'h7:
-          /* empty */;
-      4'h8:
-          /* empty */;
-      4'h9:
-          \$18  = 2'h2;
-    endcase
-    if (rst) begin
-      \$18  = 2'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$19  = sub_done_latched;
-    casez (ret_state)
-      4'h0:
-          \$19  = 1'h0;
-      4'h1:
-          /* empty */;
-      4'h2:
-          /* empty */;
-      4'h4:
-          if (sub_done) begin
-            \$19  = 1'h1;
-          end
-      4'h5:
-          \$19  = 1'h0;
-      4'h6:
-          \$19  = 1'h0;
-      4'h7:
-          (* full_case = 32'd1 *)
-          if (\$15 ) begin
+            \$18  = 4'h3;
+          end else if (\$11 ) begin
+            \$18  = 4'h3;
           end else begin
-            \$19  = 1'h0;
+            \$18  = 4'h4;
+          end
+      4'h4:
+          (* full_case = 32'd1 *)
+          if (\$12 ) begin
+            \$18  = 4'h3;
+          end else begin
+            \$18  = 4'h5;
+          end
+      4'h5:
+          if (sub_fault_latched) begin
+            \$18  = 4'h3;
+          end else if (sub_done_latched) begin
+            \$18  = 4'h6;
+          end
+      4'h6:
+          \$18  = 4'h7;
+      4'h7:
+          if (sub_fault_latched) begin
+            \$18  = 4'h3;
+          end else if (sub_done_latched) begin
+            \$18  = 4'h8;
           end
       4'h8:
-          if (sub_done) begin
-            \$19  = 1'h1;
-          end
+          \$18  = 4'h9;
       4'h9:
-          \$19  = 1'h0;
-      4'ha:
-          if (sub_done) begin
-            \$19  = 1'h1;
-          end
+          \$18  = 4'h0;
+      4'h3:
+          \$18  = 4'h0;
     endcase
     if (rst) begin
-      \$19  = 1'h0;
+      \$18  = 4'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$20  = sub_fault_latched;
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$19  = return_cap;
     casez (ret_state)
       4'h0:
-          \$20  = 1'h0;
+          /* empty */;
+      4'h1:
+          \$19  = cr_rd_data;
+    endcase
+    if (rst) begin
+      \$19  = 128'h00000000000000000000000000000000;
+    end
+  end
+  always @* begin
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$20  = sub_start;
+    casez (ret_state)
+      4'h0:
+          /* empty */;
       4'h1:
           /* empty */;
       4'h2:
           /* empty */;
       4'h4:
-          if (sub_fault) begin
+          (* full_case = 32'd1 *)
+          if (\$12 ) begin
+          end else begin
             \$20  = 1'h1;
           end
       4'h5:
           \$20  = 1'h0;
       4'h6:
-          \$20  = 1'h0;
+          \$20  = 1'h1;
       4'h7:
-          (* full_case = 32'd1 *)
-          if (\$15 ) begin
-          end else begin
-            \$20  = 1'h0;
-          end
-      4'h8:
-          if (sub_fault) begin
-            \$20  = 1'h1;
-          end
-      4'h9:
           \$20  = 1'h0;
-      4'ha:
-          if (sub_fault) begin
-            \$20  = 1'h1;
-          end
     endcase
     if (rst) begin
       \$20  = 1'h0;
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$21  = ret_state;
-    casez (ret_state)
-      4'h0:
-          if (return_start) begin
-            \$21  = 4'h1;
-          end
-      4'h1:
-          \$21  = 4'h2;
-      4'h2:
-          (* full_case = 32'd1 *)
-          if (is_null_cap) begin
-            \$21  = 4'h3;
-          end else if (\$14 ) begin
-            \$21  = 4'h3;
-          end else begin
-            \$21  = 4'h4;
-          end
-      4'h4:
-          if (sub_fault_latched) begin
-            \$21  = 4'h5;
-          end else if (sub_done_latched) begin
-            \$21  = 4'h6;
-          end
-      4'h5:
-          \$21  = 4'h7;
-      4'h6:
-          \$21  = 4'h7;
-      4'h7:
-          (* full_case = 32'd1 *)
-          if (\$15 ) begin
-            \$21  = 4'h3;
-          end else begin
-            \$21  = 4'h8;
-          end
-      4'h8:
-          if (sub_fault_latched) begin
-            \$21  = 4'h3;
-          end else if (sub_done_latched) begin
-            \$21  = 4'h9;
-          end
-      4'h9:
-          \$21  = 4'ha;
-      4'ha:
-          if (sub_fault_latched) begin
-            \$21  = 4'h3;
-          end else if (sub_done_latched) begin
-            \$21  = 4'hb;
-          end
-      4'hb:
-          \$21  = 4'hc;
-      4'hc:
-          \$21  = 4'h0;
-      4'h3:
-          \$21  = 4'h0;
-    endcase
-    if (rst) begin
-      \$21  = 4'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$22  = return_cap;
-    casez (ret_state)
-      4'h0:
-          /* empty */;
-      4'h1:
-          \$22  = cr_rd_data;
-    endcase
-    if (rst) begin
-      \$22  = 128'h00000000000000000000000000000000;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$23  = sub_start;
-    casez (ret_state)
-      4'h0:
-          /* empty */;
-      4'h1:
-          /* empty */;
-      4'h2:
-          (* full_case = 32'd1 *)
-          if (is_null_cap) begin
-          end else if (\$14 ) begin
-          end else begin
-            \$23  = 1'h1;
-          end
-      4'h4:
-          \$23  = 1'h0;
-      4'h5:
-          /* empty */;
-      4'h6:
-          /* empty */;
-      4'h7:
-          (* full_case = 32'd1 *)
-          if (\$15 ) begin
-          end else begin
-            \$23  = 1'h1;
-          end
-      4'h8:
-          \$23  = 1'h0;
-      4'h9:
-          \$23  = 1'h1;
-      4'ha:
-          \$23  = 1'h0;
-    endcase
-    if (rst) begin
-      \$23  = 1'h0;
-    end
-  end
-  always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$18 ) begin end
-    \$24  = cr6_latched;
+    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    \$21  = cr6_latched;
     casez (ret_state)
       4'h0:
           /* empty */;
@@ -15249,18 +14725,12 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
       4'h4:
           /* empty */;
       4'h5:
-          /* empty */;
-      4'h6:
-          /* empty */;
-      4'h7:
-          /* empty */;
-      4'h8:
           if (sub_done) begin
-            \$24  = \cr_wr_data$27 ;
+            \$21  = \cr_wr_data$26 ;
           end
     endcase
     if (rst) begin
-      \$24  = 128'h00000000000000000000000000000000;
+      \$21  = 128'h00000000000000000000000000000000;
     end
   end
   assign sub_start_reg = sub_start;
@@ -15270,16 +14740,16 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   assign sub_direct = 1'h1;
   assign sub_m_elevated = 1'h1;
   assign sub_direct_gt = mload_direct_gt;
-  assign \cr_rd_data$15  = cr_rd_data;
-  assign \cr15_namespace$17  = cr15_namespace;
-  assign \mem_rd_data$19  = mem_rd_data;
+  assign \cr_rd_data$14  = cr_rd_data;
+  assign \cr15_namespace$16  = cr15_namespace;
+  assign \mem_rd_data$18  = mem_rd_data;
   assign mem_rd_valid = 1'h1;
-  assign \mem_rd_valid$21  = 1'h1;
-  assign \mem_addr$32  = mem_addr;
-  assign \mem_rd_en$34  = mem_rd_en;
-  assign \thread_wr_en$36  = thread_wr_en;
-  assign \thread_wr_idx$38  = thread_wr_idx;
-  assign \thread_wr_data$40  = thread_wr_data;
+  assign \mem_rd_valid$20  = 1'h1;
+  assign \mem_addr$31  = mem_addr;
+  assign \mem_rd_en$33  = mem_rd_en;
+  assign \thread_wr_en$35  = thread_wr_en;
+  assign \thread_wr_idx$37  = thread_wr_idx;
+  assign \thread_wr_data$39  = thread_wr_data;
   assign fault_flag = fault_valid;
   assign fault_latched = fault_type;
   assign \return_cap.word0_gt  = return_cap[31:0];
@@ -15298,14 +14768,14 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   assign \cr_rd_data.word1_location  = cr_rd_data[63:32];
   assign \cr_rd_data.word2_limit  = cr_rd_data[95:64];
   assign \cr_rd_data.word3_seals  = cr_rd_data[127:96];
-  assign \cr_rd_data$15.word0_gt  = cr_rd_data[31:0];
-  assign \cr_rd_data$15.word0_gt.gt_type  = cr_rd_data[1:0];
-  assign \cr_rd_data$15.word0_gt.perms  = cr_rd_data[7:2];
-  assign \cr_rd_data$15.word0_gt.index  = cr_rd_data[24:8];
-  assign \cr_rd_data$15.word0_gt.version  = cr_rd_data[31:25];
-  assign \cr_rd_data$15.word1_location  = cr_rd_data[63:32];
-  assign \cr_rd_data$15.word2_limit  = cr_rd_data[95:64];
-  assign \cr_rd_data$15.word3_seals  = cr_rd_data[127:96];
+  assign \cr_rd_data$14.word0_gt  = cr_rd_data[31:0];
+  assign \cr_rd_data$14.word0_gt.gt_type  = cr_rd_data[1:0];
+  assign \cr_rd_data$14.word0_gt.perms  = cr_rd_data[7:2];
+  assign \cr_rd_data$14.word0_gt.index  = cr_rd_data[24:8];
+  assign \cr_rd_data$14.word0_gt.version  = cr_rd_data[31:25];
+  assign \cr_rd_data$14.word1_location  = cr_rd_data[63:32];
+  assign \cr_rd_data$14.word2_limit  = cr_rd_data[95:64];
+  assign \cr_rd_data$14.word3_seals  = cr_rd_data[127:96];
   assign \cr15_namespace.word0_gt  = cr15_namespace[31:0];
   assign \cr15_namespace.word0_gt.gt_type  = cr15_namespace[1:0];
   assign \cr15_namespace.word0_gt.perms  = cr15_namespace[7:2];
@@ -15314,14 +14784,14 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   assign \cr15_namespace.word1_location  = cr15_namespace[63:32];
   assign \cr15_namespace.word2_limit  = cr15_namespace[95:64];
   assign \cr15_namespace.word3_seals  = cr15_namespace[127:96];
-  assign \cr15_namespace$17.word0_gt  = cr15_namespace[31:0];
-  assign \cr15_namespace$17.word0_gt.gt_type  = cr15_namespace[1:0];
-  assign \cr15_namespace$17.word0_gt.perms  = cr15_namespace[7:2];
-  assign \cr15_namespace$17.word0_gt.index  = cr15_namespace[24:8];
-  assign \cr15_namespace$17.word0_gt.version  = cr15_namespace[31:25];
-  assign \cr15_namespace$17.word1_location  = cr15_namespace[63:32];
-  assign \cr15_namespace$17.word2_limit  = cr15_namespace[95:64];
-  assign \cr15_namespace$17.word3_seals  = cr15_namespace[127:96];
+  assign \cr15_namespace$16.word0_gt  = cr15_namespace[31:0];
+  assign \cr15_namespace$16.word0_gt.gt_type  = cr15_namespace[1:0];
+  assign \cr15_namespace$16.word0_gt.perms  = cr15_namespace[7:2];
+  assign \cr15_namespace$16.word0_gt.index  = cr15_namespace[24:8];
+  assign \cr15_namespace$16.word0_gt.version  = cr15_namespace[31:25];
+  assign \cr15_namespace$16.word1_location  = cr15_namespace[63:32];
+  assign \cr15_namespace$16.word2_limit  = cr15_namespace[95:64];
+  assign \cr15_namespace$16.word3_seals  = cr15_namespace[127:96];
   assign \cr_wr_data.word0_gt  = cr_wr_data[31:0];
   assign \cr_wr_data.word0_gt.gt_type  = cr_wr_data[1:0];
   assign \cr_wr_data.word0_gt.perms  = cr_wr_data[7:2];
@@ -15330,14 +14800,14 @@ module \ctmm_cap_fpga_top.core.u_return (rst, return_start, saved_cr5_gt, cr_rd_
   assign \cr_wr_data.word1_location  = cr_wr_data[63:32];
   assign \cr_wr_data.word2_limit  = cr_wr_data[95:64];
   assign \cr_wr_data.word3_seals  = cr_wr_data[127:96];
-  assign \cr_wr_data$27.word0_gt  = \cr_wr_data$27 [31:0];
-  assign \cr_wr_data$27.word0_gt.gt_type  = \cr_wr_data$27 [1:0];
-  assign \cr_wr_data$27.word0_gt.perms  = \cr_wr_data$27 [7:2];
-  assign \cr_wr_data$27.word0_gt.index  = \cr_wr_data$27 [24:8];
-  assign \cr_wr_data$27.word0_gt.version  = \cr_wr_data$27 [31:25];
-  assign \cr_wr_data$27.word1_location  = \cr_wr_data$27 [63:32];
-  assign \cr_wr_data$27.word2_limit  = \cr_wr_data$27 [95:64];
-  assign \cr_wr_data$27.word3_seals  = \cr_wr_data$27 [127:96];
+  assign \cr_wr_data$26.word0_gt  = \cr_wr_data$26 [31:0];
+  assign \cr_wr_data$26.word0_gt.gt_type  = \cr_wr_data$26 [1:0];
+  assign \cr_wr_data$26.word0_gt.perms  = \cr_wr_data$26 [7:2];
+  assign \cr_wr_data$26.word0_gt.index  = \cr_wr_data$26 [24:8];
+  assign \cr_wr_data$26.word0_gt.version  = \cr_wr_data$26 [31:25];
+  assign \cr_wr_data$26.word1_location  = \cr_wr_data$26 [63:32];
+  assign \cr_wr_data$26.word2_limit  = \cr_wr_data$26 [95:64];
+  assign \cr_wr_data$26.word3_seals  = \cr_wr_data$26 [127:96];
   assign \local_cr_wr_data.word0_gt  = local_cr_wr_data[31:0];
   assign \local_cr_wr_data.word0_gt.gt_type  = local_cr_wr_data[1:0];
   assign \local_cr_wr_data.word0_gt.perms  = local_cr_wr_data[7:2];
@@ -15359,7 +14829,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/mload.py:44" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub_done, mem_rd_data, cr15_namespace, sub_cr_dst, sub_direct_gt, sub_start, cr_rd_addr, mem_addr, mem_rd_en, thread_wr_en, thread_wr_idx, thread_wr_data, cr_wr_addr, cr_wr_data, cr_wr_en, sub_fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$19  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$21  = 0;
   wire [19:0] \$1 ;
   wire [32:0] \$10 ;
   wire \$11 ;
@@ -15651,7 +15121,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     result_cap <= \$36 ;
   assign \$auto$rtlil.cc:2739:Not$2  = ~ { result_cap[63], result_cap[56], result_cap[52:50], result_cap[47], result_cap[44:42], result_cap[40:38], result_cap[34], result_cap[32] };
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$38  = mload_state;
     casez (mload_state)
       4'h0:
@@ -15719,7 +15189,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$39  = src_cap;
     casez (mload_state)
       4'h0:
@@ -15736,7 +15206,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     cr_rd_addr = 4'h0;
     casez (mload_state)
       4'h0:
@@ -15750,7 +15220,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     mem_addr = 32'd0;
     casez (mload_state)
       4'h0:
@@ -15776,7 +15246,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     mem_rd_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -15802,7 +15272,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     thread_wr_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -15834,7 +15304,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     thread_wr_idx = 4'h0;
     casez (mload_state)
       4'h0:
@@ -15866,7 +15336,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     thread_wr_data = 32'd0;
     casez (mload_state)
       4'h0:
@@ -15898,7 +15368,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     cr_wr_addr = 4'h0;
     casez (mload_state)
       4'h0:
@@ -15930,7 +15400,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     cr_wr_data = 128'h00000000000000000000000000000000;
     casez (mload_state)
       4'h0:
@@ -15962,7 +15432,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     cr_wr_en = 1'h0;
     casez (mload_state)
       4'h0:
@@ -15994,7 +15464,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$31  = cr_src_reg;
     casez (mload_state)
       4'h0:
@@ -16007,7 +15477,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$32  = cr_dst_reg;
     casez (mload_state)
       4'h0:
@@ -16020,7 +15490,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$33  = index_reg;
     casez (mload_state)
       4'h0:
@@ -16033,7 +15503,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$34  = direct_mode;
     casez (mload_state)
       4'h0:
@@ -16046,7 +15516,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$35  = direct_gt_reg;
     casez (mload_state)
       4'h0:
@@ -16059,7 +15529,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$36  = result_cap;
     casez (mload_state)
       4'h0:
@@ -16092,7 +15562,7 @@ module \ctmm_cap_fpga_top.core.u_return.u_mload (rst, cr_rd_data, sub_fault, sub
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$19 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
     \$37  = sub_fault_type;
     casez (mload_state)
       4'h0:
@@ -16196,8 +15666,8 @@ endmodule
 
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/save.py:31" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, cr_dst, cr_src, \port$1283$20 , cr_rd_addr, save_fault, fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$20  = 0;
+module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, cr_dst, cr_src, \port$1236$20 , cr_rd_addr, save_fault, fault_type, clk);
+  reg \$auto$verilog_backend.cc:2355:dump_module$22  = 0;
   wire \$1 ;
   reg \$10 ;
   reg [2:0] \$11 ;
@@ -16291,8 +15761,8 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
   wire mem_wr_en;
   (* src = "/home/runner/workspace/ctmm_cap_amaranth/msave.py:21" *)
   wire \mem_wr_en$17 ;
-  input [11:0] \port$1283$20 ;
-  wire [11:0] \port$1283$20 ;
+  input [11:0] \port$1236$20 ;
+  wire [11:0] \port$1236$20 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -16406,7 +15876,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     .mem_wr_addr(mem_wr_addr),
     .mem_wr_data(mem_wr_data),
     .mem_wr_en(mem_wr_en),
-    .\port$1283$20 (\port$1283$20 ),
+    .\port$1236$20 (\port$1236$20 ),
     .rst(rst),
     .sub_done(sub_done),
     .sub_dst_cap(sub_dst_cap),
@@ -16416,7 +15886,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     .sub_start(sub_start)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     cr_rd_addr = 4'h0;
     casez (save_wrapper_state)
       3'h0:
@@ -16430,7 +15900,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$7  = save_fault;
     casez (save_wrapper_state)
       3'h0:
@@ -16453,7 +15923,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$8  = fault_type;
     casez (save_wrapper_state)
       3'h0:
@@ -16476,7 +15946,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$9  = sub_done_latched;
     casez (save_wrapper_state)
       3'h0:
@@ -16497,7 +15967,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$10  = sub_fault_latched;
     casez (save_wrapper_state)
       3'h0:
@@ -16518,7 +15988,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$11  = save_wrapper_state;
     casez (save_wrapper_state)
       3'h0:
@@ -16548,7 +16018,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$12  = sub_dst_cap;
     casez (save_wrapper_state)
       3'h0:
@@ -16563,7 +16033,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$13  = src_reg_latched;
     casez (save_wrapper_state)
       3'h0:
@@ -16580,7 +16050,7 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$20 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
     \$14  = sub_start;
     casez (save_wrapper_state)
       3'h0:
@@ -16601,8 +16071,8 @@ module \ctmm_cap_fpga_top.core.u_save (rst, save_start, cr_rd_data, save_busy, c
   assign \sub_start$3  = sub_start;
   assign dst_reg_latched = sub_dst_cap;
   assign sub_src_gt = src_reg_latched[31:0];
-  assign sub_index = { 5'h00, \port$1283$20  };
-  assign index = { 5'h00, \port$1283$20  };
+  assign sub_index = { 5'h00, \port$1236$20  };
+  assign index = { 5'h00, \port$1236$20  };
   assign mem_wr_done = 1'h1;
   assign \mem_wr_done$11  = 1'h1;
   assign \mem_wr_addr$13  = mem_wr_addr;
@@ -16647,8 +16117,8 @@ endmodule
 
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/msave.py:25" *)
 (* generator = "Amaranth" *)
-module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1283$20 , sub_dst_cap, sub_src_gt, sub_start, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$21  = 0;
+module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1236$20 , sub_dst_cap, sub_src_gt, sub_start, mem_wr_en, mem_wr_addr, mem_wr_data, sub_fault_type, clk);
+  reg \$auto$verilog_backend.cc:2355:dump_module$23  = 0;
   wire [19:0] \$1 ;
   wire \$10 ;
   reg [127:0] \$11 ;
@@ -16705,8 +16175,8 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
   reg mem_wr_en;
   (* src = "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144" *)
   reg [2:0] msave_state = 3'h0;
-  input [11:0] \port$1283$20 ;
-  wire [11:0] \port$1283$20 ;
+  input [11:0] \port$1236$20 ;
+  wire [11:0] \port$1236$20 ;
   (* src = "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283" *)
   input rst;
   wire rst;
@@ -16781,7 +16251,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
   always @(posedge clk)
     msave_state <= \$15 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     mem_wr_en = 1'h0;
     casez (msave_state)
       3'h0:
@@ -16797,7 +16267,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     mem_wr_addr = 32'd0;
     casez (msave_state)
       3'h0:
@@ -16813,7 +16283,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     mem_wr_data = 32'd0;
     casez (msave_state)
       3'h0:
@@ -16829,7 +16299,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     \$11  = dst_cap_reg;
     casez (msave_state)
       3'h0:
@@ -16842,7 +16312,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     \$12  = src_gt_reg;
     casez (msave_state)
       3'h0:
@@ -16855,12 +16325,12 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     \$13  = index_reg;
     casez (msave_state)
       3'h0:
           if (sub_start) begin
-            \$13  = { 5'h00, \port$1283$20  };
+            \$13  = { 5'h00, \port$1236$20  };
           end
     endcase
     if (rst) begin
@@ -16868,7 +16338,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     \$14  = sub_fault_type;
     casez (msave_state)
       3'h0:
@@ -16893,7 +16363,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$21 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
     \$15  = msave_state;
     casez (msave_state)
       3'h0:
@@ -16934,7 +16404,7 @@ module \ctmm_cap_fpga_top.core.u_save.u_msave (rst, sub_fault, sub_done, \port$1
   end
   assign write_addr = \$2 [31:0];
   assign fault_type_reg = sub_fault_type;
-  assign sub_index = { 5'h00, \port$1283$20  };
+  assign sub_index = { 5'h00, \port$1236$20  };
   assign mem_wr_done = 1'h1;
   assign \dst_cap_reg.word0_gt  = dst_cap_reg[31:0];
   assign \dst_cap_reg.word0_gt.gt_type  = dst_cap_reg[1:0];
@@ -16958,7 +16428,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/tperm.py:27" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy, cr_target, preset, cr_rd_addr, cr_wr_addr, cr_wr_data, cr_wr_en, tperm_fault, fault_type, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$22  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$24  = 0;
   wire [5:0] \$1 ;
   reg [3:0] \$10 ;
   reg [3:0] \$11 ;
@@ -17124,7 +16594,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
   always @(posedge clk)
     target_cap <= \$13 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     (* full_case = 32'd1 *)
     casez (preset_reg)
       4'h0:
@@ -17158,7 +16628,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     is_reserved = 1'h0;
     (* full_case = 32'd1 *)
     casez (preset_reg)
@@ -17193,7 +16663,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     cr_rd_addr = 4'h0;
     casez (tperm_state)
       3'h0:
@@ -17203,7 +16673,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     result_cap = 128'h00000000000000000000000000000000;
     casez (tperm_state)
       3'h0:
@@ -17220,7 +16690,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     cr_wr_addr = 4'h0;
     casez (tperm_state)
       3'h0:
@@ -17234,7 +16704,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     cr_wr_data = 128'h00000000000000000000000000000000;
     casez (tperm_state)
       3'h0:
@@ -17248,7 +16718,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     cr_wr_en = 1'h0;
     casez (tperm_state)
       3'h0:
@@ -17262,7 +16732,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     \$9  = tperm_fault;
     casez (tperm_state)
       3'h0:
@@ -17281,7 +16751,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     \$10  = fault_type;
     casez (tperm_state)
       3'h0:
@@ -17300,7 +16770,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     \$11  = preset_reg;
     casez (tperm_state)
       3'h0:
@@ -17313,7 +16783,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     \$12  = tperm_state;
     casez (tperm_state)
       3'h0:
@@ -17343,7 +16813,7 @@ module \ctmm_cap_fpga_top.core.u_tperm (rst, tperm_start, cr_rd_data, tperm_busy
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$22 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
     \$13  = target_cap;
     casez (tperm_state)
       3'h0:
@@ -17394,7 +16864,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:62" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_valid, nia, tx, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$23  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$25  = 0;
   wire \$1 ;
   wire \$10 ;
   wire \$11 ;
@@ -17487,7 +16957,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     .tx(tx)
   );
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     data = 8'h00;
     (* full_case = 32'd1 *)
     casez (reporter_state)
@@ -17508,7 +16978,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     start = 1'h0;
     (* full_case = 32'd1 *)
     casez (reporter_state)
@@ -17529,7 +16999,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     report_data = 8'h00;
     (* full_case = 32'd1 *)
     casez (reporter_state)
@@ -17555,7 +17025,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     \$15  = report_timer;
     casez (reporter_state)
       2'h0:
@@ -17566,7 +17036,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     \$16  = byte_index;
     (* full_case = 32'd1 *)
     casez (reporter_state)
@@ -17590,7 +17060,7 @@ module \ctmm_cap_fpga_top.reporter (rst, boot_complete, gc_busy, fault, fault_va
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$23 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$25 ) begin end
     \$17  = reporter_state;
     (* full_case = 32'd1 *)
     casez (reporter_state)
@@ -17624,7 +17094,7 @@ endmodule
 (* src = "/home/runner/workspace/ctmm_cap_amaranth/fpga_top.py:18" *)
 (* generator = "Amaranth" *)
 module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
-  reg \$auto$verilog_backend.cc:2355:dump_module$24  = 0;
+  reg \$auto$verilog_backend.cc:2355:dump_module$26  = 0;
   wire \$1 ;
   reg \$10 ;
   wire \$2 ;
@@ -17679,7 +17149,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
   always @(posedge clk)
     uart_tx_state <= \$10 ;
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     (* full_case = 32'd1 *)
     casez (uart_tx_state)
       1'h0:
@@ -17689,7 +17159,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     tx = 1'h1;
     (* full_case = 32'd1 *)
     casez (uart_tx_state)
@@ -17700,7 +17170,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
     endcase
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     \$7  = shift_reg;
     (* full_case = 32'd1 *)
     casez (uart_tx_state)
@@ -17718,7 +17188,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     \$8  = bit_count;
     (* full_case = 32'd1 *)
     casez (uart_tx_state)
@@ -17736,7 +17206,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     \$9  = counter;
     (* full_case = 32'd1 *)
     casez (uart_tx_state)
@@ -17757,7 +17227,7 @@ module \ctmm_cap_fpga_top.reporter.uart (rst, data, start, busy, tx, clk);
     end
   end
   always @* begin
-    if (\$auto$verilog_backend.cc:2355:dump_module$24 ) begin end
+    if (\$auto$verilog_backend.cc:2355:dump_module$26 ) begin end
     \$10  = uart_tx_state;
     (* full_case = 32'd1 *)
     casez (uart_tx_state)

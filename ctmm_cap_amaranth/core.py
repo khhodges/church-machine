@@ -34,7 +34,6 @@ class CTMMCapCore(Elaboratable):
         self.dbg_m_xr13               = Signal(32)
         self.dbg_m_xr14               = Signal(32)
         self.dbg_m_xr15               = Signal(32)
-        self.dbg_cr5_stack_depth      = Signal(8)   # CR5 stack depth (for testbench)
 
         # Direct cap-register write port (testbench only — pre-load a cap register)
         self.dbg_cap_wr_en   = Signal()
@@ -824,36 +823,6 @@ class CTMMCapCore(Elaboratable):
             self.dbg_m_xr14.eq(u_regs.m_xr14),
             self.dbg_m_xr15.eq(u_regs.m_xr15),
         ]
-
-        CR5_STACK_DEPTH = 256
-        cr5_stack = Memory(width=32, depth=CR5_STACK_DEPTH, init=[])
-        m.submodules.cr5_stack = cr5_stack
-        cr5_stack_ptr = Signal(8, init=0)
-        cr5_stack_empty = Signal()
-        cr5_stack_full = Signal()
-        cr5_stack_wr = cr5_stack.write_port()
-        cr5_stack_rd = cr5_stack.read_port(transparent=True)
-
-        m.d.comb += [
-            cr5_stack_empty.eq(cr5_stack_ptr == 0),
-            cr5_stack_full.eq(cr5_stack_ptr == CR5_STACK_DEPTH),
-            cr5_stack_rd.addr.eq(Mux(cr5_stack_ptr > 0, cr5_stack_ptr - 1, 0)),
-            u_return.saved_cr5_gt.eq(Mux(cr5_stack_empty, 0, cr5_stack_rd.data)),
-            cr5_stack_wr.addr.eq(0),
-            self.dbg_cr5_stack_depth.eq(cr5_stack_ptr),
-            cr5_stack_wr.data.eq(0),
-            cr5_stack_wr.en.eq(0),
-        ]
-
-        with m.If(u_call.call_normal_complete & ~u_call.call_fault & ~cr5_stack_full):
-            m.d.comb += [
-                cr5_stack_wr.addr.eq(cr5_stack_ptr),
-                cr5_stack_wr.data.eq(u_call.saved_cr5_gt),
-                cr5_stack_wr.en.eq(1),
-            ]
-            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
-        with m.Elif(u_return.complete & ~u_return.fault_valid & ~cr5_stack_empty):
-            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr - 1)
 
         with m.If(u_decoder.fault_valid):
             m.d.comb += [self.fault.eq(u_decoder.fault), self.fault_valid.eq(1)]

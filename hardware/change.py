@@ -2,7 +2,7 @@ from amaranth import *
 from amaranth.lib.data import View
 
 from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT
 from .mload import ChurchMLoad
 
 
@@ -157,6 +157,22 @@ class ChurchChange(Elaboratable):
         mflag_rd_addr     = Signal(32)
         mflag_val_latched = Signal()
 
+        cr5_install_active = Signal()
+        cr5_cap = Signal(CAP_REG_LAYOUT)
+
+        thr_hdr_view = View(LUMP_HEADER_LAYOUT, thread_hdr_reg)
+        cr5_cap_view = View(CAP_REG_LAYOUT, cr5_cap)
+        cr5_new_gt   = View(GT_LAYOUT, cr5_cap_view.word0_gt)
+        m.d.comb += [
+            cr5_new_gt.slot_id.eq(0),
+            cr5_new_gt.gt_seq.eq(0),
+            cr5_new_gt.gt_type.eq(GT_TYPE_INFORM),
+            cr5_new_gt.perms.eq((1 << PERM_R) | (1 << PERM_W)),
+            cr5_new_gt.b_flag.eq(0),
+            cr5_cap_view.word1_location.eq(thread_base + (17 << 2)),
+            cr5_cap_view.word2_w2.eq(thr_hdr_view.cc - 1),
+        ]
+
         m.d.comb += [
             self.mem_wr_addr.eq(mem_wr_addr_reg),
             self.mem_wr_data.eq(mem_wr_data_reg),
@@ -170,9 +186,10 @@ class ChurchChange(Elaboratable):
             # Default m_flag_restore outputs low (overridden in RESTORE_M_FLAG_LATCH)
             self.m_flag_restore_en.eq(0),
             self.m_flag_restore_val.eq(0),
-            self.cr_wr_addr.eq(u_mload.cr_wr_addr),
-            self.cr_wr_data.eq(u_mload.cr_wr_data),
-            self.cr_wr_en.eq(u_mload.cr_wr_en),
+            # CR5 install override: INSTALL_CR5 takes priority over u_mload writes
+            self.cr_wr_addr.eq(Mux(cr5_install_active, 5, u_mload.cr_wr_addr)),
+            self.cr_wr_data.eq(Mux(cr5_install_active, cr5_cap, u_mload.cr_wr_data)),
+            self.cr_wr_en.eq(u_mload.cr_wr_en | cr5_install_active),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
             self.thread_wr_idx.eq(u_mload.thread_wr_idx),
             self.thread_wr_data.eq(u_mload.thread_wr_data),
@@ -380,7 +397,14 @@ class ChurchChange(Elaboratable):
                 m.d.comb += fetch_thr_hdr_active.eq(1)
                 with m.If(self.mem_rd_valid):
                     m.d.sync += thread_hdr_reg.eq(self.mem_rd_data)
-                    m.next = "COMPLETE"
+                    m.next = "INSTALL_CR5"
+
+            with m.State("INSTALL_CR5"):
+                # Synthesise the Zone ④ heap GT from the incoming thread's lump header
+                # and install it into CR5 (the heap cap).
+                # base = thread_base + 17 words; limit_offset = heapWords - 1.
+                m.d.comb += cr5_install_active.eq(1)
+                m.next = "COMPLETE"
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"

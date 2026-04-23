@@ -118,9 +118,8 @@ All Church instructions that access the namespace route through the **mLoad mast
 2. Pop Word 0 (caller's E-GT) and Word 1 (NIA | machine indicators)
 3. mLoad the caller's E-GT: version check + MAC + G-bit reset → FAULT on failure
 4. Re-run NS split on caller's NS entry → re-derive CR6 (caller c-list) and CR14 (caller code)
-5. Restore CR5 from cr5_stack (pushed by CALL)
-6. Restore PC from NIA (Word 1); restore machine indicators from Word 1
-7. Apply mask[11:0]: all CRs with mask bit set written to NULL in one parallel clock edge
+5. Restore PC from NIA (Word 1); restore machine indicators from Word 1
+6. Apply mask[11:0]: all CRs with mask bit set written to NULL in one parallel clock edge
 
 **Mnemonic**: `RETURN [mask]` — mask is a 12-bit literal in instruction bits [11:0]; mask=0 is the no-op default (`RETURN` with no argument)
 
@@ -129,7 +128,7 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **Permission Check** | None |
 | **E-GT Revalidation** | mLoad on caller's E-GT: version, MAC, G-bit reset (FAULT on failure) |
 | **CR6 / CR14 Restore** | Re-derived from caller's NS entry via NS split — not stored directly in frame |
-| **CR5 Restore** | Popped from cr5_stack (pushed by CALL) |
+| **CR5** | Thread register — installed by CHANGE from Zone ④ bounds; not touched by CALL/RETURN |
 | **PC Restore** | NIA from Word 1 |
 | **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, stackSpace, etc.) |
 | **Mask** | bits [11:0], bit N=1 → CR_N to NULL after frame restoration. Bit 6 reserved (CR6 always restored from E-GT). All marked CRs cleared in one parallel clock edge — zero overhead. mask=0 → bare `RETURN`, no scrub. |

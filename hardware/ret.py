@@ -39,8 +39,6 @@ class ChurchReturn(Elaboratable):
         self.mload_fault = Signal()
         self.mload_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
-        self.saved_cr5_gt = Signal(32)
-
         self.lambda_active = Signal()
         self.lambda_pc = Signal(32)
         self.lambda_clear = Signal()
@@ -127,11 +125,11 @@ class ChurchReturn(Elaboratable):
         m.d.comb += [
             self.mload_start.eq(0),
             self.mload_cr_src.eq(0),
-            self.mload_cr_dst.eq(CR5_HEAP),
+            self.mload_cr_dst.eq(0),
             self.mload_index.eq(0),
-            self.mload_direct.eq(1),
-            self.mload_direct_gt.eq(self.saved_cr5_gt),
-            self.mload_m_elevated.eq(1),
+            self.mload_direct.eq(0),
+            self.mload_direct_gt.eq(0),
+            self.mload_m_elevated.eq(0),
         ]
 
         m.d.comb += [
@@ -237,24 +235,7 @@ class ChurchReturn(Elaboratable):
                 ]
                 with m.If(self.mem_rd_valid):
                     m.d.sync += callee_egt_latched.eq(self.mem_rd_data)
-                    m.d.sync += sub_start_reg.eq(1)
-                    m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
-                    m.next = "RESTORE_CR5"
-
-            with m.State("RESTORE_CR5"):
-                m.d.comb += self.mload_start.eq(sub_start_reg)
-                mload_wait_body(
-                    m,
-                    sub_start_reg=sub_start_reg,
-                    done_sig=self.mload_done,
-                    fault_sig=self.mload_fault,
-                    fault_type_sig=self.mload_fault_type,
-                    sub_done_latched=sub_done_latched,
-                    sub_fault_latched=sub_fault_latched,
-                    fault_latched=fault_flag,
-                    fault_type_latched=fault_latched,
-                    done_next="POP_STACK",
-                )
+                    m.next = "POP_STACK"
 
             with m.State("POP_STACK"):
                 m.d.comb += [

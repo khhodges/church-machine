@@ -20,11 +20,6 @@ class ChurchCall(Elaboratable):
         self.call_fault = Signal()
         self.fault_type = Signal(5)      # 5 bits: FaultType 0x0–0x12
 
-        # Snapshot of caller's CR5 GT — consumed by core to save onto cr5_stack
-        # at call_complete so ChurchReturn can restore it.  Wired combinatorially
-        # from the cr5_heap input (always valid, core samples it on call_complete).
-        self.saved_cr5_gt = Signal(GT_LAYOUT)
-
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
         self.cr_wr_addr = Signal(4)
@@ -228,9 +223,6 @@ class ChurchCall(Elaboratable):
             self.mem_wr_addr.eq(local_mem_wr_addr),
             self.mem_wr_data.eq(local_mem_wr_data),
             self.mem_wr_en.eq(local_mem_wr_en),
-            # saved_cr5_gt: expose caller's CR5 GT so core can snapshot it onto
-            # cr5_stack when call_complete asserts.  Always driven combinatorially.
-            self.saved_cr5_gt.eq(View(CAP_REG_LAYOUT, self.cr5_heap).word0_gt),
         ]
 
         # NS lump header fetch

@@ -32,7 +32,7 @@ Word 1:  NIA | packed machine indicators
 | **6. PC Reset** | PC = 0 |
 
 **Registers not touched by CALL**: DR0–DR15, CR0–CR5, CR7–CR13, CR15.
-The callee inherits all of these from the caller unchanged. Exception: CR5 is simultaneously pushed to cr5_stack by CALL and restored from cr5_stack by RETURN — the caller's CR5 always survives regardless of callee behaviour.
+The callee inherits all of these from the caller unchanged. CR5 (Heap GT) belongs to the thread and is installed by CHANGE from the incoming thread's Zone ④ bounds — it is not saved or restored by CALL/RETURN.
 
 ---
 

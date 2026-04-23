@@ -57,12 +57,6 @@ class ChurchTperm(Elaboratable):
                 m.d.comb += new_perms.eq(PERM_MASK_E)
             with m.Case(TpermPreset.LS):
                 m.d.comb += new_perms.eq(PERM_MASK_L | PERM_MASK_S)
-            with m.Case(TpermPreset.LE):
-                m.d.comb += new_perms.eq(PERM_MASK_L | PERM_MASK_E)
-            with m.Case(TpermPreset.SE):
-                m.d.comb += new_perms.eq(PERM_MASK_S | PERM_MASK_E)
-            with m.Case(TpermPreset.LSE):
-                m.d.comb += new_perms.eq(PERM_MASK_L | PERM_MASK_S | PERM_MASK_E)
             with m.Default():
                 m.d.comb += [new_perms.eq(0), is_reserved.eq(1)]
 

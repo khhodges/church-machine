@@ -38,7 +38,7 @@ LAMBDA CRn
 1. LAMBDA-active flag is NOT set (CALL cleared it)
 2. Pop stack frame
 3. Check 1-bit tag on frame:
-   - Tag=0 (CALL frame): pop [E-GT · machine word]; re-derive CR6/CR14 via mLoad using E-GT; restore CR5 from cr5_stack; check E permission; restore PC from machine word
+   - Tag=0 (CALL frame): pop [E-GT · machine word]; re-derive CR6/CR14 via mLoad using E-GT; check E permission; restore PC from machine word
    - Tag=1 (LAMBDA frame): restore PC only
 
 ## Stack Frame 1-Bit Tag
@@ -46,7 +46,7 @@ LAMBDA CRn
 Every frame on the capability stack carries a 1-bit tag:
 | Tag | Type | Contents | RETURN behavior |
 |-----|------|----------|-----------------|
-| 0 | CALL | [E-GT · machine word] — 2 words | Full domain restoration — re-derives CR6, CR14 via mLoad; restores CR5 from cr5_stack on RETURN |
+| 0 | CALL | [E-GT · machine word] — 2 words | Full domain restoration — re-derives CR6, CR14 via mLoad on RETURN |
 | 1 | LAMBDA | PC only | Simple PC restoration |
 
 The tag makes the thread's execution history **self-describing**. When resuming a suspended thread, the stack tells you exactly what kind of return each frame requires. No external metadata needed.

@@ -170,16 +170,18 @@ This is intentional: the simulator is a high-level behavioral model; the hardwar
 
 ## GAP-08 — ctmm_cap_amaranth vs hardware/: divergent RETURN restore scope  
 **Severity**: MODERATE (internal between the two Amaranth targets)  
-**Files**: `ctmm_cap_amaranth/ret.py` vs `hardware/ret.py`
+**Files**: `ctmm_cap_amaranth/ret.py` vs `hardware/ret.py`  
+**Updated**: Task #451 removed the incorrect CR5 save/restore from both branches.
 
 | | hardware/ret.py | ctmm_cap_amaranth/ret.py |
 |---|---|---|
-| Registers restored via mLoad | CR5 (Heap) only | CR5 + CR6 + CR7 (Triple-restore) |
-| GT seq revocation check | CR5 only | CR5, CR6, CR7 all checked |
-| E-perm check on saved CR6 | Not performed | Yes (`saved_cr6_has_e`) |
+| CR5 restored by RETURN | No (installed by CHANGE from Zone ④) | No (installed by CHANGE from Zone ④) |
+| Registers restored via mLoad | None (cload unit handles CR6/CR14) | CR6 + CR7 (Phase1 + Phase2) |
+| GT seq revocation check | Via separate cload unit | CR6, CR7 both checked |
+| E-perm check on saved CR6 | Not performed in ret.py | Yes (`saved_cr6_has_e`) |
 | Stack frame model | 2-word (Frame word + E-GT) | `return_cap` view descriptor |
 
-The CAP branch is significantly more rigorous (matches a full trust re-establishment on every RETURN). The main hardware branch only re-validates the heap cap.
+The CAP branch remains more rigorous for CR6/CR7 trust re-establishment on RETURN. The hardware branch delegates to a separate cload unit.
 
 ---
 

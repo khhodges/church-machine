@@ -38,8 +38,6 @@ class CTMMReturn(Elaboratable):
         self.g_bit_reset = Signal()
         self.g_bit_addr = Signal(64)
 
-        self.saved_cr5_gt = Signal(64)
-
     def elaborate(self, platform):
         m = Module()
 
@@ -63,8 +61,6 @@ class CTMMReturn(Elaboratable):
 
         saved_cr6_has_e = saved_cr6_gt_view.perms[PERM_E]
 
-        CR5_SCRATCH = 5
-
         phase = Signal(2)
         fault_flag = Signal()
         fault_latched = Signal(4)
@@ -82,11 +78,6 @@ class CTMMReturn(Elaboratable):
         mload_dst = Signal(4)
         mload_direct_gt = Signal(64)
         with m.Switch(phase):
-            with m.Case(0):
-                m.d.comb += [
-                    mload_dst.eq(CR5_SCRATCH),
-                    mload_direct_gt.eq(self.saved_cr5_gt),
-                ]
             with m.Case(1):
                 m.d.comb += [
                     mload_dst.eq(CR_CLIST),
@@ -132,7 +123,7 @@ class CTMMReturn(Elaboratable):
         with m.FSM(name="ret") as fsm:
             with m.State("IDLE"):
                 m.d.sync += [fault_flag.eq(0), fault_latched.eq(FaultType.NONE)]
-                m.d.sync += [phase.eq(0), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
+                m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
                 with m.If(self.return_start):
                     m.next = "READ_SRC"
 
@@ -149,33 +140,7 @@ class CTMMReturn(Elaboratable):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.PERM_E)]
                     m.next = "FAULT"
                 with m.Else():
-                    m.d.sync += sub_start_reg.eq(1)
-                    m.next = "PHASE0"
-
-            with m.State("PHASE0"):
-                m.d.sync += sub_start_reg.eq(0)
-                with m.If(u_mload.sub_done):
-                    m.d.sync += sub_done_latched.eq(1)
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += sub_fault_latched.eq(1)
-                with m.If(sub_fault_latched):
-                    m.next = "PHASE0_FAULT"
-                with m.Elif(sub_done_latched):
-                    m.next = "PHASE0_DONE"
-
-            with m.State("PHASE0_FAULT"):
-                m.d.comb += [
-                    local_cr_wr_en.eq(1),
-                    local_cr_wr_addr.eq(CR5_SCRATCH),
-                    local_cr_wr_data.eq(0),
-                ]
-                m.d.sync += [sub_done_latched.eq(0), sub_fault_latched.eq(0)]
-                m.d.sync += phase.eq(1)
-                m.next = "CHECK_CR6_E"
-
-            with m.State("PHASE0_DONE"):
-                m.d.sync += [phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0)]
-                m.next = "CHECK_CR6_E"
+                    m.next = "CHECK_CR6_E"
 
             with m.State("CHECK_CR6_E"):
                 with m.If(~saved_cr6_has_e):

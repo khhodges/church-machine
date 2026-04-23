@@ -100,9 +100,10 @@ RETURN [mask]
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
-3. Restore CR5 from cr5_stack (pushed by CALL)
-4. Restore PC from NIA and machine indicators from Word 1
-5. Apply mask — all marked CRs written to NULL in **one parallel clock edge** (mask bits fan into CR register-file write enables; zero overhead regardless of how many bits are set)
+3. Restore PC from NIA and machine indicators from Word 1
+4. Apply mask — all marked CRs written to NULL in **one parallel clock edge** (mask bits fan into CR register-file write enables; zero overhead regardless of how many bits are set)
+
+Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds when a thread is resumed; it is not saved or restored by CALL/RETURN.
 
 **Why the mask is programmer-declared**: GTs are first-class values — a callee may legitimately return a GT in CR0. Only the programmer knows which CRs carry return values vs. internal working state. The mask is emitted as a compile-time literal by the [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html) compiler from a `clear:` annotation.
 

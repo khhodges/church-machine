@@ -78,17 +78,13 @@ module ctmm_return
     // Thread update interface (driven by mLoad)
     output logic        thread_wr_en,
     output logic [3:0]  thread_wr_idx,
-    output logic [31:0] thread_wr_data,
-
-    // Saved CR5 GT input - from call stack for restoration
-    input  golden_token_t saved_cr5_gt
+    output logic [31:0] thread_wr_data
 );
 
     // ========================================================================
     // Constants
     // ========================================================================
     
-    localparam logic [3:0] CR5_SAVED = 4'd5;
     localparam logic [3:0] CR6_CLIST = 4'd6;
     localparam logic [3:0] CR14_CODE  = 4'd14;
     
@@ -100,9 +96,6 @@ module ctmm_return
         IDLE,
         READ_SRC,
         CHECK_PERM,
-        PHASE0_START,
-        PHASE0_WAIT,
-        PHASE0_DONE,
         CHECK_CR6_E,
         PHASE1_START,
         PHASE1_WAIT,
@@ -166,17 +159,15 @@ module ctmm_return
     // Phase Tracking
     // ========================================================================
     
-    logic [1:0] phase;  // 0 = Phase 0 (restore CR5), 1 = Phase 1 (restore CR6), 2 = Phase 2 (restore CR7)
+    logic [1:0] phase;  // 0 = Phase 1 (restore CR6), 1 = Phase 2 (restore CR7)
     
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             phase <= 2'd0;
         else if (state == IDLE)
             phase <= 2'd0;
-        else if (state == PHASE0_DONE)
-            phase <= 2'd1;
         else if (state == PHASE1_DONE)
-            phase <= 2'd2;
+            phase <= 2'd1;
     end
     
     // ========================================================================
@@ -237,7 +228,6 @@ module ctmm_return
             fault_flag <= 1'b1;
             fault_latched <= sub_fault_type;
         end
-        // Phase 0 (CR5) fault is NOT fatal - handled separately
     end
     
     // ========================================================================
@@ -261,10 +251,6 @@ module ctmm_return
     always_comb begin
         case (phase)
             2'd0: begin
-                mload_dst = CR5_SAVED;
-                mload_direct_gt = saved_cr5_gt;
-            end
-            2'd1: begin
                 mload_dst = CR6_CLIST;
                 mload_direct_gt = saved_cr6_gt;
             end
@@ -278,7 +264,7 @@ module ctmm_return
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             sub_start_reg <= 1'b0;
-        else if ((state == PHASE0_START) || (state == PHASE1_START) || (state == PHASE2_START))
+        else if ((state == PHASE1_START) || (state == PHASE2_START))
             sub_start_reg <= 1'b1;
         else
             sub_start_reg <= 1'b0;
@@ -288,7 +274,7 @@ module ctmm_return
         if (!rst_n) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
-        end else if (state == IDLE || state == PHASE0_START || state == PHASE1_START || state == PHASE2_START) begin
+        end else if (state == IDLE || state == PHASE1_START || state == PHASE2_START) begin
             sub_done_latched <= 1'b0;
             sub_fault_latched <= 1'b0;
         end else begin
@@ -333,24 +319,9 @@ module ctmm_return
         .thread_wr_data (thread_wr_data)
     );
     
-    // ========================================================================
-    // Local CR Write Mux (for CR5 fault clear and CR6 M elevation)
-    // ========================================================================
-    
-    logic local_cr_wr_en;
-    logic [3:0] local_cr_wr_addr;
-    capability_reg_t local_cr_wr_data;
-    
-    logic cr5_fault_clear;
-    assign cr5_fault_clear = (state == PHASE0_DONE) && sub_fault_latched;
-    
-    assign local_cr_wr_en   = cr5_fault_clear;
-    assign local_cr_wr_addr = CR5_SAVED;
-    assign local_cr_wr_data = '0;
-    
-    assign cr_wr_en   = mload_cr_wr_en | local_cr_wr_en;
-    assign cr_wr_addr = local_cr_wr_en ? local_cr_wr_addr : mload_cr_wr_addr;
-    assign cr_wr_data = local_cr_wr_en ? local_cr_wr_data : mload_cr_wr_data;
+    assign cr_wr_en   = mload_cr_wr_en;
+    assign cr_wr_addr = mload_cr_wr_addr;
+    assign cr_wr_data = mload_cr_wr_data;
     
     // ========================================================================
     // Next State Logic
@@ -371,19 +342,8 @@ module ctmm_return
                 if (is_null_cap || !has_e_perm)
                     next_state = FAULT;
                 else
-                    next_state = PHASE0_START;
+                    next_state = CHECK_CR6_E;
             end
-            
-            PHASE0_START: next_state = PHASE0_WAIT;
-            
-            PHASE0_WAIT: begin
-                if (sub_fault_latched)
-                    next_state = PHASE0_DONE;  // CR5 fault is tolerant - clear and continue
-                else if (sub_done_latched)
-                    next_state = PHASE0_DONE;
-            end
-            
-            PHASE0_DONE: next_state = CHECK_CR6_E;
             
             CHECK_CR6_E: begin
                 if (!saved_cr6_has_e)

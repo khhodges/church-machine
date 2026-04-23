@@ -3,13 +3,6 @@ attribute \src "/home/runner/workspace/church_machine/core.py:74"
 attribute \top 1
 module \top
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:563"
-  memory width 32 size 256 \cr5_stack
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:60"
-  attribute \init 3'000
-  wire width 3 \boot_state
-
   attribute \src "/home/runner/workspace/church_machine/core.py:118"
   attribute \init 3'000
   wire width 3 \boot_state_reg
@@ -27,7 +20,7 @@ module \top
   wire width 4 \flags
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:52"
-  wire width 4 \flags$29
+  wire width 4 \flags$27
 
   attribute \src "/home/runner/workspace/church_machine/core.py:158"
   wire width 1 \cond_exec_enable
@@ -75,22 +68,22 @@ module \top
   wire width 4 \cr_src
 
   attribute \src "/home/runner/workspace/church_machine/save.py:20"
-  wire width 4 \cr_rd_addr$45
+  wire width 4 \cr_rd_addr$43
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:18"
-  wire width 4 \cr_rd_addr$46
+  wire width 4 \cr_rd_addr$44
 
   attribute \src "/home/runner/workspace/church_machine/call.py:19"
-  wire width 4 \cr_rd_addr$47
+  wire width 4 \cr_rd_addr$45
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:19"
-  wire width 4 \cr_rd_addr$48
+  wire width 4 \cr_rd_addr$46
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:17"
-  wire width 4 \cr_rd_addr$49
+  wire width 4 \cr_rd_addr$47
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:24"
-  wire width 4 \cr_rd_addr$50
+  wire width 4 \cr_rd_addr$48
 
   attribute \src "/home/runner/workspace/church_machine/core.py:202"
   wire width 32 \perm_gt_sig
@@ -105,7 +98,7 @@ module \top
   wire width 32 \gt_in
 
   attribute \src "/home/runner/workspace/church_machine/perm_check.py:11"
-  wire width 6 \required_perms$55
+  wire width 6 \required_perms$53
 
   attribute \src "/home/runner/workspace/church_machine/perm_check.py:12"
   wire width 1 \check_valid
@@ -113,17 +106,20 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/perm_check.py:34"
   wire width 1 \check_domain_purity
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:64"
-  wire width 1 \gc_busy
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:65"
-  wire width 32 \gc_garbage_count
-
   attribute \src "/home/runner/workspace/church_machine/core.py:256"
   wire width 32 \cr_rd_data_gt
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:53"
+  wire width 32 \clist_addr
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:54"
+  wire width 1 \clist_rd_en
+
   attribute \src "/home/runner/workspace/church_machine/core.py:56"
   wire width 32 \clist_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:57"
+  wire width 1 \clist_wr_en
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:53"
   wire width 4 \flags_in
@@ -132,7 +128,7 @@ module \top
   wire width 1 \flags_wr_en
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:56"
-  wire width 1 \clear_all$64
+  wire width 1 \clear_all$63
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:48"
   wire width 4 \dr_wr_addr
@@ -150,50 +146,50 @@ module \top
   wire width 1 \cr_wr_en
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:24"
-  wire width 1 \cr_wr_en$70
+  wire width 1 \cr_wr_en$69
 
   attribute \src "/home/runner/workspace/church_machine/call.py:23"
-  wire width 1 \cr_wr_en$71
+  wire width 1 \cr_wr_en$70
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:22"
-  wire width 1 \cr_wr_en$72
+  wire width 1 \cr_wr_en$71
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:20"
-  wire width 4 \cr_wr_addr$73
+  wire width 4 \cr_wr_addr$72
 
   attribute \src "/home/runner/workspace/church_machine/call.py:21"
-  wire width 4 \cr_wr_addr$74
+  wire width 4 \cr_wr_addr$73
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:22"
-  wire width 4 \cr_wr_addr$75
+  wire width 4 \cr_wr_addr$74
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:27"
-  wire width 4 \cr_wr_addr$76
+  wire width 4 \cr_wr_addr$75
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:24"
   wire width 128 \cr_wr_data
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:21"
-  wire width 128 \cr_wr_data$78
+  wire width 128 \cr_wr_data$77
 
   attribute \src "/home/runner/workspace/church_machine/call.py:22"
-  wire width 128 \cr_wr_data$79
+  wire width 128 \cr_wr_data$78
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
-  wire width 128 \cr_wr_data$80
+  wire width 128 \cr_wr_data$79
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 128 \cr_wr_data$81
+  wire width 128 \cr_wr_data$80
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:25"
-  wire width 1 \cr_wr_en$82
+  wire width 1 \cr_wr_en$81
 
   attribute \src "/home/runner/workspace/church_machine/core.py:113"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \nia_reg
 
   attribute \src "/home/runner/workspace/church_machine/core.py:71"
-  wire width 4 \flags$84
+  wire width 4 \flags$83
 
   attribute \src "/home/runner/workspace/church_machine/core.py:345"
   wire width 32 \ns_gt
@@ -233,66 +229,6 @@ module \top
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr7_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:397"
-  wire width 1 \switch_change_active
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:403"
-  wire width 32 \switch_src_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:406"
-  wire width 3 \effective_target
-
-  attribute \src "/home/runner/workspace/church_machine/decoder.py:37"
-  wire width 4 \switch_target
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr8_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr8_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr9_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr9_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr10_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr10_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr11_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr11_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr12_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr12_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr13_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr13_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr14_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr14_wr_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  wire width 1 \rt_cr15_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 32 \rt_cr15_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:42"
   wire width 1 \cr0_gt_wr_en
@@ -429,8 +365,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:42"
   wire width 1 \cr8_gt_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr8_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr8_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr8_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:42"
   wire width 1 \cr9_gt_wr_en
@@ -438,8 +380,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr9_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr9_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr9_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr9_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr9_wr_gt
@@ -450,8 +398,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr10_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr10_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr10_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr10_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr10_wr_gt
@@ -462,8 +416,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr11_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr11_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr11_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr11_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr11_wr_gt
@@ -474,8 +434,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr12_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr12_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr12_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr12_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr12_wr_gt
@@ -486,8 +452,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr13_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr13_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr13_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr13_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr13_wr_gt
@@ -498,8 +470,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
   wire width 1 \boot_cr14_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr14_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr14_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr14_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 32 \boot_cr14_wr_gt
@@ -507,8 +485,14 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:42"
   wire width 1 \cr15_gt_wr_en
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:394"
+  wire width 1 \rt_cr15_wr_en
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 32 \cr15_gt_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 32 \rt_cr15_wr_gt
 
   attribute \src "/home/runner/workspace/church_machine/core.py:180"
   wire width 1 \call_start_sig
@@ -517,7 +501,7 @@ module \top
   wire width 1 \call_start
 
   attribute \src "/home/runner/workspace/church_machine/call.py:11"
-  wire width 4 \cr_src$192
+  wire width 4 \cr_src$187
 
   attribute \src "/home/runner/workspace/church_machine/call.py:12"
   wire width 17 \index
@@ -532,7 +516,7 @@ module \top
   wire width 15 \call_mask
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 128 \cr_rd_data$197
+  wire width 128 \cr_rd_data$192
 
   attribute \src "/home/runner/workspace/church_machine/core.py:181"
   wire width 1 \ret_start_sig
@@ -541,12 +525,12 @@ module \top
   wire width 1 \return_start
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:11"
-  wire width 3 \cr_src$200
+  wire width 3 \cr_src$195
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 128 \cr_rd_data$201
+  wire width 128 \cr_rd_data$196
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:41"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:39"
   attribute \init 1'0
   wire width 1 \lambda_active
 
@@ -554,7 +538,7 @@ module \top
   attribute \init 1'0
   wire width 1 \lambda_active_reg
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:42"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:40"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \lambda_pc
 
@@ -572,7 +556,7 @@ module \top
   wire width 4 \cr_dst
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 128 \cr_rd_data$209
+  wire width 128 \cr_rd_data$204
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:22"
   wire width 32 \saved_nia
@@ -584,7 +568,7 @@ module \top
   wire width 1 \tperm_start
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:11"
-  wire width 4 \cr_target$213
+  wire width 4 \cr_target$208
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:12"
   wire width 4 \preset
@@ -593,31 +577,31 @@ module \top
   wire width 4 \tperm_preset
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 128 \cr_rd_data$216
+  wire width 128 \cr_rd_data$211
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:466"
+  attribute \src "/home/runner/workspace/church_machine/core.py:467"
   wire width 1 \save_start_sig
 
   attribute \src "/home/runner/workspace/church_machine/save.py:11"
   wire width 1 \save_start
 
   attribute \src "/home/runner/workspace/church_machine/save.py:12"
-  wire width 4 \cr_src$219
+  wire width 4 \cr_src$214
 
   attribute \src "/home/runner/workspace/church_machine/save.py:13"
-  wire width 4 \cr_dst$220
+  wire width 4 \cr_dst$215
 
   attribute \src "/home/runner/workspace/church_machine/save.py:14"
-  wire width 17 \index$221
+  wire width 17 \index$216
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 128 \cr_rd_data$222
+  wire width 128 \cr_rd_data$217
 
   attribute \src "/home/runner/workspace/church_machine/save.py:33"
   wire width 128 \cr15_namespace
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 128 \cr15_namespace$224
+  wire width 128 \cr15_namespace$219
 
   attribute \src "/home/runner/workspace/church_machine/save.py:26"
   wire width 1 \mem_wr_done
@@ -628,75 +612,38 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/save.py:31"
   wire width 1 \mem_rd_valid
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:482"
+  attribute \src "/home/runner/workspace/church_machine/core.py:483"
   wire width 1 \load_start_sig
 
   attribute \src "/home/runner/workspace/church_machine/load.py:8"
   wire width 1 \load_start
 
   attribute \src "/home/runner/workspace/church_machine/load.py:9"
-  wire width 4 \cr_src$230
+  wire width 4 \cr_src$225
 
   attribute \src "/home/runner/workspace/church_machine/load.py:10"
-  wire width 4 \cr_dst$231
+  wire width 4 \cr_dst$226
 
   attribute \src "/home/runner/workspace/church_machine/load.py:11"
-  wire width 17 \index$232
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:566"
-  wire width 1 \cr5_stack_empty
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:565"
-  attribute \init 8'00000000
-  wire width 8 \cr5_stack_ptr
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:567"
-  wire width 1 \cr5_stack_full
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:569"
-  wire width 8 \cr5_stack_r_addr
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:39"
-  wire width 32 \saved_cr5_gt
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:569"
-  wire width 32 \cr5_stack_r_data
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  wire width 8 \cr5_stack_w_addr
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  wire width 32 \cr5_stack_w_data
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  wire width 1 \cr5_stack_w_en
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:15"
-  wire width 1 \call_complete
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:16"
-  wire width 1 \call_fault
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:13"
-  wire width 1 \complete
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:14"
-  wire width 1 \fault_valid$245
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:37"
-  wire width 32 \saved_cr5_gt$246
+  wire width 17 \index$227
 
   attribute \src "/home/runner/workspace/church_machine/decoder.py:40"
-  wire width 1 \fault_valid$247
+  wire width 1 \fault_valid$228
 
   attribute \src "/home/runner/workspace/church_machine/perm_check.py:32"
-  wire width 1 \fault_valid$248
+  wire width 1 \fault_valid$229
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:14"
   wire width 1 \lambda_fault
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:16"
   wire width 1 \tperm_fault
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:16"
+  wire width 1 \call_fault
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:14"
+  wire width 1 \fault_valid$233
 
   attribute \src "/home/runner/workspace/church_machine/save.py:17"
   wire width 1 \save_fault
@@ -705,40 +652,40 @@ module \top
   wire width 1 \load_fault
 
   attribute \src "/home/runner/workspace/church_machine/decoder.py:39"
-  wire width 4 \fault$253
+  wire width 4 \fault$236
 
   attribute \src "/home/runner/workspace/church_machine/perm_check.py:31"
   wire width 4 \fault_type
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:15"
-  wire width 4 \fault_type$255
+  wire width 4 \fault_type$238
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:17"
-  wire width 4 \fault_type$256
+  wire width 4 \fault_type$239
 
   attribute \src "/home/runner/workspace/church_machine/call.py:17"
-  wire width 4 \fault_type$257
+  wire width 4 \fault_type$240
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:15"
-  wire width 4 \fault_type$258
+  wire width 4 \fault_type$241
 
   attribute \src "/home/runner/workspace/church_machine/save.py:18"
-  wire width 4 \fault_type$259
+  wire width 4 \fault_type$242
 
   attribute \src "/home/runner/workspace/church_machine/load.py:15"
-  wire width 4 \fault_type$260
+  wire width 4 \fault_type$243
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 128 \cr_rd_data$261
+  wire width 128 \cr_rd_data$244
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 128 \cr15_namespace$262
+  wire width 128 \cr15_namespace$245
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:35"
-  wire width 32 \mem_rd_data$263
+  wire width 32 \mem_rd_data$246
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:36"
-  wire width 1 \mem_rd_valid$264
+  wire width 1 \mem_rd_valid$247
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:12"
   wire width 1 \sub_start
@@ -783,46 +730,46 @@ module \top
   wire width 1 \mload_m_elevated
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:27"
-  wire width 1 \mload_start$279
+  wire width 1 \mload_start$262
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:28"
-  wire width 4 \mload_cr_src$280
+  wire width 4 \mload_cr_src$263
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:29"
-  wire width 4 \mload_cr_dst$281
+  wire width 4 \mload_cr_dst$264
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:30"
-  wire width 17 \mload_index$282
+  wire width 17 \mload_index$265
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:31"
-  wire width 1 \mload_direct$283
+  wire width 1 \mload_direct$266
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:32"
-  wire width 32 \mload_direct_gt$284
+  wire width 32 \mload_direct_gt$267
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:33"
-  wire width 1 \mload_m_elevated$285
+  wire width 1 \mload_m_elevated$268
 
   attribute \src "/home/runner/workspace/church_machine/load.py:17"
-  wire width 1 \mload_start$286
+  wire width 1 \mload_start$269
 
   attribute \src "/home/runner/workspace/church_machine/load.py:18"
-  wire width 4 \mload_cr_src$287
+  wire width 4 \mload_cr_src$270
 
   attribute \src "/home/runner/workspace/church_machine/load.py:19"
-  wire width 4 \mload_cr_dst$288
+  wire width 4 \mload_cr_dst$271
 
   attribute \src "/home/runner/workspace/church_machine/load.py:20"
-  wire width 17 \mload_index$289
+  wire width 17 \mload_index$272
 
   attribute \src "/home/runner/workspace/church_machine/load.py:21"
-  wire width 1 \mload_direct$290
+  wire width 1 \mload_direct$273
 
   attribute \src "/home/runner/workspace/church_machine/load.py:22"
-  wire width 32 \mload_direct_gt$291
+  wire width 32 \mload_direct_gt$274
 
   attribute \src "/home/runner/workspace/church_machine/load.py:23"
-  wire width 1 \mload_m_elevated$292
+  wire width 1 \mload_m_elevated$275
 
   attribute \src "/home/runner/workspace/church_machine/call.py:33"
   wire width 1 \mload_done
@@ -843,28 +790,25 @@ module \top
   wire width 4 \sub_fault_type
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:35"
-  wire width 1 \mload_done$299
+  wire width 1 \mload_done$282
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:36"
-  wire width 1 \mload_fault$300
+  wire width 1 \mload_fault$283
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:37"
-  wire width 4 \mload_fault_type$301
+  wire width 4 \mload_fault_type$284
 
   attribute \src "/home/runner/workspace/church_machine/load.py:25"
   wire width 1 \mload_busy
 
   attribute \src "/home/runner/workspace/church_machine/load.py:26"
-  wire width 1 \mload_done$303
+  wire width 1 \mload_done$286
 
   attribute \src "/home/runner/workspace/church_machine/load.py:27"
-  wire width 1 \mload_fault$304
+  wire width 1 \mload_fault$287
 
   attribute \src "/home/runner/workspace/church_machine/load.py:28"
-  wire width 4 \mload_fault_type$305
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:42"
-  wire width 1 \dmem_rd_en
+  wire width 4 \mload_fault_type$288
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:34"
   wire width 1 \mem_rd_en
@@ -873,10 +817,10 @@ module \top
   wire width 1 \mem_wr_en
 
   attribute \src "/home/runner/workspace/church_machine/save.py:25"
-  wire width 1 \mem_wr_en$309
+  wire width 1 \mem_wr_en$291
 
   attribute \src "/home/runner/workspace/church_machine/save.py:29"
-  wire width 1 \mem_rd_en$310
+  wire width 1 \mem_rd_en$292
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:33"
   wire width 32 \mem_addr
@@ -888,10 +832,13 @@ module \top
   wire width 32 \mem_wr_addr
 
   attribute \src "/home/runner/workspace/church_machine/save.py:24"
-  wire width 32 \mem_wr_data$314
+  wire width 32 \mem_wr_data$296
 
   attribute \src "/home/runner/workspace/church_machine/save.py:28"
   wire width 32 \mem_rd_addr
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:50"
+  wire width 96 \ns_wr_data
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:16"
   wire width 1 \reboot_request
@@ -900,21 +847,21 @@ module \top
   wire width 1 \nia_set
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:24"
-  wire width 1 \nia_set$318
+  wire width 1 \nia_set$301
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:39"
-  wire width 1 \nia_set$319
+  attribute \src "/home/runner/workspace/church_machine/call.py:37"
+  wire width 1 \nia_set$302
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:21"
   wire width 32 \nia_value
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:25"
-  wire width 32 \nia_value$321
+  wire width 32 \nia_value$304
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:40"
-  wire width 32 \nia_value$322
+  attribute \src "/home/runner/workspace/church_machine/call.py:38"
+  wire width 32 \nia_value$305
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:43"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:41"
   wire width 1 \lambda_clear
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:13"
@@ -926,70 +873,68 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/core.py:39"
   wire width 1 input 1  \imem_valid
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:59"
-  wire width 1 input 2  \boot_start
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:49"
-  wire width 96 input 3  \ns_rd_data
-
   attribute \src "/home/runner/workspace/church_machine/mload.py:35"
-  wire width 32 input 4  \dmem_rd_data
+  wire width 32 input 2  \dmem_rd_data
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:59"
+  wire width 1 input 3  \boot_start
 
   attribute \src "/home/runner/workspace/church_machine/core.py:63"
-  wire width 1 input 5  \gc_start
+  wire width 1 input 4  \gc_start
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283"
-  wire width 1 input 6  \clk
+  wire width 1 input 5  \clk
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_ir.py:283"
-  wire width 1 input 7  \rst
+  wire width 1 input 6  \rst
 
   attribute \src "/home/runner/workspace/church_machine/core.py:113"
   attribute \init 32'00000000000000000000000000000000
-  wire width 32 output 8  \imem_addr
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:61"
-  wire width 1 output 9  \boot_complete
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:40"
-  wire width 32 output 10  \ns_addr
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
-  wire width 1 output 11  \ns_rd_en
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
-  wire width 1 output 12  \ns_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:50"
-  wire width 96 output 13  \ns_wr_data
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:40"
-  wire width 32 output 14  \clist_addr
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
-  wire width 1 output 15  \clist_rd_en
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
-  wire width 1 output 16  \clist_wr_en
+  wire width 32 output 7  \imem_addr
 
   attribute \src "/home/runner/workspace/church_machine/core.py:41"
-  wire width 32 output 17  \dmem_addr
+  wire width 32 output 8  \dmem_addr
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:42"
+  wire width 1 output 9  \dmem_rd_en
 
   attribute \src "/home/runner/workspace/church_machine/core.py:44"
-  wire width 32 output 18  \dmem_wr_data
+  wire width 32 output 10  \dmem_wr_data
 
   attribute \src "/home/runner/workspace/church_machine/core.py:45"
-  wire width 1 output 19  \dmem_wr_en
+  wire width 1 output 11  \dmem_wr_en
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:38"
+  wire width 32 output 12  \ns_addr
+
+  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
+  wire width 1 output 13  \ns_rd_en
+
+  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
+  wire width 1 output 14  \ns_wr_en
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:118"
+  attribute \init 3'000
+  wire width 3 output 15  \boot_state
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:61"
+  wire width 1 output 16  \boot_complete
+
+  attribute \src "/home/runner/workspace/church_machine/mload.py:37"
+  wire width 1 output 17  \gc_busy
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:38"
+  wire width 32 output 18  \gc_garbage_count
 
   attribute \src "/home/runner/workspace/church_machine/core.py:67"
-  wire width 4 output 20  \fault
+  wire width 4 output 19  \fault
 
   attribute \src "/home/runner/workspace/church_machine/core.py:68"
-  wire width 1 output 21  \fault_valid
+  wire width 1 output 20  \fault_valid
 
   attribute \src "/home/runner/workspace/church_machine/core.py:113"
   attribute \init 32'00000000000000000000000000000000
-  wire width 32 output 22  \nia
+  wire width 32 output 21  \nia
 
   wire width 1 $1
 
@@ -1061,7 +1006,7 @@ module \top
 
   wire width 1 $35
 
-  wire width 1 $36
+  wire width 33 $36
 
   wire width 1 $37
 
@@ -1099,91 +1044,15 @@ module \top
 
   wire width 1 $54
 
-  wire width 1 $55
+  wire width 3 $55
 
-  wire width 1 $56
+  wire width 32 $56
 
   wire width 1 $57
 
-  wire width 1 $58
+  wire width 32 $58
 
-  wire width 1 $59
-
-  wire width 1 $60
-
-  wire width 1 $61
-
-  wire width 1 $62
-
-  wire width 1 $63
-
-  wire width 1 $64
-
-  wire width 1 $65
-
-  wire width 9 $66
-
-  wire width 9 $67
-
-  wire width 1 $68
-
-  wire width 1 $69
-
-  wire width 1 $70
-
-  wire width 1 $71
-
-  wire width 1 $72
-
-  wire width 1 $73
-
-  wire width 1 $74
-
-  wire width 1 $75
-
-  wire width 1 $76
-
-  wire width 1 $77
-
-  wire width 1 $78
-
-  wire width 33 $79
-
-  wire width 1 $80
-
-  wire width 1 $81
-
-  wire width 1 $82
-
-  wire width 1 $83
-
-  wire width 1 $84
-
-  wire width 1 $85
-
-  wire width 1 $86
-
-  wire width 1 $87
-
-  wire width 1 $88
-
-  wire width 1 $89
-
-  wire width 9 $90
-
-  wire width 9 $91
-
-  wire width 3 $92
-
-  wire width 32 $93
-
-  wire width 1 $94
-
-  wire width 32 $95
-
-  wire width 8 $96
-
-  wire width 3 $97
+  wire width 3 $59
 
   attribute \src "/home/runner/workspace/church_machine/decoder.py:24"
   wire width 1 \flags.N
@@ -1198,16 +1067,16 @@ module \top
   wire width 1 \flags.V
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:52"
-  wire width 1 \flags$29.N
+  wire width 1 \flags$27.N
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:52"
-  wire width 1 \flags$29.Z
+  wire width 1 \flags$27.Z
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:52"
-  wire width 1 \flags$29.C
+  wire width 1 \flags$27.C
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:52"
-  wire width 1 \flags$29.V
+  wire width 1 \flags$27.V
 
   attribute \src "/home/runner/workspace/church_machine/core.py:202"
   wire width 2 \perm_gt_sig.gt_type
@@ -1318,112 +1187,112 @@ module \top
   wire width 32 \cr_wr_data.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 32 \cr_wr_data$77.word0_gt
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 2 \cr_wr_data$77.word0_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 6 \cr_wr_data$77.word0_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 17 \cr_wr_data$77.word0_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 7 \cr_wr_data$77.word0_gt.version
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 32 \cr_wr_data$77.word1_location
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 32 \cr_wr_data$77.word2_limit
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 32 \cr_wr_data$77.word3_seals
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data$78.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 2 \cr_wr_data$78.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 6 \cr_wr_data$78.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 17 \cr_wr_data$78.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 7 \cr_wr_data$78.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data$78.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data$78.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data$78.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 32 \cr_wr_data$79.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 2 \cr_wr_data$79.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 6 \cr_wr_data$79.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 17 \cr_wr_data$79.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 7 \cr_wr_data$79.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 32 \cr_wr_data$79.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 32 \cr_wr_data$79.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:22"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
   wire width 32 \cr_wr_data$79.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 32 \cr_wr_data$80.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 2 \cr_wr_data$80.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 6 \cr_wr_data$80.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 17 \cr_wr_data$80.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 7 \cr_wr_data$80.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 32 \cr_wr_data$80.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 32 \cr_wr_data$80.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
+  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
   wire width 32 \cr_wr_data$80.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 32 \cr_wr_data$81.word0_gt
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 2 \cr_wr_data$81.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 6 \cr_wr_data$81.word0_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 17 \cr_wr_data$81.word0_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 7 \cr_wr_data$81.word0_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 32 \cr_wr_data$81.word1_location
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 32 \cr_wr_data$81.word2_limit
-
-  attribute \src "/home/runner/workspace/church_machine/mload.py:28"
-  wire width 32 \cr_wr_data$81.word3_seals
+  attribute \src "/home/runner/workspace/church_machine/core.py:71"
+  wire width 1 \flags$83.N
 
   attribute \src "/home/runner/workspace/church_machine/core.py:71"
-  wire width 1 \flags$84.N
+  wire width 1 \flags$83.Z
 
   attribute \src "/home/runner/workspace/church_machine/core.py:71"
-  wire width 1 \flags$84.Z
+  wire width 1 \flags$83.C
 
   attribute \src "/home/runner/workspace/church_machine/core.py:71"
-  wire width 1 \flags$84.C
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:71"
-  wire width 1 \flags$84.V
+  wire width 1 \flags$83.V
 
   attribute \src "/home/runner/workspace/church_machine/core.py:345"
   wire width 2 \ns_gt.gt_type
@@ -1532,114 +1401,6 @@ module \top
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 7 \boot_cr7_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:403"
-  wire width 2 \switch_src_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:403"
-  wire width 6 \switch_src_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:403"
-  wire width 17 \switch_src_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:403"
-  wire width 7 \switch_src_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr8_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr8_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr8_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr8_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr9_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr9_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr9_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr9_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr10_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr10_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr10_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr10_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr11_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr11_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr11_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr11_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr12_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr12_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr12_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr12_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr13_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr13_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr13_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr13_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr14_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr14_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr14_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr14_wr_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 2 \rt_cr15_wr_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 6 \rt_cr15_wr_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 17 \rt_cr15_wr_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  wire width 7 \rt_cr15_wr_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 2 \cr0_gt_wr_data.gt_type
@@ -1917,6 +1678,18 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr8_gt_wr_data.version
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr8_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr8_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr8_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr8_wr_gt.version
+
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 2 \cr9_gt_wr_data.gt_type
 
@@ -1928,6 +1701,18 @@ module \top
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr9_gt_wr_data.version
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr9_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr9_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr9_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr9_wr_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr9_wr_gt.gt_type
@@ -1953,6 +1738,18 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr10_gt_wr_data.version
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr10_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr10_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr10_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr10_wr_gt.version
+
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr10_wr_gt.gt_type
 
@@ -1976,6 +1773,18 @@ module \top
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr11_gt_wr_data.version
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr11_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr11_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr11_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr11_wr_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr11_wr_gt.gt_type
@@ -2001,6 +1810,18 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr12_gt_wr_data.version
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr12_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr12_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr12_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr12_wr_gt.version
+
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr12_wr_gt.gt_type
 
@@ -2024,6 +1845,18 @@ module \top
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr13_gt_wr_data.version
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr13_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr13_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr13_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr13_wr_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr13_wr_gt.gt_type
@@ -2049,6 +1882,18 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr14_gt_wr_data.version
 
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr14_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr14_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr14_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr14_wr_gt.version
+
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
   wire width 2 \boot_cr14_wr_gt.gt_type
 
@@ -2073,125 +1918,137 @@ module \top
   attribute \src "/home/runner/workspace/church_machine/registers.py:41"
   wire width 7 \cr15_gt_wr_data.version
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 32 \cr_rd_data$197.word0_gt
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 2 \rt_cr15_wr_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 6 \rt_cr15_wr_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 17 \rt_cr15_wr_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:395"
+  wire width 7 \rt_cr15_wr_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 2 \cr_rd_data$197.word0_gt.gt_type
+  wire width 32 \cr_rd_data$192.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 6 \cr_rd_data$197.word0_gt.perms
+  wire width 2 \cr_rd_data$192.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 17 \cr_rd_data$197.word0_gt.index
+  wire width 6 \cr_rd_data$192.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 7 \cr_rd_data$197.word0_gt.version
+  wire width 17 \cr_rd_data$192.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 32 \cr_rd_data$197.word1_location
+  wire width 7 \cr_rd_data$192.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 32 \cr_rd_data$197.word2_limit
+  wire width 32 \cr_rd_data$192.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
-  wire width 32 \cr_rd_data$197.word3_seals
+  wire width 32 \cr_rd_data$192.word2_limit
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:20"
+  wire width 32 \cr_rd_data$192.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 32 \cr_rd_data$201.word0_gt
+  wire width 32 \cr_rd_data$196.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 2 \cr_rd_data$201.word0_gt.gt_type
+  wire width 2 \cr_rd_data$196.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 6 \cr_rd_data$201.word0_gt.perms
+  wire width 6 \cr_rd_data$196.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 17 \cr_rd_data$201.word0_gt.index
+  wire width 17 \cr_rd_data$196.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 7 \cr_rd_data$201.word0_gt.version
+  wire width 7 \cr_rd_data$196.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 32 \cr_rd_data$201.word1_location
+  wire width 32 \cr_rd_data$196.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 32 \cr_rd_data$201.word2_limit
+  wire width 32 \cr_rd_data$196.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 32 \cr_rd_data$201.word3_seals
+  wire width 32 \cr_rd_data$196.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$209.word0_gt
+  wire width 32 \cr_rd_data$204.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 2 \cr_rd_data$209.word0_gt.gt_type
+  wire width 2 \cr_rd_data$204.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 6 \cr_rd_data$209.word0_gt.perms
+  wire width 6 \cr_rd_data$204.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 17 \cr_rd_data$209.word0_gt.index
+  wire width 17 \cr_rd_data$204.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 7 \cr_rd_data$209.word0_gt.version
+  wire width 7 \cr_rd_data$204.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$209.word1_location
+  wire width 32 \cr_rd_data$204.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$209.word2_limit
+  wire width 32 \cr_rd_data$204.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/lambda_unit.py:18"
-  wire width 32 \cr_rd_data$209.word3_seals
+  wire width 32 \cr_rd_data$204.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 32 \cr_rd_data$216.word0_gt
+  wire width 32 \cr_rd_data$211.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 2 \cr_rd_data$216.word0_gt.gt_type
+  wire width 2 \cr_rd_data$211.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 6 \cr_rd_data$216.word0_gt.perms
+  wire width 6 \cr_rd_data$211.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 17 \cr_rd_data$216.word0_gt.index
+  wire width 17 \cr_rd_data$211.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 7 \cr_rd_data$216.word0_gt.version
+  wire width 7 \cr_rd_data$211.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 32 \cr_rd_data$216.word1_location
+  wire width 32 \cr_rd_data$211.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 32 \cr_rd_data$216.word2_limit
+  wire width 32 \cr_rd_data$211.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
-  wire width 32 \cr_rd_data$216.word3_seals
+  wire width 32 \cr_rd_data$211.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 32 \cr_rd_data$222.word0_gt
+  wire width 32 \cr_rd_data$217.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 2 \cr_rd_data$222.word0_gt.gt_type
+  wire width 2 \cr_rd_data$217.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 6 \cr_rd_data$222.word0_gt.perms
+  wire width 6 \cr_rd_data$217.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 17 \cr_rd_data$222.word0_gt.index
+  wire width 17 \cr_rd_data$217.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 7 \cr_rd_data$222.word0_gt.version
+  wire width 7 \cr_rd_data$217.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 32 \cr_rd_data$222.word1_location
+  wire width 32 \cr_rd_data$217.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 32 \cr_rd_data$222.word2_limit
+  wire width 32 \cr_rd_data$217.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/save.py:21"
-  wire width 32 \cr_rd_data$222.word3_seals
+  wire width 32 \cr_rd_data$217.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/save.py:33"
   wire width 32 \cr15_namespace.word0_gt
@@ -2218,76 +2075,76 @@ module \top
   wire width 32 \cr15_namespace.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 32 \cr15_namespace$224.word0_gt
+  wire width 32 \cr15_namespace$219.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 2 \cr15_namespace$224.word0_gt.gt_type
+  wire width 2 \cr15_namespace$219.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 6 \cr15_namespace$224.word0_gt.perms
+  wire width 6 \cr15_namespace$219.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 17 \cr15_namespace$224.word0_gt.index
+  wire width 17 \cr15_namespace$219.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 7 \cr15_namespace$224.word0_gt.version
+  wire width 7 \cr15_namespace$219.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 32 \cr15_namespace$224.word1_location
+  wire width 32 \cr15_namespace$219.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 32 \cr15_namespace$224.word2_limit
+  wire width 32 \cr15_namespace$219.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/registers.py:39"
-  wire width 32 \cr15_namespace$224.word3_seals
+  wire width 32 \cr15_namespace$219.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 32 \cr_rd_data$261.word0_gt
+  wire width 32 \cr_rd_data$244.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 2 \cr_rd_data$261.word0_gt.gt_type
+  wire width 2 \cr_rd_data$244.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 6 \cr_rd_data$261.word0_gt.perms
+  wire width 6 \cr_rd_data$244.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 17 \cr_rd_data$261.word0_gt.index
+  wire width 17 \cr_rd_data$244.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 7 \cr_rd_data$261.word0_gt.version
+  wire width 7 \cr_rd_data$244.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 32 \cr_rd_data$261.word1_location
+  wire width 32 \cr_rd_data$244.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 32 \cr_rd_data$261.word2_limit
+  wire width 32 \cr_rd_data$244.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:25"
-  wire width 32 \cr_rd_data$261.word3_seals
+  wire width 32 \cr_rd_data$244.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 32 \cr15_namespace$262.word0_gt
+  wire width 32 \cr15_namespace$245.word0_gt
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 2 \cr15_namespace$262.word0_gt.gt_type
+  wire width 2 \cr15_namespace$245.word0_gt.gt_type
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 6 \cr15_namespace$262.word0_gt.perms
+  wire width 6 \cr15_namespace$245.word0_gt.perms
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 17 \cr15_namespace$262.word0_gt.index
+  wire width 17 \cr15_namespace$245.word0_gt.index
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 7 \cr15_namespace$262.word0_gt.version
+  wire width 7 \cr15_namespace$245.word0_gt.version
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 32 \cr15_namespace$262.word1_location
+  wire width 32 \cr15_namespace$245.word1_location
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 32 \cr15_namespace$262.word2_limit
+  wire width 32 \cr15_namespace$245.word2_limit
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:31"
-  wire width 32 \cr15_namespace$262.word3_seals
+  wire width 32 \cr15_namespace$245.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/core.py:93"
   cell \top.u_registers \u_registers
@@ -2297,7 +2154,7 @@ module \top
     connect \cr_rd_addr \cr_rd_addr [3:0]
     connect \cr_wr_addr \cr_wr_addr [3:0]
     connect \cr_wr_data \cr_wr_data [127:0]
-    connect \cr_wr_en \cr_wr_en$82 [0]
+    connect \cr_wr_en \cr_wr_en$81 [0]
     connect \cr0_gt_wr_en \cr0_gt_wr_en [0]
     connect \cr0_gt_wr_data \cr0_gt_wr_data [31:0]
     connect \cr1_gt_wr_en \cr1_gt_wr_en [0]
@@ -2342,8 +2199,8 @@ module \top
     connect \exec_enable \exec_enable [0]
     connect \is_church_op \is_church_op [0]
     connect \flags \flags [3:0]
-    connect \fault_valid \fault_valid$247 [0]
-    connect \fault \fault$253 [3:0]
+    connect \fault_valid \fault_valid$228 [0]
+    connect \fault \fault$236 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:95"
@@ -2352,7 +2209,7 @@ module \top
     connect \check_domain_purity \check_domain_purity [0]
     connect \gt_in \cr_rd_data [31:0]
     connect \required_perms \required_perms [5:0]
-    connect \fault_valid \fault_valid$248 [0]
+    connect \fault_valid \fault_valid$229 [0]
     connect \fault_type \fault_type [3:0]
   end
 
@@ -2365,11 +2222,11 @@ module \top
     connect \cr_rd_data \cr_rd_data [127:0]
     connect \lambda_busy \lambda_busy [0]
     connect \lambda_complete \lambda_complete [0]
-    connect \cr_rd_addr \cr_rd_addr$49 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$47 [3:0]
     connect \nia_set \nia_set [0]
     connect \nia_value \nia_value [31:0]
     connect \lambda_fault \lambda_fault [0]
-    connect \fault_type \fault_type$255 [3:0]
+    connect \fault_type \fault_type$238 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:99"
@@ -2380,21 +2237,20 @@ module \top
     connect \call_start \call_start_sig [0]
     connect \cr_rd_data \cr_rd_data [127:0]
     connect \mload_src \mload_cr_src [3:0]
-    connect \port$571$0 $97 [2:0]
+    connect \port$505$0 $59 [2:0]
     connect \mload_index \mload_index [16:0]
     connect \call_busy \call_busy [0]
-    connect \call_complete \call_complete [0]
+    connect \call_complete \nia_set$302 [0]
     connect \mload_fault \mload_fault [0]
     connect \mload_done \mload_done [0]
-    connect \cr_rd_addr \cr_rd_addr$47 [3:0]
-    connect \cr_wr_data \cr_wr_data$79 [127:0]
-    connect \cr_wr_en \cr_wr_en$71 [0]
-    connect \cr_wr_addr \cr_wr_addr$74 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$45 [3:0]
+    connect \cr_wr_data \cr_wr_data$78 [127:0]
+    connect \cr_wr_en \cr_wr_en$70 [0]
+    connect \cr_wr_addr \cr_wr_addr$73 [3:0]
     connect \call_fault \call_fault [0]
-    connect \fault_type \fault_type$257 [3:0]
-    connect \saved_cr5_gt \saved_cr5_gt$246 [31:0]
+    connect \fault_type \fault_type$240 [3:0]
     connect \mload_start \mload_start [0]
-    connect \mload_fault_type \fault_type$260 [3:0]
+    connect \mload_fault_type \fault_type$243 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:100"
@@ -2403,28 +2259,23 @@ module \top
     connect \clk \clk [0]
     connect \rst \rst [0]
     connect \return_start \ret_start_sig [0]
-    connect \saved_cr5_gt \saved_cr5_gt [31:0]
     connect \cr_rd_data \cr_rd_data [127:0]
-    connect \cr_rd_addr \cr_rd_addr$46 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$44 [3:0]
     connect \busy \busy [0]
-    connect \complete \complete [0]
     connect \reboot_request \reboot_request [0]
     connect \mload_fault \mload_fault [0]
     connect \mload_done \mload_done [0]
     connect \lambda_active \lambda_active [0]
     connect \lambda_pc \lambda_pc [31:0]
-    connect \mload_dst \mload_cr_dst$281 [3:0]
-    connect \mload_direct_gt \mload_direct_gt$284 [31:0]
-    connect \nia_set \nia_set$318 [0]
-    connect \nia_value \nia_value$321 [31:0]
+    connect \mload_dst \mload_cr_dst$264 [3:0]
+    connect \mload_direct_gt \mload_direct_gt$267 [31:0]
+    connect \nia_set \nia_set$301 [0]
+    connect \nia_value \nia_value$304 [31:0]
     connect \lambda_clear \lambda_clear [0]
-    connect \cr_wr_en \cr_wr_en$72 [0]
-    connect \cr_wr_addr \cr_wr_addr$73 [3:0]
-    connect \cr_wr_data \cr_wr_data$78 [127:0]
-    connect \fault_valid \fault_valid$245 [0]
-    connect \fault_type \fault_type$258 [3:0]
-    connect \mload_start \mload_start$279 [0]
-    connect \mload_fault_type \fault_type$260 [3:0]
+    connect \fault_valid \fault_valid$233 [0]
+    connect \fault_type \fault_type$241 [3:0]
+    connect \mload_start \mload_start$262 [0]
+    connect \mload_fault_type \fault_type$243 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:101"
@@ -2436,12 +2287,12 @@ module \top
     connect \tperm_start \tperm_start_sig [0]
     connect \cr_rd_data \cr_rd_data [127:0]
     connect \tperm_busy \tperm_busy [0]
-    connect \cr_rd_addr \cr_rd_addr$48 [3:0]
-    connect \cr_wr_addr \cr_wr_addr$75 [3:0]
-    connect \cr_wr_data \cr_wr_data$80 [127:0]
-    connect \cr_wr_en \cr_wr_en$70 [0]
+    connect \cr_rd_addr \cr_rd_addr$46 [3:0]
+    connect \cr_wr_addr \cr_wr_addr$74 [3:0]
+    connect \cr_wr_data \cr_wr_data$79 [127:0]
+    connect \cr_wr_en \cr_wr_en$69 [0]
     connect \tperm_fault \tperm_fault [0]
-    connect \fault_type \fault_type$256 [3:0]
+    connect \fault_type \fault_type$239 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:102"
@@ -2454,14 +2305,14 @@ module \top
     connect \cr_rd_data \cr_rd_data [127:0]
     connect \save_busy \save_busy [0]
     connect \cr15_namespace \cr15_namespace [127:0]
-    connect \cr_rd_addr \cr_rd_addr$45 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$43 [3:0]
     connect \save_fault \save_fault [0]
-    connect \fault_type \fault_type$259 [3:0]
+    connect \fault_type \fault_type$242 [3:0]
     connect \mem_rd_addr \mem_rd_addr [31:0]
-    connect \mem_rd_en \mem_rd_en$310 [0]
-    connect \mem_wr_en \mem_wr_en$309 [0]
+    connect \mem_rd_en \mem_rd_en$292 [0]
+    connect \mem_wr_en \mem_wr_en$291 [0]
     connect \mem_wr_addr \mem_wr_addr [31:0]
-    connect \mem_wr_data \mem_wr_data$314 [31:0]
+    connect \mem_wr_data \mem_wr_data$296 [31:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:103"
@@ -2470,14 +2321,14 @@ module \top
     connect \clk \clk [0]
     connect \rst \rst [0]
     connect \load_start \load_start_sig [0]
-    connect \mload_m_elevated \mload_m_elevated$292 [0]
+    connect \mload_m_elevated \mload_m_elevated$275 [0]
     connect \load_busy \load_busy [0]
     connect \load_fault \load_fault [0]
     connect \mload_busy \sub_busy [0]
     connect \mload_fault \mload_fault [0]
     connect \mload_done \mload_done [0]
-    connect \mload_start \mload_start$286 [0]
-    connect \fault_type \fault_type$260 [3:0]
+    connect \mload_start \mload_start$269 [0]
+    connect \fault_type \fault_type$243 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:105"
@@ -2497,17 +2348,17 @@ module \top
     connect \sub_direct_gt \sub_direct_gt [31:0]
     connect \sub_m_elevated \sub_m_elevated [0]
     connect \cr15_namespace \cr15_namespace [127:0]
-    connect \cr_rd_addr \cr_rd_addr$50 [3:0]
+    connect \cr_rd_addr \cr_rd_addr$48 [3:0]
     connect \mem_addr \mem_addr [31:0]
     connect \mem_rd_en \mem_rd_en [0]
-    connect \cr_wr_addr \cr_wr_addr$76 [3:0]
-    connect \cr_wr_data \cr_wr_data$81 [127:0]
+    connect \cr_wr_addr \cr_wr_addr$75 [3:0]
+    connect \cr_wr_data \cr_wr_data$80 [127:0]
     connect \cr_wr_en \cr_wr_en [0]
-    connect \sub_fault_type \fault_type$260 [3:0]
+    connect \sub_fault_type \fault_type$243 [3:0]
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:123"
-  cell $eq $98
+  cell $eq $60
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -2519,7 +2370,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:124"
-  cell $eq $99
+  cell $eq $61
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -2531,7 +2382,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:146"
-  cell $and $100
+  cell $and $62
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2543,7 +2394,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:159"
-  cell $and $101
+  cell $and $63
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2555,7 +2406,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:163"
-  cell $or $102
+  cell $or $64
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2567,7 +2418,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:163"
-  cell $or $103
+  cell $or $65
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2579,7 +2430,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:163"
-  cell $or $104
+  cell $or $66
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2591,7 +2442,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:163"
-  cell $or $105
+  cell $or $67
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2603,7 +2454,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:163"
-  cell $or $106
+  cell $or $68
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2615,7 +2466,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:176"
-  cell $and $107
+  cell $and $69
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2627,7 +2478,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:176"
-  cell $eq $108
+  cell $eq $70
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -2639,7 +2490,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:176"
-  cell $and $109
+  cell $and $71
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2651,7 +2502,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:176"
-  cell $not $110
+  cell $not $72
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -2660,7 +2511,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:176"
-  cell $and $111
+  cell $and $73
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2672,7 +2523,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:194"
-  cell $or $112
+  cell $or $74
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2684,61 +2535,61 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:198"
-  cell $mux $113
+  cell $mux $75
     parameter \WIDTH 4
     connect \S \save_busy [0]
     connect \A \imem_data [18:15]
-    connect \B \cr_rd_addr$45 [3:0]
+    connect \B \cr_rd_addr$43 [3:0]
     connect \Y $10
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:197"
-  cell $mux $114
+  cell $mux $76
     parameter \WIDTH 4
     connect \S \busy [0]
     connect \A $10 [3:0]
-    connect \B \cr_rd_addr$46 [3:0]
+    connect \B \cr_rd_addr$44 [3:0]
     connect \Y $11
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:196"
-  cell $mux $115
+  cell $mux $77
     parameter \WIDTH 4
     connect \S \call_busy [0]
     connect \A $11 [3:0]
-    connect \B \cr_rd_addr$47 [3:0]
+    connect \B \cr_rd_addr$45 [3:0]
     connect \Y $12
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:195"
-  cell $mux $116
+  cell $mux $78
     parameter \WIDTH 4
     connect \S \tperm_busy [0]
     connect \A $12 [3:0]
-    connect \B \cr_rd_addr$48 [3:0]
+    connect \B \cr_rd_addr$46 [3:0]
     connect \Y $13
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:194"
-  cell $mux $117
+  cell $mux $79
     parameter \WIDTH 4
     connect \S $9 [0]
     connect \A $13 [3:0]
-    connect \B \cr_rd_addr$49 [3:0]
+    connect \B \cr_rd_addr$47 [3:0]
     connect \Y $14
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:193"
-  cell $mux $118
+  cell $mux $80
     parameter \WIDTH 4
     connect \S \sub_busy [0]
     connect \A $14 [3:0]
-    connect \B \cr_rd_addr$50 [3:0]
+    connect \B \cr_rd_addr$48 [3:0]
     connect \Y \cr_rd_addr
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:208"
-  cell $eq $119
+  cell $eq $81
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -2750,7 +2601,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:208"
-  cell $mux $120
+  cell $mux $82
     parameter \WIDTH 4
     connect \S $15 [0]
     connect \A 4'1000
@@ -2759,7 +2610,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:229"
-  cell $and $121
+  cell $and $83
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2771,7 +2622,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:231"
-  cell $and $122
+  cell $and $84
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2783,7 +2634,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:231"
-  cell $eq $123
+  cell $eq $85
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -2795,7 +2646,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:231"
-  cell $and $124
+  cell $and $86
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2807,115 +2658,115 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:299"
-  cell $mux $125
+  cell $mux $87
     parameter \WIDTH 4
-    connect \S \cr_wr_en$72 [0]
+    connect \S 1'0
     connect \A 4'0000
-    connect \B \cr_wr_addr$73 [3:0]
+    connect \B 4'0000
     connect \Y $19
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:298"
-  cell $mux $126
+  cell $mux $88
     parameter \WIDTH 4
-    connect \S \cr_wr_en$71 [0]
+    connect \S \cr_wr_en$70 [0]
     connect \A $19 [3:0]
-    connect \B \cr_wr_addr$74 [3:0]
+    connect \B \cr_wr_addr$73 [3:0]
     connect \Y $20
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:297"
-  cell $mux $127
+  cell $mux $89
     parameter \WIDTH 4
-    connect \S \cr_wr_en$70 [0]
+    connect \S \cr_wr_en$69 [0]
     connect \A $20 [3:0]
-    connect \B \cr_wr_addr$75 [3:0]
+    connect \B \cr_wr_addr$74 [3:0]
     connect \Y $21
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:296"
-  cell $mux $128
+  cell $mux $90
     parameter \WIDTH 4
     connect \S \cr_wr_en [0]
     connect \A $21 [3:0]
-    connect \B \cr_wr_addr$76 [3:0]
+    connect \B \cr_wr_addr$75 [3:0]
     connect \Y \cr_wr_addr
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:306"
-  cell $mux $129
+  cell $mux $91
     parameter \WIDTH 128
-    connect \S \cr_wr_en$72 [0]
+    connect \S 1'0
     connect \A 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    connect \B \cr_wr_data$78 [127:0]
+    connect \B 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     connect \Y $22
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:305"
-  cell $mux $130
+  cell $mux $92
     parameter \WIDTH 128
-    connect \S \cr_wr_en$71 [0]
+    connect \S \cr_wr_en$70 [0]
     connect \A $22 [127:0]
-    connect \B \cr_wr_data$79 [127:0]
+    connect \B \cr_wr_data$78 [127:0]
     connect \Y $23
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:304"
-  cell $mux $131
+  cell $mux $93
     parameter \WIDTH 128
-    connect \S \cr_wr_en$70 [0]
+    connect \S \cr_wr_en$69 [0]
     connect \A $23 [127:0]
-    connect \B \cr_wr_data$80 [127:0]
+    connect \B \cr_wr_data$79 [127:0]
     connect \Y $24
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:303"
-  cell $mux $132
+  cell $mux $94
     parameter \WIDTH 128
     connect \S \cr_wr_en [0]
     connect \A $24 [127:0]
-    connect \B \cr_wr_data$81 [127:0]
+    connect \B \cr_wr_data$80 [127:0]
     connect \Y \cr_wr_data
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:310"
-  cell $or $133
+  cell $or $95
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \cr_wr_en [0]
-    connect \B \cr_wr_en$70 [0]
+    connect \B \cr_wr_en$69 [0]
     connect \Y $25
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:310"
-  cell $or $134
+  cell $or $96
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $25 [0]
-    connect \B \cr_wr_en$71 [0]
+    connect \B \cr_wr_en$70 [0]
     connect \Y $26
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:310"
-  cell $or $135
+  cell $or $97
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A $26 [0]
-    connect \B \cr_wr_en$72 [0]
+    connect \B 1'0
     connect \Y $27
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:310"
-  cell $or $136
+  cell $or $98
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -2923,221 +2774,11 @@ module \top
     parameter \Y_WIDTH 1
     connect \A $27 [0]
     connect \B 1'0
-    connect \Y \cr_wr_en$82
+    connect \Y \cr_wr_en$81
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:399"
-  cell $and $137
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \boot_complete [0]
-    connect \B \cond_exec_enable [0]
-    connect \Y $28
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:399"
-  cell $and $138
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $28 [0]
-    connect \B \is_church_op [0]
-    connect \Y $29
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:399"
-  cell $not $139
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $30
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:399"
-  cell $and $140
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $29 [0]
-    connect \B $30 [0]
-    connect \Y $31
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:400"
-  cell $eq $141
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B 3'101
-    connect \Y $32
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:400"
-  cell $eq $142
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B 3'100
-    connect \Y $33
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:400"
-  cell $or $143
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $32 [0]
-    connect \B $33 [0]
-    connect \Y $34
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:399"
-  cell $and $144
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $31 [0]
-    connect \B $34 [0]
-    connect \Y \switch_change_active
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:407"
-  cell $eq $145
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B 3'100
-    connect \Y $35
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:407"
-  cell $mux $146
-    parameter \WIDTH 3
-    connect \S $35 [0]
-    connect \A \imem_data [2:0]
-    connect \B 3'000
-    connect \Y \effective_target
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $147
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 0
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B {  }
-    connect \Y $36
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $148
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 1'1
-    connect \Y $37
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $149
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 2
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 2'10
-    connect \Y $38
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $150
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 2
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 2'11
-    connect \Y $39
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $151
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 3'100
-    connect \Y $40
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $152
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 3'101
-    connect \Y $41
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $153
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 3'110
-    connect \Y $42
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:411"
-  cell $eq $154
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \effective_target [2:0]
-    connect \B 3'111
-    connect \Y $43
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $155
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $99
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3148,8 +2789,8 @@ module \top
     connect \Y \cr0_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $156
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $100
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3157,8 +2798,8 @@ module \top
     connect \Y \cr0_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $157
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $101
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3169,8 +2810,8 @@ module \top
     connect \Y \cr1_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $158
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $102
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3178,8 +2819,8 @@ module \top
     connect \Y \cr1_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $159
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $103
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3190,8 +2831,8 @@ module \top
     connect \Y \cr2_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $160
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $104
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3199,8 +2840,8 @@ module \top
     connect \Y \cr2_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $161
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $105
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3211,8 +2852,8 @@ module \top
     connect \Y \cr3_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $162
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $106
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3220,8 +2861,8 @@ module \top
     connect \Y \cr3_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $163
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $107
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3232,8 +2873,8 @@ module \top
     connect \Y \cr4_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $164
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $108
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3241,8 +2882,8 @@ module \top
     connect \Y \cr4_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $165
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $109
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3253,8 +2894,8 @@ module \top
     connect \Y \cr5_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $166
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $110
     parameter \WIDTH 32
     connect \S 1'0
     connect \A 32'00000000000000000000000000000000
@@ -3262,8 +2903,8 @@ module \top
     connect \Y \cr5_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $167
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $111
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3274,8 +2915,8 @@ module \top
     connect \Y \cr6_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $168
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $112
     parameter \WIDTH 32
     connect \S \boot_cr6_wr_en [0]
     connect \A 32'00000000000000000000000000000000
@@ -3283,8 +2924,8 @@ module \top
     connect \Y \cr6_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $169
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $113
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3295,8 +2936,8 @@ module \top
     connect \Y \cr7_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $170
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $114
     parameter \WIDTH 32
     connect \S \boot_cr7_wr_en [0]
     connect \A 32'00000000000000000000000000000000
@@ -3304,176 +2945,176 @@ module \top
     connect \Y \cr7_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $171
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $115
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_cr8_wr_en [0]
-    connect \B \rt_cr8_wr_en [0]
+    connect \B 1'0
     connect \Y \cr8_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $172
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $116
     parameter \WIDTH 32
     connect \S \boot_cr8_wr_en [0]
-    connect \A \rt_cr8_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B \boot_cr8_wr_gt [31:0]
     connect \Y \cr8_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $173
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $117
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr9_wr_en [0]
+    connect \B 1'0
     connect \Y \cr9_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $174
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $118
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr9_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr9_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $175
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $119
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr10_wr_en [0]
+    connect \B 1'0
     connect \Y \cr10_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $176
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $120
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr10_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr10_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $177
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $121
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr11_wr_en [0]
+    connect \B 1'0
     connect \Y \cr11_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $178
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $122
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr11_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr11_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $179
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $123
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr12_wr_en [0]
+    connect \B 1'0
     connect \Y \cr12_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $180
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $124
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr12_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr12_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $181
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $125
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr13_wr_en [0]
+    connect \B 1'0
     connect \Y \cr13_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $182
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $126
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr13_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr13_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $183
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $127
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A 1'0
-    connect \B \rt_cr14_wr_en [0]
+    connect \B 1'0
     connect \Y \cr14_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $184
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $128
     parameter \WIDTH 32
     connect \S 1'0
-    connect \A \rt_cr14_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B 32'00000000000000000000000000000000
     connect \Y \cr14_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:416"
-  cell $or $185
+  attribute \src "/home/runner/workspace/church_machine/core.py:417"
+  cell $or $129
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \boot_cr15_wr_en [0]
-    connect \B \rt_cr15_wr_en [0]
+    connect \B 1'0
     connect \Y \cr15_gt_wr_en
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:417"
-  cell $mux $186
+  attribute \src "/home/runner/workspace/church_machine/core.py:418"
+  cell $mux $130
     parameter \WIDTH 32
     connect \S \boot_cr15_wr_en [0]
-    connect \A \rt_cr15_wr_gt [31:0]
+    connect \A 32'00000000000000000000000000000000
     connect \B \boot_cr15_wr_gt [31:0]
     connect \Y \cr15_gt_wr_data
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:421"
-  cell $and $187
+  attribute \src "/home/runner/workspace/church_machine/core.py:422"
+  cell $and $131
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3481,11 +3122,11 @@ module \top
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $44
+    connect \Y $28
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:421"
-  cell $eq $188
+  attribute \src "/home/runner/workspace/church_machine/core.py:422"
+  cell $eq $132
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -3493,44 +3134,44 @@ module \top
     parameter \Y_WIDTH 1
     connect \A \imem_data [31:27]
     connect \B 2'10
-    connect \Y $45
+    connect \Y $29
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:421"
-  cell $and $189
+  attribute \src "/home/runner/workspace/church_machine/core.py:422"
+  cell $and $133
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $44 [0]
-    connect \B $45 [0]
-    connect \Y $46
+    connect \A $28 [0]
+    connect \B $29 [0]
+    connect \Y $30
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:421"
-  cell $not $190
+  attribute \src "/home/runner/workspace/church_machine/core.py:422"
+  cell $not $134
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $47
+    connect \Y $31
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:421"
-  cell $and $191
+  attribute \src "/home/runner/workspace/church_machine/core.py:422"
+  cell $and $135
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $46 [0]
-    connect \B $47 [0]
+    connect \A $30 [0]
+    connect \B $31 [0]
     connect \Y \call_start_sig
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:432"
-  cell $and $192
+  attribute \src "/home/runner/workspace/church_machine/core.py:433"
+  cell $and $136
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
@@ -3538,11 +3179,11 @@ module \top
     parameter \Y_WIDTH 1
     connect \A \cond_exec_enable [0]
     connect \B \is_church_op [0]
-    connect \Y $48
+    connect \Y $32
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:432"
-  cell $eq $193
+  attribute \src "/home/runner/workspace/church_machine/core.py:433"
+  cell $eq $137
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 5
@@ -3550,44 +3191,260 @@ module \top
     parameter \Y_WIDTH 1
     connect \A \imem_data [31:27]
     connect \B 2'11
-    connect \Y $49
+    connect \Y $33
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:432"
-  cell $and $194
+  attribute \src "/home/runner/workspace/church_machine/core.py:433"
+  cell $and $138
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $48 [0]
-    connect \B $49 [0]
-    connect \Y $50
+    connect \A $32 [0]
+    connect \B $33 [0]
+    connect \Y $34
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:432"
-  cell $not $195
+  attribute \src "/home/runner/workspace/church_machine/core.py:433"
+  cell $not $139
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \any_unit_busy [0]
-    connect \Y $51
+    connect \Y $35
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:432"
-  cell $and $196
+  attribute \src "/home/runner/workspace/church_machine/core.py:433"
+  cell $and $140
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $50 [0]
-    connect \B $51 [0]
+    connect \A $34 [0]
+    connect \B $35 [0]
     connect \Y \ret_start_sig
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:453"
-  cell $add $197
+  attribute \src "/home/runner/workspace/church_machine/core.py:454"
+  cell $add $141
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 32
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 33
+    connect \A \imem_addr [31:0]
+    connect \B 3'100
+    connect \Y $36
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:458"
+  cell $and $142
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cond_exec_enable [0]
+    connect \B \is_church_op [0]
+    connect \Y $37
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:458"
+  cell $eq $143
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 5
+    parameter \B_WIDTH 3
+    parameter \Y_WIDTH 1
+    connect \A \imem_data [31:27]
+    connect \B 3'110
+    connect \Y $38
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:458"
+  cell $and $144
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $37 [0]
+    connect \B $38 [0]
+    connect \Y $39
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:458"
+  cell $not $145
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $40
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:458"
+  cell $and $146
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $39 [0]
+    connect \B $40 [0]
+    connect \Y \tperm_start_sig
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:469"
+  cell $and $147
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cond_exec_enable [0]
+    connect \B \is_church_op [0]
+    connect \Y $41
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:469"
+  cell $eq $148
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 5
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \imem_data [31:27]
+    connect \B 1'1
+    connect \Y $42
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:469"
+  cell $and $149
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $41 [0]
+    connect \B $42 [0]
+    connect \Y $43
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:469"
+  cell $not $150
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $44
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:469"
+  cell $and $151
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $43 [0]
+    connect \B $44 [0]
+    connect \Y \save_start_sig
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:485"
+  cell $and $152
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cond_exec_enable [0]
+    connect \B \is_church_op [0]
+    connect \Y $45
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:485"
+  cell $eq $153
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 5
+    parameter \B_WIDTH 0
+    parameter \Y_WIDTH 1
+    connect \A \imem_data [31:27]
+    connect \B {  }
+    connect \Y $46
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:485"
+  cell $and $154
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $45 [0]
+    connect \B $46 [0]
+    connect \Y $47
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:485"
+  cell $not $155
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $48
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:485"
+  cell $and $156
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A $47 [0]
+    connect \B $48 [0]
+    connect \Y \load_start_sig
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:652"
+  cell $or $157
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \mem_rd_en [0]
+    connect \B 1'0
+    connect \Y $49
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:331"
+  cell $not $158
+    parameter \A_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \any_unit_busy [0]
+    connect \Y $50
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:331"
+  cell $and $159
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 1
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 1
+    connect \A \cond_exec_enable [0]
+    connect \B $50 [0]
+    connect \Y $51
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/core.py:332"
+  cell $add $160
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -3598,551 +3455,29 @@ module \top
     connect \Y $52
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:457"
-  cell $and $198
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cond_exec_enable [0]
-    connect \B \is_church_op [0]
-    connect \Y $53
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:457"
-  cell $eq $199
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B 3'110
-    connect \Y $54
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:457"
-  cell $and $200
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $53 [0]
-    connect \B $54 [0]
-    connect \Y $55
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:457"
-  cell $not $201
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $56
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:457"
-  cell $and $202
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $55 [0]
-    connect \B $56 [0]
-    connect \Y \tperm_start_sig
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:468"
-  cell $and $203
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cond_exec_enable [0]
-    connect \B \is_church_op [0]
-    connect \Y $57
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:468"
-  cell $eq $204
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B 1'1
-    connect \Y $58
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:468"
-  cell $and $205
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $57 [0]
-    connect \B $58 [0]
-    connect \Y $59
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:468"
-  cell $not $206
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $60
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:468"
-  cell $and $207
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $59 [0]
-    connect \B $60 [0]
-    connect \Y \save_start_sig
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:484"
-  cell $and $208
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cond_exec_enable [0]
-    connect \B \is_church_op [0]
-    connect \Y $61
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:484"
-  cell $eq $209
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 5
-    parameter \B_WIDTH 0
-    parameter \Y_WIDTH 1
-    connect \A \imem_data [31:27]
-    connect \B {  }
-    connect \Y $62
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:484"
-  cell $and $210
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $61 [0]
-    connect \B $62 [0]
-    connect \Y $63
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:484"
-  cell $not $211
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $64
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:484"
-  cell $and $212
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $63 [0]
-    connect \B $64 [0]
-    connect \Y \load_start_sig
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:572"
-  cell $eq $213
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 0
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B {  }
-    connect \Y \cr5_stack_empty
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:573"
-  cell $eq $214
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 9
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B 9'100000000
-    connect \Y \cr5_stack_full
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:574"
-  cell $gt $215
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 0
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B {  }
-    connect \Y $65
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:574"
-  cell $sub $216
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 9
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B 1'1
-    connect \Y $66
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:574"
-  cell $mux $217
-    parameter \WIDTH 9
-    connect \S $65 [0]
-    connect \A 9'000000000
-    connect \B $66 [8:0]
-    connect \Y $67
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:575"
-  cell $mux $218
-    parameter \WIDTH 32
-    connect \S \cr5_stack_empty [0]
-    connect \A \cr5_stack_r_data [31:0]
-    connect \B 32'00000000000000000000000000000000
-    connect \Y \saved_cr5_gt
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $not $219
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_fault [0]
-    connect \Y $68
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $and $220
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_complete [0]
-    connect \B $68 [0]
-    connect \Y $69
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $not $221
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_full [0]
-    connect \Y $70
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $and $222
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $69 [0]
-    connect \B $70 [0]
-    connect \Y $71
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $not $223
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fault_valid$245 [0]
-    connect \Y $72
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $and $224
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \complete [0]
-    connect \B $72 [0]
-    connect \Y $73
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $not $225
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_empty [0]
-    connect \Y $74
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $and $226
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $73 [0]
-    connect \B $74 [0]
-    connect \Y $75
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:688"
-  cell $or $227
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \mem_rd_en [0]
-    connect \B 1'0
-    connect \Y $76
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:331"
-  cell $not $228
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \any_unit_busy [0]
-    connect \Y $77
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:331"
-  cell $and $229
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cond_exec_enable [0]
-    connect \B $77 [0]
-    connect \Y $78
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:332"
-  cell $add $230
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 32
-    parameter \B_WIDTH 3
-    parameter \Y_WIDTH 33
-    connect \A \imem_addr [31:0]
-    connect \B 3'100
-    connect \Y $79
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:446"
-  cell $not $231
+  attribute \src "/home/runner/workspace/church_machine/core.py:447"
+  cell $not $161
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \lambda_fault [0]
-    connect \Y $80
+    connect \Y $53
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:446"
-  cell $and $232
+  attribute \src "/home/runner/workspace/church_machine/core.py:447"
+  cell $and $162
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 1
     parameter \B_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \lambda_complete [0]
-    connect \B $80 [0]
-    connect \Y $81
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $not $233
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_fault [0]
-    connect \Y $82
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $and $234
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \call_complete [0]
-    connect \B $82 [0]
-    connect \Y $83
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $not $235
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_full [0]
-    connect \Y $84
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:581"
-  cell $and $236
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $83 [0]
-    connect \B $84 [0]
-    connect \Y $85
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $not $237
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \fault_valid$245 [0]
-    connect \Y $86
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $and $238
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \complete [0]
-    connect \B $86 [0]
-    connect \Y $87
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $not $239
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \cr5_stack_empty [0]
-    connect \Y $88
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:596"
-  cell $and $240
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A $87 [0]
-    connect \B $88 [0]
-    connect \Y $89
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:587"
-  cell $add $241
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 9
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B 1'1
-    connect \Y $90
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:597"
-  cell $sub $242
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 8
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 9
-    connect \A \cr5_stack_ptr [7:0]
-    connect \B 1'1
-    connect \Y $91
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:563"
-  cell $meminit_v2 $243
-    parameter \MEMID "\\cr5_stack"
-    parameter \ABITS 0
-    parameter \WIDTH 32
-    parameter \WORDS 256
-    parameter \PRIORITY 0
-    connect \ADDR {  }
-    connect \DATA 8192'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    connect \EN 32'11111111111111111111111111111111
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  cell $memwr_v2 $244
-    parameter \MEMID "\\cr5_stack"
-    parameter \ABITS 8
-    parameter \WIDTH 32
-    parameter \CLK_ENABLE 1
-    parameter \CLK_POLARITY 1
-    parameter \PORTID 0
-    parameter \PRIORITY_MASK 0
-    connect \ADDR \cr5_stack_w_addr [7:0]
-    connect \DATA \cr5_stack_w_data [31:0]
-    connect \EN { \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] \cr5_stack_w_en [0] }
-    connect \CLK \clk [0]
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:569"
-  cell $memrd_v2 $245
-    parameter \MEMID "\\cr5_stack"
-    parameter \ABITS 8
-    parameter \WIDTH 32
-    parameter \TRANSPARENCY_MASK 1'1
-    parameter \COLLISION_X_MASK 1'0
-    parameter \ARST_VALUE 32'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    parameter \SRST_VALUE 32'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    parameter \INIT_VALUE 32'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    parameter \CE_OVER_SRST 0
-    parameter \CLK_ENABLE 1
-    parameter \CLK_POLARITY 1
-    connect \ADDR $67 [7:0]
-    connect \DATA \cr5_stack_r_data
-    connect \ARST 1'0
-    connect \SRST 1'0
-    connect \EN 1'1
-    connect \CLK \clk [0]
+    connect \B $53 [0]
+    connect \Y $54
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:205"
-  process $246
+  process $163
     assign \required_perms [5:0] 6'000000
     switch \imem_data [31:27]
       case 5'00000
@@ -4167,7 +3502,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:345"
-  process $247
+  process $164
     assign \ns_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4182,7 +3517,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
-  process $248
+  process $165
     assign \boot_cr15_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -4194,7 +3529,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
-  process $249
+  process $166
     assign \boot_cr15_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4206,7 +3541,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:355"
-  process $250
+  process $167
     assign \thrd_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4221,7 +3556,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
-  process $251
+  process $168
     assign \boot_cr8_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -4233,7 +3568,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
-  process $252
+  process $169
     assign \boot_cr8_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4245,7 +3580,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:365"
-  process $253
+  process $170
     assign \cr6_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4260,7 +3595,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
-  process $254
+  process $171
     assign \boot_cr6_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -4272,7 +3607,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
-  process $255
+  process $172
     assign \boot_cr6_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4284,7 +3619,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:375"
-  process $256
+  process $173
     assign \slot3_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4299,7 +3634,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:384"
-  process $257
+  process $174
     assign \cr7_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4314,7 +3649,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:340"
-  process $258
+  process $175
     assign \boot_cr7_wr_en [0] 1'0
     switch \boot_state [2:0]
       case 3'010
@@ -4326,7 +3661,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:341"
-  process $259
+  process $176
     assign \boot_cr7_wr_gt [31:0] 32'00000000000000000000000000000000
     switch \boot_state [2:0]
       case 3'010
@@ -4337,257 +3672,35 @@ module \top
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $260
-    assign \rt_cr8_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $36 [0]
-          case 1'1
-            assign \rt_cr8_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $261
-    assign \rt_cr8_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $36 [0]
-          case 1'1
-            assign \rt_cr8_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $262
-    assign \rt_cr9_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $37 [0]
-          case 1'1
-            assign \rt_cr9_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $263
-    assign \rt_cr9_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $37 [0]
-          case 1'1
-            assign \rt_cr9_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $264
-    assign \rt_cr10_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $38 [0]
-          case 1'1
-            assign \rt_cr10_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $265
-    assign \rt_cr10_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $38 [0]
-          case 1'1
-            assign \rt_cr10_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $266
-    assign \rt_cr11_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $39 [0]
-          case 1'1
-            assign \rt_cr11_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $267
-    assign \rt_cr11_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $39 [0]
-          case 1'1
-            assign \rt_cr11_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $268
-    assign \rt_cr12_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $40 [0]
-          case 1'1
-            assign \rt_cr12_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $269
-    assign \rt_cr12_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $40 [0]
-          case 1'1
-            assign \rt_cr12_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $270
-    assign \rt_cr13_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $41 [0]
-          case 1'1
-            assign \rt_cr13_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $271
-    assign \rt_cr13_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $41 [0]
-          case 1'1
-            assign \rt_cr13_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $272
-    assign \rt_cr14_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $42 [0]
-          case 1'1
-            assign \rt_cr14_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $273
-    assign \rt_cr14_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $42 [0]
-          case 1'1
-            assign \rt_cr14_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:394"
-  process $274
-    assign \rt_cr15_wr_en [0] 1'0
-    switch \switch_change_active [0]
-      case 1'1
-        switch $43 [0]
-          case 1'1
-            assign \rt_cr15_wr_en [0] 1'1
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:395"
-  process $275
-    assign \rt_cr15_wr_gt [31:0] 32'00000000000000000000000000000000
-    switch \switch_change_active [0]
-      case 1'1
-        switch $43 [0]
-          case 1'1
-            assign \rt_cr15_wr_gt [31:0] \cr_rd_data [31:0]
-        end
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  process $276
-    assign \cr5_stack_w_addr [7:0] 8'00000000
-    switch { $75 [0] $71 [0] }
-      case 2'-1
-        assign \cr5_stack_w_addr [7:0] \cr5_stack_ptr [7:0]
-      case 2'1-
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  process $277
-    assign \cr5_stack_w_data [31:0] 32'00000000000000000000000000000000
-    switch { $75 [0] $71 [0] }
-      case 2'-1
-        assign \cr5_stack_w_data [31:0] \saved_cr5_gt$246 [31:0]
-      case 2'1-
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:568"
-  process $278
-    assign \cr5_stack_w_en [0] 1'0
-    switch { $75 [0] $71 [0] }
-      case 2'-1
-        assign \cr5_stack_w_en [0] 1'1
-      case 2'1-
-    end
-  end
-
   attribute \src "/home/runner/workspace/church_machine/core.py:67"
-  process $279
+  process $177
     assign \fault [3:0] 4'0000
-    switch { \load_fault [0] \save_fault [0] \fault_valid$245 [0] \call_fault [0] \tperm_fault [0] \lambda_fault [0] \fault_valid$248 [0] \fault_valid$247 [0] }
+    switch { \load_fault [0] \save_fault [0] \fault_valid$233 [0] \call_fault [0] \tperm_fault [0] \lambda_fault [0] \fault_valid$229 [0] \fault_valid$228 [0] }
       case 8'-------1
-        assign \fault [3:0] \fault$253 [3:0]
+        assign \fault [3:0] \fault$236 [3:0]
       case 8'------1-
         assign \fault [3:0] \fault_type [3:0]
       case 8'-----1--
-        assign \fault [3:0] \fault_type$255 [3:0]
+        assign \fault [3:0] \fault_type$238 [3:0]
       case 8'----1---
-        assign \fault [3:0] \fault_type$256 [3:0]
+        assign \fault [3:0] \fault_type$239 [3:0]
       case 8'---1----
-        assign \fault [3:0] \fault_type$257 [3:0]
+        assign \fault [3:0] \fault_type$240 [3:0]
       case 8'--1-----
-        assign \fault [3:0] \fault_type$258 [3:0]
+        assign \fault [3:0] \fault_type$241 [3:0]
       case 8'-1------
-        assign \fault [3:0] \fault_type$259 [3:0]
+        assign \fault [3:0] \fault_type$242 [3:0]
       case 8'1-------
-        assign \fault [3:0] \fault_type$260 [3:0]
+        assign \fault [3:0] \fault_type$243 [3:0]
       case
         assign \fault [3:0] 4'0000
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:68"
-  process $280
+  process $178
     assign \fault_valid [0] 1'0
-    switch { \load_fault [0] \save_fault [0] \fault_valid$245 [0] \call_fault [0] \tperm_fault [0] \lambda_fault [0] \fault_valid$248 [0] \fault_valid$247 [0] }
+    switch { \load_fault [0] \save_fault [0] \fault_valid$233 [0] \call_fault [0] \tperm_fault [0] \lambda_fault [0] \fault_valid$229 [0] \fault_valid$228 [0] }
       case 8'-------1
         assign \fault_valid [0] 1'1
       case 8'------1-
@@ -4610,20 +3723,20 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:12"
-  process $281
+  process $179
     assign \sub_start [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
         assign \sub_start [0] \mload_start [0]
       case 3'-1-
-        assign \sub_start [0] \mload_start$279 [0]
+        assign \sub_start [0] \mload_start$262 [0]
       case 3'1--
-        assign \sub_start [0] \mload_start$286 [0]
+        assign \sub_start [0] \mload_start$269 [0]
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:13"
-  process $282
+  process $180
     assign \sub_cr_src [3:0] 4'0000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -4636,20 +3749,20 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:14"
-  process $283
+  process $181
     assign \sub_cr_dst [3:0] 4'0000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
-        assign \sub_cr_dst [3:0] { 1'0 $97 [2:0] }
+        assign \sub_cr_dst [3:0] { 1'0 $59 [2:0] }
       case 3'-1-
-        assign \sub_cr_dst [3:0] \mload_cr_dst$281 [3:0]
+        assign \sub_cr_dst [3:0] \mload_cr_dst$264 [3:0]
       case 3'1--
         assign \sub_cr_dst [3:0] \imem_data [22:19]
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:15"
-  process $284
+  process $182
     assign \sub_index [16:0] 17'00000000000000000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -4662,7 +3775,7 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:16"
-  process $285
+  process $183
     assign \sub_direct [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -4675,20 +3788,20 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:17"
-  process $286
+  process $184
     assign \sub_direct_gt [31:0] 32'00000000000000000000000000000000
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
         assign \sub_direct_gt [31:0] 32'00000000000000000000000000000000
       case 3'-1-
-        assign \sub_direct_gt [31:0] \mload_direct_gt$284 [31:0]
+        assign \sub_direct_gt [31:0] \mload_direct_gt$267 [31:0]
       case 3'1--
         assign \sub_direct_gt [31:0] 32'00000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/mload.py:18"
-  process $287
+  process $185
     assign \sub_m_elevated [0] 1'0
     switch { \load_busy [0] \busy [0] \call_busy [0] }
       case 3'--1
@@ -4696,14 +3809,14 @@ module \top
       case 3'-1-
         assign \sub_m_elevated [0] 1'1
       case 3'1--
-        assign \sub_m_elevated [0] \mload_m_elevated$292 [0]
+        assign \sub_m_elevated [0] \mload_m_elevated$275 [0]
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:41"
-  process $288
+  process $186
     assign \dmem_addr [31:0] 32'00000000000000000000000000000000
-    switch { \mem_rd_en$310 [0] \mem_wr_en$309 [0] $76 [0] }
+    switch { \mem_rd_en$292 [0] \mem_wr_en$291 [0] $49 [0] }
       case 3'--1
         assign \dmem_addr [31:0] \mem_addr [31:0]
       case 3'-1-
@@ -4714,9 +3827,9 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:42"
-  process $289
+  process $187
     assign \dmem_rd_en [0] 1'0
-    switch { \mem_rd_en$310 [0] \mem_wr_en$309 [0] $76 [0] }
+    switch { \mem_rd_en$292 [0] \mem_wr_en$291 [0] $49 [0] }
       case 3'--1
         assign \dmem_rd_en [0] \mem_rd_en [0]
       case 3'-1-
@@ -4726,21 +3839,21 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:44"
-  process $290
+  process $188
     assign \dmem_wr_data [31:0] 32'00000000000000000000000000000000
-    switch { \mem_rd_en$310 [0] \mem_wr_en$309 [0] $76 [0] }
+    switch { \mem_rd_en$292 [0] \mem_wr_en$291 [0] $49 [0] }
       case 3'--1
         assign \dmem_wr_data [31:0] 32'00000000000000000000000000000000
       case 3'-1-
-        assign \dmem_wr_data [31:0] \mem_wr_data$314 [31:0]
+        assign \dmem_wr_data [31:0] \mem_wr_data$296 [31:0]
       case 3'1--
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:45"
-  process $291
+  process $189
     assign \dmem_wr_en [0] 1'0
-    switch { \mem_rd_en$310 [0] \mem_wr_en$309 [0] $76 [0] }
+    switch { \mem_rd_en$292 [0] \mem_wr_en$291 [0] $49 [0] }
       case 3'--1
         assign \dmem_wr_en [0] 1'0
       case 3'-1-
@@ -4750,30 +3863,30 @@ module \top
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:118"
-  process $292
-    assign $92 [2:0] \boot_state [2:0]
+  process $190
+    assign $55 [2:0] \boot_state [2:0]
     switch \boot_state [2:0]
       case 3'000
         switch \boot_start [0]
           case 1'1
-            assign $92 [2:0] 3'001
+            assign $55 [2:0] 3'001
         end
       case 3'001
-        assign $92 [2:0] 3'010
+        assign $55 [2:0] 3'010
       case 3'010
-        assign $92 [2:0] 3'011
+        assign $55 [2:0] 3'011
       case 3'011
-        assign $92 [2:0] 3'100
+        assign $55 [2:0] 3'100
       case 3'100
-        assign $92 [2:0] 3'101
+        assign $55 [2:0] 3'101
       case 3'101
-        assign $92 [2:0] 3'110
+        assign $55 [2:0] 3'110
       case 3'110
-        assign $92 [2:0] 3'110
+        assign $55 [2:0] 3'110
     end
-    switch { $78 [0] \call_complete [0] \nia_set$318 [0] \nia_set [0] \clear_all [0] \reboot_request [0] }
+    switch { $51 [0] \nia_set$302 [0] \nia_set$301 [0] \nia_set [0] \clear_all [0] \reboot_request [0] }
       case 6'-----1
-        assign $92 [2:0] 3'001
+        assign $55 [2:0] 3'001
       case 6'----1-
       case 6'---1--
       case 6'--1---
@@ -4782,148 +3895,126 @@ module \top
     end
     switch \rst [0]
       case 1'1
-        assign $92 [2:0] 3'000
+        assign $55 [2:0] 3'000
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:118"
-  cell $dff $293
+  cell $dff $191
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
-    connect \D $92 [2:0]
+    connect \D $55 [2:0]
     connect \CLK \clk [0]
     connect \Q \boot_state
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:113"
-  process $294
-    assign $93 [31:0] \imem_addr [31:0]
-    switch { $78 [0] \call_complete [0] \nia_set$318 [0] \nia_set [0] \clear_all [0] \reboot_request [0] }
+  process $192
+    assign $56 [31:0] \imem_addr [31:0]
+    switch { $51 [0] \nia_set$302 [0] \nia_set$301 [0] \nia_set [0] \clear_all [0] \reboot_request [0] }
       case 6'-----1
-        assign $93 [31:0] 32'00000000000000000000000000000000
+        assign $56 [31:0] 32'00000000000000000000000000000000
       case 6'----1-
-        assign $93 [31:0] 32'00000000000000000000000000000000
+        assign $56 [31:0] 32'00000000000000000000000000000000
       case 6'---1--
-        assign $93 [31:0] \nia_value [31:0]
+        assign $56 [31:0] \nia_value [31:0]
       case 6'--1---
-        assign $93 [31:0] \nia_value$321 [31:0]
+        assign $56 [31:0] \nia_value$304 [31:0]
       case 6'-1----
-        assign $93 [31:0] 32'00000000000000000000000000000000
+        assign $56 [31:0] 32'00000000000000000000000000000000
       case 6'1-----
-        assign $93 [31:0] $79 [31:0]
+        assign $56 [31:0] $52 [31:0]
     end
     switch \rst [0]
       case 1'1
-        assign $93 [31:0] 32'00000000000000000000000000000000
+        assign $56 [31:0] 32'00000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:113"
-  cell $dff $295
+  cell $dff $193
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $93 [31:0]
+    connect \D $56 [31:0]
     connect \CLK \clk [0]
     connect \Q \imem_addr
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:115"
-  process $296
-    assign $94 [0] \lambda_active [0]
-    switch { $81 [0] \lambda_clear [0] \clear_all [0] }
+  process $194
+    assign $57 [0] \lambda_active [0]
+    switch { $54 [0] \lambda_clear [0] \clear_all [0] }
       case 3'--1
-        assign $94 [0] 1'0
+        assign $57 [0] 1'0
       case 3'-1-
-        assign $94 [0] 1'0
+        assign $57 [0] 1'0
       case 3'1--
-        assign $94 [0] 1'1
+        assign $57 [0] 1'1
     end
     switch \rst [0]
       case 1'1
-        assign $94 [0] 1'0
+        assign $57 [0] 1'0
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:115"
-  cell $dff $297
+  cell $dff $195
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $94 [0]
+    connect \D $57 [0]
     connect \CLK \clk [0]
     connect \Q \lambda_active
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:116"
-  process $298
-    assign $95 [31:0] \lambda_pc [31:0]
-    switch { $81 [0] \lambda_clear [0] \clear_all [0] }
+  process $196
+    assign $58 [31:0] \lambda_pc [31:0]
+    switch { $54 [0] \lambda_clear [0] \clear_all [0] }
       case 3'--1
-        assign $95 [31:0] 32'00000000000000000000000000000000
+        assign $58 [31:0] 32'00000000000000000000000000000000
       case 3'-1-
       case 3'1--
-        assign $95 [31:0] $52 [31:0]
+        assign $58 [31:0] $36 [31:0]
     end
     switch \rst [0]
       case 1'1
-        assign $95 [31:0] 32'00000000000000000000000000000000
+        assign $58 [31:0] 32'00000000000000000000000000000000
     end
   end
 
   attribute \src "/home/runner/workspace/church_machine/core.py:116"
-  cell $dff $299
+  cell $dff $197
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
-    connect \D $95 [31:0]
+    connect \D $58 [31:0]
     connect \CLK \clk [0]
     connect \Q \lambda_pc
   end
 
-  attribute \src "/home/runner/workspace/church_machine/core.py:565"
-  process $300
-    assign $96 [7:0] \cr5_stack_ptr [7:0]
-    switch { $89 [0] $85 [0] }
-      case 2'-1
-        assign $96 [7:0] $90 [7:0]
-      case 2'1-
-        assign $96 [7:0] $91 [7:0]
-    end
-    switch \rst [0]
-      case 1'1
-        assign $96 [7:0] 8'00000000
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/core.py:565"
-  cell $dff $301
-    parameter \WIDTH 8
-    parameter \CLK_POLARITY 1
-    connect \D $96 [7:0]
-    connect \CLK \clk [0]
-    connect \Q \cr5_stack_ptr
-  end
-
 connect \boot_state_reg \boot_state [2:0]
 connect \instruction \imem_data [31:0]
-connect \flags$29 \flags [3:0]
+connect \flags$27 \flags [3:0]
 connect \church_op \imem_data [31:27]
 connect \cr_src \imem_data [18:15]
 connect \perm_gt_sig \cr_rd_data [31:0]
 connect \gt_in \cr_rd_data [31:0]
-connect \required_perms$55 \required_perms [5:0]
-connect \gc_busy 1'0
-connect \gc_garbage_count 32'00000000000000000000000000000000
+connect \required_perms$53 \required_perms [5:0]
 connect \cr_rd_data_gt \cr_rd_data [31:0]
+connect \clist_addr 32'00000000000000000000000000000000
+connect \clist_rd_en 1'0
 connect \clist_wr_data \cr_rd_data [31:0]
+connect \clist_wr_en 1'0
 connect \flags_in 4'0000
 connect \flags_wr_en 1'0
-connect \clear_all$64 \clear_all [0]
+connect \clear_all$63 \clear_all [0]
 connect \dr_wr_addr 4'0000
 connect \dr_wr_data 32'00000000000000000000000000000000
 connect \dr_wr_en 1'0
+connect \cr_wr_en$71 1'0
+connect \cr_wr_addr$72 4'0000
+connect \cr_wr_data$77 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 connect \nia_reg \imem_addr [31:0]
-connect \flags$84 \flags [3:0]
-connect \switch_src_gt \cr_rd_data [31:0]
-connect \switch_target \imem_data [3:0]
+connect \flags$83 \flags [3:0]
 connect \boot_cr0_wr_en 1'0
 connect \rt_cr0_wr_en 1'0
 connect \rt_cr0_wr_gt 32'00000000000000000000000000000000
@@ -4952,102 +4043,115 @@ connect \rt_cr6_wr_en 1'0
 connect \rt_cr6_wr_gt 32'00000000000000000000000000000000
 connect \rt_cr7_wr_en 1'0
 connect \rt_cr7_wr_gt 32'00000000000000000000000000000000
+connect \rt_cr8_wr_en 1'0
+connect \rt_cr8_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr9_wr_en 1'0
+connect \rt_cr9_wr_en 1'0
+connect \rt_cr9_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr9_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr10_wr_en 1'0
+connect \rt_cr10_wr_en 1'0
+connect \rt_cr10_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr10_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr11_wr_en 1'0
+connect \rt_cr11_wr_en 1'0
+connect \rt_cr11_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr11_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr12_wr_en 1'0
+connect \rt_cr12_wr_en 1'0
+connect \rt_cr12_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr12_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr13_wr_en 1'0
+connect \rt_cr13_wr_en 1'0
+connect \rt_cr13_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr13_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr14_wr_en 1'0
+connect \rt_cr14_wr_en 1'0
+connect \rt_cr14_wr_gt 32'00000000000000000000000000000000
 connect \boot_cr14_wr_gt 32'00000000000000000000000000000000
+connect \rt_cr15_wr_en 1'0
+connect \rt_cr15_wr_gt 32'00000000000000000000000000000000
 connect \call_start \call_start_sig [0]
-connect \cr_src$192 \imem_data [18:15]
+connect \cr_src$187 \imem_data [18:15]
 connect \index { 2'00 \imem_data [14:0] }
 connect \cap_index \imem_data [14:0]
 connect \mask { 1'0 \imem_data [14:0] }
 connect \call_mask \imem_data [14:0]
-connect \cr_rd_data$197 \cr_rd_data [127:0]
+connect \cr_rd_data$192 \cr_rd_data [127:0]
 connect \return_start \ret_start_sig [0]
-connect \cr_src$200 \imem_data [17:15]
-connect \cr_rd_data$201 \cr_rd_data [127:0]
+connect \cr_src$195 \imem_data [17:15]
+connect \cr_rd_data$196 \cr_rd_data [127:0]
 connect \lambda_active_reg \lambda_active [0]
 connect \lambda_pc_reg \lambda_pc [31:0]
 connect \lambda_start \lambda_start_sig [0]
 connect \cr_target \imem_data [22:19]
 connect \cr_dst \imem_data [22:19]
-connect \cr_rd_data$209 \cr_rd_data [127:0]
-connect \saved_nia $52 [31:0]
+connect \cr_rd_data$204 \cr_rd_data [127:0]
+connect \saved_nia $36 [31:0]
 connect \tperm_start \tperm_start_sig [0]
-connect \cr_target$213 \imem_data [22:19]
+connect \cr_target$208 \imem_data [22:19]
 connect \preset \imem_data [3:0]
 connect \tperm_preset \imem_data [3:0]
-connect \cr_rd_data$216 \cr_rd_data [127:0]
+connect \cr_rd_data$211 \cr_rd_data [127:0]
 connect \save_start \save_start_sig [0]
-connect \cr_src$219 \imem_data [18:15]
-connect \cr_dst$220 \imem_data [22:19]
-connect \index$221 { 2'00 \imem_data [14:0] }
-connect \cr_rd_data$222 \cr_rd_data [127:0]
-connect \cr15_namespace$224 \cr15_namespace [127:0]
+connect \cr_src$214 \imem_data [18:15]
+connect \cr_dst$215 \imem_data [22:19]
+connect \index$216 { 2'00 \imem_data [14:0] }
+connect \cr_rd_data$217 \cr_rd_data [127:0]
+connect \cr15_namespace$219 \cr15_namespace [127:0]
 connect \mem_wr_done 1'1
 connect \mem_rd_data \dmem_rd_data [31:0]
 connect \mem_rd_valid 1'1
 connect \load_start \load_start_sig [0]
-connect \cr_src$230 \imem_data [18:15]
-connect \cr_dst$231 \imem_data [22:19]
-connect \index$232 { 2'00 \imem_data [14:0] }
-connect \cr5_stack_r_addr $67 [7:0]
-connect \cr_rd_data$261 \cr_rd_data [127:0]
-connect \cr15_namespace$262 \cr15_namespace [127:0]
-connect \mem_rd_data$263 \dmem_rd_data [31:0]
-connect \mem_rd_valid$264 1'1
-connect \mload_cr_dst { 1'0 $97 [2:0] }
+connect \cr_src$225 \imem_data [18:15]
+connect \cr_dst$226 \imem_data [22:19]
+connect \index$227 { 2'00 \imem_data [14:0] }
+connect \cr_rd_data$244 \cr_rd_data [127:0]
+connect \cr15_namespace$245 \cr15_namespace [127:0]
+connect \mem_rd_data$246 \dmem_rd_data [31:0]
+connect \mem_rd_valid$247 1'1
+connect \mload_cr_dst { 1'0 $59 [2:0] }
 connect \mload_direct 1'0
 connect \mload_direct_gt 32'00000000000000000000000000000000
 connect \mload_m_elevated 1'1
-connect \mload_cr_src$280 4'0000
-connect \mload_index$282 17'00000000000000000
-connect \mload_direct$283 1'1
-connect \mload_m_elevated$285 1'1
-connect \mload_cr_src$287 \imem_data [18:15]
-connect \mload_cr_dst$288 \imem_data [22:19]
-connect \mload_index$289 { 2'00 \imem_data [14:0] }
-connect \mload_direct$290 1'0
-connect \mload_direct_gt$291 32'00000000000000000000000000000000
+connect \mload_cr_src$263 4'0000
+connect \mload_index$265 17'00000000000000000
+connect \mload_direct$266 1'1
+connect \mload_m_elevated$268 1'1
+connect \mload_cr_src$270 \imem_data [18:15]
+connect \mload_cr_dst$271 \imem_data [22:19]
+connect \mload_index$272 { 2'00 \imem_data [14:0] }
+connect \mload_direct$273 1'0
+connect \mload_direct_gt$274 32'00000000000000000000000000000000
 connect \sub_done \mload_done [0]
 connect \sub_fault \mload_fault [0]
-connect \mload_fault_type \fault_type$260 [3:0]
-connect \sub_fault_type \fault_type$260 [3:0]
-connect \mload_done$299 \mload_done [0]
-connect \mload_fault$300 \mload_fault [0]
-connect \mload_fault_type$301 \fault_type$260 [3:0]
+connect \mload_fault_type \fault_type$243 [3:0]
+connect \sub_fault_type \fault_type$243 [3:0]
+connect \mload_done$282 \mload_done [0]
+connect \mload_fault$283 \mload_fault [0]
+connect \mload_fault_type$284 \fault_type$243 [3:0]
 connect \mload_busy \sub_busy [0]
-connect \mload_done$303 \mload_done [0]
-connect \mload_fault$304 \mload_fault [0]
-connect \mload_fault_type$305 \fault_type$260 [3:0]
+connect \mload_done$286 \mload_done [0]
+connect \mload_fault$287 \mload_fault [0]
+connect \mload_fault_type$288 \fault_type$243 [3:0]
 connect \mem_wr_en 1'0
 connect \mem_wr_data 32'00000000000000000000000000000000
-connect \nia_set$319 \call_complete [0]
-connect \nia_value$322 32'00000000000000000000000000000000
+connect \ns_wr_data 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+connect \nia_value$305 32'00000000000000000000000000000000
 connect \ns_addr 32'00000000000000000000000000000000
 connect \ns_rd_en 1'0
 connect \ns_wr_en 1'0
-connect \ns_wr_data 96'000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-connect \clist_addr 32'00000000000000000000000000000000
-connect \clist_rd_en 1'0
-connect \clist_wr_en 1'0
+connect \gc_busy 1'0
+connect \gc_garbage_count 32'00000000000000000000000000000000
 connect \nia \imem_addr [31:0]
 connect \flags.N \flags [0]
 connect \flags.Z \flags [1]
 connect \flags.C \flags [2]
 connect \flags.V \flags [3]
-connect \flags$29.N \flags [0]
-connect \flags$29.Z \flags [1]
-connect \flags$29.C \flags [2]
-connect \flags$29.V \flags [3]
+connect \flags$27.N \flags [0]
+connect \flags$27.Z \flags [1]
+connect \flags$27.C \flags [2]
+connect \flags$27.V \flags [3]
 connect \perm_gt_sig.gt_type \cr_rd_data [1:0]
 connect \perm_gt_sig.perms \cr_rd_data [7:2]
 connect \perm_gt_sig.index \cr_rd_data [24:8]
@@ -5084,6 +4188,14 @@ connect \cr_wr_data.word0_gt.version \cr_wr_data [31:25]
 connect \cr_wr_data.word1_location \cr_wr_data [63:32]
 connect \cr_wr_data.word2_limit \cr_wr_data [95:64]
 connect \cr_wr_data.word3_seals \cr_wr_data [127:96]
+connect \cr_wr_data$77.word0_gt 32'00000000000000000000000000000000
+connect \cr_wr_data$77.word0_gt.gt_type 2'00
+connect \cr_wr_data$77.word0_gt.perms 6'000000
+connect \cr_wr_data$77.word0_gt.index 17'00000000000000000
+connect \cr_wr_data$77.word0_gt.version 7'0000000
+connect \cr_wr_data$77.word1_location 32'00000000000000000000000000000000
+connect \cr_wr_data$77.word2_limit 32'00000000000000000000000000000000
+connect \cr_wr_data$77.word3_seals 32'00000000000000000000000000000000
 connect \cr_wr_data$78.word0_gt \cr_wr_data$78 [31:0]
 connect \cr_wr_data$78.word0_gt.gt_type \cr_wr_data$78 [1:0]
 connect \cr_wr_data$78.word0_gt.perms \cr_wr_data$78 [7:2]
@@ -5108,18 +4220,10 @@ connect \cr_wr_data$80.word0_gt.version \cr_wr_data$80 [31:25]
 connect \cr_wr_data$80.word1_location \cr_wr_data$80 [63:32]
 connect \cr_wr_data$80.word2_limit \cr_wr_data$80 [95:64]
 connect \cr_wr_data$80.word3_seals \cr_wr_data$80 [127:96]
-connect \cr_wr_data$81.word0_gt \cr_wr_data$81 [31:0]
-connect \cr_wr_data$81.word0_gt.gt_type \cr_wr_data$81 [1:0]
-connect \cr_wr_data$81.word0_gt.perms \cr_wr_data$81 [7:2]
-connect \cr_wr_data$81.word0_gt.index \cr_wr_data$81 [24:8]
-connect \cr_wr_data$81.word0_gt.version \cr_wr_data$81 [31:25]
-connect \cr_wr_data$81.word1_location \cr_wr_data$81 [63:32]
-connect \cr_wr_data$81.word2_limit \cr_wr_data$81 [95:64]
-connect \cr_wr_data$81.word3_seals \cr_wr_data$81 [127:96]
-connect \flags$84.N \flags [0]
-connect \flags$84.Z \flags [1]
-connect \flags$84.C \flags [2]
-connect \flags$84.V \flags [3]
+connect \flags$83.N \flags [0]
+connect \flags$83.Z \flags [1]
+connect \flags$83.C \flags [2]
+connect \flags$83.V \flags [3]
 connect \ns_gt.gt_type \ns_gt [1:0]
 connect \ns_gt.perms \ns_gt [7:2]
 connect \ns_gt.index \ns_gt [24:8]
@@ -5156,42 +4260,6 @@ connect \boot_cr7_wr_gt.gt_type \boot_cr7_wr_gt [1:0]
 connect \boot_cr7_wr_gt.perms \boot_cr7_wr_gt [7:2]
 connect \boot_cr7_wr_gt.index \boot_cr7_wr_gt [24:8]
 connect \boot_cr7_wr_gt.version \boot_cr7_wr_gt [31:25]
-connect \switch_src_gt.gt_type \cr_rd_data [1:0]
-connect \switch_src_gt.perms \cr_rd_data [7:2]
-connect \switch_src_gt.index \cr_rd_data [24:8]
-connect \switch_src_gt.version \cr_rd_data [31:25]
-connect \rt_cr8_wr_gt.gt_type \rt_cr8_wr_gt [1:0]
-connect \rt_cr8_wr_gt.perms \rt_cr8_wr_gt [7:2]
-connect \rt_cr8_wr_gt.index \rt_cr8_wr_gt [24:8]
-connect \rt_cr8_wr_gt.version \rt_cr8_wr_gt [31:25]
-connect \rt_cr9_wr_gt.gt_type \rt_cr9_wr_gt [1:0]
-connect \rt_cr9_wr_gt.perms \rt_cr9_wr_gt [7:2]
-connect \rt_cr9_wr_gt.index \rt_cr9_wr_gt [24:8]
-connect \rt_cr9_wr_gt.version \rt_cr9_wr_gt [31:25]
-connect \rt_cr10_wr_gt.gt_type \rt_cr10_wr_gt [1:0]
-connect \rt_cr10_wr_gt.perms \rt_cr10_wr_gt [7:2]
-connect \rt_cr10_wr_gt.index \rt_cr10_wr_gt [24:8]
-connect \rt_cr10_wr_gt.version \rt_cr10_wr_gt [31:25]
-connect \rt_cr11_wr_gt.gt_type \rt_cr11_wr_gt [1:0]
-connect \rt_cr11_wr_gt.perms \rt_cr11_wr_gt [7:2]
-connect \rt_cr11_wr_gt.index \rt_cr11_wr_gt [24:8]
-connect \rt_cr11_wr_gt.version \rt_cr11_wr_gt [31:25]
-connect \rt_cr12_wr_gt.gt_type \rt_cr12_wr_gt [1:0]
-connect \rt_cr12_wr_gt.perms \rt_cr12_wr_gt [7:2]
-connect \rt_cr12_wr_gt.index \rt_cr12_wr_gt [24:8]
-connect \rt_cr12_wr_gt.version \rt_cr12_wr_gt [31:25]
-connect \rt_cr13_wr_gt.gt_type \rt_cr13_wr_gt [1:0]
-connect \rt_cr13_wr_gt.perms \rt_cr13_wr_gt [7:2]
-connect \rt_cr13_wr_gt.index \rt_cr13_wr_gt [24:8]
-connect \rt_cr13_wr_gt.version \rt_cr13_wr_gt [31:25]
-connect \rt_cr14_wr_gt.gt_type \rt_cr14_wr_gt [1:0]
-connect \rt_cr14_wr_gt.perms \rt_cr14_wr_gt [7:2]
-connect \rt_cr14_wr_gt.index \rt_cr14_wr_gt [24:8]
-connect \rt_cr14_wr_gt.version \rt_cr14_wr_gt [31:25]
-connect \rt_cr15_wr_gt.gt_type \rt_cr15_wr_gt [1:0]
-connect \rt_cr15_wr_gt.perms \rt_cr15_wr_gt [7:2]
-connect \rt_cr15_wr_gt.index \rt_cr15_wr_gt [24:8]
-connect \rt_cr15_wr_gt.version \rt_cr15_wr_gt [31:25]
 connect \cr0_gt_wr_data.gt_type \cr0_gt_wr_data [1:0]
 connect \cr0_gt_wr_data.perms \cr0_gt_wr_data [7:2]
 connect \cr0_gt_wr_data.index \cr0_gt_wr_data [24:8]
@@ -5284,10 +4352,18 @@ connect \cr8_gt_wr_data.gt_type \cr8_gt_wr_data [1:0]
 connect \cr8_gt_wr_data.perms \cr8_gt_wr_data [7:2]
 connect \cr8_gt_wr_data.index \cr8_gt_wr_data [24:8]
 connect \cr8_gt_wr_data.version \cr8_gt_wr_data [31:25]
+connect \rt_cr8_wr_gt.gt_type 2'00
+connect \rt_cr8_wr_gt.perms 6'000000
+connect \rt_cr8_wr_gt.index 17'00000000000000000
+connect \rt_cr8_wr_gt.version 7'0000000
 connect \cr9_gt_wr_data.gt_type \cr9_gt_wr_data [1:0]
 connect \cr9_gt_wr_data.perms \cr9_gt_wr_data [7:2]
 connect \cr9_gt_wr_data.index \cr9_gt_wr_data [24:8]
 connect \cr9_gt_wr_data.version \cr9_gt_wr_data [31:25]
+connect \rt_cr9_wr_gt.gt_type 2'00
+connect \rt_cr9_wr_gt.perms 6'000000
+connect \rt_cr9_wr_gt.index 17'00000000000000000
+connect \rt_cr9_wr_gt.version 7'0000000
 connect \boot_cr9_wr_gt.gt_type 2'00
 connect \boot_cr9_wr_gt.perms 6'000000
 connect \boot_cr9_wr_gt.index 17'00000000000000000
@@ -5296,6 +4372,10 @@ connect \cr10_gt_wr_data.gt_type \cr10_gt_wr_data [1:0]
 connect \cr10_gt_wr_data.perms \cr10_gt_wr_data [7:2]
 connect \cr10_gt_wr_data.index \cr10_gt_wr_data [24:8]
 connect \cr10_gt_wr_data.version \cr10_gt_wr_data [31:25]
+connect \rt_cr10_wr_gt.gt_type 2'00
+connect \rt_cr10_wr_gt.perms 6'000000
+connect \rt_cr10_wr_gt.index 17'00000000000000000
+connect \rt_cr10_wr_gt.version 7'0000000
 connect \boot_cr10_wr_gt.gt_type 2'00
 connect \boot_cr10_wr_gt.perms 6'000000
 connect \boot_cr10_wr_gt.index 17'00000000000000000
@@ -5304,6 +4384,10 @@ connect \cr11_gt_wr_data.gt_type \cr11_gt_wr_data [1:0]
 connect \cr11_gt_wr_data.perms \cr11_gt_wr_data [7:2]
 connect \cr11_gt_wr_data.index \cr11_gt_wr_data [24:8]
 connect \cr11_gt_wr_data.version \cr11_gt_wr_data [31:25]
+connect \rt_cr11_wr_gt.gt_type 2'00
+connect \rt_cr11_wr_gt.perms 6'000000
+connect \rt_cr11_wr_gt.index 17'00000000000000000
+connect \rt_cr11_wr_gt.version 7'0000000
 connect \boot_cr11_wr_gt.gt_type 2'00
 connect \boot_cr11_wr_gt.perms 6'000000
 connect \boot_cr11_wr_gt.index 17'00000000000000000
@@ -5312,6 +4396,10 @@ connect \cr12_gt_wr_data.gt_type \cr12_gt_wr_data [1:0]
 connect \cr12_gt_wr_data.perms \cr12_gt_wr_data [7:2]
 connect \cr12_gt_wr_data.index \cr12_gt_wr_data [24:8]
 connect \cr12_gt_wr_data.version \cr12_gt_wr_data [31:25]
+connect \rt_cr12_wr_gt.gt_type 2'00
+connect \rt_cr12_wr_gt.perms 6'000000
+connect \rt_cr12_wr_gt.index 17'00000000000000000
+connect \rt_cr12_wr_gt.version 7'0000000
 connect \boot_cr12_wr_gt.gt_type 2'00
 connect \boot_cr12_wr_gt.perms 6'000000
 connect \boot_cr12_wr_gt.index 17'00000000000000000
@@ -5320,6 +4408,10 @@ connect \cr13_gt_wr_data.gt_type \cr13_gt_wr_data [1:0]
 connect \cr13_gt_wr_data.perms \cr13_gt_wr_data [7:2]
 connect \cr13_gt_wr_data.index \cr13_gt_wr_data [24:8]
 connect \cr13_gt_wr_data.version \cr13_gt_wr_data [31:25]
+connect \rt_cr13_wr_gt.gt_type 2'00
+connect \rt_cr13_wr_gt.perms 6'000000
+connect \rt_cr13_wr_gt.index 17'00000000000000000
+connect \rt_cr13_wr_gt.version 7'0000000
 connect \boot_cr13_wr_gt.gt_type 2'00
 connect \boot_cr13_wr_gt.perms 6'000000
 connect \boot_cr13_wr_gt.index 17'00000000000000000
@@ -5328,6 +4420,10 @@ connect \cr14_gt_wr_data.gt_type \cr14_gt_wr_data [1:0]
 connect \cr14_gt_wr_data.perms \cr14_gt_wr_data [7:2]
 connect \cr14_gt_wr_data.index \cr14_gt_wr_data [24:8]
 connect \cr14_gt_wr_data.version \cr14_gt_wr_data [31:25]
+connect \rt_cr14_wr_gt.gt_type 2'00
+connect \rt_cr14_wr_gt.perms 6'000000
+connect \rt_cr14_wr_gt.index 17'00000000000000000
+connect \rt_cr14_wr_gt.version 7'0000000
 connect \boot_cr14_wr_gt.gt_type 2'00
 connect \boot_cr14_wr_gt.perms 6'000000
 connect \boot_cr14_wr_gt.index 17'00000000000000000
@@ -5336,46 +4432,50 @@ connect \cr15_gt_wr_data.gt_type \cr15_gt_wr_data [1:0]
 connect \cr15_gt_wr_data.perms \cr15_gt_wr_data [7:2]
 connect \cr15_gt_wr_data.index \cr15_gt_wr_data [24:8]
 connect \cr15_gt_wr_data.version \cr15_gt_wr_data [31:25]
-connect \cr_rd_data$197.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$197.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$197.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$197.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$197.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$197.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$197.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$197.word3_seals \cr_rd_data [127:96]
-connect \cr_rd_data$201.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$201.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$201.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$201.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$201.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$201.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$201.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$201.word3_seals \cr_rd_data [127:96]
-connect \cr_rd_data$209.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$209.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$209.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$209.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$209.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$209.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$209.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$209.word3_seals \cr_rd_data [127:96]
-connect \cr_rd_data$216.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$216.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$216.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$216.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$216.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$216.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$216.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$216.word3_seals \cr_rd_data [127:96]
-connect \cr_rd_data$222.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$222.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$222.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$222.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$222.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$222.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$222.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$222.word3_seals \cr_rd_data [127:96]
+connect \rt_cr15_wr_gt.gt_type 2'00
+connect \rt_cr15_wr_gt.perms 6'000000
+connect \rt_cr15_wr_gt.index 17'00000000000000000
+connect \rt_cr15_wr_gt.version 7'0000000
+connect \cr_rd_data$192.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$192.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$192.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$192.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$192.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$192.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$192.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$192.word3_seals \cr_rd_data [127:96]
+connect \cr_rd_data$196.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$196.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$196.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$196.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$196.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$196.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$196.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$196.word3_seals \cr_rd_data [127:96]
+connect \cr_rd_data$204.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$204.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$204.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$204.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$204.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$204.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$204.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$204.word3_seals \cr_rd_data [127:96]
+connect \cr_rd_data$211.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$211.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$211.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$211.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$211.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$211.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$211.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$211.word3_seals \cr_rd_data [127:96]
+connect \cr_rd_data$217.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$217.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$217.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$217.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$217.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$217.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$217.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$217.word3_seals \cr_rd_data [127:96]
 connect \cr15_namespace.word0_gt \cr15_namespace [31:0]
 connect \cr15_namespace.word0_gt.gt_type \cr15_namespace [1:0]
 connect \cr15_namespace.word0_gt.perms \cr15_namespace [7:2]
@@ -5384,30 +4484,30 @@ connect \cr15_namespace.word0_gt.version \cr15_namespace [31:25]
 connect \cr15_namespace.word1_location \cr15_namespace [63:32]
 connect \cr15_namespace.word2_limit \cr15_namespace [95:64]
 connect \cr15_namespace.word3_seals \cr15_namespace [127:96]
-connect \cr15_namespace$224.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$224.word0_gt.gt_type \cr15_namespace [1:0]
-connect \cr15_namespace$224.word0_gt.perms \cr15_namespace [7:2]
-connect \cr15_namespace$224.word0_gt.index \cr15_namespace [24:8]
-connect \cr15_namespace$224.word0_gt.version \cr15_namespace [31:25]
-connect \cr15_namespace$224.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$224.word2_limit \cr15_namespace [95:64]
-connect \cr15_namespace$224.word3_seals \cr15_namespace [127:96]
-connect \cr_rd_data$261.word0_gt \cr_rd_data [31:0]
-connect \cr_rd_data$261.word0_gt.gt_type \cr_rd_data [1:0]
-connect \cr_rd_data$261.word0_gt.perms \cr_rd_data [7:2]
-connect \cr_rd_data$261.word0_gt.index \cr_rd_data [24:8]
-connect \cr_rd_data$261.word0_gt.version \cr_rd_data [31:25]
-connect \cr_rd_data$261.word1_location \cr_rd_data [63:32]
-connect \cr_rd_data$261.word2_limit \cr_rd_data [95:64]
-connect \cr_rd_data$261.word3_seals \cr_rd_data [127:96]
-connect \cr15_namespace$262.word0_gt \cr15_namespace [31:0]
-connect \cr15_namespace$262.word0_gt.gt_type \cr15_namespace [1:0]
-connect \cr15_namespace$262.word0_gt.perms \cr15_namespace [7:2]
-connect \cr15_namespace$262.word0_gt.index \cr15_namespace [24:8]
-connect \cr15_namespace$262.word0_gt.version \cr15_namespace [31:25]
-connect \cr15_namespace$262.word1_location \cr15_namespace [63:32]
-connect \cr15_namespace$262.word2_limit \cr15_namespace [95:64]
-connect \cr15_namespace$262.word3_seals \cr15_namespace [127:96]
+connect \cr15_namespace$219.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$219.word0_gt.gt_type \cr15_namespace [1:0]
+connect \cr15_namespace$219.word0_gt.perms \cr15_namespace [7:2]
+connect \cr15_namespace$219.word0_gt.index \cr15_namespace [24:8]
+connect \cr15_namespace$219.word0_gt.version \cr15_namespace [31:25]
+connect \cr15_namespace$219.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$219.word2_limit \cr15_namespace [95:64]
+connect \cr15_namespace$219.word3_seals \cr15_namespace [127:96]
+connect \cr_rd_data$244.word0_gt \cr_rd_data [31:0]
+connect \cr_rd_data$244.word0_gt.gt_type \cr_rd_data [1:0]
+connect \cr_rd_data$244.word0_gt.perms \cr_rd_data [7:2]
+connect \cr_rd_data$244.word0_gt.index \cr_rd_data [24:8]
+connect \cr_rd_data$244.word0_gt.version \cr_rd_data [31:25]
+connect \cr_rd_data$244.word1_location \cr_rd_data [63:32]
+connect \cr_rd_data$244.word2_limit \cr_rd_data [95:64]
+connect \cr_rd_data$244.word3_seals \cr_rd_data [127:96]
+connect \cr15_namespace$245.word0_gt \cr15_namespace [31:0]
+connect \cr15_namespace$245.word0_gt.gt_type \cr15_namespace [1:0]
+connect \cr15_namespace$245.word0_gt.perms \cr15_namespace [7:2]
+connect \cr15_namespace$245.word0_gt.index \cr15_namespace [24:8]
+connect \cr15_namespace$245.word0_gt.version \cr15_namespace [31:25]
+connect \cr15_namespace$245.word1_location \cr15_namespace [63:32]
+connect \cr15_namespace$245.word2_limit \cr15_namespace [95:64]
+connect \cr15_namespace$245.word3_seals \cr15_namespace [127:96]
 
 end
 
@@ -11226,26 +10326,26 @@ connect \cr_rd_data.word3_seals \cr_rd_data [127:96]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/church_machine/call.py:45"
+attribute \src "/home/runner/workspace/church_machine/call.py:43"
 module \top.u_call
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:70"
+  attribute \src "/home/runner/workspace/church_machine/call.py:66"
   wire width 1 \src_in_range
 
   attribute \src "/home/runner/workspace/church_machine/call.py:11"
   wire width 4 \cr_src
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:53"
+  attribute \src "/home/runner/workspace/church_machine/call.py:49"
   attribute \init 1'0
   wire width 1 \phase
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:78"
+  attribute \src "/home/runner/workspace/church_machine/call.py:74"
   wire width 4 \mload_dst
 
   attribute \src "/home/runner/workspace/church_machine/call.py:12"
   wire width 17 \index
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:58"
+  attribute \src "/home/runner/workspace/church_machine/call.py:54"
   attribute \init 1'0
   wire width 1 \sub_start_reg
 
@@ -11267,77 +10367,77 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:30"
   wire width 32 \mload_direct_gt
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:67"
+  attribute \src "/home/runner/workspace/church_machine/call.py:63"
   wire width 4 \b_clear_wr_addr
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 128 \b_clear_wr_data
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:66"
+  attribute \src "/home/runner/workspace/church_machine/call.py:62"
   wire width 1 \b_clear_wr_en
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:62"
+  attribute \src "/home/runner/workspace/church_machine/call.py:58"
   wire width 4 \local_cr_rd_addr
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:107"
+  attribute \src "/home/runner/workspace/church_machine/call.py:103"
   wire width 16 \dr_clear_computed
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:55"
+  attribute \src "/home/runner/workspace/church_machine/call.py:51"
   attribute \init 16'0000000000000000
   wire width 16 \mask_latched
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:108"
+  attribute \src "/home/runner/workspace/church_machine/call.py:104"
   wire width 16 \cr_clear_computed
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
   attribute \init 4'0000
   wire width 4 \call_state
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  attribute \init 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-  wire width 128 \src_reg_latched
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:64"
+  attribute \src "/home/runner/workspace/church_machine/call.py:60"
   attribute \init 3'000
   wire width 3 \b_idx
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:199"
+  attribute \src "/home/runner/workspace/church_machine/call.py:188"
   wire width 32 \cleared_limit
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   attribute \init 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 128 \b_cr_data
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:56"
+  attribute \src "/home/runner/workspace/church_machine/call.py:52"
   attribute \init 1'0
   wire width 1 \fault_latched
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:57"
+  attribute \src "/home/runner/workspace/church_machine/call.py:53"
   attribute \init 4'0000
   wire width 4 \fault_type_latched
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:39"
+  attribute \src "/home/runner/workspace/church_machine/call.py:37"
   wire width 1 \nia_set
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:40"
+  attribute \src "/home/runner/workspace/church_machine/call.py:38"
   wire width 32 \nia_value
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:41"
+  attribute \src "/home/runner/workspace/church_machine/call.py:39"
   wire width 16 \dr_clear_mask
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:42"
+  attribute \src "/home/runner/workspace/church_machine/call.py:40"
   wire width 16 \cr_clear_mask
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:59"
+  attribute \src "/home/runner/workspace/church_machine/call.py:55"
   attribute \init 1'0
   wire width 1 \sub_done_latched
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:60"
+  attribute \src "/home/runner/workspace/church_machine/call.py:56"
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
   attribute \src "/home/runner/workspace/church_machine/call.py:13"
   wire width 16 \mask
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  attribute \init 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+  wire width 128 \src_reg_latched
 
   wire width 19 input 0  \port$0$2
 
@@ -11356,7 +10456,7 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:26"
   wire width 4 output 5  \mload_src
 
-  wire width 3 output 6  \port$571$0
+  wire width 3 output 6  \port$505$0
 
   attribute \src "/home/runner/workspace/church_machine/call.py:28"
   wire width 17 output 7  \mload_index
@@ -11364,7 +10464,7 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:14"
   wire width 1 output 8  \call_busy
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:39"
+  attribute \src "/home/runner/workspace/church_machine/call.py:37"
   wire width 1 output 9  \call_complete
 
   attribute \src "/home/runner/workspace/church_machine/call.py:34"
@@ -11373,36 +10473,32 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:33"
   wire width 1 input 11  \mload_done
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:62"
+  attribute \src "/home/runner/workspace/church_machine/call.py:58"
   wire width 4 output 12  \cr_rd_addr
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 128 output 13  \cr_wr_data
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:66"
+  attribute \src "/home/runner/workspace/church_machine/call.py:62"
   wire width 1 output 14  \cr_wr_en
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:67"
+  attribute \src "/home/runner/workspace/church_machine/call.py:63"
   wire width 4 output 15  \cr_wr_addr
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:56"
+  attribute \src "/home/runner/workspace/church_machine/call.py:52"
   attribute \init 1'0
   wire width 1 output 16  \call_fault
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:57"
+  attribute \src "/home/runner/workspace/church_machine/call.py:53"
   attribute \init 4'0000
   wire width 4 output 17  \fault_type
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:37"
-  attribute \init 32'00000000000000000000000000000000
-  wire width 32 output 18  \saved_cr5_gt
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:58"
+  attribute \src "/home/runner/workspace/church_machine/call.py:54"
   attribute \init 1'0
-  wire width 1 output 19  \mload_start
+  wire width 1 output 18  \mload_start
 
   attribute \src "/home/runner/workspace/church_machine/call.py:35"
-  wire width 4 input 20  \mload_fault_type
+  wire width 4 input 19  \mload_fault_type
 
   wire width 3 $1
 
@@ -11414,9 +10510,9 @@ module \top.u_call
 
   wire width 1 $5
 
-  wire width 1 $6
+  wire width 33 $6
 
-  wire width 33 $7
+  wire width 1 $7
 
   wire width 1 $8
 
@@ -11448,37 +10544,31 @@ module \top.u_call
 
   wire width 1 $22
 
-  wire width 1 $23
+  wire width 4 $23
 
-  wire width 1 $24
+  wire width 4 $24
 
-  wire width 4 $25
+  wire width 1 $25
 
-  wire width 4 $26
+  wire width 1 $26
 
-  wire width 1 $27
+  wire width 4 $27
 
   wire width 1 $28
 
-  wire width 4 $29
+  wire width 1 $29
 
-  wire width 1 $30
+  wire width 16 $30
 
-  wire width 1 $31
+  wire width 4 $31
 
-  wire width 16 $32
+  wire width 128 $32
 
-  wire width 4 $33
+  wire width 1 $33
 
-  wire width 128 $34
+  wire width 3 $34
 
-  wire width 32 $35
-
-  wire width 1 $36
-
-  wire width 3 $37
-
-  wire width 128 $38
+  wire width 128 $35
 
   attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data.word0_gt
@@ -11504,77 +10594,77 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:22"
   wire width 32 \cr_wr_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 32 \b_clear_wr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 2 \b_clear_wr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 6 \b_clear_wr_data.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 17 \b_clear_wr_data.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 7 \b_clear_wr_data.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 32 \b_clear_wr_data.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 32 \b_clear_wr_data.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
   wire width 32 \b_clear_wr_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 32 \src_reg_latched.word0_gt
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 2 \src_reg_latched.word0_gt.gt_type
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 6 \src_reg_latched.word0_gt.perms
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 17 \src_reg_latched.word0_gt.index
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 7 \src_reg_latched.word0_gt.version
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 32 \src_reg_latched.word1_location
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 32 \src_reg_latched.word2_limit
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  wire width 32 \src_reg_latched.word3_seals
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 32 \b_cr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 2 \b_cr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 6 \b_cr_data.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 17 \b_cr_data.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 7 \b_cr_data.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 32 \b_cr_data.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 32 \b_cr_data.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
   wire width 32 \b_cr_data.word3_seals
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 32 \src_reg_latched.word0_gt
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 2 \src_reg_latched.word0_gt.gt_type
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 6 \src_reg_latched.word0_gt.perms
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 17 \src_reg_latched.word0_gt.index
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 7 \src_reg_latched.word0_gt.version
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 32 \src_reg_latched.word1_location
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 32 \src_reg_latched.word2_limit
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  wire width 32 \src_reg_latched.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
   wire width 32 \cr_rd_data.word0_gt
@@ -11600,8 +10690,8 @@ module \top.u_call
   attribute \src "/home/runner/workspace/church_machine/call.py:20"
   wire width 32 \cr_rd_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:71"
-  cell $le $39
+  attribute \src "/home/runner/workspace/church_machine/call.py:67"
+  cell $le $36
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11612,8 +10702,8 @@ module \top.u_call
     connect \Y \src_in_range
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:81"
-  cell $mux $40
+  attribute \src "/home/runner/workspace/church_machine/call.py:77"
+  cell $mux $37
     parameter \WIDTH 4
     connect \S \phase [0]
     connect \A \port$0$2 [18:15]
@@ -11621,8 +10711,8 @@ module \top.u_call
     connect \Y \mload_src
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:82"
-  cell $mux $41
+  attribute \src "/home/runner/workspace/church_machine/call.py:78"
+  cell $mux $38
     parameter \WIDTH 3
     connect \S \phase [0]
     connect \A 3'110
@@ -11630,8 +10720,8 @@ module \top.u_call
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:83"
-  cell $mux $42
+  attribute \src "/home/runner/workspace/church_machine/call.py:79"
+  cell $mux $39
     parameter \WIDTH 17
     connect \S \phase [0]
     connect \A { 2'00 \port$0$2 [14:0] }
@@ -11639,8 +10729,8 @@ module \top.u_call
     connect \Y \mload_index
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:110"
-  cell $not $43
+  attribute \src "/home/runner/workspace/church_machine/call.py:106"
+  cell $not $40
     parameter \A_SIGNED 0
     parameter \A_WIDTH 5
     parameter \Y_WIDTH 5
@@ -11648,8 +10738,8 @@ module \top.u_call
     connect \Y $2
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:111"
-  cell $not $44
+  attribute \src "/home/runner/workspace/church_machine/call.py:107"
+  cell $not $41
     parameter \A_SIGNED 0
     parameter \A_WIDTH 6
     parameter \Y_WIDTH 6
@@ -11657,17 +10747,8 @@ module \top.u_call
     connect \Y $3
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:136"
-  cell $not $45
-    parameter \A_SIGNED 0
-    parameter \A_WIDTH 1
-    parameter \Y_WIDTH 1
-    connect \A \src_reg_latched [5]
-    connect \Y $4
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:184"
-  cell $gt $46
+  attribute \src "/home/runner/workspace/church_machine/call.py:173"
+  cell $gt $42
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -11675,11 +10756,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \b_idx [2:0]
     connect \B 3'101
-    connect \Y $5
+    connect \Y $4
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:186"
-  cell $shift $47
+  attribute \src "/home/runner/workspace/church_machine/call.py:175"
+  cell $shift $43
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 6
@@ -11687,11 +10768,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \mask_latched [10:5]
     connect \B \b_idx [2:0]
-    connect \Y $6
+    connect \Y $5
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:200"
-  cell $and $48
+  attribute \src "/home/runner/workspace/church_machine/call.py:189"
+  cell $and $44
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 33
@@ -11699,20 +10780,20 @@ module \top.u_call
     parameter \Y_WIDTH 33
     connect \A { 1'0 \b_cr_data [95:64] }
     connect \B 33'101111111111111111111111111111111
-    connect \Y $7
+    connect \Y $6
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:220"
-  cell $not $49
+  attribute \src "/home/runner/workspace/church_machine/call.py:209"
+  cell $not $45
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
-    connect \A $8 [0]
+    connect \A $7 [0]
     connect \Y \call_busy
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:226"
-  cell $mux $50
+  attribute \src "/home/runner/workspace/church_machine/call.py:215"
+  cell $mux $46
     parameter \WIDTH 16
     connect \S \call_complete [0]
     connect \A 16'0000000000000000
@@ -11720,8 +10801,8 @@ module \top.u_call
     connect \Y \dr_clear_mask
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:227"
-  cell $mux $51
+  attribute \src "/home/runner/workspace/church_machine/call.py:216"
+  cell $mux $47
     parameter \WIDTH 16
     connect \S \call_complete [0]
     connect \A 16'0000000000000000
@@ -11730,7 +10811,7 @@ module \top.u_call
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $52
+  cell $eq $48
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11738,11 +10819,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B {  }
-    connect \Y $8
+    connect \Y $7
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $53
+  cell $eq $49
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11750,11 +10831,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 1'1
-    connect \Y $9
+    connect \Y $8
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $54
+  cell $eq $50
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11762,11 +10843,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 2'10
-    connect \Y $10
+    connect \Y $9
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $55
+  cell $eq $51
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11774,11 +10855,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 2'11
-    connect \Y $11
+    connect \Y $10
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $56
+  cell $eq $52
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11786,11 +10867,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 3'100
-    connect \Y $12
+    connect \Y $11
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $57
+  cell $eq $53
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11798,11 +10879,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 3'101
-    connect \Y $13
+    connect \Y $12
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $58
+  cell $eq $54
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11810,11 +10891,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 3'110
-    connect \Y $14
+    connect \Y $13
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $59
+  cell $eq $55
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -11822,7 +10903,55 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
     connect \B 3'111
+    connect \Y $14
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $56
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 1
+    connect \A \call_state [3:0]
+    connect \B 4'1000
     connect \Y $15
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $57
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 1
+    connect \A \call_state [3:0]
+    connect \B 4'1001
+    connect \Y $16
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $58
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 1
+    connect \A \call_state [3:0]
+    connect \B 4'1010
+    connect \Y \call_complete
+  end
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
+  cell $eq $59
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 4
+    parameter \B_WIDTH 4
+    parameter \Y_WIDTH 1
+    connect \A \call_state [3:0]
+    connect \B 4'1011
+    connect \Y $17
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
@@ -11833,90 +10962,30 @@ module \top.u_call
     parameter \B_WIDTH 4
     parameter \Y_WIDTH 1
     connect \A \call_state [3:0]
-    connect \B 4'1000
-    connect \Y $16
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $61
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \call_state [3:0]
-    connect \B 4'1001
-    connect \Y $17
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $62
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \call_state [3:0]
-    connect \B 4'1010
+    connect \B 4'1100
     connect \Y $18
   end
 
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $63
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \call_state [3:0]
-    connect \B 4'1011
-    connect \Y \call_complete
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $64
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \call_state [3:0]
-    connect \B 4'1100
-    connect \Y $19
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $65
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \call_state [3:0]
-    connect \B 4'1101
-    connect \Y $20
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:124"
-  cell $not $66
+  attribute \src "/home/runner/workspace/church_machine/call.py:120"
+  cell $not $61
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \src_in_range [0]
-    connect \Y $21
+    connect \Y $19
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:136"
-  cell $not $67
+  attribute \src "/home/runner/workspace/church_machine/call.py:132"
+  cell $not $62
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \src_reg_latched [5]
-    connect \Y $22
+    connect \Y $20
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:184"
-  cell $gt $68
+  attribute \src "/home/runner/workspace/church_machine/call.py:173"
+  cell $gt $63
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 3
@@ -11924,11 +10993,11 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \b_idx [2:0]
     connect \B 3'101
-    connect \Y $23
+    connect \Y $21
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:186"
-  cell $shift $69
+  attribute \src "/home/runner/workspace/church_machine/call.py:175"
+  cell $shift $64
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 6
@@ -11936,35 +11005,35 @@ module \top.u_call
     parameter \Y_WIDTH 1
     connect \A \mask_latched [10:5]
     connect \B \b_idx [2:0]
+    connect \Y $22
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:179"
+  cell $add $65
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 3
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 4
+    connect \A \b_idx [2:0]
+    connect \B 1'1
+    connect \Y $23
+  end
+
+  attribute \src "/home/runner/workspace/church_machine/call.py:199"
+  cell $add $66
+    parameter \A_SIGNED 0
+    parameter \B_SIGNED 0
+    parameter \A_WIDTH 3
+    parameter \B_WIDTH 1
+    parameter \Y_WIDTH 4
+    connect \A \b_idx [2:0]
+    connect \B 1'1
     connect \Y $24
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:190"
-  cell $add $70
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 4
-    connect \A \b_idx [2:0]
-    connect \B 1'1
-    connect \Y $25
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:210"
-  cell $add $71
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 3
-    parameter \B_WIDTH 1
-    parameter \Y_WIDTH 4
-    connect \A \b_idx [2:0]
-    connect \B 1'1
-    connect \Y $26
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:62"
-  process $72
+  attribute \src "/home/runner/workspace/church_machine/call.py:58"
+  process $67
     assign \cr_rd_addr [3:0] 4'0000
     switch \call_state [3:0]
       case 4'0000
@@ -11973,34 +11042,27 @@ module \top.u_call
       case 4'0011
         assign \cr_rd_addr [3:0] \port$0$2 [18:15]
       case 4'0100
-        switch $4 [0]
-          case 1'1
-          case
-            assign \cr_rd_addr [3:0] 4'0101
-        end
       case 4'0101
-        assign \cr_rd_addr [3:0] 4'0101
       case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-        switch { $6 [0] $5 [0] }
+        switch { $5 [0] $4 [0] }
           case 2'-1
           case 2'1-
             assign \cr_rd_addr [3:0] { 1'0 \b_idx [2:0] }
           case
         end
-      case 4'1100
-        assign \cr_rd_addr [3:0] { 1'0 \b_idx [2:0] }
-      case 4'1101
       case 4'1011
+        assign \cr_rd_addr [3:0] { 1'0 \b_idx [2:0] }
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:199"
-  process $73
+  attribute \src "/home/runner/workspace/church_machine/call.py:188"
+  process $68
     assign \cleared_limit [31:0] 32'00000000000000000000000000000000
     switch \call_state [3:0]
       case 4'0000
@@ -12012,17 +11074,16 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
-        assign \cleared_limit [31:0] $7 [31:0]
       case 4'1011
+      case 4'1100
+        assign \cleared_limit [31:0] $6 [31:0]
+      case 4'1010
       case 4'0010
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:68"
-  process $74
+  attribute \src "/home/runner/workspace/church_machine/call.py:64"
+  process $69
     assign \cr_wr_data [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     switch \call_state [3:0]
       case 4'0000
@@ -12034,20 +11095,19 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
+      case 4'1011
       case 4'1100
-      case 4'1101
         assign \cr_wr_data [31:0] \b_cr_data [31:0]
         assign \cr_wr_data [63:32] \b_cr_data [63:32]
         assign \cr_wr_data [95:64] \cleared_limit [31:0]
         assign \cr_wr_data [127:96] \b_cr_data [127:96]
-      case 4'1011
+      case 4'1010
       case 4'0010
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:66"
-  process $75
+  attribute \src "/home/runner/workspace/church_machine/call.py:62"
+  process $70
     assign \cr_wr_en [0] 1'0
     switch \call_state [3:0]
       case 4'0000
@@ -12059,17 +11119,16 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
-        assign \cr_wr_en [0] 1'1
       case 4'1011
+      case 4'1100
+        assign \cr_wr_en [0] 1'1
+      case 4'1010
       case 4'0010
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:67"
-  process $76
+  attribute \src "/home/runner/workspace/church_machine/call.py:63"
+  process $71
     assign \cr_wr_addr [3:0] 4'0000
     switch \call_state [3:0]
       case 4'0000
@@ -12081,253 +11140,247 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
-        assign \cr_wr_addr [3:0] { 1'0 \b_idx [2:0] }
       case 4'1011
+      case 4'1100
+        assign \cr_wr_addr [3:0] { 1'0 \b_idx [2:0] }
+      case 4'1010
       case 4'0010
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:53"
-  process $77
-    assign $27 [0] \phase [0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:49"
+  process $72
+    assign $25 [0] \phase [0]
     switch \call_state [3:0]
       case 4'0000
-        assign $27 [0] 1'0
+        assign $25 [0] 1'0
       case 4'0001
       case 4'0011
       case 4'0100
       case 4'0101
       case 4'0110
+        assign $25 [0] 1'1
       case 4'0111
-        assign $27 [0] 1'1
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $27 [0] 1'0
+        assign $25 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:53"
-  cell $dff $78
+  attribute \src "/home/runner/workspace/church_machine/call.py:49"
+  cell $dff $73
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $27 [0]
+    connect \D $25 [0]
     connect \CLK \clk [0]
     connect \Q \phase
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:56"
-  process $79
-    assign $28 [0] \call_fault [0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:52"
+  process $74
+    assign $26 [0] \call_fault [0]
     switch \call_state [3:0]
       case 4'0000
-        assign $28 [0] 1'0
+        assign $26 [0] 1'0
       case 4'0001
-        switch $21 [0]
+        switch $19 [0]
           case 1'1
-            assign $28 [0] 1'1
+            assign $26 [0] 1'1
           case
         end
       case 4'0011
       case 4'0100
-        switch $22 [0]
+        switch $20 [0]
           case 1'1
-            assign $28 [0] 1'1
+            assign $26 [0] 1'1
           case
         end
       case 4'0101
+        switch \mload_fault [0]
+          case 1'1
+            assign $26 [0] 1'1
+        end
       case 4'0110
-        switch \mload_fault [0]
-          case 1'1
-            assign $28 [0] 1'1
-        end
       case 4'0111
-      case 4'1000
         switch \mload_fault [0]
           case 1'1
-            assign $28 [0] 1'1
+            assign $26 [0] 1'1
         end
+      case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $28 [0] 1'0
+        assign $26 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:56"
-  cell $dff $80
+  attribute \src "/home/runner/workspace/church_machine/call.py:52"
+  cell $dff $75
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $28 [0]
+    connect \D $26 [0]
     connect \CLK \clk [0]
     connect \Q \call_fault
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:57"
-  process $81
-    assign $29 [3:0] \fault_type [3:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:53"
+  process $76
+    assign $27 [3:0] \fault_type [3:0]
     switch \call_state [3:0]
       case 4'0000
-        assign $29 [3:0] 4'0000
+        assign $27 [3:0] 4'0000
       case 4'0001
-        switch $21 [0]
+        switch $19 [0]
           case 1'1
-            assign $29 [3:0] 4'0100
+            assign $27 [3:0] 4'0100
           case
         end
       case 4'0011
       case 4'0100
-        switch $22 [0]
+        switch $20 [0]
           case 1'1
-            assign $29 [3:0] 4'0100
+            assign $27 [3:0] 4'0100
           case
         end
       case 4'0101
+        switch \mload_fault [0]
+          case 1'1
+            assign $27 [3:0] \mload_fault_type [3:0]
+        end
       case 4'0110
-        switch \mload_fault [0]
-          case 1'1
-            assign $29 [3:0] \mload_fault_type [3:0]
-        end
       case 4'0111
-      case 4'1000
         switch \mload_fault [0]
           case 1'1
-            assign $29 [3:0] \mload_fault_type [3:0]
+            assign $27 [3:0] \mload_fault_type [3:0]
         end
+      case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $29 [3:0] 4'0000
+        assign $27 [3:0] 4'0000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:57"
-  cell $dff $82
+  attribute \src "/home/runner/workspace/church_machine/call.py:53"
+  cell $dff $77
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $29 [3:0]
+    connect \D $27 [3:0]
     connect \CLK \clk [0]
     connect \Q \fault_type
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:59"
-  process $83
-    assign $30 [0] \sub_done_latched [0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:55"
+  process $78
+    assign $28 [0] \sub_done_latched [0]
     switch \call_state [3:0]
       case 4'0000
-        assign $30 [0] 1'0
+        assign $28 [0] 1'0
       case 4'0001
       case 4'0011
       case 4'0100
       case 4'0101
+        switch \mload_done [0]
+          case 1'1
+            assign $28 [0] 1'1
+        end
       case 4'0110
-        switch \mload_done [0]
-          case 1'1
-            assign $30 [0] 1'1
-        end
+        assign $28 [0] 1'0
       case 4'0111
-        assign $30 [0] 1'0
-      case 4'1000
         switch \mload_done [0]
           case 1'1
-            assign $30 [0] 1'1
+            assign $28 [0] 1'1
         end
+      case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $30 [0] 1'0
+        assign $28 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:59"
-  cell $dff $84
+  attribute \src "/home/runner/workspace/church_machine/call.py:55"
+  cell $dff $79
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $30 [0]
+    connect \D $28 [0]
     connect \CLK \clk [0]
     connect \Q \sub_done_latched
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:60"
-  process $85
-    assign $31 [0] \sub_fault_latched [0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:56"
+  process $80
+    assign $29 [0] \sub_fault_latched [0]
     switch \call_state [3:0]
       case 4'0000
-        assign $31 [0] 1'0
+        assign $29 [0] 1'0
       case 4'0001
       case 4'0011
       case 4'0100
       case 4'0101
+        switch \mload_fault [0]
+          case 1'1
+            assign $29 [0] 1'1
+        end
       case 4'0110
-        switch \mload_fault [0]
-          case 1'1
-            assign $31 [0] 1'1
-        end
+        assign $29 [0] 1'0
       case 4'0111
-        assign $31 [0] 1'0
-      case 4'1000
         switch \mload_fault [0]
           case 1'1
-            assign $31 [0] 1'1
+            assign $29 [0] 1'1
         end
+      case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $31 [0] 1'0
+        assign $29 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:60"
-  cell $dff $86
+  attribute \src "/home/runner/workspace/church_machine/call.py:56"
+  cell $dff $81
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $31 [0]
+    connect \D $29 [0]
     connect \CLK \clk [0]
     connect \Q \sub_fault_latched
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:55"
-  process $87
-    assign $32 [15:0] \mask_latched [15:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:51"
+  process $82
+    assign $30 [15:0] \mask_latched [15:0]
     switch \call_state [3:0]
       case 4'0000
         switch \call_start [0]
           case 1'1
-            assign $32 [15:0] { 1'0 \port$0$2 [14:0] }
+            assign $30 [15:0] { 1'0 \port$0$2 [14:0] }
         end
       case 4'0001
       case 4'0011
@@ -12337,215 +11390,179 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $32 [15:0] 16'0000000000000000
+        assign $30 [15:0] 16'0000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:55"
-  cell $dff $88
+  attribute \src "/home/runner/workspace/church_machine/call.py:51"
+  cell $dff $83
     parameter \WIDTH 16
     parameter \CLK_POLARITY 1
-    connect \D $32 [15:0]
+    connect \D $30 [15:0]
     connect \CLK \clk [0]
     connect \Q \mask_latched
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  process $89
-    assign $33 [3:0] \call_state [3:0]
+  process $84
+    assign $31 [3:0] \call_state [3:0]
     switch \call_state [3:0]
       case 4'0000
         switch \call_start [0]
           case 1'1
-            assign $33 [3:0] 4'0001
+            assign $31 [3:0] 4'0001
         end
       case 4'0001
-        switch $21 [0]
+        switch $19 [0]
           case 1'1
-            assign $33 [3:0] 4'0010
+            assign $31 [3:0] 4'0010
           case
-            assign $33 [3:0] 4'0011
+            assign $31 [3:0] 4'0011
         end
       case 4'0011
-        assign $33 [3:0] 4'0100
+        assign $31 [3:0] 4'0100
       case 4'0100
-        switch $22 [0]
+        switch $20 [0]
           case 1'1
-            assign $33 [3:0] 4'0010
+            assign $31 [3:0] 4'0010
           case
-            assign $33 [3:0] 4'0101
+            assign $31 [3:0] 4'0101
         end
       case 4'0101
-        assign $33 [3:0] 4'0110
+        switch { \sub_done_latched [0] \sub_fault_latched [0] }
+          case 2'-1
+            assign $31 [3:0] 4'0010
+          case 2'1-
+            assign $31 [3:0] 4'0110
+        end
       case 4'0110
-        switch { \sub_done_latched [0] \sub_fault_latched [0] }
-          case 2'-1
-            assign $33 [3:0] 4'0010
-          case 2'1-
-            assign $33 [3:0] 4'0111
-        end
+        assign $31 [3:0] 4'0111
       case 4'0111
-        assign $33 [3:0] 4'1000
-      case 4'1000
         switch { \sub_done_latched [0] \sub_fault_latched [0] }
           case 2'-1
-            assign $33 [3:0] 4'0010
+            assign $31 [3:0] 4'0010
           case 2'1-
-            assign $33 [3:0] 4'1001
+            assign $31 [3:0] 4'1000
         end
+      case 4'1000
+        assign $31 [3:0] 4'1001
       case 4'1001
-        assign $33 [3:0] 4'1010
-      case 4'1010
-        switch { $24 [0] $23 [0] }
+        switch { $22 [0] $21 [0] }
           case 2'-1
-            assign $33 [3:0] 4'1011
+            assign $31 [3:0] 4'1010
           case 2'1-
-            assign $33 [3:0] 4'1100
+            assign $31 [3:0] 4'1011
           case
         end
-      case 4'1100
-        assign $33 [3:0] 4'1101
-      case 4'1101
-        assign $33 [3:0] 4'1010
       case 4'1011
-        assign $33 [3:0] 4'0000
+        assign $31 [3:0] 4'1100
+      case 4'1100
+        assign $31 [3:0] 4'1001
+      case 4'1010
+        assign $31 [3:0] 4'0000
       case 4'0010
-        assign $33 [3:0] 4'0000
+        assign $31 [3:0] 4'0000
     end
     switch \rst [0]
       case 1'1
-        assign $33 [3:0] 4'0000
+        assign $31 [3:0] 4'0000
     end
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  cell $dff $90
+  cell $dff $85
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $33 [3:0]
+    connect \D $31 [3:0]
     connect \CLK \clk [0]
     connect \Q \call_state
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  process $91
-    assign $34 [127:0] \src_reg_latched [127:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  process $86
+    assign $32 [127:0] \src_reg_latched [127:0]
     switch \call_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0011
-        assign $34 [127:0] \cr_rd_data [127:0]
+        assign $32 [127:0] \cr_rd_data [127:0]
       case 4'0100
       case 4'0101
       case 4'0110
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $34 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+        assign $32 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:54"
-  cell $dff $92
+  attribute \src "/home/runner/workspace/church_machine/call.py:50"
+  cell $dff $87
     parameter \WIDTH 128
     parameter \CLK_POLARITY 1
-    connect \D $34 [127:0]
+    connect \D $32 [127:0]
     connect \CLK \clk [0]
     connect \Q \src_reg_latched
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:37"
-  process $93
-    assign $35 [31:0] \saved_cr5_gt [31:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:54"
+  process $88
+    assign $33 [0] \mload_start [0]
     switch \call_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0011
       case 4'0100
+        switch $20 [0]
+          case 1'1
+          case
+            assign $33 [0] 1'1
+        end
       case 4'0101
-        assign $35 [31:0] \cr_rd_data [31:0]
+        assign $33 [0] 1'0
       case 4'0110
+        assign $33 [0] 1'1
       case 4'0111
+        assign $33 [0] 1'0
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
       case 4'1011
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $35 [31:0] 32'00000000000000000000000000000000
+        assign $33 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:37"
-  cell $dff $94
-    parameter \WIDTH 32
-    parameter \CLK_POLARITY 1
-    connect \D $35 [31:0]
-    connect \CLK \clk [0]
-    connect \Q \saved_cr5_gt
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:58"
-  process $95
-    assign $36 [0] \mload_start [0]
-    switch \call_state [3:0]
-      case 4'0000
-      case 4'0001
-      case 4'0011
-      case 4'0100
-      case 4'0101
-        assign $36 [0] 1'1
-      case 4'0110
-        assign $36 [0] 1'0
-      case 4'0111
-        assign $36 [0] 1'1
-      case 4'1000
-        assign $36 [0] 1'0
-      case 4'1001
-      case 4'1010
-      case 4'1100
-      case 4'1101
-      case 4'1011
-      case 4'0010
-    end
-    switch \rst [0]
-      case 1'1
-        assign $36 [0] 1'0
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/call.py:58"
-  cell $dff $96
+  attribute \src "/home/runner/workspace/church_machine/call.py:54"
+  cell $dff $89
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $36 [0]
+    connect \D $33 [0]
     connect \CLK \clk [0]
     connect \Q \mload_start
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:64"
-  process $97
-    assign $37 [2:0] \b_idx [2:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:60"
+  process $90
+    assign $34 [2:0] \b_idx [2:0]
     switch \call_state [3:0]
       case 4'0000
       case 4'0001
@@ -12555,39 +11572,38 @@ module \top.u_call
       case 4'0110
       case 4'0111
       case 4'1000
+        assign $34 [2:0] 3'000
       case 4'1001
-        assign $37 [2:0] 3'000
-      case 4'1010
-        switch { $24 [0] $23 [0] }
+        switch { $22 [0] $21 [0] }
           case 2'-1
           case 2'1-
           case
-            assign $37 [2:0] $25 [2:0]
+            assign $34 [2:0] $23 [2:0]
         end
-      case 4'1100
-      case 4'1101
-        assign $37 [2:0] $26 [2:0]
       case 4'1011
+      case 4'1100
+        assign $34 [2:0] $24 [2:0]
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $37 [2:0] 3'000
+        assign $34 [2:0] 3'000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:64"
-  cell $dff $98
+  attribute \src "/home/runner/workspace/church_machine/call.py:60"
+  cell $dff $91
     parameter \WIDTH 3
     parameter \CLK_POLARITY 1
-    connect \D $37 [2:0]
+    connect \D $34 [2:0]
     connect \CLK \clk [0]
     connect \Q \b_idx
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
-  process $99
-    assign $38 [127:0] \b_cr_data [127:0]
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
+  process $92
+    assign $35 [127:0] \b_cr_data [127:0]
     switch \call_state [3:0]
       case 4'0000
       case 4'0001
@@ -12598,24 +11614,23 @@ module \top.u_call
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1100
-        assign $38 [127:0] \cr_rd_data [127:0]
-      case 4'1101
       case 4'1011
+        assign $35 [127:0] \cr_rd_data [127:0]
+      case 4'1100
+      case 4'1010
       case 4'0010
     end
     switch \rst [0]
       case 1'1
-        assign $38 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+        assign $35 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/call.py:65"
-  cell $dff $100
+  attribute \src "/home/runner/workspace/church_machine/call.py:61"
+  cell $dff $93
     parameter \WIDTH 128
     parameter \CLK_POLARITY 1
-    connect \D $38 [127:0]
+    connect \D $35 [127:0]
     connect \CLK \clk [0]
     connect \Q \b_cr_data
   end
@@ -12641,7 +11656,7 @@ connect \fault_type_latched \fault_type [3:0]
 connect \nia_set \call_complete [0]
 connect \nia_value 32'00000000000000000000000000000000
 connect \mask { 1'0 \port$0$2 [14:0] }
-connect \port$571$0 $1 [2:0]
+connect \port$505$0 $1 [2:0]
 connect \cr_wr_data.word0_gt \cr_wr_data [31:0]
 connect \cr_wr_data.word0_gt.gt_type \cr_wr_data [1:0]
 connect \cr_wr_data.word0_gt.perms \cr_wr_data [7:2]
@@ -12658,14 +11673,6 @@ connect \b_clear_wr_data.word0_gt.version \cr_wr_data [31:25]
 connect \b_clear_wr_data.word1_location \cr_wr_data [63:32]
 connect \b_clear_wr_data.word2_limit \cr_wr_data [95:64]
 connect \b_clear_wr_data.word3_seals \cr_wr_data [127:96]
-connect \src_reg_latched.word0_gt \src_reg_latched [31:0]
-connect \src_reg_latched.word0_gt.gt_type \src_reg_latched [1:0]
-connect \src_reg_latched.word0_gt.perms \src_reg_latched [7:2]
-connect \src_reg_latched.word0_gt.index \src_reg_latched [24:8]
-connect \src_reg_latched.word0_gt.version \src_reg_latched [31:25]
-connect \src_reg_latched.word1_location \src_reg_latched [63:32]
-connect \src_reg_latched.word2_limit \src_reg_latched [95:64]
-connect \src_reg_latched.word3_seals \src_reg_latched [127:96]
 connect \b_cr_data.word0_gt \b_cr_data [31:0]
 connect \b_cr_data.word0_gt.gt_type \b_cr_data [1:0]
 connect \b_cr_data.word0_gt.perms \b_cr_data [7:2]
@@ -12674,6 +11681,14 @@ connect \b_cr_data.word0_gt.version \b_cr_data [31:25]
 connect \b_cr_data.word1_location \b_cr_data [63:32]
 connect \b_cr_data.word2_limit \b_cr_data [95:64]
 connect \b_cr_data.word3_seals \b_cr_data [127:96]
+connect \src_reg_latched.word0_gt \src_reg_latched [31:0]
+connect \src_reg_latched.word0_gt.gt_type \src_reg_latched [1:0]
+connect \src_reg_latched.word0_gt.perms \src_reg_latched [7:2]
+connect \src_reg_latched.word0_gt.index \src_reg_latched [24:8]
+connect \src_reg_latched.word0_gt.version \src_reg_latched [31:25]
+connect \src_reg_latched.word1_location \src_reg_latched [63:32]
+connect \src_reg_latched.word2_limit \src_reg_latched [95:64]
+connect \src_reg_latched.word3_seals \src_reg_latched [127:96]
 connect \cr_rd_data.word0_gt \cr_rd_data [31:0]
 connect \cr_rd_data.word0_gt.gt_type \cr_rd_data [1:0]
 connect \cr_rd_data.word0_gt.perms \cr_rd_data [7:2]
@@ -12686,21 +11701,21 @@ connect \cr_rd_data.word3_seals \cr_rd_data [127:96]
 end
 
 attribute \generator "Amaranth"
-attribute \src "/home/runner/workspace/church_machine/ret.py:46"
+attribute \src "/home/runner/workspace/church_machine/ret.py:44"
 module \top.u_return
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:57"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:51"
   wire width 1 \is_null_cap
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   attribute \init 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
   wire width 128 \return_cap
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:68"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:62"
   attribute \init 2'00
   wire width 2 \phase
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:71"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:65"
   attribute \init 1'0
   wire width 1 \sub_start_reg
 
@@ -12720,37 +11735,49 @@ module \top.u_return
   wire width 1 \mload_m_elevated
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:32"
-  wire width 32 \mload_direct_gt$13
+  wire width 32 \mload_direct_gt$12
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:77"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:20"
+  wire width 4 \cr_wr_addr
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:71"
   wire width 4 \local_cr_wr_addr
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:21"
+  wire width 128 \cr_wr_data
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 128 \local_cr_wr_data
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:76"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:22"
+  wire width 1 \cr_wr_en
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:70"
   wire width 1 \local_cr_wr_en
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:75"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
   wire width 1 \local_cr_rd_en
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
   attribute \init 4'0000
   wire width 4 \ret_state
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:13"
+  wire width 1 \complete
+
+  attribute \src "/home/runner/workspace/church_machine/ret.py:63"
   attribute \init 1'0
   wire width 1 \fault_flag
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:70"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:64"
   attribute \init 4'0000
   wire width 4 \fault_latched
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:66"
   attribute \init 1'0
   wire width 1 \sub_done_latched
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:73"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:67"
   attribute \init 1'0
   wire width 1 \sub_fault_latched
 
@@ -12766,74 +11793,59 @@ module \top.u_return
   attribute \src "/home/runner/workspace/church_machine/ret.py:10"
   wire width 1 input 3  \return_start
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:39"
-  wire width 32 input 4  \saved_cr5_gt
-
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
-  wire width 128 input 5  \cr_rd_data
+  wire width 128 input 4  \cr_rd_data
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:18"
-  wire width 4 output 6  \cr_rd_addr
+  wire width 4 output 5  \cr_rd_addr
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:12"
-  wire width 1 output 7  \busy
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:13"
-  wire width 1 output 8  \complete
+  wire width 1 output 6  \busy
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:16"
-  wire width 1 output 9  \reboot_request
+  wire width 1 output 7  \reboot_request
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:36"
-  wire width 1 input 10  \mload_fault
+  wire width 1 input 8  \mload_fault
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:35"
-  wire width 1 input 11  \mload_done
+  wire width 1 input 9  \mload_done
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:41"
-  wire width 1 input 12  \lambda_active
+  attribute \src "/home/runner/workspace/church_machine/ret.py:39"
+  wire width 1 input 10  \lambda_active
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:42"
-  wire width 32 input 13  \lambda_pc
+  attribute \src "/home/runner/workspace/church_machine/ret.py:40"
+  wire width 32 input 11  \lambda_pc
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:29"
-  wire width 4 output 14  \mload_dst
+  wire width 4 output 12  \mload_dst
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:32"
-  wire width 32 output 15  \mload_direct_gt
+  wire width 32 output 13  \mload_direct_gt
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:24"
-  wire width 1 output 16  \nia_set
+  wire width 1 output 14  \nia_set
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:25"
-  wire width 32 output 17  \nia_value
+  wire width 32 output 15  \nia_value
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:43"
-  wire width 1 output 18  \lambda_clear
+  attribute \src "/home/runner/workspace/church_machine/ret.py:41"
+  wire width 1 output 16  \lambda_clear
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:76"
-  wire width 1 output 19  \cr_wr_en
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:77"
-  wire width 4 output 20  \cr_wr_addr
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
-  wire width 128 output 21  \cr_wr_data
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:63"
   attribute \init 1'0
-  wire width 1 output 22  \fault_valid
+  wire width 1 output 17  \fault_valid
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:70"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:64"
   attribute \init 4'0000
-  wire width 4 output 23  \fault_type
+  wire width 4 output 18  \fault_type
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:71"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:65"
   attribute \init 1'0
-  wire width 1 output 24  \mload_start
+  wire width 1 output 19  \mload_start
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:37"
-  wire width 4 input 25  \mload_fault_type
+  wire width 4 input 20  \mload_fault_type
 
   wire width 33 $1
 
@@ -12863,48 +11875,42 @@ module \top.u_return
 
   wire width 1 $14
 
-  wire width 1 $15
+  wire width 4 $15
 
-  wire width 1 $16
+  wire width 2 $16
 
   wire width 1 $17
 
-  wire width 4 $18
+  wire width 1 $18
 
-  wire width 2 $19
+  wire width 4 $19
 
-  wire width 1 $20
+  wire width 128 $20
 
   wire width 1 $21
 
-  wire width 4 $22
-
-  wire width 128 $23
-
-  wire width 1 $24
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 32 \return_cap.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 2 \return_cap.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 6 \return_cap.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 17 \return_cap.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 7 \return_cap.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 32 \return_cap.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 32 \return_cap.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
   wire width 32 \return_cap.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:21"
@@ -12931,28 +11937,28 @@ module \top.u_return
   attribute \src "/home/runner/workspace/church_machine/ret.py:21"
   wire width 32 \cr_wr_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 32 \local_cr_wr_data.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 2 \local_cr_wr_data.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 6 \local_cr_wr_data.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 17 \local_cr_wr_data.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 7 \local_cr_wr_data.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 32 \local_cr_wr_data.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 32 \local_cr_wr_data.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
+  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
   wire width 32 \local_cr_wr_data.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
@@ -12979,8 +11985,8 @@ module \top.u_return
   attribute \src "/home/runner/workspace/church_machine/ret.py:19"
   wire width 32 \cr_rd_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:58"
-  cell $eq $25
+  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
+  cell $eq $22
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 2
@@ -12991,8 +11997,8 @@ module \top.u_return
     connect \Y \is_null_cap
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:116"
-  cell $mux $26
+  attribute \src "/home/runner/workspace/church_machine/ret.py:105"
+  cell $mux $23
     parameter \WIDTH 4
     connect \S \local_cr_rd_en [0]
     connect \A 4'0000
@@ -13000,8 +12006,8 @@ module \top.u_return
     connect \Y \cr_rd_addr
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:218"
-  cell $add $27
+  attribute \src "/home/runner/workspace/church_machine/ret.py:181"
+  cell $add $24
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 32
@@ -13012,8 +12018,8 @@ module \top.u_return
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:232"
-  cell $not $28
+  attribute \src "/home/runner/workspace/church_machine/ret.py:195"
+  cell $not $25
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
@@ -13022,7 +12028,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $29
+  cell $eq $26
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13034,7 +12040,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $30
+  cell $eq $27
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13046,7 +12052,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $31
+  cell $eq $28
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13058,7 +12064,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $32
+  cell $eq $29
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13070,7 +12076,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $33
+  cell $eq $30
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13082,7 +12088,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $34
+  cell $eq $31
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13094,7 +12100,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $35
+  cell $eq $32
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13106,7 +12112,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $36
+  cell $eq $33
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13118,7 +12124,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $37
+  cell $eq $34
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13130,7 +12136,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $38
+  cell $eq $35
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13142,7 +12148,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $39
+  cell $eq $36
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13154,7 +12160,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $40
+  cell $eq $37
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
     parameter \A_WIDTH 4
@@ -13165,66 +12171,28 @@ module \top.u_return
     connect \Y $11
   end
 
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $41
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \ret_state [3:0]
-    connect \B 4'1100
-    connect \Y $12
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $42
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \ret_state [3:0]
-    connect \B 4'1101
-    connect \Y $13
-  end
-
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/hdl/_dsl.py:486"
-  cell $eq $43
-    parameter \A_SIGNED 0
-    parameter \B_SIGNED 0
-    parameter \A_WIDTH 4
-    parameter \B_WIDTH 4
-    parameter \Y_WIDTH 1
-    connect \A \ret_state [3:0]
-    connect \B 4'1110
-    connect \Y $14
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:145"
-  cell $not $44
+  attribute \src "/home/runner/workspace/church_machine/ret.py:134"
+  cell $not $38
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \return_cap [7]
-    connect \Y $15
+    connect \Y $12
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:178"
-  cell $not $45
+  attribute \src "/home/runner/workspace/church_machine/ret.py:141"
+  cell $not $39
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
     parameter \Y_WIDTH 1
     connect \A \return_cap [71]
-    connect \Y $16
+    connect \Y $13
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:80"
-  process $46
+  attribute \src "/home/runner/workspace/church_machine/ret.py:74"
+  process $40
     assign \mload_dst [3:0] 4'0000
     switch \phase [1:0]
-      case 2'00
-        assign \mload_dst [3:0] 4'0101
       case 2'01
         assign \mload_dst [3:0] 4'0110
       case
@@ -13232,12 +12200,10 @@ module \top.u_return
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:81"
-  process $47
+  attribute \src "/home/runner/workspace/church_machine/ret.py:75"
+  process $41
     assign \mload_direct_gt [31:0] 32'00000000000000000000000000000000
     switch \phase [1:0]
-      case 2'00
-        assign \mload_direct_gt [31:0] \saved_cr5_gt [31:0]
       case 2'01
         assign \mload_direct_gt [31:0] \return_cap [95:64]
       case
@@ -13246,7 +12212,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:24"
-  process $48
+  process $42
     assign \nia_set [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
@@ -13259,9 +12225,6 @@ module \top.u_return
       case 4'1001
       case 4'1010
       case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
         assign \nia_set [0] 1'1
       case 4'0011
       case 4'0101
@@ -13270,7 +12233,7 @@ module \top.u_return
   end
 
   attribute \src "/home/runner/workspace/church_machine/ret.py:25"
-  process $49
+  process $43
     assign \nia_value [31:0] 32'00000000000000000000000000000000
     switch \ret_state [3:0]
       case 4'0000
@@ -13283,9 +12246,6 @@ module \top.u_return
       case 4'1001
       case 4'1010
       case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
         assign \nia_value [31:0] $1 [31:0]
       case 4'0011
       case 4'0101
@@ -13293,8 +12253,8 @@ module \top.u_return
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:43"
-  process $50
+  attribute \src "/home/runner/workspace/church_machine/ret.py:41"
+  process $44
     assign \lambda_clear [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
@@ -13307,17 +12267,14 @@ module \top.u_return
       case 4'1001
       case 4'1010
       case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:75"
-  process $51
+  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
+  process $45
     assign \local_cr_rd_en [0] 1'0
     switch \ret_state [3:0]
       case 4'0000
@@ -13330,512 +12287,387 @@ module \top.u_return
       case 4'1001
       case 4'1010
       case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:76"
-  process $52
-    assign \cr_wr_en [0] 1'0
+  attribute \src "/home/runner/workspace/church_machine/ret.py:63"
+  process $46
+    assign $14 [0] \fault_valid [0]
     switch \ret_state [3:0]
       case 4'0000
+        assign $14 [0] 1'0
       case 4'0001
       case 4'0010
       case 4'0100
-      case 4'0111
-      case 4'1000
-        assign \cr_wr_en [0] 1'1
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
-      case 4'0011
-      case 4'0101
-      case 4'0110
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:77"
-  process $53
-    assign \cr_wr_addr [3:0] 4'0000
-    switch \ret_state [3:0]
-      case 4'0000
-      case 4'0001
-      case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-        assign \cr_wr_addr [3:0] 4'0101
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
-      case 4'0011
-      case 4'0101
-      case 4'0110
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:78"
-  process $54
-    assign \cr_wr_data [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-    switch \ret_state [3:0]
-      case 4'0000
-      case 4'0001
-      case 4'0010
-      case 4'0100
-      case 4'0111
-      case 4'1000
-        assign \cr_wr_data [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-      case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
-      case 4'0011
-      case 4'0101
-      case 4'0110
-    end
-  end
-
-  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
-  process $55
-    assign $17 [0] \fault_valid [0]
-    switch \ret_state [3:0]
-      case 4'0000
-        assign $17 [0] 1'0
-      case 4'0001
-      case 4'0010
-      case 4'0100
-        switch { $15 [0] \is_null_cap [0] }
+        switch { $12 [0] \is_null_cap [0] }
           case 2'-1
           case 2'1-
-            assign $17 [0] 1'1
+            assign $14 [0] 1'1
           case
         end
       case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-        switch $16 [0]
+        switch $13 [0]
           case 1'1
-            assign $17 [0] 1'1
+            assign $14 [0] 1'1
           case
         end
+      case 4'1000
+        switch \mload_fault [0]
+          case 1'1
+            assign $14 [0] 1'1
+        end
+      case 4'1001
+      case 4'1010
+        switch \mload_fault [0]
+          case 1'1
+            assign $14 [0] 1'1
+        end
       case 4'1011
-        switch \mload_fault [0]
-          case 1'1
-            assign $17 [0] 1'1
-        end
-      case 4'1100
-      case 4'1101
-        switch \mload_fault [0]
-          case 1'1
-            assign $17 [0] 1'1
-        end
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $17 [0] 1'0
+        assign $14 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:69"
-  cell $dff $56
+  attribute \src "/home/runner/workspace/church_machine/ret.py:63"
+  cell $dff $47
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $17 [0]
+    connect \D $14 [0]
     connect \CLK \clk [0]
     connect \Q \fault_valid
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:70"
-  process $57
-    assign $18 [3:0] \fault_type [3:0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:64"
+  process $48
+    assign $15 [3:0] \fault_type [3:0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $18 [3:0] 4'0000
+        assign $15 [3:0] 4'0000
       case 4'0001
       case 4'0010
       case 4'0100
-        switch { $15 [0] \is_null_cap [0] }
+        switch { $12 [0] \is_null_cap [0] }
           case 2'-1
           case 2'1-
-            assign $18 [3:0] 4'0110
+            assign $15 [3:0] 4'0110
           case
         end
       case 4'0111
-      case 4'1000
-      case 4'1001
-      case 4'1010
-        switch $16 [0]
+        switch $13 [0]
           case 1'1
-            assign $18 [3:0] 4'0110
+            assign $15 [3:0] 4'0110
           case
         end
+      case 4'1000
+        switch \mload_fault [0]
+          case 1'1
+            assign $15 [3:0] \mload_fault_type [3:0]
+        end
+      case 4'1001
+      case 4'1010
+        switch \mload_fault [0]
+          case 1'1
+            assign $15 [3:0] \mload_fault_type [3:0]
+        end
       case 4'1011
-        switch \mload_fault [0]
-          case 1'1
-            assign $18 [3:0] \mload_fault_type [3:0]
-        end
-      case 4'1100
-      case 4'1101
-        switch \mload_fault [0]
-          case 1'1
-            assign $18 [3:0] \mload_fault_type [3:0]
-        end
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $18 [3:0] 4'0000
+        assign $15 [3:0] 4'0000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:70"
-  cell $dff $58
+  attribute \src "/home/runner/workspace/church_machine/ret.py:64"
+  cell $dff $49
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $18 [3:0]
+    connect \D $15 [3:0]
     connect \CLK \clk [0]
     connect \Q \fault_type
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:68"
-  process $59
-    assign $19 [1:0] \phase [1:0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:62"
+  process $50
+    assign $16 [1:0] \phase [1:0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $19 [1:0] 2'00
+        assign $16 [1:0] 2'01
       case 4'0001
       case 4'0010
       case 4'0100
       case 4'0111
       case 4'1000
-        assign $19 [1:0] 2'01
       case 4'1001
-        assign $19 [1:0] 2'01
+        assign $16 [1:0] 2'10
       case 4'1010
       case 4'1011
-      case 4'1100
-        assign $19 [1:0] 2'10
-      case 4'1101
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $19 [1:0] 2'00
+        assign $16 [1:0] 2'00
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:68"
-  cell $dff $60
+  attribute \src "/home/runner/workspace/church_machine/ret.py:62"
+  cell $dff $51
     parameter \WIDTH 2
     parameter \CLK_POLARITY 1
-    connect \D $19 [1:0]
+    connect \D $16 [1:0]
     connect \CLK \clk [0]
     connect \Q \phase
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
-  process $61
-    assign $20 [0] \sub_done_latched [0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:66"
+  process $52
+    assign $17 [0] \sub_done_latched [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $20 [0] 1'0
+        assign $17 [0] 1'0
       case 4'0001
       case 4'0010
       case 4'0100
       case 4'0111
-        switch \mload_done [0]
-          case 1'1
-            assign $20 [0] 1'1
-        end
-      case 4'1000
-        assign $20 [0] 1'0
-      case 4'1001
-        assign $20 [0] 1'0
-      case 4'1010
-        switch $16 [0]
+        switch $13 [0]
           case 1'1
           case
-            assign $20 [0] 1'0
+            assign $17 [0] 1'0
+        end
+      case 4'1000
+        switch \mload_done [0]
+          case 1'1
+            assign $17 [0] 1'1
+        end
+      case 4'1001
+        assign $17 [0] 1'0
+      case 4'1010
+        switch \mload_done [0]
+          case 1'1
+            assign $17 [0] 1'1
         end
       case 4'1011
-        switch \mload_done [0]
-          case 1'1
-            assign $20 [0] 1'1
-        end
-      case 4'1100
-        assign $20 [0] 1'0
-      case 4'1101
-        switch \mload_done [0]
-          case 1'1
-            assign $20 [0] 1'1
-        end
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $20 [0] 1'0
+        assign $17 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:72"
-  cell $dff $62
+  attribute \src "/home/runner/workspace/church_machine/ret.py:66"
+  cell $dff $53
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $20 [0]
+    connect \D $17 [0]
     connect \CLK \clk [0]
     connect \Q \sub_done_latched
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:73"
-  process $63
-    assign $21 [0] \sub_fault_latched [0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:67"
+  process $54
+    assign $18 [0] \sub_fault_latched [0]
     switch \ret_state [3:0]
       case 4'0000
-        assign $21 [0] 1'0
+        assign $18 [0] 1'0
       case 4'0001
       case 4'0010
       case 4'0100
       case 4'0111
-        switch \mload_fault [0]
-          case 1'1
-            assign $21 [0] 1'1
-        end
-      case 4'1000
-        assign $21 [0] 1'0
-      case 4'1001
-        assign $21 [0] 1'0
-      case 4'1010
-        switch $16 [0]
+        switch $13 [0]
           case 1'1
           case
-            assign $21 [0] 1'0
+            assign $18 [0] 1'0
+        end
+      case 4'1000
+        switch \mload_fault [0]
+          case 1'1
+            assign $18 [0] 1'1
+        end
+      case 4'1001
+        assign $18 [0] 1'0
+      case 4'1010
+        switch \mload_fault [0]
+          case 1'1
+            assign $18 [0] 1'1
         end
       case 4'1011
-        switch \mload_fault [0]
-          case 1'1
-            assign $21 [0] 1'1
-        end
-      case 4'1100
-        assign $21 [0] 1'0
-      case 4'1101
-        switch \mload_fault [0]
-          case 1'1
-            assign $21 [0] 1'1
-        end
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $21 [0] 1'0
+        assign $18 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:73"
-  cell $dff $64
+  attribute \src "/home/runner/workspace/church_machine/ret.py:67"
+  cell $dff $55
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $21 [0]
+    connect \D $18 [0]
     connect \CLK \clk [0]
     connect \Q \sub_fault_latched
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  process $65
-    assign $22 [3:0] \ret_state [3:0]
+  process $56
+    assign $19 [3:0] \ret_state [3:0]
     switch \ret_state [3:0]
       case 4'0000
         switch \return_start [0]
           case 1'1
             switch \lambda_active [0]
               case 1'1
-                assign $22 [3:0] 4'0001
+                assign $19 [3:0] 4'0001
               case
-                assign $22 [3:0] 4'0010
+                assign $19 [3:0] 4'0010
             end
         end
       case 4'0001
-        assign $22 [3:0] 4'0011
+        assign $19 [3:0] 4'0011
       case 4'0010
-        assign $22 [3:0] 4'0100
+        assign $19 [3:0] 4'0100
       case 4'0100
-        switch { $15 [0] \is_null_cap [0] }
+        switch { $12 [0] \is_null_cap [0] }
           case 2'-1
-            assign $22 [3:0] 4'0101
+            assign $19 [3:0] 4'0101
           case 2'1-
-            assign $22 [3:0] 4'0110
+            assign $19 [3:0] 4'0110
           case
-            assign $22 [3:0] 4'0111
+            assign $19 [3:0] 4'0111
         end
       case 4'0111
-        switch { \sub_done_latched [0] \sub_fault_latched [0] }
-          case 2'-1
-            assign $22 [3:0] 4'1000
-          case 2'1-
-            assign $22 [3:0] 4'1001
+        switch $13 [0]
+          case 1'1
+            assign $19 [3:0] 4'0110
+          case
+            assign $19 [3:0] 4'1000
         end
       case 4'1000
-        assign $22 [3:0] 4'1010
+        switch { \sub_done_latched [0] \sub_fault_latched [0] }
+          case 2'-1
+            assign $19 [3:0] 4'0110
+          case 2'1-
+            assign $19 [3:0] 4'1001
+        end
       case 4'1001
-        assign $22 [3:0] 4'1010
+        assign $19 [3:0] 4'1010
       case 4'1010
-        switch $16 [0]
-          case 1'1
-            assign $22 [3:0] 4'0110
-          case
-            assign $22 [3:0] 4'1011
+        switch { \sub_done_latched [0] \sub_fault_latched [0] }
+          case 2'-1
+            assign $19 [3:0] 4'0110
+          case 2'1-
+            assign $19 [3:0] 4'1011
         end
       case 4'1011
-        switch { \sub_done_latched [0] \sub_fault_latched [0] }
-          case 2'-1
-            assign $22 [3:0] 4'0110
-          case 2'1-
-            assign $22 [3:0] 4'1100
-        end
-      case 4'1100
-        assign $22 [3:0] 4'1101
-      case 4'1101
-        switch { \sub_done_latched [0] \sub_fault_latched [0] }
-          case 2'-1
-            assign $22 [3:0] 4'0110
-          case 2'1-
-            assign $22 [3:0] 4'1110
-        end
-      case 4'1110
-        assign $22 [3:0] 4'0011
+        assign $19 [3:0] 4'0011
       case 4'0011
-        assign $22 [3:0] 4'0000
+        assign $19 [3:0] 4'0000
       case 4'0101
-        assign $22 [3:0] 4'0000
+        assign $19 [3:0] 4'0000
       case 4'0110
-        assign $22 [3:0] 4'0000
+        assign $19 [3:0] 4'0000
     end
     switch \rst [0]
       case 1'1
-        assign $22 [3:0] 4'0000
+        assign $19 [3:0] 4'0000
     end
   end
 
   attribute \src "/nix/store/h097imm3w6dpx10qynrd2sz9fks2wbq8-python3-3.12.11/lib/python3.12/contextlib.py:144"
-  cell $dff $66
+  cell $dff $57
     parameter \WIDTH 4
     parameter \CLK_POLARITY 1
-    connect \D $22 [3:0]
+    connect \D $19 [3:0]
     connect \CLK \clk [0]
     connect \Q \ret_state
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
-  process $67
-    assign $23 [127:0] \return_cap [127:0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
+  process $58
+    assign $20 [127:0] \return_cap [127:0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
-        assign $23 [127:0] \cr_rd_data [127:0]
+        assign $20 [127:0] \cr_rd_data [127:0]
       case 4'0100
       case 4'0111
       case 4'1000
       case 4'1001
       case 4'1010
       case 4'1011
-      case 4'1100
-      case 4'1101
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $23 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+        assign $20 [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:52"
-  cell $dff $68
+  attribute \src "/home/runner/workspace/church_machine/ret.py:46"
+  cell $dff $59
     parameter \WIDTH 128
     parameter \CLK_POLARITY 1
-    connect \D $23 [127:0]
+    connect \D $20 [127:0]
     connect \CLK \clk [0]
     connect \Q \return_cap
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:71"
-  process $69
-    assign $24 [0] \mload_start [0]
+  attribute \src "/home/runner/workspace/church_machine/ret.py:65"
+  process $60
+    assign $21 [0] \mload_start [0]
     switch \ret_state [3:0]
       case 4'0000
       case 4'0001
       case 4'0010
       case 4'0100
-        switch { $15 [0] \is_null_cap [0] }
-          case 2'-1
-          case 2'1-
-          case
-            assign $24 [0] 1'1
-        end
       case 4'0111
-        assign $24 [0] 1'0
-      case 4'1000
-      case 4'1001
-      case 4'1010
-        switch $16 [0]
+        switch $13 [0]
           case 1'1
           case
-            assign $24 [0] 1'1
+            assign $21 [0] 1'1
         end
+      case 4'1000
+        assign $21 [0] 1'0
+      case 4'1001
+        assign $21 [0] 1'1
+      case 4'1010
+        assign $21 [0] 1'0
       case 4'1011
-        assign $24 [0] 1'0
-      case 4'1100
-        assign $24 [0] 1'1
-      case 4'1101
-        assign $24 [0] 1'0
-      case 4'1110
       case 4'0011
       case 4'0101
       case 4'0110
     end
     switch \rst [0]
       case 1'1
-        assign $24 [0] 1'0
+        assign $21 [0] 1'0
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/ret.py:71"
-  cell $dff $70
+  attribute \src "/home/runner/workspace/church_machine/ret.py:65"
+  cell $dff $61
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
-    connect \D $24 [0]
+    connect \D $21 [0]
     connect \CLK \clk [0]
     connect \Q \mload_start
   end
@@ -13846,10 +12678,13 @@ connect \mload_cr_dst \mload_dst [3:0]
 connect \mload_index 17'00000000000000000
 connect \mload_direct 1'1
 connect \mload_m_elevated 1'1
-connect \mload_direct_gt$13 \mload_direct_gt [31:0]
-connect \local_cr_wr_addr \cr_wr_addr [3:0]
-connect \local_cr_wr_data \cr_wr_data [127:0]
-connect \local_cr_wr_en \cr_wr_en [0]
+connect \mload_direct_gt$12 \mload_direct_gt [31:0]
+connect \cr_wr_addr 4'0000
+connect \local_cr_wr_addr 4'0000
+connect \cr_wr_data 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+connect \local_cr_wr_data 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+connect \cr_wr_en 1'0
+connect \local_cr_wr_en 1'0
 connect \fault_flag \fault_valid [0]
 connect \fault_latched \fault_type [3:0]
 connect \return_cap.word0_gt \return_cap [31:0]
@@ -13860,22 +12695,22 @@ connect \return_cap.word0_gt.version \return_cap [31:25]
 connect \return_cap.word1_location \return_cap [63:32]
 connect \return_cap.word2_limit \return_cap [95:64]
 connect \return_cap.word3_seals \return_cap [127:96]
-connect \cr_wr_data.word0_gt \cr_wr_data [31:0]
-connect \cr_wr_data.word0_gt.gt_type \cr_wr_data [1:0]
-connect \cr_wr_data.word0_gt.perms \cr_wr_data [7:2]
-connect \cr_wr_data.word0_gt.index \cr_wr_data [24:8]
-connect \cr_wr_data.word0_gt.version \cr_wr_data [31:25]
-connect \cr_wr_data.word1_location \cr_wr_data [63:32]
-connect \cr_wr_data.word2_limit \cr_wr_data [95:64]
-connect \cr_wr_data.word3_seals \cr_wr_data [127:96]
-connect \local_cr_wr_data.word0_gt \cr_wr_data [31:0]
-connect \local_cr_wr_data.word0_gt.gt_type \cr_wr_data [1:0]
-connect \local_cr_wr_data.word0_gt.perms \cr_wr_data [7:2]
-connect \local_cr_wr_data.word0_gt.index \cr_wr_data [24:8]
-connect \local_cr_wr_data.word0_gt.version \cr_wr_data [31:25]
-connect \local_cr_wr_data.word1_location \cr_wr_data [63:32]
-connect \local_cr_wr_data.word2_limit \cr_wr_data [95:64]
-connect \local_cr_wr_data.word3_seals \cr_wr_data [127:96]
+connect \cr_wr_data.word0_gt 32'00000000000000000000000000000000
+connect \cr_wr_data.word0_gt.gt_type 2'00
+connect \cr_wr_data.word0_gt.perms 6'000000
+connect \cr_wr_data.word0_gt.index 17'00000000000000000
+connect \cr_wr_data.word0_gt.version 7'0000000
+connect \cr_wr_data.word1_location 32'00000000000000000000000000000000
+connect \cr_wr_data.word2_limit 32'00000000000000000000000000000000
+connect \cr_wr_data.word3_seals 32'00000000000000000000000000000000
+connect \local_cr_wr_data.word0_gt 32'00000000000000000000000000000000
+connect \local_cr_wr_data.word0_gt.gt_type 2'00
+connect \local_cr_wr_data.word0_gt.perms 6'000000
+connect \local_cr_wr_data.word0_gt.index 17'00000000000000000
+connect \local_cr_wr_data.word0_gt.version 7'0000000
+connect \local_cr_wr_data.word1_location 32'00000000000000000000000000000000
+connect \local_cr_wr_data.word2_limit 32'00000000000000000000000000000000
+connect \local_cr_wr_data.word3_seals 32'00000000000000000000000000000000
 connect \cr_rd_data.word0_gt \cr_rd_data [31:0]
 connect \cr_rd_data.word0_gt.gt_type \cr_rd_data [1:0]
 connect \cr_rd_data.word0_gt.perms \cr_rd_data [7:2]
@@ -13901,7 +12736,7 @@ module \top.u_tperm
   attribute \src "/home/runner/workspace/church_machine/tperm.py:37"
   wire width 1 \is_reserved
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:69"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:63"
   wire width 1 \can_only_reduce
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:29"
@@ -13912,7 +12747,7 @@ module \top.u_tperm
   attribute \init 3'000
   wire width 3 \tperm_state
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 128 \result_cap
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:15"
@@ -14017,28 +12852,28 @@ module \top.u_tperm
   attribute \src "/home/runner/workspace/church_machine/tperm.py:29"
   wire width 32 \target_cap.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 32 \result_cap.word0_gt
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 2 \result_cap.word0_gt.gt_type
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 6 \result_cap.word0_gt.perms
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 17 \result_cap.word0_gt.index
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 7 \result_cap.word0_gt.version
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 32 \result_cap.word1_location
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 32 \result_cap.word2_limit
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   wire width 32 \result_cap.word3_seals
 
   attribute \src "/home/runner/workspace/church_machine/tperm.py:23"
@@ -14089,7 +12924,7 @@ module \top.u_tperm
   attribute \src "/home/runner/workspace/church_machine/tperm.py:20"
   wire width 32 \cr_rd_data.word3_seals
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:70"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:64"
   cell $and $14
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -14101,7 +12936,7 @@ module \top.u_tperm
     connect \Y $1
   end
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:70"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:64"
   cell $eq $15
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -14113,7 +12948,7 @@ module \top.u_tperm
     connect \Y \can_only_reduce
   end
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:100"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:94"
   cell $and $16
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -14125,7 +12960,7 @@ module \top.u_tperm
     connect \Y $2
   end
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:114"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:108"
   cell $not $17
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -14206,7 +13041,7 @@ module \top.u_tperm
     connect \Y \tperm_complete
   end
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:88"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:82"
   cell $not $24
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -14239,12 +13074,6 @@ module \top.u_tperm
         assign \new_perms [5:0] 6'100000
       case 4'1001
         assign \new_perms [5:0] 6'011000
-      case 4'1010
-        assign \new_perms [5:0] 6'101000
-      case 4'1011
-        assign \new_perms [5:0] 6'110000
-      case 4'1100
-        assign \new_perms [5:0] 6'111000
       case
         assign \new_perms [5:0] 6'000000
     end
@@ -14264,9 +13093,6 @@ module \top.u_tperm
       case 4'0111
       case 4'1000
       case 4'1001
-      case 4'1010
-      case 4'1011
-      case 4'1100
       case
         assign \is_reserved [0] 1'1
     end
@@ -14286,7 +13112,7 @@ module \top.u_tperm
     end
   end
 
-  attribute \src "/home/runner/workspace/church_machine/tperm.py:95"
+  attribute \src "/home/runner/workspace/church_machine/tperm.py:89"
   process $28
     assign \result_cap [127:0] 128'00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
     switch \tperm_state [2:0]

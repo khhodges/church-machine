@@ -597,29 +597,6 @@ module ctmm_core
     // CALL and RETURN Module Instantiation
     // ========================================================================
     
-    // CR5 call stack for nested CALL/RETURN support (synchronized with architectural call stack)
-    localparam CR5_STACK_DEPTH = 256;
-    golden_token_t cr5_stack [0:CR5_STACK_DEPTH-1];
-    logic [7:0]    cr5_stack_ptr;
-    golden_token_t saved_cr5_gt_wire;
-    golden_token_t cr5_stack_top;
-    logic          cr5_stack_empty;
-    logic          cr5_stack_full;
-    
-    assign cr5_stack_empty = (cr5_stack_ptr == '0);
-    assign cr5_stack_full  = (cr5_stack_ptr == CR5_STACK_DEPTH[7:0]);
-    assign cr5_stack_top   = cr5_stack_empty ? '0 : cr5_stack[cr5_stack_ptr - 1];
-    
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
-            cr5_stack_ptr <= '0;
-        end else if (call_complete_sig && !call_fault_sig && !cr5_stack_full) begin
-            cr5_stack[cr5_stack_ptr] <= saved_cr5_gt_wire;
-            cr5_stack_ptr <= cr5_stack_ptr + 1;
-        end else if (ret_complete_sig && !ret_fault_valid_sig && !cr5_stack_empty) begin
-            cr5_stack_ptr <= cr5_stack_ptr - 1;
-        end
-    end
 
     logic        call_start_sig, call_busy_sig, call_complete_sig, call_fault_sig;
     fault_type_t call_fault_type;
@@ -718,7 +695,6 @@ module ctmm_core
         .thread_wr_idx  (call_thread_wr_idx),
         .thread_wr_data (call_thread_wr_data),
         .thread_hdr_in  (call_thread_hdr_in),
-        .saved_cr5_gt   (saved_cr5_gt_wire),
         .nia_set        (call_nia_set),
         .nia_value      (call_nia_value),
         .dr_clear_mask  (call_dr_clear_mask),
@@ -768,8 +744,7 @@ module ctmm_core
         .mem_rd_valid   (1'b1),
         .thread_wr_en   (ret_thread_wr_en),
         .thread_wr_idx  (ret_thread_wr_idx),
-        .thread_wr_data (ret_thread_wr_data),
-        .saved_cr5_gt   (cr5_stack_top)
+        .thread_wr_data (ret_thread_wr_data)
     );
 
     assign ret_start_sig = exec_enable && is_church_op && (church_op == OP_RETURN) && all_checks_pass;

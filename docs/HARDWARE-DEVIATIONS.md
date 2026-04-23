@@ -16,7 +16,7 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 | C-5 | Church instruction count: 6 → 10; added LAMBDA/ELOADCALL/XLOADLAMBDA | `church-instructions.md` |
 | C-6 | Removed non-existent LOADX/SAVEX/LDM/STM | `church-instructions.md`, `overview.md` |
 | C-7 | SAVE operand labels: CRd=c-list dest (S perm), CRs=source GT (B=1) | `isa_encoding.md`, `instruction-set.md` |
-| C-8 | RETURN derivation: updated to show CR6/CR14 via mLoad + CR5 from cr5_stack | `lambda-instruction.md` |
+| C-8 | RETURN derivation: updated to show CR6/CR14 via mLoad; CR5 installed by CHANGE from Zone ④ bounds | `lambda-instruction.md` |
 | C-9 | Namespace capacity: 131,072 → 65,536 (16-bit `object_id`) | `overview.md`, `garbage-collection.md` |
 | C-10 | R002 risk: 25-bit FNV → 16-bit CRC-16 seal | `risks.md`, `longevity.md` |
 | C-11 | TPERM presets 0x0A–0x0C: LE/SE/LSE → reserved (E isolation) | `isa_encoding.md` |
@@ -37,7 +37,7 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 
 ### D-2: RETURN MASK Field — Not Implemented
 
-- **Hardware**: `ret.py` has no mask signal or mask-based register clearing. The RETURN FSM restores CR5 via cr5_stack and re-derives CR6/CR14 via mLoad, but has no general-purpose mask mechanism. `fused_unit.py` (ELOADCALL/XLOADLAMBDA) has a mask mechanism, but RETURN does not.
+- **Hardware**: `ret.py` has no mask signal or mask-based register clearing. The RETURN FSM re-derives CR6/CR14 via the separate cload unit, but has no general-purpose mask mechanism. `fused_unit.py` (ELOADCALL/XLOADLAMBDA) has a mask mechanism, but RETURN does not.
 - **Docs**: `boot_rom.py` lines 138–139 encode `RETURN AL, CR5` with comment "mask bit 5 = 0b100000 clears CR5." This mask behavior is not implemented. `isa_encoding.md` now notes this gap.
 - **Decision**: Should RETURN gain a mask field, or should the boot epilogue use a different mechanism?
 - **Affected files**: `boot_rom.py`, `instruction-set.md`, `isa_encoding.md`
@@ -79,10 +79,10 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 - **Resolution (C-6 / Task #6)**: `app.js` INSTRUCTION_DATA SAVE entry corrected — CRd = C-List (S permission), CRs = Source GT (B=1), mSave validates all. Now matches assembler field assignments.
 - **Status**: RESOLVED
 
-### D-8: CR5 Instance-Data Behavior (Save/Restore via cr5_stack)
+### D-8: CR5 Thread-Register Behavior (Installed by CHANGE)
 
-- **Hardware**: `core.py` lines 1113–1148 implement a 256-entry `cr5_stack`. CALL pushes CR5's GT (`call.py` line 209: `saved_cr5_gt`). RETURN pops and re-derives CR5 via mLoad from the saved GT (`ret.py`: `RESTORE_CR5` state). CR5 is actively saved and restored — not passively inherited.
-- **Resolution (C-3 / Task #3)**: `architecture.md`, `call-stack.md`, and `garbage-collection.md` updated to correctly describe CR5 as pushed to cr5_stack by CALL and restored from cr5_stack by RETURN. The stale "inherited unchanged" language and the incorrect "mLoad revalidates CR5/CR6/CR7" text in garbage-collection.md are both fixed. `architecture.md` now also includes CR12 in the correct inherited-register range (CR7–CR13 instead of CR7–CR11, CR13).
+- **Hardware (corrected, Task #451)**: The incorrect `cr5_stack` mechanism (a 256-entry hardware stack pushed by CALL, popped by RETURN) has been removed from all variants (`hardware/`, `ctmm_cap_amaranth/`, `ctmm_amaranth/`, `church_machine/`). CR5 is now correctly a thread register: `hardware/change.py` synthesises and installs the CR5 (Heap GT) from the incoming thread's Zone ④ bounds (base = `thread_base + 17*4`, limit_offset = `heapWords − 1` from the lump header `cc` field) in the new `INSTALL_CR5` FSM state after `READ_THREAD_HDR`.
+- **Resolution (Task #451)**: All docs (`architecture.md`, `call-stack.md`, `garbage-collection.md`, `church-instructions.md`, `AMARANTH-SIMULATOR-AUDIT-2026-04-23.md`) and simulator comments updated to match the specification in `CM_LUMP_SPECIFICATION.md`. The `saved_cr5_gt` signal and `RESTORE_CR5`/`PHASE0` FSM states have been removed from all CALL and RETURN units respectively.
 - **Status**: RESOLVED
 
 ### D-9: LAMBDA Recursion — Idempotent Re-Entry via CR6 (Revised Design)

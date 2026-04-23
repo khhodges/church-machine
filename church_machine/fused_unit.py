@@ -34,8 +34,6 @@ class ChurchELoadCall(Elaboratable):
         self.thread_wr_idx = Signal(4)
         self.thread_wr_data = Signal(32)
 
-        self.saved_cr5_gt = Signal(32)
-
         self.nia_set = Signal()
         self.nia_value = Signal(32)
         self.dr_clear_mask = Signal(16)
@@ -182,18 +180,11 @@ class ChurchELoadCall(Elaboratable):
                     ]
                     m.next = "FAULT"
                 with m.Else():
-                    m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(5)]
-                    m.next = "READ_CR5"
-
-            with m.State("READ_CR5"):
-                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(5)]
-                cr5_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
-                m.d.sync += self.saved_cr5_gt.eq(cr5_view.word0_gt)
-                m.d.sync += [
-                    phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0),
-                ]
-                m.d.sync += sub_start_reg.eq(1)
-                m.next = "CALL_P1"
+                    m.d.sync += [
+                        phase.eq(1), sub_done_latched.eq(0), sub_fault_latched.eq(0),
+                    ]
+                    m.d.sync += sub_start_reg.eq(1)
+                    m.next = "CALL_P1"
 
             with m.State("CALL_P1"):
                 m.d.sync += sub_start_reg.eq(0)

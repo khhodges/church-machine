@@ -865,7 +865,7 @@ Flow diagram showing LAMBDA entry (save PC+4 to LAMBDA_PC register, set LAMBDA-a
 
 ### Figure 4: Self-Describing Stack Frames
 
-Diagram showing the capability stack with interleaved CALL frames (tag=0, 2-word frame: [E-GT · machine word]; RETURN re-derives CR5/CR6/CR14 via mLoad) and LAMBDA frames (tag=1, 1-word frame: machine word only). Shows RETURN inspecting the tag to determine the restoration path.
+Diagram showing the capability stack with interleaved CALL frames (tag=0, 2-word frame: [E-GT · machine word]; RETURN re-derives CR6/CR14 via mLoad) and LAMBDA frames (tag=1, 1-word frame: machine word only). Shows RETURN inspecting the tag to determine the restoration path.
 
 ### Figure 5: Non-Nestable LAMBDA with CALL-Mediated Nesting
 

@@ -560,43 +560,6 @@ class ChurchCore(Elaboratable):
                 u_xloadlambda.saved_nia.eq(nia_reg + 4),
             ]
 
-        CR5_STACK_DEPTH = 256
-        cr5_stack = Memory(width=32, depth=CR5_STACK_DEPTH, init=[])
-        m.submodules.cr5_stack = cr5_stack
-        cr5_stack_ptr = Signal(8, init=0)
-        cr5_stack_empty = Signal()
-        cr5_stack_full = Signal()
-        cr5_stack_wr = cr5_stack.write_port()
-        cr5_stack_rd = cr5_stack.read_port(transparent=True)
-
-        m.d.comb += [
-            cr5_stack_empty.eq(cr5_stack_ptr == 0),
-            cr5_stack_full.eq(cr5_stack_ptr == CR5_STACK_DEPTH),
-            cr5_stack_rd.addr.eq(Mux(cr5_stack_ptr > 0, cr5_stack_ptr - 1, 0)),
-            u_return.saved_cr5_gt.eq(Mux(cr5_stack_empty, 0, cr5_stack_rd.data)),
-            cr5_stack_wr.addr.eq(0),
-            cr5_stack_wr.data.eq(0),
-            cr5_stack_wr.en.eq(0),
-        ]
-
-        with m.If(u_call.call_complete & ~u_call.call_fault & ~cr5_stack_full):
-            m.d.comb += [
-                cr5_stack_wr.addr.eq(cr5_stack_ptr),
-                cr5_stack_wr.data.eq(u_call.saved_cr5_gt),
-                cr5_stack_wr.en.eq(1),
-            ]
-            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
-        if ENABLE_FUSED_OPS:
-            with m.Elif(u_eloadcall.complete & ~u_eloadcall.fault & ~cr5_stack_full):
-                m.d.comb += [
-                    cr5_stack_wr.addr.eq(cr5_stack_ptr),
-                    cr5_stack_wr.data.eq(u_eloadcall.saved_cr5_gt),
-                    cr5_stack_wr.en.eq(1),
-                ]
-                m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr + 1)
-        with m.Elif(u_return.complete & ~u_return.fault_valid & ~cr5_stack_empty):
-            m.d.sync += cr5_stack_ptr.eq(cr5_stack_ptr - 1)
-
         with m.If(u_decoder.fault_valid):
             m.d.comb += [self.fault.eq(u_decoder.fault), self.fault_valid.eq(1)]
         with m.Elif(u_perm.fault_valid):

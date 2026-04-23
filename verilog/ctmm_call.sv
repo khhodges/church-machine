@@ -73,9 +73,6 @@ module ctmm_call
     // CALL reads stack bounds from this word directly (no memory read per CALL).
     input  logic [31:0] thread_hdr_in,
 
-    // Saved CR5 GT output for RETURN restoration
-    output golden_token_t saved_cr5_gt,
-
     // Isolation interface
     output logic        nia_set,
     output logic [31:0] nia_value,
@@ -273,21 +270,6 @@ module ctmm_call
     logic src_has_e_perm;
     assign src_in_range  = (cr_src <= MAX_SRC_REG);
     assign src_has_e_perm = src_reg_latched.word0_gt.perms[PERM_E];
-
-    // ========================================================================
-    // CR5 GT Latching
-    // ========================================================================
-
-    golden_token_t saved_cr5_gt_reg;
-
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n)
-            saved_cr5_gt_reg <= GT_NULL;
-        else if (state == CALL_READ_CR5)
-            saved_cr5_gt_reg <= cr_rd_data.word0_gt;
-    end
-
-    assign saved_cr5_gt = saved_cr5_gt_reg;
 
     // ========================================================================
     // Fault Latching
