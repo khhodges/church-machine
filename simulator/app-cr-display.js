@@ -172,7 +172,7 @@ function renderCListEntryDetail(nsIdx, entry) {
             const hdrHex    = '0x' + (hdrRaw >>> 0).toString(16).toUpperCase().padStart(8,'0');
             const typNames  = ['lump','data','Thread','Outform'];
             // ── Lump Header ──────────────────────────────────────────────────
-            h += `<div class="clist-detail-title" style="margin-top:0.4rem;color:rgba(156,220,254,0.6);">Header`
+            h += `<div class="clist-detail-title" style="margin-top:0.4rem;color:var(--church-gold);">Header`
                + ` <span style="font-size:0.72rem;color:#3f3f46;">word 0 \u00b7 ${hdrHex}`
                + ` \u00b7 magic=0x${hdr.magic.toString(16).toUpperCase()}`
                + ` \u00b7 n\u22126=${hdr.n_minus_6}\u2192${lumpSize}w`
@@ -237,7 +237,7 @@ function renderCListEntryDetail(nsIdx, entry) {
             if (totalFreeWords > 0) {
                 const freeBase = loc + 1 + actualCodeEnd;
                 const freeEnd  = loc + clistStart - 1;
-                h += `<div class="clist-detail-title" style="margin-top:0.3rem;color:#52525b;">Freespace`
+                h += `<div class="clist-detail-title" style="margin-top:0.3rem;color:var(--church-gold);">Freespace`
                    + ` <span style="font-size:0.72rem;color:#3f3f46;">`
                    + `words +${1 + actualCodeEnd}\u2013+${clistStart - 1}`
                    + ` \u00b7 ${totalFreeWords} unused words`
