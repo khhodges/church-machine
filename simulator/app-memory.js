@@ -279,7 +279,21 @@ function updateCRDetail() {
             const gtWord = (addr < sim.memory.length) ? (sim.memory[addr] >>> 0) : 0;
             const parsed = sim.parseGT(gtWord);
             const permsStr = Object.entries(parsed.permissions).filter(([,v]) => v).map(([k]) => k).join('');
-            const nsLabel = (sim.nsLabels && sim.nsLabels[parsed.index]) ? sim.nsLabels[parsed.index] : '';
+            let nsLabel = '';
+            if (parsed.type === 3 && gtWord !== 0) {
+                // Abstract GT: lower 16 bits are ab_data, not an NS slot index — derive name from device fields.
+                const ab = sim.parseAbstractGT(gtWord);
+                const AB_TYPE_NAMES  = { 0: 'I/O', 1: 'M-Elevation' };
+                const DEVICE_CLASSES = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
+                if (ab.ab_type === 0) {
+                    const dc = DEVICE_CLASSES[ab.device_class] || `dc${ab.device_class}`;
+                    nsLabel = `${dc}[${ab.device_data}]`;
+                } else {
+                    nsLabel = `${AB_TYPE_NAMES[ab.ab_type] || `ab${ab.ab_type}`} 0x${ab.ab_data.toString(16).toUpperCase()}`;
+                }
+            } else {
+                nsLabel = (sim.nsLabels && sim.nsLabels[parsed.index]) ? sim.nsLabels[parsed.index] : '';
+            }
             const isExpanded = (clistExpandedIdx === i);
             const hasGT = gtWord !== 0;
             html += `<tr class="${hasGT ? 'cr-active clist-clickable' : ''}${isExpanded ? ' clist-selected' : ''}" `;
