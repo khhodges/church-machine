@@ -2,7 +2,7 @@ function updateCRDisplay() {
     const container = document.getElementById('crRegs');
     if (!container) return;
     const localNames = {
-        0: 'Result', 1: 'Arg 1', 6: 'C-List',
+        0: 'Result', 1: 'Arg 1', 5: 'Heap', 6: 'C-List',
         12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
     };
     const crMeta = {
@@ -11,7 +11,7 @@ function updateCRDisplay() {
         2:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
         3:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
         4:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
-        5:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
+        5:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
         6:  { group: 'gt',     role: 'arch',   badge: 'Arch'   },
         7:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
         8:  { group: 'gt',     role: 'prog',   badge: 'Prog'   },
@@ -819,8 +819,8 @@ function showCRPopup(evt, crIdx) {
 
     const hexW = w => '0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
     const petCR = _petNameCRMap[crIdx];
-    const _archNames = { 0: 'Result', 1: 'Arg 1', 6: 'C-List', 12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace' };
-    const _reservedCRs = new Set([0, 6, 12, 13, 14, 15]);
+    const _archNames = { 0: 'Result', 1: 'Arg 1', 5: 'Heap', 6: 'C-List', 12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace' };
+    const _reservedCRs = new Set([0, 5, 6, 12, 13, 14, 15]);
 
     let html = '';
 
@@ -838,7 +838,7 @@ function showCRPopup(evt, crIdx) {
             html += `<div class="zdp-title" style="border-color:#374151;color:#6b7280;">CR${crIdx} · EMPTY</div>`;
             html += `<table>`;
             html += `<tr><td>Status</td><td class="zdp-dim">Empty — available for use</td></tr>`;
-            html += `<tr><td>Role</td><td class="zdp-note">Programmer register (CR1–CR5, CR7–CR11)</td></tr>`;
+            html += `<tr><td>Role</td><td class="zdp-note">Programmer register (CR1–CR4, CR7–CR11)</td></tr>`;
             html += `</table>`;
         }
     } else {
