@@ -403,6 +403,24 @@ function updateCRDetail() {
     html += `<div class="crd-panel" id="crdPanel-lump" style="display:${crDetailTab==='lump'?'block':'none'}">`;
     html += '<div class="cr-detail-grid">';
 
+    // Compress / Save Lump action toolbar — code lumps only
+    if (showCode && _lumpHdr.valid) {
+        const _lsz   = _lumpHdr.lumpSize;
+        const _free  = _lsz - 1 - _lumpHdr.cw - _lumpHdr.cc;
+        let _minSz   = 64;
+        while (_minSz < (1 + _lumpHdr.cw + _lumpHdr.cc)) _minSz <<= 1;
+        const _canCmp = _minSz < _lsz;
+        html += `<div class="crd-lump-actions">`;
+        html += `<button class="crd-lump-btn${_canCmp ? '' : ' crd-lump-btn-disabled'}" ` +
+                `onclick="lumpCompress(${nsIdx})" ` +
+                `${_canCmp ? '' : 'disabled title="Already at minimum size"'}>` +
+                `\u2913\u202FCompress</button>`;
+        html += `<button class="crd-lump-btn" onclick="lumpSaveLump(${nsIdx})">\u2193\u202FSave Lump</button>`;
+        html += `<span class="crd-lump-info">${_lsz}w\u202F=\u202F1\u202Fhdr\u202F+\u202F${_lumpHdr.cw}w\u202Fcode` +
+                `\u202F+\u202F${_lumpHdr.cc}\u202Fc-list\u202F+\u202F${_free}\u202Ffree</span>`;
+        html += `</div>`;
+    }
+
     // Memory layout (renderCListEntryDetail) — only if permitted
     if ((showCode || showCList) && _sharedNSE) {
         html += renderCListEntryDetail(nsIdx, _sharedNSE);
@@ -2511,7 +2529,107 @@ let bootEntrySlot = (() => { const s = parseInt(localStorage.getItem('bootEntryS
 let userMethodData = {};
 let userMethodLists = {};
 
-// ── Fault Detail Toggle ────────────────────────────────────────────────────
+// ── Lump Compress ─────────────────────────────────────────────────────────
+// Resizes the lump at nsIdx in simulator memory to its minimum power-of-2 size
+// (smallest 2^k ≥ 1 header + cw code words + cc c-list slots), zero-fills the
+// freed tail, and updates the NS table entry's limit field in-place.
+window.lumpCompress = function(nsIdx) {
+    const logEl = document.getElementById('crInjectLog');
+    function log(msg) { if (logEl) { logEl.style.display = 'block'; logEl.textContent = msg; } }
+
+    const nse = sim.readNSEntry(nsIdx);
+    if (!nse) { log('No NS entry for slot ' + nsIdx); return; }
+    const baseLoc = nse.word0_location >>> 0;
+    if (baseLoc === 0 || baseLoc >= sim.memory.length) { log('Bad lump base address'); return; }
+
+    const hdr = sim.parseLumpHeader(sim.memory[baseLoc] >>> 0);
+    if (!hdr.valid) { log('No valid lump header at 0x' + baseLoc.toString(16)); return; }
+
+    const { cw, cc, typ, n_minus_6 } = hdr;
+    const currentSize = hdr.lumpSize;
+
+    let minSize = 64;
+    while (minSize < (1 + cw + cc)) minSize <<= 1;
+
+    if (minSize >= currentSize) {
+        log(`Already at minimum size (${currentSize} words = 1 hdr + ${cw}w code + ${cc} c-list + ${currentSize - 1 - cw - cc} free).`);
+        return;
+    }
+
+    let newNM6 = 0;
+    while ((64 << newNM6) < minSize) newNM6++;
+
+    // Save c-list words from old tail position
+    const clistWords = [];
+    for (let i = 0; i < cc; i++) clistWords.push(sim.memory[baseLoc + currentSize - cc + i] >>> 0);
+
+    // Write new header
+    sim.memory[baseLoc] = sim.packLumpHeader(newNM6, cw, cc, typ) >>> 0;
+
+    // Zero freespace within new lump (code already in-place at [1..cw])
+    for (let i = cw + 1; i < minSize - cc; i++) sim.memory[baseLoc + i] = 0;
+
+    // Write c-list at new tail
+    for (let i = 0; i < cc; i++) sim.memory[baseLoc + minSize - cc + i] = clistWords[i];
+
+    // Zero freed trailing words
+    for (let i = minSize; i < currentSize; i++) sim.memory[baseLoc + i] = 0;
+
+    // Update NS entry word1: preserve b/f/g/chainable/gtType, update clistCount+limit
+    const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
+    const oldW1  = sim.memory[nsBase + 1] >>> 0;
+    const topBits = oldW1 & 0xFC000000;
+    sim.memory[nsBase + 1] = (topBits | ((cc & 0x1FF) << 17) | ((minSize - 1) & 0x1FFFF)) >>> 0;
+
+    log(`Compressed NS${nsIdx}: ${currentSize}\u2192${minSize} words (saved ${currentSize - minSize} words, n_minus_6 ${n_minus_6}\u2192${newNM6}).`);
+    updateCRDetail();
+};
+
+// ── Lump Save (to server) ──────────────────────────────────────────────────
+// Reads the current lump binary from simulator memory and POSTs it to
+// /api/lumps/save, storing it as a named .lump file in server/lumps/.
+window.lumpSaveLump = async function(nsIdx) {
+    const logEl = document.getElementById('crInjectLog');
+    function log(msg) { if (logEl) { logEl.style.display = 'block'; logEl.textContent = msg; } }
+
+    const nse = sim.readNSEntry(nsIdx);
+    if (!nse) { log('No NS entry for slot ' + nsIdx); return; }
+    const baseLoc = nse.word0_location >>> 0;
+    if (baseLoc === 0 || baseLoc >= sim.memory.length) { log('Bad lump base address'); return; }
+
+    const hdr = sim.parseLumpHeader(sim.memory[baseLoc] >>> 0);
+    if (!hdr.valid) { log('No valid lump header at 0x' + baseLoc.toString(16)); return; }
+
+    const lumpSize = hdr.lumpSize;
+    const words = [];
+    for (let i = 0; i < lumpSize; i++) words.push(sim.memory[baseLoc + i] >>> 0);
+
+    const absName = (sim.nsLabels && sim.nsLabels[nsIdx]) || 'Unnamed';
+    const typeNames = ['code', 'data', 'thread', 'outform'];
+    const metadata = {
+        abstraction: absName,
+        ns_slot: nsIdx,
+        content_type: typeNames[hdr.typ] || 'code',
+        cw: hdr.cw,
+        cc: hdr.cc,
+        lump_size: lumpSize,
+    };
+
+    log(`Saving ${lumpSize}-word lump for \u201C${absName}\u201D (NS${nsIdx})\u2026`);
+    try {
+        const resp = await fetch('/api/lumps/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ binary: words, metadata }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Server error');
+        log(`Saved \u2014 token: ${data.token} \u2192 ${data.lump_path || 'server/lumps/'}`);
+    } catch (e) {
+        log(`Save failed: ${e.message}`);
+    }
+};
+
 window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
     const detailRow = document.getElementById(detailRowId);
     if (!detailRow) return;
