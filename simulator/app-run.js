@@ -364,6 +364,9 @@ function stepSim() {
             }
         }
         if (sim.bootComplete) {
+            // Clear boot-microcode gate entries so the Gate Log starts empty
+            // for user-code debugging after a clean boot.
+            sim.auditLog = [];
             _autoLoadDefaultProgram();
             updateDashboard();
             switchView('dashboard');
@@ -792,7 +795,12 @@ function slowBoot() {
                     con.scrollTop = con.scrollHeight;
                 }
                 if (pipelineViz) { pipelineViz.setNIA(null); pipelineViz.render(); }
-                if (!sim.halted) _autoLoadDefaultProgram();
+                if (!sim.halted) {
+                    // Clear boot-microcode gate entries so the Gate Log starts
+                    // empty for user-code debugging after a clean boot.
+                    sim.auditLog = [];
+                    _autoLoadDefaultProgram();
+                }
                 updateDashboard();
                 return;
             }
@@ -852,6 +860,9 @@ function runSim() {
         }
     }
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
+    // Clear boot-microcode gate entries so the Gate Log starts empty for
+    // user-code debugging after a clean boot.
+    if (!sim.halted) sim.auditLog = [];
     _autoLoadDefaultProgram();
 
     const MAX_STEPS   = 10000;
