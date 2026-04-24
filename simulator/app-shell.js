@@ -447,6 +447,12 @@ function init() {
         pipelineViz.render();
         initTooltipAutoFlip();
         hideLoadingOverlay();
+        // Auto-boot on open: if the user has the auto-boot preference set,
+        // run the boot sequence immediately after the page finishes loading.
+        // This covers the case where the user navigates here from the landing
+        // page (or any external link) — not just via the hamburger menu item.
+        const chk = document.getElementById('autoBootChk');
+        if (chk && chk.checked) resetSim();
     });
 }
 
@@ -525,7 +531,10 @@ function saveAutoBootPref() {
 function restoreAutoBootPref() {
     const chk = document.getElementById('autoBootChk');
     if (!chk) return;
-    try { chk.checked = localStorage.getItem('churchMachine_autoBootOnOpen') === '1'; } catch(e) {}
+    // Default is ON — auto-boot unless the user has explicitly turned it off.
+    // A saved value of '0' means the user unchecked it; anything else (including
+    // null for first-time visitors) means auto-boot is enabled.
+    try { chk.checked = localStorage.getItem('churchMachine_autoBootOnOpen') !== '0'; } catch(e) {}
 }
 
 document.addEventListener('click', function(e) {

@@ -84,22 +84,22 @@ BOOT_PROGRAM += [
     # A SEAL_MISMATCH fault fires if NS Slot 4 (boot code) has been tampered with.
     encode_church(ChurchOpcode.LAMBDA, CondCode.AL, cr_dst=2),
 
-    # B:04 LOAD_NUC — load Salvation E-GT into CR0 from c-list[4]
-    # CLOOMC: LOAD AL, CR0, CR6[4]  → make_gt(GT_TYPE_INFORM, E, slot_id=4, gt_seq=0)
+    # B:04 LOAD_NUC — load Startup.Config E-GT into CR0 from c-list[4] (Task #512)
+    # CLOOMC: LOAD AL, CR0, CR6[4]  → make_gt(GT_TYPE_INFORM, E, slot_id=2, gt_seq=0)
     encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=0, cr_src=6, imm=4),
 
     # B:04 — restrict CR0 to E permission only before CALL
     # CLOOMC: TPERM AL, CR0, #E
     encode_church(ChurchOpcode.TPERM, CondCode.AL, cr_dst=0, imm=TpermPreset.E),
 
-    # B:04 LOAD_NUC — CALL into the first user abstraction
+    # B:04 LOAD_NUC — CALL into Startup.Config (which then calls configured entry)
     # CLOOMC: CALL AL, CR0, CR0
-    # SECURITY CHECKPOINT 2: hardware re-validates CRC-16 seal of NS Slot 4 here.
+    # SECURITY CHECKPOINT 2: hardware re-validates CRC-16 seal of NS Slot 2 here.
     # On success:
-    #   CR14 derived from NS Slot 4: base=word0_location, limit=word1[16:0], perm=RX only (no W)
-    #   CR6  derived from NS Slot 4: base=clistStart, limit=clistCount-1, perm=L
+    #   CR14 derived from NS Slot 2: base=0x0200, limit=63 (word), perm=RX only (no W)
+    #   CR6  derived from NS Slot 2: base=clistStart, limit=0 (1 c-list entry), perm=L
     #   2-word CALL frame pushed onto thread LIFO stack (STO += 2)
-    #   PC = 0 — user abstraction begins executing
+    #   PC = 0 — Startup.Config code begins executing (LOAD/TPERM/CALL chain to configured entry)
     encode_church(ChurchOpcode.CALL, CondCode.AL, cr_dst=0, cr_src=0),
 
     # Epilogue (after user RETURN) — reload Boot.Abstr code GT
@@ -125,6 +125,34 @@ BOOT_PROGRAM += [
 
 while len(BOOT_PROGRAM) < 256:
     BOOT_PROGRAM.append(0x00000000)
+
+
+# ---------------------------------------------------------------------------
+# STARTUP_CONFIG_PROGRAM — CLOOMC code region for Startup.Config lump (Task #512)
+#
+# Placed in the Startup.Config lump (NS slot 2) code region (lump words 1–3).
+# Executed by the FPGA on every reset, invoked via CALL from Boot.Abstr (B:04).
+#
+# After CALL enters Startup.Config:
+#   CR6  = Startup.Config c-list (L perm) — c-list[0] holds configured entry E-GT
+#   CR14 = Startup.Config code region (R+X perm)
+#
+# Program:
+#   LOAD  AL, CR0, CR6[0]  — load configured entry E-GT from c-list[0] into CR0
+#   TPERM AL, CR0, #E      — restrict CR0 to E permission only
+#   CALL  AL, CR0, CR0     — enter configured entry abstraction
+#
+# c-list[0] defaults to Salvation E-GT (NS slot 4); changeable via SetEntry().
+# Boot path: Boot.Abstr → CALL Startup.Config → CALL <configured entry>.
+#
+# Must stay in sync with server/boot_image.py STARTUP_CONFIG_WORDS and
+# simulator.js _initNamespaceTable STARTUP_CONFIG_WORDS.
+# ---------------------------------------------------------------------------
+STARTUP_CONFIG_PROGRAM = [
+    encode_church(ChurchOpcode.LOAD,  CondCode.AL, cr_dst=0, cr_src=6, imm=0),  # LOAD  AL, CR0, CR6[0]
+    encode_church(ChurchOpcode.TPERM, CondCode.AL, cr_dst=0, imm=TpermPreset.E), # TPERM AL, CR0, #E
+    encode_church(ChurchOpcode.CALL,  CondCode.AL, cr_dst=0, cr_src=0),          # CALL  AL, CR0, CR0
+]
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +340,37 @@ SLIDERULE_LUMP_HEADER = (0x1F << 27) | (SLIDERULE_N_MINUS_6 << 23) | (SLIDERULE_
 
 SLIDERULE_METHOD_OFFSETS = {name: off for name, off in zip(_SR_METHOD_NAMES, _sr_offsets)}
 
+# ---------------------------------------------------------------------------
+# Startup.Config lump initialisation — Task #512
+#
+# NS slot 2, lump base byte address 0x0200, ROM word index 128.
+# 64-word lump layout:
+#   word  0: lump header (magic=0x1F, cw=3, cc=1, n_minus_6=0, typ=0)
+#   words 1-3: STARTUP_CONFIG_PROGRAM (LOAD/TPERM/CALL)
+#   word  4: data[0] = entry_slot (default 4 = Salvation, NS slot 4)
+#   word  5: data[1] = config_version = 0x00000001
+#   words 6-62: zero (flags=0, fault_count=0, user params=0)
+#   word 63: c-list[0] = Salvation E-GT (NS slot 4, E perm)
+# ---------------------------------------------------------------------------
+_STARTUP_CONFIG_LUMP_WORD    = 2 * 0x100 // 4   # = 128 (ROM word index of lump base)
+_STARTUP_CONFIG_DEFAULT_ENTRY = 4                # Salvation, NS slot 4
+_STARTUP_CONFIG_VERSION       = 0x00000001
+_STARTUP_CONFIG_LUMP_HEADER   = (0x1F << 27) | (3 << 10) | 1  # cw=3, cc=1, n_minus_6=0, typ=0
+_STARTUP_CONFIG_SALVATION_E_GT = make_gt(GT_TYPE_INFORM, PERM_MASK_E, _STARTUP_CONFIG_DEFAULT_ENTRY, 0)
+
 FULL_ROM = BOOT_PROGRAM + _NUC_PADDED + list(SLIDERULE_CODE)
 while len(FULL_ROM) < 1024:
     FULL_ROM.append(0x00000000)
+
+# Inject Startup.Config lump data into ROM words 128-191
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 0]  = _STARTUP_CONFIG_LUMP_HEADER
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 1]  = STARTUP_CONFIG_PROGRAM[0]   # LOAD  AL, CR0, CR6[0]
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 2]  = STARTUP_CONFIG_PROGRAM[1]   # TPERM AL, CR0, #E
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 3]  = STARTUP_CONFIG_PROGRAM[2]   # CALL  AL, CR0, CR0
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 4]  = _STARTUP_CONFIG_DEFAULT_ENTRY  # data[0] = entry_slot = 4
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 5]  = _STARTUP_CONFIG_VERSION        # data[1] = config_version
+# words 6-62 remain zero (flags=0, fault_count=0, user params all zero)
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 63] = _STARTUP_CONFIG_SALVATION_E_GT  # c-list[0] = Salvation E-GT
 
 # ---------------------------------------------------------------------------
 # NUC_PROGRAM lump header constants — derived entirely from NUC_PROGRAM contents.
@@ -468,7 +524,7 @@ _MMIO_ENTRIES = {
 # CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js §"Boot ROM Cross-Reference"
 #   Slot  0: Boot.NS      — NS root (location=NS_TABLE_BASE, limit = full phys space)
 #   Slot  1: Boot.Thread  — Thread Abstraction lump (base = 0x0100)
-#   Slot  2: Boot.Abstr   — Boot Abstraction lump   (base = 0x0200)
+#   Slot  2: Startup.Config — cw=3/cc=1 lump (base = 0x0200); CLOOMC calls configured entry (Task #512)
 #   Slot  3: (empty)      — placeholder
 #   Slot  4: Salvation     — first user abstraction (NUC_PROGRAM on hardware), E-perm
 #   Slot  5: Navana        — namespace controller, E-perm
@@ -520,6 +576,12 @@ for _i in range(NS_SLOT_COUNT):
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
                                 NS_TABLE_BASE, 64,
                                 abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
+    elif _i == 2:
+        # Startup.Config lump (Task #512): E-perm, alloc=64 words, cw=3, cc=1
+        # Lump data (header + code + data + c-list) baked into FULL_ROM at word 128.
+        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
+                                _i * 0x100, 64,
+                                abstract_gt=_abstract_gt_word(PERM_MASK_E))
     elif _i == 4:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
                                 NUC_LUMP_BASE, 64,
@@ -578,7 +640,7 @@ DEMO_CLIST = [
     make_gt(GT_TYPE_INFORM, PERM_MASK_X, 4, 0),                       # idx 1: boot-internal boot code X-only
     make_gt(GT_TYPE_NULL, 0, 0, 0),                                    # idx 2: boot-internal → Thread GT after SAVE
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),                       # idx 3: boot-internal Boot.Abstr E-GT
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 4, 0),                       # idx 4: Salvation E-GT, Slot 4 (B:04)
+    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),                       # idx 4: Startup.Config E-GT, Slot 2 (B:04 → Task #512)
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 5, 0),                       # idx 5: Navana E-GT, Slot 5
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 6, 0),                       # idx 6: Mint E-GT, Slot 6
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 7, 0),                       # idx 7: Memory E-GT, Slot 7

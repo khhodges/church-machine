@@ -190,10 +190,10 @@ class ChurchSimulator {
         if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
         const src = new Uint32Array(arrayBuffer);
 
-        // Format-version guard: reject binaries generated before Task #396
-        // (Startup.Config at NS slot 2; Boot.Abstr c-list[4] wired to it).
+        // Format-version guard: reject binaries generated before Task #512
+        // (Startup.Config gains cw=3/cc=1 code region + c-list; DEMO_CLIST[4] rewired).
         // Tag written by boot_image.py at mem[NS_TABLE_BASE - 1].
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0070431;  // must match boot_image.py; bumped Task #431 (Abstract UART/Button/Timer GTs)
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0070512;  // must match boot_image.py; bumped Task #512 (Startup.Config CLOOMC code region)
         const tagIdx = src.length - this.NS_TABLE_RESERVE - 1;
         if (tagIdx >= 0 && tagIdx < src.length) {
             if ((src[tagIdx] >>> 0) !== BOOT_IMAGE_FORMAT_TAG) {
@@ -1067,30 +1067,63 @@ class ChurchSimulator {
         this.nsClistMap[BOOT_ABSTR_NS_SLOT] = clistChildren;         // Boot.Abstr owns full capability list
 
         // ── Startup.Config lump (NS slot 2) ───────────────────────────────────────
-        // 64-word data-only lump (no code region, no c-list).
-        // Data region layout (lump words 1-63):
-        //   word 1 (data[0]): entry_slot = 4  (NS[4] Salvation, the default boot target)
-        //   word 2 (data[1]): config_version = STARTUP_CONFIG_VERSION_INIT
-        //   word 3 (data[2]): flags = 0
-        //   word 4 (data[3]): fault_count = 0
-        //   words 5-63 (data[4-62]): user params = 0 (already zero-initialized)
+        // 64-word lump with a 3-word CLOOMC code region and a 1-slot c-list (Task #512).
+        //   word  0:        Lump header (cw=3, cc=1)
+        //   words 1-3:      Code region — 3 CLOOMC instructions (LOAD / TPERM / CALL)
+        //   words 4-62:     Data region (59 words)
+        //     word 4 (data[0]): entry_slot  = 4   (NS[4] Salvation, the default boot target)
+        //     word 5 (data[1]): config_version = STARTUP_CONFIG_VERSION_INIT
+        //     word 6 (data[2]): flags = 0
+        //     word 7 (data[3]): fault_count = 0
+        //     words 8-62 (data[4-58]): user params = 0 (already zero-initialized)
+        //   word 63:        C-list slot 0 — configured entry E-GT (default: Salvation, slot 4)
+        //
+        // The CLOOMC program (executed by FPGA on every reset via CALL from Boot.Abstr):
+        //   LOAD  AL, CR0, CR6[0]  — load entry E-GT from Startup.Config c-list[0] into CR0
+        //   TPERM AL, CR0, #E      — restrict CR0 to E permission only
+        //   CALL  AL, CR0, CR0     — enter configured entry abstraction
+        //
+        // DEMO_CLIST[4] now points to Startup.Config (slot 2) instead of Salvation (slot 4).
+        // The boot path becomes: Boot.Abstr → CALL Startup.Config → CALL <configured entry>.
+        // Default configured entry is Salvation (slot 4); changeable via Startup.Config.SetEntry().
         const STARTUP_CONFIG_VERSION_INIT = 0x00000001;
         const STARTUP_CONFIG_DEFAULT_ENTRY = 4;
+        // Pre-computed CLOOMC instruction words (Task #512).
+        // Must stay in sync with hardware/boot_rom.py STARTUP_CONFIG_PROGRAM.
+        const STARTUP_CONFIG_WORDS = [
+            0x07030000, // LOAD  AL, CR0, CR6[0]  — load entry E-GT from c-list[0]
+            0x37000008, // TPERM AL, CR0, #E       — restrict to E permission only
+            0x17000000, // CALL  AL, CR0, CR0      — enter configured entry abstraction
+        ];
         const startupConfigLoc = this.memory[this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS];
-        this.memory[startupConfigLoc + 0] = this.packLumpHeader(0, 0, 0, 0); // 64-word lump header
-        this.memory[startupConfigLoc + 1] = STARTUP_CONFIG_DEFAULT_ENTRY;    // data[0]: entry_slot
-        this.memory[startupConfigLoc + 2] = STARTUP_CONFIG_VERSION_INIT;     // data[1]: config_version
-        // data[2..62] remain 0 (memory is zero-initialized)
+        this.memory[startupConfigLoc + 0] = this.packLumpHeader(0, 3, 1, 0); // 64-word lump header: cw=3, cc=1
+        // Code region (words 1-3)
+        for (let i = 0; i < STARTUP_CONFIG_WORDS.length; i++) {
+            this.memory[startupConfigLoc + 1 + i] = STARTUP_CONFIG_WORDS[i] >>> 0;
+        }
+        // Data region starts at word 4 (shifted +3 from old data-only layout)
+        this.memory[startupConfigLoc + 4] = STARTUP_CONFIG_DEFAULT_ENTRY;  // data[0]: entry_slot
+        this.memory[startupConfigLoc + 5] = STARTUP_CONFIG_VERSION_INIT;   // data[1]: config_version
+        // data[2..58] remain 0 (memory is zero-initialized)
+        // C-list slot 0 (word 63): Salvation E-GT — the default configured entry
+        this.memory[startupConfigLoc + 63] = clistGTs[4];   // clistGTs[4] = Salvation E-GT (NS slot 4)
+        // Override NS entry for Startup.Config (slot 2):
+        //   lim17 = lumpSize - cc - 1 = 64 - 1 - 1 = 62 (last data word; c-list at word 63)
+        //   clist_count = 1
+        const startupConfigCRLimit = this.SLOT_SIZE - 1 - 1;  // = 62
+        const startupConfigNSBase  = this.NS_TABLE_BASE + 2 * this.NS_ENTRY_WORDS;
+        this.memory[startupConfigNSBase + 1] = this.packNSWord1(startupConfigCRLimit, 0, 0, 0, 0, 1, 1);
+        this.memory[startupConfigNSBase + 2] = this.makeVersionSeals(0, startupConfigLoc, startupConfigCRLimit);
 
         // Boot-entry slot: written at NS_TABLE_BASE - 2 (mirrors boot_image.py).
         // loadBootImage() reads this word and restores bootEntrySlot from the image.
         this.memory[this.NS_TABLE_BASE - 2] = this.bootEntrySlot >>> 0;
         // Format-version tag: written immediately before the NS table (at
         // NS_TABLE_BASE - 1) so that loadBootImage() can detect and reject
-        // stale binaries. Bumped to 0x396 (Task #396) — Startup.Config at slot 2,
-        // Boot.Abstr c-list[4] rewired to Startup.Config GT.
+        // stale binaries. Bumped to 0x512 (Task #512) — Startup.Config gains cw=3/cc=1
+        // code region + c-list; DEMO_CLIST[4] rewired from Salvation to Startup.Config.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070431;  // bumped Task #431 (Abstract UART/Button/Timer GTs)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070512;  // bumped Task #512 (Startup.Config CLOOMC code region)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 

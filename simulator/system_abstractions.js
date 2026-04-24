@@ -119,13 +119,18 @@ class SystemAbstractions {
     }
 
     _bindStartupConfig() {
-        // Startup.Config lump data layout (lump word = NS slot 2 physical location + offset):
-        //   lump[0]  : lump header (packLumpHeader result — 0 for data-only)
-        //   lump[1]  : data[0] = entry_slot  (default 4 = NS[4] Salvation, the first user abstraction)
-        //   lump[2]  : data[1] = config_version (STARTUP_CONFIG_VERSION = 0x00000001)
-        //   lump[3]  : data[2] = flags (reserved, must be 0)
-        //   lump[4]  : data[3] = fault_count (incremented on Execute pre-check failure)
-        //   lump[5..63] : data[4..62] = user params (R/W via ReadParam/WriteParam)
+        // Startup.Config lump layout (Task #512 — cw=3, cc=1 — 64 words total):
+        //   lump[0]     : lump header (packLumpHeader: cw=3, cc=1)
+        //   lump[1..3]  : code region — 3 CLOOMC instructions (LOAD/TPERM/CALL)
+        //   lump[4]     : data[0] = entry_slot  (default 4 = NS[4] Salvation)
+        //   lump[5]     : data[1] = config_version (STARTUP_CONFIG_VERSION = 0x00000001)
+        //   lump[6]     : data[2] = flags (reserved, must be 0)
+        //   lump[7]     : data[3] = fault_count (incremented on Execute pre-check failure)
+        //   lump[8..62] : data[4..58] = user params (R/W via ReadParam/WriteParam)
+        //   lump[63]    : c-list slot 0 — configured entry E-GT (default: Salvation, NS slot 4)
+        //
+        // getData(sim, key) → lump[4 + key]   (data region starts at word 4)
+        // setData(sim, key, value) → lump[4 + key] = value
         //
         // Default entry_slot is 4 (NS[4] = Salvation), NOT 3 (Boot.Abstr = NS[3] = LED flash).
         // Slot 3 is rejected by SetEntry as RECURSIVE_SLOT because Boot.Abstr calls
@@ -142,10 +147,12 @@ class SystemAbstractions {
             return sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] >>> 0;
         }
         function getData(sim, key) {
-            return sim.memory[lumpLoc(sim) + 1 + key] >>> 0;
+            // Data region starts at word 4 (after header word 0 and 3 code words 1-3).
+            return sim.memory[lumpLoc(sim) + 4 + key] >>> 0;
         }
         function setData(sim, key, value) {
-            sim.memory[lumpLoc(sim) + 1 + key] = value >>> 0;
+            // Data region starts at word 4 (after header word 0 and 3 code words 1-3).
+            sim.memory[lumpLoc(sim) + 4 + key] = value >>> 0;
         }
         function bumpFaultCount(sim) {
             const fc = (getData(sim, 3) + 1) >>> 0;
@@ -266,9 +273,9 @@ class SystemAbstractions {
 
         this.registry.bindMethod(2, 'ReadParam', function(sim, args) {
             const key = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
-            // 64-word lump: lump[0]=header; data words are lump[1..63] → keys 0..62.
-            // Key 63+ would map past the end of the lump into the next slot's memory.
-            if (key >= 63) {
+            // 64-word lump: header@0, code@1-3, data@4-62, c-list@63.
+            // Data region = 59 words → keys 0..58.  Key 59+ would reach c-list or beyond.
+            if (key >= 59) {
                 return { ok: true, result: 0xFFFFFFFF,
                          message: 'Startup.Config.ReadParam: KEY_OOB' };
             }
@@ -284,9 +291,9 @@ class SystemAbstractions {
                 return { ok: false, result: 2,
                          message: `Startup.Config.WriteParam: READ_ONLY (key ${key})` };
             }
-            // 64-word lump: lump[0]=header; data words are lump[1..63] → keys 0..62.
-            // Key 63+ would corrupt the next slot's memory.
-            if (key >= 63) {
+            // 64-word lump: header@0, code@1-3, data@4-62, c-list@63.
+            // Data region = 59 words → keys 0..58.  Key 59+ would corrupt c-list or beyond.
+            if (key >= 59) {
                 return { ok: false, result: 1,
                          message: 'Startup.Config.WriteParam: KEY_OOB' };
             }
@@ -318,7 +325,7 @@ class SystemAbstractions {
         this.registry.bindMethod(2, 'Reset', function(sim, args) {
             setData(sim, 0, STARTUP_CONFIG_DEFAULT_ENTRY); // entry_slot = 4 (Salvation, default)
             setData(sim, 2, 0);                             // flags = 0
-            for (let k = 3; k < 63; k++) setData(sim, k, 0); // fault_count + user params = 0
+            for (let k = 3; k < 59; k++) setData(sim, k, 0); // fault_count + user params = 0 (keys 0..58)
             // data[1] (config_version) is intentionally preserved across Reset
             return { ok: true, result: 0, message: 'Startup.Config.Reset → ok' };
         });
