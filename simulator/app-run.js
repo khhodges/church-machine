@@ -753,6 +753,7 @@ function _autoLoadDefaultProgram() {
 function slowBoot() {
     if (bootAnimating || sim.bootComplete || sim.halted) return;
     bootAnimating = true;
+    if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
     const delay = 800;
     function nextPhase() {
         try {
@@ -804,12 +805,14 @@ function runSim() {
             sim._bootStep();
         } catch(e) {
             console.error('runSim _bootStep error:', e);
+            if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
             updateDashboard();
             switchView('dashboard');
             openCRDetail(14);
             return;
         }
     }
+    if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     _autoLoadDefaultProgram();
 
     const MAX_STEPS   = 10000;
@@ -1846,10 +1849,12 @@ function resetAndStep() {
     while (!sim.bootComplete && !sim.halted) {
         try { sim._bootStep(); } catch(e) {
             console.error('resetAndStep _bootStep error:', e);
+            if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
             updateDashboard();
             return;
         }
     }
+    if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
     if (!sim.halted) _autoLoadDefaultProgram();
     updateDashboard();
     switchView('dashboard');
