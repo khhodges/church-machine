@@ -866,7 +866,7 @@ class ChurchSimulator {
         // LED:    freed Task #406 (slot 12); Abstract GTs in c-list[8]–[13].
         // UART:   freed Task #431 (slot 11); Abstract GT  in c-list[14].
         // Button: freed Task #431 (slot 13); Abstract GT  in c-list[15].
-        // Timer:  freed Task #431 (slot 14); Abstract GT  in c-list[16].
+        // Timer:  freed Task #431 (slot 14); Abstract GT  in c-list[17] (moved from 16, Task #461).
         // Display (slot 15) is next in the migration roadmap.
         const DEVICE_REG_LIMITS = {};  // no device register Inform NS entries remain
 
@@ -1032,7 +1032,7 @@ class ChurchSimulator {
         //   Word  0:          Lump header (n_minus_6, cw=NUC_CODE_WORDS, cc=DEMO_CLIST_SIZE)
         //   Words 1–17:       Code region (NUC_CODE_WORDS=17; loaded by loadProgram)
         //   Words 18..(end-DEMO_CLIST_SIZE-1): Freespace
-        //   Words (end-DEMO_CLIST_SIZE)..(end-1): C-list (17 GTs at physical end)
+        //   Words (end-DEMO_CLIST_SIZE)..(end-1): C-list (18 GTs at physical end)
         // CR14 (R+X) and CR6 (E) are derived from this lump's header in B:04.
         const bootEntryLoc     = this.memory[this.NS_TABLE_BASE + BOOT_ABSTR_NS_SLOT * this.NS_ENTRY_WORDS];
         const entryN_MINUS_6   = Math.max(0, Math.ceil(Math.log2(BOOT_ABSTR_LUMP_SIZE)) - 6);

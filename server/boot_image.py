@@ -537,7 +537,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
     clist_gts[0] = mem_mgr_gt
 
-    # Truncate to DEMO_CLIST_SIZE (slot 17 TIMER_DEV is simulator-only).
+    # Truncate to DEMO_CLIST_SIZE.
+    # Slot 16 = SlideRule Inform GT; slot 17 = TIMER_DEV Abstract GT (moved from 16, Task #461).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
     # ----- Boot.Abstr lump (NS slot 3) ------------------------------------
