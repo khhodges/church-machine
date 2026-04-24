@@ -1002,9 +1002,45 @@ function _applyMethodDRNames(text, methodObj) {
 }
 
 function _applyCRNames(text) {
-    if (!_petNameCRMap || Object.keys(_petNameCRMap).length === 0) return text;
+    return _applyMethodCRNames(text, null);
+}
+
+/**
+ * Look up the method object from _lumpManifests[nsIdx]._methods that contains
+ * the given 0-based code-region offset.  Returns null when not found.
+ */
+function _methodAtOffset(nsIdx, codeOffset) {
+    const manifest = _lumpManifests[nsIdx];
+    if (!manifest) return null;
+    const methods = manifest._methods;
+    if (!methods) return null;
+    for (const m of methods) {
+        if (typeof m.offset !== 'number' || m.aliasOf) continue;
+        const len = typeof m.length === 'number' ? m.length : ((m.code && m.code.length) || 0);
+        if (codeOffset >= m.offset && codeOffset < m.offset + len) return m;
+    }
+    return null;
+}
+
+/**
+ * Post-process a disassembly string to replace "CRN" tokens with
+ * "petName(CRN)" using per-method pet_names first, falling back to the
+ * global _petNameCRMap.  Returns the input string unchanged when no names
+ * are available.
+ */
+function _applyMethodCRNames(text, methodObj) {
+    const own = (((methodObj && methodObj.pet_names) || {}).CR) || {};
+    let crMap;
+    if (Object.keys(own).length > 0) {
+        crMap = {};
+        for (const [k, v] of Object.entries(own)) crMap[parseInt(k)] = v;
+    } else if (_petNameCRMap && Object.keys(_petNameCRMap).length > 0) {
+        crMap = _petNameCRMap;
+    } else {
+        return text;
+    }
     return text.replace(/\bCR(\d+)\b/g, (match, numStr) => {
-        const pet = _petNameCRMap[parseInt(numStr)];
+        const pet = crMap[parseInt(numStr)];
         return pet ? `${pet}(CR${numStr})` : match;
     });
 }
