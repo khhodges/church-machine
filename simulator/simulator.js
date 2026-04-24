@@ -598,6 +598,7 @@ class ChurchSimulator {
         this.mElevation = false;
         this.bootStep = 0;
         this._initThrdEntry = null;
+        this._nucLumpData = null;
         this.callHomeStatus = null;
         this.callHomeTimestamp = null;
         this.ledBits = 0;
@@ -659,6 +660,7 @@ class ChurchSimulator {
         this.mElevation = false;
         this.bootStep = 0;
         this._initThrdEntry = null;
+        this._nucLumpData = null;
         this.callHomeStatus = null;
         this.callHomeTimestamp = null;
         this.ledBits = 0;
@@ -1370,18 +1372,18 @@ class ChurchSimulator {
             }
 
             // ════════════════════════════════════════════════════════════════════
-            // B:06  LOAD_NUC  (case 6)
-            // "Load Nucleus": the hardware's CALL microcode for Boot.Abstr.
-            // Slot 2 is a free/null entry (Task #247).
+            // B:06  NUC_CLIST  (case 6)
+            // First half of nucleus load: validate Boot.Abstr NS entry, read the
+            // lump header, push the sentinel CALL frame, and derive CR6 (c-list, E)
+            // from the lump header.  Stashes base/layout data for NUC_CODE (B:07).
             //
             //   1. E-perm mLoad on Boot.Abstr (BOOT_ABSTR_NS_SLOT=3): validates
             //      the NS entry and checks F-bit and GT type.
             //   2. Read Boot.Abstr lump header (word 0) to extract cc and lumpSize.
             //   3. Push a sentinel CALL frame into thread lump memory so that any
             //      eventual RETURN from the root abstraction reboots the machine.
-            //   4. Simultaneously derive CR14 (code, R+X) and CR6 (c-list, E) from
-            //      the lump header — exactly as CALL microcode does at runtime.
-            //   5. Set PC = 0 (first instruction of Boot.Abstr).
+            //   4. Derive CR6 (c-list, E) from the lump header.
+            //   5. Stash layout data for B:07 NUC_CODE.
             // ════════════════════════════════════════════════════════════════════
             case 6: {
                 // ── Step 1: Direct E-perm mLoad of boot entry abstraction ────────────
@@ -1389,22 +1391,22 @@ class ChurchSimulator {
                 const bootEntryGT = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
                 const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
                 if (!entryCheck.ok) {
-                    this.fault('BOOT', `LOAD_NUC mLoad(${_b4Label}) failed: ${entryCheck.message}`);
+                    this.fault('BOOT', `NUC_CLIST mLoad(${_b4Label}) failed: ${entryCheck.message}`);
                     return false;
                 }
                 const _actualNSType     = entryCheck.entry.gtType;
                 const _GT_TYPE_NAMES    = ['NULL', 'Inform', 'Outform', 'Abstract'];
                 const _actualNSTypeName = _GT_TYPE_NAMES[_actualNSType & 3] || 'Unknown';
                 const _nsTypePass = _actualNSType === 1;
-                this._auditNSType(this.bootEntrySlot, _b4Label, _actualNSType, _actualNSTypeName, 'LOAD_NUC');
+                this._auditNSType(this.bootEntrySlot, _b4Label, _actualNSType, _actualNSTypeName, 'NUC_CLIST');
                 if (!_nsTypePass) {                                                                         // must be Inform (type=1)
-                    this.fault('TYPE', `LOAD_NUC: ${_b4Label} type is ${_actualNSTypeName}, must be Inform`);
+                    this.fault('TYPE', `NUC_CLIST: ${_b4Label} type is ${_actualNSTypeName}, must be Inform`);
                     return false;
                 }
                 const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
                 const entryNSParsed = this.parseNSWord1(entryNSEntry.word1_limit);
                 if (entryNSParsed.f === 1) {                                        // Far-lumps not supported at boot
-                    this.fault('F_BIT', `LOAD_NUC: ${_b4Label} has F-bit set (Far) — not supported at boot`);
+                    this.fault('F_BIT', `NUC_CLIST: ${_b4Label} has F-bit set (Far) — not supported at boot`);
                     return false;
                 }
                 const bootEntrySlot = this.bootEntrySlot;
@@ -1418,7 +1420,7 @@ class ChurchSimulator {
                 this._auditLumpHeader(this.bootEntrySlot, _b4Label, hdr);
 
                 if (!hdr.valid) {
-                    this.fault('LUMP_MAGIC', `LOAD_NUC: ${_b4Label} lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F) — lump not installed or memory zeroed`);
+                    this.fault('LUMP_MAGIC', `NUC_CLIST: ${_b4Label} lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F) — lump not installed or memory zeroed`);
                     return false;
                 }
                 const cw         = hdr.cw;                                          // code-word count
@@ -1426,7 +1428,7 @@ class ChurchSimulator {
                 const lumpSz     = hdr.lumpSize;                                    // total lump size in 32-bit words
                 const clistStart = lumpSz - cc;                                     // c-list begins at physical end of lump
                 if (cc === 0) {
-                    this.fault('LUMP_LAYOUT', `LOAD_NUC: ${_b4Label} lump header cc=0 — no C-List (lump has no capability slots)`);
+                    this.fault('LUMP_LAYOUT', `NUC_CLIST: ${_b4Label} lump header cc=0 — no C-List (lump has no capability slots)`);
                     return false;
                 }
 
@@ -1454,16 +1456,7 @@ class ChurchSimulator {
                 }
                 this.sto = sp_max - 2;
 
-                // ── Step 4: Derive CR14 (code) and CR6 (c-list) from Boot.Abstr header ─
-                const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
-                this.cr[14] = {
-                    word0: cr14GT,
-                    word1: base,                    // physical base of Boot.Abstr lump
-                    word2: entryNSEntry.word1_limit >>> 0,
-                    word3: entryNSEntry.word2_seals,
-                    m: this.mElevation ? 1 : 0
-                };
-
+                // ── Step 4: Derive CR6 (c-list, E) from lump header ───────────────────
                 const cr6GT = this.createGT(0, bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);   // E-perm c-list token
                 this.cr[6] = {
                     word0: cr6GT,
@@ -1473,22 +1466,11 @@ class ChurchSimulator {
                     m: this.mElevation ? 1 : 0
                 };
 
-                // ── Step 5: Set PC and emit log ───────────────────────────────────────
-                this.pc = 0;
-                this.output += `[BOOT] LOAD_NUC — ${_b4Label} (Slot ${bootEntrySlot}) hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← ${_b4Label} lump header; CR14(X,cw=${cw},lim=0..${cw-1}) CR6(E,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
+                // ── Step 5: Stash layout data for B:07 NUC_CODE ───────────────────────
+                this._nucLumpData = { base, hdrWord, cw, cc, lumpSz, clistStart, bootEntrySlot, label: _b4Label, entryNSEntry };
+
+                this.output += `[BOOT] NUC_CLIST — CR6(E) <- c-list of ${_b4Label} (base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}); sentinel pushed (frame@+${sp_max}, STO=${this.sto})\n`;
                 this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
-                // Synthetic audit entries for CR14 and CR6 direct writes
-                this.auditLog.push({
-                    gate: 'CR_WR',
-                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0`,
-                    label: _b4Label + ' code',
-                    nsIndex: bootEntrySlot,
-                    requiredPerm: 'R+X',
-                    checks: { install: { pass: true } },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'LOAD_NUC CR14',
-                });
                 this.auditLog.push({
                     gate: 'CR_WR',
                     desc: `CR6(E) ← ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
@@ -1498,19 +1480,64 @@ class ChurchSimulator {
                     checks: { install: { pass: true } },
                     b: 0, f: 0,
                     result: 'pass',
-                    stepCtx: 'LOAD_NUC CR6',
+                    stepCtx: 'NUC_CLIST CR6',
                 });
 
-                this.bootStep++;                  // advance state machine → B:07 (COMPLETE)
-                this.ledBits = 0b111111;          // all 6 LEDs on = LOAD_NUC complete
+                this.bootStep++;                  // advance state machine → B:07 (NUC_CODE)
+                this.ledBits = 0b011111;          // 5 LEDs on = NUC_CLIST complete
                 break;
             }
 
             // ════════════════════════════════════════════════════════════════════
-            // B:07  COMPLETE  (case 7)
-            // Run Startup.Config.Execute(), drop M-elevation, mark boot done.
+            // B:07  NUC_CODE  (case 7)
+            // Second half of nucleus load: derive CR14 (code, R+X) from the lump
+            // layout stashed by B:06 NUC_CLIST, then set PC = 0.
             // ════════════════════════════════════════════════════════════════════
             case 7: {
+                const nd = this._nucLumpData;
+                if (!nd) {
+                    this.fault('BOOT', 'NUC_CODE: _nucLumpData is null (NUC_CLIST did not run)');
+                    return false;
+                }
+                const { base, hdrWord, cw, cc, lumpSz, clistStart, bootEntrySlot, label: _b4Label, entryNSEntry } = nd;
+
+                // ── Derive CR14 (code, R+X) from lump header ──────────────────────────
+                const cr14GT = this.createGT(0, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
+                this.cr[14] = {
+                    word0: cr14GT,
+                    word1: base,                    // physical base of Boot.Abstr lump
+                    word2: entryNSEntry.word1_limit >>> 0,
+                    word3: entryNSEntry.word2_seals,
+                    m: this.mElevation ? 1 : 0
+                };
+
+                // ── Set PC = 0 ────────────────────────────────────────────────────────
+                this.pc = 0;
+                this._nucLumpData = null;                                            // clear stash
+
+                this.output += `[BOOT] NUC_CODE — CR14(R+X) <- ${_b4Label} code lump (base=0x${base.toString(16).toUpperCase()}, cw=${cw}); PC=0\n`;
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0`,
+                    label: _b4Label + ' code',
+                    nsIndex: bootEntrySlot,
+                    requiredPerm: 'R+X',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'NUC_CODE CR14',
+                });
+
+                this.bootStep++;                  // advance state machine → B:08 (COMPLETE)
+                this.ledBits = 0b111111;          // all 6 LEDs on = NUC_CODE complete
+                break;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:08  COMPLETE  (case 8)
+            // Run Startup.Config.Execute(), drop M-elevation, mark boot done.
+            // ════════════════════════════════════════════════════════════════════
+            case 8: {
                 // Startup.Config.Execute(): automatic dispatch (mirrors
                 // BOOT_ROM_WORDS[7] CALL via c-list[4]) under M-elevation so the
                 // pre-checks always run even if Boot.Thread lacks S-perm.
@@ -4559,7 +4586,7 @@ class ChurchSimulator {
     // Push an NS.Type gate-log entry for the NS entry type check in _bootStep B:05
     // and B:06.  Called immediately after each mLoad succeeds so the outcome is always
     // recorded, whether the type is correct (Inform, type=1) or not.
-    // bootStepName should be 'INIT_ABSTR' (B:05) or 'LOAD_NUC' (B:06).
+    // bootStepName should be 'INIT_ABSTR' (B:05) or 'NUC_CLIST' (B:06).
     _auditNSType(nsIndex, label, actualType, actualTypeName, bootStepName) {
         const typePass = actualType === 1;
         this.auditLog.push({
@@ -4587,7 +4614,7 @@ class ChurchSimulator {
     _auditLumpHeader(nsIndex, label, hdr) {
         const magicPass = hdr.valid;
         const ccPass    = magicPass && (hdr.cc > 0);
-        // Hardware only checks MAGIC and CC from the lump header word at B:06 LOAD_NUC.
+        // Hardware only checks MAGIC and CC from the lump header word at B:06 NUC_CLIST.
         // The typ field (bits [9:8]) is never validated by the hardware at this step;
         // the NS entry type check happens earlier via entryCheck.parsed.type.
         const checks = { magic: { pass: magicPass, rawMagic: hdr.magic } };
@@ -4613,7 +4640,7 @@ class ChurchSimulator {
                 perm: v.perm || null,
             }));
             // For NS.Type entries, prefix the stage and description with the
-            // originating boot step name (INIT_ABSTR for B:05, LOAD_NUC for B:06)
+            // originating boot step name (INIT_ABSTR for B:05, NUC_CLIST for B:06)
             // so the audit panel shows a precise step label.
             let stage, desc;
             if (a.gate === 'NS.Type' && a.bootStepName) {
@@ -4831,6 +4858,7 @@ class ChurchSimulator {
         this.mElevation = false;
         this.bootStep = 0;
         this._initThrdEntry = null;
+        this._nucLumpData = null;
         this.callHomeStatus = null;
         this.callHomeTimestamp = null;
         this.ledBits = 0; this.ledMode = 'boot'; this.lastSignedReturn = null;
@@ -4939,6 +4967,7 @@ class ChurchSimulator {
         this.mElevation = false;
         this.bootStep = 0;
         this._initThrdEntry = null;
+        this._nucLumpData = null;
         this.callHomeStatus = null;
         this.callHomeTimestamp = null;
         this.ledBits = 0; this.ledMode = 'boot'; this.lastSignedReturn = null;

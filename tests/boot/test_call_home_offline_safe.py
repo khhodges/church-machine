@@ -1,14 +1,14 @@
-"""Headless test: CALL_HOME (B:02½) is offline-safe.
+"""Headless test: CALL_HOME (B:04) is offline-safe.
 
-Drives the simulator through all 8 boot steps with no abstraction registry
+Drives the simulator through all 9 boot steps with no abstraction registry
 (and no uartRegs) present and asserts that:
 
   1. CALL_HOME runs as its own atomic step (bootStepBefore=4, bootStepAfter=5).
   2. bootStep advances from 4 to 5 during that iteration.
   3. The console output for that step contains the expected log line:
        [BOOT] CALL_HOME — ... ACK=0 (offline)
-  4. The simulator does NOT halt: bootComplete == True and bootStep == 7 after
-     exactly 8 _bootStep() calls (case 7 / B:05 COMPLETE sets bootComplete=True
+  4. The simulator does NOT halt: bootComplete == True and bootStep == 8 after
+     exactly 9 _bootStep() calls (case 8 / B:08 COMPLETE sets bootComplete=True
      without incrementing bootStep).
 """
 import base64
@@ -87,20 +87,20 @@ def test_call_home_offline_safe():
         f"bootComplete is False after driving _bootStep(); "
         f"reached bootStep={status['bootStep']}, iterations={status['iterations']}"
     )
-    assert status["bootStep"] == 7, (
-        f"expected bootStep=7 after full boot (case 7 / B:05 COMPLETE does not "
+    assert status["bootStep"] == 8, (
+        f"expected bootStep=8 after full boot (case 8 / B:08 COMPLETE does not "
         f"increment bootStep, it sets bootComplete=true instead), "
         f"got {status['bootStep']}"
     )
-    assert status["iterations"] == 8, (
-        f"expected exactly 8 _bootStep() calls, got {status['iterations']}"
+    assert status["iterations"] == 9, (
+        f"expected exactly 9 _bootStep() calls, got {status['iterations']}"
     )
 
     # ---- (1) & (2) CALL_HOME is its own atomic step -----------------------
     # Iteration 5 (1-indexed) drives bootStep from 4 → 5 (case 4 = CALL_HOME).
     snapshots = status["stepSnapshots"]
-    assert len(snapshots) == 8, (
-        f"expected 8 step snapshots, got {len(snapshots)}"
+    assert len(snapshots) == 9, (
+        f"expected 9 step snapshots, got {len(snapshots)}"
     )
     call_home_snap = snapshots[4]   # 0-indexed: the 5th call
     assert call_home_snap["bootStepBefore"] == 4, (

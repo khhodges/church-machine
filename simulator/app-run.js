@@ -300,8 +300,9 @@ const _BOOT_STEPS = [
     { addrStr: 'B:03', disasm: 'INIT_HEAP',  label: 'CR5(RW) \u2190 thread heap \u00b7 CHANGE-consistent synthesis',                  offset: null, prog: 'boot' },
     { addrStr: 'B:04', disasm: 'CALL_HOME',  label: 'Tunnel.Register \u2192 23-byte packet \u00b7 await ACK',                         offset: null, prog: 'boot' },
     { addrStr: 'B:05', disasm: 'INIT_ABSTR', label: 'CR6(E) \u2190 NS[3] Boot.Abstr',                                                 offset: null, prog: 'boot' },
-    { addrStr: 'B:06', disasm: 'LOAD_NUC',   label: 'CR14(R+X) + CR6(E) \u2190 lump header \u00b7 push sentinel \u00b7 PC\u21900',   offset: null, prog: 'boot' },
-    { addrStr: 'B:07', disasm: 'COMPLETE',   label: 'bootComplete \u2190 true \u00b7 M-elevation OFF \u00b7 dispatch begins',          offset: null, prog: 'boot' },
+    { addrStr: 'B:06', disasm: 'NUC_CLIST',  label: 'CR6(E) \u2190 lump c-list \u00b7 push sentinel',                                 offset: null, prog: 'boot' },
+    { addrStr: 'B:07', disasm: 'NUC_CODE',   label: 'CR14(R+X) \u2190 lump code \u00b7 PC\u21900',                                    offset: null, prog: 'boot' },
+    { addrStr: 'B:08', disasm: 'COMPLETE',   label: 'bootComplete \u2190 true \u00b7 M-elevation OFF \u00b7 dispatch begins',          offset: null, prog: 'boot' },
 ];
 
 function _bootNIARows(bootStep) {
@@ -8272,15 +8273,16 @@ Reserved slots:
 User abstractions:
   Slot 2+  IDE-assigned at compile time
 
-Boot sequence (B:00–B:07, 8 steps):
+Boot sequence (B:00–B:08, 9 steps):
   B:00  FAULT_RST  — capture fault context; clear all CRs / DRs
   B:01  LOAD_NS    — CR15 ← NS[0] Namespace GT
   B:02  INIT_THRD  — CR12 ← NS[1] thread stack GT (zero perms)
   B:03  INIT_HEAP  — CR5(RW) ← thread heap (CHANGE-consistent)
   B:04  CALL_HOME  — Tunnel.Register → 23-byte packet; await ACK
-  B:05  INIT_ABSTR — CR6(E) ← NS[3] Boot.Abstr
-  B:06  LOAD_NUC   — CR14(R+X)+CR6(E) ← lump header; push sentinel; PC←0
-  B:07  COMPLETE   — M-Elevation OFF; dispatch begins
+  B:05  INIT_ABSTR — CR6(E) ← NS[3] Boot.Abstr (pre-CALL token)
+  B:06  NUC_CLIST  — CR6(E) ← lump c-list; push sentinel
+  B:07  NUC_CODE   — CR14(R+X) ← lump code; PC←0
+  B:08  COMPLETE   — M-Elevation OFF; dispatch begins
 
 Access: LOAD/SAVE instructions using a namespace-scoped GT with L/S perm.`,
         example: `; Assembly: load namespace entry for slot 3
