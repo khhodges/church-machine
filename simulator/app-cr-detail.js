@@ -823,6 +823,26 @@ function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
     if (capabilities && capabilities.length > 0) {
         annot._caps = capabilities.slice();
     }
+    // Store methods metadata for the API tab (.pet preamble generation).
+    if (methods && methods.length > 0) {
+        annot._methods = methods.map(m => ({
+            name:     m.name,
+            offset:   m.offset,
+            length:   m.length,
+            pet_names: m.pet_names || {},
+            inputs:   m.inputs   || [],
+            outputs:  m.outputs  || [],
+            aliasOf:  m.aliasOf  || null,
+        }));
+        // Merge DR/CR pet_names across all methods as a top-level fallback.
+        const allDR = {};
+        const allCR = {};
+        for (const m of annot._methods) {
+            for (const [k, v] of Object.entries((m.pet_names.DR) || {})) allDR[k] = v;
+            for (const [k, v] of Object.entries((m.pet_names.CR) || {})) allCR[k] = v;
+        }
+        annot.pet_names = { DR: allDR, CR: allCR };
+    }
     _lumpManifests[nsIdx] = annot;
 }
 

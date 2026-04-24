@@ -37,8 +37,8 @@ The browser simulator (`simulator/`) is split across multiple files:
 - `app-shell.js` — hamburger, views, tabs, tooltips, back navigation
 - `app-tools.js` — HP-35 calculator, abacus, slide rule, math challenge
 - `app-cr-display.js` — CR/DR popup panels, zone scroll, thread layout
-- `app-cr-detail.js` — CR detail tabs, c-list display, CR state rendering
-- `app-memory.js` — memory hex viewer, page browsing, search
+- `app-cr-detail.js` — CR detail tabs, c-list display, CR state rendering; `_storeLumpManifest()` now stores `_methods` and `pet_names` for the API tab
+- `app-memory.js` — memory hex viewer, page browsing, search; CR detail panel now has an "API" tab (`crdPanel-api`) that renders per-method example blocks with `.pet` preambles
 - `app-abstractions.js` — abstraction viewer, NS table, lazy-load manifest
 - `app-lumps.js` — lump type selector, lump viewer, lump repo toolbar
 - `app-absdetail.js` — abstraction detail panel, MTBF, deploy tab, library

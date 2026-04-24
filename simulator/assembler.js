@@ -107,6 +107,19 @@
 //   .word  <hex>    — emit a raw 32-bit literal word
 //   name:           — define a branch target label (on its own line)
 //   ; any text      — comment, stripped before encoding
+//   .pet <alias> DR<n>  — declare symbolic alias for data register DR<n>
+//   .pet <alias> CR<n>  — declare symbolic alias for capability register CR<n>
+//
+// PET DIRECTIVES  (.pet — register aliases)
+//   Aliases allow human-readable names in place of DR<n> / CR<n> tokens.
+//   They are collected in a pre-pass and produce no machine words.
+//   Case-insensitive for the keyword (.PET); alias names are case-sensitive.
+//   Redeclaring an alias to a different register emits a warning.
+//   Redeclaring to the same register is silently accepted.
+//   Example:
+//       .pet result  DR1
+//       .pet count   DR2
+//       IADD  result, result, count   ; same as IADD DR1, DR1, DR2
 //
 // OUTPUT
 //   assemble() returns:
@@ -149,6 +162,9 @@ class ChurchAssembler {
         };
         this.labels = {};
         this.errors = [];
+        this.warnings = [];    // non-fatal diagnostics (e.g. .pet alias redefinition to different reg)
+        this._drAliases = {};  // alias name → DR index (0–15), populated by _parsePetDirectives
+        this._crAliases = {};  // alias name → CR index (0–15), populated by _parsePetDirectives
         // Inherit the class-level namespace so locally-created assembler instances
         // (e.g. inside tutorials, builder, CLOOMC) automatically get symbol resolution
         // without every call site needing to call setNamespace() individually.
@@ -171,11 +187,87 @@ class ChurchAssembler {
         return slot !== undefined ? slot : null;
     }
 
+    // ── Pre-pass: collect .pet alias declarations ──────────────────────────────
+    // Scans all source lines for .pet directives and populates _drAliases and
+    // _crAliases before the main encode loop runs.  Produces no machine words.
+    // Syntax: .pet <alias> DR<n>  or  .pet <alias> CR<n>
+    //   alias — any identifier matching /^[A-Za-z_][A-Za-z0-9_]*$/
+    //           Built-in register names DR0..DR15 / CR0..CR15 are not permitted
+    //           as aliases (they shadow the canonical syntax unambiguously and
+    //           would make programs confusing).
+    //   n     — 0–15 (out-of-range emits an error, alias is not stored)
+    // Redeclaring the same alias to the same register is silently accepted.
+    // Redeclaring to a different register emits a non-fatal warning (this.warnings).
+    _parsePetDirectives(lines) {
+        for (let lineNum = 0; lineNum < lines.length; lineNum++) {
+            let line = lines[lineNum].trim();
+            // Strip inline comments — normalised to match Pass-1 comment handling (;, --, //)
+            const ci = line.indexOf(';');
+            if (ci >= 0) line = line.substring(0, ci).trim();
+            const di = line.indexOf('--');
+            if (di >= 0) line = line.substring(0, di).trim();
+            const sli = line.indexOf('//');
+            if (sli >= 0) line = line.substring(0, sli).trim();
+            const m = line.match(/^\.pet\s+([A-Za-z_][A-Za-z0-9_]*)\s+(DR|CR)(\d+)\s*$/i);
+            if (!m) {
+                // Line starts with .pet but doesn't match the valid form — report a syntax error
+                if (/^\.pet\b/i.test(line)) {
+                    this.errors.push({ line: lineNum + 1, message: `invalid .pet syntax — expected: .pet <alias> DR<n>  or  .pet <alias> CR<n>` });
+                }
+                continue;
+            }
+            const alias   = m[1];               // preserve original case
+            const regType = m[2].toUpperCase(); // 'DR' or 'CR'
+            const regIdx  = parseInt(m[3], 10);
+            // Built-in register names DR0..DR15 and CR0..CR15 cannot be used as aliases.
+            if (/^(DR|CR)(1[0-5]|[0-9])$/i.test(alias)) {
+                this.errors.push({ line: lineNum + 1, message: `'${alias}' is a built-in register name and cannot be used as a .pet alias` });
+                continue;
+            }
+            if (regIdx > 15) {
+                this.errors.push({ line: lineNum + 1, message: `${regType}${regIdx} out of range — ${regType} aliases must be ${regType}0–${regType}15` });
+                continue;
+            }
+            if (regType === 'DR') {
+                if (this._drAliases[alias] !== undefined && this._drAliases[alias] !== regIdx) {
+                    // Non-fatal: warn but allow the redefinition
+                    this.warnings.push({ line: lineNum + 1, message: `'.pet ${alias}' already declared as DR${this._drAliases[alias]}; redefining to DR${regIdx}` });
+                }
+                if (this._crAliases[alias] !== undefined) {
+                    // Cross-type: alias was previously a CR alias, now declared as DR
+                    this.warnings.push({ line: lineNum + 1, message: `'.pet ${alias}' was previously declared as a CR alias; redefining as DR${regIdx}` });
+                    delete this._crAliases[alias];
+                }
+                this._drAliases[alias] = regIdx;
+            } else {
+                if (this._crAliases[alias] !== undefined && this._crAliases[alias] !== regIdx) {
+                    this.warnings.push({ line: lineNum + 1, message: `'.pet ${alias}' already declared as CR${this._crAliases[alias]}; redefining to CR${regIdx}` });
+                }
+                if (this._drAliases[alias] !== undefined) {
+                    // Cross-type: alias was previously a DR alias, now declared as CR
+                    this.warnings.push({ line: lineNum + 1, message: `'.pet ${alias}' was previously declared as a DR alias; redefining as CR${regIdx}` });
+                    delete this._drAliases[alias];
+                }
+                this._crAliases[alias] = regIdx;
+            }
+        }
+    }
+
+    // Returns the current alias maps (useful for callers that want to inspect
+    // which names are in scope after assembly).
+    getAliases() {
+        return { dr: Object.assign({}, this._drAliases), cr: Object.assign({}, this._crAliases) };
+    }
+
     assemble(source) {
         this.labels = {};
         this.errors = [];
+        this.warnings = [];
+        this._drAliases = {};
+        this._crAliases = {};
         this.nsLoaded = {};   // reset per-assembly loaded-CR tracking
         const lines = source.split('\n');
+        this._parsePetDirectives(lines);  // pre-pass: collect all .pet aliases
         const instructions = [];
 
         // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
@@ -219,6 +311,12 @@ class ChurchAssembler {
             // Skip these in both passes — they are documentation artifacts, not
             // code instructions, and must not shift label word offsets.
             if (/^\.header\b/i.test(line)) {
+                continue;
+            }
+
+            // .pet directives are pre-pass-only; skip them here so they produce
+            // no machine words and do not shift label or word offsets.
+            if (/^\.pet\b/i.test(line)) {
                 continue;
             }
 
@@ -270,7 +368,7 @@ class ChurchAssembler {
             }
         }
 
-        return { words, errors: this.errors, labels: this.labels };
+        return { words, errors: this.errors, warnings: this.warnings, labels: this.labels };
     }
 
     _assembleLine(line, lineNum, addr) {
@@ -367,7 +465,9 @@ class ChurchAssembler {
                 crDst = this._parseCR(parts[1], lineNum);
                 if (parts[2]) {
                     const tok2upper = parts[2].toUpperCase().replace(/,/g, '').trim();
-                    const isNumericSelector = /^CR\d+$/.test(tok2upper) || /^0X[0-9A-F]+$/.test(tok2upper) || /^\d+$/.test(tok2upper);
+                    const tok2raw   = (parts[2] || '').replace(/,/g, '').trim();
+                    const isNumericSelector = /^CR\d+$/.test(tok2upper) || /^0X[0-9A-F]+$/.test(tok2upper) || /^\d+$/.test(tok2upper)
+                        || this._crAliases[tok2raw] !== undefined;
                     if (!isNumericSelector) {
                         const rawTok1 = (parts[1] || '').replace(/,/g, '').trim();
                         const rawTok2 = (parts[2] || '').replace(/,/g, '').trim();
@@ -598,6 +698,14 @@ class ChurchAssembler {
         // Level 2: check if this token is an abstraction name already loaded into a CR.
         if (this.nsLoaded[rawTok] !== undefined) return this.nsLoaded[rawTok];
 
+        // .pet alias lookup — check CR aliases first, then give a helpful
+        // cross-type error if the name is a DR alias used in a CR position.
+        if (this._crAliases[rawTok] !== undefined) return this._crAliases[rawTok];
+        if (this._drAliases[rawTok] !== undefined) {
+            this.errors.push({ line: lineNum, message: `'${rawTok}' is a DR alias — expected a CR here` });
+            return 0;
+        }
+
         let hint = '';
         const knownNames  = Object.keys(this.nsSymbols);
         const loadedNames = Object.keys(this.nsLoaded);
@@ -612,6 +720,7 @@ class ChurchAssembler {
 
     _parseCRorBare(token, lineNum) {
         if (!token) return 0;
+        const rawAlias = token.replace(/,/g, '').trim();  // preserve case for alias lookup
         token = token.toUpperCase().replace(/,/g, '');
         const crMatch = token.match(/^CR(\d+)$/);
         if (crMatch) {
@@ -634,7 +743,9 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: `Method selector ${idx} is too big — must be 0–15.` });
             return 0;
         }
-        this.errors.push({ line: lineNum, message: `Expected a method selector (0–15, 0x0–0xF, or CR0–CR15), but got "${token}".` });
+        // .pet CR alias — allows a named capability register as a method selector
+        if (this._crAliases[rawAlias] !== undefined) return this._crAliases[rawAlias];
+        this.errors.push({ line: lineNum, message: `Expected a method selector (0–15, 0x0–0xF, or CR0–CR15), but got "${rawAlias}".` });
         return 0;
     }
 
@@ -643,6 +754,7 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: 'A data register (like DR0, DR1, 1, or hex 0x0–0xF) is needed here, but nothing was given.' });
             return 0;
         }
+        const rawAlias = token.replace(/,/g, '').trim();  // preserve case for alias lookup
         token = token.toUpperCase().replace(/,/g, '');
         const m = token.match(/^DR(\d+)$/);
         if (m) {
@@ -665,7 +777,14 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, message: `${idx} is out of range for a data register — must be 0–15 (DR0–DR15).` });
             return 0;
         }
-        this.errors.push({ line: lineNum, message: `Expected a data register like DR0, DR1, 1, or hex 0x1, but got "${token}". Data registers are DR0–DR15 (or 0–15, or 0x0–0xF).` });
+        // .pet alias lookup — check DR aliases first, then give a helpful
+        // cross-type error if the name is a CR alias used in a DR position.
+        if (this._drAliases[rawAlias] !== undefined) return this._drAliases[rawAlias];
+        if (this._crAliases[rawAlias] !== undefined) {
+            this.errors.push({ line: lineNum, message: `'${rawAlias}' is a CR alias — expected a DR here` });
+            return 0;
+        }
+        this.errors.push({ line: lineNum, message: `Expected a data register like DR0, DR1, 1, or hex 0x1, but got "${rawAlias}". Data registers are DR0–DR15 (or 0–15, or 0x0–0xF).` });
         return 0;
     }
 

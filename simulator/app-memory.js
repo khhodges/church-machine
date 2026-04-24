@@ -47,8 +47,8 @@ function updateCRDetail() {
     const showEditButton = showCode && _editLumpHdr.valid;
 
     // ── Correct default tab for this CR's capabilities ───────────────────────
-    if (crDetailTab === 'code' && !showCode) {
-        crDetailTab = showCList ? 'clist' : 'lump';
+    if (crDetailTab === 'content' && !showCode) {
+        crDetailTab = showCList ? 'register' : 'binary';
     }
 
     // ── Hoist shared data used across multiple panels ─────────────────────────
@@ -81,6 +81,7 @@ function updateCRDetail() {
     const _absName      = (sim.nsLabels && sim.nsLabels[nsIdx]) || '';
     const _absLabel     = _absName ? (_absName + ' Abstraction') : '';
 
+    const _activeTabLabel = crDetailTab === 'register' ? 'Register' : crDetailTab === 'binary' ? 'Binary' : crDetailTab === 'api' ? 'API' : 'Content';
     let html = '';
     html += '<div class="crd-menu-bar">';
     html += `<button class="crd-hamburger" onclick="toggleCRDetailMenu(event)" title="Views &amp; Actions">&#x2630;</button>`;
@@ -97,11 +98,9 @@ function updateCRDetail() {
     }
     html += '<div class="crd-menu-dropdown" id="crdMenuDropdown" style="display:none">';
     html += '<div class="crd-menu-section-label">View</div>';
-    if (showCode) {
-        html += `<button class="crd-menu-item${crDetailTab==='code'?' crd-menu-item-active':''}" data-tab="code" id="crdTab-code" onclick="switchCRDetailTab('code');toggleCRDetailMenu()">Code</button>`;
-    }
-    html += `<button class="crd-menu-item${crDetailTab==='clist'?' crd-menu-item-active':''}" data-tab="clist" id="crdTab-clist" onclick="switchCRDetailTab('clist');toggleCRDetailMenu()">C-List</button>`;
-    html += `<button class="crd-menu-item${crDetailTab==='lump'?' crd-menu-item-active':''}" data-tab="lump" id="crdTab-lump" onclick="switchCRDetailTab('lump');toggleCRDetailMenu()">Lump</button>`;
+    html += `<button class="crd-menu-item${crDetailTab==='content'?' crd-menu-item-active':''}" data-tab="content" id="crdTab-content" onclick="switchCRDetailTab('content');toggleCRDetailMenu()">Content</button>`;
+    html += `<button class="crd-menu-item${crDetailTab==='register'?' crd-menu-item-active':''}" data-tab="register" id="crdTab-register" onclick="switchCRDetailTab('register');toggleCRDetailMenu()">Register</button>`;
+    html += `<button class="crd-menu-item${crDetailTab==='binary'?' crd-menu-item-active':''}" data-tab="binary" id="crdTab-binary" onclick="switchCRDetailTab('binary');toggleCRDetailMenu()">Binary</button>`;
     html += `<button class="crd-menu-item${crDetailTab==='api'?' crd-menu-item-active':''}" data-tab="api" id="crdTab-api" onclick="switchCRDetailTab('api');toggleCRDetailMenu()">API</button>`;
     if (showEditButton) {
         html += '<div class="crd-menu-divider"></div>';
@@ -825,6 +824,147 @@ function updateCRDetail() {
         html += line + '<br>';
     }
     html += '</div>';
+    html += '</div>';
+    html += '</div></div>';
+
+    // ── API tab panel ────────────────────────────────────────────────────────
+    // Shows per-method CLOOMC example blocks with a generated .pet preamble
+    // derived from the lump manifest's pet_names.  The examples are only
+    // available after the abstraction has been compiled (which populates
+    // _lumpManifests[nsIdx]._methods).
+    html += `<div class="crd-panel" id="crdPanel-api" style="display:${crDetailTab==='api'?'block':'none'}">`;
+    html += '<div class="cr-detail-grid">';
+    html += '<div class="cr-detail-section">';
+    html += '<div class="cr-detail-heading">API \u2014 Method Examples</div>';
+
+    const _apiManifest = _lumpManifests[nsIdx] || {};
+    const _apiMethods  = _apiManifest._methods  || [];
+    const _apiAbsName  = (sim && sim.nsLabels && sim.nsLabels[nsIdx]) || `NS[${nsIdx}]`;
+
+    if (_apiMethods.length === 0) {
+        // Fallback: show pet name aliases from global _petNameDRMap / _petNameCRMap if available
+        const _fallbackDREntries = Object.entries(_petNameDRMap).filter(([, v]) => v);
+        const _fallbackCREntries = Object.entries(_petNameCRMap).filter(([, v]) => v);
+        if (_fallbackDREntries.length > 0 || _fallbackCREntries.length > 0) {
+            html += '<div style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem 0 0.25rem;">Pet name aliases (from current context):</div>';
+            let fbEx = '';
+            for (const [idx, name] of _fallbackDREntries.sort(([a], [b]) => parseInt(a) - parseInt(b))) {
+                fbEx += `.pet ${name.padEnd(12)} DR${idx}\n`;
+            }
+            for (const [idx, name] of _fallbackCREntries.sort(([a], [b]) => parseInt(a) - parseInt(b))) {
+                fbEx += `.pet ${name.padEnd(12)} CR${idx}\n`;
+            }
+            const escapedFb = fbEx.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            html += `<pre class="abs-method-panel-code" style="font-size:0.72rem;line-height:1.55;background:#0a0a1a;padding:0.75rem;border-radius:6px;overflow-x:auto;white-space:pre;">${escapedFb}</pre>`;
+            html += '<div style="color:var(--text-secondary);font-size:0.75rem;margin-top:0.25rem;">Compile the abstraction source to generate full method examples.</div>';
+        } else {
+            html += '<div style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem 0;">';
+            html += 'No method manifest available for this abstraction.<br>';
+            html += '<span style="font-size:0.75rem;">Compile the abstraction source to generate API examples.</span>';
+            html += '</div>';
+        }
+    } else {
+        // Build global pet_names from the merged manifest (fallback for methods
+        // that don't declare their own).
+        const _apiGlobalDR = Object.assign({}, (_apiManifest.pet_names || {}).DR || {});
+        const _apiGlobalCR = Object.assign({}, (_apiManifest.pet_names || {}).CR || {});
+        // Lump-level pet_names empty flag — used to conditionally show the no-pet note
+        const _lumpHasPetNames = Object.keys(_apiGlobalDR).length > 0 || Object.keys(_apiGlobalCR).length > 0;
+
+        for (let mIdx = 0; mIdx < _apiMethods.length; mIdx++) {
+            const method = _apiMethods[mIdx];
+            // Priority: method-specific > manifest-global; _petNameDRMap/_petNameCRMap are
+            // NOT merged here — they are only shown in the no-methods fallback branch.
+            const methodDR = Object.assign({}, _apiGlobalDR, (method.pet_names || {}).DR || {});
+            const methodCR = Object.assign({}, _apiGlobalCR, (method.pet_names || {}).CR || {});
+
+            // ── Resolve a DR/CR token (returns pet name if one exists) ───────
+            const drToken = (n) => methodDR[String(n)] || `DR${n}`;
+            const crToken = (n) => methodCR[String(n)] || `CR${n}`;
+
+            // ── Collect DRs mentioned in inputs/outputs ──────────────────────
+            const inputDRs  = [];
+            const outputDRs = [];
+            for (const s of (method.inputs  || [])) { for (const m2 of (s.matchAll(/\bDR(\d+)\b/g) || [])) { const n = parseInt(m2[1]); if (!inputDRs.includes(n)) inputDRs.push(n); } }
+            for (const s of (method.outputs || [])) { for (const m2 of (s.matchAll(/\bDR(\d+)\b/g) || [])) { const n = parseInt(m2[1]); if (!outputDRs.includes(n)) outputDRs.push(n); } }
+            const outputOnlyDRs = outputDRs.filter(n => !inputDRs.includes(n));
+
+            // ── Build the example block text ─────────────────────────────────
+            const ruler = '\u2500'.repeat(48);
+            let ex = `; \u2500\u2500 ${_apiAbsName}.${method.name} \u2500 method ${mIdx} ${ruler}\n`;
+            let anyPet = false;   // track whether any .pet lines were emitted (used for note below)
+            if (method.aliasOf) {
+                ex += `; Alias of: ${method.aliasOf}\n`;
+            } else {
+                if (method.inputs  && method.inputs.length  > 0) ex += `; Inputs:  ${method.inputs.join(', ')}\n`;
+                if (method.outputs && method.outputs.length > 0) ex += `; Outputs: ${method.outputs.join(', ')}\n`;
+                ex += ';\n';
+
+                // ── .pet preamble ─────────────────────────────────────────────
+                // Emit .pet lines only for DRs that appear in this method's
+                // inputs/outputs (not every named DR in the manifest).
+                // Ordering: input DRs ascending first, then output-only DRs ascending.
+                const emittedDRs = new Set();
+                const drOrder = [
+                    ...inputDRs.slice().sort((a, b) => a - b),
+                    ...outputOnlyDRs.slice().sort((a, b) => a - b),
+                ];
+                for (const drNum of drOrder) {
+                    const petName = methodDR[String(drNum)];
+                    if (!petName || emittedDRs.has(drNum)) continue;
+                    emittedDRs.add(drNum);
+                    const isInput  = inputDRs.includes(drNum);
+                    const isOutput = outputDRs.includes(drNum);
+                    const role = isInput && isOutput ? 'input/output' : isOutput ? 'output' : 'input';
+                    ex += `.pet ${petName.padEnd(12)} DR${drNum}          ; ${role}\n`;
+                    anyPet = true;
+                }
+                // Emit .pet for every CR referenced in the generated example that
+                // has a pet name.  For the standard CALL example the referenced CRs
+                // are: callDstCR (CR0, the CALL destination) and callCR (CR14 by
+                // convention, the CLOOMC method register).
+                const callDstCR = 0;   // CALL destination register
+                const callCR    = 14;  // CLOOMC method register by convention
+                const crsInExample = [...new Set([callDstCR, callCR])].sort((a, b) => a - b);
+                for (const crNum of crsInExample) {
+                    if (methodCR[String(crNum)]) {
+                        const crRole = crNum === callCR ? 'CLOOMC register' : 'capability register';
+                        ex += `.pet ${methodCR[String(crNum)].padEnd(12)} CR${crNum}          ; ${crRole}\n`;
+                        anyPet = true;
+                    }
+                }
+                if (anyPet) {
+                    ex += ';\n';
+                }
+
+                // ── LOAD lines for each input DR ─────────────────────────────
+                for (const drNum of inputDRs.sort((a, b) => a - b)) {
+                    ex += `LOAD  ${drToken(drNum).padEnd(12)}, #<value>       ; input\n`;
+                }
+                // ── CALL line ────────────────────────────────────────────────
+                const callCRTok    = crToken(callCR);
+                const callDstTok   = crToken(callDstCR);
+                ex += `CALL  ${callDstTok}, ${callCRTok}, #${mIdx}       ; \u2192 ${_apiAbsName}.${method.name}\n`;
+                // ── Result comment ───────────────────────────────────────────
+                for (const drNum of outputDRs.sort((a, b) => a - b)) {
+                    ex += `; result in ${drToken(drNum)} (DR${drNum})\n`;
+                }
+            }
+
+            const escapedEx = ex
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            html += `<div style="margin-bottom:1.5rem;">`;
+            html += `<pre class="abs-method-panel-code" style="font-size:0.72rem;line-height:1.55;background:#0a0a1a;padding:0.75rem;border-radius:6px;overflow-x:auto;white-space:pre;">${escapedEx}</pre>`;
+            if (!method.aliasOf && !_lumpHasPetNames) {
+                html += `<div style="color:var(--text-secondary);font-size:0.75rem;margin-top:0.25rem;font-style:italic;">; (no pet names defined \u2014 compile abstraction to add aliases)</div>`;
+            }
+            html += `</div>`;
+        }
+    }
+
     html += '</div>';
     html += '</div></div>';
 
