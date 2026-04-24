@@ -17,6 +17,7 @@ class AbstractionRegistry {
             chainable: options.chainable || false,
             handler: options.handler || null,
             dispatch: {},
+            invokeCount: 0,
             faultCount: 0,
             firstActiveTime: null,
             lastFaultTime: null
@@ -155,6 +156,8 @@ class AbstractionRegistry {
         if (!a) return { ok: false, fault: 'ABSTRACTION', message: `Abstraction ${index} not found` };
         const fn = a.dispatch[methodName.toUpperCase()];
         if (!fn) return { ok: false, fault: 'METHOD', message: `Method ${methodName} not found on ${a.name}` };
+        a.invokeCount++;
+        if (!a.firstActiveTime) a.firstActiveTime = Date.now();
         return fn(sim, args);
     }
 

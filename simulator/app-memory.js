@@ -490,6 +490,7 @@ function updateCRDetail() {
     // ── Ownership ─────────────────────────────────────────────────────────────
     {
         const _mfst = _lumpManifests[nsIdx];
+        const _owAbs = sim.abstractionRegistry && sim.abstractionRegistry.getAbstraction && sim.abstractionRegistry.getAbstraction(nsIdx);
         html += '<div class="crd-lump-section">';
         html += '<div class="crd-lump-section-label">Ownership</div>';
         if (_mfst) {
@@ -512,6 +513,25 @@ function updateCRDetail() {
                 html += `<tr><td colspan="2" style="color:var(--text-secondary);font-style:italic;">No ownership fields in manifest.</td></tr>`;
             }
             html += '</tbody></table>';
+        } else if (_owAbs) {
+            const _layerNamesMap = (sim.abstractionRegistry && sim.abstractionRegistry.getLayerNames && sim.abstractionRegistry.getLayerNames()) || {};
+            const _layerLabel = _layerNamesMap[_owAbs.layer] != null ? `Layer ${_owAbs.layer} \u2014 ${_layerNamesMap[_owAbs.layer]}` : `Layer ${_owAbs.layer}`;
+            html += '<table class="cr-table cr-detail-words"><tbody>';
+            html += `<tr><td style="color:var(--church-blue);width:130px;">Name</td><td>${_escHtml(_owAbs.name || _absName)}</td></tr>`;
+            if (_owAbs.author) {
+                html += `<tr><td style="color:var(--church-blue)">Author</td><td>${_escHtml(_owAbs.author)}</td></tr>`;
+            }
+            if (_owAbs.version) {
+                html += `<tr><td style="color:var(--church-blue)">Version</td><td>${_escHtml(_owAbs.version)}</td></tr>`;
+            }
+            html += `<tr><td style="color:var(--church-blue)">Layer</td><td>${_escHtml(_layerLabel)}</td></tr>`;
+            if (_owAbs.description) {
+                html += `<tr><td style="color:var(--church-blue)">Description</td><td style="font-size:0.82rem;">${_escHtml(_owAbs.description)}</td></tr>`;
+            }
+            if (_owAbs.methods && _owAbs.methods.length > 0) {
+                html += `<tr><td style="color:var(--church-blue)">Methods</td><td style="font-size:0.82rem;">${_owAbs.methods.map(_escHtml).join(', ')}</td></tr>`;
+            }
+            html += '</tbody></table>';
         } else {
             html += '<div style="color:var(--text-secondary);font-style:italic;">(no ownership metadata \u2014 compile and publish to add)</div>';
         }
@@ -523,7 +543,8 @@ function updateCRDetail() {
         const _mfst  = _lumpManifests[nsIdx];
         const _mtbf  = _mfst && _mfst.mtbf;
         const _abs   = sim.abstractionRegistry && sim.abstractionRegistry.getAbstraction && sim.abstractionRegistry.getAbstraction(nsIdx);
-        const _rtFaults = _abs ? (_abs.faultCount || 0) : null;
+        const _rtFaults  = _abs ? (_abs.faultCount  || 0) : null;
+        const _rtInvokes = _abs ? (_abs.invokeCount  || 0) : null;
         const _rtMTBF   = (_abs && _rtFaults > 0 && sim.abstractionRegistry.getMTBF)
                           ? sim.abstractionRegistry.getMTBF(nsIdx) : null;
 
@@ -552,7 +573,12 @@ function updateCRDetail() {
                     html += `<tr><td style="color:var(--church-blue)">Source hash</td><td><code>${_mtbf.source_hash}</code></td></tr>`;
                 }
             }
+            html += `<tr><td style="color:var(--church-blue);width:130px;">Live invocations</td><td>${_rtInvokes !== null ? _rtInvokes : '\u2014'}</td></tr>`;
             html += `<tr><td style="color:var(--church-blue);width:130px;">Live fault count</td><td>${_rtFaults !== null ? _rtFaults : '\u2014'}</td></tr>`;
+            const _liveFaultRateStr = (_rtInvokes === null || _rtFaults === null) ? '\u2014'
+                                    : _rtInvokes === 0 ? '0.00%'
+                                    : ((_rtFaults / _rtInvokes) * 100).toFixed(2) + '%';
+            html += `<tr><td style="color:var(--church-blue)">Live fault rate</td><td>${_liveFaultRateStr}</td></tr>`;
             const _liveMTBFStr = _rtFaults === null ? '\u2014'
                                : _rtMTBF != null    ? (_rtMTBF / 1000).toFixed(1) + 's'
                                : '\u221e (no faults)';
