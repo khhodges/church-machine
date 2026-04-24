@@ -116,7 +116,10 @@ function updateCRDetail() {
         codeHtml += '<th class="code-decompiled-hdr">Decompiled</th>';
         codeHtml += '</tr></thead><tbody>';
 
-        if (nsIdx === bootEntrySlot) {
+        // Show boot preamble rows only while boot is in progress or has faulted.
+        // After a clean boot they are no longer relevant and should not appear
+        // above the CLOOMC instructions in the code view.
+        if (nsIdx === bootEntrySlot && !(sim.bootComplete && !sim.halted)) {
             const _beLabel = (sim.nsLabels && sim.nsLabels[bootEntrySlot]) || `Slot ${bootEntrySlot}`;
             const _bootPreamble = [
                 { addr: 'B:00', desc: 'FAULT_RST',   decomp: 'CR0\u2013CR15 \u2190 NULL \u00b7 DR0\u2013DR15 \u2190 0' },
