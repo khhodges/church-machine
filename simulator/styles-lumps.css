@@ -159,7 +159,40 @@
 .lump-ct-doc    { background: #2a2a4a; color: #b0b8ff; }
 .lump-ct-boot   { background: #3a1e1e; color: #ff9f7e; }
 
-/* ── LUMP detail tab bar ───────────────────────────────── */
+/* ── Lump header strip (between title and tabs) ─────────── */
+.lump-header-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.6rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(100, 160, 255, 0.12);
+    flex-shrink: 0;
+}
+.lump-hs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    font-family: 'Courier New', monospace;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: var(--text-primary, #e0e0f0);
+    white-space: nowrap;
+}
+.lump-hs-label {
+    font-size: 0.6rem;
+    font-family: inherit;
+    color: var(--text-secondary, #8888aa);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-right: 1px;
+}
+
+/* ── LUMP tab bar ──────────────────────────────────────── */
 .lump-tabs-bar {
     display: flex;
     gap: 2px;

@@ -25,12 +25,28 @@ function showLumpDetail(token) {
     const _prevTab = _lumpActiveTab[_tk] || 'overview';
     delete _lumpContentLoaded[_tk];
     delete _lumpHexLoaded[_tk];
+
+    // ── Lump header strip (shown between title and tabs, always visible) ──────
+    const _e = _escHtml;
+    let _headerStrip = `<div class="lump-header-strip">`;
+    _headerStrip += _lumpTypeBadge(lump);
+    _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Token</span>0x${_e(lump.token || '')}</span>`;
+    if (lump.ns_slot !== null && lump.ns_slot !== undefined)
+        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">NS</span>${parseInt(lump.ns_slot)}</span>`;
+    if (lump.lump_size)
+        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">Size</span>${parseInt(lump.lump_size)}w</span>`;
+    if (lump.cw !== undefined && lump.cw !== null)
+        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">CW</span>${parseInt(lump.cw)}</span>`;
+    if (lump.cc !== undefined && lump.cc !== null)
+        _headerStrip += `<span class="lump-hs-chip"><span class="lump-hs-label">CC</span>${parseInt(lump.cc)}</span>`;
+    _headerStrip += `</div>`;
+
     let _tabBar = `<div class="lump-tabs-bar" id="lumpTabBar_${_tk}">` +
         `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
     if (!isNamespace) _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
     _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','hexdump')">Hex Dump</button></div>`;
 
-    let html = _tabBar + `<div class="lump-tab-panel lump-tab-panel-active" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
+    let html = _headerStrip + _tabBar + `<div class="lump-tab-panel lump-tab-panel-active" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
 
     const e = _escHtml;
 
