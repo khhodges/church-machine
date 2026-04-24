@@ -62,9 +62,18 @@ process.stdin.on('end', () => {
     // when bootComplete or halted; cap iterations defensively.
     const MAX_STEPS = 64;
     let iters = 0;
+    const stepSnapshots = [];
     while (iters < MAX_STEPS && !sim.bootComplete && !sim.halted) {
+        const bootStepBefore = sim.bootStep | 0;
+        const outputBefore   = sim.output || '';
         const advanced = sim._bootStep();
         iters++;
+        stepSnapshots.push({
+            iteration:      iters,
+            bootStepBefore: bootStepBefore,
+            bootStepAfter:  sim.bootStep | 0,
+            outputDelta:    (sim.output || '').slice(outputBefore.length),
+        });
         if (!advanced) break;
     }
 
@@ -116,6 +125,8 @@ process.stdin.on('end', () => {
         pipelineOutput: typeof sim._auditPipeline === 'function'
             ? sim._auditPipeline()
             : [],
+        consoleOutput: sim.output || '',
+        stepSnapshots: stepSnapshots,
     };
     process.stdout.write(JSON.stringify(status));
 });
