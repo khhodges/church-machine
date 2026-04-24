@@ -334,9 +334,11 @@ function renderCListEntryDetail(nsIdx, entry) {
 
 function switchCRDetailTab(tab) {
     crDetailTab = tab;
-    document.querySelectorAll('.crd-tab').forEach(t => t.classList.remove('active'));
-    const btn = document.getElementById('crdTab-' + tab);
-    if (btn) btn.classList.add('active');
+    document.querySelectorAll('.crd-menu-item[data-tab]').forEach(it => it.classList.remove('crd-menu-item-active'));
+    const menuItem = document.querySelector(`.crd-menu-item[data-tab="${tab}"]`);
+    if (menuItem) menuItem.classList.add('crd-menu-item-active');
+    const lbl = document.getElementById('crdMenuActiveLabel');
+    if (lbl) lbl.textContent = tab === 'register' ? 'Register' : tab === 'binary' ? 'Binary' : 'Content';
     document.querySelectorAll('.crd-panel').forEach(p => p.style.display = 'none');
     const panel = document.getElementById('crdPanel-' + tab);
     if (panel) panel.style.display = 'block';
@@ -348,7 +350,7 @@ function scrollToThreadZone(zone) {
     requestAnimationFrame(() => {
         // Helper: measure sticky offset (tabs row + thread-layout header)
         function getStickyOffset(scroller) {
-            const tabsEl   = scroller.querySelector('.crd-tabs');
+            const tabsEl   = scroller.querySelector('.crd-menu-bar');
             const stickyEl = scroller.querySelector('.thread-layout-sticky');
             const tabsH    = tabsEl   ? tabsEl.offsetHeight   : 46;
             const stickyH  = stickyEl ? stickyEl.offsetHeight : 0;

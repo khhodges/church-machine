@@ -46,13 +46,13 @@ function updateCRDetail() {
     const _editLumpHdr = sim.parseLumpHeader(_editWord0);
     const showEditButton = showCode && _editLumpHdr.valid;
 
+    const _activeTabLabel = crDetailTab === 'register' ? 'Register' : crDetailTab === 'binary' ? 'Binary' : 'Content';
     let html = '';
-    html += '<div class="crd-tabs">';
-    html += `<button class="crd-tab${crDetailTab==='content'?' active':''}" id="crdTab-content" onclick="switchCRDetailTab('content')">Content</button>`;
-    html += `<button class="crd-tab${crDetailTab==='register'?' active':''}" id="crdTab-register" onclick="switchCRDetailTab('register')">Register</button>`;
-    html += `<button class="crd-tab${crDetailTab==='binary'?' active':''}" id="crdTab-binary" onclick="switchCRDetailTab('binary')">Binary</button>`;
+    html += '<div class="crd-menu-bar">';
+    html += `<button class="crd-hamburger" onclick="toggleCRDetailMenu(event)" title="Views &amp; Actions">&#x2630;</button>`;
+    html += `<span class="crd-menu-active-label" id="crdMenuActiveLabel">${_activeTabLabel}</span>`;
     if (showThread) {
-        html += `<span class="crd-zone-nav" title="Jump to zone · hover for live data">`;
+        html += `<span class="crd-zone-nav" title="Jump to zone \u00b7 hover for live data">`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone('hdr')" onmouseenter="showZonePopup(event,'hdr',${nsIdx})" onmouseleave="hideZonePopup()">Hdr</button>`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(5)" onmouseenter="showZonePopup(event,5,${nsIdx})" onmouseleave="hideZonePopup()">⑤\u202FDR</button>`;
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(4)" onmouseenter="showZonePopup(event,4,${nsIdx})" onmouseleave="hideZonePopup()">④\u202FHeap</button>`;
@@ -61,14 +61,25 @@ function updateCRDetail() {
         html += `<button class="crd-tab crd-tab-zone" onclick="scrollToThreadZone(1)" onmouseenter="showZonePopup(event,1,${nsIdx})" onmouseleave="hideZonePopup()">①\u202FCaps</button>`;
         html += `</span>`;
     }
+    html += '<div class="crd-menu-dropdown" id="crdMenuDropdown" style="display:none">';
+    html += '<div class="crd-menu-section-label">View</div>';
+    html += `<button class="crd-menu-item${crDetailTab==='content'?' crd-menu-item-active':''}" data-tab="content" id="crdTab-content" onclick="switchCRDetailTab('content');toggleCRDetailMenu()">Content</button>`;
+    html += `<button class="crd-menu-item${crDetailTab==='register'?' crd-menu-item-active':''}" data-tab="register" id="crdTab-register" onclick="switchCRDetailTab('register');toggleCRDetailMenu()">Register</button>`;
+    html += `<button class="crd-menu-item${crDetailTab==='binary'?' crd-menu-item-active':''}" data-tab="binary" id="crdTab-binary" onclick="switchCRDetailTab('binary');toggleCRDetailMenu()">Binary</button>`;
     if (showEditButton) {
-        html += `<button class="crd-tab crd-tab-action" onclick="editCRCodeInEditor()" data-tooltip="Edit — Load this code lump into the assembly editor">&#x270E; Edit</button>`;
-        html += `<button class="crd-tab crd-tab-action" onclick="patchSimulator()" data-tooltip="Patch — Assemble editor code and write it directly into simulator memory at this lump\u2019s base address. Updates lump header, NS limit, and CRC automatically.">&#x21A9; Patch</button>`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="patchFPGA()" data-tooltip="Patch FPGA — Runs Patch Simulator first, then uploads the updated lump to the Ti60 F225 over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportPatchFile()" data-tooltip="Export Patch — Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
-        html += `<button class="crd-tab crd-tab-action crd-tab-fpga" onclick="exportLumpAsPatch()" data-tooltip="Lump\u2192Patch — Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump&#x2192;Patch</button>`;
-        html += `<button class="crd-tab crd-tab-action" onclick="publishToLibrary()" data-tooltip="Publish — Compile and publish this abstraction to the Mum Tunnel Library on GitHub, including machine words, c-list, source, and metadata." style="background:#4a7a2e;">&#x21E1; Publish</button>`;
+        html += '<div class="crd-menu-divider"></div>';
+        html += '<div class="crd-menu-section-label">Simulator</div>';
+        html += `<button class="crd-menu-item crd-menu-item-action" onclick="editCRCodeInEditor();toggleCRDetailMenu()" title="Edit \u2014 Load this code lump into the assembly editor">&#x270E; Edit</button>`;
+        html += `<button class="crd-menu-item crd-menu-item-action" onclick="patchSimulator();toggleCRDetailMenu()" title="Patch \u2014 Assemble editor code and write it directly into simulator memory at this lump\u2019s base address. Updates lump header, NS limit, and CRC automatically.">&#x21A9; Patch</button>`;
+        html += '<div class="crd-menu-divider"></div>';
+        html += '<div class="crd-menu-section-label">FPGA</div>';
+        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="patchFPGA();toggleCRDetailMenu()" title="Patch FPGA \u2014 Runs Patch Simulator first, then uploads the updated lump to the Ti60 F225 over WebSerial (UART). Requires an active hardware connection.">&#x21A9; Patch FPGA</button>`;
+        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportPatchFile();toggleCRDetailMenu()" title="Export Patch \u2014 Assembles the code and downloads a .patch file with UART frames, CRC, and RUN sentinel. Flash with: python3 patch_fpga.py /dev/ttyUSB1 file.patch">&#x2B73; Export Patch</button>`;
+        html += `<button class="crd-menu-item crd-menu-item-fpga" onclick="exportLumpAsPatch();toggleCRDetailMenu()" title="Lump\u2192Patch \u2014 Pick a pre-built .lump binary, validate its header, and wrap it into a .patch UART frame file for FPGA flashing.">&#x2B73; Lump\u2192Patch</button>`;
+        html += '<div class="crd-menu-divider"></div>';
+        html += `<button class="crd-menu-item crd-menu-item-publish" onclick="publishToLibrary();toggleCRDetailMenu()" title="Publish \u2014 Compile and publish this abstraction to the Mum Tunnel Library on GitHub, including machine words, c-list, source, and metadata.">&#x21E1; Publish</button>`;
     }
+    html += '</div>';
     html += '</div>';
 
     html += `<div class="crd-panel" id="crdPanel-content" style="display:${crDetailTab==='content'?'block':'none'}">`;
@@ -1954,6 +1965,26 @@ function _positionNSTooltip(tt, evt, anchorEl) {
 function hideNSEntryTooltip() {
     const tt = document.getElementById('nsEntryTooltip');
     if (tt) tt.classList.remove('visible');
+}
+
+function toggleCRDetailMenu(evt) {
+    const dd = document.getElementById('crdMenuDropdown');
+    if (!dd) return;
+    const isOpen = dd.style.display !== 'none' && dd.style.display !== '';
+    if (isOpen) {
+        dd.style.display = 'none';
+    } else {
+        dd.style.display = 'block';
+        setTimeout(() => {
+            document.addEventListener('click', _closeCRDetailMenuOnce, { once: true });
+        }, 0);
+    }
+    if (evt) evt.stopPropagation();
+}
+
+function _closeCRDetailMenuOnce() {
+    const dd = document.getElementById('crdMenuDropdown');
+    if (dd) dd.style.display = 'none';
 }
 
 let selectedAbsIndex = null;

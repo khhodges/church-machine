@@ -2809,6 +2809,114 @@ a.next-step-link:hover {
     border-color: #38bdf8;
 }
 
+/* ── Hamburger menu bar (replaces flat crd-tabs strip) ─────────────────── */
+.crd-menu-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem;
+    background: #0d1b2a;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 12;
+}
+.crd-hamburger {
+    padding: 0.3rem 0.6rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    background: #1b2d45;
+    color: #e0e0e0;
+    border: 2px solid #3a86ff;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.crd-hamburger:hover {
+    background: #3a86ff;
+    color: #fff;
+}
+.crd-menu-active-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.03em;
+    padding: 0 0.15rem;
+}
+.crd-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 200;
+    background: #0c1825;
+    border: 1px solid #2a5a8a;
+    border-radius: 7px;
+    min-width: 190px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.65);
+    padding: 0.3rem 0;
+}
+.crd-menu-section-label {
+    font-size: 0.63rem;
+    font-weight: 800;
+    color: #4a6a88;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.45rem 0.85rem 0.18rem;
+}
+.crd-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.38rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: none;
+    color: #c0d0e0;
+    border: none;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+.crd-menu-item:hover {
+    background: #1b3a5a;
+    color: #fff;
+}
+.crd-menu-item-active {
+    color: var(--accent);
+}
+.crd-menu-item-active:hover {
+    color: #fff;
+}
+.crd-menu-item-action {
+    color: #4caf50;
+}
+.crd-menu-item-action:hover {
+    background: #122212;
+    color: #7eca82;
+}
+.crd-menu-item-fpga {
+    color: #5599ee;
+}
+.crd-menu-item-fpga:hover {
+    background: #101e30;
+    color: #88bbff;
+}
+.crd-menu-item-publish {
+    color: #8bc060;
+}
+.crd-menu-item-publish:hover {
+    background: #112210;
+    color: #b0dc88;
+}
+.crd-menu-divider {
+    height: 1px;
+    background: #1e3a5f;
+    margin: 0.25rem 0.55rem;
+}
+
 #zone-data-popup {
     display: none;
     position: fixed;
