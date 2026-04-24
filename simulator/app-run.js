@@ -327,6 +327,7 @@ function stepSim() {
             con.textContent = '--- Stepping through boot sequence ---\n(Click Step to advance one phase at a time)';
         }
         sim.auditLog = [];
+        const _stepPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
         try {
             sim._bootStep();
         } catch(e) {
@@ -335,7 +336,7 @@ function stepSim() {
             return;
         }
         if (con) {
-            con.textContent += `\n[boot ${sim.bootStep}/7] ${sim.output.split('\n').filter(l => l).pop()}`;
+            con.textContent += `\n[boot ${_stepPhaseNum}/7] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
         }
         if (pipelineViz) {
@@ -772,11 +773,12 @@ function slowBoot() {
                 updateDashboard();
                 return;
             }
+            const _slowPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
             sim._bootStep();
             const con = document.getElementById('editorConsole');
             if (con) {
                 const lastLine = (sim.output || '').split('\n').filter(l => l).pop() || '';
-                con.textContent += `\n[boot ${sim.bootStep}/7] ${lastLine}`;
+                con.textContent += `\n[boot ${_slowPhaseNum}/7] ${lastLine}`;
                 con.scrollTop = con.scrollHeight;
             }
             if (pipelineViz) {
