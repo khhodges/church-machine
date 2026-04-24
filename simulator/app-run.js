@@ -351,7 +351,11 @@ function stepSim() {
                 const _auditSource = _bootAuditAccum.length > 0 ? _bootAuditAccum : sim.auditLog;
                 pipelineViz.showFullPipeline(_auditSource.map(a => {
                     const checks = Object.entries(a.checks || {}).map(([k, v]) => ({ name: k.toUpperCase(), pass: v.pass, perm: v.perm || null }));
-                    return { stage: a.gate, type: a.gate, desc: `${a.gate}(NS[${a.nsIndex}]="${a.label}"${a.requiredPerm ? ', '+a.requiredPerm : ''})`, label: a.label, nsIndex: a.nsIndex, requiredPerm: a.requiredPerm, checks, status: a.result, b: a.b, f: a.f };
+                    const desc = a.desc !== undefined ? a.desc
+                        : (a.nsIndex !== null && a.nsIndex !== undefined)
+                            ? `${a.gate}(NS[${a.nsIndex}]="${a.label}"${a.requiredPerm ? ', '+a.requiredPerm : ''})`
+                            : `${a.gate} — ${a.label}`;
+                    return { stage: a.gate, type: a.gate, desc, label: a.label, nsIndex: a.nsIndex, requiredPerm: a.requiredPerm, checks, status: a.result, b: a.b, f: a.f };
                 }));
             } else {
                 pipelineViz.render();
@@ -809,7 +813,11 @@ function slowBoot() {
                     const _auditSource = _bootAuditAccum.length > 0 ? _bootAuditAccum : sim.auditLog;
                     pipelineViz.showFullPipeline(_auditSource.map(a => {
                         const checks = Object.entries(a.checks || {}).map(([k, v]) => ({ name: k.toUpperCase(), pass: v.pass, perm: v.perm || null }));
-                        return { stage: a.gate, type: a.gate, desc: `${a.gate}(NS[${a.nsIndex}]="${a.label}"${a.requiredPerm ? ', '+a.requiredPerm : ''})`, label: a.label, nsIndex: a.nsIndex, requiredPerm: a.requiredPerm, checks, status: a.result, b: a.b, f: a.f };
+                        const desc = a.desc !== undefined ? a.desc
+                            : (a.nsIndex !== null && a.nsIndex !== undefined)
+                                ? `${a.gate}(NS[${a.nsIndex}]="${a.label}"${a.requiredPerm ? ', '+a.requiredPerm : ''})`
+                                : `${a.gate} — ${a.label}`;
+                        return { stage: a.gate, type: a.gate, desc, label: a.label, nsIndex: a.nsIndex, requiredPerm: a.requiredPerm, checks, status: a.result, b: a.b, f: a.f };
                     }));
                 } else {
                     pipelineViz.render();

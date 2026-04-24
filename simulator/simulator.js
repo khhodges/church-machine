@@ -1161,6 +1161,18 @@ class ChurchSimulator {
                 this.dr.fill(0);                  // zero all 16 data registers (DR0–DR15)
                 this.mElevation = true;           // enable M-elevation: mLoad bypasses R/W/X/L perms during boot
                 this.output += '[BOOT] FAULT_RST — All CRs cleared to NULL, all DRs zeroed. M-Elevation ON.\n';
+                // Synthetic audit entry — registers the CR/DR wipe in the TSB Audit trail
+                this.auditLog.push({
+                    gate: 'RST',
+                    desc: 'CR0–CR15 → NULL  ·  DR0–DR15 → 0  ·  M-elevation ON',
+                    label: 'All CRs / DRs cleared',
+                    nsIndex: null,
+                    requiredPerm: null,
+                    checks: {},
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'FAULT_RST',
+                });
                 this.bootStep++;                  // advance state machine → B:01
                 this.ledBits = 0b000001;          // LED bit 0 ON = FAULT_RST complete
                 this.ledMode = 'boot';            // set LED display to boot-progress mode
@@ -1288,8 +1300,23 @@ class ChurchSimulator {
                         `@ physPC=0x${fv.physicalPC.toString(16).toUpperCase()} offset=+${fv.offset} ` +
                         `[${fv.faultType}: ${fv.faultMsg}]\n`;
                 }
-                this.callHomeStatus = _callHomeMode;  // 'online' or 'offline' — cleared on reset
-                this.callHomeTimestamp = Date.now();  // ms since epoch — cleared on reset
+                this.callHomeStatus = _callHomeMode;
+                this.callHomeTimestamp = Date.now();
+                // Synthetic audit entry — shows the CALL_HOME registration in the TSB Audit trail
+                const _fvSuffix = this.faultViolationData
+                    ? ` · Fault: ${this.faultViolationData.namespace.label}.${this.faultViolationData.thread.label}.${this.faultViolationData.abstraction.label}.${this.faultViolationData.method}`
+                    : '';
+                this.auditLog.push({
+                    gate: 'CALL_HOME',
+                    desc: `Tunnel.Register(reason=${_bootReason}, fault_NIA=0x${_faultNIA.toString(16).toUpperCase()}) ACK=${_ack} [${_callHomeMode}]${_fvSuffix}`,
+                    label: `Tunnel.Register ACK=${_ack}`,
+                    nsIndex: null,
+                    requiredPerm: null,
+                    checks: {},
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'CALL_HOME',
+                });
                 this.bootStep++;                  // advance state machine → B:03  (offline-safe: always advance)
                 this.ledBits = 0b001111;          // LED bit 3 ON = CALL_HOME complete
                 break;
@@ -1434,6 +1461,29 @@ class ChurchSimulator {
                 this.pc = 0;
                 this.output += `[BOOT] LOAD_NUC — ${_b4Label} (Slot ${bootEntrySlot}) hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← ${_b4Label} lump header; CR14(X,cw=${cw},lim=0..${cw-1}) CR6(E,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
                 this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
+                // Synthetic audit entries for CR14 and CR6 direct writes
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0`,
+                    label: _b4Label + ' code',
+                    nsIndex: bootEntrySlot,
+                    requiredPerm: 'R+X',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'LOAD_NUC CR14',
+                });
+                this.auditLog.push({
+                    gate: 'CR_WR',
+                    desc: `CR6(E) ← ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
+                    label: _b4Label + ' c-list',
+                    nsIndex: bootEntrySlot,
+                    requiredPerm: 'E',
+                    checks: { install: { pass: true } },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'LOAD_NUC CR6',
+                });
 
                 this.bootStep++;                  // advance state machine → B:05 (COMPLETE)
                 this.ledBits = 0b111111;          // all 6 LEDs on = LOAD_NUC complete
@@ -1463,6 +1513,18 @@ class ChurchSimulator {
                 this.ledBits = 0b111111;            // Execute() already set ledBits=0x3F on success; keep all LEDs on
                 this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
                 this.output += '[BOOT] COMPLETE — M-Elevation OFF. All Layer 0–1 abstractions initialized. Boot complete.\n';
+                // Synthetic audit entry — closes the boot gate trail
+                this.auditLog.push({
+                    gate: 'CMPL',
+                    desc: 'bootComplete ← true  ·  M-elevation OFF  ·  dispatch begins',
+                    label: 'Boot complete',
+                    nsIndex: null,
+                    requiredPerm: null,
+                    checks: {},
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'COMPLETE',
+                });
                 break;
             }
         }

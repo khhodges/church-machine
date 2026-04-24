@@ -228,7 +228,7 @@ class PipelineVisualizer {
 
     _renderAudit() {
         const steps = this.stageData || [];
-        const tsbGates = ['mLoad', 'mSave', 'HEAP'];
+        const tsbGates = ['mLoad', 'mSave', 'HEAP', 'RST', 'CALL_HOME', 'CR_WR', 'CMPL'];
 
         let html = '<div class="pipeline-wrapper pipeline-audit">';
 
@@ -273,12 +273,20 @@ class PipelineVisualizer {
                 html += `<div class="audit-gate ${overallPass ? 'gate-pass' : 'gate-fail'} ${isActive ? 'gate-active' : ''} ${isDone ? 'gate-done' : ''}">`;
                 html += `<div class="gate-header">`;
                 html += `<span class="gate-type-badge gate-${step.type.toLowerCase()}">${step.type}</span>`;
-                html += `<span class="gate-label gate-label-link" onclick="pipelineGateClick(${step.nsIndex})" title="Open register detail for NS[${step.nsIndex}]">NS[${step.nsIndex}] &ldquo;${step.label}&rdquo;</span>`;
+                if (step.nsIndex !== null && step.nsIndex !== undefined) {
+                    html += `<span class="gate-label gate-label-link" onclick="pipelineGateClick(${step.nsIndex})" title="Open CR detail for NS[${step.nsIndex}]">NS[${step.nsIndex}] &ldquo;${step.label}&rdquo;</span>`;
+                } else {
+                    html += `<span class="gate-label">${step.label}</span>`;
+                }
                 if (step.requiredPerm) {
-                    html += `<span class="gate-perm-req">requires&nbsp;<b>${step.requiredPerm}</b></span>`;
+                    html += `<span class="gate-perm-req">perm&nbsp;<b>${step.requiredPerm}</b></span>`;
                 }
                 html += `<span class="gate-result ${overallPass ? 'result-pass' : 'result-fail'}">${overallPass ? '\u2713 PASS' : '\u2717 FAULT'}</span>`;
                 html += `</div>`;
+
+                if (step.desc) {
+                    html += `<div class="gate-desc-row">${step.desc}</div>`;
+                }
 
                 if (step.checks && step.checks.length > 0) {
                     html += '<div class="gate-checks">';
@@ -310,17 +318,21 @@ class PipelineVisualizer {
         }
         html += '</div>';
 
-        const tsbCount = steps.filter(s => tsbGates.includes(s.type)).length;
+        const capGates   = ['mLoad', 'mSave', 'HEAP', 'CR_WR'];
+        const capCount   = steps.filter(s => capGates.includes(s.type)).length;
+        const totalCount = steps.filter(s => tsbGates.includes(s.type)).length;
         html += '<div class="pipeline-info">';
-        if (tsbCount > 0) {
+        if (totalCount > 0) {
             const allPass = steps.filter(s => tsbGates.includes(s.type)).every(s => s.status === 'pass');
             html += `<div class="pipeline-current ${allPass ? 'pipeline-complete' : 'pipeline-fault'}">`;
-            html += allPass ? `\u2713 ${tsbCount} TSB gate${tsbCount > 1 ? 's' : ''} passed` : `\u2717 TSB gate fault`;
+            html += allPass
+                ? `\u2713 ${capCount} capability gate${capCount !== 1 ? 's' : ''} · ${totalCount} register action${totalCount !== 1 ? 's' : ''} passed`
+                : `\u2717 register action fault`;
             html += '</div>';
-            html += `<div class="pipeline-detail">${steps.length - tsbCount} instruction step${steps.length - tsbCount !== 1 ? 's' : ''}, ${tsbCount} capability gate${tsbCount > 1 ? 's' : ''} — all checks live from hardware model</div>`;
+            html += `<div class="pipeline-detail">${capCount} cap gate${capCount !== 1 ? 's' : ''} (mLoad/mSave/HEAP/CR_WR) · ${totalCount - capCount} boot event${totalCount - capCount !== 1 ? 's' : ''} (RST/CALL_HOME/CMPL) — full boot register audit</div>`;
         } else {
-            html += '<div class="pipeline-current">No TSB gates this step</div>';
-            html += '<div class="pipeline-detail">This instruction did not invoke mLoad or mSave</div>';
+            html += '<div class="pipeline-current">No register actions this step</div>';
+            html += '<div class="pipeline-detail">This instruction did not invoke mLoad, mSave, or a direct CR write</div>';
         }
         html += '</div>';
 
