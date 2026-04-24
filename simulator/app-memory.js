@@ -1163,8 +1163,12 @@ function _gtPetName(gtWord) {
 
 function _renderGTRow(idx, addr, word) {
     const hex = '0x' + (word >>> 0).toString(16).toUpperCase().padStart(8, '0');
+    const crPetName = (typeof _petNameCRMap !== 'undefined' && _petNameCRMap) ? _petNameCRMap[idx] : null;
+    const crPetPrefix = crPetName
+        ? `<span style="color:rgba(156,220,254,0.9);font-weight:600;">${crPetName}</span><span style="color:#777;">(CR${idx})</span> `
+        : '';
     if (word === 0) {
-        return `<tr><td style="color:rgba(200,155,60,0.7);">${idx}</td><td>0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td><td style="color:rgba(206,145,120,0.6);">${hex}</td><td><span style="color:#666;">0 (empty)</span></td></tr>`;
+        return `<tr><td style="color:rgba(200,155,60,0.7);">${idx}</td><td>0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td><td style="color:rgba(206,145,120,0.6);">${hex}</td><td><span style="color:#666;">${crPetPrefix}0 (empty)</span></td></tr>`;
     }
     const p = sim.parseGT(word);
     let decoded;
@@ -1179,14 +1183,16 @@ function _renderGTRow(idx, addr, word) {
         const deviceDetail = ab.ab_type === 0
             ? ` ${deviceName}[${ab.device_data}]`
             : ` 0x${ab.ab_data.toString(16).toUpperCase()}`;
-        decoded  = `<span style="color:rgba(52,211,153,0.9);">Abstract</span>`;
+        decoded  = crPetPrefix;
+        decoded += `<span style="color:rgba(52,211,153,0.9);">Abstract</span>`;
         decoded += ` <span style="color:rgba(200,155,60,0.55);">[${rwStr}]</span>`;
         decoded += ` <span style="color:rgba(156,220,254,0.7);">${abTypeName}${deviceDetail}</span>`;
         decoded += ` <span style="color:#555;">seq${ab.gt_seq}</span>`;
     } else {
         const permStr = (p.permissions.B ? 'B' : '-') + (p.permissions.R ? 'R' : '-') + (p.permissions.W ? 'W' : '-') + (p.permissions.X ? 'X' : '-') + (p.permissions.L ? 'L' : '-') + (p.permissions.S ? 'S' : '-') + (p.permissions.E ? 'E' : '-');
         const label = sim.nsLabels[p.index] || '';
-        decoded  = `<span style="color:rgba(78,201,176,0.7);">${p.typeName}</span>`;
+        decoded  = crPetPrefix;
+        decoded += `<span style="color:rgba(78,201,176,0.7);">${p.typeName}</span>`;
         decoded += ` <span style="color:rgba(200,155,60,0.55);">[${permStr}]</span>`;
         decoded += ` \u2192 idx <span style="color:rgba(86,156,214,0.7);">${p.index}</span>`;
         if (label) decoded += ` <span style="color:rgba(156,220,254,0.6);">(${label})</span>`;
