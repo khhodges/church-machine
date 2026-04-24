@@ -3113,9 +3113,12 @@ function updateLineNumbers() {
     const lines = editor.value.split('\n');
     let html = '';
     for (let i = 1; i <= lines.length; i++) {
-        html += i + '\n';
+        html += '<span id="ln-' + i + '">' + i + '</span>\n';
     }
-    gutter.textContent = html;
+    gutter.innerHTML = html;
+    if (typeof _activeAsmErrors !== 'undefined' && _activeAsmErrors.length > 0) {
+        _highlightAsmErrorLines(_activeAsmErrors);
+    }
 }
 
 function syncLineScroll() {

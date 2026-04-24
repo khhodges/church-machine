@@ -1,3 +1,5 @@
+var _activeAsmErrors = [];
+
 function _showAsmErrors(errors) {
     var panel = document.getElementById('asmErrorPanel');
     if (!panel) return;
@@ -14,6 +16,8 @@ function _showAsmErrors(errors) {
     html += '</ul>';
     panel.innerHTML = html;
     panel.style.display = 'flex';
+    _activeAsmErrors = errors.slice();
+    _highlightAsmErrorLines(errors);
 }
 
 function _clearAsmErrors() {
@@ -21,6 +25,32 @@ function _clearAsmErrors() {
     if (!panel) return;
     panel.style.display = 'none';
     panel.innerHTML = '';
+    _activeAsmErrors = [];
+    _highlightAsmErrorLines([]);
+}
+
+function _highlightAsmErrorLines(errors) {
+    document.querySelectorAll('#lineNumbers span.line-num-error').forEach(function(el) {
+        el.classList.remove('line-num-error');
+    });
+    if (!errors || errors.length === 0) return;
+    var minLine = null;
+    errors.forEach(function(e) {
+        if (!e.line) return;
+        var span = document.getElementById('ln-' + e.line);
+        if (span) span.classList.add('line-num-error');
+        if (minLine === null || e.line < minLine) minLine = e.line;
+    });
+    if (minLine) {
+        var editor = document.getElementById('asmEditor');
+        if (editor) {
+            var style = getComputedStyle(editor);
+            var lineHeight = parseFloat(style.lineHeight) || 19.2;
+            var paddingTop = parseFloat(style.paddingTop) || 0;
+            var targetScrollTop = paddingTop + (minLine - 1) * lineHeight - editor.clientHeight / 3;
+            editor.scrollTop = Math.max(0, targetScrollTop);
+        }
+    }
 }
 
 function _updateEditorPatchBar() {

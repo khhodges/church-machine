@@ -1,3 +1,12 @@
+/* ── Error line gutter marker ────────────────────────────────────────────── */
+#lineNumbers span.line-num-error {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.22);
+    border-radius: 2px;
+    font-weight: 700;
+    outline: 1px solid rgba(239, 68, 68, 0.4);
+}
+
 /* ── Breakpoint button ───────────────────────────────────────────────────── */
 .btn-break {
     background: #1c1a1a;
