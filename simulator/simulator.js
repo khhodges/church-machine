@@ -3646,21 +3646,45 @@ class ChurchSimulator {
             return null;
         }
 
-        const slotGT = this.memory[srcLoc + d.imm] || 0;
+        let slotGT = this.memory[srcLoc + d.imm] || 0;
         if (slotGT === 0) {
             this.fault('NULL_CAP', `XLOADLAMBDA: c-list offset ${d.imm} is empty`);
             return null;
         }
-        const slotParsed = this.parseGT(slotGT);
+        let slotParsed = this.parseGT(slotGT);
         const targetIdx = slotParsed.index;
         if (targetIdx >= this.nsCount || !this.isNSEntryValid(targetIdx)) {
             this.fault('BOUNDS', `XLOADLAMBDA: slot ${targetIdx} out of bounds`);
             return null;
         }
-        const entry = this.readNSEntry(targetIdx);
+        let entry = this.readNSEntry(targetIdx);
         if (!entry) {
             this.fault('BOUNDS', `XLOADLAMBDA: slot ${targetIdx} is null`);
             return null;
+        }
+        // Mode 2 — Outform: the c-list slot holds a GT with type=2 (Outform).
+        // Intercept before the absent-lump check so the lazy loader fires and
+        // the slot GT is promoted to Inform before the LOAD+LAMBDA continues.
+        if (slotParsed.type === 2) {
+            const manifest2 = this.lazyManifest[targetIdx];
+            if (manifest2 && !manifest2.loaded) {
+                this.output += `[LOADER] XLOADLAMBDA: c-list [CR${d.crSrc} + ${d.imm}] is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
+                const loaded = this._dispatchLoaderLoad(targetIdx);
+                if (!loaded) {
+                    this.fault('CODE_NOT_RESIDENT', `XLOADLAMBDA: Outform lazy load failed for slot ${targetIdx}`);
+                    return null;
+                }
+            }
+            // Promote the slot GT from Outform→Inform so the TPERM check and
+            // subsequent LAMBDA phase operate on a valid Inform GT.
+            const nsW2_promote = this.memory[this.NS_TABLE_BASE + targetIdx * this.NS_ENTRY_WORDS + 2];
+            const gt_seq_promote = (nsW2_promote >>> 25) & 0x7F;
+            slotGT = this.createGT(gt_seq_promote, targetIdx, slotParsed.permissions, 1);
+            slotParsed = this.parseGT(slotGT);
+            // Re-read the NS entry so subsequent checks (_absentLumpIntercept,
+            // validateMAC, _writeCR) see the promoted Inform state.
+            entry = this.readNSEntry(targetIdx);
+            this.output += `[LOADER] XLOADLAMBDA: Outform→Inform promotion complete for NS[${targetIdx}], proceeding with LOAD+LAMBDA\n`;
         }
         // ── Absent-lump intercept ─────────────────────────────────────────────
         const absentXL = this._absentLumpIntercept(entry, targetIdx, d, 'XLOADLAMBDA');
