@@ -308,9 +308,11 @@ function _bootNIARows(bootStep) {
     const currIdx = bootStep;
     const nextIdx = bootStep + 1;
     return {
-        last: prevIdx >= 0 ? _BOOT_STEPS[prevIdx] : null,
-        curr: _BOOT_STEPS[currIdx] || null,
-        next: nextIdx < _BOOT_STEPS.length ? _BOOT_STEPS[nextIdx] : null,
+        last:    prevIdx >= 0 ? _BOOT_STEPS[prevIdx] : null,
+        curr:    _BOOT_STEPS[currIdx] || null,
+        next:    nextIdx < _BOOT_STEPS.length ? _BOOT_STEPS[nextIdx] : null,
+        all:     _BOOT_STEPS,
+        currIdx: currIdx,
     };
 }
 
@@ -352,10 +354,13 @@ function stepSim() {
         }
         if (sim.bootComplete) {
             _autoLoadDefaultProgram();
+            updateDashboard();
+            switchView('dashboard');
+            openCRDetail(14);
+        } else {
+            updateDashboard();
+            switchView('pipeline');  // keep boot-step overview in view while stepping through boot
         }
-        updateDashboard();
-        switchView('dashboard');
-        openCRDetail(14);
         return;
     }
     let result;
@@ -754,6 +759,7 @@ function slowBoot() {
     if (bootAnimating || sim.bootComplete || sim.halted) return;
     bootAnimating = true;
     if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(0)); pipelineViz.render(); }  // prime NIA to B:00 before first step
+    switchView('pipeline');  // show pipeline so boot-step overview is immediately visible
     const delay = 800;
     function nextPhase() {
         try {

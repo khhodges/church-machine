@@ -29,6 +29,39 @@ class PipelineVisualizer {
             try { niaData = this.niaProvider(); } catch(e) { niaData = null; }
         }
         if (!niaData || !niaData.curr) return '';
+
+        // Full boot-sequence overview — show all steps as a checklist with current highlighted
+        if (niaData.all && niaData.currIdx !== undefined) {
+            const steps = niaData.all;
+            const ci    = niaData.currIdx;
+            let html = '<div class="nia-boot-table">';
+            html += '<div class="nia-boot-title">Boot Sequence</div>';
+            html += '<table class="nia-table nia-boot-full">';
+            for (let i = 0; i < steps.length; i++) {
+                const d = steps[i];
+                const done    = i < ci;
+                const current = i === ci;
+                const rowCls  = current ? 'nia-row-curr' : (done ? 'nia-row-done' : 'nia-row-next');
+                const icon    = done ? '\u2713' : (current ? '\u25b6' : '\u00b7');
+                const loc     = d.label ? (d.label + (d.offset > 0 ? `+${d.offset}` : '')) : (d.prog || '');
+                html += `<tr class="${rowCls}">`;
+                html += `<td class="nia-boot-icon">${icon}</td>`;
+                html += `<td class="nia-addr"><code>${d.addrStr || ''}</code></td>`;
+                html += `<td class="nia-disasm"><code>${d.disasm || ''}</code></td>`;
+                html += `<td class="nia-loc">${loc ? `<span class="nia-loc-text">${loc}</span>` : ''}</td>`;
+                html += '</tr>';
+            }
+            html += '</table>';
+            const callHomeStatus = this.callHomeStatusProvider ? this.callHomeStatusProvider() : null;
+            if (callHomeStatus) {
+                const isOnline = callHomeStatus === 'online';
+                html += `<div class="nia-ide-badge-row"><span class="nia-ide-badge ${isOnline ? 'nia-ide-online' : 'nia-ide-offline'}">IDE: ${callHomeStatus}</span></div>`;
+            }
+            html += '</div>';
+            return html;
+        }
+
+        // Normal 3-row NIA (last / this / next)
         const rows = [
             { key: 'last', label: 'last',               data: niaData.last },
             { key: 'curr', label: '\u25b6\u202fthis',   data: niaData.curr },

@@ -507,3 +507,36 @@ tr.itrace-fault td { color: #ff9999; }
     border-color: rgba(248, 113, 113, 0.30);
 }
 
+/* ─── Full boot-sequence overview (rendered in pipeline NIA area during boot) ─── */
+.nia-boot-table {
+    margin: 4px 0 10px 0;
+}
+.nia-boot-title {
+    font-size: 0.70rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a7060;
+    padding: 2px 2px 4px;
+}
+.nia-boot-full {
+    width: 100%;
+}
+/* icon column */
+.nia-boot-icon {
+    width: 22px;
+    font-size: 0.80rem;
+    text-align: center;
+    padding: 3px 4px;
+}
+/* done rows (steps already executed) */
+.nia-row-done td               { color: #5a6050; border-bottom: 1px solid rgba(100,130,80,0.08); }
+.nia-row-done .nia-boot-icon   { color: #4ade80; }
+.nia-row-done .nia-addr code   { color: #4a6040; font-family: var(--font-mono, monospace); font-size: 0.79rem; }
+.nia-row-done .nia-disasm code { color: #4a6040; font-family: var(--font-mono, monospace); font-size: 0.79rem; text-decoration: line-through; }
+.nia-row-done .nia-loc-text    { color: #4a6040; }
+/* current row */
+.nia-row-curr .nia-boot-icon   { color: #ffe060; font-weight: 700; }
+/* future rows (not yet run) keep the existing nia-row-next dim styling */
+.nia-row-next .nia-boot-icon   { color: #3a3830; }
+
