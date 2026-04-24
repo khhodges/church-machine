@@ -626,19 +626,37 @@ function showZonePopup(evt, zone, nsIdx) {
 }
 
 let _crPopupTimer = null;
+let _crPopupSuppressed = false;
+let _crPopupSuppressTimer = null;
+let _crAutoFadeTimer = null;
+
+function _cancelAutoFade() {
+    if (_crAutoFadeTimer) { clearTimeout(_crAutoFadeTimer); _crAutoFadeTimer = null; }
+}
+
+function _startAutoFade() {
+    _cancelAutoFade();
+    _crAutoFadeTimer = setTimeout(() => hideCRPopup(true), 10000);
+}
 
 function cancelHideCRPopup() {
     if (_crPopupTimer) { clearTimeout(_crPopupTimer); _crPopupTimer = null; }
+    _cancelAutoFade();
 }
 
 function hideCRPopup(immediate) {
     if (immediate) {
         cancelHideCRPopup();
+        _cancelAutoFade();
         const pop = document.getElementById('cr-hover-popup');
         if (pop) pop.style.display = 'none';
+        if (_crPopupSuppressTimer) clearTimeout(_crPopupSuppressTimer);
+        _crPopupSuppressed = true;
+        _crPopupSuppressTimer = setTimeout(() => { _crPopupSuppressed = false; }, 350);
         return;
     }
     _crPopupTimer = setTimeout(() => {
+        _cancelAutoFade();
         const pop = document.getElementById('cr-hover-popup');
         if (pop) pop.style.display = 'none';
     }, 80);
@@ -672,6 +690,7 @@ function _positionPopup(pop, evt, anchorEl) {
 }
 
 function showDRPopup(evt, drIdx) {
+    if (_crPopupSuppressed) return;
     cancelHideCRPopup();
     const pop = document.getElementById('cr-hover-popup');
     if (!pop || !sim) return;
@@ -782,9 +801,11 @@ function showDRPopup(evt, drIdx) {
     pop.innerHTML = dismissBtn + html;
     pop.style.display = 'block';
     _positionPopup(pop, evt);
+    _startAutoFade();
 }
 
 function showCRPopup(evt, crIdx) {
+    if (_crPopupSuppressed) return;
     cancelHideCRPopup();
     const pop = document.getElementById('cr-hover-popup');
     if (!pop || !sim) return;
@@ -934,6 +955,7 @@ function showCRPopup(evt, crIdx) {
     pop.innerHTML = dismissBtn + html;
     pop.style.display = 'block';
     _positionPopup(pop, evt);
+    _startAutoFade();
 }
 
 var _editorCREditActive = false;
