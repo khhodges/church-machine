@@ -51,6 +51,8 @@ class AbstractionRegistry {
             layer: layer,
             methods: methods || [],
             description: description || '',
+            author: options.author || null,
+            version: options.version || null,
             perms: options.perms || { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 },
             chainable: options.chainable || false,
             handler: options.handler || null,
@@ -212,100 +214,100 @@ class AbstractionRegistry {
     _registerAll() {
         this.createAbstraction(0, 'Boot.NS', 0, [],
             'Namespace root (location = NS_TABLE_BASE)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
         this.createAbstraction(1, 'Boot.Thread', 0, ['run'],
             'Thread stack for the boot thread (loaded into CR12, privileged)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 0 } });
 
         this.createAbstraction(2, 'Startup.Config', 0,
             ['Execute', 'GetEntry', 'SetEntry', 'ReadParam', 'WriteParam', 'Validate', 'Version', 'Reset'],
             'Startup configuration — patchable boot target seam; Boot.Abstr calls Execute() on every reset (Task #396)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(3, 'LED flash', 0, [],
             'LED flash — combined code (CR14) + c-list (CR6) in one slot',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(4, 'Salvation', 1,
             ['LOAD', 'TPERM', 'LAMBDA', 'TransitionToNavana'],
             'First callable abstraction — proves CALL works, then transitions to Navana (does not RETURN)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(5, 'Navana', 1,
             ['Init', 'Add', 'Remove', 'Abstraction.Add', 'Abstraction.Remove', 'Abstraction.Update', 'Manage', 'Monitor', 'IDS'],
             'Namespace controller — master NS writer, runs indefinitely, manages all abstractions via uploads (does not RETURN)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(6, 'Mint', 1,
             ['Create', 'Revoke', 'Transfer'],
             'GT lifecycle — creates new GTs with bounded permissions',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(7, 'Memory', 1,
             ['Allocate', 'Free', 'Resize'],
             'Memory allocation — reserves memory regions for DATA objects (does not manage the NS table)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(8, 'Scheduler', 1,
             ['Yield', 'Spawn', 'Wait', 'Stop'],
             'Thread scheduling — manages time slices and thread lifecycle',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(9, 'Stack', 1,
             ['Push', 'Pop', 'Peek', 'Depth'],
             'Managed call stack — hardware-enforced overflow protection',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
 
         this.createAbstraction(10, 'DijkstraFlag', 1,
             ['Wait', 'Signal', 'Reset', 'Test'],
             'Dijkstra semaphore for inter-thread messaging and synchronization',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(11, 'UART', 2,
             ['Send', 'Receive', 'SetBaud'],
             'Serial communication — Tang Nano 20K BL616 bridge',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(12, 'LED', 2,
             ['Set', 'Clear', 'Toggle', 'State'],
             '6 onboard LEDs — visual output for children\'s programs. LED identity is the capability offset (0\u20135) in the C-list; no DR arguments. DR0 return: \u22650 success, <0 failure.',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(13, 'Button', 2,
             ['Read', 'WaitPress', 'OnEvent'],
             'Push button input — user interaction',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(14, 'Timer', 2,
             ['Start', 'Stop', 'Read', 'SetAlarm'],
             'Hardware timer — delays, timeouts, scheduling support',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(15, 'Display', 2,
             ['Write', 'Clear', 'Scroll'],
             'HDMI output (Tang Nano 20K has HDMI) — text/graphics display',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 1, E: 1 } });
 
         this.createAbstraction(16, 'SlideRule', 3,
             ['Multiply', 'Divide', 'Sqrt', 'Mod', 'Sin', 'Cos', 'Tan', 'Asin', 'Acos', 'Atan', 'ToDegrees', 'ToRadians', 'Bernoulli', 'Abs', 'Pow', 'Min', 'Max', 'GCD', 'Factorial', 'Log2', 'Atan2', 'Signum'],
             'Arithmetic, trigonometry, angle functions, and Bernoulli numbers — DR3 selects method',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
 
         this.createAbstraction(17, 'Abacus', 3,
             ['Add', 'Sub', 'Mul', 'Div', 'Mod', 'Abs'],
             '32-bit integer arithmetic',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, chainable: true });
 
         this.createAbstraction(18, 'Constants', 3,
             ['Pi', 'E', 'Phi', 'Zero', 'One', 'Add'],
             'Read-only mathematical constants + user-defined constant pool (14 slots)',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(19, 'Loader', 1,
             ['Load', 'Prefetch', 'Evict'],
             'Lazy load — fault-driven on-demand abstraction loading. Catches NULL_CAP on manifest-registered slots, fetches and installs the lump, retries the faulting CALL transparently.',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         const churchNumerals = [
             [20, 'SUCC', 'Successor function'],
@@ -323,103 +325,103 @@ class AbstractionRegistry {
                 ? [] : ['Apply'];
             this.createAbstraction(idx, name, 4, methods,
                 `Church numeral: ${desc}`,
-                { perms: { R: 0, W: 0, X: 1, L: 1, S: 0, E: 1 } });
+                { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 1, L: 1, S: 0, E: 1 } });
         }
 
         this.createAbstraction(28, 'Family', 5,
             ['Register', 'Hello', 'Oversight'],
             'Parent-child capability binding — Hello(target_GT) sends greeting/request to any family member via their GT',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(29, 'Schoolroom', 5,
             ['Join', 'Lesson', 'Submit', 'Grade'],
             'Teacher distributes lessons, students submit work',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(30, 'Friends', 5,
             ['Request', 'Accept', 'Share', 'Revoke'],
             'Peer-to-peer capability sharing, parent-gated',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(31, 'Tunnel', 1,
             ['Register', 'Send', 'Receive', 'Fault', 'Fetch', 'Call'],
             'Resident I/O channel — FPGA\u2194IDE host over UART; self-identifying media channel (FourCC type tags: TEXT \u00b7 VOIC \u00b7 LUMP \u00b7 GTKN \u00b7 \u2026); Register replaces the hardwired call-home boot step (B:02\u00BD); Call(GT) forwards through the tunnel to a remote capability',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 1, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 1, E: 1 } });
 
         this.createAbstraction(32, 'Negotiate', 5,
             ['Propose', 'Approve', 'Reject', 'Status'],
             'Parent-teacher joint approval for special grants',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(33, 'Editor', 6,
             ['Open', 'Save', 'Load', 'Undo'],
             'Code editor — manages source text as a DATA object',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(34, 'Assembler', 6,
             ['Assemble', 'Disassemble', 'Validate'],
             'Translates assembly to machine code',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(35, 'Debugger', 6,
             ['Step', 'Run', 'Breakpoint', 'Inspect'],
             'Single-step debugger with register/memory inspection',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(36, 'Deployer', 6,
             ['Build', 'Upload', 'Verify', 'Boot'],
             'Compiles + uploads to Tang via UART',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(37, 'Browser', 7,
             ['Navigate', 'Back', 'Bookmark', 'Search'],
             'Web browser — child LOADs site GTs from c-list',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(38, 'Messenger', 7,
             ['Send', 'Receive', 'Contacts', 'Block'],
             'Messaging — parent-approved contacts',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(39, 'Photos', 7,
             ['View', 'Share', 'Upload', 'Album'],
             'Photo sharing — child LOADs recipient GTs',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(40, 'Social', 7,
             ['Post', 'Read', 'Follow', 'Feed'],
             'Social feed — child LOADs account GTs',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(41, 'Video', 7,
             ['Watch', 'Search', 'Playlist', 'Share'],
             'Video viewing — child LOADs channel GTs',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(42, 'Email', 7,
             ['Compose', 'Read', 'Reply', 'Contacts'],
             'Email — child LOADs contact GTs',
-            { perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(43, 'PAIR', 4,
             ['Apply'],
             'Church pair constructor',
-            { perms: { R: 0, W: 0, X: 1, L: 1, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 1, L: 1, S: 0, E: 1 } });
 
         this.createAbstraction(44, 'GC', 8,
             ['Scan', 'Identify', 'Clear', 'Flip'],
             'PP250 deterministic GC with bidirectional G-bit',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, handler: 'gc' });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, handler: 'gc' });
 
         this.createAbstraction(45, 'Thread', 1,
             ['switchTo', 'Kill', 'Compile'],
             'Thread Abstraction \u2014 switch execution to a named thread, terminate a thread, or compile a new thread with a given start abstraction',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(46, 'Circle', 3,
             ['Area', 'Circumference'],
             'Geometry via SlideRule — delegates trig to SlideRule, computes area and circumference',
-            { perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
     }
 }
 
