@@ -1170,6 +1170,23 @@ class ChurchSimulator {
                 const gt5 = this.createGT(0, 1, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
                 this._writeCR(5, gt5, check12.entry);                              // CR5 ← heap RW token (base=thread lump, perms=RW)
                 this.output += `[BOOT] INIT_THRD — CR5 <- thread heap (RW, Inform, Slot 1) heap=[+${_heapStart12}..+${_spMax12}] (CHANGE-consistent)\n`;
+                // Synthetic audit entry so the TSB Audit panel shows the CR5 heap
+                // synthesis as an explicit capability gate (not an mLoad — the GT is
+                // created directly by the boot state machine, CHANGE-consistent).
+                this.auditLog.push({
+                    gate: 'HEAP',
+                    label: this.nsLabels[1] || 'Boot.Thread',
+                    nsIndex: 1,
+                    requiredPerm: null,
+                    checks: {
+                        version: { pass: true },
+                        seal:    { pass: true },
+                        perm:    { pass: true, perm: null },
+                    },
+                    b: 0, f: 0,
+                    result: 'pass',
+                    stepCtx: 'INIT_THRD CR5←heap',
+                });
 
                 this.bootStep++;                  // advance state machine → B:03
                 this.ledBits = 0b000111;          // LED bit 2 ON = INIT_THRD complete

@@ -62,6 +62,12 @@
     border: 1px solid rgba(220, 160, 60, 0.35);
 }
 
+.gate-heap {
+    background: rgba(20, 110, 60, 0.4);
+    color: #5de098;
+    border: 1px solid rgba(50, 170, 90, 0.35);
+}
+
 .gate-navana {
     background: rgba(100, 40, 140, 0.4);
     color: #c8a0f0;

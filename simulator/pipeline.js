@@ -228,7 +228,7 @@ class PipelineVisualizer {
 
     _renderAudit() {
         const steps = this.stageData || [];
-        const tsbGates = ['mLoad', 'mSave'];
+        const tsbGates = ['mLoad', 'mSave', 'HEAP'];
 
         let html = '<div class="pipeline-wrapper pipeline-audit">';
 
