@@ -476,3 +476,34 @@ tr.itrace-fault td { color: #ff9999; }
 .nia-row-curr .nia-loc-text { color: #c0a840; background: rgba(180,160,80,0.17); }
 .nia-row-next .nia-loc-text { color: #7a7060; }
 
+/* IDE call-home online/offline badge (appears in NIA panel after CALL_HOME step) */
+.nia-ide-badge-row {
+    padding: 3px 8px 5px;
+    display: flex;
+    align-items: center;
+}
+
+.nia-ide-badge {
+    display: inline-block;
+    font-size: 0.70rem;
+    font-weight: 700;
+    font-family: var(--font-mono, 'Courier New', monospace);
+    letter-spacing: 0.04em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    text-transform: lowercase;
+}
+
+.nia-ide-online {
+    background: rgba(34, 197, 100, 0.15);
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.35);
+}
+
+.nia-ide-offline {
+    background: rgba(220, 80, 60, 0.13);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.30);
+}
+

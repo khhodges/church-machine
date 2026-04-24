@@ -289,6 +289,7 @@ function init() {
         if (!sim.bootComplete) return _bootNIARows(sim.bootStep);
         return _buildNIARows(sim.physicalPC, sim._nextPhysicalAddr());
     });
+    pipelineViz.setCallHomeStatusProvider(() => sim.callHomeStatus || null);
     if (typeof _flushPendingPipelineBuffer === 'function') _flushPendingPipelineBuffer();
     repl = new ChurchREPL(sim, pipelineViz);
     _ensureTutorialObjects();

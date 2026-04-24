@@ -19,6 +19,10 @@ class PipelineVisualizer {
         this.niaProvider = fn;
     }
 
+    setCallHomeStatusProvider(fn) {
+        this.callHomeStatusProvider = fn;
+    }
+
     _renderNIA() {
         let niaData = this.niaRows;
         if (!niaData && this.niaProvider) {
@@ -45,6 +49,11 @@ class PipelineVisualizer {
             html += `</tr>`;
         }
         html += '</table>';
+        const callHomeStatus = this.callHomeStatusProvider ? this.callHomeStatusProvider() : null;
+        if (callHomeStatus) {
+            const isOnline = callHomeStatus === 'online';
+            html += `<div class="nia-ide-badge-row"><span class="nia-ide-badge ${isOnline ? 'nia-ide-online' : 'nia-ide-offline'}">IDE: ${callHomeStatus}</span></div>`;
+        }
         return html;
     }
 

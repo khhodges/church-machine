@@ -596,6 +596,7 @@ class ChurchSimulator {
         this.bootComplete = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this.callHomeStatus = null;
         this.ledBits = 0;
         this.ledMode = 'boot';
         this.uartRegs    = [0, 0, 0];      // TX@0, STATUS@1 (1=ready), RX@2
@@ -654,6 +655,7 @@ class ChurchSimulator {
         this.bootComplete = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this.callHomeStatus = null;
         this.ledBits = 0;
         this.ledMode = 'boot';
         this.uartRegs    = [0, 0, 0];
@@ -1195,6 +1197,7 @@ class ChurchSimulator {
                 }
 
                 this.output += `[BOOT] CALL_HOME — Tunnel.Register(boot_reason=${_bootReason}, last_fault=${_lastFault}, fault_NIA=0x${_faultNIA.toString(16).toUpperCase()}) ACK=${_ack} (${_callHomeMode})\n`;
+                this.callHomeStatus = _callHomeMode;  // 'online' or 'offline' — cleared on reset
                 this.bootStep++;                  // advance state machine → B:03  (offline-safe: always advance)
                 this.ledBits = 0b001111;          // LED bit 3 ON = CALL_HOME complete
                 break;
@@ -4657,6 +4660,7 @@ class ChurchSimulator {
         this.bootComplete = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this.callHomeStatus = null;
         this.ledBits = 0; this.ledMode = 'boot'; this.lastSignedReturn = null;
         this.faultLog = [];
         this._instrHistory = [];
@@ -4762,6 +4766,7 @@ class ChurchSimulator {
         this.bootComplete = false;
         this.mElevation = false;
         this.bootStep = 0;
+        this.callHomeStatus = null;
         this.ledBits = 0; this.ledMode = 'boot'; this.lastSignedReturn = null;
         this.faultLog = [];
         this._instrHistory = [];
