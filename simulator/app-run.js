@@ -294,10 +294,13 @@ function _buildNIARows(prevAddr, currAddr) {
 }
 
 const _BOOT_STEPS = [
-    { addrStr: 'B:00', disasm: 'FAULT_RST',  label: 'Clear all CRs / DRs',    offset: null, prog: 'boot' },
-    { addrStr: 'B:01', disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Namespace (base=0x0000, full memory)',  offset: null, prog: 'boot' },
-    { addrStr: 'B:02', disasm: 'INIT_THRD',  label: 'CR12 \u2190 NS[1] thread stack GT', offset: null, prog: 'boot' },
-    { addrStr: 'B:03', disasm: 'INIT_ABSTR \u2b64 LOAD_NUC \u2b64 COMPLETE', label: 'CR6(E) \u2190 NS[2]; CR14+CR6 \u2190 lump header; M-Elev OFF; boot done', offset: null, prog: 'boot' },
+    { addrStr: 'B:00',  disasm: 'FAULT_RST',  label: 'Clear all CRs / DRs',                                                          offset: null, prog: 'boot' },
+    { addrStr: 'B:01',  disasm: 'LOAD_NS',    label: 'CR15 \u2190 NS[0] Namespace (base=0x0000, full memory)',                        offset: null, prog: 'boot' },
+    { addrStr: 'B:02',  disasm: 'INIT_THRD',  label: 'CR12 \u2190 NS[1] thread stack GT',                                            offset: null, prog: 'boot' },
+    { addrStr: 'B:02\u00bd', disasm: 'CALL_HOME', label: 'Tunnel.Register \u2192 23-byte packet \u00b7 await ACK',                   offset: null, prog: 'boot' },
+    { addrStr: 'B:03',  disasm: 'INIT_ABSTR', label: 'CR6(E) \u2190 NS[3] Boot.Abstr \u26a1 LED flash',                              offset: null, prog: 'boot' },
+    { addrStr: 'B:04',  disasm: 'LOAD_NUC',   label: 'CR14(R+X) + CR6(L) \u2190 lump header \u00b7 push sentinel \u00b7 PC\u21900', offset: null, prog: 'boot' },
+    { addrStr: 'B:05',  disasm: 'COMPLETE',   label: 'bootComplete \u2190 true \u00b7 M-elevation OFF \u00b7 dispatch begins',        offset: null, prog: 'boot' },
 ];
 
 function _bootNIARows(bootStep) {
@@ -332,7 +335,7 @@ function stepSim() {
             return;
         }
         if (con) {
-            con.textContent += `\n[boot ${sim.bootStep}/4] ${sim.output.split('\n').filter(l => l).pop()}`;
+            con.textContent += `\n[boot ${sim.bootStep}/7] ${sim.output.split('\n').filter(l => l).pop()}`;
             con.scrollTop = con.scrollHeight;
         }
         if (pipelineViz) {
@@ -773,7 +776,7 @@ function slowBoot() {
             const con = document.getElementById('editorConsole');
             if (con) {
                 const lastLine = (sim.output || '').split('\n').filter(l => l).pop() || '';
-                con.textContent += `\n[boot ${sim.bootStep}/4] ${lastLine}`;
+                con.textContent += `\n[boot ${sim.bootStep}/7] ${lastLine}`;
                 con.scrollTop = con.scrollHeight;
             }
             if (pipelineViz) {

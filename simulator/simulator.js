@@ -102,6 +102,7 @@ const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
 // Module-scope boot constants — referenced by loadProgram, _bootStep, etc.
 const BOOT_ABSTR_NS_SLOT      = 3;  // NS slot of the Boot Abstraction lump (Boot.Abstr)
 const STARTUP_CONFIG_NS_SLOT  = 2;  // NS slot of Startup.Config (Task #396)
+const TUNNEL_NS_SLOT          = 31; // NS slot of the Tunnel abstraction (call-home I/O channel)
 
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 // (Task #237). Written into Boot.Abstr lump code region during _initNamespaceTable()
@@ -1158,13 +1159,55 @@ class ChurchSimulator {
             }
 
             // ════════════════════════════════════════════════════════════════════
-            // B:03  INIT_ABSTR  (falls through directly to B:04 — indivisible pair)
+            // B:02½  CALL_HOME  (case 3)
+            // Send the Tunnel.Register identification packet and await ACK.
+            // Offline-safe: always advances bootStep regardless of ACK result.
+            // When the abstraction registry is available, dispatches via
+            // Tunnel.Register; otherwise simulates the UART interaction directly
+            // (write boot_reason/last_fault/fault_NIA to uartRegs[0], read ACK
+            // from uartRegs[1]).
+            // ════════════════════════════════════════════════════════════════════
+            case 3: {
+                const _bootReason = (this.faultLog && this.faultLog.length > 0) ? 2 : 0; // 0=cold, 2=fault-recovery
+                const _lastFault  = (this.faultLog && this.faultLog.length > 0)
+                    ? (this.faultLog[this.faultLog.length - 1].type || 0) : 0;
+                const _faultNIA   = (this.faultLog && this.faultLog.length > 0)
+                    ? (this.faultLog[this.faultLog.length - 1].pc || 0) : 0;
+
+                let _ack = 0;
+                let _callHomeMode = 'offline';
+
+                if (this.abstractionRegistry) {
+                    const _chResult = this.abstractionRegistry.dispatchMethod(
+                        TUNNEL_NS_SLOT, 'Register', this,
+                        { dr1: _bootReason, dr2: _lastFault, dr3: _faultNIA }
+                    );
+                    if (_chResult && _chResult.ok !== false) {
+                        _ack = (_chResult.dr0 !== undefined) ? (_chResult.dr0 | 0) : 0;
+                        _callHomeMode = _ack > 0 ? 'online' : 'offline';
+                    }
+                } else if (this.uartRegs) {
+                    this.uartRegs[0] = _bootReason;
+                    this.uartRegs[0] = _lastFault;
+                    this.uartRegs[0] = _faultNIA;
+                    _ack = this.uartRegs[1] | 0;
+                    _callHomeMode = _ack > 0 ? 'online' : 'offline';
+                }
+
+                this.output += `[BOOT] CALL_HOME — Tunnel.Register(boot_reason=${_bootReason}, last_fault=${_lastFault}, fault_NIA=0x${_faultNIA.toString(16).toUpperCase()}) ACK=${_ack} (${_callHomeMode})\n`;
+                this.bootStep++;                  // advance state machine → B:03  (offline-safe: always advance)
+                this.ledBits = 0b001111;          // LED bit 3 ON = CALL_HOME complete
+                break;
+            }
+
+            // ════════════════════════════════════════════════════════════════════
+            // B:03  INIT_ABSTR  (case 4)
             // Load Boot.Abstr (NS Slot 3) into CR6 with E-perm.
             // Slot 2 is a free/null entry — Task #247.
             // The E-type GT written here is snapshotted as oldCR6GT in B:04 and
             // saved to the sentinel call frame in the thread stack.
             // ════════════════════════════════════════════════════════════════════
-            case 3: {
+            case 4: {
                 const gt6 = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
                 const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
                 const _b3Label = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
@@ -1184,15 +1227,14 @@ class ChurchSimulator {
                 this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:04)
                 this.output += `[BOOT] INIT_ABSTR — CR6 <- mLoad(Slot ${this.bootEntrySlot}, ${_b3Label}) (E, M-elevation)\n`;
                 this.bootStep++;                  // advance state machine → B:04
-                this.ledBits = 0b001111;          // LED bit 3 ON = INIT_ABSTR complete
-                // ↓ fall through — B:03 and B:04 always execute together in one Step
+                this.ledBits = 0b011111;          // LED bit 4 ON = INIT_ABSTR complete
+                break;
             }
 
             // ════════════════════════════════════════════════════════════════════
-            // B:04  LOAD_NUC  (and B:05 COMPLETE, also indivisible)
+            // B:04  LOAD_NUC  (case 5)
             // "Load Nucleus": the hardware's CALL microcode for Boot.Abstr.
             // Slot 2 is a free/null entry (Task #247).
-            // B:04 loads Boot.Abstr (NS slot 3) directly — no director hop.
             //
             //   1. E-perm mLoad on Boot.Abstr (BOOT_ABSTR_NS_SLOT=3): validates
             //      the NS entry and checks F-bit and GT type.
@@ -1202,9 +1244,8 @@ class ChurchSimulator {
             //   4. Simultaneously derive CR14 (code, R+X) and CR6 (c-list, E) from
             //      the lump header — exactly as CALL microcode does at runtime.
             //   5. Set PC = 0 (first instruction of Boot.Abstr).
-            //   6. Drop M-elevation and mark boot complete.
             // ════════════════════════════════════════════════════════════════════
-            case 4: {
+            case 5: {
                 // ── Step 1: Direct E-perm mLoad of boot entry abstraction ────────────
                 const _b4Label    = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
                 const bootEntryGT = this.createGT(0, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
@@ -1299,10 +1340,17 @@ class ChurchSimulator {
                 this.output += `[BOOT] LOAD_NUC — ${_b4Label} (Slot ${bootEntrySlot}) hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} (cw=${cw},cc=${cc},lumpSize=${lumpSz}); CR14+CR6 ← ${_b4Label} lump header; CR14(X,cw=${cw},lim=0..${cw-1}) CR6(E,base=0x${(base+clistStart).toString(16).toUpperCase()},lim=${cc-1}), PC=0\n`;
                 this.output += `[BOOT] SENTINEL CALL — frame@+${sp_max}=0x${sentinelFrameWord.toString(16).toUpperCase().padStart(8,'0')} (NIA=0x7FFF,sz=1,prev_STO=${sp_max}), E-GT@+${sp_max-1}=0x${oldCR6GT.toString(16).toUpperCase().padStart(8,'0')}, STO=${this.sto}\n`;
 
-                // ── Step 6 (B:05): COMPLETE ───────────────────────────────────────────
-                this.bootStep++;                    // advance state machine → B:05 (COMPLETE)
+                this.bootStep++;                  // advance state machine → B:05 (COMPLETE)
+                this.ledBits = 0b111111;          // all 6 LEDs on = LOAD_NUC complete
+                break;
+            }
 
-                // B:05a — Startup.Config.Execute(): automatic dispatch (mirrors
+            // ════════════════════════════════════════════════════════════════════
+            // B:05  COMPLETE  (case 6)
+            // Run Startup.Config.Execute(), drop M-elevation, mark boot done.
+            // ════════════════════════════════════════════════════════════════════
+            case 6: {
+                // Startup.Config.Execute(): automatic dispatch (mirrors
                 // BOOT_ROM_WORDS[7] CALL via c-list[4]) under M-elevation so the
                 // pre-checks always run even if Boot.Thread lacks S-perm.
                 if (this.abstractionRegistry) {
