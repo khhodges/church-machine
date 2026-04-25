@@ -415,6 +415,7 @@ class ChurchAssembler {
                     this.nsLoaded[(parts[2] || '').replace(/,/g, '').trim()] = crDst;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
+                    this._checkPrivCR(crSrc, 'LOAD', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
                 }
                 break;
@@ -429,6 +430,7 @@ class ChurchAssembler {
                     this.nsLoaded[(parts[2] || '').replace(/,/g, '').trim()] = crDst;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
+                    this._checkPrivCR(crSrc, 'SAVE', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
                 }
                 break;
@@ -465,6 +467,7 @@ class ChurchAssembler {
                     break;
                 }
                 crDst = this._parseCR(parts[1], lineNum);
+                this._checkPrivCR(crDst, 'CALL', lineNum);
                 if (parts[2]) {
                     const tok2upper = parts[2].toUpperCase().replace(/,/g, '').trim();
                     const tok2raw   = (parts[2] || '').replace(/,/g, '').trim();
@@ -499,6 +502,7 @@ class ChurchAssembler {
                         }
                     } else {
                         crSrc = this._parseCRorBare(parts[2], lineNum);
+                        this._checkPrivCR(crSrc, 'CALL', lineNum);
                     }
                 }
                 break;
@@ -511,17 +515,21 @@ class ChurchAssembler {
             }
             case 4: {
                 crDst = this._parseCR(parts[1], lineNum);
+                this._checkPrivCR(crDst, 'CHANGE', lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
+                this._checkPrivCR(crSrc, 'CHANGE', lineNum);
                 imm = this._parseImm(parts[3], lineNum);
                 break;
             }
             case 5: {
                 crSrc = this._parseCR(parts[1], lineNum);
+                this._checkPrivCR(crSrc, 'SWITCH', lineNum);
                 imm = this._parseImm(parts[2], lineNum) & 0x7;
                 break;
             }
             case 6: {
                 crDst = this._parseCR(parts[1], lineNum);
+                this._checkPrivCR(crDst, 'TPERM', lineNum);
                 const presetName = (parts[2] || 'CLEAR').toUpperCase();
                 if (this.tpermPresets[presetName] !== undefined) {
                     imm = this.tpermPresets[presetName];
@@ -532,6 +540,7 @@ class ChurchAssembler {
             }
             case 7: {
                 crDst = this._parseCR(parts[1], lineNum);
+                this._checkPrivCR(crDst, 'LAMBDA', lineNum);
                 break;
             }
             case 8: {
@@ -543,6 +552,7 @@ class ChurchAssembler {
                     imm   = nsSlot8;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
+                    this._checkPrivCR(crSrc, 'ELOADCALL', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
                 }
                 break;
@@ -556,6 +566,7 @@ class ChurchAssembler {
                     imm   = nsSlot9;
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
+                    this._checkPrivCR(crSrc, 'XLOADLAMBDA', lineNum);
                     imm   = this._parseImm(parts[3], lineNum);
                 }
                 break;
@@ -563,12 +574,14 @@ class ChurchAssembler {
             case 10: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
+                this._checkPrivCR(crSrc, 'DREAD', lineNum);
                 imm = this._parseImm(parts[3], lineNum);
                 break;
             }
             case 11: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
+                this._checkPrivCR(crSrc, 'DWRITE', lineNum);
                 imm = this._parseImm(parts[3], lineNum);
                 break;
             }
@@ -675,7 +688,7 @@ class ChurchAssembler {
             const names = { 12: 'Thread', 13: 'Nucleus', 14: 'Current-Lump', 15: 'Namespace' };
             this.errors.push({
                 line: lineNum,
-                message: `CR${idx} (${names[idx] || 'Privilege Zone'}) is in the Privilege Zone — CR12\u2013CR15 are kernel-managed and cannot be a destination for ${mnemonic}. Use CR0\u2013CR11 instead.`,
+                message: `CR${idx} (${names[idx] || 'Privilege Zone'}) is in the Privilege Zone \u2014 CR12\u2013CR15 are reserved for microcode tasks and cannot be referenced in ${mnemonic}. Use CR0\u2013CR11 instead.`,
             });
             return true;
         }

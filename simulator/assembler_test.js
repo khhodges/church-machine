@@ -280,12 +280,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         `canonical=0x${(result.words[0]>>>0).toString(16)} alias=0x${(result2.words[0]>>>0).toString(16)}`);
 }
 
-// P2: .pet alias in CR position — LOAD cloomc CR14 then CALL CR0, cloomc, 0
+// P2: .pet alias in CR position — alias cloomc→CR9 then CALL CR0, cloomc, 0
 {
     const a = new ChurchAssembler();
-    const r1 = a.assemble('CALL CR0, CR14, 0');
+    const r1 = a.assemble('CALL CR0, CR9, 0');
     const a2 = new ChurchAssembler();
-    const r2 = a2.assemble('.pet cloomc CR14\nCALL CR0, cloomc, 0');
+    const r2 = a2.assemble('.pet cloomc CR9\nCALL CR0, cloomc, 0');
     assert('P2 .pet CR alias: no errors', a2.errors.length === 0,
         a2.errors.map(e => e.message).join('; '));
     assert('P2 .pet CR alias: same word as canonical',
@@ -304,7 +304,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 // P4: cross-type error — DR alias used where CR expected
 {
     const a = new ChurchAssembler();
-    a.assemble('.pet x DR1\nCALL x, CR14, 0');
+    a.assemble('.pet x DR1\nCALL x, CR9, 0');
     assert('P4 cross-type DR in CR position: error', a.errors.length > 0, 'expected an error');
     assert('P4 cross-type error message mentions DR alias',
         a.errors.some(e => e.message.includes('DR alias')),
@@ -355,10 +355,10 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 // P9: getAliases() returns correct maps
 {
     const a = new ChurchAssembler();
-    a.assemble('.pet result DR1\n.pet cloomc CR14\nNOP');
+    a.assemble('.pet result DR1\n.pet cloomc CR9\nNOP');
     const aliases = a.getAliases();
     assert('P9 getAliases DR: result→1', aliases.dr['result'] === 1, JSON.stringify(aliases.dr));
-    assert('P9 getAliases CR: cloomc→14', aliases.cr['cloomc'] === 14, JSON.stringify(aliases.cr));
+    assert('P9 getAliases CR: cloomc→9', aliases.cr['cloomc'] === 9, JSON.stringify(aliases.cr));
 }
 
 // P10: built-in register names DR0..DR15 / CR0..CR15 are rejected as alias names
@@ -443,11 +443,75 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     assert('P12f LOAD CR11: no error (CR0–CR11 are valid)', f.errors.length === 0,
         f.errors.map(e => e.message).join('; '));
 
-    // P12g: CALL CR12, 0 → no error (CALL is control-flow, not a dest write)
+    // P12g: CALL CR12, 0 → error (ALL instructions now restricted)
     const g = new ChurchAssembler();
     g.assemble('CALL CR12, 0');
-    assert('P12g CALL CR12: no error (CALL not restricted)', g.errors.length === 0,
+    assert('P12g CALL CR12: error', g.errors.length > 0, 'expected an error');
+    assert('P12g CALL CR12: error mentions CR12',
+        g.errors.some(e => e.message.includes('CR12')),
         g.errors.map(e => e.message).join('; '));
+
+    // P12h: CALL crSrc CR13 (method selector via CR syntax) → error
+    const h = new ChurchAssembler();
+    h.assemble('CALL CR0, CR13, 0');
+    assert('P12h CALL CR0 CR13: error (priv-zone method selector)', h.errors.length > 0, 'expected an error');
+    assert('P12h error mentions CR13', h.errors.some(e => e.message.includes('CR13')),
+        h.errors.map(e => e.message).join('; '));
+
+    // P12i: CHANGE CR0, CR15 → error on crSrc
+    const i = new ChurchAssembler();
+    i.assemble('CHANGE CR0, CR15, 0');
+    assert('P12i CHANGE CR0 CR15: error', i.errors.length > 0, 'expected an error');
+    assert('P12i error mentions CR15', i.errors.some(e => e.message.includes('CR15')),
+        i.errors.map(e => e.message).join('; '));
+
+    // P12j: CHANGE CR14, CR0 → error on crDst
+    const j = new ChurchAssembler();
+    j.assemble('CHANGE CR14, CR0, 0');
+    assert('P12j CHANGE CR14 CR0: error', j.errors.length > 0, 'expected an error');
+    assert('P12j error mentions CR14', j.errors.some(e => e.message.includes('CR14')),
+        j.errors.map(e => e.message).join('; '));
+
+    // P12k: SWITCH CR12 → error
+    const k = new ChurchAssembler();
+    k.assemble('SWITCH CR12, 0');
+    assert('P12k SWITCH CR12: error', k.errors.length > 0, 'expected an error');
+    assert('P12k error mentions CR12', k.errors.some(e => e.message.includes('CR12')),
+        k.errors.map(e => e.message).join('; '));
+
+    // P12l: TPERM CR15 → error
+    const l = new ChurchAssembler();
+    l.assemble('TPERM CR15, 0');
+    assert('P12l TPERM CR15: error', l.errors.length > 0, 'expected an error');
+    assert('P12l error mentions CR15', l.errors.some(e => e.message.includes('CR15')),
+        l.errors.map(e => e.message).join('; '));
+
+    // P12m: LAMBDA CR13 → error
+    const m = new ChurchAssembler();
+    m.assemble('LAMBDA CR13');
+    assert('P12m LAMBDA CR13: error', m.errors.length > 0, 'expected an error');
+    assert('P12m error mentions CR13', m.errors.some(e => e.message.includes('CR13')),
+        m.errors.map(e => e.message).join('; '));
+
+    // P12n: DREAD DR0, CR12, 0 → error (crSrc is a priv CR)
+    const n = new ChurchAssembler();
+    n.assemble('DREAD DR0, CR12, 0');
+    assert('P12n DREAD DR0 CR12: error', n.errors.length > 0, 'expected an error');
+    assert('P12n error mentions CR12', n.errors.some(e => e.message.includes('CR12')),
+        n.errors.map(e => e.message).join('; '));
+
+    // P12o: DWRITE DR0, CR15, 0 → error (crSrc is a priv CR)
+    const o = new ChurchAssembler();
+    o.assemble('DWRITE DR0, CR15, 0');
+    assert('P12o DWRITE DR0 CR15: error', o.errors.length > 0, 'expected an error');
+    assert('P12o error mentions CR15', o.errors.some(e => e.message.includes('CR15')),
+        o.errors.map(e => e.message).join('; '));
+
+    // P12p: SWITCH CR11 → no error (CR11 is the boundary)
+    const p = new ChurchAssembler();
+    p.assemble('SWITCH CR11, 0');
+    assert('P12p SWITCH CR11: no error', p.errors.length === 0,
+        p.errors.map(e => e.message).join('; '));
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
