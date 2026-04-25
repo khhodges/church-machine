@@ -383,7 +383,7 @@ function updateCRDetail() {
             }
             const isExpanded = (clistExpandedIdx === i);
             const hasGT = gtWord !== 0;
-            const isUnref = hasGT && _refSlots !== null && !_refSlots.has(i);
+            const isUnref = hasGT && (_refSlots === null || !_refSlots.has(i));
             html += `<tr class="${hasGT ? 'cr-active clist-clickable' : ''}${isExpanded ? ' clist-selected' : ''}${isUnref ? ' clist-unref-row' : ''}" `;
             html += hasGT ? `onclick="toggleCListEntry(${i})" title="Click to inspect NS[${parsed.index}]"` : '';
             html += '>';
@@ -454,7 +454,7 @@ function updateCRDetail() {
                 nsLabel = (sim.nsLabels && sim.nsLabels[parsed.index]) ? sim.nsLabels[parsed.index] : '';
             }
             const hasGT = gtWord !== 0;
-            const isUnref2 = hasGT && _ref2Slots !== null && !_ref2Slots.has(i);
+            const isUnref2 = hasGT && (_ref2Slots === null || !_ref2Slots.has(i));
             html += `<tr class="${hasGT ? 'cr-active' : ''}${isUnref2 ? ' clist-unref-row' : ''}">`;
             html += `<td class="cr-idx">${i}</td>`;
             html += `<td class="cr-gt">0x${gtWord.toString(16).toUpperCase().padStart(8,'0')}</td>`;
