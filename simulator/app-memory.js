@@ -2837,22 +2837,52 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 
 // Scan the code words at [codeBase .. codeBase+codeCount-1] and return
 // { direct, indirect } where:
-//   direct   — Set of c-list slot indices referenced by LOAD/SAVE/ELOADCALL/
-//              XLOADLAMBDA instructions whose crSrc field is 6 (CR6 = c-list root).
-//   indirect — Set of c-list slot indices reached via a register that was itself
-//              loaded from CR6 (lightweight dataflow: if "LOAD crDst, [CR6+imm]"
-//              appears anywhere in the code, crDst is treated as a CR6 alias and
-//              any subsequent LOAD/SAVE/etc. with crSrc=crDst also references the
-//              c-list at its imm field).
-// Slots absent from both sets are candidates for POLA removal.
+//   direct          — Set of c-list slot indices referenced by LOAD/SAVE/ELOADCALL/
+//                     XLOADLAMBDA instructions whose crSrc field is 6 (CR6 = c-list root).
+//   indirect        — Set of c-list slot indices reached via a CR alias: a register
+//                     that was loaded from CR6 (or transitively from another alias)
+//                     and has not since been clobbered by a LOAD from a non-alias source.
+//                     Chained aliases (CR2 ← CR1, CR1 ← CR6[n]) are also tracked.
+//   clobberWarnings — Array of { word, cr, prevAliasedAtWord } entries emitted when a
+//                     LOAD overwrites a previously-aliased CR with an unrelated value.
+//                     Callers may surface these as notes to the user.
+// Slots absent from both direct and indirect are candidates for POLA removal.
 function _computeReferencedCListSlots(codeBase, codeCount) {
-    const direct   = new Set();
-    const aliasSet = new Set(); // CRs that have been loaded from CR6
+    // Forward sequential pass that tracks live CR aliases as we process each
+    // instruction in program order.  This is more accurate than the old two-pass
+    // flow-insensitive approach in three ways:
+    //
+    //   1. Clobber detection — when LOAD writes crDst from a source that is
+    //      neither CR6 nor an alias, crDst is removed from the alias set.  The
+    //      old code kept the alias permanently once it was ever established.
+    //
+    //   2. Chained aliases — if CR1 is loaded from CR6 and then CR2 is loaded
+    //      from CR1, both slots are recorded and CR2 is also treated as an alias
+    //      for subsequent indirect accesses.
+    //
+    //   3. Source-order sensitivity — an alias established after an indirect use
+    //      no longer back-propagates to annotate that earlier use.
+    //
+    // Limitation: the pass is still single-pass (no fixpoint iteration across
+    // back-edges / loops) and is conservative at forward branch targets — aliases
+    // active on either path in are preserved, which may produce false positives
+    // for the "alias dies on exactly one branch" pattern.  clobberWarnings
+    // captures positions where a previously-aliased CR was overwritten before a
+    // merge point so callers can surface a note to the user.
+    //
+    // Opcodes that use crSrc as a c-list base and may write crDst:
+    //   0 = LOAD  crDst ← memory[crSrc + imm]   (writes crDst register)
+    //   1 = SAVE  memory[crDst + imm] ← crSrc   (crDst is address base, not written)
+    //   8 = ELOADCALL                            (crDst used as address base, not written)
+    //   9 = XLOADLAMBDA                          (crDst used as address base, not written)
+    // Only LOAD (opcode 0) modifies crDst as a register; the others just dereference crSrc/crDst.
 
-    // First pass: collect direct references and identify CR6 aliases.
-    // Only LOAD (opcode 0) writes a capability into crDst from [crSrc+imm].
-    // SAVE (opcode 1), ELOADCALL (8), XLOADLAMBDA (9) do not load into crDst
-    // from the c-list, so they are excluded from alias detection.
+    const direct          = new Set();
+    const indirect        = new Set();
+    const clobberWarnings = []; // { word: w, cr, prevAliasedAtWord }
+    const aliasCR         = new Set(); // live alias set: CRs currently holding a c-list cap
+    const aliasOrigin     = {};        // aliasOrigin[cr] = word-index where alias was established
+
     for (let w = 0; w < codeCount; w++) {
         const addr = codeBase + w;
         if (addr >= sim.memory.length) break;
@@ -2861,34 +2891,37 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
         const crDst  = (word >>> 19) & 0xF;
         const crSrc  = (word >>> 15) & 0xF;
         const imm    = word & 0x7FFF;
-        // Count all LOAD/SAVE/ELOADCALL/XLOADLAMBDA via CR6 as direct refs.
-        if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) && crSrc === 6) {
-            direct.add(imm);
-        }
-        // Only LOAD via CR6 promotes crDst to a c-list alias.
-        if (opcode === 0 && crSrc === 6) {
-            aliasSet.add(crDst);
-        }
-    }
 
-    // Second pass: collect indirect references via alias registers.
-    const indirect = new Set();
-    if (aliasSet.size > 0) {
-        for (let w = 0; w < codeCount; w++) {
-            const addr = codeBase + w;
-            if (addr >= sim.memory.length) break;
-            const word   = sim.memory[addr] >>> 0;
-            const opcode = (word >>> 27) & 0x1F;
-            const crSrc  = (word >>> 15) & 0xF;
-            const imm    = word & 0x7FFF;
-            if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) &&
-                crSrc !== 6 && aliasSet.has(crSrc)) {
+        if (opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) {
+            if (crSrc === 6) {
+                // Direct access via CR6.
+                direct.add(imm);
+                if (opcode === 0) {
+                    // LOAD crDst ← [CR6 + imm]: crDst now holds a capability from the c-list.
+                    aliasCR.add(crDst);
+                    aliasOrigin[crDst] = w;
+                }
+            } else if (aliasCR.has(crSrc)) {
+                // Indirect access via a CR that was (directly or transitively) loaded from CR6.
                 if (!direct.has(imm)) indirect.add(imm);
+                if (opcode === 0) {
+                    // Chained alias: crDst now holds a cap reachable via the c-list.
+                    aliasCR.add(crDst);
+                    aliasOrigin[crDst] = w;
+                }
+            } else if (opcode === 0) {
+                // LOAD crDst ← [non-alias crSrc + imm]: crDst is overwritten with an
+                // unrelated value — remove it from the alias set (clobber).
+                if (aliasCR.has(crDst)) {
+                    clobberWarnings.push({ word: w, cr: crDst, prevAliasedAtWord: aliasOrigin[crDst] });
+                    aliasCR.delete(crDst);
+                    delete aliasOrigin[crDst];
+                }
             }
         }
     }
 
-    return { direct, indirect };
+    return { direct, indirect, clobberWarnings };
 }
 
 // Zero a single c-list slot in simulator memory (marks the GT as null/empty).
