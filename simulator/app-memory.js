@@ -338,18 +338,20 @@ function updateCRDetail() {
     if (showCList) {
         const _refCodeBase  = _clBase + 1;
         const _refCodeCount = (_clHdr.valid && _clHdr.cw > 0) ? _clHdr.cw : 0;
-        const _refSlots     = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
+        const _refResult    = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
+        const _refSlots     = _refResult ? _refResult.direct   : null;
+        const _indSlots     = _refResult ? _refResult.indirect : null;
         // POLA strip — unreferenced GTs and/or interior null gaps
         { let _pu = 0, _pt = 0, _hasGaps = false;
-          // Unreferenced: non-null GTs not in refSlots; when refSlots===null (no code) all non-null are unref
-          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && (_refSlots === null || !_refSlots.has(_i))) _pu++; }
+          // Unreferenced: non-null GTs not in refSlots and not in indSlots; when refSlots===null all non-null are unref
+          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && (_refSlots === null || (!_refSlots.has(_i) && !(_indSlots && _indSlots.has(_i))))) _pu++; }
           // Interior gap: null slot at position < index of last non-null slot
           let _lastNN = -1;
           for (let _i = _clistCount - 1; _i >= 0; _i--) { if ((sim.memory[_clistBase + _i] >>> 0) !== 0) { _lastNN = _i; break; } }
           for (let _i = 0; _i < _lastNN; _i++) { if ((sim.memory[_clistBase + _i] >>> 0) === 0) { _hasGaps = true; break; } }
           // Eligible tail slots (null or unref, contiguous from end)
           { let _seenNN = false;
-            for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; const _nullOrUnref = _gw === 0 || (_refSlots === null || !_refSlots.has(_i)); if (!_seenNN && _nullOrUnref) _pt++; else _seenNN = true; }
+            for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; const _nullOrUnref = _gw === 0 || (_refSlots === null || (!_refSlots.has(_i) && !(_indSlots && _indSlots.has(_i)))); if (!_seenNN && _nullOrUnref) _pt++; else _seenNN = true; }
           }
           if (_pu > 0 || _hasGaps) {
             const _polaMsg = [_pu > 0 ? `${_pu} unreferenced GT slot${_pu !== 1 ? 's' : ''}` : '', _hasGaps ? 'interior null gaps' : ''].filter(Boolean).join(', ');
@@ -383,8 +385,9 @@ function updateCRDetail() {
             }
             const isExpanded = (clistExpandedIdx === i);
             const hasGT = gtWord !== 0;
-            const isUnref = hasGT && (_refSlots === null || !_refSlots.has(i));
-            html += `<tr class="${hasGT ? 'cr-active clist-clickable' : ''}${isExpanded ? ' clist-selected' : ''}${isUnref ? ' clist-unref-row' : ''}" `;
+            const isIndirect = hasGT && _indSlots && _indSlots.has(i);
+            const isUnref = hasGT && !isIndirect && (_refSlots === null || !_refSlots.has(i));
+            html += `<tr class="${hasGT ? 'cr-active clist-clickable' : ''}${isExpanded ? ' clist-selected' : ''}${isUnref ? ' clist-unref-row' : ''}${isIndirect ? ' clist-indirect-row' : ''}" `;
             html += hasGT ? `onclick="toggleCListEntry(${i})" title="Click to inspect NS[${parsed.index}]"` : '';
             html += '>';
             html += `<td class="cr-idx">${i}</td>`;
@@ -393,7 +396,9 @@ function updateCRDetail() {
             html += `<td>${hasGT ? parsed.typeName : '\u2014'}</td>`;
             html += `<td class="cr-perms">[${permsStr || '\u2014'}]</td>`;
             html += `<td class="cr-name">${nsLabel}</td>`;
-            if (isUnref) {
+            if (isIndirect) {
+                html += `<td onclick="event.stopPropagation()"><span class="clist-indirect-badge" title="Accessed via a register loaded from CR6 \u2014 slot preserved by POLA">\u26A0\u202Findirect</span></td>`;
+            } else if (isUnref) {
                 html += `<td onclick="event.stopPropagation()"><span class="clist-unref-badge">unref</span><button class="clist-zero-btn" onclick="zeroLumpSlot(${addr})" title="Zero this slot — marks GT as null/empty">&#xD7;&nbsp;zero</button></td>`;
             } else {
                 html += '<td></td>';
@@ -410,18 +415,20 @@ function updateCRDetail() {
     } else if (showCode && _lumpHdr.valid && _lumpHdr.cc > 0 && _lumpClistBase > 0) {
         const _ref2CodeBase  = _baseLoc + 1;
         const _ref2CodeCount = (_lumpHdr.valid && _lumpHdr.cw > 0) ? _lumpHdr.cw : 0;
-        const _ref2Slots     = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
+        const _ref2Result    = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
+        const _ref2Slots     = _ref2Result ? _ref2Result.direct   : null;
+        const _ind2Slots     = _ref2Result ? _ref2Result.indirect : null;
         // POLA strip — unreferenced GTs and/or interior null gaps
         { let _pu2 = 0, _pt2 = 0, _hasGaps2 = false;
-          // Unreferenced: non-null GTs not in ref2Slots; when ref2Slots===null all non-null are unref
-          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0 && (_ref2Slots === null || !_ref2Slots.has(_i))) _pu2++; }
+          // Unreferenced: non-null GTs not in ref2Slots and not in ind2Slots; when ref2Slots===null all non-null are unref
+          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0 && (_ref2Slots === null || (!_ref2Slots.has(_i) && !(_ind2Slots && _ind2Slots.has(_i))))) _pu2++; }
           // Interior gap: null slot at position < index of last non-null slot
           let _lastNN2 = -1;
           for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { if ((sim.memory[_lumpClistBase + _i] >>> 0) !== 0) { _lastNN2 = _i; break; } }
           for (let _i = 0; _i < _lastNN2; _i++) { if ((sim.memory[_lumpClistBase + _i] >>> 0) === 0) { _hasGaps2 = true; break; } }
           // Eligible tail slots (null or unref, contiguous from end)
           { let _seenNN2 = false;
-            for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; const _nullOrUnref2 = _gw === 0 || (_ref2Slots === null || !_ref2Slots.has(_i)); if (!_seenNN2 && _nullOrUnref2) _pt2++; else _seenNN2 = true; }
+            for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; const _nullOrUnref2 = _gw === 0 || (_ref2Slots === null || (!_ref2Slots.has(_i) && !(_ind2Slots && _ind2Slots.has(_i)))); if (!_seenNN2 && _nullOrUnref2) _pt2++; else _seenNN2 = true; }
           }
           if (_pu2 > 0 || _hasGaps2) {
             const _polaMsg2 = [_pu2 > 0 ? `${_pu2} unreferenced GT slot${_pu2 !== 1 ? 's' : ''}` : '', _hasGaps2 ? 'interior null gaps' : ''].filter(Boolean).join(', ');
@@ -454,15 +461,18 @@ function updateCRDetail() {
                 nsLabel = (sim.nsLabels && sim.nsLabels[parsed.index]) ? sim.nsLabels[parsed.index] : '';
             }
             const hasGT = gtWord !== 0;
-            const isUnref2 = hasGT && (_ref2Slots === null || !_ref2Slots.has(i));
-            html += `<tr class="${hasGT ? 'cr-active' : ''}${isUnref2 ? ' clist-unref-row' : ''}">`;
+            const isIndirect2 = hasGT && _ind2Slots && _ind2Slots.has(i);
+            const isUnref2 = hasGT && !isIndirect2 && (_ref2Slots === null || !_ref2Slots.has(i));
+            html += `<tr class="${hasGT ? 'cr-active' : ''}${isUnref2 ? ' clist-unref-row' : ''}${isIndirect2 ? ' clist-indirect-row' : ''}">`;
             html += `<td class="cr-idx">${i}</td>`;
             html += `<td class="cr-gt">0x${gtWord.toString(16).toUpperCase().padStart(8,'0')}</td>`;
             html += `<td>${hasGT ? parsed.index : '\u2014'}</td>`;
             html += `<td>${hasGT ? parsed.typeName : '\u2014'}</td>`;
             html += `<td class="cr-perms">[${permsStr || '\u2014'}]</td>`;
             html += `<td class="cr-name">${nsLabel}</td>`;
-            if (isUnref2) {
+            if (isIndirect2) {
+                html += `<td><span class="clist-indirect-badge" title="Accessed via a register loaded from CR6 \u2014 slot preserved by POLA">\u26A0\u202Findirect</span></td>`;
+            } else if (isUnref2) {
                 html += `<td><span class="clist-unref-badge">unref</span><button class="clist-zero-btn" onclick="zeroLumpSlot(${addr})" title="Zero this slot — marks GT as null/empty">&#xD7;&nbsp;zero</button></td>`;
             } else {
                 html += '<td></td>';
@@ -2683,11 +2693,11 @@ window.lumpCompress = async function(nsIdx) {
     for (let i = 0; i < cc; i++) clistWords.push(sim.memory[baseLoc + currentSize - cc + i] >>> 0);
 
     // ── Step 2: trim trailing null GTs not referenced by any instruction ──────
-    const refSlots = _computeReferencedCListSlots(baseLoc + 1, cw);
+    const { direct: refSlots, indirect: indSlots_lc } = _computeReferencedCListSlots(baseLoc + 1, cw);
     let trimmed = 0;
     while (cc > 0) {
         const slotIdx = cc - 1;
-        if (clistWords[slotIdx] === 0 && !refSlots.has(slotIdx)) {
+        if (clistWords[slotIdx] === 0 && !refSlots.has(slotIdx) && !indSlots_lc.has(slotIdx)) {
             clistWords.pop();
             cc--;
             trimmed++;
@@ -2825,25 +2835,60 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 
 // ── C-List static analysis helpers ─────────────────────────────────────────
 
-// Scan the code words at [codeBase .. codeBase+codeCount-1] and return a Set
-// of c-list slot indices directly referenced by any LOAD / SAVE / ELOADCALL /
-// XLOADLAMBDA instruction whose crSrc field is 6 (CR6 = c-list root).
-// Slots reached via a different base register are NOT included — this is a
-// conservative first-pass; slots absent from the set are candidates for removal.
+// Scan the code words at [codeBase .. codeBase+codeCount-1] and return
+// { direct, indirect } where:
+//   direct   — Set of c-list slot indices referenced by LOAD/SAVE/ELOADCALL/
+//              XLOADLAMBDA instructions whose crSrc field is 6 (CR6 = c-list root).
+//   indirect — Set of c-list slot indices reached via a register that was itself
+//              loaded from CR6 (lightweight dataflow: if "LOAD crDst, [CR6+imm]"
+//              appears anywhere in the code, crDst is treated as a CR6 alias and
+//              any subsequent LOAD/SAVE/etc. with crSrc=crDst also references the
+//              c-list at its imm field).
+// Slots absent from both sets are candidates for POLA removal.
 function _computeReferencedCListSlots(codeBase, codeCount) {
-    const refs = new Set();
+    const direct   = new Set();
+    const aliasSet = new Set(); // CRs that have been loaded from CR6
+
+    // First pass: collect direct references and identify CR6 aliases.
+    // Only LOAD (opcode 0) writes a capability into crDst from [crSrc+imm].
+    // SAVE (opcode 1), ELOADCALL (8), XLOADLAMBDA (9) do not load into crDst
+    // from the c-list, so they are excluded from alias detection.
     for (let w = 0; w < codeCount; w++) {
         const addr = codeBase + w;
         if (addr >= sim.memory.length) break;
         const word   = sim.memory[addr] >>> 0;
         const opcode = (word >>> 27) & 0x1F;
+        const crDst  = (word >>> 19) & 0xF;
         const crSrc  = (word >>> 15) & 0xF;
         const imm    = word & 0x7FFF;
+        // Count all LOAD/SAVE/ELOADCALL/XLOADLAMBDA via CR6 as direct refs.
         if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) && crSrc === 6) {
-            refs.add(imm);
+            direct.add(imm);
+        }
+        // Only LOAD via CR6 promotes crDst to a c-list alias.
+        if (opcode === 0 && crSrc === 6) {
+            aliasSet.add(crDst);
         }
     }
-    return refs;
+
+    // Second pass: collect indirect references via alias registers.
+    const indirect = new Set();
+    if (aliasSet.size > 0) {
+        for (let w = 0; w < codeCount; w++) {
+            const addr = codeBase + w;
+            if (addr >= sim.memory.length) break;
+            const word   = sim.memory[addr] >>> 0;
+            const opcode = (word >>> 27) & 0x1F;
+            const crSrc  = (word >>> 15) & 0xF;
+            const imm    = word & 0x7FFF;
+            if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) &&
+                crSrc !== 6 && aliasSet.has(crSrc)) {
+                if (!direct.has(imm)) indirect.add(imm);
+            }
+        }
+    }
+
+    return { direct, indirect };
 }
 
 // Zero a single c-list slot in simulator memory (marks the GT as null/empty).
@@ -2868,39 +2913,46 @@ window.zeroAllUnrefSlots = function(nsIdx) {
     if (!hdr.valid || hdr.cc === 0) return;
 
     const clistBase = baseLoc + hdr.lumpSize - hdr.cc;
-    const refSlots  = _computeReferencedCListSlots(baseLoc + 1, hdr.cw);
+    const { direct: refSlots, indirect: indSlots } = _computeReferencedCListSlots(baseLoc + 1, hdr.cw);
 
     let zeroed = 0;
+    let preserved = 0;
     for (let i = 0; i < hdr.cc; i++) {
         const addr = clistBase + i;
-        if ((sim.memory[addr] >>> 0) !== 0 && !refSlots.has(i)) {
+        if ((sim.memory[addr] >>> 0) !== 0) {
+            if (refSlots.has(i) || indSlots.has(i)) continue;
             sim.memory[addr] = 0;
             zeroed++;
         }
     }
+    preserved = indSlots.size;
 
     updateCRDetail();
 
     const absName = (sim.nsLabels && sim.nsLabels[nsIdx]) || 'Unnamed';
     if (typeof showPatchModal === 'function') {
+        const indNote = preserved > 0 ? `\n\u26A0 ${preserved} indirect slot${preserved !== 1 ? 's' : ''} preserved (accessed via a loaded register).` : '';
         showPatchModal(
             zeroed > 0,
             `POLA \u2014 NS${nsIdx} \u201C${absName}\u201D`,
             zeroed > 0
-                ? `Zeroed ${zeroed} unreferenced GT slot${zeroed !== 1 ? 's' : ''}.\nUse \u2913\u202FCompress to shrink the lump.`
-                : 'No unreferenced GT slots found \u2014 already minimal authority.'
+                ? `Zeroed ${zeroed} unreferenced GT slot${zeroed !== 1 ? 's' : ''}.\nUse \u2913\u202FCompress to shrink the lump.${indNote}`
+                : `No unreferenced GT slots found \u2014 already minimal authority.${indNote}`
         );
     }
 };
 
 // ── C-List POLA Optimizer ──────────────────────────────────────────────────
 // Single async pipeline triggered by the "⚡ Apply POLA" button:
-//   1. Zero every non-null GT not referenced via CR6 (unreferenced authority).
-//   2. Pack remaining non-null GTs to consecutive low slot indices.
-//   3. Rewrite LOAD/SAVE/ELOADCALL/XLOADLAMBDA instruction words where crSrc=6
+//   1. Zero every non-null GT that is neither directly referenced via CR6 nor
+//      indirectly referenced via a register that was loaded from CR6 (dataflow).
+//   2. If indirect slots exist: save zeroing results and stop — compaction is
+//      unsafe because non-CR6 instructions cannot be auto-rewritten.
+//   3. Otherwise pack remaining non-null GTs to consecutive low slot indices.
+//   4. Rewrite LOAD/SAVE/ELOADCALL/XLOADLAMBDA instruction words where crSrc=6
 //      to use the new slot index: (word & 0xFFFF8000) | (newSlot & 0x7FFF).
-//   4. Update lump header cc + NS entry word1.
-//   5. Auto-save to server/lumps/ and show a patch-modal with full report.
+//   5. Update lump header cc + NS entry word1.
+//   6. Auto-save to server/lumps/ and show a patch-modal with full report.
 window.applyPOLA = async function(nsIdx) {
     if (!sim) return;
     const nse = sim.readNSEntry(nsIdx);
@@ -2922,14 +2974,14 @@ window.applyPOLA = async function(nsIdx) {
     const oldGTs = [];
     for (let i = 0; i < cc; i++) oldGTs.push(sim.memory[clistBase + i] >>> 0);
 
-    // ── Step 2: compute slots referenced via CR6 ───────────────────────────
-    const refSlots = _computeReferencedCListSlots(baseLoc + 1, cw);
+    // ── Step 2: compute slots referenced via CR6 and via alias registers ──
+    const { direct: refSlots, indirect: indSlots } = _computeReferencedCListSlots(baseLoc + 1, cw);
 
-    // ── Step 3: zero unreferenced non-null GTs ─────────────────────────────
+    // ── Step 3: zero unreferenced non-null GTs (skip indirect slots) ───────
     let zeroedCount = 0;
     const zeroedLog = [];
     for (let i = 0; i < cc; i++) {
-        if (oldGTs[i] !== 0 && !refSlots.has(i)) {
+        if (oldGTs[i] !== 0 && !refSlots.has(i) && !indSlots.has(i)) {
             const _pg = sim.parseGT(oldGTs[i]);
             const _pn = (_pg && sim.nsLabels && sim.nsLabels[_pg.index]) ? sim.nsLabels[_pg.index] : `GT@slot${i}`;
             zeroedLog.push(`  slot ${i} \u201C${_pn}\u201D (unreferenced)`);
@@ -2939,7 +2991,53 @@ window.applyPOLA = async function(nsIdx) {
         }
     }
 
-    // ── Step 4: build compacted list and old→new slot mapping ──────────────
+    // ── Step 4a: if any indirect slots exist, skip compaction ──────────────
+    // Null-gap compaction shifts slot indices. Non-CR6 instructions that access
+    // c-list via an alias register cannot be auto-rewritten, so compaction when
+    // indirect slots are present would silently corrupt those accesses.
+    // Safe strategy: zero unreferenced slots (step 3 above), report, save, stop.
+    if (indSlots.size > 0) {
+        updateCRDetail();
+        const logLines0 = [];
+        if (zeroedCount > 0) {
+            logLines0.push(`Zeroed ${zeroedCount} unreferenced GT slot${zeroedCount !== 1 ? 's' : ''}:`);
+            logLines0.push(...zeroedLog);
+        } else {
+            logLines0.push('No unreferenced GT slots found \u2014 nothing to zero.');
+        }
+        logLines0.push(`\u26A0 Compaction skipped: ${indSlots.size} indirect slot${indSlots.size !== 1 ? 's' : ''} detected (accessed via a register loaded from CR6).`);
+        logLines0.push('  Null-gap compaction cannot safely rewrite non-CR6 instructions.');
+        logLines0.push('  Resolve indirect accesses first, then re-run POLA.');
+        for (const s of [...indSlots].sort((a, b) => a - b)) {
+            const _pgInd = sim.parseGT(oldGTs[s] || 0);
+            const _pnInd = (_pgInd && sim.nsLabels && sim.nsLabels[_pgInd.index]) ? sim.nsLabels[_pgInd.index] : `slot${s}`;
+            logLines0.push(`  \u26A0 indirect: slot ${s} \u201C${_pnInd}\u201D`);
+        }
+        if (zeroedCount > 0) {
+            logLines0.push('Saving\u2026');
+            try {
+                const saveWords0 = [];
+                for (let i = 0; i < lumpSize; i++) saveWords0.push(sim.memory[baseLoc + i] >>> 0);
+                const typeNames0 = ['code', 'data', 'thread', 'outform'];
+                const meta0 = { abstraction: absName, ns_slot: nsIdx, content_type: typeNames0[typ] || 'code', cw, cc, lump_size: lumpSize };
+                const resp0 = await fetch('/api/lumps/save', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ binary: saveWords0, metadata: meta0 }),
+                });
+                const data0 = await resp0.json();
+                if (!resp0.ok) throw new Error(data0.error || 'Server error');
+                logLines0[logLines0.length - 1] = `Saved \u2014 token: ${data0.token}`;
+                if (data0.lump_path) logLines0.push(data0.lump_path);
+            } catch (e0) {
+                logLines0[logLines0.length - 1] = `Zeroing done but save failed: ${e0.message}`;
+            }
+        }
+        if (typeof showPatchModal === 'function') showPatchModal(true, title, logLines0.join('\n'));
+        return;
+    }
+
+    // ── Step 4b: build compacted list and old→new slot mapping ────────────
+    // (Only reached when indSlots is empty — safe to move all surviving slots.)
     const newGTs   = [];
     const oldToNew = new Map();
     for (let i = 0; i < cc; i++) {
@@ -2977,7 +3075,8 @@ window.applyPOLA = async function(nsIdx) {
             }
         }
     }
-    // Flag instructions with crSrc != 6 whose immediate slot was moved (NOT rewritten — may be stale)
+    // Flag ALL instructions with crSrc != 6 whose slot was moved — indSlots is
+    // empty here, so every such instruction is a genuinely untracked indirect.
     for (let w = 0; w < cw; w++) {
         const addr = baseLoc + 1 + w;
         if (addr >= sim.memory.length) break;
@@ -3028,7 +3127,7 @@ window.applyPOLA = async function(nsIdx) {
     }
     if (rewriteCount > 0) logLines.push(`Rewrote ${rewriteCount} instruction word${rewriteCount !== 1 ? 's' : ''}`);
     if (indirectWarnings.length > 0) {
-        logLines.push(`\u26A0 ${indirectWarnings.length} slot${indirectWarnings.length !== 1 ? 's' : ''} moved, not in CR6 scan (may be accessed via another register):`);
+        logLines.push(`\u26A0 ${indirectWarnings.length} slot${indirectWarnings.length !== 1 ? 's' : ''} moved, accessed by non-CR6 instruction (verify manually):`);
         logLines.push(...indirectWarnings);
     }
 
