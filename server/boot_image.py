@@ -36,6 +36,10 @@ Layout (all words 32-bit little-endian):
 import json
 import os
 import struct
+try:
+    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+except ImportError:
+    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
 
 NS_TABLE_RESERVE = 0x400        # 1024 words = 256 entries × 4
 NS_ENTRY_WORDS   = 4
@@ -522,9 +526,6 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # Thread lump (NS slot 1): cw=32, cc=64, typ=2.
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 64, 2)
-
-    NUC_CODE_WORDS  = 17
-    DEMO_CLIST_SIZE = 18
 
     # Hardware device GTs (clist slots 8..17) — match simulator.js HW_DEVICE_SLOTS.
     # Slots 8–13: Abstract LED GTs (Task #406) — type=0b11, no NS slot, no lump.

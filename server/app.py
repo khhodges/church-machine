@@ -21,6 +21,10 @@ if _SERVER_DIR not in sys.path:
     sys.path.insert(0, _SERVER_DIR)
 
 import boot_image as _boot_image_gen
+try:
+    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+except ImportError:
+    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -2097,7 +2101,7 @@ def _load_boot_abstr_lump():
         # logical (user-edited) size that should be shown in the LUMP
         # repository.  We also replace LAZY_LUMPS['00000003'] so the content
         # and hex-dump tabs show the compact user-edited version.
-        # NUC_CODE_WORDS=17, DEMO_CLIST_SIZE=18 are fixed Boot.Abstr constants.
+        # NUC_CODE_WORDS and DEMO_CLIST_SIZE are imported from boot_constants.
         _saved300_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000300.lump')
         if os.path.isfile(_saved300_path):
             try:
@@ -2110,13 +2114,12 @@ def _load_boot_abstr_lump():
                     _s300cc  = _s300hdr & 0xFF
                     _s300nm6 = (_s300hdr >> 23) & 0xF
                     _s300sz  = 1 << (_s300nm6 + 6)
-                    # Magic [31:27] must be 0x1F; cw must be NUC_CODE_WORDS
-                    # (17); cc must be in range; file must cover the declared
-                    # lump size and at least DEMO_CLIST_SIZE (18) words.
-                    # Constants 17/18 are hardcoded pending task #564.
-                    if ((_s300hdr >> 27) == 0x1F and _s300cw == 17 and
-                            0 < _s300cc <= 18 and
-                            _s300n >= _s300sz and _s300n >= 18):
+                    # Magic [31:27] must be 0x1F; cw must be NUC_CODE_WORDS;
+                    # cc must be in range; file must cover the declared
+                    # lump size and at least DEMO_CLIST_SIZE words.
+                    if ((_s300hdr >> 27) == 0x1F and _s300cw == NUC_CODE_WORDS and
+                            0 < _s300cc <= DEMO_CLIST_SIZE and
+                            _s300n >= _s300sz and _s300n >= DEMO_CLIST_SIZE):
                         _BOOT_ABSTR_META['lump_size'] = _s300sz
                         _BOOT_ABSTR_META['cc']        = _s300cc
                         LAZY_LUMPS['00000003'] = _s300raw[:_s300n * 4]
