@@ -3127,6 +3127,157 @@ window.applyPOLA = async function(nsIdx) {
         }
     }
 
+    // ── Step 5.5: sync assembly source text in editor ──────────────────────
+    // Mirrors assembler._assembleLine() tokenisation exactly:
+    //   · comment stripping: sequential ';' then '--' then '//' (not first-match)
+    //   · normalise brackets/commas → spaces, then split on whitespace
+    // Covers all valid source forms:
+    //   · 3-operand explicit: LOAD CRd, CR6, slot  (or 6, 0x6, .pet alias)
+    //   · bracket/disasm:     LOAD CRd, CR6[0x0003]
+    //   · condition suffixes: LOADNE, ELOADCALLGT, …  (no dot)
+    //   · decimal/hex/binary immediates with optional # or + prefix
+    //   · 2-operand NS shorthand: LOAD CRd, Name → expanded to LOAD CRd, CR6, newSlot
+    const changedSourceLines = [];
+    const _asmEd = document.getElementById('asmEditor');
+    if (typeof _highlightPolaChangedLines === 'function') _highlightPolaChangedLines([]);
+    if (_asmEd && oldToNew.size > 0) {
+        const _targetOps = new Set(['LOAD', 'SAVE', 'ELOADCALL', 'XLOADLAMBDA']);
+        const _condSet   = new Set(['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','AL','NV','HS','LO']);
+
+        const _srcLines = _asmEd.value.split('\n');
+
+        // Pre-scan source for .pet <alias> CR6 declarations (case-sensitive alias names)
+        const _cr6Pets = new Set();
+        for (const _sl of _srcLines) {
+            let _pl = _sl.trim();
+            let _ci = _pl.indexOf(';');  if (_ci >= 0) _pl = _pl.slice(0, _ci).trim();
+            let _di = _pl.indexOf('--'); if (_di >= 0) _pl = _pl.slice(0, _di).trim();
+            let _si = _pl.indexOf('//'); if (_si >= 0) _pl = _pl.slice(0, _si).trim();
+            const _pm = _pl.match(/^\.pet\s+([A-Za-z_][A-Za-z0-9_]*)\s+CR6\s*$/i);
+            if (_pm) _cr6Pets.add(_pm[1]);
+        }
+
+        // Resolve a register token to its index, including .pet CR6 aliases
+        const _parseRegIdx = tok => {
+            const u = tok.toUpperCase();
+            const cm = u.match(/^CR(\d+)$/);        if (cm) return parseInt(cm[1]);
+            const hm = u.match(/^0X([0-9A-F]+)$/); if (hm) return parseInt(hm[1], 16);
+            const dm = u.match(/^(\d+)$/);          if (dm) return parseInt(dm[1]);
+            if (_cr6Pets.has(tok)) return 6;        // case-sensitive alias
+            return -1;
+        };
+
+        // Parse an immediate token (matches assembler._parseImm minus label lookup)
+        const _parseImm = tok => {
+            const s = tok.replace(/^[#+]/, '');
+            if (/^0[xX][0-9A-Fa-f]+$/.test(s)) return parseInt(s, 16);
+            if (/^0[bB][01]+$/.test(s))         return parseInt(s.slice(2), 2);
+            if (/^\d+$/.test(s))                return parseInt(s, 10);
+            return NaN;
+        };
+
+        // NS symbol table for resolving 2-operand shorthand (name → old c-list slot)
+        const _nsSyms = (typeof assembler !== 'undefined' && assembler && assembler.nsSymbols)
+            ? assembler.nsSymbols
+            : ((typeof ChurchAssembler !== 'undefined' && ChurchAssembler._sharedNsSymbols) || {});
+
+        // Track which abstraction names are currently bound to CR6 via 2-operand
+        // LOAD (simulates assembler.nsLoaded for CR6, updated sequentially).
+        // Only LOAD instructions set nsLoaded in the assembler; rebinding to a
+        // different CR removes the name from the CR6 set.
+        const _cr6Bound = new Set();
+
+        let _srcChanged = false;
+        for (let _li = 0; _li < _srcLines.length; _li++) {
+            const rawLine = _srcLines[_li];
+
+            // Strip comments sequentially — mirrors assembler Pass-1 exactly
+            let codePart = rawLine.trim();
+            let _ci = codePart.indexOf(';');  if (_ci >= 0) codePart = codePart.slice(0, _ci).trim();
+            let _di = codePart.indexOf('--'); if (_di >= 0) codePart = codePart.slice(0, _di).trim();
+            let _si = codePart.indexOf('//'); if (_si >= 0) codePart = codePart.slice(0, _si).trim();
+
+            // Tokenise: commas/brackets → spaces, split on whitespace
+            const parts = codePart.replace(/,/g, ' ').replace(/\[/g, ' ').replace(/\]/g, ' ')
+                                  .split(/\s+/).filter(Boolean);
+            if (parts.length < 2) continue;
+
+            // Identify mnemonic (with optional condition suffix, no dot)
+            const mnemU = parts[0].toUpperCase();
+            let baseOp = null;
+            for (const op of _targetOps) {
+                if (mnemU === op) { baseOp = op; break; }
+                if (mnemU.startsWith(op) && _condSet.has(mnemU.slice(op.length))) { baseOp = op; break; }
+            }
+            if (!baseOp) continue;
+
+            // Update _cr6Bound: LOAD and SAVE 2-operand shorthand both set nsLoaded in the
+            // assembler (see assembler.js case 0 line 415 and case 1 line 430).
+            // We mirror that here so subsequent 3-operand lines can match the bound name.
+            if ((baseOp === 'LOAD' || baseOp === 'SAVE') && parts.length === 3) {
+                const _crDst = _parseRegIdx(parts[1]);
+                if (_crDst === 6) {
+                    _cr6Bound.add(parts[2]);          // Name now bound to CR6
+                } else if (_crDst >= 0) {
+                    _cr6Bound.delete(parts[2]);        // Name rebound away from CR6
+                }
+            }
+
+            let rewritten = null;
+
+            if (parts.length >= 4 && (_parseRegIdx(parts[2]) === 6 || _cr6Bound.has(parts[2]))) {
+                // ── 3-operand explicit form: MNEM CRd, CR6(or alias), slot ──
+                const oldSlot = _parseImm(parts[3]);
+                if (isNaN(oldSlot) || !oldToNew.has(oldSlot) || oldToNew.get(oldSlot) === oldSlot) continue;
+                const newSlot = oldToNew.get(oldSlot);
+                // Precisely replace the slot token in the raw line, preserving
+                // surrounding separators (commas, brackets, whitespace).
+                // Lookahead after source-reg ensures no partial matches (e.g. CR60 ≠ CR6).
+                const crEsc   = parts[2].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const slotEsc = parts[3].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Use [^\w] ("non-word char") so any separator — comma, bracket,
+                // space, semicolon, etc. — satisfies the boundary.  This is
+                // simpler and more robust than enumerating specific separators.
+                rewritten = rawLine.replace(
+                    new RegExp(`(${crEsc}(?=[^\\w])([\\s,\\[\\]]*))` +
+                               `(${slotEsc})(?=[^\\w]|$)`, 'i'),
+                    `$1${newSlot}`
+                );
+                if (rewritten === rawLine) continue;
+
+            } else if (parts.length === 3) {
+                // ── 2-operand NS shorthand: MNEM CRd, Name ──────────────────
+                // The assembler resolves Name via nsSymbols[Name] to a c-list slot.
+                // After POLA that slot has moved; expand to explicit 3-operand form.
+                const nameToken = parts[2];
+                const oldSlot   = _nsSyms[nameToken];
+                if (oldSlot === undefined || !oldToNew.has(oldSlot) || oldToNew.get(oldSlot) === oldSlot) continue;
+                const newSlot  = oldToNew.get(oldSlot);
+                // Preserve leading whitespace and any trailing comment from rawLine
+                const leadWS   = rawLine.match(/^(\s*)/)[1];
+                const origMnem = rawLine.trimStart().split(/[\s,\[]/)[0];
+                let trailCmt   = '';
+                for (const cs of [';', '--', '//']) {
+                    const tci = rawLine.indexOf(cs);
+                    if (tci >= 0) { trailCmt = ' ' + rawLine.slice(tci); break; }
+                }
+                rewritten = `${leadWS}${origMnem} ${parts[1]}, CR6, ${newSlot}${trailCmt}`;
+            }
+
+            if (rewritten && rewritten !== rawLine) {
+                _srcLines[_li] = rewritten;
+                changedSourceLines.push(_li + 1);
+                _srcChanged = true;
+            }
+        }
+
+        if (_srcChanged) {
+            _asmEd.value = _srcLines.join('\n');
+            if (typeof updateLineNumbers === 'function') updateLineNumbers();
+            if (typeof _highlightPolaChangedLines === 'function') _highlightPolaChangedLines(changedSourceLines);
+        }
+    }
+
     // ── Step 6: write compacted c-list at new tail position ────────────────
     const newClistBase = baseLoc + lumpSize - newCC;
     for (let j = 0; j < newCC; j++) sim.memory[newClistBase + j] = newGTs[j] >>> 0;
@@ -3159,6 +3310,8 @@ window.applyPOLA = async function(nsIdx) {
         }
     }
     if (rewriteCount > 0) logLines.push(`Rewrote ${rewriteCount} instruction word${rewriteCount !== 1 ? 's' : ''}`);
+    if (changedSourceLines.length > 0)
+        logLines.push(`Updated source: ${changedSourceLines.length} line${changedSourceLines.length !== 1 ? 's' : ''} rewritten (line${changedSourceLines.length !== 1 ? 's' : ''} ${changedSourceLines.join(', ')})`);
     if (indirectWarnings.length > 0) {
         logLines.push(`\u26A0 ${indirectWarnings.length} slot${indirectWarnings.length !== 1 ? 's' : ''} moved, accessed by non-CR6 instruction (verify manually):`);
         logLines.push(...indirectWarnings);

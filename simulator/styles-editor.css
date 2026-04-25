@@ -1,3 +1,12 @@
+/* ── POLA-rewritten line gutter marker ───────────────────────────────────── */
+#lineNumbers span.line-num-pola {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.18);
+    border-radius: 2px;
+    font-weight: 700;
+    outline: 1px solid rgba(245, 158, 11, 0.35);
+}
+
 /* ── Error line gutter marker ────────────────────────────────────────────── */
 #lineNumbers span.line-num-error {
     color: #ef4444;

@@ -3190,6 +3190,19 @@ HALT
     }
 }
 
+var _polaChangedLines = [];
+
+function _highlightPolaChangedLines(lineNums) {
+    document.querySelectorAll('#lineNumbers span.line-num-pola').forEach(function(el) {
+        el.classList.remove('line-num-pola');
+    });
+    _polaChangedLines = lineNums ? lineNums.slice() : [];
+    _polaChangedLines.forEach(function(n) {
+        var span = document.getElementById('ln-' + n);
+        if (span) span.classList.add('line-num-pola');
+    });
+}
+
 function updateLineNumbers() {
     const editor = document.getElementById('asmEditor');
     const gutter = document.getElementById('lineNumbers');
@@ -3202,6 +3215,9 @@ function updateLineNumbers() {
     gutter.innerHTML = html;
     if (typeof _activeAsmErrors !== 'undefined' && _activeAsmErrors.length > 0) {
         _highlightAsmErrorLines(_activeAsmErrors);
+    }
+    if (typeof _polaChangedLines !== 'undefined' && _polaChangedLines.length > 0) {
+        _highlightPolaChangedLines(_polaChangedLines);
     }
 }
 
