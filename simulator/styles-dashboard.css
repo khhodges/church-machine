@@ -2920,18 +2920,18 @@ a.next-step-link:hover {
     font-size: 0.74rem;
     font-weight: 600;
     font-family: inherit;
-    background: rgba(245,166,35,0.1);
-    color: #f5a623;
-    border: 1px solid rgba(245,166,35,0.4);
+    background: rgba(80,160,255,0.12);
+    color: #5cb8ff;
+    border: 1px solid rgba(80,160,255,0.38);
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
     transition: background 0.15s, border-color 0.15s;
 }
 .clist-pola-btn:hover {
-    background: rgba(245,166,35,0.22);
-    border-color: rgba(245,166,35,0.7);
-    color: #ffc940;
+    background: rgba(80,160,255,0.24);
+    border-color: rgba(80,160,255,0.7);
+    color: #90d0ff;
 }
 .clist-pola-compress-hint {
     color: #88dd99;

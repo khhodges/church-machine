@@ -339,15 +339,24 @@ function updateCRDetail() {
         const _refCodeBase  = _clBase + 1;
         const _refCodeCount = (_clHdr.valid && _clHdr.cw > 0) ? _clHdr.cw : 0;
         const _refSlots     = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
-        // POLA strip — count unreferenced non-null GTs + trailing-trim eligible slots
-        { let _pu = 0, _pt = 0;
+        // POLA strip — unreferenced GTs and/or interior null gaps
+        { let _pu = 0, _pt = 0, _hasGaps = false, _seenNonNull = false;
+          for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && !_seenNonNull) _seenNonNull = true; if ((_gw === 0 || (_refSlots && !_refSlots.has(_i))) && !_seenNonNull) _pt++; else if (_gw !== 0 && _seenNonNull) {} }
+          // recompute _pt and _hasGaps cleanly
+          _seenNonNull = false; _pt = 0;
+          for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; const _isNull = _gw === 0; const _isUnref = _gw !== 0 && _refSlots && !_refSlots.has(_i); if (!_seenNonNull && (_isNull || _isUnref)) _pt++; else { _seenNonNull = true; } }
+          // gap detection: a null between two non-null slots
+          let _sawNonNull = false;
+          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0) _sawNonNull = true; else if (_sawNonNull) { _hasGaps = true; break; } }
           for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && _refSlots && !_refSlots.has(_i)) _pu++; }
-          for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw === 0 || (_refSlots && !_refSlots.has(_i))) _pt++; else break; }
-          if (_pu > 0) html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
-              `<span class="clist-pola-msg">${_pu} unreferenced GT slot${_pu !== 1 ? 's' : ''} detected</span>` +
-              `<button class="clist-pola-btn" onclick="zeroAllUnrefSlots(${nsIdx})">&#xD7;\u202FZero all unref</button>` +
-              (_pt > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress (${_pt} tail slot${_pt !== 1 ? 's' : ''} eligible)</span>` : '') +
-              `</div>`; }
+          if (_pu > 0 || _hasGaps) {
+            const _polaMsg = [_pu > 0 ? `${_pu} unreferenced GT slot${_pu !== 1 ? 's' : ''}` : '', _hasGaps ? 'interior null gaps' : ''].filter(Boolean).join(', ');
+            html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
+              `<span class="clist-pola-msg">${_polaMsg}</span>` +
+              `<button class="clist-pola-btn" onclick="applyPOLA(${nsIdx})">\u26A1\u202FApply POLA</button>` +
+              (_pt > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress after (${_pt} tail slot${_pt !== 1 ? 's' : ''} eligible)</span>` : '') +
+              `</div>`;
+          } }
         html += '<table class="cr-table"><thead><tr>';
         html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Pet Name</th><th></th>';
         html += '</tr></thead><tbody>';
@@ -400,15 +409,21 @@ function updateCRDetail() {
         const _ref2CodeBase  = _baseLoc + 1;
         const _ref2CodeCount = (_lumpHdr.valid && _lumpHdr.cw > 0) ? _lumpHdr.cw : 0;
         const _ref2Slots     = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
-        // POLA strip — count unreferenced non-null GTs + trailing-trim eligible slots
-        { let _pu2 = 0, _pt2 = 0;
+        // POLA strip — unreferenced GTs and/or interior null gaps
+        { let _pu2 = 0, _pt2 = 0, _hasGaps2 = false;
+          let _seenNN2 = false; _pt2 = 0;
+          for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; const _isNull2 = _gw === 0; const _isUnref2 = _gw !== 0 && _ref2Slots && !_ref2Slots.has(_i); if (!_seenNN2 && (_isNull2 || _isUnref2)) _pt2++; else _seenNN2 = true; }
+          let _sawNN2 = false;
+          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0) _sawNN2 = true; else if (_sawNN2) { _hasGaps2 = true; break; } }
           for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0 && _ref2Slots && !_ref2Slots.has(_i)) _pu2++; }
-          for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw === 0 || (_ref2Slots && !_ref2Slots.has(_i))) _pt2++; else break; }
-          if (_pu2 > 0) html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
-              `<span class="clist-pola-msg">${_pu2} unreferenced GT slot${_pu2 !== 1 ? 's' : ''} detected</span>` +
-              `<button class="clist-pola-btn" onclick="zeroAllUnrefSlots(${nsIdx})">&#xD7;\u202FZero all unref</button>` +
-              (_pt2 > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress (${_pt2} tail slot${_pt2 !== 1 ? 's' : ''} eligible)</span>` : '') +
-              `</div>`; }
+          if (_pu2 > 0 || _hasGaps2) {
+            const _polaMsg2 = [_pu2 > 0 ? `${_pu2} unreferenced GT slot${_pu2 !== 1 ? 's' : ''}` : '', _hasGaps2 ? 'interior null gaps' : ''].filter(Boolean).join(', ');
+            html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
+              `<span class="clist-pola-msg">${_polaMsg2}</span>` +
+              `<button class="clist-pola-btn" onclick="applyPOLA(${nsIdx})">\u26A1\u202FApply POLA</button>` +
+              (_pt2 > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress after (${_pt2} tail slot${_pt2 !== 1 ? 's' : ''} eligible)</span>` : '') +
+              `</div>`;
+          } }
         html += '<table class="cr-table"><thead><tr>';
         html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Pet Name</th><th></th>';
         html += '</tr></thead><tbody>';
@@ -2863,6 +2878,160 @@ window.zeroAllUnrefSlots = function(nsIdx) {
                 : 'No unreferenced GT slots found \u2014 already minimal authority.'
         );
     }
+};
+
+// ── C-List POLA Optimizer ──────────────────────────────────────────────────
+// Single async pipeline triggered by the "⚡ Apply POLA" button:
+//   1. Zero every non-null GT not referenced via CR6 (unreferenced authority).
+//   2. Pack remaining non-null GTs to consecutive low slot indices.
+//   3. Rewrite LOAD/SAVE/ELOADCALL/XLOADLAMBDA instruction words where crSrc=6
+//      to use the new slot index: (word & 0xFFFF8000) | (newSlot & 0x7FFF).
+//   4. Update lump header cc + NS entry word1.
+//   5. Auto-save to server/lumps/ and show a patch-modal with full report.
+window.applyPOLA = async function(nsIdx) {
+    if (!sim) return;
+    const nse = sim.readNSEntry(nsIdx);
+    if (!nse) return;
+    const baseLoc = nse.word0_location >>> 0;
+    if (baseLoc === 0 || baseLoc >= sim.memory.length) return;
+    const hdr = sim.parseLumpHeader(sim.memory[baseLoc] >>> 0);
+    if (!hdr.valid || hdr.cc === 0) {
+        if (typeof showPatchModal === 'function') showPatchModal(false, `POLA \u2014 NS${nsIdx}`, 'No valid c-list to optimize.');
+        return;
+    }
+
+    const { cw, cc, typ, n_minus_6, lumpSize } = hdr;
+    const clistBase = baseLoc + lumpSize - cc;
+    const absName   = (sim.nsLabels && sim.nsLabels[nsIdx]) || 'Unnamed';
+    const title     = `\u26A1 Apply POLA \u2014 NS${nsIdx} \u201C${absName}\u201D`;
+
+    // ── Step 1: read current c-list words ──────────────────────────────────
+    const oldGTs = [];
+    for (let i = 0; i < cc; i++) oldGTs.push(sim.memory[clistBase + i] >>> 0);
+
+    // ── Step 2: compute slots referenced via CR6 ───────────────────────────
+    const refSlots = _computeReferencedCListSlots(baseLoc + 1, cw);
+
+    // ── Step 3: zero unreferenced non-null GTs ─────────────────────────────
+    let zeroedCount = 0;
+    const zeroedLog = [];
+    for (let i = 0; i < cc; i++) {
+        if (oldGTs[i] !== 0 && !refSlots.has(i)) {
+            const _pg = sim.parseGT(oldGTs[i]);
+            const _pn = (_pg && sim.nsLabels && sim.nsLabels[_pg.index]) ? sim.nsLabels[_pg.index] : `GT@slot${i}`;
+            zeroedLog.push(`  slot ${i} \u201C${_pn}\u201D (unreferenced)`);
+            oldGTs[i] = 0;
+            sim.memory[clistBase + i] = 0;
+            zeroedCount++;
+        }
+    }
+
+    // ── Step 4: build compacted list and old→new slot mapping ──────────────
+    const newGTs   = [];
+    const oldToNew = new Map();
+    for (let i = 0; i < cc; i++) {
+        if (oldGTs[i] !== 0) {
+            oldToNew.set(i, newGTs.length);
+            newGTs.push(oldGTs[i]);
+        }
+    }
+    const newCC = newGTs.length;
+
+    // Early exit if nothing changed
+    if (zeroedCount === 0 && newCC === cc) {
+        if (typeof showPatchModal === 'function')
+            showPatchModal(true, title, 'C-list is already compact \u2014 no unreferenced GTs, no null gaps.');
+        return;
+    }
+
+    // ── Step 5: rewrite LOAD/SAVE/ELOADCALL/XLOADLAMBDA via CR6 ───────────
+    let rewriteCount = 0;
+    const indirectWarnings = [];
+    for (let w = 0; w < cw; w++) {
+        const addr = baseLoc + 1 + w;
+        if (addr >= sim.memory.length) break;
+        const word    = sim.memory[addr] >>> 0;
+        const opcode  = (word >>> 27) & 0x1F;
+        const crSrcW  = (word >>> 15) & 0xF;
+        const oldSlot = word & 0x7FFF;
+        if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) && crSrcW === 6) {
+            if (oldToNew.has(oldSlot)) {
+                const newSlot = oldToNew.get(oldSlot);
+                if (newSlot !== oldSlot) {
+                    sim.memory[addr] = ((word & 0xFFFF8000) | (newSlot & 0x7FFF)) >>> 0;
+                    rewriteCount++;
+                }
+            }
+        }
+    }
+    // Flag moved slots that had no CR6 reference (potential indirect access)
+    for (const [oldSlot, newSlot] of oldToNew) {
+        if (!refSlots.has(oldSlot) && newSlot !== oldSlot) {
+            const _pg2 = sim.parseGT(newGTs[newSlot]);
+            const _pn2 = (_pg2 && sim.nsLabels && sim.nsLabels[_pg2.index]) ? sim.nsLabels[_pg2.index] : `slot${oldSlot}`;
+            indirectWarnings.push(`  slot ${oldSlot}\u2192${newSlot} \u201C${_pn2}\u201D (not in CR6 scan)`);
+        }
+    }
+
+    // ── Step 6: write compacted c-list at new tail position ────────────────
+    const newClistBase = baseLoc + lumpSize - newCC;
+    for (let j = 0; j < newCC; j++) sim.memory[newClistBase + j] = newGTs[j] >>> 0;
+    // Zero freed region between old and new c-list start
+    for (let addr = clistBase; addr < newClistBase; addr++) sim.memory[addr] = 0;
+
+    // ── Step 7: update lump header and NS entry ────────────────────────────
+    sim.memory[baseLoc] = sim.packLumpHeader(n_minus_6, cw, newCC, typ) >>> 0;
+    const nsBase = sim.NS_TABLE_BASE + nsIdx * sim.NS_ENTRY_WORDS;
+    const oldW1  = sim.memory[nsBase + 1] >>> 0;
+    sim.memory[nsBase + 1] = ((oldW1 & 0xFC000000) | ((newCC & 0x1FF) << 17) | ((lumpSize - 1) & 0x1FFFF)) >>> 0;
+
+    updateCRDetail();
+
+    // ── Step 8: build report ───────────────────────────────────────────────
+    const logLines = [];
+    if (zeroedCount > 0) {
+        logLines.push(`Zeroed ${zeroedCount} unreferenced GT slot${zeroedCount !== 1 ? 's' : ''}:`);
+        logLines.push(...zeroedLog);
+    }
+    const gapsRemoved = cc - newCC;
+    if (gapsRemoved > 0) {
+        logLines.push(`Compacted: ${cc} \u2192 ${newCC} slots (${gapsRemoved} null gap${gapsRemoved !== 1 ? 's' : ''} removed)`);
+        for (const [oldSlot, newSlot] of oldToNew) {
+            if (newSlot !== oldSlot) {
+                const _pg3 = sim.parseGT(newGTs[newSlot]);
+                const _pn3 = (_pg3 && sim.nsLabels && sim.nsLabels[_pg3.index]) ? sim.nsLabels[_pg3.index] : '';
+                logLines.push(`  slot ${oldSlot} \u2192 ${newSlot}${_pn3 ? ` \u201C${_pn3}\u201D` : ''}`);
+            }
+        }
+    }
+    if (rewriteCount > 0) logLines.push(`Rewrote ${rewriteCount} instruction word${rewriteCount !== 1 ? 's' : ''}`);
+    if (indirectWarnings.length > 0) {
+        logLines.push(`\u26A0 ${indirectWarnings.length} slot${indirectWarnings.length !== 1 ? 's' : ''} moved, not in CR6 scan (may be accessed via another register):`);
+        logLines.push(...indirectWarnings);
+    }
+
+    // ── Step 9: auto-save ──────────────────────────────────────────────────
+    let saveOk = true;
+    logLines.push('Saving\u2026');
+    try {
+        const saveWords = [];
+        for (let i = 0; i < lumpSize; i++) saveWords.push(sim.memory[baseLoc + i] >>> 0);
+        const typeNames = ['code', 'data', 'thread', 'outform'];
+        const meta = { abstraction: absName, ns_slot: nsIdx, content_type: typeNames[typ] || 'code', cw, cc: newCC, lump_size: lumpSize };
+        const resp = await fetch('/api/lumps/save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ binary: saveWords, metadata: meta }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Server error');
+        logLines[logLines.length - 1] = `Saved \u2014 token: ${data.token}`;
+        if (data.lump_path) logLines.push(data.lump_path);
+    } catch (e) {
+        saveOk = false;
+        logLines[logLines.length - 1] = `Optimize done but save failed: ${e.message}`;
+    }
+
+    if (typeof showPatchModal === 'function') showPatchModal(saveOk, title, logLines.join('\n'));
 };
 
 // ── Boot Sequence Code ─────────────────────────────────────────────────────
