@@ -158,6 +158,20 @@ function updateCRDetail() {
     html += '</div>';
     html += '</div>';
 
+    // Pre-compute clobber analysis once (only when a panel that needs it will render);
+    // reused by both the Code and C-List panels.
+    // Prefer _clBase/_clHdr (from NS entry, always correct lump header) when valid;
+    // fall back to _baseLoc/_lumpHdr for code-lump paths where _clBase may be absent.
+    let _sharedRefResult = null;
+    if (showCode || showCList) {
+        const _sharedRefCodeBase  = (_clHdr && _clHdr.valid && _clHdr.cw > 0) ? _clBase  : _baseLoc;
+        const _sharedRefCodeCount = (_clHdr && _clHdr.valid && _clHdr.cw > 0) ? _clHdr.cw
+                                  : ((_lumpHdr.valid && _lumpHdr.cw > 0) ? _lumpHdr.cw : 0);
+        if (_sharedRefCodeCount > 0) {
+            _sharedRefResult = _computeReferencedCListSlots(_sharedRefCodeBase + 1, _sharedRefCodeCount);
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Panel: Code — disassembly table (only rendered when X permission is held)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -244,11 +258,9 @@ function updateCRDetail() {
 
         const _crPets3 = {};
 
-        // Pre-compute clobber warnings so the code table can highlight offending rows
-        const _earlyRefResult = (lumpHdr.valid && lumpHdr.cw > 0)
-            ? _computeReferencedCListSlots(baseLoc + 1, lumpHdr.cw) : null;
-        const _earlyClobberWarnings = (_earlyRefResult && _earlyRefResult.clobberWarnings)
-            ? _earlyRefResult.clobberWarnings : [];
+        // Use the pre-computed clobber analysis to highlight offending rows
+        const _earlyClobberWarnings = (_sharedRefResult && _sharedRefResult.clobberWarnings)
+            ? _sharedRefResult.clobberWarnings : [];
         const _clobberWordMap = new Map(); // word index → [{cr, prevAliasedAtWord}]
         for (const _cwe of _earlyClobberWarnings) {
             if (!_clobberWordMap.has(_cwe.word)) _clobberWordMap.set(_cwe.word, []);
@@ -352,9 +364,7 @@ function updateCRDetail() {
     html += '<div class="cr-detail-heading">C-List \u2014 Capability Slots</div>';
 
     if (showCList) {
-        const _refCodeBase  = _clBase + 1;
-        const _refCodeCount = (_clHdr.valid && _clHdr.cw > 0) ? _clHdr.cw : 0;
-        const _refResult    = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
+        const _refResult    = _sharedRefResult;
         const _refSlots     = _refResult ? _refResult.direct   : null;
         const _indSlots     = _refResult ? _refResult.indirect : null;
         const _clobberWarnings = (_refResult && _refResult.clobberWarnings) ? _refResult.clobberWarnings : [];
@@ -442,9 +452,7 @@ function updateCRDetail() {
         }
         html += '</tbody></table>';
     } else if (showCode && _lumpHdr.valid && _lumpHdr.cc > 0 && _lumpClistBase > 0) {
-        const _ref2CodeBase  = _baseLoc + 1;
-        const _ref2CodeCount = (_lumpHdr.valid && _lumpHdr.cw > 0) ? _lumpHdr.cw : 0;
-        const _ref2Result    = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
+        const _ref2Result    = _sharedRefResult;
         const _ref2Slots     = _ref2Result ? _ref2Result.direct   : null;
         const _ind2Slots     = _ref2Result ? _ref2Result.indirect : null;
         const _clobberWarnings2 = (_ref2Result && _ref2Result.clobberWarnings) ? _ref2Result.clobberWarnings : [];
