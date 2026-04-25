@@ -190,10 +190,10 @@ class ChurchSimulator {
         if (!arrayBuffer || arrayBuffer.byteLength < 4) return false;
         const src = new Uint32Array(arrayBuffer);
 
-        // Format-version guard: reject binaries generated before Task #512
-        // (Startup.Config gains cw=3/cc=1 code region + c-list; DEMO_CLIST[4] rewired).
+        // Format-version guard: reject binaries generated before Task #568
+        // (dynamic Boot.Abstr placement; size from saved lump or 64w default).
         // Tag written by boot_image.py at mem[NS_TABLE_BASE - 1].
-        const BOOT_IMAGE_FORMAT_TAG = 0xB0070512;  // must match boot_image.py; bumped Task #512 (Startup.Config CLOOMC code region)
+        const BOOT_IMAGE_FORMAT_TAG = 0xB0070563;  // must match boot_image.py; bumped Task #563/568 (dynamic Boot.Abstr placement)
         const tagIdx = src.length - this.NS_TABLE_RESERVE - 1;
         if (tagIdx >= 0 && tagIdx < src.length) {
             if ((src[tagIdx] >>> 0) !== BOOT_IMAGE_FORMAT_TAG) {
@@ -886,15 +886,19 @@ class ChurchSimulator {
         // work unchanged. See docs/foundation-lump-design.md §4.
         const _bcStep1 = (typeof window !== 'undefined' && window.bootConfig
                           && window.bootConfig.step1) ? window.bootConfig.step1 : null;
-        const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)      || 256;
-        const BOOT_ABSTR_LUMP_SIZE = (_bcStep1 && _bcStep1.abstractionLumpWords) || 256;
-        const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords)   || this.SLOT_SIZE;
+        const THREAD_LUMP_SIZE     = (_bcStep1 && _bcStep1.threadLumpWords)    || 256;
+        // Boot.Abstr lump size: always 64w in the fallback init path (Task #568).
+        // The hardcoded init is only a fallback when no binary boot image is present;
+        // loadBootImage() uses the actual size from the generator.  Defaulting to 64w
+        // keeps this path consistent with server/boot_image.py BOOT_ABSTR_DEFAULT_SIZE.
+        const BOOT_ABSTR_LUMP_SIZE = 64;
+        const NS_LUMP_SIZE         = (_bcStep1 && _bcStep1.namespaceLumpWords) || this.SLOT_SIZE;
         // BOOT_ABSTR_NS_SLOT — module-level constant; slot 2 is Startup.Config (Task #396).
         const slotSizes = {};
         slotSizes[0] = NS_LUMP_SIZE;
         slotSizes[1] = THREAD_LUMP_SIZE;
         // Slot 2 (Startup.Config) uses the default SLOT_SIZE=64 — no override needed.
-        slotSizes[BOOT_ABSTR_NS_SLOT] = BOOT_ABSTR_LUMP_SIZE;  // Boot.Abstr: abstractionLumpWords
+        slotSizes[BOOT_ABSTR_NS_SLOT] = BOOT_ABSTR_LUMP_SIZE;  // Boot.Abstr: 64w default
 
         // Boot Image Designer Step 2 (Task #215): per-slot physAddr overrides
         // for programmer-declared resident lumps. NS entries for those slots
@@ -1120,10 +1124,10 @@ class ChurchSimulator {
         this.memory[this.NS_TABLE_BASE - 2] = this.bootEntrySlot >>> 0;
         // Format-version tag: written immediately before the NS table (at
         // NS_TABLE_BASE - 1) so that loadBootImage() can detect and reject
-        // stale binaries. Bumped to 0x512 (Task #512) — Startup.Config gains cw=3/cc=1
-        // code region + c-list; DEMO_CLIST[4] rewired from Salvation to Startup.Config.
+        // stale binaries. Bumped to 0x563 (Task #568) — Boot.Abstr placement is now
+        // dynamic (64w default or saved lump size); abstractionLumpWords deprecated.
         // Must match boot_image.py BOOT_IMAGE_FORMAT_TAG and loadBootImage().
-        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070512;  // bumped Task #512 (Startup.Config CLOOMC code region)
+        const BOOT_IMAGE_FORMAT_TAG_INIT = 0xB0070563;  // bumped Task #568 (dynamic Boot.Abstr placement)
         this.memory[this.NS_TABLE_BASE - 1] = BOOT_IMAGE_FORMAT_TAG_INIT >>> 0;
     }
 

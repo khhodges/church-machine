@@ -37,9 +37,9 @@ import json
 import os
 import struct
 try:
-    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
-    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 
 NS_TABLE_RESERVE = 0x400        # 1024 words = 256 entries × 4
 NS_ENTRY_WORDS   = 4
@@ -62,7 +62,7 @@ _MANDATORY_NS_SLOTS = (0, 1, STARTUP_CONFIG_NS_SLOT, BOOT_ABSTR_NS_SLOT)  # slot
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
 # can reject stale binaries. Bumped to 0x396 (Task #396) when Startup.Config
 # was added at NS slot 2 and Boot.Abstr's c-list[4] was rewired to it.
-BOOT_IMAGE_FORMAT_TAG = 0xB0070512  # "BOOT 0512" — must match simulator.js; bumped Task #512 (Startup.Config CLOOMC code region + c-list)
+BOOT_IMAGE_FORMAT_TAG = 0xB0070563  # "BOOT 0563" — must match simulator.js; bumped Task #563/568 (dynamic Boot.Abstr placement)
 
 # Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 # (Task #237). Written into Boot.Abstr lump code region so the binary matches
@@ -411,7 +411,37 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     total       = int(step1["totalNamespaceWords"])
     ns_size     = int(step1["namespaceLumpWords"])
     thread_size = int(step1["threadLumpWords"])
-    abstr_size  = int(step1["abstractionLumpWords"])
+    if "abstractionLumpWords" in step1:
+        print("WARNING: abstractionLumpWords is deprecated and ignored; "
+              "Boot.Abstr size is determined by the saved lump (00000300.lump) "
+              "or defaults to 64 words.")
+
+    # ── Load saved Boot.Abstr lump (00000300.lump) if present and valid ──────
+    # The saved lump is written big-endian by /api/lumps/save.  If it passes
+    # all validation checks its declared size becomes the actual Boot.Abstr
+    # allocation; otherwise the hardcoded default (64 words) is used.
+    _boot_saved_path = os.path.join(
+        lumps_dir, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")   # "00000300.lump"
+    actual_abstr_size = BOOT_ABSTR_DEFAULT_SIZE
+    abstr_words = None
+    if os.path.isfile(_boot_saved_path):
+        try:
+            with open(_boot_saved_path, "rb") as _bsf:
+                _bsraw = _bsf.read()
+            _bsn = len(_bsraw) // 4
+            if _bsn >= 1:
+                _bswords = list(struct.unpack(f">{_bsn}I", _bsraw[:_bsn * 4]))
+                _bshdr = _bswords[0]
+                _bscw  = (_bshdr >> 10) & 0x1FFF
+                _bscc  = _bshdr & 0xFF
+                _bsnm6 = (_bshdr >> 23) & 0xF
+                _bssz  = 1 << (_bsnm6 + 6)
+                if ((_bshdr >> 27) == 0x1F and _bscw == NUC_CODE_WORDS
+                        and 0 < _bscc <= DEMO_CLIST_SIZE and _bsn >= _bssz):
+                    actual_abstr_size = _bssz
+                    abstr_words = _bswords[:_bssz]
+        except Exception:
+            pass  # Fall back to default 64w Boot.Abstr silently.
 
     # Memory image (Python ints, packed at the end).
     mem = [0] * total
@@ -451,7 +481,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         0: ns_size,
         1: thread_size,
         # Slot 2 (Startup.Config) uses the default SLOT_SIZE=64 (no override needed).
-        BOOT_ABSTR_NS_SLOT: abstr_size,  # Boot.Abstr: abstractionLumpWords
+        BOOT_ABSTR_NS_SLOT: actual_abstr_size,  # Boot.Abstr: from saved lump or 64w default
     }
 
     # ----- NS entries ----------------------------------------------------
@@ -560,70 +590,40 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # The Boot Abstraction: directly loaded by B:03/B:04 (no director hop).
     #   Word  0:      Lump header (n_minus_6, cw=NUC_CODE_WORDS, cc=DEMO_CLIST_SIZE)
     #   Words 1–17:   Code region (loaded by the boot program loader)
-    #   Words 18..(end-DEMO_CLIST_SIZE-1): Freespace
-    #   Words (end-DEMO_CLIST_SIZE)..(end-1): C-list (18 GTs at physical end)
+    #   Words 18..(end-cc-1): Freespace
+    #   Words (end-cc)..(end-1): C-list (cc GTs at physical end)
     # B:04 derives CR14 (R+X) and CR6 (E) from this lump's header.
-    boot_entry_loc     = locations[BOOT_ABSTR_NS_SLOT]
-    entry_lump_size    = abstr_size
-    entry_clist_start  = entry_lump_size - DEMO_CLIST_SIZE
-    mem[boot_entry_loc] = pack_lump_header(
-        _ns_n_minus_6(abstr_size), NUC_CODE_WORDS, DEMO_CLIST_SIZE, 0)
-    # Write BOOT_PROGRAM instruction words into the code region (words 1..NUC_CODE_WORDS).
-    for i, word in enumerate(BOOT_ROM_WORDS[:NUC_CODE_WORDS]):
-        mem[boot_entry_loc + 1 + i] = word & 0xFFFFFFFF
-    for i, gt in enumerate(clist_gts):
-        mem[boot_entry_loc + entry_clist_start + i] = gt & 0xFFFFFFFF
-    mem[boot_entry_loc + entry_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF  # c-list[0] = memory-manager GT
-    # c-list[4] must point to Startup.Config (NS slot 2) so BOOT_ROM_WORDS[7] CALL
-    # dispatches to Startup.Config.Execute() on every reset (Task #396).
-    # clist_gts[2] is the Startup.Config GT built by the for-loop above.
-    mem[boot_entry_loc + entry_clist_start + 4] = clist_gts[STARTUP_CONFIG_NS_SLOT] & 0xFFFFFFFF
-    entry_cr_limit     = entry_lump_size - DEMO_CLIST_SIZE - 1
-    entry_ns_base      = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
-    mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 0, 1, DEMO_CLIST_SIZE)
-    mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+    boot_entry_loc  = locations[BOOT_ABSTR_NS_SLOT]
+    entry_ns_base   = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
 
-    # ── Patch Boot.Abstr c-list from saved lump (if present) ────────────────
-    # /api/lumps/save writes big-endian words to server/lumps/00000300.lump.
-    # If such a file exists, overlay the c-list region and cc from it so that
-    # edits made in the IDE (POLA, hand-zeroing) survive server reboots.
-    # Only the c-list tail is patched; the code region (BOOT_ROM_WORDS) is
-    # always kept as-is because the hardware boot ROM depends on it exactly.
-    _boot_saved_path = os.path.join(
-        lumps_dir, f"{BOOT_ABSTR_NS_SLOT << 8:08x}.lump")   # "00000300.lump"
-    if os.path.isfile(_boot_saved_path):
-        try:
-            with open(_boot_saved_path, "rb") as _bsf:
-                _bsraw = _bsf.read()
-            _bsn = len(_bsraw) // 4
-            # Saved lumps are packed big-endian by /api/lumps/save.
-            _bswords = list(struct.unpack(f">{_bsn}I", _bsraw[:_bsn * 4]))
-            # Validate: code-word count must match the boot ROM; cc must be in
-            # range; lump must be long enough to index its c-list tail.  Size
-            # is NOT required to equal entry_lump_size — the saved lump may be
-            # 64w (written before a boot-config change) or compressed smaller.
-            # The copy arithmetic works for any saved lump where
-            # _bsn >= DEMO_CLIST_SIZE: the last DEMO_CLIST_SIZE words map
-            # correctly to the boot image's 18-slot c-list region.
-            _bshdr = _bswords[0]
-            _bscw  = (_bshdr >> 10) & 0x1FFF
-            _bscc  = _bshdr & 0xFF
-            if (_bsn >= DEMO_CLIST_SIZE and
-                    _bscw == NUC_CODE_WORDS and 0 < _bscc <= DEMO_CLIST_SIZE):
-                # Copy all DEMO_CLIST_SIZE words from the saved lump's
-                # c-list region (which includes freed/zero gaps after POLA).
-                _bs_clist_base = _bsn - DEMO_CLIST_SIZE
-                for _ci in range(DEMO_CLIST_SIZE):
-                    mem[boot_entry_loc + entry_clist_start + _ci] = (
-                        _bswords[_bs_clist_base + _ci] & 0xFFFFFFFF)
-                # Patch lump header cc; keep n_minus_6 and cw unchanged.
-                mem[boot_entry_loc] = pack_lump_header(
-                    _ns_n_minus_6(entry_lump_size), NUC_CODE_WORDS, _bscc, 0)
-                # Update NS entry word1 cc; keep limit17 and permission bits.
-                mem[entry_ns_base + 1] = pack_ns_word1(
-                    entry_cr_limit, 0, 0, 0, 0, 1, _bscc)
-        except Exception:
-            pass  # Fall back silently to the hardcoded defaults above.
+    if abstr_words is not None:
+        # Saved lump present and validated — copy it directly into the image.
+        # abstr_words was parsed from big-endian disk format into Python ints;
+        # writing them into mem[] produces correct little-endian output at pack time.
+        for _i, _w in enumerate(abstr_words):
+            mem[boot_entry_loc + _i] = _w & 0xFFFFFFFF
+        # Derive cc from the saved lump header (already validated above).
+        _saved_cc      = abstr_words[0] & 0xFF
+        entry_cr_limit = actual_abstr_size - _saved_cc - 1
+        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 0, 1, _saved_cc)
+        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
+    else:
+        # No saved lump — synthesise the default Boot.Abstr at 64 words.
+        entry_clist_start = actual_abstr_size - DEMO_CLIST_SIZE
+        mem[boot_entry_loc] = pack_lump_header(
+            _ns_n_minus_6(actual_abstr_size), NUC_CODE_WORDS, DEMO_CLIST_SIZE, 0)
+        # Write BOOT_PROGRAM instruction words into the code region.
+        for i, word in enumerate(BOOT_ROM_WORDS[:NUC_CODE_WORDS]):
+            mem[boot_entry_loc + 1 + i] = word & 0xFFFFFFFF
+        for i, gt in enumerate(clist_gts):
+            mem[boot_entry_loc + entry_clist_start + i] = gt & 0xFFFFFFFF
+        mem[boot_entry_loc + entry_clist_start + 0] = mem_mgr_gt & 0xFFFFFFFF  # c-list[0] = memory-manager GT
+        # c-list[4] must point to Startup.Config (NS slot 2) so BOOT_ROM_WORDS[7] CALL
+        # dispatches to Startup.Config.Execute() on every reset (Task #396).
+        mem[boot_entry_loc + entry_clist_start + 4] = clist_gts[STARTUP_CONFIG_NS_SLOT] & 0xFFFFFFFF
+        entry_cr_limit = actual_abstr_size - DEMO_CLIST_SIZE - 1
+        mem[entry_ns_base + 1] = pack_ns_word1(entry_cr_limit, 0, 0, 0, 0, 1, DEMO_CLIST_SIZE)
+        mem[entry_ns_base + 2] = make_version_seals(0, boot_entry_loc, entry_cr_limit)
 
     # ----- Startup.Config lump (NS slot 2) --------------------------------
     # 64-word lump with a 3-word CLOOMC code region and a 1-slot c-list (Task #512).

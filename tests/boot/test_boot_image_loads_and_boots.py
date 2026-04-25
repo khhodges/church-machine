@@ -56,7 +56,6 @@ def _cfg_default():
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":     64,
             "threadLumpWords":       256,
-            "abstractionLumpWords":  256,
         },
     }
 
@@ -67,7 +66,6 @@ def _cfg_custom_step1():
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":     64,
             "threadLumpWords":       512,
-            "abstractionLumpWords":  512,
         },
     }
 
@@ -99,7 +97,6 @@ def _cfg_no_window():
             "totalNamespaceWords": 65536,
             "namespaceLumpWords":     64,
             "threadLumpWords":       256,
-            "abstractionLumpWords":  256,
         },
     }
 

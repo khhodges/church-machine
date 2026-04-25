@@ -41,15 +41,14 @@ def _default_cfg():
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":     64,
             "threadLumpWords":       256,
-            "abstractionLumpWords":  256,
         },
     }
 
 
-def _image_words(cfg=None):
+def _image_words(cfg=None, lumps_dir=LUMPS_DIR):
     if cfg is None:
         cfg = _default_cfg()
-    raw = generate_boot_image(cfg, LUMPS_DIR)
+    raw = generate_boot_image(cfg, lumps_dir)
     n = len(raw) // 4
     return list(struct.unpack(f"<{n}I", raw))
 
@@ -176,19 +175,25 @@ def test_boot_image_startup_config_fault_count_zero():
     assert fault_count == 0
 
 
-def test_boot_image_boot_abstr_clist4_points_to_startup_config():
-    """Boot.Abstr's c-list[4] must be a GT pointing at NS slot 2 (Startup.Config)."""
-    cfg = _default_cfg()
-    ns_size     = int(cfg["step1"]["namespaceLumpWords"])
-    thread_size = int(cfg["step1"]["threadLumpWords"])
-    abstr_size  = int(cfg["step1"]["abstractionLumpWords"])
+def test_boot_image_boot_abstr_clist4_points_to_startup_config(tmp_path):
+    """Boot.Abstr's c-list[4] must be a GT pointing at NS slot 2 (Startup.Config).
 
-    words = _image_words(cfg)
+    Uses a temp lumps dir (no saved 00000300.lump) so the default 64w synthesized
+    Boot.Abstr — which always has DEMO_CLIST_SIZE=18 c-list entries — is used.
+    This ensures c-list[4] is always in range regardless of any saved lump in
+    the real server/lumps directory (Task #568).
+    """
+    cfg = _default_cfg()
+    words = _image_words(cfg, lumps_dir=str(tmp_path))
     # Boot.Abstr lump location from NS table slot 3
     base = _ns_table_base(words, cfg)
     boot_abstr_loc = words[base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS]
-    DEMO_CLIST_SIZE = 18
-    clist_start = abstr_size - DEMO_CLIST_SIZE
+    # Derive abstr_size and cc from the lump header (Task #568 — abstractionLumpWords deprecated)
+    hdr        = words[boot_abstr_loc]
+    n_minus_6  = (hdr >> 23) & 0xF
+    abstr_size = 1 << (n_minus_6 + 6)
+    cc         = hdr & 0xFF
+    clist_start = abstr_size - cc
     clist4_gt = words[boot_abstr_loc + clist_start + 4]
     # GT bits[8:0] = NS slot index
     gt_index = clist4_gt & 0x1FF
@@ -403,7 +408,7 @@ def test_boot_integration_execute_failure_halts_boot():
         ["node", "-e", r"""
 global.window = { bootConfig: { step1: {
     totalNamespaceWords: 16384, namespaceLumpWords: 64,
-    threadLumpWords: 256, abstractionLumpWords: 256 } } };
+    threadLumpWords: 256 } } };
 const ChurchSimulator     = require('./simulator/simulator.js');
 const AbstractionRegistry = require('./simulator/abstractions.js');
 const SystemAbstractions  = require('./simulator/system_abstractions.js');

@@ -22,9 +22,9 @@ if _SERVER_DIR not in sys.path:
 
 import boot_image as _boot_image_gen
 try:
-    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+    from boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 except ImportError:
-    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE
+    from server.boot_constants import NUC_CODE_WORDS, DEMO_CLIST_SIZE, BOOT_ABSTR_DEFAULT_SIZE
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -373,10 +373,37 @@ def _validate_step2(step2, step1, target_board):
     catalog = {e["nsSlot"]: e for e in _load_lump_catalog()}
     NS_TABLE_RESERVE = 0x300  # keep in sync with simulator.js
     total = step1["totalNamespaceWords"]
+    # Determine actual Boot.Abstr size from saved 00000300.lump (Task #568).
+    # A resident step-2 lump must not overlap whichever Boot.Abstr will actually be placed.
+    _abstr_size_for_validation = BOOT_ABSTR_DEFAULT_SIZE
+    _saved_abstr_path = os.path.join(LUMPS_DIR, '00000300.lump')
+    if os.path.isfile(_saved_abstr_path):
+        try:
+            import struct as _vstruct
+            with open(_saved_abstr_path, "rb") as _fh:
+                _raw = _fh.read()
+            _n_words = len(_raw) // 4
+            if _n_words >= 1:
+                _hdr       = _vstruct.unpack(">I", _raw[:4])[0]
+                _magic     = (_hdr >> 27) & 0x1F
+                _n_minus_6 = (_hdr >> 23) & 0xF
+                _cw        = (_hdr >> 10) & 0x1FFF
+                _cc        = _hdr & 0xFF
+                _declared  = 1 << (_n_minus_6 + 6)
+                # Use the same validation criteria as generate_boot_image() (Task #568)
+                # so that "placed size" is computed consistently between generation and
+                # validation; an invalid/truncated lump falls back to BOOT_ABSTR_DEFAULT_SIZE.
+                if (_magic == 0x1F and
+                        64 <= _declared <= 16384 and
+                        _n_words >= _declared and
+                        _cw >= 1 and _cc >= 1 and _cc <= _declared):
+                    _abstr_size_for_validation = _declared
+        except OSError:
+            pass
     foundation_end = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      FREE_SLOT_SIZE +              # free/null slot 2 (64 words — Task #247)
-                      step1["abstractionLumpWords"])  # Boot.Abstr (slot 3)
+                      FREE_SLOT_SIZE +                  # free/null slot 2 (64 words — Task #247)
+                      _abstr_size_for_validation)       # Boot.Abstr: saved lump size or 64w default
     usable_end = total - NS_TABLE_RESERVE
     seen_slots = set()
     occupied = []  # list of (start, end_exclusive, label) for resident lumps
@@ -453,26 +480,31 @@ def _validate_step1(target_board, step1):
     if target_board not in HARDWARE_PROFILES:
         return f"Unknown target board: {target_board}"
     profile = HARDWARE_PROFILES[target_board]
-    fields = ("totalNamespaceWords", "namespaceLumpWords",
-              "threadLumpWords", "abstractionLumpWords")
-    for f in fields:
+    required_fields = ("totalNamespaceWords", "namespaceLumpWords", "threadLumpWords")
+    for f in required_fields:
         v = step1.get(f)
         if not isinstance(v, int) or v <= 0:
             return f"step1.{f} must be a positive integer"
+    # abstractionLumpWords is deprecated (Task #568) — warn and ignore if present.
+    if "abstractionLumpWords" in step1:
+        v = step1["abstractionLumpWords"]
+        if not isinstance(v, int) or v <= 0:
+            return "step1.abstractionLumpWords must be a positive integer (deprecated)"
     total = step1["totalNamespaceWords"]
     if total > profile["totalRamWords"]:
         return (f"totalNamespaceWords ({total}) exceeds {profile['label']} "
                 f"budget ({profile['totalRamWords']} words)")
-    for f in ("totalNamespaceWords", "namespaceLumpWords",
-              "threadLumpWords", "abstractionLumpWords"):
+    for f in required_fields:
         if not _is_pow2(step1[f]):
             return f"step1.{f} must be a power of 2"
         if step1[f] < 64:
             return f"step1.{f} must be at least 64 words (FPGA minimum slot)"
+    # Boot.Abstr actual size is always BOOT_ABSTR_DEFAULT_SIZE (64) or the saved
+    # lump size — abstractionLumpWords is ignored for the foundation_sum check.
     foundation_sum = (step1["namespaceLumpWords"] +
                       step1["threadLumpWords"] +
-                      FREE_SLOT_SIZE +              # free/null slot 2 (64 words — Task #247)
-                      step1["abstractionLumpWords"])  # Boot.Abstr (slot 3)
+                      FREE_SLOT_SIZE +               # free/null slot 2 (64 words — Task #247)
+                      BOOT_ABSTR_DEFAULT_SIZE)        # Boot.Abstr (slot 3) — always 64w minimum
     if foundation_sum > total:
         return (f"Sum of foundational lump sizes ({foundation_sum}) exceeds "
                 f"totalNamespaceWords ({total})")
@@ -555,9 +587,12 @@ def boot_config_post():
             "totalNamespaceWords": int(step1["totalNamespaceWords"]),
             "namespaceLumpWords": int(step1["namespaceLumpWords"]),
             "threadLumpWords": int(step1["threadLumpWords"]),
-            "abstractionLumpWords": int(step1["abstractionLumpWords"]),
         },
     }
+    # abstractionLumpWords is deprecated (Task #568) — preserve in saved config if present
+    # so legacy tools that re-read the config don't lose the field.
+    if "abstractionLumpWords" in step1:
+        cfg["step1"]["abstractionLumpWords"] = int(step1["abstractionLumpWords"])
     if step2 is not None:
         norm = []
         for e in (step2.get("lumps") or []):
@@ -2094,39 +2129,10 @@ def _load_boot_abstr_lump():
         })
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
-        # If a saved lump exists (written by /api/lumps/save after POLA or
-        # compress), override lump_size and cc with the saved lump's values.
-        # The boot image always allocates abstractionLumpWords (256w) for
-        # Boot.Abstr regardless of compression; the saved lump records the
-        # logical (user-edited) size that should be shown in the LUMP
-        # repository.  We also replace LAZY_LUMPS['00000003'] so the content
-        # and hex-dump tabs show the compact user-edited version.
-        # NUC_CODE_WORDS and DEMO_CLIST_SIZE are imported from boot_constants.
-        _saved300_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000300.lump')
-        if os.path.isfile(_saved300_path):
-            try:
-                with open(_saved300_path, 'rb') as _s300f:
-                    _s300raw = _s300f.read()
-                _s300n = len(_s300raw) // 4
-                if _s300n >= 1:
-                    _s300hdr = _struct.unpack('>I', _s300raw[:4])[0]
-                    _s300cw  = (_s300hdr >> 10) & 0x1FFF
-                    _s300cc  = _s300hdr & 0xFF
-                    _s300nm6 = (_s300hdr >> 23) & 0xF
-                    _s300sz  = 1 << (_s300nm6 + 6)
-                    # Magic [31:27] must be 0x1F; cw must be NUC_CODE_WORDS;
-                    # cc must be in range; file must cover the declared
-                    # lump size and at least DEMO_CLIST_SIZE words.
-                    if ((_s300hdr >> 27) == 0x1F and _s300cw == NUC_CODE_WORDS and
-                            0 < _s300cc <= DEMO_CLIST_SIZE and
-                            _s300n >= _s300sz and _s300n >= DEMO_CLIST_SIZE):
-                        _BOOT_ABSTR_META['lump_size'] = _s300sz
-                        _BOOT_ABSTR_META['cc']        = _s300cc
-                        LAZY_LUMPS['00000003'] = _s300raw[:_s300n * 4]
-                        print(f'[boot] Boot.Abstr saved lump: {_s300sz}w, cc={_s300cc}',
-                              flush=True)
-            except Exception:
-                pass  # Fall back to boot-image values already set above.
+        # The boot image generator (boot_image.py) now places the saved lump
+        # (00000300.lump) directly at the Boot.Abstr slot with the correct size
+        # and cc.  lump_size and cc are authoritative from the boot image above;
+        # no separate 00000300.lump-override block is needed (Task #568).
         # Restore author/version from sidecar if one has been written (e.g. after
         # an authorship edit).  Only these two user-editable fields are merged;
         # lump_size and cc come from the saved lump (above) or the boot image.

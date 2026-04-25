@@ -7,11 +7,13 @@ Covers:
   - LED c-list slots 8-13 in the generated boot image
   - DREAD/DWRITE routing via Node simulator (headless)
 """
+import atexit
 import json
 import os
 import struct
 import subprocess
 import sys
+import tempfile
 
 import pytest
 
@@ -29,6 +31,13 @@ from server.boot_image import (
 )
 
 LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
+
+# Empty lumps dir (no 00000300.lump) used for all tests that check the
+# synthesized default 64w Boot.Abstr c-list content (Task #568 — the real
+# server/lumps/ may contain a saved 00000300.lump which would override the
+# synthesized lump and change c-list content unexpectedly).
+_EMPTY_LUMPS_DIR = tempfile.mkdtemp(prefix="gt_clist_test_")
+atexit.register(lambda: __import__('shutil').rmtree(_EMPTY_LUMPS_DIR, ignore_errors=True))
 
 
 # ── create_abstract_gt bit-level tests ───────────────────────────────────────
@@ -111,10 +120,10 @@ def test_ab_type_constants():
 
 # ── BOOT_IMAGE_FORMAT_TAG ────────────────────────────────────────────────────
 
-def test_boot_image_format_tag_is_task_431():
-    """BOOT_IMAGE_FORMAT_TAG was bumped to 0xB0070431 for Task #431."""
-    assert BOOT_IMAGE_FORMAT_TAG == 0xB0070431, (
-        f"Expected 0xB0070431, got 0x{BOOT_IMAGE_FORMAT_TAG:08X}"
+def test_boot_image_format_tag_is_task_568():
+    """BOOT_IMAGE_FORMAT_TAG was bumped to 0xB0070563 for Task #568 (dynamic Boot.Abstr)."""
+    assert BOOT_IMAGE_FORMAT_TAG == 0xB0070563, (
+        f"Expected 0xB0070563, got 0x{BOOT_IMAGE_FORMAT_TAG:08X}"
     )
 
 
@@ -124,9 +133,8 @@ def test_boot_image_contains_correct_format_tag():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     words = struct.unpack(f"<{len(img)//4}I", img)
     total = len(words)
     tag_idx = total - NS_TABLE_RESERVE - 1
@@ -136,11 +144,13 @@ def test_boot_image_contains_correct_format_tag():
 # ── LED c-list slots in generated boot image ─────────────────────────────────
 
 def _get_clist_words(img_bytes, cfg):
-    """Return the 17 c-list GT words from Boot.Abstr in the generated image."""
+    """Return the c-list GT words from Boot.Abstr in the generated image.
+
+    Derives the lump size and cc from the lump header rather than from
+    config (abstractionLumpWords is deprecated — Task #568).
+    """
     step1 = cfg["step1"]
     total       = int(step1["totalNamespaceWords"])
-    ns_size     = int(step1["namespaceLumpWords"])
-    abstr_size  = int(step1["abstractionLumpWords"])
     BOOT_ABSTR_NS_SLOT = 3
     DEMO_CLIST_SIZE = 18
 
@@ -149,7 +159,12 @@ def _get_clist_words(img_bytes, cfg):
 
     # Boot.Abstr loc is at NS table slot 3, word0
     boot_entry_loc = words[ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS]
-    entry_clist_start = abstr_size - DEMO_CLIST_SIZE
+    # Derive lump size and cc from the lump header (Task #568 — abstr size is dynamic)
+    hdr       = words[boot_entry_loc]
+    n_minus_6 = (hdr >> 23) & 0xF
+    abstr_size = 1 << (n_minus_6 + 6)
+    cc         = hdr & 0xFF
+    entry_clist_start = abstr_size - cc
     clist = [words[boot_entry_loc + entry_clist_start + i] for i in range(DEMO_CLIST_SIZE)]
     return clist
 
@@ -160,9 +175,8 @@ def test_led_clist_slots_are_abstract_gts():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     for slot_offset in range(6):
         slot_idx = 8 + slot_offset
@@ -177,9 +191,8 @@ def test_led_clist_slots_correct_device_class():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     for led_idx in range(6):
         gt = clist[8 + led_idx]
@@ -195,9 +208,8 @@ def test_led_clist_slots_correct_device_data():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     for led_idx in range(6):
         gt = clist[8 + led_idx]
@@ -213,9 +225,8 @@ def test_led_clist_slots_rw_permissions():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     for led_idx in range(6):
         gt = clist[8 + led_idx]
@@ -232,9 +243,8 @@ def test_uart_btn_timer_clist_slots_are_abstract_gts():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     expected = [
         (14, DEVICE_CLASS_UART,   0),   # UART   reg0=TX
@@ -293,9 +303,8 @@ def test_led_ns_slot_12_is_freed():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     words = struct.unpack(f"<{len(img) // 4}I", img)
     total = len(words)
     ns_table_base = total - NS_TABLE_RESERVE
@@ -323,9 +332,8 @@ def test_uart_btn_timer_ns_slots_are_freed():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     words = struct.unpack(f"<{len(img) // 4}I", img)
     total = len(words)
     ns_table_base = total - NS_TABLE_RESERVE
@@ -355,9 +363,8 @@ def test_uart_btn_perms_in_abstract_gts():
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,
         "threadLumpWords": 256,
-        "abstractionLumpWords": 256,
     }}
-    img = generate_boot_image(cfg, LUMPS_DIR)
+    img = generate_boot_image(cfg, _EMPTY_LUMPS_DIR)
     clist = _get_clist_words(img, cfg)
     uart_gt      = clist[14]
     btn_gt       = clist[15]

@@ -44,7 +44,6 @@ def _default_cfg():
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":     64,
             "threadLumpWords":       256,
-            "abstractionLumpWords":  256,
         },
     }
 

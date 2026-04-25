@@ -29,7 +29,6 @@ global.window = {
             totalNamespaceWords:  16384,
             namespaceLumpWords:      64,
             threadLumpWords:        256,
-            abstractionLumpWords:   256,
         }
     }
 };

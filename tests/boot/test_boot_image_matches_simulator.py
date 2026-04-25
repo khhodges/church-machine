@@ -49,20 +49,19 @@ def _cfg_default():
             "totalNamespaceWords": 16384,
             "namespaceLumpWords":     64,
             "threadLumpWords":       256,
-            "abstractionLumpWords":  256,
         },
     }
 
 
 def _cfg_custom_step1():
-    # Larger thread + abstraction lumps; verifies the lump-header
-    # n_minus_6 computation is driven by config (not hardcoded).
+    # Larger thread lump; verifies the lump-header n_minus_6 computation is
+    # driven by threadLumpWords (not hardcoded). Boot.Abstr is always 64w
+    # default (Task #568); abstractionLumpWords is deprecated and ignored.
     return {
         "step1": {
             "totalNamespaceWords": 32768,
             "namespaceLumpWords":     64,
             "threadLumpWords":       512,
-            "abstractionLumpWords":  512,
         },
     }
 
@@ -95,12 +94,13 @@ CONFIGS = [
 # ---- helpers --------------------------------------------------------------
 
 STARTUP_CONFIG_LUMP_SIZE = 64  # Slot 2 (Startup.Config) is always 64 words (Task #396)
+BOOT_ABSTR_DEFAULT_SIZE  = 64  # Boot.Abstr default size when no saved lump (Task #568)
 
 def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
     """Human-readable name for the foundation region containing word_index.
 
     After Task #396: slot 2 (0x0140-0x017F, 64 words) is Startup.Config;
-    Boot.Abstr (NS slot 3) takes abstractionLumpWords (= entry_size here).
+    Boot.Abstr (NS slot 3) takes entry_size words (64w default, Task #568).
     """
     ns_table_base = total_words - NS_TABLE_RESERVE
     if word_index >= ns_table_base:
@@ -167,7 +167,8 @@ def _compare(py_bytes, sim_words, cfg):
     total       = step1["totalNamespaceWords"]
     ns_size     = step1["namespaceLumpWords"]
     thread_size = step1["threadLumpWords"]
-    abstr_size  = step1["abstractionLumpWords"]
+    # Boot.Abstr is always the 64w default when no saved lump (tmp_path used here).
+    abstr_size  = BOOT_ABSTR_DEFAULT_SIZE
 
     assert len(py_bytes) == total * 4, (
         f"Python image length {len(py_bytes)} bytes != expected {total * 4}"
@@ -215,6 +216,98 @@ def test_boot_image_matches_simulator(cfg, tmp_path):
     py_bytes  = generate_boot_image(cfg, str(tmp_path))
     sim_words = _run_simulator(cfg)
     _compare(py_bytes, sim_words, cfg)
+
+
+# ---- saved-lump path tests -------------------------------------------------
+
+def _make_boot_abstr_lump(lump_size, cc, nuc_code_words=17, demo_clist_size=18):
+    """Synthesise a valid big-endian Boot.Abstr .lump file of `lump_size` words.
+
+    The header encodes: magic=0x1F, n_minus_6, cw=nuc_code_words, typ=0, cc.
+    The last `cc` words are non-zero sentinel GTs; everything else is zero.
+    """
+    import math
+    n_minus_6 = max(0, int(math.ceil(math.log2(lump_size))) - 6)
+    hdr = (0x1F << 27) | ((n_minus_6 & 0xF) << 23) | ((nuc_code_words & 0x1FFF) << 10) | (cc & 0xFF)
+    words = [0] * lump_size
+    words[0] = hdr
+    # Fill code region (words 1..nuc_code_words) with placeholder instruction
+    for i in range(nuc_code_words):
+        words[1 + i] = 0x07000000  # LOAD no-op placeholder
+    # Fill c-list tail with non-zero sentinels
+    for i in range(cc):
+        words[lump_size - cc + i] = 0x04000000 | (i & 0xFF)  # sentinel GT
+    return struct.pack(f">{lump_size}I", *words)
+
+
+@pytest.mark.parametrize("lump_size,cc", [
+    (64,  17),  # 64w with full cc (minimum size, full c-list)
+    (128, 10),  # 128w with reduced cc (larger lump, partial c-list)
+])
+def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
+    """generate_boot_image() places a valid 00000300.lump at Boot.Abstr's slot.
+
+    Verifies:
+      - Boot.Abstr NS table entry (word0) points to the correct physical address.
+      - The NS table word1 encodes the correct limit17 (lump_size - cc - 1)
+        and clist_count (= cc).
+      - The lump header at that address round-trips (n_minus_6, cw, cc).
+    """
+    from server.boot_image import (
+        generate_boot_image, NS_TABLE_RESERVE, NS_ENTRY_WORDS,
+        BOOT_ABSTR_NS_SLOT, NUC_CODE_WORDS, DEMO_CLIST_SIZE,
+        pack_ns_word1,
+    )
+
+    # Write a synthetic saved lump into tmp_path.
+    saved_bytes = _make_boot_abstr_lump(lump_size, cc)
+    saved_path = tmp_path / "00000300.lump"
+    saved_path.write_bytes(saved_bytes)
+
+    cfg = {
+        "step1": {
+            "totalNamespaceWords": 16384,
+            "namespaceLumpWords":     64,
+            "threadLumpWords":       256,
+        },
+    }
+    img = generate_boot_image(cfg, str(tmp_path))
+    total = 16384
+    words = list(struct.unpack(f"<{total}I", img))
+    ns_table_base = total - NS_TABLE_RESERVE
+
+    # NS table slot 3 word0 = physical location
+    ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
+    boot_loc = words[ns_base]
+
+    # Expected physical address: after Boot.NS(64) + Boot.Thread(256) + Startup.Config(64)
+    expected_loc = 64 + 256 + 64
+    assert boot_loc == expected_loc, (
+        f"Boot.Abstr physical address {boot_loc} != expected {expected_loc}"
+    )
+
+    # NS word1: limit17 = lump_size - cc - 1; clistCount = cc
+    ns_word1 = words[ns_base + 1]
+    limit17   = ns_word1 & 0x1FFFF
+    clist_cnt = (ns_word1 >> 17) & 0x1FF
+    expected_limit17 = lump_size - cc - 1
+    assert limit17 == expected_limit17, (
+        f"NS word1 limit17={limit17} != expected {expected_limit17}"
+    )
+    assert clist_cnt == cc, f"NS word1 clistCount={clist_cnt} != expected cc={cc}"
+
+    # Lump header at boot_loc
+    hdr = words[boot_loc]
+    hdr_magic = (hdr >> 27) & 0x1F
+    hdr_nm6   = (hdr >> 23) & 0xF
+    hdr_cw    = (hdr >> 10) & 0x1FFF
+    hdr_cc    = hdr & 0xFF
+    import math
+    expected_nm6 = max(0, int(math.ceil(math.log2(lump_size))) - 6)
+    assert hdr_magic == 0x1F, f"lump header magic={hdr_magic:#x} != 0x1F"
+    assert hdr_nm6 == expected_nm6, f"lump header n_minus_6={hdr_nm6} != {expected_nm6}"
+    assert hdr_cw == NUC_CODE_WORDS, f"lump header cw={hdr_cw} != {NUC_CODE_WORDS}"
+    assert hdr_cc == cc, f"lump header cc={hdr_cc} != {cc}"
 
 
 if __name__ == "__main__":

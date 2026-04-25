@@ -15,7 +15,6 @@ global.window = {
             totalNamespaceWords:  16384,
             namespaceLumpWords:      64,
             threadLumpWords:        256,
-            abstractionLumpWords:   256,
         },
         step2: { lumps: [] },
         step3: { baseNamedNsCount: 17, emptySlotCount: 0 },
