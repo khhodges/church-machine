@@ -105,7 +105,7 @@ const STARTUP_CONFIG_NS_SLOT  = 2;  // NS slot of Startup.Config (Task #396)
 const TUNNEL_NS_SLOT          = 31; // NS slot of the Tunnel abstraction (call-home I/O channel)
 
 // Startup.Config lump layout constants — single source of truth in startup_config_layout.js.
-const {
+var {
     SC_DATA_OFFSET,
     SC_FLAGS_WORD,
     SC_FAULT_COUNT_WORD,
