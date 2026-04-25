@@ -262,9 +262,14 @@ function updateCRDetail() {
         const _earlyClobberWarnings = (_sharedRefResult && _sharedRefResult.clobberWarnings)
             ? _sharedRefResult.clobberWarnings : [];
         const _clobberWordMap = new Map(); // word index → [{cr, prevAliasedAtWord}]
+        const _clobberOriginMap = new Map(); // prevAliasedAtWord → [{cr, clobberAtWord}]
         for (const _cwe of _earlyClobberWarnings) {
             if (!_clobberWordMap.has(_cwe.word)) _clobberWordMap.set(_cwe.word, []);
             _clobberWordMap.get(_cwe.word).push(_cwe);
+            if (typeof _cwe.prevAliasedAtWord === 'number' && _cwe.prevAliasedAtWord >= 0) {
+                if (!_clobberOriginMap.has(_cwe.prevAliasedAtWord)) _clobberOriginMap.set(_cwe.prevAliasedAtWord, []);
+                _clobberOriginMap.get(_cwe.prevAliasedAtWord).push({ cr: _cwe.cr, clobberAtWord: _cwe.word });
+            }
         }
 
         const _brLabelCondNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
@@ -302,6 +307,8 @@ function updateCRDetail() {
             let rowClass = isPC ? 'code-pc-row' : (isBP ? 'code-bp-row' : (isCompiler ? 'code-row-compiler' : ''));
             const _clobberInfos = _clobberWordMap.get(w);
             if (_clobberInfos) rowClass = (rowClass ? rowClass + ' ' : '') + 'code-row-clobber';
+            const _clobberOriginInfos = _clobberOriginMap.get(w);
+            if (_clobberOriginInfos && !_clobberInfos) rowClass = (rowClass ? rowClass + ' ' : '') + 'code-row-clobber-origin';
 
             let decoded;
             if (word === 0) {
@@ -321,7 +328,10 @@ function updateCRDetail() {
             }
             const bpDot    = isBP ? '<span class="bp-dot" title="Breakpoint">&#x25CF;</span> ' : '';
             const _clobberIcon = _clobberInfos
-                ? `<span class="code-clobber-icon" title="${_clobberInfos.map(c => `CR${c.cr} alias clobbered here (set at word\u00A0${c.prevAliasedAtWord})`).join('\n')}">&#x26A0;</span> `
+                ? `<span class="code-clobber-icon" title="${_clobberInfos.map(c => `CR${c.cr} alias clobbered here (alias set at word\u00A0${c.prevAliasedAtWord})`).join('\n')}">&#x26A0;</span> `
+                : '';
+            const _clobberOriginIcon = (_clobberOriginInfos && !_clobberInfos)
+                ? `<span class="code-clobber-origin-icon" title="${_clobberOriginInfos.map(o => `CR${o.cr} alias set here \u2014 clobbered at word\u00A0${o.clobberAtWord}`).join('\n')}">&#x25CC;</span> `
                 : '';
             const decompTd = decomp
                 ? `<td class="code-decompiled ${isCompiler ? 'code-decompiled-compiler' : 'code-decompiled-user'}">${_wrapRegHover(decomp.desc)}</td>`
@@ -330,7 +340,7 @@ function updateCRDetail() {
             codeHtml += `<tr class="${rowClass}" style="cursor:pointer;" title="Double-click to set breakpoint" ondblclick="openBreakPopoverAt(${addr})">`;
             codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
             codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-            codeHtml += `<td class="code-disasm">${bpDot}${_clobberIcon}${decoded}</td>`;
+            codeHtml += `<td class="code-disasm">${bpDot}${_clobberIcon}${_clobberOriginIcon}${decoded}</td>`;
             if (_brArrows.hasBranches) codeHtml += `<td class="br-arrow-col">${_brArrows.html[w]}</td>`;
             codeHtml += decompTd;
             codeHtml += '</tr>';

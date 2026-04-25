@@ -3000,6 +3000,21 @@ a.next-step-link:hover {
     vertical-align: middle;
     text-shadow: 0 0 4px rgba(255, 80, 60, 0.4);
 }
+.code-row-clobber-origin {
+    border-left: 3px dashed #c47a5a;
+    background: rgba(196, 122, 90, 0.04);
+}
+.code-row-clobber-origin:hover {
+    background: rgba(196, 122, 90, 0.10) !important;
+}
+.code-clobber-origin-icon {
+    color: #c47a5a;
+    font-size: 0.8em;
+    cursor: help;
+    margin-right: 0.2em;
+    vertical-align: middle;
+    opacity: 0.8;
+}
 .crd-menu-active-label {
     font-size: 0.82rem;
     font-weight: 700;
