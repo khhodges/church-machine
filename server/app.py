@@ -2090,6 +2090,19 @@ def _load_boot_abstr_lump():
         })
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
+        # Restore author/version from sidecar if one has been written (e.g. after
+        # an authorship edit).  Only these two user-editable fields are merged so
+        # that lump_size / cw / cc always reflect the current boot image.
+        _sidecar03 = os.path.join(os.path.dirname(__file__), 'lumps', '00000003.json')
+        if os.path.isfile(_sidecar03):
+            try:
+                with open(_sidecar03) as _s03f:
+                    _s03 = json.load(_s03f)
+                for _f03 in ('author', 'version'):
+                    if _f03 in _s03:
+                        _BOOT_ABSTR_META[_f03] = _s03[_f03]
+            except Exception:
+                pass
     except Exception as exc:
         print(f'[boot] Failed to extract Boot.Abstr lump: {exc}', flush=True)
 
@@ -2557,8 +2570,20 @@ def patch_lump_meta(token):
 
     lumps_dir    = os.path.join(os.path.dirname(__file__), 'lumps')
     sidecar_path = os.path.join(lumps_dir, f'{key8}.json')
+
+    # Boot.Abstr (token "00000003") is synthetic — no sidecar file exists until the
+    # first authorship edit.  Bootstrap one from _BOOT_ABSTR_META so the PATCH can
+    # proceed and subsequent reads return the persisted author/version.
     if not os.path.isfile(sidecar_path):
-        return jsonify({"error": "Lump sidecar not found"}), 404
+        if key8 == '00000003' and _BOOT_ABSTR_META:
+            seed = dict(_BOOT_ABSTR_META)
+            try:
+                with open(sidecar_path, 'w') as _sf:
+                    json.dump(seed, _sf, indent=2)
+            except Exception as _se:
+                return jsonify({"error": f"Could not create sidecar: {_se}"}), 500
+        else:
+            return jsonify({"error": "Lump sidecar not found"}), 404
 
     payload = request.get_json(force=True, silent=True) or {}
 
@@ -2582,6 +2607,12 @@ def patch_lump_meta(token):
             json.dump(sidecar, fh, indent=2)
     except Exception as exc:
         return jsonify({"error": f"Could not write sidecar: {exc}"}), 500
+
+    # Keep _BOOT_ABSTR_META in sync so /api/lumps/list returns the new values immediately.
+    if key8 == '00000003':
+        for field in ("author", "version"):
+            if field in payload:
+                _BOOT_ABSTR_META[field] = sidecar[field]
 
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     if os.path.isfile(manifest_path):

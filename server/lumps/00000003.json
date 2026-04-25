@@ -1,0 +1,23 @@
+{
+  "token": "00000003",
+  "abstraction": "LED flash",
+  "ns_slot": 3,
+  "lump_size": 256,
+  "cw": 17,
+  "cc": 18,
+  "lump_type": "boot",
+  "language": "ISA",
+  "description": "Boot Abstraction (Boot.Abstr) \u2014 the lump executed by the hardware ROM during boot phases B:01\u2013B:05.  Loads the NS lump, Thread lump, and Startup.Config, then jumps to the default entry (NS slot 4, Salvation).",
+  "methods": [
+    {
+      "name": "Boot",
+      "offset": 0,
+      "length": 17,
+      "description": "Hardware boot sequence entry point.",
+      "inputs": [],
+      "outputs": []
+    }
+  ],
+  "author": "Ken HH",
+  "version": "2"
+}
