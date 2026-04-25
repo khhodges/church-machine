@@ -341,6 +341,7 @@ function updateCRDetail() {
         const _refResult    = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
         const _refSlots     = _refResult ? _refResult.direct   : null;
         const _indSlots     = _refResult ? _refResult.indirect : null;
+        const _clobberWarnings = (_refResult && _refResult.clobberWarnings) ? _refResult.clobberWarnings : [];
         // POLA strip — unreferenced GTs and/or interior null gaps
         { let _pu = 0, _pt = 0, _hasGaps = false;
           // Unreferenced: non-null GTs not in refSlots and not in indSlots; when refSlots===null all non-null are unref
@@ -361,6 +362,18 @@ function updateCRDetail() {
               (_pt > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress after (${_pt} tail slot${_pt !== 1 ? 's' : ''} eligible)</span>` : '') +
               `</div>`;
           } }
+        // Clobber warning strip — aliased CRs overwritten before use
+        if (_clobberWarnings.length > 0) {
+          const _clobberStripId = `clobber-strip-${nsIdx}-a`;
+          const _clobberEntries = _clobberWarnings.map(w =>
+            `<span class="clist-clobber-entry">CR${w.cr} alias (set at word\u00A0${w.prevAliasedAtWord}) clobbered at word\u00A0${w.word}</span>`
+          ).join('');
+          html += `<div class="clist-clobber-strip" id="${_clobberStripId}">` +
+            `<span class="clist-clobber-label">CLOBBER</span>` +
+            `<span class="clist-clobber-body">${_clobberEntries}</span>` +
+            `<button class="clist-clobber-dismiss" onclick="var el=document.getElementById('${_clobberStripId}');if(el)el.style.display='none';" title="Dismiss">\u00D7</button>` +
+            `</div>`;
+        }
         html += '<table class="cr-table"><thead><tr>';
         html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Pet Name</th><th></th>';
         html += '</tr></thead><tbody>';
@@ -418,6 +431,7 @@ function updateCRDetail() {
         const _ref2Result    = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
         const _ref2Slots     = _ref2Result ? _ref2Result.direct   : null;
         const _ind2Slots     = _ref2Result ? _ref2Result.indirect : null;
+        const _clobberWarnings2 = (_ref2Result && _ref2Result.clobberWarnings) ? _ref2Result.clobberWarnings : [];
         // POLA strip — unreferenced GTs and/or interior null gaps
         { let _pu2 = 0, _pt2 = 0, _hasGaps2 = false;
           // Unreferenced: non-null GTs not in ref2Slots and not in ind2Slots; when ref2Slots===null all non-null are unref
@@ -438,6 +452,18 @@ function updateCRDetail() {
               (_pt2 > 0 ? `<span class="clist-pola-compress-hint">\u2192 enables \u2913\u202FCompress after (${_pt2} tail slot${_pt2 !== 1 ? 's' : ''} eligible)</span>` : '') +
               `</div>`;
           } }
+        // Clobber warning strip — aliased CRs overwritten before use
+        if (_clobberWarnings2.length > 0) {
+          const _clobberStripId2 = `clobber-strip-${nsIdx}-b`;
+          const _clobberEntries2 = _clobberWarnings2.map(w =>
+            `<span class="clist-clobber-entry">CR${w.cr} alias (set at word\u00A0${w.prevAliasedAtWord}) clobbered at word\u00A0${w.word}</span>`
+          ).join('');
+          html += `<div class="clist-clobber-strip" id="${_clobberStripId2}">` +
+            `<span class="clist-clobber-label">CLOBBER</span>` +
+            `<span class="clist-clobber-body">${_clobberEntries2}</span>` +
+            `<button class="clist-clobber-dismiss" onclick="var el=document.getElementById('${_clobberStripId2}');if(el)el.style.display='none';" title="Dismiss">\u00D7</button>` +
+            `</div>`;
+        }
         html += '<table class="cr-table"><thead><tr>';
         html += '<th>Slot</th><th>GT Word</th><th>NS Idx</th><th>Type</th><th>Perms</th><th>Pet Name</th><th></th>';
         html += '</tr></thead><tbody>';

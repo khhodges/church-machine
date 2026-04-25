@@ -2938,6 +2938,53 @@ a.next-step-link:hover {
     font-size: 0.73rem;
     font-style: italic;
 }
+.clist-clobber-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.4rem 0.6rem;
+    margin-bottom: 0.5rem;
+    background: rgba(255,80,60,0.07);
+    border: 1px solid rgba(255,80,60,0.28);
+    border-radius: 5px;
+    font-size: 0.78rem;
+}
+.clist-clobber-label {
+    font-weight: 700;
+    color: #ff6b55;
+    letter-spacing: 0.04em;
+    font-size: 0.7rem;
+    background: rgba(255,80,60,0.15);
+    border: 1px solid rgba(255,80,60,0.38);
+    border-radius: 3px;
+    padding: 0.1rem 0.35rem;
+    flex-shrink: 0;
+    margin-top: 0.05rem;
+}
+.clist-clobber-body {
+    flex: 1;
+    min-width: 10rem;
+    color: #c07870;
+}
+.clist-clobber-entry {
+    display: block;
+    line-height: 1.5;
+}
+.clist-clobber-dismiss {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0 0.2rem;
+    line-height: 1;
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+.clist-clobber-dismiss:hover {
+    color: #ccc;
+}
 .crd-menu-active-label {
     font-size: 0.82rem;
     font-weight: 700;
