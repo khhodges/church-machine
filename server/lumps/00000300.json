@@ -6,7 +6,7 @@
   "typ": 0,
   "content_type": "code",
   "cw": 17,
-  "cc": 9,
+  "cc": 1,
   "profile": "IoT",
   "language": "unknown",
   "author": "",
@@ -26,7 +26,7 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-04-25T12:28:38.175479Z",
+    "built_at": "2026-04-25T12:50:19.459043Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [

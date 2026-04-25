@@ -340,15 +340,17 @@ function updateCRDetail() {
         const _refCodeCount = (_clHdr.valid && _clHdr.cw > 0) ? _clHdr.cw : 0;
         const _refSlots     = _refCodeCount > 0 ? _computeReferencedCListSlots(_refCodeBase, _refCodeCount) : null;
         // POLA strip — unreferenced GTs and/or interior null gaps
-        { let _pu = 0, _pt = 0, _hasGaps = false, _seenNonNull = false;
-          for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && !_seenNonNull) _seenNonNull = true; if ((_gw === 0 || (_refSlots && !_refSlots.has(_i))) && !_seenNonNull) _pt++; else if (_gw !== 0 && _seenNonNull) {} }
-          // recompute _pt and _hasGaps cleanly
-          _seenNonNull = false; _pt = 0;
-          for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; const _isNull = _gw === 0; const _isUnref = _gw !== 0 && _refSlots && !_refSlots.has(_i); if (!_seenNonNull && (_isNull || _isUnref)) _pt++; else { _seenNonNull = true; } }
-          // gap detection: a null between two non-null slots
-          let _sawNonNull = false;
-          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0) _sawNonNull = true; else if (_sawNonNull) { _hasGaps = true; break; } }
-          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && _refSlots && !_refSlots.has(_i)) _pu++; }
+        { let _pu = 0, _pt = 0, _hasGaps = false;
+          // Unreferenced: non-null GTs not in refSlots; when refSlots===null (no code) all non-null are unref
+          for (let _i = 0; _i < _clistCount; _i++) { const _gw = sim.memory[_clistBase + _i] >>> 0; if (_gw !== 0 && (_refSlots === null || !_refSlots.has(_i))) _pu++; }
+          // Interior gap: null slot at position < index of last non-null slot
+          let _lastNN = -1;
+          for (let _i = _clistCount - 1; _i >= 0; _i--) { if ((sim.memory[_clistBase + _i] >>> 0) !== 0) { _lastNN = _i; break; } }
+          for (let _i = 0; _i < _lastNN; _i++) { if ((sim.memory[_clistBase + _i] >>> 0) === 0) { _hasGaps = true; break; } }
+          // Eligible tail slots (null or unref, contiguous from end)
+          { let _seenNN = false;
+            for (let _i = _clistCount - 1; _i >= 0; _i--) { const _gw = sim.memory[_clistBase + _i] >>> 0; const _nullOrUnref = _gw === 0 || (_refSlots === null || !_refSlots.has(_i)); if (!_seenNN && _nullOrUnref) _pt++; else _seenNN = true; }
+          }
           if (_pu > 0 || _hasGaps) {
             const _polaMsg = [_pu > 0 ? `${_pu} unreferenced GT slot${_pu !== 1 ? 's' : ''}` : '', _hasGaps ? 'interior null gaps' : ''].filter(Boolean).join(', ');
             html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
@@ -411,11 +413,16 @@ function updateCRDetail() {
         const _ref2Slots     = _ref2CodeCount > 0 ? _computeReferencedCListSlots(_ref2CodeBase, _ref2CodeCount) : null;
         // POLA strip — unreferenced GTs and/or interior null gaps
         { let _pu2 = 0, _pt2 = 0, _hasGaps2 = false;
-          let _seenNN2 = false; _pt2 = 0;
-          for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; const _isNull2 = _gw === 0; const _isUnref2 = _gw !== 0 && _ref2Slots && !_ref2Slots.has(_i); if (!_seenNN2 && (_isNull2 || _isUnref2)) _pt2++; else _seenNN2 = true; }
-          let _sawNN2 = false;
-          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0) _sawNN2 = true; else if (_sawNN2) { _hasGaps2 = true; break; } }
-          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0 && _ref2Slots && !_ref2Slots.has(_i)) _pu2++; }
+          // Unreferenced: non-null GTs not in ref2Slots; when ref2Slots===null all non-null are unref
+          for (let _i = 0; _i < _lumpHdr.cc; _i++) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; if (_gw !== 0 && (_ref2Slots === null || !_ref2Slots.has(_i))) _pu2++; }
+          // Interior gap: null slot at position < index of last non-null slot
+          let _lastNN2 = -1;
+          for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { if ((sim.memory[_lumpClistBase + _i] >>> 0) !== 0) { _lastNN2 = _i; break; } }
+          for (let _i = 0; _i < _lastNN2; _i++) { if ((sim.memory[_lumpClistBase + _i] >>> 0) === 0) { _hasGaps2 = true; break; } }
+          // Eligible tail slots (null or unref, contiguous from end)
+          { let _seenNN2 = false;
+            for (let _i = _lumpHdr.cc - 1; _i >= 0; _i--) { const _gw = sim.memory[_lumpClistBase + _i] >>> 0; const _nullOrUnref2 = _gw === 0 || (_ref2Slots === null || !_ref2Slots.has(_i)); if (!_seenNN2 && _nullOrUnref2) _pt2++; else _seenNN2 = true; }
+          }
           if (_pu2 > 0 || _hasGaps2) {
             const _polaMsg2 = [_pu2 > 0 ? `${_pu2} unreferenced GT slot${_pu2 !== 1 ? 's' : ''}` : '', _hasGaps2 ? 'interior null gaps' : ''].filter(Boolean).join(', ');
             html += `<div class="clist-pola-strip"><span class="clist-pola-label">POLA</span>` +
