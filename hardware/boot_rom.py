@@ -3,6 +3,19 @@ from amaranth import *
 from .hw_types import *
 from .integrity32 import integrity32
 
+# Startup.Config lump layout constants — imported from the single source of truth.
+# JS mirror: simulator/startup_config_layout.js
+try:
+    from startup_config_layout import (
+        SC_DATA_OFFSET, SC_LAST_DATA_KEY, SC_OOB_KEY,
+        SC_FLAGS_WORD, SC_FAULT_COUNT_WORD,
+    )
+except ImportError:
+    from server.startup_config_layout import (
+        SC_DATA_OFFSET, SC_LAST_DATA_KEY, SC_OOB_KEY,
+        SC_FLAGS_WORD, SC_FAULT_COUNT_WORD,
+    )
+
 
 def encode_church(opcode, cond=CondCode.AL, cr_dst=0, cr_src=0, imm=0):
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23) | \
@@ -145,8 +158,8 @@ while len(BOOT_PROGRAM) < 256:
 # c-list[0] defaults to Salvation E-GT (NS slot 4); changeable via SetEntry().
 # Boot path: Boot.Abstr → CALL Startup.Config → CALL <configured entry>.
 #
-# Must stay in sync with server/boot_image.py STARTUP_CONFIG_WORDS and
-# simulator.js _initNamespaceTable STARTUP_CONFIG_WORDS.
+# Must stay in sync with server/startup_config_layout.py (SC_DATA_OFFSET et al.)
+# and its JS mirror simulator/startup_config_layout.js.
 # ---------------------------------------------------------------------------
 STARTUP_CONFIG_PROGRAM = [
     encode_church(ChurchOpcode.LOAD,  CondCode.AL, cr_dst=0, cr_src=6, imm=0),  # LOAD  AL, CR0, CR6[0]
@@ -367,8 +380,8 @@ FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 0]  = _STARTUP_CONFIG_LUMP_HEADER
 FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 1]  = STARTUP_CONFIG_PROGRAM[0]   # LOAD  AL, CR0, CR6[0]
 FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 2]  = STARTUP_CONFIG_PROGRAM[1]   # TPERM AL, CR0, #E
 FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 3]  = STARTUP_CONFIG_PROGRAM[2]   # CALL  AL, CR0, CR0
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 4]  = _STARTUP_CONFIG_DEFAULT_ENTRY  # data[0] = entry_slot = 4
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 5]  = _STARTUP_CONFIG_VERSION        # data[1] = config_version
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + SC_DATA_OFFSET]      = _STARTUP_CONFIG_DEFAULT_ENTRY  # data[0] = entry_slot = 4
+FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + SC_DATA_OFFSET + 1]  = _STARTUP_CONFIG_VERSION        # data[1] = config_version
 # words 6-62 remain zero (flags=0, fault_count=0, user params all zero)
 FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 63] = _STARTUP_CONFIG_SALVATION_E_GT  # c-list[0] = Salvation E-GT
 
