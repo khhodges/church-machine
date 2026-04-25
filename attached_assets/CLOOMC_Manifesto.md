@@ -5,7 +5,7 @@
 
 ### Preamble
 
-The binary computer is frozen in time. Born of Cold War necessity and never unfrozen, it carries architectural wounds that no patch, firewall, or antivirus can heal. Its shared virtual memory is a public square where any program — trivial game or hostile malware — inherits the full authority of the logged-on user by default, simply by existing. Cybercrime, ransomware, zero-day exploits, and the spectre of an AI breakout are not accidents. They are the predictable consequences of a machine design that was never mathematically sound to begin with. Problems will grow. AI will cause damage beyond our imagination. The flawed design is outside its working limits.
+The binary computer is frozen in time. Born of Cold War necessity and never unfrozen, it carries architectural wounds that no patch, firewall, or antivirus can heal. Its shared virtual memory is a public square where any program — trivial game or hostile malware — inherits the full authority of the logged-on user by default, simply by existing. Cybercrime, ransomware, zero-day exploits, and the spectre of an AI breakout are not accidents. They are the predictable consequences of a machine design that was never mathematically sound to begin with. Problems will grow. AI will cause damage beyond our imagination. The outdated design is operating outside its working limits.
 
 We do not propose another patch.
 
