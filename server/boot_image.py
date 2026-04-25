@@ -54,6 +54,13 @@ BOOT_ABSTR_NS_SLOT   = 3   # NS slot holding the Boot Abstraction lump (Boot.Abs
 STARTUP_CONFIG_NS_SLOT = 2   # NS slot holding Startup.Config (Task #396)
 STARTUP_CONFIG_VERSION = 0x00000001  # data[1] schema version — bumped on breaking data-region changes
 
+# Startup.Config lump layout constants — imported from the single source of truth.
+# JS mirror: simulator/startup_config_layout.js
+try:
+    from startup_config_layout import SC_DATA_OFFSET
+except ImportError:
+    from server.startup_config_layout import SC_DATA_OFFSET
+
 # Mandatory NS slots — every valid boot image must have a non-zero entry here.
 # All four foundational slots (Boot.NS, Boot.Thread, Startup.Config, Boot.Abstr)
 # are required since Task #396; Startup.Config joins the foundational quad.
@@ -641,9 +648,9 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # Code region (words 1-3)
     for i, word in enumerate(STARTUP_CONFIG_WORDS):
         mem[startup_config_loc + 1 + i] = word & 0xFFFFFFFF
-    # Data region starts at word 4 (shifted +3 from old data-only layout)
-    mem[startup_config_loc + 4] = 4                              # data[0]: entry_slot = 4 (Salvation)
-    mem[startup_config_loc + 5] = STARTUP_CONFIG_VERSION         # data[1]: config_version
+    # Data region starts at SC_DATA_OFFSET (shifted +3 from old data-only layout)
+    mem[startup_config_loc + SC_DATA_OFFSET]     = 4                      # data[0]: entry_slot = 4 (Salvation)
+    mem[startup_config_loc + SC_DATA_OFFSET + 1] = STARTUP_CONFIG_VERSION # data[1]: config_version
     # data[2..58] remain 0 (mem is zero-initialized)
     # C-list slot 0 (word 63): Salvation E-GT — the default configured entry
     # clist_gts[4] is the Salvation E-GT built by the NS loop above (NS slot 4, E perm).

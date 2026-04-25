@@ -104,6 +104,15 @@ const BOOT_ABSTR_NS_SLOT      = 3;  // NS slot of the Boot Abstraction lump (Boo
 const STARTUP_CONFIG_NS_SLOT  = 2;  // NS slot of Startup.Config (Task #396)
 const TUNNEL_NS_SLOT          = 31; // NS slot of the Tunnel abstraction (call-home I/O channel)
 
+// Startup.Config lump layout constants — single source of truth in startup_config_layout.js.
+const {
+    SC_DATA_OFFSET,
+    SC_FLAGS_WORD,
+    SC_FAULT_COUNT_WORD,
+} = (typeof require !== 'undefined')
+    ? require('./startup_config_layout.js')
+    : (window.StartupConfigLayout || {});
+
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 // (Task #237). Written into Boot.Abstr lump code region during _initNamespaceTable()
 // so the binary matches the CLOOMC listing displayed in the code view.
@@ -1105,9 +1114,9 @@ class ChurchSimulator {
         for (let i = 0; i < STARTUP_CONFIG_WORDS.length; i++) {
             this.memory[startupConfigLoc + 1 + i] = STARTUP_CONFIG_WORDS[i] >>> 0;
         }
-        // Data region starts at word 4 (shifted +3 from old data-only layout)
-        this.memory[startupConfigLoc + 4] = STARTUP_CONFIG_DEFAULT_ENTRY;  // data[0]: entry_slot
-        this.memory[startupConfigLoc + 5] = STARTUP_CONFIG_VERSION_INIT;   // data[1]: config_version
+        // Data region starts at SC_DATA_OFFSET (shifted +3 from old data-only layout)
+        this.memory[startupConfigLoc + SC_DATA_OFFSET]     = STARTUP_CONFIG_DEFAULT_ENTRY;  // data[0]: entry_slot
+        this.memory[startupConfigLoc + SC_DATA_OFFSET + 1] = STARTUP_CONFIG_VERSION_INIT;   // data[1]: config_version
         // data[2..58] remain 0 (memory is zero-initialized)
         // C-list slot 0 (word 63): Salvation E-GT — the default configured entry
         this.memory[startupConfigLoc + 63] = clistGTs[4];   // clistGTs[4] = Salvation E-GT (NS slot 4)

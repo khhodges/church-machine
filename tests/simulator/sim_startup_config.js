@@ -38,6 +38,12 @@ global.window = {
 const ChurchSimulator    = require('../../simulator/simulator.js');
 const AbstractionRegistry = require('../../simulator/abstractions.js');
 const SystemAbstractions  = require('../../simulator/system_abstractions.js');
+const {
+    SC_LAST_DATA_KEY,
+    SC_OOB_KEY,
+    SC_FLAGS_WORD,
+    SC_FAULT_COUNT_WORD,
+} = require('../../simulator/startup_config_layout.js');
 
 const sim      = new ChurchSimulator();
 const registry = new AbstractionRegistry();
@@ -81,16 +87,16 @@ out.ReadParam_key0 = { result: rp0.result };
 const rp1 = call('ReadParam', { dr1: 1 });
 out.ReadParam_key1 = { result: rp1.result };
 
-// ReadParam(58) — last valid key (data region: words 4-62, c-list at 63 → keys 0..58)
-const rp62 = call('ReadParam', { dr1: 58 });
+// ReadParam(SC_LAST_DATA_KEY) — last valid key (data region: words 4-62, c-list at 63 → keys 0..SC_LAST_DATA_KEY)
+const rp62 = call('ReadParam', { dr1: SC_LAST_DATA_KEY });
 out.ReadParam_key62 = { result: rp62.result };
 
-// ReadParam(59) — first OOB key → 0xFFFFFFFF
-const rpOob = call('ReadParam', { dr1: 59 });
+// ReadParam(SC_OOB_KEY) — first OOB key → 0xFFFFFFFF
+const rpOob = call('ReadParam', { dr1: SC_OOB_KEY });
 out.ReadParam_oob = { result: rpOob.result };
 
-// ReadParam(60) — also OOB → 0xFFFFFFFF
-const rpOob64 = call('ReadParam', { dr1: 60 });
+// ReadParam(SC_OOB_KEY + 1) — also OOB → 0xFFFFFFFF
+const rpOob64 = call('ReadParam', { dr1: SC_OOB_KEY + 1 });
 out.ReadParam_oob64 = { result: rpOob64.result };
 
 // WriteParam(5, 0xABCD) — ok
@@ -101,26 +107,26 @@ out.WriteParam_ok = { result: wp.result };
 const rp5 = call('ReadParam', { dr1: 5 });
 out.ReadParam_key5 = { result: rp5.result };
 
-// WriteParam(58, 0x1234) — last valid writable key (data region: keys 0..58)
-const wp62 = call('WriteParam', { dr1: 58, dr2: 0x1234 });
+// WriteParam(SC_LAST_DATA_KEY, 0x1234) — last valid writable key (data region: keys 0..SC_LAST_DATA_KEY)
+const wp62 = call('WriteParam', { dr1: SC_LAST_DATA_KEY, dr2: 0x1234 });
 out.WriteParam_key62 = { result: wp62.result };
 
 // WriteParam(1, 0) — READ_ONLY (key 0..2 are protected)
 const wpRo = call('WriteParam', { dr1: 1, dr2: 0 });
 out.WriteParam_ro = { result: wpRo.result };
 
-// WriteParam(59, 0xDEAD) — KEY_OOB (data region is keys 0..58; key 59 is past end)
+// WriteParam(SC_OOB_KEY, 0xDEAD) — KEY_OOB (data region is keys 0..SC_LAST_DATA_KEY; SC_OOB_KEY is past end)
 // Record Boot.Abstr header BEFORE, attempt write, verify header unchanged.
 const oobBootAbstrBase = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
 const oobBootAbstrLoc  = sim.memory[oobBootAbstrBase] >>> 0;
 const bootAbstrHdrBefore = sim.memory[oobBootAbstrLoc] >>> 0;
-const wpOob = call('WriteParam', { dr1: 59, dr2: 0xDEADBEEF });
+const wpOob = call('WriteParam', { dr1: SC_OOB_KEY, dr2: 0xDEADBEEF });
 const bootAbstrHdrAfter  = sim.memory[oobBootAbstrLoc] >>> 0;
 out.WriteParam_oob = { result: wpOob.result };
 out.WriteParam_oob_boot_abstr_hdr_unchanged = (bootAbstrHdrBefore === bootAbstrHdrAfter);
 
-// WriteParam(60, 0) — also KEY_OOB
-const wpOob64 = call('WriteParam', { dr1: 60, dr2: 0 });
+// WriteParam(SC_OOB_KEY + 1, 0) — also KEY_OOB
+const wpOob64 = call('WriteParam', { dr1: SC_OOB_KEY + 1, dr2: 0 });
 out.WriteParam_oob64 = { result: wpOob64.result };
 
 // Validate — all four foundational slots should be non-null → 0xF
@@ -151,17 +157,17 @@ out.auditLog_entry_result  = scAuditEntry ? (scAuditEntry.result || '') : '';
 // Execute with BAD_FLAGS — fault_count increments and Execute returns !ok
 // We can't WriteParam(2) directly (READ_ONLY), so we patch memory directly via lumpLoc.
 // Lump layout: word 0 = header, words 1-3 = code, word 4 = data[0], word 5 = data[1],
-//              word 6 = data[2] (flags), word 7 = data[3] (fault_count).
+//              SC_FLAGS_WORD = data[2] (flags), SC_FAULT_COUNT_WORD = data[3] (fault_count).
 const sc_loc = sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] >>> 0;
-const prevFaultCount = sim.memory[sc_loc + 7]; // data[3] = lump[7]
-// Corrupt flags (lump[6] = data[2]) in simulator memory to trigger BAD_FLAGS
-sim.memory[sc_loc + 6] = 0xFF; // data[2] = flags = 0xFF (non-zero → BAD_FLAGS)
+const prevFaultCount = sim.memory[sc_loc + SC_FAULT_COUNT_WORD]; // data[3] = lump[SC_FAULT_COUNT_WORD]
+// Corrupt flags (lump[SC_FLAGS_WORD] = data[2]) in simulator memory to trigger BAD_FLAGS
+sim.memory[sc_loc + SC_FLAGS_WORD] = 0xFF; // data[2] = flags = 0xFF (non-zero → BAD_FLAGS)
 const execFault = call('Execute', {});
-const newFaultCount = sim.memory[sc_loc + 7];
+const newFaultCount = sim.memory[sc_loc + SC_FAULT_COUNT_WORD];
 out.Execute_fault_bad_flags = { ok: execFault.ok, result: execFault.result };
 out.Execute_fault_count_incremented = (newFaultCount === prevFaultCount + 1);
 // Restore: reset flags to 0
-sim.memory[sc_loc + 6] = 0;
+sim.memory[sc_loc + SC_FLAGS_WORD] = 0;
 
 // NS label for slot 2
 out.nsLabel2 = sim.nsLabels[2] || '';

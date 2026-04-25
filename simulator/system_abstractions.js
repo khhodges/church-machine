@@ -84,6 +84,16 @@
 //
 // =============================================================================
 
+const {
+    SC_DATA_OFFSET,
+    SC_LAST_DATA_KEY,
+    SC_OOB_KEY,
+    SC_FLAGS_WORD,
+    SC_FAULT_COUNT_WORD,
+} = (typeof require !== 'undefined')
+    ? require('./startup_config_layout.js')
+    : (window.StartupConfigLayout || {});
+
 function nextPow2(n) {
     if (n <= 0) return 1;
     n = n - 1;
@@ -147,12 +157,12 @@ class SystemAbstractions {
             return sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] >>> 0;
         }
         function getData(sim, key) {
-            // Data region starts at word 4 (after header word 0 and 3 code words 1-3).
-            return sim.memory[lumpLoc(sim) + 4 + key] >>> 0;
+            // Data region starts at SC_DATA_OFFSET (after header word 0 and 3 code words 1-3).
+            return sim.memory[lumpLoc(sim) + SC_DATA_OFFSET + key] >>> 0;
         }
         function setData(sim, key, value) {
-            // Data region starts at word 4 (after header word 0 and 3 code words 1-3).
-            sim.memory[lumpLoc(sim) + 4 + key] = value >>> 0;
+            // Data region starts at SC_DATA_OFFSET (after header word 0 and 3 code words 1-3).
+            sim.memory[lumpLoc(sim) + SC_DATA_OFFSET + key] = value >>> 0;
         }
         function bumpFaultCount(sim) {
             const fc = (getData(sim, 3) + 1) >>> 0;
@@ -274,8 +284,8 @@ class SystemAbstractions {
         this.registry.bindMethod(2, 'ReadParam', function(sim, args) {
             const key = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
             // 64-word lump: header@0, code@1-3, data@4-62, c-list@63.
-            // Data region = 59 words → keys 0..58.  Key 59+ would reach c-list or beyond.
-            if (key >= 59) {
+            // Data region = 59 words → keys 0..SC_LAST_DATA_KEY.  SC_OOB_KEY+ reaches c-list or beyond.
+            if (key >= SC_OOB_KEY) {
                 return { ok: true, result: 0xFFFFFFFF,
                          message: 'Startup.Config.ReadParam: KEY_OOB' };
             }
@@ -292,8 +302,8 @@ class SystemAbstractions {
                          message: `Startup.Config.WriteParam: READ_ONLY (key ${key})` };
             }
             // 64-word lump: header@0, code@1-3, data@4-62, c-list@63.
-            // Data region = 59 words → keys 0..58.  Key 59+ would corrupt c-list or beyond.
-            if (key >= 59) {
+            // Data region = 59 words → keys 0..SC_LAST_DATA_KEY.  SC_OOB_KEY+ would corrupt c-list.
+            if (key >= SC_OOB_KEY) {
                 return { ok: false, result: 1,
                          message: 'Startup.Config.WriteParam: KEY_OOB' };
             }
