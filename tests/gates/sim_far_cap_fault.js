@@ -22,57 +22,55 @@ const path = require('path');
 const ERRORS = [];
 function fail(msg) { ERRORS.push(msg); }
 
-// ─── Test 1: LOAD_NUC fires F_BIT when boot-entry NS slot has F=1 ────────────
+// ─── Test 1: NUC_CLIST fires F_BIT when boot-entry NS slot has F=1 ──────────
 
 (function testLoadNucFBitFault() {
     const sim = new ChurchSimulator();
 
-    // Drive boot steps 0–2.  Steps 3 and 4 (INIT_ABSTR / LOAD_NUC) always
-    // execute together as an indivisible pair in a single _bootStep() call —
-    // case 3 falls through into case 4 with no intervening break.  We stop
-    // just before that combined call (bootStep === 3) so we can inject F=1
-    // into the boot-entry slot before either step sees it.
+    // Drive boot steps 0–5 (B:00 through B:05 INIT_ABSTR).  We stop just
+    // before B:06 NUC_CLIST (bootStep === 6) so we can inject F=1 into the
+    // boot-entry slot before NUC_CLIST sees it.
     //
-    // Step 3's mLoad is called with requiredPerm=null and M-elevation, so it
-    // does not fail on the F-bit.  Step 4 then performs an explicit
+    // B:05 INIT_ABSTR uses M-elevation (requiredPerm=null) and does not check
+    // the F-bit itself.  B:06 NUC_CLIST then performs an explicit
     // parseNSWord1(...).f === 1 check and fires the F_BIT fault.
     let iterations = 0;
-    while (!sim.bootComplete && !sim.halted && sim.bootStep < 3 && iterations < 200) {
+    while (!sim.bootComplete && !sim.halted && sim.bootStep < 6 && iterations < 200) {
         sim._bootStep();
         iterations++;
     }
 
     if (sim.halted) {
-        fail('Simulator halted during boot steps 0–2: ' +
+        fail('Simulator halted during boot steps 0–5: ' +
              (sim.faultLog && sim.faultLog.length
                  ? sim.faultLog[sim.faultLog.length - 1].message
                  : '(no fault message)'));
         return;
     }
     if (sim.bootComplete) {
-        fail('Boot completed before reaching step 3 — unexpected');
+        fail('Boot completed before reaching step 6 — unexpected');
         return;
     }
-    if (sim.bootStep !== 3) {
-        fail(`Expected bootStep=3 after driving steps 0–2, got ${sim.bootStep}`);
+    if (sim.bootStep !== 6) {
+        fail(`Expected bootStep=6 after driving steps 0–5, got ${sim.bootStep}`);
         return;
     }
 
     // Inject F=1 (bit 30) into the boot-entry slot's word1.
     // The CRC seal covers only (word0_location, limit17) — bit 30 is outside
-    // that range — so the seal remains valid and mLoad in step 3 passes.
-    // The explicit F-bit check inside step 4 (LOAD_NUC) then fires the fault.
+    // that range — so the seal remains valid and mLoad in B:06 passes the seal
+    // check.  The explicit F-bit check inside B:06 NUC_CLIST then fires the fault.
     const slotIdx  = sim.bootEntrySlot;
     const memBase  = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
     sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
 
-    // Run step 4: LOAD_NUC should now fault with F_BIT.
+    // Run B:06 NUC_CLIST: should now fault with F_BIT.
     const faultsBefore = sim.faultLog.length;
     sim._bootStep();
     const newFaults = sim.faultLog.slice(faultsBefore);
 
     if (newFaults.length === 0) {
-        fail('No fault fired after LOAD_NUC with F=1 in boot-entry NS slot');
+        fail('No fault fired after NUC_CLIST with F=1 in boot-entry NS slot');
         return;
     }
 
@@ -83,7 +81,7 @@ function fail(msg) { ERRORS.push(msg); }
         return;
     }
 
-    console.log('[PASS] LOAD_NUC F_BIT fault fired: "' + fBitFault.message + '"');
+    console.log('[PASS] NUC_CLIST F_BIT fault fired: "' + fBitFault.message + '"');
 })();
 
 // ─── Test 2: _FAULT_CODES['F_BIT'] === 0x0F in app.js ───────────────────────

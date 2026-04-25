@@ -143,8 +143,8 @@ def test_boot_image_startup_config_entry_slot_default():
     cfg = _default_cfg()
     words = _image_words(cfg)
     loc = _slot2_loc(words, cfg)
-    # lump word 0 = header, lump word 1 = data[0] = entry_slot
-    entry_slot = words[loc + 1]
+    # lump layout: word 0 = header, words 1-3 = code region, word 4 = data[0] = entry_slot
+    entry_slot = words[loc + 4]
     assert entry_slot == 4, f"entry_slot default should be 4, got {entry_slot}"
 
 
@@ -153,7 +153,7 @@ def test_boot_image_startup_config_version_word():
     cfg = _default_cfg()
     words = _image_words(cfg)
     loc = _slot2_loc(words, cfg)
-    config_version = words[loc + 2]
+    config_version = words[loc + 5]
     assert config_version == STARTUP_CONFIG_VERSION
 
 
@@ -162,7 +162,7 @@ def test_boot_image_startup_config_flags_zero():
     cfg = _default_cfg()
     words = _image_words(cfg)
     loc = _slot2_loc(words, cfg)
-    flags = words[loc + 3]
+    flags = words[loc + 6]
     assert flags == 0
 
 
@@ -171,7 +171,7 @@ def test_boot_image_startup_config_fault_count_zero():
     cfg = _default_cfg()
     words = _image_words(cfg)
     loc = _slot2_loc(words, cfg)
-    fault_count = words[loc + 4]
+    fault_count = words[loc + 7]
     assert fault_count == 0
 
 
@@ -239,17 +239,17 @@ def test_method_ReadParam_config_version():
 
 
 def test_method_ReadParam_last_valid_key():
-    """ReadParam(62) returns a non-OOB value — key 62 is valid (default 0)."""
+    """ReadParam(58) returns a non-OOB value — key 58 is the last valid data key."""
     assert _h()["ReadParam_key62"]["result"] != 0xFFFFFFFF
 
 
 def test_method_ReadParam_oob_key63():
-    """ReadParam(63) returns 0xFFFFFFFF — key 63 is past the 64-word lump boundary."""
+    """ReadParam(59) returns 0xFFFFFFFF — key 59 is past the data region boundary."""
     assert _h()["ReadParam_oob"]["result"] == 0xFFFFFFFF
 
 
 def test_method_ReadParam_oob_key64():
-    """ReadParam(64) also returns 0xFFFFFFFF (deeply OOB)."""
+    """ReadParam(60) also returns 0xFFFFFFFF (deeply OOB)."""
     assert _h()["ReadParam_oob64"]["result"] == 0xFFFFFFFF
 
 
@@ -260,7 +260,7 @@ def test_method_WriteParam_and_roundtrip():
 
 
 def test_method_WriteParam_last_valid_key():
-    """WriteParam(62, 0x1234) returns 0=ok (key 62 is the last writable key)."""
+    """WriteParam(58, 0x1234) returns 0=ok (key 58 is the last writable key)."""
     assert _h()["WriteParam_key62"]["result"] == 0
 
 
@@ -270,17 +270,17 @@ def test_method_WriteParam_readonly():
 
 
 def test_method_WriteParam_oob_key63():
-    """WriteParam(63, ...) returns 1=KEY_OOB — must not write past the lump end."""
+    """WriteParam(59, ...) returns 1=KEY_OOB — must not write past the data region."""
     assert _h()["WriteParam_oob"]["result"] == 1
 
 
 def test_method_WriteParam_oob_does_not_corrupt_boot_abstr():
-    """WriteParam(63, 0xDEADBEEF) must not overwrite Boot.Abstr's lump header."""
+    """WriteParam(59, 0xDEADBEEF) must not overwrite Boot.Abstr's lump header."""
     assert _h()["WriteParam_oob_boot_abstr_hdr_unchanged"] is True
 
 
 def test_method_WriteParam_oob_key64():
-    """WriteParam(64, ...) also returns 1=KEY_OOB (deeply OOB)."""
+    """WriteParam(60, ...) also returns 1=KEY_OOB (deeply OOB)."""
     assert _h()["WriteParam_oob64"]["result"] == 1
 
 
@@ -417,8 +417,10 @@ const registry = new AbstractionRegistry();
 const sys = new SystemAbstractions(registry);
 sim.initAbstractions(registry, sys, null);
 // Corrupt the flags word (data[2]) in the Startup.Config lump so Execute() fails BAD_FLAGS.
+// Lump layout: word 0 = header, words 1-3 = code, word 4 = data[0], word 5 = data[1],
+//              word 6 = data[2] (flags), word 7 = data[3] (fault_count).
 const scLoc = sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS];
-sim.memory[scLoc + 3] = 0xDEAD;  // data[2] = flags (must be 0)
+sim.memory[scLoc + 6] = 0xDEAD;  // data[2] = flags (must be 0)
 // Drive boot — B:05a should detect failure and halt.
 for (let i = 0; i < 32 && !sim.bootComplete && !sim.halted; i++) sim._bootStep();
 const out = {

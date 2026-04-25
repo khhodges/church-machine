@@ -289,8 +289,8 @@ def test_pipeline_output_stage_labels_for_ns_type_entries():
     )
 
     b04_stage = ns_type_pipeline[1].get("stage", "")
-    assert b04_stage == "LOAD_NUC \u2013 NS.Type", (
-        f"Expected second NS.Type pipeline entry stage='LOAD_NUC \u2013 NS.Type' (B:04); "
+    assert b04_stage == "NUC_CLIST \u2013 NS.Type", (
+        f"Expected second NS.Type pipeline entry stage='NUC_CLIST \u2013 NS.Type' (B:06); "
         f"got {b04_stage!r}"
     )
 
