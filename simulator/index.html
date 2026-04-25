@@ -117,6 +117,9 @@
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Hardware</div>
+                                <button class="ham-item fpga-conn-btn" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">&#x26AC; FPGA</button>
+                                <button class="ham-item fpga-conn-btn fpga-bridge-btn" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">&#x1F310; Bridge</button>
+                                <button class="ham-item fpga-conn-btn fpga-readbram-btn" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">&#x1F4C4; BRAM</button>
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k" onclick="setSelectedBoard('tang-nano-20k');switchView('builder');closeHamburger()">Tang Nano 20K</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K IoT</button>
@@ -174,9 +177,6 @@
                     </div>
                     <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
                     <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
-                    <button class="btn fpga-conn-btn" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">&#x26AC; FPGA</button>
-                    <button class="btn fpga-conn-btn fpga-bridge-btn" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">&#x1F310; Bridge</button>
-                    <button class="btn fpga-conn-btn fpga-readbram-btn" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">&#x1F4C4; BRAM</button>
                 </div>
                 <div class="sim-controls">
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>
