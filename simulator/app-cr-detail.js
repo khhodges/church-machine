@@ -24,6 +24,131 @@ function _jumpToAsmLine(lineNum) {
     editor.scrollTop = Math.max(0, targetScrollTop);
 }
 
+function _getSyntaxSuggestion(msg) {
+    if (!msg) return null;
+    var OPCODES = 'LOAD · SAVE · CALL · RETURN · CHANGE · SWITCH · TPERM · LAMBDA · DREAD · DWRITE · BFEXT · BFINS · MCMP · IADD · ISUB · BRANCH · SHL · SHR · ELOADCALL · XLOADLAMBDA';
+
+    if (/don.t recognis|don.t recognize|unrecognized.*opcode/i.test(msg)) {
+        var m1 = msg.match(/"([^"]+)"/);
+        var bad = m1 ? m1[1] : 'this word';
+        return {
+            title: 'Unknown instruction',
+            body: '<strong>' + _escHtml(bad) + '</strong> is not a valid opcode. Did you mean one of these?',
+            example: OPCODES + '\n\nExamples:\n  LOAD   CR1, CR0, #5   ; load abstraction\n  CALL   CR1, CR0, #0   ; call method 0\n  DREAD  DR2, CR3, #0   ; read data register\n  BRANCH #MyLabel        ; jump to label\n  RETURN CR0             ; return from method'
+        };
+    }
+    if (/is a DR alias.*expected a CR/i.test(msg)) {
+        return {
+            title: 'Use a CR here, not a DR',
+            body: 'This instruction needs a <strong>capability register</strong> (CR0–CR15). Data registers (DR0–DR15) hold plain values; CRs hold Golden Tokens.',
+            example: 'LOAD   CR1, CR0, #5   ; CR in every position\nCALL   CR1, CR0, #0   ; CR as destination and source\nSWITCH CR8            ; CR only'
+        };
+    }
+    if (/is a CR alias.*expected a DR/i.test(msg)) {
+        return {
+            title: 'Use a DR here, not a CR',
+            body: 'This instruction needs a <strong>data register</strong> (DR0–DR15). DRs hold 32-bit integers; CRs hold capabilities.',
+            example: 'DREAD  DR2, CR3, #0   ; DR as destination\nDWRITE DR1, CR4, #0   ; DR as source\nIADD   DR0, DR1, #10  ; DR arithmetic'
+        };
+    }
+    if (/label.*is not defined|define it with.*:/i.test(msg)) {
+        var m2 = msg.match(/"([^"]+)"/);
+        var lbl = m2 ? m2[1] : 'MyLabel';
+        return {
+            title: 'Label not defined',
+            body: 'Labels must be declared with a colon before you can branch to them.',
+            example: _escHtml(lbl) + ':               ; ← declare the label\n    DREAD  DR1, CR3, #0\n    IADD   DR1, DR1, #1\n    BRANCH #' + _escHtml(lbl) + '   ; ← jump to it'
+        };
+    }
+    if (/not a known method|no method conventions registered/i.test(msg)) {
+        return {
+            title: 'Unknown method name',
+            body: 'The dot-name you used doesn\'t match any registered method. Use a numeric selector (0–15) or check the abstraction\'s C-list.',
+            example: 'CALL   CR1, CR0, #0          ; numeric selector\nCALL   CR11, SlideRule.Multiply  ; dot-notation\nCALL   CR11, SlideRule.Divide    ; known methods only'
+        };
+    }
+    if (/has not been loaded.*LOAD/i.test(msg)) {
+        return {
+            title: 'Abstraction not loaded into a CR',
+            body: 'You must LOAD an abstraction from the C-list into a CR before you can CALL or use dot-notation with it.',
+            example: 'LOAD   CR1, CR0, #5   ; load from C-list slot 5 into CR1\nCALL   CR1, CR0, #0   ; then call its method 0'
+        };
+    }
+    if (/privilege zone|priv.*zone|CR1[2-5].*reserved|reserved.*CR1[2-5]/i.test(msg)) {
+        return {
+            title: 'CR12–CR15 are reserved',
+            body: 'CR12–CR15 form the privilege zone and are managed by the OS. User code must use CR0–CR11.',
+            example: 'LOAD   CR1, CR0, #5   ; CR0–CR11 are safe\nCALL   CR1, CR0, #0   ; use CR0–CR11 for your code'
+        };
+    }
+    if (/capability register.*needed.*nothing|nothing was given.*capability/i.test(msg)) {
+        return {
+            title: 'Missing capability register operand',
+            body: 'This instruction expects a CR operand (CR0–CR15) but none was supplied.',
+            example: 'LOAD   CR1, CR0, #5\nCALL   CR0, CR1, #0\nRETURN CR0'
+        };
+    }
+    if (/invalid \.pet syntax|pet syntax/i.test(msg)) {
+        return {
+            title: '.pet alias syntax',
+            body: '<code>.pet</code> creates a friendly name for a register.',
+            example: '.pet result  DR1    ; alias DR1 as "result"\n.pet ledSlot CR11  ; alias CR11 as "ledSlot"\n\nDREAD  result, ledSlot, #0'
+        };
+    }
+    if (/defined more than once|duplicate label/i.test(msg)) {
+        return {
+            title: 'Duplicate label name',
+            body: 'Each label must have a unique name. Rename one of them.',
+            example: 'loopA:\n    BRANCH #loopA\nloopB:\n    BRANCH #loopB'
+        };
+    }
+    if (/no abstraction declaration|Expected:.*abstraction/i.test(msg)) {
+        return {
+            title: 'Missing abstraction declaration',
+            body: 'CLOOMC++ files must start with <code>abstraction Name { ... }</code>.',
+            example: 'abstraction MyCounter {\n    method Increment() {\n        Write 1 to the result\n    }\n}'
+        };
+    }
+    if (/let binding uses = not ==/i.test(msg)) {
+        return {
+            title: 'Assignment uses = not ==',
+            body: 'In CLOOMC++ Haskell mode, <code>let</code> bindings use a single <code>=</code>, not <code>==</code>.',
+            example: 'let x = 5\nlet y = x + 3'
+        };
+    }
+    if (/undefined.*variable|undefined variable/i.test(msg)) {
+        var m3 = msg.match(/:\s*(\w+)/);
+        var varName = m3 ? m3[1] : 'x';
+        return {
+            title: 'Undefined variable',
+            body: 'The variable <code>' + _escHtml(varName) + '</code> was used before it was declared.',
+            example: 'let ' + _escHtml(varName) + ' = 0     ; declare before using\nlet result = ' + _escHtml(varName) + ' + 1'
+        };
+    }
+    if (/cannot compile statement|cannot parse.*statement/i.test(msg)) {
+        return {
+            title: 'Unrecognised statement',
+            body: 'This line couldn\'t be compiled. Check the language you\'ve selected in the dropdown.',
+            example: '/* JavaScript / CLOOMC++ */\nabstraction MyIdea {\n    method DoSomething() {\n        Write 1 to the result\n    }\n}'
+        };
+    }
+    if (/Expected a capability register like CR0/i.test(msg)) {
+        return {
+            title: 'Expected a capability register',
+            body: 'Provide a CR argument like <code>CR0</code>, <code>CR1</code>, … <code>CR11</code>.',
+            example: 'LOAD   CR1, CR0, #5   ; valid CR operands\nCALL   CR2, CR1, #0'
+        };
+    }
+    if (/Expected a data register like DR0/i.test(msg)) {
+        return {
+            title: 'Expected a data register',
+            body: 'Provide a DR argument like <code>DR0</code>, <code>DR1</code>, … <code>DR15</code>.',
+            example: 'DREAD  DR0, CR3, #0   ; valid DR operands\nIADD   DR1, DR0, #1'
+        };
+    }
+    return null;
+}
+
 function _showAsmErrors(errors) {
     var panel = document.getElementById('asmErrorPanel');
     if (!panel) return;
@@ -35,11 +160,19 @@ function _showAsmErrors(errors) {
              + '</div>'
              + '<ul class="asm-error-panel-list">';
     errors.forEach(function(e) {
+        var sugg = _getSyntaxSuggestion(e.message);
         html += '<li>'
               + '<button type="button" class="asm-error-item" data-line="' + e.line + '" title="Jump to line ' + e.line + '">'
-              + '<span class="asm-error-line">Line ' + e.line + ':</span>' + _escHtml(e.message)
-              + '</button>'
-              + '</li>';
+              + '<span class="asm-error-line">Line ' + (e.line || '?') + ':</span>' + _escHtml(e.message)
+              + '</button>';
+        if (sugg) {
+            html += '<div class="asm-error-suggestion">'
+                  + '<div class="aes-title">&#x1F4A1; ' + sugg.title + '</div>'
+                  + '<div class="aes-body">' + sugg.body + '</div>'
+                  + '<pre class="aes-example">' + _escHtml(sugg.example) + '</pre>'
+                  + '</div>';
+        }
+        html += '</li>';
     });
     html += '</ul>';
     panel.innerHTML = html;

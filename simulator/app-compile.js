@@ -938,6 +938,7 @@ function compileCLOOMC() {
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
         if (con) { con.textContent = `CLOOMC++ compilation errors:\n${errText}`; con.scrollTop = 0; }
+        if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors);
         showNextSteps('error');
         return;
     }

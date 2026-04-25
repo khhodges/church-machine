@@ -610,6 +610,56 @@
     margin-right: 0.35rem;
 }
 
+.asm-error-suggestion {
+    margin: 0.3rem 0 0.45rem 0;
+    padding: 0.5rem 0.65rem;
+    background: rgba(251, 191, 36, 0.07);
+    border: 1px solid rgba(251, 191, 36, 0.25);
+    border-left: 3px solid rgba(251, 191, 36, 0.7);
+    border-radius: 0 4px 4px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.aes-title {
+    font-family: system-ui, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fcd34d;
+    letter-spacing: 0.02em;
+}
+
+.aes-body {
+    font-family: system-ui, sans-serif;
+    font-size: 0.73rem;
+    color: #e5d3a0;
+    line-height: 1.45;
+}
+
+.aes-body strong { color: #fde68a; }
+.aes-body code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.71rem;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    padding: 0 0.25rem;
+    color: #fde68a;
+}
+
+.aes-example {
+    margin: 0.1rem 0 0;
+    padding: 0.4rem 0.55rem;
+    background: rgba(0,0,0,0.35);
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.71rem;
+    color: #a3d4a8;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-x: auto;
+}
+
 .hw-led-label {
     font-size: 0.62rem;
     font-weight: 700;
