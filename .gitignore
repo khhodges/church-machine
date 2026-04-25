@@ -9,6 +9,9 @@ dist-newstyle/
 cabal.sandbox.config
 .ghc.environment.*
 server/boot-config.json
+# Playwright test artifacts
+test-results/
+playwright-report/
 # Generated VCD simulation traces and build artifacts
 # Note: the two canonical sim waveforms are tracked intentionally.
 /tmp/*.vcd
