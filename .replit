@@ -122,7 +122,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node simulator/assembler_test.js && python3 -m pytest tests/simulator/test_clist_analysis.py -v"
+args = "node simulator/assembler_test.js && node simulator/lump_warning_test.js && python3 -m pytest tests/simulator/test_clist_analysis.py -v"
 
 [[workflows.workflow]]
 name = "assembler-tests-watch"
