@@ -2090,9 +2090,37 @@ def _load_boot_abstr_lump():
         })
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
+        # If a saved lump exists (written by /api/lumps/save after POLA or
+        # compress), override lump_size and cc with the saved lump's values.
+        # The boot image always allocates abstractionLumpWords (256w) for
+        # Boot.Abstr regardless of compression; the saved lump records the
+        # logical (user-edited) size that should be shown in the LUMP
+        # repository.  We also replace LAZY_LUMPS['00000003'] so the content
+        # and hex-dump tabs show the compact user-edited version.
+        # NUC_CODE_WORDS=17, DEMO_CLIST_SIZE=18 are fixed Boot.Abstr constants.
+        _saved300_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000300.lump')
+        if os.path.isfile(_saved300_path):
+            try:
+                with open(_saved300_path, 'rb') as _s300f:
+                    _s300raw = _s300f.read()
+                _s300n = len(_s300raw) // 4
+                if _s300n >= 1:
+                    _s300hdr = _struct.unpack('>I', _s300raw[:4])[0]
+                    _s300cw  = (_s300hdr >> 10) & 0x1FFF
+                    _s300cc  = _s300hdr & 0xFF
+                    _s300nm6 = (_s300hdr >> 23) & 0xF
+                    _s300sz  = 1 << (_s300nm6 + 6)
+                    if _s300cw == 17 and 0 < _s300cc <= 18 and _s300n >= 18:
+                        _BOOT_ABSTR_META['lump_size'] = _s300sz
+                        _BOOT_ABSTR_META['cc']        = _s300cc
+                        LAZY_LUMPS['00000003'] = _s300raw[:_s300n * 4]
+                        print(f'[boot] Boot.Abstr saved lump: {_s300sz}w, cc={_s300cc}',
+                              flush=True)
+            except Exception:
+                pass  # Fall back to boot-image values already set above.
         # Restore author/version from sidecar if one has been written (e.g. after
-        # an authorship edit).  Only these two user-editable fields are merged so
-        # that lump_size / cw / cc always reflect the current boot image.
+        # an authorship edit).  Only these two user-editable fields are merged;
+        # lump_size and cc come from the saved lump (above) or the boot image.
         _sidecar03 = os.path.join(os.path.dirname(__file__), 'lumps', '00000003.json')
         if os.path.isfile(_sidecar03):
             try:

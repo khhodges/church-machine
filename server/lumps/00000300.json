@@ -2,11 +2,11 @@
   "token": "00000300",
   "abstraction": "LED flash",
   "ns_slot": 3,
-  "lump_size": 64,
+  "lump_size": 256,
   "typ": 0,
   "content_type": "code",
   "cw": 17,
-  "cc": 18,
+  "cc": 1,
   "profile": "IoT",
   "language": "unknown",
   "author": "",
@@ -26,7 +26,7 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-04-25T14:55:57.938513Z",
+    "built_at": "2026-04-25T15:08:25.885305Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
