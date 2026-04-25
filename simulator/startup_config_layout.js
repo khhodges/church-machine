@@ -21,26 +21,18 @@
 // Python mirror: server/startup_config_layout.py defines the same five constants
 // so server/boot_image.py can import them.  Keep the two files in sync.
 
-const SC_DATA_OFFSET      = 4;   // first data word index in lump (after header + 3-word code region)
-const SC_LAST_DATA_KEY    = 58;  // last valid ReadParam / WriteParam key  (word 62 in lump)
-const SC_OOB_KEY          = 59;  // first out-of-bounds key (would reach c-list at word 63)
-const SC_FLAGS_WORD       = 6;   // absolute lump word index for flags      (data key 2)
-const SC_FAULT_COUNT_WORD = 7;   // absolute lump word index for fault_count (data key 3)
+(function () {
+    var _SC = {
+        SC_DATA_OFFSET:      4,   // first data word index in lump (after header + 3-word code region)
+        SC_LAST_DATA_KEY:    58,  // last valid ReadParam / WriteParam key  (word 62 in lump)
+        SC_OOB_KEY:          59,  // first out-of-bounds key (would reach c-list at word 63)
+        SC_FLAGS_WORD:       6,   // absolute lump word index for flags      (data key 2)
+        SC_FAULT_COUNT_WORD: 7,   // absolute lump word index for fault_count (data key 3)
+    };
 
-if (typeof module !== 'undefined') {
-    module.exports = {
-        SC_DATA_OFFSET,
-        SC_LAST_DATA_KEY,
-        SC_OOB_KEY,
-        SC_FLAGS_WORD,
-        SC_FAULT_COUNT_WORD,
-    };
-} else if (typeof window !== 'undefined') {
-    window.StartupConfigLayout = {
-        SC_DATA_OFFSET,
-        SC_LAST_DATA_KEY,
-        SC_OOB_KEY,
-        SC_FLAGS_WORD,
-        SC_FAULT_COUNT_WORD,
-    };
-}
+    if (typeof module !== 'undefined') {
+        module.exports = _SC;
+    } else if (typeof window !== 'undefined') {
+        window.StartupConfigLayout = _SC;
+    }
+})();
