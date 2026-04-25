@@ -2792,6 +2792,7 @@ window.lumpCompress = async function(nsIdx) {
         const detail = [parts.join('; '), `token: ${data2.token}`, data2.lump_path || 'server/lumps/', _biLine2].filter(Boolean).join('\n');
         log(`Compressed NS${nsIdx}: ${parts.join('; ')}. Saved \u2014 token: ${data2.token}`);
         if (typeof showPatchModal === 'function') showPatchModal(true, _saveTitle, detail);
+        if (typeof renderLumps === 'function') renderLumps();
     } catch (e) {
         log(`Compress done but auto-save failed: ${e.message}. Use \u2193\u202FSave to retry.`);
         if (typeof showPatchModal === 'function') showPatchModal(false, _saveTitle, `Compress OK. Save failed: ${e.message}\nUse \u2193\u202FSave to retry.`);
@@ -2843,6 +2844,7 @@ window.lumpSaveLump = async function(nsIdx) {
         const msg = [`token: ${data.token}`, data.lump_path || 'server/lumps/', _biLine].filter(Boolean).join('\n');
         log(`Saved \u2014 token: ${data.token}`);
         if (typeof showPatchModal === 'function') showPatchModal(true, `Save Lump \u2014 NS${nsIdx} \u201C${absName}\u201D`, msg);
+        if (typeof renderLumps === 'function') renderLumps();
     } catch (e) {
         log(`Save failed: ${e.message}`);
         if (typeof showPatchModal === 'function') showPatchModal(false, `Save Lump \u2014 NS${nsIdx} \u201C${absName}\u201D`, e.message);
@@ -3092,6 +3094,7 @@ window.applyPOLA = async function(nsIdx) {
             }
         }
         if (typeof showPatchModal === 'function') showPatchModal(true, title, logLines0.join('\n'));
+        if (typeof renderLumps === 'function') renderLumps();
         return;
     }
 
@@ -3367,6 +3370,7 @@ window.applyPOLA = async function(nsIdx) {
     }
 
     if (typeof showPatchModal === 'function') showPatchModal(saveOk, title, logLines.join('\n'));
+    if (saveOk && typeof renderLumps === 'function') renderLumps();
 };
 
 // ── Boot Sequence Code ─────────────────────────────────────────────────────
