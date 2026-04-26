@@ -390,6 +390,27 @@ tr.itrace-fault {
     border-left: 3px solid #e05555;
 }
 tr.itrace-fault td { color: #ff9999; }
+.itrace-pet {
+    color: #b8d4ff;
+    font-style: italic;
+    cursor: default;
+    border-bottom: 1px dotted #6699cc;
+}
+.itrace-offset-fault {
+    background: rgba(255, 160, 0, 0.25);
+    color: #ffcc44;
+    border-radius: 3px;
+    padding: 0 2px;
+    font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(255, 160, 0, 0.5);
+}
+.fault-offset-bad {
+    background: rgba(255, 160, 0, 0.2);
+    color: #ffcc44 !important;
+    border-radius: 3px;
+    padding: 1px 5px;
+    border: 1px solid rgba(255, 160, 0, 0.4);
+}
 
 .gate-flag {
     font-family: 'Courier New', monospace;

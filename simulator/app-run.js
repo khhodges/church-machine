@@ -1471,31 +1471,85 @@ function showFaultModal(f) {
             <div class="fault-flags-row">Flags: ${flagsStr}</div>
         </div>` : '';
 
+    // ── Pet name alias maps (number → name) for register annotation ──────────
+    const _petCR = {}, _petDR = {};
+    if (assembler) {
+        const _al = assembler.getAliases();
+        for (const [nm, num] of Object.entries(_al.cr || {})) _petCR[num] = nm;
+        for (const [nm, num] of Object.entries(_al.dr || {})) _petDR[num] = nm;
+    }
+    // Apply pet names and (optionally) highlight a specific offset bracket in a disasm string.
+    // offsetToHighlight: string like "[0x0008]" to wrap in .itrace-offset-fault, or null.
+    function _petDisasm(str, offsetToHighlight) {
+        let s = str
+            .replace(/\bCR(\d+)\b/g, (m, n) => {
+                const a = _petCR[+n];
+                return a ? `<span class="itrace-pet" title="CR${n}">${a}</span>` : m;
+            })
+            .replace(/\bDR(\d+)\b/g, (m, n) => {
+                const a = _petDR[+n];
+                return a ? `<span class="itrace-pet" title="DR${n}">${a}</span>` : m;
+            });
+        if (offsetToHighlight) {
+            // Escape for use in regex
+            const escaped = offsetToHighlight.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            s = s.replace(new RegExp(escaped, 'g'),
+                `<span class="itrace-offset-fault">${offsetToHighlight}</span>`);
+        }
+        return s;
+    }
+
+    // ── Find the faulting trace entry (used by scope section below) ───────────
+    const _faultTraceEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
+                          || ((f.instrHistory || []).length > 0 ? f.instrHistory[f.instrHistory.length - 1] : null);
+
     // ── Scope callout for BOUNDS / range faults ────────────────────────────
     // When a DREAD/DWRITE range check fails, sim.auditLog has a checks.range entry.
     // Surface it here so the user can see exactly which offset exceeded which limit.
     let scopeSection = '';
+    let _scopeBadOffsetStr = null; // shared with trace renderer to highlight same token
     if (f.type === 'BOUNDS' || f.type === 'RANGE') {
         const auditEntries = sim.auditLog || [];
         const lastEntry = auditEntries.length > 0 ? auditEntries[auditEntries.length - 1] : null;
         if (lastEntry && lastEntry.checks && lastEntry.checks.range && !lastEntry.checks.range.pass) {
             const rc = lastEntry.checks.range;
             if (rc.address !== undefined) {
+                // Derive offset and capacity from absolute address + range
+                const badOffset  = rc.address - rc.base;
+                const maxOffset  = rc.limit  - rc.base;
+                const badOffHex  = '[0x' + badOffset.toString(16).toUpperCase().padStart(4, '0') + ']';
+                const maxOffHex  = '[0x' + maxOffset.toString(16).toUpperCase().padStart(4, '0') + ']';
+                const entryCount = maxOffset + 1;
+                _scopeBadOffsetStr = badOffHex;
+
+                // Identify the source register (crSrc of the faulting instruction)
+                let crSrcLabel = '';
+                if (_faultTraceEntry) {
+                    const crSrcNum = (_faultTraceEntry.raw >>> 15) & 0xF;
+                    const pet = _petCR[crSrcNum];
+                    crSrcLabel = pet
+                        ? `<span class="itrace-pet" title="CR${crSrcNum}">${pet}</span>`
+                        : `CR${crSrcNum}`;
+                }
+
                 scopeSection = `
         <div class="fault-scope-section">
             <div class="fault-scope-label">&#x26A0; Scope violation</div>
             <div class="fault-scope-detail">
-                Address <code>${rc.address}</code> is outside valid range
-                <code>[${rc.base}..${rc.limit}]</code>.
+                Offset <code class="fault-offset-bad">${badOffHex}</code> is out of range${crSrcLabel ? ` &mdash; ${crSrcLabel} has <code>${entryCount}</code> ${entryCount === 1 ? 'entry' : 'entries'}` : ''}.
+                Valid indices: <code>&#x5B;0x0000..${maxOffHex.slice(1)}</code>.
             </div>
         </div>`;
             } else {
+                const offHex = '[0x' + (rc.offset !== undefined ? rc.offset.toString(16).toUpperCase().padStart(4, '0') : '????') + ']';
+                const limHex = '[0x' + (rc.limit  !== undefined ? rc.limit .toString(16).toUpperCase().padStart(4, '0') : '????') + ']';
+                _scopeBadOffsetStr = offHex;
                 scopeSection = `
         <div class="fault-scope-section">
             <div class="fault-scope-label">&#x26A0; Scope violation</div>
             <div class="fault-scope-detail">
-                Accessed offset <code>${rc.offset}</code> but NS limit is <code>${rc.limit}</code>
-                &nbsp;&mdash;&nbsp;valid range is <code>0</code>&ndash;<code>${rc.limit}</code>.
+                Offset <code class="fault-offset-bad">${offHex}</code> exceeds NS limit &mdash;
+                valid range is <code>[0x0000..${limHex.slice(1)}</code>.
             </div>
         </div>`;
             }
@@ -1529,10 +1583,11 @@ function showFaultModal(f) {
         for (const h of instrTrace) {
             const addr = '0x' + (h.physicalPC >>> 0).toString(16).toUpperCase().padStart(4, '0');
             const rawHex = '0x' + (h.raw >>> 0).toString(16).toUpperCase().padStart(8, '0');
-            const instr = assembler ? assembler.disassemble(h.raw) : `${h.opName} CR${h.crDst}, CR${h.crSrc}, ${h.imm}`;
+            const rawDisasm = assembler ? assembler.disassemble(h.raw) : `${h.opName} CR${h.crDst}, CR${h.crSrc}, ${h.imm}`;
             const isFault = (f.faultStep != null && h.step === f.faultStep);
+            const instrHtml = _petDisasm(rawDisasm, isFault ? _scopeBadOffsetStr : null);
             const cls = isFault ? ' class="itrace-fault"' : '';
-            traceRows += `<tr${cls}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instr}</td></tr>`;
+            traceRows += `<tr${cls}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instrHtml}</td></tr>`;
         }
         instrTraceSection = `
         <div class="fault-trace-section">
