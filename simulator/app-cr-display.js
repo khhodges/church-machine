@@ -256,7 +256,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         if (addr >= sim.memory.length) break;
                         const word = _cw1[w];
                         const _mObj1 = _methodAtOffset(nsIdx, w);
-                        const decoded = word === 0 ? 'HALT' : _wrapRegHover(_applyMethodCRNames(_applyMethodDRNames(asm.disassemble(word), _mObj1), _mObj1));
+                        const decoded = word === 0 ? 'HALT' : _annotateCR6PetNameHtml(_wrapRegHover(_applyMethodCRNames(_applyMethodDRNames(asm.disassemble(word), _mObj1), _mObj1)));
                         const isPC   = sim.bootComplete && (addr === (sim.memory[sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS] || (2 * sim.SLOT_SIZE)) + 1 + sim.pc);
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                         const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
@@ -341,7 +341,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     if (addr >= sim.memory.length) break;
                     const word = _cw2[w];
                     const _mObj2 = _methodAtOffset(nsIdx, w);
-                    const decoded = word === 0 ? 'HALT' : _wrapRegHover(_applyMethodCRNames(_applyMethodDRNames(asm2.disassemble(word), _mObj2), _mObj2));
+                    const decoded = word === 0 ? 'HALT' : _annotateCR6PetNameHtml(_wrapRegHover(_applyMethodCRNames(_applyMethodDRNames(asm2.disassemble(word), _mObj2), _mObj2)));
                     const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
                     const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2, _crPets2);
                     const _dc2Cls = _dc2 ? (_dc2.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
@@ -1285,6 +1285,20 @@ function showEditorCListPopup(evt) {
             }
         });
     }, 0);
+}
+
+function showPetNameTip(evt, label) {
+    const tip = document.getElementById('code-pet-tip');
+    if (!tip) return;
+    tip.textContent = label;
+    tip.style.display = 'block';
+    tip.style.left = (evt.clientX + 14) + 'px';
+    tip.style.top  = (evt.clientY - 28) + 'px';
+}
+
+function hidePetNameTip() {
+    const tip = document.getElementById('code-pet-tip');
+    if (tip) tip.style.display = 'none';
 }
 
 function _showEditorCListNotice(pop, evt, msg) {

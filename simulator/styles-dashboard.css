@@ -3383,6 +3383,19 @@ a.next-step-link:hover {
     border-bottom-color: #f4b942;
 }
 
+.clist-petname-ref {
+    cursor: help;
+    color: #f4b942;
+    border-bottom: 1px dotted rgba(244,185,66,0.6);
+    border-radius: 2px;
+    transition: color 0.12s, background 0.12s;
+}
+.clist-petname-ref:hover {
+    color: #ffd280;
+    background: rgba(244,185,66,0.12);
+    border-bottom-color: #f4b942;
+}
+
 .dr-hover-row {
     cursor: help;
     transition: background 0.12s;

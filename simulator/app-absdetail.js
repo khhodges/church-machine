@@ -1,3 +1,21 @@
+/**
+ * HTML-escape raw assembly text, then annotate register tokens and CRN[0xNNNN]
+ * c-list slot references with hover tooltips showing the abstraction pet name.
+ * Used for <pre class="abs-method-panel-code"> blocks in the Abstraction view.
+ */
+function _annotateAbsCodeHtml(rawText) {
+    if (!rawText) return '';
+    let html = rawText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    // Wrap CRN / DRN tokens with hover spans (reuses cr-detail helpers)
+    if (typeof _wrapRegHover === 'function') html = _wrapRegHover(html);
+    // Annotate CRN[0xNNNN] with pet name tooltip
+    if (typeof _annotateCR6PetNameHtml === 'function') html = _annotateCR6PetNameHtml(html);
+    return html;
+}
+
 function _signedReturnDesc(dr1, absIndex) {
     if (absIndex === 12) {
         if (dr1 > 0)        return dr1 === 1 ? 'on / success' : 'success';
@@ -137,7 +155,7 @@ function showAbstractionDetail(index) {
                     html += '</tbody></table>';
                 }
                 if (example) {
-                    html += `<pre class="abs-method-panel-code">${example}</pre>`;
+                    html += `<pre class="abs-method-panel-code">${_annotateAbsCodeHtml(example)}</pre>`;
                 }
                 html += '</div>';
             }
@@ -152,7 +170,7 @@ function showAbstractionDetail(index) {
         html += '<div class="abs-detail-section abs-boot-code-section">';
         html += '<div class="abs-detail-label">Boot Sequence Code</div>';
         html += '<div class="abs-boot-code-desc">Installed implementation \u2014 executed by the STEP controller at power-on reset. Mirrors <code>_bootStep()</code> in simulator.js exactly.</div>';
-        html += `<pre class="abs-method-panel-code abs-boot-code-pre">${BOOT_SEQ_CODE[abs.index]}</pre>`;
+        html += `<pre class="abs-method-panel-code abs-boot-code-pre">${_annotateAbsCodeHtml(BOOT_SEQ_CODE[abs.index])}</pre>`;
         html += '</div>';
     }
 

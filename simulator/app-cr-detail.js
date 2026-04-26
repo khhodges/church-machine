@@ -1183,6 +1183,28 @@ function _wrapCListHover(html, clistBase, cc) {
     );
 }
 
+/**
+ * Annotate post-_wrapCRHover HTML: replace CRN[0xNNNN] bracket part with a
+ * pet-name tooltip span when the NS slot has a known abstraction name.
+ * Works on both the EDIT-page disassembly and the Abstraction-view code blocks.
+ */
+function _annotateCR6PetNameHtml(html) {
+    return html.replace(
+        /(<span[^>]*onmouseenter="showCRPopup\(event,(\d+)\)"[^>]*>CR\2<\/span>)(\[0x([0-9A-Fa-f]+)\])/g,
+        function(m, crSpan, crNumStr, slotBracket, hexDigits) {
+            const slotIdx = parseInt(hexDigits, 16);
+            const reg = (typeof abstractionRegistry !== 'undefined') ? abstractionRegistry : null;
+            const abs = reg && reg.abstractions ? reg.abstractions[slotIdx] : null;
+            if (!abs) return m;
+            const safeLabel = abs.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return crSpan +
+                `<span class="clist-petname-ref" ` +
+                `onmouseenter="showPetNameTip(event,'${safeLabel}')" ` +
+                `onmouseleave="hidePetNameTip()">${slotBracket}</span>`;
+        }
+    );
+}
+
 function _crTag(crNum, crPets) {
     const pet = crPets && crPets[crNum];
     return pet ? `${pet.toLowerCase()}(CR${crNum})` : `CR${crNum}`;
