@@ -1379,40 +1379,9 @@ function updateFlagsDisplay() {
             `<span class="flag-info">STO:&nbsp;${sim.sto}</span>`;
     }
 
-    // ── Cap popover (anchored below fault button, auto-shows on halt) ──────
+    // ── Cap popover (disabled) ──────────────────────────────────────────────
     const capPop = document.getElementById('capPopover');
-    if (capPop) {
-        if (sim.halted && cap) {
-            const p = cap.perms;
-            const gateNames = {L:'LOAD',S:'SAVE',E:'CALL',R:'DREAD',W:'DWRITE',X:'LAMBDA'};
-            const gateName  = gateNames[cap.op] || cap.op || 'mLoad';
-            const req = cap.op;
-            capPop.innerHTML =
-                `<span class="cap-group-label">${gateName}</span>` +
-                `<span class="cap-bit ${p.R?'cap-on':''} ${req==='R'?'cap-req':''}">R</span>` +
-                `<span class="cap-bit ${p.W?'cap-on':''} ${req==='W'?'cap-req':''}">W</span>` +
-                `<span class="cap-bit ${p.X?'cap-on':''} ${req==='X'?'cap-req':''}">X</span>` +
-                `<span class="cap-sep">|</span>` +
-                `<span class="cap-bit ${p.L?'cap-on':''} ${req==='L'?'cap-req':''}">L</span>` +
-                `<span class="cap-bit ${p.S?'cap-on':''} ${req==='S'?'cap-req':''}">S</span>` +
-                `<span class="cap-bit ${p.E?'cap-on':''} ${req==='E'?'cap-req':''}">E</span>` +
-                `<span class="cap-sep">|</span>` +
-                `<span class="cap-bit ${cap.b?'cap-on cap-b':''}">B</span>` +
-                `<span class="cap-bit ${cap.f?'cap-on cap-f':''}">F</span>` +
-                `<span class="cap-bit ${cap.versionMatch?'cap-on cap-v':'cap-fail'}">V${cap.versionMatch?'\u2713':'\u2717'}</span>` +
-                `<span class="cap-label">${cap.label}</span>`;
-            const faultBtn = document.getElementById('toolFaultBtn');
-            if (faultBtn) {
-                const r = faultBtn.getBoundingClientRect();
-                capPop.style.top  = (r.bottom + 5) + 'px';
-                capPop.style.left = r.left + 'px';
-            }
-            capPop.style.display = 'flex';
-        } else {
-            capPop.innerHTML = '';
-            capPop.style.display = 'none';
-        }
-    }
+    if (capPop) { capPop.innerHTML = ''; capPop.style.display = 'none'; }
 }
 
 function updateInfoDisplay() {
