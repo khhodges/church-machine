@@ -1086,6 +1086,30 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     };
 
     const effEnd = Math.min(cw + 1, lumpSize - cc > 0 ? lumpSize - cc : cw + 1, words.length);
+
+    // ── Branch-label + arrow pre-scan ────────────────────────────────────
+    // Mirror exactly what the Code View table does: find all BRANCH targets,
+    // assign L0…Ln labels in address order, compute per-row SVG arrows.
+    const _lumpCondAbbr = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
+    const _lumpCodeWords = [];
+    for (let _ci = 1; _ci < effEnd; _ci++) _lumpCodeWords.push(words[_ci] >>> 0);
+
+    const _lumpBrTargetSet = new Set();
+    for (let _ci = 0; _ci < _lumpCodeWords.length; _ci++) {
+        const _cw2 = _lumpCodeWords[_ci];
+        if (((_cw2 >>> 27) & 0x1F) !== 17) continue;
+        const _rawImm = _cw2 & 0x7FFF;
+        const _soff   = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
+        const _tgt    = _ci + _soff;
+        if (_tgt >= 0 && _tgt < _lumpCodeWords.length) _lumpBrTargetSet.add(_tgt);
+    }
+    const _lumpBrLabelMap = new Map();
+    Array.from(_lumpBrTargetSet).sort((a, b) => a - b).forEach((idx, n) => _lumpBrLabelMap.set(idx, `L${n}`));
+
+    const _lumpBrArrows = (typeof _computeBranchArrows === 'function')
+        ? _computeBranchArrows(_lumpCodeWords)
+        : { html: new Array(_lumpCodeWords.length).fill(''), hasBranches: false };
+
     let html = '<div class="lump-content-code">';
     html += '<div class="lump-methods-section">';
     html += '<div class="lump-methods-title">MyMethods</div>';
@@ -1099,7 +1123,8 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
         let _methodCardOpen = false;
         let _methodCardIdx  = 0;
 
-        for (let i = 1; i < effEnd; i++) {
+        let _lumpCi = 0;  // code-region offset (0-based, used for branch label/arrow lookup)
+        for (let i = 1; i < effEnd; i++, _lumpCi++) {
             // Method boundary → reset per-method register aliases and update DR pet names
             if (mb[i] !== undefined) {
                 if (_methodCardOpen) html += '</div>';  // close previous method card
@@ -1176,7 +1201,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
             const staticCmt = _curMethodObj && Array.isArray(_curMethodObj.comments)
                 ? (_curMethodObj.comments[instrRelIdx] || null)
                 : null;
-            const commentText = staticCmt || _autoComment(w, op, crDst, crSrc, imm, cond, crAlias);
+            let commentText = staticCmt || _autoComment(w, op, crDst, crSrc, imm, cond, crAlias);
 
             const addr = (i * 4).toString(16).toUpperCase().padStart(4, '0');
             const hex  = (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
@@ -1187,11 +1212,34 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                     return pet ? `${pet}(DR${numStr})` : match;
                 });
             }
+
+            // BRANCH: replace raw PC-offset text with symbolic label (L0, L1, …)
+            if (op === 17) {
+                const _bsoff   = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
+                const _btgt    = _lumpCi + _bsoff;
+                const _blabel  = _lumpBrLabelMap.get(_btgt);
+                if (_blabel !== undefined) {
+                    const _bcond = _lumpCondAbbr[cond];
+                    disText     = `BRANCH${_bcond}  ${_blabel}`;
+                    commentText = staticCmt || `branch → ${_blabel}${cond !== 14 ? ` [if ${_bcond}]` : ''}`;
+                }
+            }
+
+            // Emit branch-target label row before this instruction if it's a target
+            if (_lumpBrLabelMap.has(_lumpCi)) {
+                html += `<div class="lump-code-label-row">${_lumpBrLabelMap.get(_lumpCi)}:</div>`;
+            }
+
+            // Branch arrow SVG (from pre-computed _lumpBrArrows)
+            const _brSvgHtml = (_lumpBrArrows.hasBranches && _lumpBrArrows.html[_lumpCi])
+                ? `<span class="lump-code-branch-svg">${_lumpBrArrows.html[_lumpCi]}</span>`
+                : (_lumpBrArrows.hasBranches ? `<span class="lump-code-branch-svg lump-code-branch-svg-empty" style="width:${(_lumpBrArrows.svgW||14)}px;display:inline-block;"></span>` : '');
+
             html += `<div class="lump-code-row">` +
                     `<span class="lump-code-addr lump-code-binary">\u00A00x${addr}</span>` +
                     `<span class="lump-code-hex lump-code-binary">${hex}</span>` +
                     `<span class="lump-code-comment">${e(commentText)}</span>` +
-                    `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}</span>` +
+                    `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}${_brSvgHtml}</span>` +
                     `</div>`;
 
             instrRelIdx++;
