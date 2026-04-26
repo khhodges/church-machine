@@ -1660,11 +1660,28 @@ function showFaultModal(f) {
             const rawDisasm = assembler ? assembler.disassemble(h.raw) : `${h.opName} CR${h.crDst}, CR${h.crSrc}, ${h.imm}`;
             const isFault = (f.faultStep != null && h.step === f.faultStep);
             const instrHtml = _petDisasm(rawDisasm, isFault ? _scopeBadOffsetStr : null);
+            let clistAnnotation = '';
+            {
+                const _op = (h.raw >>> 27) & 0x1F;
+                const _isLoadOrCall = (_op === 0 || _op === 2);
+                if (_isLoadOrCall && h.crSrc === 6 && sim.cr && sim.cr[6]) {
+                    const _slotIdx = h.imm;
+                    const _clistBase = sim.cr[6].word1 >>> 0;
+                    const _slotAddr = _clistBase + _slotIdx;
+                    if (sim.memory && _slotAddr < sim.memory.length) {
+                        const _slotGT = sim.memory[_slotAddr] >>> 0;
+                        const _name = (typeof _resolveCListPetName === 'function') ? _resolveCListPetName(_slotGT) : null;
+                        if (_name) {
+                            clistAnnotation = ` <span class="fault-clist-petname">${_name}</span>`;
+                        }
+                    }
+                }
+            }
             const rowOnclick = (isFault && _editLineNum)
                 ? ` onclick="faultModalOpenEditor(${_editLineNum})" title="Click to open editor at line ${_editLineNum}" style="cursor:pointer"`
                 : '';
             const cls = isFault ? ' class="itrace-fault"' : '';
-            traceRows += `<tr${cls}${rowOnclick}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instrHtml}</td></tr>`;
+            traceRows += `<tr${cls}${rowOnclick}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instrHtml}${clistAnnotation}</td></tr>`;
         }
         instrTraceSection = `
         <div class="fault-trace-section fault-trace-collapsible">
