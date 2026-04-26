@@ -1186,8 +1186,9 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
             html += `<div class="lump-code-row">` +
                     `<span class="lump-code-addr lump-code-binary">\u00A00x${addr}</span>` +
                     `<span class="lump-code-hex lump-code-binary">${hex}</span>` +
+                    `<span class="lump-code-comment">${e(commentText)}</span>` +
                     `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}</span>` +
-                    `<span class="lump-code-comment">; ${e(commentText)}</span></div>`;
+                    `</div>`;
 
             instrRelIdx++;
 
