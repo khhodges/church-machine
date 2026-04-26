@@ -1279,13 +1279,13 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                         `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}</span>` +
                         `</div>`;
             } else {
-                // Pet name priority: manifest CR pet_names → token lookup → abstractionRegistry → numeric fallback
+                // Pet name priority: manifest CR pet_names → token lookup → sim.nsLabels → numeric fallback
                 const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
                 const tokenName    = wVal ? _clistName(wVal) : '';
-                const absName      = abstractionRegistry && abstractionRegistry.abstractions
-                    ? (abstractionRegistry.abstractions[gtSlotId] || {}).name || ''
+                const simNsName    = (typeof sim !== 'undefined' && sim && sim.nsLabels)
+                    ? (sim.nsLabels[gtSlotId] || '')
                     : '';
-                const displayName  = manifestName || tokenName || absName;
+                const displayName  = manifestName || tokenName || simNsName;
                 const nameHtml = displayName
                     ? `<span class="lump-gt-chip-name">${e(displayName)}</span>`
                     : `<span class="lump-gt-chip-name lump-gt-name-unresolved">NS[${gtSlotId}]</span>`;
