@@ -308,6 +308,7 @@ function init() {
         }
         assembler.setNamespace(_nsSymMap);
     }
+    ChurchAssembler.setRegistry(abstractionRegistry);
     // window.bootConfig was prefetched by the DOMContentLoaded handler before
     // init() ran (Task #214 Step 1), so this single reset already uses the
     // programmer-chosen lump sizes when present, and historical defaults

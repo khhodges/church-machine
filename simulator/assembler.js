@@ -183,8 +183,25 @@ class ChurchAssembler {
     _resolveNSName(token) {
         if (!token) return null;
         const name = token.replace(/,/g, '').trim();
-        const slot = this.nsSymbols[name];
-        return slot !== undefined ? slot : null;
+
+        // 1. Currently loaded into a CR (e.g. after  LOAD CR6, LED)
+        if (this.nsLoaded[name] !== undefined) return this.nsLoaded[name];
+
+        // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
+        if (this.nsSymbols[name] !== undefined) return this.nsSymbols[name];
+
+        // 3. Abstract registry (last resort — returns the abstraction's own index)
+        const reg = ChurchAssembler._sharedRegistry;
+        if (reg) {
+            const abs = reg.getByName(name);
+            if (abs !== null) return abs.index;
+        }
+
+        return null;
+    }
+
+    static setRegistry(registry) {
+        ChurchAssembler._sharedRegistry = registry;
     }
 
     // ── Pre-pass: collect .pet alias declarations ──────────────────────────────
