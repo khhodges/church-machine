@@ -1499,6 +1499,33 @@ function showFaultModal(f) {
         return s;
     }
 
+    // Rewrite the raw simulator fault message to use pet names and offset notation.
+    // Input:  "LOAD: CR6: address 455 outside valid range [447..447]"
+    // Output: "LOAD: cloomc\u00a0(CR6): offset [0x0008] outside valid range [0x0000..0x0000]"
+    function _transformFaultMsg(msg) {
+        let s = msg
+            .replace(/\bCR(\d+)\b/g, (m, n) => {
+                const a = _petCR[+n];
+                return a ? `${a}\u00a0(CR${n})` : m;
+            })
+            .replace(/\bDR(\d+)\b/g, (m, n) => {
+                const a = _petDR[+n];
+                return a ? `${a}\u00a0(DR${n})` : m;
+            });
+        // Rewrite "address N outside valid range [base..limit]" → offset-relative form
+        s = s.replace(
+            /address\s+(\d+)\s+outside valid range\s+\[(\d+)\.\.(\d+)\]/,
+            (m, addr, base, limit) => {
+                const badOff = parseInt(addr) - parseInt(base);
+                const maxOff = parseInt(limit) - parseInt(base);
+                const badHex = '[0x' + badOff.toString(16).toUpperCase().padStart(4, '0') + ']';
+                const maxHex = '[0x' + (maxOff >= 0 ? maxOff : 0).toString(16).toUpperCase().padStart(4, '0') + ']';
+                return `offset ${badHex} outside valid range [0x0000..${maxHex.slice(1)}`;
+            }
+        );
+        return s;
+    }
+
     // ── Find the faulting trace entry (used by scope section below) ───────────
     const _faultTraceEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
                           || ((f.instrHistory || []).length > 0 ? f.instrHistory[f.instrHistory.length - 1] : null);
@@ -1612,7 +1639,7 @@ function showFaultModal(f) {
             <span class="fault-type-badge" style="background:${color}22;border-color:${color};color:${color}">${f.type}</span>
             <span class="fault-modal-title">Machine Fault</span>
         </div>
-        <div class="fault-modal-message">${f.message}</div>
+        <div class="fault-modal-message">${_transformFaultMsg(f.message)}</div>
         <div class="fault-detail-grid">
             <div class="fault-detail-row">
                 <span class="fault-detail-label">Code</span>
@@ -1624,7 +1651,7 @@ function showFaultModal(f) {
             </div>
             <div class="fault-detail-row">
                 <span class="fault-detail-label">Instruction</span>
-                <span class="fault-detail-value"><code>${disasm}</code></span>
+                <span class="fault-detail-value"><code>${_petDisasm(disasm, _scopeBadOffsetStr)}</code></span>
             </div>
             <div class="fault-detail-row">
                 <span class="fault-detail-label">Location</span>
