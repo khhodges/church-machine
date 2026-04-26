@@ -1184,3 +1184,49 @@ function editCRCodeInEditor() {
 var _editorCREditCR = null;
 var _editorCREditNS = null;
 
+function showEditorCListPopup(evt) {
+    _crPopupSuppressed = false;
+    cancelHideCRPopup();
+    const pop = document.getElementById('cr-hover-popup');
+    if (!pop) return;
+
+    if (!sim || !sim.cr || !sim.cr[6]) {
+        _showEditorCListNotice(pop, evt, 'Simulator not running \u2014 boot first, then run a program that sets CR6');
+        return;
+    }
+
+    const cr6w0 = sim.cr[6].word0 >>> 0;
+    const cr6w1 = sim.cr[6].word1 >>> 0;
+
+    if (cr6w0 === 0 || cr6w1 === 0) {
+        _showEditorCListNotice(pop, evt, 'No C-List loaded \u2014 run a program that sets CR6 first');
+        return;
+    }
+
+    const clistBase = cr6w1;
+    let cc = 0;
+
+    if (sim.parseGT) {
+        const gt = sim.parseGT(cr6w0);
+        if (gt && gt.index !== undefined && sim.readNSEntry && sim.parseNSWord1) {
+            const nse = sim.readNSEntry(gt.index);
+            if (nse) {
+                const lim = sim.parseNSWord1(nse.word1_limit);
+                cc = (lim && lim.clistCount) || 0;
+            }
+        }
+    }
+
+    showCListPopup(evt, clistBase, cc);
+}
+
+function _showEditorCListNotice(pop, evt, msg) {
+    const dismissBtn = `<button class="zdp-dismiss" onclick="hideCRPopup(true)" title="Close">&times;</button>`;
+    pop.innerHTML = dismissBtn +
+        `<div class="zdp-title" style="border-color:#374151;color:#6b7280;">C-List Picker</div>` +
+        `<div class="zdp-empty" style="padding:0.4rem 0;">${msg}</div>`;
+    pop.style.display = 'block';
+    _positionPopup(pop, evt);
+    _startAutoFade();
+}
+

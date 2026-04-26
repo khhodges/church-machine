@@ -1002,6 +1002,15 @@ document.addEventListener('DOMContentLoaded', () => {
         adjustViewTop();
         initCodeCopyButtons();
         updateFPGAStatusBtn();
+        const _asmEd = document.getElementById('asmEditor');
+        if (_asmEd) {
+            _asmEd.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                    e.preventDefault();
+                    if (typeof showEditorCListPopup === 'function') showEditorCListPopup(e);
+                }
+            });
+        }
     });
 });
 
