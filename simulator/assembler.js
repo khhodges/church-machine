@@ -836,6 +836,9 @@ class ChurchAssembler {
             return this.labels[token] & 0xFFFF;
         }
 
+        const nsSlotImm = this._resolveNSName(token);
+        if (nsSlotImm !== null) return nsSlotImm & 0xFFFF;
+
         let val = 0;
         if (token.startsWith('0x') || token.startsWith('0X')) {
             val = parseInt(token, 16);
