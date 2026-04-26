@@ -1,6 +1,30 @@
 /**
- * HTML-escape raw assembly text, then annotate register tokens and CRN[0xNNNN]
- * c-list slot references with hover tooltips showing the abstraction pet name.
+ * Annotate NS[N] references in already HTML-escaped code text.
+ * Wraps each NS[N] token with a tooltip span showing the abstraction name
+ * at namespace slot N.  Uses sim.nsLabels (runtime NS table) first, then
+ * abstractionRegistry as a static fallback.
+ * NS[N] IS a namespace reference, so namespace lookup is correct here.
+ */
+function _annotateNsRefInCode(html) {
+    return html.replace(/\bNS\[(\d+)\]/g, function(m, numStr) {
+        const idx = parseInt(numStr, 10);
+        const label = (sim && sim.nsLabels && sim.nsLabels[idx]) ||
+                      (typeof abstractionRegistry !== 'undefined' &&
+                       abstractionRegistry.abstractions &&
+                       abstractionRegistry.abstractions[idx] &&
+                       abstractionRegistry.abstractions[idx].name) ||
+                      null;
+        if (!label) return m;
+        const safe = label.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `<span class="clist-petname-ref" ` +
+               `onmouseenter="showPetNameTip(event,'${safe}')" ` +
+               `onmouseleave="hidePetNameTip()">${m}</span>`;
+    });
+}
+
+/**
+ * HTML-escape raw assembly text, annotate NS[N] namespace references and
+ * register tokens with hover tooltips.
  * Used for <pre class="abs-method-panel-code"> blocks in the Abstraction view.
  */
 function _annotateAbsCodeHtml(rawText) {
@@ -9,10 +33,10 @@ function _annotateAbsCodeHtml(rawText) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
+    // Annotate NS[N] references before wrapping registers
+    html = _annotateNsRefInCode(html);
     // Wrap CRN / DRN tokens with hover spans (reuses cr-detail helpers)
     if (typeof _wrapRegHover === 'function') html = _wrapRegHover(html);
-    // Annotate CRN[0xNNNN] with pet name tooltip
-    if (typeof _annotateCR6PetNameHtml === 'function') html = _annotateCR6PetNameHtml(html);
     return html;
 }
 

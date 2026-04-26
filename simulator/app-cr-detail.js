@@ -1184,25 +1184,27 @@ function _wrapCListHover(html, clistBase, cc) {
 }
 
 /**
- * Annotate post-_wrapCRHover HTML: replace CRN[0xNNNN] bracket part with a
- * pet-name tooltip span when the NS slot has a known abstraction name.
- * Works on both the EDIT-page disassembly and the Abstraction-view code blocks.
+ * Annotate raw disassembly text: find CR6[0xNNNN] patterns and replace the
+ * bracket portion with a pet-name tooltip span.
+ *
+ * Must be called on PLAIN disassembly text BEFORE _applyMethodCRNames /
+ * _wrapRegHover so that pet-name substitution of CR6 (e.g. "NS(CR6)") does
+ * not push the bracket away from the CR6 token and break the pattern.
+ *
+ * CR6 == "My List" — slot names come from _resolveClistPetName which reads
+ * the actual runtime c-list and sim.nsLabels, NOT abstractionRegistry.
  */
-function _annotateCR6PetNameHtml(html) {
-    return html.replace(
-        /(<span[^>]*onmouseenter="showCRPopup\(event,(\d+)\)"[^>]*>CR\2<\/span>)(\[0x([0-9A-Fa-f]+)\])/g,
-        function(m, crSpan, crNumStr, slotBracket, hexDigits) {
-            const slotIdx = parseInt(hexDigits, 16);
-            const reg = (typeof abstractionRegistry !== 'undefined') ? abstractionRegistry : null;
-            const abs = reg && reg.abstractions ? reg.abstractions[slotIdx] : null;
-            if (!abs) return m;
-            const safeLabel = abs.name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            return crSpan +
-                `<span class="clist-petname-ref" ` +
-                `onmouseenter="showPetNameTip(event,'${safeLabel}')" ` +
-                `onmouseleave="hidePetNameTip()">${slotBracket}</span>`;
-        }
-    );
+function _annotateRawClistSlot(text, clistBase, nsIdx) {
+    if (!text) return text;
+    return text.replace(/CR6\[0x([0-9A-Fa-f]+)\]/g, function(m, hex) {
+        const slotIdx = parseInt(hex, 16);
+        const label = _resolveClistPetName(clistBase || 0, slotIdx, nsIdx);
+        if (!label) return m;
+        const safe = label.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return `CR6<span class="clist-petname-ref" ` +
+               `onmouseenter="showPetNameTip(event,'${safe}')" ` +
+               `onmouseleave="hidePetNameTip()">[0x${hex}]</span>`;
+    });
 }
 
 function _crTag(crNum, crPets) {
