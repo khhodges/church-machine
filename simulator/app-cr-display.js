@@ -1240,6 +1240,20 @@ function showEditorCListPopup(evt) {
         const cr6w1 = sim.cr[6].word1 >>> 0;
 
         if (cr6w0 === 0 || cr6w1 === 0) {
+            // Fallback: if a lump is being edited, show its own c-list directly
+            if (_editorCREditNS !== null && sim.readNSEntry && sim.parseLumpHeader && sim.memory) {
+                const _edNse = sim.readNSEntry(_editorCREditNS);
+                if (_edNse) {
+                    const _edLoc  = _edNse.word0_location >>> 0;
+                    const _edW0   = _edLoc < sim.memory.length ? (sim.memory[_edLoc] >>> 0) : 0;
+                    const _edHdr  = sim.parseLumpHeader(_edW0);
+                    if (_edHdr && _edHdr.valid && _edHdr.cc > 0) {
+                        const _edBase = _edLoc + _edHdr.lumpSize - _edHdr.cc;
+                        showCListPopup(evt, _edBase, _edHdr.cc);
+                        return;
+                    }
+                }
+            }
             _showEditorCListNotice(pop, evt, 'No C-List loaded \u2014 run a program that sets CR6 first');
         } else {
             const clistBase = cr6w1;

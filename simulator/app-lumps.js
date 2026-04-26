@@ -296,7 +296,7 @@ function showLumpDetail(token) {
     const delBtn = contentEl.querySelector('.lump-delete-btn[data-delete-token]');
     if (delBtn) delBtn.addEventListener('click', () => deleteLump(delBtn.dataset.deleteToken));
     const editBtn = contentEl.querySelector('.lump-edit-btn[data-edit-token]');
-    if (editBtn) editBtn.addEventListener('click', () => switchView('editor'));
+    if (editBtn) editBtn.addEventListener('click', () => openLumpInEditor(editBtn.dataset.editToken));
     _lumpActiveTab[_tk] = 'overview';
     const nsdgWrap = contentEl.querySelector('.ns-dep-graph-wrap[id]');
     if (nsdgWrap) _initNsDepGraphPanZoom(nsdgWrap.id);
@@ -1826,5 +1826,124 @@ async function _goToLumpByAbstractionName(name) {
     } catch (e) {
         // Network error: do nothing rather than navigating blindly.
     }
+}
+
+// ── Open a saved lump in the Create (editor) page ──────────────────────────
+// Disassembles the lump from simulator memory (if loaded) and opens the
+// editor with the code and c-list context set so the C-List picker and
+// Patch button work for this specific lump.
+function openLumpInEditor(token) {
+    var lump = _lumpsCache.find(function(l) { return l.token === token; });
+    if (!lump) return;
+    var lumpName = lump.abstraction || ('Lump 0x' + token);
+
+    // ── Locate the lump in simulator memory ────────────────────────────────
+    var baseLoc = null;
+    var resolvedNsIdx = null;
+    var resolvedCRIdx = null;
+
+    if (typeof sim !== 'undefined' && sim && sim.memory && sim.readNSEntry) {
+        // 1. Via the stored ns_slot
+        var nsSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined)
+            ? parseInt(lump.ns_slot) : null;
+        if (nsSlot !== null) {
+            var nsEnt = sim.readNSEntry(nsSlot);
+            if (nsEnt) {
+                var loc0 = nsEnt.word0_location >>> 0;
+                var hw0  = loc0 < sim.memory.length ? (sim.memory[loc0] >>> 0) : 0;
+                var hdr0 = sim.parseLumpHeader ? sim.parseLumpHeader(hw0) : null;
+                if (hdr0 && hdr0.valid) { baseLoc = loc0; resolvedNsIdx = nsSlot; }
+            }
+        }
+        // 2. Fallback: the token encodes the lump's base address
+        if (baseLoc === null) {
+            var tAddr = parseInt(token, 16) >>> 0;
+            if (tAddr > 0 && tAddr < sim.memory.length) {
+                var hw1 = sim.memory[tAddr] >>> 0;
+                var hdr1 = sim.parseLumpHeader ? sim.parseLumpHeader(hw1) : null;
+                if (hdr1 && hdr1.valid) {
+                    baseLoc = tAddr;
+                    // Scan NS table to find which entry owns this address
+                    for (var ni = 0; ni < (sim.nsCount || 0); ni++) {
+                        var ne = sim.readNSEntry(ni);
+                        if (ne && (ne.word0_location >>> 0) === tAddr) {
+                            resolvedNsIdx = ni; break;
+                        }
+                    }
+                }
+            }
+        }
+        // 3. Find which CR currently holds this NS entry
+        if (resolvedNsIdx !== null && typeof sim.getFormattedCR === 'function') {
+            for (var ci = 0; ci < 16; ci++) {
+                try {
+                    var cr = sim.getFormattedCR(ci);
+                    if (cr && cr.gtIndex === resolvedNsIdx) { resolvedCRIdx = ci; break; }
+                } catch (_e) {}
+            }
+        }
+    }
+
+    // ── Disassemble code from simulator memory ─────────────────────────────
+    var disasmLines = null;
+    if (baseLoc !== null && typeof sim !== 'undefined' && sim && sim.memory && sim.parseLumpHeader) {
+        var lhdrW = sim.memory[baseLoc] >>> 0;
+        var lhdr  = sim.parseLumpHeader(lhdrW);
+        if (lhdr && lhdr.valid) {
+            var codeStart = baseLoc + 1;
+            var codeLimit = lhdr.cw;
+            var rawWords  = [];
+            for (var wi = 0; wi < codeLimit; wi++) {
+                var wa = codeStart + wi;
+                if (wa >= sim.memory.length) break;
+                rawWords.push(sim.memory[wa] >>> 0);
+            }
+            var trimLen = rawWords.length;
+            while (trimLen > 0 && rawWords[trimLen - 1] === 0) trimLen--;
+            var trimmed = rawWords.slice(0, trimLen);
+            var nsTag   = resolvedNsIdx !== null ? ('NS[' + resolvedNsIdx + ']  ') : '';
+            disasmLines = [
+                '; ' + lumpName + '  ' + nsTag + '@ 0x' +
+                baseLoc.toString(16).toUpperCase().padStart(4, '0') +
+                '  (' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') + ')'
+            ];
+            if (trimmed.length === 0) {
+                disasmLines.push('; (empty lump)');
+            } else if (typeof ChurchAssembler !== 'undefined') {
+                disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(trimmed));
+            }
+        }
+    }
+
+    // ── Set up editor context ──────────────────────────────────────────────
+    _editorCREditActive = true;
+    _editorCREditCR     = resolvedCRIdx;
+    _editorCREditNS     = resolvedNsIdx;
+    if (resolvedCRIdx !== null && typeof selectedCR !== 'undefined') {
+        selectedCR = resolvedCRIdx;
+    }
+
+    switchView('editor');
+
+    var sel = document.getElementById('langSelector');
+    if (sel) sel.value = 'assembly';
+
+    var asmEd = document.getElementById('asmEditor');
+    if (asmEd) {
+        if (disasmLines) {
+            asmEd.value = disasmLines.join('\n');
+        } else {
+            var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
+            var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
+            asmEd.value = '; ' + lumpName + cwHint + ccHint +
+                          '\n; Boot the machine to edit live code\n';
+        }
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+    }
+
+    if (typeof _updateEditorPatchBar   === 'function') _updateEditorPatchBar();
+    if (typeof _updateMtbfIndicator    === 'function') _updateMtbfIndicator();
+    var outEl = document.getElementById('assemblyOutput');
+    if (outEl) outEl.innerHTML = '';
 }
 
