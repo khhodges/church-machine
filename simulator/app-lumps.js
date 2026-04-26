@@ -823,6 +823,63 @@ async function _loadLumpContent(token, lump) {
     }
 }
 
+// ── Comment colorizer ─────────────────────────────────────────────────────
+// Converts a plain-text auto-comment into HTML with semantic colour spans:
+//   .lump-com-pet  → capability/pet names  (red)
+//   .lump-com-dr   → DR data registers     (green)
+//   .lump-com-cr   → CR cap registers      (yellow)
+function _colorizeComment(text) {
+    const _h = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    let out = '';
+    let i   = 0;
+    while (i < text.length) {
+        // Quoted pet name  "LED[0]" / "myAbstraction" / …
+        if (text[i] === '"') {
+            const end = text.indexOf('"', i + 1);
+            if (end !== -1) {
+                out += `<span class="lump-com-pet">${_h(text.slice(i, end + 1))}</span>`;
+                i = end + 1;
+                continue;
+            }
+        }
+        // Unquoted device-class pet name from DREAD/DWRITE: LED[0], UART[0], Button[0], Abs[2], Dev5[0], …
+        const devM = text.slice(i).match(/^[A-Z][A-Za-z0-9]*\[\d+\]/);
+        if (devM) {
+            out += `<span class="lump-com-pet">${_h(devM[0])}</span>`;
+            i += devM[0].length;
+            continue;
+        }
+        // M-Elevation abstract GT label
+        if (text.slice(i).startsWith('M-Elevation')) {
+            out += `<span class="lump-com-pet">M-Elevation</span>`;
+            i += 11;
+            continue;
+        }
+        // DR register  DR0 … DR15
+        const drM = text.slice(i).match(/^DR(\d{1,2})\b/);
+        if (drM) {
+            out += `<span class="lump-com-dr">${drM[0]}</span>`;
+            i += drM[0].length;
+            continue;
+        }
+        // CR register  CR0 … CR15  (optional parenthetical: CR14(code))
+        const crM = text.slice(i).match(/^CR(\d{1,2})(?:\([^)]*\))?/);
+        if (crM) {
+            out += `<span class="lump-com-cr">${_h(crM[0])}</span>`;
+            i += crM[0].length;
+            continue;
+        }
+        // Plain character — HTML-escape
+        const c = text[i];
+        if      (c === '<') out += '&lt;';
+        else if (c === '>') out += '&gt;';
+        else if (c === '&') out += '&amp;';
+        else                out += c;
+        i++;
+    }
+    return out;
+}
+
 function _renderLumpCodeContent(bodyEl, lump, words) {
     const e = _escHtml;
     const methods   = lump.methods  || [];
@@ -1026,9 +1083,17 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                 return `${condStr}fused load + lambda ${crName(crSrc)}[${imm}] → CR${crDst}`;
             }
             case 10: {  // DREAD DRd, CRs[imm]
+                if (crAlias[crSrc] !== undefined) {
+                    const nm = clistSlotName[crAlias[crSrc]];
+                    if (nm) return `${condStr}DR${crDst} ← ${nm}`;
+                }
                 return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${imm}]`;
             }
             case 11: {  // DWRITE DRd, CRs[imm]
+                if (crAlias[crSrc] !== undefined) {
+                    const nm = clistSlotName[crAlias[crSrc]];
+                    if (nm) return `${condStr}${nm} ← DR${crDst}`;
+                }
                 return `${condStr}data[${crName(crSrc)}+${imm}] ← DR${crDst}`;
             }
             case 12: {  // BFEXT DRd, DRs, pos, w
@@ -1241,7 +1306,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                     _brSvgHtml +
                     `<span class="lump-code-addr lump-code-binary">\u00A00x${addr}</span>` +
                     `<span class="lump-code-hex lump-code-binary">${hex}</span>` +
-                    `<span class="lump-code-comment">${e(commentText)}</span>` +
+                    `<span class="lump-code-comment">${_colorizeComment(commentText)}</span>` +
                     `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}</span>` +
                     `</div>`;
 

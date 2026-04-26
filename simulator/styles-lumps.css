@@ -353,7 +353,7 @@
     font-style: italic;
 }
 .lump-code-comment {
-    color: #ffee00;
+    color: #a8b8c8;
     font-size: 0.78rem;
     font-style: normal;
     white-space: nowrap;
@@ -361,6 +361,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.lump-com-pet { color: #ff7b7b; font-weight: 600; }
+.lump-com-dr  { color: #7dd3a8; font-weight: 600; }
+.lump-com-cr  { color: #ffc85a; font-weight: 600; }
 .lump-code-label-row {
     font-family: 'Courier New', monospace;
     font-size: 0.72rem;
