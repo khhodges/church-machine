@@ -370,15 +370,13 @@
     letter-spacing: 0.02em;
 }
 .lump-code-branch-svg {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    vertical-align: middle;
-    margin-left: 3px;
+    flex-shrink: 0;
     opacity: 0.9;
 }
 .lump-code-branch-svg svg.br-svg {
-    display: inline-block;
-    vertical-align: middle;
+    display: block;
 }
 .lump-code-docstring {
     color: #8a9aaa;

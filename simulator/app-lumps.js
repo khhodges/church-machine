@@ -1235,13 +1235,14 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
             // Branch arrow SVG (from pre-computed _lumpBrArrows)
             const _brSvgHtml = (_lumpBrArrows.hasBranches && _lumpBrArrows.html[_lumpCi])
                 ? `<span class="lump-code-branch-svg">${_lumpBrArrows.html[_lumpCi]}</span>`
-                : (_lumpBrArrows.hasBranches ? `<span class="lump-code-branch-svg lump-code-branch-svg-empty" style="width:${(_lumpBrArrows.svgW||14)}px;display:inline-block;"></span>` : '');
+                : (_lumpBrArrows.hasBranches ? `<span class="lump-code-branch-svg lump-code-branch-svg-empty" style="width:${(_lumpBrArrows.svgW||14)}px;"></span>` : '');
 
             html += `<div class="lump-code-row">` +
+                    _brSvgHtml +
                     `<span class="lump-code-addr lump-code-binary">\u00A00x${addr}</span>` +
                     `<span class="lump-code-hex lump-code-binary">${hex}</span>` +
                     `<span class="lump-code-comment">${e(commentText)}</span>` +
-                    `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}${_brSvgHtml}</span>` +
+                    `<span class="lump-code-instr">${e(disText)}${ann ? ' ' + ann : ''}</span>` +
                     `</div>`;
 
             instrRelIdx++;
