@@ -1859,6 +1859,7 @@ function showFaultModal(f) {
             <button class="btn btn-warning" onclick="faultModalInvestigate()">&#x1F50D; Investigate</button>
             ${isOutformFault ? '<button class="btn btn-primary" onclick="faultModalRetryDownload()">&#x21BB; Retry Download</button>' : ''}
             <button class="btn btn-primary" onclick="faultModalEditCode()" title="Open the assembly editor to inspect and correct the faulting code">&#x270E; Edit Code</button>
+            ${instrTrace.length > 0 ? '<button class="btn btn-muted fault-trace-btn" id="faultTraceToggleBtn" onclick="faultModalToggleTrace(this)" title="Show/hide instruction trace (last ' + instrTrace.length + ' instructions)">&#x25B6; Trace</button>' : ''}
             <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
         </div>
         <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
@@ -1915,6 +1916,19 @@ function showFaultModal(f) {
 function faultModalDismiss() {
     const el = document.getElementById('faultModalOverlay');
     if (el) el.remove();
+}
+
+function faultModalToggleTrace(btn) {
+    const overlay = document.getElementById('faultModalOverlay');
+    if (!overlay) return;
+    const section = overlay.querySelector('.fault-trace-collapsible');
+    if (!section) return;
+    const isOpen = section.classList.toggle('fault-trace-open');
+    if (btn) {
+        btn.innerHTML = (isOpen ? '&#x25BC; Trace' : '&#x25B6; Trace');
+        btn.classList.toggle('fault-trace-btn-active', isOpen);
+    }
+    if (isOpen) section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function faultModalOpenEditor(lineNum) {
