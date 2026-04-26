@@ -916,14 +916,36 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
         return lm ? (lm.abstraction || '') : '';
     };
 
-    // Pre-parse c-list slots so we can resolve names during disassembly
+    // Pre-parse c-list slots — resolve human pet names for use during disassembly.
+    // Uses the same priority as MyGoldenTokens rendering:
+    //   1. lump manifest pet_names.CR[s]
+    //   2. Abstract GT device-class derivation (LED[0], UART[0], …)
+    //   3. Inform/Outform GT: token lookup → sim.nsLabels[slot_id]
     const clistSlotName = {};   // slot index (0-based) → human name
+    const _crPetNamesForCode = (lump.pet_names || {}).CR || {};
+    const _abDevClsNames     = ['?','LED','UART','Button','Timer','Display'];
     const clistStart = lumpSize - cc;
     for (let s = 0; s < cc; s++) {
         const wIdx = clistStart + s;
         const wVal = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
-        const resolved = wVal ? _clistName(wVal) : '';
-        clistSlotName[s] = resolved || `0x${wVal.toString(16).padStart(8, '0')}`;
+        if (!wVal) { clistSlotName[s] = '(empty)'; continue; }
+        const _mfstName = _crPetNamesForCode[s] || _crPetNamesForCode[String(s)] || '';
+        if (_mfstName) { clistSlotName[s] = _mfstName; continue; }
+        const _gtType = (wVal >>> 23) & 0x3;
+        if (_gtType === 3) {  // Abstract GT: [31:27]=ab_type [26]=R [25]=W [15:0]=ab_data
+            const _abType  = (wVal >>> 27) & 0x1F;
+            const _abData  = wVal & 0xFFFF;
+            const _devCls  = (_abData >>> 8) & 0xFF;
+            const _devDat  = _abData & 0xFF;
+            if (_abType === 0)      clistSlotName[s] = `${_abDevClsNames[_devCls] || `Dev${_devCls}`}[${_devDat}]`;
+            else if (_abType === 1) clistSlotName[s] = 'M-Elevation';
+            else                   clistSlotName[s] = `Abs[${_abType}]`;
+        } else {  // Inform / Outform GT: [15:0]=slot_id
+            const _slotId   = wVal & 0xFFFF;
+            const _tokName  = _clistName(wVal);
+            const _simNsNm  = (typeof sim !== 'undefined' && sim && sim.nsLabels) ? (sim.nsLabels[_slotId] || '') : '';
+            clistSlotName[s] = _tokName || _simNsNm || '';
+        }
     }
 
     // ── Auto-comment engine ──────────────────────────────────────────────
@@ -935,40 +957,35 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
         const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
         const condStr   = cond === 14 ? '' : `if ${condNames[cond]} `;
 
+        // crName: returns pet name in quotes when CRn carries a known c-list alias,
+        // otherwise returns the structural register label. This gives the logical view.
         const crName = n => {
+            if (crAlias[n] !== undefined) {
+                const nm = clistSlotName[crAlias[n]];
+                if (nm) return `"${nm}"`;
+            }
             if (n === 6 && cc > 0) return 'c-list';
             if (n === 14) return 'CR14(code)';
             if (n === 13) return 'CR13(int)';
             if (n === 15) return 'CR15(priv)';
             return `CR${n}`;
         };
-        const crAliasSym = n => {
-            if (crAlias[n] !== undefined) {
-                const nm = clistSlotName[crAlias[n]];
-                return nm ? `"${nm}"` : null;
-            }
-            return null;
-        };
+        // Helper: pet name for a c-list slot, falling back to slot index label
+        const _slotLabel = idx => clistSlotName[idx] || `c-list[${idx}]`;
 
         switch (op) {
             case 0: {  // LOAD CRd, CRs[imm]
                 if (crSrc === 6 && cc > 0) {
-                    const nsName = abstractionRegistry && abstractionRegistry.abstractions[imm] ? abstractionRegistry.abstractions[imm].name : null;
-                    const nm = nsName || clistSlotName[imm] || `slot ${imm}`;
-                    return `${condStr}CR${crDst} ← c-list[${imm}] (${nm})`;
+                    return `${condStr}CR${crDst} ← "${_slotLabel(imm)}"`;
                 }
-                const sym = crAliasSym(crSrc);
-                return `${condStr}CR${crDst} ← GT via ${crName(crSrc)}[${imm}]${sym ? ` ${sym}` : ''}`;
+                return `${condStr}CR${crDst} ← GT via ${crName(crSrc)}[${imm}]`;
             }
             case 1: {  // SAVE CRd, CRs[imm]
-                const sym = crAliasSym(crDst);
-                return `${condStr}store CR${crSrc} → GT space of ${crName(crDst)}[${imm}]${sym ? ` ${sym}` : ''}`;
+                return `${condStr}store CR${crSrc} → GT space of ${crName(crDst)}[${imm}]`;
             }
             case 2: {  // CALL CRd[, sel]
-                const sym = crAliasSym(crDst);
-                const name = sym ? ` ${sym}` : '';
                 const selSrc = crSrc ? `, method #${crSrc}` : '';
-                return `${condStr}invoke CR${crDst}${name}${selSrc}`;
+                return `${condStr}invoke ${crName(crDst)}${selSrc}`;
             }
             case 3: {  // RETURN [mask]
                 const retMask = imm & 0xFFF;
@@ -978,9 +995,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
             }
             case 4: {  // CHANGE CRd, CRs[imm]
                 if (crSrc === 6 && cc > 0) {
-                    const nsName = abstractionRegistry && abstractionRegistry.abstractions[imm] ? abstractionRegistry.abstractions[imm].name : null;
-                    const nm = nsName || clistSlotName[imm] || `slot ${imm}`;
-                    return `${condStr}hot-swap CR${crDst} ← c-list[${imm}] (${nm})`;
+                    return `${condStr}hot-swap CR${crDst} ← "${_slotLabel(imm)}"`;
                 }
                 return `${condStr}update CR${crDst} via ${crName(crSrc)}[${imm}]`;
             }
@@ -998,27 +1013,21 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
             }
             case 8: {  // ELOADCALL CRd, CRs[imm]
                 if (crSrc === 6 && cc > 0) {
-                    const nsName = abstractionRegistry && abstractionRegistry.abstractions[imm] ? abstractionRegistry.abstractions[imm].name : null;
-                    const nm = nsName || clistSlotName[imm] || `slot ${imm}`;
-                    return `${condStr}fused load + call c-list[${imm}] (${nm}) → CR${crDst}`;
+                    return `${condStr}fused load + call "${_slotLabel(imm)}" → CR${crDst}`;
                 }
                 return `${condStr}fused load + call ${crName(crSrc)}[${imm}] → CR${crDst}`;
             }
             case 9: {  // XLOADLAMBDA CRd, CRs[imm]
                 if (crSrc === 6 && cc > 0) {
-                    const nsName = abstractionRegistry && abstractionRegistry.abstractions[imm] ? abstractionRegistry.abstractions[imm].name : null;
-                    const nm = nsName || clistSlotName[imm] || `slot ${imm}`;
-                    return `${condStr}fused load + lambda c-list[${imm}] (${nm}) → CR${crDst}`;
+                    return `${condStr}fused load + lambda "${_slotLabel(imm)}" → CR${crDst}`;
                 }
                 return `${condStr}fused load + lambda ${crName(crSrc)}[${imm}] → CR${crDst}`;
             }
             case 10: {  // DREAD DRd, CRs[imm]
-                const sym = crAliasSym(crSrc);
-                return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${imm}]${sym ? ` (${sym})` : ''}`;
+                return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${imm}]`;
             }
             case 11: {  // DWRITE DRd, CRs[imm]
-                const sym = crAliasSym(crSrc);
-                return `${condStr}data[${crName(crSrc)}+${imm}]${sym ? ` (${sym})` : ''} ← DR${crDst}`;
+                return `${condStr}data[${crName(crSrc)}+${imm}] ← DR${crDst}`;
             }
             case 12: {  // BFEXT DRd, DRs, pos, w
                 const pos   = (imm >>> 5) & 0x1F;
@@ -1151,12 +1160,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
 
             // Build symbolic annotation (capability arrow shown next to mnemonic)
             let ann = '';
-            const _nsOrClistName = idx => {
-                const fromClist = clistSlotName[idx];
-                if (fromClist && !fromClist.startsWith('0x')) return fromClist;
-                const nsEntry = abstractionRegistry && abstractionRegistry.abstractions[idx];
-                return (nsEntry ? nsEntry.name : null) || fromClist;
-            };
+            const _nsOrClistName = idx => clistSlotName[idx] || null;
             if ((op === 0 || op === 4) && crSrc === 6 && cc > 0) {
                 const nm = _nsOrClistName(imm);
                 if (nm) ann = `<span class="lump-sym-ann">\u2190 ${e(nm)}</span>`;
