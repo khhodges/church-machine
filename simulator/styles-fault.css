@@ -1,7 +1,7 @@
 /* ── Fault Popup Modal ───────────────────────────────────────── */
 .fault-dialog {
-    min-width: 380px;
-    max-width: 620px;
+    min-width: 480px;
+    max-width: 680px;
     max-height: 90vh;
     overflow-y: auto;
     border: 1px solid rgba(220, 60, 60, 0.45);
@@ -39,8 +39,13 @@
     margin-top: 0;
     margin-bottom: 0.85rem;
     justify-content: flex-start;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.4rem;
+}
+
+.fault-modal-actions .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .fault-modal-message {
