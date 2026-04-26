@@ -58,8 +58,8 @@ function showLumpDetail(token) {
     _headerStrip += `</div>`;
 
     let _tabBar = `<div class="lump-tabs-bar" id="lumpTabBar_${_tk}">` +
-        `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
-    if (!isNamespace) _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
+        `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
+    if (!isNamespace) _tabBar += `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
     _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','hexdump')">Hex Dump</button></div>`;
 
     // ── Action bar (Edit + Delete) shown below the header strip ─────────────
@@ -70,7 +70,7 @@ function showLumpDetail(token) {
     _actionBar += `<button class="btn lump-delete-btn lump-delete-top-btn" data-delete-token="${_e(token)}" title="Delete this lump">Delete</button>`;
     _actionBar += `</div>`;
 
-    let html = _headerStrip + _actionBar + _tabBar + `<div class="lump-tab-panel lump-tab-panel-active" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
+    let html = _headerStrip + _actionBar + _tabBar + `<div class="lump-tab-panel${isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
 
     const e = _escHtml;
 
@@ -286,7 +286,7 @@ function showLumpDetail(token) {
     html += '</div></div>';
 
     if (!isNamespace) {
-        html += `<div class="lump-tab-panel" id="lumpTabContent_${_tk}">` +
+        html += `<div class="lump-tab-panel${!isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabContent_${_tk}">` +
                 `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
     }
     html += `<div class="lump-tab-panel" id="lumpTabHexdump_${_tk}">` +
