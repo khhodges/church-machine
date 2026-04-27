@@ -512,6 +512,7 @@ function _populateLumpLogicTab(lump) {
             }
             html += `</div></div>`;
         }
+        html += _lumpBootSeqCodeHtml(lump);
         el.innerHTML = html;
         return;
     }
@@ -572,7 +573,24 @@ function _populateLumpLogicTab(lump) {
         html += '</div>';
     }
 
+    html += _lumpBootSeqCodeHtml(lump);
+
     el.innerHTML = html;
+}
+
+function _lumpBootSeqCodeHtml(lump) {
+    const nsSlot = lump.ns_slot !== null && lump.ns_slot !== undefined ? parseInt(lump.ns_slot) : -1;
+    if (nsSlot < 0 || nsSlot > 2) return '';
+    if (typeof BOOT_SEQ_CODE === 'undefined' || BOOT_SEQ_CODE[nsSlot] === undefined) return '';
+    const code = BOOT_SEQ_CODE[nsSlot];
+    const rendered = (typeof _annotateAbsCodeHtml === 'function') ? _annotateAbsCodeHtml(code) : code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return '<div class="lump-logic-section">' +
+        '<details class="lump-boot-code-details" open>' +
+        '<summary class="lump-logic-methods-title lump-boot-code-summary">Boot Sequence Pseudocode</summary>' +
+        '<div class="abs-boot-code-desc" style="margin:4px 0 6px;">Installed implementation \u2014 executed by the STEP controller at power-on reset.</div>' +
+        `<pre class="abs-method-panel-code abs-boot-code-pre">${rendered}</pre>` +
+        '</details>' +
+        '</div>';
 }
 
 function _isRawISASource(src) {
