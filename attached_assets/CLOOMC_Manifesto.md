@@ -30,7 +30,7 @@ Four token forms are recognised:
 - **Passive Tokens** — carrying immutable values such as entry credentials or sealed secrets.
 - **Void Tokens** — enabling resource managers to release storage instantly, without garbage-collecting existing keys.
 
-Each token may be watermarked at origin. Attempted forgery is detectable. The cockpit is locked.
+Each token may be watermarked at origin. Deep-Fake forgery is detectable. The cockpit is locked.
 
 ---
 
