@@ -2192,9 +2192,10 @@ function _openGTSlotPicker(lumpToken, slotIndex, chipEl) {
         for (let i = 0; i < count; i++) {
             const ent = sim.readNSEntry(i);
             if (!ent) continue;
+            if (!ent.word0_location) continue;           // no physical lump — not a real slot
+            const gtTypeNum = ent.gtType || 0;
+            if (gtTypeNum === 0) continue;               // NULL type — nothing to bind
             const label = (sim.nsLabels && sim.nsLabels[i]) || ent.label || '';
-            const gtTypeNum = ent.gtType || 0;  // 0=NULL 1=Inf 2=Out 3=Abs
-            if (gtTypeNum === 0 && !label) continue;  // skip truly empty unnamed slots
             entries.push({
                 slot: i,
                 label,
