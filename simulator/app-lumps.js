@@ -1344,6 +1344,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
     if (!autoDetected) {
         let _codeOnlyCursor = 0;  // cumulative offset for source-JSON code-only methods
         for (const m of methods) {
+            if (m.aliasOf) continue;  // aliases share the target's binary — no separate card
             const hasOffset = typeof m.offset === 'number';
             const codeArr   = Array.isArray(m.code) ? m.code : null;
             const hasCode   = codeArr !== null || typeof m.code === 'string';
