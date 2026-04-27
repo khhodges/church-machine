@@ -1099,6 +1099,26 @@
     font-size: 0.68rem;
     font-weight: 700;
     letter-spacing: 0.3px;
+    cursor: pointer;
+    user-select: none;
+}
+.lump-method-card-name::before {
+    content: '\25bc\00a0';
+    font-size: 0.5rem;
+    opacity: 0.6;
+    vertical-align: middle;
+}
+.lump-method-card[data-collapsed="1"] .lump-method-card-name::before {
+    content: '\25b6\00a0';
+}
+.lump-method-card-name:hover {
+    color: #e8c870;
+}
+.lump-method-body {
+    display: block;
+}
+.lump-method-card[data-collapsed="1"] .lump-method-body {
+    display: none;
 }
 .lump-method-toggle-btn {
     font-size: 0.6rem;

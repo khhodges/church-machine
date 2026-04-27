@@ -1630,19 +1630,20 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
         for (let i = 1; i < effEnd; i++, _lumpCi++) {
             // Method boundary → reset per-method register aliases and update DR pet names
             if (mb[i] !== undefined) {
-                if (_methodCardOpen) html += '</div>';  // close previous method card
+                if (_methodCardOpen) html += '</div></div>';  // close previous method body + card
                 const auto = autoDetected ? ' <span class="lump-meth-auto" title="Auto-detected boundary">[~]</span>' : '';
                 const cardId = `lump-mc-${_methodCardIdx++}`;
                 html += `<div class="lump-method-card" id="${cardId}">` +
                         `<div class="lump-method-card-header">` +
-                        `<span class="lump-method-card-name">\u25c6 ${e(mb[i])}${auto}</span>` +
+                        `<span class="lump-method-card-name" onclick="(function(el){var card=el.closest('.lump-method-card');var c=card.getAttribute('data-collapsed')==='1';card.setAttribute('data-collapsed',c?'0':'1');})(this)">\u25c6 ${e(mb[i])}${auto}</span>` +
                         `<button class="lump-method-toggle-btn" onclick="(function(btn){` +
                             `var card=btn.closest('.lump-method-card');` +
                             `var shown=card.getAttribute('data-binary')==='1';` +
                             `card.setAttribute('data-binary',shown?'0':'1');` +
                             `btn.textContent=shown?'Show binary':'Hide binary';` +
                         `})(this)">Show binary</button>` +
-                        `</div>`;
+                        `</div>` +
+                        `<div class="lump-method-body">`;
                 _methodCardOpen = true;
                 for (const k of Object.keys(crAlias)) delete crAlias[k];
                 _curMethodDRMap = methodDRPetNames[mb[i]] || {};
@@ -1654,14 +1655,15 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                 const cardId = `lump-mc-${_methodCardIdx++}`;
                 html += `<div class="lump-method-card" id="${cardId}">` +
                         `<div class="lump-method-card-header">` +
-                        `<span class="lump-method-card-name">\u25c6 (code)</span>` +
+                        `<span class="lump-method-card-name" onclick="(function(el){var card=el.closest('.lump-method-card');var c=card.getAttribute('data-collapsed')==='1';card.setAttribute('data-collapsed',c?'0':'1');})(this)">\u25c6 (code)</span>` +
                         `<button class="lump-method-toggle-btn" onclick="(function(btn){` +
                             `var card=btn.closest('.lump-method-card');` +
                             `var shown=card.getAttribute('data-binary')==='1';` +
                             `card.setAttribute('data-binary',shown?'0':'1');` +
                             `btn.textContent=shown?'Show binary':'Hide binary';` +
                         `})(this)">Show binary</button>` +
-                        `</div>`;
+                        `</div>` +
+                        `<div class="lump-method-body">`;
                 _methodCardOpen = true;
             }
 
@@ -1757,7 +1759,7 @@ function _renderLumpCodeContent(bodyEl, lump, words) {
                 for (const k of Object.keys(crAlias)) delete crAlias[k];
             }
         }
-        if (_methodCardOpen) html += '</div>';  // close last method card
+        if (_methodCardOpen) html += '</div></div>';  // close last method body + card
     }
     html += '</div></div>';  // close .lump-methods-section and .lump-content-code
 
