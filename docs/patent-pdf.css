@@ -1,0 +1,47 @@
+@page {
+    margin: 2.5cm 2.5cm 3cm 2.5cm;
+
+    @bottom-left {
+        content: "© 2026 Kenneth James Hamer-Hodges (KJHH)";
+        font-size: 9pt;
+        font-family: serif;
+        color: #444;
+    }
+
+    @bottom-center {
+        content: "April 27, 2026";
+        font-size: 9pt;
+        font-family: serif;
+        color: #444;
+    }
+
+    @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-size: 9pt;
+        font-family: serif;
+        color: #444;
+    }
+}
+
+body {
+    font-family: serif;
+    font-size: 11pt;
+    line-height: 1.5;
+}
+
+h1 { font-size: 16pt; margin-top: 1.4em; }
+h2 { font-size: 13pt; margin-top: 1.2em; }
+h3 { font-size: 11pt; margin-top: 1em; }
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 9pt;
+}
+th, td {
+    border: 1px solid #999;
+    padding: 3pt 6pt;
+}
+th {
+    background: #eee;
+}
