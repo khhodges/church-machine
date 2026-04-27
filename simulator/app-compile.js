@@ -362,7 +362,7 @@ function onLangChange(restoring) {
     if (btnBuildLumpMenu) btnBuildLumpMenu.disabled = (lang === 'assembly');
 
     const langExampleGroups = {
-        english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_string', 'cloomc_english_loops'],
+        english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_string', 'cloomc_english_loops', 'cloomc_english_contact'],
         assembly: ['ada_note_g', 'selftest', 'load_save', 'bernoulli', 'conditional', 'gc_test', 'turing_test', 'led_blink', 'salvation', 'perm_attack', 'bind_attack', 'tperm_halt'],
         javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_contact', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
@@ -1482,6 +1482,93 @@ abstraction Heap {
         'ada_note_g': `-- Ada Lovelace — Note G (1843)\n-- The First Computer Program\n-- Computes B7 (Bernoulli number = -1/30)\n-- Written in Symbolic Mathematics notation\n\nabstraction NoteG {\n    capabilities {\n    }\n\n    method compute() {\n        -- Initialize Ada's Store columns\n        let V1 = 1\n        let V2 = 2\n        let V3 = 4\n\n        -- Operation 1: V4 = 2n = 8\n        let V4, V5, V6 = V2 * V3\n\n        -- Operation 2: 2n-1 = 7\n        let V4 = V4 - V1\n\n        -- Operation 3: 2n+1 = 9\n        let V5 = V5 + V1\n\n        -- Operation 4: (2n-1)/(2n+1) — CORRECTED per Bromley (1990)\n        let V11 = V4 / V5\n\n        -- Operation 5: divide coefficient by 2\n        let V11 = V11 / V2\n\n        -- Operation 6: accumulator\n        let V13 = 0\n        let V13 = V13 - V11\n\n        -- Operation 7: loop counter = n-1 = 3\n        let V10 = V3 - V1\n\n        -- Operation 8: denominator counter\n        let V7 = V2\n\n        -- Operation 9: 2n / counter\n        let V11 = V6 / V7\n\n        -- Operation 10: B1 * coefficient\n        let V15 = 1\n        let V12 = V15 * V11\n\n        -- Operation 11: accumulate\n        let V13 = V12 + V13\n\n        -- Operation 12: decrement loop\n        let V10 = V10 - V1\n\n        -- Operations 13-23: loop body\n        repeat V10 as V10\n            let V6 = V6 - V1\n            let V7 = V1 + V7\n            let V8 = V6 / V7\n            let V11 = V8 * V11\n            let V6 = V6 - V1\n            let V7 = V1 + V7\n            let V9 = V6 / V7\n            let V11 = V9 * V11\n            let V15 = 1\n            let V12 = V15 * V11\n            let V13 = V12 + V13\n        end\n\n        -- Operation 24: B7 = -sum\n        let V15 = 0\n        let V15 = V15 - V13\n\n        -- Operation 25: increment n\n        let V3 = V1 + V3\n\n        halt\n    }\n}`,
         'bernoulli_numbers': `-- Bernoulli Numbers via SlideRule\n-- One CALL per number — no loops, no algorithm.\n-- Ada needed 25 operations; the SlideRule does it in 1.\n--\n-- SlideRule.Bernoulli(n) returns numerator in DR(dst),\n-- denominator in DR(dst+1). Both are machine-accessible.\n-- B(0)=1/1, B(1)=-1/2, B(2)=1/6, B(4)=-1/30,\n-- B(6)=1/42, B(8)=-1/30, B(10)=5/66, B(12)=-691/2730\n\nabstraction BernoulliNumbers {\n    capabilities {\n    }\n\n    method compute() {\n        -- Compute Bernoulli numbers using shorthand syntax\n        -- bernoulli(x) compiles to SlideRule.Bernoulli(x)\n\n        let V1 = bernoulli(0)\n\n        let V2 = 2\n        let V2 = bernoulli(V2)\n\n        let V3 = 4\n        let V3 = bernoulli(V3)\n\n        -- Also supports explicit SlideRule.Bernoulli() form\n        let V4 = 6\n        let V4 = SlideRule.Bernoulli(V4)\n\n        let V5 = 8\n        let V5 = SlideRule.Bernoulli(V5)\n\n        let V6 = 10\n        let V6 = bernoulli(V6)\n\n        let V7 = 12\n        let V7 = bernoulli(V7)\n\n        -- After each call: DR(n) = numerator, DR(n+1) = denominator\n        -- V1=1/1, V2=1/6, V3=-1/30, V4=1/42,\n        -- V5=-1/30, V6=5/66, V7=-691/2730\n\n        halt\n    }\n}`,
         'sliderule_hs': `-- SlideRule — Haskell front-end\n-- Integer arithmetic on Church Machine hardware\n-- Proves both languages compile to the same 20-instruction target\n\nabstraction SlideRuleHS {\n    capabilities { Constants }\n\n    -- Basic arithmetic\n    method Add(a, b) = a + b\n\n    method Sub(a, b) = a - b\n\n    method Mul(a, b) = a * b\n\n    -- Integer square root via conditional lookup (floor)\n    method Sqrt(n) = if n < 1 then 0 else if n < 4 then 1 else if n < 9 then 2 else if n < 16 then 3 else if n < 25 then 4 else if n < 36 then 5 else if n < 49 then 6 else if n < 64 then 7 else if n < 81 then 8 else if n < 100 then 9 else 10\n\n    -- Power of 2 via conditional lookup\n    method Pow2(exp) = if exp == 0 then 1 else if exp == 1 then 2 else if exp == 2 then 4 else if exp == 3 then 8 else if exp == 4 then 16 else if exp == 5 then 32 else if exp == 6 then 64 else if exp == 7 then 128 else 256\n\n    -- Absolute value\n    method Abs(n) = if n < 0 then 0 - n else n\n\n    -- Signum: -1, 0, or 1\n    method Signum(n) = if n == 0 then 0 else if n > 0 then 1 else 0 - 1\n\n    -- Max of two values\n    method Max(a, b) = if a > b then a else b\n\n    -- Min of two values\n    method Min(a, b) = if a < b then a else b\n\n    -- Clamp value between lo and hi\n    method Clamp(x, lo, hi) = if x < lo then lo else if x > hi then hi else x\n}`,
+        'english_contact': `-- ENGLISH: Contact — Stage 3 Application-Level Abstraction
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--
+-- Contact is the Stage 3 example from the namespace
+-- vocabulary tutorial. It illustrates how the namespace
+-- becomes the language of the application.
+--
+-- The developer writes:
+--   Contact.Connect(me, myMother)
+--
+-- Behind that single call hides everything: identity
+-- resolution, medium selection (voice, text, email),
+-- session negotiation, and routing. None of it is
+-- visible to the caller.
+--
+-- Public interface (three selectors):
+--   selector 1 → Connect(callerToken, calleeToken)
+--   selector 2 → Disconnect(sessionToken)
+--   selector 3 → GetStatus(sessionToken)
+--
+-- Private (no selector — sealed out of dispatch table):
+--   ResolveLocation(addressToken)
+--
+-- Capabilities:
+--   Identity — resolves identity tokens to network addresses
+--   Routing  — selects the best available medium (private use)
+--   Media    — opens, closes, and queries sessions (private use)
+--   Mint     — allocates capability tokens for new sessions
+--
+-- See docs/namespace-vocabulary-tutorial.md §Stage 3
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an abstraction called Contact
+
+It needs Identity and Routing and Media and Mint
+
+-- Connect: establish a person-to-person session.
+--
+-- Resolves both caller and callee to network addresses,
+-- selects the best available medium, opens a session,
+-- and returns a session token to the caller.
+-- Medium selection and session negotiation are sealed
+-- inside this method — the caller never sees Routing
+-- or Media.
+--
+-- Returns: sessionToken (GT for the new session object)
+
+Add a method called Connect that takes callerToken and calleeToken
+Set callerAddress to the result of calling Identity.Lookup with callerToken
+Set calleeAddress to the result of calling Identity.Lookup with calleeToken
+Set medium to the result of calling Routing.SelectMedium with callerAddress and calleeAddress
+Set session to the result of calling Media.Open with medium and callerAddress and calleeAddress
+Set sessionToken to the result of calling Mint.Create with 64 and 3
+Return sessionToken
+
+-- Disconnect: close an existing session.
+--
+-- Releases the session identified by sessionToken.
+-- After this call the sessionToken is no longer valid.
+--
+-- Returns: 0
+
+Add a method called Disconnect that takes sessionToken
+Call Media.Close with sessionToken
+Return 0
+
+-- GetStatus: query the current state of a session.
+--
+-- Returns a status word from the underlying Media layer.
+-- The caller does not need to know which medium is in use.
+--
+-- Returns: status word (0 = offline/closed, 1 = active)
+
+Add a method called GetStatus that takes sessionToken
+Set status to the result of calling Media.QueryStatus with sessionToken
+Return status
+
+-- ResolveLocation: internal address resolution helper.
+--
+-- Maps an address token to a raw network location.
+-- This method is private — it has no dispatch-table entry,
+-- so no external selector can reach it. The lump seal
+-- makes this structural, not advisory.
+
+Add a private method called ResolveLocation that takes addressToken
+Set raw to the result of calling Identity.GetAddress with addressToken
+Return raw`,
         'english_hello': `Create an abstraction called Hello\n\nAdd a method called Greet that takes who\nSet result to who plus 1\nReturn the result`,
         'english_counter': `Create an abstraction called Counter\n\nAdd a method called Increment that takes value\nSet result to value plus 1\nReturn the result\n\nAdd a method called Add that takes a and b\nSet result to a plus b\nReturn the result\n\nAdd a method called Double that takes x\nSet result to x plus x\nReturn the result`,
         'english_loops': `-- ENGLISH: Loops — Three Ways to Iterate
@@ -2277,7 +2364,7 @@ abstraction Feedback {
     if (sel) {
         const isHaskell = ['church_math','church_pair','church_case','church_lambda','sliderule_hs'].includes(name);
         const isSymbolic = ['ada_note_g', 'bernoulli_numbers'].includes(name);
-        const isEnglish = ['english_hello','english_counter','english_string','english_loops'].includes(name);
+        const isEnglish = ['english_hello','english_counter','english_string','english_loops','english_contact'].includes(name);
         const isLambda = ['lambda_church','lambda_booleans','lambda_pairs','lambda_ycomb','lambda_sliderule','lambda_fixedpoint','lambda_rational','lambda_church_vs_compiled'].includes(name);
         sel.value = isLambda ? 'lambda' : isEnglish ? 'english' : isSymbolic ? 'symbolic' : isHaskell ? 'haskell' : 'javascript';
     }
