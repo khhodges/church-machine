@@ -123,9 +123,9 @@
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Hardware</div>
-                                <button class="ham-item fpga-conn-btn" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">FPGA</button>
-                                <button class="ham-item fpga-conn-btn fpga-bridge-btn" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">Bridge</button>
-                                <button class="ham-item fpga-conn-btn fpga-readbram-btn" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">BRAM</button>
+                                <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">FPGA</button>
+                                <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">Bridge</button>
+                                <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">BRAM</button>
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k" onclick="setSelectedBoard('tang-nano-20k');switchView('builder');closeHamburger()">Tang Nano 20K</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K IoT</button>
