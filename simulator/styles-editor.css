@@ -302,6 +302,67 @@
     flex: 1;
     min-height: 0;
 }
+#editorConsole.cmp-html {
+    white-space: normal;
+}
+.cmp-file-hdr {
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+    white-space: pre-wrap;
+}
+.cmp-method {
+    margin-bottom: 0.25rem;
+    border-left: 2px solid #1e293b;
+    padding-left: 0.4rem;
+}
+.cmp-method[open] {
+    border-left-color: #334155;
+}
+.cmp-method-hdr {
+    cursor: pointer;
+    user-select: none;
+    color: var(--church-green);
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    list-style: none;
+    outline: none;
+    padding: 0.15rem 0;
+    white-space: nowrap;
+}
+.cmp-method-hdr::-webkit-details-marker { display: none; }
+.cmp-method-hdr::marker { display: none; }
+.cmp-method-hdr:hover { color: #86efac; }
+.cmp-conv {
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+.cmp-priv {
+    color: #f97316;
+    font-size: 0.7rem;
+    border: 1px solid #f97316;
+    border-radius: 3px;
+    padding: 0 3px;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+.cmp-method-alias {
+    color: #4b5563;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    padding: 0.1rem 0 0.1rem 0.4rem;
+    white-space: pre;
+}
+.cmp-body {
+    margin: 0.1rem 0 0.2rem 1rem;
+    padding: 0;
+    color: #a3e6b8;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre;
+    background: transparent;
+    border: none;
+}
 
 .next-steps-box {
     background: rgba(218,165,32,0.08);

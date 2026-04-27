@@ -149,11 +149,11 @@ class CLOOMCCompiler {
 
         for (const method of parsed.methods) {
             if (method.aliasOf) {
-                methods.push({ name: method.name, aliasOf: method.aliasOf, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
                 continue;
             }
             if (method.rawIsa) {
-                methods.push({ name: method.name, code: method.rawIsa, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: [] });
                 continue;
             }
@@ -161,7 +161,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }
@@ -221,11 +221,11 @@ class CLOOMCCompiler {
 
         for (const method of parsed.methods) {
             if (method.aliasOf) {
-                methods.push({ name: method.name, aliasOf: method.aliasOf, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
                 continue;
             }
             if (method.rawIsa) {
-                methods.push({ name: method.name, code: method.rawIsa, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: [] });
                 continue;
             }
@@ -233,7 +233,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }
@@ -1430,11 +1430,11 @@ class CLOOMCCompiler {
 
         for (const method of parsed.methods) {
             if (method.aliasOf) {
-                methods.push({ name: method.name, aliasOf: method.aliasOf, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
                 continue;
             }
             if (method.rawIsa) {
-                methods.push({ name: method.name, code: method.rawIsa, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: [] });
                 continue;
             }
@@ -1442,7 +1442,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }
@@ -2293,7 +2293,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }
@@ -2787,11 +2787,11 @@ class CLOOMCCompiler {
 
         for (const method of parsed.methods) {
             if (method.aliasOf) {
-                methods.push({ name: method.name, aliasOf: method.aliasOf, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, aliasOf: method.aliasOf, params: method.params || [], visibility: method.visibility || 'public' });
                 continue;
             }
             if (method.rawIsa) {
-                methods.push({ name: method.name, code: method.rawIsa, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: method.rawIsa, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: [] });
                 continue;
             }
@@ -2799,7 +2799,7 @@ class CLOOMCCompiler {
             if (result.errors.length > 0) {
                 errors.push(...result.errors);
             } else {
-                methods.push({ name: method.name, code: result.code, visibility: method.visibility || 'public' });
+                methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public' });
                 manifest.push({ name: method.name, mapping: result.manifest });
             }
         }

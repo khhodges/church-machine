@@ -455,6 +455,7 @@ function smartCompile() {
 }
 
 function compileDraftAssembly(source, con) {
+    if (con) con.className = '';
     switchCodeTab('console');
     if (!source || !source.trim()) {
         if (con) { con.textContent = 'Draft — no code to draft. Enter assembly code first.'; con.scrollTop = 0; }
@@ -532,6 +533,7 @@ function compileDraft() {
     if (!editor) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    if (con) con.className = '';
 
     if (!cloomcCompiler) return;
     switchCodeTab('console');
@@ -670,6 +672,7 @@ function buildAndDownloadLump() {
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    if (con) con.className = '';
     switchCodeTab('console');
 
     const isHighLevel = cloomcCompiler._detectPetName(source) ||
@@ -936,6 +939,7 @@ function compileCLOOMC() {
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    if (con) con.className = '';
     switchCodeTab('console');
 
     _runStopped = true;
@@ -956,8 +960,15 @@ function compileCLOOMC() {
     const langNames2 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
     const lang = langNames2[result.language] || 'JavaScript';
     const _compileSrcLabel = _getActiveSourceLabel();
-    const _compileSrcHint = _compileSrcLabel ? ` · source: ${_compileSrcLabel}` : '';
-    let listing = `; CLOOMC++ [${lang}] compiled "${result.abstractionName}"${_compileSrcHint} — ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}\n\n`;
+    const _compileSrcHint = _compileSrcLabel ? ` · ${_compileSrcLabel}` : '';
+
+    const _ec = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const _methodConv = m => {
+        if (m.name === 'Dispatch' || m.name === 'M00') return 'DR1\u202f=\u202fselector';
+        const ps = (m.params || []).slice(0, 3);
+        if (!ps.length) return '\u2192\u202fDR1';
+        return ps.map((p, i) => `DR${i+1}\u202f=\u202f${p}`).join(', ') + '\u2002\u2192\u202fDR1';
+    };
 
     const manifestByMethod = {};
     if (result.manifest) {
@@ -977,24 +988,31 @@ function compileCLOOMC() {
         }
     }
 
+    let html = `<div class="cmp-file-hdr">; CLOOMC++ [${_ec(lang)}] compiled \u201c${_ec(result.abstractionName)}\u201d${_ec(_compileSrcHint)} \u2014 ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}</div>`;
+
     for (const m of result.methods) {
+        const visBadge = m.visibility === 'private' ? '<span class="cmp-priv">private</span> ' : '';
         if (m.aliasOf) {
-            listing += `; method ${m.name} → alias of ${m.aliasOf}\n\n`;
+            html += `<div class="cmp-method-alias">\u25c6 method ${visBadge}${_ec(m.name)} \u2192 alias of ${_ec(m.aliasOf)}</div>`;
             continue;
         }
-        listing += `; method ${m.name}\n`;
+        const conv = _methodConv(m);
         const mCode = m.code || [];
         const comments = manifestByMethod[m.name] || {};
+        let bodyTxt = '';
         for (let i = 0; i < mCode.length; i++) {
             const word = mCode[i];
             const mnem = _applyMethodDRNames(word === 0 ? 'NOP' : assembler.disassemble(word), m);
             const comment = comments[i];
-            listing += comment ? `${mnem.padEnd(40)}; ${comment}\n` : `${mnem}\n`;
+            bodyTxt += _ec(comment ? `${mnem.padEnd(40)}; ${comment}` : mnem) + '\n';
         }
-        listing += '\n';
+        html += `<details class="cmp-method" open>`
+            + `<summary class="cmp-method-hdr">\u25c6 method ${visBadge}${_ec(m.name)}<span class="cmp-conv"> \u2014 ${_ec(conv)}</span></summary>`
+            + `<pre class="cmp-body">${bodyTxt}</pre>`
+            + `</details>`;
     }
 
-    if (con) { con.textContent = listing; con.scrollTop = 0; }
+    if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
     showNextSteps('compiled');
     trackAction('compile', { name: result.abstractionName, lang: result.language });
     const _outSrcLabel = _getActiveSourceLabel();
@@ -1008,6 +1026,7 @@ function compileAndCreateAbstraction() {
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
+    if (con) con.className = '';
 
     const result = cloomcCompiler.compile(source, []);
 
