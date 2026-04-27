@@ -14,6 +14,13 @@
       "name": "Dispatch",
       "offset": 0,
       "length": 41,
+      "description": "Zero DR15, then increment it and compare to DR0 (method selector) for each entry. Branch to the matching method when DR0 = DR15. Falls through to RETURN if the selector is out of range (1\u201313).",
+      "inputs": [
+        "DR0: method index (1\u201313)"
+      ],
+      "outputs": [
+        "Dispatches to the selected method; return value depends on the method called"
+      ],
       "pet_names": {
         "DR": {
           "0": "method"

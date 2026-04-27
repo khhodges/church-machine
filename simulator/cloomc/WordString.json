@@ -58,12 +58,12 @@
         "0x8800003d",
         "0x1f000000"
       ],
-      "description": "Route a WordString method call by index using conventional MCMP+BRANCHEQ linear dispatch. DR15 is used as scratch counter; no GT/c-list references.",
+      "description": "Zero DR15, then increment it and compare to DR0 (method selector) for each entry. Branch to the matching method when DR0 = DR15. Falls through to RETURN if the selector is out of range (1\u201313).",
       "inputs": [
-        "DR0: method index (integer)"
+        "DR0: method index (1\u201313)"
       ],
       "outputs": [
-        "Dispatches to the selected WordString method; return value depends on the method called"
+        "Dispatches to the selected method; return value depends on the method called"
       ]
     },
     {
