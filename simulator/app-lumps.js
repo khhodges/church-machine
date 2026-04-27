@@ -1191,7 +1191,7 @@ async function _loadLumpContent(token, lump) {
         const typ = lump.typ;
         const dataWords = words.slice(1);
         if (ct === 'code' || typ === 0 || lump.cw > 0) {
-            _renderLumpCodeContent(bodyEl, lump, words);
+            _renderLumpCodeContent(bodyEl, lump, words, token);
         } else if (ct === 'text') {
             const text = _pack4Decode(dataWords);
             bodyEl.innerHTML = '';
@@ -1236,7 +1236,30 @@ async function _loadLumpContent(token, lump) {
         }
     } catch (err) {
         bodyEl.className = '';
-        bodyEl.textContent = `Failed to load content: ${err.message}`;
+        bodyEl.innerHTML = '';
+        const panel = document.createElement('div');
+        panel.className = 'lump-content-error-panel';
+
+        const diagMsg = (() => {
+            const m = err.message || '';
+            if (m.includes('token') && m.includes('not defined')) return 'The lump is missing a valid token — check that it has been saved correctly.';
+            if (m.includes('Empty lump'))   return 'This lump has no content words yet. Compile or upload content to populate it.';
+            if (m.includes('HTTP 404'))     return 'The lump could not be found on the server — it may have been deleted or its token is wrong.';
+            if (m.includes('HTTP 4') || m.includes('HTTP 5')) return 'The server returned an error when fetching this lump.';
+            return 'An unexpected error occurred while rendering this lump.';
+        })();
+
+        panel.innerHTML =
+            `<div class="lcep-icon">\u26a0\ufe0f</div>` +
+            `<div class="lcep-headline">Could not load lump content</div>` +
+            `<div class="lcep-desc">${_escHtml(diagMsg)}</div>` +
+            `<div class="lcep-detail">${_escHtml(err.message)}</div>` +
+            `<div class="lcep-actions">` +
+                `<button class="btn lcep-btn" onclick="_switchLumpTab('${tk}','overview')" title="Go to Overview to check or edit metadata">&#9998; Edit Metadata</button>` +
+                `<button class="btn lcep-btn" onclick="_switchLumpTab('${tk}','hexdump')" title="View raw hex words">&#9727; Hex Dump</button>` +
+                `<button class="btn lcep-btn" onclick="_lumpContentLoaded['${tk}']=false;_switchLumpTab('${tk}','content')" title="Try loading again">&#8635; Retry</button>` +
+            `</div>`;
+        bodyEl.appendChild(panel);
     }
 }
 
@@ -1306,7 +1329,7 @@ function _colorizeComment(text) {
     return out;
 }
 
-function _renderLumpCodeContent(bodyEl, lump, words) {
+function _renderLumpCodeContent(bodyEl, lump, words, token) {
     const e = _escHtml;
     const methods   = lump.methods  || [];
     const cw        = parseInt(lump.cw)        || 0;
