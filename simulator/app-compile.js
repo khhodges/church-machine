@@ -364,7 +364,7 @@ function onLangChange(restoring) {
     const langExampleGroups = {
         english: ['cloomc_english_hello', 'cloomc_english_counter', 'cloomc_english_string', 'cloomc_english_loops', 'cloomc_english_contact'],
         assembly: ['ada_note_g', 'selftest', 'load_save', 'bernoulli', 'conditional', 'gc_test', 'turing_test', 'led_blink', 'salvation', 'perm_attack', 'bind_attack', 'tperm_halt'],
-        javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_contact', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
+        javascript: ['cloomc_hello', 'cloomc_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_counter', 'cloomc_sliderule', 'cloomc_contact', 'cloomc_contact_call', 'cloomc_stack_overflow', 'cloomc_recall_demo'],
         haskell: ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_church_lambda', 'cloomc_sliderule_hs'],
         symbolic: ['cloomc_ada_note_g', 'cloomc_bernoulli_numbers'],
         lambda: ['cloomc_lambda_church_vs_compiled', 'cloomc_lambda_church', 'cloomc_lambda_booleans', 'cloomc_lambda_pairs', 'cloomc_lambda_ycomb', 'cloomc_lambda_sliderule', 'cloomc_lambda_fixedpoint', 'cloomc_lambda_rational'],
@@ -1122,7 +1122,8 @@ function loadCLOOMCExample(name) {
 
     const fileExamples = {
         'sliderule': '/simulator/cloomc/sliderule.cloomc',
-        'contact': '/simulator/cloomc/Contact.cloomc'
+        'contact': '/simulator/cloomc/Contact.cloomc',
+        'contact_call': '/simulator/cloomc/ContactCall.cloomc'
     };
     if (fileExamples[name]) {
         fetch(fileExamples[name])

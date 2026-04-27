@@ -1,0 +1,40 @@
+// ── Stage 3 Caller: Contact.Connect ──
+// This is the complete application-level program from the namespace
+// vocabulary tutorial (§Stage 3).  It shows what developer code looks
+// like once the Contact abstraction is sealed in the namespace.
+//
+// The three LOAD lines fetch Golden Tokens from the caller's c-list:
+//   LOAD Contact  → places the Contact GT into a capability register
+//   LOAD me       → places the caller's identity GT into DR1
+//   LOAD myMother → places the callee's identity GT into DR2
+//
+// The pet-name compiler translates Contact.Connect(me, myMother) into:
+//   CALL <Contact CR slot>, 1   ; selector 1 = Connect
+//   (DR1 = me, DR2 = myMother already in place from the LOADs above)
+//
+// The caller:
+//   - Does not know which medium is selected.
+//   - Does not know how the session is established.
+//   - Does not know what network protocol is used.
+//   - Does not know which capability registers hold Routing or Media GTs.
+//
+// All of that is hidden behind the Contact seal as private methods and
+// private capability dependencies.  The hardware enforces this: the
+// Contact lump's dispatch table exposes only three selectors
+// (Connect=1, Disconnect=2, GetStatus=3) and the seal prevents any
+// external caller from reaching the private Routing and Media calls.
+//
+// Compare with JS: Contact (the abstraction side) to see both halves
+// of the tutorial story.
+
+method run [pet name] {
+    LOAD Contact
+    LOAD me
+    LOAD myMother
+
+    // Contact.Connect resolves both parties, selects the best medium,
+    // opens a session, and returns a session capability token.
+    // The caller never sees Routing, Media, or any network detail.
+    sessionToken = Contact.Connect(me, myMother)
+    return(sessionToken)
+}
