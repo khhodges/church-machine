@@ -1112,17 +1112,17 @@ function updateFPGAStatusBtn() {
     const btn = document.getElementById('fpgaConnBtn');
     if (!btn) return;
     if (typeof TangSerial === 'undefined') {
-        btn.className = 'ham-item fpga-conn-btn';
+        btn.className = 'ham-item';
         btn.textContent = 'FPGA';
         btn.title = 'WebSerial not available';
         return;
     }
     if (TangSerial.isConnected()) {
-        btn.className = 'ham-item fpga-conn-btn fpga-connected';
+        btn.className = 'ham-item';
         btn.textContent = 'FPGA ✓';
         btn.setAttribute('data-tooltip', 'FPGA Connected — click to disconnect');
     } else {
-        btn.className = 'ham-item fpga-conn-btn fpga-disconnected';
+        btn.className = 'ham-item';
         btn.textContent = 'FPGA';
         btn.setAttribute('data-tooltip', 'FPGA Disconnected — click to connect');
     }
@@ -1216,7 +1216,7 @@ async function fpgaConnectToggle() {
         return;
     }
     if (btn) {
-        btn.className = 'btn fpga-conn-btn fpga-connecting';
+        btn.className = 'ham-item';
         btn.textContent = '\u2B21 FPGA \u2026';
     }
     _showFpgaToast('FPGA Connecting\u2026', 'Select your FPGA serial port in the browser dialog.', 'info', 0);
@@ -1317,7 +1317,7 @@ function _showBridgeModal() {
             return;
         }
         var btn = document.getElementById('fpgaConnBtn');
-        if (btn) { btn.className = 'btn fpga-conn-btn fpga-connecting'; btn.textContent = '\u2B21 FPGA \u2026'; }
+        if (btn) { btn.className = 'ham-item'; btn.textContent = '\u2B21 FPGA \u2026'; }
         _showFpgaToast('Bridge Connecting\u2026', 'Reaching ' + url, 'info', 0);
         _fpgaLog('FPGA Bridge: Connecting to ' + url + ' \u2026');
         try {
