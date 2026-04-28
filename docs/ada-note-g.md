@@ -89,20 +89,134 @@ Bromley's discovery is a reminder that bugs do not require a running machine to 
 
 ---
 
+## How the Pre-loaded Values Are Produced — Abbreviated Traces for n=2 and n=3
+
+The B₇ computation (n=4) opens with V21=1/6, V22=−1/30, and V23=1/42 already present in the Store. These are not arbitrary constants: each is the result of an earlier invocation of the same 25-operation program, run with a smaller value of n. The diagram below shows how three successive runs feed into one another.
+
+```
+n=2  →  B₃ = −1/30  (stored into V22 before the n=4 run)
+n=3  →  B₅ = 1/42   (stored into V23 before the n=4 run)
+n=4  →  B₇ = −1/30  (the run Ada traces in full)
+```
+
+B₁ = 1/6 (stored in V21) is the seed value that all three runs share; it is not itself computed by Ada's 25-step program but is instead the well-known closed-form result B₁ = 1/2 · 1/3. The sections below give abbreviated step-by-step traces for n=2 and n=3, showing exactly how V22 and V23 are produced.
+
+---
+
+### Abbreviated Trace — n=2 (computing B₃)
+
+For n=2 the inner loop (Ops 13–23) runs n−2=**0** times, so the execution is a straight sequence of twelve operations followed by the finalisation pair.
+
+**Initial state (n=2 run):**
+
+| Variable | Value | Meaning |
+|----------|-------|---------|
+| V1  | 1   | Constant 1 |
+| V2  | 2   | Constant 2 |
+| V3  | 2   | n=2 |
+| V21 | 1/6 | B₁ (seed; pre-loaded by hand) |
+| V4–V13, V22–V24 | 0 | Working columns, cleared |
+
+**Key computed values:**
+
+| Block | Ops | Variable | Value | How |
+|-------|-----|----------|-------|-----|
+| Setup | 1   | V4=V5=V6 | 4     | 2×2 |
+| Setup | 2   | V4       | 3     | 4−1 = 2n−1 |
+| Setup | 3   | V5       | 5     | 4+1 = 2n+1 |
+| Setup | 4   | V11      | 3/5   | V4÷V5 (Bromley correction) |
+| Setup | 5   | V11      | 3/10  | (3/5)÷2 |
+| Setup | 6   | V13      | −3/10 | 0−3/10 = A₀ |
+| Setup | 7   | V10      | 1     | 2−1 = n−1 (loop counter) |
+| 1st term | 8 | V7  | 2     | denominator counter initialised |
+| 1st term | 9 | V11 | 2     | V6÷V7 = 4÷2 (A₁ first factor) |
+| 1st term | 10 | V12 | 1/3   | V21×V11 = (1/6)×2 = B₁×A₁ |
+| 1st term | 11 | V13 | 1/30  | 1/3+(−3/10) = 10/30−9/30 |
+| 1st term | 12 | V10 | 0     | 1−1 → inner loop skipped |
+| Finalize | 24 | V24 | **−1/30** | 0−(1/30) |
+| Finalize | 25 | V3  | 3     | advance n for next run |
+
+**Result: B₃ = −1/30.** This value is written into V22 before the n=4 run begins.
+
+---
+
+### Abbreviated Trace — n=3 (computing B₅)
+
+For n=3 the inner loop runs n−2=**1** time, using B₃ (−1/30) loaded in V22.
+
+**Initial state (n=3 run):**
+
+| Variable | Value | Meaning |
+|----------|-------|---------|
+| V1  | 1     | Constant 1 |
+| V2  | 2     | Constant 2 |
+| V3  | 3     | n=3 |
+| V21 | 1/6   | B₁ (seed) |
+| V22 | −1/30 | B₃ (result of the n=2 run above) |
+| V4–V13, V23–V24 | 0 | Working columns, cleared |
+
+**Key computed values:**
+
+| Block | Ops | Variable | Value | How |
+|-------|-----|----------|-------|-----|
+| Setup | 1   | V4=V5=V6 | 6     | 2×3 |
+| Setup | 2   | V4       | 5     | 6−1 = 2n−1 |
+| Setup | 3   | V5       | 7     | 6+1 = 2n+1 |
+| Setup | 4   | V11      | 5/7   | V4÷V5 (Bromley correction) |
+| Setup | 5   | V11      | 5/14  | (5/7)÷2 |
+| Setup | 6   | V13      | −5/14 | 0−5/14 = A₀ |
+| Setup | 7   | V10      | 2     | 3−1 = n−1 (loop counter) |
+| 1st term | 8 | V7  | 2     | denominator counter initialised |
+| 1st term | 9 | V11 | 3     | V6÷V7 = 6÷2 (A₁ first factor) |
+| 1st term | 10 | V12 | 1/2   | V21×V11 = (1/6)×3 = B₁×A₁ |
+| 1st term | 11 | V13 | 1/7   | 1/2+(−5/14) = 7/14−5/14 |
+| 1st term | 12 | V10 | 1     | 2−1 → one loop pass follows |
+| Inner loop (pass 1) | 13 | V6 | 5   | 6−1 |
+| Inner loop (pass 1) | 14 | V7 | 3   | 2+1 |
+| Inner loop (pass 1) | 15 | V8 | 5/3 | V6÷V7 (first ratio for A₂) |
+| Inner loop (pass 1) | 16 | V11 | 5   | (5/3)×3 |
+| Inner loop (pass 1) | 17 | V6 | 4   | 5−1 |
+| Inner loop (pass 1) | 18 | V7 | 4   | 3+1 |
+| Inner loop (pass 1) | 19 | V9 | 1   | V6÷V7 = 4÷4 (second ratio for A₂) |
+| Inner loop (pass 1) | 20 | V11 | 5  | 1×5 → A₂=5 complete |
+| Inner loop (pass 1) | 21 | V12 | −1/6 | V22×V11 = (−1/30)×5 = B₃×A₂ |
+| Inner loop (pass 1) | 22 | V13 | −1/42 | −1/6+1/7 = −7/42+6/42 |
+| Inner loop (pass 1) | 23 | V10 | 0   | 1−1 → loop exits |
+| Finalize | 24 | V24 | **1/42** | 0−(−1/42) |
+| Finalize | 25 | V3  | 4    | advance n for next run |
+
+**Result: B₅ = 1/42.** This value is written into V23 before the n=4 run begins.
+
+---
+
+### The Series Build-up
+
+The three runs form a chain: each run reads Bernoulli numbers produced by its predecessors and writes one new value that the next run will read.
+
+| Run | n | Loop passes | Bernoulli numbers read | Result written to |
+|-----|---|-------------|------------------------|-------------------|
+| 1st | 2 | 0 | B₁ = 1/6 only | V22 ← B₃ = −1/30 |
+| 2nd | 3 | 1 | B₁ = 1/6, B₃ = −1/30 | V23 ← B₅ = 1/42 |
+| 3rd | 4 | 2 | B₁ = 1/6, B₃ = −1/30, B₅ = 1/42 | V24 ← B₇ = −1/30 |
+
+This self-referential structure is precisely what makes Note G remarkable. The 25 operations are not a one-off calculation but a reusable program: the same barrel of cards, advanced from n=2 upward, produces every odd Bernoulli number in sequence. Ada made this explicit by labelling V21–V23 as "previously computed" values and by including Operation 25 — which increments V3 (i.e., n) — as the final step, so the Engine is left ready to begin the next computation immediately.
+
+---
+
 ## Complete Step-by-Step Numerical Trace (n = 4)
 
 This section carries every active variable forward through every execution step of the algorithm for n = 4 (computing B₇ = −1/30). Because Operations 13–23 form a loop that runs n − 2 = **2** times, the physical execution expands to 36 steps. Each row shows the full variable state **after** the named operation completes; unchanged variables retain their previous value.
 
-**Pre-loaded initial state.** The following values are set before Operation 1 runs. V21, V22, and V23 hold previously computed Bernoulli numbers that the algorithm reads but never overwrites.
+**Pre-loaded initial state.** The following values are set before Operation 1 runs. V21, V22, and V23 hold previously computed Bernoulli numbers produced by the two earlier runs described above; they are read by this run but never overwritten.
 
 | Variable | Value | Meaning |
 |----------|-------|---------|
 | V1  | 1      | Constant 1 |
 | V2  | 2      | Constant 2 |
 | V3  | 4      | n (for B₇) |
-| V21 | 1/6    | B₁ (pre-loaded) |
-| V22 | −1/30  | B₃ (pre-loaded) |
-| V23 | 1/42   | B₅ (pre-loaded) |
+| V21 | 1/6    | B₁ (seed value, pre-loaded by hand) |
+| V22 | −1/30  | B₃ (produced by the n=2 run — see abbreviated trace above) |
+| V23 | 1/42   | B₅ (produced by the n=3 run — see abbreviated trace above) |
 | V4–V13, V24 | 0 | Working columns, cleared |
 
 ---
