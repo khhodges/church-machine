@@ -2194,6 +2194,8 @@ function faultModalReboot() {
     faultModalDismiss();
     _lastFault = null;
     faultAlertOff();
+    if (sim && sim.faultLog) sim.faultLog = [];
+    try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
     _defaultProgramLoaded = false;
     _bootAuditAccum = [];
@@ -2462,7 +2464,10 @@ function runLazyLoadTest() {
 
 function resetSim() {
     switchView('dashboard');
+    _lastFault = null;
     faultAlertOff();
+    if (sim && sim.faultLog) sim.faultLog = [];
+    try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
     _defaultProgramLoaded = false;
     _bootAuditAccum = [];
@@ -2480,7 +2485,10 @@ function resetSim() {
 // Fast-reset, complete the boot sequence immediately, then land on the
 // CR14 step view.  Bound to the "↺ Reset & Step" button in the Gate Log panel.
 function resetAndStep() {
+    _lastFault = null;
     faultAlertOff();
+    if (sim && sim.faultLog) sim.faultLog = [];
+    try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
     _defaultProgramLoaded = false;
     _bootAuditAccum = [];
