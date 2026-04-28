@@ -1,20 +1,30 @@
-// Harness for test_boot_cr0_autoinstall.py (Task #661).
+// Harness for test_boot_cr0_autoinstall.py (Tasks #661, #663).
 //
-// Exercises the B:05 auto-install path that writes the boot-entry E-GT into
-// the thread lump's CR0 home slot (offset +244) when that slot is zero.
+// Exercises two branches of the B:05 CR0 auto-install guard:
+//
+//   Default mode  (sentinelValue absent / 0):
+//     Zeros memory[threadLoc + THREAD_CAPS_OFFSET] before running B:05 so the
+//     guard fires and writes the boot-entry E-GT.
+//
+//   Sentinel mode  (sentinelValue non-zero):
+//     Writes a caller-supplied non-zero value into the CR0 slot before B:05 so
+//     the guard's "already populated" branch is taken and the slot is left
+//     unchanged.  Used by Task #663 to verify the skip path.
 //
 // Input (stdin, JSON):
 //   {
-//     "config":      { ... boot config ... },
-//     "imageBase64": "<base64 raw LE binary>",
-//     "skipWindow":  false
+//     "config":        { ... boot config ... },
+//     "imageBase64":   "<base64 raw LE binary>",
+//     "skipWindow":    false,
+//     "sentinelValue": 0          // optional — non-zero activates sentinel mode
 //   }
 //
 // Protocol:
 //   1. Load the boot image exactly as sim_boot_loader.js does.
 //   2. Run _bootStep() until sim.bootStep === 5  (B:05 not yet executed).
 //   3. Read threadLoc from readNSEntry(1).word0_location.
-//   4. Zero memory[threadLoc + THREAD_CAPS_OFFSET] to simulate an empty CR0.
+//   4a. Default mode:  zero memory[threadLoc + THREAD_CAPS_OFFSET].
+//   4b. Sentinel mode: write sentinelValue into that slot.
 //   5. Run one more _bootStep()  (executes B:05).
 //   6. Report the CR0 home value, the expected GT, bootEntrySlot, faultLog, …
 
@@ -27,6 +37,10 @@ process.stdin.on('end', () => {
     const env = JSON.parse(raw);
     const cfg = env.config || null;
     const imgBuf = Buffer.from(env.imageBase64 || '', 'base64');
+    const sentinelValue = (env.sentinelValue !== undefined && env.sentinelValue !== null)
+        ? (env.sentinelValue >>> 0)
+        : 0;
+    const sentinelMode = sentinelValue !== 0;
 
     if (env.skipWindow) {
         // no global.window — simulator uses historical 65536-word default
@@ -57,17 +71,20 @@ process.stdin.on('end', () => {
 
     const bootStepBeforeB05 = sim.bootStep | 0;
 
-    // ── Phase 2: locate CR0 home slot and zero it ────────────────────────────
+    // ── Phase 2: locate CR0 home slot and set it up ──────────────────────────
     const threadEntry = sim.readNSEntry(1);   // NS slot 1 = Boot.Thread
     const threadLoc   = threadEntry ? (threadEntry.word0_location >>> 0) : null;
     const cr0Addr     = threadLoc !== null ? threadLoc + THREAD_CAPS_OFFSET : null;
-    const valueBeforeZero = (cr0Addr !== null) ? (sim.memory[cr0Addr] >>> 0) : null;
+    const valueBeforeWrite = (cr0Addr !== null) ? (sim.memory[cr0Addr] >>> 0) : null;
 
     if (cr0Addr !== null) {
-        sim.memory[cr0Addr] = 0;   // simulate never-installed CR0
+        sim.memory[cr0Addr] = sentinelMode ? sentinelValue : 0;
     }
 
-    const zeroed = (cr0Addr !== null) ? (sim.memory[cr0Addr] >>> 0) === 0 : false;
+    const zeroed          = (!sentinelMode && cr0Addr !== null) ? (sim.memory[cr0Addr] >>> 0) === 0 : false;
+    const sentinelWritten = (sentinelMode && cr0Addr !== null)
+        ? (sim.memory[cr0Addr] >>> 0) === sentinelValue
+        : false;
 
     // ── Phase 3: run B:05 ───────────────────────────────────────────────────
     const outputBefore = sim.output || '';
@@ -88,8 +105,10 @@ process.stdin.on('end', () => {
         bootStepAfterB05:    bootStepAfterB05,
         threadLoc:           threadLoc,
         cr0Addr:             cr0Addr,
-        valueBeforeZero:     valueBeforeZero,
+        valueBeforeWrite:    valueBeforeWrite,
         zeroed:              zeroed,
+        sentinelValue:       sentinelValue,
+        sentinelWritten:     sentinelWritten,
         b05Returned:         b05Returned,
         cr0HomeValue:        cr0HomeValue,
         expectedGT:          expectedGT,
