@@ -3652,6 +3652,27 @@ def _verify_build_sig(board_type, fw_major, fw_minor, sig_hex):
     expected = _hmac.new(key.encode(), msg, _hashlib.sha256).digest()[:4]
     return _hmac.compare_digest(sig_bytes, expected)
 
+def _auto_populate_boot_tests(device_uid, boot_reason, last_fault, timestamp):
+    try:
+        clean_boot = (last_fault == 0) and (boot_reason in (0, 1))
+        t01 = LaunchTest.query.filter_by(test_id="TEST-01").first()
+        t02 = LaunchTest.query.filter_by(test_id="TEST-02").first()
+        if clean_boot:
+            if t01 and t01.status != "passing":
+                t01.status = "passing"
+                t01.device_uid = device_uid
+                t01.updated_at = timestamp
+                t01.notes = "Auto-populated: device called home with no NS fault."
+            if t02 and t02.status != "passing":
+                t02.status = "passing"
+                t02.device_uid = device_uid
+                t02.updated_at = timestamp
+                t02.notes = "Auto-populated: boot thread completed without fault."
+        db.session.commit()
+    except Exception as e:
+        logging.warning("_auto_populate_boot_tests: %s", e)
+
+
 @app.route("/api/device/register", methods=["POST"])
 def device_register():
     data = request.get_json(silent=True) or {}
@@ -3736,6 +3757,8 @@ def device_register():
         db.session.add(fe)
         db.session.commit()
         logging.info("Fault event logged: device=%s fault=0x%02X nia=0x%08X", uid, last_fault, fault_nia)
+
+    _auto_populate_boot_tests(uid, boot_reason, last_fault, now)
 
     logging.info("Device registered: %s (%s) via %s:%s",
                  uid, dev.board_name, bridge_host, bridge_port)
@@ -3913,15 +3936,114 @@ def device_deploy(device_id):
         return jsonify({"ok": False, "error": f"bridge transact failed: {e}"}), 502
 
 
+@app.route("/api/launch-tests")
+def launch_tests_list():
+    tests = LaunchTest.query.order_by(LaunchTest.test_id).all()
+    result = []
+    for t in tests:
+        result.append({
+            "test_id": t.test_id,
+            "name": t.name,
+            "description": t.description,
+            "status": t.status,
+            "device_uid": t.device_uid or "",
+            "updated_at": t.updated_at or 0.0,
+            "notes": t.notes or "",
+        })
+    return jsonify({"ok": True, "tests": result})
+
+
+@app.route("/api/launch-tests/<test_id>", methods=["PUT"])
+def launch_test_update(test_id):
+    data = request.get_json(silent=True) or {}
+    t = LaunchTest.query.filter_by(test_id=test_id).first()
+    if not t:
+        return jsonify({"ok": False, "error": "test not found"}), 404
+    new_status = data.get("status", "").strip()
+    if new_status not in ("not-run", "passing", "failing"):
+        return jsonify({"ok": False, "error": "invalid status"}), 400
+    t.status = new_status
+    t.device_uid = data.get("device_uid", t.device_uid or "")
+    t.notes = data.get("notes", t.notes or "")[:1024]
+    t.updated_at = _time.time()
+    db.session.commit()
+    return jsonify({"ok": True, "test_id": t.test_id, "status": t.status})
+
+
+@app.route("/api/launch-tests/reset", methods=["POST"])
+def launch_tests_reset():
+    tests = LaunchTest.query.all()
+    for t in tests:
+        t.status = "not-run"
+        t.device_uid = ""
+        t.updated_at = _time.time()
+        t.notes = ""
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 Device = None
 Project = None
 TutorialProgress = None
+FaultEvent = None
+LaunchTest = None
+
+LAUNCH_TESTS_SEED = [
+    ("TEST-01", "Boot.NS",
+     "Device online; NS Table valid; all CRC seals pass",
+     True),
+    ("TEST-02", "Boot.Thread",
+     "Boot thread reaches Navana; no THREAD_FAULT",
+     True),
+    ("TEST-03", "Salvation",
+     "All four methods pass; MTBF = \u221e; Navana takes over",
+     False),
+    ("TEST-04", "Navana",
+     "Lump Add \u2192 Monitor \u2192 Remove round-trip; stale GT faults",
+     False),
+    ("TEST-05", "Mint",
+     "Subset permission enforced; escalation faults; Revoke propagates",
+     False),
+    ("TEST-06", "Memory",
+     "Power-of-2 alloc; size-0 faults; Free reclaims",
+     False),
+    ("TEST-07", "Scheduler",
+     "Two threads run to completion; no deadlock",
+     False),
+    ("TEST-08", "DijkstraFlag",
+     "Wait blocks; Signal wakes; Test non-blocking; Reset clears",
+     False),
+    ("TEST-09", "UART",
+     "Byte send/receive at 115200 and 9600; permission denied faults",
+     False),
+    ("TEST-10", "Family",
+     "Hello delivers encrypted message to parent within 5 s",
+     False),
+    ("TEST-11", "Tunnel",
+     "Connect \u2192 Send \u2192 Receive \u2192 Close; stale session faults",
+     False),
+    ("TEST-12", "Negotiate",
+     "Approve delivers GT to child; Reject never delivers; replay faults",
+     False),
+    ("TEST-13", "Schoolroom",
+     "Lesson distributed; Submit delivered; Grade returned; no-GT faults",
+     False),
+    ("TEST-14", "Abacus",
+     "Add, Sub, Mul, Div, Mod, Abs all correct; Div-by-zero faults",
+     False),
+    ("TEST-15", "Friends",
+     "Share delivers GT; Revoke kills it; unapproved share faults",
+     False),
+    ("TEST-16", "Loader",
+     "Absent lump fetched, inflated, installed; eviction transparent; NS authority unchanged throughout",
+     False),
+]
 
 with app.app_context():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from server.models import register_models, BOARD_TYPES, PROFILE_NAMES
-    Project, TutorialProgress, Device, FaultEvent = register_models(db)
+    Project, TutorialProgress, Device, FaultEvent, LaunchTest = register_models(db)
     db.create_all()
 
     from sqlalchemy import inspect as _sa_inspect, text as _sa_text
@@ -3943,6 +4065,32 @@ with app.app_context():
         db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN fault_nia INTEGER DEFAULT 0"))
         db.session.commit()
         logging.info("Migrated: added fault_nia column to devices table")
+
+    _existing_launch = {t.test_id: t for t in LaunchTest.query.all()}
+    for seed_id, seed_name, seed_desc, _auto in LAUNCH_TESTS_SEED:
+        if seed_id not in _existing_launch:
+            db.session.add(LaunchTest(
+                test_id=seed_id,
+                name=seed_name,
+                description=seed_desc,
+                status="not-run",
+                device_uid="",
+                updated_at=0.0,
+                notes="",
+            ))
+        else:
+            row = _existing_launch[seed_id]
+            changed = False
+            if row.name != seed_name:
+                row.name = seed_name
+                changed = True
+            if row.description != seed_desc:
+                row.description = seed_desc
+                changed = True
+            if changed:
+                logging.info("Migrated launch_test %s name/description to Section 6 text", seed_id)
+    db.session.commit()
+    logging.info("Launch tests seeded/migrated")
 
     logging.info("Database tables created")
 

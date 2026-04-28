@@ -1243,3 +1243,164 @@
 .mtbf-cell-green { color: #4ade80; }
 .mtbf-cell-amber { color: #fbbf24; }
 .mtbf-cell-red { color: #ef5350; }
+
+/* ── Devices view tab strip ─────────────────────────────────── */
+.dev-view-tabs {
+    display: flex;
+    gap: 2px;
+    margin-top: 6px;
+}
+.dev-view-tab {
+    background: none;
+    border: 1px solid #333;
+    border-radius: 4px 4px 0 0;
+    color: #888;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 4px 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dev-view-tab:hover { background: #1e1e30; color: #ccc; border-color: #555; }
+.dev-view-tab.active {
+    background: #1e1e30;
+    color: var(--church-gold, #daa520);
+    border-color: var(--church-gold, #daa520);
+    border-bottom-color: #1e1e30;
+}
+
+/* ── Launch Readiness checklist ─────────────────────────────── */
+.launch-test-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0.5rem 0;
+}
+.launch-progress-bar-wrap {
+    padding: 0.6rem 0.8rem 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.launch-progress-track {
+    flex: 1;
+    height: 6px;
+    background: #222;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.launch-progress-fill {
+    height: 100%;
+    background: #4caf50;
+    border-radius: 3px;
+    transition: width 0.4s;
+}
+.launch-progress-label {
+    font-size: 0.78rem;
+    color: #aaa;
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: right;
+}
+.launch-test-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid #1e1e1e;
+    transition: background 0.12s;
+}
+.launch-test-row:last-child { border-bottom: none; }
+.launch-test-row:hover { background: #131320; }
+.launch-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+.launch-dot-notrun { background: #444; }
+.launch-dot-passing { background: #4caf50; box-shadow: 0 0 4px #4caf5080; }
+.launch-dot-failing { background: #ef5350; box-shadow: 0 0 4px #ef535080; }
+.launch-test-body { flex: 1; min-width: 0; }
+.launch-test-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.launch-test-id {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: #888;
+    flex-shrink: 0;
+}
+.launch-test-name {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #e0e0e0;
+}
+.launch-badge-auto {
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: #1a3a4a;
+    color: #4fc3f7;
+    border: 1px solid #2a5a6a;
+    border-radius: 3px;
+    padding: 0 5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.launch-test-desc {
+    font-size: 0.77rem;
+    color: #777;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+.launch-test-notes {
+    font-size: 0.72rem;
+    color: #5a8a5a;
+    margin-top: 3px;
+    font-style: italic;
+}
+.launch-test-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: flex-end;
+}
+.launch-status-chip {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+.launch-chip-notrun { background: #252525; color: #888; border: 1px solid #333; }
+.launch-chip-passing { background: #1a3a1a; color: #8bc34a; border: 1px solid #3a6a1a; }
+.launch-chip-failing { background: #3a1a1a; color: #ef5350; border: 1px solid #6a1a1a; }
+.launch-set-btn {
+    font-size: 0.68rem;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid #333;
+    background: #1a1a2a;
+    color: #aaa;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    white-space: nowrap;
+}
+.launch-set-btn:hover { background: #252535; border-color: #555; color: #ddd; }
+.dev-launch-reset-btn {
+    background: #3a1a1a;
+    border: 1px solid #6a2222;
+    color: #ef9a9a;
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.dev-launch-reset-btn:hover { background: #4a2222; color: #fff; }

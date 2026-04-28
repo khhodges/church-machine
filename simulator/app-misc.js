@@ -2091,3 +2091,139 @@ function deployAll() {
     });
 }
 
+var _currentDevicesTab = 'devices';
+
+function switchDevicesTab(tab) {
+    _currentDevicesTab = tab;
+    var isLaunch = (tab === 'launch');
+
+    var tabDevices = document.getElementById('devTabDevices');
+    var tabLaunch = document.getElementById('devTabLaunch');
+    var paneDevices = document.getElementById('devPaneDevices');
+    var paneLaunch = document.getElementById('devPaneLaunch');
+    var actionsDevices = document.getElementById('devTabActionsDevices');
+    var actionsLaunch = document.getElementById('devTabActionsLaunch');
+
+    if (tabDevices) tabDevices.classList.toggle('active', !isLaunch);
+    if (tabLaunch) tabLaunch.classList.toggle('active', isLaunch);
+    if (paneDevices) paneDevices.style.display = isLaunch ? 'none' : '';
+    if (paneLaunch) paneLaunch.style.display = isLaunch ? '' : 'none';
+    if (actionsDevices) actionsDevices.style.display = isLaunch ? 'none' : '';
+    if (actionsLaunch) actionsLaunch.style.display = isLaunch ? '' : 'none';
+
+    if (isLaunch) loadLaunchTests();
+}
+
+var _LAUNCH_AUTO_IDS = new Set(['TEST-01', 'TEST-02']);
+
+function loadLaunchTests() {
+    var grid = document.getElementById('launchTestGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="dev-empty">Loading...</div>';
+    fetch('/api/launch-tests')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok || !data.tests || data.tests.length === 0) {
+                grid.innerHTML = '<div class="dev-empty">No launch tests found.</div>';
+                return;
+            }
+            var tests = data.tests;
+            var passing = tests.filter(function(t) { return t.status === 'passing'; }).length;
+            var failing = tests.filter(function(t) { return t.status === 'failing'; }).length;
+            var total = tests.length;
+            var pct = Math.round((passing / total) * 100);
+
+            var html = '<div class="launch-progress-bar-wrap">' +
+                '<div class="launch-progress-track"><div class="launch-progress-fill" style="width:' + pct + '%"></div></div>' +
+                '<span class="launch-progress-label">' + passing + ' / ' + total + ' passing</span>' +
+                '</div>';
+
+            tests.forEach(function(t) {
+                var dotClass = t.status === 'passing' ? 'launch-dot-passing' :
+                               t.status === 'failing' ? 'launch-dot-failing' : 'launch-dot-notrun';
+                var chipClass = t.status === 'passing' ? 'launch-chip-passing' :
+                                t.status === 'failing' ? 'launch-chip-failing' : 'launch-chip-notrun';
+                var chipLabel = t.status === 'passing' ? 'Passing' :
+                                t.status === 'failing' ? 'Failing' : 'Not Run';
+                var autoBadge = _LAUNCH_AUTO_IDS.has(t.test_id)
+                    ? '<span class="launch-badge-auto">Auto</span>' : '';
+                var notesHtml = (t.notes && t.notes.trim())
+                    ? '<div class="launch-test-notes">' + _escHtml(t.notes) + '</div>' : '';
+
+                var nextPass = t.status === 'passing' ? 'not-run' : 'passing';
+                var nextFail = t.status === 'failing' ? 'not-run' : 'failing';
+                var qId = _escHtml(JSON.stringify(t.test_id));
+                var qPass = _escHtml(JSON.stringify(nextPass));
+                var qFail = _escHtml(JSON.stringify(nextFail));
+
+                html += '<div class="launch-test-row" id="launchRow_' + _escHtml(t.test_id) + '">' +
+                    '<div class="launch-dot ' + dotClass + '"></div>' +
+                    '<div class="launch-test-body">' +
+                        '<div class="launch-test-header">' +
+                            '<span class="launch-test-id">' + _escHtml(t.test_id) + '</span>' +
+                            '<span class="launch-test-name">' + _escHtml(t.name) + '</span>' +
+                            autoBadge +
+                        '</div>' +
+                        '<div class="launch-test-desc">' + _escHtml(t.description) + '</div>' +
+                        notesHtml +
+                    '</div>' +
+                    '<div class="launch-test-actions">' +
+                        '<span class="launch-status-chip ' + chipClass + '">' + chipLabel + '</span>' +
+                        '<button class="launch-set-btn" onclick="setLaunchTestStatus(' + qId + ', ' + qPass + ')">' +
+                            (t.status === 'passing' ? 'Clear' : 'Mark Pass') +
+                        '</button>' +
+                        '<button class="launch-set-btn" onclick="setLaunchTestStatus(' + qId + ', ' + qFail + ')">' +
+                            (t.status === 'failing' ? 'Clear' : 'Mark Fail') +
+                        '</button>' +
+                    '</div>' +
+                '</div>';
+            });
+
+            grid.innerHTML = html;
+        })
+        .catch(function() {
+            grid.innerHTML = '<div class="dev-empty">Failed to load launch tests.</div>';
+        });
+}
+
+function setLaunchTestStatus(testId, status) {
+    fetch('/api/launch-tests/' + encodeURIComponent(testId), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: status })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.ok) loadLaunchTests();
+    })
+    .catch(function() {});
+}
+
+function confirmResetLaunchTests() {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+        '<div class="modal-dialog" style="max-width:420px;padding:1.5rem;">' +
+            '<div class="modal-title" style="margin-bottom:0.75rem;">Reset Launch Tests</div>' +
+            '<p style="color:#aaa;font-size:0.88rem;margin-bottom:1.25rem;">Reset all 16 tests to <strong>not-run</strong>? This cannot be undone.</p>' +
+            '<div style="display:flex;gap:0.5rem;justify-content:flex-end;">' +
+                '<button id="launchResetCancel" class="dev-action-btn" style="padding:6px 16px;">Cancel</button>' +
+                '<button id="launchResetConfirm" class="dev-launch-reset-btn" style="padding:6px 16px;">Reset All</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+
+    function close() { document.body.removeChild(overlay); }
+    document.getElementById('launchResetCancel').addEventListener('click', close);
+    document.getElementById('launchResetConfirm').addEventListener('click', function() {
+        fetch('/api/launch-tests/reset', { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                close();
+                if (data.ok) loadLaunchTests();
+            })
+            .catch(function() { close(); });
+    });
+}
+

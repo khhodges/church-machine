@@ -67,4 +67,16 @@ def register_models(db):
         boot_reason = Column(Integer, default=0)
         timestamp = Column(Float, default=0.0)
 
-    return Project, TutorialProgress, Device, FaultEvent
+    class LaunchTest(db.Model):
+        __tablename__ = "launch_tests"
+
+        id = Column(Integer, primary_key=True)
+        test_id = Column(String(16), unique=True, nullable=False)
+        name = Column(String(64), nullable=False)
+        description = Column(Text, default="")
+        status = Column(String(16), default="not-run")
+        device_uid = Column(String(16), default="")
+        updated_at = Column(Float, default=0.0)
+        notes = Column(Text, default="")
+
+    return Project, TutorialProgress, Device, FaultEvent, LaunchTest

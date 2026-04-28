@@ -132,7 +132,8 @@
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Configure</div>
-                                <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');closeHamburger()">Devices<kbd class="ham-kbd">C+V</kbd></button>
+                                <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');switchDevicesTab('devices');closeHamburger()">Devices<kbd class="ham-kbd">C+V</kbd></button>
+                                <button class="ham-item" id="hamItem-launch" onclick="switchView('devices');switchDevicesTab('launch');closeHamburger()">Launch Readiness</button>
                                 <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub</button>
                             </div>
                             <div class="ham-group">
@@ -1048,15 +1049,31 @@
         <div class="devices-layout">
             <div class="dev-header">
                 <div class="dev-header-left">
-                    <div class="gc-title">FPGA Devices</div>
-                    <div class="gc-sub">Registered boards and bridge connections</div>
+                    <div class="gc-title">Hardware</div>
+                    <div class="dev-view-tabs">
+                        <button class="dev-view-tab active" id="devTabDevices" onclick="switchDevicesTab('devices')">FPGA Devices</button>
+                        <button class="dev-view-tab" id="devTabLaunch" onclick="switchDevicesTab('launch')">Launch Readiness</button>
+                    </div>
                 </div>
-                <button class="dev-deploy-all-btn" onclick="deployAll()" title="Deploy current program to all online IoT boards">Deploy All</button>
-                <button class="dev-fault-log-btn" onclick="showDeviceFaultLog()" title="View fault log and MTBF per instruction">Fault Log</button>
-                <button class="gh-refresh-btn" onclick="loadDeviceList()" title="Refresh device list">&#x21BB;</button>
+                <span id="devTabActionsDevices">
+                    <button class="dev-deploy-all-btn" onclick="deployAll()" title="Deploy current program to all online IoT boards">Deploy All</button>
+                    <button class="dev-fault-log-btn" onclick="showDeviceFaultLog()" title="View fault log and MTBF per instruction">Fault Log</button>
+                    <button class="gh-refresh-btn" onclick="loadDeviceList()" title="Refresh device list">&#x21BB;</button>
+                </span>
+                <span id="devTabActionsLaunch" style="display:none;">
+                    <button class="dev-launch-reset-btn" onclick="confirmResetLaunchTests()" title="Reset all tests to not-run">Reset All</button>
+                    <button class="gh-refresh-btn" onclick="loadLaunchTests()" title="Refresh launch test status">&#x21BB;</button>
+                </span>
             </div>
-            <div class="dev-grid" id="devGrid">
-                <div class="dev-empty">No devices registered. Connect a board via the local bridge to see it here.</div>
+            <div id="devPaneDevices">
+                <div class="dev-grid" id="devGrid">
+                    <div class="dev-empty">No devices registered. Connect a board via the local bridge to see it here.</div>
+                </div>
+            </div>
+            <div id="devPaneLaunch" style="display:none;">
+                <div id="launchTestGrid" class="launch-test-grid">
+                    <div class="dev-empty">Loading...</div>
+                </div>
             </div>
         </div>
     </div>
