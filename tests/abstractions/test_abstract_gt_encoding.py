@@ -144,28 +144,22 @@ def test_boot_image_contains_correct_format_tag():
 # ── LED c-list slots in generated boot image ─────────────────────────────────
 
 def _get_clist_words(img_bytes, cfg):
-    """Return the c-list GT words from Boot.Abstr in the generated image.
+    """Return the c-list GT words from the NS lump c-list tail in the generated image.
 
-    Derives the lump size and cc from the lump header rather than from
-    config (abstractionLumpWords is deprecated — Task #568).
+    Since Task #694 the DEMO_CLIST lives at the end of the NS lump body
+    (mem[ns_size-47 .. ns_size-1]), not in Boot.Abstr's free region.
+    Boot.Abstr has cc=0 since Task #651, so its tail is zeroed.
     """
     step1 = cfg["step1"]
-    total       = int(step1["totalNamespaceWords"])
-    BOOT_ABSTR_NS_SLOT = 3
-    DEMO_CLIST_SIZE = 18
+    total   = int(step1["totalNamespaceWords"])
+    ns_size = int(step1["namespaceLumpWords"])
+    NS_CATALOG_COUNT = 47   # len(DEFAULT_ABSTRACTION_CATALOG)
+    DEMO_CLIST_SIZE  = 18
 
     words = list(struct.unpack(f"<{total}I", img_bytes))
-    ns_table_base = total - NS_TABLE_RESERVE
-
-    # Boot.Abstr loc is at NS table slot 3, word0
-    boot_entry_loc = words[ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS]
-    # Derive lump size and cc from the lump header (Task #568 — abstr size is dynamic)
-    hdr       = words[boot_entry_loc]
-    n_minus_6 = (hdr >> 23) & 0xF
-    abstr_size = 1 << (n_minus_6 + 6)
-    cc         = hdr & 0xFF
-    entry_clist_start = abstr_size - cc
-    clist = [words[boot_entry_loc + entry_clist_start + i] for i in range(DEMO_CLIST_SIZE)]
+    # The NS lump c-list tail starts at ns_size - NS_CATALOG_COUNT (word index into mem[]).
+    clist_start = ns_size - NS_CATALOG_COUNT
+    clist = [words[clist_start + i] for i in range(DEMO_CLIST_SIZE)]
     return clist
 
 
