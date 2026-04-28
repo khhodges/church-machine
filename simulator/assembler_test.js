@@ -396,6 +396,8 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 
 // P12: Privilege Zone — CR12–CR15 cannot be a destination for LOAD / SAVE /
 //      ELOADCALL / XLOADLAMBDA. CALL is unrestricted (control-flow only).
+//      Exception: CR14 (Current-Lump, RX) is allowed as the SOURCE of DREAD
+//      so user code can read embedded data constants from the code lump.
 {
     // P12a: LOAD CR12 → error (Thread register)
     const a = new ChurchAssembler();
@@ -512,6 +514,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     p.assemble('SWITCH CR11, 0');
     assert('P12p SWITCH CR11: no error', p.errors.length === 0,
         p.errors.map(e => e.message).join('; '));
+
+    // P12q: DREAD DR0, CR14, 0 → no error (CR14 is RX — data-constant reads allowed)
+    const q = new ChurchAssembler();
+    q.assemble('DREAD DR0, CR14, 0');
+    assert('P12q DREAD DR0 CR14: no error (CR14 is RX)', q.errors.length === 0,
+        q.errors.map(e => e.message).join('; '));
 }
 
 // ── LED[N] Abstract GT bracket syntax ────────────────────────────────────────

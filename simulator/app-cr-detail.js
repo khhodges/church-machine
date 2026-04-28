@@ -80,8 +80,8 @@ function _getSyntaxSuggestion(msg) {
     if (/privilege zone|priv.*zone|CR1[2-5].*reserved|reserved.*CR1[2-5]/i.test(msg)) {
         return {
             title: 'CR12–CR15 are reserved',
-            body: 'CR12–CR15 form the privilege zone and are managed by the OS. User code must use CR0–CR11.',
-            example: 'LOAD   CR1, CR0, #5   ; CR0–CR11 are safe\nCALL   CR1, CR0, #0   ; use CR0–CR11 for your code'
+            body: 'CR12, CR13, and CR15 are managed by the OS — user code cannot reference them.\nCR14 (Current-Lump) is the one exception: it has read+execute permission, so DREAD DR, CR14, offset is valid and lets your code read embedded data constants from the code lump.',
+            example: 'LOAD   CR1, CR0, #5      ; CR0–CR11 are always safe\nDREAD  DR0, CR14, #2     ; OK — reads a constant from the code lump'
         };
     }
     if (/capability register.*needed.*nothing|nothing was given.*capability/i.test(msg)) {

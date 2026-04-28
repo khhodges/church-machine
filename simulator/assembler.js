@@ -638,7 +638,10 @@ class ChurchAssembler {
             case 10: {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
-                this._checkPrivCR(crSrc, 'DREAD', lineNum);
+                // CR14 (Current-Lump) is RX — user code may DREAD it to read
+                // embedded data constants.  All other privilege-zone registers
+                // (CR12, CR13, CR15) remain blocked.
+                if (crSrc !== 14) this._checkPrivCR(crSrc, 'DREAD', lineNum);
                 imm = this._parseImm(parts[3], lineNum);
                 break;
             }
