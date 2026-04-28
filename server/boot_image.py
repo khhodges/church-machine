@@ -564,6 +564,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 64, 2)
 
+    # Thread caps zone — CR0 home slot at word offset +244 (absolute word 0x0134 when
+    # thread_loc=0x40).  Default value: LED flash E-GT (NS slot 3, E-perm, Inform type).
+    # make_gt(GT_TYPE_INFORM=1, PERM_MASK_E=1<<5=32, slot_id=BOOT_ABSTR_NS_SLOT=3, seq=0)
+    # = (32 << 25) | (1 << 23) | 3 = 0x40800003
+    THREAD_CAPS_OFFSET = 244
+    mem[thread_loc + THREAD_CAPS_OFFSET] = 0x40800003  # LED flash E-GT (slot 3, E-perm, Inform)
+
     # Hardware device GTs (clist slots 8..17) — match simulator.js HW_DEVICE_SLOTS.
     # Slots 8–13: Abstract LED GTs (Task #406) — type=0b11, no NS slot, no lump.
     rw_perms = {"R":1,"W":1}

@@ -1016,6 +1016,12 @@ class ChurchSimulator {
         const threadLoc = this.memory[this.NS_TABLE_BASE + 1 * this.NS_ENTRY_WORDS];
         this.memory[threadLoc] = this.packLumpHeader(THREAD_N_MINUS_6, THREAD_SW, THREAD_CC, 2);
 
+        // Thread caps zone — CR0 home slot at word offset +244 (absolute word 0x0134 when
+        // threadLoc=0x40).  Default value: LED flash E-GT (NS slot 3, E-perm, Inform type).
+        // The 3-instruction CLOOMC reads this via CHANGE's thread-restore pass, placing the
+        // E-GT into CR0 before TPERM+CALL.  Write with GT seq=0 (fresh boot, no revocation).
+        this.memory[threadLoc + THREAD_CAPS_OFFSET] = this.createGT(0, BOOT_ABSTR_NS_SLOT, {E:1}, 1);
+
         // DEMO_CLIST hardware alignment: slots 8–16 hold device GTs so
         // hardware code "LOAD CR3, CR6, 8" picks up the LED device, exactly as on Ti60 F225.
         //   [8]–[13] LED[0]–LED[5] Abstract GTs (type=0b11, ab_type=I/O, device_class=LED, device_data=0-5)
