@@ -1610,10 +1610,9 @@ function _saveFaultLog() {
                 if (_cr14s && !_cr14s.isNull && _cr14s.gtIndex != null) {
                     const _ni = _cr14s.gtIndex;
                     const _lbl = (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
-                    const _nsBase = sim.NS_TABLE_BASE + _ni * sim.NS_ENTRY_WORDS;
-                    const _loc = (sim.memory && sim.memory[_nsBase]) ? (sim.memory[_nsBase] >>> 0) : 0;
+                    const _base = (_cr14s.word1 !== undefined && _cr14s.word1 !== null) ? (_cr14s.word1 >>> 0) : 0;
                     const _fpc = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
-                    f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: _fpc - _loc };
+                    f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: _fpc - _base };
                 } else {
                     const _pc = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
                     f._nsSnapshot = _nsOwnerOf(_pc);
@@ -1685,17 +1684,40 @@ function showFaultModal(f) {
     const word   = _histEntry ? _histEntry.raw : ((sim.memory && pc < sim.memory.length) ? sim.memory[pc] : 0);
     const disasm = assembler ? assembler.disassemble(word) : '???';
     if (!Object.prototype.hasOwnProperty.call(f, '_nsSnapshot')) {
-        f._nsSnapshot = _nsOwnerOf(pc);
+        // Prefer CR14 snapshot — directly names the executing lump's ns slot
+        // without depending on memory-range lookups.
+        const _cr14lazy = f.crSnapshot && f.crSnapshot[14];
+        if (_cr14lazy && !_cr14lazy.isNull && _cr14lazy.gtIndex != null) {
+            const _ni = _cr14lazy.gtIndex;
+            const _lbl = (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
+            const _base = (_cr14lazy.word1 !== undefined && _cr14lazy.word1 !== null) ? (_cr14lazy.word1 >>> 0) : 0;
+            f._nsSnapshot = { label: _lbl, nsIdx: _ni, offset: pc - _base };
+        } else {
+            f._nsSnapshot = _nsOwnerOf(pc);
+        }
     }
     const ns     = f._nsSnapshot;
-    const nsStr  = ns ? `${ns.label} +${ns.offset}` : '\u2014';
+
+    // locationNs — the authoritative lump label and offset for display.
+    // Prefers crSnapshot[14] (captured at fault time) over _nsSnapshot so
+    // heap-loaded lumps (e.g. LED flash) are shown instead of Boot.NS.
+    const _cr14snap = f.crSnapshot && f.crSnapshot[14];
+    let locationNs;
+    if (_cr14snap && !_cr14snap.isNull && _cr14snap.gtIndex != null) {
+        const _ni   = _cr14snap.gtIndex;
+        const _lbl  = (sim.nsLabels && sim.nsLabels[_ni]) || `NS[${_ni}]`;
+        const _base = (_cr14snap.word1 !== undefined && _cr14snap.word1 !== null) ? (_cr14snap.word1 >>> 0) : 0;
+        locationNs  = { label: _lbl, nsIdx: _ni, offset: pc - _base };
+    } else {
+        locationNs  = ns;
+    }
+    const nsStr  = locationNs ? `${locationNs.label} +${locationNs.offset}` : '\u2014';
 
     // Authoritative ns index for "view lump" navigation.
     // crSnapshot[14].gtIndex is captured at fault time and directly names
     // the executing code lump's namespace slot — more reliable than
     // _nsOwnerOf which does a memory-range search that can find the wrong
     // lump or return null.
-    const _cr14snap = f.crSnapshot && f.crSnapshot[14];
     const nsIdxForViewLump = (_cr14snap && !_cr14snap.isNull && _cr14snap.gtIndex != null)
         ? _cr14snap.gtIndex
         : (ns ? ns.nsIdx : null);
@@ -2071,9 +2093,9 @@ function showFaultModal(f) {
         <div class="fault-modal-header">
             <span class="fault-type-badge" style="background:${color}22;border-color:${color};color:${color}">${f.type}</span>
             <span class="fault-modal-title">Machine Fault</span>
-            ${ns && ns.label ? (ns.nsIdx != null
-                ? `<button class="fault-modal-lump-chip fault-modal-lump-chip-link" onclick="faultModalOpenBinaryLump(${ns.nsIdx})" title="Click to open lump in code view">${ns.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${ns.offset}</span></button>`
-                : `<span class="fault-modal-lump-chip">${ns.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${ns.offset}</span></span>`) : ''}
+            ${locationNs && locationNs.label ? (nsIdxForViewLump != null
+                ? `<button class="fault-modal-lump-chip fault-modal-lump-chip-link" onclick="faultModalOpenBinaryLump(${nsIdxForViewLump})" title="Click to open lump in code view">${locationNs.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></button>`
+                : `<span class="fault-modal-lump-chip">${locationNs.label.replace(/</g,'&lt;').replace(/>/g,'&gt;')}<span class="fault-modal-lump-offset">+${locationNs.offset}</span></span>`) : ''}
             <button class="fault-modal-close" onclick="faultModalDismiss()" title="Close">&times;</button>
         </div>
         <div class="modal-buttons fault-modal-actions">
