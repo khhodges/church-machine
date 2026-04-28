@@ -19,13 +19,16 @@
 --   V5  = working: 2n, then 2n+1
 --   V6  = working: 2n, decrements through loop
 --   V7  = denominator counter
---   V8  = fraction quotient
---   V9  = fraction quotient
+--   V8  = fraction quotient (first ratio per loop pass)
+--   V9  = fraction quotient (second ratio per loop pass)
 --   V10 = loop counter
---   V11 = working coefficient
+--   V11 = working coefficient (Ak)
 --   V12 = product Bk * Ak
---   V13 = accumulator
---   V15 = result B7 (DR15 = V24 in Ada's notation)
+--   V13 = accumulator (running sum)
+--   V21 = B1 = 1/6  (pre-loaded; consumed in Op 10)
+--   V22 = Bk = B3 = -1/30 initially; advances to B5 = 1/42 after first loop pass
+--   V23 = B5 = 1/42 (pre-loaded; used to advance V22 inside the loop)
+--   V24 = result B7 (Ada's original result column)
 
 abstraction NoteG {
     capabilities {
@@ -36,6 +39,12 @@ abstraction NoteG {
         let V1 = 1
         let V2 = 2
         let V3 = 4
+
+        -- Pre-load previously computed Bernoulli numbers into Ada's Store
+        -- (Ada's diagram assumes the Engine has run earlier to compute these)
+        let V21 = 1 / 6       -- B1
+        let V22 = -1 / 30     -- B3
+        let V23 = 1 / 42      -- B5
 
         -- Operation 1: multiply V2 * V3 -> V4, V5, V6
         -- "Multiply 2 by n" = 2 * 4 = 8
@@ -50,16 +59,16 @@ abstraction NoteG {
         let V5 = V5 + V1
 
         -- Operation 4: divide V4 / V5 -> V11
-        -- "(2n-1) / (2n+1)" = 7 / 9 = 0
+        -- "(2n-1) / (2n+1)" = 7 / 9
         -- NOTE: Ada's published table shows V5/V4 — CORRECTED per Bromley (1990)
         let V11 = V4 / V5
 
         -- Operation 5: divide V11 / V2 -> V11
-        -- "Divide coefficient by 2"
+        -- "Divide coefficient by 2" = 7/18
         let V11 = V11 / V2
 
         -- Operation 6: subtract V13 - V11 -> V13
-        -- "Accumulator A0 = 0 - coefficient"
+        -- "Accumulator A0 = 0 - coefficient" = -7/18
         let V13 = 0
         let V13 = V13 - V11
 
@@ -76,21 +85,21 @@ abstraction NoteG {
         let V11 = V6 / V7
 
         -- Operation 10: multiply B1 * V11 -> V12
-        -- "B1 * coefficient" = 1 * 4 = 4
-        let V15 = 1
-        let V12 = V15 * V11
+        -- "B1 * A1" = (1/6) * 4 = 2/3
+        let V12 = V21 * V11
 
         -- Operation 11: add V12 + V13 -> V13
-        -- "Accumulate: sum += B1 * A1"
+        -- "Accumulate: sum += B1 * A1" = 2/3 + (-7/18) = 5/18
         let V13 = V12 + V13
 
         -- Operation 12: subtract V10 - V1 -> V10
-        -- "Decrement loop counter"
+        -- "Decrement loop counter" = 2
         let V10 = V10 - V1
 
-        -- Operations 13–23: Loop body (repeats for each subsequent Bk term)
+        -- Operations 13-23: Loop body (repeats for each subsequent Bk term)
         -- Ada's "backing" mechanism — the Engine returns the barrel
         -- to operation 13 while V10 > 0.
+        -- V22 holds the current Bk; it is advanced to V23 at the end of each pass.
         repeat V10 as V10
 
             -- Operation 13: subtract V6 - V1 -> V6
@@ -102,7 +111,7 @@ abstraction NoteG {
             let V7 = V1 + V7
 
             -- Operation 15: divide V6 / V7 -> V8
-            -- "Fraction part"
+            -- "First ratio for coefficient Ak"
             let V8 = V6 / V7
 
             -- Operation 16: multiply V8 * V11 -> V11
@@ -110,40 +119,44 @@ abstraction NoteG {
             let V11 = V8 * V11
 
             -- Operation 17: subtract V6 - V1 -> V6
+            -- "Decrement again"
             let V6 = V6 - V1
 
             -- Operation 18: add V1 + V7 -> V7
+            -- "Increment denominator again"
             let V7 = V1 + V7
 
             -- Operation 19: divide V6 / V7 -> V9
-            -- "Fraction part"
+            -- "Second ratio for coefficient Ak"
             let V9 = V6 / V7
 
             -- Operation 20: multiply V9 * V11 -> V11
-            -- "Coefficient -> Ak"
+            -- "Ak coefficient complete"
             let V11 = V9 * V11
 
             -- Operation 21: multiply Bk * V11 -> V12
-            -- "Bk * coefficient"
-            let V15 = 1
-            let V12 = V15 * V11
+            -- "Bk * Ak" — V22 holds the current Bk (B3 first pass, B5 second pass)
+            let V12 = V22 * V11
 
             -- Operation 22: add V12 + V13 -> V13
             -- "Accumulate: sum += Bk * Ak"
             let V13 = V12 + V13
 
+            -- Advance Bk register to the next Bernoulli number for the next pass
+            let V22 = V23
+
         end
 
-        -- Operation 24: subtract 0 - V13 -> V15
-        -- "Final result: B7 = -accumulated sum"
-        let V15 = 0
-        let V15 = V15 - V13
+        -- Operation 24: subtract 0 - V13 -> V24
+        -- "Final result: B7 = -accumulated sum" = -(1/30) = -1/30
+        let V24 = 0
+        let V24 = V24 - V13
 
         -- Operation 25: add V1 + V3 -> V3
         -- "Increment n for next Bernoulli number"
         let V3 = V1 + V3
 
-        -- Result: V15 = B7
+        -- Result: V24 = B7 = -1/30
         -- Ada, 1843: "The Analytical Engine weaves
         -- algebraical patterns just as the Jacquard
         -- loom weaves flowers and leaves."
