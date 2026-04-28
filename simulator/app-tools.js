@@ -353,10 +353,16 @@ function updateGateLog() {
             .replace(/\bCR(\d+)\b/g, (m, n) => { const a = _bPetCR[+n]; return a ? `<span class="itrace-pet" title="CR${n}">${a}</span>` : m; })
             .replace(/\bDR(\d+)\b/g, (m, n) => { const a = _bPetDR[+n]; return a ? `<span class="itrace-pet" title="DR${n}">${a}</span>` : m; });
 
+        // Resolve namespace / lump ownership.  Prefer the snapshot stored on the
+        // fault object so that the correct lump name is shown even after a page
+        // reload, when the live namespace table may be empty.
+        const _ns = Object.prototype.hasOwnProperty.call(lf, '_nsSnapshot')
+            ? lf._nsSnapshot
+            : ((typeof _nsOwnerOf === 'function') ? _nsOwnerOf(lfPC) : null);
+
         // CLOOMC source line
         let lfSrcLine = '';
         if (assembler && assembler.getLastLineNums) {
-            const _ns = (typeof _nsOwnerOf === 'function') ? _nsOwnerOf(lfPC) : null;
             if (_ns && _ns.offset >= 1) {
                 const instrIdx = _ns.offset - 1;
                 const lns = assembler.getLastLineNums();
@@ -382,6 +388,10 @@ function updateGateLog() {
         }
         html += `<div class="fault-gate-banner-meta">`;
         html += `<span class="fault-gate-banner-pc">PC&nbsp;<code>${lfPCHex}</code></span>`;
+        if (_ns && _ns.label) {
+            html += `<span class="fault-gate-banner-sep">&middot;</span>`;
+            html += `<span class="fault-gate-banner-lump">${_ns.label}&nbsp;<span class="fault-gate-banner-offset">+${_ns.offset}</span></span>`;
+        }
         html += `<span class="fault-gate-banner-sep">&middot;</span>`;
         html += `<span class="fault-gate-banner-instr">${lfDisasm}</span>`;
         if (lfSrcLine) {
