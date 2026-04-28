@@ -612,6 +612,45 @@ function _applyPendingSimLoad() {
     const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
     const progBase = sim.bootComplete ? (sim.memory[abstrBase2] || (2 * sim.SLOT_SIZE)) : 0;
     sim.programBaseAddr = progBase;
+    // ── LAZY-LOAD c-list: cc=0 → DEMO_CLIST_SIZE ────────────────────────────────
+    // Boot.Abstr boots with cc=0 (CLOOMC/no-c-list design, Task #651).  When the
+    // NUC_PROGRAM is loaded at Run time it accesses LOAD CRn, CR6, 8 which needs
+    // the hardware DEMO_CLIST (LED[0..5], UART, BTN, Timer, SlideRule) pre-placed
+    // in c-list slots [8..17].  This block is "the LAZY LOAD that does work on
+    // First CALL": it promotes Boot.Abstr from cc=0 to cc=18, writes the pre-
+    // computed Abstract GTs (saved as sim.demoClistGTs in _initNamespaceTable) into
+    // the FREE region of the 64-word lump (words 46–63, above the code at 1–17),
+    // then patches the NS entry clistCount and CR6 so the range check passes.
+    if (sim.bootComplete && sim.demoClistGTs && sim.demoClistGTs.length > 0) {
+        const BOOT_ABSTR_SLOT = 3;
+        const nsBase  = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
+        const w1f     = sim.parseNSWord1(sim.memory[nsBase + 1]);
+        if (w1f.clistCount === 0) {
+            const lumpBase  = sim.cr[6].word1;              // 0x180 — set by _writeCR at B:04
+            const lumpHdr   = sim.memory[lumpBase] >>> 0;
+            const hdrParsed = sim.parseLumpHeader(lumpHdr);
+            const SLOT_SIZE = hdrParsed.lumpSize;           // 64 words for default Boot.Abstr
+            const cc        = sim.demoClistGTs.length;      // 18 = DEMO_CLIST_SIZE
+            const clistBase = lumpBase + SLOT_SIZE - cc;    // 0x1AE — safely above code (1–17)
+            // Write DEMO_CLIST GTs into the free region (words 46–63)
+            for (let i = 0; i < cc; i++) {
+                sim.memory[clistBase + i] = sim.demoClistGTs[i] >>> 0;
+            }
+            // Patch lump header cc (bits [7:0])
+            sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
+            // Patch NS entry clistCount (bits [25:17] of word1)
+            sim.memory[nsBase + 1] = sim.packNSWord1(
+                w1f.limit, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, cc
+            );
+            // Patch CR6: word1 → c-list base; word2.clistCount → cc
+            sim.cr[6].word1 = clistBase;
+            const cr6W2f = sim.parseNSWord1(sim.cr[6].word2 >>> 0);
+            sim.cr[6].word2 = sim.packNSWord1(
+                cr6W2f.limit, cr6W2f.b, cr6W2f.f, cr6W2f.g, cr6W2f.chainable, cr6W2f.gtType, cc
+            );
+        }
+    }
+    // ── Sequential capabilities (CLOOMC compiler path) ──────────────────────────
     if (sim.bootComplete && lastAssembledCapabilities && lastAssembledCapabilities.length > 0) {
         const clistBase = sim.cr[6].word1;
         for (let ci = 0; ci < lastAssembledCapabilities.length; ci++) {

@@ -1045,6 +1045,10 @@ class ChurchSimulator {
         // Slots 0–16 map to NS slots 0–16 (or contain hardware-device Abstract GTs at 8–15).
         // Slot 17 (TIMER_DEV) is simulator-only; not present in the boot c-list on real hardware.
         clistGTs.length         = DEMO_CLIST_SIZE;
+        // Save the completed DEMO_CLIST so _applyPendingSimLoad() (app-run.js) can
+        // lazily install it into Boot.Abstr's free region when the NUC_PROGRAM is
+        // loaded at Run time (the "LAZY LOAD does work on First CALL" fix).
+        this.demoClistGTs       = clistGTs.slice();
 
         // ── Boot.Abstr lump (NS Slot 3) ────────────────────────────────────────────
         // Redesigned (Task #651): cc=0, cw=3. No c-list. Three instructions:
