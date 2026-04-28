@@ -14,7 +14,7 @@ Both programs share the same philosophy: one operation per line, each result nam
 
 ## Ada's Note G: Summary (1843)
 
-Computing B₇ on the Analytical Engine. Reconstructed from Ada's published table in Taylor's Scientific Memoirs, August 1843. The original table uses Babbage's notation where superscript-prefixed variables (e.g., ²V₄) track the number of times each variable column has been assigned a new value.
+Computing B₇ on the Analytical Engine. Reconstructed from Ada's published table in Taylor's Scientific Memoirs, August 1843. The original table uses Babbage's notation where superscript-prefixed variables (e.g., ²V₄) track the number of times each variable column has been assigned a new value. A full plain-text transcription of all 25 operations is in [ada-note-g.md](ada-note-g.md).
 
 **Structure**: 25 operations organized into four blocks:
 
