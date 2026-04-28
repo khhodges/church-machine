@@ -169,8 +169,35 @@ function openCRDetail(crIdx) {
     updateCRDetail();
 }
 
-function openCRDetailAtPC(pc) {
+function openCRDetailAtPC(pc, physicalPC) {
     _crDetailHighlightPC = (pc !== undefined && pc !== null) ? (pc >>> 0) : null;
+
+    // Find which CR register (if any) currently holds the lump that contained
+    // physicalPC at gate time. CR14 is the executing code register; but after
+    // a reboot it may point to Boot.NS — so we scan all X-permitted CRs.
+    if (physicalPC !== undefined && physicalPC !== null && sim && sim.getFormattedCR) {
+        const ns = _nsOwnerOf(physicalPC >>> 0);
+        if (ns && ns.nsIdx !== undefined) {
+            // Scan CRs for one whose gtIndex matches the executing lump.
+            let targetCR = -1;
+            for (let ci = 0; ci < 16; ci++) {
+                const _cr = sim.getFormattedCR(ci);
+                if (!_cr || _cr.isNull) continue;
+                if (_cr.gtIndex === ns.nsIdx) { targetCR = ci; break; }
+            }
+            if (targetCR >= 0) {
+                openCRDetail(targetCR);
+                return;
+            }
+            // No CR currently holds the executing lump (e.g. after reboot).
+            // Fall back to opening the lump in the editor / namespace browser.
+            if (typeof faultModalOpenBinaryLump === 'function') {
+                faultModalOpenBinaryLump(ns.nsIdx);
+                return;
+            }
+        }
+    }
+    // Default: open CR14 (code register for current execution context).
     openCRDetail(14);
 }
 

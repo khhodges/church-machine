@@ -2627,13 +2627,14 @@ class ChurchSimulator {
         // Capture current instruction context so mLoad/mSave audit entries can
         // include a "location" row (Step#, PC, decoded instruction) for fault display.
         this._currentInstrLabel = {
-            pc:        this.pc,
-            step:      this.stepCount,
-            opName:    this.opName(d.opcode),
-            crDst:     d.crDst,
-            crSrc:     d.crSrc,
-            imm:       d.imm,
-            instrWord: d.raw,
+            pc:         this.pc,
+            physicalPC: this.physicalPC,
+            step:       this.stepCount,
+            opName:     this.opName(d.opcode),
+            crDst:      d.crDst,
+            crSrc:      d.crSrc,
+            imm:        d.imm,
+            instrWord:  d.raw,
         };
 
         let result = null;

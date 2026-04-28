@@ -451,7 +451,8 @@ function updateGateLog() {
         else if (isNSType)  badgeClass = 'gate-nstype';
         else                badgeClass = 'gate-mload';
         const _hasClickPC = a.stepCtx && typeof a.stepCtx === 'object' && a.stepCtx.pc !== undefined;
-        html += `<div class="audit-gate ${pass ? 'gate-pass' : 'gate-fail'}${_hasClickPC ? ' audit-gate-clickable' : ''}"${_hasClickPC ? ` onclick="openCRDetailAtPC(${a.stepCtx.pc})" title="Click to view instruction in CR14 code view"` : ''}>`;
+        const _physPC = _hasClickPC && a.stepCtx.physicalPC !== undefined ? a.stepCtx.physicalPC : 'undefined';
+        html += `<div class="audit-gate ${pass ? 'gate-pass' : 'gate-fail'}${_hasClickPC ? ' audit-gate-clickable' : ''}"${_hasClickPC ? ` onclick="openCRDetailAtPC(${a.stepCtx.pc},${_physPC})" title="Click to view instruction in code view"` : ''}>`;
         html += `<div class="gate-header">`;
         html += `<span class="gate-type-badge ${badgeClass}">${a.gate}</span>`;
         html += `<span class="gate-label">NS[${a.nsIndex}] &ldquo;${a.label}&rdquo;</span>`;
