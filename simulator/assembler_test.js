@@ -520,6 +520,28 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     q.assemble('DREAD DR0, CR14, 0');
     assert('P12q DREAD DR0 CR14: no error (CR14 is RX)', q.errors.length === 0,
         q.errors.map(e => e.message).join('; '));
+
+    // P12r: CHANGE CR12, CR12, #1 → no error (CHANGE is the thread-switch instruction;
+    //       CR12 is its dedicated operand and is exempt from the privilege-zone block)
+    const r = new ChurchAssembler();
+    r.assemble('CHANGE CR12, CR12, #1');
+    assert('P12r CHANGE CR12 CR12: no error (thread switch)', r.errors.length === 0,
+        r.errors.map(e => e.message).join('; '));
+
+    // P12s: CHANGE CR13 (not CR12) → still an error
+    const s = new ChurchAssembler();
+    s.assemble('CHANGE CR13, CR0, 0');
+    assert('P12s CHANGE CR13: error (only CR12 exempt)', s.errors.length > 0,
+        'expected an error for CR13 in CHANGE');
+    assert('P12s CHANGE CR13: error mentions CR13',
+        s.errors.some(e => e.message.includes('CR13')),
+        s.errors.map(e => e.message).join('; '));
+
+    // P12t: CHANGE CR14 as crDst → still an error (CR14 is not the thread register)
+    const t = new ChurchAssembler();
+    t.assemble('CHANGE CR14, CR0, 0');
+    assert('P12t CHANGE CR14 crDst: error', t.errors.length > 0,
+        'expected an error for CR14 as crDst in CHANGE');
 }
 
 // ── LED[N] Abstract GT bracket syntax ────────────────────────────────────────
@@ -770,6 +792,78 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         `imm0=${r.words[0]&0x7FFF}`);
     assert('DL5 V2 offset = 4', (r.words[1] & 0x7FFF) === 4,
         `imm1=${r.words[1]&0x7FFF}`);
+}
+
+// ── Shared alias inheritance (setSharedAliases) ───────────────────────────────
+// All tests in this block clear shared state before and after to avoid
+// contaminating the rest of the suite.
+
+// SA1: DR alias set via setSharedAliases is visible in a fresh assembler instance
+{
+    ChurchAssembler.setSharedAliases({ myResult: 3 }, {});
+    const a = new ChurchAssembler();
+    const r = a.assemble('IADD myResult, myResult, #1');
+    assert('SA1 shared DR alias: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    // crDst field = DR3 → bits[22:19] of the word = 3
+    assert('SA1 shared DR alias: crDst = 3', ((r.words[0] >>> 19) & 0xF) === 3,
+        `crDst=${(r.words[0]>>>19)&0xF}`);
+    ChurchAssembler.setSharedAliases({}, {});
+}
+
+// SA2: CR alias set via setSharedAliases is visible in a fresh assembler instance
+{
+    ChurchAssembler.setSharedAliases({}, { heap: 5 });
+    const a = new ChurchAssembler();
+    const r = a.assemble('LOAD CR0, heap, #0');
+    assert('SA2 shared CR alias: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    // crSrc field = CR5 → bits[18:15] = 5
+    assert('SA2 shared CR alias: crSrc = 5', ((r.words[0] >>> 15) & 0xF) === 5,
+        `crSrc=${(r.words[0]>>>15)&0xF}`);
+    ChurchAssembler.setSharedAliases({}, {});
+}
+
+// SA3: local .pet declaration overrides a shared alias for that lump only
+{
+    ChurchAssembler.setSharedAliases({ acc: 1 }, {});
+    const a = new ChurchAssembler();
+    // Override acc → DR7 for this lump
+    const r = a.assemble('.pet acc DR7\nIADD acc, acc, #0');
+    assert('SA3 local .pet overrides shared: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SA3 local .pet overrides shared: crDst = 7', ((r.words[0] >>> 19) & 0xF) === 7,
+        `crDst=${(r.words[0]>>>19)&0xF}`);
+    // Second assembler still sees the original shared alias (acc → DR1)
+    const b = new ChurchAssembler();
+    const r2 = b.assemble('IADD acc, acc, #0');
+    assert('SA3 other instance unaffected: crDst = 1', ((r2.words[0] >>> 19) & 0xF) === 1,
+        `crDst=${(r2.words[0]>>>19)&0xF}`);
+    ChurchAssembler.setSharedAliases({}, {});
+}
+
+// SA4: setSharedAliases({},{}) clears — a new instance no longer sees old aliases
+{
+    ChurchAssembler.setSharedAliases({ ghost: 9 }, {});
+    ChurchAssembler.setSharedAliases({}, {});
+    const a = new ChurchAssembler();
+    a.assemble('IADD ghost, ghost, #0');
+    assert('SA4 cleared shared alias: produces an error', a.errors.length > 0,
+        'expected error — ghost should no longer be a known alias');
+}
+
+// SA5: shared alias inherited across multiple separate assemble() calls on the
+//      same instance — verify assemble() resets to shared, not to empty
+{
+    ChurchAssembler.setSharedAliases({ rtn: 2 }, {});
+    const a = new ChurchAssembler();
+    a.assemble('IADD rtn, rtn, #1');     // first call
+    const r = a.assemble('ISUB rtn, rtn, #1');  // second call — alias must still be present
+    assert('SA5 shared alias persists across calls: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SA5 second call crDst = 2', ((r.words[0] >>> 19) & 0xF) === 2,
+        `crDst=${(r.words[0]>>>19)&0xF}`);
+    ChurchAssembler.setSharedAliases({}, {});
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────

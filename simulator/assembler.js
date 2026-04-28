@@ -157,6 +157,19 @@
 //       .pet count   DR2
 //       IADD  result, result, count   ; same as IADD DR1, DR1, DR2
 //
+// SHARED / INHERITED ALIASES  (ChurchAssembler.setSharedAliases)
+//   Call  ChurchAssembler.setSharedAliases(drMap, crMap)  once at startup to
+//   declare project-wide register conventions that all subsequently-created
+//   assembler instances inherit automatically.  Local .pet declarations in
+//   individual lumps take precedence over shared aliases.
+//   Example:
+//       ChurchAssembler.setSharedAliases(
+//           { result: 1, count: 2 },   // DR aliases shared by all lumps
+//           { heap: 5, logger: 10 }    // CR aliases shared by all lumps
+//       );
+//   This is the correct place to encode a project's calling convention so it
+//   does not have to be duplicated with .pet in every abstraction source file.
+//
 // OUTPUT
 //   assemble() returns:
 //     words[]    — Uint32Array of encoded machine words
@@ -200,8 +213,10 @@ class ChurchAssembler {
         this.labels = {};
         this.errors = [];
         this.warnings = [];    // non-fatal diagnostics (e.g. .pet alias redefinition to different reg)
-        this._drAliases = {};  // alias name → DR index (0–15), populated by _parsePetDirectives
-        this._crAliases = {};  // alias name → CR index (0–15), populated by _parsePetDirectives
+        // Start with shared (project-wide) aliases; local .pet declarations added later
+        // by _parsePetDirectives will shadow / override these.
+        this._drAliases = Object.assign({}, ChurchAssembler._sharedDrAliases || {});
+        this._crAliases = Object.assign({}, ChurchAssembler._sharedCrAliases || {});
         // Inherit the class-level namespace so locally-created assembler instances
         // (e.g. inside tutorials, builder, CLOOMC) automatically get symbol resolution
         // without every call site needing to call setNamespace() individually.
@@ -215,6 +230,22 @@ class ChurchAssembler {
         ChurchAssembler._sharedNsSymbols = Object.assign({}, map);
         this.nsSymbols = Object.assign({}, ChurchAssembler._sharedNsSymbols);
         this.nsLoaded  = {};   // clear stale CR assignments
+    }
+
+    // ── Shared register alias conventions (inherited by all future instances) ──
+    //
+    // Call once at project startup to establish project-wide DR/CR naming
+    // conventions.  Every ChurchAssembler constructed afterwards inherits these
+    // as default aliases; local .pet directives inside individual lumps override
+    // them for that lump only.
+    //
+    //   drMap — { aliasName: drIndex, … }   e.g. { result: 1, count: 2 }
+    //   crMap — { aliasName: crIndex, … }   e.g. { heap: 5, logger: 10 }
+    //
+    // Call with empty objects to clear previously-set shared aliases.
+    static setSharedAliases(drMap = {}, crMap = {}) {
+        ChurchAssembler._sharedDrAliases = Object.assign({}, drMap);
+        ChurchAssembler._sharedCrAliases = Object.assign({}, crMap);
     }
 
     // _resolveNSNameBracket(nameToken, idxToken)
@@ -345,8 +376,10 @@ class ChurchAssembler {
         this.labels = {};
         this.errors = [];
         this.warnings = [];
-        this._drAliases = {};
-        this._crAliases = {};
+        // Reset to shared conventions — local .pet directives for this lump are
+        // re-collected by _parsePetDirectives below and shadow these.
+        this._drAliases = Object.assign({}, ChurchAssembler._sharedDrAliases || {});
+        this._crAliases = Object.assign({}, ChurchAssembler._sharedCrAliases || {});
         this.nsLoaded = {};   // reset per-assembly loaded-CR tracking
         const lines = source.split('\n');
         this._parsePetDirectives(lines);  // pre-pass: collect all .pet aliases
@@ -601,10 +634,15 @@ class ChurchAssembler {
                 break;
             }
             case 4: {
+                // CHANGE is the microcode thread-switch instruction.
+                // It exclusively operates on CR12 (thread stack) — both the
+                // destination and source must be CR12, so CR12 is exempted from
+                // the normal privilege-zone block.  All other privilege-zone
+                // registers (CR13, CR14, CR15) remain blocked.
                 crDst = this._parseCR(parts[1], lineNum);
-                this._checkPrivCR(crDst, 'CHANGE', lineNum);
+                if (crDst !== 12) this._checkPrivCR(crDst, 'CHANGE', lineNum);
                 crSrc = this._parseCR(parts[2], lineNum);
-                this._checkPrivCR(crSrc, 'CHANGE', lineNum);
+                if (crSrc !== 12) this._checkPrivCR(crSrc, 'CHANGE', lineNum);
                 imm = this._parseImm(parts[3], lineNum);
                 break;
             }
