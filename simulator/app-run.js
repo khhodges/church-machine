@@ -8903,7 +8903,7 @@ Permission bits:
   R = DREAD   — read data words
   W = DWRITE  — write data words
   X = LAMBDA  — capture as closure
-  L = CALL    — invoke via C-List (loads CR6/CR14)
+  L = LOAD    — load GT from C-List into a CR
   S = SAVE    — store GT into lump
   E = CALL    — direct invocation (E-perm CALL)
   B = boot    — present in boot C-List
