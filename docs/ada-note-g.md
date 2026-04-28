@@ -638,7 +638,7 @@ Running this file lets you observe the wrong result directly in the simulator an
 
 1. Open the Church Machine IDE.
 2. Click the **Code** tab in the toolbar.
-3. Paste the contents of `simulator/cloomc/ada_note_g_published_bug.cloomc` into the editor (or open the file directly if it appears as a preset).
+3. Click the **Ada: Note G — Published Bug** preset button. This loads `ada_note_g_published_bug.cloomc` directly into the editor with one click — no manual copy-paste required.
 4. Click **Assemble**. The status bar should confirm successful compilation with no errors.
 5. Click **Run** (or **Run to HALT**) to execute to completion.
 
