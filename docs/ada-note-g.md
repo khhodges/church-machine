@@ -201,6 +201,8 @@ The three runs form a chain: each run reads Bernoulli numbers produced by its pr
 
 This self-referential structure is precisely what makes Note G remarkable. The 25 operations are not a one-off calculation but a reusable program: the same barrel of cards, advanced from n=2 upward, produces every odd Bernoulli number in sequence. Ada made this explicit by labelling V21–V23 as "previously computed" values and by including Operation 25 — which increments V3 (i.e., n) — as the final step, so the Engine is left ready to begin the next computation immediately.
 
+The complete three-run chain is implemented as an executable CLOOMC program in `simulator/cloomc/ada_note_g_series.cloomc`. It seeds only V21 = 1/6 by hand, then runs the 25-operation program for n=2, n=3, and n=4 in sequence. The result of each run is transferred into the next run's Store before execution begins, exactly mirroring the feed-forward structure described above. A scratch register (V20, outside Ada's original V1–V24 layout) is used to preserve the computed B₃ across the n=3 run, compensating for a CLOOMC loop-advance step that would otherwise overwrite V22; this workaround is explained in the file header. Comments in the file tie each sub-invocation to the abbreviated traces in the sections above.
+
 ---
 
 ## Complete Step-by-Step Numerical Trace (n = 4)

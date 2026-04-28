@@ -1,0 +1,294 @@
+-- Ada Lovelace — Note G (1843)
+-- The First Computer Program — Series Build-up
+-- Runs the 25-operation program three times in sequence:
+--   n=2  →  B₃ = −1/30   (written into V22)
+--   n=3  →  B₅ =  1/42   (written into V23)
+--   n=4  →  B₇ = −1/30   (written into V24 — Ada's original result)
+--
+-- Each invocation feeds the next: the result stored by run k becomes a
+-- pre-loaded input for run k+1, exactly as Ada's diagram describes.
+-- Only B₁ = 1/6 (V21) is seeded by hand; every other Bernoulli number
+-- is computed by the program itself.
+--
+-- Operation 25 advances V3 (n) by 1 at the end of every run, so the three
+-- invocations share a single initialisation block and differ only in how
+-- many times the inner loop (Ops 13–23) executes:
+--   n=2 → 0 inner-loop passes   (abbreviated trace: docs/ada-note-g.md §n=2)
+--   n=3 → 1 inner-loop pass     (abbreviated trace: docs/ada-note-g.md §n=3)
+--   n=4 → 2 inner-loop passes   (full trace:        docs/ada-note-g.md §n=4)
+--
+-- Note on V22 preservation across the n=3 run
+-- ─────────────────────────────────────────────
+-- The CLOOMC inner loop advances the Bk register with "let V22 = V23" at
+-- the end of each pass. In the n=3 run V23 is still 0 when that assignment
+-- executes (Run 2 has not yet placed a value there), so V22 is zeroed after
+-- the loop completes. On Ada's physical Analytical Engine the column
+-- registers are permanent and this does not arise; in CLOOMC an explicit
+-- register save/restore is needed.
+--
+-- To keep the series entirely data-driven, V20 is used as a scratch column
+-- not present in Ada's original diagram. It receives a copy of V24 (= B₃)
+-- immediately after Run 1, and is read back into V22 after Run 2's loop
+-- completes, before Run 3 begins. No Bernoulli number is ever assigned from
+-- a literal after the V21 seed.
+--
+-- Variable mapping (V1–V13, V21–V24 follow Ada's original; V20 is added):
+--   V1  = 1 (constant)
+--   V2  = 2 (constant)
+--   V3  = n — starts at 2; advanced to 3 then 4 by Operation 25
+--   V4  = working: 2n, then 2n-1
+--   V5  = working: 2n, then 2n+1
+--   V6  = working: 2n, decrements through inner loop
+--   V7  = denominator counter
+--   V8  = fraction quotient (first ratio per loop pass)
+--   V9  = fraction quotient (second ratio per loop pass)
+--   V10 = loop counter
+--   V11 = working coefficient (Ak)
+--   V12 = product Bk * Ak
+--   V13 = accumulator (running sum)
+--   V20 = CLOOMC scratch: holds B₃ for restoring V22 after the n=3 loop
+--   V21 = B1 = 1/6  (seeded once; never overwritten)
+--   V22 = B3 = −1/30 (written by run 1; read by runs 2 and 3)
+--   V23 = B5 =  1/42 (written by run 2; read by run 3)
+--   V24 = result register — holds B₃, then B₅, then B₇ in turn
+
+abstraction NoteGSeries {
+    capabilities {
+    }
+
+    method compute_series() {
+        -- ── One-time initialisation ──────────────────────────────────────────
+        let V1  = 1
+        let V2  = 2
+        let V3  = 2         -- n=2 for the first run; Op 25 advances this each run
+
+        -- V21 = B1 = 1/6 is the only Bernoulli number not produced by the
+        -- 25-step program.  It is the well-known closed-form result and is
+        -- seeded here once, shared across all three runs.
+        let V21 = 1 / 6
+
+
+        -- ════════════════════════════════════════════════════════════════════
+        -- RUN 1 — n=2 — computes B₃ = −1/30
+        -- Inner loop runs n−2 = 0 times; execution is a straight sequence.
+        -- Abbreviated trace: docs/ada-note-g.md §"Abbreviated Trace — n=2"
+        -- ════════════════════════════════════════════════════════════════════
+
+        -- Operation 1: 2×n = 2×2 = 4  (result copied to V4, V5, V6)
+        let V4, V5, V6 = V2 * V3
+
+        -- Operation 2: 2n−1 = 3
+        let V4 = V4 - V1
+
+        -- Operation 3: 2n+1 = 5
+        let V5 = V5 + V1
+
+        -- Operation 4: (2n−1)÷(2n+1) = 3/5  (Bromley correction)
+        let V11 = V4 / V5
+
+        -- Operation 5: coefficient ÷ 2 = 3/10
+        let V11 = V11 / V2
+
+        -- Operation 6: A₀ = 0 − 3/10 = −3/10
+        let V13 = 0
+        let V13 = V13 - V11
+
+        -- Operation 7: loop counter = n−1 = 1
+        let V10 = V3 - V1
+
+        -- Operation 8: denominator counter = 2
+        let V7 = V2
+
+        -- Operation 9: 2n÷2 = 4÷2 = 2  (A₁ first factor)
+        let V11 = V6 / V7
+
+        -- Operation 10: B₁×A₁ = (1/6)×2 = 1/3
+        let V12 = V21 * V11
+
+        -- Operation 11: sum += 1/3 + (−3/10) = 1/30
+        let V13 = V12 + V13
+
+        -- Operation 12: loop counter = 1−1 = 0  → inner loop skipped
+        let V10 = V10 - V1
+
+        -- Operations 13–23: inner loop — 0 passes for n=2 (body not executed)
+        repeat V10 as V10
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V8  = V6  / V7
+            let V11 = V8  * V11
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V9  = V6  / V7
+            let V11 = V9  * V11
+            let V12 = V22 * V11
+            let V13 = V12 + V13
+            let V22 = V23
+        end
+
+        -- Operation 24: B₃ = 0 − 1/30 = −1/30
+        let V24 = 0
+        let V24 = V24 - V13
+
+        -- Operation 25: advance n  (V3: 2 → 3)
+        let V3 = V1 + V3
+
+        -- Transfer: write computed B₃ into V22 for the next run,
+        -- and save a copy in V20 so Run 3 can restore V22 after the n=3 loop.
+        let V22 = V24
+        let V20 = V24
+
+
+        -- ════════════════════════════════════════════════════════════════════
+        -- RUN 2 — n=3 — computes B₅ = 1/42
+        -- Inner loop runs n−2 = 1 time, using B₃ = −1/30 now in V22.
+        -- Abbreviated trace: docs/ada-note-g.md §"Abbreviated Trace — n=3"
+        -- ════════════════════════════════════════════════════════════════════
+
+        -- Operation 1: 2×3 = 6
+        let V4, V5, V6 = V2 * V3
+
+        -- Operation 2: 2n−1 = 5
+        let V4 = V4 - V1
+
+        -- Operation 3: 2n+1 = 7
+        let V5 = V5 + V1
+
+        -- Operation 4: 5/7  (Bromley correction)
+        let V11 = V4 / V5
+
+        -- Operation 5: 5/14
+        let V11 = V11 / V2
+
+        -- Operation 6: A₀ = −5/14
+        let V13 = 0
+        let V13 = V13 - V11
+
+        -- Operation 7: loop counter = 3−1 = 2
+        let V10 = V3 - V1
+
+        -- Operation 8: denominator counter = 2
+        let V7 = V2
+
+        -- Operation 9: 6÷2 = 3  (A₁ first factor)
+        let V11 = V6 / V7
+
+        -- Operation 10: B₁×A₁ = (1/6)×3 = 1/2
+        let V12 = V21 * V11
+
+        -- Operation 11: sum += 1/2 + (−5/14) = 1/7
+        let V13 = V12 + V13
+
+        -- Operation 12: loop counter = 2−1 = 1  → one pass follows
+        let V10 = V10 - V1
+
+        -- Operations 13–23: inner loop — 1 pass for n=3
+        --   V22 = B₃ = −1/30 on entry; the final "let V22 = V23" sets
+        --   V22 = V23 = 0 (V23 is still unpopulated here).  V22 is restored
+        --   from the V20 scratch register below, before Run 3 begins.
+        repeat V10 as V10
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V8  = V6  / V7
+            let V11 = V8  * V11
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V9  = V6  / V7
+            let V11 = V9  * V11
+            let V12 = V22 * V11     -- B₃ × A₂ = (−1/30) × 5 = −1/6
+            let V13 = V12 + V13     -- sum: 1/7 + (−1/6) = −1/42
+            let V22 = V23           -- V22 ← 0 (V23 unpopulated; restored below)
+        end
+
+        -- Operation 24: B₅ = 0 − (−1/42) = 1/42
+        let V24 = 0
+        let V24 = V24 - V13
+
+        -- Operation 25: advance n  (V3: 3 → 4)
+        let V3 = V1 + V3
+
+        -- Transfer: write computed B₅ into V23 for the next run
+        let V23 = V24
+
+        -- Restore V22 = B₃ from the V20 scratch register (computed in Run 1).
+        -- This replaces the 0 written by the loop-advance above.  On Ada's
+        -- physical Engine the column would have retained its value; V20 makes
+        -- the restore data-driven rather than hardcoded.
+        let V22 = V20
+
+
+        -- ════════════════════════════════════════════════════════════════════
+        -- RUN 3 — n=4 — computes B₇ = −1/30
+        -- Inner loop runs n−2 = 2 times; V22 = B₃, V23 = B₅ (both computed above).
+        -- Full 36-step trace: docs/ada-note-g.md §"Complete Step-by-Step"
+        -- Matches ada_note_g.cloomc exactly — V21–V23 are now filled by prior runs.
+        -- ════════════════════════════════════════════════════════════════════
+
+        -- Operation 1: 2×4 = 8
+        let V4, V5, V6 = V2 * V3
+
+        -- Operation 2: 2n−1 = 7
+        let V4 = V4 - V1
+
+        -- Operation 3: 2n+1 = 9
+        let V5 = V5 + V1
+
+        -- Operation 4: 7/9  (Bromley correction)
+        let V11 = V4 / V5
+
+        -- Operation 5: 7/18
+        let V11 = V11 / V2
+
+        -- Operation 6: A₀ = −7/18
+        let V13 = 0
+        let V13 = V13 - V11
+
+        -- Operation 7: loop counter = 4−1 = 3
+        let V10 = V3 - V1
+
+        -- Operation 8: denominator counter = 2
+        let V7 = V2
+
+        -- Operation 9: 8÷2 = 4  (A₁ first factor)
+        let V11 = V6 / V7
+
+        -- Operation 10: B₁×A₁ = (1/6)×4 = 2/3
+        let V12 = V21 * V11
+
+        -- Operation 11: sum += 2/3 + (−7/18) = 5/18
+        let V13 = V12 + V13
+
+        -- Operation 12: loop counter = 3−1 = 2  → two passes follow
+        let V10 = V10 - V1
+
+        -- Operations 13–23: inner loop — 2 passes for n=4
+        --   Pass 1 (a): V22 = B₃ = −1/30  →  B₃ × A₂ term; V22 advanced to B₅
+        --   Pass 2 (b): V22 = B₅ =  1/42  →  B₅ × A₃ term
+        repeat V10 as V10
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V8  = V6  / V7
+            let V11 = V8  * V11
+            let V6  = V6  - V1
+            let V7  = V1  + V7
+            let V9  = V6  / V7
+            let V11 = V9  * V11
+            let V12 = V22 * V11
+            let V13 = V12 + V13
+            let V22 = V23
+        end
+
+        -- Operation 24: B₇ = 0 − accumulated sum  (0 − 1/30 = −1/30)
+        let V24 = 0
+        let V24 = V24 - V13
+
+        -- Operation 25: advance n  (V3: 4 → 5; Engine ready for B₉ if needed)
+        let V3 = V1 + V3
+
+        -- Result: V24 = B₇ = −1/30
+        -- Ada, 1843: "The Analytical Engine weaves
+        -- algebraical patterns just as the Jacquard
+        -- loom weaves flowers and leaves."
+        halt
+    }
+}
