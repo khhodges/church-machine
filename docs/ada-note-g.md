@@ -370,6 +370,80 @@ The table below traces every step between Op 4 and Op 22 where V11 or V13 differ
 
 ---
 
+### Bug Propagation Table — n=2 (computing B₃)
+
+For n=2 the inner loop does not execute (n−2 = 0 passes), so the error introduced by Op 4 has only one opportunity to poison the accumulator: through Op 6 setting V13 to a wrong A₀ seed, which is then shifted once more at Op 11 and carried directly into Op 24.
+
+**Key values for n=2:** V4 = 3 (2n−1), V5 = 5 (2n+1), V6 = 4 (2n).
+
+| Step | Op | V11 (published — bug) | V11 (corrected) | V13 (published — bug) | V13 (corrected) |
+|------|----|-----------------------|-----------------|-----------------------|-----------------|
+| 4    | ÷  | **5/3** (= V5 ÷ V4)  | **3/5** (= V4 ÷ V5) | 0 | 0 |
+| 5    | ÷  | **5/6**              | **3/10**        | 0 | 0 |
+| 6    | −  | 5/6                  | 3/10            | **−5/6**              | **−3/10** |
+| 9    | ÷  | **2** (same; reset from V6 ÷ V7 = 4 ÷ 2) | **2** | −5/6 | −3/10 |
+| 11   | +  | 2 | 2 | **−1/2**              | **1/30** |
+| 24   | −  | 2 | 2 | −1/2 | 1/30 |
+
+**V24 results:** published (buggy) → **1/2 = 0.5000**, corrected → **−1/30 ≈ −0.0333**
+
+**Key observations for n=2:**
+
+1. V11 converges at Op 9 for the same reason as in the n=4 run: Op 9 computes V6 ÷ V7 = 4 ÷ 2 = 2 from scratch, discarding the wrong Op 4 quotient entirely.
+2. V13 diverges at Op 6 and, with no loop passes to accumulate further terms, the single Op 11 shift is the only additional propagation step. The buggy A₀ seed (−5/6 instead of −3/10) is the entirety of the error.
+3. The buggy answer, 1/2, is a recognisable fraction — unlike the n=4 buggy result of 139/630 — which makes it subtly more dangerous as a false intermediate value. A reader who happened to check V24 after a buggy n=2 run might not immediately notice that 1/2 is wrong; −1/30 is a far less intuitive expectation.
+
+---
+
+### Bug Propagation Table — n=3 (computing B₅)
+
+For n=3 the inner loop runs exactly once (n−2 = 1 pass). The bug still seeds V13 with a wrong A₀ at Op 6; the single loop pass then adds a B₃ × A₂ term onto the corrupted accumulator rather than onto the correct partial sum.
+
+**Key values for n=3:** V4 = 5 (2n−1), V5 = 7 (2n+1), V6 = 6 (2n). V22 = −1/30 (B₃, pre-loaded from the n=2 run).
+
+| Step | Op | V11 (published — bug) | V11 (corrected) | V13 (published — bug) | V13 (corrected) |
+|------|----|-----------------------|-----------------|-----------------------|-----------------|
+| 4    | ÷  | **7/5** (= V5 ÷ V4)  | **5/7** (= V4 ÷ V5) | 0 | 0 |
+| 5    | ÷  | **7/10**             | **5/14**        | 0 | 0 |
+| 6    | −  | 7/10                 | 5/14            | **−7/10**             | **−5/14** |
+| 9    | ÷  | **3** (same; reset from V6 ÷ V7 = 6 ÷ 2) | **3** | −7/10 | −5/14 |
+| 11   | +  | 3 | 3 | **−1/5**              | **1/7** |
+| 22 (pass 1) | + | 5 | 5 | **−11/30**        | **−1/42** |
+| 24   | −  | 5 | 5 | −11/30 | −1/42 |
+
+**V24 results:** published (buggy) → **11/30 ≈ 0.3667**, corrected → **1/42 ≈ 0.0238**
+
+**Arithmetic verification of the divergent steps:**
+
+- Op 4 (buggy): V5 ÷ V4 = 7 ÷ 5 = **7/5**; corrected: 5 ÷ 7 = **5/7**
+- Op 11 (buggy): 1/2 + (−7/10) = 5/10 − 7/10 = **−1/5**; corrected: 1/2 − 5/14 = 7/14 − 5/14 = **1/7**
+- Op 21 (pass 1): V22 × V11 = (−1/30) × 5 = **−1/6** — *identical in both versions*, because V11 was fully reset by Ops 13–20 and V22 is unchanged
+- Op 22 (buggy, pass 1): −1/6 + (−1/5) = −5/30 − 6/30 = **−11/30**; corrected: −1/6 + 1/7 = −7/42 + 6/42 = **−1/42**
+
+**Key observations for n=3:**
+
+1. As in the n=4 case, V11 converges at Op 9 and remains identical in both versions through the entire inner loop (Ops 13–20 recompute V11 from V6 and V7, which are unaffected by Op 4).
+2. V13 diverges at Op 6 and stays wrong through Op 22 of the loop pass. Crucially, Op 21 adds the same B₃ × A₂ term (−1/6) to both the buggy and corrected V13 — the loop arithmetic itself is correct; it is simply applied to an already-corrupted accumulator.
+3. The buggy answer, 11/30, has no algebraic relationship to B₅ = 1/42.
+
+---
+
+### Connecting the Three Bug Tables — Cascade into the n=4 Run
+
+The three bug-propagation tables share a common structure that reflects the algorithm's design:
+
+| Run | n | V11 bug (Op 4) | V11 convergence | Buggy V13 seed (Op 6) | Correct V13 seed | Buggy V24 | Correct V24 |
+|-----|---|----------------|-----------------|------------------------|------------------|-----------|-------------|
+| 1st | 2 | 5/3 vs 3/5 | Op 9 (resets to 2) | −5/6 | −3/10 | **1/2** | **−1/30** |
+| 2nd | 3 | 7/5 vs 5/7 | Op 9 (resets to 3) | −7/10 | −5/14 | **11/30** | **1/42** |
+| 3rd | 4 | 9/7 vs 7/9 | Op 9 (resets to 4) | −9/14 | −7/18 | **139/630** | **−1/30** |
+
+In every run the Op 4 error follows the same path: it corrupts V11 for exactly two steps (Ops 4 and 5), corrupts V13 permanently from Op 6 onward, and then vanishes from V11 when Op 9 recomputes it from V6 and V7. The inner loop arithmetic (Ops 13–20 and Op 21) is identical in both versions in every run, because by the time the loop begins, V11 has been fully corrected and V22 is unaltered. The error lives entirely in the running accumulator V13 from Op 6 to Op 24.
+
+**Does a buggy earlier run cascade into later runs?** Yes, directly. The n=4 run reads V22 = B₃ and V23 = B₅ as pre-loaded constants. If both earlier runs were executed with the published (buggy) Op 4, those slots would contain 1/2 (instead of −1/30) and 11/30 (instead of 1/42) respectively. The n=4 inner loop then computes B₃ × A₂ and B₅ × A₃ using these wrong values: at Op 21a it would multiply 1/2 × 14 = 7 instead of the correct (−1/30) × 14 = −7/15, and at Op 21b it would multiply 11/30 × (28/3) = 308/90 = 154/45 instead of the correct (1/42) × (28/3) = 2/9. The n=4 accumulator would diverge at Op 22a even further from −1/30 than it already does from the Op 4 bug alone. The bugs compound multiplicatively rather than additively, since each wrong Bₖ is scaled by its Aₖ coefficient before entering the sum. In practice the published program, run end-to-end from n=2 through n=4 with Ada's Op 4 as printed, would produce three successive wrong answers — none of them recognisable as Bernoulli numbers.
+
+---
+
 ## Connection to the CLOOMC Implementation
 
 The Church Machine simulator includes a working implementation of Ada's Note G algorithm in `simulator/cloomc/ada_note_g.cloomc`. That implementation incorporates the Bromley correction: Operation 4 is written as
