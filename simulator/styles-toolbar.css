@@ -154,6 +154,13 @@
     overflow-y: auto;
 }
 
+.editor-actions-dropdown {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: unset;
+    min-width: 200px;
+}
+
 .ham-group {
     display: flex;
     flex-direction: column;
