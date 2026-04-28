@@ -9038,25 +9038,25 @@ Syntax:  CHANGE CRd, imm     (imm = context-switch mode)`,
     },
     {
         id: 'switch',
-        name: 'SWITCH — Privilege Switch',
-        brief: 'Switch between privilege levels (ARCH → PROG → PRIV). Monotonic downward.',
-        detail: `SWITCH changes the privilege level of the current execution context.
+        name: 'SWITCH — Namespace Switch',
+        brief: 'Reload CR15 with a new namespace root GT — changes the machine\'s capability world view.',
+        detail: `SWITCH atomically reloads CR15 (the namespace root register) with the
+namespace GT held in a source CR. CR15 is the machine's view of the
+entire capability namespace — every LOAD, SAVE, and CALL resolves
+through it.
 
-Privilege levels (monotonic — can only decrease):
-  ARCH  (0)  Full hardware access; set at boot
-  PROG  (1)  Normal abstraction code; no CR12–CR15 access
-  PRIV  (2)  Restricted; only safe operations
-
-SWITCH is monotonic: you can downgrade privilege but never upgrade within a thread.
-Upgrading requires a CALL into a higher-privilege abstraction via the C-List.
+SWITCH does NOT change permission bits. The GT permission set
+(R, W, X, L, S, E, B, G, F) of any existing capability register is
+unaffected by a SWITCH. Only the namespace root changes.
 
 Use cases:
-  — Boot firmware runs at ARCH; downgrades to PROG before entering user code
-  — Safety-critical sections can SWITCH to PRIV for isolation
+  — Domain isolation: switch to a restricted sub-namespace for a sandboxed task
+  — Controlled handoff: hand a thread a different view of the capability world
+  — Boot: the boot sequence installs the full namespace via CR15 at B:00
 
-Syntax:  SWITCH CRs, imm     (imm = new privilege level)`,
-        example: `; Boot sequence downgrade after kernel init
-SWITCH CR15, #PROG   ; drop from ARCH to PROG before user CALL`
+Syntax:  SWITCH CRs, imm     (CRs = GT for the target namespace; imm = flags)`,
+        example: `; Switch namespace root to the GT in CR3
+SWITCH CR3, 0        ; CR15 <- namespace GT from CR3`
     },
 ];
 
