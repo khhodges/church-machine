@@ -1601,9 +1601,14 @@ function showFaultModal(f) {
     // fall back to f.pc (relative PC) for pre-boot faults or older entries.
     const pc     = (f.physicalPC !== undefined && f.physicalPC !== null) ? f.physicalPC : f.pc;
     const pcHex  = '0x' + pc.toString(16).toUpperCase().padStart(4, '0');
-    const word   = (sim.memory && pc < sim.memory.length) ? sim.memory[pc] : 0;
+    const _histEntry = (f.instrHistory || []).find(h => h.step === f.faultStep)
+                    || (f.instrHistory && f.instrHistory.length ? f.instrHistory[f.instrHistory.length - 1] : null);
+    const word   = _histEntry ? _histEntry.raw : ((sim.memory && pc < sim.memory.length) ? sim.memory[pc] : 0);
     const disasm = assembler ? assembler.disassemble(word) : '???';
-    const ns     = _nsOwnerOf(pc);
+    if (!Object.prototype.hasOwnProperty.call(f, '_nsSnapshot')) {
+        f._nsSnapshot = _nsOwnerOf(pc);
+    }
+    const ns     = f._nsSnapshot;
     const nsStr  = ns ? `${ns.label} +${ns.offset}` : '\u2014';
     const color  = _FAULT_COLORS[f.type] || '#e05555';
 
