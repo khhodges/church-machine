@@ -927,26 +927,28 @@ def six_laws_pdf():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
-_SIMULATOR_HTML_VERSION = "20260429c"
+_SIMULATOR_HTML_VERSION = "r20260429c"
 
 @app.route("/simulator")
 @app.route("/simulator/")
 def simulator_index():
-    # Force the proxy/browser to load a versioned URL it has never cached.
-    # When the URL has no version param, redirect to the versioned form.
-    if request.args.get('v') != _SIMULATOR_HTML_VERSION:
-        return redirect(f"/simulator/?v={_SIMULATOR_HTML_VERSION}", code=302)
+    # Redirect to a versioned path so the proxy never serves a stale HTML.
+    return redirect(f"/simulator/{_SIMULATOR_HTML_VERSION}/", code=302)
+
+@app.route("/simulator/<version>/")
+@app.route("/simulator/<version>")
+def simulator_versioned(version):
     filepath = os.path.join(SIMULATOR_DIR, "index.html")
     if os.path.isfile(filepath):
-        with open(filepath, 'rb') as f:
-            data = f.read()
-        resp = make_response(data)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            html = f.read()
+        # Inject <base> so all relative URLs resolve to /simulator/
+        html = html.replace('<head>', '<head><base href="/simulator/">', 1)
+        resp = make_response(html)
         resp.headers['Content-Type'] = 'text/html; charset=utf-8'
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = '0'
-        resp.headers['Surrogate-Control'] = 'no-store'
-        resp.headers['Vary'] = '*'
         return resp
     return jsonify({"status": "simulator not yet built"})
 
