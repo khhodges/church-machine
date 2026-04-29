@@ -546,6 +546,9 @@ if __name__ == '__main__':
     print('Press Ctrl+C to stop.')
     print()
 
+    if _REPORT_LAUNCH and _IDE_SERVER_URL:
+        _fetch_launch_summary()
+
     server = HTTPServer(('0.0.0.0', HTTP_PORT), Handler)
     if use_https:
         import ssl as _ssl
