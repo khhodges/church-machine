@@ -42,7 +42,7 @@
 // meaning even a tab that has had /simulator/ cached for days will execute this fresh code
 // and be sent to the versioned URL where the correct HTML is served.
 (function _simulatorCacheBust() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.location) return;
     var _VER = 'r20260429e';
     var _path = window.location.pathname;
     // If not already on this exact versioned URL, redirect (catches both /simulator/ and old /~/rXXX).
