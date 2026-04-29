@@ -4349,6 +4349,21 @@ pre:hover .code-copy-btn {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    cursor: help;
+}
+
+.live-lump-warnings[data-tooltip]::after {
+    bottom: auto;
+    top: calc(100% + 6px);
+    left: 0;
+    transform: none;
+    white-space: pre-line;
+    text-align: left;
+    max-width: 420px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: #e0a055;
+    border-color: rgba(224, 160, 85, 0.5);
 }
 
 .live-lump-banner-save-row {
