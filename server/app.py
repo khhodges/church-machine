@@ -928,7 +928,7 @@ def six_laws_pdf():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
-_SIMULATOR_HTML_VERSION = "r20260429l"
+_SIMULATOR_HTML_VERSION = "r20260429m"
 
 @app.route("/simulator")
 @app.route("/simulator/")
@@ -2280,19 +2280,50 @@ def _load_boot_abstr_lump():
         })
         print(f'[boot] Boot.Abstr extracted: {lump_size}w at mem[{word0_location}], '
               f'cw={cw}, cc={cc}', flush=True)
-        # The boot image generator (boot_image.py) now places the saved lump
-        # (00000300.lump) directly at the Boot.Abstr slot with the correct size
-        # and cc.  lump_size and cc are authoritative from the boot image above;
-        # no separate 00000300.lump-override block is needed (Task #568).
-        # Restore author/version from sidecar if one has been written (e.g. after
-        # an authorship edit).  Only these two user-editable fields are merged;
-        # lump_size and cc come from the saved lump (above) or the boot image.
-        _sidecar03 = os.path.join(os.path.dirname(__file__), 'lumps', '00000003.json')
-        if os.path.isfile(_sidecar03):
+        # Check whether the programmer's saved lump (00000300.lump, written by
+        # /api/lumps/save for ns_slot=3) exists on disk.  If it does and carries
+        # valid lump magic (top 5 bits = 0x1F), use its cw/cc for display and
+        # update LAZY_LUMPS['00000003'] so the Binary tab word rendering is
+        # consistent.  boot-image.bin is not changed by this block.
+        _saved300_path = os.path.join(os.path.dirname(__file__), 'lumps', '00000300.lump')
+        if os.path.isfile(_saved300_path):
             try:
-                with open(_sidecar03) as _s03f:
+                with open(_saved300_path, 'rb') as _s300f:
+                    _s300raw = _s300f.read()
+                _s300n = len(_s300raw) // 4
+                if _s300n >= 1:
+                    _s300words = list(_struct.unpack(f'>{_s300n}I', _s300raw[:_s300n * 4]))
+                    _s300hdr = _s300words[0]
+                    if (_s300hdr >> 27) == 0x1F:
+                        _s300cw  = (_s300hdr >> 10) & 0x1FFF
+                        _s300cc  = _s300hdr & 0xFF
+                        _s300nm6 = (_s300hdr >> 23) & 0xF
+                        _s300sz  = 1 << (_s300nm6 + 6)
+                        if _s300n >= _s300sz:
+                            LAZY_LUMPS['00000003'] = _struct.pack(
+                                f'>{_s300sz}I', *_s300words[:_s300sz])
+                            _BOOT_ABSTR_META['cw'] = _s300cw
+                            _BOOT_ABSTR_META['cc'] = _s300cc
+                            _BOOT_ABSTR_META['lump_size'] = _s300sz
+                            if _BOOT_ABSTR_META.get('methods'):
+                                _BOOT_ABSTR_META['methods'][0]['length'] = _s300cw
+                            print(f'[boot] 00000300.lump override: cw={_s300cw}, cc={_s300cc}',
+                                  flush=True)
+            except Exception as _e300:
+                print(f'[boot] 00000300.lump override failed: {_e300}', flush=True)
+        # Restore author/version/cw/cc from sidecar.  Prefer 00000300.json (written
+        # by /api/lumps/save for ns_slot=3); fall back to 00000003.json for
+        # backward-compat with metadata edits stored under the legacy name.
+        _lumps_dir_sc = os.path.dirname(__file__)
+        _sidecar_300 = os.path.join(_lumps_dir_sc, 'lumps', '00000300.json')
+        _sidecar_003 = os.path.join(_lumps_dir_sc, 'lumps', '00000003.json')
+        _sidecar_path = _sidecar_300 if os.path.isfile(_sidecar_300) else (
+            _sidecar_003 if os.path.isfile(_sidecar_003) else None)
+        if _sidecar_path:
+            try:
+                with open(_sidecar_path) as _s03f:
                     _s03 = json.load(_s03f)
-                for _f03 in ('author', 'version'):
+                for _f03 in ('author', 'version', 'cw', 'cc'):
                     if _f03 in _s03:
                         _BOOT_ABSTR_META[_f03] = _s03[_f03]
             except Exception:
