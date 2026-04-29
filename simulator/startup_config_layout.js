@@ -37,8 +37,21 @@
     }
 })();
 
-// Failsafe: inject "Turing DR Test ✦" tab if missing from HTML (cache-busting guard).
-// This file has no version tag so browsers always revalidate it via ETag.
+// Cache-busting guard: force navigation to the versioned simulator URL if on the plain
+// /simulator/ path.  This file has no version tag so browsers always revalidate via ETag —
+// meaning even a tab that has had /simulator/ cached for days will execute this fresh code
+// and be sent to the versioned URL where the correct HTML is served.
+(function _simulatorCacheBust() {
+    if (typeof window === 'undefined') return;
+    var _VER = 'r20260429d';
+    var _path = window.location.pathname;
+    // If we are on /simulator/ (or /simulator) but NOT already on the versioned path, redirect.
+    if (/^\/simulator\/?$/.test(_path) || (_path.indexOf('/simulator/') === 0 && _path.indexOf('/~/' + _VER) === -1 && _path.indexOf('/~/') === -1)) {
+        window.location.replace('/simulator/~/' + _VER + (window.location.hash || ''));
+    }
+})();
+
+// Failsafe: inject "Turing DR Test ✦" tab if missing from HTML.
 (function _ensureTuringDRTab() {
     if (typeof document === 'undefined') return;
     function _inject() {
