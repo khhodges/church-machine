@@ -867,17 +867,17 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 }
 
 // ── LTF: led_turing_full snippet regression ───────────────────────────────────
-// Loads the led_turing_full assembly from app-run.js, assembles it, and asserts
-// zero errors.  This catches any edit that introduces an invalid instruction,
-// bad label, or mis-encoded operand in the visual Turing DR test.
+// Loads the led_turing_full assembly from _TURING_DR_TEST_SOURCE in app-run.js,
+// assembles it, and asserts zero errors.  This catches any edit that introduces
+// an invalid instruction, bad label, or mis-encoded operand in the Turing DR test.
 {
     const fs   = require('fs');
     const path = require('path');
     const src  = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
-    const m    = src.match(/'led_turing_full':\s*`([\s\S]*?)`\s*[,\n]/);
+    const m    = src.match(/const _TURING_DR_TEST_SOURCE\s*=\s*`([\s\S]*?)`\s*;/);
     assert('LTF1 led_turing_full: snippet found in app-run.js',
         m !== null,
-        'regex did not match — check snippet delimiter in app-run.js');
+        'regex did not match — check _TURING_DR_TEST_SOURCE definition in app-run.js');
     if (m) {
         const a = new ChurchAssembler();
         a.assemble(m[1]);

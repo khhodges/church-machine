@@ -2993,596 +2993,10 @@ function closeGitHubConsole() {
     _ghConsoleStatus = null;
 }
 
-function loadExample(name) {
-    const editor = document.getElementById('asmEditor');
-    if (!editor) return;
-    _editorCREditActive = false;
-    _editorCREditCR = null;
-    _editorCREditNS = null;
-    _updateEditorPatchBar();
-    if (activeUserTabId && userTabDirty) saveActiveUserTab();
-    activeUserTabId = null;
-    userTabDirty = false;
-    renderUserTabs();
-    updateSaveUserTabBtn();
-
-    const examples = {
-        'ada_note_g': `; ============================================
-; Ada Lovelace — Note G (1843)
-; The First Computer Program
-; Computes B7 (Bernoulli number = -1/30)
-; 25 operations from the original diagram
-; ============================================
-;
-; Ada wrote this for Babbage's Analytical
-; Engine, which was never built. Here it runs
-; on the Church Machine — 181 years later.
-;
-; The Analytical Engine had multiply and
-; divide in hardware. The Church Machine has
-; no multiply or divide — so Ada's × becomes
-; repeated addition (IADD loop) and ÷ becomes
-; repeated subtraction (ISUB loop), exactly
-; as a child would compute them by hand.
-;
-; *** INTEGER ARITHMETIC WARNING ***
-; This assembly rendering uses INTEGER arithmetic
-; only. All registers hold whole numbers; division
-; discards the remainder (truncates toward zero).
-;
-; As a direct consequence, Operation 4 computes
-; 7 ÷ 9 = 0 (remainder 7), NOT 7/9. Every
-; subsequent coefficient built on that result is
-; also 0, so the final value in DR15 (V24) will
-; be 0 — not the expected -1/30.
-;
-; This is not a bug: integer truncation is the
-; correct behaviour for a machine with no
-; rational-number support. The assembly listing
-; exists to demonstrate Ada's 25-operation
-; structure on real Church Machine opcodes.
-;
-; To see exact rational results (-1/30 in DR24),
-; load the CLOOMC preset instead. The CLOOMC
-; symbolic front-end compiles to rational-
-; arithmetic bytecode and produces all
-; intermediate fractions exactly as Ada's
-; trace shows (Op 4 → 7/9, Op 5 → 7/18, …).
-;
-; Variable mapping (Ada → Church Machine):
-;   DR1  = V1  = 1 (constant)
-;   DR2  = V2  = 2 (constant)
-;   DR3  = V3  = n (4 for B7)
-;   DR4  = V4  (working: 2n, then 2n-1)
-;   DR5  = V5  (working: 2n, then 2n+1)
-;   DR6  = V6  (working: 2n, decrements)
-;   DR7  = V7  (denominator counter)
-;   DR8  = V8  (fraction quotient)
-;   DR9  = V9  (fraction quotient)
-;   DR10 = V10 (loop counter)
-;   DR11 = V11 (working coefficient)
-;   DR12 = V12 (product Bk × Ak)
-;   DR13 = V13 (accumulator)
-;   DR14 = scratch (loop counter for ×/÷)
-;   DR15 = V24 (result: B7)
-;
-; DR0 = 0 always (hardwired zero register).
-; Constants loaded via DREAD from a data
-; table at the end of this program (CR14 code lump exception).
-; ============================================
-
-; --- Initialize Ada's Store columns ---
-DREAD DR1, CR14, 100       ; V1 = 1
-DREAD DR2, CR14, 101       ; V2 = 2
-DREAD DR3, CR14, 102       ; V3 = n = 4
-
-; ============================================
-; OPERATION 1: × (V2 × V3 → V4, V5, V6)
-; "Multiply 2 by n"
-; 2 × 4 = 8 — by repeated addition
-; ============================================
-IADD DR4, DR0, DR0         ; V4 = 0
-IADD DR14, DR3, DR0        ; counter = n
-op1_loop:
-MCMP DR14, DR0
-BRANCHEQ op1_done
-IADD DR4, DR4, DR2         ; V4 += 2
-ISUB DR14, DR14, DR1       ; counter--
-BRANCH op1_loop
-op1_done:
-IADD DR5, DR4, DR0         ; V5 = 2n
-IADD DR6, DR4, DR0         ; V6 = 2n
-
-; ============================================
-; OPERATION 2: − (V4 − V1 → V4)
-; "2n minus 1"
-; ============================================
-ISUB DR4, DR4, DR1         ; V4 = 2n - 1 = 7
-
-; ============================================
-; OPERATION 3: + (V5 + V1 → V5)
-; "2n plus 1"
-; ============================================
-IADD DR5, DR5, DR1         ; V5 = 2n + 1 = 9
-
-; ============================================
-; OPERATION 4: ÷ (V4 ÷ V5 → V11)
-; "(2n-1) / (2n+1)" = 7 / 9 = 0 remainder 7
-; NOTE: Published as V5÷V4 — typo per
-; Bromley (1990). Corrected here.
-; ============================================
-IADD DR11, DR0, DR0        ; quotient = 0
-IADD DR14, DR4, DR0        ; dividend = V4
-op4_loop:
-MCMP DR14, DR5
-BRANCHLT op4_done
-ISUB DR14, DR14, DR5       ; dividend -= V5
-IADD DR11, DR11, DR1       ; quotient++
-BRANCH op4_loop
-op4_done:
-
-; ============================================
-; OPERATION 5: ÷ (V11 ÷ V2 → V11)
-; "Divide coefficient by 2"
-; ============================================
-SHR DR11, DR11, 1          ; V11 / 2
-
-; ============================================
-; OPERATION 6: − (V13 − V11 → V13)
-; "Accumulator A0 = 0 − coefficient"
-; ============================================
-IADD DR13, DR0, DR0        ; V13 = 0
-ISUB DR13, DR13, DR11      ; V13 = -V11
-
-; ============================================
-; OPERATION 7: − (V3 − V1 → V10)
-; "Loop counter = n − 1 = 3"
-; ============================================
-ISUB DR10, DR3, DR1        ; V10 = 4 - 1 = 3
-
-; ============================================
-; OPERATION 8: + (V2 + V7 → V7)
-; "Set denominator counter = 2"
-; ============================================
-IADD DR7, DR2, DR0         ; V7 = 2
-
-; ============================================
-; OPERATION 9: ÷ (V6 ÷ V7 → V11)
-; "2n / counter" = 8 / 2 = 4
-; ============================================
-IADD DR11, DR0, DR0        ; quotient = 0
-IADD DR14, DR6, DR0        ; dividend = V6
-op9_loop:
-MCMP DR14, DR7
-BRANCHLT op9_done
-ISUB DR14, DR14, DR7
-IADD DR11, DR11, DR1       ; quotient++
-BRANCH op9_loop
-op9_done:
-
-; ============================================
-; OPERATION 10: × (V21 × V11 → V12)
-; "B1 × coefficient"
-; B1 = 1 (integer stand-in for 1/6)
-; 1 × 4 = 4 — multiplication loop
-; ============================================
-DREAD DR15, CR14, 103       ; DR15 = B1 = 1
-IADD DR12, DR0, DR0        ; V12 = 0
-IADD DR14, DR11, DR0       ; counter = V11
-op10_loop:
-MCMP DR14, DR0
-BRANCHEQ op10_done
-IADD DR12, DR12, DR15      ; V12 += B1
-ISUB DR14, DR14, DR1       ; counter--
-BRANCH op10_loop
-op10_done:
-
-; ============================================
-; OPERATION 11: + (V12 + V13 → V13)
-; "Accumulate: sum += B1 × A1"
-; ============================================
-IADD DR13, DR12, DR13      ; V13 += V12
-
-; ============================================
-; OPERATION 12: − (V10 − V1 → V10)
-; "Decrement loop counter"
-; ============================================
-ISUB DR10, DR10, DR1       ; V10 = 3 - 1 = 2
-
-; ============================================
-; OPERATION 13: − (V6 − V1 → V6)
-; "Decrement working variable"
-; ============================================
-ISUB DR6, DR6, DR1         ; V6 = 8 - 1 = 7
-
-; ============================================
-; OPERATION 14: + (V1 + V7 → V7)
-; "Increment denominator"
-; ============================================
-IADD DR7, DR1, DR7         ; V7 = 2 + 1 = 3
-
-; ============================================
-; OPERATION 15: ÷ (V6 ÷ V7 → V8)
-; "Fraction part" = 7 / 3 = 2
-; ============================================
-IADD DR8, DR0, DR0         ; quotient = 0
-IADD DR14, DR6, DR0        ; dividend = V6
-op15_loop:
-MCMP DR14, DR7
-BRANCHLT op15_done
-ISUB DR14, DR14, DR7
-IADD DR8, DR8, DR1
-BRANCH op15_loop
-op15_done:
-
-; ============================================
-; OPERATION 16: × (V8 × V11 → V11)
-; "Update coefficient" = 2 × 4 = 8
-; ============================================
-IADD DR14, DR11, DR0       ; save old V11
-IADD DR11, DR0, DR0        ; V11 = 0
-IADD DR15, DR8, DR0        ; counter = V8
-op16_loop:
-MCMP DR15, DR0
-BRANCHEQ op16_done
-IADD DR11, DR11, DR14      ; V11 += old V11
-ISUB DR15, DR15, DR1       ; counter--
-BRANCH op16_loop
-op16_done:
-
-; ============================================
-; OPERATION 17: − (V6 − V1 → V6)
-; "Decrement working variable"
-; ============================================
-ISUB DR6, DR6, DR1         ; V6 = 7 - 1 = 6
-
-; ============================================
-; OPERATION 18: + (V1 + V7 → V7)
-; "Increment denominator"
-; ============================================
-IADD DR7, DR1, DR7         ; V7 = 3 + 1 = 4
-
-; ============================================
-; OPERATION 19: ÷ (V6 ÷ V7 → V9)
-; "Fraction part" = 6 / 4 = 1
-; ============================================
-IADD DR9, DR0, DR0         ; quotient = 0
-IADD DR14, DR6, DR0        ; dividend = V6
-op19_loop:
-MCMP DR14, DR7
-BRANCHLT op19_done
-ISUB DR14, DR14, DR7
-IADD DR9, DR9, DR1
-BRANCH op19_loop
-op19_done:
-
-; ============================================
-; OPERATION 20: × (V9 × V11 → V11)
-; "Coefficient → A3" = 1 × 8 = 8
-; ============================================
-IADD DR14, DR11, DR0       ; save V11
-IADD DR11, DR0, DR0        ; V11 = 0
-IADD DR15, DR9, DR0        ; counter = V9
-op20_loop:
-MCMP DR15, DR0
-BRANCHEQ op20_done
-IADD DR11, DR11, DR14
-ISUB DR15, DR15, DR1
-BRANCH op20_loop
-op20_done:
-
-; ============================================
-; OPERATION 21: × (V22 × V11 → V12)
-; "B3 × coefficient"
-; B3 = 1 (integer stand-in for -1/30)
-; ============================================
-DREAD DR15, CR14, 104       ; DR15 = B3 = 1
-IADD DR12, DR0, DR0        ; V12 = 0
-IADD DR14, DR11, DR0       ; counter = V11
-op21_loop:
-MCMP DR14, DR0
-BRANCHEQ op21_done
-IADD DR12, DR12, DR15      ; V12 += B3
-ISUB DR14, DR14, DR1       ; counter--
-BRANCH op21_loop
-op21_done:
-
-; ============================================
-; OPERATION 22: + (V12 + V13 → V13)
-; "Accumulate: sum += B3 × A3"
-; ============================================
-IADD DR13, DR12, DR13      ; V13 += V12
-
-; ============================================
-; OPERATION 23: − (V10 − V1 → V10)
-; "Decrement loop counter"
-; ============================================
-ISUB DR10, DR10, DR1       ; V10 = 2 - 1 = 1
-
-; ============================================
-; Ada writes: "Here follows a repetition of
-; Operations thirteen to twenty-three."
-; The inner loop repeats for each Bernoulli
-; term. For B7, it runs twice: once for B3
-; (above), once for B5 (below).
-; ============================================
-
-; --- Second iteration: B5 term ---
-; OPERATION 13b: V6 = V6 - V1
-ISUB DR6, DR6, DR1         ; V6 = 6 - 1 = 5
-
-; OPERATION 14b: V7 = V1 + V7
-IADD DR7, DR1, DR7         ; V7 = 4 + 1 = 5
-
-; OPERATION 15b: V8 = V6 / V7 = 5/5 = 1
-IADD DR8, DR0, DR0
-IADD DR14, DR6, DR0
-op15b_loop:
-MCMP DR14, DR7
-BRANCHLT op15b_done
-ISUB DR14, DR14, DR7
-IADD DR8, DR8, DR1
-BRANCH op15b_loop
-op15b_done:
-
-; OPERATION 16b: V11 = V8 × V11 = 1 × 8 = 8
-IADD DR14, DR11, DR0
-IADD DR11, DR0, DR0
-IADD DR15, DR8, DR0
-op16b_loop:
-MCMP DR15, DR0
-BRANCHEQ op16b_done
-IADD DR11, DR11, DR14
-ISUB DR15, DR15, DR1
-BRANCH op16b_loop
-op16b_done:
-
-; OPERATION 17b: V6 = V6 - V1
-ISUB DR6, DR6, DR1         ; V6 = 5 - 1 = 4
-
-; OPERATION 18b: V7 = V1 + V7
-IADD DR7, DR1, DR7         ; V7 = 5 + 1 = 6
-
-; OPERATION 19b: V9 = V6 / V7 = 4/6 = 0
-IADD DR9, DR0, DR0
-IADD DR14, DR6, DR0
-op19b_loop:
-MCMP DR14, DR7
-BRANCHLT op19b_done
-ISUB DR14, DR14, DR7
-IADD DR9, DR9, DR1
-BRANCH op19b_loop
-op19b_done:
-
-; OPERATION 20b: V11 = V9 × V11 = 0 × 8 = 0
-IADD DR14, DR11, DR0
-IADD DR11, DR0, DR0
-IADD DR15, DR9, DR0
-op20b_loop:
-MCMP DR15, DR0
-BRANCHEQ op20b_done
-IADD DR11, DR11, DR14
-ISUB DR15, DR15, DR1
-BRANCH op20b_loop
-op20b_done:
-
-; OPERATION 21b: V12 = V23 × V11 = B5 × 0 = 0
-DREAD DR15, CR14, 105       ; DR15 = B5 = 1
-IADD DR12, DR0, DR0
-IADD DR14, DR11, DR0
-op21b_loop:
-MCMP DR14, DR0
-BRANCHEQ op21b_done
-IADD DR12, DR12, DR15
-ISUB DR14, DR14, DR1
-BRANCH op21b_loop
-op21b_done:
-
-; OPERATION 22b: V13 = V12 + V13
-IADD DR13, DR12, DR13
-
-; OPERATION 23b: V10 = V10 - V1
-ISUB DR10, DR10, DR1       ; V10 = 1 - 1 = 0
-
-; ============================================
-; OPERATION 24: − (V24 − V13 → V24)
-; "Final result: B7 = −accumulated sum"
-; ============================================
-IADD DR15, DR0, DR0        ; V24 = 0
-ISUB DR15, DR15, DR13      ; V24 = -V13
-
-; ============================================
-; OPERATION 25: + (V1 + V3 → V3)
-; "Increment n for next Bernoulli number"
-; ============================================
-IADD DR3, DR1, DR3         ; V3 = 4 + 1 = 5
-
-; ============================================
-; Result: DR15 = B7 (negated accumulator)
-; DR13 = accumulated sum of Bk × Ak terms
-;
-; Ada, 1843: "The Analytical Engine weaves
-; algebraical patterns just as the Jacquard
-; loom weaves flowers and leaves."
-;
-; The first program — running 181 years later
-; inside a capability-secured namespace where
-; no instruction can escape its lump.
-; ============================================
-HALT
-
-; --- Data table (Ada's Store constants) ---
-; Placed at offset 100 via .org directive.
-; DREAD DR, CR14, offset reads these values (CR14 code lump exception).
-.org 100
-.word 1                    ; offset 100: V1 = 1
-.word 2                    ; offset 101: V2 = 2
-.word 4                    ; offset 102: V3 = n = 4
-.word 1                    ; offset 103: B1 (stand-in)
-.word 1                    ; offset 104: B3 (stand-in)
-.word 1                    ; offset 105: B5 (stand-in)
-`,
-        'selftest': `; ============================================
-; Church Machine Self-Test
-; Tests opcodes using boot C-List (12 entries)
-; Boot must complete before assembling
-; ============================================
-;
-; Boot C-List layout:
-;   [0] Boot.NS  [1] Thread  [2] Boot.Abstr (E)
-;   [3] (empty)  [4] Salvation (E)  [5] Navana (E)
-;   [6] Mint (E) [7] Memory (E)
-;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
-
-; --- TEST 1: LOAD system abstractions ---
-LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
-LOAD CR1, CR6, 5       ; CR1 = Navana    (E)
-LOAD CR2, CR6, 6       ; CR2 = Mint      (E)
-LOAD CR3, CR6, 7       ; CR3 = Memory    (E)
-LOAD CR4, CR6, 8       ; CR4 = LED       (RW)
-LOAD CR5, CR6, 9       ; CR5 = UART      (RW)
-
-; --- TEST 2: TPERM - permission checks ---
-TPERM CR0, E           ; Salvation has E? PASS (Z=1)
-TPERM CR1, E           ; Navana has E? PASS (Z=1)
-TPERM CR4, RW          ; LED has R+W? PASS (Z=1)
-TPERM CR5, RW          ; UART has R+W? PASS (Z=1)
-
-; --- TEST 3: TPERM failure ---
-TPERM CR0, L           ; Salvation has L? FAIL (Z=0)
-
-; --- TEST 4: Conditional execution ---
-; Z=0 from failed TPERM above
-LOADEQ CR0, CR6, 5     ; SKIP (Z=0, not equal)
-LOADNE CR0, CR6, 4     ; EXEC (Z=0, is not-equal) -> Salvation
-
-; --- TEST 5: SWITCH - swap registers ---
-SWITCH CR0, 1          ; CR0 <-> CR1
-; Now CR0=Navana, CR1=Salvation
-SWITCH CR0, 1          ; Swap back
-; CR0=Salvation, CR1=Navana again
-
-; --- TEST 6: Turing ISA ---
-IADD DR1, DR0, #42     ; DR1 = 42
-IADD DR2, DR1, #8      ; DR2 = 50
-ISUB DR3, DR2, DR1     ; DR3 = 8
-MCMP DR1, DR2          ; 42 < 50 → N=1, Z=0
-IADD DR4, DR0, #1      ; DR4 = 1
-SHL DR4, DR4, 3        ; DR4 = 8
-SHR DR4, DR4, 1        ; DR4 = 4
-
-; --- TEST 7: CALL/RETURN ---
-LOAD CR0, CR6, 4       ; CR0 = Salvation
-CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
-
-; --- TEST 8: ELOADCALL - fused Load+TPERM+Call ---
-ELOADCALL CR0, CR6, 4  ; Load Salvation + check E + call
-
-; --- All tests complete ---
-HALT
-`,
-        'load_save': `; Load and Save example
-; Boot C-List: [4]=Salvation(E) [5]=Navana(E) [8]=LED(RW)
-LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
-TPERM CR0, E           ; Check E permission → Z=1
-LOAD CR1, CR6, 5       ; CR1 = Navana (E)
-TPERM CR1, E           ; Check E → Z=1
-LOAD CR2, CR6, 8       ; CR2 = LED (RW)
-TPERM CR2, RW          ; Check R+W → Z=1
-CALL CR0, 0xF          ; CALL Salvation (atomic dispatch)
-HALT
-`,
-        'bernoulli': `; Bernoulli Sum Identity — Pure Turing Arithmetic
-; Computes S(n) = 1 + 2 + ... + n = n(n+1)/2
-; Ada's insight: summation formulas ARE Bernoulli numbers
-; B0 = 1, and sum(k, k=1..n) = n²/2 + n*B0/1
-;
-; Uses only boot-level Turing instructions:
-; IADD, ISUB, MCMP, BRANCH, SHR
-
-; --- Setup ---
-IADD DR1, DR0, #10     ; n = 10
-IADD DR2, DR1, #1      ; DR2 = n + 1 = 11
-
-; --- Software multiply: DR3 = n * (n+1) ---
-IADD DR3, DR0, DR0     ; product = 0
-IADD DR4, DR2, DR0     ; counter = n + 1
-mul:
-MCMP DR4, DR0          ; counter == 0?
-BRANCHEQ div           ; → done with multiply
-IADD DR3, DR3, DR1     ; product += n
-ISUB DR4, DR4, #1      ; counter--
-BRANCH mul
-
-; --- Divide by 2 ---
-div:
-SHR DR3, DR3, 1        ; DR3 = n(n+1)/2 = 55
-
-; --- Verify by loop: DR5 = 1+2+...+n ---
-IADD DR5, DR0, DR0     ; sum = 0
-IADD DR6, DR0, #1      ; k = 1
-loop:
-MCMP DR6, DR1          ; k > n?
-BRANCHGT done          ; → finished
-IADD DR5, DR5, DR6     ; sum += k
-IADD DR6, DR6, #1      ; k++
-BRANCH loop
-
-done:
-; DR3 = 55 (formula), DR5 = 55 (loop) — match!
-HALT
-`,
-        'conditional': `; Conditional execution demo
-; Boot C-List: [4]=Salvation(E) [5]=Navana(E) [8]=LED(RW)
-LOAD CR0, CR6, 4       ; Load Salvation (E)
-TPERM CR0, E           ; Check E \u2014 sets Z=1 (pass)
-
-; This executes only if Z=1 (TPERM passed)
-LOADEQ CR1, CR6, 5     ; Load Navana only if equal (Z=1) → EXEC
-CALLNE CR0, 0xF        ; SKIP (Z=1, so NE is false)
-
-; Force Z=0 via failed TPERM
-TPERM CR0, L           ; Salvation has L? FAIL → Z=0
-
-; This would skip if Z=0 (TPERM failed)
-LOADEQ CR2, CR6, 6     ; SKIP (Z=0, not equal)
-LOADNE CR2, CR6, 7     ; EXEC (Z=0, is not-equal) → Memory
-
-HALT
-`,
-        'gc_test': `; ============================================
-; Church Machine GC Test (PP250)
-; Exercises LOAD, TPERM, CALL with boot C-List
-; Boot must complete before assembling
-; ============================================
-;
-; Boot C-List layout:
-;   [4] Salvation (E)  [5] Navana (E)
-;   [6] Mint (E)       [7] Memory (E)
-;   [8] LED (RW)       [9] UART (RW)
-;   [10] BTN (R)       [11] TIMER (RW)
-
-; --- Load subset into CRs ---
-LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
-LOAD CR1, CR6, 5       ; CR1 = Navana    (E)
-LOAD CR2, CR6, 6       ; CR2 = Mint      (E)
-LOAD CR3, CR6, 7       ; CR3 = Memory    (E)
-LOAD CR4, CR6, 8       ; CR4 = LED       (RW)
-
-; --- Verify permissions ---
-TPERM CR0, E           ; Salvation has E? PASS
-TPERM CR1, E           ; Navana has E? PASS
-TPERM CR2, E           ; Mint has E? PASS
-TPERM CR3, E           ; Memory has E? PASS
-TPERM CR4, RW          ; LED has R+W? PASS
-
-; --- CALL Salvation: checks E via mLoad ---
-CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
-
-HALT
-`,
-        'led_turing_full': `; ============================================================
-; Turing DR Test ✦ — Full ISA Visual Test Across All DR0–DR15
+// ── Turing DR Test source ─────────────────────────────────────────────────
+// Canonical source for the led_turing_full example (Turing DR Test ✦).
+// Used by loadExample() and runTuringSimGate() (pre-flash simulation gate).
+const _TURING_DR_TEST_SOURCE = `; Turing DR Test ✦ — Full ISA Visual Test Across All DR0–DR15
 ; Exercises all 10 Turing instructions across 16 data registers:
 ;   DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR
 ; ============================================================
@@ -4755,6 +4169,715 @@ DWRITE DR0, CR3, 3        ; LED3 off
 DWRITE DR0, CR3, 4        ; LED4 off
 DWRITE DR0, CR3, 5        ; LED5 off
 BRANCH fail               ; infinite halt loop
+`;
+
+function loadExample(name) {
+    const editor = document.getElementById('asmEditor');
+    if (!editor) return;
+    _editorCREditActive = false;
+    _editorCREditCR = null;
+    _editorCREditNS = null;
+    _updateEditorPatchBar();
+    if (activeUserTabId && userTabDirty) saveActiveUserTab();
+    activeUserTabId = null;
+    userTabDirty = false;
+    renderUserTabs();
+    updateSaveUserTabBtn();
+
+    const examples = {
+        'ada_note_g': `; ============================================
+; Ada Lovelace — Note G (1843)
+; The First Computer Program
+; Computes B7 (Bernoulli number = -1/30)
+; 25 operations from the original diagram
+; ============================================
+;
+; Ada wrote this for Babbage's Analytical
+; Engine, which was never built. Here it runs
+; on the Church Machine — 181 years later.
+;
+; The Analytical Engine had multiply and
+; divide in hardware. The Church Machine has
+; no multiply or divide — so Ada's × becomes
+; repeated addition (IADD loop) and ÷ becomes
+; repeated subtraction (ISUB loop), exactly
+; as a child would compute them by hand.
+;
+; *** INTEGER ARITHMETIC WARNING ***
+; This assembly rendering uses INTEGER arithmetic
+; only. All registers hold whole numbers; division
+; discards the remainder (truncates toward zero).
+;
+; As a direct consequence, Operation 4 computes
+; 7 ÷ 9 = 0 (remainder 7), NOT 7/9. Every
+; subsequent coefficient built on that result is
+; also 0, so the final value in DR15 (V24) will
+; be 0 — not the expected -1/30.
+;
+; This is not a bug: integer truncation is the
+; correct behaviour for a machine with no
+; rational-number support. The assembly listing
+; exists to demonstrate Ada's 25-operation
+; structure on real Church Machine opcodes.
+;
+; To see exact rational results (-1/30 in DR24),
+; load the CLOOMC preset instead. The CLOOMC
+; symbolic front-end compiles to rational-
+; arithmetic bytecode and produces all
+; intermediate fractions exactly as Ada's
+; trace shows (Op 4 → 7/9, Op 5 → 7/18, …).
+;
+; Variable mapping (Ada → Church Machine):
+;   DR1  = V1  = 1 (constant)
+;   DR2  = V2  = 2 (constant)
+;   DR3  = V3  = n (4 for B7)
+;   DR4  = V4  (working: 2n, then 2n-1)
+;   DR5  = V5  (working: 2n, then 2n+1)
+;   DR6  = V6  (working: 2n, decrements)
+;   DR7  = V7  (denominator counter)
+;   DR8  = V8  (fraction quotient)
+;   DR9  = V9  (fraction quotient)
+;   DR10 = V10 (loop counter)
+;   DR11 = V11 (working coefficient)
+;   DR12 = V12 (product Bk × Ak)
+;   DR13 = V13 (accumulator)
+;   DR14 = scratch (loop counter for ×/÷)
+;   DR15 = V24 (result: B7)
+;
+; DR0 = 0 always (hardwired zero register).
+; Constants loaded via DREAD from a data
+; table at the end of this program (CR14 code lump exception).
+; ============================================
+
+; --- Initialize Ada's Store columns ---
+DREAD DR1, CR14, 100       ; V1 = 1
+DREAD DR2, CR14, 101       ; V2 = 2
+DREAD DR3, CR14, 102       ; V3 = n = 4
+
+; ============================================
+; OPERATION 1: × (V2 × V3 → V4, V5, V6)
+; "Multiply 2 by n"
+; 2 × 4 = 8 — by repeated addition
+; ============================================
+IADD DR4, DR0, DR0         ; V4 = 0
+IADD DR14, DR3, DR0        ; counter = n
+op1_loop:
+MCMP DR14, DR0
+BRANCHEQ op1_done
+IADD DR4, DR4, DR2         ; V4 += 2
+ISUB DR14, DR14, DR1       ; counter--
+BRANCH op1_loop
+op1_done:
+IADD DR5, DR4, DR0         ; V5 = 2n
+IADD DR6, DR4, DR0         ; V6 = 2n
+
+; ============================================
+; OPERATION 2: − (V4 − V1 → V4)
+; "2n minus 1"
+; ============================================
+ISUB DR4, DR4, DR1         ; V4 = 2n - 1 = 7
+
+; ============================================
+; OPERATION 3: + (V5 + V1 → V5)
+; "2n plus 1"
+; ============================================
+IADD DR5, DR5, DR1         ; V5 = 2n + 1 = 9
+
+; ============================================
+; OPERATION 4: ÷ (V4 ÷ V5 → V11)
+; "(2n-1) / (2n+1)" = 7 / 9 = 0 remainder 7
+; NOTE: Published as V5÷V4 — typo per
+; Bromley (1990). Corrected here.
+; ============================================
+IADD DR11, DR0, DR0        ; quotient = 0
+IADD DR14, DR4, DR0        ; dividend = V4
+op4_loop:
+MCMP DR14, DR5
+BRANCHLT op4_done
+ISUB DR14, DR14, DR5       ; dividend -= V5
+IADD DR11, DR11, DR1       ; quotient++
+BRANCH op4_loop
+op4_done:
+
+; ============================================
+; OPERATION 5: ÷ (V11 ÷ V2 → V11)
+; "Divide coefficient by 2"
+; ============================================
+SHR DR11, DR11, 1          ; V11 / 2
+
+; ============================================
+; OPERATION 6: − (V13 − V11 → V13)
+; "Accumulator A0 = 0 − coefficient"
+; ============================================
+IADD DR13, DR0, DR0        ; V13 = 0
+ISUB DR13, DR13, DR11      ; V13 = -V11
+
+; ============================================
+; OPERATION 7: − (V3 − V1 → V10)
+; "Loop counter = n − 1 = 3"
+; ============================================
+ISUB DR10, DR3, DR1        ; V10 = 4 - 1 = 3
+
+; ============================================
+; OPERATION 8: + (V2 + V7 → V7)
+; "Set denominator counter = 2"
+; ============================================
+IADD DR7, DR2, DR0         ; V7 = 2
+
+; ============================================
+; OPERATION 9: ÷ (V6 ÷ V7 → V11)
+; "2n / counter" = 8 / 2 = 4
+; ============================================
+IADD DR11, DR0, DR0        ; quotient = 0
+IADD DR14, DR6, DR0        ; dividend = V6
+op9_loop:
+MCMP DR14, DR7
+BRANCHLT op9_done
+ISUB DR14, DR14, DR7
+IADD DR11, DR11, DR1       ; quotient++
+BRANCH op9_loop
+op9_done:
+
+; ============================================
+; OPERATION 10: × (V21 × V11 → V12)
+; "B1 × coefficient"
+; B1 = 1 (integer stand-in for 1/6)
+; 1 × 4 = 4 — multiplication loop
+; ============================================
+DREAD DR15, CR14, 103       ; DR15 = B1 = 1
+IADD DR12, DR0, DR0        ; V12 = 0
+IADD DR14, DR11, DR0       ; counter = V11
+op10_loop:
+MCMP DR14, DR0
+BRANCHEQ op10_done
+IADD DR12, DR12, DR15      ; V12 += B1
+ISUB DR14, DR14, DR1       ; counter--
+BRANCH op10_loop
+op10_done:
+
+; ============================================
+; OPERATION 11: + (V12 + V13 → V13)
+; "Accumulate: sum += B1 × A1"
+; ============================================
+IADD DR13, DR12, DR13      ; V13 += V12
+
+; ============================================
+; OPERATION 12: − (V10 − V1 → V10)
+; "Decrement loop counter"
+; ============================================
+ISUB DR10, DR10, DR1       ; V10 = 3 - 1 = 2
+
+; ============================================
+; OPERATION 13: − (V6 − V1 → V6)
+; "Decrement working variable"
+; ============================================
+ISUB DR6, DR6, DR1         ; V6 = 8 - 1 = 7
+
+; ============================================
+; OPERATION 14: + (V1 + V7 → V7)
+; "Increment denominator"
+; ============================================
+IADD DR7, DR1, DR7         ; V7 = 2 + 1 = 3
+
+; ============================================
+; OPERATION 15: ÷ (V6 ÷ V7 → V8)
+; "Fraction part" = 7 / 3 = 2
+; ============================================
+IADD DR8, DR0, DR0         ; quotient = 0
+IADD DR14, DR6, DR0        ; dividend = V6
+op15_loop:
+MCMP DR14, DR7
+BRANCHLT op15_done
+ISUB DR14, DR14, DR7
+IADD DR8, DR8, DR1
+BRANCH op15_loop
+op15_done:
+
+; ============================================
+; OPERATION 16: × (V8 × V11 → V11)
+; "Update coefficient" = 2 × 4 = 8
+; ============================================
+IADD DR14, DR11, DR0       ; save old V11
+IADD DR11, DR0, DR0        ; V11 = 0
+IADD DR15, DR8, DR0        ; counter = V8
+op16_loop:
+MCMP DR15, DR0
+BRANCHEQ op16_done
+IADD DR11, DR11, DR14      ; V11 += old V11
+ISUB DR15, DR15, DR1       ; counter--
+BRANCH op16_loop
+op16_done:
+
+; ============================================
+; OPERATION 17: − (V6 − V1 → V6)
+; "Decrement working variable"
+; ============================================
+ISUB DR6, DR6, DR1         ; V6 = 7 - 1 = 6
+
+; ============================================
+; OPERATION 18: + (V1 + V7 → V7)
+; "Increment denominator"
+; ============================================
+IADD DR7, DR1, DR7         ; V7 = 3 + 1 = 4
+
+; ============================================
+; OPERATION 19: ÷ (V6 ÷ V7 → V9)
+; "Fraction part" = 6 / 4 = 1
+; ============================================
+IADD DR9, DR0, DR0         ; quotient = 0
+IADD DR14, DR6, DR0        ; dividend = V6
+op19_loop:
+MCMP DR14, DR7
+BRANCHLT op19_done
+ISUB DR14, DR14, DR7
+IADD DR9, DR9, DR1
+BRANCH op19_loop
+op19_done:
+
+; ============================================
+; OPERATION 20: × (V9 × V11 → V11)
+; "Coefficient → A3" = 1 × 8 = 8
+; ============================================
+IADD DR14, DR11, DR0       ; save V11
+IADD DR11, DR0, DR0        ; V11 = 0
+IADD DR15, DR9, DR0        ; counter = V9
+op20_loop:
+MCMP DR15, DR0
+BRANCHEQ op20_done
+IADD DR11, DR11, DR14
+ISUB DR15, DR15, DR1
+BRANCH op20_loop
+op20_done:
+
+; ============================================
+; OPERATION 21: × (V22 × V11 → V12)
+; "B3 × coefficient"
+; B3 = 1 (integer stand-in for -1/30)
+; ============================================
+DREAD DR15, CR14, 104       ; DR15 = B3 = 1
+IADD DR12, DR0, DR0        ; V12 = 0
+IADD DR14, DR11, DR0       ; counter = V11
+op21_loop:
+MCMP DR14, DR0
+BRANCHEQ op21_done
+IADD DR12, DR12, DR15      ; V12 += B3
+ISUB DR14, DR14, DR1       ; counter--
+BRANCH op21_loop
+op21_done:
+
+; ============================================
+; OPERATION 22: + (V12 + V13 → V13)
+; "Accumulate: sum += B3 × A3"
+; ============================================
+IADD DR13, DR12, DR13      ; V13 += V12
+
+; ============================================
+; OPERATION 23: − (V10 − V1 → V10)
+; "Decrement loop counter"
+; ============================================
+ISUB DR10, DR10, DR1       ; V10 = 2 - 1 = 1
+
+; ============================================
+; Ada writes: "Here follows a repetition of
+; Operations thirteen to twenty-three."
+; The inner loop repeats for each Bernoulli
+; term. For B7, it runs twice: once for B3
+; (above), once for B5 (below).
+; ============================================
+
+; --- Second iteration: B5 term ---
+; OPERATION 13b: V6 = V6 - V1
+ISUB DR6, DR6, DR1         ; V6 = 6 - 1 = 5
+
+; OPERATION 14b: V7 = V1 + V7
+IADD DR7, DR1, DR7         ; V7 = 4 + 1 = 5
+
+; OPERATION 15b: V8 = V6 / V7 = 5/5 = 1
+IADD DR8, DR0, DR0
+IADD DR14, DR6, DR0
+op15b_loop:
+MCMP DR14, DR7
+BRANCHLT op15b_done
+ISUB DR14, DR14, DR7
+IADD DR8, DR8, DR1
+BRANCH op15b_loop
+op15b_done:
+
+; OPERATION 16b: V11 = V8 × V11 = 1 × 8 = 8
+IADD DR14, DR11, DR0
+IADD DR11, DR0, DR0
+IADD DR15, DR8, DR0
+op16b_loop:
+MCMP DR15, DR0
+BRANCHEQ op16b_done
+IADD DR11, DR11, DR14
+ISUB DR15, DR15, DR1
+BRANCH op16b_loop
+op16b_done:
+
+; OPERATION 17b: V6 = V6 - V1
+ISUB DR6, DR6, DR1         ; V6 = 5 - 1 = 4
+
+; OPERATION 18b: V7 = V1 + V7
+IADD DR7, DR1, DR7         ; V7 = 5 + 1 = 6
+
+; OPERATION 19b: V9 = V6 / V7 = 4/6 = 0
+IADD DR9, DR0, DR0
+IADD DR14, DR6, DR0
+op19b_loop:
+MCMP DR14, DR7
+BRANCHLT op19b_done
+ISUB DR14, DR14, DR7
+IADD DR9, DR9, DR1
+BRANCH op19b_loop
+op19b_done:
+
+; OPERATION 20b: V11 = V9 × V11 = 0 × 8 = 0
+IADD DR14, DR11, DR0
+IADD DR11, DR0, DR0
+IADD DR15, DR9, DR0
+op20b_loop:
+MCMP DR15, DR0
+BRANCHEQ op20b_done
+IADD DR11, DR11, DR14
+ISUB DR15, DR15, DR1
+BRANCH op20b_loop
+op20b_done:
+
+; OPERATION 21b: V12 = V23 × V11 = B5 × 0 = 0
+DREAD DR15, CR14, 105       ; DR15 = B5 = 1
+IADD DR12, DR0, DR0
+IADD DR14, DR11, DR0
+op21b_loop:
+MCMP DR14, DR0
+BRANCHEQ op21b_done
+IADD DR12, DR12, DR15
+ISUB DR14, DR14, DR1
+BRANCH op21b_loop
+op21b_done:
+
+; OPERATION 22b: V13 = V12 + V13
+IADD DR13, DR12, DR13
+
+; OPERATION 23b: V10 = V10 - V1
+ISUB DR10, DR10, DR1       ; V10 = 1 - 1 = 0
+
+; ============================================
+; OPERATION 24: − (V24 − V13 → V24)
+; "Final result: B7 = −accumulated sum"
+; ============================================
+IADD DR15, DR0, DR0        ; V24 = 0
+ISUB DR15, DR15, DR13      ; V24 = -V13
+
+; ============================================
+; OPERATION 25: + (V1 + V3 → V3)
+; "Increment n for next Bernoulli number"
+; ============================================
+IADD DR3, DR1, DR3         ; V3 = 4 + 1 = 5
+
+; ============================================
+; Result: DR15 = B7 (negated accumulator)
+; DR13 = accumulated sum of Bk × Ak terms
+;
+; Ada, 1843: "The Analytical Engine weaves
+; algebraical patterns just as the Jacquard
+; loom weaves flowers and leaves."
+;
+; The first program — running 181 years later
+; inside a capability-secured namespace where
+; no instruction can escape its lump.
+; ============================================
+HALT
+
+; --- Data table (Ada's Store constants) ---
+; Placed at offset 100 via .org directive.
+; DREAD DR, CR14, offset reads these values (CR14 code lump exception).
+.org 100
+.word 1                    ; offset 100: V1 = 1
+.word 2                    ; offset 101: V2 = 2
+.word 4                    ; offset 102: V3 = n = 4
+.word 1                    ; offset 103: B1 (stand-in)
+.word 1                    ; offset 104: B3 (stand-in)
+.word 1                    ; offset 105: B5 (stand-in)
+`,
+        'selftest': `; ============================================
+; Church Machine Self-Test
+; Tests opcodes using boot C-List (12 entries)
+; Boot must complete before assembling
+; ============================================
+;
+; Boot C-List layout:
+;   [0] Boot.NS  [1] Thread  [2] Boot.Abstr (E)
+;   [3] (empty)  [4] Salvation (E)  [5] Navana (E)
+;   [6] Mint (E) [7] Memory (E)
+;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
+
+; --- TEST 1: LOAD system abstractions ---
+LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
+LOAD CR1, CR6, 5       ; CR1 = Navana    (E)
+LOAD CR2, CR6, 6       ; CR2 = Mint      (E)
+LOAD CR3, CR6, 7       ; CR3 = Memory    (E)
+LOAD CR4, CR6, 8       ; CR4 = LED       (RW)
+LOAD CR5, CR6, 9       ; CR5 = UART      (RW)
+
+; --- TEST 2: TPERM - permission checks ---
+TPERM CR0, E           ; Salvation has E? PASS (Z=1)
+TPERM CR1, E           ; Navana has E? PASS (Z=1)
+TPERM CR4, RW          ; LED has R+W? PASS (Z=1)
+TPERM CR5, RW          ; UART has R+W? PASS (Z=1)
+
+; --- TEST 3: TPERM failure ---
+TPERM CR0, L           ; Salvation has L? FAIL (Z=0)
+
+; --- TEST 4: Conditional execution ---
+; Z=0 from failed TPERM above
+LOADEQ CR0, CR6, 5     ; SKIP (Z=0, not equal)
+LOADNE CR0, CR6, 4     ; EXEC (Z=0, is not-equal) -> Salvation
+
+; --- TEST 5: SWITCH - swap registers ---
+SWITCH CR0, 1          ; CR0 <-> CR1
+; Now CR0=Navana, CR1=Salvation
+SWITCH CR0, 1          ; Swap back
+; CR0=Salvation, CR1=Navana again
+
+; --- TEST 6: Turing ISA ---
+IADD DR1, DR0, #42     ; DR1 = 42
+IADD DR2, DR1, #8      ; DR2 = 50
+ISUB DR3, DR2, DR1     ; DR3 = 8
+MCMP DR1, DR2          ; 42 < 50 → N=1, Z=0
+IADD DR4, DR0, #1      ; DR4 = 1
+SHL DR4, DR4, 3        ; DR4 = 8
+SHR DR4, DR4, 1        ; DR4 = 4
+
+; --- TEST 7: CALL/RETURN ---
+LOAD CR0, CR6, 4       ; CR0 = Salvation
+CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
+
+; --- TEST 8: ELOADCALL - fused Load+TPERM+Call ---
+ELOADCALL CR0, CR6, 4  ; Load Salvation + check E + call
+
+; --- All tests complete ---
+HALT
+`,
+        'load_save': `; Load and Save example
+; Boot C-List: [4]=Salvation(E) [5]=Navana(E) [8]=LED(RW)
+LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
+TPERM CR0, E           ; Check E permission → Z=1
+LOAD CR1, CR6, 5       ; CR1 = Navana (E)
+TPERM CR1, E           ; Check E → Z=1
+LOAD CR2, CR6, 8       ; CR2 = LED (RW)
+TPERM CR2, RW          ; Check R+W → Z=1
+CALL CR0, 0xF          ; CALL Salvation (atomic dispatch)
+HALT
+`,
+        'bernoulli': `; Bernoulli Sum Identity — Pure Turing Arithmetic
+; Computes S(n) = 1 + 2 + ... + n = n(n+1)/2
+; Ada's insight: summation formulas ARE Bernoulli numbers
+; B0 = 1, and sum(k, k=1..n) = n²/2 + n*B0/1
+;
+; Uses only boot-level Turing instructions:
+; IADD, ISUB, MCMP, BRANCH, SHR
+
+; --- Setup ---
+IADD DR1, DR0, #10     ; n = 10
+IADD DR2, DR1, #1      ; DR2 = n + 1 = 11
+
+; --- Software multiply: DR3 = n * (n+1) ---
+IADD DR3, DR0, DR0     ; product = 0
+IADD DR4, DR2, DR0     ; counter = n + 1
+mul:
+MCMP DR4, DR0          ; counter == 0?
+BRANCHEQ div           ; → done with multiply
+IADD DR3, DR3, DR1     ; product += n
+ISUB DR4, DR4, #1      ; counter--
+BRANCH mul
+
+; --- Divide by 2 ---
+div:
+SHR DR3, DR3, 1        ; DR3 = n(n+1)/2 = 55
+
+; --- Verify by loop: DR5 = 1+2+...+n ---
+IADD DR5, DR0, DR0     ; sum = 0
+IADD DR6, DR0, #1      ; k = 1
+loop:
+MCMP DR6, DR1          ; k > n?
+BRANCHGT done          ; → finished
+IADD DR5, DR5, DR6     ; sum += k
+IADD DR6, DR6, #1      ; k++
+BRANCH loop
+
+done:
+; DR3 = 55 (formula), DR5 = 55 (loop) — match!
+HALT
+`,
+        'conditional': `; Conditional execution demo
+; Boot C-List: [4]=Salvation(E) [5]=Navana(E) [8]=LED(RW)
+LOAD CR0, CR6, 4       ; Load Salvation (E)
+TPERM CR0, E           ; Check E \u2014 sets Z=1 (pass)
+
+; This executes only if Z=1 (TPERM passed)
+LOADEQ CR1, CR6, 5     ; Load Navana only if equal (Z=1) → EXEC
+CALLNE CR0, 0xF        ; SKIP (Z=1, so NE is false)
+
+; Force Z=0 via failed TPERM
+TPERM CR0, L           ; Salvation has L? FAIL → Z=0
+
+; This would skip if Z=0 (TPERM failed)
+LOADEQ CR2, CR6, 6     ; SKIP (Z=0, not equal)
+LOADNE CR2, CR6, 7     ; EXEC (Z=0, is not-equal) → Memory
+
+HALT
+`,
+        'gc_test': `; ============================================
+; Church Machine GC Test (PP250)
+; Exercises LOAD, TPERM, CALL with boot C-List
+; Boot must complete before assembling
+; ============================================
+;
+; Boot C-List layout:
+;   [4] Salvation (E)  [5] Navana (E)
+;   [6] Mint (E)       [7] Memory (E)
+;   [8] LED (RW)       [9] UART (RW)
+;   [10] BTN (R)       [11] TIMER (RW)
+
+; --- Load subset into CRs ---
+LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
+LOAD CR1, CR6, 5       ; CR1 = Navana    (E)
+LOAD CR2, CR6, 6       ; CR2 = Mint      (E)
+LOAD CR3, CR6, 7       ; CR3 = Memory    (E)
+LOAD CR4, CR6, 8       ; CR4 = LED       (RW)
+
+; --- Verify permissions ---
+TPERM CR0, E           ; Salvation has E? PASS
+TPERM CR1, E           ; Navana has E? PASS
+TPERM CR2, E           ; Mint has E? PASS
+TPERM CR3, E           ; Memory has E? PASS
+TPERM CR4, RW          ; LED has R+W? PASS
+
+; --- CALL Salvation: checks E via mLoad ---
+CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
+
+HALT
+`,
+        'led_turing_full': _TURING_DR_TEST_SOURCE,
+        'turing_test': `; ============================================
+; Turing ISA Test
+; Exercises IADD, ISUB, MCMP, BRANCH, SHL, SHR
+; ============================================
+;
+; Turing ISA (11 instructions):
+;   DREAD, DWRITE, BFEXT, BFINS  (R/W via GT)
+;   MCMP, IADD, ISUB, BRANCH
+;   SHL, SHR (logical/arithmetic)
+;   RETURN (shared with Church)
+; ============================================
+
+; --- Initialize DR1 = 0 ---
+IADD DR1, DR0, DR0     ; DR1 = 0 (Z=1)
+
+; --- Load system abstractions (boot C-List) ---
+LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
+TPERM CR0, E           ; Verify E → Z=1
+
+; --- Integer arithmetic ---
+IADD DR3, DR1, DR2     ; DR3 = DR1 + DR2
+ISUB DR4, DR3, DR1     ; DR4 = DR3 - DR1
+
+; --- MCMP: compare DR4 vs DR2 ---
+MCMP DR4, DR2          ; Should be equal (Z=1)
+BRANCHEQ +2            ; Skip if equal
+IADD DR5, DR1, DR1     ; Skipped
+
+; --- MCMP: nonzero compare ---
+MCMP DR3, DR4          ; DR3 vs DR4
+BRANCHNE +2            ; Skip if not equal
+ISUB DR6, DR1, DR1     ; Skipped if equal
+
+; --- Zero flag test ---
+ISUB DR7, DR3, DR3     ; DR7 = 0 (Z=1)
+BRANCHEQ +2            ; Branch taken
+IADD DR8, DR1, DR1     ; Skipped
+
+; --- SHL: Shift left ---
+IADD DR9, DR3, DR0     ; DR9 = DR3 (copy)
+SHL DR10, DR9, 4       ; DR10 = DR9 << 4
+
+; --- SHR: Logical shift right ---
+SHR DR11, DR10, 2      ; DR11 = DR10 >> 2
+
+; --- SHR: Arithmetic shift right ---
+ISUB DR12, DR0, DR3    ; DR12 = negative
+SHR DR13, DR12, 1, ASR ; DR13 sign-extending
+
+; --- Verify: SHL then SHR restores ---
+SHL DR14, DR3, 8       ; DR14 = DR3 << 8
+SHR DR15, DR14, 8      ; DR15 = DR14 >> 8
+MCMP DR15, DR3         ; Should be equal (Z=1)
+
+HALT
+`,
+        'salvation': `; ============================================
+; Salvation \u2014 First Callable Abstraction
+; Proves CALL works, transitions to Navana
+; ============================================
+;
+; Salvation is NS[4] \u2014 the first abstraction
+; that can be CALLed. It proves:
+;   1. LOAD works (namespace lookup)
+;   2. TPERM works (permission check)
+;   3. LAMBDA works (Church reduction)
+; Then transitions to Navana (does not RETURN).
+; Navana runs indefinitely as namespace controller.
+; ============================================
+
+; --- Load Salvation abstraction ---
+LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
+TPERM CR0, E           ; Verify E permission
+
+; --- CALL Salvation ---
+CALL CR0, 0xF          ; Direct mode: CR0 is the E-GT — enter Salvation
+; Salvation transitions to Navana (no RETURN)
+; Navana runs indefinitely managing all abstractions
+
+; --- Navana is now in control ---
+; Navana manages: IDS, abstraction lifecycle,
+; system health monitoring. It does not RETURN.
+
+HALT
+`,
+        'perm_attack': `; ============================================
+; ADVERSARIAL TEST: Permission Violations
+; Every operation here should FAULT cleanly.
+; mLoad is the single guard at the gate.
+; ============================================
+;
+; Boot C-List layout:
+;   [4] Salvation (E)  [5] Navana (E)
+;   [6] Mint (E)       [7] Memory (E)
+;   [8] LED (RW)       [9] UART (RW)
+;   [10] BTN (R)       [11] TIMER (RW)
+; ============================================
+
+; --- ATTACK 1: CALL device without E ---
+; LED (slot 8) has R+W but no E.
+; CALL requires E via mLoad. Should FAULT.
+LOAD CR0, CR6, 8       ; CR0 = LED (RW, no E)
+CALL CR0, 0xF          ; FAULT: LED lacks E permission
+
+; --- ATTACK 2: DREAD without R ---
+; Salvation (slot 4) has E but no R.
+; DREAD requires R. Should FAULT.
+LOAD CR1, CR6, 4       ; CR1 = Salvation (E only)
+DREAD DR1, CR1, 0      ; FAULT: Salvation lacks R permission
+
+; --- ATTACK 3: DWRITE without W ---
+; BTN (slot 10) has R only, no W.
+; DWRITE requires W. Should FAULT.
+LOAD CR2, CR6, 10      ; CR2 = BTN (R only)
+DWRITE DR1, CR2, 0     ; FAULT: BTN lacks W permission
+
+; --- If we get here, something is broken ---
+HALT
 `,
         'led_blink': `; ============================================
 ; LED Blink — Ti60 F225 Hardware Nucleus Code
@@ -8838,6 +8961,136 @@ async function downloadFPGAPackage() {
     }
 }
 
+// ── Turing DR Test pre-flash simulation gate ─────────────────────────────────
+// Assembles and runs the led_turing_full Turing DR Test in a fresh, headless
+// ChurchSimulator instance.  Returns { passed, steps, error? }.
+// A 'fail' breakpoint is set so the run terminates immediately on any assertion
+// failure rather than spinning in the infinite fail loop.  If the breakpoint is
+// never hit within MAX_GATE_STEPS the test is considered passing.
+// The fresh sim runs independently of the IDE's live simulator state.
+function runTuringSimGate() {
+    const BOOT_ABSTR_NS_SLOT = 3;   // Boot.Abstr — see simulator.js constant
+    const MAX_GATE_STEPS     = 50000;
+
+    if (typeof ChurchSimulator === 'undefined') {
+        return { passed: false, error: 'ChurchSimulator not loaded' };
+    }
+    if (typeof ChurchAssembler === 'undefined') {
+        return { passed: false, error: 'ChurchAssembler not loaded' };
+    }
+
+    const testSim = new ChurchSimulator();
+    testSim.reset();
+
+    // Boot the fresh simulator
+    let bootIterations = 0;
+    while (!testSim.bootComplete && !testSim.halted && bootIterations < 200) {
+        testSim._bootStep();
+        bootIterations++;
+    }
+    if (!testSim.bootComplete) {
+        return { passed: false, error: 'Simulation gate: boot did not complete' };
+    }
+
+    // Assemble the Turing DR Test
+    const testAssembler = new ChurchAssembler({});
+    const asmResult = testAssembler.assemble(_TURING_DR_TEST_SOURCE);
+    if (asmResult.errors && asmResult.errors.length > 0) {
+        return { passed: false, error: 'Turing DR Test assembly failed: ' + asmResult.errors.join('; ') };
+    }
+
+    // Load the assembled program into the fresh simulator (resets pc, faultLog, etc.)
+    testSim.loadProgram(asmResult.words, 0);
+
+    // ── Expand limit17 and relocate the DEMO_CLIST ────────────────────────────
+    // After loadProgram, limit17=63 (Boot.Abstr lump is only 64 words) and the
+    // DEMO_CLIST would normally be installed at lumpBase+46..63 — directly over-
+    // writing program words at pc=45‥62, causing a NULL_CAP fault on the first
+    // BRANCHNE at pc=45 and a false "gate pass" (sim crashes before reaching fail).
+    //
+    // Fix: set limit17 = progWords (863) so CR14 can fetch all instructions, then
+    // place the c-list at lumpBase+progWords+1 (well past the last code word).
+    // Re-seal the NS entry so mLoad version/seal checks still pass.
+    {
+        const _nsBase     = testSim.NS_TABLE_BASE + BOOT_ABSTR_NS_SLOT * testSim.NS_ENTRY_WORDS;
+        const _lumpBase   = testSim.memory[_nsBase] >>> 0;
+        const _progWords  = asmResult.words.length;          // 863
+        const _newLimit17 = _progWords;                      // fetchAddr for pc=progWords-1 is lumpBase+progWords = lumpBase+limit17
+        const _oldW1f     = testSim.parseNSWord1(testSim.memory[_nsBase + 1]);
+        const _oldGtSeq   = (testSim.memory[_nsBase + 2] >>> 25) & 0x7F;
+
+        // Update NS entry word1: new limit17, cc stays 0 (c-list lives elsewhere)
+        const _newW1 = testSim.packNSWord1(
+            _newLimit17, _oldW1f.b, _oldW1f.f, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, 0
+        );
+        testSim.memory[_nsBase + 1] = _newW1;
+
+        // Reseal NS entry word2 so validateMAC passes with the new limit17
+        const _newW2 = testSim.makeVersionSeals(_oldGtSeq, _lumpBase, _newLimit17);
+        testSim.memory[_nsBase + 2] = _newW2;
+
+        // Mirror into CR14 (the code-region capability held live in the register file)
+        if (testSim.cr[14]) {
+            testSim.cr[14].word2 = _newW1;
+            testSim.cr[14].word3 = _newW2;
+        }
+
+        // Install DEMO_CLIST immediately after the last program word — no overlap
+        if (testSim.demoClistGTs && testSim.demoClistGTs.length > 0) {
+            const _cc        = testSim.demoClistGTs.length;   // 18
+            const _clistBase = _lumpBase + _progWords + 1;    // lumpBase + 864
+
+            for (let i = 0; i < _cc; i++) {
+                testSim.memory[_clistBase + i] = testSim.demoClistGTs[i] >>> 0;
+            }
+
+            // CR6: E-GT for Boot.Abstr (gt_seq=0 matches NS entry), c-list at _clistBase
+            // word2 carries the clistCount (18) so _execLoad can bound-check slot offsets
+            const _cr6W1 = testSim.packNSWord1(
+                _newLimit17, _oldW1f.b, _oldW1f.f, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, _cc
+            );
+            const _cr6GT = testSim.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+            testSim.cr[6] = {
+                word0: _cr6GT,
+                word1: _clistBase >>> 0,
+                word2: _cr6W1    >>> 0,
+                word3: _newW2    >>> 0,
+                m: 0,
+            };
+        }
+    }
+
+    // Locate the 'fail' label word-offset in the assembled program
+    const failOffset = asmResult.labels && asmResult.labels['fail'];
+    if (failOffset === undefined || failOffset === null) {
+        return { passed: false, error: 'Simulation gate: no "fail" label found in Turing DR Test' };
+    }
+
+    // Compute the physical address of 'fail'.
+    // _nextPhysicalAddr() returns  entry.word0_location + 1 + pc
+    // where entry = readNSEntry(BOOT_ABSTR_NS_SLOT).
+    const nsEntry = testSim.readNSEntry(BOOT_ABSTR_NS_SLOT);
+    if (!nsEntry) {
+        return { passed: false, error: 'Simulation gate: Boot.Abstr NS entry not found' };
+    }
+    const failPhysAddr = (nsEntry.word0_location + 1 + failOffset) >>> 0;
+
+    // Run with a breakpoint at the 'fail' label
+    const breakpoints  = new Set([failPhysAddr]);
+    const runResult    = testSim.run(MAX_GATE_STEPS, breakpoints);
+
+    if (runResult.stopReason === 'breakpoint' && runResult.breakpointAddr === failPhysAddr) {
+        return { passed: false, steps: runResult.steps,
+                 error: 'Turing DR Test hit the FAIL path at step ' + runResult.steps };
+    }
+    if (testSim.faultLog && testSim.faultLog.length > 0) {
+        const faultTypes = testSim.faultLog.map(f => f.type).join(', ');
+        return { passed: false, steps: runResult.steps,
+                 error: 'Fault(s) during simulation gate: ' + faultTypes };
+    }
+    return { passed: true, steps: runResult.steps };
+}
+
 async function uploadToTang() {
     if (!requirePermission('deploy', 'Deploy to Tang')) return;
     switchView('editor');
@@ -8877,6 +9130,27 @@ async function uploadToTang() {
             '  4. Watch LEDs — walking pattern confirms successful boot\n';
         return;
     }
+
+    // ── Pre-flash simulation gate ─────────────────────────────────────────────
+    // Run the Turing DR Test in a headless simulator before touching hardware.
+    // Any assertion failure blocks the flash and surfaces a clear error.
+    con.textContent = 'Pre-flash check: running Turing DR Test in simulation…\n';
+    await new Promise(r => setTimeout(r, 0));   // let the UI render the status line
+    const _gateResult = runTuringSimGate();
+    if (!_gateResult.passed) {
+        con.textContent  = '✗ SIMULATION GATE FAILED — flash blocked.\n\n';
+        con.textContent += (_gateResult.error || 'Turing DR Test failed in simulation.') + '\n\n';
+        con.textContent += 'Fix the regression in the assembly before flashing to hardware.\n';
+        if (_gateResult.steps !== undefined) {
+            con.textContent += '(simulation ran ' + _gateResult.steps + ' steps)\n';
+        }
+        return;
+    }
+    con.textContent  = '✓ Simulation gate passed';
+    if (_gateResult.steps !== undefined) {
+        con.textContent += ' (' + _gateResult.steps + ' steps)';
+    }
+    con.textContent += '. Proceeding with flash…\n\n';
 
     if (board === 'tang-nano-20k' && typeof checkUploadProfile === 'function') {
         const fullNames = [];

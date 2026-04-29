@@ -4205,9 +4205,11 @@ class ChurchSimulator {
     }
 
     _dispatchAbstractDread(crIdx, drIdx, instrOffset) {
-        // M-window: copy CR words to DR11–DR15, decode from DR11.
-        this._setMWindow(crIdx);
-        const info = this.parseAbstractGT(this.dr[11]);
+        // Parse the abstract GT directly from the CR word (avoids clobbering DR11–DR15
+        // as a side-effect; _setMWindow is only needed when calling a software
+        // Abstract Manager, not for natively-dispatched device reads).
+        this.cr[crIdx].m = 1;
+        const info = this.parseAbstractGT(this.cr[crIdx].word0);
         if (!info.R) {
             this._clearMWindow(crIdx);
             this.fault('PERM_R', `DREAD: Abstract GT lacks R permission`);
@@ -4292,9 +4294,11 @@ class ChurchSimulator {
     }
 
     _dispatchAbstractDwrite(crIdx, drIdx, instrOffset) {
-        // M-window: copy CR words to DR11–DR15, decode from DR11.
-        this._setMWindow(crIdx);
-        const info = this.parseAbstractGT(this.dr[11]);
+        // Parse the abstract GT directly from the CR word (avoids clobbering DR11–DR15
+        // as a side-effect; _setMWindow is only needed when calling a software
+        // Abstract Manager, not for natively-dispatched device writes).
+        this.cr[crIdx].m = 1;
+        const info = this.parseAbstractGT(this.cr[crIdx].word0);
         if (!info.W) {
             this._clearMWindow(crIdx);
             this.fault('PERM_W', `DWRITE: Abstract GT lacks W permission`);
