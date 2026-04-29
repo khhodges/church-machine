@@ -3581,6 +3581,696 @@ CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
 
 HALT
 `,
+        'led_turing_full': `; ============================================================
+; Turing ISA Full DR Test — LED Visual
+; All 10 Turing instructions × DR0–DR15
+; ============================================================
+;
+; LED feedback (Ti60 F225 6-LED strip):
+;   LED0 BOOT  — blinks once at start of each phase
+;   LED3 DONE  — blinks after each sub-test passes
+;   LED2 FAULT — stays ON permanently if any test fails
+;   ALL 6 LEDs blink 3× at end = full PASS
+;
+; Phases:
+;   A  DR0 hardwired-zero enforcement
+;   B  Count cycling: IADD 0→16 then ISUB 16→0 on DR1
+;       (with 3-bit binary LED display using BFEXT)
+;   C  IADD / ISUB point-tests on DR2–DR14
+;   D  DR15 IADD/ISUB, then restore DR15 = 1
+;   E  SHL bit-walk: walking 1-bit across 6 LEDs
+;   F  SHR: logical and arithmetic right shift on DR8–DR14
+;   G  BFEXT / BFINS: extract, insert, round-trip
+;   H  MCMP / BRANCH: all 6 condition codes
+;   I  DREAD / DWRITE: write-then-read on all 6 LED offsets
+;
+; Requires: Boot must have run (C-List[8] = LED device).
+; Lump size: set code lump ≥ 512 words in Boot Image Designer.
+; DR0 is hardwired zero. DR15 holds constant 1 throughout.
+; ============================================================
+
+; ── SETUP ────────────────────────────────────────────────────
+LOAD CR3, CR6, 8              ; CR3 ← LED device capability (W+R)
+IADD DR15, DR0, #1            ; DR15 = 1  (constant — restore after DR15 tests)
+
+; Clear all 6 LEDs
+DWRITE DR0, CR3, 0
+DWRITE DR0, CR3, 1
+DWRITE DR0, CR3, 2
+DWRITE DR0, CR3, 3
+DWRITE DR0, CR3, 4
+DWRITE DR0, CR3, 5
+
+; ── PHASE A: DR0 hardwired-zero ──────────────────────────────
+; A write to DR0 must be silently discarded.
+DWRITE DR15, CR3, 0           ; LED0 on  (phase marker)
+DWRITE DR0,  CR3, 0           ; LED0 off
+
+IADD DR0, DR0, #7             ; attempt to corrupt DR0 — must be no-op
+IADD DR2, DR0, #5             ; DR2 = 0+5 = 5  (only if DR0 stayed 0)
+IADD DR3, DR0, #5             ; DR3 = 5  (expected)
+MCMP DR2, DR3
+BRANCHNE fail                 ; corrupt → fail
+DWRITE DR15, CR3, 3           ; LED3 blink = sub-test pass
+DWRITE DR0,  CR3, 3
+
+; ── PHASE B: Count cycling on DR1 ────────────────────────────
+; IADD counts DR1 from 0 → 16, ISUB counts back 16 → 0.
+; Each step: BFEXT bit[0-2] → LED0/1/3 (binary counter display).
+; Exercises: IADD, ISUB, BFEXT, DWRITE, BRANCHNE, MCMP.
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+IADD DR1, DR0, #0             ; DR1 = 0 (counter)
+IADD DR14, DR0, #16           ; DR14 = 16 (up-limit)
+
+count_up:
+IADD DR1, DR1, #1             ; counter++
+BFEXT DR13, DR1, 0, 1
+DWRITE DR13, CR3, 0           ; LED0 = bit 0 of counter
+BFEXT DR13, DR1, 1, 1
+DWRITE DR13, CR3, 1           ; LED1 = bit 1
+BFEXT DR13, DR1, 2, 1
+DWRITE DR13, CR3, 3           ; LED3 = bit 2
+ISUB DR14, DR14, #1
+BRANCHNE count_up             ; loop until DR14 = 0  (DR1 reaches 16)
+
+IADD DR13, DR0, #16
+MCMP DR1, DR13                ; verify DR1 == 16 after loop
+BRANCHNE fail
+
+IADD DR14, DR0, #16           ; reload DR14 = 16 for down phase
+count_down:
+BFEXT DR13, DR1, 0, 1
+DWRITE DR13, CR3, 0
+BFEXT DR13, DR1, 1, 1
+DWRITE DR13, CR3, 1
+BFEXT DR13, DR1, 2, 1
+DWRITE DR13, CR3, 3
+ISUB DR1, DR1, #1             ; counter--
+ISUB DR14, DR14, #1
+BRANCHNE count_down           ; loop until DR14 = 0  (DR1 reaches 0)
+
+MCMP DR1, DR0                 ; verify DR1 == 0 after count-down
+BRANCHNE fail
+
+; Clear LEDs after display
+DWRITE DR0, CR3, 0
+DWRITE DR0, CR3, 1
+DWRITE DR0, CR3, 3
+DWRITE DR15, CR3, 3           ; LED3 blink = phase pass
+DWRITE DR0,  CR3, 3
+
+; ── PHASE C: IADD + ISUB point-tests on DR2–DR14 ─────────────
+; Each DR: load a seed, add a delta, MCMP vs expected; then subtract back to 0.
+; Uses DR13 as expected-value scratch (except when testing DR13 itself).
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+; Macro pattern: IADD DRn, DR0, #seed; IADD DRn, DRn, #delta; expected=seed+delta
+; DR2:  3 + 11 = 14
+IADD DR2, DR0, #3
+IADD DR2, DR2, #11
+IADD DR13, DR0, #14
+MCMP DR2, DR13
+BRANCHNE fail
+ISUB DR2, DR2, #14
+MCMP DR2, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR3:  5 + 10 = 15
+IADD DR3, DR0, #5
+IADD DR3, DR3, #10
+IADD DR13, DR0, #15
+MCMP DR3, DR13
+BRANCHNE fail
+ISUB DR3, DR3, #15
+MCMP DR3, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR4:  9 + 11 = 20
+IADD DR4, DR0, #9
+IADD DR4, DR4, #11
+IADD DR13, DR0, #20
+MCMP DR4, DR13
+BRANCHNE fail
+ISUB DR4, DR4, #20
+MCMP DR4, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR5:  11 + 15 = 26
+IADD DR5, DR0, #11
+IADD DR5, DR5, #15
+IADD DR13, DR0, #26
+MCMP DR5, DR13
+BRANCHNE fail
+ISUB DR5, DR5, #13
+ISUB DR5, DR5, #13
+MCMP DR5, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR6:  15 + 17 = 32
+IADD DR6, DR0, #15
+IADD DR6, DR6, #17
+IADD DR13, DR0, #32
+MCMP DR6, DR13
+BRANCHNE fail
+ISUB DR6, DR6, #16
+ISUB DR6, DR6, #16
+MCMP DR6, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR7:  19 + 21 = 40
+IADD DR7, DR0, #19
+IADD DR7, DR7, #21
+IADD DR13, DR0, #40
+MCMP DR7, DR13
+BRANCHNE fail
+ISUB DR7, DR7, #20
+ISUB DR7, DR7, #20
+MCMP DR7, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR8:  23 + 27 = 50
+IADD DR8, DR0, #23
+IADD DR8, DR8, #27
+IADD DR13, DR0, #50
+MCMP DR8, DR13
+BRANCHNE fail
+ISUB DR8, DR8, #25
+ISUB DR8, DR8, #25
+MCMP DR8, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR9:  31 + 31 = 62
+IADD DR9, DR0, #31
+IADD DR9, DR9, #31
+IADD DR13, DR0, #62
+MCMP DR9, DR13
+BRANCHNE fail
+ISUB DR9, DR9, #31
+ISUB DR9, DR9, #31
+MCMP DR9, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR10: 40 + 40 = 80
+IADD DR10, DR0, #40
+IADD DR10, DR10, #40
+IADD DR13, DR0, #80
+MCMP DR10, DR13
+BRANCHNE fail
+ISUB DR10, DR10, #40
+ISUB DR10, DR10, #40
+MCMP DR10, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR11: 50 + 50 = 100
+IADD DR11, DR0, #50
+IADD DR11, DR11, #50
+IADD DR13, DR0, #100
+MCMP DR11, DR13
+BRANCHNE fail
+ISUB DR11, DR11, #50
+ISUB DR11, DR11, #50
+MCMP DR11, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR12: 63 + 63 = 126
+IADD DR12, DR0, #63
+IADD DR12, DR12, #63
+IADD DR13, DR0, #126
+MCMP DR12, DR13
+BRANCHNE fail
+ISUB DR12, DR12, #63
+ISUB DR12, DR12, #63
+MCMP DR12, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR13: 55 + 55 = 110  (use DR12 as expected-value temp)
+IADD DR13, DR0, #55
+IADD DR13, DR13, #55
+IADD DR12, DR0, #55
+IADD DR12, DR12, #55
+MCMP DR13, DR12
+BRANCHNE fail
+ISUB DR13, DR13, #55
+ISUB DR13, DR13, #55
+MCMP DR13, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR14: 60 + 63 = 123  (use DR13 as expected-value temp)
+IADD DR14, DR0, #60
+IADD DR14, DR14, #63
+IADD DR13, DR0, #60
+IADD DR13, DR13, #63
+MCMP DR14, DR13
+BRANCHNE fail
+ISUB DR14, DR14, #60
+ISUB DR14, DR14, #63
+MCMP DR14, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE D: DR15 test, then restore constant ─────────────────
+IADD DR15, DR0, #70
+IADD DR15, DR15, #55         ; DR15 = 125
+IADD DR13, DR0, #70
+IADD DR13, DR13, #55         ; DR13 = 125 (expected)
+MCMP DR15, DR13
+BRANCHNE fail
+ISUB DR15, DR15, #70
+ISUB DR15, DR15, #55         ; DR15 = 0
+MCMP DR15, DR0
+BRANCHNE fail
+IADD DR15, DR0, #1           ; RESTORE DR15 = 1
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE E: SHL bit-walk — walking 1-bit displayed on 6 LEDs ─
+; DR7 = 1-bit pattern. SHL by 1 each step, show pattern on LEDs.
+; Uses BFEXT to extract each bit for DWRITE. 6 loop iterations.
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+IADD DR7, DR0, #1             ; DR7 = 0b000001 (bit 0 set)
+IADD DR14, DR0, #6            ; DR14 = loop count
+
+shl_walk:
+BFEXT DR13, DR7, 0, 1
+DWRITE DR13, CR3, 0           ; LED0 = bit 0
+BFEXT DR13, DR7, 1, 1
+DWRITE DR13, CR3, 1           ; LED1 = bit 1
+BFEXT DR13, DR7, 2, 1
+DWRITE DR13, CR3, 2           ; LED2 = bit 2
+BFEXT DR13, DR7, 3, 1
+DWRITE DR13, CR3, 3           ; LED3 = bit 3
+BFEXT DR13, DR7, 4, 1
+DWRITE DR13, CR3, 4           ; LED4 = bit 4
+BFEXT DR13, DR7, 5, 1
+DWRITE DR13, CR3, 5           ; LED5 = bit 5
+IADD DR12, DR0, #30           ; short delay
+shl_delay:
+ISUB DR12, DR12, #1
+BRANCHNE shl_delay
+SHL DR7, DR7, 1               ; shift bit left one position
+ISUB DR14, DR14, #1
+BRANCHNE shl_walk             ; next position
+
+; After 6 shifts: DR7 = 0b01000000 = 64 (bit 6, off all LEDs)
+IADD DR13, DR0, #64
+MCMP DR7, DR13
+BRANCHNE fail
+
+; Clear LEDs
+DWRITE DR0, CR3, 0
+DWRITE DR0, CR3, 1
+DWRITE DR0, CR3, 2
+DWRITE DR0, CR3, 3
+DWRITE DR0, CR3, 4
+DWRITE DR0, CR3, 5
+
+; Also test SHL with known values across DR1–DR4
+; DR1: 1 << 3 = 8
+IADD DR1, DR0, #1
+SHL DR1, DR1, 3
+IADD DR13, DR0, #8
+MCMP DR1, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR2: 3 << 4 = 48
+IADD DR2, DR0, #3
+SHL DR2, DR2, 4
+IADD DR13, DR0, #48
+MCMP DR2, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR3: 7 << 2 = 28
+IADD DR3, DR0, #7
+SHL DR3, DR3, 2
+IADD DR13, DR0, #28
+MCMP DR3, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR4: 5 << 3 = 40
+IADD DR4, DR0, #5
+SHL DR4, DR4, 3
+IADD DR13, DR0, #40
+MCMP DR4, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE F: SHR — logical and arithmetic right shift ─────────
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+; DR8: 64 >> 3 = 8
+IADD DR8, DR0, #64
+SHR DR8, DR8, 3
+IADD DR13, DR0, #8
+MCMP DR8, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR9: 96 >> 2 = 24
+IADD DR9, DR0, #96
+SHR DR9, DR9, 2
+IADD DR13, DR0, #24
+MCMP DR9, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR10: bit walk right — 64 >> 1 six times = 1
+IADD DR10, DR0, #64
+SHR DR10, DR10, 1             ; 32
+SHR DR10, DR10, 1             ; 16
+SHR DR10, DR10, 1             ; 8
+SHR DR10, DR10, 1             ; 4
+SHR DR10, DR10, 1             ; 2
+SHR DR10, DR10, 1             ; 1
+MCMP DR10, DR15               ; DR15 = 1
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR11: ASR — (-64) >> 2 = -16
+ISUB DR11, DR0, #64           ; DR11 = 0 - 64 = -64
+SHR DR11, DR11, 2, ASR        ; sign-extending shift: -64/4 = -16
+ISUB DR13, DR0, #16           ; DR13 = -16 (expected)
+MCMP DR11, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; DR12: ASR — (-96) >> 3 = -12
+ISUB DR12, DR0, #96           ; DR12 = -96
+SHR DR12, DR12, 3, ASR        ; -96 / 8 = -12
+ISUB DR13, DR0, #12
+MCMP DR12, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE G: BFEXT / BFINS ────────────────────────────────────
+; Working value: 0x55 = 85 = 0b01010101
+;   BFEXT pos=0 w=4 → 5   (low nibble)
+;   BFEXT pos=4 w=4 → 5   (high nibble of low byte)
+;   BFEXT pos=0 w=8 → 85  (full low byte)
+; BFINS: build 0x55 from two nibble inserts, verify with BFEXT.
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+IADD DR1, DR0, #85            ; DR1 = 0x55
+IADD DR14, DR0, #5            ; DR14 = 5  (nibble constant)
+
+; BFEXT low nibble: DR2 = DR1[3:0] = 5
+BFEXT DR2, DR1, 0, 4
+MCMP DR2, DR14
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; BFEXT high nibble: DR3 = DR1[7:4] = 5
+BFEXT DR3, DR1, 4, 4
+MCMP DR3, DR14
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; BFEXT full byte: DR4 = DR1[7:0] = 85
+BFEXT DR4, DR1, 0, 8
+IADD DR13, DR0, #85
+MCMP DR4, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; BFINS: DR5 = 0, insert 5 at pos=0 w=4 → DR5 = 5
+IADD DR5, DR0, #0
+BFINS DR5, DR14, 0, 4
+MCMP DR5, DR14
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; BFINS: insert 5 at pos=4 w=4 → DR5 = 0x55 = 85
+BFINS DR5, DR14, 4, 4
+IADD DR13, DR0, #85
+MCMP DR5, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Round-trip: BFEXT bit 0 of DR5, BFINS into DR6 at bit 1, verify = 2
+BFEXT DR6, DR5, 0, 1          ; DR6 = bit 0 of 0x55 = 1
+IADD DR9, DR0, #0
+BFINS DR9, DR6, 1, 1          ; DR9 = (1 << 1) = 2
+IADD DR13, DR0, #2
+MCMP DR9, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; BFEXT with mask — confirm only specified bits extracted (no bleed)
+IADD DR10, DR0, #85           ; DR10 = 0b01010101
+BFEXT DR11, DR10, 1, 1        ; DR11 = bit 1 of 0x55 = 0 (bit 1 of 01010101 is 0)
+MCMP DR11, DR0
+BRANCHNE fail
+BFEXT DR12, DR10, 2, 1        ; DR12 = bit 2 of 0x55 = 1
+MCMP DR12, DR15               ; DR15 = 1
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE H: MCMP / BRANCH all condition codes ────────────────
+DWRITE DR15, CR3, 0
+DWRITE DR0,  CR3, 0
+
+; EQ: 7 == 7 → BRANCHEQ branches, BRANCHNE does not
+IADD DR1, DR0, #7
+IADD DR2, DR0, #7
+MCMP DR1, DR2
+BRANCHNE fail
+BRANCHEQ h_eq_ok
+BRANCH fail
+h_eq_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; NE: 10 ≠ 3 → BRANCHNE branches, BRANCHEQ does not
+IADD DR1, DR0, #10
+IADD DR2, DR0, #3
+MCMP DR1, DR2
+BRANCHEQ fail
+BRANCHNE h_ne_ok
+BRANCH fail
+h_ne_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; GT: 10 > 3 → BRANCHGT branches, BRANCHLE/BRANCHLT do not
+MCMP DR1, DR2
+BRANCHLE fail
+BRANCHLT fail
+BRANCHGT h_gt_ok
+BRANCH fail
+h_gt_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; LT: 3 < 10 → BRANCHLT branches, BRANCHGE/BRANCHGT do not
+MCMP DR2, DR1
+BRANCHGE fail
+BRANCHGT fail
+BRANCHLT h_lt_ok
+BRANCH fail
+h_lt_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; GE: 7 >= 7 → BRANCHGE branches, BRANCHLT does not
+IADD DR1, DR0, #7
+IADD DR2, DR0, #7
+MCMP DR1, DR2
+BRANCHLT fail
+BRANCHGE h_ge_ok
+BRANCH fail
+h_ge_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; LE: 3 <= 7 → BRANCHLE branches, BRANCHGT does not
+IADD DR1, DR0, #3
+IADD DR2, DR0, #7
+MCMP DR1, DR2
+BRANCHGT fail
+BRANCHLE h_le_ok
+BRANCH fail
+h_le_ok:
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Unconditional BRANCH — must skip the IADD below
+BRANCH h_branch_ok
+IADD DR1, DR0, #99            ; unreachable (would corrupt DR1)
+h_branch_ok:
+IADD DR13, DR0, #3            ; DR1 should still be 3 from LE test
+MCMP DR1, DR13
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PHASE I: DREAD / DWRITE roundtrip on all 6 LED offsets ────
+; Write 1 → DREAD → expect 1; Write 0 → DREAD → expect 0.
+; Uses DR1–DR12 as read-result registers (2 per offset).
+DWRITE DR0, CR3, 0
+DWRITE DR0, CR3, 1
+DWRITE DR0, CR3, 2
+DWRITE DR0, CR3, 3
+DWRITE DR0, CR3, 4
+DWRITE DR0, CR3, 5
+
+; Offset 0  (LED0)
+DWRITE DR15, CR3, 0
+DREAD  DR1,  CR3, 0
+MCMP   DR1,  DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 0
+DREAD  DR2,  CR3, 0
+MCMP   DR2,  DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Offset 1  (LED1)
+DWRITE DR15, CR3, 1
+DREAD  DR3,  CR3, 1
+MCMP   DR3,  DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 1
+DREAD  DR4,  CR3, 1
+MCMP   DR4,  DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Offset 2  (LED2)
+DWRITE DR15, CR3, 2
+DREAD  DR5,  CR3, 2
+MCMP   DR5,  DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 2
+DREAD  DR6,  CR3, 2
+MCMP   DR6,  DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Offset 3  (LED3) — the LED3 pass-blink IS the write-1 step
+DWRITE DR15, CR3, 3
+DREAD  DR7,  CR3, 3
+MCMP   DR7,  DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 3
+DREAD  DR8,  CR3, 3
+MCMP   DR8,  DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Offset 4  (LED4)
+DWRITE DR15, CR3, 4
+DREAD  DR9,  CR3, 4
+MCMP   DR9,  DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 4
+DREAD  DR10, CR3, 4
+MCMP   DR10, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; Offset 5  (LED5)
+DWRITE DR15, CR3, 5
+DREAD  DR11, CR3, 5
+MCMP   DR11, DR15
+BRANCHNE fail
+DWRITE DR0,  CR3, 5
+DREAD  DR12, CR3, 5
+MCMP   DR12, DR0
+BRANCHNE fail
+DWRITE DR15, CR3, 3
+DWRITE DR0,  CR3, 3
+
+; ── PASS ─────────────────────────────────────────────────────
+; All tests passed. Blink all 6 LEDs 3× then loop.
+pass:
+DWRITE DR15, CR3, 0
+DWRITE DR15, CR3, 1
+DWRITE DR15, CR3, 2
+DWRITE DR15, CR3, 3
+DWRITE DR15, CR3, 4
+DWRITE DR15, CR3, 5
+IADD DR14, DR0, #100
+pass_on:
+ISUB DR14, DR14, #1
+BRANCHNE pass_on
+DWRITE DR0, CR3, 0
+DWRITE DR0, CR3, 1
+DWRITE DR0, CR3, 2
+DWRITE DR0, CR3, 3
+DWRITE DR0, CR3, 4
+DWRITE DR0, CR3, 5
+IADD DR14, DR0, #100
+pass_off:
+ISUB DR14, DR14, #1
+BRANCHNE pass_off
+BRANCH pass                   ; repeat pass blink forever
+
+; ── FAIL ─────────────────────────────────────────────────────
+; LED2 (FAULT red) stays ON permanently. All others off.
+fail:
+DWRITE DR0,  CR3, 0
+DWRITE DR0,  CR3, 1
+DWRITE DR15, CR3, 2           ; FAULT LED on
+DWRITE DR0,  CR3, 3
+DWRITE DR0,  CR3, 4
+DWRITE DR0,  CR3, 5
+BRANCH fail                   ; halt: spin forever
+`,
         'turing_test': `; ============================================
 ; Turing ISA Test
 ; Exercises IADD, ISUB, MCMP, BRANCH, SHL, SHR
