@@ -26,7 +26,7 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-04-29T20:47:49.201503Z",
+    "built_at": "2026-04-29T20:59:41.388942Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [

@@ -639,6 +639,67 @@ function patchSimulator() {
         };
         _updateMtbfIndicator();
         updateCRDetail();
+        // Auto-save patched lump to repository so it persists across reboots
+        _autoSaveAfterPatch(result);
+    }
+}
+
+// Auto-save the freshly-patched lump to server/lumps/ so it persists across
+// reboots. Reads lump words from simulator memory after injectCRCode has
+// updated the NS entry (so word0_location always points to the right base,
+// including the extended-lump path). Non-fatal: any error is noted in the
+// existing patch toast without hiding the patch success.
+async function _autoSaveAfterPatch(result) {
+    const { nsIdx } = result;
+    const nse = sim.readNSEntry(nsIdx);
+    if (!nse) return;
+    const baseLoc = nse.word0_location >>> 0;
+    if (baseLoc === 0 || baseLoc >= sim.memory.length) return;
+
+    const hdr = sim.parseLumpHeader(sim.memory[baseLoc] >>> 0);
+    if (!hdr.valid) return;
+
+    const lumpSize = hdr.lumpSize;
+    const words = [];
+    for (let i = 0; i < lumpSize; i++) words.push(sim.memory[baseLoc + i] >>> 0);
+
+    const absName = (sim.nsLabels && sim.nsLabels[nsIdx]) || 'Unnamed';
+    const typeNames = ['code', 'data', 'thread', 'outform'];
+    const metadata = {
+        abstraction: absName,
+        ns_slot: nsIdx,
+        content_type: typeNames[hdr.typ] || 'code',
+        cw: hdr.cw,
+        cc: hdr.cc,
+        lump_size: lumpSize,
+    };
+
+    let saveNote = '';
+    try {
+        const resp = await fetch('/api/lumps/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ binary: words, metadata }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Server error');
+        const biLine = data.boot_image_refreshed
+            ? ' \u2713 boot-image.bin refreshed \u2014 persists on reboot'
+            : data.boot_image_note
+            ? ` \u26A0 boot image: ${data.boot_image_note}`
+            : '';
+        saveNote = `\u2193 Saved to repository \u2014 token: ${data.token}${biLine}`;
+        if (typeof renderLumps === 'function') renderLumps();
+    } catch (e) {
+        saveNote = `\u26A0 Auto-save failed: ${e.message}`;
+    }
+
+    const toast = document.getElementById('patchToastOverlay');
+    if (toast && saveNote) {
+        const noteEl = document.createElement('div');
+        noteEl.className = 'patch-toast-save-note';
+        noteEl.textContent = saveNote;
+        toast.appendChild(noteEl);
     }
 }
 
