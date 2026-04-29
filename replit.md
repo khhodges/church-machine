@@ -29,3 +29,14 @@ The architecture uses a scale-free abstraction model with 47 abstractions in 9 l
 - **localStorage:** Client-side storage for IDE state.
 - **oss-cad-suite:** FPGA toolchain for synthesis and programming.
 - **GitHub:** Integrated for the Mum Tunnel shared abstraction library and community features.
+
+## Gotchas / Known Traps
+
+### Adding a new Assembly example tab (MUST DO BOTH steps)
+
+1. Add the `<button class="example-tab" ...>` to `simulator/index.html` (in the `#exampleTabsScroll` container).
+2. **Also add the `data-example` key to the `langExampleGroups.assembly` array in `simulator/app-compile.js`** (around line 369).
+
+If step 2 is missed, `app-compile.js` will call `tab.style.display = 'none'` on the button whenever Assembly mode is active (which is the default). The button will be present in the HTML source and visible to curl, but invisible to the user — a very difficult bug to diagnose remotely.
+
+After both edits, bump the `app-compile.js` version tag in `index.html` (e.g. `?v=20260429e`) so browsers fetch the updated file.
