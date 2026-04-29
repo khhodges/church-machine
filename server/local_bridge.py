@@ -150,7 +150,30 @@ def _heartbeat_thread():
             urllib.request.urlopen(req, timeout=10)
         except Exception:
             pass
+        if _REPORT_LAUNCH:
+            _fetch_launch_summary()
         time.sleep(60)
+
+
+def _fetch_launch_summary():
+    """Fetch /api/launch-tests and print a passing/total summary line."""
+    if not _IDE_SERVER_URL:
+        return
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"{_IDE_SERVER_URL}/api/launch-tests",
+            headers={"Content-Type": "application/json"},
+            method="GET",
+        )
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+        tests = data if isinstance(data, list) else data.get("tests", [])
+        total = len(tests)
+        passing = sum(1 for t in tests if t.get("status") == "passing")
+        print(f'  [LAUNCH] {passing}/{total} tests passing')
+    except Exception as e:
+        print(f'  [LAUNCH] Could not fetch summary: {e}')
 
 
 def _report_launch_test(test_id, status="passing", notes=""):
@@ -180,6 +203,7 @@ def _report_launch_test(test_id, status="passing", notes=""):
             print(f'  [LAUNCH] {test_id} reported as {status}')
             if status == "passing":
                 _launch_test_reported.add(test_id)
+            _fetch_launch_summary()
         else:
             print(f'  [LAUNCH] {test_id} report failed: {result}')
     except Exception as e:
