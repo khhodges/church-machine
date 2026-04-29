@@ -4364,6 +4364,7 @@ pre:hover .code-copy-btn {
     flex-shrink: 0;
     font-size: 0.63rem;
     font-weight: 700;
+    font-family: inherit;
     letter-spacing: 0.03em;
     padding: 0.05rem 0.45rem;
     border-radius: 8px;
@@ -4371,6 +4372,60 @@ pre:hover .code-copy-btn {
     border: 1px solid rgba(224, 160, 85, 0.45);
     color: #f0ba70;
     white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.13s, border-color 0.13s;
+}
+
+.live-lump-warn-badge:hover {
+    background: rgba(224, 160, 85, 0.38);
+    border-color: rgba(224, 160, 85, 0.7);
+}
+
+.warn-popover {
+    position: absolute;
+    z-index: 9999;
+    background: #0e0e1e;
+    border: 1px solid rgba(224, 160, 85, 0.45);
+    border-radius: 5px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65);
+    min-width: 200px;
+    max-width: 380px;
+    font-family: inherit;
+    font-size: 0.72rem;
+}
+
+.warn-popover[hidden] {
+    display: none;
+}
+
+.warn-popover-title {
+    padding: 6px 12px 5px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #f0ba70;
+    border-bottom: 1px solid rgba(224, 160, 85, 0.25);
+    background: rgba(224, 160, 85, 0.08);
+    border-radius: 5px 5px 0 0;
+}
+
+.warn-popover-list {
+    list-style: none;
+    margin: 0;
+    padding: 6px 0;
+}
+
+.warn-popover-list li {
+    padding: 5px 12px;
+    font-size: 0.72rem;
+    color: #e0a055;
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(224, 160, 85, 0.1);
+}
+
+.warn-popover-list li:last-child {
+    border-bottom: none;
 }
 
 .live-lump-warnings[data-tooltip]::after {

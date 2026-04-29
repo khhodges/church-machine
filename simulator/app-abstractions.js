@@ -683,8 +683,9 @@ function updateLiveLumpBanner() {
         : '<span class="live-lump-seal live-lump-seal-fail">\u2717 SEAL FAIL</span>';
     const warnings = Array.isArray(state.warnings) ? state.warnings : [];
     const warningsTooltip = warnings.map(w => e(w)).join('&#10;');
+    _warnPopoverData = warnings;
     const warnBadge = warnings.length >= 2
-        ? '<span class="live-lump-warn-badge">' + warnings.length + ' warnings</span>'
+        ? '<button class="live-lump-warn-badge" onclick="_warnBadgeClick(this,event)">' + warnings.length + ' warnings</button>'
         : '';
     const warningsRow = warnings.length > 0
         ? '<div class="live-lump-warnings" data-tooltip="' + warningsTooltip + '"><span class="live-lump-warnings-text">\u26A0 ' + e(warnings.join(' \u00B7 ')) + '</span>' + warnBadge + '</div>'
@@ -710,6 +711,64 @@ function updateLiveLumpBanner() {
         '<button class="live-lump-save-btn" onclick="_liveLumpSave(' + state.nsIdx + ')">\u2193 Save Lump</button>' +
         '</div>' +
         '</div>';
+}
+
+let _warnPopoverData = [];
+
+function _warnPopoverGet() {
+    let pop = document.getElementById('_warnPopover');
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.id = '_warnPopover';
+        pop.className = 'warn-popover';
+        pop.hidden = true;
+        pop._btn = null;
+        document.body.appendChild(pop);
+        document.addEventListener('click', function(e) {
+            if (!pop.hidden && !pop.contains(e.target)) {
+                _warnPopoverClose();
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !pop.hidden) {
+                _warnPopoverClose();
+            }
+        });
+    }
+    return pop;
+}
+
+function _warnBadgeClick(btn, event) {
+    event.stopPropagation();
+    const pop = _warnPopoverGet();
+    if (pop._btn === btn && !pop.hidden) {
+        _warnPopoverClose();
+        return;
+    }
+    pop._btn = btn;
+    const esc = _escHtml;
+    const items = _warnPopoverData.map(function(w) {
+        return '<li>' + esc(w) + '</li>';
+    }).join('');
+    pop.innerHTML = '<div class="warn-popover-title">Warnings</div><ul class="warn-popover-list">' + items + '</ul>';
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect();
+    pop.style.top = (r.bottom + window.scrollY + 4) + 'px';
+    pop.style.left = (r.left + window.scrollX) + 'px';
+    requestAnimationFrame(function() {
+        const pr = pop.getBoundingClientRect();
+        if (pr.right > window.innerWidth - 8) {
+            pop.style.left = Math.max(8, window.innerWidth - pr.width - 8) + 'px';
+        }
+    });
+}
+
+function _warnPopoverClose() {
+    const pop = document.getElementById('_warnPopover');
+    if (pop) {
+        pop.hidden = true;
+        pop._btn = null;
+    }
 }
 
 function _liveLumpSave(nsIdx) {
