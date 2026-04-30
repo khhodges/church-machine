@@ -1019,12 +1019,16 @@ function compileCLOOMC() {
             + `</details>`;
     }
 
-    if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
-    showNextSteps('compiled');
-    trackAction('compile', { name: result.abstractionName, lang: result.language });
+    // appendOutput uses textContent += which destroys child elements — call it
+    // BEFORE setting innerHTML so the HTML (including the Load into Sim button)
+    // is the final write to the console and is never clobbered.
     const _outSrcLabel = _getActiveSourceLabel();
     const _outSrcHint = _outSrcLabel ? ` · ${_outSrcLabel}` : '';
     appendOutput(`CLOOMC++ compiled "${result.abstractionName}"${_outSrcHint} — ${result.methods.length} methods`, 'info');
+    trackAction('compile', { name: result.abstractionName, lang: result.language });
+
+    if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
+    showNextSteps('compiled');
 }
 
 // Load the most-recently-compiled CLOOMC++ lump into the simulator so the user

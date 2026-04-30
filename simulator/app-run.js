@@ -6817,6 +6817,10 @@ function replCompileSession() {
 function appendOutput(text, type) {
     const editorConsole = document.getElementById('editorConsole');
     if (editorConsole) {
+        // Guard: if the console is showing rich cmp-html content (e.g. a CLOOMC++
+        // compile listing with interactive buttons), textContent+= would destroy all
+        // child elements. Skip the append so the HTML is never clobbered.
+        if (editorConsole.classList.contains('cmp-html')) return;
         editorConsole.textContent += '\n' + text;
         editorConsole.scrollTop = editorConsole.scrollHeight;
     }
