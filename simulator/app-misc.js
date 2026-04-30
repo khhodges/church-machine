@@ -1455,7 +1455,6 @@ function loadDeviceList() {
             };
             data.devices.forEach(dev => {
                 const isOnline = dev.status === 'online';
-                const tunnelOnline = dev.tunnel_status === 'online';
                 const profileClass = dev.profile === 'IoT' ? 'dev-badge-iot' : 'dev-badge-full';
                 const petName = (dev.label || '').trim() || dev.board_name;
                 const statusChip = isOnline
@@ -1468,11 +1467,7 @@ function loadDeviceList() {
                     ? '<span class="dev-fault-badge">' + _escHtml(faultStr) + _escHtml(niaStr) + '</span>'
                     : '';
                 const _ts = dev.tunnel_status || 'pending';
-                const tunnelBadge = tunnelOnline
-                    ? '<span class="dev-tunnel-badge" title="Hello-Mum tunnel verified — GREET_RESPONSE received">Tunnel online</span>'
-                    : _ts === 'offline'
-                        ? '<span class="dev-tunnel-badge-offline" title="Hello-Mum handshake failed at boot">Tunnel offline</span>'
-                        : '<span class="dev-tunnel-badge-pending" title="Tunnel handshake not yet confirmed">Checking...</span>';
+                const tunnelBadge = _tunnelBadgeHtml(_ts, 'devTunnelRow_' + dev.id);
 
                 const wrap = document.createElement('div');
                 wrap.className = 'dev-entry';
@@ -1497,7 +1492,7 @@ function loadDeviceList() {
                         '<div class="dev-detail-item"><span class="dev-detail-label">FW</span><span class="dev-detail-val">' + _escHtml(dev.fw_version) + '</span></div>' +
                         '<div class="dev-detail-item"><span class="dev-detail-label">Boots</span><span class="dev-detail-val">' + dev.boot_count + '</span></div>' +
                         '<div class="dev-detail-item"><span class="dev-detail-label">Boot reason</span><span class="dev-detail-val">' + _escHtml(bootReasonStr) + (faultBadge ? ' ' + faultBadge : '') + '</span></div>' +
-                        '<div class="dev-detail-item"><span class="dev-detail-label">Tunnel</span><span class="dev-detail-val">' + (tunnelOnline ? '<span class="dev-tunnel-badge" title="Hello-Mum handshake succeeded at boot">Tunnel online</span>' : (_ts === 'offline' ? '<span class="dev-tunnel-badge-offline" title="Hello-Mum handshake failed at boot">Tunnel offline</span>' : '<span class="dev-tunnel-badge-pending" title="Tunnel handshake not yet confirmed">Checking...</span>')) + '</span></div>' +
+                        '<div class="dev-detail-item"><span class="dev-detail-label">Tunnel</span><span class="dev-detail-val">' + _tunnelBadgeHtml(_ts, 'devTunnelDetail_' + dev.id) + '</span></div>' +
                         (dev.bridge_host ? '<div class="dev-detail-item"><span class="dev-detail-label">Bridge</span><span class="dev-detail-val">' + _escHtml(dev.bridge_host) + ':' + _escHtml(String(dev.bridge_port || '')) + '</span></div>' : '') +
                         (dev.serial_port ? '<div class="dev-detail-item"><span class="dev-detail-label">Serial</span><span class="dev-detail-val">' + _escHtml(dev.serial_port) + '</span></div>' : '') +
                     '</div>' +
@@ -1526,6 +1521,7 @@ function loadDeviceList() {
                 wrap.appendChild(detail);
                 grid.appendChild(wrap);
             });
+            startDeviceTunnelPolling();
         })
         .catch(() => {
             grid.innerHTML = '<div class="dev-empty">Failed to load devices.</div>';
@@ -1535,6 +1531,72 @@ function loadDeviceList() {
 function _escHtml(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function _tunnelBadgeHtml(ts, id) {
+    var cls, text, title;
+    if (ts === 'online') {
+        cls = 'dev-tunnel-badge';
+        text = 'Tunnel online';
+        title = 'Hello-Mum tunnel verified \u2014 GREET_RESPONSE received';
+    } else if (ts === 'offline') {
+        cls = 'dev-tunnel-badge-offline';
+        text = 'Tunnel offline';
+        title = 'Hello-Mum handshake failed at boot';
+    } else {
+        cls = 'dev-tunnel-badge-pending';
+        text = 'Checking...';
+        title = 'Tunnel handshake not yet confirmed';
+    }
+    return '<span class="' + cls + '" title="' + title + '"' + (id ? ' id="' + id + '"' : '') + '>' + text + '</span>';
+}
+
+var _deviceTunnelTimer = null;
+
+function startDeviceTunnelPolling() {
+    stopDeviceTunnelPolling();
+    _deviceTunnelTimer = setInterval(refreshTunnelStatuses, 12000);
+}
+
+function stopDeviceTunnelPolling() {
+    if (_deviceTunnelTimer !== null) {
+        clearInterval(_deviceTunnelTimer);
+        _deviceTunnelTimer = null;
+    }
+}
+
+function refreshTunnelStatuses() {
+    var grid = document.getElementById('devGrid');
+    if (!grid) { stopDeviceTunnelPolling(); return; }
+    fetch('/api/device/list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok || !data.devices) return;
+            data.devices.forEach(function(dev) {
+                var ts = dev.tunnel_status || 'pending';
+                ['devTunnelRow_', 'devTunnelDetail_'].forEach(function(prefix) {
+                    var el = document.getElementById(prefix + dev.id);
+                    if (!el) return;
+                    var newCls = ts === 'online' ? 'dev-tunnel-badge'
+                                : ts === 'offline' ? 'dev-tunnel-badge-offline'
+                                : 'dev-tunnel-badge-pending';
+                    var newText = ts === 'online' ? 'Tunnel online'
+                                : ts === 'offline' ? 'Tunnel offline'
+                                : 'Checking...';
+                    var newTitle = ts === 'online'
+                                ? 'Hello-Mum tunnel verified \u2014 GREET_RESPONSE received'
+                                : ts === 'offline'
+                                    ? 'Hello-Mum handshake failed at boot'
+                                    : 'Tunnel handshake not yet confirmed';
+                    if (el.className !== newCls) {
+                        el.className = newCls;
+                        el.textContent = newText;
+                        el.title = newTitle;
+                    }
+                });
+            });
+        })
+        .catch(function() {});
 }
 
 function setDeviceLabel(deviceId, label) {

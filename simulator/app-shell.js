@@ -712,6 +712,9 @@ function switchView(viewId) {
         document.querySelectorAll('.trace-row-highlighted').forEach(el => el.classList.remove('trace-row-highlighted'));
         document.querySelectorAll('.trace-gatelog-back').forEach(el => el.remove());
     }
+    if (viewId !== currentView && currentView === 'devices' && typeof stopDeviceTunnelPolling === 'function') {
+        stopDeviceTunnelPolling();
+    }
     if (viewId !== currentView) previousView = currentView;
     currentView = viewId;
     window.location.hash = viewId;
