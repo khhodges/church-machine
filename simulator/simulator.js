@@ -843,7 +843,7 @@ class ChurchSimulator {
             { label: 'Schoolroom',    perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Friends',       perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Tunnel',        perms: {R:0,W:0,X:0,L:0,S:1,E:1}, chainable: false },
-            { label: 'Negotiate',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
+            { label: 'Keystone',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Editor',        perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Assembler',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },
             { label: 'Debugger',      perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },

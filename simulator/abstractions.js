@@ -406,10 +406,10 @@ class AbstractionRegistry {
             'Resident I/O channel — FPGA\u2194IDE host over UART; self-identifying media channel (FourCC type tags: TEXT \u00b7 VOIC \u00b7 LUMP \u00b7 GTKN \u00b7 \u2026); Register replaces the hardwired call-home boot step (B:02\u00BD); Call(GT) forwards through the tunnel to a remote capability',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 1, E: 1 } });
 
-        this.createAbstraction(32, 'Negotiate', 5,
-            ['Propose', 'Approve', 'Reject', 'Status'],
-            'Parent-teacher joint approval for special grants',
-            { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
+        this.createAbstraction(32, 'Keystone', 5,
+            ['Connect', 'Hello'],
+            'Application namespace — first boot-resident application_namespace lump (NS[32], token 00002000). Connect(mum_identity_word) verifies Mum\'s Ed25519 identity and issues an Outform E-GT into c-list slot 1. Hello() forwards a CALL through the Tunnel to Mum.Greet(); returns FAULT_NO_CONTACT (0xDEAD0001) if Connect has not been called.',
+            { author: 'SIPantic', version: '1.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(33, 'Editor', 6,
             ['Open', 'Save', 'Load', 'Undo'],

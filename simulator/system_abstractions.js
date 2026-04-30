@@ -126,6 +126,7 @@ class SystemAbstractions {
         this._bindSlideRuleBernoulli();
         this._bindSlideRuleExtended();
         this._bindConstants();
+        this._initKeystone();
     }
 
     _bindStartupConfig() {
@@ -1974,6 +1975,81 @@ class SystemAbstractions {
             return {
                 ok: true,
                 message: `Constants.Add(0x${hex}) \u2192 Abstract GT in CR0 [pool slot ${slotIdx}, NS[${poolNsSlot}]]`
+            };
+        });
+    }
+
+    _initKeystone() {
+        const FAULT_NO_CONTACT = 0xDEAD0001;
+        const GREET_RESPONSE   = 0x48454C4C;
+        const KEYSTONE_NS      = 32;
+
+        this.registry.bindMethod(KEYSTONE_NS, 'Connect', function(sim, args) {
+            const identityWord = (args && args[0] !== undefined) ? (args[0] >>> 0) : 0;
+
+            if (!identityWord) {
+                return {
+                    ok: true,
+                    result: 0,
+                    message: 'Keystone.Connect: identity word is zero — AM rejected'
+                };
+            }
+
+            const version = (identityWord >>> 28) & 0xF;
+            if (version !== 1) {
+                return {
+                    ok: true,
+                    result: 0,
+                    message: `Keystone.Connect: unknown protocol tag 0x${version.toString(16)} — AM rejected`
+                };
+            }
+
+            // Issue an Outform E-GT for the far-end Mum entity (gtType=2, E-only, far=1).
+            const mumGT = sim.createGT(0, KEYSTONE_NS, { E: 1 }, 2);
+
+            // Write the GT directly into c-list slot 1 of the Keystone lump in memory.
+            const entry = sim.readNSEntry(KEYSTONE_NS);
+            if (entry) {
+                const hdr = sim.parseLumpHeader(sim.memory[entry.word0_location]);
+                const clistBase = entry.word0_location + hdr.lumpSize - hdr.cc;
+                sim.memory[clistBase + 1] = mumGT;
+                if (!sim.nsClistMap[KEYSTONE_NS]) sim.nsClistMap[KEYSTONE_NS] = [];
+                sim.nsClistMap[KEYSTONE_NS][1] = { gt: mumGT, name: 'MumGT' };
+            }
+
+            const hex = identityWord.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: 1,
+                message: `Keystone.Connect(0x${hex}): Mum identity accepted — Outform E-GT issued and stored in c-list slot 1`
+            };
+        });
+
+        this.registry.bindMethod(KEYSTONE_NS, 'Hello', function(sim, args) {
+            // Read c-list slot 1 directly from the Keystone lump in memory.
+            const entry = sim.readNSEntry(KEYSTONE_NS);
+            let mumGT = 0;
+            if (entry) {
+                const hdr = sim.parseLumpHeader(sim.memory[entry.word0_location]);
+                const clistBase = entry.word0_location + hdr.lumpSize - hdr.cc;
+                mumGT = (sim.memory[clistBase + 1] >>> 0);
+            }
+
+            if (!mumGT) {
+                const hex = FAULT_NO_CONTACT.toString(16).toUpperCase().padStart(8, '0');
+                return {
+                    ok: true,
+                    result: FAULT_NO_CONTACT,
+                    fault: 'NO_CONTACT',
+                    message: `Keystone.Hello(): c-list slot 1 is NULL GT \u2014 FAULT_NO_CONTACT (0x${hex}). Call Connect(mum_identity_word) first.`
+                };
+            }
+
+            const hex = GREET_RESPONSE.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: GREET_RESPONSE,
+                message: `Keystone.Hello(): Tunnel.Call forwarded to Mum.Greet() \u2192 0x${hex} ('HELL')`
             };
         });
     }

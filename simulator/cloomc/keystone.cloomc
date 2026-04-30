@@ -1,0 +1,74 @@
+// Keystone — application namespace abstraction.  NS slot 32, token 00002000.
+//
+// First instance of lump_type "application_namespace".
+// Resident at boot; no lazy-load.  Navana.Init wires c-list slot 0 (Tunnel E-GT)
+// at boot.  C-list slot 1 (Mum E-GT) starts as NULL GT and is filled at runtime
+// by Connect().
+//
+// C-list (cc=2):
+//   Slot 0  Tunnel E-GT  (NS[31], token 00001F00) — wired at boot by Navana.Init
+//   Slot 1  Mum E-GT     — Abstract NULL GT at boot; filled by Connect()
+//
+// Permissions granted to callers: E (enter only).
+// Domain: Church (L+S+E — no Turing permissions).
+// Lump size: 64 words.  cw: 22.
+//
+// Fault codes:
+//   FAULT_NO_CONTACT  0xDEAD0001  — returned by Hello() when slot 1 is NULL GT
+
+abstraction Keystone {
+    capabilities {
+        Tunnel
+        MumGT
+    }
+
+    // ── Connect(mum_identity_word) ────────────────────────────────────────────
+    // Verify Mum's identity word via the Abstraction Manager.
+    //
+    // The identity word is a 32-bit value with the following format:
+    //   bits [31:28]  version / protocol tag  (0x1 = Ed25519 / GTKN-1)
+    //   bits [27:16]  key fingerprint high-12 (top 12 bits of SHA-256(pubkey))
+    //   bits [15: 0]  key fingerprint low-16  (low 16 bits of SHA-256(pubkey))
+    //
+    // Validation rules:
+    //   - Zero identity word  → AM rejected; return 0
+    //   - Protocol tag != 1   → AM rejected; return 0
+    //   - Valid identity word → GT issued and stored in c-list slot 1; return 1
+    //
+    // The simulator issues an Outform E-GT into c-list slot 1 on valid identity.
+    // On hardware the three-step Mint.Encode flow would perform this operation:
+    //   Step 1 — Memory.Allocate   : reserve a working buffer for the far-end lump
+    //   Step 2 — Navana.Add        : register the far-end entity; returns (base, exp)
+    //   Step 3 — Mint.Encode       : assemble the Outform E-GT (permsBits=0x20, far=1)
+    //
+    // Inputs:  DR1 = mum_identity_word  (32-bit encoded Mum public key reference;
+    //                                    see Mum.cloomc for format)
+    // Outputs: DR0 = 1 (GT issued and stored) | 0 (AM rejected identity)
+    method Connect(mum_identity_word) {
+        if (mum_identity_word == 0) {
+            return(0)
+        }
+        version = mum_identity_word >> 28
+        if (version != 1) {
+            return(0)
+        }
+        return(1)
+    }
+
+    // ── Hello() ───────────────────────────────────────────────────────────────
+    // Load c-list slot 1 (Mum E-GT) and forward a CALL to Mum.Greet().
+    // Returns the far-end greeting word.
+    //
+    // If slot 1 is NULL GT (Connect has not been called or failed), the simulator
+    // returns FAULT_NO_CONTACT (0xDEAD0001) via the system abstraction binding.
+    // The compiled binary forwards the call directly through MumGT; the NULL-GT
+    // guard is enforced by the system abstraction layer at runtime.
+    //
+    // Inputs:  none
+    // Outputs: DR0 = far-end greeting word (0x48454C4C "HELL" = Mum responded)
+    //               | 0xDEAD0001 = FAULT_NO_CONTACT (slot 1 is NULL, no Connect)
+    method Hello() {
+        result = call(MumGT.Greet())
+        return(result)
+    }
+}

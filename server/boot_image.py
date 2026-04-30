@@ -189,7 +189,7 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("Schoolroom",    {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Friends",       {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Tunnel",        {"R":0,"W":0,"X":0,"L":0,"S":1,"E":1}, False),
-    ("Negotiate",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
+    ("Keystone",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Editor",        {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Assembler",     {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
     ("Debugger",      {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),
@@ -388,6 +388,25 @@ def _load_catalog_token_map(manifest_path):
         tok  = e.get("token")
         if isinstance(slot, int) and isinstance(tok, str):
             out[slot] = tok
+    return out
+
+
+def _load_boot_resident_entries(manifest_path):
+    """Return list of (ns_slot, token_hex) for all manifest entries
+    with boot_resident=true and a non-empty token."""
+    try:
+        with open(manifest_path, "r") as f:
+            entries = json.load(f)
+    except Exception:
+        return []
+    out = []
+    for e in entries if isinstance(entries, list) else []:
+        if not e.get("boot_resident"):
+            continue
+        slot = e.get("ns_slot")
+        tok  = e.get("token")
+        if isinstance(slot, int) and isinstance(tok, str) and tok:
+            out.append((slot, tok))
     return out
 
 
@@ -672,9 +691,27 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # loadBootImage() can detect and reject stale pre-Task-#229 binaries.
     mem[ns_table_base - 1] = BOOT_IMAGE_FORMAT_TAG & 0xFFFFFFFF
 
+    # ----- Boot-resident manifest lumps (auto-placement) ---------------
+    # Any manifest entry with boot_resident=true and a corresponding
+    # .lump file is automatically embedded at its catalog physAddr so that
+    # the lump body is present on cold boot without a lazy fetch.
+    # Step-2 explicit config can override a slot's physAddr and will
+    # overwrite this placement in the loop below.
+    _manifest_path = os.path.join(lumps_dir, "manifest.json")
+    _token_map     = _load_catalog_token_map(_manifest_path)
+    for _slot, _tok in _load_boot_resident_entries(_manifest_path):
+        _phys = locations.get(_slot)
+        if _phys is None:
+            continue
+        _body = _read_lump_body(lumps_dir, _tok)
+        if _body is None:
+            continue
+        _n = min(len(_body), total - _phys)
+        for _wi in range(_n):
+            mem[_phys + _wi] = _body[_wi] & 0xFFFFFFFF
+
     # ----- Resident lump bodies (Step 2) --------------------------------
-    token_map = _load_catalog_token_map(
-        os.path.join(lumps_dir, "manifest.json"))
+    token_map = _token_map
     for e in step2_lumps:
         if not (isinstance(e, dict) and e.get("resident")):
             continue

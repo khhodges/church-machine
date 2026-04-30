@@ -392,13 +392,26 @@ function init() {
     loadNamespaceState();
     checkBootId();
     const views = ['repl','editor','tutorial','dashboard','namespace','abstractions','lumps','pipeline','trace','reference','docs','builder','sitemap'];
-    const hash = window.location.hash.replace('#', '');
-    let startView = views.includes(hash) ? hash : null;
+    const rawHash = window.location.hash.replace('#', '');
+    const [hashView, hashQuery] = rawHash.split('?');
+    const hashParams = {};
+    if (hashQuery) hashQuery.split('&').forEach(p => { const [k,v] = p.split('='); hashParams[k] = v; });
+    let startView = views.includes(hashView) ? hashView : null;
     if (!startView) {
         try { const saved = localStorage.getItem('church_lastView'); if (saved && views.includes(saved)) startView = saved; } catch(e) {}
     }
     if (!startView) startView = 'docs';
     switchView(startView);
+    if (startView === 'namespace' && hashParams.ns !== undefined) {
+        const nsSlot = parseInt(hashParams.ns, 10);
+        if (!isNaN(nsSlot)) {
+            setTimeout(function() {
+                if (typeof toggleNSDetail === 'function') toggleNSDetail(nsSlot);
+                const row = document.getElementById('ns-row-' + nsSlot);
+                if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 120);
+        }
+    }
     // If the page was opened directly to the dashboard (e.g. from the landing
     // page link) and auto-boot is enabled, fire the boot sequence now.
     // switchView('dashboard') calls restoreAutoBootPref() so the checkbox

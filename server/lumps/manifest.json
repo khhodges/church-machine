@@ -1394,5 +1394,67 @@
     "grants": [
       "E"
     ]
+  },
+  {
+    "token": "00002000",
+    "abstraction": "Keystone",
+    "ns_slot": 32,
+    "lump_size": 64,
+    "lump_type": "application_namespace",
+    "cw": 22,
+    "dw": 0,
+    "cc": 2,
+    "boot_resident": true,
+    "author": "SIPantic",
+    "version": "1.0",
+    "capabilities": [
+      { "slot": 0, "target_ns": 31, "target_token": "00001F00", "name": "Tunnel", "grants": ["E"], "wired_at_boot": true },
+      { "slot": 1, "name": "MumGT", "grants": ["E"], "initial": "NULL_GT", "filled_by": "Connect" }
+    ],
+    "methods": [
+      {
+        "name": "Connect",
+        "offset": 0,
+        "length": 17,
+        "description": "Verify Mum's 32-bit identity word. Zero or unknown protocol tag (bits[31:28] != 1) returns 0 (AM rejected). Valid identity returns 1; the simulator issues an Outform E-GT into c-list slot 1.",
+        "inputs": [
+          "DR1: mum_identity_word — 32-bit encoded Mum public key reference (Ed25519 fingerprint; see Mum.cloomc)"
+        ],
+        "outputs": [
+          "DR0: 1 (identity accepted; GT stored in c-list slot 1) | 0 (AM rejected)"
+        ],
+        "comments": [
+          "if mum_identity_word == 0: return 0 (AM rejected)",
+          "version = mum_identity_word >> 28",
+          "if version != 1: return 0 (unknown protocol tag)",
+          "return 1 (identity accepted; system abstraction issues GT)"
+        ]
+      },
+      {
+        "name": "Hello",
+        "offset": 17,
+        "length": 5,
+        "description": "Load c-list slot 1 (Mum E-GT) and forward a CALL through the Tunnel to the far-end Mum.Greet() method. Returns FAULT_NO_CONTACT (0xDEAD0001) if Connect has not been called.",
+        "inputs": [],
+        "outputs": [
+          "DR0: 0x48454C4C (far-end greeting word 'HELL' — Mum responded normally)",
+          "DR0: 0xDEAD0001 (FAULT_NO_CONTACT — c-list slot 1 is NULL, Connect not yet called)",
+          "DR0: non-zero Tunnel error on transmission failure"
+        ],
+        "comments": [
+          "Load c-list slot 1 into CR7 — the Mum E-GT (NULL at boot)",
+          "Test CR7 for NULL GT (word == 0); if NULL branch to FAULT_NO_CONTACT return",
+          "FAULT_NO_CONTACT = 0xDEAD0001 — clean fault, not a crash",
+          "Load Tunnel GT from c-list slot 0 into CR8",
+          "Tunnel.Call(mum_gt) — forward CALL via GTKN packet to far-end Mum.Greet()",
+          "Receive far-end return value; return it as DR0"
+        ]
+      }
+    ],
+    "grants": [
+      "E"
+    ],
+    "domain": "Church",
+    "domain_perms": "L+S+E"
   }
 ]

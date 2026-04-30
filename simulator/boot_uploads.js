@@ -262,6 +262,22 @@ const BOOT_UPLOADS = [
         ]
     },
     {
+        abstraction: 'Keystone',
+        type: 'abstraction',
+        index: 32,
+        token: '00002000',
+        lump_type: 'application_namespace',
+        grants: ['E'],
+        capabilities: [
+            { target: 31, name: 'Tunnel', grants: ['E'], wired_at_boot: true },
+            { target: null, name: 'MumGT', grants: ['E'], initial: 'NULL_GT' }
+        ],
+        methods: [
+            { name: 'Connect', code: [0x1F000000] },
+            { name: 'Hello',   code: [0x1F000000] }
+        ]
+    },
+    {
         abstraction: 'Loader',
         type: 'abstraction',
         index: 19,

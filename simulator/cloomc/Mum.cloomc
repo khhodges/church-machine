@@ -1,0 +1,63 @@
+// =============================================================================
+// SPECIFICATION ONLY — no compiled binary output, no NS slot, no GT issued.
+// =============================================================================
+//
+// Mum — far-end contract specification.
+//
+// This file documents the calling convention and identity format that the
+// far-end "Mum" entity must satisfy.  Keystone.Connect() verifies a Mum
+// identity word against this contract before issuing an Outform E-GT and
+// writing it into Keystone's c-list slot 1.
+//
+// Far-end address: any reachable internet host running a Mum service
+//                  that presents a valid Ed25519 public key identity.
+//
+// ── Identity String Format ────────────────────────────────────────────────────
+//
+//   The Mum identity is a single 32-bit word that encodes a compressed
+//   reference to a full Ed25519 public key (256-bit / 32-byte).
+//
+//   Full representation (used during Connect):
+//     base64url-encoded Ed25519 public key, no padding characters ('=').
+//     Example: "mXq3aP4kR7vNz2eW0cUdBfJoKyLsAhGiTnQpYxEb"
+//     Length: exactly 43 characters (ceil(32 * 4 / 3) with no padding).
+//
+//   Compressed identity word (32-bit, stored in c-list after Connect):
+//     The AM verifies the full base64url key, then issues a Mint-encoded
+//     Outform GT with the F-bit set (far=1).  This GT is the runtime handle.
+//     The raw 32-bit identity word passed to Connect() carries:
+//       bits [31:28]  version / protocol tag  (0x1 = Ed25519 / GTKN-1)
+//       bits [27:16]  key fingerprint high-12 (top 12 bits of SHA-256(pubkey))
+//       bits [15: 0]  key fingerprint low-16  (low 16 bits of SHA-256(pubkey))
+//
+// ── GTKN Packet Structure ─────────────────────────────────────────────────────
+//
+//   When Keystone.Hello() calls Tunnel.Call(mum_gt), the Tunnel encodes a
+//   GTKN (FourCC = 0x47544B4E) packet and transmits it.  The packet has the
+//   following layout over the UART channel:
+//
+//     Word 0  FourCC tag     0x47544B4E  ('G' 'T' 'K' 'N')
+//     Word 1  payload count  1           (one GT word follows)
+//     Word 2  Mum E-GT       the Outform GT issued at Connect time
+//
+//   The far-end receives the GTKN, verifies the GT, and dispatches to Greet().
+//
+// ── Greet() Calling Convention ────────────────────────────────────────────────
+//
+//   The far-end Greet() method is the only callable method on the Mum entity.
+//   It is invoked transparently by Tunnel.Call; Keystone has no visibility
+//   into the far-end implementation.
+//
+//   Input:   none (the GTKN packet is self-identifying)
+//   Output:  DR0 = a single 32-bit greeting word
+//               0x48454C4C  ('H' 'E' 'L' 'L') — Mum responded normally
+//               0           — far-end busy / deferred
+//               negative    — error code from far-end
+//
+// ── Domain ───────────────────────────────────────────────────────────────────
+//
+//   Mum is Church-domain only (E-only entry, no Turing permissions).
+//   The Outform GT written into Keystone c-list[1] carries permsBits = 0x20
+//   (bit 5 = E set; bits 4:0 = 0).
+//
+// =============================================================================
