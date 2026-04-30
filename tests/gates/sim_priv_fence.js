@@ -24,7 +24,7 @@
 
 global.window = { bootConfig: {} };
 
-const ChurchSimulator = require('../../simulator/simulator.js');
+const { bootSim } = require('./sim_helpers');
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -35,15 +35,10 @@ process.stdin.on('end', () => {
 
     for (const sc of scenarios) {
         // Fresh sim + boot on every scenario so state doesn't bleed through.
-        const sim = new ChurchSimulator();
-        let steps = 0;
-        while (!sim.bootComplete && !sim.halted && steps < 200) {
-            sim._bootStep();
-            steps++;
-        }
+        const sim = bootSim();
 
         if (!sim.bootComplete) {
-            results.push({ name: sc.name, error: 'boot did not complete', steps });
+            results.push({ name: sc.name, error: 'boot did not complete' });
             continue;
         }
 

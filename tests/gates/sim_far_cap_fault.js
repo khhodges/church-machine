@@ -16,6 +16,7 @@
 global.window = { bootConfig: {} };
 
 const ChurchSimulator = require('../../simulator/simulator.js');
+const { bootSim } = require('./sim_helpers');
 const fs   = require('fs');
 const path = require('path');
 
@@ -124,14 +125,7 @@ function fail(msg) { ERRORS.push(msg); }
 // ─── Test 3: CALL instruction fires F_BIT at runtime (not just during boot) ──
 
 (function testCallFBitFaultRuntime() {
-    const sim = new ChurchSimulator();
-
-    // Boot the simulator completely so the runtime CALL path is reachable.
-    let steps = 0;
-    while (!sim.bootComplete && !sim.halted && steps < 200) {
-        sim._bootStep();
-        steps++;
-    }
+    const sim = bootSim();
 
     if (!sim.bootComplete) {
         fail('Boot did not complete for CALL runtime test: ' +
@@ -203,14 +197,7 @@ function fail(msg) { ERRORS.push(msg); }
 //   4. Assert mSave returns { ok: false, fault: 'F_BIT' }.
 
 (function testMSaveFBitFault() {
-    const sim = new ChurchSimulator();
-
-    // Boot the simulator completely so all NS entries are initialised.
-    let steps = 0;
-    while (!sim.bootComplete && !sim.halted && steps < 200) {
-        sim._bootStep();
-        steps++;
-    }
+    const sim = bootSim();
 
     if (!sim.bootComplete) {
         fail('Boot did not complete for mSave F_BIT test: ' +

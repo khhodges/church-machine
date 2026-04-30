@@ -25,18 +25,12 @@
 
 global.window = { bootConfig: {} };
 
-const ChurchSimulator = require('../../simulator/simulator.js');
+const { bootSim } = require('./sim_helpers');
 
-const sim = new ChurchSimulator();
-
-let steps = 0;
-while (!sim.bootComplete && !sim.halted && steps < 300) {
-    sim._bootStep();
-    steps++;
-}
+const sim = bootSim();
 
 if (!sim.bootComplete) {
-    process.stdout.write(JSON.stringify({ error: 'boot did not complete', steps }) + '\n');
+    process.stdout.write(JSON.stringify({ error: 'boot did not complete' }) + '\n');
     process.exit(0);
 }
 
