@@ -23,3 +23,6 @@ build/*.vcd
 
 # APScheduler runtime database (generated at server startup)
 server/scheduler.db
+
+# Mum private key (Stage 3 — Keystone Hello Mum; generated on first run)
+server/mum_key.pem
