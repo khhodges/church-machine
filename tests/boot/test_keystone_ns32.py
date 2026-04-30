@@ -813,3 +813,93 @@ def test_hello_dispatches_tunnel_call_with_mum_gt():
         f"Hello() did not dispatch Tunnel.Call correctly; "
         f"message={data.get('message')!r}, dispatchCalls={data.get('dispatchCalls')!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — Tunnel.Call (NS[31]) is registered by _bindTunnel() and returns
+#          ok:true with the cr2 GT echoed back when cr2 is non-zero
+# ---------------------------------------------------------------------------
+
+_TUNNEL_CALL_HARNESS = """\
+"use strict";
+const SystemAbstractions = require("./simulator/system_abstractions.js");
+
+const TUNNEL_NS = 31;
+
+// Minimal mock sim — Tunnel.Call does not read sim memory.
+const sim = {
+    memory: new Array(64).fill(0),
+};
+
+const _methods = {};
+const registry = {
+    bindMethod(ns, name, fn) { _methods[`${ns}.${name}`] = fn; },
+};
+
+const sa = Object.create(SystemAbstractions.prototype);
+sa.registry = registry;
+sa._bindTunnel();
+
+const callFn = _methods[`${TUNNEL_NS}.Call`];
+if (!callFn) {
+    process.stdout.write(JSON.stringify({ ok: false, message: "Tunnel.Call not bound by _bindTunnel()" }) + "\\n");
+    process.exit(1);
+}
+
+// Case 1: non-zero cr2 — must return ok:true and echo the GT back.
+const FAKE_MUM_GT = 0xC0FFEE01;
+const result1 = callFn(sim, { cr2: FAKE_MUM_GT });
+const case1ok = result1.ok === true && (result1.result >>> 0) === FAKE_MUM_GT;
+
+// Case 2: zero cr2 — must return ok:false with NULL_GT fault.
+const result2 = callFn(sim, { cr2: 0 });
+const case2ok = result2.ok === false && result2.fault === "NULL_GT";
+
+const ok = case1ok && case2ok;
+process.stdout.write(JSON.stringify({
+    ok,
+    case1: { ok: result1.ok, result: result1.result >>> 0, fault: result1.fault, pass: case1ok },
+    case2: { ok: result2.ok, result: result2.result, fault: result2.fault, pass: case2ok },
+    message: ok
+        ? "Tunnel.Call: non-zero cr2 → ok:true; zero cr2 → ok:false/NULL_GT"
+        : `Tunnel.Call assertion failure — case1ok=${case1ok}, case2ok=${case2ok}`
+}) + "\\n");
+process.exit(ok ? 0 : 1);
+"""
+
+
+def test_tunnel_call_returns_ok_when_cr2_nonzero():
+    """Tunnel.Call (NS[31]) registered by _bindTunnel() returns ok:true and echoes
+    the cr2 GT when cr2 is non-zero, and ok:false / fault='NULL_GT' when cr2 is zero.
+
+    Exercises the _bindTunnel() path added in this task.  Without _bindTunnel(),
+    Hello() calling dispatchMethod(31, 'Call', ...) silently receives a METHOD
+    fault instead of forwarding.  This test confirms the handler is reachable and
+    correct independently of the Keystone path.
+    """
+    proc = subprocess.run(
+        ["node", "--input-type=commonjs"],
+        input=_TUNNEL_CALL_HARNESS.encode("utf-8"),
+        capture_output=True,
+        timeout=10,
+        cwd=ROOT,
+    )
+    stdout = proc.stdout.decode("utf-8", errors="replace").strip()
+    stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+
+    assert proc.returncode == 0, (
+        f"Tunnel.Call harness exited {proc.returncode}.\n"
+        f"stdout: {stdout}\nstderr: {stderr}"
+    )
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        pytest.fail(
+            f"Harness produced non-JSON output: {exc}\nstdout: {stdout}"
+        )
+
+    assert data.get("ok") is True, (
+        f"Tunnel.Call test failed; message={data.get('message')!r}, "
+        f"case1={data.get('case1')!r}, case2={data.get('case2')!r}"
+    )

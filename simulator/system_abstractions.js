@@ -129,6 +129,7 @@ class SystemAbstractions {
         this._bindSlideRuleBernoulli();
         this._bindSlideRuleExtended();
         this._bindConstants();
+        this._bindTunnel();
         this._initKeystone();
     }
 
@@ -2375,6 +2376,31 @@ class SystemAbstractions {
             return {
                 ok: true,
                 message: `Constants.Add(0x${hex}) \u2192 Abstract GT in CR0 [pool slot ${slotIdx}, NS[${poolNsSlot}]]`
+            };
+        });
+    }
+
+    _bindTunnel() {
+        const TUNNEL_NS = 31;
+
+        this.registry.bindMethod(TUNNEL_NS, 'Call', function(sim, args) {
+            const cr2 = (args && args.cr2 !== undefined) ? (args.cr2 >>> 0) : 0;
+
+            if (!cr2) {
+                return {
+                    ok: false,
+                    result: 0,
+                    fault: 'NULL_GT',
+                    message: 'Tunnel.Call: cr2 (MumGT) is NULL GT — no target to forward to'
+                };
+            }
+
+            const hex = cr2.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: cr2,
+                fault: null,
+                message: `Tunnel.Call: forwarded to MumGT 0x${hex} — Outform acknowledgment`
             };
         });
     }
