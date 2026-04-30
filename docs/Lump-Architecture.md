@@ -153,19 +153,19 @@ architecture-fixed, not recorded in `cc`.
 **Body layout — five zones (word addresses within the 256-word lump):**
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│  Word 0          Header (typ=10, cw=0)                   │  Zone: Header
-├──────────────────────────────────────────────────────────┤
-│  Words 1..16     Data Registers DR0–DR15                 │  Zone ⑤
-├──────────────────────────────────────────────────────────┤
-│  Words 17..80    Heap max size set by IDE (grows upward) │  Zone ④
-├──────────────────────────────────────────────────────────┤
-│  Words 81..211   Freespace (all-zero; Mint verified)     │  Zone ③
-├──────────────────────────────────────────────────────────┤
-│  Words 212..243  LIFO Stack (grows downward)             │  Zone ②
-├──────────────────────────────────────────────────────────┤
-│  Words 244..255  Initial CR0–CR11 GT Word 0 values       │  Zone ①
-└──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│  Word 0          Header (typ=10, cw=0)                  │  Zone: Header
+├─────────────────────────────────────────────────────────┤
+│  Words 1..16     Data Registers DR0–DR15                │  Zone ⑤
+├─────────────────────────────────────────────────────────┤
+│  Words 17..HS    Heap HS size set by IDE (grows upward) │  Zone ④
+├─────────────────────────────────────────────────────────┤
+│  Words HS+1..FS-13-SS   Freespace (all-zero; Mint verified)    │  Zone ③
+├─────────────────────────────────────────────────────────┤
+│  Words FS-13-SS..FS-13  LIFO Stack (grows downward)            │  Zone ②
+├─────────────────────────────────────────────────────────┤
+│  Words FS-12..FS  Initial CR0–CR11 GT Word 0 values      │  Zone ①
+└─────────────────────────────────────────────────────────┘ where FS, SS, & HS (F=full, S=stack, & H=heap) are set by the IDE under programmer control
 ```
 
 - Zone ① is pre-populated by the IDE at compile time with the thread's
