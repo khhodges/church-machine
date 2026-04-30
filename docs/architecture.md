@@ -511,5 +511,17 @@ Both languages prove the Church Machine is a universal computation target — th
 | DR12-DR15 | Temporaries (compiler scratch) | Caller |
 
 DR0 is hardwired to zero — it reads as 0 unconditionally after every instruction.
+
+## Cross-references
+
+- [Lump-Architecture.md](./Lump-Architecture.md) — Lump header format, lump split mechanics, and
+  power-of-2 allocation rules
+- [CM_LUMP_SPECIFICATION.md](./CM_LUMP_SPECIFICATION.md) — Full binary-level lump specification with
+  encoding formulae, example words, and hardware flow diagrams
+- [foundation-lump-design.md](./foundation-lump-design.md) — Boot image design and three-lump
+  foundation architecture (Salvation, Navana, Mint)
+- [golden-tokens.md](./golden-tokens.md) — Golden Token format, CRC coverage, permission
+  model, and revocation protocol
+
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*
