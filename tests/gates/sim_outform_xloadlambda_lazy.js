@@ -28,7 +28,7 @@ const bootUploadsCode = fs.readFileSync(
     path.join(__dirname, '..', '..', 'simulator', 'boot_uploads.js'), 'utf8');
 vm.runInThisContext(bootUploadsCode);
 
-const { bootSim } = require('./sim_helpers');
+const { bootSim, setupCR6 } = require('./sim_helpers');
 
 const ERRORS = [];
 function fail(msg) { ERRORS.push(msg); }
@@ -83,6 +83,7 @@ function fail(msg) { ERRORS.push(msg); }
 
     // Write the Outform GT into c-list slot 1 of CR6.
     // (Slot 0 is the CLOOMC entry; slot 1 is safe for test manipulation.)
+    setupCR6(sim);
     const clistBase = sim.cr[6].word1;
     sim.memory[clistBase + 1] = outformGT >>> 0;
 
@@ -182,6 +183,7 @@ function fail(msg) { ERRORS.push(msg); }
     const gt_seq = (nsW2 >>> 25) & 0x7F;
     const informGT = sim.createGT(gt_seq, 16, { X: 1 }, 1);
 
+    setupCR6(sim);
     const clistBase = sim.cr[6].word1;
     sim.memory[clistBase + 1] = informGT >>> 0;
 
@@ -241,6 +243,7 @@ function fail(msg) { ERRORS.push(msg); }
     const gt_seq = (nsW2 >>> 25) & 0x7F;
     const outformGT = sim.createGT(gt_seq, 16, { X: 1 }, 2);
 
+    setupCR6(sim);
     const clistBase = sim.cr[6].word1;
     sim.memory[clistBase + 1] = outformGT >>> 0;
 
