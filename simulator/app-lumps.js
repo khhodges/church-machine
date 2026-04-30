@@ -25,6 +25,7 @@ function showLumpDetail(token) {
     const _prevTab = _lumpActiveTab[_tk] || 'overview';
     delete _lumpContentLoaded[_tk];
     delete _lumpHexLoaded[_tk];
+    delete _lumpTokensLoaded[_tk];
 
     // ── Lump header strip (shown between title and tabs, always visible) ──────
     const _e = _escHtml;
@@ -59,7 +60,10 @@ function showLumpDetail(token) {
 
     let _tabBar = `<div class="lump-tabs-bar" id="lumpTabBar_${_tk}">` +
         `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
-    if (!isNamespace) _tabBar += `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
+    if (!isNamespace) {
+        _tabBar += `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
+        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','tokens')">Tokens</button>`;
+    }
     _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','hexdump')">Hex Dump</button></div>`;
 
     // ── Action bar (Edit + Delete) shown below the header strip ─────────────
@@ -287,6 +291,8 @@ function showLumpDetail(token) {
     if (!isNamespace) {
         html += `<div class="lump-tab-panel${!isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabContent_${_tk}">` +
                 `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
+        html += `<div class="lump-tab-panel" id="lumpTabTokens_${_tk}">` +
+                `<div id="lumpTokensBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
     }
     html += `<div class="lump-tab-panel" id="lumpTabHexdump_${_tk}">` +
             `<div id="lumpBinBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
@@ -394,6 +400,7 @@ async function _fetchAndShowLumpBinary(token, lump) {
 const _lumpActiveTab      = {};
 const _lumpContentLoaded  = {};
 const _lumpHexLoaded      = {};
+const _lumpTokensLoaded   = {};
 const _lumpEditorOpen     = {};
 const _lumpEditorDraftText = {};
 
@@ -863,7 +870,7 @@ function _lumpTypeBadge(lump) {
 
 function _switchLumpTab(tk, tab) {
     _lumpActiveTab[tk] = tab;
-    const tabMap = { overview: `lumpTabOverview_${tk}`, content: `lumpTabContent_${tk}`, hexdump: `lumpTabHexdump_${tk}` };
+    const tabMap = { overview: `lumpTabOverview_${tk}`, content: `lumpTabContent_${tk}`, tokens: `lumpTabTokens_${tk}`, hexdump: `lumpTabHexdump_${tk}` };
     Object.entries(tabMap).forEach(([t, id]) => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('lump-tab-panel-active', t === tab);
@@ -872,7 +879,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { overview: 'Overview', content: 'Content', hexdump: 'Hex Dump' };
+            const labelMap = { overview: 'Overview', content: 'Content', tokens: 'Tokens', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -881,6 +888,10 @@ function _switchLumpTab(tk, tab) {
     if (tab === 'content' && !_lumpContentLoaded[tk] && lump) {
         _lumpContentLoaded[tk] = true;
         _loadLumpContent(token, lump);
+    }
+    if (tab === 'tokens' && !_lumpTokensLoaded[tk] && lump) {
+        _lumpTokensLoaded[tk] = true;
+        _loadLumpTokens(token, lump);
     }
     if (tab === 'hexdump' && !_lumpHexLoaded[tk] && lump) {
         _lumpHexLoaded[tk] = true;
@@ -1862,91 +1873,142 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
         html += '</div></div>';
     }
 
-    // MyGoldenTokens (C-list viewer)
-    if (cc > 0) {
-        html += `<div class="lump-clist-section"><div class="lump-clist-title">MyGoldenTokens <span class="lump-gt-count">(${cc} ${cc === 1 ? 'capability' : 'capabilities'})</span></div>`;
-        html += `<div class="lump-gt-chips">`;
-        const _gtCRPetNames = (lump.pet_names || {}).CR || {};
+    bodyEl.innerHTML = html;
+    bodyEl.className = '';
+}
 
-        // Abstract GT device-class names (bits[15:8] of ab_data when ab_type=0 IO)
-        const _abDevClass = ['?','LED','UART','Button','Timer','Display'];
+async function _loadLumpTokens(token, lump) {
+    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const bodyEl = document.getElementById(`lumpTokensBody_${tk}`);
+    if (!bodyEl) return;
 
-        for (let s = 0; s < cc; s++) {
-            const wIdx   = clistStart + s;
-            const wVal   = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
+    const e         = _escHtml;
+    const cc        = parseInt(lump.cc) || 0;
+    const lumpSize  = parseInt(lump.lump_size) || 0;
+    const nsIdx     = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? parseInt(lump.ns_slot) : null;
 
-            // Common GT fields
-            const gtType = (wVal >>> 23) & 0x3;   // bits[24:23]: 0=NULL 1=Inf 2=Out 3=Abs
-            const gtSeq  = (wVal >>> 16) & 0x7F;  // bits[22:16]: revocation counter
+    // ── POLA action strip ────────────────────────────────────────────────────
+    let html = `<div class="lump-clist-section">`;
+    html += `<div class="lump-section-title">POLA — Principle of Least Authority</div>`;
+    if (nsIdx !== null) {
+        html += `<div class="clist-pola-strip">` +
+            `<span class="clist-pola-label">POLA</span>` +
+            `<span class="clist-pola-msg">Remove unused capabilities to reduce authority surface.</span>` +
+            `<button class="clist-pola-btn" onclick="applyPOLA(${nsIdx})">\u26A1\u202FApply POLA</button>` +
+            `</div>`;
+    } else {
+        html += `<div class="clist-pola-strip">` +
+            `<span class="clist-pola-label">POLA</span>` +
+            `<span class="clist-pola-msg" style="color:var(--text-secondary,#888)">No NS slot assigned — POLA requires a loaded namespace entry.</span>` +
+            `</div>`;
+    }
+    html += `</div>`;
 
-            if (!wVal) {
-                const _safeToken = e(token || '');
-                html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty" title="Slot ${s} is empty — click to assign a capability" onclick="_openGTSlotPicker(${JSON.stringify(token || '')},${s},this)">` +
-                        `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
-                        `<span class="lump-gt-chip-name lump-gt-name-null">— empty —</span>` +
-                        `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}</span>` +
-                        `<span class="lump-gt-empty-btn" title="Assign capability">+</span>` +
-                        `</div>`;
-
-            } else if (gtType === 3) {
-                // ── Abstract GT: layout is [31:27]=ab_type [26]=R [25]=W [24:23]=11 [22:16]=gt_seq [15:0]=ab_data
-                const abType      = (wVal >>> 27) & 0x1F;
-                const rBit        = (wVal >>> 26) & 1;
-                const wBit        = (wVal >>> 25) & 1;
-                const abData      = wVal & 0xFFFF;
-                const devClass    = (abData >>> 8) & 0xFF;
-                const devData     = abData & 0xFF;
-                const permStr     = (rBit ? 'R' : '-') + (wBit ? 'W' : '-');
-
-                // Pet name from manifest first, then derive from device class
-                const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
-                let   derivedName  = '';
-                if (!manifestName) {
-                    if (abType === 0) {  // IO device
-                        const cls = _abDevClass[devClass] || `Dev${devClass}`;
-                        derivedName = `${cls}[${devData}]`;
-                    } else if (abType === 1) {
-                        derivedName = 'M-Elevation';
-                    } else {
-                        derivedName = `Abs[${abType}]`;
-                    }
-                }
-                const displayName = manifestName || derivedName;
-                const nameHtml = `<span class="lump-gt-chip-name">${e(displayName)}</span>`;
-                const clsLabel = abType === 0 ? (_abDevClass[devClass] || `Dev${devClass}`) : `ab${abType}`;
-                html += `<div class="lump-gt-chip" data-slot="${s}">` +
-                        `<span class="lump-gt-chip-dot"></span>` +
-                        nameHtml +
-                        `<span class="lump-gt-chip-meta">${permStr} · Abs · ${clsLabel} · v${gtSeq}</span>` +
-                        `</div>`;
-
-            } else {
-                // ── Inform / Outform GT: layout is [30:25]=perms(RWXLSE) [24:23]=type [22:16]=gt_seq [15:0]=slot_id
-                const gtSlotId  = wVal & 0xFFFF;
-                const gtPerms   = (wVal >>> 25) & 0x3F;
-                const gtTypeStr = ['NULL','Inf','Out','Abs'][gtType];
-                const permStr   = 'RWXLSE'.split('').map((c, i) => (gtPerms >> i) & 1 ? c : '-').join('');
-
-                // Pet name priority: manifest CR → token lookup → sim.nsLabels → ns slot number
-                const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
-                const tokenName    = _clistName(wVal);
-                const simNsName    = (typeof sim !== 'undefined' && sim && sim.nsLabels)
-                    ? (sim.nsLabels[gtSlotId] || '')
-                    : '';
-                const displayName  = manifestName || tokenName || simNsName;
-                const nameHtml = displayName
-                    ? `<span class="lump-gt-chip-name">${e(displayName)}</span>`
-                    : `<span class="lump-gt-chip-name lump-gt-name-unresolved">NS[${gtSlotId}]</span>`;
-                html += `<div class="lump-gt-chip" data-slot="${s}">` +
-                        `<span class="lump-gt-chip-dot"></span>` +
-                        nameHtml +
-                        `<span class="lump-gt-chip-meta">${permStr} · ${gtTypeStr} · #${gtSlotId} · v${gtSeq}</span>` +
-                        `</div>`;
-            }
-        }
-        html += `</div></div>`;
+    // ── MyGoldenTokens (C-list viewer) ───────────────────────────────────────
+    if (cc === 0) {
+        html += `<div class="lump-clist-section"><div class="lump-clist-table">` +
+            `<div style="color:var(--text-secondary,#888);font-size:0.8rem;padding:0.5rem 0;">` +
+            `This lump has no capability slots (cc\u202F=\u202F0).</div></div></div>`;
+        bodyEl.innerHTML = html;
+        bodyEl.className = '';
+        return;
     }
 
+    // Fetch words to decode GT values
+    let words = [];
+    try {
+        const resp = await fetch(`/api/lump/${token}/words`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        words = data.words || [];
+    } catch (err) {
+        html += `<div class="lump-clist-section"><div style="color:#f87171;font-size:0.8rem;padding:0.4rem 0;">` +
+            `Failed to load token words: ${e(err.message)}</div></div>`;
+        bodyEl.innerHTML = html;
+        bodyEl.className = '';
+        return;
+    }
+
+    const clistStart    = lumpSize - cc;
+    const _gtCRPetNames = (lump.pet_names || {}).CR || {};
+    const _abDevClass   = ['?','LED','UART','Button','Timer','Display'];
+    const _tokenToName  = tok => {
+        if (!_lumpsCache || !_lumpsCache.length) return '';
+        const h = tok.toString(16).padStart(8, '0');
+        const lm = _lumpsCache.find(l => {
+            const t = (l.token || '').toLowerCase();
+            return t === h || t.replace(/^0+/, '') === h.replace(/^0+/, '');
+        });
+        return lm ? (lm.abstraction || '') : '';
+    };
+
+    html += `<div class="lump-clist-section">`;
+    html += `<div class="lump-clist-title">MyGoldenTokens <span class="lump-gt-count">(${cc} ${cc === 1 ? 'capability' : 'capabilities'})</span></div>`;
+    html += `<div class="lump-gt-chips">`;
+
+    for (let s = 0; s < cc; s++) {
+        const wIdx  = clistStart + s;
+        const wVal  = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
+        const gtType = (wVal >>> 23) & 0x3;
+        const gtSeq  = (wVal >>> 16) & 0x7F;
+
+        if (!wVal) {
+            html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty" title="Slot ${s} is empty \u2014 click to assign a capability" onclick="_openGTSlotPicker(${JSON.stringify(token || '')},${s},this)">` +
+                    `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
+                    `<span class="lump-gt-chip-name lump-gt-name-null">\u2014 empty \u2014</span>` +
+                    `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}</span>` +
+                    `<span class="lump-gt-empty-btn" title="Assign capability">+</span>` +
+                    `</div>`;
+        } else if (gtType === 3) {
+            const abType   = (wVal >>> 27) & 0x1F;
+            const rBit     = (wVal >>> 26) & 1;
+            const wBit     = (wVal >>> 25) & 1;
+            const abData   = wVal & 0xFFFF;
+            const devClass = (abData >>> 8) & 0xFF;
+            const devData  = abData & 0xFF;
+            const permStr  = (rBit ? 'R' : '-') + (wBit ? 'W' : '-');
+            const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
+            let derivedName = '';
+            if (!manifestName) {
+                if (abType === 0) {
+                    const cls = _abDevClass[devClass] || `Dev${devClass}`;
+                    derivedName = `${cls}[${devData}]`;
+                } else if (abType === 1) {
+                    derivedName = 'M-Elevation';
+                } else {
+                    derivedName = `Abs[${abType}]`;
+                }
+            }
+            const displayName = manifestName || derivedName;
+            const clsLabel    = abType === 0 ? (_abDevClass[devClass] || `Dev${devClass}`) : `ab${abType}`;
+            html += `<div class="lump-gt-chip" data-slot="${s}">` +
+                    `<span class="lump-gt-chip-dot"></span>` +
+                    `<span class="lump-gt-chip-name">${e(displayName)}</span>` +
+                    `<span class="lump-gt-chip-meta">${permStr} \u00B7 Abs \u00B7 ${clsLabel} \u00B7 v${gtSeq}</span>` +
+                    `</div>`;
+        } else {
+            const gtSlotId  = wVal & 0xFFFF;
+            const gtPerms   = (wVal >>> 25) & 0x3F;
+            const gtTypeStr = ['NULL','Inf','Out','Abs'][gtType];
+            const permStr   = 'RWXLSE'.split('').map((c, i) => (gtPerms >> i) & 1 ? c : '-').join('');
+            const manifestName = _gtCRPetNames[s] || _gtCRPetNames[String(s)] || '';
+            const tokenName    = _tokenToName(wVal);
+            const simNsName    = (typeof sim !== 'undefined' && sim && sim.nsLabels)
+                ? (sim.nsLabels[gtSlotId] || '')
+                : '';
+            const displayName  = manifestName || tokenName || simNsName;
+            const nameHtml = displayName
+                ? `<span class="lump-gt-chip-name">${e(displayName)}</span>`
+                : `<span class="lump-gt-chip-name lump-gt-name-unresolved">NS[${gtSlotId}]</span>`;
+            html += `<div class="lump-gt-chip" data-slot="${s}">` +
+                    `<span class="lump-gt-chip-dot"></span>` +
+                    nameHtml +
+                    `<span class="lump-gt-chip-meta">${permStr} \u00B7 ${gtTypeStr} \u00B7 #${gtSlotId} \u00B7 v${gtSeq}</span>` +
+                    `</div>`;
+        }
+    }
+
+    html += `</div></div>`;
     bodyEl.innerHTML = html;
     bodyEl.className = '';
 }
