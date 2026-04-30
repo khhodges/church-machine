@@ -49,7 +49,9 @@ from http.server import HTTPServer
 
 import pytest
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT         = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+CAPTURED_BIN = os.path.join(FIXTURES_DIR, "gtkn_captured.bin")
 sys.path.insert(0, ROOT)
 
 # ---------------------------------------------------------------------------
@@ -431,4 +433,140 @@ def test_rx_word_equals_greet_response_integer(transact_result):
         f"Decoded RX word = 0x{word:08X}, expected 0x{GREET_RESPONSE:08X} "
         f"('HELL').\n"
         f"rx={rx!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Golden fixture replay — captured from real Ti60 hardware
+# ---------------------------------------------------------------------------
+# tests/boot/fixtures/gtkn_captured.bin is a 12-byte binary captured from a
+# live Ti60 FPGA over UART.  When the file is present the test below replays
+# those exact bytes through the same pty bridge harness used by the synthetic
+# tests above and verifies that the bridge parses them correctly.
+#
+# CI / developer machines without the fixture file skip this test
+# automatically — the suite stays green without hardware.
+
+@pytest.fixture(scope="module")
+def captured_transact_result(bridge_context):
+    """Replay gtkn_captured.bin through the pty bridge and return the result.
+
+    Skips automatically when the fixture binary is absent so that CI stays
+    green on machines without Ti60 hardware.
+
+    Returns (http_status, response_dict, fpga_emulator, captured_bytes).
+    """
+    if not os.path.isfile(CAPTURED_BIN):
+        pytest.skip(
+            f"Golden fixture not present: {CAPTURED_BIN!r}. "
+            "Capture a real GTKN packet from Ti60 hardware to enable this test."
+        )
+
+    with open(CAPTURED_BIN, "rb") as fh:
+        captured = fh.read()
+
+    if len(captured) != 12:
+        pytest.fail(
+            f"gtkn_captured.bin must be exactly 12 bytes; got {len(captured)}. "
+            "Re-capture from hardware."
+        )
+
+    port      = bridge_context["port"]
+    master_fd = bridge_context["master_fd"]
+
+    emulator = _FpgaEmulator(master_fd)
+    emulator.start()
+
+    status, data = _http_post(
+        f"http://127.0.0.1:{port}/transact",
+        {
+            "tx":         list(captured),   # 12 captured bytes
+            "rx_count":   4,                # expect 4-byte GREET_RESPONSE
+            "timeout_ms": 2000,
+        },
+    )
+
+    emulator.join(timeout=3.0)
+    return status, data, emulator, captured
+
+
+def test_captured_fixture_has_valid_gtkn_tag():
+    """The golden fixture file must start with the 4-byte GTKN FourCC tag.
+
+    This test validates the fixture file itself — it does not require the
+    bridge or pty infrastructure.  It is skipped when the file is absent.
+    """
+    if not os.path.isfile(CAPTURED_BIN):
+        pytest.skip(f"Golden fixture not present: {CAPTURED_BIN!r}")
+
+    with open(CAPTURED_BIN, "rb") as fh:
+        data = fh.read()
+
+    assert len(data) == 12, (
+        f"gtkn_captured.bin must be exactly 12 bytes; got {len(data)}"
+    )
+    tag = struct.unpack(">I", data[:4])[0]
+    assert tag == GTKN_TAG, (
+        f"gtkn_captured.bin tag = 0x{tag:08X}, expected 0x{GTKN_TAG:08X} "
+        f"('GTKN').  The file may be corrupt or from a different protocol version."
+    )
+    count = struct.unpack(">I", data[4:8])[0]
+    assert count == 1, (
+        f"gtkn_captured.bin count word = {count}, expected 1.  "
+        "Only single-payload GTKN packets are supported by the current harness."
+    )
+
+
+def test_captured_replay_returns_http_200(captured_transact_result):
+    """Replaying the golden fixture bytes must yield HTTP 200 from /transact."""
+    status, data, _, _ = captured_transact_result
+    assert status == 200, (
+        f"/transact returned HTTP {status} for captured fixture bytes, "
+        f"expected 200.\nresponse={data!r}"
+    )
+
+
+def test_captured_replay_response_ok(captured_transact_result):
+    """/transact must carry ok=True when replaying the captured fixture."""
+    _, data, _, _ = captured_transact_result
+    assert data.get("ok") is True, (
+        f"/transact ok={data.get('ok')!r} for captured fixture, expected True.\n"
+        f"response={data!r}"
+    )
+
+
+def test_captured_replay_emulator_received_correct_bytes(captured_transact_result):
+    """The FPGA emulator must receive the exact bytes from the golden fixture."""
+    _, _, emulator, captured = captured_transact_result
+    assert emulator.framing_ok, (
+        "FPGA emulator received fewer than 12 bytes when replaying the captured "
+        f"fixture.\nreceived={emulator.received.hex()!r}, "
+        f"error={emulator.error!r}"
+    )
+    assert bytes(emulator.received[:12]) == bytes(captured), (
+        "Bytes relayed through the bridge do not match the golden fixture.\n"
+        f"Got     : {bytes(emulator.received[:12]).hex()}\n"
+        f"Expected: {bytes(captured).hex()}"
+    )
+
+
+def test_captured_replay_rx_matches_greet_response(captured_transact_result):
+    """The bridge must return the canonical GREET_RESPONSE for the captured packet.
+
+    Verifies that the hardware-captured packet is accepted end-to-end by the
+    same bridge + emulator path used for the synthetic packet, confirming that
+    the firmware packet format and the test harness agree.
+    """
+    _, data, _, _ = captured_transact_result
+    rx = data.get("rx", [])
+    assert len(rx) >= 4, (
+        f"Bridge returned only {len(rx)} RX byte(s) for captured fixture; "
+        "need at least 4."
+    )
+    rx_bytes = bytes(rx[:4])
+    assert rx_bytes == GREET_BYTES, (
+        f"First 4 RX bytes mismatch for captured fixture replay.\n"
+        f"Got     : {rx_bytes.hex()}  ({list(rx_bytes)})\n"
+        f"Expected: {GREET_BYTES.hex()}  ({list(GREET_BYTES)})  "
+        f"(big-endian 0x{GREET_RESPONSE:08X} = 'HELL')"
     )
