@@ -1125,6 +1125,14 @@ BOOK_CHAPTERS = [
         "tang-nano-20k.md",
         "production_silicon_todo.md",
     ]),
+    ("Part X: IDE Design Guide", [
+        "IDE-Designer.md",
+        "pet-name-language.md",
+        "namespace-vocabulary-tutorial.md",
+        "method-access-control.md",
+        "foundation-lump-design.md",
+        "Lump-Architecture.md",
+    ]),
     ("Part XI: Implementation Plans", [
         "plan-lazy-load.md",
         "plan-call-mum.md",

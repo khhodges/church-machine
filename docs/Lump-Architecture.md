@@ -204,8 +204,12 @@ data (NS Table entries), not GT slots.
 ├─────────────────────────────────────────────────────────┤
 │  Words NS_TABLE_END+1..lumpSize-1   Trailing zeros      │
 ├─────────────────────────────────────────────────────────┤
-│  Words PYSICAL_MEMORY +1..lumpSize-1   LUMP zone        │
-└─────────────────────────────────────────────────────────┘
+│  Words PYSICAL_MEMORY size             LUMP zone        │
+└─────────────────────────────────────────────────────────┘ ← memory size for this namespace
+
+Several Namespace Applications can coexist (timeshare) in a single memory system.
+
+**Example Namespace Slot values:**
 
 Each NS Table entry is three 32-bit words and carries one of three states:
 
