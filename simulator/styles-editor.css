@@ -364,6 +364,34 @@
     border: none;
 }
 
+.cmp-footer {
+    margin-top: 0.75rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #1e293b;
+}
+.cmp-load-sim-btn {
+    background: transparent;
+    border: 1px solid #22c55e;
+    color: #22c55e;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.cmp-load-sim-btn:hover {
+    background: rgba(34,197,94,0.12);
+}
+.cmp-load-sim-btn--done {
+    border-color: #4b5563;
+    color: #6b7280;
+    cursor: default;
+}
+.cmp-load-sim-btn--done:hover {
+    background: transparent;
+}
+
 .next-steps-box {
     background: rgba(218,165,32,0.08);
     border: 1px solid rgba(218,165,32,0.25);

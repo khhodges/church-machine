@@ -1012,12 +1012,71 @@ function compileCLOOMC() {
             + `</details>`;
     }
 
+    // Store for loadCLOOMCIntoSim() so the user can step individual instructions
+    // without re-running the compile.
+    window._lastCLOOMCResult = result;
+
+    html += `<div class="cmp-footer"><button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load this compiled lump into the simulator so you can Step or Walk through every instruction">Load into Sim \u25b6</button></div>`;
+
     if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
     showNextSteps('compiled');
     trackAction('compile', { name: result.abstractionName, lang: result.language });
     const _outSrcLabel = _getActiveSourceLabel();
     const _outSrcHint = _outSrcLabel ? ` · ${_outSrcLabel}` : '';
     appendOutput(`CLOOMC++ compiled "${result.abstractionName}"${_outSrcHint} — ${result.methods.length} methods`, 'info');
+}
+
+// Load the most-recently-compiled CLOOMC++ lump into the simulator so the user
+// can step/walk through individual instructions — bridging the compile-display
+// path and the assemble-and-run path.
+function loadCLOOMCIntoSim() {
+    const result = window._lastCLOOMCResult;
+    if (!result || !result.methods) {
+        appendOutput('Load into Sim: nothing compiled yet — run Compile first.', 'warn');
+        return;
+    }
+
+    const methods = result.methods || [];
+    const methodTableSize = methods.length;
+    const words = [];
+    const labels = {};
+    let codeOffset = methodTableSize;
+    const methodTableEntries = [];
+    for (const m of methods) {
+        methodTableEntries.push(codeOffset);
+        labels[m.name] = codeOffset;
+        codeOffset += (m.code || []).length;
+    }
+    for (const entry of methodTableEntries) words.push(entry);
+    for (const m of methods) {
+        for (const w of (m.code || [])) words.push(w);
+    }
+
+    lastAssembledWords      = words.slice();
+    lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
+        ? result.capabilities.slice() : null;
+    lastMethodTableSize     = methodTableSize;
+    _defaultProgramLoaded   = true;
+    sim.programLabels       = labels;
+    sim.programName         = result.abstractionName || (methods.length > 0 ? methods[0].name : 'prog');
+    window._assemblerSymbols = { labels, lumpName: sim.programName };
+    _pendingSimLoad          = true;
+
+    // Update the button to give immediate visual feedback
+    const btn = document.getElementById('btnLoadIntoSim');
+    if (btn) {
+        btn.textContent = 'Loaded \u2014 click Step \u25b6';
+        btn.classList.add('cmp-load-sim-btn--done');
+        btn.disabled = true;
+    }
+
+    // Switch the next-steps hints to the "assembled" state so the user sees
+    // "click Step to execute one instruction at a time"
+    showNextSteps('assembled');
+
+    const _loadSrcLabel = _getActiveSourceLabel();
+    const _loadSrcHint  = _loadSrcLabel ? ` · ${_loadSrcLabel}` : '';
+    appendOutput(`Loaded \u201c${result.abstractionName}\u201d${_loadSrcHint} into simulator \u2014 ${words.length} words, ${methodTableSize} method${methodTableSize !== 1 ? 's' : ''} \u2014 click Step or Run`, 'info');
 }
 
 function compileAndCreateAbstraction() {
