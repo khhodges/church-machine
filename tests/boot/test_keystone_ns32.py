@@ -16,6 +16,7 @@ Four focused assertions from the Stage 2 code review:
      Node.js subprocess that mocks the minimal simulator interface and
      directly calls the system_abstractions.js handler.
 """
+import base64
 import json
 import os
 import struct
@@ -902,4 +903,130 @@ def test_tunnel_call_returns_ok_when_cr2_nonzero():
     assert data.get("ok") is True, (
         f"Tunnel.Call test failed; message={data.get('message')!r}, "
         f"case1={data.get('case1')!r}, case2={data.get('case2')!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Test 9 — Full round-trip: boot image → live simulator → Navana.Init →
+#           assert memory[Keystone_clist_base + 0] == Tunnel E-GT
+# ---------------------------------------------------------------------------
+
+_NAVANA_INIT_KEYSTONE_HARNESS = os.path.join(
+    os.path.dirname(__file__), "sim_navana_init_keystone.js"
+)
+
+_ROUND_TRIP_CFG = {
+    "step1": {
+        "totalNamespaceWords": 16384,
+        "namespaceLumpWords":     64,
+        "threadLumpWords":       256,
+    },
+}
+
+
+def test_keystone_slot0_wiring_survives_boot_image_round_trip():
+    """Boot image → live simulator → Navana.Init → Keystone c-list slot 0 is Tunnel E-GT.
+
+    This exercises the full path that the isolated unit tests cannot cover:
+
+      1. generate_boot_image() produces the canonical NS memory image with
+         Keystone (NS[32]) placed at its correct physical address, with a
+         real cc=2 lump header and the correct NS-table entry.
+
+      2. The image is loaded into a ChurchSimulator instance that has a
+         full AbstractionRegistry + SystemAbstractions stack — the same stack
+         the browser IDE uses.
+
+      3. The boot state machine (_bootStep loop) runs to completion, placing
+         NS entries and lump headers exactly as they will appear in production.
+
+      4. Navana.Init (NS[5] Init method) is dispatched.  Navana.Init calls
+         sim.abstractionRegistry.dispatchMethod(32, 'Init', sim, {}) which is
+         Keystone.Init.  Keystone.Init uses sim.readNSEntry(32) and
+         sim.parseLumpHeader() to locate the c-list base inside the lump
+         body, then writes the Tunnel E-GT (NS[31]) into slot 0.
+
+      5. This test reads sim.memory at that same c-list slot 0 address and
+         asserts the value is a non-zero E-GT pointing at NS[31] (Tunnel).
+
+    A failure here catches wiring that passes in isolation but breaks when
+    combined with the full NS table layout, a real lump header, or the actual
+    clistBase calculation performed inside the live simulator.
+    """
+    img_bytes = generate_boot_image(_ROUND_TRIP_CFG, LUMPS_DIR)
+    img_b64   = base64.b64encode(img_bytes).decode("ascii")
+
+    envelope = json.dumps({"imageBase64": img_b64, "config": _ROUND_TRIP_CFG}).encode("utf-8")
+
+    proc = subprocess.run(
+        ["node", _NAVANA_INIT_KEYSTONE_HARNESS],
+        input=envelope,
+        capture_output=True,
+        timeout=30,
+        cwd=ROOT,
+    )
+    stdout = proc.stdout.decode("utf-8", errors="replace").strip()
+    stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+
+    assert proc.returncode == 0, (
+        f"sim_navana_init_keystone.js exited {proc.returncode}.\n"
+        f"stdout: {stdout}\nstderr: {stderr}"
+    )
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        pytest.fail(
+            f"Harness produced non-JSON output: {exc}\nstdout: {stdout}"
+        )
+
+    assert data.get("loaded") is True, (
+        f"loadBootImage() returned False — boot image was not loaded into the simulator.\n"
+        f"faultCount={data.get('faultCount')}"
+    )
+
+    assert data.get("bootComplete") is True, (
+        f"Boot state machine did not complete — check the image or simulator.\n"
+        f"faultCount={data.get('faultCount')}, message={data.get('message')!r}"
+    )
+
+    assert data.get("navanaOk") is True, (
+        "Navana.Init dispatch returned a falsy/error result — "
+        "Keystone.Init cannot have been called.\n"
+        f"message={data.get('message')!r}"
+    )
+
+    assert data.get("slot0", 0) != 0, (
+        "Keystone c-list slot 0 is NULL GT after Navana.Init in live simulator.\n"
+        f"message={data.get('message')!r}\n"
+        f"lumpSize={data.get('lumpSize')}, cc={data.get('cc')}, clistBase={data.get('clistBase')}"
+    )
+
+    assert data.get("tunnelNS") == TUNNEL_SLOT, (
+        f"Keystone c-list slot 0 NS index = {data.get('tunnelNS')}, "
+        f"expected {TUNNEL_SLOT} (Tunnel)\n"
+        f"slot0={data.get('slot0Hex')!r}, message={data.get('message')!r}"
+    )
+
+    assert data.get("eBitSet") is True, (
+        f"Tunnel GT in Keystone c-list slot 0 has E-bit clear.\n"
+        f"slot0={data.get('slot0Hex')!r}, message={data.get('message')!r}"
+    )
+
+    # Strict bitwise equality: createGT(seq=0, ns=31, {E:1}, type=1) = 0x4080001F
+    #   bits[31:25] = permBits=0x20 (E only)  → 0x20 << 25 = 0x40000000
+    #   bits[24:23] = type=1                  → 0x01 << 23 = 0x00800000
+    #   bits[22:16] = gt_seq=0                → 0
+    #   bits[15:0]  = slot_id=31              → 0x0000001F
+    expected_gt = create_gt(0, TUNNEL_SLOT, {"E": 1}, 1)
+    actual_slot0 = data.get("slot0", 0)
+    assert actual_slot0 == expected_gt, (
+        f"Keystone c-list slot 0 bitwise mismatch: "
+        f"got 0x{actual_slot0:08X}, expected 0x{expected_gt:08X} "
+        f"(Tunnel E-GT for NS[{TUNNEL_SLOT}], type=1, seq=0).\n"
+        f"This catches extra permission bits or wrong GT type even when NS index and E-bit are correct."
+    )
+
+    assert data.get("ok") is True, (
+        f"Round-trip wiring check failed: {data.get('message')!r}"
     )
