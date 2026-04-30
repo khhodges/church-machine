@@ -14,7 +14,7 @@
 //     → _goToLumpByAbstractionName() sets _pendingLumpAbstractionName and
 //       calls switchView('lumps')
 //     → renderLumps() picks up the pending name, selects the correct token,
-//       and renders the LUMP row with the `active` class
+//       and pre-selects the matching option in #lumpPickerSelect (dropdown)
 //
 // The /api/lumps/list route is intercepted in both suites to make tests
 // deterministic regardless of which LUMPs happen to be compiled locally.
@@ -121,7 +121,7 @@ test.describe('happy-path LUMP navigation', () => {
         await page.waitForLoadState('networkidle');
     });
 
-    test('double-clicking an abstraction with a compiled LUMP switches to the LUMP repository and highlights the correct row', async ({ page }) => {
+    test('double-clicking an abstraction with a compiled LUMP switches to the LUMP repository and selects the correct option in the dropdown', async ({ page }) => {
         // ── Step 1: open the hamburger menu, then switch to Abstractions ──────
         const hamBtn = page.locator('#hamBtn');
         await hamBtn.waitFor({ state: 'visible' });
@@ -155,12 +155,12 @@ test.describe('happy-path LUMP navigation', () => {
         const lumpsView = page.locator('#lumps');
         await expect(lumpsView).toBeVisible();
 
-        // ── Assert 2: the correct LUMP row carries the `active` class ─────────
+        // ── Assert 2: the dropdown picker shows the correct LUMP selected ────
         // renderLumps() resolves _pendingLumpAbstractionName → token, then
-        // emits the matching .lump-item with class `active`.
-        const lumpRow = page.locator(`.lump-item[data-token="${STUB_TOKEN}"]`);
-        await expect(lumpRow).toBeVisible();
-        await expect(lumpRow).toHaveClass(/\bactive\b/);
+        // sets the matching <option> as selected in #lumpPickerSelect.
+        const lumpPicker = page.locator('#lumpPickerSelect');
+        await expect(lumpPicker).toBeVisible();
+        await expect(lumpPicker).toHaveValue(STUB_TOKEN);
     });
 
 });
