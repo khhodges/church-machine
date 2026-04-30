@@ -62,6 +62,10 @@ class CLOOMCCompiler {
         this.DR_LOCALS_END = 11;
         this.DR_TEMP_START = 12;
         this.DR_TEMP_END = 15;
+        // methodConventions: { 'ABSTRACTION_NAME': { 'MethodName': { index: N } } }
+        // Populated externally from the AbstractionRegistry so the compiler can emit
+        // the correct method selector in CALL instructions for capability methods.
+        this.methodConventions = {};
     }
 
     encode(opcode, cond, dst, src, imm) {
@@ -1265,10 +1269,21 @@ class CLOOMCCompiler {
                 }
             }
 
+            // Look up the method selector from conventions (e.g. Billing.Balance = index 4).
+            // Without conventions every call would encode selector 0, making all
+            // single-call methods compile to identical bytecode (→ "alias of X").
+            let methodSelector = 0;
+            const convEntry = this.methodConventions[absName];
+            if (convEntry && convEntry[methodName] !== undefined) {
+                methodSelector = typeof convEntry[methodName] === 'object'
+                    ? (convEntry[methodName].index || 0)
+                    : convEntry[methodName];
+            }
+
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `LOAD CR0, [CR6 + ${clistOffset}] (${callMatch[2]})` });
             code.push(this.encode(this.opcodes.LOAD, 14, 0, 6, clistOffset));
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `CALL CR0 -> ${callMatch[2]}.${methodName}` });
-            code.push(this.encode(this.opcodes.CALL, 14, 0, 0, 0));
+            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `CALL CR0, #${methodSelector} -> ${callMatch[2]}.${methodName}` });
+            code.push(this.encode(this.opcodes.CALL, 14, 0, methodSelector, 0));
 
             if (resultVar) {
                 const dr = this._allocLocal(resultVar, locals, errors, stmt.lineNum);

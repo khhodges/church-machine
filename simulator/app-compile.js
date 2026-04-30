@@ -2508,13 +2508,13 @@ abstraction CodeLoader {
 // counted handles so the system knows when a slot is
 // still in use.
 //
-// AllocAbstract(ns_slot) → handle
+// AllocAbstract(ns_slot) → handle   (selector 0)
 //   Claims a handle for ns_slot. The first claim
 //   creates the tracking entry; subsequent claims
 //   increment a reference count. The handle value
 //   IS the ns_slot number — it doubles as a pointer.
 //
-// FreeAbstract(ns_slot)
+// Free(ns_slot)                      (selector 1)
 //   Decrements the reference count. When it reaches
 //   zero, the slot is marked free. Any GT pointing
 //   into that slot will then fail TPERM — hardware
@@ -2545,7 +2545,7 @@ abstraction AbstractionLifecycle {
     // Release: decrement the reference count for ns_slot.
     // When the count reaches zero the slot is freed.
     method Release(ns_slot) {
-        ok = call(ChurchMemory.FreeAbstract(ns_slot))
+        ok = call(ChurchMemory.Free(ns_slot))
         return(ok)
     }
 
@@ -2565,33 +2565,33 @@ abstraction AbstractionLifecycle {
     method ReleaseRange(first, count) {
         i = 0
         while (i < count) {
-            call(ChurchMemory.FreeAbstract(first + i))
+            call(ChurchMemory.Free(first + i))
             i = i + 1
         }
         return(0)
     }
 }`,
 
-        'physical_pool': `// ── PhysicalPool (NS 50+): Raw Physical Memory ──
-// PhysicalPool is the bottom of the Church Machine's
-// memory hierarchy — raw word-addressed physical blocks
-// with no quota, no billing, and no garbage collection.
+        'physical_pool': `// ── Memory (NS 7): Raw Physical Word Allocation ──
+// Memory is the bottom of the Church Machine's
+// memory hierarchy — raw word-addressed blocks with
+// no quota, no billing, and no garbage collection.
 //
 // Two allocation styles:
 //
-//   Allocate(size) / Free(location)
+//   Allocate(size) / Free(location)   (selectors 0 / 1)
 //     Paired: every Allocate should be matched by a
 //     Free. The block returns to the free list and
 //     can be reused. Use for temporary scratch buffers.
 //
-//   Claim(size) / Release(location)
+//   Claim(size) / Release(location)   (selectors 3 / 4)
 //     Permanent: Claim acquires a block that is NOT
 //     tracked in the free list. Release marks it gone
 //     but the physical words are never reused.
 //     Use for boot-time structures and DMA regions
 //     that must survive for the life of the machine.
 //
-// PhysicalPool has no Billing integration — it is
+// Memory has no Billing integration — it is
 // system-level only. User abstractions should reach
 // memory through TuringMemory + Billing instead.
 //
@@ -2602,26 +2602,26 @@ abstraction AbstractionLifecycle {
 
 abstraction DMABuffer {
     capabilities {
-        PhysicalPool
+        Memory
     }
 
     // Reserve: claim a permanent DMA region of 'words' words.
     // Never returned to the pool — use for hardware I/O.
     method Reserve(words) {
-        location = call(PhysicalPool.Claim(words))
+        location = call(Memory.Claim(words))
         return(location)
     }
 
     // Scratch: allocate a temporary buffer.
     // Must be paired with a call to Drop(location).
     method Scratch(words) {
-        location = call(PhysicalPool.Allocate(words))
+        location = call(Memory.Allocate(words))
         return(location)
     }
 
     // Drop: return a scratch buffer to the pool.
     method Drop(location) {
-        ok = call(PhysicalPool.Free(location))
+        ok = call(Memory.Free(location))
         return(ok)
     }
 
@@ -2629,13 +2629,13 @@ abstraction DMABuffer {
     // Returns (loc_a, loc_b), or (0, 0) if either fails.
     // Rolls back the first allocation if the second fails.
     method ScratchPair(words) {
-        loc_a = call(PhysicalPool.Allocate(words))
+        loc_a = call(Memory.Allocate(words))
         if (loc_a == 0) {
             return(0, 0)
         }
-        loc_b = call(PhysicalPool.Allocate(words))
+        loc_b = call(Memory.Allocate(words))
         if (loc_b == 0) {
-            call(PhysicalPool.Free(loc_a))
+            call(Memory.Free(loc_a))
             return(0, 0)
         }
         return(loc_a, loc_b)

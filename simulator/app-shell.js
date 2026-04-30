@@ -322,6 +322,23 @@ function init() {
 
     if (typeof CLOOMCCompiler !== 'undefined') {
         cloomcCompiler = new CLOOMCCompiler();
+        // Populate method conventions from the AbstractionRegistry so the compiler
+        // emits the correct CALL selector for capability methods (e.g. Billing.Balance
+        // is selector 4, not 0). Without this, every single-call method compiles to
+        // identical bytecode and shows as "alias of <first method>".
+        if (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
+                abstractionRegistry.abstractions) {
+            const convs = {};
+            for (const idx in abstractionRegistry.abstractions) {
+                const abs = abstractionRegistry.abstractions[idx];
+                if (abs && abs.name && Array.isArray(abs.methods)) {
+                    const key = abs.name.toUpperCase();
+                    convs[key] = {};
+                    abs.methods.forEach((mName, i) => { convs[key][mName] = { index: i }; });
+                }
+            }
+            cloomcCompiler.methodConventions = convs;
+        }
     }
 
     sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); });

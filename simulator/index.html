@@ -378,8 +378,8 @@
                         <button class="example-tab" onclick="loadCLOOMCExample('recall_demo')" data-example="cloomc_recall_demo" style="color:#c084fc;" data-tooltip="recall() — Re-call self via CR6: the event-loop primitive — one instruction, CALL CR6">recall() ✦</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('billing')" data-example="cloomc_billing" style="color:#C89B3C;" data-tooltip="JS: Billing (NS 47) — Capability-based memory quota accounting: Open/Charge/Balance/Close without a kernel">JS: Billing</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('turing_memory')" data-example="cloomc_turing_memory" style="color:#C89B3C;" data-tooltip="JS: TuringMemory (NS 48) — Code-region allocation charged against a Billing account: AllocCode / FreeCode">JS: TuringMemory</button>
-                        <button class="example-tab" onclick="loadCLOOMCExample('church_memory')" data-example="cloomc_church_memory" style="color:#C89B3C;" data-tooltip="JS: ChurchMemory (NS 49) — Namespace slot handle management: reference-counted AllocAbstract / FreeAbstract">JS: ChurchMemory</button>
-                        <button class="example-tab" onclick="loadCLOOMCExample('physical_pool')" data-example="cloomc_physical_pool" style="color:#C89B3C;" data-tooltip="JS: PhysicalPool (NS 50+) — Raw physical memory: paired Allocate/Free for scratch buffers, Claim/Release for permanent DMA regions">JS: PhysicalPool</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('church_memory')" data-example="cloomc_church_memory" style="color:#C89B3C;" data-tooltip="JS: ChurchMemory (NS 49) — Namespace slot handle management: reference-counted AllocAbstract / Free">JS: ChurchMemory</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('physical_pool')" data-example="cloomc_physical_pool" style="color:#C89B3C;" data-tooltip="JS: Memory (NS 7) — Raw physical word allocation: paired Allocate/Free for scratch buffers, Claim/Release for permanent DMA regions">JS: Memory</button>
                     </div>
                     <div id="userTabsContainer" class="user-tabs-container"></div>
                     <button class="new-tab-btn" onclick="showNewTabDialog()" data-tooltip="New Program — Create a new blank program tab">+</button>
@@ -1549,7 +1549,7 @@
     </div>
 
     <script src="startup_config_layout.js"></script>
-    <script src="abstractions.js?v=20260430c"></script>
+    <script src="abstractions.js?v=20260430g"></script>
     <script src="system_abstractions.js?v=20260430c"></script>
     <script src="device_abstractions.js"></script>
     <script async src="boot_uploads.js"></script>
@@ -1561,7 +1561,7 @@
     <script src="repl.js"></script>
     <script src="hp35.js"></script>
     <script async src="history.js"></script>
-    <script src="cloomc_compiler.js?v=20260427a"></script>
+    <script src="cloomc_compiler.js?v=20260430g"></script>
     <script async src="abacus.js"></script>
     <script async src="sliderule.js"></script>
     <script async src="tutorial.js"></script>
@@ -1576,7 +1576,7 @@
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
-    <script src="app-shell.js?v=20260428n"></script>
+    <script src="app-shell.js?v=20260430g"></script>
     <script src="app-tools.js?v=20260430c"></script>
     <script src="app-cr-display.js?v=20260429b"></script>
     <script src="app-cr-detail.js?v=20260429i"></script>
@@ -1585,7 +1585,7 @@
     <script src="app-lumps.js?v=20260430d"></script>
     <script src="app-absdetail.js?v=20260428d"></script>
     <script src="app-run.js?v=20260430e"></script>
-    <script src="app-compile.js?v=20260430f"></script>
+    <script src="app-compile.js?v=20260430g"></script>
     <script src="app-misc.js?v=20260428e"></script>
     <!-- jsQR — client-side QR code decoder (camera scanning for Hello Mum panel) -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>

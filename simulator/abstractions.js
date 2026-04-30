@@ -303,7 +303,7 @@ class AbstractionRegistry {
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(7, 'Memory', 1,
-            ['Allocate', 'Free', 'Resize'],
+            ['Allocate', 'Free', 'Resize', 'Claim', 'Release'],
             'Memory allocation — reserves memory regions for DATA objects (does not manage the NS table)',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
