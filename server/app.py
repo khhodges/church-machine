@@ -4038,10 +4038,26 @@ def device_heartbeat():
     dev = Device.query.filter_by(device_uid=uid).first()
     if not dev:
         return jsonify({"ok": False, "error": "unknown device"}), 404
+
+    now = _time.time()
+    was_offline = (
+        dev.status != "online"
+        or (now - (dev.last_seen or 0)) >= DEVICE_ONLINE_TIMEOUT
+    )
+
     dev.status = "online"
-    dev.last_seen = _time.time()
+    dev.last_seen = now
     db.session.commit()
-    return jsonify({"ok": True})
+
+    if was_offline:
+        _run_hello_mum_flow(dev)
+        db.session.commit()
+        logging.info(
+            "device_heartbeat: reconnect detected for device=%s, re-ran Hello-Mum, tunnel_status=%s",
+            uid, dev.tunnel_status,
+        )
+
+    return jsonify({"ok": True, "tunnel_status": dev.tunnel_status or "pending"})
 
 
 @app.route("/api/device/list")

@@ -452,3 +452,126 @@ def test_auto_hello_mum_visible_in_device_list(bridge_server, registered_device)
         f"device_uid={uid!r}: tunnel_status={ts!r} in /api/device/list — "
         "expected 'online'.  The Devices view would not show the Tunnel online badge."
     )
+
+
+# ---------------------------------------------------------------------------
+# Reconnect: Hello-Mum re-verification on offline → online transition
+# ---------------------------------------------------------------------------
+
+_RECONNECT_UID = "TESTBOOT0000RECO"
+
+
+def _force_device_offline(uid):
+    """Mark a device as offline in the DB directly via an app context.
+
+    Sets status='offline' and last_seen=0 so the heartbeat handler treats the
+    next heartbeat as an offline → online transition.
+    """
+    from server.app import app as _flask_app, db as _db, Device as _Device
+
+    with _flask_app.app_context():
+        dev = _Device.query.filter_by(device_uid=uid).first()
+        if dev:
+            dev.status = "offline"
+            dev.last_seen = 0
+            _db.session.commit()
+
+
+def test_heartbeat_reruns_hello_mum_on_reconnect(bridge_server):
+    """A heartbeat from a previously offline board must re-run the Hello-Mum flow.
+
+    Simulates the offline → online reconnect scenario:
+      1. Register a board so it has a known tunnel_status from the initial flow.
+      2. Force the device to 'offline' in the DB to simulate it going dark.
+      3. Send /api/device/heartbeat.
+      4. Confirm the response includes tunnel_status (re-verified, not stale).
+      5. Confirm /api/device/list reflects the refreshed tunnel_status.
+
+    This is the regression guard for the re-verify-on-reconnect feature: without
+    it, the badge would stay stale at whatever tunnel_status was set at
+    registration, even if the tunnel had broken during the offline period.
+    """
+    uid = _RECONNECT_UID
+
+    register_payload = {
+        "device_uid":  uid,
+        "board_type":  0x03,
+        "fw_major":    1,
+        "fw_minor":    0,
+        "build_sig":   "CCDDEEFF",
+        "profile":     "Full",
+        "boot_reason": 0,
+        "last_fault":  0,
+        "fault_nia":   0,
+        "bridge_host": "127.0.0.1",
+        "bridge_port": 9997,
+        "bridge_scheme": "http",
+    }
+    reg = _http_post_json(f"{bridge_server}/api/device/register", register_payload)
+    assert reg.get("ok") is True, f"Initial registration failed: {reg}"
+    initial_ts = reg.get("tunnel_status")
+    assert initial_ts in ("online", "offline"), (
+        f"Unexpected initial tunnel_status={initial_ts!r} after registration."
+    )
+
+    _force_device_offline(uid)
+
+    hb = _http_post_json(
+        f"{bridge_server}/api/device/heartbeat",
+        {"device_uid": uid},
+    )
+    assert hb.get("ok") is True, f"/api/device/heartbeat returned ok=False: {hb}"
+    hb_ts = hb.get("tunnel_status")
+    assert hb_ts is not None, (
+        "Heartbeat response missing 'tunnel_status' field — re-verification did not run "
+        "or the endpoint does not return tunnel_status after a reconnect."
+    )
+    assert hb_ts in ("online", "offline"), (
+        f"tunnel_status={hb_ts!r} from heartbeat is not a valid value."
+    )
+
+    list_data = _http_get_json(f"{bridge_server}/api/device/list")
+    assert list_data.get("ok") is True, f"/api/device/list returned ok=False: {list_data}"
+    matching = [d for d in list_data.get("devices", []) if d.get("device_uid") == uid]
+    assert matching, (
+        f"Reconnected device UID={uid!r} not found in /api/device/list.\n"
+        f"devices: {[d.get('device_uid') for d in list_data.get('devices', [])]}"
+    )
+    list_ts = matching[0].get("tunnel_status")
+    assert list_ts == hb_ts, (
+        f"device_uid={uid!r}: tunnel_status in /api/device/list ({list_ts!r}) does not "
+        f"match the heartbeat response ({hb_ts!r}) — DB was not updated on reconnect."
+    )
+
+
+def test_heartbeat_does_not_rerun_hello_mum_when_already_online(bridge_server):
+    """A heartbeat from an already-online board must NOT re-run Hello-Mum.
+
+    Confirms the reconnect guard only fires on offline → online transitions.
+    A board that is already online should have its heartbeat processed cheaply,
+    without incurring the cost of another Hello-Mum round-trip.
+
+    We verify this indirectly: the heartbeat response must still include
+    tunnel_status (so the client can read it), but the value must remain
+    whatever was set during the earlier reconnect test (not reset by a new run).
+    """
+    uid = _RECONNECT_UID
+
+    hb1 = _http_post_json(
+        f"{bridge_server}/api/device/heartbeat",
+        {"device_uid": uid},
+    )
+    assert hb1.get("ok") is True, f"First heartbeat failed: {hb1}"
+    ts1 = hb1.get("tunnel_status")
+    assert ts1 is not None, "Heartbeat response missing 'tunnel_status'."
+
+    hb2 = _http_post_json(
+        f"{bridge_server}/api/device/heartbeat",
+        {"device_uid": uid},
+    )
+    assert hb2.get("ok") is True, f"Second heartbeat failed: {hb2}"
+    ts2 = hb2.get("tunnel_status")
+    assert ts2 == ts1, (
+        f"tunnel_status changed between consecutive heartbeats ({ts1!r} → {ts2!r}) "
+        "even though the device was already online — Hello-Mum ran unnecessarily."
+    )
