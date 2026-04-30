@@ -55,19 +55,32 @@ abstraction Navana {
 
         // Create enter-capable GTs for the two resident software lumps
         // so the scheduler can CALL into them once they are loaded.
-        srGT    = call(Mint.Create(16384, 5))
-        constGT = call(Mint.Create(256, 5))
+        //
+        // Three-step Mint.Encode flow for each lump:
+        //   Step 1 — Memory.Allocate  (done above: srBase, constBase)
+        //   Step 2 — Navana.Add       registers the lump; returns (base, exp)
+        //   Step 3 — Mint.Encode      assembles the GT word from those fields
+        //
+        // gtType=1 (Inform), permsBits=0x20 (E only), bindable=0, far=0
+
+        (srNs, srExp)       = call(Navana.Add(srBase,    16384, 1, 0))
+        srGT                = call(Mint.Encode(srNs, srExp, 0x20, 0, 0))
+
+        (constNs, constExp) = call(Navana.Add(constBase, 256,   1, 0))
+        constGT             = call(Mint.Encode(constNs, constExp, 0x20, 0, 0))
 
         // Signal successful boot to Salvation (non-zero = OK).
         return(1)
     }
 
-    // Add(location, limit) — register a new abstraction in the live NS.
+    // Add(location, limit, gtType, far) — register a new abstraction in the live NS.
     // location : physical base address of the lump
     // limit    : byte size of the lump region
-    // Returns the NS index assigned, or 0 on failure.
-    method Add(location, limit) {
-        return(location)
+    // gtType   : 2-bit type field (1=Inform, 2=Outform, 3=Abstract)
+    // far      : boolean hint — lump may require remote fetch on first access
+    // Returns (base, exp): NS slot index assigned and initial gt_seq (always 0).
+    method Add(location, limit, gtType, far) {
+        return(location, 0)
     }
 
     // Remove(index) — unregister an abstraction from the NS.

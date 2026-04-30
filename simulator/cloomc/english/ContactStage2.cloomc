@@ -11,9 +11,9 @@
 -- What changed from Stage 1:
 --   - Raw register names (CR3, DR1, #2) are gone from
 --     the method body.
---   - Identity.Lookup, WordString.GetCharCount, and Mint.Create
---     replace manual DREAD/DWRITE sequences against unnamed
---     device registers.
+--   - Identity.Lookup, WordString.GetCharCount, and the Mint.Encode
+--     three-step flow replace manual DREAD/DWRITE sequences against
+--     unnamed device registers.
 --   - The pet-name compiler resolves each abstraction name
 --     to the correct LOAD CRn + CALL sequence automatically.
 --   - The developer no longer needs to know which c-list slot
@@ -44,7 +44,7 @@
 
 Create an abstraction called ContactStage2
 
-It needs Identity and WordString and Mint
+It needs Identity and WordString and Memory and Navana and Mint
 
 -- run: assemble a connection the Stage 2 way.
 --
@@ -66,10 +66,12 @@ Set addressToken to the result of calling Identity.Lookup with "myMother"
 -- WordString.GetCharCount replaces a manual byte-counting loop.
 Set charCount to the result of calling WordString.GetCharCount with addressToken
 
--- Allocate a new token for the outgoing session.
--- Mint.Create replaces a hand-coded DREAD/DWRITE sequence against
--- a memory manager whose internal logic is now hidden behind its seal.
-Set sessionToken to the result of calling Mint.Create with 128 and 3
+-- Allocate a new token for the outgoing session using the three-step
+-- Mint.Encode flow. Memory.Allocate and Navana.Add are now explicit
+-- caller responsibilities before Mint assembles the GT word.
+Set sessionBuf to the result of calling Memory.Allocate with 128
+Set sessionNs and sessionExp to the results of calling Navana.Add with sessionBuf and 128 and 1 and 0
+Set sessionToken to the result of calling Mint.Encode with sessionNs and sessionExp and 3 and 0 and 0
 
 -- Hand the session token to the routing device.
 -- This DWRITE is the one thing Stage 3 will eliminate: in Stage 3 the

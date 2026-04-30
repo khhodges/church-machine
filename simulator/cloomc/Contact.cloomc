@@ -28,7 +28,9 @@ abstraction Contact {
         Identity    // resolve identity tokens to network addresses
         Routing     // select communication medium (private use only)
         Media       // open/close/query sessions (private use only)
-        Mint        // allocate session capability tokens
+        Memory      // allocate backing memory for new session objects
+        Navana      // register session objects in the Namespace
+        Mint        // encode capability tokens for new session objects
     }
 
     // Connect: establish a person-to-person session.
@@ -44,7 +46,11 @@ abstraction Contact {
         calleeAddress = Identity.Lookup(calleeToken)
         medium = Routing.SelectMedium(callerAddress, calleeAddress)
         session = Media.Open(medium, callerAddress, calleeAddress)
-        sessionToken = Mint.Create(64, 0x3)
+        // Three-step Mint.Encode flow: Allocate → Navana.Add → Mint.Encode
+        // gtType=1 (Inform), permsBits=0x3 (R+W), bindable=0, far=0
+        sessionBuf                = call(Memory.Allocate(64))
+        (sessionNs, sessionExp)   = call(Navana.Add(sessionBuf, 64, 1, 0))
+        sessionToken              = call(Mint.Encode(sessionNs, sessionExp, 0x3, 0, 0))
         return(sessionToken)
     }
 
