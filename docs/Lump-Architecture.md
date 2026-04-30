@@ -327,14 +327,12 @@ memory accordingly. ZIP files where bit 3 is `1` are rejected.
 
 ---
 
-## Cross-References
+## Cross-references
 
-- `docs/CM_LUMP_SPECIFICATION.md` — Full binary-level specification with
-  encoding formulae, example words, and hardware flow diagrams
-- `docs/foundation-lump-design.md` — Boot image design and three-lump
-  foundation architecture
-- `docs/golden-tokens.md` — GT format, CRC coverage, and permission model
-- `docs/architecture.md` — Overall Church Machine architecture
+- [`architecture.md`](architecture.md) — Overall Church Machine architecture
+- [`CM_LUMP_SPECIFICATION.md`](CM_LUMP_SPECIFICATION.md) — Full binary-level specification with encoding formulae, example words, and hardware flow diagrams
+- [`foundation-lump-design.md`](foundation-lump-design.md) — Boot image design and three-lump foundation architecture
+- [`golden-tokens.md`](golden-tokens.md) — GT format, CRC coverage, and permission model
 
 ---
 
