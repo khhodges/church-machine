@@ -223,19 +223,382 @@ def _matrix_to_png(matrix, box_size: int = 10, border: int = 4) -> bytes:
     return sig + ihdr + idat + iend
 
 
-def get_qr_png() -> bytes:
-    """Return a PNG-encoded QR code of Mum's canonical identity string."""
-    import qrcode
-    _load_or_generate()
-    qr = qrcode.QRCode(
-        version=None,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=1,
-        border=0,
+def _make_qr_matrix(data: str) -> list:
+    """
+    Generate a QR code matrix (list[list[bool]]) encoding *data* as bytes.
+    Uses byte mode with M error-correction level.
+    Selects the minimum version (1–9) that fits the payload.
+    Pure stdlib — no external dependencies.
+    """
+    data_bytes = data.encode("utf-8")
+
+    # ------------------------------------------------------------------
+    # Version / capacity tables for byte mode, M error correction.
+    # Each entry: (max_bytes, data_cw_total, ec_per_block, [(n_blocks, data_per_block), ...])
+    # Source: ISO/IEC 18004:2015 tables 7 and 9.
+    # ------------------------------------------------------------------
+    _M_TABLES = {
+        1: (14,  16, 10, [(1, 16)]),
+        2: (26,  28, 16, [(1, 28)]),
+        3: (42,  44, 26, [(1, 44)]),
+        4: (62,  64, 18, [(2, 32)]),
+        5: (84,  86, 24, [(2, 43)]),
+        6: (106, 108, 16, [(4, 27)]),
+        7: (122, 124, 18, [(4, 31)]),
+        8: (152, 154, 22, [(2, 38), (2, 39)]),
+        9: (180, 182, 22, [(3, 36), (2, 37)]),
+    }
+
+    # Alignment pattern centre coordinates (row, col) per version.
+    # Version 1 has no alignment pattern; versions 2-6 have one at these centres.
+    _ALIGN_POS = {
+        2: [6, 18], 3: [6, 22], 4: [6, 26], 5: [6, 30], 6: [6, 34],
+        7: [6, 22, 38], 8: [6, 24, 42], 9: [6, 26, 46],
+    }
+
+    # ------------------------------------------------------------------
+    # Select minimum version
+    # ------------------------------------------------------------------
+    version = None
+    for v in range(1, 10):
+        if _M_TABLES[v][0] >= len(data_bytes):
+            version = v
+            break
+    if version is None:
+        raise ValueError(f"Data too long for versions 1-9 ({len(data_bytes)} bytes)")
+
+    _, data_cw_total, ec_per_block, block_groups = _M_TABLES[version]
+    size = 21 + (version - 1) * 4   # module side length
+
+    # ------------------------------------------------------------------
+    # GF(256) arithmetic (primitive polynomial x^8+x^4+x^3+x^2+1 = 0x11D)
+    # ------------------------------------------------------------------
+    _GF_EXP = [0] * 512
+    _GF_LOG  = [0] * 256
+    x = 1
+    for i in range(255):
+        _GF_EXP[i] = x
+        _GF_LOG[x] = i
+        x <<= 1
+        if x & 256:
+            x ^= 0x11D
+    for i in range(255, 512):
+        _GF_EXP[i] = _GF_EXP[i - 255]
+
+    def gf_mul(a, b):
+        if a == 0 or b == 0:
+            return 0
+        return _GF_EXP[_GF_LOG[a] + _GF_LOG[b]]
+
+    def gf_poly_mul(p, q):
+        r = [0] * (len(p) + len(q) - 1)
+        for i, pi in enumerate(p):
+            for j, qj in enumerate(q):
+                r[i + j] ^= gf_mul(pi, qj)
+        return r
+
+    def rs_generator(n_ec):
+        g = [1]
+        for i in range(n_ec):
+            g = gf_poly_mul(g, [1, _GF_EXP[i]])
+        return g
+
+    def rs_encode(data_cws, n_ec):
+        gen = rs_generator(n_ec)
+        msg = list(data_cws) + [0] * n_ec
+        for i in range(len(data_cws)):
+            coef = msg[i]
+            if coef:
+                for j, g in enumerate(gen):
+                    msg[i + j] ^= gf_mul(g, coef)
+        return msg[len(data_cws):]
+
+    # ------------------------------------------------------------------
+    # Build data bitstream (byte mode)
+    # ------------------------------------------------------------------
+    bits = []
+
+    def push_bits(val, n):
+        for i in range(n - 1, -1, -1):
+            bits.append((val >> i) & 1)
+
+    # Mode indicator: byte mode = 0b0100
+    push_bits(0b0100, 4)
+    # Character count (8 bits for versions 1-9 in byte mode)
+    push_bits(len(data_bytes), 8)
+    # Data bytes
+    for b in data_bytes:
+        push_bits(b, 8)
+    # Terminator (up to 4 zero bits)
+    for _ in range(min(4, data_cw_total * 8 - len(bits))):
+        bits.append(0)
+    # Pad to byte boundary
+    while len(bits) % 8:
+        bits.append(0)
+    # Pad to required capacity with alternating pad bytes
+    pad_bytes = [0xEC, 0x11]
+    pi = 0
+    while len(bits) < data_cw_total * 8:
+        push_bits(pad_bytes[pi % 2], 8)
+        pi += 1
+
+    # Convert bitstream to codewords list
+    codewords = [int("".join(str(b) for b in bits[i:i+8]), 2)
+                 for i in range(0, len(bits), 8)]
+
+    # ------------------------------------------------------------------
+    # Split into blocks and compute error-correction codewords
+    # ------------------------------------------------------------------
+    blocks_data = []
+    idx = 0
+    for n_blocks, data_per_block in block_groups:
+        for _ in range(n_blocks):
+            blocks_data.append(codewords[idx:idx + data_per_block])
+            idx += data_per_block
+
+    blocks_ec = [rs_encode(bd, ec_per_block) for bd in blocks_data]
+
+    # Interleave: data codewords first
+    final_cws = []
+    max_data = max(len(bd) for bd in blocks_data)
+    for i in range(max_data):
+        for bd in blocks_data:
+            if i < len(bd):
+                final_cws.append(bd[i])
+    # Then error-correction codewords
+    for i in range(ec_per_block):
+        for be in blocks_ec:
+            final_cws.append(be[i])
+
+    # Convert to final bitstream
+    data_bits = []
+    for cw in final_cws:
+        for i in range(7, -1, -1):
+            data_bits.append((cw >> i) & 1)
+    # Remainder bits: versions 2-6 require 7 trailing zero bits (ISO 18004 §6.7.3)
+    data_bits += [0] * (7 if 2 <= version <= 6 else 0)
+
+    # ------------------------------------------------------------------
+    # Build the QR matrix
+    # ------------------------------------------------------------------
+    DARK  = True
+    LIGHT = False
+    UNDEF = None
+
+    mat = [[UNDEF] * size for _ in range(size)]
+
+    def place(r, c, val):
+        mat[r][c] = val
+
+    def place_rect(r, c, rows, cols, pattern):
+        for dr in range(rows):
+            for dc in range(cols):
+                place(r + dr, c + dc, pattern[dr][dc])
+
+    # Finder pattern (7×7 dark square + 6×6 border + 1 light separator)
+    finder = [
+        [DARK]*7,
+        [DARK, LIGHT, LIGHT, LIGHT, LIGHT, LIGHT, DARK],
+        [DARK, LIGHT, DARK,  DARK,  DARK,  LIGHT, DARK],
+        [DARK, LIGHT, DARK,  DARK,  DARK,  LIGHT, DARK],
+        [DARK, LIGHT, DARK,  DARK,  DARK,  LIGHT, DARK],
+        [DARK, LIGHT, LIGHT, LIGHT, LIGHT, LIGHT, DARK],
+        [DARK]*7,
+    ]
+    # Top-left finder
+    place_rect(0, 0, 7, 7, finder)
+    for c in range(8): place(7, c, LIGHT)
+    for r in range(8): place(r, 7, LIGHT)
+    # Top-right finder
+    place_rect(0, size - 7, 7, 7, finder)
+    for c in range(size - 8, size): place(7, c, LIGHT)
+    for r in range(8): place(r, size - 8, LIGHT)
+    # Bottom-left finder
+    place_rect(size - 7, 0, 7, 7, finder)
+    for c in range(8): place(size - 8, c, LIGHT)
+    for r in range(size - 8, size): place(r, 7, LIGHT)
+
+    # Timing patterns (row 6 and col 6, between finder patterns)
+    for i in range(8, size - 8):
+        val = DARK if i % 2 == 0 else LIGHT
+        place(6, i, val)
+        place(i, 6, val)
+
+    # Dark module (always dark, fixed position)
+    place(size - 8, 8, DARK)
+
+    # Alignment patterns (5×5 pattern)
+    align_pat = [
+        [DARK]*5,
+        [DARK, LIGHT, LIGHT, LIGHT, DARK],
+        [DARK, LIGHT, DARK,  LIGHT, DARK],
+        [DARK, LIGHT, LIGHT, LIGHT, DARK],
+        [DARK]*5,
+    ]
+    if version >= 2:
+        coords = _ALIGN_POS.get(version, [])
+        positions = [(r, c) for r in coords for c in coords]
+        for (r, c) in positions:
+            # Skip if overlaps finder pattern areas
+            if (r <= 8 and c <= 8) or (r <= 8 and c >= size - 8) or (r >= size - 8 and c <= 8):
+                continue
+            place_rect(r - 2, c - 2, 5, 5, align_pat)
+
+    # ------------------------------------------------------------------
+    # Place data bits (zigzag upward column pairs, skipping reserved areas)
+    # ------------------------------------------------------------------
+    reserved = set()
+    for r in range(size):
+        for c in range(size):
+            if mat[r][c] is not UNDEF:
+                reserved.add((r, c))
+    # Format info positions (to be reserved)
+    fmt_positions = (
+        [(8, c) for c in range(9) if c != 6] +
+        [(r, 8) for r in range(8) if r != 6] +
+        [(8, size - 1 - i) for i in range(8)] +
+        [(size - 1 - i, 8) for i in range(7)]
     )
-    qr.add_data(_identity_string)
-    qr.make(fit=True)
-    matrix = qr.get_matrix()
+    for pos in fmt_positions:
+        reserved.add(pos)
+
+    bit_idx = 0
+    going_up = True
+    col = size - 1
+    while col > 0:
+        if col == 6:
+            col -= 1  # skip timing column
+        for row_step in range(size):
+            r = (size - 1 - row_step) if going_up else row_step
+            for dc in range(2):
+                c = col - dc
+                if (r, c) not in reserved:
+                    if bit_idx < len(data_bits):
+                        mat[r][c] = bool(data_bits[bit_idx])
+                        bit_idx += 1
+                    else:
+                        mat[r][c] = LIGHT
+        col -= 2
+        going_up = not going_up
+
+    # ------------------------------------------------------------------
+    # Format information (EC level M = 0b00, masks 0-7)
+    # Precomputed: format bits = (EC_bits XOR mask_bits) encoded with BCH(15,5)
+    # M level indicator bits = 0b00 (note: QR spec uses different encoding:
+    #   L=01, M=00, Q=11, H=10 — this is the *raw* 2-bit EC indicator).
+    # ------------------------------------------------------------------
+    # Precomputed format strings for M (00) + masks 0-7.
+    # Each is the full 15-bit format word (data + BCH + XOR with 101010000010010).
+    _FMT_M = [
+        0b101010000010010,  # mask 0
+        0b101000100100101,  # mask 1
+        0b101111001111100,  # mask 2
+        0b101101101001011,  # mask 3
+        0b100010111111001,  # mask 4
+        0b100000011001110,  # mask 5
+        0b100111110010111,  # mask 6
+        0b100101010100000,  # mask 7
+    ]
+
+    def apply_mask_and_format(mask_id):
+        # Mask functions
+        mask_fn = [
+            lambda r, c: (r + c) % 2 == 0,
+            lambda r, c: r % 2 == 0,
+            lambda r, c: c % 3 == 0,
+            lambda r, c: (r + c) % 3 == 0,
+            lambda r, c: (r // 2 + c // 3) % 2 == 0,
+            lambda r, c: (r * c) % 2 + (r * c) % 3 == 0,
+            lambda r, c: ((r * c) % 2 + (r * c) % 3) % 2 == 0,
+            lambda r, c: ((r + c) % 2 + (r * c) % 3) % 2 == 0,
+        ][mask_id]
+
+        m = [row[:] for row in mat]
+        for r in range(size):
+            for c in range(size):
+                if (r, c) not in reserved and (r, c) not in set(fmt_positions):
+                    if mask_fn(r, c):
+                        m[r][c] = not m[r][c]
+
+        # Write format info bits (LSB = bit 0 is placed first, per ISO 18004 §7.9)
+        fmt = _FMT_M[mask_id]
+        fmt_bits = [(fmt >> i) & 1 for i in range(15)]
+
+        # Top-left region (8 around finder)
+        tl_pos = (
+            [(8, 0), (8, 1), (8, 2), (8, 3), (8, 4), (8, 5),
+             (8, 7), (8, 8), (7, 8), (5, 8), (4, 8), (3, 8), (2, 8), (1, 8), (0, 8)]
+        )
+        for i, (r, c) in enumerate(tl_pos):
+            m[r][c] = bool(fmt_bits[i])
+
+        # Top-right and bottom-left regions
+        tr_bl_pos = (
+            [(size - 1, 8), (size - 2, 8), (size - 3, 8), (size - 4, 8),
+             (size - 5, 8), (size - 6, 8), (size - 7, 8),
+             (8, size - 8), (8, size - 7), (8, size - 6), (8, size - 5),
+             (8, size - 4), (8, size - 3), (8, size - 2), (8, size - 1)]
+        )
+        for i, (r, c) in enumerate(tr_bl_pos):
+            m[r][c] = bool(fmt_bits[i])
+
+        return m
+
+    def penalty(m):
+        score = 0
+        n = len(m)
+        # Rule 1: 5+ in a row/col same color
+        for row in m:
+            run = 1
+            for i in range(1, n):
+                if row[i] == row[i-1]:
+                    run += 1
+                else:
+                    if run >= 5: score += run - 2
+                    run = 1
+            if run >= 5: score += run - 2
+        for c in range(n):
+            run = 1
+            for r in range(1, n):
+                if m[r][c] == m[r-1][c]:
+                    run += 1
+                else:
+                    if run >= 5: score += run - 2
+                    run = 1
+            if run >= 5: score += run - 2
+        # Rule 2: 2x2 same color blocks
+        for r in range(n - 1):
+            for c in range(n - 1):
+                v = m[r][c]
+                if m[r][c+1] == v and m[r+1][c] == v and m[r+1][c+1] == v:
+                    score += 3
+        # Rule 3: finder-like patterns (simplified)
+        finder_pat = [DARK,LIGHT,DARK,DARK,DARK,LIGHT,DARK,LIGHT,LIGHT,LIGHT,LIGHT]
+        rev_finder = list(reversed(finder_pat))
+        for row in m:
+            for i in range(n - 10):
+                if row[i:i+11] == finder_pat or row[i:i+11] == rev_finder:
+                    score += 40
+        # Rule 4: proportion of dark modules
+        dark = sum(1 for row in m for v in row if v)
+        pct = dark * 100 // (n * n)
+        score += min(abs(pct - 50) // 5, abs(pct + 5 - 50) // 5) * 10
+        return score
+
+    best_mask = min(range(8), key=lambda mid: penalty(apply_mask_and_format(mid)))
+    return apply_mask_and_format(best_mask)
+
+
+def get_qr_png() -> bytes:
+    """Return a PNG-encoded QR code of Mum's canonical identity string.
+
+    Encodes the identity string (43 ASCII bytes for a 32-byte Ed25519 key) as
+    a version-4 QR code (33×33 modules) with M error correction.  The encoder
+    supports payloads up to 180 bytes (version 9); payloads beyond that raise
+    ValueError from _make_qr_matrix.
+    """
+    _load_or_generate()
+    matrix = _make_qr_matrix(_identity_string)
     return _matrix_to_png(matrix, box_size=10, border=4)
 
 
