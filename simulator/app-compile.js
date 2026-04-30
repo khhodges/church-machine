@@ -988,7 +988,14 @@ function compileCLOOMC() {
         }
     }
 
-    let html = `<div class="cmp-file-hdr">; CLOOMC++ [${_ec(lang)}] compiled \u201c${_ec(result.abstractionName)}\u201d${_ec(_compileSrcHint)} \u2014 ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}</div>`;
+    // Store early so the Load button works even before innerHTML is committed.
+    window._lastCLOOMCResult = result;
+
+    // "Load into Sim" button sits at the TOP so it is immediately visible
+    // regardless of how many methods the listing contains (con.scrollTop = 0
+    // would otherwise hide a bottom-placed button under the fold).
+    let html = `<div class="cmp-load-toolbar"><button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load this compiled lump into the simulator so you can Step or Walk through every instruction">Load into Sim \u25b6</button></div>`
+        + `<div class="cmp-file-hdr">; CLOOMC++ [${_ec(lang)}] compiled \u201c${_ec(result.abstractionName)}\u201d${_ec(_compileSrcHint)} \u2014 ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}</div>`;
 
     for (const m of result.methods) {
         const visBadge = m.visibility === 'private' ? '<span class="cmp-priv">private</span> ' : '';
@@ -1011,12 +1018,6 @@ function compileCLOOMC() {
             + `<pre class="cmp-body">${bodyTxt}</pre>`
             + `</details>`;
     }
-
-    // Store for loadCLOOMCIntoSim() so the user can step individual instructions
-    // without re-running the compile.
-    window._lastCLOOMCResult = result;
-
-    html += `<div class="cmp-footer"><button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load this compiled lump into the simulator so you can Step or Walk through every instruction">Load into Sim \u25b6</button></div>`;
 
     if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
     showNextSteps('compiled');
