@@ -20,3 +20,6 @@ build/*.vcd
 !ctmm_amaranth/sim_output.vcd
 !build/church_pico_ice_test.vcd
 !build/church_change_sto_test.vcd
+
+# APScheduler runtime database (generated at server startup)
+server/scheduler.db
