@@ -141,12 +141,15 @@ function fail(msg) { ERRORS.push(msg); }
         return;
     }
 
-    // After boot, CR6.word0 is an E-perm GT (type=1 Inform) pointing to
-    // bootEntrySlot.  Flip the F-bit (bit 30) in that NS entry's word1.
-    // The CRC seal covers only (word0_location, limit17) — bit 30 is
-    // outside that range — so the seal stays valid, mLoad passes, and
-    // only the explicit F-bit check at simulator.js ~line 2372 fires.
+    // After a full boot with cc=0 (no c-list), NUC_CLIST sets CR6 to all
+    // zeros.  Set CR6.word0 to a valid E-perm Inform GT for bootEntrySlot
+    // so that CALL CR6 reaches the F-bit check instead of faulting NULL_CAP.
     const slotIdx = sim.bootEntrySlot;
+    {
+        const nsBase_ = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
+        const gt_seq_ = (sim.memory[nsBase_ + 2] >>> 25) & 0x7F;
+        sim.cr[6].word0 = sim.createGT(gt_seq_, slotIdx, { E: 1 }, 1);
+    }
     const memBase = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
     sim.memory[memBase + 1] = (sim.memory[memBase + 1] | (1 << 30)) >>> 0;
 

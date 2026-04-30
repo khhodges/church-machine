@@ -45,6 +45,31 @@ function bootSim() {
     return sim;
 }
 
+// ─── Helper: initialise CR6 to a valid c-list capability ─────────────────────
+//
+// After a full boot with cc=0 (no c-list in the default boot entry), the
+// NUC_CLIST step sets CR6 to all-zeros.  ELOADCALL [CR6 + n] then faults with
+// NULL_CAP before reaching the Mode 2 path under test.
+//
+// This helper points CR6 at a 2-slot scratch region starting at address 500
+// (safely between the code buffer at ~384 and the NS table at 64512).  The
+// region is zeroed by default and can be populated by the test before the
+// ELOADCALL instruction fires.
+
+function setupCR6(sim) {
+    const slotIdx = sim.bootEntrySlot;
+    const nsBase  = sim.NS_TABLE_BASE + slotIdx * sim.NS_ENTRY_WORDS;
+    const gt_seq  = (sim.memory[nsBase + 2] >>> 25) & 0x7F;
+    const eGT     = sim.createGT(gt_seq, slotIdx, { E: 1 }, 1);
+    sim.cr[6] = {
+        word0: eGT,
+        word1: 500,
+        word2: sim.packNSWord1(0, 0, 0, 0, 0, 1, 2),
+        word3: 0,
+        m:     0,
+    };
+}
+
 // ─── Test 1: ELOADCALL on Outform GT fires Mode 2 loader ─────────────────────
 //
 // Writes an Outform GT (type=2) for NS[16] into c-list offset 1 of CR6,
@@ -63,6 +88,8 @@ function bootSim() {
         fail('SlideRule (index=16) not found in BOOT_UPLOADS');
         return;
     }
+
+    setupCR6(sim);
 
     // Register slot 16 as cold; initLazyManifest writes gtType=2 into NS word1.
     sim.initLazyManifest({
@@ -172,6 +199,8 @@ function bootSim() {
         return;
     }
 
+    setupCR6(sim);
+
     // Register as warm so NS entry stays Inform (gtType=1).
     sim.initLazyManifest({
         16: {
@@ -238,6 +267,8 @@ function bootSim() {
         fail('SlideRule (index=16) not found in BOOT_UPLOADS');
         return;
     }
+
+    setupCR6(sim);
 
     sim.initLazyManifest({
         16: {
