@@ -4351,6 +4351,27 @@ def mum_connect():
     })
 
 
+@app.route("/mum/greet", methods=["POST"])
+def mum_greet():
+    """Tunnel CALL bridge dispatch — invoked when a GTKN-tagged packet arrives
+    from the Tunnel and resolves to Mum's GT.
+
+    The Observer IDE bridge calls this endpoint after it receives a GTKN packet
+    from the Ti60/simulator and verifies the GT.  This handler runs Greet() and
+    returns the greeting response word back to the bridge, which writes it to
+    the Tunnel RX path.
+
+    POST body (optional): { "gt": <int>, "tag": "GTKN" }
+    Returns: { "response_word": 0x48454C4C, "response_hex": "0x48454C4C", "greeting": "HELL" }
+    """
+    GREETING_WORD = 0x48454C4C
+    return jsonify({
+        "response_word": GREETING_WORD,
+        "response_hex": f"0x{GREETING_WORD:08X}",
+        "greeting": "HELL",
+    })
+
+
 if __name__ == "__main__":
     _free_port(5000)
     logging.info("Starting Church Machine server on port 5000")
