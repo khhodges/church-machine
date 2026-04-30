@@ -1443,6 +1443,7 @@ function loadDeviceList() {
                 grid.innerHTML = '<div class="dev-empty">No devices registered. Connect a board via the local bridge to see it here.</div>';
                 return;
             }
+            _devLastSeenMap = {};
             grid.innerHTML = '';
             const _bootReasonNames = {0: 'Cold', 1: 'Warm', 2: 'Fault'};
             const _faultNames = {
@@ -1455,6 +1456,7 @@ function loadDeviceList() {
             };
             data.devices.forEach(dev => {
                 const isOnline = dev.status === 'online';
+                if (dev.last_seen) _devLastSeenMap[dev.id] = dev.last_seen;
                 const profileClass = dev.profile === 'IoT' ? 'dev-badge-iot' : 'dev-badge-full';
                 const petName = (dev.label || '').trim() || dev.board_name;
                 const statusChip = isOnline
@@ -1552,16 +1554,34 @@ function _tunnelBadgeHtml(ts, id) {
 }
 
 var _deviceTunnelTimer = null;
+var _deviceRelTimeTimer = null;
+var _devLastSeenMap = {};
 
 function startDeviceTunnelPolling() {
     stopDeviceTunnelPolling();
     _deviceTunnelTimer = setInterval(refreshTunnelStatuses, 12000);
+    _refreshOfflineChipTimes();
+    _deviceRelTimeTimer = setInterval(_refreshOfflineChipTimes, 30000);
 }
 
 function stopDeviceTunnelPolling() {
     if (_deviceTunnelTimer !== null) {
         clearInterval(_deviceTunnelTimer);
         _deviceTunnelTimer = null;
+    }
+    if (_deviceRelTimeTimer !== null) {
+        clearInterval(_deviceRelTimeTimer);
+        _deviceRelTimeTimer = null;
+    }
+}
+
+function _refreshOfflineChipTimes() {
+    for (var id in _devLastSeenMap) {
+        var chipEl = document.getElementById('devStatusChip_' + id);
+        if (!chipEl || chipEl.className.indexOf('chip-offline') === -1) continue;
+        var lastSeen = _devLastSeenMap[id];
+        if (!lastSeen) continue;
+        chipEl.textContent = 'Offline \u00B7 ' + _devRelativeTime(lastSeen);
     }
 }
 
@@ -1573,6 +1593,7 @@ function refreshTunnelStatuses() {
         .then(function(data) {
             if (!data.ok || !data.devices) return;
             data.devices.forEach(function(dev) {
+                if (dev.last_seen) _devLastSeenMap[dev.id] = dev.last_seen;
                 var ts = dev.tunnel_status || 'pending';
                 ['devTunnelRow_', 'devTunnelDetail_'].forEach(function(prefix) {
                     var el = document.getElementById(prefix + dev.id);
