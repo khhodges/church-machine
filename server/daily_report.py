@@ -28,7 +28,7 @@ _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _TASKS_DIR = os.path.join(_BASE_DIR, ".local", "tasks")
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 
-REPORT_TO = "sipanticinc@gmail.com"
+REPORT_TO = "kenneth@hamer-hodges.us"
 BILLING_URL = "https://replit.com/account#billing"
 COST_PER_TASK_RUN_USD = 0.50
 
