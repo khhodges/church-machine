@@ -1189,13 +1189,22 @@ class CLOOMCCompiler {
             const rawEntry = convEntry[methodName];
             const methodSelector = typeof rawEntry === 'object' ? (rawEntry.index || 0) : rawEntry;
 
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `LOAD CR0, [CR6 + ${clistOffset}] (${callMatch[2]})` });
-            code.push(this.encode(this.opcodes.LOAD, 14, 0, 6, clistOffset));
-            // Method index encoding: imm15 stores (methodSelector + 1), where methodSelector is the
-            // 0-based index from methodConventions. imm15=0 is reserved for the fast-path entry (no table).
-            // Hardware reads imm15 directly; index 1 → table[1] → Create, etc. (see dispatch-styles.md §3).
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `CALL CR0, imm=${methodSelector + 1} -> ${callMatch[2]}.${methodName}` });
-            code.push(this.encode(this.opcodes.CALL, 14, 0, 0, methodSelector + 1));
+            // Fused ELOADCALL: replaces LOAD CR0 + CALL CR0 with a single instruction.
+            // imm15[14:8] = method index (1-based; 0 = fast-path / no table; valid range 1–127).
+            // imm15[7:0]  = c-list row (clistOffset; valid range 0–255).
+            // methodSelector is the 0-based index from methodConventions; +1 converts to 1-based.
+            const eloadcallMethodIdx = methodSelector + 1;
+            if (methodSelector < 0 || methodSelector > 126) {
+                errors.push({ line: stmt.lineNum, message: `Method index ${methodSelector} for '${callMatch[2]}.${methodName}' is out of range (0–126 allowed for ELOADCALL).` });
+                return;
+            }
+            if (clistOffset < 0 || clistOffset > 255) {
+                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callMatch[2]}' is out of range (0–255 allowed for ELOADCALL).` });
+                return;
+            }
+            const eloadcallImm = (eloadcallMethodIdx << 8) | clistOffset;
+            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${callMatch[2]}.${methodName}` });
+            code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
 
             if (resultVar) {
                 const dr = this._allocLocal(resultVar, locals, errors, stmt.lineNum);
