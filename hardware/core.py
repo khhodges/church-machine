@@ -1079,11 +1079,12 @@ class ChurchCore(Elaboratable):
         ]
 
         # ── SHL / SHR ────────────────────────────────────────────────────────
-        # Logical shift on data registers.
-        # DR[dst] = DR[src] << imm[4:0]   (SHL — shift left)
-        # DR[dst] = DR[src] >> imm[4:0]   (SHR — shift right, zero-fill)
-        # Flags: N = result[31], Z = (result==0), C = 0, V = 0.
-        # Shift amount: imm[4:0] (0-31).
+        # Shift on data registers.
+        # DR[dst] = DR[src] << imm[4:0]              (SHL — shift left)
+        # DR[dst] = DR[src] >> imm[4:0]  LSR          (SHR imm[5]=0 — logical shift right, zero-fill)
+        # DR[dst] = DR[src] >>> imm[4:0] ASR          (SHR imm[5]=1 — arithmetic shift right, sign-extend)
+        # Flags: N = result[31], Z = (result==0), C = last bit shifted out, V = 0.
+        # Shift amount: imm[4:0] (0-31).  SHR mode:   imm[5]=0 LSR, imm[5]=1 ASR.
 
         m.d.comb += [
             shl_start_sig.eq(cond_exec_enable & is_shl_op & ~any_unit_busy),
@@ -1097,9 +1098,34 @@ class ChurchCore(Elaboratable):
         shift_amt = Signal(5)
         m.d.comb += shift_amt.eq(u_decoder.immediate[0:5])
 
+        # SHL result (logical left shift — always zero-fills from the right)
+        m.d.comb += shl_result.eq(u_regs.dr_rd_data1 << shift_amt)
+
+        # SHR: choose between LSR (zero-fill) and ASR (sign-extend) based on imm[5]
+        asr_mode = Signal()
+        m.d.comb += asr_mode.eq(u_decoder.immediate[5])
+
+        # Sign-extend source to 64 bits for arithmetic shift right
+        shr_src_sx = Signal(64)
+        m.d.comb += shr_src_sx.eq(Cat(u_regs.dr_rd_data1, Repl(u_regs.dr_rd_data1[31], 32)))
+        lsr_result = Signal(32)
+        asr_result = Signal(32)
         m.d.comb += [
-            shl_result.eq(u_regs.dr_rd_data1 << shift_amt),
-            shr_result.eq(u_regs.dr_rd_data1 >> shift_amt),
+            lsr_result.eq(u_regs.dr_rd_data1 >> shift_amt),
+            asr_result.eq((shr_src_sx >> shift_amt)[:32]),
+            shr_result.eq(Mux(asr_mode, asr_result, lsr_result)),
+        ]
+
+        # C flag = last bit shifted out, gated on shift_amt > 0
+        # SHR: last bit out = source[shift_amt - 1]  → (source >> (shift_amt-1))[0]
+        # SHL: last bit out = source[32 - shift_amt] → (source >> (32-shift_amt))[0]
+        shr_c_bit = Signal()
+        shl_c_bit = Signal()
+        m.d.comb += [
+            shr_c_bit.eq(Mux(shift_amt == 0, 0,
+                             (u_regs.dr_rd_data1 >> (shift_amt - 1))[0])),
+            shl_c_bit.eq(Mux(shift_amt == 0, 0,
+                             (u_regs.dr_rd_data1 >> (32 - shift_amt))[0])),
         ]
 
         shl_flags_view = View(COND_FLAGS_LAYOUT, shl_flags_sig)
@@ -1107,11 +1133,11 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             shl_flags_view.N.eq(shl_result[31]),
             shl_flags_view.Z.eq(shl_result == 0),
-            shl_flags_view.C.eq(0),
+            shl_flags_view.C.eq(shl_c_bit),
             shl_flags_view.V.eq(0),
             shr_flags_view.N.eq(shr_result[31]),
             shr_flags_view.Z.eq(shr_result == 0),
-            shr_flags_view.C.eq(0),
+            shr_flags_view.C.eq(shr_c_bit),
             shr_flags_view.V.eq(0),
         ]
 

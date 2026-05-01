@@ -144,4 +144,17 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 - **Status**: Fully implemented — hardware + simulator.
 
 ---
+
+## D-12: SHR/SHL Shift Flags — CLOSED (Task #857)
+
+- **Previous hardware state**: SHR was always LSR (zero-fill only — no ASR mode). C flag was hardwired 0 for both SHL and SHR.
+- **Simulator reference**: `_execShr` selects ASR via `imm[5]=1` (sign-extends result). `_execShl` and `_execShr` both set C = last bit shifted out (source[32-shamt] and source[shamt-1] respectively), gated on shamt > 0.
+- **Fix applied (`hardware/core.py` lines 1084–1145)**:
+  - SHR result uses `Mux(asr_mode, asr_result, lsr_result)` where `asr_mode = imm[5]`. ASR is implemented by sign-extending the 32-bit source to 64 bits (`Cat(src, Repl(src[31], 32))`) then shifting right and taking the low 32 bits.
+  - `shr_flags_view.C` = `(source >> (shift_amt-1))[0]`, gated on `shift_amt != 0`.
+  - `shl_flags_view.C` = `(source >> (32-shift_amt))[0]`, gated on `shift_amt != 0`.
+  - Comment at line 1085 updated: "Flags: N = result[31], Z = (result==0), C = last bit shifted out, V = 0."
+- **Status**: CLOSED — hardware now matches simulator.
+
+---
 *Confidential — Kenneth Hamer-Hodges — May 2026*

@@ -190,8 +190,8 @@ Flag-writing summary across all 20 instructions:
 | IADD        | ✓ | ✓ | ✓ | ✓ | Addition flags |
 | ISUB        | ✓ | ✓ | ✓ | ✓ | Subtraction flags |
 | BRANCH      | — | — | — | — | Reads flags, never writes them |
-| SHL         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out; V always 0 |
-| SHR         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out; V always 0 |
+| SHL         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out (source[32-shamt], 0 if shamt=0); V always 0. Hardware confirmed (Task #857) |
+| SHR         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out (source[shamt-1], 0 if shamt=0); imm[5]=0→LSR, imm[5]=1→ASR (sign-extend). V always 0. Hardware confirmed (Task #857) |
 
 ---
 
