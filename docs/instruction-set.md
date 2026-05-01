@@ -116,7 +116,7 @@ Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds w
 
 DRs and non-masked CRs retain whatever values the callee left. Shared between Church and Turing domains.
 
-If the call stack is empty, RETURN triggers a reboot (warm restart) — not a halt.
+If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
 ### CHANGE (opcode 4)
 
