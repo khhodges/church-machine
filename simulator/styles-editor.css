@@ -548,6 +548,58 @@
     background: transparent;
 }
 
+.cmp-mtbl {
+    margin-bottom: 0.6rem;
+    border-left: 2px solid #1e293b;
+    padding-left: 0.4rem;
+}
+.cmp-mtbl[open] {
+    border-left-color: #334155;
+}
+.cmp-mtbl-hdr {
+    cursor: pointer;
+    user-select: none;
+    color: #94a3b8;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    list-style: none;
+    outline: none;
+    padding: 0.15rem 0;
+}
+.cmp-mtbl-hdr::-webkit-details-marker { display: none; }
+.cmp-mtbl-hdr::marker { display: none; }
+.cmp-mtbl-hdr:hover { color: #cbd5e1; }
+.cmp-mtbl-body {
+    margin: 0.1rem 0 0.2rem 1rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+.cmp-mtbl-word {
+    white-space: pre;
+}
+.cmp-mtbl-addr {
+    color: #6b7280;
+}
+.cmp-mtbl-hex {
+    color: #64748b;
+}
+.cmp-mtbl-label {
+    color: #4b5563;
+}
+.cmp-mtbl-idx {
+    color: #4b5563;
+}
+.cmp-mtbl-word--pub .cmp-mtbl-name {
+    color: var(--church-green);
+}
+.cmp-mtbl-word--priv .cmp-mtbl-name {
+    color: #9ca3af;
+}
+.cmp-mtbl-arrow {
+    color: #6b7280;
+}
+
 .next-steps-box {
     background: rgba(218,165,32,0.08);
     border: 1px solid rgba(218,165,32,0.25);

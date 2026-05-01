@@ -997,6 +997,50 @@ function compileCLOOMC() {
     let html = `<div class="cmp-load-toolbar"><button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load this compiled lump into the simulator so you can Step or Walk through every instruction">Load into Sim \u25b6</button></div>`
         + `<div class="cmp-file-hdr">; CLOOMC++ [${_ec(lang)}] compiled \u201c${_ec(result.abstractionName)}\u201d${_ec(_compileSrcHint)} \u2014 ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}</div>`;
 
+    // ── Method Table ──
+    // Layout: lump word 0 = header; words 1..N = method table; words N+1.. = bodies.
+    const _methodTableSize = result.methods.length;
+    let _bodyOffset = 0;
+    const _methodTableEntries = [];
+    for (const m of result.methods) {
+        _methodTableEntries.push(m.visibility === 'private' ? 0 : _methodTableSize + 1 + _bodyOffset);
+        _bodyOffset += (m.code || []).length;
+    }
+
+    let mtblHtml = `<div class="cmp-mtbl-word"><span class="cmp-mtbl-addr">[word&nbsp;&nbsp;0]</span>`
+        + ` <span class="cmp-mtbl-hex">0x00000000</span>`
+        + ` <span class="cmp-mtbl-label">(lump header)</span></div>`;
+    for (let i = 0; i < result.methods.length; i++) {
+        const m = result.methods[i];
+        const entry = _methodTableEntries[i];
+        const isPrivate = m.visibility === 'private';
+        const entryHex = `0x${entry.toString(16).padStart(8, '0').toUpperCase()}`;
+        const idxStr = String(i + 1).padStart(2);
+        if (isPrivate) {
+            mtblHtml += `<div class="cmp-mtbl-word cmp-mtbl-word--priv">`
+                + `<span class="cmp-mtbl-addr">[word&nbsp;${_ec(idxStr)}]</span>`
+                + ` <span class="cmp-mtbl-hex">${_ec(entryHex)}</span>`
+                + ` <span class="cmp-mtbl-idx">[${i}]</span>`
+                + ` <span class="cmp-priv">private</span>`
+                + ` <span class="cmp-mtbl-name">${_ec(m.name)}</span>`
+                + `</div>`;
+        } else {
+            mtblHtml += `<div class="cmp-mtbl-word cmp-mtbl-word--pub">`
+                + `<span class="cmp-mtbl-addr">[word&nbsp;${_ec(idxStr)}]</span>`
+                + ` <span class="cmp-mtbl-hex">${_ec(entryHex)}</span>`
+                + ` <span class="cmp-mtbl-idx">[${i}]</span>`
+                + ` <span class="cmp-mtbl-name">${_ec(m.name)}</span>`
+                + ` <span class="cmp-mtbl-arrow">\u2192 lump word ${entry}</span>`
+                + `</div>`;
+        }
+    }
+    html += `<details class="cmp-mtbl" open>`
+        + `<summary class="cmp-mtbl-hdr">Method Table <span class="cmp-conv">\u2014 ${result.methods.length} entr${result.methods.length !== 1 ? 'ies' : 'y'}</span></summary>`
+        + `<div class="cmp-mtbl-body">${mtblHtml}</div>`
+        + `</details>`;
+
+    // ── Method Bodies ──
+    let _lumpBodyBase = _methodTableSize + 1; // lump-word address of first body instruction
     for (const m of result.methods) {
         const visBadge = m.visibility === 'private' ? '<span class="cmp-priv">private</span> ' : '';
         if (m.aliasOf) {
@@ -1011,12 +1055,15 @@ function compileCLOOMC() {
             const word = mCode[i];
             const mnem = _applyMethodDRNames(word === 0 ? 'NOP' : assembler.disassemble(word), m);
             const comment = comments[i];
-            bodyTxt += _ec(comment ? `${mnem.padEnd(40)}; ${comment}` : mnem) + '\n';
+            const lumpWord = _lumpBodyBase + i;
+            const addrLabel = `[word ${String(lumpWord).padStart(2)}] `;
+            bodyTxt += _ec(comment ? `${addrLabel}${mnem.padEnd(40)}; ${comment}` : `${addrLabel}${mnem}`) + '\n';
         }
         html += `<details class="cmp-method" open>`
             + `<summary class="cmp-method-hdr">\u25c6 method ${visBadge}${_ec(m.name)}<span class="cmp-conv"> \u2014 ${_ec(conv)}</span></summary>`
             + `<pre class="cmp-body">${bodyTxt}</pre>`
             + `</details>`;
+        _lumpBodyBase += mCode.length;
     }
 
     // appendOutput uses textContent += which destroys child elements — call it
