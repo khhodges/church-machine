@@ -15,6 +15,7 @@ class ChurchELoadCall(Elaboratable):
         self.cr_dst = Signal(4)
         self.index = Signal(16)
         self.mask = Signal(16)
+        self.call_imm = Signal(15)    # method-table slot (1-based; 0 = fast-path)
         self.busy = Signal()
         self.complete = Signal()
         self.fault = Signal()
@@ -52,12 +53,20 @@ class ChurchELoadCall(Elaboratable):
         phase = Signal(2)
         loaded_cap = Signal(CAP_REG_LAYOUT)
         mask_latched = Signal(16)
+        call_imm_latched = Signal(15)
         fault_latched = Signal()
         fault_type_latched = Signal(4)
         sub_start = Signal()
         sub_start_reg = Signal()
         sub_done_latched = Signal()
         sub_fault_latched = Signal()
+
+        cr14_latched = Signal(CAP_REG_LAYOUT)
+        cr14_lat_view = View(CAP_REG_LAYOUT, cr14_latched)
+        ns_base = Signal(32)
+        method_entry_reg = Signal(32)
+        method_entry_reading = Signal()
+        method_entry_addr_sig = Signal(32)
 
         local_cr_rd_en = Signal()
         local_cr_rd_addr = Signal(4)
@@ -110,8 +119,9 @@ class ChurchELoadCall(Elaboratable):
             self.cr_wr_addr.eq(u_mload.cr_wr_addr),
             self.cr_wr_data.eq(u_mload.cr_wr_data),
             self.cr_wr_en.eq(u_mload.cr_wr_en),
-            self.mem_addr.eq(u_mload.mem_addr),
-            self.mem_rd_en.eq(u_mload.mem_rd_en),
+            # Mux: method-entry fetch overrides mload's memory bus after CALL_P2 completes.
+            self.mem_addr.eq(Mux(method_entry_reading, method_entry_addr_sig, u_mload.mem_addr)),
+            self.mem_rd_en.eq(method_entry_reading | u_mload.mem_rd_en),
             self.thread_wr_en.eq(u_mload.thread_wr_en),
             self.thread_wr_idx.eq(u_mload.thread_wr_idx),
             self.thread_wr_data.eq(u_mload.thread_wr_data),
@@ -122,14 +132,24 @@ class ChurchELoadCall(Elaboratable):
         )
         m.d.comb += sub_start.eq(sub_start_reg)
 
+        # ns_base: lump base address extracted from CR14 (CR_CLOOMC) after loading.
+        # word1_location holds the lump's base byte address.
+        m.d.comb += ns_base.eq(cr14_lat_view.word1_location[:32])
+
         cr_preserve = mask_latched[5:11]
         dr1_5_preserve = mask_latched[0:5]
 
         dr_clear_computed = Signal(16)
         cr_clear_computed = Signal(16)
+        nia_computed = Signal(32)
         m.d.comb += [
             dr_clear_computed.eq(Cat(Const(0, 1), ~dr1_5_preserve, Const(0x3FF, 10))),
             cr_clear_computed.eq(Cat(~cr_preserve, Const(0, 10))),
+            # imm=0 fast-path: NIA = lump word 1 = ns_base+4.
+            # imm=k+1: NIA = ns_base + (method_entry_reg << 2).
+            nia_computed.eq(
+                Mux(call_imm_latched == 0, ns_base + 4, ns_base + (method_entry_reg << 2))
+            ),
         ]
 
         with m.FSM(name="eloadcall") as fsm:
@@ -140,7 +160,10 @@ class ChurchELoadCall(Elaboratable):
                     sub_done_latched.eq(0), sub_fault_latched.eq(0),
                 ]
                 with m.If(self.start):
-                    m.d.sync += mask_latched.eq(self.mask)
+                    m.d.sync += [
+                        mask_latched.eq(self.mask),
+                        call_imm_latched.eq(self.call_imm),
+                    ]
                     m.next = "CHECK_SRC"
 
             with m.State("CHECK_SRC"):
@@ -217,8 +240,45 @@ class ChurchELoadCall(Elaboratable):
                     sub_fault_latched=sub_fault_latched,
                     fault_latched=fault_latched,
                     fault_type_latched=fault_type_latched,
-                    done_next="COMPLETE",
+                    done_next="READ_CR14",
                 )
+
+            with m.State("READ_CR14"):
+                # Read CR14 (CR_CLOOMC) to get the current lump's base address (ns_base).
+                m.d.comb += [local_cr_rd_en.eq(1), local_cr_rd_addr.eq(CR_CLOOMC)]
+                m.d.sync += cr14_latched.eq(self.cr_rd_data)
+                m.next = "DISPATCH"
+
+            with m.State("DISPATCH"):
+                # cr14_latched is now valid; ns_base is derived from it combinatorially.
+                with m.If(call_imm_latched == 0):
+                    # Fast-path: NIA = ns_base + 4 (lump word 1 = first body word).
+                    m.next = "COMPLETE"
+                with m.Else():
+                    # Indexed dispatch: assert method-entry memory read this cycle.
+                    m.d.comb += [
+                        method_entry_reading.eq(1),
+                        method_entry_addr_sig.eq(ns_base + (call_imm_latched.as_unsigned() << 2)),
+                    ]
+                    m.next = "FETCH_METHOD_ENTRY"
+
+            with m.State("FETCH_METHOD_ENTRY"):
+                # Keep address asserted; mem_rd_valid is always 1, so entry is available now.
+                m.d.comb += [
+                    method_entry_reading.eq(1),
+                    method_entry_addr_sig.eq(ns_base + (call_imm_latched.as_unsigned() << 2)),
+                ]
+                with m.If(self.mem_rd_valid):
+                    with m.If(self.mem_rd_data == 0):
+                        # Entry 0 = private/absent: fault.
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.PERM_E),
+                        ]
+                        m.next = "FAULT"
+                    with m.Else():
+                        m.d.sync += method_entry_reg.eq(self.mem_rd_data)
+                        m.next = "COMPLETE"
 
             with m.State("COMPLETE"):
                 m.next = "IDLE"
@@ -232,7 +292,7 @@ class ChurchELoadCall(Elaboratable):
             self.fault.eq(fault_latched),
             self.fault_type.eq(fault_type_latched),
             self.nia_set.eq(fsm.ongoing("COMPLETE")),
-            self.nia_value.eq(0),
+            self.nia_value.eq(nia_computed),
             self.dr_clear_mask.eq(Mux(fsm.ongoing("COMPLETE"), dr_clear_computed, 0)),
             self.cr_clear_mask.eq(Mux(fsm.ongoing("COMPLETE"), cr_clear_computed, 0)),
         ]

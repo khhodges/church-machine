@@ -898,8 +898,8 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             u_call.call_start.eq(call_start_sig),
             u_call.cr_src.eq(cr_src),
-            u_call.index.eq(cap_index),
-            u_call.call_imm.eq(u_decoder.call_method_index),
+            u_call.index.eq(0),               # CALL uses call_imm for method-table dispatch; c-list index always 0
+            u_call.call_imm.eq(u_decoder.call_imm),
             u_call.mask.eq(u_decoder.call_mask),
             u_call.cr_rd_data.eq(u_regs.cr_rd_data),
             u_call.cr15_namespace.eq(u_regs.cr15_namespace),
@@ -1269,6 +1269,7 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.cr_dst.eq(cr_dst),
                 u_eloadcall.index.eq(u_decoder.eloadcall_clist_row),
                 u_eloadcall.mask.eq(u_decoder.call_mask),
+                u_eloadcall.call_imm.eq(u_decoder.eloadcall_method_index),  # method-table slot (1-based)
                 u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),

@@ -97,16 +97,16 @@ Permission meanings:
 | `W`    | Write (DWRITE into the backing data object) |
 | `X`    | Execute (CALL into the abstraction) |
 | `L`    | Load (mLoad — use GT as a capability handle) |
-| `S`    | Save (mSave — store GT into another c-list slot) |
+| `S`    | Save (mSave — store GT into another c-list row) |
 | `E`    | Enter (CALL — the standard callable permission) |
 
 Capability GTs are stored in c-list order at the top of the lump:
 
 ```
-c-list slot 0  →  capabilities[0] GT
-c-list slot 1  →  capabilities[1] GT
+c-list row 0  →  capabilities[0] GT
+c-list row 1  →  capabilities[1] GT
 ...
-c-list slot N  →  capabilities[N] GT
+c-list row N  →  capabilities[N] GT
 ```
 
 At runtime, CALL splits the lump and sets `CR6` to the c-list region (L-only). The abstraction accesses its capabilities by loading from `CR6` with an offset.

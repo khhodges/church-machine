@@ -49,8 +49,8 @@ The IDE has eight views, accessible via the toolbar:
 ; My first Church program
 ; Load the Salvation abstraction and call it
 
-LOAD CR0, CR6, #4     ; Load Salvation GT from c-list slot 4
-CALL CR0, 0xF         ; Direct mode: CR0 is the E-GT — enter Salvation
+LOAD CR0, CR6, #4     ; Load Salvation GT from c-list row 4
+CALL CR0              ; Enter Salvation (imm=0: fast-path, NIA = lump word 1)
 ; Salvation transitions to Navana (does not RETURN)
 ; Navana runs indefinitely as namespace controller
 ```
@@ -89,8 +89,8 @@ ARM-style condition flags displayed in the flags bar:
 #### Loading and Calling an Abstraction
 
 ```asm
-LOAD CR0, CR6, #4     ; Load from c-list slot 4
-CALL CR0, 0xF         ; Direct mode: CR0 is the E-GT — enter abstraction
+LOAD CR0, CR6, #4     ; Load from c-list row 4
+CALL CR0              ; Enter abstraction (imm=0: fast-path)
 ; ... abstraction executes and RETURNs here
 ```
 
@@ -99,7 +99,7 @@ CALL CR0, 0xF         ; Direct mode: CR0 is the E-GT — enter abstraction
 ```asm
 LOAD CR1, CR6, #5     ; Load Mint from c-list
 TPERM CR1, E          ; Restrict to Enter-only (remove all other perms)
-CALL CR1, 0xF         ; Direct mode: CR1 is the E-GT — can still enter
+CALL CR1              ; Enter Mint (imm=0: fast-path, permission check still applies)
 ```
 
 #### Integer Arithmetic (Turing Domain)

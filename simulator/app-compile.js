@@ -1045,11 +1045,16 @@ function loadCLOOMCIntoSim() {
     const methodTableSize = methods.length;
     const words = [];
     const labels = {};
-    let codeOffset = methodTableSize;
+    // Layout: words[0..N-1] = method table entries; words[N..] = method bodies.
+    // loadProgram writes words[k] at lump word k+1 (word 0 is lump header).
+    // Entry value = lump-word offset of body start (= codeOffset+1 for words[codeOffset]).
+    // imm = methodIndex+1 (1-based); dispatch reads lump word imm = words[imm-1] = entry.
+    // pc = entry - 1; fetchAddr = lump_base + 1 + pc = lump word entry = body start. ✓
+    let codeOffset = methodTableSize; // words[] index of next body (= pc value for BRANCH)
     const methodTableEntries = [];
     for (const m of methods) {
-        methodTableEntries.push(codeOffset);
-        labels[m.name] = codeOffset;
+        methodTableEntries.push(m.visibility === 'private' ? 0 : codeOffset + 1);
+        labels[m.name] = codeOffset;      // pc value: body at lump word codeOffset+1
         codeOffset += (m.code || []).length;
     }
     for (const entry of methodTableEntries) words.push(entry);

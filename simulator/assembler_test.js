@@ -38,12 +38,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const word   = result.words[1];
     const opcode = (word >>> 27) & 0x1F;
     const crDst  = (word >>> 19) & 0xF;
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T1 CALL CR11, Multiply assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
     assert('T1 opcode=2 (CALL)', opcode === 2, 'got ' + opcode);
     assert('T1 crDst=11', crDst === 11, 'got ' + crDst);
-    assert('T1 crSrc=0 (Multiply index)', crSrc === 0, 'got ' + crSrc);
+    assert('T1 imm=1 (Multiply index 0 → 1-based imm)', imm === 1, 'got ' + imm);
 }
 
 // T2: CALL CR11, Multiply produces a clear, targeted error when no binding exists.
@@ -58,17 +58,17 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         errors.length > 0 ? errors[0].message : '(no error)');
 }
 
-// T3: CALL CR11, 0 (numeric selector) is unaffected by the change.
+// T3: CALL CR11, 0 (numeric selector 0) encodes as imm=1 (1-based).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
     const result = a.assemble('LOAD CR11, SlideRule\nCALL CR11, 0');
     const errors = a.errors;
     const word   = result.words[1];
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T3 CALL CR11, 0 (numeric) assembles without errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
-    assert('T3 crSrc=0', crSrc === 0, 'got ' + crSrc);
+    assert('T3 imm=1 (numeric 0 → 1-based imm)', imm === 1, 'got ' + imm);
 }
 
 // T4: Bound abstraction with no registered conventions produces a clear error.
@@ -102,7 +102,7 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
 // ── CALL SlideRule, MethodName  (abstraction-name comma form) ───────────────
 
 // T9: CALL SlideRule, Multiply succeeds when SlideRule was bound via LOAD.
-//     crDst should resolve to 11 (SlideRule's CR), crSrc to 0 (Multiply index).
+//     crDst should resolve to 11 (SlideRule's CR), imm=1 (Multiply index 0 → 1-based).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -111,28 +111,28 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const word   = result.words[1];
     const opcode = (word >>> 27) & 0x1F;
     const crDst  = (word >>> 19) & 0xF;
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T9 CALL SlideRule, Multiply assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
     assert('T9 opcode=2 (CALL)', opcode === 2, 'got ' + opcode);
     assert('T9 crDst=11 (SlideRule → CR11)', crDst === 11, 'got ' + crDst);
-    assert('T9 crSrc=0 (Multiply index)', crSrc === 0, 'got ' + crSrc);
+    assert('T9 imm=1 (Multiply index 0 → 1-based imm)', imm === 1, 'got ' + imm);
 }
 
-// T10: CALL SlideRule, Divide uses index 1.
+// T10: CALL SlideRule, Divide uses index 1 → imm=2 (1-based).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
     const result = a.assemble('LOAD CR11, SlideRule\nCALL SlideRule, Divide');
     const errors = a.errors;
     const word   = result.words[1];
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T10 CALL SlideRule, Divide assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
-    assert('T10 crSrc=1 (Divide index)', crSrc === 1, 'got ' + crSrc);
+    assert('T10 imm=2 (Divide index 1 → 1-based imm)', imm === 2, 'got ' + imm);
 }
 
-// T11: CALL SlideRule, 0 (numeric selector with abstraction name) passes through unmodified.
+// T11: CALL SlideRule, 0 (numeric selector 0 with abstraction name) encodes as imm=1.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -140,16 +140,16 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const errors = a.errors;
     const word   = result.words[1];
     const crDst  = (word >>> 19) & 0xF;
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T11 CALL SlideRule, 0 (numeric) assembles without errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
     assert('T11 crDst=11', crDst === 11, 'got ' + crDst);
-    assert('T11 crSrc=0', crSrc === 0, 'got ' + crSrc);
+    assert('T11 imm=1 (numeric 0 → 1-based imm)', imm === 1, 'got ' + imm);
 }
 
 // ── CALL SlideRule.MethodName  (dot-notation form) ───────────────────────────
 
-// T12: CALL SlideRule.Multiply succeeds and encodes crDst=11, crSrc=0.
+// T12: CALL SlideRule.Multiply succeeds and encodes crDst=11, imm=1.
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
@@ -158,25 +158,25 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
     const word   = result.words[1];
     const opcode = (word >>> 27) & 0x1F;
     const crDst  = (word >>> 19) & 0xF;
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T12 CALL SlideRule.Multiply assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
     assert('T12 opcode=2 (CALL)', opcode === 2, 'got ' + opcode);
     assert('T12 crDst=11 (SlideRule → CR11)', crDst === 11, 'got ' + crDst);
-    assert('T12 crSrc=0 (Multiply index)', crSrc === 0, 'got ' + crSrc);
+    assert('T12 imm=1 (Multiply index 0 → 1-based imm)', imm === 1, 'got ' + imm);
 }
 
-// T13: CALL SlideRule.Sqrt encodes index 2.
+// T13: CALL SlideRule.Sqrt encodes index 2 → imm=3 (1-based).
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
     const result = a.assemble('LOAD CR11, SlideRule\nCALL SlideRule.Sqrt');
     const errors = a.errors;
     const word   = result.words[1];
-    const crSrc  = (word >>> 15) & 0xF;
+    const imm    = word & 0x7FFF;
     assert('T13 CALL SlideRule.Sqrt assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
-    assert('T13 crSrc=2 (Sqrt index)', crSrc === 2, 'got ' + crSrc);
+    assert('T13 imm=3 (Sqrt index 2 → 1-based imm)', imm === 3, 'got ' + imm);
 }
 
 // T14: CALL SlideRule.Multiply without a prior LOAD produces a clear error.
@@ -453,12 +453,12 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         g.errors.some(e => e.message.includes('CR12')),
         g.errors.map(e => e.message).join('; '));
 
-    // P12h: CALL crSrc CR13 (method selector via CR syntax) → error
+    // P12h: CALL crSrc CR13 (numeric method selector via CR syntax) — valid with imm15 encoding.
+    // Method selector is now in imm15 (1-based), not crSrc; no priv-zone restriction on values.
     const h = new ChurchAssembler();
     h.assemble('CALL CR0, CR13, 0');
-    assert('P12h CALL CR0 CR13: error (priv-zone method selector)', h.errors.length > 0, 'expected an error');
-    assert('P12h error mentions CR13', h.errors.some(e => e.message.includes('CR13')),
-        h.errors.map(e => e.message).join('; '));
+    assert('P12h CALL CR0 CR13: no error (numeric selector, no priv-zone restriction)',
+        h.errors.length === 0, h.errors.map(e => e.message).join('; '));
 
     // P12i: CHANGE CR0, CR15 → error on crSrc
     const i = new ChurchAssembler();

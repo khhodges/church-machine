@@ -92,7 +92,7 @@ No DRs and no other CRs are pushed. Callee inherits DR0–DR15, CR0–CR5, CR7�
 | 0 | lump_base + 4 (word 1 — single entry point, no method table) |
 | n > 0 | hardware reads `memory[lump_base + n×4]`; result is lump-base-relative word offset → NIA = lump_base + offset×4. Result = 0 → private method → FAULT. |
 
-PC=0 (lump header word) is always a FAULT — the header is never executable.
+**PC = 0 always FAULTs** — the lump header (word 0) is never a valid entry point.
 
 ### RETURN (opcode 3)
 
@@ -393,7 +393,7 @@ loop:
 
 ```asm
 LOAD CR0, CR6, #4    ; Load Salvation from c-list slot 4
-CALL CR0, 0xF        -- Direct mode: CR0 is the E-GT
+CALL CR0             -- Enter Salvation (imm=0: fast-path, NIA = lump word 1)
 ```
 
 Both `;` and `--` introduce comments.

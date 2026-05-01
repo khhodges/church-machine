@@ -1112,7 +1112,8 @@ class SystemAbstractions {
                 totalCodeWords += (m.code || []).length;
             }
             const methodTableSize = methods.length;
-            const codeSize = methodTableSize + totalCodeWords;
+            // +1 for lump header placeholder at word 0; method table entries at words 1..N.
+            const codeSize = methodTableSize + 1 + totalCodeWords;
 
             const neededSize = codeSize + clistCount;
             const allocSize = Math.max(32, nextPow2(neededSize));
@@ -1129,13 +1130,18 @@ class SystemAbstractions {
             const location = memResult.result.location;
             const limit = allocSize - 1;
 
+            // word 0: skip word (acts as lump-header placeholder for the +1 in fetch formula)
+            sim.memory[location] = 0;
+            // words 1..N: method table entries (lump-word offset of body; 0 = private)
+            // Entry = N+1+bodySum_k: word 0 is placeholder, words 1..N are table, bodies at N+1..
             let offset = 0;
             for (let mi = 0; mi < methods.length; mi++) {
-                sim.memory[location + mi] = totalCodeWords > 0 ? (methods.length + offset) : 0;
+                const isPrivate = methods[mi].visibility === 'private';
+                sim.memory[location + 1 + mi] = (totalCodeWords > 0 && !isPrivate) ? (methods.length + 1 + offset) : 0;
                 offset += (methods[mi].code || []).length;
             }
-
-            offset = methods.length;
+            // words N+1..: method bodies (offset = N+1 skips placeholder + N table entries)
+            offset = methods.length + 1;
             for (const m of methods) {
                 for (const word of (m.code || [])) {
                     sim.memory[location + offset] = word >>> 0;

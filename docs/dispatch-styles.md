@@ -141,7 +141,7 @@ This is the most familiar model — the capability framework wraps it, but the i
 
 ### Hardware Method-Table Dispatch (Style 3 Extension)
 
-Style 3 abstractions written in CLOOMC use a hardware method table baked into the lump by the compiler. The caller encodes the method index directly in the `CALL` instruction's imm15 field — no runtime ISUB/IADD/MCMP loop executes.
+CLOOMC abstractions written with `public` and `private` method qualifiers use a hardware method table baked into the lump by the compiler. The caller encodes the method index directly in the `CALL` instruction's imm15 field — no runtime ISUB/IADD/MCMP loop executes.
 
 ```cloomc
 abstraction Mint {
@@ -180,7 +180,9 @@ The CALL instruction encodes the method index in bits[14:0]:
 
 **No Dispatch method**: the ISUB/IADD/MCMP/BRANCHEQ linear scan is eliminated entirely. No code runs between the CALL and the target method body.
 
-**Backward compatibility**: abstractions that use no visibility qualifiers and emit `CALL CRsrc` (imm15=0) continue to work — NIA = lump_base + 4 (single entry point at word 1).
+**No NS table amplification**: the method table lives inside the existing lump boundary. No new GT or NS entry is created per method.
+
+**Backward compatibility**: abstractions that use no visibility qualifiers and emit `CALL CRsrc` (imm15=0) continue to work — NIA = lump_base + 4 (single entry point at word 1). ELOADCALL encodes method index in imm15[14:8] and c-list row in imm15[7:0]; existing programs have bits[14:8] = 0 and are fully backward-compatible.
 
 For the full vocabulary table (slot/row/index), selector numbering rules, and a worked Mint example, see [method-access-control.md](method-access-control.md).
 

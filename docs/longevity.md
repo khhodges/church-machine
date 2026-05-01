@@ -133,7 +133,7 @@ The permissions are not copied from the source GT. They are not read from the NS
 - DR4–DR11: local variables (callee-saved by the compiler)
 - DR12–DR15: temporaries (compiler scratch, caller-saved)
 
-**C-list mapping** (R005 fix): capability names in the source map to c-list offsets. When the compiler sees `call(Memory, Allocate, size)`, it looks up "Memory" in the capability list to find its c-list slot number, then emits `LOAD CR0, CR6, <slot>` followed by `CALL CR0, 0xF` (direct mode).
+**C-list mapping** (R005 fix): capability names in the source map to c-list offsets. When the compiler sees `call(Memory, Allocate, size)`, it looks up "Memory" in the capability list to find its c-list row number, then emits `LOAD CR0, CR6, <row>` followed by `CALL CR0, 0xF` (direct mode).
 
 **Output format:** An array of methods, each containing an array of 32-bit code words, plus a manifest with abstraction name, capabilities, and grants.
 
@@ -272,7 +272,7 @@ Mint still forges the GT (that is Mint's unique role — only Mint can create ne
 - **Unified Compile button:** `smartCompile()` routes to the assembler or [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html)++ compiler based on the selector
 - **Draft button:** `compileDraft()` shows a full compilation preview:
   - Methods list with instruction counts
-  - Capabilities list with c-list slot assignments
+  - Capabilities list with c-list row assignments
   - Lump layout diagram: Method Table (words) | Code (words) | FREESPACE (words) | C-List (slots)
   - clistCount, code size, lump size (power-of-2), freespace
   - CALL split preview: CR14 base/limit and CR6 base/limit

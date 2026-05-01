@@ -3226,7 +3226,7 @@ class ChurchSimulator {
         const desc = `CALL CR${d.crDst} -> ${label}${cr14Desc}`;
         this.output += desc + '\n';
         const prevPC = this.pc;
-        // Hardware method-table dispatch (D-10).
+        // Hardware method-table dispatch.
         // CALL imm15 = method index.  index=0 → NIA = lump_base + 1 (word 1, single entry point).
         // index>0 → read memory[lump_base + index] (lump-base-relative word offset); 0 = private → FAULT.
         const methodIndex = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
@@ -3237,7 +3237,7 @@ class ChurchSimulator {
             const lumpBaseWord = nsEntry.word0_location;  // word index of lump_base in memory[]
             const tableEntry = this.memory[lumpBaseWord + methodIndex] >>> 0;
             if (tableEntry === 0) {
-                this.fault('PERM', `CALL CR${d.crDst}: method index ${methodIndex} is private (table entry = 0)`);
+                this.fault('PRIVATE_METHOD', `CALL CR${d.crDst}: method index ${methodIndex} is private (table entry = 0)`);
                 return null;
             }
             this.pc = tableEntry;  // lump-base-relative word offset = new PC
@@ -3999,7 +3999,10 @@ class ChurchSimulator {
             srcLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
             ecClistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
         }
-        const ecAbsAddr = (srcLoc + d.imm) >>> 0;
+        // imm15[14:8] = method index (0–127); imm15[7:0] = c-list row (0–255).
+        const ecRow = d.imm & 0xFF;
+        const ecMethodIdx = (d.imm >>> 8) & 0x7F;
+        const ecAbsAddr = (srcLoc + ecRow) >>> 0;
         const ecClistRange = { base: srcLoc, upperBound: (srcLoc + ecClistSize - 1) >>> 0 };
         const loadCheck = this.mLoad(clistGT, d.crSrc === 6 ? null : 'L', d.crSrc, ecAbsAddr, ecClistRange);
         if (!loadCheck.ok) {
@@ -4007,9 +4010,9 @@ class ChurchSimulator {
             return null;
         }
 
-        let slotGT = this.memory[srcLoc + d.imm] || 0;
+        let slotGT = this.memory[srcLoc + ecRow] || 0;
         if (slotGT === 0) {
-            this.fault('NULL_CAP', `ELOADCALL: c-list offset ${d.imm} is empty`);
+            this.fault('NULL_CAP', `ELOADCALL: c-list row ${ecRow} is empty`);
             return null;
         }
         let slotParsed = this.parseGT(slotGT);
@@ -4029,7 +4032,7 @@ class ChurchSimulator {
         if (slotParsed.type === 2) {
             const manifest2 = this.lazyManifest[targetIdx];
             if (manifest2 && !manifest2.loaded) {
-                this.output += `[LOADER] ELOADCALL: c-list [CR${d.crSrc} + ${d.imm}] is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
+                this.output += `[LOADER] ELOADCALL: c-list [CR${d.crSrc} + row ${ecRow}] is Outform GT (NS[${targetIdx}]) — dispatching Loader (Mode 2)...\n`;
                 const loaded = this._dispatchLoaderLoad(targetIdx);
                 if (!loaded) {
                     this.fault('CODE_NOT_RESIDENT', `ELOADCALL: Outform lazy load failed for slot ${targetIdx}`);
@@ -4119,10 +4122,30 @@ class ChurchSimulator {
         }
 
         const label = this.nsLabels[targetIdx] || 'abstraction';
-        const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] -> ${label} (LOAD+TPERM+CALL)`;
+        const ecIdxSuffix = ecMethodIdx > 0 ? `, #${ecMethodIdx}` : '';
+        const desc = `ELOADCALL CR${d.crDst}, [CR${d.crSrc} + row ${ecRow}]${ecIdxSuffix} -> ${label} (LOAD+TPERM+CALL)`;
         this.output += desc + '\n';
-        this.pc++;
-        return { pc: this.pc - 1, instr: d, desc, pipeline: this._eloadcallPipeline(d, label) };
+        const prevPC_ec = this.pc;
+        if (cr14Check) {
+            // Hardware method-table dispatch: method index from imm15[14:8] (ecMethodIdx).
+            // ecMethodIdx=0: fast path — NIA = word 1 (pc=0).
+            // ecMethodIdx=k>0: read table entry at lump word k; pc = entry - 1.
+            // Entry value 0 = private method → FAULT.
+            if (ecMethodIdx === 0) {
+                this.pc = 0;
+            } else {
+                const ecMethodEntry = (this.memory[this.cr[14].word1 + ecMethodIdx] || 0) >>> 0;
+                if (ecMethodEntry === 0) {
+                    this.fault('PRIVATE_METHOD', `ELOADCALL CR${d.crDst}: method index ${ecMethodIdx} is private or unmapped (table entry = 0)`);
+                    return null;
+                }
+                this.pc = ecMethodEntry - 1;
+            }
+        } else {
+            this.fault('NO_CODE', `ELOADCALL CR${d.crDst}: target abstraction has no code capability`);
+            return null;
+        }
+        return { pc: prevPC_ec, instr: d, desc, pipeline: this._eloadcallPipeline(d, label) };
     }
 
     _execXloadlambda(d) {

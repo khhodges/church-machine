@@ -125,13 +125,16 @@
 //   When the assembler is constructed with a methodConventions map (e.g.
 //   METHOD_REGISTER_CONVENTIONS), the second operand of CALL may be a method
 //   name instead of a raw integer.  Two equivalent syntaxes are accepted:
-//     CALL SlideRule, Multiply       → CALL CR11, 0   (comma-separated form)
-//     CALL SlideRule.Multiply        → CALL CR11, 0   (dot-notation form)
-//     CALL SlideRule, Divide         → CALL CR11, 1
-//     CALL SlideRule.Sqrt            → CALL CR11, 2
+//     CALL SlideRule, Multiply       → imm=1  (Multiply index 0 → 1-based)
+//     CALL SlideRule.Multiply        → imm=1  (dot-notation form, identical)
+//     CALL SlideRule, Divide         → imm=2  (Divide index 1)
+//     CALL SlideRule.Sqrt            → imm=3  (Sqrt index 2)
 //   The abstraction name must have been previously bound via LOAD (Level 2).
-//   Numeric selectors still work alongside named selectors:
-//     CALL SlideRule, 0              → CALL CR11, 0  (identical encoding)
+//   Numeric selectors use 1-based encoding (selector+1 stored in imm15):
+//     CALL SlideRule, 0              → imm=1  (method 0, table slot 1)
+//     CALL CR11, 0                   → imm=1  (method 0, table slot 1)
+//     CALL CR11 (no selector)        → imm=0  (fast-path, NIA = lump word 1)
+//   Supported range: 0–16383 (imm15 slots 1–16384).
 //   If the method name is not found a clear error lists the known methods.
 //
 // POST-ASSEMBLY BRANCH BOUNDS CHECK
@@ -569,10 +572,10 @@ class ChurchAssembler {
                             const methodEntry = this.methodConventions[dotAbsName][dotMethodName];
                             if (methodEntry !== undefined) {
                                 const idx = methodEntry.index;
-                                if (idx >= 0 && idx <= 15) {
-                                    crSrc = idx;
+                                if (idx >= 0 && idx <= 16383) {
+                                    imm = idx + 1;  // 1-based: imm=0 reserved for fast-path
                                 } else {
-                                    this.errors.push({ line: lineNum, message: `Method "${dotMethodName}" of ${dotAbsName} has index ${idx} which is out of range — method selectors must be 0–15.` });
+                                    this.errors.push({ line: lineNum, message: `Method "${dotMethodName}" of ${dotAbsName} has index ${idx} which is out of range — method selectors must be 0–16383.` });
                                 }
                             } else {
                                 const known = Object.keys(this.methodConventions[dotAbsName]).join(', ');
@@ -610,10 +613,10 @@ class ChurchAssembler {
                             const methodEntry = this.methodConventions[absName][rawTok2];
                             if (methodEntry !== undefined) {
                                 const idx = methodEntry.index;
-                                if (idx >= 0 && idx <= 15) {
-                                    crSrc = idx;
+                                if (idx >= 0 && idx <= 16383) {
+                                    imm = idx + 1;  // 1-based: imm=0 reserved for fast-path
                                 } else {
-                                    this.errors.push({ line: lineNum, message: `Method "${rawTok2}" of ${absName} has index ${idx} which is out of range — method selectors must be 0–15.` });
+                                    this.errors.push({ line: lineNum, message: `Method "${rawTok2}" of ${absName} has index ${idx} which is out of range — method selectors must be 0–16383.` });
                                 }
                             } else {
                                 const known = Object.keys(this.methodConventions[absName]).join(', ');
@@ -621,8 +624,30 @@ class ChurchAssembler {
                             }
                         }
                     } else {
-                        crSrc = this._parseCRorBare(parts[2], lineNum);
-                        this._checkPrivCR(crSrc, 'CALL', lineNum);
+                        // Numeric method selector: encode as imm = value + 1 (1-based).
+                        // Accepts CRn (→ n), decimal integer, or 0x... hex. Range: 0–16383.
+                        const tok2 = (parts[2] || '').replace(/,/g, '').trim();
+                        const tok2u = tok2.toUpperCase();
+                        const crM2 = tok2u.match(/^CR(\d+)$/);
+                        const hexM2 = tok2u.match(/^0X([0-9A-F]+)$/);
+                        const decM2 = tok2.match(/^(\d+)$/);
+                        let numIdx = 0;
+                        if (crM2) {
+                            numIdx = parseInt(crM2[1]);
+                        } else if (hexM2) {
+                            numIdx = parseInt(hexM2[1], 16);
+                        } else if (decM2) {
+                            numIdx = parseInt(decM2[1]);
+                        } else if (this._crAliases[tok2] !== undefined) {
+                            numIdx = this._crAliases[tok2];
+                        } else {
+                            this.errors.push({ line: lineNum, message: `Expected a method selector (0–16383, CRn, or hex 0x...), but got "${tok2}".` });
+                        }
+                        if (numIdx < 0 || numIdx > 16383) {
+                            this.errors.push({ line: lineNum, message: `Method selector ${numIdx} is out of range — must be 0–16383.` });
+                            numIdx = 0;
+                        }
+                        imm = (numIdx + 1) & 0x7FFF;
                     }
                 }
                 break;
@@ -1105,10 +1130,13 @@ class ChurchAssembler {
             case 0: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
             // SAVE CRd, CRs[offset]  — save GT to c-list
             case 1: return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
-            // CALL CRd[, sel[, #extra]]  — invoke capability
+            // CALL CRd[, MethodName]  — invoke capability via method-table dispatch
             case 2: {
                 if (imm & 0x4000) return `${mnemonic}  CR${crDst}`;
-                const sel = crSrc;
+                // imm=0: fast-path (backward-compat, no table dispatch).
+                // imm>0: 1-based; method index = imm-1 (0-based) used for name resolution.
+                if (imm === 0) return `${mnemonic}  CR${crDst}`;
+                const sel = imm - 1;
                 // Try to resolve method name: invert nsLoaded (name→crIdx) to find
                 // what abstraction is bound to crDst, then look up the method name
                 // for the selector index in methodConventions.
@@ -1124,13 +1152,8 @@ class ChurchAssembler {
                         break;
                     }
                 }
-                if (resolvedMethod !== null) {
-                    return imm
-                        ? `${mnemonic}  CR${crDst}, ${resolvedMethod}, #${imm}`
-                        : `${mnemonic}  CR${crDst}, ${resolvedMethod}`;
-                }
-                if (imm) return `${mnemonic}  CR${crDst}, sel=${crSrc}, #${imm}`;
-                return crSrc ? `${mnemonic}  CR${crDst}, sel=${crSrc}` : `${mnemonic}  CR${crDst}`;
+                if (resolvedMethod !== null) return `${mnemonic}  CR${crDst}, ${resolvedMethod}`;
+                return `${mnemonic}  CR${crDst}, sel=${sel}`;
             }
             // RETURN [mask]  — unwind call frame, optional register scrub
             case 3: {

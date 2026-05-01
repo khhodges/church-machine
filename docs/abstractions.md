@@ -186,7 +186,7 @@ SlideRule (n-6=4, cw=525, cc=1,  typ=00):  0xFA08_3401
 Boot.Abstr(n-6=2, cw=0,  cc=46, typ=00):  0xF900_002E
 ```
 
-The IDE pre-populates every c-list slot with either an Inform GT (resident dependency) or an Outform GT (lazy-loaded dependency). Outform GT slots fire the Absent event on first LOAD, invoking the Locator to fetch the zip, derive `n` from `uncompressed_size`, allocate memory, inflate, and mint a Live NS entry.
+The IDE pre-populates every c-list row with either an Inform GT (resident dependency) or an Outform GT (lazy-loaded dependency). Outform GT rows fire the Absent event on first LOAD, invoking the Locator to fetch the zip, derive `n` from `uncompressed_size`, allocate memory, inflate, and mint a Live NS entry.
 
 ---
 
@@ -196,7 +196,7 @@ The IDE pre-populates every c-list slot with either an Inform GT (resident depen
 |-----------|-----|-----------------|------------------|--------------------|
 | Namespace | 10  | always 0 (no code) | Locator count  | `n = log₂(size/4)`; `n-6` in [26:23] |
 | Thread    | 10  | `sw` — stack words (IDE) | `heapWords` (IDE) | same |
-| Function  | 00  | `cw` — code word count (IDE) | c-list slots (IDE) | same |
+| Function  | 00  | `cw` — code word count (IDE) | c-list rows (IDE) | same |
 
 All three use `magic=0x1F`, power-of-2 lump sizes (minimum 64 words), and the same CRC-16/CCITT integrity check in the NS entry. The ZIP `uncompressed_size` field is the single authoritative source for lump size — Mint cross-checks the header word's `n-6` against the physical binary length.
 
@@ -513,7 +513,7 @@ Compiles assembly to binary, uploads to Tang Nano 20K via UART, verifies the upl
 
 Parent-approved external services. All internet access is GT-gated via L/S permissions.
 
-The c-list IS the parental approval. Parent holds S permission on the child's internet c-list slots and SAVEs GTs for approved resources. Child holds L permission — they can LOAD whatever GTs the parent has placed, but cannot add new ones. A NULL slot = denied access = FAULT on LOAD.
+The c-list IS the parental approval. Parent holds S permission on the child's internet c-list rows and SAVEs GTs for approved resources. Child holds L permission — they can LOAD whatever GTs the parent has placed, but cannot add new ones. A NULL row = denied access = FAULT on LOAD.
 
 Each approved external resource is an Outform+Far GT pointing to that resource via the Tunnel abstraction.
 

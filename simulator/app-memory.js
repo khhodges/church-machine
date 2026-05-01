@@ -3145,9 +3145,9 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 
 // Scan the code words at [codeBase .. codeBase+codeCount-1] and return
 // { direct, indirect, clobberWarnings } where:
-//   direct          — Set of c-list slot indices referenced by LOAD/SAVE/ELOADCALL/
+//   direct          — Set of c-list row indices referenced by LOAD/SAVE/ELOADCALL/
 //                     XLOADLAMBDA instructions whose crSrc field is 6 (CR6 = c-list root).
-//   indirect        — Set of c-list slot indices reached via a CR alias: a register
+//   indirect        — Set of c-list row indices reached via a CR alias: a register
 //                     that was loaded from CR6 (or transitively from another alias)
 //                     and has not since been clobbered by a LOAD from a non-alias source.
 //                     Chained aliases (CR2 ← CR1, CR1 ← CR6[n]) are also tracked.
@@ -3363,7 +3363,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
     return { direct, indirect, clobberWarnings };
 }
 
-// Zero a single c-list slot in simulator memory (marks the GT as null/empty).
+// Zero a single c-list row in simulator memory (marks the GT as null/empty).
 // Called by the "× zero" button in the C-List panel.
 function zeroLumpSlot(addr) {
     if (!sim || addr < 0 || addr >= sim.memory.length) return;
@@ -3625,7 +3625,7 @@ window.applyPOLA = async function(nsIdx) {
             return NaN;
         };
 
-        // NS symbol table for resolving 2-operand shorthand (name → old c-list slot)
+        // NS symbol table for resolving 2-operand shorthand (name → old c-list row)
         const _nsSyms = (typeof assembler !== 'undefined' && assembler && assembler.nsSymbols)
             ? assembler.nsSymbols
             : ((typeof ChurchAssembler !== 'undefined' && ChurchAssembler._sharedNsSymbols) || {});
@@ -3696,7 +3696,7 @@ window.applyPOLA = async function(nsIdx) {
 
             } else if (parts.length === 3) {
                 // ── 2-operand NS shorthand: MNEM CRd, Name ──────────────────
-                // The assembler resolves Name via nsSymbols[Name] to a c-list slot.
+                // The assembler resolves Name via nsSymbols[Name] to a c-list row.
                 // After POLA that slot has moved; expand to explicit 3-operand form.
                 const nameToken = parts[2];
                 const oldSlot   = _nsSyms[nameToken];

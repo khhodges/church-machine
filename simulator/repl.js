@@ -620,7 +620,8 @@ class ChurchREPL {
         let totalCodeWords = 0;
         for (const m of result.methods) totalCodeWords += (m.code || []).length;
         const methodTableSize = result.methods.length;
-        const codeSize = methodTableSize + totalCodeWords;
+        // +1 for lump header placeholder at word 0; method table at words 1..N.
+        const codeSize = methodTableSize + 1 + totalCodeWords;
         const neededSize = codeSize + clistCount;
         const allocSize = Math.max(32, Math.pow(2, Math.ceil(Math.log2(Math.max(neededSize, 1)))));
 

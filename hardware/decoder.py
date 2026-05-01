@@ -55,6 +55,9 @@ class ChurchDecoder(Elaboratable):
         self.tperm_preset = Signal(4)
         self.cap_index = Signal(15)
         self.call_mask = Signal(15)
+        self.call_imm = Signal(15)           # CALL method index, imm15 field (0 = fast-path, k>0 = table slot k)
+        self.eloadcall_row = Signal(8)       # ELOADCALL c-list row  (imm15[7:0])
+        self.eloadcall_method_index = Signal(7)  # ELOADCALL method index (imm15[14:8])
         self.switch_target = Signal(4)
 
         # CALL: full imm15 = method index (0 = single entry point; n>0 = method table lookup)
@@ -85,7 +88,10 @@ class ChurchDecoder(Elaboratable):
         m.d.comb += [
             self.cap_index.eq(imm_field),
             self.tperm_preset.eq(imm_field[:4]),
-            self.call_mask.eq(imm_field),
+            self.call_mask.eq(0),            # Scrub mask: fixed 0; imm15 now carries method index, not mask
+            self.call_imm.eq(imm_field),     # CALL method index from imm15 bits[14:0]
+            self.eloadcall_row.eq(imm_field[:8]),
+            self.eloadcall_method_index.eq(imm_field[8:15]),
             self.switch_target.eq(imm_field[:4]),
             # CALL method index: full imm15 (method index 0 = single entry, n>0 = table lookup)
             self.call_method_index.eq(imm_field),

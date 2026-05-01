@@ -150,11 +150,16 @@ function assembleAndLoad() {
         const methodTableSize = methods.length;
         const words = [];
         const labels = {};
-        let codeOffset = methodTableSize;
+        // Layout: words[0..N-1] = method table entries; words[N..] = method bodies.
+        // loadProgram writes words[k] at lump word k+1 (word 0 is lump header).
+        // Entry value = lump-word offset of body start (= codeOffset+1 for words[codeOffset]).
+        // imm = methodIndex+1 (1-based); dispatch reads lump word imm = words[imm-1] = entry.
+        // pc = entry - 1; fetchAddr = lump_base + 1 + pc = lump word entry = body start. ✓
+        let codeOffset = methodTableSize; // words[] index of next body (= pc value for BRANCH)
         const methodTableEntries = [];
         for (const m of methods) {
-            methodTableEntries.push(codeOffset);
-            labels[m.name] = codeOffset;
+            methodTableEntries.push(m.visibility === 'private' ? 0 : codeOffset + 1);
+            labels[m.name] = codeOffset;      // pc value: body at lump word codeOffset+1
             codeOffset += (m.code || []).length;
         }
         for (const entry of methodTableEntries) words.push(entry);
@@ -636,8 +641,8 @@ function hideRunPopover() {
 function _applyPendingSimLoad() {
     if (!_pendingSimLoad || !lastAssembledWords || !lastAssembledWords.length) return;
     sim.loadProgram(lastAssembledWords, 0);
-    // Skip past the method table so PC starts at the first real instruction,
-    // matching the behaviour of _autoLoadDefaultProgram() on boot/reset.
+    // Skip past the lump header (word 0) and method table so PC starts at the
+    // first real instruction, matching _autoLoadDefaultProgram() on boot/reset.
     if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
     if (pipelineViz) pipelineViz.setNIA(null);
     const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
@@ -959,6 +964,7 @@ function _autoLoadDefaultProgram() {
         if (lastAssembledWords && lastAssembledWords.length > 0) {
             sim.loadProgram(lastAssembledWords, 0);
             if (lastMethodTableSize > 0) {
+                // Skip method table so PC lands on the first instruction (body at word N).
                 sim.pc = lastMethodTableSize;
             }
             // Restore the namespace label for Boot.Abstr (sim.reset() clears

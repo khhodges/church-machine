@@ -1,6 +1,6 @@
 # Method Access Control in CLOOMC
 
-**v1.1 — 2026-05-01**
+**v2.0 — 2026-05-01**
 **CONFIDENTIAL**
 
 **Status**: Architectural specification. April 27, 2026. Revised May 1, 2026 (hardware method-table dispatch).
@@ -24,7 +24,7 @@ private method Bar(args) { ... }
 
 Omitting the qualifier defaults to `public` — existing source files without qualifiers compile identically to before.
 
-These qualifiers have a specific, structural meaning tied to the lump seal and the hardware method table. This document explains what they mean, how they are enforced, and why the design is sound.
+These qualifiers have a specific, structural meaning tied to the lump seal and the hardware method-table dispatch built into the CALL instruction. This document explains what they mean, how they are enforced, and why the design is sound.
 
 ---
 
@@ -36,7 +36,7 @@ A public method is externally callable. The compiler writes its lump-base-relati
 
 ### `private`
 
-A private method is an internal implementation detail. It is compiled into the lump binary at its assigned offset and is fully reachable from within the abstraction via a direct `BRANCH` instruction. However, the compiler writes `0` into the method table at the private method's index position. Because the hardware faults on a zero table entry, and the lump seal prevents modification of the lump from outside, private methods are **structurally unreachable** from external callers — not merely hidden by convention.
+A private method is an internal implementation detail. It is compiled into the lump binary at its assigned offset and is fully reachable from within the abstraction via a direct `BRANCH` instruction. However, its method table slot stores **0** (the FAULT sentinel). Because CALL with a zero method table entry raises PRIVATE_METHOD fault immediately, and the lump seal prevents modification of the code region from outside, private methods are **structurally unreachable** from external callers — not merely hidden by convention.
 
 ---
 
@@ -44,19 +44,19 @@ A private method is an internal implementation detail. It is compiled into the l
 
 The security property comes from two orthogonal mechanisms working together:
 
-1. **Method table exclusion**: The compiler writes `0` for every private method's index position. Hardware reads this 0 and faults (PERM fault) before executing any code.
+1. **Hardware table dispatch**: The CALL instruction reads `memory[lump_base + index×4]`. A zero entry raises PRIVATE_METHOD fault in hardware without executing a single instruction from the callee. There is no software dispatch loop that could be manipulated.
 
-2. **Lump seal**: The lump is a sealed binary object. Once committed to the namespace, its method table region cannot be patched or extended from outside. An attacker cannot write a non-zero offset into a private method's table entry.
+2. **Lump seal**: The lump is a sealed binary object. Once committed to the namespace, its code region cannot be patched or extended from outside. An attacker cannot write a non-zero entry to a private method's table slot.
 
-Together these mean: a private method's byte offset exists in the lump binary, but no externally-reachable hardware path leads to it. It is unreachable in the same sense that dead code is unreachable in a conventional binary — structurally, not probabilistically.
+Together these mean: a private method's byte offset exists in the lump binary, but every external access path raises a hardware FAULT before reaching it. No code executes. No side-effects occur.
 
 ---
 
 ## Why Not a Separate GT?
 
-A natural alternative would be to give each method its own GT (capability token) so that private methods simply never have a GT issued. This is the capability approach used for object-level facets. It was considered and rejected for the following reasons:
+A natural alternative would be to give each method its own GT (capability token) so that private methods simply never have a GT issued. This was considered and rejected:
 
-**NS table amplification**: Every new GT requires a namespace table entry. An abstraction with 20 methods would require 20 NS entries under this model, growing the NS table and the trusted computing base.
+**NS table amplification**: Every new GT requires a namespace table entry. An abstraction with 20 methods would require 20 NS entries, growing the NS table and the trusted computing base.
 
 **Trust boundary fragmentation**: Each GT creates a new security boundary with its own c-list. A 20-method abstraction would have 20 separate c-lists, each needing its own lump seal verification. The atomic simplicity of a single sealed lump is lost.
 
@@ -98,11 +98,13 @@ No software loop executes. The dispatch is one memory read in hardware.
 
 Private methods are compiled at their word offset in the lump binary — reachable from sibling methods via direct `BRANCH` — but their table entry is 0, making them unreachable from any external `CALL`.
 
+No Dispatch method. No ISUB/IADD/MCMP/BRANCHEQ loop. No runtime overhead.
+
 ---
 
 ## Method Index Numbering
 
-Public methods are assigned indices in source order, starting at 1. Private methods are compiled at their offset but receive a 0 table entry. AliasOf methods share the offset (and index) of their target method.
+Methods are assigned indices in source order, starting at 1. Private methods receive an index but store 0 in the table. AliasOf methods share the entry (and index) of their target method.
 
 | Method index | Method     | Visibility | Table entry |
 |-------------|------------|------------|-------------|
@@ -142,9 +144,9 @@ abstraction Mint {
 
 ### Why Revoke is private
 
-`Revoke` modifies the version number embedded in a capability word (at CR7 offset 2). This operation is an internal bookkeeping step — it increments the version counter that a revocation check compares against. External callers should never be able to trigger version bumps directly; doing so would allow them to revoke capabilities they don't own.
+`Revoke` modifies the version number embedded in a capability word. This operation is an internal bookkeeping step — it increments the version counter that a revocation check compares against. External callers must never trigger version bumps directly; doing so would allow them to revoke capabilities they don't own.
 
-By marking `Revoke` as `private`, the lump seal guarantees that no external caller can reach `Revoke`. The version bump can only occur when `Create` internally decides to call it (via a `BRANCH` instruction to `Revoke`'s offset) — a design decision that the abstraction author controls and that is verified by the lump seal at build time.
+By marking `Revoke` as `private`, the lump seal guarantees that no external caller can reach `Revoke`. The version bump can only occur when `Create` internally calls it via a direct `BRANCH` to `Revoke`'s offset.
 
 ### Compiled lump layout
 
@@ -159,9 +161,17 @@ word 4   Create body (first instruction)
 ```
 
 Callers use:
-- `CALL CRsrc, #1` — invokes Create
-- `CALL CRsrc, #2` — FAULT (private)
-- `CALL CRsrc, #3` — invokes Transfer
+- `CALL CRsrc, #1` — invokes Create (reads word 1 → Create's body offset → direct jump)
+- `CALL CRsrc, #2` — PRIVATE_METHOD FAULT (word 2 = 0)
+- `CALL CRsrc, #3` — invokes Transfer (reads word 3 → Transfer's body offset → direct jump)
+
+No linear scan. No MCMP loop. O(1) dispatch for every method.
+
+---
+
+## Backward Compatibility
+
+Abstractions that use no visibility qualifiers (all `method Foo(...)` without prefix) compile identically to before. No method table is generated; CALL with index=0 goes to lump word 1 directly. The single-entry-point path is preserved unchanged.
 
 ---
 
@@ -169,13 +179,14 @@ Callers use:
 
 | Property | Value |
 |----------|-------|
-| Qualifier `public` | Compiler writes method's word offset into method table |
-| Qualifier `private` | Compiler writes 0 into method table; hardware faults on 0 entry |
+| Qualifier `public` | Compiler writes method's word offset into method table at lump words 1..N |
+| Qualifier `private` | Compiler writes 0 into method table — hardware PRIVATE_METHOD FAULT on CALL |
 | Default (no qualifier) | Treated as `public`; `CALL #0` (single entry point) still works |
-| Enforcement mechanism | Structural: zero table entry + lump seal |
+| Enforcement mechanism | Hardware: CALL reads method table; zero entry = FAULT + lump seal prevents patching |
 | GT count | Unchanged — one GT per abstraction, no per-method GTs |
 | Method index | Compile-time immediate in CALL imm15 — cannot be runtime-manipulated |
-| Dispatch overhead | One memory read in hardware (no ISUB/IADD/MCMP loop) |
+| Dispatch overhead | O(1) — one memory read in hardware (no ISUB/IADD/MCMP loop) |
+| Dispatch method | None — removed entirely |
 
 ---
 
@@ -185,12 +196,12 @@ Callers use:
 
 ### Method table design
 
-The compiler assigns method indices 1–13 to the public methods and writes 0 into the table entries for the 14 private methods:
+The compiler assigns method indices 1–27 (one per method in declaration order) and writes 0 into the table entries for the 14 private methods:
 
-- **13 public** (indices 1–13): `GetWordCount`, `GetCharCount`, `GetByteCount`, `GetCharByte`, `IsUppercase`, `IsLowercase`, `ReturnFalse`, `IsDigit`, `IsAlpha`, `IsUpperExt`, `IsPunct`, `IsLowerExt`, `IsSymbol`.
+- **13 public** (indices 1–13, non-zero table entries): `GetWordCount`, `GetCharCount`, `GetByteCount`, `GetCharByte`, `IsUppercase`, `IsLowercase`, `ReturnFalse`, `IsDigit`, `IsAlpha`, `IsUpperExt`, `IsPunct`, `IsLowerExt`, `IsSymbol`.
 - **14 private** (table entry = 0): `IsSpace`, `IsAlphaNum`, `ToUppercase`, `Stub`, `ToLowercase`, `StubExt`, `NormaliseDigit`, `IsHex`, `Offset`, `StringOp`, `CheckNonZero`, `CheckPositive`, `ComputeBase`, `Classify`.
 
-The method table occupies words 1..27 of the lump (27 entries). The previous hand-written Dispatch method (41 words) is completely eliminated — saving 41 words of code and removing the runtime linear scan.
+The method table occupies words 1..27 of the lump (27 entries). The previous hand-written Dispatch method (41 words) is completely eliminated — saving 41 words of code and removing the runtime linear scan. CALL #1 → `GetWordCount` directly. Any index pointing to a private method → immediate FAULT.
 
 ---
 
@@ -198,10 +209,10 @@ The method table occupies words 1..27 of the lump (27 entries). The previous han
 
 ### Pet-name (`[pet name]`) sources
 
-Pet-name abstractions are expression-oriented — they describe data-register naming aliases rather than method implementations. They do not use `method` declarations and therefore cannot carry `public`/`private` qualifiers. Pet-name compilation is unaffected by this change; visibility qualifiers are simply inapplicable to that target.
+Pet-name abstractions are expression-oriented — they describe data-register naming aliases rather than method implementations. They do not use `method` declarations and therefore cannot carry `public`/`private` qualifiers. Pet-name compilation is unaffected by this change.
 
 ---
 
-See also: [dispatch-styles.md](dispatch-styles.md) for how auto-dispatch fits into the three existing dispatch styles.
+See also: [dispatch-styles.md](dispatch-styles.md) for how hardware method-table dispatch fits into the three existing dispatch styles.
 ---
-*Confidential — Kenneth Hamer-Hodges — April 2026*
+*Confidential — Kenneth Hamer-Hodges — May 2026*

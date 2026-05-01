@@ -82,19 +82,20 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 ### 3. CALL — Protected Call Through Capability
 
-**Purpose**: Invoke a protected abstraction (service/function) referenced by a Golden Token, saving context for later return.
+**Purpose**: Invoke a protected abstraction (service/function) referenced by a Golden Token, saving context for later return. The `imm15` field carries the **method index** for hardware method-table dispatch.
 
 **Validation Path**: Routes through mLoad for loading the callee's context — permission check, namespace validation, MAC check, G-bit reset.
 
 **Operation**:
-1. Check required permission on the target CR via mLoad → FAULT if not
+1. Check E permission on the target CR via mLoad → FAULT if not
 2. Validate the GT → FAULT if invalid
 3. Reset G=0 on the callee's namespace entry
 4. FAULT if call stack full (256 frames)
 5. Push 2-word frame: [caller's E-GT | NIA+machine_indicators]
-6. Set CR6 = callee c-list (L-only), CR14 = callee code (X-only, privileged), PC = 0
+6. Set CR6 = callee c-list (E-only), CR14 = callee code (RX, privileged)
+7. Hardware method-table dispatch: if imm15 = 0 → NIA = lump_base + 4 (word 1); if imm15 = n > 0 → read memory[lump_base + n×4]; zero entry → PRIVATE_METHOD FAULT; else NIA = lump_base + entry×4
 
-**Mnemonic**: `CALL CRs`
+**Mnemonic**: `CALL CRs [, #index]`
 
 | Aspect | Detail |
 |--------|--------|
@@ -103,7 +104,10 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **G-bit Reset** | Yes — on callee namespace entry via mLoad |
 | **Frame Pushed** | 2 words: [caller E-GT \| NIA+machine_indicators] — no CRs or DRs saved |
 | **Stack Overflow** | FAULT if stack full (256 frames). stackSpace indicator updated |
-| **New Context** | CR6 = callee c-list (L-only), CR14 = callee code (X-only, privileged), PC = 0 |
+| **Method index = 0** | NIA = lump_base + 4 (word 1, single entry point, backward-compatible) |
+| **Method index n > 0** | NIA = memory[lump_base + n×4]; zero entry → PRIVATE_METHOD FAULT |
+| **PC = 0** | Always FAULTs — lump header (word 0) is never a valid entry point |
+| **New Context** | CR6 = callee c-list (E-only), CR14 = callee code (RX, privileged) |
 | **Unchanged** | DR0–DR15, CR0–CR5, CR7–CR13, CR15 — callee inherits all from caller |
 
 ---
@@ -271,7 +275,7 @@ Applies the code object referenced by a CR in the current scope. Requires X perm
 
 ### 8. ELOADCALL — Fused Load + Call
 
-Loads a GT from a c-list row (word offset) and immediately enters it. Atomic: no intermediate CR state is visible. imm15 is split: bits[7:0] = c-list row, bits[14:8] = method index for the CALL phase. Equivalent to `LOAD CRd, CRsrc, #row` followed by `CALL CRd, #method_index`, but atomic.
+Loads a GT from a c-list row (word offset) and immediately enters it. Atomic: no intermediate CR state is visible. imm15 is split: bits[7:0] = c-list row (0–255), bits[14:8] = method index for the CALL phase (0–127). Equivalent to `LOAD CRd, CRsrc, #row` followed by `CALL CRd, #method_index`, but atomic.
 
 ### 9. XLOADLAMBDA — Fused Load + Lambda
 

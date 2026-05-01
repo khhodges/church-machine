@@ -183,17 +183,6 @@ class CLOOMCCompiler {
             }
         }
 
-        if (errors.length === 0 && methods.length > 0) {
-            const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            if (!hasDispatch) {
-                const dispatch = this._generateAutoDispatch(methods);
-                if (dispatch) {
-                    methods.unshift(dispatch);
-                    manifest.unshift({ name: 'Dispatch', mapping: [] });
-                }
-            }
-        }
-
         return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'javascript' };
     }
 
@@ -250,17 +239,6 @@ class CLOOMCCompiler {
                     m.aliasOf = _bodyIndex.get(fp);
                 } else {
                     _bodyIndex.set(fp, m.name);
-                }
-            }
-        }
-
-        if (errors.length === 0 && methods.length > 0) {
-            const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            if (!hasDispatch) {
-                const dispatch = this._generateAutoDispatch(methods);
-                if (dispatch) {
-                    methods.unshift(dispatch);
-                    manifest.unshift({ name: 'Dispatch', mapping: [] });
                 }
             }
         }
@@ -814,78 +792,6 @@ class CLOOMCCompiler {
         return i;
     }
 
-    _generateAutoDispatch(methods) {
-        // Collect only public methods (private methods are not dispatched externally)
-        const publicMethods = methods.filter(m => (m.visibility || 'public') === 'public');
-        const N = publicMethods.length;
-        if (N === 0) {
-            // All methods are private: emit a single-word RETURN stub so the lump
-            // entrypoint is a harmless return rather than the first private method body.
-            return { name: 'Dispatch', code: [this.encode(this.opcodes.RETURN, 14, 0, 0, 0)], visibility: 'public' };
-        }
-
-        // Compute absolute word offset of each method body within the lump.
-        // Auto-dispatch (M00) occupies the first (3*N + 2) words:
-        //   1 word  — ISUB DR15, DR0, DR0   (initialize counter)
-        //   N * 3   — IADD + MCMP + BRANCHEQ per public method
-        //   1 word  — RETURN AL              (unknown selector fallthrough)
-        const dispatchSize = 3 * N + 2;
-
-        // Map method name → absolute word offset (only code-bearing methods)
-        const codeOffsets = {};
-        let currentOffset = dispatchSize;
-        for (const m of methods) {
-            if (m.aliasOf) continue;
-            if (!m.code) continue;
-            codeOffsets[m.name] = currentOffset;
-            currentOffset += m.code.length;
-        }
-
-        // Resolve aliasOf transitively
-        const resolveOffset = (name, seen = new Set()) => {
-            if (seen.has(name)) return null;
-            seen.add(name);
-            if (codeOffsets[name] !== undefined) return codeOffsets[name];
-            const m = methods.find(x => x.name === name);
-            if (!m || !m.aliasOf) return null;
-            return resolveOffset(m.aliasOf, seen);
-        };
-        for (const m of methods) {
-            if (m.aliasOf && codeOffsets[m.name] === undefined) {
-                const resolved = resolveOffset(m.aliasOf);
-                if (resolved !== null) codeOffsets[m.name] = resolved;
-            }
-        }
-
-        // Generate the dispatch code words
-        const code = [];
-
-        // ISUB DR15, DR0, DR0  —  set DR15 = 0 (initialize method counter)
-        // encode(ISUB=16, AL=14, dst=DR15, src=DR0, imm=0)
-        code.push(this.encode(this.opcodes.ISUB, 14, 15, 0, 0));
-
-        for (const m of publicMethods) {
-            const targetOffset = codeOffsets[m.name];
-            if (targetOffset === undefined) continue;
-
-            // IADD DR15, DR15, #1  —  increment counter
-            code.push(this.encode(this.opcodes.IADD, 14, 15, 15, 1 | 0x4000));
-
-            // MCMP DR0, DR15  —  compare selector (DR0) with counter
-            code.push(this.encode(this.opcodes.MCMP, 14, 0, 15, 0));
-
-            // BRANCHEQ → targetOffset  —  branch if selector matches
-            const branchPos = code.length;
-            const relOffset = targetOffset - branchPos;
-            code.push(this.encode(this.opcodes.BRANCH, this.conditions.EQ, 0, 0, relOffset & 0x7FFF));
-        }
-
-        // RETURN AL  —  unknown selector: return without action
-        code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
-
-        return { name: 'Dispatch', code, visibility: 'public' };
-    }
-
     _parseCRFull(name) {
         const up = (name || '').toUpperCase();
         const direct = up.match(/^CR(\d+)$/);
@@ -1280,8 +1186,8 @@ class CLOOMCCompiler {
 
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `LOAD CR0, [CR6 + ${clistOffset}] (${callMatch[2]})` });
             code.push(this.encode(this.opcodes.LOAD, 14, 0, 6, clistOffset));
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `CALL CR0, #${methodSelector} -> ${callMatch[2]}.${methodName}` });
-            code.push(this.encode(this.opcodes.CALL, 14, 0, methodSelector, 0));
+            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `CALL CR0, imm=${methodSelector + 1} -> ${callMatch[2]}.${methodName}` });
+            code.push(this.encode(this.opcodes.CALL, 14, 0, 0, methodSelector + 1));
 
             if (resultVar) {
                 const dr = this._allocLocal(resultVar, locals, errors, stmt.lineNum);
@@ -1469,17 +1375,6 @@ class CLOOMCCompiler {
                     m.aliasOf = _bodyIndex.get(fp);
                 } else {
                     _bodyIndex.set(fp, m.name);
-                }
-            }
-        }
-
-        if (errors.length === 0 && methods.length > 0) {
-            const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            if (!hasDispatch) {
-                const dispatch = this._generateAutoDispatch(methods);
-                if (dispatch) {
-                    methods.unshift(dispatch);
-                    manifest.unshift({ name: 'Dispatch', mapping: [] });
                 }
             }
         }
@@ -2310,17 +2205,6 @@ class CLOOMCCompiler {
             }
         }
 
-        if (errors.length === 0 && methods.length > 0) {
-            const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            if (!hasDispatch) {
-                const dispatch = this._generateAutoDispatch(methods);
-                if (dispatch) {
-                    methods.unshift(dispatch);
-                    manifest.unshift({ name: 'Dispatch', mapping: [] });
-                }
-            }
-        }
-
         return { methods, errors, manifest, abstractionName: parsed.name, capabilities: parsed.capabilities || [], language: 'symbolic' };
     }
 
@@ -2824,17 +2708,6 @@ class CLOOMCCompiler {
                     m.aliasOf = _bodyIndex.get(fp);
                 } else {
                     _bodyIndex.set(fp, m.name);
-                }
-            }
-        }
-
-        if (errors.length === 0 && methods.length > 0) {
-            const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            if (!hasDispatch) {
-                const dispatch = this._generateAutoDispatch(methods);
-                if (dispatch) {
-                    methods.unshift(dispatch);
-                    manifest.unshift({ name: 'Dispatch', mapping: [] });
                 }
             }
         }
@@ -3379,15 +3252,14 @@ class CLOOMCCompiler {
         const emitAbsCall = (nsSlot, absName, methodIndex, lineNum) => {
             const clistOffset = requireCap(nsSlot, absName);
             const cr = allocCR(absName, lineNum);
-            code.push(this.encode(this.opcodes.IADD, 14, 3, 0, methodIndex | 0x4000));
             if (!loadedCRs[absName]) {
                 manifest.push({ src: lineNum, addr: code.length, desc: `LOAD CR${cr}, CR6, #${clistOffset}  (${absName} GT from c-list)` });
                 code.push(this.encode(this.opcodes.LOAD, 14, cr, 6, clistOffset));
                 loadedCRs[absName] = true;
             }
             const mName = this._resolveMethodName(absName, methodIndex);
-            manifest.push({ src: lineNum, addr: code.length, desc: `CALL ${absName}.${mName || methodIndex} via CR${cr}` });
-            code.push(this.encode(this.opcodes.CALL, 14, cr, 0, 0));
+            manifest.push({ src: lineNum, addr: code.length, desc: `CALL ${absName}.${mName || methodIndex} via CR${cr}, imm=${methodIndex + 1}` });
+            code.push(this.encode(this.opcodes.CALL, 14, cr, 0, methodIndex + 1));
         };
 
         const emitOpCall = (opEntry, leftDR, rightDR, lineNum) => {

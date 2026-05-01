@@ -165,6 +165,13 @@ PC=0 (lump header) is always a FAULT — the lump header word is never an execut
 
 #### Instruction-specific notes
 
+**CALL** — Two execution modes selected by `imm15` (method index):
+
+- **index = 0** (no method table): NIA = lump_base + 4 (word 1, single entry point). Backward-compatible with all existing programs.
+- **index n > 0** (hardware method-table dispatch): hardware reads the 32-bit word at byte address `lump_base + n×4`; the word holds a lump-base-relative WORD offset baked in by the compiler (private method = 0 → FAULT; first public method index = methodTableSize + 1). NIA = lump_base + entry×4.
+- **PC=0 always FAULTs** — the lump header (word 0) is never a valid entry point.
+- **ELOADCALL backward compat**: existing programs have `imm15 = small c-list row` (bits[14:8] = 0 → method index 0 → single entry point). Fully backward-compatible.
+
 **BRANCH** — `imm15` is a **signed PC-relative offset**.
 Execution: `target_PC = current_PC + sign_extend(imm15)`. Bit 14 of imm15 is the
 sign bit. Sign-extend: `soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm`.

@@ -131,4 +131,17 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 - **Simulator** (`app.js`): `word2_seals` stores `version[31:25] | spare[24:16] | CRC-16[15:0]`. `gBit` from Word 1.
 - **Status**: `namespace-json.md` updated to note divergence. Not tracked as a formal deviation since `namespace-json.md` documents the simulator JSON format, not hardware.
 ---
-*Confidential — Kenneth Hamer-Hodges — April 2026*
+
+## Hardware Method-Table Dispatch (Task #837)
+
+- **Change**: CALL and ELOADCALL now implement hardware method-table dispatch. Software Dispatch method (ISUB/IADD/MCMP/BRANCHEQ loop) is eliminated.
+- **CALL imm15**: Method index (0–127). Index 0 → NIA = lump_base + 4 (word 1, single entry point). Index n > 0 → read `memory[lump_base + n×4]`; zero entry → PRIVATE_METHOD FAULT; else NIA = lump_base + entry×4.
+- **ELOADCALL imm15**: Split field — bits[14:8] = method index, bits[7:0] = c-list row.
+- **Lump layout**: Word 0 = lump header placeholder; words 1..N = method table entries (lump-base-relative word offsets; 0 = private); words N+1.. = method bodies.
+- **Hardware files changed**: `hardware/call.py` (added `call_imm` Signal(15), `FETCH_METHOD_ENTRY` FSM state, conditional `nia_computed`), `hardware/decoder.py` (added `call_imm`, `eloadcall_row`, `eloadcall_method_index` split signals), `hardware/core.py` (wired `call_imm` to ChurchCall, changed c-list index to 0).
+- **Simulator files changed**: `simulator/simulator.js` (_execCall, _execEloadcall), `simulator/cloomc_compiler.js` (removed `_generateAutoDispatch` and all 5 call sites), `simulator/app-compile.js`, `simulator/app-run.js`, `simulator/system_abstractions.js`, `simulator/repl.js` (lump layout: +1 word for header placeholder, PC start at word N+1).
+- **Vocabulary**: NS table positions = "slot"; c-list positions = "row"; method table positions = "index".
+- **Status**: Fully implemented — hardware + simulator.
+
+---
+*Confidential — Kenneth Hamer-Hodges — May 2026*
