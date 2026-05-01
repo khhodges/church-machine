@@ -122,7 +122,62 @@ test.describe('CR detail tab correction in the live UI', () => {
         await expect(codePanel).not.toBeVisible();
     });
 
-    // ── Test 3: tab correction fires via a real DOM row click ─────────────────
+    // ── Test 3: Rule 2 — code-only CR snaps 'register' back to 'code' ────────
+    //
+    // word0 = 0x08000001: X=1 (bit 27) + index=1; no R → showData=false.
+    // After openCRDetail resets crDetailTab to 'code' we manually set it to
+    // 'register' (simulating a stale tab value) and call updateCRDetail() again.
+    // correctCRDetailTab('register', true, false, false) must return 'code'.
+    // Expected: #crdPanel-code is visible; #crdPanel-register absent.
+
+    test('Rule 2: snaps "register" back to "code" for a code-only CR (hasX=true, no R)', async ({ page }) => {
+        // Step 1: open a code CR so the panel DOM is initialised.
+        await injectCRAndOpen(page, 2, 0x08000001);   // CR2: X-only
+
+        // Step 2: override crDetailTab to the invalid value and re-run the
+        // correction by calling updateCRDetail() directly.
+        await page.evaluate(() => {
+            crDetailTab = 'register';
+            updateCRDetail();
+        });
+
+        const codePanel = page.locator('#crdPanel-code');
+        await codePanel.waitFor({ state: 'attached' });
+        await expect(codePanel).toBeVisible();
+
+        const registerPanel = page.locator('#crdPanel-register');
+        await expect(registerPanel).not.toBeVisible();
+    });
+
+    // ── Test 4: Rule 3 — CR without C-List snaps 'clist' to 'register' ───────
+    //
+    // word0 = 0x02000001: R=1 (bit 25) + index=1; no X, no L → showCList=false.
+    // After openCRDetail resets crDetailTab to 'code' (then corrects to
+    // 'register'), we manually set crDetailTab to 'clist' and call
+    // updateCRDetail() again.
+    // correctCRDetailTab('clist', false, false, true) must return 'register'.
+    // Expected: #crdPanel-register is visible; #crdPanel-clist absent.
+
+    test('Rule 3: snaps "clist" to "register" for an R-only CR (no C-List, no code)', async ({ page }) => {
+        // Step 1: open an R-only CR so the panel DOM is initialised.
+        await injectCRAndOpen(page, 4, 0x02000001);   // CR4: R-only
+
+        // Step 2: override crDetailTab to 'clist' (the CR has no C-List) and
+        // re-run the correction.
+        await page.evaluate(() => {
+            crDetailTab = 'clist';
+            updateCRDetail();
+        });
+
+        const registerPanel = page.locator('#crdPanel-register');
+        await registerPanel.waitFor({ state: 'attached' });
+        await expect(registerPanel).toBeVisible();
+
+        const clistPanel = page.locator('#crdPanel-clist');
+        await expect(clistPanel).not.toBeVisible();
+    });
+
+    // ── Test 5: tab correction fires via a real DOM row click ─────────────────
     //
     // This test exercises the full click-handler wiring path: clicking a rendered
     // CR table row fires the inline onclick="openCRDetail(n)" handler, which in
