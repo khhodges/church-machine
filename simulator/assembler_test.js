@@ -1507,6 +1507,85 @@ const ChurchSimulator = require('./simulator.js');
         `expected 0xE0000000 got 0x${gotST4.toString(16).toUpperCase()}`);
 }
 
+// ── SH: End-to-end step() integration tests for SHL ──────────────────────────
+// These tests assemble a real SHL instruction, inject it into the simulator's
+// flat memory at address 0, prime the source DR with a known value, call step()
+// exactly once, and inspect the destination DR and flags.  This exercises the
+// full instruction-fetch → decode → _execShl path.
+
+// SH1: Basic left-shift by 4, positive value — no carry, no sign, no zero.
+//   Input:  DR1 = 0x00000001, shift 4
+//   Expected DR3 = 0x00000010, Z=false, N=false, C=false
+{
+    const asmSH1 = new ChurchAssembler();
+    const rSH1   = asmSH1.assemble('SHL DR3, DR1, 4');
+    assert('SH1 SHL DR3, DR1, 4 assembles with no errors',
+        asmSH1.errors.length === 0,
+        asmSH1.errors.map(e => e.message).join('; '));
+
+    const simSH1 = new ChurchSimulator();
+    simSH1.memory[0] = rSH1.words[0] >>> 0;
+    simSH1.dr[1]     = 0x00000001;
+    simSH1.step();
+    const gotSH1 = simSH1.dr[3] >>> 0;
+    const expSH1 = 0x00000010;
+    assert('SH1 SHL positive via step(): DR3 = 0x00000010',
+        gotSH1 === expSH1,
+        `expected 0x${expSH1.toString(16).toUpperCase()} got 0x${gotSH1.toString(16).toUpperCase()}`);
+    assert('SH1 SHL positive via step(): Z flag clear', simSH1.flags.Z === false, `Z=${simSH1.flags.Z}`);
+    assert('SH1 SHL positive via step(): N flag clear', simSH1.flags.N === false, `N=${simSH1.flags.N}`);
+    assert('SH1 SHL positive via step(): C flag clear', simSH1.flags.C === false, `C=${simSH1.flags.C}`);
+}
+
+// SH2: Left-shift that produces a negative result (N flag) — no carry out.
+//   Input:  DR1 = 0x08000000, shift 4
+//   Expected DR3 = 0x80000000 (bit 31 set → N), Z=false, C=false
+//   lastBitOut = (0x08000000 >>> 28) & 1 = 0
+{
+    const asmSH2 = new ChurchAssembler();
+    const rSH2   = asmSH2.assemble('SHL DR3, DR1, 4');
+    assert('SH2 SHL DR3, DR1, 4 assembles with no errors',
+        asmSH2.errors.length === 0,
+        asmSH2.errors.map(e => e.message).join('; '));
+
+    const simSH2 = new ChurchSimulator();
+    simSH2.memory[0] = rSH2.words[0] >>> 0;
+    simSH2.dr[1]     = 0x08000000;
+    simSH2.step();
+    const gotSH2 = simSH2.dr[3] >>> 0;
+    const expSH2 = 0x80000000;
+    assert('SH2 SHL sets N via step(): DR3 = 0x80000000',
+        gotSH2 === expSH2,
+        `expected 0x${expSH2.toString(16).toUpperCase()} got 0x${gotSH2.toString(16).toUpperCase()}`);
+    assert('SH2 SHL sets N via step(): N flag set',   simSH2.flags.N === true,  `N=${simSH2.flags.N}`);
+    assert('SH2 SHL sets N via step(): Z flag clear', simSH2.flags.Z === false, `Z=${simSH2.flags.Z}`);
+    assert('SH2 SHL sets N via step(): C flag clear', simSH2.flags.C === false, `C=${simSH2.flags.C}`);
+}
+
+// SH3: Left-shift that sets both Z and C — the only set bit is shifted off the top.
+//   Input:  DR1 = 0x80000000, shift 1
+//   Expected DR3 = 0x00000000 (Z), lastBitOut = (0x80000000 >>> 31) & 1 = 1 (C)
+{
+    const asmSH3 = new ChurchAssembler();
+    const rSH3   = asmSH3.assemble('SHL DR3, DR1, 1');
+    assert('SH3 SHL DR3, DR1, 1 assembles with no errors',
+        asmSH3.errors.length === 0,
+        asmSH3.errors.map(e => e.message).join('; '));
+
+    const simSH3 = new ChurchSimulator();
+    simSH3.memory[0] = rSH3.words[0] >>> 0;
+    simSH3.dr[1]     = 0x80000000;
+    simSH3.step();
+    const gotSH3 = simSH3.dr[3] >>> 0;
+    const expSH3 = 0x00000000;
+    assert('SH3 SHL shifts bit off top via step(): DR3 = 0x00000000',
+        gotSH3 === expSH3,
+        `expected 0x${expSH3.toString(16).toUpperCase()} got 0x${gotSH3.toString(16).toUpperCase()}`);
+    assert('SH3 SHL shifts bit off top via step(): Z flag set', simSH3.flags.Z === true,  `Z=${simSH3.flags.Z}`);
+    assert('SH3 SHL shifts bit off top via step(): N flag clear', simSH3.flags.N === false, `N=${simSH3.flags.N}`);
+    assert('SH3 SHL shifts bit off top via step(): C flag set', simSH3.flags.C === true,  `C=${simSH3.flags.C}`);
+}
+
 // ── LTF: led_turing_full snippet regression ───────────────────────────────────
 // Loads the led_turing_full assembly from _TURING_DR_TEST_SOURCE in app-run.js,
 // assembles it, and asserts zero errors.  This catches any edit that introduces
