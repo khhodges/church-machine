@@ -1098,10 +1098,40 @@ function loadCLOOMCIntoSim() {
         con.textContent = `${_bootPrefix} \u2014 \u201c${result.abstractionName}\u201d loaded${_loadSrcHint} \u2014 ${words.length} words, ${methodTableSize} method${methodTableSize !== 1 ? 's' : ''} \u2014 click Step or Run`;
     }
 
+    // ── Update namespace label so the CR detail heading shows the abstraction name
+    // rather than the boot-image occupant of that slot ("LED flash", etc.).
+    const _bootSlot = (typeof BOOT_ABSTR_NS_SLOT !== 'undefined') ? BOOT_ABSTR_NS_SLOT : 3;
+    if (sim && sim.nsLabels) {
+        sim.nsLabels[_bootSlot] = result.abstractionName || sim.programName;
+    }
+
+    // ── Populate a lump manifest from the CLOOMC methods so the API tab shows
+    // call-site examples instead of "No method manifest available".
+    if (typeof _lumpManifests !== 'undefined') {
+        const _publicMethods = (result.methods || []).filter(m => m.name !== 'Dispatch' && m.name !== 'M00');
+        const _globalPetDR   = { '0': 'result' };
+        const _manifestMethods = _publicMethods.map((m) => {
+            const params = m.params || [];
+            const drPets = {};
+            // Dispatch selector is always DR0; param[0] → DR1, param[1] → DR2, etc.
+            params.forEach((p, j) => { drPets[String(j + 1)] = p; });
+            const inputs  = params.map((p, j) => `DR${j + 1} (${p})`);
+            const outputs = ['DR0 (return value)'];
+            return { name: m.name, inputs, outputs, pet_names: { DR: drPets, CR: {} } };
+        });
+        _lumpManifests[_bootSlot] = {
+            _methods: _manifestMethods,
+            pet_names: { DR: _globalPetDR, CR: {} }
+        };
+    }
+
     // Open the simulator dashboard so the user lands on the Step / Run controls
     switchView('dashboard');
     // Refresh the invoke-method button visibility now that an abstraction is loaded
     if (typeof refreshInvokeBtn === 'function') refreshInvokeBtn();
+    // Re-render the CR detail if one is selected so the heading reflects the new name
+    if (typeof selectedCR !== 'undefined' && selectedCR !== null &&
+        typeof updateCRDetail === 'function') updateCRDetail();
 }
 
 function compileAndCreateAbstraction() {
