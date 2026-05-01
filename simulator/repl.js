@@ -602,24 +602,57 @@ class ChurchREPL {
             }
         }
 
+        // Build method table entries (mirrors loadCLOOMCIntoSim layout).
+        // Layout: lump word 0 = header; words 1..N = method table; words N+1.. = bodies.
+        const caps = result.capabilities || [];
+        const clistCount = caps.length;
+        const methodTableSize = result.methods.length;
+        let bodyOffset = 0;
+        const methodTableEntries = [];
         for (const m of result.methods) {
-            output += `  method ${m.name}: ${m.code.length} instruction(s)\n`;
+            // public entry = lump-word address of body start; private = 0
+            methodTableEntries.push(m.visibility === 'private' ? 0 : methodTableSize + 1 + bodyOffset);
+            bodyOffset += (m.code || []).length;
+        }
+        const totalCodeWords = bodyOffset;
+
+        // ── Method Table ──
+        output += `  Method Table:\n`;
+        output += `    [word  0] 0x00000000  (lump header)\n`;
+        for (let i = 0; i < result.methods.length; i++) {
+            const m = result.methods[i];
+            const entry = methodTableEntries[i];
+            const isPrivate = m.visibility === 'private';
+            const entryHex = `0x${entry.toString(16).padStart(8, '0').toUpperCase()}`;
+            const idxLabel = String(i + 1).padStart(2);
+            if (isPrivate) {
+                output += `    [word ${idxLabel}] ${entryHex}  [${i}] ${m.name}  (private)\n`;
+            } else {
+                output += `    [word ${idxLabel}] ${entryHex}  [${i}] ${m.name}  \u2192 lump word ${entry}\n`;
+            }
+        }
+        output += `\n`;
+
+        // ── Method Bodies ──
+        let lumpBodyBase = methodTableSize + 1; // lump-word address of first body instruction
+        for (const m of result.methods) {
+            const isPrivate = m.visibility === 'private';
+            const privLabel = isPrivate ? '  (private)' : '';
+            output += `  method ${m.name}${privLabel}: ${m.code.length} instruction(s)\n`;
             const comments = manifestByMethod[m.name] || {};
             for (let i = 0; i < m.code.length; i++) {
                 const word = m.code[i];
                 const hex = `0x${word.toString(16).padStart(8, '0').toUpperCase()}`;
                 const disasm = (typeof assembler !== 'undefined' && assembler) ? assembler.disassemble(word) : '';
                 const comment = comments[i];
-                const base = `    [${i}] ${hex}  ${disasm}`;
-                output += comment ? `${base.padEnd(55)}; ${comment}\n` : `${base}\n`;
+                const lumpWord = lumpBodyBase + i;
+                const base = `    [word ${String(lumpWord).padStart(2)}] ${hex}  ${disasm}`;
+                output += comment ? `${base.padEnd(60)}; ${comment}\n` : `${base}\n`;
             }
+            lumpBodyBase += m.code.length;
         }
 
-        const caps = result.capabilities || [];
-        const clistCount = caps.length;
-        let totalCodeWords = 0;
-        for (const m of result.methods) totalCodeWords += (m.code || []).length;
-        const methodTableSize = result.methods.length;
+        // ── Lump summary ──
         // +1 for lump header placeholder at word 0; method table at words 1..N.
         const codeSize = methodTableSize + 1 + totalCodeWords;
         const neededSize = codeSize + clistCount;
