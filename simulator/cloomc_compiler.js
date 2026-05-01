@@ -996,6 +996,16 @@ class CLOOMCCompiler {
             return dr;
         }
 
+        // Arithmetic (signed) shift right: x >>s n  — sets imm[5]=1 (ASR mode)
+        const asrMatch = expr.match(/^(\w+)\s*>>s\s*(\d+)$/);
+        if (asrMatch) {
+            const srcDR = this._resolveExpr(asrMatch[1], code, locals, rom, errors, lineNum, method);
+            const dr = this._allocTemp(locals);
+            const shamt = parseInt(asrMatch[2]) & 0x1F;
+            code.push(this.encode(this.opcodes.SHR, 14, dr, srcDR, (1 << 5) | shamt));
+            return dr;
+        }
+
         const shrMatch = expr.match(/^(\w+)\s*>>\s*(\d+)$/);
         if (shrMatch) {
             const srcDR = this._resolveExpr(shrMatch[1], code, locals, rom, errors, lineNum, method);
@@ -3090,6 +3100,7 @@ class CLOOMCCompiler {
         e = e.replace(/\b(\w+)\s+multiplied\s+by\s+(\w+)\b/gi, '$1 * $2');
         e = e.replace(/\b(\w+)\s+divided\s+by\s+(\w+)\b/gi, '$1 / $2');
         e = e.replace(/\b(\w+)\s+shifted\s+left\s+(?:by\s+)?(\d+)\b/gi, '$1 << $2');
+        e = e.replace(/\b(\w+)\s+shifted\s+right\s+(?:signed|arithmetically)\s+(?:by\s+)?(\d+)\b/gi, '$1 >>s $2');
         e = e.replace(/\b(\w+)\s+shifted\s+right\s+(?:by\s+)?(\d+)\b/gi, '$1 >> $2');
 
         return e.trim();

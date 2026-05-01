@@ -1105,6 +1105,217 @@ const NS_SYMBOLS = { 'SlideRule': 3 };
         a.errors.map(e => e.message).join('; '));
 }
 
+// ── SHR / ASR encoding and disassembly ───────────────────────────────────────
+
+// SA1: Plain SHR (LSR) — imm[5] must be 0.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR3, DR1, 4');
+    assert('SA1 SHR DR3, DR1, 4: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const word  = r.words[0];
+    const opcode = (word >>> 27) & 0x1F;
+    const imm   = word & 0x7FFF;
+    const shamt = imm & 0x1F;
+    const arith = (imm >>> 5) & 1;
+    assert('SA1 opcode=19 (SHR)', opcode === 19, 'got ' + opcode);
+    assert('SA1 shamt=4', shamt === 4, 'got ' + shamt);
+    assert('SA1 arith=0 (LSR)', arith === 0, 'got ' + arith);
+}
+
+// SA2: SHR with ASR keyword — imm[5] must be 1.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR3, DR1, 4, ASR');
+    assert('SA2 SHR DR3, DR1, 4, ASR: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const word  = r.words[0];
+    const opcode = (word >>> 27) & 0x1F;
+    const imm   = word & 0x7FFF;
+    const shamt = imm & 0x1F;
+    const arith = (imm >>> 5) & 1;
+    assert('SA2 opcode=19 (SHR)', opcode === 19, 'got ' + opcode);
+    assert('SA2 shamt=4', shamt === 4, 'got ' + shamt);
+    assert('SA2 arith=1 (ASR)', arith === 1, 'got ' + arith);
+}
+
+// SA3: ASR disassembly — SHR with imm[5]=1 must show " ASR" modifier.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR3, DR1, 4, ASR');
+    const dis = a.disassemble(r.words[0]);
+    assert('SA3 disassemble SHR ASR: includes "ASR"', dis.includes('ASR'), 'got: ' + dis);
+    assert('SA3 disassemble SHR ASR: includes "DR3"', dis.includes('DR3'), 'got: ' + dis);
+    assert('SA3 disassemble SHR ASR: includes "DR1"', dis.includes('DR1'), 'got: ' + dis);
+}
+
+// SA4: LSR disassembly — plain SHR must NOT show "ASR".
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR2, DR0, 7');
+    const dis = a.disassemble(r.words[0]);
+    assert('SA4 disassemble SHR LSR: does NOT include "ASR"', !dis.includes('ASR'), 'got: ' + dis);
+    assert('SA4 disassemble SHR LSR: includes "7"', dis.includes('7'), 'got: ' + dis);
+}
+
+// SA5: Maximum shift amount 31 with ASR — shamt=31, arith=1, imm = 0x3F.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR0, DR0, 31, ASR');
+    assert('SA5 SHR DR0, DR0, 31, ASR: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const imm   = r.words[0] & 0x7FFF;
+    const shamt = imm & 0x1F;
+    const arith = (imm >>> 5) & 1;
+    assert('SA5 shamt=31', shamt === 31, 'got ' + shamt);
+    assert('SA5 arith=1 (ASR)', arith === 1, 'got ' + arith);
+}
+
+// SA6: ASR keyword is case-insensitive (lowercase "asr").
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('SHR DR1, DR2, 3, asr');
+    assert('SA6 SHR ... asr (lowercase): no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const imm   = r.words[0] & 0x7FFF;
+    const arith = (imm >>> 5) & 1;
+    assert('SA6 arith=1 (ASR via lowercase)', arith === 1, 'got ' + arith);
+}
+
+// SA7: ASR and LSR produce different machine words for same DR/shamt operands.
+{
+    const a = new ChurchAssembler();
+    const rLSR = a.assemble('SHR DR1, DR2, 8');
+    const b = new ChurchAssembler();
+    const rASR = b.assemble('SHR DR1, DR2, 8, ASR');
+    assert('SA7 ASR word differs from LSR word',
+        rLSR.words[0] !== rASR.words[0],
+        `LSR=0x${(rLSR.words[0]>>>0).toString(16)} ASR=0x${(rASR.words[0]>>>0).toString(16)}`);
+    assert('SA7 ASR imm[5]=1, LSR imm[5]=0',
+        ((rASR.words[0] >>> 5) & 1) === 1 && ((rLSR.words[0] >>> 5) & 1) === 0,
+        `ASR_bit=${(rASR.words[0] >>> 5) & 1} LSR_bit=${(rLSR.words[0] >>> 5) & 1}`);
+}
+
+// ── CLOOMC compiler ASR regression tests ─────────────────────────────────────
+// These tests verify that the CLOOMC compiler emits SHR with imm[5]=1 (ASR mode)
+// when the >>s operator or its English equivalent is used.
+
+const CLOOMCCompiler = require('./cloomc_compiler.js');
+
+// Helper: find the first SHR word in an array of compiled code words.
+// Returns { word, shamt, arith } or null.
+function findSHR(words) {
+    for (const w of words) {
+        if (((w >>> 27) & 0x1F) === 19) {
+            const imm = w & 0x7FFF;
+            return { word: w, shamt: imm & 0x1F, arith: (imm >>> 5) & 1 };
+        }
+    }
+    return null;
+}
+
+// CC1: Compiler emits SHR with arith=1 (ASR) for the >>s operator.
+//      compileJS auto-wraps bare statements; return(expr) uses parenthesised form.
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    method run(x) {
+        return(x >>s 4);
+    }
+}`;
+    const result = cc.compileJS(src);
+    assert('CC1 >>s compiles without errors', result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const shr = findSHR(words);
+    assert('CC1 >>s: a SHR instruction is emitted', shr !== null, 'no SHR found in ' + JSON.stringify(words));
+    if (shr) {
+        assert('CC1 >>s: shamt=4', shr.shamt === 4, 'got shamt=' + shr.shamt);
+        assert('CC1 >>s: arith=1 (ASR)', shr.arith === 1, 'got arith=' + shr.arith);
+    }
+}
+
+// CC2: Compiler emits SHR with arith=0 (LSR) for the plain >> operator (no regression).
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    method run(x) {
+        return(x >> 4);
+    }
+}`;
+    const result = cc.compileJS(src);
+    assert('CC2 >> (LSR) compiles without errors', result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const shr = findSHR(words);
+    assert('CC2 >> (LSR): a SHR instruction is emitted', shr !== null, 'no SHR found');
+    if (shr) {
+        assert('CC2 >>: arith=0 (LSR, no regression)', shr.arith === 0, 'got arith=' + shr.arith);
+    }
+}
+
+// CC3: English "shifted right signed by N" → ASR encoding.
+//      Block mode: first line must start with "abstraction Name {" (no leading newline).
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    run(x):
+        return x shifted right signed by 8
+}`;
+    const result = cc.compileEnglish(src);
+    assert('CC3 "shifted right signed by 8" compiles without errors', result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const shr = findSHR(words);
+    assert('CC3 English signed shift: SHR instruction emitted', shr !== null, 'no SHR found');
+    if (shr) {
+        assert('CC3 English signed shift: shamt=8', shr.shamt === 8, 'got shamt=' + shr.shamt);
+        assert('CC3 English signed shift: arith=1 (ASR)', shr.arith === 1, 'got arith=' + shr.arith);
+    }
+}
+
+// CC4: English "shifted right arithmetically by N" → ASR encoding.
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    run(x):
+        return x shifted right arithmetically by 3
+}`;
+    const result = cc.compileEnglish(src);
+    assert('CC4 "shifted right arithmetically by 3" compiles without errors', result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const shr = findSHR(words);
+    assert('CC4 English arithmetic shift: SHR instruction emitted', shr !== null, 'no SHR found');
+    if (shr) {
+        assert('CC4 English arithmetic shift: shamt=3', shr.shamt === 3, 'got shamt=' + shr.shamt);
+        assert('CC4 English arithmetic shift: arith=1 (ASR)', shr.arith === 1, 'got arith=' + shr.arith);
+    }
+}
+
+// CC5: English plain "shifted right by N" still produces LSR (no regression).
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    run(x):
+        return x shifted right by 2
+}`;
+    const result = cc.compileEnglish(src);
+    assert('CC5 "shifted right by 2" (LSR) compiles without errors', result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const shr = findSHR(words);
+    assert('CC5 English plain shift: SHR instruction emitted', shr !== null, 'no SHR found');
+    if (shr) {
+        assert('CC5 English plain shift: arith=0 (LSR, no regression)', shr.arith === 0, 'got arith=' + shr.arith);
+    }
+}
+
 // ── LTF: led_turing_full snippet regression ───────────────────────────────────
 // Loads the led_turing_full assembly from _TURING_DR_TEST_SOURCE in app-run.js,
 // assembles it, and asserts zero errors.  This catches any edit that introduces
