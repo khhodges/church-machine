@@ -72,7 +72,7 @@ function updateCRDetail() {
 
     // ── Correct default tab for this CR's capabilities ───────────────────────
     if (crDetailTab === 'code' && !showCode) {
-        crDetailTab = showCList ? 'clist' : 'lump';
+        crDetailTab = showCList ? 'clist' : showData ? 'register' : 'lump';
     }
 
     // ── Hoist shared data used across multiple panels ─────────────────────────
