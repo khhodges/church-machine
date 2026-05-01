@@ -636,6 +636,9 @@ function hideRunPopover() {
 function _applyPendingSimLoad() {
     if (!_pendingSimLoad || !lastAssembledWords || !lastAssembledWords.length) return;
     sim.loadProgram(lastAssembledWords, 0);
+    // Skip past the method table so PC starts at the first real instruction,
+    // matching the behaviour of _autoLoadDefaultProgram() on boot/reset.
+    if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
     if (pipelineViz) pipelineViz.setNIA(null);
     const abstrBase2 = sim.NS_TABLE_BASE + 2 * sim.NS_ENTRY_WORDS;
     const abstrBase3 = sim.NS_TABLE_BASE + 3 * sim.NS_ENTRY_WORDS;
