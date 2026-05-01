@@ -146,4 +146,49 @@ to an all-zero word unless a reboot is the intended outcome.
 
 ---
 
-*(Instruction entries for opcodes 0–19 follow in §5 onwards — to be added.)*
+---
+
+## 5. Flag Behaviour — Quick Reference
+
+Four flags: **N** (negative), **Z** (zero), **C** (carry), **V** (overflow).
+
+> **A.2 — BFEXT and BFINS never write any flags.**
+>
+> Both bitfield instructions (`_execBfext`, `_execBfins` in `simulator.js`) return
+> a result object with no flag assignments. The flag register is left exactly as it
+> was by the last flag-writing instruction. The most common mistake:
+>
+> ```
+> BFEXT  DR1, DR2, 0, 8      ; extract byte — flags are NOT updated
+> BRANCH EQ, handle_zero     ; tests Z from a previous instruction, not from the extract
+> ```
+>
+> To test whether the extracted value is zero, follow BFEXT with `MCMP DR1, DR0`
+> (compare the result against the hardwired-zero register), then branch.
+
+Flag-writing summary across all 20 instructions:
+
+| Instruction | N | Z | C | V | Notes |
+|-------------|---|---|---|---|-------|
+| LOAD        | — | — | — | — | |
+| SAVE        | — | — | — | — | |
+| CALL        | — | — | — | — | |
+| RETURN      | — | — | — | — | |
+| CHANGE      | — | — | — | — | |
+| SWITCH      | — | — | — | — | |
+| TPERM       | ✓ | ✓ | 0 | 0 | N = !Z; C and V always cleared |
+| LAMBDA      | — | — | — | — | |
+| ELOADCALL   | — | — | — | — | |
+| XLOADLAMBDA | — | — | — | — | |
+| DREAD       | — | — | — | — | |
+| DWRITE      | — | — | — | — | |
+| BFEXT       | — | — | — | — | **Flags unchanged — see A.2 above** |
+| BFINS       | — | — | — | — | **Flags unchanged — see A.2 above** |
+| MCMP        | ✓ | ✓ | ✓ | ✓ | Subtraction flags: a − b; no result register |
+| IADD        | ✓ | ✓ | ✓ | ✓ | Addition flags |
+| ISUB        | ✓ | ✓ | ✓ | ✓ | Subtraction flags |
+| BRANCH      | — | — | — | — | Reads flags, never writes them |
+| SHL         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out; V always 0 |
+| SHR         | ✓ | ✓ | ✓ | 0 | C = last bit shifted out; V always 0 |
+
+*(Instruction entries for opcodes 0–19 follow in §6 onwards — to be added.)*
