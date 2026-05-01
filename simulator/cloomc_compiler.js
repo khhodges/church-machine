@@ -185,8 +185,7 @@ class CLOOMCCompiler {
 
         if (errors.length === 0 && methods.length > 0) {
             const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            const hasExplicitVisibility = parsed.methods.some(m => m.explicitVisibility);
-            if (!hasDispatch && hasExplicitVisibility) {
+            if (!hasDispatch) {
                 const dispatch = this._generateAutoDispatch(methods);
                 if (dispatch) {
                     methods.unshift(dispatch);
@@ -257,8 +256,7 @@ class CLOOMCCompiler {
 
         if (errors.length === 0 && methods.length > 0) {
             const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            const hasExplicitVisibility = parsed.methods.some(m => m.explicitVisibility);
-            if (!hasDispatch && hasExplicitVisibility) {
+            if (!hasDispatch) {
                 const dispatch = this._generateAutoDispatch(methods);
                 if (dispatch) {
                     methods.unshift(dispatch);
@@ -1477,8 +1475,7 @@ class CLOOMCCompiler {
 
         if (errors.length === 0 && methods.length > 0) {
             const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            const hasExplicitVisibility = parsed.methods.some(m => m.explicitVisibility);
-            if (!hasDispatch && hasExplicitVisibility) {
+            if (!hasDispatch) {
                 const dispatch = this._generateAutoDispatch(methods);
                 if (dispatch) {
                     methods.unshift(dispatch);
@@ -2315,8 +2312,7 @@ class CLOOMCCompiler {
 
         if (errors.length === 0 && methods.length > 0) {
             const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            const hasExplicitVisibility = parsed.methods.some(m => m.explicitVisibility);
-            if (!hasDispatch && hasExplicitVisibility) {
+            if (!hasDispatch) {
                 const dispatch = this._generateAutoDispatch(methods);
                 if (dispatch) {
                     methods.unshift(dispatch);
@@ -2834,8 +2830,7 @@ class CLOOMCCompiler {
 
         if (errors.length === 0 && methods.length > 0) {
             const hasDispatch = methods.some(m => m.name === 'Dispatch' || m.name === 'M00');
-            const hasExplicitVisibility = parsed.methods.some(m => m.explicitVisibility);
-            if (!hasDispatch && hasExplicitVisibility) {
+            if (!hasDispatch) {
                 const dispatch = this._generateAutoDispatch(methods);
                 if (dispatch) {
                     methods.unshift(dispatch);
