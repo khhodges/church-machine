@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWITCH Instruction — Full Lifecycle and Chain of Trust</title>
+<style>
+  :root {
+    --purple:  #6d28d9;
+    --purple-l: #ede9fe;
+    --purple-b: #c4b5fd;
+    --blue:    #1d4ed8;
+    --blue-l:  #dbeafe;
+    --blue-b:  #93c5fd;
+    --amber:   #b45309;
+    --amber-l: #fef3c7;
+    --amber-b: #fcd34d;
+    --green:   #065f46;
+    --green-l: #d1fae5;
+    --green-b: #6ee7b7;
+    --red:     #991b1b;
+    --red-l:   #fee2e2;
+    --red-b:   #fca5a5;
+    --slate:   #334155;
+    --slate-l: #f1f5f9;
+    --slate-b: #cbd5e1;
+    --text:    #0f172a;
+    --mono:    'Fira Mono', 'Cascadia Code', 'Consolas', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    background: #f8fafc;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--slate);
+    border-bottom: 3px solid var(--slate-b);
+    padding-bottom: .5rem;
+    margin-bottom: .4rem;
+  }
+
+  .subtitle {
+    color: #64748b;
+    font-size: .9rem;
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin: 2.5rem 0 1rem;
+    padding: .5rem .9rem;
+    border-radius: 6px;
+  }
+
+  h2.phase-0 { background: var(--purple-l); color: var(--purple); border-left: 4px solid var(--purple); }
+  h2.phase-1 { background: var(--blue-l);   color: var(--blue);   border-left: 4px solid var(--blue); }
+  h2.phase-2 { background: var(--amber-l);  color: var(--amber);  border-left: 4px solid var(--amber); }
+  h2.phase-3 { background: var(--green-l);  color: var(--green);  border-left: 4px solid var(--green); }
+  h2.plain   { background: var(--slate-l);  color: var(--slate);  border-left: 4px solid var(--slate-b); }
+
+  p { margin-bottom: .9rem; }
+
+  .phase-label {
+    display: inline-block;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: .15rem .55rem;
+    border-radius: 99px;
+    margin-bottom: .6rem;
+  }
+  .pl-0 { background: var(--purple-b); color: var(--purple); }
+  .pl-1 { background: var(--blue-b);   color: var(--blue); }
+  .pl-2 { background: var(--amber-b);  color: var(--amber); }
+  .pl-3 { background: var(--green-b);  color: var(--green); }
+
+  /* ── Flow diagrams ── */
+
+  .flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin: 1.5rem 0;
+  }
+
+  .box {
+    border-radius: 8px;
+    padding: .7rem 1.2rem;
+    text-align: center;
+    font-size: .88rem;
+    min-width: 240px;
+    max-width: 520px;
+    width: 100%;
+    border: 2px solid transparent;
+    position: relative;
+  }
+
+  .box.purple { background: var(--purple-l); border-color: var(--purple-b); color: var(--purple); }
+  .box.blue   { background: var(--blue-l);   border-color: var(--blue-b);   color: var(--blue); }
+  .box.amber  { background: var(--amber-l);  border-color: var(--amber-b);  color: var(--amber); }
+  .box.green  { background: var(--green-l);  border-color: var(--green-b);  color: var(--green); }
+  .box.red    { background: var(--red-l);    border-color: var(--red-b);    color: var(--red); }
+  .box.slate  { background: var(--slate-l);  border-color: var(--slate-b);  color: var(--slate); }
+
+  .box strong { font-weight: 700; display: block; margin-bottom: .2rem; }
+  .box small  { font-size: .78rem; opacity: .75; }
+
+  .arrow {
+    width: 2px;
+    height: 28px;
+    background: #94a3b8;
+    position: relative;
+    margin: 0 auto;
+  }
+  .arrow::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #94a3b8;
+  }
+
+  .arrow-label {
+    font-size: .75rem;
+    color: #64748b;
+    text-align: center;
+    margin: -4px 0 4px;
+  }
+
+  /* Split (fork) layout */
+  .split {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    width: 100%;
+    margin: 1rem 0;
+  }
+  .split-branch {
+    flex: 1;
+    max-width: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .split-label {
+    font-size: .75rem;
+    font-weight: 700;
+    padding: .2rem .6rem;
+    border-radius: 99px;
+    margin-bottom: .5rem;
+  }
+  .split-label.ok  { background: var(--green-b);  color: var(--green); }
+  .split-label.bad { background: var(--red-b);    color: var(--red); }
+
+  /* FSM check rows */
+  .fsm-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto .3rem;
+  }
+  .fsm-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .8rem;
+    font-weight: 700;
+    margin-top: .15rem;
+  }
+  .fsm-num.green { background: var(--green-b); color: var(--green); }
+  .fsm-body {
+    flex: 1;
+    background: var(--green-l);
+    border: 1px solid var(--green-b);
+    border-radius: 6px;
+    padding: .5rem .8rem;
+    font-size: .85rem;
+  }
+  .fsm-body .check-q  { font-weight: 600; color: var(--green); margin-bottom: .25rem; }
+  .fsm-body .fault    { color: var(--red); font-size: .8rem; }
+  .fsm-body .pass     { color: #059669; font-size: .8rem; }
+
+  .fsm-connector {
+    width: 2px;
+    height: 16px;
+    background: var(--green-b);
+    margin: 0 auto;
+  }
+
+  /* Boot sequence */
+  .boot-step {
+    display: flex;
+    align-items: flex-start;
+    gap: .8rem;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .boot-badge {
+    flex-shrink: 0;
+    background: var(--blue-b);
+    color: var(--blue);
+    font-size: .75rem;
+    font-weight: 700;
+    font-family: var(--mono);
+    padding: .2rem .5rem;
+    border-radius: 4px;
+    margin-top: .2rem;
+    min-width: 52px;
+    text-align: center;
+  }
+  .boot-text {
+    flex: 1;
+    font-size: .88rem;
+    padding: .3rem 0;
+    border-bottom: 1px dashed var(--blue-b);
+  }
+  .boot-text:last-child { border-bottom: none; }
+  .boot-note {
+    font-size: .76rem;
+    color: #64748b;
+    margin-top: .1rem;
+  }
+
+  /* Boot CR table */
+  .cr-table {
+    width: 100%;
+    max-width: 600px;
+    margin: 1rem auto;
+    border-collapse: collapse;
+    font-size: .85rem;
+  }
+  .cr-table th {
+    background: var(--blue);
+    color: #fff;
+    padding: .4rem .8rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  .cr-table td {
+    padding: .4rem .8rem;
+    border-bottom: 1px solid var(--slate-b);
+  }
+  .cr-table tr:nth-child(even) td { background: var(--blue-l); }
+  .cr-table .scope {
+    font-size: .75rem;
+    color: #64748b;
+  }
+
+  /* Guarantee table */
+  .g-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .85rem;
+    margin: 1rem 0;
+  }
+  .g-table th {
+    background: var(--slate);
+    color: #fff;
+    padding: .45rem .9rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  .g-table td {
+    padding: .45rem .9rem;
+    border-bottom: 1px solid var(--slate-b);
+    vertical-align: top;
+  }
+  .g-table tr:nth-child(even) td { background: var(--slate-l); }
+  .g-table td:first-child { font-weight: 600; color: var(--green); }
+
+  /* Files table */
+  .f-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+    margin: 1rem 0;
+  }
+  .f-table th {
+    background: var(--slate);
+    color: #fff;
+    padding: .4rem .8rem;
+    text-align: left;
+  }
+  .f-table td {
+    padding: .38rem .8rem;
+    border-bottom: 1px solid var(--slate-b);
+    vertical-align: top;
+  }
+  .f-table tr:nth-child(even) td { background: var(--slate-l); }
+  .f-table code {
+    font-family: var(--mono);
+    font-size: .8rem;
+    background: #e2e8f0;
+    padding: .05rem .3rem;
+    border-radius: 3px;
+    color: var(--slate);
+  }
+
+  /* Chain of trust diagram */
+  .chain {
+    background: #fff;
+    border: 2px solid var(--slate-b);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    font-size: .84rem;
+  }
+  .chain-row {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    margin: .5rem 0;
+  }
+  .chain-node {
+    border-radius: 6px;
+    padding: .35rem .75rem;
+    font-size: .82rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chain-arrow {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+  .chain-note {
+    font-size: .76rem;
+    color: #64748b;
+    font-style: italic;
+  }
+  .chain-divider {
+    border: none;
+    border-top: 1px dashed var(--slate-b);
+    margin: .8rem 0;
+  }
+
+  /* Warning box */
+  .warning {
+    background: var(--red-l);
+    border: 1px solid var(--red-b);
+    border-radius: 8px;
+    padding: .9rem 1.1rem;
+    font-size: .87rem;
+    color: var(--red);
+    margin: 1rem 0;
+  }
+  .warning strong { font-weight: 700; }
+
+  .note {
+    background: var(--amber-l);
+    border: 1px solid var(--amber-b);
+    border-radius: 8px;
+    padding: .9rem 1.1rem;
+    font-size: .87rem;
+    color: var(--amber);
+    margin: 1rem 0;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: .85em;
+    background: #e2e8f0;
+    padding: .05rem .3rem;
+    border-radius: 3px;
+  }
+
+  .confidential {
+    text-align: center;
+    color: #94a3b8;
+    font-size: .8rem;
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--slate-b);
+  }
+
+  @media (max-width: 600px) {
+    .split { flex-direction: column; align-items: center; }
+    .split-branch { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>SWITCH — Full Lifecycle &amp; Chain of Trust</h1>
+  <p class="subtitle">v1.0 &nbsp;·&nbsp; May 2026 &nbsp;·&nbsp; CONFIDENTIAL &nbsp;·&nbsp; Kenneth Hamer-Hodges</p>
+
+  <p>
+    <strong>SWITCH</strong> is the only instruction that can write to the system-wide
+    privileged registers <strong>CR13</strong> (interrupt handler) and <strong>CR15</strong>
+    (namespace root). The hardware FSM checks are necessary but not sufficient —
+    the full security guarantee requires tracing the chain of trust through three phases.
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 0 -->
+
+  <h2 class="phase-0">Phase 0 — Namespace Birth</h2>
+  <span class="phase-label pl-0">Once only &mdash; at manufacture or first configuration</span>
+
+  <p>
+    Before any GT exists there is nothing — no namespace, no permissions, no authority.
+    The root of trust must be created from randomness. This is <em>turning lead into gold</em>:
+    inert random data becomes an unforgeable Abstract GT that anchors all future authority.
+  </p>
+
+  <div class="flow">
+    <div class="box purple">
+      <strong>Hardware RNG</strong>
+      128-bit secret &mdash; known to nobody yet
+    </div>
+    <div class="arrow"></div>
+    <div class="arrow-label">Mint.Encode( type=Abstract, ab_data=secret, perms=none )</div>
+    <div class="box purple">
+      <strong>NS_IDENTITY_GT</strong>
+      Abstract GT &nbsp;·&nbsp; no NS entry &nbsp;·&nbsp; no permissions &nbsp;·&nbsp; gt_seq=0
+      <small>This word IS the root of trust — value-in-token, unforgeable</small>
+    </div>
+    <div class="arrow"></div>
+  </div>
+
+  <div class="split">
+    <div class="split-branch">
+      <span class="split-label ok">Copy A</span>
+      <div class="box purple" style="font-size:.82rem">
+        <strong>Mint's private c-list</strong>
+        Never shared. This is Mint's proof that it is the legitimate issuer for this namespace.
+      </div>
+    </div>
+    <div class="split-branch">
+      <span class="split-label ok">Copy B</span>
+      <div class="box purple" style="font-size:.82rem">
+        <strong>Namespace owner</strong>
+        The "owner credential". Must be kept secret. Required to authorise any future SWITCH.
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    After Phase 0, exactly <strong>two</strong> parties hold the NS Identity: Mint and the namespace owner.
+    No instruction can derive, copy (B=0), or forge it.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 1 -->
+
+  <h2 class="phase-1">Phase 1 — Boot Sequence</h2>
+  <span class="phase-label pl-1">Every power-on &mdash; Boot ROM with M-elevation</span>
+
+  <p>
+    The boot ROM runs with <code>m_elevated=1</code> permanently asserted.
+    This bypasses the L-permission check inside mLoad, allowing the namespace root
+    to be loaded before any GT authority exists. NS integrity32 is still verified —
+    the boot image must contain correct pre-computed hashes.
+    <strong>SWITCH is not used during normal boot.</strong>
+  </p>
+
+  <div style="max-width:600px;margin:1rem auto;display:flex;flex-direction:column;gap:.3rem">
+    <div class="boot-step">
+      <span class="boot-badge">B:00</span>
+      <div class="boot-text">
+        FAULT_RST &mdash; clear all CRs, DRs; M-elevation ON
+        <div class="boot-note">LEDs = 0b000001</div>
+      </div>
+    </div>
+    <div class="boot-step">
+      <span class="boot-badge">B:01</span>
+      <div class="boot-text">
+        LOAD_NS &mdash; mLoad( NS[0] = Boot.NS ) &rarr; CR15
+        <div class="boot-note">M-elevation bypasses L-perm &nbsp;·&nbsp; integrity32 still verified &nbsp;·&nbsp; CR15: NULL &rarr; namespace root</div>
+      </div>
+    </div>
+    <div class="boot-step">
+      <span class="boot-badge">B:02</span>
+      <div class="boot-text">
+        INIT_THRD &mdash; mLoad( NS[1] = Boot.Thread ) &rarr; CR12
+      </div>
+    </div>
+    <div class="boot-step">
+      <span class="boot-badge">B:03</span>
+      <div class="boot-text">
+        INIT_ABSTR &mdash; mLoad( NS[3] = Boot.Abstr ) &rarr; CR6
+      </div>
+    </div>
+    <div class="boot-step">
+      <span class="boot-badge">B:04</span>
+      <div class="boot-text">
+        LOAD_NUC &mdash; CR14 &larr; Boot.Abstr code region
+        <div class="boot-note">LEDs = 0b111111 &nbsp;·&nbsp; Boot.Abstr executes &rarr; Startup.Config.Execute()</div>
+      </div>
+    </div>
+  </div>
+
+  <p style="margin-top:1rem"><strong>Register state after boot:</strong></p>
+  <table class="cr-table">
+    <tr><th>Register</th><th>Contents</th><th>Scope</th></tr>
+    <tr><td><code>CR12</code></td><td>Thread Stack GT</td><td class="scope">System-wide &mdash; unchanged by CHANGE</td></tr>
+    <tr><td><code>CR13</code></td><td>NULL or boot default</td><td class="scope">System-wide &mdash; unchanged by CHANGE</td></tr>
+    <tr><td><code>CR14</code></td><td>Boot.Abstr code GT</td><td class="scope">Per-thread &mdash; re-derived on every CALL</td></tr>
+    <tr><td><code>CR15</code></td><td>Boot.NS root GT</td><td class="scope">System-wide &mdash; unchanged by CHANGE</td></tr>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 2 -->
+
+  <h2 class="phase-2">Phase 2 — PassKey Issuance</h2>
+  <span class="phase-label pl-2">Runtime &mdash; required before any SWITCH can execute</span>
+
+  <p>
+    The caller must prove namespace ownership to Mint before Mint will produce a PassKey.
+    Without this upstream gate, the hardware checks in Phase 3 would be trivially bypassable
+    by anyone who could place any Abstract GT into a source CR.
+  </p>
+
+  <div class="flow">
+    <div class="box amber">
+      <strong>Caller presents NS_IDENTITY_GT to Mint</strong>
+      Mint.IssuePassKey( NS_IDENTITY_GT, target = CR15 )
+    </div>
+    <div class="arrow"></div>
+    <div class="box slate">
+      <strong>Does NS_IDENTITY_GT match Mint's stored copy?</strong>
+    </div>
+    <div class="arrow"></div>
+  </div>
+
+  <div class="split">
+    <div class="split-branch">
+      <span class="split-label ok">MATCH</span>
+      <div class="arrow" style="background:var(--green-b)"></div>
+      <div class="box green" style="font-size:.82rem">
+        <strong>Mint.Encode( type=Abstract )</strong>
+        word1_location = 0xFFFFFFFF (CR15 sentinel)<br>
+        &mdash; or &mdash;<br>
+        word1_location = 0xFFFFFFFE (CR13 sentinel)
+      </div>
+      <div class="arrow" style="background:var(--green-b)"></div>
+      <div class="box green" style="font-size:.82rem">
+        <strong>PassKey Abstract GT issued</strong>
+        B=0 &mdash; cannot be copied by user code (mSave faults)
+      </div>
+      <div class="arrow" style="background:var(--green-b)"></div>
+      <div class="box green" style="font-size:.82rem">
+        <strong>Mint.Transfer &rarr; caller's CR (e.g. CR0)</strong>
+        Mint places it directly; no mSave needed
+      </div>
+    </div>
+    <div class="split-branch">
+      <span class="split-label bad">NO MATCH</span>
+      <div class="arrow" style="background:var(--red-b)"></div>
+      <div class="box red" style="font-size:.82rem">
+        <strong>REFUSE &mdash; fault</strong>
+        No PassKey issued.<br>
+        Caller cannot SWITCH anything.
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:1.5rem">
+    <strong>Sentinel values</strong> — <code>0xFFFFFFFF</code> (CR15) and <code>0xFFFFFFFE</code> (CR13) —
+    sit at the top of the hardware I/O address range. No live lump base address can ever occupy
+    these locations, so there is no ambiguity with a real memory capability.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ PHASE 3 -->
+
+  <h2 class="phase-3">Phase 3 — The SWITCH Instruction</h2>
+  <span class="phase-label pl-3">Hardware FSM &mdash; hardware/switch.py</span>
+
+  <p>
+    <code>SWITCH CR0, #7</code> &nbsp;&mdash;&nbsp; CR0 holds the PassKey; <code>#7</code> is the Tgt field for CR15
+    (<code>dest_cr = CR8 + Tgt = CR15</code>). Five sequential checks before mLoad.
+  </p>
+
+  <div style="margin:1.5rem 0">
+    <div class="fsm-check">
+      <div class="fsm-num green">①</div>
+      <div class="fsm-body">
+        <div class="check-q">CHECK_TARGET — is Tgt ∈ {5, 7}?</div>
+        <div class="pass">5 &rarr; CR13 &nbsp;&nbsp; 7 &rarr; CR15 &nbsp;&nbsp; → proceed to ②</div>
+        <div class="fault">Any other value &rarr; INVALID_OP fault</div>
+      </div>
+    </div>
+    <div class="fsm-connector"></div>
+    <div class="fsm-check">
+      <div class="fsm-num green">②</div>
+      <div class="fsm-body">
+        <div class="check-q">CHECK_SRC — is source CR index in range 0–7?</div>
+        <div class="pass">In range &rarr; proceed to ③</div>
+        <div class="fault">Out of range &rarr; INVALID_OP fault</div>
+      </div>
+    </div>
+    <div class="fsm-connector"></div>
+    <div class="fsm-check">
+      <div class="fsm-num green">③</div>
+      <div class="fsm-body">
+        <div class="check-q">READ_SRC — latch full contents of source CR</div>
+        <div class="pass">PassKey capability latched into src_reg &rarr; proceed to ④</div>
+      </div>
+    </div>
+    <div class="fsm-connector"></div>
+    <div class="fsm-check">
+      <div class="fsm-num green">④</div>
+      <div class="fsm-body">
+        <div class="check-q">CHECK_PASSKEY_TYPE — is src.word0_gt.gt_type == 0b11 (Abstract)?</div>
+        <div class="pass">Abstract GT confirmed &rarr; proceed to ⑤</div>
+        <div class="fault">Inform, Outform, or NULL &rarr; INVALID_OP fault</div>
+      </div>
+    </div>
+    <div class="fsm-connector"></div>
+    <div class="fsm-check">
+      <div class="fsm-num green">⑤</div>
+      <div class="fsm-body">
+        <div class="check-q">CHECK_PASSKEY_SENTINEL — does src.word1_location match the expected sentinel for this target?</div>
+        <div class="pass">Sentinel matches &rarr; proceed to ⑥</div>
+        <div class="fault">Mismatch (e.g. CR13 PassKey presented to CR15 target) &rarr; INVALID_OP fault</div>
+      </div>
+    </div>
+    <div class="fsm-connector"></div>
+    <div class="fsm-check">
+      <div class="fsm-num green">⑥</div>
+      <div class="fsm-body">
+        <div class="check-q">ChurchMLoad( src=CR0, dst=CR15, m_elevated=1 )</div>
+        <div class="pass">
+          L-permission check bypassed (m_elevated) &nbsp;·&nbsp;
+          NS integrity32 verified &nbsp;·&nbsp;
+          gt_seq revocation check &nbsp;·&nbsp;
+          g-bit reset &nbsp;·&nbsp;
+          CR15 &larr; new capability &nbsp;·&nbsp;
+          thread table shadow updated
+        </div>
+        <div class="fault">Any mLoad failure &rarr; fault propagated</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="split" style="margin-top:1rem">
+    <div class="split-branch">
+      <span class="split-label ok">SUCCESS</span>
+      <div class="box green" style="font-size:.82rem">
+        <strong>CR15 holds the new namespace root</strong>
+        CR0 is <em>unchanged</em> &mdash; one-way install, not a swap.<br>
+        Change is system-wide and immediate.
+      </div>
+    </div>
+    <div class="split-branch">
+      <span class="split-label bad">FAULT</span>
+      <div class="box red" style="font-size:.82rem">
+        <strong>INVALID_OP (checks ①–⑤) or mLoad fault (⑥)</strong>
+        CR15 unchanged. Fault handler invoked.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ CHAIN -->
+
+  <h2 class="plain">Complete Chain of Trust</h2>
+
+  <div class="chain">
+    <div class="chain-row">
+      <div class="chain-node" style="background:var(--purple-l);color:var(--purple)">Phase 0: Random Number</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--purple-l);color:var(--purple)">NS_IDENTITY_GT</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--purple-l);color:var(--purple)">Mint (private copy)</div>
+    </div>
+    <div class="chain-note" style="margin:.3rem 0 .6rem 1rem">
+      &uarr; owner also holds a copy &mdash; never shared with anyone else
+    </div>
+    <hr class="chain-divider">
+    <div class="chain-row">
+      <div class="chain-node" style="background:var(--amber-l);color:var(--amber)">Owner presents NS_IDENTITY_GT</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--amber-l);color:var(--amber)">Mint verifies identity</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--amber-l);color:var(--amber)">PassKey issued (sentinel set)</div>
+    </div>
+    <div class="chain-note" style="margin:.3rem 0 .6rem 1rem">
+      B=0 on PassKey &mdash; cannot be copied by user code
+    </div>
+    <hr class="chain-divider">
+    <div class="chain-row">
+      <div class="chain-node" style="background:var(--amber-l);color:var(--amber)">Mint.Transfer &rarr; caller's CR</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--green-l);color:var(--green)">SWITCH CRn, #target</div>
+    </div>
+    <hr class="chain-divider">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.4rem">
+      <div class="chain-node" style="background:var(--green-l);color:var(--green);font-size:.8rem">① target valid?</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--green-l);color:var(--green);font-size:.8rem">② src in range?</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--green-l);color:var(--green);font-size:.8rem">③ Abstract GT?</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--green-l);color:var(--green);font-size:.8rem">④ sentinel ok?</div>
+      <span class="chain-arrow">&rarr;</span>
+      <div class="chain-node" style="background:var(--green-l);color:var(--green);font-size:.8rem">⑤ mLoad validates</div>
+    </div>
+    <hr class="chain-divider">
+    <div class="chain-row">
+      <div class="chain-node" style="background:var(--green-l);color:var(--green)">CR13 or CR15 updated — system-wide, immediate</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ GUARANTEES -->
+
+  <h2 class="plain">Five Guarantees</h2>
+
+  <table class="g-table">
+    <tr><th>Guarantee</th><th>Enforced by</th></tr>
+    <tr>
+      <td>Only the namespace owner can trigger a SWITCH</td>
+      <td>Mint refuses PassKey issuance without NS_IDENTITY_GT (Phase 2)</td>
+    </tr>
+    <tr>
+      <td>A PassKey for CR13 cannot install into CR15</td>
+      <td>Sentinel check in hardware FSM — check ④</td>
+    </tr>
+    <tr>
+      <td>No ordinary capability (Inform/Outform) can be SWITCHed</td>
+      <td>Abstract GT type check in hardware FSM — check ③</td>
+    </tr>
+    <tr>
+      <td>The capability being installed is authentic and unrevoked</td>
+      <td>mLoad NSGate: integrity32 + gt_seq check — check ⑤</td>
+    </tr>
+    <tr>
+      <td>The old CR15/CR13 value is not secretly moved anywhere</td>
+      <td>One-way install — source CR unchanged; no swap behaviour</td>
+    </tr>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════════ WARNING -->
+
+  <h2 class="plain">What Hardware Alone Cannot Enforce</h2>
+
+  <p>
+    The hardware FSM checks ①–④ verify the <em>form</em> of the PassKey but have no knowledge
+    of whether Mint verified the NS Identity before issuing it. The full chain depends on three
+    software conditions:
+  </p>
+
+  <div class="warning">
+    <strong>1.</strong> Mint's private c-list must be unreadable by any user-level code.<br><br>
+    <strong>2.</strong> NS_IDENTITY_GT must never be placed in a bindable (B=1) slot —
+    propagation beyond the initial two holders breaks the guarantee.<br><br>
+    <strong>3.</strong> Mint must refuse all PassKey requests that do not present the matching
+    NS_IDENTITY_GT.
+    <br><br>
+    If any of these three software conditions fail, the hardware checks are insufficient —
+    a forged PassKey could reach SWITCH and succeed.
+    <strong>The hardware is the last line of defence, not the only one.</strong>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ SIMULATOR -->
+
+  <h2 class="plain">Current Simulator Status (D-11)</h2>
+
+  <div class="warning">
+    <strong>The simulator does not implement this design.</strong>
+    <code>_execSwitch</code> in <code>simulator/simulator.js</code> performs a plain atomic CR swap
+    (<code>cr[src] ↔ cr[target]</code>) with only a NULL check on the source.
+    No type check, no sentinel check, no target restriction, no mLoad.
+    Any register 0–7 can be the target. This reflects the old pre-PassKey design.
+    Fix tracked as <strong>Task #880</strong>. Hardware is the reference.
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ FILES -->
+
+  <h2 class="plain">Related Files</h2>
+
+  <table class="f-table">
+    <tr><th>File</th><th>Role</th></tr>
+    <tr><td><code>hardware/switch.py</code></td><td>Hardware FSM — five checks + mLoad call</td></tr>
+    <tr><td><code>hardware/mload.py</code></td><td>ChurchMLoad — NS validation, g-bit reset, CR write</td></tr>
+    <tr><td><code>hardware/hw_types.py</code></td><td>Sentinel constants, GT type constants, Tgt field values</td></tr>
+    <tr><td><code>simulator/simulator.js</code></td><td><code>_execSwitch</code> — current stale implementation (pre-PassKey)</td></tr>
+    <tr><td><code>docs/HARDWARE-DEVIATIONS.md</code></td><td>D-11 — SWITCH hardware vs simulator gap</td></tr>
+    <tr><td><code>docs/switch-lifecycle.md</code></td><td>This document in Markdown form</td></tr>
+    <tr><td><code>docs/mint.md</code></td><td>Mint issuance protocol, Abstract GT note (§9)</td></tr>
+    <tr><td><code>docs/abstract-gt.md</code></td><td>Abstract GT word layout and ab_type registry</td></tr>
+    <tr><td><code>docs/namespace-security.md</code></td><td>mLoad validation pipeline, NS entry format</td></tr>
+  </table>
+
+  <div class="confidential">Confidential &mdash; Kenneth Hamer-Hodges &mdash; May 2026</div>
+
+</div>
+</body>
+</html>

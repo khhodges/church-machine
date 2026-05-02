@@ -1110,6 +1110,10 @@ def business_deck():
 def patent_unified():
     return send_from_directory(DOCS_DIR, "patent-ctmm-unified.html")
 
+@app.route("/docs/switch-lifecycle.html")
+def switch_lifecycle_html():
+    return send_from_directory(DOCS_DIR, "switch-lifecycle.html")
+
 BOOK_CHAPTERS = [
     ("Getting Started", [
         "quick-start.md",
@@ -1135,6 +1139,7 @@ BOOK_CHAPTERS = [
     ]),
     ("Part III: Security", [
         "namespace-security.md",
+        "switch-lifecycle.md",
         "trusted-security-base.md",
         "boot-permission-rules.md",
         "risks.md",
