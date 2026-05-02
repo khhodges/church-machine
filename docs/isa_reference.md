@@ -472,233 +472,257 @@ Flag-writing summary across all 20 instructions:
 
 ---
 
-## §7 — Instruction Reference (Opcodes 0–19)
+## 7. Instruction Reference — All 20 Opcodes
 
-Encoding template for all instructions:
-
-```
- 31      27 26    23 22    19 18    15 14             0
- ┌─────────┬────────┬────────┬────────┬───────────────┐
- │  op[4:0]│ cond   │ fld_a  │ fld_b  │   imm15       │
- └─────────┴────────┴────────┴────────┴───────────────┘
-```
-
-`op` selects the instruction. `cond` (4 bits) is the condition code (see §2);
-most instructions use `cond = 0b1110` (AL — always execute). `fld_a` and `fld_b`
-are 4-bit register indices; their roles vary per instruction. `imm15` is the
-15-bit immediate field; its internal structure varies.
-
-> **Permission abbreviations** used below: R=Read, W=Write, X=Execute, L=Load,
-> S=Store, E=Enter, B=Busy. "GT" = Golden Token (capability). NULL GT = word0=0.
+> **Encoding note**: The 32-bit word layout used throughout this section is:
+>
+> ```
+> bits[31:27]  op     (5 bits)  — opcode 0–19; 20–30 reserved; 31=lump header
+> bits[26:23]  cond   (4 bits)  — condition code (see §2)
+> bits[22:19]  fld_a  (4 bits)  — first operand register (CR or DR)
+> bits[18:15]  fld_b  (4 bits)  — second operand register (CR or DR)
+> bits[14:0]   imm15  (15 bits) — immediate / index field
+> ```
+>
+> This matches `assembler.js` line 924: `((op & 0x1F) << 27) | ((cond & 0xF) << 23) | ((fld_a & 0xF) << 19) | ((fld_b & 0xF) << 15) | (imm & 0x7FFF)`.
+> The diagram in §1 shows opcode as 4 bits — that diagram is a simplification; the correct width is 5 bits.
+>
+> **Permission abbreviations** used below: R=Read, W=Write, X=Execute, L=Load, S=Store, E=Enter, B=Busy. "GT" = Golden Token (capability). NULL GT = word0=0.
 
 ---
 
-### LOAD — opcode 0 (0x00)
+### LOAD — Load Capability (opcode 0, 0x00)
 
 ```
-LOAD  CRd, CRs, #row        ; three-operand (explicit c-list base)
-LOAD  CRd, Name             ; two-operand shorthand (CRs=CR6 implicit)
+Syntax:  LOAD CRd, CRs, #row
+         LOAD CRd, Name          (shorthand: CRs = CR6, row = NS slot — see A.16)
+Encoding: op[4:0]=0x00 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
-**Encoding:** `op=0 | cond | CRd | CRs | row[14:0]`
+**Semantics:** Loads the 32-bit GT word from the c-list addressed by CRs at word offset `row` into `CRd`. The full NS entry is then read and installed into CRd's three-word cache (word0=GT, word1=NS Word 1, word2=NS seals).
 
-**Semantics:** Read the GT from c-list slot `CRs[row]` and write it to `CRd`. The
-c-list base GT must have L-permission. If `CRs = CR6` the c-list location is read
-directly from `CR6.word1` (NS root); otherwise the lump header is read first to
-locate the embedded c-list at `lumpBase + lumpSize − cc`. The target NS entry's
-CRC-16 seal is validated before `CRd` is written.
+- **CRs = CR6** (c-list root): mLoad validates version and CRC seal; L permission check is skipped because CALL already validated E before the call frame was created.
+- **CRs ≠ CR6**: mLoad validates L permission on CRs itself, reads the lump header to locate the c-list region, then validates the slot.
+- **Abstract GT in slot**: installed directly into CRd without an NS table lookup (hardware device handle path).
+- **Outform GT in slot**: triggers lazy-load (Mode 1 or Mode 2); NS entry is promoted Outform→Inform on completion.
 
-*Outform (type=2):* Dispatches the Loader to install the lump, then promotes the
-slot GT from Outform → Inform and writes the Inform GT to `CRd`.
-
-*Abstract (type=3):* GT is written to `CRd` directly without a MAC/seal check.
-
-**Flags:** None written.
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `NULL_CAP` | `CRs` is NULL, or slot `row` is empty (NULL GT) |
-| `PERM_L` | `CRs` GT lacks L-permission |
-| `BOUNDS` | `row` outside c-list range, or NS index out of bounds |
-| `SEAL` | CRC-16 MAC check fails on the NS entry |
+| `NULL_CAP` | CRs is NULL, or c-list slot at `row` is 0 |
+| `PERM` | CRs lacks L permission (except when CRs = CR6) |
+| `BOUNDS` | `row` is outside the c-list range |
+| `SEAL` | NS entry CRC-16 validation fails |
 | `F_BIT` | Source GT is in a Far namespace (F=1) |
-| `CODE_NOT_RESIDENT` | Lazy load (Mode 1 restore) failed |
+| `CODE_NOT_RESIDENT` | Outform lazy-load failed |
+
+**Example:** Load the abstraction at c-list row 5 from CR6 into CR0.
+```
+LOAD AL, CR0, CR6, #5    ; opcode=0, cond=14, fld_a=0, fld_b=6, imm=5
+                          ; encoding: 0x07030005
+```
 
 ---
 
-### SAVE — opcode 1 (0x01)
+### SAVE — Save Capability (opcode 1, 0x01)
 
 ```
-SAVE  CRd, CRs, #row        ; write CRd into c-list slot CRs[row]
-SAVE  CRd, Name             ; two-operand shorthand (CRs=CR6 implicit)
+Syntax:  SAVE CRd, CRs, #row
+         SAVE CRd, Name          (shorthand: CRs = CR6, row = NS slot — see A.16)
+Encoding: op[4:0]=0x01 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
-**Encoding:** `op=1 | cond | CRd | CRs | row[14:0]`
+**Field roles** (note: reversed vs. what "destination" usually implies):
+- **CRd** — the c-list pointer. Must hold a GT with **S (Save) permission**. This is the c-list that will be written.
+- **CRs** — the GT to save. Must have **B = 1** (Bindable bit). A GT with B = 0 cannot be delegated.
 
-**Semantics:** Write the GT in `CRd` into c-list slot `CRs[row]`. Requires
-S-permission on `CRs`. The destination c-list is located by the same lump-header
-path as LOAD. After writing `memory[clistLoc + row] = CRd.word0`, updates the
-internal c-list membership map (`nsClistMap`) for the affected NS entries.
+**Semantics:** Writes the GT held in CRs into the c-list pointed to by CRd at word offset `row`. mSave validates: version seal on CRd, S permission on CRd, B=1 on CRs, and the F-bit policy on the target slot. The namespace entry is not touched — only the c-list word is written.
 
-**Flags:** None written.
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `NULL_CAP` | `CRd` or `CRs` is NULL |
-| `PERM_S` | `CRs` GT lacks S-permission |
-| `BOUNDS` | `row` outside c-list range |
-| `F_BIT` | Source GT's NS entry has F=1 |
+| `NULL_CAP` | CRd or CRs is NULL |
+| `PERM` | CRd lacks S permission, or CRs has B = 0 |
+| `BOUNDS` | `row` is outside the c-list range |
+| `SEAL` | CRd NS entry CRC fails |
+| `F_BIT` | Target slot has F = 1 (far-bit, cross-namespace) |
+
+**Example:** Save the GT in CR1 to c-list row 3 of CR0's c-list.
+```
+SAVE AL, CR0, CR1, #3    ; CRd=CR0 (S perm), CRs=CR1 (B=1), row=3
+                          ; opcode=1, cond=14, fld_a=0, fld_b=1, imm=3
+                          ; encoding: 0x0F008003
+```
 
 ---
 
-### CALL — opcode 2 (0x02)
+### CALL — Enter Abstraction (opcode 2, 0x02)
 
 ```
-CALL  CRd, MethodName       ; named method (assembler resolves index)
-CALL  CRd, #n               ; numeric method index (assembler encodes n+1)
+Syntax:  CALL CRs [, #method_index]
+         CALL CRs, MethodName     (named method — assembler resolves to 1-based index)
+         CALL Name.Method         (dot-notation shorthand)
+Encoding: op[4:0]=0x02 | cond[4] | CRs[4] | 0[4] | method[15]
 ```
 
-**Encoding:** `op=2 | cond | CRd | 0 | method_index_plus1[14:0]`
-
-`imm15 = 0` → fast path (NIA = lump_base + word 4, skipping the method table).
-`imm15 = k > 0` → method index `k−1`; hardware reads the method table at
-`lump_base + k` to find the callee's entry point.
+**Method index encoding** (see A.5):
+- `imm15 = 0` → fast path: NIA = lump_base + 4 (word 1, skips method table)
+- `imm15 = N` → hardware reads `memory[lump_base + N×4]`; result is lump-relative word offset; 0 entry = PRIVATE_METHOD FAULT
 
 **Semantics:**
-1. Verify E-permission on `CRd` GT. Far-cap check (F=1 → `F_BIT` fault, before
-   M-window writeback).
-2. M-window writeback (if M-bit active): DR11–DR13 → CR15 namespace entry, M cleared.
-3. Push 2-word frame to thread lump at STO:
-   - `STO−1`: caller's E-GT (current `CR6.word0`)
-   - `STO`: packed frame word (`returnPC[14:0] | sz=1[12] | flags[11:8] | savedSTO[7:0]`)
-4. STO decrements by 2. Callee inherits all CRs and DRs.
-5. PC → 0 (fast path) or method table entry (named method).
+1. M-window writeback fires (if M-flag set); faults `INVALID_OP` if writeback fails.
+2. mLoad validates E permission on CRs GT; derives callee lump base, c-list address, and code address.
+3. Push 2-word call frame to thread stack (see A.12):
+   - `memory[STO]` = frame word (packed returnPC, sz=1, flags, savedSTO)
+   - `memory[STO-1]` = caller's E-GT (CR6 value before call)
+4. CR6 ← callee c-list GT (E-only). CR14 ← callee code GT (X-only, privileged).
+5. PC ← NIA (lump_base + method entry, or lump_base + 4 for fast path).
 
-**Flags:** None written (saved in frame; restored by RETURN).
+Callee inherits DR0–DR15, CR0–CR5, CR7–CR11 from the caller. CR12 and CR13 are system-wide (unchanged). CR15 is per-thread (unchanged by CALL itself — restored by RETURN).
+
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `NULL_CAP` | `CRd` is NULL |
-| `PERM_E` | `CRd` GT lacks E-permission |
+| `NULL_CAP` | CRs is NULL |
+| `PERM` | CRs lacks E permission (unless Abstract GT — bypasses E check) |
+| `SEAL` | NS entry CRC fails |
+| `STACK_OVERFLOW` | STO would write into heap/DR zone |
 | `F_BIT` | Far-namespace GT (checked before M-window writeback) |
-| `PRIVATE_METHOD` | Method table entry is 0 (private or unmapped) |
+| `PRIVATE_METHOD` | Method table entry at `imm15` is 0 |
 | `INVALID_OP` | M-window writeback failed |
-| `BOUNDS` | Stack overflow (STO underrun) |
+
+**Example:** Enter the abstraction in CR1 via fast path (single entry point).
+```
+CALL AL, CR1             ; imm=0 → NIA = lump_base + 4
+                          ; opcode=2, cond=14, fld_a=1, fld_b=0, imm=0
+                          ; encoding: 0x17080000
+```
 
 ---
 
-### RETURN — opcode 3 (0x03)
+### RETURN — Return from Abstraction (opcode 3, 0x03)
 
 ```
-RETURN              ; mask = 0 (no CRs cleared)
-RETURN  #mask       ; bits 0–11 select CRs 0–11 to clear; bit 6 reserved
+Syntax:  RETURN [#mask]
+Encoding: op[4:0]=0x03 | cond[4] | 0[4] | 0[4] | mask[12] | 0[3]
 ```
 
-**Encoding:** `op=3 | cond | 0 | 0 | mask[11:0]`
+`mask` is a 12-bit field in `imm15[11:0]`. Bit N = 1 → CR_N is cleared to NULL after context restore. Bit 6 is architecturally reserved (CR6 is always restored from the frame E-GT; clearing it via mask is undefined). Bare `RETURN` (mask = 0) is fully backward-compatible.
 
-**Semantics:**
-1. If call stack is empty → `STACK_UNDERFLOW` fault.
-2. M-window writeback fires (same as CALL).
-3. Pop frame. `sz=0` → LAMBDA 1-word frame; `sz=1` → CALL 2-word frame.
-4. Restore PC, STO, and flags from frame.
-5. Reset M-bits on all CRs (`_resetAllMBits`).
-6. Apply clear mask: for each bit `i` set in `mask[11:0]`, clear `CR[i]` (zero
-   word0–word3). Bit 6 is reserved — CR6 is always restored from the frame.
-7. Sentinel frame (NIA = 0x7FFF at bottom of call stack) → `STACK_UNDERFLOW` fault.
+**Semantics** (see A.12, A.13):
+1. M-window writeback fires; faults `INVALID_OP` if writeback fails.
+2. Call stack is checked; empty stack or sentinel frame → `STACK_UNDERFLOW`.
+3. All M-bits are reset across all CRs (`_resetAllMBits`).
+4. Frame is popped:
+   - **SZ = 1 (CALL frame):** caller's CRs and DRs are restored from the saved snapshot; returnPC comes from the frame word.
+   - **SZ = 0 (LAMBDA frame):** PC is restored from `lambdaReturnPC` cache without a memory read (O(1) fast path). `lambdaActive` is cleared.
+5. mask is applied: each bit-N=1 CRs is written to NULL in one parallel operation.
+6. PC ← returnPC.
 
-*LAMBDA fast path:* When `lambdaActive=1` and the popped frame has `sz=0`, PC is
-restored from the cached `lambdaReturnPC` register — no memory read required.
-
-> **Note:** Older docs say RETURN "triggers a reboot". This is incorrect. The
-> simulator (and hardware) fault with `STACK_UNDERFLOW` when the stack is empty
-> or the sentinel frame is reached.
-
-**Flags:** Restored from saved frame (not written by RETURN itself).
+**Flags:** N — Z — C — V (no flag writes; caller's flags are restored from the saved snapshot)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `STACK_UNDERFLOW` | Empty call stack, or RETURN through sentinel frame |
-| `INVALID_OP` | M-window writeback failed |
+| `STACK_UNDERFLOW` | Call stack empty, or RETURN through boot sentinel frame (NIA = 0x7FFF) |
+| `INVALID_OP` | M-window writeback failed before frame pop |
+
+**Example:** Return, clearing CR0 and CR1 (mask = 0b000000000011 = 0x003).
+```
+RETURN AL, #0x003        ; mask bits 0 and 1 set → CR0, CR1 ← NULL
+                          ; opcode=3, cond=14, fld_a=0, fld_b=0, imm=3
+                          ; encoding: 0x1F000003
+```
+Bare return (no clearing):
+```
+RETURN AL                 ; mask=0 → no CRs cleared
+                          ; encoding: 0x1F000000
+```
 
 ---
 
-### CHANGE — opcode 4 (0x04)
+### CHANGE — Thread Context Switch (opcode 4, 0x04)
 
 ```
-CHANGE  CRd, CRs, #ns_slot      ; CRd must be CR12–CR15
+Syntax:  CHANGE CR12, CR12, #idx
+Encoding: op[4:0]=0x04 | cond[4] | CRd[4] | CRs[4] | idx[15]
 ```
 
-**Encoding:** `op=4 | cond | CRd | CRs | ns_slot[14:0]`
+**Assembler restriction:** The assembler only permits `CRd = CR12` and `CRs = CR12` (both operands reference the thread-stack register). All other privilege-zone registers (CR13–CR15) are blocked at the assembler level. The hardware is broader: CRd may be any of CR12–CR15 and drives different behaviour.
 
-**Semantics by destination register:**
+**Semantics by destination register (hardware):**
+- **CR12 or CR13** (system-wide): Load GT directly from c-list at `CRs[idx]`; no per-thread save/restore.
+- **CR14 or CR15** (per-thread): Full context switch — save the current thread's per-thread registers (CR0–CR11, CR14, CR15, DR0–DR15, STO, PC, flags) to the current thread lump; load the incoming thread's saved state from its lump. First activation of a thread starts at PC = 0.
 
-| CRd | Behaviour |
-|-----|-----------|
-| CR12 (thread stack) | System-wide direct write. Requires S-permission on `CRs`, or first-activation bypass (self-reload `CRs=CRd=CR12` by Boot.Abstr). |
-| CR13 (interrupt handler) | System-wide direct write. Requires S-permission on `CRs`. |
-| CR14 (code register) | Per-thread full context switch: saves outgoing thread's CR0–CR11, CR14, CR15, DR0–DR15, STO, PC, FLAGS; restores incoming thread's saved state (or first-activation at PC=0). CR12 and CR13 are never saved/restored (system-wide). |
-| CR15 (namespace root) | Same full context switch as CR14. |
-
-The assembler enforces that `CRd` is CR12 for normal code; CR13–CR15 require
-explicit operand override. See SWITCH (opcode 5) for context-switch via PassKey.
-
-**Flags:** None written by the instruction itself; CR14/CR15 switches restore the
-incoming thread's saved flags.
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `PRIV_REG` | `CRd` is CR0–CR11 |
-| `NULL_CAP` | `CRs` is NULL |
-| `BOUNDS` | `ns_slot` out of range |
-| `PERM_S` | CR12/CR13 write and `CRs` lacks S-permission (unless first-activation bypass) |
+| `PRIV_REG` | CRd < 12 (destination is not a privileged register) |
+| `PERM` | CRs lacks required permission for the target type |
+| `NULL_CAP` | Source c-list slot is NULL |
+
+**Example:** Switch to thread at NS index 7 (both operands are CR12 per assembler convention).
+```
+CHANGE AL, CR12, CR12, #7   ; opcode=4, cond=14, fld_a=12, fld_b=12, imm=7
+                              ; encoding: 0x27660007
+```
 
 ---
 
-### SWITCH — opcode 5 (0x05)
+### SWITCH — PassKey-Gated Privileged Write (opcode 5, 0x05)
 
 ```
-SWITCH  CRs, #Tgt
+Syntax:  SWITCH CRn, #target
+Encoding: op[4:0]=0x05 | cond[4] | 0[4] | CRn[4] | target[3] | 0[12]
 ```
 
-**Encoding:** `op=5 | cond | 0 | CRs | Tgt[2:0]`  (`Tgt` in `imm15[2:0]`)
+`target` is a 3-bit value in `imm15[2:0]`. Valid target values: `5` (CR13, interrupt handler) and `7` (CR15, namespace root).
 
-**⚠ Major simulator/hardware deviation — see D-11 in `HARDWARE-DEVIATIONS.md`.**
+**Hardware semantics** (reference: `hardware/switch.py`):
+1. **Target validity check**: `target` must be 5 or 7 — any other value → `FAULT(INVALID_OP)`.
+2. **Source range check**: CRn index (from fld_b) must be in range 0–7.
+3. **PassKey type check**: `CRn` must hold an Abstract GT (`gt_type == 0b11`). Any Inform, Outform, or NULL GT → `FAULT(INVALID_OP)`.
+4. **Sentinel check**: `CRn.word1_location` must equal the hardware-reserved sentinel for the chosen target: `0xFFFFFFFE` for CR13, `0xFFFFFFFF` for CR15. Mismatch → `FAULT(INVALID_OP)`.
+5. On all checks passing: `ChurchMLoad` writes the source capability into the target privileged register with `m_elevated = 1`; G-bit is reset. **The source CR is not cleared** — this is a one-way install, not a swap.
 
-**Hardware semantics** (`hardware/switch.py`):
-1. Read `CRs`. Check `gt_type == 0b11` (Abstract GT) → else `FAULT(INVALID_OP)`.
-2. Check `Tgt ∈ {5=CR13, 7=CR15}` → else `FAULT(INVALID_OP)`.
-3. Check `CRs.word1_location == sentinel[Tgt]`:
-   - Tgt=5 (CR13): sentinel = `0xFFFFFFFE`
-   - Tgt=7 (CR15): sentinel = `0xFFFFFFFF`
-   → else `FAULT(INVALID_OP)`.
-4. `ChurchMLoad` writes `CRs` into the target privileged register with `m_elevated=1`,
-   resetting G=0 on the NS entry. The source CR is **not** cleared.
+**Simulator semantics** (`_execSwitch`, line ~3836): performs an **atomic CR swap** (`CRn ↔ CR[target]`) with only a NULL check. No PassKey check, no target-validity check, no sentinel check, no mLoad. See D-11 in `HARDWARE-DEVIATIONS.md`.
 
-**Simulator semantics** (`_execSwitch`, line ~3836):
-Atomic swap `cr[CRs] ↔ cr[Tgt]` where `Tgt = imm & 0x7`. No type check, no
-target-validity check, no sentinel check, no mLoad. Any register 0–7 is a valid
-target. The source CR receives the old contents of the target.
+**Flags:** N — Z — C — V (no flag writes)
 
-**Flags:** None written.
+**Faults (hardware only):**
+| Fault | Condition |
+|-------|-----------|
+| `INVALID_OP` | target ≠ 5 and target ≠ 7 |
+| `INVALID_OP` | CRn not an Abstract GT |
+| `INVALID_OP` | CRn sentinel address does not match target |
+| `NULL_CAP` | CRn is NULL (simulator only) |
+
+**Example:** Install a PassKey into CR15 (namespace root).
+```
+SWITCH AL, CR2, #7       ; CRn=CR2 (must be Abstract GT with sentinel 0xFFFFFFFF)
+                          ; opcode=5, cond=14, fld_a=0, fld_b=2, imm=7
+                          ; encoding: 0x2F010007
+```
 
 ---
 
-### TPERM — opcode 6 (0x06)
+### TPERM — Test/Attenuate Permission (opcode 6, 0x06)
 
 ```
-TPERM  CRd, PRESET      ; named preset (assembler expands to code)
-TPERM  CRd, #code       ; raw preset code (0–10 valid; 11–15 reserved)
-TPERM  CRd, PRESET B    ; B-modifier variant (bit 4 of code set)
+Syntax:  TPERM CRd, preset
+         TPERM CRd, presetB        (B-modifier variant, e.g. EB, RWB)
+Encoding: op[4:0]=0x06 | cond[4] | CRd[4] | 0[4] | preset[5] | 0[10]
 ```
 
-**Encoding:** `op=6 | cond | CRd | 0 | B[4] | code[3:0]`  (`imm15[4:0]`)
-
-**Preset table:**
+`preset` is a 5-bit value in `imm15[4:0]`. Bit 4 = B-modifier; bits [3:0] = preset code:
 
 | Code | Name | Required permissions |
 |------|------|---------------------|
@@ -715,428 +739,587 @@ TPERM  CRd, PRESET B    ; B-modifier variant (bit 4 of code set)
 | 0x0A | W | W only (no R) |
 | 0x0B–0x0F | — | **Reserved** |
 
-B-modifier variants: add 0x10 to any valid code (e.g. `EB = 0x18`).
+B-modifier variants (bit 4 = 1): add 0x10 to any valid code (e.g. `EB = 0x18`). The B-modifier clears the Busy bit in CRd when the permission test passes.
+
+**Semantics** (in order):
+1. **NULL check**: if `CRd.word0 == 0` → Z=0, N=1, C=0, V=0, return immediately (no fault).
+2. **Reserved preset check**: if preset code (bits[3:0]) is `0x0B–0x0F` → Z=0, N=1, C=0, V=0. Hardware additionally faults with `TPERM_RSV` (see D-3 in `HARDWARE-DEVIATIONS.md`).
+3. **Domain-purity check**: if the intersection of the preset's required permissions and the GT's held permissions would combine X with any of L/S/E → `FAULT(TPERM_RSV)`.
+4. **Permission test**: `hasAll = required_permissions.every(p => GT.permissions[p])`.
+5. **B-modifier**: if bit 4 is set and `hasAll == true` → clear bit 31 of `CRd.word0` (the Busy bit) in place.
+6. Set flags: Z = hasAll, N = !hasAll, C = 0, V = 0.
+
+**Flags:** N = !Z, Z = (all required permissions present), C = 0 (always), V = 0 (always)
+
+**Faults:**
+| Fault | Condition |
+|-------|-----------|
+| `TPERM_RSV` | Result permissions would combine X with L/S/E (domain-purity violation) |
+
+Note: reserved preset codes (0x0B–0x0F) are a hard fault on hardware but produce Z=0 in the simulator (see D-3).
+
+**Example:** Test for E permission; clear B-bit if present.
+```
+TPERM AL, CR1, EB        ; preset EB = 0x18 (E=0x08 | B-modifier=0x10)
+BRANCH EQ, call_ok       ; Z=1 → CR1 has E permission and B was cleared
+                          ; opcode=6, cond=14, fld_a=1, fld_b=0, imm=0x18
+                          ; encoding: 0x37080018
+```
+
+Test for R permission (existence of a readable data object):
+```
+TPERM AL, CR2, R         ; preset R = 0x01
+                          ; opcode=6, cond=14, fld_a=2, fld_b=0, imm=1
+                          ; encoding: 0x37100001
+```
+
+---
+
+### LAMBDA — Execute Code Object in Caller Scope (opcode 7, 0x07)
+
+```
+Syntax:  LAMBDA CRn
+Encoding: op[4:0]=0x07 | cond[4] | CRn[4] | 0[4] | 0[15]
+```
 
 **Semantics:**
-1. If `CRd.word0 == 0` (NULL GT): Z=0, N=1, C=0, V=0. Return. No fault.
-2. If preset code is reserved (0x0B–0x0F, or B-modifier variant): hardware faults
-   `TPERM_RSV`; simulator currently sets Z=0 silently (deviation C.1, Task #873).
-3. Domain-purity check: if result would combine X with any of L/S/E →
-   `FAULT(TPERM_RSV)`. Hard fault in both simulator and hardware.
-4. Test: does the GT hold all required permissions? Z = 1 if yes, 0 if no.
-5. If Z=1 and B-modifier set: clear bit 31 of `CRd.word0` (the Busy bit) in-place.
+1. mLoad validates X permission on CRn's GT. Faults if NULL or lacks X.
+2. M-window cache is flushed (`_flushLambdaCache`).
+3. A **SZ=0 frame** (1 word) is written to the thread stack: `memory[STO] = frameWord` (see A.13). No E-GT word is pushed.
+4. `lambdaActive` ← 1. `lambdaReturnPC` ← PC + 1 (instruction after LAMBDA).
+5. PC ← NIA derived from CRn's lump (code executes within the **caller's c-list context** — CR6 is not changed). CR14 is also unchanged; the lambda shares the caller's code fence.
 
-**Mode 2 (attenuation sentinel):** `imm15 = 0x7FFF` triggers permission
-attenuation rather than a test — see A.7 in §6. Not yet implemented in simulator
-(Task #874).
+LAMBDA does not switch c-lists. The callee inherits the caller's CR6. This is the defining difference from CALL.
 
-**Flags:** Z = pass/fail, N = !Z, C = 0, V = 0. Always.
+**Idempotent re-entry rule (D-9):** `LAMBDA CR6` while `lambdaActive = 1` is permitted and idempotent (same return address overwrites the same register). `LAMBDA CRn` (n ≠ 6) while `lambdaActive = 1` is a FAULT.
+
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `TPERM_RSV` | Reserved preset code, or domain-purity violation (X+LSE) |
+| `NULL_CAP` | CRn is NULL |
+| `PERM` | CRn's GT lacks X permission |
+| `BOUNDS` | STO would write into heap/DR zone (stack overflow) |
+| `FAULT` | `LAMBDA CRn` (n ≠ 6) while `lambdaActive = 1` |
+
+**Example:** Execute reduction code referenced by CR3.
+```
+LAMBDA AL, CR3           ; opcode=7, cond=14, fld_a=3, fld_b=0, imm=0
+                          ; encoding: 0x3F180000
+```
 
 ---
 
-### LAMBDA — opcode 7 (0x07)
+### ELOADCALL — Fused Load + Call (opcode 8, 0x08)
 
 ```
-LAMBDA  CRd
+Syntax:  ELOADCALL CRd, CRs, #row [, #method]
+         ELOADCALL CRd, Name [, Method]    (shorthand — see A.6 and A.16)
+Encoding: op[4:0]=0x08 | cond[4] | CRd[4] | CRs[4] | method[7] | row[8]
 ```
 
-**Encoding:** `op=7 | cond | CRd | 0 | 0`
+`imm15[14:8]` = method index (7 bits, 1-based; 0 = fast path).
+`imm15[7:0]` = c-list row (8 bits, 0–255).
 
-**Semantics:** Enter an inline (leaf) Church reduction. `CRd` must hold a non-NULL
-GT with X-permission.
-1. Verify X-permission on `CRd` GT via mLoad.
-2. Check stack bounds against thread lump `sw` (stack watermark) field; set V=1 if
-   STO would go below the watermark, but do not fault.
-3. Push SZ=0 frame word to thread lump at `STO`: `returnPC[14:0] | sz=0[12] | flags[11:8] | savedSTO[7:0]`.
-4. Cache `lambdaReturnPC = PC + 1` and set `lambdaActive = true`.
-5. STO decrements by 1. PC advances by 1 (callee code immediately follows).
+**Semantics:** Atomic LOAD + CALL. No intermediate CR state is visible between the two phases.
+1. mLoad validates CRs's c-list for the row slot (L permission check as per LOAD semantics).
+2. GT at `CRs[row]` is loaded; Outform GTs are promoted Outform→Inform.
+3. mLoad validates E permission on the loaded GT.
+4. CRd ← loaded GT.
+5. Hardware CALL phase executes: push 2-word frame, set CR6/CR14, jump to callee entry. Method index is decoded from `imm15[14:8]` using the same 1-based encoding as CALL.
 
-*Idempotent re-entry:* Re-executing `LAMBDA CR6` while `lambdaActive = 1` is
-non-faulting — the same return address overwrites the cached register. `LAMBDA CRn`
-(n ≠ 6) while `lambdaActive = 1` → `FAULT`.
+Backward compatibility: programs that encode `imm15[14:8] = 0` get the fast-path (NIA = lump_base + 4) — identical to pre-split behaviour.
 
-**Flags:** V=1 if stack below watermark (soft warning only); otherwise flags
-unchanged by LAMBDA itself.
+**Flags:** N — Z — C — V (no flag writes)
+
+**Faults:** All faults from LOAD and CALL apply. Additionally:
+| Fault | Condition |
+|-------|-----------|
+| `BOUNDS` | `row` > 255 (assembler-enforced; hardware checks via c-list bounds) |
+
+**Example:** Load abstraction from c-list row 2 of CR6 into CR0, then call it via fast path.
+```
+ELOADCALL AL, CR0, CR6, #2    ; row=2, method=0 (fast path)
+                                ; opcode=8, cond=14, fld_a=0, fld_b=6, imm=0x0002
+                                ; encoding: 0x43030002
+```
+
+---
+
+### XLOADLAMBDA — Fused Load + Lambda (opcode 9, 0x09)
+
+```
+Syntax:  XLOADLAMBDA CRd, CRs, #row
+         XLOADLAMBDA CRd, Name       (shorthand — see A.16)
+Encoding: op[4:0]=0x09 | cond[4] | CRd[4] | CRs[4] | row[15]
+```
+
+**Semantics:** Atomic LOAD + LAMBDA. Equivalent to `LOAD CRd, CRs, #row` followed by `LAMBDA CRd`, but the two operations are indivisible — no intermediate CR state is visible.
+
+1. Load GT from `CRs[row]` into CRd (same as LOAD — L permission check, mLoad validation).
+2. LAMBDA phase: mLoad validates X permission on the loaded GT; push SZ=0 frame; set `lambdaActive`, `lambdaReturnPC`; PC jumps to callee code within the **caller's c-list** (CR6 unchanged).
+
+XLOADLAMBDA is used to invoke shared code objects (reducers, helpers) referenced in an abstraction's c-list without switching context.
+
+**Flags:** N — Z — C — V (no flag writes)
+
+**Faults:** All faults from LOAD and LAMBDA apply.
+
+**Example:** Load and execute the reduction at c-list row 7.
+```
+XLOADLAMBDA AL, CR1, CR6, #7  ; opcode=9, cond=14, fld_a=1, fld_b=6, imm=7
+                                ; encoding: 0x4B038007
+```
+
+---
+
+### DREAD — Data Read (opcode 10, 0x0A)
+
+```
+Syntax:  DREAD DRd, CRs, #offset
+Encoding: op[4:0]=0x0A | cond[4] | DRd[4] | CRs[4] | offset[15]
+```
+
+**Semantics:** Read a 32-bit word from the data object referenced by CRs at word offset `offset` into `DRd`.
+
+- **CRs requires R permission** (exception: when CRs = CR14, X permission is accepted in place of R — this allows reading embedded `WORD` constants from the current code lump via the code register).
+- mLoad validates: permission, version, CRC seal, and that `lump_base + offset` lies within the GT's bounds.
+- `DRd` is written via `_writeDR`, which enforces the DR0 hardwired-zero rule (A.1).
+- **Abstract GT intercept**: if CRs holds an Abstract GT (type = 0b11), the read is routed to the Abstract Manager — MMIO device registers (LED, UART, TIMER, BUTTON) are accessed this way.
+
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `NULL_CAP` | `CRd` is NULL |
-| `PERM_X` | `CRd` GT lacks X-permission |
-| `BOUNDS` | Stack pointer would overwrite the heap/DR zone |
-| `FAULT` | `LAMBDA CRn` (n≠6) while `lambdaActive=1` |
+| `NULL_CAP` | CRs is NULL |
+| `PERM` | CRs lacks R permission (or X when CRs = CR14) |
+| `BOUNDS` | `lump_base + offset` is outside the GT's allowed range |
+| `SEAL` | NS entry CRC fails |
+
+**Example:** Read word 3 from the data object in CR2 into DR1.
+```
+DREAD AL, DR1, CR2, #3   ; opcode=10, cond=14, fld_a=1, fld_b=2, imm=3
+                           ; encoding: 0x57090003
+```
+
+Read inline data constant from current lump (CR14 path):
+```
+data_val:  WORD 0x1234
+; ...
+DREAD AL, DR0, CR14, #data_val   ; offset = label word index; X permission accepted
+```
 
 ---
 
-### ELOADCALL — opcode 8 (0x08)
+### DWRITE — Data Write (opcode 11, 0x0B)
 
 ```
-ELOADCALL  CRd, CRs, #row       ; explicit c-list base
-ELOADCALL  CRd, Name            ; shorthand (CRs=CR6, method index from convention)
+Syntax:  DWRITE DRd, CRs, #offset
+Encoding: op[4:0]=0x0B | cond[4] | DRd[4] | CRs[4] | offset[15]
 ```
 
-**Encoding:** `op=8 | cond | CRd | CRs | method_idx[14:8] | row[7:0]`
+**Semantics:** Write the 32-bit value in `DRd` to the data object referenced by CRs at word offset `offset`.
 
-- `imm15[14:8]` = method index (7 bits, 0–127). 0 = fast path.
-- `imm15[7:0]` = c-list row (8 bits, 0–255).
+- **CRs requires W permission**. mLoad validates: W permission, version, CRC, bounds.
+- The value written is `DR[DRd] >>> 0` (unsigned 32-bit).
+- **Thread sync**: if `DRd < 16`, the written value is also mirrored to the DR home slot in the thread lump (`thread_base + 1 + DRd`) so the thread image stays coherent across context switches.
+- **Abstract GT intercept**: if CRs holds an Abstract GT (type = 0b11), the write is routed to the Abstract Manager (MMIO device write).
+- **CR14 restriction**: CR14 is X-only; DWRITE to CR14 will fail the W-permission check.
 
-**Semantics:** Atomic LOAD + TPERM(E) + CALL in a single instruction. Loads the GT
-from `CRs[row]`, verifies E-permission, pushes a SZ=1 CALL frame, and enters the
-abstraction. Outform (type=2) GTs trigger a lazy load before the TPERM check.
-Method dispatch behaves identically to CALL: `method_idx=0` → fast path (NIA=
-lump_base + word 4); `method_idx=k>0` → read method table entry k.
-
-**Flags:** None written.
-
-**Faults:** Same combined set as LOAD + CALL (NULL_CAP, PERM_E, F_BIT,
-PRIVATE_METHOD, INVALID_OP, BOUNDS, CODE_NOT_RESIDENT).
-
----
-
-### XLOADLAMBDA — opcode 9 (0x09)
-
-```
-XLOADLAMBDA  CRd, CRs, #row
-XLOADLAMBDA  CRd, Name
-```
-
-**Encoding:** `op=9 | cond | CRd | CRs | row[14:0]`
-
-**Semantics:** Atomic LOAD + TPERM(X) + LAMBDA. Loads the GT from `CRs[row]`,
-verifies X-permission, and enters it as an inline reduction (SZ=0 frame). Combines
-the load and lambda phases with no intermediate instruction.
-
-**Flags:** V=1 if stack below watermark (from LAMBDA phase); otherwise unchanged.
-
-**Faults:** Same combined set as LOAD + LAMBDA (NULL_CAP, PERM_X, F_BIT, BOUNDS,
-CODE_NOT_RESIDENT).
-
----
-
-### DREAD — opcode 10 (0x0A)
-
-```
-DREAD  DRd, CRs, #offset
-```
-
-**Encoding:** `op=10 | cond | DRd | CRs | offset[14:0]`
-
-`fld_a` encodes the destination DR index (not a CR). `fld_b` encodes the source
-CR index (the capability granting data access).
-
-**Semantics:** Read the 32-bit word at `memory[CRs.word1 + offset]` into `DRd`.
-Requires R-permission on `CRs`.
-
-**CR14 exception:** When `CRs = CR14` (the code register, which is X-only),
-DREAD uses X-permission instead of R. This is the only instruction that accepts
-X in place of R for a data read.
-
-**Abstract GT intercept:** If `CRs` holds an Abstract GT (type=3), DREAD is
-routed to the Abstract Manager rather than performing a direct memory read.
-
-**Thread lump sync:** After writing `DRd`, the value is mirrored to the DR zone of
-the current thread lump (`CR12.word1 + 1 + DRd`). CR12 must be non-NULL.
-
-**Flags:** None written.
+**Flags:** N — Z — C — V (no flag writes)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `NULL_CAP` | `CRs` is NULL, or CR12 is NULL (thread lump sync) |
-| `PERM_R` / `PERM_X` | `CRs` GT lacks required permission |
-| `BOUNDS` | `offset` out of GT address range |
+| `NULL_CAP` | CRs is NULL |
+| `PERM` | CRs lacks W permission |
+| `BOUNDS` | `lump_base + offset` outside GT's allowed range |
+| `SEAL` | NS entry CRC fails |
+| `NULL_CAP` | CR12 (thread stack) is NULL when `DRd < 16` (cannot sync DR home) |
+
+**Example:** Write DR0 to offset 0 of the data object in CR1.
+```
+DWRITE AL, DR0, CR1, #0   ; opcode=11, cond=14, fld_a=0, fld_b=1, imm=0
+                            ; encoding: 0x5F008000
+```
 
 ---
 
-### DWRITE — opcode 11 (0x0B)
+### BFEXT — Bit-Field Extract (opcode 12, 0x0C)
 
 ```
-DWRITE  DRs, CRd, #offset
+Syntax:  BFEXT DRd, DRs, #pos, #width
+Encoding: op[4:0]=0x0C | cond[4] | DRd[4] | DRs[4] | pos[5] | width[5] | 0[5]
 ```
 
-**Encoding:** `op=11 | cond | DRs | CRd | offset[14:0]`
+`imm15[9:5]` = `pos` (5-bit, 0–31 — LSB of the extracted field).
+`imm15[4:0]` = `width` (5-bit, 1–32 — number of bits to extract).
 
-Note: by convention the assembler places the source DR in `fld_a` and the
-capability register in `fld_b`. The simulator decoder names these `crDst` (= DRs)
-and `crSrc` (= CRd) which is misleading — `crDst` holds the DR index here.
-
-**Semantics:** Write `DRs` to `memory[CRd.word1 + offset]`. Requires W-permission
-on `CRd`. Mirrors the written value to the thread lump's DR zone (same path as
-DREAD). Device writes for LED, UART, and Timer NS indices are routed to simulated
-hardware peripherals.
-
-**Abstract GT intercept:** Same as DREAD — routed to Abstract Manager if `CRd`
-holds type=3.
-
-**Flags:** None written.
-
-**Faults:**
-| Fault | Condition |
-|-------|-----------|
-| `NULL_CAP` | `CRd` is NULL, or CR12 is NULL |
-| `PERM_W` | `CRd` GT lacks W-permission |
-| `BOUNDS` | `offset` out of GT address range |
-
----
-
-### BFEXT — opcode 12 (0x0C)
+**Semantics:** Extract `width` bits from `DRs` starting at bit `pos` (LSB) into `DRd`, zero-extended to 32 bits.
 
 ```
-BFEXT  DRd, DRs, pos, width
+mask  = (1 << width) - 1
+DRd   = (DRs >>> pos) & mask        ; bits[pos + width - 1 : pos]
 ```
 
-**Encoding:** `op=12 | cond | DRd | DRs | pos[9:5] | width[4:0]`
+Constraints: `width ≥ 1` and `pos + width ≤ 32` (faults `BOUNDS` otherwise).
 
-- `imm15[9:5]` = bit position (0–31)
-- `imm15[4:0]` = field width (1–31; 0 = fault)
+Flags are written (see A.2): N = result[31], Z = (result == 0), C = 0, V = 0. Since a single-byte field can never have bit 31 set, N is effectively always 0 for widths < 32.
 
-**Semantics:** Extract a `width`-bit field starting at bit `pos` from `DRs`,
-zero-extend to 32 bits, write to `DRd`:
-
-```
-mask  = (1 << width) − 1
-DRd   = (DRs >>> pos) & mask
-```
-
-**Flags:** N = DRd[31], Z = (DRd == 0), C = 0, V = 0.
+**Flags:** N = result[31], Z = (result == 0), C = 0, V = 0
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
 | `BOUNDS` | `width == 0` or `pos + width > 32` |
 
+**Example:** Extract byte 0 (bits [7:0]) of DR2 into DR1.
+```
+BFEXT AL, DR1, DR2, #0, #8  ; pos=0, width=8
+                              ; imm = (0 << 5) | 8 = 0x0008
+                              ; opcode=12, cond=14, fld_a=1, fld_b=2, imm=8
+                              ; encoding: 0x67090008
+```
+
 ---
 
-### BFINS — opcode 13 (0x0D)
+### BFINS — Bit-Field Insert (opcode 13, 0x0D)
 
 ```
-BFINS  DRd, DRs, pos, width
+Syntax:  BFINS DRd, DRs, #pos, #width
+Encoding: op[4:0]=0x0D | cond[4] | DRd[4] | DRs[4] | pos[5] | width[5] | 0[5]
 ```
 
-**Encoding:** identical field packing as BFEXT.
+Same imm15 layout as BFEXT: `imm15[9:5]` = pos, `imm15[4:0]` = width.
 
-**Semantics:** Insert the low `width` bits of `DRs` into `DRd` at bit position
-`pos`. All other bits of `DRd` are preserved:
+**Semantics:** Insert the low `width` bits of `DRs` into `DRd` at bit position `pos`. Bits of DRs beyond `width` are discarded (see A.15).
 
 ```
-mask   = ((1 << width) − 1) << pos
-DRd    = (DRd & ~mask) | ((DRs & ((1<<width)−1)) << pos)
+mask    = ((1 << width) - 1) << pos
+DRd_new = (DRd & ~mask) | ((DRs & ((1 << width) - 1)) << pos)
+DRd     ← DRd_new
 ```
 
-Upper bits of `DRs` beyond bit `width−1` are **discarded** before insertion
-(see A.15 in §6).
+Flags reflect the **entire new value of DRd** (not just the inserted bits): N = DRd_new[31], Z = (DRd_new == 0), C = 0, V = 0.
 
-**Flags:** N = DRd[31] (result), Z = (result == 0), C = 0, V = 0.
+**Flags:** N = DRd_new[31], Z = (DRd_new == 0), C = 0, V = 0
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
 | `BOUNDS` | `width == 0` or `pos + width > 32` |
 
----
-
-### MCMP — opcode 14 (0x0E)
-
+**Example:** Insert the low 4 bits of DR3 into DR2 at bit position 8.
 ```
-MCMP  DRa, DRb
-```
-
-**Encoding:** `op=14 | cond | DRa | DRb | 0`
-
-`fld_a` = DRa, `fld_b` = DRb. The decoder field names `crDst`/`crSrc` are
-misleading here — both encode DR indices. No result register.
-
-**Semantics:** Set flags from the unsigned subtraction `DRa − DRb`. No register
-is written. Equivalent to a compare for use with BRANCH condition codes.
-
-```
-N = (DRa − DRb)[31]
-Z = (DRa == DRb)
-C = (DRa >= DRb)         ; C=1 means no borrow (ARM-style)
-V = signed overflow from DRa − DRb
-```
-
-**Flags:** N, Z, C, V all written.
-
-**Faults:** None.
-
----
-
-### IADD — opcode 15 (0x0F)
-
-```
-IADD  DRd, DRa, DRb         ; register form (imm15[14]=0)
-IADD  DRd, DRa, #imm        ; immediate form (imm15[14]=1)
-```
-
-**Encoding:**
-
-- Register form: `op=15 | cond | DRd | DRa | 0[14] | 0…0 | DRb[3:0]`
-- Immediate form: `op=15 | cond | DRd | DRa | 1[14] | imm14[13:0]`
-
-`imm14` is a 14-bit **unsigned** integer (range 0–16383). There is no sign
-extension — the assembler masks negative values with `0x3FFF`.
-
-**Semantics:** `DRd = DRa + DRb` (or `DRa + #imm14`). 32-bit unsigned addition
-with full flag computation. DR0 as destination silently discards the result (DR0
-is always 0 — see A.1).
-
-**Flags:** N = result[31], Z = (result==0), C = (unsigned overflow), V = (signed overflow).
-
-**Faults:** None.
-
-**Common patterns:**
-```
-IADD  DR3, DR0, DR5         ; copy: DR3 = DR5  (using DR0 = 0)
-IADD  DR2, DR0, #42         ; load immediate: DR2 = 42
-IADD  DR1, DR1, #1          ; increment: DR1++
+BFINS AL, DR2, DR3, #8, #4  ; pos=8, width=4
+                              ; imm = (8 << 5) | 4 = 0x0104
+                              ; opcode=13, cond=14, fld_a=2, fld_b=3, imm=0x104
+                              ; encoding: 0x6F118104
 ```
 
 ---
 
-### ISUB — opcode 16 (0x10)
+### MCMP — Integer Compare (opcode 14, 0x0E)
 
 ```
-ISUB  DRd, DRa, DRb
-ISUB  DRd, DRa, #imm
+Syntax:  MCMP DRd, DRs
+Encoding: op[4:0]=0x0E | cond[4] | DRd[4] | DRs[4] | 0[15]
 ```
 
-**Encoding:** identical structure to IADD; `op=16`.
+**Semantics:** Compute `DRd − DRs` and set condition flags. **No result register is written.** This is a pure flag-setting instruction.
 
-**Semantics:** `DRd = DRa − DRb` (or `DRa − #imm14`). 32-bit unsigned subtraction.
+```
+temp = DRd - DRs
+N = temp[31]
+Z = (temp == 0)
+C = (DRd_unsigned >= DRs_unsigned)   ; borrow flag (C=1 means no borrow)
+V = signed overflow of DRd - DRs
+```
 
-**Flags:** N = result[31], Z = (result==0), C = (DRa ≥ DRb — no borrow, ARM style),
-V = (signed overflow from subtraction).
+The flag semantics match ISUB exactly (they share `_setSubFlags`). MCMP is the canonical compare instruction for use before a conditional BRANCH or conditional suffix.
 
-**Faults:** None.
+**Flags:** N, Z, C, V — all written (subtraction semantics)
+
+**Faults:** None
+
+**Example:** Compare DR1 with DR2, then branch if equal.
+```
+MCMP AL, DR1, DR2        ; flags set from DR1 - DR2
+BRANCH EQ, equal_path    ; branch if Z=1 (DR1 == DR2)
+                          ; opcode=14, cond=14, fld_a=1, fld_b=2, imm=0
+                          ; encoding: 0x77090000
+```
 
 ---
 
-### BRANCH — opcode 17 (0x11)
+### IADD — Integer Add (opcode 15, 0x0F)
 
 ```
-BRANCH.cond  ±offset        ; signed PC-relative
+Syntax:  IADD DRd, DRs, DRt      (register form)
+         IADD DRd, DRs, #k        (immediate form, 0 ≤ k ≤ 16383)
+Encoding (register): op[4:0]=0x0F | cond[4] | DRd[4] | DRs[4] | 0[11] | DRt[4]
+Encoding (immediate): op[4:0]=0x0F | cond[4] | DRd[4] | DRs[4] | 1[1] | k[14]
 ```
 
-**Encoding:** `op=17 | cond | 0 | 0 | soff[14:0]`
+`imm15[14] = 1` → immediate mode; `imm15[13:0]` = k (0–16383, unsigned).
+`imm15[14] = 0` → register mode; `imm15[3:0]` = DRt index.
 
-`imm15[14]` is the sign bit. Sign-extend to 32 bits:
+**Semantics:**
+- Register form: `DRd = DRs + DRt` (unsigned 32-bit addition with flag capture)
+- Immediate form: `DRd = DRs + k`
+
+All arithmetic is 33-bit wide internally; the low 32 bits are stored in DRd; bit 32 drives the C flag.
+
+Idioms enabled by DR0 = 0 (A.1):
+- `IADD DRd, DR0, #k` → `DRd ← k` (load small immediate, 0–16383)
+- `IADD DRd, DR0, DRs` → `DRd ← DRs` (register copy)
+
+**Note on negative immediate:** `#-1` is not directly encodable (immediate is unsigned 14 bits: 0–16383). To load −1, use `ISUB DRd, DR0, #1`.
+
+**Flags:** N = result[31], Z = (result == 0), C = carry out (bit 32), V = signed overflow
+
+**Faults:** None
+
+**Example:** Add DR1 and the constant 10, store in DR2.
+```
+IADD AL, DR2, DR1, #10   ; immediate form: imm = 0x4000 | 10 = 0x400A
+                           ; opcode=15, cond=14, fld_a=2, fld_b=1, imm=0x400A
+                           ; encoding: 0x7F10C00A
+```
+
+Load immediate 42 into DR5:
+```
+IADD AL, DR5, DR0, #42   ; DR0 = 0 always; result = 0 + 42 = 42
+                           ; encoding: 0x7F28000A... (imm=0x4000|42=0x402A)
+```
+
+---
+
+### ISUB — Integer Subtract (opcode 16, 0x10)
 
 ```
-soff = (imm15 & 0x4000) ? (imm15 | 0xFFFF8000) : imm15
+Syntax:  ISUB DRd, DRs, DRt      (register form)
+         ISUB DRd, DRs, #k        (immediate form, 0 ≤ k ≤ 16383)
+Encoding (register): op[4:0]=0x10 | cond[4] | DRd[4] | DRs[4] | 0[11] | DRt[4]
+Encoding (immediate): op[4:0]=0x10 | cond[4] | DRd[4] | DRs[4] | 1[1] | k[14]
 ```
 
-**Semantics:** If the condition code `cond` is satisfied by the current flags: PC
-← PC + soff. Otherwise: PC ← PC + 1 (sequential).
+Immediate encoding identical to IADD: `imm15[14] = 1` → immediate, `imm15[13:0]` = k.
 
-`soff = 0` is an **infinite loop** (PC + 0 = PC). `soff = -1` (0x7FFF) branches
-to the previous instruction. BRANCH is the only instruction that may leave PC
-unchanged.
+**Semantics:**
+- Register form: `DRd = DRs − DRt`
+- Immediate form: `DRd = DRs − k`
 
-**Flags:** None written (reads existing flags to evaluate `cond`).
+Carry flag semantics: `C = 1` when `DRs_unsigned ≥ DRt_unsigned` (no borrow). This matches ARM convention: C is the complement of the borrow bit.
+
+Idiom: `ISUB DRd, DR0, #1` → `DRd ← −1` (all-ones, 0xFFFFFFFF), since DR0 = 0.
+
+**Flags:** N = result[31], Z = (result == 0), C = (DRs ≥ DRt unsigned), V = signed overflow
+
+**Faults:** None
+
+**Example:** Subtract 1 from the loop counter in DR3.
+```
+ISUB AL, DR3, DR3, #1    ; DR3 ← DR3 - 1; sets Z=1 when DR3 reaches 0
+                           ; opcode=16, cond=14, fld_a=3, fld_b=3, imm=0x4001
+                           ; encoding: 0x831BC001
+```
+
+---
+
+### BRANCH — Conditional PC-Relative Branch (opcode 17, 0x11)
+
+```
+Syntax:  BRANCH[cond] #offset        (signed integer offset)
+         BRANCH[cond] label           (assembler resolves to signed offset)
+Encoding: op[4:0]=0x11 | cond[4] | 0[4] | 0[4] | soff[15]
+```
+
+`imm15` is interpreted as a **signed 15-bit offset** with bit 14 as the sign bit (see A.4):
+```
+soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm    ; sign-extend bit 14
+PC   ← PC + soff                                      ; word addressing
+```
+
+Range: −16384 to +16383 words. BRANCH always requires a condition suffix — use `BRANCH AL` for unconditional. Condition code is encoded in bits[26:23] as usual; the instruction word has no "bare BRANCH" form.
+
+The condition is tested on entry to this instruction. If the condition is false, BRANCH is skipped like any other instruction (PC += 1, no flags changed, no side effects).
+
+Key offsets (see A.4):
+- `#0` → infinite loop (target = current PC)
+- `#1` → fall-through (target = PC + 1 = next instruction; effectively a NOP branch)
+- `#-1` → step back to previous instruction
+
+**Flags:** None written (flags are read, never modified)
 
 **Faults:**
 | Fault | Condition |
 |-------|-----------|
-| `BOUNDS` | Target address `PC + soff` is outside memory |
+| `BOUNDS` | `PC + soff` is outside the loaded memory image (simulator) or outside CR14 code fence (hardware) |
+
+**Example:** Loop back to `loop_top` while DR1 ≠ 0.
+```
+loop_top:
+    ISUB AL, DR1, DR1, #1
+    BRANCH NE, loop_top   ; soff = loop_top_word − branch_word (negative)
+                           ; cond=1 (NE), opcode=17
+```
+
+Unconditional forward jump by 3 words:
+```
+BRANCH AL, #3             ; opcode=17, cond=14, fld_a=0, fld_b=0, imm=3
+                           ; encoding: 0x8B000003
+```
 
 ---
 
-### SHL — opcode 18 (0x12)
+### SHL — Shift Left (opcode 18, 0x12)
 
 ```
-SHL  DRd, DRs, #shamt       ; shamt = 0–31
+Syntax:  SHL DRd, DRs, #shamt     (0 ≤ shamt ≤ 31)
+Encoding: op[4:0]=0x12 | cond[4] | DRd[4] | DRs[4] | 0[10] | shamt[5]
 ```
 
-**Encoding:** `op=18 | cond | DRd | DRs | 0…0 | shamt[4:0]`
+`imm15[4:0]` = shift amount (5 bits, 0–31). `imm15[14:5]` must be 0.
 
-**Semantics:** `DRd = (DRs << shamt) & 0xFFFFFFFF`. Logical left shift; vacated
-low bits are filled with 0.
-
-Carry: `C = DRs[32 − shamt]` (the last bit shifted out of the top of the word),
-gated to 0 when `shamt = 0`.
+**Semantics:** Logical shift left. Zero-fill from the right.
 
 ```
-shamt = 0: DRd = DRs, C = 0
-shamt = 1: DRd = DRs << 1, C = DRs[31]
-shamt = 31: DRd = DRs << 31, C = DRs[1]
+DRd    = (DRs << shamt) & 0xFFFFFFFF    ; 32-bit result
+C      = (shamt > 0) ? DRs[32 - shamt] : 0
+                                          ; last bit shifted out (source[32-shamt])
+N      = DRd[31]
+Z      = (DRd == 0)
+V      = 0 always
 ```
 
-**Flags:** N = DRd[31], Z = (DRd==0), C = last bit shifted out, V = 0.
+Hardware confirmed: C is the last bit shifted out of DRs, gated on shamt > 0 (Task #857, D-12).
 
-**Faults:** None.
+**Flags:** N = result[31], Z = (result == 0), C = last bit shifted out (0 if shamt = 0), V = 0
+
+**Faults:** None
+
+**Example:** Shift DR2 left by 4, store in DR1.
+```
+SHL AL, DR1, DR2, #4     ; opcode=18, cond=14, fld_a=1, fld_b=2, imm=4
+                           ; encoding: 0x97090004
+```
 
 ---
 
-### SHR — opcode 19 (0x13)
+### SHR — Shift Right (opcode 19, 0x13)
 
 ```
-SHR  DRd, DRs, #shamt           ; LSR — logical (zero-fill)
-SHR  DRd, DRs, #shamt, ASR      ; ASR — arithmetic (sign-extend)
+Syntax:  SHR DRd, DRs, #shamt              (LSR — logical, zero-fill)
+         SHR DRd, DRs, #shamt, ASR         (ASR — arithmetic, sign-extend)
+Encoding: op[4:0]=0x13 | cond[4] | DRd[4] | DRs[4] | 0[9] | mode[1] | shamt[5]
 ```
 
-**Encoding:** `op=19 | cond | DRd | DRs | 0…0 | arith[5] | shamt[4:0]`
-
-- `imm15[5] = 0` → LSR (logical shift right, zero-fill from top)
-- `imm15[5] = 1` → ASR (arithmetic shift right, replicate sign bit)
-- `imm15[4:0]` = shift amount (0–31)
+`imm15[4:0]` = shift amount (0–31). `imm15[5]` = mode select: 0 = LSR, 1 = ASR (see A.3).
 
 **Semantics:**
-
 ```
-LSR: DRd = DRs >>> shamt                        ; zero-extended
-ASR: DRd = sign_extend_32(DRs >> shamt)         ; sign bit replicated
-C   = DRs[shamt − 1]  if shamt > 0  else  0     ; last bit shifted out
+; LSR (mode=0):
+DRd = DRs >>> shamt            ; zero-fill from the left
+C   = (shamt > 0) ? DRs[shamt - 1] : 0
+
+; ASR (mode=1):
+DRd = sign_extend(DRs) >> shamt   ; sign-fill from the left (bit 31 propagated)
+DRd = DRd & 0xFFFFFFFF
+C   = (shamt > 0) ? DRs[shamt - 1] : 0
+N   = DRd[31]
+Z   = (DRd == 0)
+V   = 0 always
 ```
 
-`shamt = 0`: DRd = DRs, C = 0 (no bits shifted — both LSR and ASR are identity).
+Hardware deviation (D-12, **CLOSED**): the hardware previously implemented LSR only (imm[5] ignored, C = 0). Task #857 fixed the hardware to match the simulator. Both now implement ASR and the C flag correctly.
 
-**ASR examples:**
+**Flags:** N = result[31], Z = (result == 0), C = last bit shifted out (0 if shamt = 0), V = 0
+
+**Faults:** None
+
+**Example:** Logical right shift DR2 by 3.
 ```
-SHR  DR3, DR1, 4, ASR    ; 0x80000000 >> 4 = 0xF8000000 (N=1, C=0)
-SHR  DR3, DR1, 1, ASR    ; 0xFFFFFFFE >> 1 = 0xFFFFFFFF (N=1, C=1)
+SHR AL, DR1, DR2, #3     ; LSR, mode=0; imm = (0 << 5) | 3 = 0x03
+                           ; opcode=19, cond=14, fld_a=1, fld_b=2, imm=3
+                           ; encoding: 0x9F090003
 ```
 
-**Hardware note:** Prior to Task #857, hardware only supported LSR (imm15[5] was
-ignored) and C was hardwired to 0. Both are now fixed. See D-12 in
-`HARDWARE-DEVIATIONS.md` (CLOSED).
-
-**Flags:** N = DRd[31], Z = (DRd==0), C = last bit shifted out, V = 0.
-
-**Faults:** None.
+Arithmetic right shift DR2 by 3 (sign-preserving):
+```
+SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
+                               ; encoding: 0x9F090023
+```
 
 ---
 
-## §8 — Quick-Reference Appendix
+## 8. Quick-Reference Appendix
 
-| Opcode | Hex | Mnemonic | fld_a | fld_b | imm15 key | N | Z | C | V | Faults |
-|--------|-----|----------|-------|-------|-----------|---|---|---|---|--------|
-| 0 | 0x00 | LOAD | CRd | CRs | c-list row | — | — | — | — | NULL_CAP PERM_L BOUNDS SEAL F_BIT |
-| 1 | 0x01 | SAVE | CRd | CRs | c-list row | — | — | — | — | NULL_CAP PERM_S BOUNDS F_BIT |
-| 2 | 0x02 | CALL | CRd | — | method_idx+1 (0=fast) | — | — | — | — | NULL_CAP PERM_E F_BIT PRIVATE_METHOD |
-| 3 | 0x03 | RETURN | — | — | mask[11:0] | restored | restored | restored | restored | STACK_UNDERFLOW |
-| 4 | 0x04 | CHANGE | CRd | CRs | ns_slot | — | — | — | — | PRIV_REG NULL_CAP PERM_S BOUNDS |
-| 5 | 0x05 | SWITCH | — | CRs | Tgt[2:0] | — | — | — | — | NULL_CAP INVALID_OP (hw) |
-| 6 | 0x06 | TPERM | CRd | — | B\|code[4:0] | !Z | pass | 0 | 0 | TPERM_RSV |
-| 7 | 0x07 | LAMBDA | CRd | — | 0 | — | — | — | W | NULL_CAP PERM_X BOUNDS |
-| 8 | 0x08 | ELOADCALL | CRd | CRs | midx[14:8]\|row[7:0] | — | — | — | — | (LOAD+CALL combined) |
-| 9 | 0x09 | XLOADLAMBDA | CRd | CRs | c-list row | — | — | — | W | (LOAD+LAMBDA combined) |
-| 10 | 0x0A | DREAD | DRd | CRs | offset | — | — | — | — | NULL_CAP PERM_R/X BOUNDS |
-| 11 | 0x0B | DWRITE | DRs | CRd | offset | — | — | — | — | NULL_CAP PERM_W BOUNDS |
-| 12 | 0x0C | BFEXT | DRd | DRs | pos[9:5]\|w[4:0] | res[31] | res=0 | 0 | 0 | BOUNDS |
-| 13 | 0x0D | BFINS | DRd | DRs | pos[9:5]\|w[4:0] | res[31] | res=0 | 0 | 0 | BOUNDS |
-| 14 | 0x0E | MCMP | DRa | DRb | 0 | sub[31] | a=b | a≥b | ovf | — |
-| 15 | 0x0F | IADD | DRd | DRa | 0\|DRb or 1\|imm14 | r[31] | r=0 | uovf | sovf | — |
-| 16 | 0x10 | ISUB | DRd | DRa | 0\|DRb or 1\|imm14 | r[31] | r=0 | a≥b | sovf | — |
-| 17 | 0x11 | BRANCH | cond | — | soff[14:0] (signed) | — | — | — | — | BOUNDS |
-| 18 | 0x12 | SHL | DRd | DRs | shamt[4:0] | r[31] | r=0 | last-out | 0 | — |
-| 19 | 0x13 | SHR | DRd | DRs | arith[5]\|shamt[4:0] | r[31] | r=0 | last-out | 0 | — |
+### 8.1 Opcode Table
 
-**Flag column key:** `—` = not written (preserved). `W` = written with specific value noted in entry. `res` = result. `sub` = DRa−DRb. `uovf` = unsigned overflow. `sovf` = signed overflow. `last-out` = last bit shifted out. `a≥b` = C=1 when no borrow.
+| Dec | Hex  | Mnemonic    | Domain  | fld_a  | fld_b  | imm15 summary                          | Flags written | Faults possible       | Sim/HW diff |
+|-----|------|-------------|---------|--------|--------|----------------------------------------|---------------|-----------------------|-------------|
+| 0   | 0x00 | LOAD        | Church  | CRd    | CRs    | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
+| 1   | 0x01 | SAVE        | Church  | CRd(S) | CRs(B) | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
+| 2   | 0x02 | CALL        | Church  | CRs    | 0      | method index (0=fast, N+1=user N)      | —             | NULL, PERM, SEAL, PRIVATE_METHOD, STACK_OVERFLOW | — |
+| 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — CRs to NULL on return     | —             | STACK_UNDERFLOW       | —           |
+| 4   | 0x04 | CHANGE      | Church  | CRd    | CRs    | NS index (0–32767)                     | —             | PRIV_REG, PERM, NULL  | —           |
+| 5   | 0x05 | SWITCH      | Church  | 0      | CRn    | target[2:0] (5=CR13, 7=CR15)           | —             | INVALID_OP (hw), NULL_CAP (sim) | **D-11** |
+| 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
+| 7   | 0x07 | LAMBDA      | Church  | CRn    | 0      | 0 (unused)                             | —             | NULL, PERM, BOUNDS    | —           |
+| 8   | 0x08 | ELOADCALL   | Church  | CRd    | CRs    | method[14:8] \| row[7:0]              | —             | NULL, PERM, SEAL, BOUNDS | —        |
+| 9   | 0x09 | XLOADLAMBDA | Church  | CRd    | CRs    | c-list row (0–32767)                   | —             | NULL, PERM, SEAL, BOUNDS | —        |
+| 10  | 0x0A | DREAD       | Turing  | DRd    | CRs    | word offset (0–32767)                  | —             | NULL, PERM, BOUNDS    | —           |
+| 11  | 0x0B | DWRITE      | Turing  | DRd    | CRs    | word offset (0–32767)                  | —             | NULL, PERM, BOUNDS    | —           |
+| 12  | 0x0C | BFEXT       | Turing  | DRd    | DRs    | pos[9:5] \| width[4:0]                | N Z C=0 V=0   | BOUNDS (pos+width>32) | —           |
+| 13  | 0x0D | BFINS       | Turing  | DRd    | DRs    | pos[9:5] \| width[4:0]                | N Z C=0 V=0   | BOUNDS (pos+width>32) | —           |
+| 14  | 0x0E | MCMP        | Turing  | DRd    | DRs    | 0 (unused)                             | N Z C V       | —                     | —           |
+| 15  | 0x0F | IADD        | Turing  | DRd    | DRs    | bit14=0→DRt[3:0]; bit14=1→imm[13:0]   | N Z C V       | —                     | —           |
+| 16  | 0x10 | ISUB        | Turing  | DRd    | DRs    | bit14=0→DRt[3:0]; bit14=1→imm[13:0]   | N Z C V       | —                     | —           |
+| 17  | 0x11 | BRANCH      | Turing  | 0      | 0      | signed offset (−16384..+16383)         | —             | BOUNDS                | —           |
+| 18  | 0x12 | SHL         | Turing  | DRd    | DRs    | shamt[4:0] (0–31)                      | N Z C V=0     | —                     | —           |
+| 19  | 0x13 | SHR         | Turing  | DRd    | DRs    | mode[5] \| shamt[4:0] (mode: 0=LSR, 1=ASR) | N Z C V=0 | —                   | D-12 closed |
 
-**Deviation flags:** SWITCH (D-11), SHR/SHL carry+ASR (D-12, closed). TPERM reserved-preset fault (C.1, Task #873). TPERM Mode 2 (C.3, Task #874).
+### 8.2 Assembler Encoding Formula
+
+```
+word = ((opcode & 0x1F) << 27)
+     | ((cond   & 0x0F) << 23)
+     | ((fld_a  & 0x0F) << 19)
+     | ((fld_b  & 0x0F) << 15)
+     | ((imm    & 0x7FFF))
+```
+
+### 8.3 Flag Conditions (for BRANCH and conditional suffixes)
+
+| Condition | Code | Flags tested         | Use after        |
+|-----------|------|----------------------|------------------|
+| EQ        | 0    | Z = 1                | MCMP, ISUB, IADD |
+| NE        | 1    | Z = 0                | MCMP, ISUB, IADD |
+| LT        | 2    | N ≠ V                | MCMP signed      |
+| LE        | 3    | Z=1 or N≠V           | MCMP signed      |
+| GT        | 4    | Z=0 and N=V          | MCMP signed      |
+| GE        | 5    | N = V                | MCMP signed      |
+| CS/HS     | 6    | C = 1                | IADD carry       |
+| CC/LO     | 7    | C = 0                | ISUB borrow      |
+| MI        | 8    | N = 1                | IADD/ISUB        |
+| PL        | 9    | N = 0                | IADD/ISUB        |
+| VS        | 10   | V = 1                | IADD/ISUB        |
+| VC        | 11   | V = 0                | IADD/ISUB        |
+| HI        | 12   | C=1 and Z=0          | ISUB unsigned    |
+| LS        | 13   | C=0 or Z=1           | ISUB unsigned    |
+| AL        | 14   | (always)             | unconditional    |
+| NV        | 15   | (never)              | static no-op     |
+
+### 8.4 Design Question Notes (Group E)
+
+The following open questions affect instruction behaviour but are not yet decided. They are tracked here to prevent spec ambiguity from silently propagating into implementations.
+
+| ID | Instruction | Question | Current behaviour |
+|----|-------------|----------|-------------------|
+| E-1 | IADD / ISUB | Can `#-1` be encoded? | No — immediate is unsigned 0–16383. Use `ISUB DRd, DR0, #1` to get −1. |
+| E-2 | RETURN | Is bit 6 of the mask reserved (CR6 always restored from frame)? | Assembler: no restriction. Hardware: CR6 is always re-derived by cload; mask bit 6 would be a no-op or clash. Decision pending. |
+| E-3 | DREAD CR14 | Is X-in-place-of-R the only special case, or does a broader X→R substitution apply? | Simulator: CR14-specific only (`d.crSrc === 14`). Hardware: enforced by code-fence permission check. |
+| E-4 | CHANGE | Assembler restricts both operands to CR12. Is this an architectural rule or only a toolchain convention? | Assembler restriction (assembler.js case 4). Hardware `change.py` is broader (any CR12–CR15 destination). Decision: document as assembler convention, not ISA restriction. |
