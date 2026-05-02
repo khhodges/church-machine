@@ -235,14 +235,14 @@ def test_boot_abstr_exec(cfg):
         f"CALL did not enter the boot-entry abstraction cleanly: "
         f"callDepthDelta={call['callDepthDelta']}, "
         f"pcAfterCall={call['pcAfterCall']}; "
-        "expected callDepthDelta=1 and pcAfterCall=0"
+        "expected callDepthDelta=1 and pcAfterCall=1"
     )
     assert call["callDepthDelta"] == 1, (
         f"CALL should push exactly one new call frame; "
         f"callDepthDelta={call['callDepthDelta']}"
     )
-    assert call["pcAfterCall"] == 0, (
-        f"PC after CALL should be 0 (callee's first instruction); "
+    assert call["pcAfterCall"] == 1, (
+        f"PC after CALL should be 1 (callee's first instruction, word 1 of the lump); "
         f"got pcAfterCall={call['pcAfterCall']}"
     )
 

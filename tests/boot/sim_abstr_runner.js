@@ -158,7 +158,7 @@ process.stdin.on('end', () => {
             callEnteredClean: newFaults.length === 0 &&
                               !sim.halted &&
                               depthAfter === callDepthAfterBoot + 1 &&
-                              (sim.pc | 0) === 0,
+                              (sim.pc | 0) === 1,
             result:           r ? { pc: r.pc, desc: r.desc || null } : null,
         };
     }
