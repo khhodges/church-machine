@@ -4,6 +4,7 @@ import sys
 from amaranth.back.verilog import convert
 from .core import ChurchCore
 from .tang_nano_20k import ChurchTangNano20K
+from .zynq_xc7z010 import ChurchZynqXC7Z010
 
 
 _STALE_CR7_PATTERN = "cr7_wr_"
@@ -252,16 +253,50 @@ def generate_tang_nano_20k_iot_verilog(output_dir="build"):
     return output_path
 
 
+def generate_zynq_xc7z010_verilog(output_dir="build"):
+    os.makedirs(output_dir, exist_ok=True)
+
+    top = ChurchZynqXC7Z010(clk_freq=100_000_000, baud=115200, sim_mode=False)
+
+    ports = [
+        top.clk_in, top.uart_tx, top.uart_rx, top.push_button,
+    ] + top.led
+
+    verilog_text = convert(top, ports=ports)
+    verilog_text = _patch_clocks(verilog_text)
+    verilog_text = _patch_rst(verilog_text)
+
+    output_path = os.path.join(output_dir, "church_zynq_xc7z010.v")
+    _check_stale_cr7(verilog_text, output_path)
+
+    with open(output_path, "w") as f:
+        f.write(verilog_text)
+
+    print(f"Generated: {output_path}")
+    print(f"  File size: {len(verilog_text):,} bytes")
+    print(f"  Lines: {verilog_text.count(chr(10)):,}")
+
+    module_count = verilog_text.count("module ")
+    print(f"  Verilog modules: {module_count}")
+
+    return output_path
+
+
 if __name__ == "__main__":
     output_dir = "build"
     iot_only = False
+    zynq_only = False
     for arg in sys.argv[1:]:
         if arg == "--iot":
             iot_only = True
+        elif arg == "zynq":
+            zynq_only = True
         elif not arg.startswith("--"):
             output_dir = arg
 
-    if iot_only:
+    if zynq_only:
+        generate_zynq_xc7z010_verilog(output_dir)
+    elif iot_only:
         generate_core_iot_verilog(output_dir)
         generate_tang_nano_20k_iot_verilog(output_dir)
     else:
