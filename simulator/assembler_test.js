@@ -1896,6 +1896,94 @@ const ChurchSimulator = require('./simulator.js');
     assert('MC3 DRa >= DRb unsigned via step(): C flag set',   simMC3.flags.C === true,  `C=${simMC3.flags.C}`);
 }
 
+// ── BF: End-to-end step() integration tests for BFEXT and BFINS ─────────────
+// These tests assemble a real BFEXT or BFINS instruction via ChurchAssembler,
+// inject the encoded word into simulator.memory[0], prime the source DR values,
+// call step() exactly once, and verify the extracted/inserted value and the
+// resulting Z and N flags.  This exercises the full fetch → decode → _execBfext
+// / _execBfins path and catches regressions that assembler encoding tests alone
+// cannot catch.
+
+// BF1: BFEXT — extract non-zero middle bits → correct value, Z=0, N=0, C=0.
+//   DR2 = 0b00110100 (52).  BFEXT DR1, DR2, 2, 3 extracts bits[4:2] = 0b101 = 5.
+{
+    const asmBF1 = new ChurchAssembler();
+    const rBF1   = asmBF1.assemble('BFEXT DR1, DR2, 2, 3');
+    assert('BF1 BFEXT DR1, DR2, 2, 3 assembles with no errors',
+        asmBF1.errors.length === 0,
+        asmBF1.errors.map(e => e.message).join('; '));
+
+    const simBF1 = new ChurchSimulator();
+    simBF1.memory[0] = rBF1.words[0] >>> 0;
+    simBF1.dr[2] = 0b00110100;   // 52 decimal; bits[4:2] = 0b101 = 5
+    simBF1.step();
+    assert('BF1 BFEXT extracted value: DR1=5',  simBF1.dr[1] === 5,     `DR1=${simBF1.dr[1]}`);
+    assert('BF1 BFEXT non-zero result: Z=0',    simBF1.flags.Z === false, `Z=${simBF1.flags.Z}`);
+    assert('BF1 BFEXT non-negative result: N=0', simBF1.flags.N === false, `N=${simBF1.flags.N}`);
+    assert('BF1 BFEXT: C=0',                    simBF1.flags.C === false, `C=${simBF1.flags.C}`);
+}
+
+// BF2: BFEXT — extract bits that are all zero → Z=1, N=0, C=0.
+//   DR2 = 0xF0 = 0b11110000.  BFEXT DR1, DR2, 0, 4 extracts bits[3:0] = 0 → Z=1.
+{
+    const asmBF2 = new ChurchAssembler();
+    const rBF2   = asmBF2.assemble('BFEXT DR1, DR2, 0, 4');
+    assert('BF2 BFEXT DR1, DR2, 0, 4 assembles with no errors',
+        asmBF2.errors.length === 0,
+        asmBF2.errors.map(e => e.message).join('; '));
+
+    const simBF2 = new ChurchSimulator();
+    simBF2.memory[0] = rBF2.words[0] >>> 0;
+    simBF2.dr[2] = 0xF0;   // bits[3:0] are all 0
+    simBF2.step();
+    assert('BF2 BFEXT zero result: DR1=0', simBF2.dr[1] === 0,     `DR1=${simBF2.dr[1]}`);
+    assert('BF2 BFEXT zero result: Z=1',   simBF2.flags.Z === true,  `Z=${simBF2.flags.Z}`);
+    assert('BF2 BFEXT zero result: N=0',   simBF2.flags.N === false, `N=${simBF2.flags.N}`);
+    assert('BF2 BFEXT zero result: C=0',   simBF2.flags.C === false, `C=${simBF2.flags.C}`);
+}
+
+// BF3: BFINS — insert non-zero value into a zeroed destination → correct word, Z=0, N=0, C=0.
+//   DR1 (dst) = 0x00000000, DR2 (src) = 7 = 0b111.
+//   BFINS DR1, DR2, 4, 3 inserts bits[6:4] = 0b111 → newWord = 0b1110000 = 0x70.
+{
+    const asmBF3 = new ChurchAssembler();
+    const rBF3   = asmBF3.assemble('BFINS DR1, DR2, 4, 3');
+    assert('BF3 BFINS DR1, DR2, 4, 3 assembles with no errors',
+        asmBF3.errors.length === 0,
+        asmBF3.errors.map(e => e.message).join('; '));
+
+    const simBF3 = new ChurchSimulator();
+    simBF3.memory[0] = rBF3.words[0] >>> 0;
+    simBF3.dr[1] = 0x00000000;   // destination: empty
+    simBF3.dr[2] = 7;            // source: 0b111 to insert at pos 4
+    simBF3.step();
+    assert('BF3 BFINS inserted value: DR1=0x70', simBF3.dr[1] === 0x70,   `DR1=0x${simBF3.dr[1].toString(16)}`);
+    assert('BF3 BFINS non-zero result: Z=0',     simBF3.flags.Z === false, `Z=${simBF3.flags.Z}`);
+    assert('BF3 BFINS non-negative result: N=0', simBF3.flags.N === false, `N=${simBF3.flags.N}`);
+    assert('BF3 BFINS: C=0',                     simBF3.flags.C === false, `C=${simBF3.flags.C}`);
+}
+
+// BF4: BFINS — insert zero into the only set bits → result zero, Z=1, N=0, C=0.
+//   DR1 (dst) = 0x0000000F (low nibble set), DR2 (src) = 0.
+//   BFINS DR1, DR2, 0, 4 clears bits[3:0] → newWord = 0x00000000 → Z=1.
+{
+    const asmBF4 = new ChurchAssembler();
+    const rBF4   = asmBF4.assemble('BFINS DR1, DR2, 0, 4');
+    assert('BF4 BFINS DR1, DR2, 0, 4 assembles with no errors',
+        asmBF4.errors.length === 0,
+        asmBF4.errors.map(e => e.message).join('; '));
+
+    const simBF4 = new ChurchSimulator();
+    simBF4.memory[0] = rBF4.words[0] >>> 0;
+    simBF4.dr[1] = 0x0000000F;   // destination: only low nibble set
+    simBF4.dr[2] = 0;            // source: insert 0, clearing those bits
+    simBF4.step();
+    assert('BF4 BFINS zero result: DR1=0', simBF4.dr[1] === 0,     `DR1=0x${simBF4.dr[1].toString(16)}`);
+    assert('BF4 BFINS zero result: Z=1',   simBF4.flags.Z === true,  `Z=${simBF4.flags.Z}`);
+    assert('BF4 BFINS zero result: N=0',   simBF4.flags.N === false, `N=${simBF4.flags.N}`);
+    assert('BF4 BFINS zero result: C=0',   simBF4.flags.C === false, `C=${simBF4.flags.C}`);
+}
+
 // ── LTF: led_turing_full snippet regression ───────────────────────────────────
 // Loads the led_turing_full assembly from _TURING_DR_TEST_SOURCE in app-run.js,
 // assembles it, and asserts zero errors.  This catches any edit that introduces
