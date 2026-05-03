@@ -123,7 +123,7 @@ def _try_load_openssl():
 def _load_or_generate():
     global _identity_string, _identity_word
 
-    if _private_key_pem is not None:
+    if _private_key_pem is not None and _identity_string is not None:
         return
 
     try:

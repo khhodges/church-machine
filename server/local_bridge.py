@@ -59,6 +59,7 @@ BOARD_TYPES = {
     0x01: ("TN20K-IoT", "IoT"),
     0x02: ("TN20K-Full", "Full"),
     0x03: ("Ti60-Full", "Full"),
+    0x05: ("Zynq XC7Z010 (QMTECH ZYJZGW)", "Full"),
 }
 
 def _handle_callhome(pkt):
