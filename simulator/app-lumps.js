@@ -2698,15 +2698,18 @@ async function _goToLumpByAbstractionName(name) {
 }
 
 // ── Open a saved lump in the Create (editor) page ──────────────────────────
-// Disassembles the lump from simulator memory (if loaded) and opens the
-// editor with the code and c-list context set so the C-List picker and
-// Patch button work for this specific lump.
-function openLumpInEditor(token) {
+// Fetches words from /api/lump/<token>/words (same source as Binary /
+// Content / Audit tabs) so the editor disassembly is always consistent with
+// every other view.  sim.memory is used only for structural location info
+// (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
+async function openLumpInEditor(token) {
     var lump = _lumpsCache.find(function(l) { return l.token === token; });
     if (!lump) return;
     var lumpName = lump.abstraction || ('Lump 0x' + token);
 
-    // ── Locate the lump in simulator memory ────────────────────────────────
+    // ── Locate the lump in simulator memory (structural info only) ─────────
+    // baseLoc / nsIdx / crIdx are used for editor context (patch bar, c-list
+    // picker) but NOT for the disassembly — words come from the server below.
     var baseLoc = null;
     var resolvedNsIdx = null;
     var resolvedCRIdx = null;
@@ -2753,28 +2756,37 @@ function openLumpInEditor(token) {
         }
     }
 
-    // ── Disassemble code from simulator memory ─────────────────────────────
+    // ── Fetch authoritative words from server ──────────────────────────────
+    // Reads from the same source as Binary / Content / Audit tabs so the
+    // editor disassembly is always consistent with every other view.
+    var serverWords = null;
+    try {
+        var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+        if (_wr.ok) {
+            var _wj = await _wr.json();
+            if (_wj && Array.isArray(_wj.words)) serverWords = _wj.words;
+        }
+    } catch (_fe) {}
+
+    // ── Disassemble from server words (authoritative) ──────────────────────
     var disasmLines = null;
-    if (baseLoc !== null && typeof sim !== 'undefined' && sim && sim.memory && sim.parseLumpHeader) {
-        var lhdrW = sim.memory[baseLoc] >>> 0;
-        var lhdr  = sim.parseLumpHeader(lhdrW);
+    if (serverWords && serverWords.length > 0) {
+        var lhdrW = serverWords[0] >>> 0;
+        var lhdr  = (typeof sim !== 'undefined' && sim && sim.parseLumpHeader)
+                        ? sim.parseLumpHeader(lhdrW) : null;
         if (lhdr && lhdr.valid) {
-            var codeStart = baseLoc + 1;
             var codeLimit = lhdr.cw;
-            var rawWords  = [];
-            for (var wi = 0; wi < codeLimit; wi++) {
-                var wa = codeStart + wi;
-                if (wa >= sim.memory.length) break;
-                rawWords.push(sim.memory[wa] >>> 0);
-            }
+            var rawWords  = serverWords.slice(1, 1 + codeLimit).map(function(w) { return w >>> 0; });
             var trimLen = rawWords.length;
             while (trimLen > 0 && rawWords[trimLen - 1] === 0) trimLen--;
             var trimmed = rawWords.slice(0, trimLen);
             var nsTag   = resolvedNsIdx !== null ? ('NS[' + resolvedNsIdx + ']  ') : '';
+            var addrStr = baseLoc !== null
+                ? ('@ 0x' + baseLoc.toString(16).toUpperCase().padStart(4, '0') + '  ')
+                : '';
             disasmLines = [
-                '; ' + lumpName + '  ' + nsTag + '@ 0x' +
-                baseLoc.toString(16).toUpperCase().padStart(4, '0') +
-                '  (' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') + ')'
+                '; ' + lumpName + '  ' + nsTag + addrStr +
+                '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') + ')'
             ];
             if (trimmed.length === 0) {
                 disasmLines.push('; (empty lump)');
