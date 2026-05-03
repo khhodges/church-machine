@@ -353,7 +353,17 @@ function init() {
     // here after a previous session generated an image.
     _probeBootImage().then(buf => {
         if (buf) { window.bootImage = buf; window.bootImageAvailable = true;
-                   try { sim.loadBootImage(buf); _applyBootEntryToSim(); } catch(e) { console.warn('[bootImage] apply failed:', e); } }
+                   try {
+                       sim.loadBootImage(buf); _applyBootEntryToSim();
+                       // Invalidate any sticky patches covering NS slots now
+                       // owned by the boot image.  A patch recorded against an
+                       // older boot image binary is stale by definition; leaving
+                       // it active lets _reapplyStickyPatches() overwrite the
+                       // freshly-loaded canonical words at boot completion.
+                       if (typeof clearStickyPatch === 'function') {
+                           for (var _bi = 0; _bi < (sim.nsCount || 0); _bi++) clearStickyPatch(_bi);
+                       }
+                   } catch(e) { console.warn('[bootImage] apply failed:', e); } }
         // Re-apply user-assigned namespace labels that sim.loadBootImage() may
         // have overwritten (the boot image zeros any NS slot it does not populate,
         // including free slots where the user stored custom pet names).

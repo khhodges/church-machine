@@ -2446,14 +2446,23 @@ function _probeBootImage() {
 // Reset hook: re-overlay the cached boot image (or fetch once) so the
 // programmer-authored binary survives manual resets.
 function _maybeApplyBootImage() {
+    // After every successful loadBootImage call, clear sticky patches for all
+    // NS slots the boot image owns.  Those slots are now boot-image-canonical;
+    // any patch built against an older binary is stale and must not be
+    // re-applied by _reapplyStickyPatches() at the upcoming boot completion.
+    function _clearBootImgPatches() {
+        if (typeof clearStickyPatch === 'function') {
+            for (var _bi = 0; _bi < (sim.nsCount || 0); _bi++) clearStickyPatch(_bi);
+        }
+    }
     if (window.bootImage) {
-        try { sim.loadBootImage(window.bootImage); _applyBootEntryToSim(); } catch (e) { console.warn('[bootImage] apply failed:', e); }
+        try { sim.loadBootImage(window.bootImage); _applyBootEntryToSim(); _clearBootImgPatches(); } catch (e) { console.warn('[bootImage] apply failed:', e); }
         return;
     }
     if (window.bootImageAvailable) {
         _probeBootImage().then(buf => {
             if (buf) { window.bootImage = buf;
-                       try { sim.loadBootImage(buf); _applyBootEntryToSim(); } catch(e){ console.warn('[bootImage] apply failed:', e); } }
+                       try { sim.loadBootImage(buf); _applyBootEntryToSim(); _clearBootImgPatches(); } catch(e){ console.warn('[bootImage] apply failed:', e); } }
         });
     }
 }
