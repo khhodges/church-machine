@@ -3503,10 +3503,10 @@ class CLOOMCCompiler {
                     asmBlockSrcLines.push(i);
                     continue;
                 }
-                // LED[N] shorthand: boot-loaded Abstract GT at fixed c-list slot 8+N.
-                // These are not in CAP_NAMES (which is keyed by abstraction name, not
-                // compound pet name), so handle them directly before the lookup.
-                const _ledBracket = petName.match(/^LED\[(\d)\]$/i);
+                // LED<N> shorthand (canonical) or legacy LED[N] bracket form:
+                // boot-loaded Abstract GT at fixed c-list slot 8+N.
+                // Not in CAP_NAMES (keyed by abstraction name), so handle directly.
+                const _ledBracket = petName.match(/^LED(\d)$/i) || petName.match(/^LED\[(\d)\]$/i);
                 if (_ledBracket) {
                     const _n = parseInt(_ledBracket[1], 10);
                     if (_n >= 0 && _n <= 5) {

@@ -305,9 +305,10 @@ class ChurchAssembler {
         // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
         if (this.nsSymbols[name] !== undefined) return this.nsSymbols[name];
 
-        // 3. LED[N] Abstract GT shorthand — LED[0]–LED[5] are boot-loaded AGTs
-        //    at c-list slots 8–13.  LOAD CR3, LED[0]  →  LOAD CR3, CR6, #8
-        const ledMatch = name.match(/^LED\[(\d)\]$/i);
+        // 3. LED<N> Abstract GT shorthand — LED0–LED5 are boot-loaded AGTs at
+        //    c-list slots 8–13.  LOAD CR3, LED0  →  LOAD CR3, CR6, #8
+        //    Legacy bracket form LED[N] is still accepted for back-compat.
+        const ledMatch = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
         if (ledMatch) {
             const n = parseInt(ledMatch[1], 10);
             if (n >= 0 && n <= 5) return 8 + n;

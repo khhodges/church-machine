@@ -4386,7 +4386,7 @@ class ChurchSimulator {
     // Called from _execDread / _execDwrite / _execCall when GT type = 0b11.
 
     _abstractLedLabel(deviceData) {
-        return `Abstract LED[${deviceData}]`;
+        return `Abstract LED${deviceData}`;
     }
 
     _dispatchAbstractDread(crIdx, drIdx, instrOffset) {
