@@ -10,25 +10,45 @@
 # IMPORTANT: Only the PL (programmable logic) side is used.
 # The Zynq PS (ARM cores) is held in reset and not connected.
 #
-# NOTE ON PIN ASSIGNMENTS: The pins below are based on the typical QMTECH
-# XC7Z010 (ZYJZGW) board design.  VERIFY each assignment against your
-# specific board revision schematic before programming.  If a pin differs,
-# update this file and re-run implementation.
+# ── VERIFICATION STATUS ────────────────────────────────────────────────────
+# Before programming a board, confirm each item below against the schematic.
+# See hardware/zynq_xc7z010_verify.md for a step-by-step bench checklist.
+#
+#   [ ] Clock    — H16 (50 MHz osc) — schematic net: PL_CLK or CLK_50M
+#   [ ] UART TX  — L15 (PMOD JA pin 1) — schematic net: JA1 or PMOD_JA[0]
+#   [ ] UART RX  — L16 (PMOD JA pin 2) — schematic net: JA2 or PMOD_JA[1]
+#   [ ] LED[0]   — M14 — schematic net: LED0 or PL_LED0
+#   [ ] LED[1]   — M15 — schematic net: LED1 or PL_LED1
+#   [ ] LED[2]   — G14 — schematic net: LED2 or PL_LED2
+#   [ ] LED[3]   — D18 — schematic net: LED3 or PL_LED3
+#   [ ] BTN      — R18 (KEY1) — schematic net: KEY1 or PL_KEY1
+#
+# When a pin is confirmed: remove the UNVERIFIED tag on that assignment
+# and record the schematic page/revision in its place.
 # --------------------------------------------------------------------------
 
 # ── Clock ──────────────────────────────────────────────────────────────────
 # 50 MHz PL oscillator.  The QMTECH ZYJZGW routes a 50 MHz crystal oscillator
 # to PL pin H16 (bank 35, LVCMOS33).  Vivado will infer the MMCM from the
 # create_clock constraint plus the MMCM primitive instantiated by the design.
-# VERIFY: confirm oscillator pin against your schematic revision.
+#
+# UNVERIFIED — confirm against schematic:
+#   Bank 35 oscillator → look for net "PL_CLK" or "CLK_50M" tied to H16.
+#   If your revision uses a different pin, update PACKAGE_PIN and
+#   re-run implementation (no other changes needed).
 set_property PACKAGE_PIN H16 [get_ports clk_in]
 set_property IOSTANDARD  LVCMOS33 [get_ports clk_in]
 create_clock -period 20.000 -name clk_in [get_ports clk_in]
 
 # ── UART (PMOD JA connector, pins 1/2 — 3.3 V) ────────────────────────────
 # Connect an external USB-UART adapter: TX board→host, RX host→board.
-# The QMTECH ZYJZGW PMOD JA is typically on bank 35 (3.3 V).
-# VERIFY: JA pin 1 (TX) and pin 2 (RX) against your schematic.
+# The QMTECH ZYJZGW PMOD JA is on bank 35 (3.3 V).
+#
+# UNVERIFIED — confirm against schematic:
+#   PMOD JA connector pinout → look for nets "JA1"/"PMOD_JA[0]" (TX) on L15
+#   and "JA2"/"PMOD_JA[1]" (RX) on L16.
+#   Physical connector: JA pin 1 = top-left, pin 2 = top-second from left
+#   (standard Digilent PMOD pinout, odd pins on top row).
 set_property PACKAGE_PIN L15 [get_ports uart_tx]
 set_property IOSTANDARD  LVCMOS33 [get_ports uart_tx]
 
@@ -37,9 +57,14 @@ set_property IOSTANDARD  LVCMOS33 [get_ports uart_rx]
 
 # ── User LEDs (active-LOW — drive low to illuminate) ──────────────────────
 # QMTECH ZYJZGW has 4 user LEDs on the PL side (bank 35, LVCMOS33).
-# The Amaranth logic drives led[i]=1 to mean ON; the XDC inversion is done
-# via the design logic (active-low convention matches Wukong).
-# VERIFY: LED pin assignments against your schematic.
+# The Amaranth logic drives led[i]=1 to mean ON; active-low inversion is
+# handled in the design logic (matches Wukong board convention).
+#
+# UNVERIFIED — confirm against schematic:
+#   Look for nets "LED0"–"LED3" or "PL_LED0"–"PL_LED3".
+#   Expected: M14=LED0, M15=LED1, G14=LED2, D18=LED3.
+#   Quick bench check: after bitstream load, short any LED pin to GND
+#   through a 330 Ω resistor — the correct pin will light the LED.
 set_property PACKAGE_PIN M14 [get_ports {led[0]}]
 set_property IOSTANDARD  LVCMOS33 [get_ports {led[0]}]
 
@@ -58,7 +83,12 @@ set_property SLEW  SLOW [get_ports {led[*]}]
 
 # ── Push button KEY1 (active-LOW, internal pull-up) ───────────────────────
 # QMTECH ZYJZGW user push button on PL side (bank 35, LVCMOS33).
-# VERIFY: push button pin against your schematic.
+#
+# UNVERIFIED — confirm against schematic:
+#   Look for net "KEY1" or "PL_KEY1" tied to R18.
+#   The button should pull the pin LOW when pressed (active-low).
+#   Internal PULLUP is enabled here; remove it if the board has an
+#   external pull-up resistor on this net.
 set_property PACKAGE_PIN R18 [get_ports push_button]
 set_property IOSTANDARD  LVCMOS33 [get_ports push_button]
 set_property PULLUP true [get_ports push_button]
