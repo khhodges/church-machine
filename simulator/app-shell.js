@@ -371,15 +371,15 @@ function init() {
         // boot-image catalog entries take precedence; only truly empty slots
         // (like user-defined slot 50+) are restored from localStorage.
         loadNamespaceState();
-        // Dashboard auto-boot fires HERE (inside the .then) so that:
+        // ALL auto-boot fires HERE (inside the .then) so that:
         //   1. window.bootImage is already set → sim.reset() → _maybeApplyBootImage()
         //      loads the correct binary immediately.
         //   2. _clearBootImageStickyPatches() has already run → _stickyPatches is
         //      empty → _reapplyStickyPatches() inside _autoLoadDefaultProgram() is
         //      a no-op → the stale sticky patch can never overwrite sim.memory.
-        // Previously this was synchronous (before the fetch resolved), so boot ran
-        // against _initNamespaceTable() defaults with the stale patch still live.
-        if (startView === 'dashboard' && !sim.bootComplete) {
+        // Previously auto-boot fired from requestAnimationFrame (before the fetch
+        // resolved) so _reapplyStickyPatches() ran with the stale patch still live.
+        if (!sim.bootComplete) {
             const _abChk = document.getElementById('autoBootChk');
             if (_abChk && _abChk.checked) resetSim();
         }
@@ -503,12 +503,10 @@ function init() {
         pipelineViz.render();
         initTooltipAutoFlip();
         hideLoadingOverlay();
-        // Auto-boot on open: if the user has the auto-boot preference set,
-        // run the boot sequence immediately after the page finishes loading.
-        // This covers the case where the user navigates here from the landing
-        // page (or any external link) — not just via the hamburger menu item.
-        const chk = document.getElementById('autoBootChk');
-        if (chk && chk.checked) resetSim();
+        // Auto-boot is now deferred to _probeBootImage().then() so that
+        // _clearBootImageStickyPatches() always runs before _reapplyStickyPatches().
+        // Do NOT call resetSim() here — the fetch hasn't returned yet and the
+        // stale sticky-patch eviction hasn't happened.
     });
 }
 
