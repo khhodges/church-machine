@@ -1001,3 +1001,83 @@
     line-height: 1.4;
 }
 
+
+/* ==================== ASM INSTRUCTION PICKER POPUP ==================== */
+
+.asm-instr-picker {
+    position: fixed;
+    z-index: 9500;
+    background: #12121f;
+    border: 1px solid #f4b942;
+    border-radius: 6px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.7);
+    width: 580px;
+    max-height: 260px;
+    display: none;
+    flex-direction: column;
+    animation: asmPickerIn 0.12s ease;
+    overflow: hidden;
+}
+
+@keyframes asmPickerIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.asm-picker-header {
+    padding: 5px 10px;
+    color: #f4b942;
+    font-size: 0.68rem;
+    font-weight: 600;
+    border-bottom: 1px solid #2a2a4a;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.asm-picker-body {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+}
+
+.asm-picker-group {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #2a2a4a;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.asm-picker-group:last-child {
+    border-right: none;
+}
+
+.asm-picker-group-label {
+    padding: 3px 8px 2px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid #2a2a4a;
+}
+
+.asm-picker-item {
+    padding: 4px 10px;
+    font-size: 0.72rem;
+    font-family: 'Courier New', Courier, monospace;
+    color: #c9d1d9;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s ease;
+}
+
+.asm-picker-item:hover,
+.asm-picker-item--active {
+    background: rgba(244, 185, 66, 0.18);
+    color: #fff;
+}
