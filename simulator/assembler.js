@@ -263,22 +263,35 @@ class ChurchAssembler {
     }
 
     // _resolveNSNameBracket(nameToken, idxToken)
-    // Tries _resolveNSName(nameToken) first; if that fails and idxToken is a
-    // bare decimal digit, attempts the bracket form "NAME[N]".  Returns
-    // { slot, key, consumed } on success, or null on failure.
-    // This handles the tokenizer splitting "LED[0]" into two tokens "LED" "0".
+    // Tries _resolveNSName(nameToken) first; if that fails:
+    //   • idxToken is a bare decimal  → tries the bracket form "NAME[N]"
+    //     (handles the tokenizer splitting "LED[0]" into "LED" "0")
+    //   • idxToken is a plain word    → tries the two-word form "NAME WORD"
+    //     (handles the tokenizer splitting "LED flash" into "LED" "flash")
+    // Returns { slot, key, consumed } on success, or null on failure.
     _resolveNSNameBracket(nameToken, idxToken) {
         const name = (nameToken || '').replace(/,/g, '').trim();
         const idx  = (idxToken  || '').replace(/,/g, '').trim();
 
+        // 1. Single-token lookup (idxToken not needed).
         const slot = this._resolveNSName(nameToken);
         if (slot !== null) return { slot, key: name, consumed: false };
 
+        // 2. Bracket form: tokenizer split "LED[0]" → "LED" + "0".
         if (idx && /^\d+$/.test(idx)) {
-            const combined  = name + '[' + idx + ']';
+            const combined = name + '[' + idx + ']';
             const slotBr = this._resolveNSName(combined);
             if (slotBr !== null) return { slot: slotBr, key: combined, consumed: true };
         }
+
+        // 3. Two-word abstraction name: tokenizer split "LED flash" → "LED" + "flash".
+        //    Only when idxToken is a plain identifier (not a number, not empty).
+        if (idx && /^[A-Za-z_]\w*$/.test(idx)) {
+            const combined2 = name + ' ' + idx;
+            const slot2 = this._resolveNSName(combined2);
+            if (slot2 !== null) return { slot: slot2, key: combined2, consumed: true };
+        }
+
         return null;
     }
 
