@@ -764,7 +764,15 @@ function buildAndDownloadLump() {
     let _auditErrors  = [];
     let _auditWarns   = [];
     if (typeof lumpAudit === 'function') {
-        _auditResults = lumpAudit(Array.from(lumpWords), null);
+        const _auditPnCR = {};
+        for (let _i = 0; _i < resolvedCaps.length; _i++) {
+            if (resolvedCaps[_i] && resolvedCaps[_i].name) _auditPnCR[String(_i)] = resolvedCaps[_i].name;
+        }
+        _auditResults = lumpAudit(Array.from(lumpWords), {
+            cw, cc, lump_size: lumpSize,
+            pet_names:    { CR: _auditPnCR },
+            capabilities: resolvedCaps.map(rc => ({ name: rc.name })),
+        });
         _auditErrors  = _auditResults.filter(r => r.severity === 'error');
         _auditWarns   = _auditResults.filter(r => r.severity === 'warn');
     }
@@ -1046,7 +1054,15 @@ function auditLumpOnly() {
     const _auditClistStart = lumpSize - cc;
     for (let i = 0; i < cc; i++) { lumpWords[_auditClistStart + i] = 0; }
 
-    const auditResults = lumpAudit(Array.from(lumpWords), null);
+    const _aloPnCR = {};
+    for (let _i = 0; _i < caps.length; _i++) {
+        if (caps[_i] && caps[_i].name) _aloPnCR[String(_i)] = caps[_i].name;
+    }
+    const auditResults = lumpAudit(Array.from(lumpWords), {
+        cw, cc, lump_size: lumpSize,
+        pet_names:    { CR: _aloPnCR },
+        capabilities: caps.map(c => ({ name: c.name || String(c) })),
+    });
     const auditErrors  = auditResults.filter(r => r.severity === 'error');
     const auditWarns   = auditResults.filter(r => r.severity === 'warn');
 

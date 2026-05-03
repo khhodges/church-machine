@@ -311,7 +311,7 @@ function showLumpDetail(token) {
             const _auditLump  = _lumpsCache.find(l => l.token === _auditToken);
             const _auditWrap  = document.getElementById(`lumpAuditResults_${_auditToken.replace(/[^a-z0-9]/gi, '')}`);
             if (!_auditWrap) return;
-            const _manifest = _auditLump ? { cw: _auditLump.cw, cc: _auditLump.cc, lump_size: _auditLump.lump_size } : null;
+            const _manifest = _auditLump ? { cw: _auditLump.cw, cc: _auditLump.cc, lump_size: _auditLump.lump_size, pet_names: _auditLump.pet_names || null, capabilities: _auditLump.capabilities || [] } : null;
             if (typeof lumpAuditFromServer === 'function') {
                 auditBtn.disabled = true;
                 lumpAuditFromServer(_auditToken, _manifest, _auditWrap, { collapsible: true, startOpen: true })
@@ -325,7 +325,7 @@ function showLumpDetail(token) {
     if (!isNamespace && _lumpAutoAuditEnabled && typeof lumpAuditFromServer === 'function') {
         const _autoAuditWrap = document.getElementById(`lumpAuditResults_${_tk}`);
         if (_autoAuditWrap) {
-            const _autoManifest = { cw: lump.cw, cc: lump.cc, lump_size: lump.lump_size };
+            const _autoManifest = { cw: lump.cw, cc: lump.cc, lump_size: lump.lump_size, pet_names: lump.pet_names || null, capabilities: lump.capabilities || [] };
             if (auditBtn) auditBtn.disabled = true;
             lumpAuditFromServer(token, _autoManifest, _autoAuditWrap, { collapsible: true })
                 .finally(() => { if (auditBtn) auditBtn.disabled = false; });

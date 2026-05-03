@@ -210,6 +210,154 @@ function lumpAudit(words, manifest) {
         }
     }
 
+    // ── RCI — Church Instruction Range Check ──────────────────────────────────
+    // For each code word in words[1..cw]:
+    //   LOAD/SAVE/ELOADCALL/XLOADLAMBDA (crSrc=6, c-list access): slot must be < cc.
+    //   BRANCH (opcode 17): sign-extended 15-bit offset must land in [0, cw-1].
+    // Skipped when binary size or bounds checks have already failed.
+    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1) {
+        const _rciChurchOps = new Set([0, 1, 8, 9]);
+        const _rciOpName    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
+        const _rciBranchOp  = 17;
+        const _rciViolations = [];
+
+        for (let wi = 1; wi <= cw && wi < actualWords; wi++) {
+            const ww     = words[wi] >>> 0;
+            const op     = (ww >>> 27) & 0x1F;
+            const crSrc  = (ww >>> 15) & 0xF;
+            const slot   =  ww         & 0x7FFF;
+            const codeIdx = wi - 1;   // 0-based index within the code section
+
+            if (_rciChurchOps.has(op) && crSrc === 6 && slot >= cc) {
+                _rciViolations.push(
+                    `word[${wi}] ${_rciOpName[op]}: c-list slot ${slot} \u2265 cc=${cc}`
+                );
+            }
+
+            if (op === _rciBranchOp) {
+                let off = ww & 0x7FFF;
+                if (off & 0x4000) off = off - 0x8000;   // sign-extend 15-bit
+                const target = codeIdx + off;
+                if (target < 0 || target >= cw) {
+                    _rciViolations.push(
+                        `word[${wi}] BRANCH: offset ${off} \u2192 target code[${target}] ` +
+                        `out of range [0\u2013${cw - 1}]`
+                    );
+                }
+            }
+        }
+
+        if (_rciViolations.length === 0) {
+            results.push({
+                ruleId: 'RCI',
+                severity: 'pass',
+                message: 'Church instructions in range',
+                detail: `All ${cw} code word${cw !== 1 ? 's' : ''} checked \u2014 no range violations \u2713`,
+            });
+        } else {
+            results.push({
+                ruleId: 'RCI',
+                severity: 'error',
+                message: `${_rciViolations.length} range violation${_rciViolations.length !== 1 ? 's' : ''}`,
+                detail: _rciViolations.join('; '),
+            });
+        }
+    } else {
+        results.push({
+            ruleId: 'RCI',
+            severity: 'warn',
+            message: 'Church instruction check skipped',
+            detail: 'Fix size or bounds errors above first.',
+        });
+    }
+
+    // ── RPN — Pet Name Coverage ───────────────────────────────────────────────
+    // Verify every c-list slot accessed by a Church instruction (LOAD/SAVE/
+    // ELOADCALL/XLOADLAMBDA via CR6) has a pet name declared in the manifest.
+    // Name sources: manifest.pet_names.CR (slot-index string → name) and/or
+    // manifest.capabilities[] (array index = slot, .name = capability name).
+    // Skipped when cc=0 (no c-list) or when binary size/bounds failed.
+    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
+            manifest && typeof manifest === 'object') {
+        const _rpnHasPetCR = manifest.pet_names &&
+                             typeof manifest.pet_names.CR === 'object' &&
+                             manifest.pet_names.CR !== null;
+        const _rpnHasCaps  = Array.isArray(manifest.capabilities) &&
+                             manifest.capabilities.length > 0;
+
+        if (!_rpnHasPetCR && !_rpnHasCaps) {
+            results.push({
+                ruleId: 'RPN',
+                severity: 'warn',
+                message: 'Pet names not verifiable',
+                detail: `cc=${cc} but no pet_names or capabilities in manifest \u2014 ` +
+                        'pass the full sidecar to verify pet name coverage.',
+            });
+        } else {
+            // Build slot → best name map from manifest sources.
+            const _rpnSlotName = {};
+            if (_rpnHasPetCR) {
+                for (const [k, v] of Object.entries(manifest.pet_names.CR)) {
+                    const s = parseInt(k, 10);
+                    if (!isNaN(s) && s >= 0 && s < cc) _rpnSlotName[s] = String(v);
+                }
+            }
+            if (_rpnHasCaps) {
+                for (let i = 0; i < manifest.capabilities.length && i < cc; i++) {
+                    const cap = manifest.capabilities[i];
+                    if (!_rpnSlotName[i] && cap && cap.name) _rpnSlotName[i] = String(cap.name);
+                }
+            }
+
+            // Scan Church instructions for unnamed-slot references.
+            const _rpnChurchOps = new Set([0, 1, 8, 9]);
+            const _rpnUnnamedReferenced = new Set();
+            for (let wi = 1; wi <= cw && wi < actualWords; wi++) {
+                const ww    = words[wi] >>> 0;
+                const op    = (ww >>> 27) & 0x1F;
+                const crSrc = (ww >>> 15) & 0xF;
+                const slot  =  ww         & 0x7FFF;
+                if (!_rpnChurchOps.has(op) || crSrc !== 6 || slot >= cc) continue;
+                if (!_rpnSlotName[slot]) _rpnUnnamedReferenced.add(slot);
+            }
+
+            // Check coverage of all allocated slots (even unreferenced ones).
+            const _rpnUnnamedAny = [];
+            for (let s = 0; s < cc; s++) {
+                if (!_rpnSlotName[s]) _rpnUnnamedAny.push(s);
+            }
+
+            if (_rpnUnnamedReferenced.size > 0) {
+                const refs = Array.from(_rpnUnnamedReferenced).sort((a, b) => a - b);
+                results.push({
+                    ruleId: 'RPN',
+                    severity: 'warn',
+                    message: `${refs.length} unnamed slot${refs.length !== 1 ? 's' : ''} in Church instructions`,
+                    detail: `Slot${refs.length !== 1 ? 's' : ''} [${refs.join(', ')}] used by Church ` +
+                            'instructions have no pet name \u2014 add .pet declarations for these capabilities.',
+                });
+            } else if (_rpnUnnamedAny.length > 0) {
+                results.push({
+                    ruleId: 'RPN',
+                    severity: 'warn',
+                    message: `${_rpnUnnamedAny.length} unnamed c-list slot${_rpnUnnamedAny.length !== 1 ? 's' : ''}`,
+                    detail: `Slot${_rpnUnnamedAny.length !== 1 ? 's' : ''} [${_rpnUnnamedAny.join(', ')}] ` +
+                            'allocated but unnamed \u2014 add .pet declarations.',
+                });
+            } else {
+                const nameList = Array.from({ length: cc }, (_, i) =>
+                    `[${i}]\u202F"${_rpnSlotName[i]}"`
+                ).join(', ');
+                results.push({
+                    ruleId: 'RPN',
+                    severity: 'pass',
+                    message: 'Pet names complete',
+                    detail: `All ${cc} slot${cc !== 1 ? 's' : ''} named: ${nameList} \u2713`,
+                });
+            }
+        }
+    }
+
     return results;
 }
 
