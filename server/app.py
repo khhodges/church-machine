@@ -2463,7 +2463,7 @@ def _load_boot_abstr_lump():
             try:
                 with open(_sidecar_path) as _s03f:
                     _s03 = json.load(_s03f)
-                for _f03 in ('author', 'version', 'cw', 'cc'):
+                for _f03 in ('author', 'version', 'cw', 'cc', 'pet_names', 'capabilities'):
                     if _f03 in _s03:
                         _BOOT_ABSTR_META[_f03] = _s03[_f03]
             except Exception:

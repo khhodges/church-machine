@@ -522,7 +522,7 @@ function updateCRDetail() {
                 const DEVICE_CLASSES = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
                 if (ab.ab_type === 0) {
                     const dc = DEVICE_CLASSES[ab.device_class] || `dc${ab.device_class}`;
-                    nsLabel = `${dc}[${ab.device_data}]`;
+                    nsLabel = `${dc}${ab.device_data}`;
                 } else {
                     nsLabel = `${AB_TYPE_NAMES[ab.ab_type] || `ab${ab.ab_type}`} 0x${ab.ab_data.toString(16).toUpperCase()}`;
                 }
@@ -610,7 +610,7 @@ function updateCRDetail() {
                 const DEVICE_CLASSES = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
                 if (ab.ab_type === 0) {
                     const dc = DEVICE_CLASSES[ab.device_class] || `dc${ab.device_class}`;
-                    nsLabel = `${dc}[${ab.device_data}]`;
+                    nsLabel = `${dc}${ab.device_data}`;
                 } else {
                     nsLabel = `${AB_TYPE_NAMES[ab.ab_type] || `ab${ab.ab_type}`} 0x${ab.ab_data.toString(16).toUpperCase()}`;
                 }
