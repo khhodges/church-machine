@@ -459,14 +459,41 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
                         and _bscc <= DEMO_CLIST_SIZE and _bsn >= _bssz
                         and (1 + _bscw + _bscc) <= _bssz):
                     actual_abstr_size = _bssz
-                    # Strip cc to 0: the DEMO_CLIST is injected at runtime
-                    # by the simulator's LAZY-LOAD mechanism in app-run.js
-                    # (_applyPendingSimLoad).  Embedding a non-zero cc here
-                    # would make B:06 NUC_CLIST set CR6 ≠ NULL at HALT,
-                    # breaking the CLOOMC cc=0 invariant (Task #651) and
-                    # silently blocking the LAZY injection from firing.
-                    _hdr_cc0 = _bswords[0] & ~0xFF   # zero bits [7:0] = cc
-                    abstr_words = [_hdr_cc0] + list(_bswords[1:_bssz])
+                    # Decide whether to strip cc → 0 (triggering LAZY injection
+                    # in _applyPendingSimLoad) or embed cc as-is (POLA-finalized
+                    # lump whose c-list is already correct).
+                    #
+                    # Rule: scan every LOAD/SAVE/ELOADCALL/XLOADLAMBDA word
+                    # (opcodes 0/1/8/9) whose crSrc field is CR6 (= 6).  If the
+                    # slot operand >= _bscc then the stored c-list is incomplete
+                    # (e.g. assembler-generated cc=1 placeholder) and the
+                    # simulator must LAZY-inject the DEMO_CLIST at runtime.
+                    # If ALL slot references are < _bscc the lump was finalized
+                    # by POLA compression and must be embedded with its actual cc
+                    # so LAZY injection does NOT overwrite the POLA c-list with
+                    # the original DEMO_CLIST order (which would corrupt the
+                    # POLA-rewritten slot indices in the code words).
+                    _CLIST_OPS = frozenset((0, 1, 8, 9))  # LOAD SAVE ELOADCALL XLOADLAMBDA
+                    _needs_lazy = (_bscc == 0)             # no c-list → always needs LAZY
+                    if not _needs_lazy:
+                        for _wi in range(1, 1 + _bscw):
+                            if _wi >= _bssz:
+                                break
+                            _ww = _bswords[_wi]
+                            _op     = (_ww >> 27) & 0x1F
+                            _cr_src = (_ww >> 15) & 0xF
+                            _slot   = _ww & 0x7FFF
+                            if _op in _CLIST_OPS and _cr_src == 6 and _slot >= _bscc:
+                                _needs_lazy = True
+                                break
+                    if _needs_lazy:
+                        # Pre-LAZY / assembler-placeholder c-list: strip cc → 0.
+                        # The simulator will inject the full DEMO_CLIST on first Run.
+                        abstr_words = [_bswords[0] & ~0xFF] + list(_bswords[1:_bssz])
+                    else:
+                        # POLA-finalized c-list: embed with actual cc so the
+                        # simulator's LAZY guard (clistCount === 0) does not fire.
+                        abstr_words = list(_bswords[:_bssz])
         except Exception:
             pass  # Fall back to default 64w Boot.Abstr silently.
 
