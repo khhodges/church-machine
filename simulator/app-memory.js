@@ -2438,7 +2438,7 @@ function saveBootDesigner() {
 // Task #217 — fetch the saved boot-image.bin (if any) without triggering
 // a 404 console error noise. Returns ArrayBuffer or null.
 function _probeBootImage() {
-    return fetch('/api/boot-image/binary')
+    return fetch('/api/boot-image/binary', { cache: 'no-store' })
         .then(r => r.ok ? r.arrayBuffer() : null)
         .catch(() => null);
 }

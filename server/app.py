@@ -753,7 +753,10 @@ def boot_image_binary():
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
-    return send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream")
+    resp = send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 @app.route("/api/boot-image/exists", methods=["GET"])
 def boot_image_exists():
