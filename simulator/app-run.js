@@ -1000,8 +1000,14 @@ function _autoLoadDefaultProgram() {
     }
     _defaultProgramLoaded = true;
     loadExample('led_blink');
-    assembleAndLoad();
-    _applyPendingSimLoad();
+    // Do NOT auto-assemble here. assembleAndLoad() → sim.loadProgram() would
+    // overwrite Boot.Abstr word[0] with the led_blink first instruction
+    // (LOAD CR3, CR6[8] = 0x071B0008), masking the boot image's correct value
+    // (LOAD CR3, CR6[0] = 0x071B0000) in Code View on every boot.
+    // The led_blink example comments already direct the user to assemble
+    // manually ("2. Assemble this code, then click Step").  Once they do,
+    // lastAssembledWords is set and the if-branch above reloads it on every
+    // subsequent boot automatically.
     _applyBootLumpPetNames();
     if (typeof updateLiveLumpBanner === 'function') updateLiveLumpBanner();
 }
