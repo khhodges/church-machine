@@ -41,14 +41,6 @@ args = "boot-image-serve-endpoints"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "assembler-tests"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "assembler-tests-watch"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "e2e-tests"
 
 [[workflows.workflow]]
@@ -116,28 +108,6 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python -m pytest tests/boot/test_boot_image_serve_endpoints.py -v"
-
-[[workflows.workflow]]
-name = "assembler-tests"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/assembler_test.js && node simulator/lump_warning_test.js && node simulator/keystone_test.js && python3 -m pytest tests/simulator/test_clist_analysis.py -v"
-
-[[workflows.workflow]]
-name = "assembler-tests-watch"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/watch_assembler_tests.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow]]
 name = "e2e-tests"

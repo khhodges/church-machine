@@ -5742,15 +5742,26 @@ class ChurchSimulator {
         }
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
-        const totalLen = 1 + codeLen;
-        const lim17 = Math.min(totalLen - 1, 0x1FFFF);
-        const gtWord = this.createGT(0, idx, perms, gtType);
+        const cc = 0;
+        // Lump must be a power-of-2 block >= 64 words that fits header + code + c-list.
+        let lumpSize = 64;
+        while (lumpSize < 1 + codeLen + cc) lumpSize <<= 1;
+        const n_minus_6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
+        // NS entry limit17 = index of last valid code/data word = lumpSize - cc - 1.
+        const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
         const abstractGtWord = (this.getPermBits(perms) << 25) >>> 0;
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, 0, gtType, 0, undefined, abstractGtWord);
+        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
         this.nsLabels[idx] = label;
-        this.memory[loc] = gtWord;
+        // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
+        // Previously a GT word was written here, which broke CALL dispatch and
+        // lumpSaveLump because both require magic=0x1F at bits[31:27] of word 0.
+        this.memory[loc] = this.packLumpHeader(n_minus_6, codeLen, cc, 0);
         for (let i = 0; i < codeLen; i++) {
             this.memory[loc + 1 + i] = words[i] >>> 0;
+        }
+        // Zero freespace and c-list region.
+        for (let i = 1 + codeLen; i < lumpSize; i++) {
+            this.memory[loc + i] = 0;
         }
         this.emit('stateChange', this.getState());
         return idx;
@@ -5761,16 +5772,24 @@ class ChurchSimulator {
         gtType = (gtType !== undefined && gtType !== null) ? gtType : 1;
         const loc = idx * this.SLOT_SIZE;
         const codeLen = words.length;
-        const totalLen = 1 + codeLen;
-        const lim17 = Math.min(totalLen - 1, 0x1FFFF);
-        const gtWord = this.createGT(0, idx, perms, gtType);
-        for (let j = 0; j < this.SLOT_SIZE; j++) {
+        const cc = 0;
+        // Lump must be a power-of-2 block >= 64 words that fits header + code + c-list.
+        let lumpSize = 64;
+        while (lumpSize < 1 + codeLen + cc) lumpSize <<= 1;
+        const n_minus_6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
+        // NS entry limit17 = index of last valid code/data word = lumpSize - cc - 1.
+        const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
+        // Zero the entire lump region before writing the new lump.
+        for (let j = 0; j < lumpSize; j++) {
             if (loc + j < this.memory.length) this.memory[loc + j] = 0;
         }
         const abstractGtWord = (this.getPermBits(perms) << 25) >>> 0;
-        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, 0, gtType, 0, undefined, abstractGtWord);
+        this.writeNSEntry(idx, loc, lim17, 0, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
         this.nsLabels[idx] = label;
-        this.memory[loc] = gtWord;
+        // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
+        // Previously a GT word was written here, which broke CALL dispatch and
+        // lumpSaveLump because both require magic=0x1F at bits[31:27] of word 0.
+        this.memory[loc] = this.packLumpHeader(n_minus_6, codeLen, cc, 0);
         for (let i = 0; i < codeLen; i++) {
             this.memory[loc + 1 + i] = words[i] >>> 0;
         }
