@@ -877,6 +877,95 @@ window.clearStickyPatch = function(nsIdx) {
     if (typeof updateCRDetail === 'function') updateCRDetail();
 };
 
+// ── Boot-image sticky-patch eviction ─────────────────────────────────────────
+// Called from app-shell.js and app-memory.js immediately after a successful
+// sim.loadBootImage() call.  For each NS slot the boot image owns (0..nsCount-1):
+//
+//   Patch words == boot-image words  →  redundant; clear silently.
+//   Patch words != boot-image words  →  stale; clear it, log each differing
+//                                       word (old vs new disassembly) to the
+//                                       IDE console, and raise a persistent
+//                                       toast (duration=0) the programmer must
+//                                       explicitly dismiss.
+//
+// Defined here so it can access _stickyPatches without exposing that variable.
+window._clearBootImageStickyPatches = function(nsCount) {
+    var staleCleared = [];
+    var _dis = function(w) {
+        try {
+            return (typeof ChurchAssembler !== 'undefined')
+                ? ChurchAssembler.disassemble(w >>> 0)
+                : ('0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0'));
+        } catch (_e) {
+            return '0x' + (w >>> 0).toString(16).toUpperCase().padStart(8, '0');
+        }
+    };
+
+    for (var _slot = 0; _slot < nsCount; _slot++) {
+        var _patch = _stickyPatches[_slot];
+        if (!_patch) continue;
+
+        // Locate this slot's lump in sim.memory
+        var _nse    = (typeof sim !== 'undefined' && sim && typeof sim.readNSEntry === 'function')
+                          ? sim.readNSEntry(_slot) : null;
+        var _base   = _nse ? (_nse.word0_location >>> 0) : 0;
+        var _pWords = Array.isArray(_patch.words) ? _patch.words : [];
+        var _pCW    = (_patch.newCW > 0) ? _patch.newCW : _pWords.length;
+
+        // Compare patch words vs what loadBootImage wrote to sim.memory
+        var _diffs = [];
+        for (var _wi = 0; _wi < _pCW; _wi++) {
+            var _pw = (_pWords[_wi] || 0) >>> 0;
+            var _mw = (_base && typeof sim !== 'undefined' && (_base + 1 + _wi) < sim.memory.length)
+                          ? (sim.memory[_base + 1 + _wi] >>> 0) : 0;
+            if (_pw !== _mw) _diffs.push({ wi: _wi, old: _pw, cur: _mw });
+        }
+
+        var _label = (typeof sim !== 'undefined' && sim.nsLabels && sim.nsLabels[_slot])
+                         || ('NS[' + _slot + ']');
+
+        // Always remove the patch — either it's redundant (matches) or stale (differs)
+        delete _stickyPatches[_slot];
+        _clearPersistedStickyPatch(_slot);
+
+        if (_diffs.length > 0) {
+            staleCleared.push({ slot: _slot, label: _label, diffs: _diffs, pCW: _pCW });
+        }
+    }
+
+    if (typeof updateCRDetail === 'function') updateCRDetail();
+    if (staleCleared.length === 0) return;   // all redundant — nothing to report
+
+    // ── IDE console: per-slot, per-word diff ─────────────────────────────
+    if (typeof appendOutput === 'function') {
+        appendOutput('── Boot image updated — ' + staleCleared.length +
+            ' stale sticky patch' + (staleCleared.length !== 1 ? 'es' : '') + ' cleared ──', 'info');
+        for (var _sc of staleCleared) {
+            appendOutput('  ' + _sc.label + ' (' + _sc.pCW + ' word' + (_sc.pCW !== 1 ? 's' : '') + '):');
+            for (var _d of _sc.diffs) {
+                appendOutput('    [' + _d.wi + ']  was: ' + _dis(_d.old) +
+                             '   now: ' + _dis(_d.cur));
+            }
+        }
+    }
+
+    // ── Persistent toast (stays until dismissed) ──────────────────────────
+    if (typeof _showFpgaToast === 'function') {
+        var _names  = staleCleared.map(function(s) { return s.label; }).join(', ');
+        var _plural = staleCleared.length !== 1;
+        _showFpgaToast(
+            'Stale patch' + (_plural ? 'es' : '') + ' cleared',
+            (_plural
+                ? staleCleared.length + ' sticky patches (' + _names + ') were built against ' +
+                  'an older boot image and have been removed. See the IDE console for the word-by-word diff.'
+                : 'Your sticky patch for ' + _names + ' was built against an older boot image ' +
+                  'and has been removed. See the IDE console for the word-by-word diff.'),
+            'warn',
+            0   // duration=0 — stays until the programmer explicitly dismisses it
+        );
+    }
+};
+
 async function patchFPGA() {
     const logEl = document.getElementById('crInjectLog');
     if (logEl) { logEl.style.display = 'block'; logEl.textContent = ''; }

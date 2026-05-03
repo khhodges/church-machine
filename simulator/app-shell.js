@@ -355,13 +355,13 @@ function init() {
         if (buf) { window.bootImage = buf; window.bootImageAvailable = true;
                    try {
                        sim.loadBootImage(buf); _applyBootEntryToSim();
-                       // Invalidate any sticky patches covering NS slots now
-                       // owned by the boot image.  A patch recorded against an
-                       // older boot image binary is stale by definition; leaving
-                       // it active lets _reapplyStickyPatches() overwrite the
-                       // freshly-loaded canonical words at boot completion.
-                       if (typeof clearStickyPatch === 'function') {
-                           for (var _bi = 0; _bi < (sim.nsCount || 0); _bi++) clearStickyPatch(_bi);
+                       // Evict stale sticky patches for all NS slots now owned
+                       // by the boot image.  Patches that differ from the new
+                       // binary are cleared and reported; matching (redundant)
+                       // patches are cleared silently.  Must run before
+                       // _reapplyStickyPatches() fires at boot completion.
+                       if (typeof window._clearBootImageStickyPatches === 'function') {
+                           window._clearBootImageStickyPatches(sim.nsCount || 0);
                        }
                    } catch(e) { console.warn('[bootImage] apply failed:', e); } }
         // Re-apply user-assigned namespace labels that sim.loadBootImage() may
