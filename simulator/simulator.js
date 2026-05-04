@@ -1811,13 +1811,13 @@ class ChurchSimulator {
     _validateClistSlotPerms(parsed, slotIdx) {
         const p = parsed.permissions;
         const permStr = (p.B?'B':'')+(p.R?'R':'')+(p.W?'W':'')+(p.X?'X':'')+(p.L?'L':'')+(p.S?'S':'')+(p.E?'E':'');
-        if (slotIdx === 0) {
+        if (slotIdx === 0 && parsed.type !== 3) {
             const hasX = p.X;
             const onlyXorRX = hasX && !p.W && !p.L && !p.S && !p.E;
             if (!onlyXorRX) {
                 return { ok: false, fault: 'DOMAIN_PURITY', message: `CLOOMC slot 0 has ${permStr||'no'} permissions — only X or RX allowed` };
             }
-        } else {
+        } else if (slotIdx !== 0) {
             if (p.X && p.E) {
                 return { ok: false, fault: 'DOMAIN_PURITY', message: `C-List slot ${slotIdx} has ${permStr} — mixed XE not allowed (use separate slots for X and E)` };
             }
