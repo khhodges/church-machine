@@ -159,14 +159,13 @@ class ChurchOutform(Elaboratable):
 
         win_mem = LibMemory(shape=unsigned(8), depth=DEFL_WIN_SIZE, init=[])
         m.submodules.win_mem = win_mem
-        win_rd = win_mem.read_port(domain="comb")
+        win_rd = win_mem.read_port(domain="sync")
         win_wr = win_mem.write_port()
 
         m.d.comb += [
             win_wr.addr.eq(0),
             win_wr.data.eq(0),
             win_wr.en.eq(0),
-            win_rd.addr.eq(0),
         ]
 
         defl_bits      = Signal(32, name="defl_bits")

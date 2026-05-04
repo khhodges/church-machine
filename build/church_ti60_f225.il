@@ -60827,30 +60827,27 @@ module \top.core.u_outform
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:400"
   wire width 1 \win_wr__en
 
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:240"
-  wire width 11 \win_rd__addr
-
-  attribute \src "/home/runner/workspace/hardware/outform.py:195"
+  attribute \src "/home/runner/workspace/hardware/outform.py:194"
   wire width 7 \code7_rev
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:172"
+  attribute \src "/home/runner/workspace/hardware/outform.py:171"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \defl_bits
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:196"
+  attribute \src "/home/runner/workspace/hardware/outform.py:195"
   wire width 8 \code8_rev
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:197"
+  attribute \src "/home/runner/workspace/hardware/outform.py:196"
   wire width 9 \code9_rev
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:198"
+  attribute \src "/home/runner/workspace/hardware/outform.py:197"
   wire width 5 \dist5_rev
 
   attribute \src "/home/runner/workspace/hardware/outform.py:129"
   attribute \init 3'000
   wire width 3 \tx_byte_cnt
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:223"
+  attribute \src "/home/runner/workspace/hardware/outform.py:222"
   wire width 32 \inflate_word
 
   attribute \src "/home/runner/workspace/hardware/outform.py:148"
@@ -60880,14 +60877,14 @@ module \top.core.u_outform
   attribute \init 5'00000
   wire width 5 \outform_state
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:345"
+  attribute \src "/home/runner/workspace/hardware/outform.py:344"
   wire width 1 \is_pow2
 
   attribute \src "/home/runner/workspace/hardware/outform.py:142"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \word_count_reg
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:350"
+  attribute \src "/home/runner/workspace/hardware/outform.py:349"
   wire width 5 \n_computed
 
   attribute \src "/home/runner/workspace/hardware/outform.py:135"
@@ -60905,11 +60902,11 @@ module \top.core.u_outform
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \wr_word_cnt
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:173"
+  attribute \src "/home/runner/workspace/hardware/outform.py:172"
   attribute \init 6'000000
   wire width 6 \defl_bit_cnt
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:182"
+  attribute \src "/home/runner/workspace/hardware/outform.py:181"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \defl_rx_count
 
@@ -60917,54 +60914,57 @@ module \top.core.u_outform
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \comp_size_reg
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:447"
+  attribute \src "/home/runner/workspace/hardware/outform.py:446"
   wire width 2 \btype
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:175"
+  attribute \src "/home/runner/workspace/hardware/outform.py:174"
   attribute \init 9'000000000
   wire width 9 \defl_symbol
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:179"
+  attribute \src "/home/runner/workspace/hardware/outform.py:178"
   attribute \init 11'00000000000
   wire width 11 \defl_win_pos
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:565"
+  attribute \src "/home/runner/workspace/hardware/outform.py:564"
   wire width 4 \len_extra_needed
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:180"
+  attribute \src "/home/runner/workspace/hardware/outform.py:179"
   attribute \init 5'00000
   wire width 5 \defl_len_idx
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:637"
+  attribute \src "/home/runner/workspace/hardware/outform.py:636"
   wire width 4 \dist_extra_needed
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:181"
+  attribute \src "/home/runner/workspace/hardware/outform.py:180"
   attribute \init 5'00000
   wire width 5 \defl_dist_code
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:664"
+  attribute \src "/home/runner/workspace/hardware/outform.py:663"
   wire width 32 \defl_hist_depth
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:183"
+  attribute \src "/home/runner/workspace/hardware/outform.py:182"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \defl_bytes_out
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:178"
+  attribute \src "/home/runner/workspace/hardware/outform.py:177"
   attribute \init 9'000000000
   wire width 9 \defl_copy_idx
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:177"
+  attribute \src "/home/runner/workspace/hardware/outform.py:176"
   attribute \init 12'000000000000
   wire width 12 \defl_copy_dist
+
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:240"
+  wire width 11 \win_rd__addr
 
   attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:241"
   wire width 8 \win_rd__data
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:187"
+  attribute \src "/home/runner/workspace/hardware/outform.py:186"
   attribute \init 8'00000000
   wire width 8 \rle_literal
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:801"
+  attribute \src "/home/runner/workspace/hardware/outform.py:800"
   wire width 32 \crc_final
 
   attribute \src "/home/runner/workspace/hardware/outform.py:128"
@@ -61007,23 +61007,23 @@ module \top.core.u_outform
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \total_words
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:174"
+  attribute \src "/home/runner/workspace/hardware/outform.py:173"
   attribute \init 1'0
   wire width 1 \defl_bfinal
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:176"
+  attribute \src "/home/runner/workspace/hardware/outform.py:175"
   attribute \init 9'000000000
   wire width 9 \defl_copy_len
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:186"
+  attribute \src "/home/runner/workspace/hardware/outform.py:185"
   attribute \init 8'00000000
   wire width 8 \rle_count
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:188"
+  attribute \src "/home/runner/workspace/hardware/outform.py:187"
   attribute \init 8'00000000
   wire width 8 \rle_remaining
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:184"
+  attribute \src "/home/runner/workspace/hardware/outform.py:183"
   attribute \init 32'00000000000000000000000000000000
   wire width 32 \rle_rx_count
 
@@ -62136,7 +62136,7 @@ module \top.core.u_outform
     connect \Y \_cs7
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:347"
+  attribute \src "/home/runner/workspace/hardware/outform.py:346"
   cell $ne $370
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62148,7 +62148,7 @@ module \top.core.u_outform
     connect \Y $17
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:348"
+  attribute \src "/home/runner/workspace/hardware/outform.py:347"
   cell $sub $371
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62160,7 +62160,7 @@ module \top.core.u_outform
     connect \Y $18
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:348"
+  attribute \src "/home/runner/workspace/hardware/outform.py:347"
   cell $and $372
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62172,7 +62172,7 @@ module \top.core.u_outform
     connect \Y $19
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:348"
+  attribute \src "/home/runner/workspace/hardware/outform.py:347"
   cell $eq $373
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62184,7 +62184,7 @@ module \top.core.u_outform
     connect \Y $20
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:347"
+  attribute \src "/home/runner/workspace/hardware/outform.py:346"
   cell $and $374
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62196,7 +62196,7 @@ module \top.core.u_outform
     connect \Y $21
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:404"
+  attribute \src "/home/runner/workspace/hardware/outform.py:403"
   cell $eq $375
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62208,7 +62208,7 @@ module \top.core.u_outform
     connect \Y $22
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:426"
+  attribute \src "/home/runner/workspace/hardware/outform.py:425"
   cell $eq $376
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62220,7 +62220,7 @@ module \top.core.u_outform
     connect \Y $23
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:435"
+  attribute \src "/home/runner/workspace/hardware/outform.py:434"
   cell $eq $377
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62232,7 +62232,7 @@ module \top.core.u_outform
     connect \Y $24
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:407"
+  attribute \src "/home/runner/workspace/hardware/outform.py:406"
   cell $eq $378
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62244,7 +62244,7 @@ module \top.core.u_outform
     connect \Y $25
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:409"
+  attribute \src "/home/runner/workspace/hardware/outform.py:408"
   cell $shl $379
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62256,7 +62256,7 @@ module \top.core.u_outform
     connect \Y $26
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:409"
+  attribute \src "/home/runner/workspace/hardware/outform.py:408"
   cell $add $380
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62268,7 +62268,7 @@ module \top.core.u_outform
     connect \Y $27
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:446"
+  attribute \src "/home/runner/workspace/hardware/outform.py:445"
   cell $ge $381
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62280,7 +62280,7 @@ module \top.core.u_outform
     connect \Y $28
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:459"
+  attribute \src "/home/runner/workspace/hardware/outform.py:458"
   cell $ge $382
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62292,7 +62292,7 @@ module \top.core.u_outform
     connect \Y $29
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:462"
+  attribute \src "/home/runner/workspace/hardware/outform.py:461"
   cell $le $383
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62304,7 +62304,7 @@ module \top.core.u_outform
     connect \Y $30
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:462"
+  attribute \src "/home/runner/workspace/hardware/outform.py:461"
   cell $and $384
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62316,7 +62316,7 @@ module \top.core.u_outform
     connect \Y $31
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:540"
+  attribute \src "/home/runner/workspace/hardware/outform.py:539"
   cell $eq $385
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62328,7 +62328,7 @@ module \top.core.u_outform
     connect \Y $32
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:542"
+  attribute \src "/home/runner/workspace/hardware/outform.py:541"
   cell $shl $386
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62340,7 +62340,7 @@ module \top.core.u_outform
     connect \Y $33
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:542"
+  attribute \src "/home/runner/workspace/hardware/outform.py:541"
   cell $add $387
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62352,7 +62352,7 @@ module \top.core.u_outform
     connect \Y $34
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:566"
+  attribute \src "/home/runner/workspace/hardware/outform.py:565"
   process $388
     assign $35 [2:0] 3'000
     switch \defl_len_idx [4:0]
@@ -62417,7 +62417,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:638"
+  attribute \src "/home/runner/workspace/hardware/outform.py:637"
   process $389
     assign $36 [3:0] 4'0000
     switch \defl_dist_code [4:0]
@@ -62484,7 +62484,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:665"
+  attribute \src "/home/runner/workspace/hardware/outform.py:664"
   cell $ge $390
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62496,7 +62496,7 @@ module \top.core.u_outform
     connect \Y $37
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:665"
+  attribute \src "/home/runner/workspace/hardware/outform.py:664"
   cell $mux $391
     parameter \WIDTH 32
     connect \S $37 [0]
@@ -62505,7 +62505,7 @@ module \top.core.u_outform
     connect \Y $38
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $eq $392
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62517,7 +62517,7 @@ module \top.core.u_outform
     connect \Y $39
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $eq $393
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62529,7 +62529,7 @@ module \top.core.u_outform
     connect \Y $40
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $gt $394
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62541,7 +62541,7 @@ module \top.core.u_outform
     connect \Y $41
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $or $395
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62553,7 +62553,7 @@ module \top.core.u_outform
     connect \Y $42
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $and $396
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62565,7 +62565,7 @@ module \top.core.u_outform
     connect \Y $43
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:670"
+  attribute \src "/home/runner/workspace/hardware/outform.py:669"
   cell $sub $397
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62577,7 +62577,7 @@ module \top.core.u_outform
     connect \Y $44
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:670"
+  attribute \src "/home/runner/workspace/hardware/outform.py:669"
   cell $and $398
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62589,7 +62589,7 @@ module \top.core.u_outform
     connect \Y $45
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:687"
+  attribute \src "/home/runner/workspace/hardware/outform.py:686"
   cell $eq $399
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62601,7 +62601,7 @@ module \top.core.u_outform
     connect \Y $46
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:689"
+  attribute \src "/home/runner/workspace/hardware/outform.py:688"
   cell $shl $400
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62613,7 +62613,7 @@ module \top.core.u_outform
     connect \Y $47
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:689"
+  attribute \src "/home/runner/workspace/hardware/outform.py:688"
   cell $add $401
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62625,7 +62625,7 @@ module \top.core.u_outform
     connect \Y $48
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:764"
+  attribute \src "/home/runner/workspace/hardware/outform.py:763"
   cell $eq $402
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62637,7 +62637,7 @@ module \top.core.u_outform
     connect \Y $49
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:766"
+  attribute \src "/home/runner/workspace/hardware/outform.py:765"
   cell $shl $403
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62649,7 +62649,7 @@ module \top.core.u_outform
     connect \Y $50
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:766"
+  attribute \src "/home/runner/workspace/hardware/outform.py:765"
   cell $add $404
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -62661,7 +62661,7 @@ module \top.core.u_outform
     connect \Y $51
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:802"
+  attribute \src "/home/runner/workspace/hardware/outform.py:801"
   cell $xor $405
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63021,7 +63021,7 @@ module \top.core.u_outform
     connect \Y $81
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:280"
+  attribute \src "/home/runner/workspace/hardware/outform.py:279"
   cell $eq $435
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63033,7 +63033,7 @@ module \top.core.u_outform
     connect \Y $82
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:284"
+  attribute \src "/home/runner/workspace/hardware/outform.py:283"
   cell $add $436
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63045,7 +63045,7 @@ module \top.core.u_outform
     connect \Y $83
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:314"
+  attribute \src "/home/runner/workspace/hardware/outform.py:313"
   cell $add $437
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63057,7 +63057,7 @@ module \top.core.u_outform
     connect \Y $84
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:315"
+  attribute \src "/home/runner/workspace/hardware/outform.py:314"
   cell $eq $438
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63069,7 +63069,7 @@ module \top.core.u_outform
     connect \Y $85
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:320"
+  attribute \src "/home/runner/workspace/hardware/outform.py:319"
   cell $ne $439
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63081,7 +63081,7 @@ module \top.core.u_outform
     connect \Y $86
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:336"
+  attribute \src "/home/runner/workspace/hardware/outform.py:335"
   cell $ne $440
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63093,7 +63093,7 @@ module \top.core.u_outform
     connect \Y $87
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:340"
+  attribute \src "/home/runner/workspace/hardware/outform.py:339"
   cell $shr $441
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63105,7 +63105,7 @@ module \top.core.u_outform
     connect \Y $88
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:357"
+  attribute \src "/home/runner/workspace/hardware/outform.py:356"
   cell $not $442
     parameter \A_SIGNED 0
     parameter \A_WIDTH 1
@@ -63114,7 +63114,7 @@ module \top.core.u_outform
     connect \Y $89
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:357"
+  attribute \src "/home/runner/workspace/hardware/outform.py:356"
   cell $lt $443
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63126,7 +63126,7 @@ module \top.core.u_outform
     connect \Y $90
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:357"
+  attribute \src "/home/runner/workspace/hardware/outform.py:356"
   cell $or $444
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63138,7 +63138,7 @@ module \top.core.u_outform
     connect \Y $91
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:357"
+  attribute \src "/home/runner/workspace/hardware/outform.py:356"
   cell $gt $445
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63150,7 +63150,7 @@ module \top.core.u_outform
     connect \Y $92
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:357"
+  attribute \src "/home/runner/workspace/hardware/outform.py:356"
   cell $or $446
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63162,7 +63162,7 @@ module \top.core.u_outform
     connect \Y $93
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:389"
+  attribute \src "/home/runner/workspace/hardware/outform.py:388"
   cell $eq $447
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63174,7 +63174,7 @@ module \top.core.u_outform
     connect \Y $94
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:393"
+  attribute \src "/home/runner/workspace/hardware/outform.py:392"
   cell $sub $448
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63186,7 +63186,7 @@ module \top.core.u_outform
     connect \Y $95
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:397"
+  attribute \src "/home/runner/workspace/hardware/outform.py:396"
   cell $eq $449
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63198,7 +63198,7 @@ module \top.core.u_outform
     connect \Y $96
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:400"
+  attribute \src "/home/runner/workspace/hardware/outform.py:399"
   cell $sub $450
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63210,7 +63210,7 @@ module \top.core.u_outform
     connect \Y $97
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:404"
+  attribute \src "/home/runner/workspace/hardware/outform.py:403"
   cell $eq $451
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63222,7 +63222,7 @@ module \top.core.u_outform
     connect \Y $98
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:426"
+  attribute \src "/home/runner/workspace/hardware/outform.py:425"
   cell $eq $452
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63234,7 +63234,7 @@ module \top.core.u_outform
     connect \Y $99
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:435"
+  attribute \src "/home/runner/workspace/hardware/outform.py:434"
   cell $eq $453
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63246,7 +63246,7 @@ module \top.core.u_outform
     connect \Y $100
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:407"
+  attribute \src "/home/runner/workspace/hardware/outform.py:406"
   cell $eq $454
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63258,7 +63258,7 @@ module \top.core.u_outform
     connect \Y $101
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:414"
+  attribute \src "/home/runner/workspace/hardware/outform.py:413"
   cell $add $455
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63270,7 +63270,7 @@ module \top.core.u_outform
     connect \Y $102
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:418"
+  attribute \src "/home/runner/workspace/hardware/outform.py:417"
   cell $add $456
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63282,7 +63282,7 @@ module \top.core.u_outform
     connect \Y $103
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:418"
+  attribute \src "/home/runner/workspace/hardware/outform.py:417"
   cell $eq $457
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63294,7 +63294,7 @@ module \top.core.u_outform
     connect \Y $104
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:425"
+  attribute \src "/home/runner/workspace/hardware/outform.py:424"
   cell $add $458
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63306,7 +63306,7 @@ module \top.core.u_outform
     connect \Y $105
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:446"
+  attribute \src "/home/runner/workspace/hardware/outform.py:445"
   cell $ge $459
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63318,7 +63318,7 @@ module \top.core.u_outform
     connect \Y $106
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:459"
+  attribute \src "/home/runner/workspace/hardware/outform.py:458"
   cell $ge $460
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63330,7 +63330,7 @@ module \top.core.u_outform
     connect \Y $107
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:462"
+  attribute \src "/home/runner/workspace/hardware/outform.py:461"
   cell $le $461
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63342,7 +63342,7 @@ module \top.core.u_outform
     connect \Y $108
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:462"
+  attribute \src "/home/runner/workspace/hardware/outform.py:461"
   cell $and $462
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63354,7 +63354,7 @@ module \top.core.u_outform
     connect \Y $109
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:451"
+  attribute \src "/home/runner/workspace/hardware/outform.py:450"
   cell $shr $463
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63366,7 +63366,7 @@ module \top.core.u_outform
     connect \Y $110
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:452"
+  attribute \src "/home/runner/workspace/hardware/outform.py:451"
   cell $sub $464
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63378,7 +63378,7 @@ module \top.core.u_outform
     connect \Y $111
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:454"
+  attribute \src "/home/runner/workspace/hardware/outform.py:453"
   cell $eq $465
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63390,7 +63390,7 @@ module \top.core.u_outform
     connect \Y $112
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:464"
+  attribute \src "/home/runner/workspace/hardware/outform.py:463"
   cell $shl $466
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63402,7 +63402,7 @@ module \top.core.u_outform
     connect \Y $113
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:464"
+  attribute \src "/home/runner/workspace/hardware/outform.py:463"
   cell $or $467
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63414,7 +63414,7 @@ module \top.core.u_outform
     connect \Y $114
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:465"
+  attribute \src "/home/runner/workspace/hardware/outform.py:464"
   cell $add $468
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63426,7 +63426,7 @@ module \top.core.u_outform
     connect \Y $115
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:466"
+  attribute \src "/home/runner/workspace/hardware/outform.py:465"
   cell $add $469
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63438,7 +63438,7 @@ module \top.core.u_outform
     connect \Y $116
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:471"
+  attribute \src "/home/runner/workspace/hardware/outform.py:470"
   cell $ge $470
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63450,7 +63450,7 @@ module \top.core.u_outform
     connect \Y $117
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:471"
+  attribute \src "/home/runner/workspace/hardware/outform.py:470"
   cell $le $471
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63462,7 +63462,7 @@ module \top.core.u_outform
     connect \Y $118
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:471"
+  attribute \src "/home/runner/workspace/hardware/outform.py:470"
   cell $and $472
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63474,7 +63474,7 @@ module \top.core.u_outform
     connect \Y $119
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:489"
+  attribute \src "/home/runner/workspace/hardware/outform.py:488"
   cell $ge $473
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63486,7 +63486,7 @@ module \top.core.u_outform
     connect \Y $120
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:489"
+  attribute \src "/home/runner/workspace/hardware/outform.py:488"
   cell $ge $474
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63498,7 +63498,7 @@ module \top.core.u_outform
     connect \Y $121
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:489"
+  attribute \src "/home/runner/workspace/hardware/outform.py:488"
   cell $and $475
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63510,7 +63510,7 @@ module \top.core.u_outform
     connect \Y $122
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:489"
+  attribute \src "/home/runner/workspace/hardware/outform.py:488"
   cell $le $476
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63522,7 +63522,7 @@ module \top.core.u_outform
     connect \Y $123
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:489"
+  attribute \src "/home/runner/workspace/hardware/outform.py:488"
   cell $and $477
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63534,7 +63534,7 @@ module \top.core.u_outform
     connect \Y $124
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:496"
+  attribute \src "/home/runner/workspace/hardware/outform.py:495"
   cell $ge $478
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63546,7 +63546,7 @@ module \top.core.u_outform
     connect \Y $125
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:496"
+  attribute \src "/home/runner/workspace/hardware/outform.py:495"
   cell $ge $479
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63558,7 +63558,7 @@ module \top.core.u_outform
     connect \Y $126
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:496"
+  attribute \src "/home/runner/workspace/hardware/outform.py:495"
   cell $and $480
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63570,7 +63570,7 @@ module \top.core.u_outform
     connect \Y $127
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:496"
+  attribute \src "/home/runner/workspace/hardware/outform.py:495"
   cell $le $481
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63582,7 +63582,7 @@ module \top.core.u_outform
     connect \Y $128
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:496"
+  attribute \src "/home/runner/workspace/hardware/outform.py:495"
   cell $and $482
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63594,7 +63594,7 @@ module \top.core.u_outform
     connect \Y $129
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:504"
+  attribute \src "/home/runner/workspace/hardware/outform.py:503"
   cell $ge $483
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63606,7 +63606,7 @@ module \top.core.u_outform
     connect \Y $130
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:504"
+  attribute \src "/home/runner/workspace/hardware/outform.py:503"
   cell $ge $484
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63618,7 +63618,7 @@ module \top.core.u_outform
     connect \Y $131
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:504"
+  attribute \src "/home/runner/workspace/hardware/outform.py:503"
   cell $and $485
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63630,7 +63630,7 @@ module \top.core.u_outform
     connect \Y $132
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:504"
+  attribute \src "/home/runner/workspace/hardware/outform.py:503"
   cell $le $486
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63642,7 +63642,7 @@ module \top.core.u_outform
     connect \Y $133
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:504"
+  attribute \src "/home/runner/workspace/hardware/outform.py:503"
   cell $and $487
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63654,7 +63654,7 @@ module \top.core.u_outform
     connect \Y $134
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:507"
+  attribute \src "/home/runner/workspace/hardware/outform.py:506"
   cell $ge $488
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63666,7 +63666,7 @@ module \top.core.u_outform
     connect \Y $135
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:507"
+  attribute \src "/home/runner/workspace/hardware/outform.py:506"
   cell $ge $489
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63678,7 +63678,7 @@ module \top.core.u_outform
     connect \Y $136
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:507"
+  attribute \src "/home/runner/workspace/hardware/outform.py:506"
   cell $and $490
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63690,7 +63690,7 @@ module \top.core.u_outform
     connect \Y $137
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:507"
+  attribute \src "/home/runner/workspace/hardware/outform.py:506"
   cell $le $491
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63702,7 +63702,7 @@ module \top.core.u_outform
     connect \Y $138
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:507"
+  attribute \src "/home/runner/workspace/hardware/outform.py:506"
   cell $and $492
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63714,7 +63714,7 @@ module \top.core.u_outform
     connect \Y $139
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:514"
+  attribute \src "/home/runner/workspace/hardware/outform.py:513"
   cell $ge $493
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63726,7 +63726,7 @@ module \top.core.u_outform
     connect \Y $140
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:517"
+  attribute \src "/home/runner/workspace/hardware/outform.py:516"
   cell $ge $494
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63738,7 +63738,7 @@ module \top.core.u_outform
     connect \Y $141
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:520"
+  attribute \src "/home/runner/workspace/hardware/outform.py:519"
   cell $le $495
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63750,7 +63750,7 @@ module \top.core.u_outform
     connect \Y $142
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:520"
+  attribute \src "/home/runner/workspace/hardware/outform.py:519"
   cell $and $496
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63762,7 +63762,7 @@ module \top.core.u_outform
     connect \Y $143
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:473"
+  attribute \src "/home/runner/workspace/hardware/outform.py:472"
   cell $add $497
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63774,7 +63774,7 @@ module \top.core.u_outform
     connect \Y $144
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:474"
+  attribute \src "/home/runner/workspace/hardware/outform.py:473"
   cell $shr $498
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63786,7 +63786,7 @@ module \top.core.u_outform
     connect \Y $145
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:475"
+  attribute \src "/home/runner/workspace/hardware/outform.py:474"
   cell $sub $499
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63798,7 +63798,7 @@ module \top.core.u_outform
     connect \Y $146
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:477"
+  attribute \src "/home/runner/workspace/hardware/outform.py:476"
   cell $eq $500
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63810,7 +63810,7 @@ module \top.core.u_outform
     connect \Y $147
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:479"
+  attribute \src "/home/runner/workspace/hardware/outform.py:478"
   cell $eq $501
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63822,7 +63822,7 @@ module \top.core.u_outform
     connect \Y $148
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:479"
+  attribute \src "/home/runner/workspace/hardware/outform.py:478"
   cell $eq $502
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63834,7 +63834,7 @@ module \top.core.u_outform
     connect \Y $149
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:479"
+  attribute \src "/home/runner/workspace/hardware/outform.py:478"
   cell $and $503
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63846,7 +63846,7 @@ module \top.core.u_outform
     connect \Y $150
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:487"
+  attribute \src "/home/runner/workspace/hardware/outform.py:486"
   cell $sub $504
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63858,7 +63858,7 @@ module \top.core.u_outform
     connect \Y $151
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:491"
+  attribute \src "/home/runner/workspace/hardware/outform.py:490"
   cell $sub $505
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63870,7 +63870,7 @@ module \top.core.u_outform
     connect \Y $152
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:492"
+  attribute \src "/home/runner/workspace/hardware/outform.py:491"
   cell $shr $506
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63882,7 +63882,7 @@ module \top.core.u_outform
     connect \Y $153
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:493"
+  attribute \src "/home/runner/workspace/hardware/outform.py:492"
   cell $sub $507
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63894,7 +63894,7 @@ module \top.core.u_outform
     connect \Y $154
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:498"
+  attribute \src "/home/runner/workspace/hardware/outform.py:497"
   cell $sub $508
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63906,7 +63906,7 @@ module \top.core.u_outform
     connect \Y $155
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:498"
+  attribute \src "/home/runner/workspace/hardware/outform.py:497"
   cell $add $509
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
@@ -63918,7 +63918,7 @@ module \top.core.u_outform
     connect \Y $156
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:499"
+  attribute \src "/home/runner/workspace/hardware/outform.py:498"
   cell $sub $510
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63930,7 +63930,7 @@ module \top.core.u_outform
     connect \Y $157
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:499"
+  attribute \src "/home/runner/workspace/hardware/outform.py:498"
   cell $add $511
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
@@ -63942,7 +63942,7 @@ module \top.core.u_outform
     connect \Y $158
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:500"
+  attribute \src "/home/runner/workspace/hardware/outform.py:499"
   cell $shr $512
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63954,7 +63954,7 @@ module \top.core.u_outform
     connect \Y $159
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:501"
+  attribute \src "/home/runner/workspace/hardware/outform.py:500"
   cell $sub $513
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63966,7 +63966,7 @@ module \top.core.u_outform
     connect \Y $160
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:509"
+  attribute \src "/home/runner/workspace/hardware/outform.py:508"
   cell $sub $514
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -63978,7 +63978,7 @@ module \top.core.u_outform
     connect \Y $161
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:509"
+  attribute \src "/home/runner/workspace/hardware/outform.py:508"
   cell $add $515
     parameter \A_SIGNED 1
     parameter \B_SIGNED 1
@@ -63990,7 +63990,7 @@ module \top.core.u_outform
     connect \Y $162
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:510"
+  attribute \src "/home/runner/workspace/hardware/outform.py:509"
   cell $shr $516
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64002,7 +64002,7 @@ module \top.core.u_outform
     connect \Y $163
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:511"
+  attribute \src "/home/runner/workspace/hardware/outform.py:510"
   cell $sub $517
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64014,7 +64014,7 @@ module \top.core.u_outform
     connect \Y $164
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:522"
+  attribute \src "/home/runner/workspace/hardware/outform.py:521"
   cell $shl $518
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64026,7 +64026,7 @@ module \top.core.u_outform
     connect \Y $165
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:522"
+  attribute \src "/home/runner/workspace/hardware/outform.py:521"
   cell $or $519
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64038,7 +64038,7 @@ module \top.core.u_outform
     connect \Y $166
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:523"
+  attribute \src "/home/runner/workspace/hardware/outform.py:522"
   cell $add $520
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64050,7 +64050,7 @@ module \top.core.u_outform
     connect \Y $167
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:524"
+  attribute \src "/home/runner/workspace/hardware/outform.py:523"
   cell $add $521
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64062,7 +64062,7 @@ module \top.core.u_outform
     connect \Y $168
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:537"
+  attribute \src "/home/runner/workspace/hardware/outform.py:536"
   cell $add $522
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64074,7 +64074,7 @@ module \top.core.u_outform
     connect \Y $169
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:538"
+  attribute \src "/home/runner/workspace/hardware/outform.py:537"
   cell $add $523
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64086,7 +64086,7 @@ module \top.core.u_outform
     connect \Y $170
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:540"
+  attribute \src "/home/runner/workspace/hardware/outform.py:539"
   cell $eq $524
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64098,7 +64098,7 @@ module \top.core.u_outform
     connect \Y $171
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:547"
+  attribute \src "/home/runner/workspace/hardware/outform.py:546"
   cell $add $525
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64110,7 +64110,7 @@ module \top.core.u_outform
     connect \Y $172
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:551"
+  attribute \src "/home/runner/workspace/hardware/outform.py:550"
   cell $add $526
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64122,7 +64122,7 @@ module \top.core.u_outform
     connect \Y $173
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:551"
+  attribute \src "/home/runner/workspace/hardware/outform.py:550"
   cell $eq $527
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64134,7 +64134,7 @@ module \top.core.u_outform
     connect \Y $174
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:560"
+  attribute \src "/home/runner/workspace/hardware/outform.py:559"
   cell $add $528
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64146,7 +64146,7 @@ module \top.core.u_outform
     connect \Y $175
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:567"
+  attribute \src "/home/runner/workspace/hardware/outform.py:566"
   cell $ge $529
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64158,7 +64158,7 @@ module \top.core.u_outform
     connect \Y $176
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:602"
+  attribute \src "/home/runner/workspace/hardware/outform.py:601"
   cell $ge $530
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64170,7 +64170,7 @@ module \top.core.u_outform
     connect \Y $177
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:605"
+  attribute \src "/home/runner/workspace/hardware/outform.py:604"
   cell $le $531
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64182,7 +64182,7 @@ module \top.core.u_outform
     connect \Y $178
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:605"
+  attribute \src "/home/runner/workspace/hardware/outform.py:604"
   cell $and $532
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64194,7 +64194,7 @@ module \top.core.u_outform
     connect \Y $179
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:570"
+  attribute \src "/home/runner/workspace/hardware/outform.py:569"
   process $533
     assign $180 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64259,7 +64259,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:573"
+  attribute \src "/home/runner/workspace/hardware/outform.py:572"
   process $534
     assign $181 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64336,7 +64336,7 @@ module \top.core.u_outform
     connect \Y $182
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:574"
+  attribute \src "/home/runner/workspace/hardware/outform.py:573"
   cell $shr $536
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64348,7 +64348,7 @@ module \top.core.u_outform
     connect \Y $183
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:575"
+  attribute \src "/home/runner/workspace/hardware/outform.py:574"
   cell $sub $537
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64360,7 +64360,7 @@ module \top.core.u_outform
     connect \Y $184
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:579"
+  attribute \src "/home/runner/workspace/hardware/outform.py:578"
   process $538
     assign $185 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64437,7 +64437,7 @@ module \top.core.u_outform
     connect \Y $186
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:580"
+  attribute \src "/home/runner/workspace/hardware/outform.py:579"
   cell $shr $540
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64449,7 +64449,7 @@ module \top.core.u_outform
     connect \Y $187
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:581"
+  attribute \src "/home/runner/workspace/hardware/outform.py:580"
   cell $sub $541
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64461,7 +64461,7 @@ module \top.core.u_outform
     connect \Y $188
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:585"
+  attribute \src "/home/runner/workspace/hardware/outform.py:584"
   process $542
     assign $189 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64538,7 +64538,7 @@ module \top.core.u_outform
     connect \Y $190
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:586"
+  attribute \src "/home/runner/workspace/hardware/outform.py:585"
   cell $shr $544
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64550,7 +64550,7 @@ module \top.core.u_outform
     connect \Y $191
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:587"
+  attribute \src "/home/runner/workspace/hardware/outform.py:586"
   cell $sub $545
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64562,7 +64562,7 @@ module \top.core.u_outform
     connect \Y $192
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:591"
+  attribute \src "/home/runner/workspace/hardware/outform.py:590"
   process $546
     assign $193 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64639,7 +64639,7 @@ module \top.core.u_outform
     connect \Y $194
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:592"
+  attribute \src "/home/runner/workspace/hardware/outform.py:591"
   cell $shr $548
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64651,7 +64651,7 @@ module \top.core.u_outform
     connect \Y $195
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:593"
+  attribute \src "/home/runner/workspace/hardware/outform.py:592"
   cell $sub $549
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64663,7 +64663,7 @@ module \top.core.u_outform
     connect \Y $196
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:597"
+  attribute \src "/home/runner/workspace/hardware/outform.py:596"
   process $550
     assign $197 [8:0] 9'000000000
     switch \defl_len_idx [4:0]
@@ -64740,7 +64740,7 @@ module \top.core.u_outform
     connect \Y $198
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:598"
+  attribute \src "/home/runner/workspace/hardware/outform.py:597"
   cell $shr $552
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64752,7 +64752,7 @@ module \top.core.u_outform
     connect \Y $199
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:599"
+  attribute \src "/home/runner/workspace/hardware/outform.py:598"
   cell $sub $553
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64764,7 +64764,7 @@ module \top.core.u_outform
     connect \Y $200
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:607"
+  attribute \src "/home/runner/workspace/hardware/outform.py:606"
   cell $shl $554
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64776,7 +64776,7 @@ module \top.core.u_outform
     connect \Y $201
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:607"
+  attribute \src "/home/runner/workspace/hardware/outform.py:606"
   cell $or $555
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64788,7 +64788,7 @@ module \top.core.u_outform
     connect \Y $202
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:608"
+  attribute \src "/home/runner/workspace/hardware/outform.py:607"
   cell $add $556
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64800,7 +64800,7 @@ module \top.core.u_outform
     connect \Y $203
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:609"
+  attribute \src "/home/runner/workspace/hardware/outform.py:608"
   cell $add $557
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64812,7 +64812,7 @@ module \top.core.u_outform
     connect \Y $204
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:614"
+  attribute \src "/home/runner/workspace/hardware/outform.py:613"
   cell $ge $558
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64824,7 +64824,7 @@ module \top.core.u_outform
     connect \Y $205
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:625"
+  attribute \src "/home/runner/workspace/hardware/outform.py:624"
   cell $ge $559
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64836,7 +64836,7 @@ module \top.core.u_outform
     connect \Y $206
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:628"
+  attribute \src "/home/runner/workspace/hardware/outform.py:627"
   cell $le $560
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64848,7 +64848,7 @@ module \top.core.u_outform
     connect \Y $207
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:628"
+  attribute \src "/home/runner/workspace/hardware/outform.py:627"
   cell $and $561
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64860,7 +64860,7 @@ module \top.core.u_outform
     connect \Y $208
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:617"
+  attribute \src "/home/runner/workspace/hardware/outform.py:616"
   cell $shr $562
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64872,7 +64872,7 @@ module \top.core.u_outform
     connect \Y $209
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:618"
+  attribute \src "/home/runner/workspace/hardware/outform.py:617"
   cell $sub $563
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64884,7 +64884,7 @@ module \top.core.u_outform
     connect \Y $210
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:620"
+  attribute \src "/home/runner/workspace/hardware/outform.py:619"
   cell $gt $564
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64896,7 +64896,7 @@ module \top.core.u_outform
     connect \Y $211
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:630"
+  attribute \src "/home/runner/workspace/hardware/outform.py:629"
   cell $shl $565
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64908,7 +64908,7 @@ module \top.core.u_outform
     connect \Y $212
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:630"
+  attribute \src "/home/runner/workspace/hardware/outform.py:629"
   cell $or $566
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64920,7 +64920,7 @@ module \top.core.u_outform
     connect \Y $213
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:631"
+  attribute \src "/home/runner/workspace/hardware/outform.py:630"
   cell $add $567
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64932,7 +64932,7 @@ module \top.core.u_outform
     connect \Y $214
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:632"
+  attribute \src "/home/runner/workspace/hardware/outform.py:631"
   cell $add $568
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64944,7 +64944,7 @@ module \top.core.u_outform
     connect \Y $215
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:639"
+  attribute \src "/home/runner/workspace/hardware/outform.py:638"
   cell $ge $569
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64956,7 +64956,7 @@ module \top.core.u_outform
     connect \Y $216
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:652"
+  attribute \src "/home/runner/workspace/hardware/outform.py:651"
   cell $ge $570
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64968,7 +64968,7 @@ module \top.core.u_outform
     connect \Y $217
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:655"
+  attribute \src "/home/runner/workspace/hardware/outform.py:654"
   cell $le $571
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64980,7 +64980,7 @@ module \top.core.u_outform
     connect \Y $218
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:655"
+  attribute \src "/home/runner/workspace/hardware/outform.py:654"
   cell $and $572
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -64992,7 +64992,7 @@ module \top.core.u_outform
     connect \Y $219
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:642"
+  attribute \src "/home/runner/workspace/hardware/outform.py:641"
   process $573
     assign $220 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65059,7 +65059,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $574
     assign $221 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65138,7 +65138,7 @@ module \top.core.u_outform
     connect \Y $222
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $576
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65150,7 +65150,7 @@ module \top.core.u_outform
     connect \Y $223
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $577
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65162,7 +65162,7 @@ module \top.core.u_outform
     connect \Y $224
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $578
     assign $225 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65241,7 +65241,7 @@ module \top.core.u_outform
     connect \Y $226
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $580
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65253,7 +65253,7 @@ module \top.core.u_outform
     connect \Y $227
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $581
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65265,7 +65265,7 @@ module \top.core.u_outform
     connect \Y $228
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $582
     assign $229 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65344,7 +65344,7 @@ module \top.core.u_outform
     connect \Y $230
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $584
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65356,7 +65356,7 @@ module \top.core.u_outform
     connect \Y $231
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $585
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65368,7 +65368,7 @@ module \top.core.u_outform
     connect \Y $232
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $586
     assign $233 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65447,7 +65447,7 @@ module \top.core.u_outform
     connect \Y $234
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $588
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65459,7 +65459,7 @@ module \top.core.u_outform
     connect \Y $235
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $589
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65471,7 +65471,7 @@ module \top.core.u_outform
     connect \Y $236
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $590
     assign $237 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65550,7 +65550,7 @@ module \top.core.u_outform
     connect \Y $238
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $592
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65562,7 +65562,7 @@ module \top.core.u_outform
     connect \Y $239
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $593
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65574,7 +65574,7 @@ module \top.core.u_outform
     connect \Y $240
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $594
     assign $241 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65653,7 +65653,7 @@ module \top.core.u_outform
     connect \Y $242
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $596
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65665,7 +65665,7 @@ module \top.core.u_outform
     connect \Y $243
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $597
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65677,7 +65677,7 @@ module \top.core.u_outform
     connect \Y $244
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $598
     assign $245 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65756,7 +65756,7 @@ module \top.core.u_outform
     connect \Y $246
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $600
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65768,7 +65768,7 @@ module \top.core.u_outform
     connect \Y $247
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $601
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65780,7 +65780,7 @@ module \top.core.u_outform
     connect \Y $248
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $602
     assign $249 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65859,7 +65859,7 @@ module \top.core.u_outform
     connect \Y $250
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $604
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65871,7 +65871,7 @@ module \top.core.u_outform
     connect \Y $251
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $605
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65883,7 +65883,7 @@ module \top.core.u_outform
     connect \Y $252
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:646"
+  attribute \src "/home/runner/workspace/hardware/outform.py:645"
   process $606
     assign $253 [14:0] 15'000000000000000
     switch \defl_dist_code [4:0]
@@ -65962,7 +65962,7 @@ module \top.core.u_outform
     connect \Y $254
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:647"
+  attribute \src "/home/runner/workspace/hardware/outform.py:646"
   cell $shr $608
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65974,7 +65974,7 @@ module \top.core.u_outform
     connect \Y $255
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:648"
+  attribute \src "/home/runner/workspace/hardware/outform.py:647"
   cell $sub $609
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65986,7 +65986,7 @@ module \top.core.u_outform
     connect \Y $256
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:657"
+  attribute \src "/home/runner/workspace/hardware/outform.py:656"
   cell $shl $610
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -65998,7 +65998,7 @@ module \top.core.u_outform
     connect \Y $257
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:657"
+  attribute \src "/home/runner/workspace/hardware/outform.py:656"
   cell $or $611
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66010,7 +66010,7 @@ module \top.core.u_outform
     connect \Y $258
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:658"
+  attribute \src "/home/runner/workspace/hardware/outform.py:657"
   cell $add $612
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66022,7 +66022,7 @@ module \top.core.u_outform
     connect \Y $259
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:659"
+  attribute \src "/home/runner/workspace/hardware/outform.py:658"
   cell $add $613
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66034,7 +66034,7 @@ module \top.core.u_outform
     connect \Y $260
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $eq $614
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66046,7 +66046,7 @@ module \top.core.u_outform
     connect \Y $261
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $eq $615
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66058,7 +66058,7 @@ module \top.core.u_outform
     connect \Y $262
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $gt $616
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66070,7 +66070,7 @@ module \top.core.u_outform
     connect \Y $263
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $or $617
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66082,7 +66082,7 @@ module \top.core.u_outform
     connect \Y $264
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:666"
+  attribute \src "/home/runner/workspace/hardware/outform.py:665"
   cell $and $618
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66094,7 +66094,7 @@ module \top.core.u_outform
     connect \Y $265
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:683"
+  attribute \src "/home/runner/workspace/hardware/outform.py:682"
   cell $add $619
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66106,7 +66106,7 @@ module \top.core.u_outform
     connect \Y $266
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:684"
+  attribute \src "/home/runner/workspace/hardware/outform.py:683"
   cell $add $620
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66118,7 +66118,7 @@ module \top.core.u_outform
     connect \Y $267
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:685"
+  attribute \src "/home/runner/workspace/hardware/outform.py:684"
   cell $add $621
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66130,7 +66130,7 @@ module \top.core.u_outform
     connect \Y $268
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:687"
+  attribute \src "/home/runner/workspace/hardware/outform.py:686"
   cell $eq $622
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66142,7 +66142,7 @@ module \top.core.u_outform
     connect \Y $269
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:694"
+  attribute \src "/home/runner/workspace/hardware/outform.py:693"
   cell $add $623
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66154,7 +66154,7 @@ module \top.core.u_outform
     connect \Y $270
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:698"
+  attribute \src "/home/runner/workspace/hardware/outform.py:697"
   cell $add $624
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66166,7 +66166,7 @@ module \top.core.u_outform
     connect \Y $271
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:698"
+  attribute \src "/home/runner/workspace/hardware/outform.py:697"
   cell $eq $625
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66178,7 +66178,7 @@ module \top.core.u_outform
     connect \Y $272
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:700"
+  attribute \src "/home/runner/workspace/hardware/outform.py:699"
   cell $add $626
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66190,7 +66190,7 @@ module \top.core.u_outform
     connect \Y $273
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:700"
+  attribute \src "/home/runner/workspace/hardware/outform.py:699"
   cell $ge $627
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66202,7 +66202,7 @@ module \top.core.u_outform
     connect \Y $274
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:709"
+  attribute \src "/home/runner/workspace/hardware/outform.py:708"
   cell $add $628
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66214,7 +66214,7 @@ module \top.core.u_outform
     connect \Y $275
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:710"
+  attribute \src "/home/runner/workspace/hardware/outform.py:709"
   cell $add $629
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66226,7 +66226,7 @@ module \top.core.u_outform
     connect \Y $276
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:710"
+  attribute \src "/home/runner/workspace/hardware/outform.py:709"
   cell $ge $630
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66238,7 +66238,7 @@ module \top.core.u_outform
     connect \Y $277
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:717"
+  attribute \src "/home/runner/workspace/hardware/outform.py:716"
   cell $ge $631
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66250,7 +66250,7 @@ module \top.core.u_outform
     connect \Y $278
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:720"
+  attribute \src "/home/runner/workspace/hardware/outform.py:719"
   cell $add $632
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66262,7 +66262,7 @@ module \top.core.u_outform
     connect \Y $279
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:726"
+  attribute \src "/home/runner/workspace/hardware/outform.py:725"
   cell $ge $633
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66274,7 +66274,7 @@ module \top.core.u_outform
     connect \Y $280
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:727"
+  attribute \src "/home/runner/workspace/hardware/outform.py:726"
   cell $eq $634
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66286,7 +66286,7 @@ module \top.core.u_outform
     connect \Y $281
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:727"
+  attribute \src "/home/runner/workspace/hardware/outform.py:726"
   cell $eq $635
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66298,7 +66298,7 @@ module \top.core.u_outform
     connect \Y $282
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:727"
+  attribute \src "/home/runner/workspace/hardware/outform.py:726"
   cell $and $636
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66310,7 +66310,7 @@ module \top.core.u_outform
     connect \Y $283
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:735"
+  attribute \src "/home/runner/workspace/hardware/outform.py:734"
   cell $add $637
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66322,7 +66322,7 @@ module \top.core.u_outform
     connect \Y $284
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:741"
+  attribute \src "/home/runner/workspace/hardware/outform.py:740"
   cell $ge $638
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66334,7 +66334,7 @@ module \top.core.u_outform
     connect \Y $285
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:748"
+  attribute \src "/home/runner/workspace/hardware/outform.py:747"
   cell $add $639
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66346,7 +66346,7 @@ module \top.core.u_outform
     connect \Y $286
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:750"
+  attribute \src "/home/runner/workspace/hardware/outform.py:749"
   cell $eq $640
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66358,7 +66358,7 @@ module \top.core.u_outform
     connect \Y $287
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:762"
+  attribute \src "/home/runner/workspace/hardware/outform.py:761"
   cell $sub $641
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66370,7 +66370,7 @@ module \top.core.u_outform
     connect \Y $288
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:764"
+  attribute \src "/home/runner/workspace/hardware/outform.py:763"
   cell $eq $642
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66382,7 +66382,7 @@ module \top.core.u_outform
     connect \Y $289
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:771"
+  attribute \src "/home/runner/workspace/hardware/outform.py:770"
   cell $add $643
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66394,7 +66394,7 @@ module \top.core.u_outform
     connect \Y $290
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:775"
+  attribute \src "/home/runner/workspace/hardware/outform.py:774"
   cell $add $644
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66406,7 +66406,7 @@ module \top.core.u_outform
     connect \Y $291
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:775"
+  attribute \src "/home/runner/workspace/hardware/outform.py:774"
   cell $eq $645
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66418,7 +66418,7 @@ module \top.core.u_outform
     connect \Y $292
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:777"
+  attribute \src "/home/runner/workspace/hardware/outform.py:776"
   cell $le $646
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66430,7 +66430,7 @@ module \top.core.u_outform
     connect \Y $293
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:786"
+  attribute \src "/home/runner/workspace/hardware/outform.py:785"
   cell $add $647
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66442,7 +66442,7 @@ module \top.core.u_outform
     connect \Y $294
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:787"
+  attribute \src "/home/runner/workspace/hardware/outform.py:786"
   cell $le $648
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66454,7 +66454,7 @@ module \top.core.u_outform
     connect \Y $295
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:792"
+  attribute \src "/home/runner/workspace/hardware/outform.py:791"
   cell $ge $649
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66466,7 +66466,7 @@ module \top.core.u_outform
     connect \Y $296
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:795"
+  attribute \src "/home/runner/workspace/hardware/outform.py:794"
   cell $add $650
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66478,7 +66478,7 @@ module \top.core.u_outform
     connect \Y $297
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:803"
+  attribute \src "/home/runner/workspace/hardware/outform.py:802"
   cell $ne $651
     parameter \A_SIGNED 0
     parameter \B_SIGNED 0
@@ -66528,14 +66528,14 @@ module \top.core.u_outform
     parameter \SRST_VALUE 8'xxxxxxxx
     parameter \INIT_VALUE 8'xxxxxxxx
     parameter \CE_OVER_SRST 0
-    parameter \CLK_ENABLE 0
+    parameter \CLK_ENABLE 1
     parameter \CLK_POLARITY 1
     connect \ADDR \win_rd__addr [10:0]
     connect \DATA \win_rd__data
     connect \ARST 1'0
     connect \SRST 1'0
     connect \EN 1'1
-    connect \CLK 1'0
+    connect \CLK \clk [0]
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:153"
@@ -66691,49 +66691,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:240"
+  attribute \src "/home/runner/workspace/hardware/outform.py:212"
   process $659
-    assign \win_rd__addr [10:0] 11'00000000000
-    switch \outform_state [4:0]
-      case 5'00000
-      case 5'00001
-      case 5'00010
-      case 5'00011
-      case 5'00101
-      case 5'00110
-      case 5'00111
-      case 5'01000
-      case 5'01001
-      case 5'01010
-      case 5'01011
-      case 5'01101
-      case 5'01111
-      case 5'10010
-      case 5'10001
-      case 5'10011
-      case 5'10100
-      case 5'10101
-        switch $43 [0]
-          case 1'1
-          case
-            assign \win_rd__addr [10:0] $45 [10:0]
-        end
-      case 5'10110
-      case 5'10000
-      case 5'01110
-      case 5'10111
-      case 5'11000
-      case 5'11001
-      case 5'01100
-      case 5'11010
-      case 5'11011
-      case 5'11100
-      case 5'00100
-    end
-  end
-
-  attribute \src "/home/runner/workspace/hardware/outform.py:213"
-  process $660
     assign \tx_byte [7:0] 8'00000000
     switch \tx_byte_cnt [2:0]
       case 3'000
@@ -66754,7 +66713,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:80"
-  process $661
+  process $660
     assign \outform_busy [0] 1'0
     switch \outform_state [4:0]
       case 5'00000
@@ -66819,7 +66778,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:88"
-  process $662
+  process $661
     assign \tx_valid [0] 1'0
     switch \outform_state [4:0]
       case 5'00000
@@ -66855,8 +66814,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:345"
-  process $663
+  attribute \src "/home/runner/workspace/hardware/outform.py:344"
+  process $662
     assign \is_pow2 [0] 1'0
     switch \outform_state [4:0]
       case 5'00000
@@ -66892,8 +66851,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:350"
-  process $664
+  attribute \src "/home/runner/workspace/hardware/outform.py:349"
+  process $663
     assign \n_computed [4:0] 5'00000
     switch \outform_state [4:0]
       case 5'00000
@@ -66951,7 +66910,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:94"
-  process $665
+  process $664
     assign \alloc_req [0] 1'0
     switch \outform_state [4:0]
       case 5'00000
@@ -66988,7 +66947,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:95"
-  process $666
+  process $665
     assign \alloc_n [4:0] 5'00000
     switch \outform_state [4:0]
       case 5'00000
@@ -67025,7 +66984,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:100"
-  process $667
+  process $666
     assign \mem_wr_addr [31:0] 32'00000000000000000000000000000000
     switch \outform_state [4:0]
       case 5'00000
@@ -67090,7 +67049,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:101"
-  process $668
+  process $667
     assign \mem_wr_data [31:0] 32'00000000000000000000000000000000
     switch \outform_state [4:0]
       case 5'00000
@@ -67155,7 +67114,7 @@ module \top.core.u_outform
   end
 
   attribute \src "/home/runner/workspace/hardware/outform.py:102"
-  process $669
+  process $668
     assign \mem_wr_en [0] 1'0
     switch \outform_state [4:0]
       case 5'00000
@@ -67219,8 +67178,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:447"
-  process $670
+  attribute \src "/home/runner/workspace/hardware/outform.py:446"
+  process $669
     assign \btype [1:0] 2'00
     switch \outform_state [4:0]
       case 5'00000
@@ -67261,8 +67220,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:565"
-  process $671
+  attribute \src "/home/runner/workspace/hardware/outform.py:564"
+  process $670
     assign \len_extra_needed [3:0] 4'0000
     switch \outform_state [4:0]
       case 5'00000
@@ -67298,8 +67257,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:637"
-  process $672
+  attribute \src "/home/runner/workspace/hardware/outform.py:636"
+  process $671
     assign \dist_extra_needed [3:0] 4'0000
     switch \outform_state [4:0]
       case 5'00000
@@ -67335,8 +67294,8 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:664"
-  process $673
+  attribute \src "/home/runner/workspace/hardware/outform.py:663"
+  process $672
     assign \defl_hist_depth [31:0] 32'00000000000000000000000000000000
     switch \outform_state [4:0]
       case 5'00000
@@ -67372,7 +67331,48 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:801"
+  attribute \src "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/amaranth/lib/memory.py:240"
+  process $673
+    assign \win_rd__addr [10:0] 11'00000000000
+    switch \outform_state [4:0]
+      case 5'00000
+      case 5'00001
+      case 5'00010
+      case 5'00011
+      case 5'00101
+      case 5'00110
+      case 5'00111
+      case 5'01000
+      case 5'01001
+      case 5'01010
+      case 5'01011
+      case 5'01101
+      case 5'01111
+      case 5'10010
+      case 5'10001
+      case 5'10011
+      case 5'10100
+      case 5'10101
+        switch $43 [0]
+          case 1'1
+          case
+            assign \win_rd__addr [10:0] $45 [10:0]
+        end
+      case 5'10110
+      case 5'10000
+      case 5'01110
+      case 5'10111
+      case 5'11000
+      case 5'11001
+      case 5'01100
+      case 5'11010
+      case 5'11011
+      case 5'11100
+      case 5'00100
+    end
+  end
+
+  attribute \src "/home/runner/workspace/hardware/outform.py:800"
   process $674
     assign \crc_final [31:0] 32'00000000000000000000000000000000
     switch \outform_state [4:0]
@@ -68962,7 +68962,7 @@ module \top.core.u_outform
     connect \Q \result_gt
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:172"
+  attribute \src "/home/runner/workspace/hardware/outform.py:171"
   process $718
     assign $319 [31:0] \defl_bits [31:0]
     switch \outform_state [4:0]
@@ -69084,7 +69084,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:172"
+  attribute \src "/home/runner/workspace/hardware/outform.py:171"
   cell $dff $719
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -69093,7 +69093,7 @@ module \top.core.u_outform
     connect \Q \defl_bits
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:173"
+  attribute \src "/home/runner/workspace/hardware/outform.py:172"
   process $720
     assign $320 [5:0] \defl_bit_cnt [5:0]
     switch \outform_state [4:0]
@@ -69215,7 +69215,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:173"
+  attribute \src "/home/runner/workspace/hardware/outform.py:172"
   cell $dff $721
     parameter \WIDTH 6
     parameter \CLK_POLARITY 1
@@ -69224,7 +69224,7 @@ module \top.core.u_outform
     connect \Q \defl_bit_cnt
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:174"
+  attribute \src "/home/runner/workspace/hardware/outform.py:173"
   process $722
     assign $321 [0] \defl_bfinal [0]
     switch \outform_state [4:0]
@@ -69270,7 +69270,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:174"
+  attribute \src "/home/runner/workspace/hardware/outform.py:173"
   cell $dff $723
     parameter \WIDTH 1
     parameter \CLK_POLARITY 1
@@ -69279,7 +69279,7 @@ module \top.core.u_outform
     connect \Q \defl_bfinal
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:175"
+  attribute \src "/home/runner/workspace/hardware/outform.py:174"
   process $724
     assign $322 [8:0] \defl_symbol [8:0]
     switch \outform_state [4:0]
@@ -69333,7 +69333,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:175"
+  attribute \src "/home/runner/workspace/hardware/outform.py:174"
   cell $dff $725
     parameter \WIDTH 9
     parameter \CLK_POLARITY 1
@@ -69342,7 +69342,7 @@ module \top.core.u_outform
     connect \Q \defl_symbol
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:176"
+  attribute \src "/home/runner/workspace/hardware/outform.py:175"
   process $726
     assign $323 [8:0] \defl_copy_len [8:0]
     switch \outform_state [4:0]
@@ -69401,7 +69401,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:176"
+  attribute \src "/home/runner/workspace/hardware/outform.py:175"
   cell $dff $727
     parameter \WIDTH 9
     parameter \CLK_POLARITY 1
@@ -69410,7 +69410,7 @@ module \top.core.u_outform
     connect \Q \defl_copy_len
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:177"
+  attribute \src "/home/runner/workspace/hardware/outform.py:176"
   process $728
     assign $324 [11:0] \defl_copy_dist [11:0]
     switch \outform_state [4:0]
@@ -69477,7 +69477,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:177"
+  attribute \src "/home/runner/workspace/hardware/outform.py:176"
   cell $dff $729
     parameter \WIDTH 12
     parameter \CLK_POLARITY 1
@@ -69486,7 +69486,7 @@ module \top.core.u_outform
     connect \Q \defl_copy_dist
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:178"
+  attribute \src "/home/runner/workspace/hardware/outform.py:177"
   process $730
     assign $325 [8:0] \defl_copy_idx [8:0]
     switch \outform_state [4:0]
@@ -69533,7 +69533,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:178"
+  attribute \src "/home/runner/workspace/hardware/outform.py:177"
   cell $dff $731
     parameter \WIDTH 9
     parameter \CLK_POLARITY 1
@@ -69542,7 +69542,7 @@ module \top.core.u_outform
     connect \Q \defl_copy_idx
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:179"
+  attribute \src "/home/runner/workspace/hardware/outform.py:178"
   process $732
     assign $326 [10:0] \defl_win_pos [10:0]
     switch \outform_state [4:0]
@@ -69591,7 +69591,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:179"
+  attribute \src "/home/runner/workspace/hardware/outform.py:178"
   cell $dff $733
     parameter \WIDTH 11
     parameter \CLK_POLARITY 1
@@ -69600,7 +69600,7 @@ module \top.core.u_outform
     connect \Q \defl_win_pos
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:180"
+  attribute \src "/home/runner/workspace/hardware/outform.py:179"
   process $734
     assign $327 [4:0] \defl_len_idx [4:0]
     switch \outform_state [4:0]
@@ -69656,7 +69656,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:180"
+  attribute \src "/home/runner/workspace/hardware/outform.py:179"
   cell $dff $735
     parameter \WIDTH 5
     parameter \CLK_POLARITY 1
@@ -69665,7 +69665,7 @@ module \top.core.u_outform
     connect \Q \defl_len_idx
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:181"
+  attribute \src "/home/runner/workspace/hardware/outform.py:180"
   process $736
     assign $328 [4:0] \defl_dist_code [4:0]
     switch \outform_state [4:0]
@@ -69711,7 +69711,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:181"
+  attribute \src "/home/runner/workspace/hardware/outform.py:180"
   cell $dff $737
     parameter \WIDTH 5
     parameter \CLK_POLARITY 1
@@ -69720,7 +69720,7 @@ module \top.core.u_outform
     connect \Q \defl_dist_code
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:186"
+  attribute \src "/home/runner/workspace/hardware/outform.py:185"
   process $738
     assign $329 [7:0] \rle_count [7:0]
     switch \outform_state [4:0]
@@ -69765,7 +69765,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:186"
+  attribute \src "/home/runner/workspace/hardware/outform.py:185"
   cell $dff $739
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -69774,7 +69774,7 @@ module \top.core.u_outform
     connect \Q \rle_count
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:187"
+  attribute \src "/home/runner/workspace/hardware/outform.py:186"
   process $740
     assign $330 [7:0] \rle_literal [7:0]
     switch \outform_state [4:0]
@@ -69819,7 +69819,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:187"
+  attribute \src "/home/runner/workspace/hardware/outform.py:186"
   cell $dff $741
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -69828,7 +69828,7 @@ module \top.core.u_outform
     connect \Q \rle_literal
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:188"
+  attribute \src "/home/runner/workspace/hardware/outform.py:187"
   process $742
     assign $331 [7:0] \rle_remaining [7:0]
     switch \outform_state [4:0]
@@ -69874,7 +69874,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:188"
+  attribute \src "/home/runner/workspace/hardware/outform.py:187"
   cell $dff $743
     parameter \WIDTH 8
     parameter \CLK_POLARITY 1
@@ -70387,7 +70387,7 @@ module \top.core.u_outform
     connect \Q \mint_base
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:183"
+  attribute \src "/home/runner/workspace/hardware/outform.py:182"
   process $750
     assign $335 [31:0] \defl_bytes_out [31:0]
     switch \outform_state [4:0]
@@ -70432,7 +70432,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:183"
+  attribute \src "/home/runner/workspace/hardware/outform.py:182"
   cell $dff $751
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -70441,7 +70441,7 @@ module \top.core.u_outform
     connect \Q \defl_bytes_out
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:182"
+  attribute \src "/home/runner/workspace/hardware/outform.py:181"
   process $752
     assign $336 [31:0] \defl_rx_count [31:0]
     switch \outform_state [4:0]
@@ -70524,7 +70524,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:182"
+  attribute \src "/home/runner/workspace/hardware/outform.py:181"
   cell $dff $753
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1
@@ -70533,7 +70533,7 @@ module \top.core.u_outform
     connect \Q \defl_rx_count
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:184"
+  attribute \src "/home/runner/workspace/hardware/outform.py:183"
   process $754
     assign $337 [31:0] \rle_rx_count [31:0]
     switch \outform_state [4:0]
@@ -70591,7 +70591,7 @@ module \top.core.u_outform
     end
   end
 
-  attribute \src "/home/runner/workspace/hardware/outform.py:184"
+  attribute \src "/home/runner/workspace/hardware/outform.py:183"
   cell $dff $755
     parameter \WIDTH 32
     parameter \CLK_POLARITY 1

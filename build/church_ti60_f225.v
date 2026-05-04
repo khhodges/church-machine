@@ -2679,17 +2679,17 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   wire _2675_;
   wire _2676_;
   wire _2677_;
-  wire [1:0] _2678_;
-  wire [31:0] _2679_;
+  wire [10:0] _2678_;
+  wire [1:0] _2679_;
   wire [31:0] _2680_;
   wire [31:0] _2681_;
   wire [31:0] _2682_;
-  wire _2683_;
+  wire [31:0] _2683_;
   wire _2684_;
   wire _2685_;
   wire _2686_;
   wire _2687_;
-  wire [10:0] _2688_;
+  wire _2688_;
   wire _2689_;
   wire _2690_;
   wire _2691_;
@@ -9769,7 +9769,11 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
     if (\core.u_outform.win_wr__en )
       \core.u_outform.win_mem [\core.u_outform.win_wr__addr ] <= \core.u_outform.crc_byte_in ;
   end
-  assign \core.u_outform.win_rd__data  = \core.u_outform.win_mem [\core.u_outform.win_rd__addr ];
+  reg [7:0] _7242_;
+  always @(posedge clk) begin
+    _7242_ <= \core.u_outform.win_mem [\core.u_outform.win_rd__addr ];
+  end
+  assign \core.u_outform.win_rd__data  = _7242_;
   reg [31:0] dmem [2047:0];
   initial begin
     dmem[0] = 32'd64768;
@@ -11825,11 +11829,11 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
     if (dmem_wr__en)
       dmem[dmem_wr__addr] <= dmem_wr__data;
   end
-  reg [31:0] _7242_;
+  reg [31:0] _7243_;
   always @(posedge clk) begin
-    _7242_ <= dmem[mem_addr];
+    _7243_ <= dmem[mem_addr];
   end
-  assign mem_rd_data = _7242_;
+  assign mem_rd_data = _7243_;
   assign any_ns_access = ns_rd_en | ns_wr_en;
   assign _0000_ = ~ dmem_addr[31];
   assign is_mmio = dmem_addr[30] & _0000_;
@@ -16387,10 +16391,10 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign _0881_ = { \core.outform_done_in$508 , \core.outform_fault_in$510 , _2790_ } != 3'h1;
   assign _0882_ = | { _2669_, \core.u_outform.win_wr__en  };
   assign _0883_ = ~ _2669_;
-  assign _0884_ = ~ _2685_;
+  assign _0884_ = ~ _2686_;
   assign _0885_ = { _2667_, _2576_, _2563_, \core.u_outform.defl_bfinal  } != 4'he;
   assign _0886_ = { _2667_, _2579_, _2576_, _2563_, \core.u_outform.defl_bfinal  } != 5'h1f;
-  assign _0887_ = | { \core.alloc_fault , _2686_, _2685_, _2683_, _2677_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2641_, _2639_, _2638_, _2637_, _2635_ };
+  assign _0887_ = | { \core.alloc_fault , _2687_, _2686_, _2684_, _2677_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2641_, _2639_, _2638_, _2637_, _2635_ };
   assign _0888_ = { _1561_, _2635_ } != 2'h3;
   assign _0889_ = { _1460_, _1579_, _2637_ } != 3'h3;
   assign _0890_ = { _1560_, _2638_ } != 2'h3;
@@ -16402,10 +16406,10 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign _0896_ = { _2667_, _2568_, _2566_, _2563_ } != 4'hc;
   assign _0897_ = { _2667_, _2566_, _2563_ } != 3'h6;
   assign _0898_ = { _2667_, _2576_, _2563_ } != 3'h5;
-  assign _0899_ = { _2683_, _2579_ } != 2'h3;
+  assign _0899_ = { _2684_, _2579_ } != 2'h3;
   assign _0900_ = { _2677_, _2620_ } != 2'h2;
   assign _0901_ = { \core.alloc_fault , \core.alloc_fault  } != 2'h2;
-  assign _0902_ = | { \core.outform_tx_valid , \core.alloc_fault , \core.mint_call , _2686_, _2685_, _2684_, _2683_, _2677_, _2676_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2643_, _2642_, _2641_, _2640_, _2639_, _2638_, _2637_, _2636_, _2635_, _2634_, _2632_, _1399_ };
+  assign _0902_ = | { \core.outform_tx_valid , \core.alloc_fault , \core.mint_call , _2687_, _2686_, _2685_, _2684_, _2677_, _2676_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2643_, _2642_, _2641_, _2640_, _2639_, _2638_, _2637_, _2636_, _2635_, _2634_, _2632_, _1399_ };
   assign _0903_ = { \core._outform_start , _2632_ } != 2'h1;
   assign _0904_ = { \core.mint_done , \core.mint_fault , _2645_ } != 3'h1;
   assign _0905_ = { \core.outform_tx_valid , _2646_ } != 2'h2;
@@ -16837,7 +16841,7 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign _1316_ = | { _2487_, _2486_, _2485_, _2484_, _2473_, _2470_ };
   assign _1317_ = | { _2510_, _2512_ };
   assign _1318_ = | { _2535_, _2534_ };
-  assign _1319_ = | { _2683_, _2641_ };
+  assign _1319_ = | { _2684_, _2641_ };
   assign _1320_ = | { _2668_, _2667_, _2638_, _2635_ };
   assign _1321_ = | { _2675_, _2674_ };
   assign _1322_ = | { _2643_, _2634_ };
@@ -16854,7 +16858,7 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign _1333_ = | { _3217_, _3207_ };
   assign _1334_ = | { _0004_, _0003_ };
   assign _1335_ = | { _2322_, _2304_, _2303_, _2302_ };
-  assign _1336_ = | { \core.alloc_fault , _2686_, _2674_, _2669_, _2641_ };
+  assign _1336_ = | { \core.alloc_fault , _2687_, _2674_, _2669_, _2641_ };
   assign _1337_ = | { \core.u_save.u_msave.sub_done , _2974_ };
   assign \core.mem_rd_en$675  = | { _2962_, _2972_, _2973_ };
   assign _1338_ = | { _2959_, _2958_ };
@@ -16929,7 +16933,7 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign \core.u_cload.mem_rd_en$8  = | { _2381_, _2391_, _2392_, _2393_ };
   assign \core.cr_wr_en$128  = | { _2373_, _2372_ };
   assign _1396_ = | { _2371_, \core.u_cload.cload_done  };
-  assign \core.outform_busy  = | { \core.outform_tx_valid , \core.alloc_fault , \core.mint_call , _2687_, _2686_, _2685_, _2684_, _2683_, _2677_, _2676_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2643_, _2642_, _2641_, _2640_, _2639_, _2638_, _2637_, _2636_, _2635_, _2634_ };
+  assign \core.outform_busy  = | { \core.outform_tx_valid , \core.alloc_fault , \core.mint_call , _2688_, _2687_, _2686_, _2685_, _2684_, _2677_, _2676_, _2675_, _2674_, _2669_, _2668_, _2667_, _2645_, _2643_, _2642_, _2641_, _2640_, _2639_, _2638_, _2637_, _2636_, _2635_, _2634_ };
   assign _1398_ = | { _2275_, _2271_ };
   assign _1399_ = | { \core.outform_done , \core.outform_fault  };
   assign _1400_ = | { _2275_, _2271_, _2234_ };
@@ -19478,59 +19482,59 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
   assign \core.outform_fault  = \core.u_outform.outform_state  == 5'h04;
   assign \core.outform_done  = \core.u_outform.outform_state  == 5'h1c;
   assign \core.u_outform.crc_final  = _2677_ ? _2631_ : 32'd0;
+  assign _2678_ = _2617_ ? 11'h000 : _2630_[10:0];
+  assign \core.u_outform.win_rd__addr  = _2639_ ? _2678_ : 11'h000;
   assign \core.u_outform.defl_hist_depth  = _2639_ ? _2628_ : 32'd0;
   assign \core.u_outform.dist_extra_needed  = _2638_ ? _2627_ : 4'h0;
   assign \core.u_outform.len_extra_needed  = _2635_ ? { 1'h0, _2626_ } : 4'h0;
-  assign _2678_ = _1578_ ? \core.u_outform.defl_bits [2:1] : 2'h0;
-  assign \core.u_outform.btype  = _2668_ ? _2678_ : 2'h0;
+  assign _2679_ = _1578_ ? \core.u_outform.defl_bits [2:1] : 2'h0;
+  assign \core.u_outform.btype  = _2668_ ? _2679_ : 2'h0;
   assign \core.mem_wr_en$679  = _1397_ ? _2557_ : 1'h0;
-  assign _2679_ = _2557_ ? { 8'h00, \core.u_outform.byte_buf  } : 32'd0;
-  function [31:0] _6373_;
+  assign _2680_ = _2557_ ? { 8'h00, \core.u_outform.byte_buf  } : 32'd0;
+  function [31:0] _6375_;
     input [31:0] a;
     input [95:0] b;
     input [2:0] s;
     casez (s) // synopsys parallel_case
       3'b??1:
-        _6373_ = b[31:0];
+        _6375_ = b[31:0];
       3'b?1?:
-        _6373_ = b[63:32];
+        _6375_ = b[63:32];
       3'b1??:
-        _6373_ = b[95:64];
+        _6375_ = b[95:64];
       default:
-        _6373_ = a;
+        _6375_ = a;
     endcase
   endfunction
-  assign \core.mem_wr_data$695  = _6373_(32'd0, { _2681_, _2680_, _2679_ }, { _2636_, _2640_, _2642_ });
-  assign _2680_ = _2557_ ? { \core.u_outform.win_rd__data , \core.u_outform.byte_buf  } : 32'd0;
-  assign _2681_ = _2557_ ? { \core.u_outform.defl_symbol [7:0], \core.u_outform.byte_buf  } : 32'd0;
-  assign \core.mem_wr_addr$694  = _1397_ ? _2682_ : 32'd0;
-  assign _2682_ = _2557_ ? { \core.u_outform.wr_word_cnt [29:0], 2'h0 } : 32'd0;
+  assign \core.mem_wr_data$695  = _6375_(32'd0, { _2682_, _2681_, _2680_ }, { _2636_, _2640_, _2642_ });
+  assign _2681_ = _2557_ ? { \core.u_outform.win_rd__data , \core.u_outform.byte_buf  } : 32'd0;
+  assign _2682_ = _2557_ ? { \core.u_outform.defl_symbol [7:0], \core.u_outform.byte_buf  } : 32'd0;
+  assign \core.mem_wr_addr$694  = _1397_ ? _2683_ : 32'd0;
+  assign _2683_ = _2557_ ? { \core.u_outform.wr_word_cnt [29:0], 2'h0 } : 32'd0;
   assign _2645_ = \core.u_outform.outform_state  == 5'h1b;
   assign \core.mint_call  = \core.u_outform.outform_state  == 5'h1a;
   assign _2677_ = \core.u_outform.outform_state  == 5'h0c;
   assign _2643_ = \core.u_outform.outform_state  == 5'h19;
   assign _2641_ = \core.u_outform.outform_state  == 5'h17;
-  assign _2683_ = \core.u_outform.outform_state  == 5'h0e;
+  assign _2684_ = \core.u_outform.outform_state  == 5'h0e;
   assign _2634_ = \core.u_outform.outform_state  == 5'h10;
+  assign _2639_ = \core.u_outform.outform_state  == 5'h15;
   assign _2638_ = \core.u_outform.outform_state  == 5'h14;
   assign _2637_ = \core.u_outform.outform_state  == 5'h13;
   assign _2635_ = \core.u_outform.outform_state  == 5'h11;
   assign _2667_ = \core.u_outform.outform_state  == 5'h0f;
   assign _2668_ = \core.u_outform.outform_state  == 5'h0d;
   assign _2669_ = \core.u_outform.outform_state  == 5'h0b;
-  assign _2684_ = \core.u_outform.outform_state  == 5'h0a;
+  assign _2685_ = \core.u_outform.outform_state  == 5'h0a;
   assign _2676_ = \core.u_outform.outform_state  == 5'h09;
   assign \core.alloc_fault  = \core.u_outform.outform_state  == 5'h08;
   assign _2674_ = \core.u_outform.outform_state  == 5'h07;
   assign _2675_ = \core.u_outform.outform_state  == 5'h06;
-  assign _2685_ = \core.u_outform.outform_state  == 5'h05;
-  assign _2686_ = \core.u_outform.outform_state  == 5'h03;
-  assign _2687_ = \core.u_outform.outform_state  == 5'h02;
+  assign _2686_ = \core.u_outform.outform_state  == 5'h05;
+  assign _2687_ = \core.u_outform.outform_state  == 5'h03;
+  assign _2688_ = \core.u_outform.outform_state  == 5'h02;
   assign \core.outform_tx_valid  = \core.u_outform.outform_state  == 5'h01;
   assign _2646_ = \core.u_outform.tx_byte_cnt  == 3'h5;
-  assign _2688_ = _2617_ ? 11'h000 : _2630_[10:0];
-  assign \core.u_outform.win_rd__addr  = _2639_ ? _2688_ : 11'h000;
-  assign _2639_ = \core.u_outform.outform_state  == 5'h15;
   function [7:0] _6404_;
     input [7:0] a;
     input [15:0] b;
@@ -19831,7 +19835,7 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
         _6472_ = a;
     endcase
   endfunction
-  assign _2625_ = _6472_(5'h11, { 20'h952d3, _2748_, 25'h18ceab7 }, { _2685_, _1321_, \core.alloc_fault , _2669_, _2637_, _1320_, _2639_, _1319_, _2677_, _2645_ });
+  assign _2625_ = _6472_(5'h11, { 20'h952d3, _2748_, 25'h18ceab7 }, { _2686_, _1321_, \core.alloc_fault , _2669_, _2637_, _1320_, _2639_, _1319_, _2677_, _2645_ });
   assign _2748_ = _1579_ ? 5'h19 : 5'h18;
   function [4:0] _6474_;
     input [4:0] a;
@@ -19884,7 +19888,7 @@ module top(push_button, clk, uart_tx, led0, led1, led2, led3, uart_rx);
         _6474_ = a;
     endcase
   endfunction
-  assign _2624_ = _6474_(5'h01, { 25'h0231d4b, _2774_, _2772_, _2764_, _2762_, _2761_, _2759_, _2758_, _2757_, _2754_, 5'h04, _2753_, 5'h0c, _2750_, 5'h1b, _2749_, 5'h00 }, { \core.outform_tx_valid , _2685_, _2675_, _2676_, _2684_, _2668_, _2667_, _2636_, _2635_, _2637_, _2638_, _2639_, _2640_, _2683_, _1336_, _2642_, _1322_, _2677_, \core.mint_call , _2645_, _1399_ });
+  assign _2624_ = _6474_(5'h01, { 25'h0231d4b, _2774_, _2772_, _2764_, _2762_, _2761_, _2759_, _2758_, _2757_, _2754_, 5'h04, _2753_, 5'h0c, _2750_, 5'h1b, _2749_, 5'h00 }, { \core.outform_tx_valid , _2686_, _2675_, _2676_, _2685_, _2668_, _2667_, _2636_, _2635_, _2637_, _2638_, _2639_, _2640_, _2684_, _1336_, _2642_, _1322_, _2677_, \core.mint_call , _2645_, _1399_ });
   assign _2749_ = \core.mint_fault  ? 5'h04 : 5'h1c;
   assign _2750_ = _2620_ ? 5'h04 : 5'h1a;
   assign _2751_ = _1583_ ? 5'h0e : \core.u_outform.outform_state ;
