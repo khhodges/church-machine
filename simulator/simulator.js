@@ -1809,18 +1809,25 @@ class ChurchSimulator {
     }
 
     _validateClistSlotPerms(parsed, slotIdx) {
+        // mTCB domain-purity chokepoint for LOAD and SAVE.
+        //
+        // Hardware rule (ctmm_cap_amaranth/perm_check.py, church_machine/perm_check.py):
+        //   DATA_PERMS = R | W | X   (Turing domain)
+        //   CAP_PERMS  = L | S | E   (Church domain)
+        //   domain_purity_ok = ~(has_turing & has_church)
+        //
+        // Any of the 9 cross-pairs {R,W,X}×{L,S,E} is a violation.
+        // Pure-Turing GTs (e.g. LED {R,W}) and pure-Church GTs (e.g. {E}) pass.
+        //
+        // This check lives here — not only in TPERM — because malware can acquire
+        // GTs via LOAD (zero required permissions) without ever executing TPERM.
+        // mLoad/mSave is the last line of defence against a mixed GT reaching a CR.
         const p = parsed.permissions;
-        const permStr = (p.B?'B':'')+(p.R?'R':'')+(p.W?'W':'')+(p.X?'X':'')+(p.L?'L':'')+(p.S?'S':'')+(p.E?'E':'');
-        if (slotIdx === 0 && parsed.type !== 3) {
-            const hasX = p.X;
-            const onlyXorRX = hasX && !p.W && !p.L && !p.S && !p.E;
-            if (!onlyXorRX) {
-                return { ok: false, fault: 'DOMAIN_PURITY', message: `CLOOMC slot 0 has ${permStr||'no'} permissions — only X or RX allowed` };
-            }
-        } else if (slotIdx !== 0) {
-            if (p.X && p.E) {
-                return { ok: false, fault: 'DOMAIN_PURITY', message: `C-List slot ${slotIdx} has ${permStr} — mixed XE not allowed (use separate slots for X and E)` };
-            }
+        const hasTuring = p.R || p.W || p.X;
+        const hasChurch = p.L || p.S || p.E;
+        if (hasTuring && hasChurch) {
+            const permStr = (p.B?'B':'')+(p.R?'R':'')+(p.W?'W':'')+(p.X?'X':'')+(p.L?'L':'')+(p.S?'S':'')+(p.E?'E':'');
+            return { ok: false, fault: 'DOMAIN_PURITY', message: `C-List slot ${slotIdx} mixes Turing {R,W,X} with Church {L,S,E} permissions (${permStr})` };
         }
         return { ok: true };
     }
@@ -4014,18 +4021,22 @@ class ChurchSimulator {
             }
         }
 
-        // X⊕LSE domain-purity check on the TPERM result permissions.
-        // Mirrors hardware tperm.py: result_perms = new_perms & target_gt.perms
-        // (i.e. only permissions present in BOTH the preset AND the GT survive).
-        // Faults TPERM_RSV if the result would combine X with any of L/S/E.
-        // No built-in preset triggers this (pressets are disjoint in X vs. L/S/E)
-        // but the check exists as a safety net, matching hardware.
+        // Full 3×3 domain-purity check on the TPERM result permissions.
+        // Mirrors hardware perm_check.py:
+        //   DATA_PERMS = R | W | X   (Turing domain)
+        //   CAP_PERMS  = L | S | E   (Church domain)
+        //   domain_purity_ok = ~(has_turing & has_church)
+        // All 9 cross-pairs {R,W,X}×{L,S,E} are forbidden at creation time.
+        // TPERM can only attenuate (intersect) permissions, so if the result is
+        // mixed the preset and GT were already incompatible.
+        const resultR   = required.includes('R') && !!parsed.permissions['R'];
+        const resultW   = required.includes('W') && !!parsed.permissions['W'];
         const resultX   = required.includes('X') && !!parsed.permissions['X'];
         const resultL   = required.includes('L') && !!parsed.permissions['L'];
         const resultS   = required.includes('S') && !!parsed.permissions['S'];
         const resultE   = required.includes('E') && !!parsed.permissions['E'];
-        if (resultX && (resultL || resultS || resultE)) {
-            this.fault('TPERM_RSV', `TPERM CR${d.crDst}: result would combine X with L/S/E — Church Hardware Address Range domain-purity violation`);
+        if ((resultR || resultW || resultX) && (resultL || resultS || resultE)) {
+            this.fault('TPERM_RSV', `TPERM CR${d.crDst}: result mixes Turing {R,W,X} with Church {L,S,E} permissions — domain-purity violation`);
             return null;
         }
 

@@ -227,8 +227,24 @@ class ChurchCore(Elaboratable):
             u_perm.gt_in.eq(perm_gt_sig),
             u_perm.required_perms.eq(required_perms),
             u_perm.check_valid.eq(cond_exec_enable & is_church_op),
+            # mTCB domain-purity rule — full 3×3: (R|W|X) ∧ (L|S|E) = violation.
+            # Checked at TPERM (creation time) AND at LOAD/SAVE (use time).
+            #
+            # Threat: malware can acquire GTs via LOAD (zero required permissions)
+            # without ever executing TPERM.  If a malicious boot image pre-loads
+            # a mixed GT into the C-List, TPERM is never on the path.  mLoad/mSave
+            # is the last line of defence — it sees every GT that moves from the
+            # C-List into a CR.  Enabling check_domain_purity here costs zero gates:
+            # the domain_purity_ok signal is already computed in perm_check.py.
+            #
+            # mTCB LOC baseline (both variants, 15 files): 2,973 LOC total.
+            # Every line outside that set is untrusted by definition.
             u_perm.check_domain_purity.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM)
+                cond_exec_enable & is_church_op & (
+                    (church_op == ChurchOpcode.TPERM) |
+                    (church_op == ChurchOpcode.LOAD)  |
+                    (church_op == ChurchOpcode.SAVE)
+                )
             ),
         ]
 
