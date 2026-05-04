@@ -155,7 +155,12 @@ def _rtlil_to_verilog(il_path, v_path):
         f"hierarchy -top top; "
         f"proc; "
         f"flatten; "
+        f"opt -mux_undef -undriven; "
+        f"opt; "
+        f"opt_reduce; "
+        f"opt_clean; "
         f"alumacc; "
+        f"opt -fast; "
         f"clean; "
         f"write_verilog -noattr {v_path}"
     )

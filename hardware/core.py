@@ -55,6 +55,7 @@ class ChurchCore(Elaboratable):
         self.dmem_addr = Signal(32)
         self.dmem_rd_en = Signal()
         self.dmem_rd_data = Signal(32)
+        self.dmem_rd_valid = Signal()
         self.dmem_wr_data = Signal(32)
         self.dmem_wr_en = Signal()
 
@@ -911,7 +912,7 @@ class ChurchCore(Elaboratable):
             u_call.cr15_namespace.eq(u_regs.cr15_namespace),
             u_call.cr14_code.eq(u_regs.cr14_code),
             u_call.mem_rd_data.eq(self.dmem_rd_data),
-            u_call.mem_rd_valid.eq(1),
+            u_call.mem_rd_valid.eq(self.dmem_rd_valid),
             # Stack push inputs
             u_call.cr5_heap.eq(u_regs.cr5_heap),
             u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
@@ -936,7 +937,7 @@ class ChurchCore(Elaboratable):
             u_return.cr5_heap.eq(u_regs.cr5_heap),
             u_return.cr12_thread.eq(u_regs.cr12_thread),
             u_return.mem_rd_data.eq(self.dmem_rd_data),
-            u_return.mem_rd_valid.eq(1),
+            u_return.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
 
         with m.If(ret_start_sig):
@@ -952,7 +953,7 @@ class ChurchCore(Elaboratable):
             u_cload.e_gt.eq(u_return.cload_e_gt),
             u_cload.cr15_namespace.eq(u_regs.cr15_namespace),
             u_cload.mem_rd_data.eq(self.dmem_rd_data),
-            u_cload.mem_rd_valid.eq(1),
+            u_cload.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
 
         if not self.iot_profile:
@@ -998,7 +999,7 @@ class ChurchCore(Elaboratable):
             u_save.cr15_namespace.eq(u_regs.cr15_namespace),
             u_save.mem_wr_done.eq(1),
             u_save.mem_rd_data.eq(self.dmem_rd_data),
-            u_save.mem_rd_valid.eq(1),
+            u_save.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
 
         dread_start_sig = Signal()
@@ -1270,7 +1271,7 @@ class ChurchCore(Elaboratable):
                 u_change.cr12_thread.eq(u_regs.cr12_thread),
                 u_change.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_change.mem_rd_data.eq(self.dmem_rd_data),
-                u_change.mem_rd_valid.eq(1),
+                u_change.mem_rd_valid.eq(self.dmem_rd_valid),
                 u_change.mem_wr_done.eq(1),
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.nia.eq(nia_reg),
@@ -1292,7 +1293,7 @@ class ChurchCore(Elaboratable):
                 u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_switch.mem_rd_data.eq(self.dmem_rd_data),
-                u_switch.mem_rd_valid.eq(1),
+                u_switch.mem_rd_valid.eq(self.dmem_rd_valid),
             ]
 
             eloadcall_start_sig = Signal()
@@ -1309,7 +1310,7 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),
-                u_eloadcall.mem_rd_valid.eq(1),
+                u_eloadcall.mem_rd_valid.eq(self.dmem_rd_valid),
             ]
 
             xloadlambda_start_sig = Signal()
@@ -1324,7 +1325,7 @@ class ChurchCore(Elaboratable):
                 u_xloadlambda.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_xloadlambda.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_xloadlambda.mem_rd_data.eq(self.dmem_rd_data),
-                u_xloadlambda.mem_rd_valid.eq(1),
+                u_xloadlambda.mem_rd_valid.eq(self.dmem_rd_valid),
                 u_xloadlambda.saved_nia.eq(nia_reg + 4),
             ]
 
@@ -1508,6 +1509,9 @@ class ChurchCore(Elaboratable):
                         mint_dmem_rd_en.eq(1),
                         mint_dmem_addr.eq(mint_base_reg),
                     ]
+                    m.next = "MINT_READ_HDR_WAIT"
+
+                with m.State("MINT_READ_HDR_WAIT"):
                     m.d.sync += mint_hdr_reg.eq(self.dmem_rd_data)
                     m.next = "MINT_CHECK_HDR"
 
@@ -1605,8 +1609,11 @@ class ChurchCore(Elaboratable):
                                 mint_base_reg + (cc_off << 2)
                             ),
                         ]
-                        m.d.sync += mint_copy_data_reg.eq(self.dmem_rd_data)
-                        m.next = "MINT_COPY_CLIST_WR"
+                        m.next = "MINT_COPY_CLIST_RD_WAIT"
+
+                with m.State("MINT_COPY_CLIST_RD_WAIT"):
+                    m.d.sync += mint_copy_data_reg.eq(self.dmem_rd_data)
+                    m.next = "MINT_COPY_CLIST_WR"
 
                 with m.State("MINT_COPY_CLIST_WR"):
                     m.d.comb += [
@@ -1734,6 +1741,9 @@ class ChurchCore(Elaboratable):
                         mint_dmem_rd_en.eq(1),
                         mint_dmem_addr.eq(mint_base_reg_ni),
                     ]
+                    m.next = "MINT_READ_HDR_WAIT"
+
+                with m.State("MINT_READ_HDR_WAIT"):
                     m.d.sync += mint_hdr_reg_ni.eq(self.dmem_rd_data)
                     m.next = "MINT_CHECK_HDR"
 
@@ -1823,8 +1833,11 @@ class ChurchCore(Elaboratable):
                                 mint_base_reg_ni + (cc_off_ni << 2)
                             ),
                         ]
-                        m.d.sync += mint_copy_data_reg_ni.eq(self.dmem_rd_data)
-                        m.next = "MINT_COPY_CLIST_WR"
+                        m.next = "MINT_COPY_CLIST_RD_WAIT"
+
+                with m.State("MINT_COPY_CLIST_RD_WAIT"):
+                    m.d.sync += mint_copy_data_reg_ni.eq(self.dmem_rd_data)
+                    m.next = "MINT_COPY_CLIST_WR"
 
                 with m.State("MINT_COPY_CLIST_WR"):
                     m.d.comb += [
@@ -2059,7 +2072,7 @@ class ChurchCore(Elaboratable):
             u_shared_mload.cr_rd_data.eq(u_regs.cr_rd_data),
             u_shared_mload.cr15_namespace.eq(u_regs.cr15_namespace),
             u_shared_mload.mem_rd_data.eq(self.dmem_rd_data),
-            u_shared_mload.mem_rd_valid.eq(1),
+            u_shared_mload.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
 
         with m.If(u_call.call_busy):

@@ -110,6 +110,12 @@ class ChurchDRead(Elaboratable):
                     self.busy.eq(1),
                     self.dmem_addr.eq(addr_reg),
                     self.dmem_rd_en.eq(1),
+                ]
+                m.next = "MEM_ACCESS_WAIT"
+
+            with m.State("MEM_ACCESS_WAIT"):
+                m.d.comb += [
+                    self.busy.eq(1),
                     self.dr_wr_addr.eq(dr_dst_reg),
                     self.dr_wr_data.eq(self.dmem_rd_data),
                     self.dr_wr_en.eq(dr_dst_reg != 0),

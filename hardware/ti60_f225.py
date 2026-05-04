@@ -99,7 +99,7 @@ class ChurchTi60F225(Elaboratable):
 
         dmem = LibMemory(shape=unsigned(32), depth=2048, init=dmem_init)
         m.submodules.dmem = dmem
-        dmem_rd = dmem.read_port(domain="comb")
+        dmem_rd = dmem.read_port(domain="sync")
         dmem_wr = dmem.write_port()
 
         mem_addr = Signal(11)
@@ -239,6 +239,13 @@ class ChurchTi60F225(Elaboratable):
             core.ns_rd_data.eq(Cat(mem_rd_data, C(0, 64))),
             core.clist_rd_data.eq(mem_rd_data),
         ]
+
+        # Drive dmem_rd_valid: RAM reads are valid one cycle after dmem_rd_en
+        # (sync read port has 1-cycle latency); MMIO reads are combinatorial
+        # and valid in the same cycle.
+        _dmem_rd_valid_r = Signal()
+        m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
+        m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
 
         halted = Signal(init=1)
         stepping = Signal()

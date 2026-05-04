@@ -243,12 +243,12 @@ class ChurchTangNano20K(Elaboratable):
 
             dmem_init[511] = SLIDERULE_LUMP_HEADER
 
-            # Use LibMemory with domain='comb' for true async reads that
-            # match the FPGA GowinBSRAM async-read behaviour and let the
-            # Mint FSM read valid data in the same cycle it sets the address.
+            # Use LibMemory with domain='sync' (1-cycle read latency).
+            # All FSMs using dmem gate on dmem_rd_valid; MINT FSMs use
+            # explicit WAIT states to absorb the pipeline cycle.
             dmem = LibMemory(shape=unsigned(32), depth=2048, init=dmem_init)
             m.submodules.dmem = dmem
-            dmem_rd = dmem.read_port(domain="comb")
+            dmem_rd = dmem.read_port(domain="sync")
             dmem_wr = dmem.write_port()
 
             mem_addr = Signal(11)
@@ -278,6 +278,13 @@ class ChurchTangNano20K(Elaboratable):
                 core.ns_rd_data.eq(Cat(mem_rd_data, C(0, 64))),
                 core.clist_rd_data.eq(mem_rd_data),
             ]
+
+            # Drive dmem_rd_valid: RAM reads are valid one cycle after dmem_rd_en
+            # (sync read port has 1-cycle latency); MMIO reads are combinatorial
+            # and valid in the same cycle.
+            _dmem_rd_valid_r = Signal()
+            m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
+            m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
 
             wr_data = Signal(32)
             wr_en = Signal()
