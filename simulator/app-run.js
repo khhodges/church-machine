@@ -7640,7 +7640,9 @@ function _renderBuildNextSteps(isTi60) {
     const el = document.getElementById('buildNextSteps');
     if (!el) return;
     const steps = isTi60 ? [
-        'Extract the zip to any folder',
+        'Extract the zip — all files land in one folder',
+        'Run setup_ti60_peri.py with Efinity\'s Python to add the PLL (see BUILD.md Step 1b)',
+        'In the SDC file: switch from Phase A (25 MHz) to Phase B (50 MHz) per the comments',
         'File → Open Project → church_ti60_f225.xml',
         'Run Synthesis → P&R → Generate Bitstream',
         'Tool → Programmer → Program (JTAG / USB)',
