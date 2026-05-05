@@ -131,6 +131,7 @@
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k" onclick="setSelectedBoard('tang-nano-20k');switchView('builder');closeHamburger()">Tang Nano 20K</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K IoT</button>
+                                <button class="ham-item" id="hamItem-hw-tang9k" onclick="setSelectedBoard('tang-nano-9k');switchView('builder');closeHamburger()">Tang Nano 9K (IoT)</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Configure</div>
@@ -838,6 +839,7 @@
                 <select id="hardwareBoardSel" class="lang-selector" onchange="setSelectedBoard(this.value); updateHardwarePanelLabel()" title="Target FPGA board">
                     <option value="tang-nano-20k">Sipeed Tang Nano 20K (Gowin GW2AR-18)</option>
                     <option value="tang-nano-20k-iot">Sipeed Tang Nano 20K IoT (Gowin GW2AR-18)</option>
+                    <option value="tang-nano-9k">Sipeed Tang Nano 9K IoT (Gowin GW1NR-9C)</option>
                     <option value="ti60-f225">Efinix Ti60 F225</option>
                 </select>
                 <button class="btn btn-deploy" id="btnHWBuild" onclick="buildFPGAOnly()" data-tooltip="Build — Run Amaranth elaboration + Yosys synthesis and save RTL artifacts to server">Build</button>
@@ -1390,6 +1392,7 @@
                             <select id="settingFPGABoard" class="modal-input">
                                 <option value="tang-nano-20k">Sipeed Tang Nano 20K (Gowin GW2AR-18)</option>
                                 <option value="tang-nano-20k-iot">Sipeed Tang Nano 20K IoT (Gowin GW2AR-18)</option>
+                                <option value="tang-nano-9k">Sipeed Tang Nano 9K IoT (Gowin GW1NR-9C)</option>
                                 <option value="ti60-f225">Efinix Ti60 F225 (Titanium, 50 MHz)</option>
                             </select>
                         </label>
