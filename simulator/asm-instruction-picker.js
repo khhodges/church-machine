@@ -202,7 +202,25 @@
         });
     }
 
-    // Render items matching query in a flat vertical list
+    // Returns { positions: [label indices matched], score: number } or null.
+    // Fuzzy: every character of q must appear in order in label (case-insensitive).
+    // Score is lower for earlier / tighter matches so results can be sorted best-first.
+    function fuzzyScore(label, q) {
+        var lLower = label.toLowerCase();
+        var positions = [];
+        var li = 0;
+        for (var qi = 0; qi < q.length; qi++) {
+            var found = lLower.indexOf(q[qi], li);
+            if (found === -1) return null;
+            positions.push(found);
+            li = found + 1;
+        }
+        var first = positions[0];
+        var last = positions[positions.length - 1];
+        return { positions: positions, score: first * 1000 + (last - first) };
+    }
+
+    // Render items matching query in a flat vertical list (fuzzy, sorted by score)
     function renderFiltered(query) {
         pickerBodyEl.innerHTML = '';
         allFlatItems = [];
@@ -215,11 +233,15 @@
             return;
         }
 
-        var matches = allSourceItems.filter(function (item) {
-            return item.label.toLowerCase().indexOf(q) !== -1;
+        var scored = [];
+        allSourceItems.forEach(function (item) {
+            var result = fuzzyScore(item.label, q);
+            if (result) scored.push({ item: item, positions: result.positions, score: result.score });
         });
 
-        if (matches.length === 0) {
+        scored.sort(function (a, b) { return a.score - b.score; });
+
+        if (scored.length === 0) {
             var empty = document.createElement('div');
             empty.className = 'asm-picker-empty';
             empty.textContent = 'No matches';
@@ -227,44 +249,44 @@
             return;
         }
 
-        matches.forEach(function (item) {
+        scored.forEach(function (entry) {
             var flatIdx = allFlatItems.length;
-            allFlatItems.push(item);
-            pickerBodyEl.appendChild(makeItemRow(item, flatIdx, q));
+            allFlatItems.push(entry.item);
+            pickerBodyEl.appendChild(makeItemRow(entry.item, flatIdx, entry.positions));
         });
 
         setSelected(0);
     }
 
-    // Populate el with label text, wrapping every non-overlapping occurrence of
-    // q in a <span class="asm-picker-match"> highlight span.  Uses DOM nodes so
-    // no HTML escaping is needed and monospace layout is preserved.
-    function applyHighlight(el, label, q) {
-        var lower = label.toLowerCase();
-        var cursor = 0;
-        var idx;
-        while ((idx = lower.indexOf(q, cursor)) !== -1) {
-            if (idx > cursor) {
-                el.appendChild(document.createTextNode(label.substring(cursor, idx)));
+    // Populate el with label text, wrapping each individually matched character
+    // position in a <span class="asm-picker-match"> highlight span.
+    // positions is an array of character indices within label.
+    function applyHighlight(el, label, positions) {
+        var posSet = Object.create(null);
+        positions.forEach(function (p) { posSet[p] = true; });
+        var i = 0;
+        while (i < label.length) {
+            if (posSet[i]) {
+                var mark = document.createElement('span');
+                mark.className = 'asm-picker-match';
+                mark.textContent = label[i];
+                el.appendChild(mark);
+                i++;
+            } else {
+                var start = i;
+                while (i < label.length && !posSet[i]) i++;
+                el.appendChild(document.createTextNode(label.substring(start, i)));
             }
-            var mark = document.createElement('span');
-            mark.className = 'asm-picker-match';
-            mark.textContent = label.substring(idx, idx + q.length);
-            el.appendChild(mark);
-            cursor = idx + q.length;
-        }
-        if (cursor < label.length) {
-            el.appendChild(document.createTextNode(label.substring(cursor)));
         }
     }
 
-    function makeItemRow(item, flatIdx, query) {
+    function makeItemRow(item, flatIdx, positions) {
         var row = document.createElement('div');
         row.className = 'asm-picker-item';
         row.setAttribute('role', 'option');
         row.setAttribute('data-idx', flatIdx);
-        if (query) {
-            applyHighlight(row, item.label, query);
+        if (positions && positions.length) {
+            applyHighlight(row, item.label, positions);
         } else {
             row.textContent = item.label;
         }
