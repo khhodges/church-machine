@@ -236,24 +236,26 @@
         setSelected(0);
     }
 
-    // Populate el with label text, wrapping the first occurrence of q in a
-    // <span class="asm-picker-match"> highlight span.  Uses DOM nodes so no
-    // HTML escaping is needed and monospace layout is preserved.
+    // Populate el with label text, wrapping every non-overlapping occurrence of
+    // q in a <span class="asm-picker-match"> highlight span.  Uses DOM nodes so
+    // no HTML escaping is needed and monospace layout is preserved.
     function applyHighlight(el, label, q) {
-        var idx = label.toLowerCase().indexOf(q);
-        if (idx === -1) {
-            el.appendChild(document.createTextNode(label));
-            return;
+        var lower = label.toLowerCase();
+        var cursor = 0;
+        var idx;
+        while ((idx = lower.indexOf(q, cursor)) !== -1) {
+            if (idx > cursor) {
+                el.appendChild(document.createTextNode(label.substring(cursor, idx)));
+            }
+            var mark = document.createElement('span');
+            mark.className = 'asm-picker-match';
+            mark.textContent = label.substring(idx, idx + q.length);
+            el.appendChild(mark);
+            cursor = idx + q.length;
         }
-        var before = label.substring(0, idx);
-        var matched = label.substring(idx, idx + q.length);
-        var after = label.substring(idx + q.length);
-        if (before) el.appendChild(document.createTextNode(before));
-        var mark = document.createElement('span');
-        mark.className = 'asm-picker-match';
-        mark.textContent = matched;
-        el.appendChild(mark);
-        if (after) el.appendChild(document.createTextNode(after));
+        if (cursor < label.length) {
+            el.appendChild(document.createTextNode(label.substring(cursor)));
+        }
     }
 
     function makeItemRow(item, flatIdx, query) {
