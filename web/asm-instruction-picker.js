@@ -84,6 +84,33 @@
         return acc;
     }());
 
+    // ── Configurable shortcut ────────────────────────────────────────────────
+    // Override before or after the script loads via window.AsmInstructionPickerConfig:
+    //   window.AsmInstructionPickerConfig = { code: 'KeyI', ctrl: true };
+    //
+    // Supported fields (all optional — defaults shown):
+    //   code  {string}  — KeyboardEvent.code value (default: 'Space')
+    //   ctrl  {boolean} — require Ctrl (Windows/Linux) or Cmd (macOS) (default: true)
+    //   shift {boolean} — require Shift (default: false)
+    //   alt   {boolean} — require Alt/Option (default: false)
+    var SHORTCUT_DEFAULTS = { code: 'Space', ctrl: true, shift: false, alt: false };
+
+    function matchesPickerShortcut(e) {
+        var cfg = window.AsmInstructionPickerConfig || {};
+        var code  = cfg.code  !== undefined ? cfg.code  : SHORTCUT_DEFAULTS.code;
+        var ctrl  = cfg.ctrl  !== undefined ? cfg.ctrl  : SHORTCUT_DEFAULTS.ctrl;
+        var shift = cfg.shift !== undefined ? cfg.shift : SHORTCUT_DEFAULTS.shift;
+        var alt   = cfg.alt   !== undefined ? cfg.alt   : SHORTCUT_DEFAULTS.alt;
+
+        // Match by e.code (reliable) with e.key as a fallback for older browsers
+        var codeMatch = (e.code === code) || (code === 'Space' && e.key === ' ');
+        if (!codeMatch) return false;
+        if (ctrl  ? !(e.ctrlKey || e.metaKey) : (e.ctrlKey || e.metaKey)) return false;
+        if (shift ? !e.shiftKey : e.shiftKey) return false;
+        if (alt   ? !e.altKey  : e.altKey)   return false;
+        return true;
+    }
+
     var pickerEl = null;
     var filterInputEl = null;
     var pickerBodyEl = null;
@@ -464,6 +491,17 @@
             // Let picker handle navigation / confirm / dismiss first
             if (handlePickerKeydown(e)) return;
 
+            // Configurable shortcut (default: Ctrl+Space / Cmd+Space) — open/close picker on demand
+            if (matchesPickerShortcut(e)) {
+                e.preventDefault();
+                if (isPickerVisible()) {
+                    hidePicker();
+                } else {
+                    showPicker(textarea);
+                }
+                return;
+            }
+
             if (e.key === 'Enter') {
                 // After the browser inserts the newline, check if new line is blank
                 setTimeout(function () {
@@ -507,8 +545,10 @@
     // Public API (for debugging or future extension)
     window.AsmInstructionPicker = {
         attach: attachToEditor,
+        show: showPicker,
         hide: hidePicker,
         isVisible: isPickerVisible,
+        shortcutDefaults: SHORTCUT_DEFAULTS,
     };
 
 }());

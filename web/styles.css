@@ -8384,3 +8384,21 @@ body.landing-mode .auth-section {
     color: var(--accent, #e94560);
     font-weight: 700;
 }
+
+.btn-instr-picker {
+    padding: 2px 8px;
+    background: rgba(233, 69, 96, 0.12);
+    border: 1px solid var(--accent, #e94560);
+    border-radius: 4px;
+    color: var(--accent, #e94560);
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+    line-height: 1.6;
+}
+.btn-instr-picker:hover {
+    background: rgba(233, 69, 96, 0.28);
+    color: #fff;
+}

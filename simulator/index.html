@@ -416,6 +416,9 @@
                     <span class="preset-notice-icon">&#x2139;</span>
                     <span class="preset-notice-text">Integer arithmetic only — load the CLOOMC preset for exact fractions.</span>
                 </div>
+                <div class="asm-picker-toolbar">
+                    <button class="btn-instr-picker" title="Open instruction picker (Ctrl+Space)" data-tooltip="Instruction Picker — Browse and insert assembly instructions (Ctrl+Space)" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
+                </div>
                 <div class="code-editor-wrap">
                     <div class="line-numbers" id="lineNumbers"></div>
                     <div id="asmErrorOverlay" class="asm-error-overlay" aria-hidden="true"></div>

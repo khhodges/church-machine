@@ -642,6 +642,7 @@
                             <select class="editor-file-dropdown" id="editorFileSelect" onchange="selectCodeFile(this.value)">
                                 <option value="">Select file...</option>
                             </select>
+                            <button class="btn-instr-picker" title="Open instruction picker (Ctrl+Space)" data-tooltip="Instruction Picker — Browse and insert assembly instructions (Ctrl+Space)" onclick="(function(){var ed=document.getElementById('codeEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
                             <span class="line-info" id="lineInfo">Line 1</span>
                         </div>
                         <div class="code-container">
