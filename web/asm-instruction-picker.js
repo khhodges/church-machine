@@ -75,10 +75,22 @@
         },
     ];
 
+    // Flat list of every item across all categories (never changes after init)
+    var allSourceItems = (function () {
+        var acc = [];
+        INSTR_CATEGORIES.forEach(function (cat) {
+            cat.items.forEach(function (item) { acc.push(item); });
+        });
+        return acc;
+    }());
+
     var pickerEl = null;
+    var filterInputEl = null;
+    var pickerBodyEl = null;
     var activeEditorEl = null;
     var selectedIndex = -1;
-    var allFlatItems = [];
+    var allFlatItems = [];   // items currently visible (filtered or all)
+    var currentOnSelect = null;
 
     // ── DOM helpers ─────────────────────────────────────────────────────────
 
@@ -96,17 +108,51 @@
     }
 
     function buildPickerContent(onSelect) {
+        currentOnSelect = onSelect;
         var picker = getOrCreatePicker();
         picker.innerHTML = '';
         allFlatItems = [];
+        selectedIndex = -1;
+        filterInputEl = null;
+        pickerBodyEl = null;
 
         var header = document.createElement('div');
         header.className = 'asm-picker-header';
         header.textContent = 'Insert instruction \u00b7 \u2191\u2193 navigate \u00b7 Enter confirm \u00b7 Esc dismiss';
         picker.appendChild(header);
 
-        var body = document.createElement('div');
-        body.className = 'asm-picker-body';
+        // Filter input
+        filterInputEl = document.createElement('input');
+        filterInputEl.type = 'text';
+        filterInputEl.className = 'asm-picker-filter';
+        filterInputEl.placeholder = 'Filter\u2026';
+        filterInputEl.setAttribute('aria-label', 'Filter instructions');
+        filterInputEl.setAttribute('autocomplete', 'off');
+        filterInputEl.setAttribute('spellcheck', 'false');
+        picker.appendChild(filterInputEl);
+
+        // Body container
+        pickerBodyEl = document.createElement('div');
+        pickerBodyEl.className = 'asm-picker-body';
+        picker.appendChild(pickerBodyEl);
+
+        renderGrouped();
+
+        filterInputEl.addEventListener('input', function () {
+            renderFiltered(filterInputEl.value);
+        });
+
+        filterInputEl.addEventListener('keydown', function (e) {
+            handleFilterKeydown(e);
+        });
+    }
+
+    // Render all instructions in the standard grouped horizontal layout
+    function renderGrouped() {
+        pickerBodyEl.innerHTML = '';
+        allFlatItems = [];
+        selectedIndex = -1;
+        pickerBodyEl.className = 'asm-picker-body';
 
         INSTR_CATEGORIES.forEach(function (cat) {
             var group = document.createElement('div');
@@ -121,26 +167,62 @@
                 var flatIdx = allFlatItems.length;
                 allFlatItems.push(item);
 
-                var row = document.createElement('div');
-                row.className = 'asm-picker-item';
-                row.setAttribute('role', 'option');
-                row.setAttribute('data-idx', flatIdx);
-                row.textContent = item.label;
-                row.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
-                    onSelect(item);
-                });
-                row.addEventListener('mouseenter', function () {
-                    setSelected(flatIdx);
-                });
+                var row = makeItemRow(item, flatIdx);
                 group.appendChild(row);
             });
 
-            body.appendChild(group);
+            pickerBodyEl.appendChild(group);
+        });
+    }
+
+    // Render items matching query in a flat vertical list
+    function renderFiltered(query) {
+        pickerBodyEl.innerHTML = '';
+        allFlatItems = [];
+        selectedIndex = -1;
+        pickerBodyEl.className = 'asm-picker-body asm-picker-body--flat';
+
+        var q = query.trim().toLowerCase();
+        if (!q) {
+            renderGrouped();
+            return;
+        }
+
+        var matches = allSourceItems.filter(function (item) {
+            return item.label.toLowerCase().indexOf(q) !== -1;
         });
 
-        picker.appendChild(body);
-        selectedIndex = -1;
+        if (matches.length === 0) {
+            var empty = document.createElement('div');
+            empty.className = 'asm-picker-empty';
+            empty.textContent = 'No matches';
+            pickerBodyEl.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(function (item) {
+            var flatIdx = allFlatItems.length;
+            allFlatItems.push(item);
+            pickerBodyEl.appendChild(makeItemRow(item, flatIdx));
+        });
+
+        setSelected(0);
+    }
+
+    function makeItemRow(item, flatIdx) {
+        var row = document.createElement('div');
+        row.className = 'asm-picker-item';
+        row.setAttribute('role', 'option');
+        row.setAttribute('data-idx', flatIdx);
+        row.textContent = item.label;
+        row.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            currentOnSelect(item);
+        });
+        row.addEventListener('mouseenter', function () {
+            setSelected(flatIdx);
+        });
+        return row;
     }
 
     function setSelected(idx) {
@@ -152,6 +234,38 @@
         });
         var activeEl = picker.querySelector('.asm-picker-item[data-idx="' + idx + '"]');
         if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+    }
+
+    // ── Filter-input keyboard handler ────────────────────────────────────────
+
+    function handleFilterKeydown(e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            hidePicker();
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            var next = (selectedIndex < 0) ? 0 : Math.min(selectedIndex + 1, allFlatItems.length - 1);
+            setSelected(next);
+            return;
+        }
+
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            var prev = (selectedIndex < 0) ? allFlatItems.length - 1 : Math.max(selectedIndex - 1, 0);
+            setSelected(prev);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedIndex >= 0 && allFlatItems[selectedIndex]) {
+                insertIntoEditor(allFlatItems[selectedIndex]);
+            }
+            return;
+        }
     }
 
     // ── Cursor pixel position ────────────────────────────────────────────────
@@ -204,7 +318,7 @@
         var picker = getOrCreatePicker();
         var pos = getCaretPixelPos(textarea);
         var pickerWidth = 580;
-        var pickerMaxHeight = 260;
+        var pickerMaxHeight = 300;
         var viewW = window.innerWidth;
         var viewH = window.innerHeight;
 
@@ -226,11 +340,18 @@
         var picker = getOrCreatePicker();
         picker.style.display = 'flex';
         positionPicker(textarea);
+        // Auto-focus the filter input so the user can type immediately
+        if (filterInputEl) {
+            filterInputEl.value = '';
+            filterInputEl.focus();
+        }
     }
 
     function hidePicker() {
         if (pickerEl) pickerEl.style.display = 'none';
         selectedIndex = -1;
+        // Return focus to the editor
+        if (activeEditorEl) activeEditorEl.focus();
     }
 
     function isPickerVisible() {
@@ -266,7 +387,7 @@
         if (typeof markUserTabDirty === 'function') markUserTabDirty();
     }
 
-    // ── Keyboard navigation ──────────────────────────────────────────────────
+    // ── Keyboard navigation (textarea keydown — handles picker before focus moves) ──
 
     function handlePickerKeydown(e) {
         if (!isPickerVisible()) return false;
@@ -281,6 +402,8 @@
             e.preventDefault();
             var next = (selectedIndex < 0) ? 0 : Math.min(selectedIndex + 1, allFlatItems.length - 1);
             setSelected(next);
+            // Ensure filter input keeps focus
+            if (filterInputEl) filterInputEl.focus();
             return true;
         }
 
@@ -288,6 +411,7 @@
             e.preventDefault();
             var prev = (selectedIndex < 0) ? allFlatItems.length - 1 : Math.max(selectedIndex - 1, 0);
             setSelected(prev);
+            if (filterInputEl) filterInputEl.focus();
             return true;
         }
 
@@ -297,9 +421,10 @@
             return true;
         }
 
-        // Any printable key or destructive key dismisses the picker
-        if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
-            hidePicker();
+        // Redirect focus to the filter input so the user's keystroke lands there
+        if (filterInputEl && (e.key.length === 1 || e.key === 'Backspace')) {
+            filterInputEl.focus();
+            // Don't call preventDefault — let the character reach the input
         }
 
         return false;

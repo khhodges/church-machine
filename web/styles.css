@@ -8278,7 +8278,7 @@ body.landing-mode .auth-section {
     border-radius: 8px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.6);
     width: 580px;
-    max-height: 260px;
+    max-height: 300px;
     display: none;
     flex-direction: column;
     animation: menuFadeIn 0.12s ease;
@@ -8341,4 +8341,41 @@ body.landing-mode .auth-section {
 .asm-picker-item--active {
     background: rgba(233, 69, 96, 0.22);
     color: #fff;
+}
+
+.asm-picker-filter {
+    margin: 4px 8px;
+    padding: 3px 7px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border, #2a2a4a);
+    border-radius: 4px;
+    color: var(--text-primary, #cdd6f4);
+    font-size: 0.72rem;
+    font-family: 'Courier New', Courier, monospace;
+    outline: none;
+    flex-shrink: 0;
+    width: calc(100% - 16px);
+    box-sizing: border-box;
+}
+
+.asm-picker-filter:focus {
+    border-color: var(--accent, #e94560);
+    background: rgba(233, 69, 96, 0.08);
+}
+
+.asm-picker-filter::placeholder {
+    color: #555;
+}
+
+.asm-picker-body--flat {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.asm-picker-empty {
+    padding: 8px 12px;
+    color: #666;
+    font-size: 0.72rem;
+    font-style: italic;
 }
