@@ -205,6 +205,9 @@
     // Returns { positions: [label indices matched], score: number } or null.
     // Fuzzy: every character of q must appear in order in label (case-insensitive).
     // Score is lower for earlier / tighter matches so results can be sorted best-first.
+    // Word-boundary bonus: each matched position that is at index 0 or immediately
+    // follows a space in the label subtracts 200 from the score, floating
+    // semantically relevant matches (e.g. "ds" hitting "dest" + "src") to the top.
     function fuzzyScore(label, q) {
         var lLower = label.toLowerCase();
         var positions = [];
@@ -217,7 +220,14 @@
         }
         var first = positions[0];
         var last = positions[positions.length - 1];
-        return { positions: positions, score: first * 1000 + (last - first) };
+        var boundaryBonus = 0;
+        for (var bi = 0; bi < positions.length; bi++) {
+            var p = positions[bi];
+            if (p === 0 || lLower[p - 1] === ' ') {
+                boundaryBonus -= 200;
+            }
+        }
+        return { positions: positions, score: first * 1000 + (last - first) + boundaryBonus };
     }
 
     // Render items matching query in a flat vertical list (fuzzy, sorted by score)
@@ -573,6 +583,7 @@
         hide: hidePicker,
         isVisible: isPickerVisible,
         shortcutDefaults: SHORTCUT_DEFAULTS,
+        fuzzyScore: fuzzyScore,
     };
 
 }());
