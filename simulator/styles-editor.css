@@ -1149,3 +1149,169 @@
     background: rgba(244, 185, 66, 0.26);
     color: #fff;
 }
+
+/* ── C-List Viewer button ─────────────────────────────────────────────────── */
+.btn-clist-viewer {
+    padding: 2px 8px;
+    background: rgba(244, 185, 66, 0.1);
+    border: 1px solid #f4b942;
+    border-radius: 4px;
+    color: #f4b942;
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+    line-height: 1.6;
+    margin-left: 6px;
+}
+.btn-clist-viewer:hover {
+    background: rgba(244, 185, 66, 0.26);
+    color: #fff;
+}
+.btn-clist-viewer--active {
+    background: rgba(244, 185, 66, 0.32);
+    color: #fff;
+    border-color: #f4b942;
+}
+
+/* ── C-List Viewer popup ─────────────────────────────────────────────────── */
+.clist-viewer-popup {
+    position: fixed;
+    z-index: 9500;
+    background: #12121f;
+    border: 1px solid #f4b942;
+    border-radius: 6px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.7);
+    width: 480px;
+    max-height: 320px;
+    display: none;
+    flex-direction: column;
+    animation: asmPickerIn 0.12s ease;
+    overflow: hidden;
+}
+
+.clist-viewer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    border-bottom: 1px solid #2a2a4a;
+    flex-shrink: 0;
+}
+
+.clist-viewer-title {
+    color: #f4b942;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.clist-viewer-hint {
+    color: #555;
+    font-size: 0.62rem;
+}
+
+.clist-viewer-body {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.clist-viewer-empty {
+    padding: 12px 14px;
+    color: #666;
+    font-size: 0.72rem;
+    font-style: italic;
+}
+
+.clist-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.clist-row:last-child {
+    border-bottom: none;
+}
+.clist-row:hover,
+.clist-row--focused {
+    background: rgba(244, 185, 66, 0.12);
+}
+.clist-row--null {
+    opacity: 0.4;
+    cursor: default;
+}
+.clist-row--null:hover {
+    background: none;
+}
+
+.clist-slot {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #f4b942;
+    min-width: 30px;
+    flex-shrink: 0;
+}
+
+.clist-perms {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.clist-perm-chip {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 1px 3px;
+    border-radius: 3px;
+    border: 1px solid #333;
+    background: rgba(255,255,255,0.04);
+    color: #444;
+    line-height: 1.3;
+}
+.clist-perm-chip--on {
+    /* colour applied inline per-perm */
+}
+
+.clist-b-badge,
+.clist-f-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid #333;
+    background: rgba(255,255,255,0.04);
+    color: #444;
+    flex-shrink: 0;
+    cursor: help;
+}
+.clist-b-badge--on {
+    background: rgba(244, 185, 66, 0.2);
+    border-color: #f4b942;
+    color: #f4b942;
+}
+.clist-f-badge--on {
+    background: rgba(224, 155, 40, 0.2);
+    border-color: #e09b28;
+    color: #e09b28;
+}
+
+.clist-null-label {
+    font-size: 0.68rem;
+    color: #555;
+    font-style: italic;
+}
+
+.clist-name {
+    font-size: 0.7rem;
+    color: #c9d1d9;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}

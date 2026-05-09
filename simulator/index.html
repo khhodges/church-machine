@@ -418,6 +418,7 @@
                 </div>
                 <div class="asm-picker-toolbar">
                     <button class="btn-instr-picker" title="Open instruction picker (Ctrl+Space)" data-tooltip="Instruction Picker — Browse and insert assembly instructions (Ctrl+Space)" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
+                    <button class="btn-clist-viewer" title="View C-List capabilities (Ctrl+Shift+C)" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6 (Ctrl+Shift+C)" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
                 </div>
                 <div class="code-editor-wrap">
                     <div class="line-numbers" id="lineNumbers"></div>
@@ -1620,6 +1621,7 @@
     <script src="app-invoke.js?v=20260501a"></script>
     <script src="app-misc.js?v=20260501a"></script>
     <script src="asm-instruction-picker.js"></script>
+    <script src="clist-viewer.js"></script>
     <!-- jsQR — client-side QR code decoder (camera scanning for Hello Mum panel) -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script>
