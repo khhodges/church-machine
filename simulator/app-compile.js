@@ -1497,7 +1497,8 @@ function loadCLOOMCExample(name) {
         'contact_stage2': '/simulator/cloomc/ContactStage2.cloomc',
         'contact_call': '/simulator/cloomc/ContactCall.cloomc',
         'english_contact_stage2': '/simulator/cloomc/english/ContactStage2.cloomc',
-        'ada_note_g_published_bug': '/simulator/cloomc/ada_note_g_published_bug.cloomc'
+        'ada_note_g_published_bug': '/simulator/cloomc/ada_note_g_published_bug.cloomc',
+        'memory': '/simulator/cloomc/memory.cloomc'
     };
     if (fileExamples[name]) {
         fetch(fileExamples[name])
@@ -1520,79 +1521,6 @@ function loadCLOOMCExample(name) {
     }
 
     const examples = {
-        'memory': `// ============================================================
-// Abstraction:  Memory
-// Description:  Memory allocator using CR5 instance data (NS slot 7)
-// Author:       Church Machine Educational Platform
-// Version:      1.0
-// Created:      2026-05-09
-// Language:     CLOOMC++
-// Dependencies: None
-// ============================================================
-// Methods:
-//   1. Allocate(size) — reserve size words; return (base, limit)
-//   2. Free(base) — release a previously allocated block
-//   3. Resize(base, newSize) — resize an existing block in-place
-// ============================================================
-// ── Memory Allocator using CR5 Instance Data ──
-// Base abstractions are shared code — they hold no
-// state themselves. Instance state lives in CR5,
-// the private instance data register.
-//
-// CR5 is a thread register — installed by CHANGE from
-// the incoming thread's Zone ④ bounds (derived from
-// the lump header's heapWords field). All abstractions
-// on a thread share the same CR5, so software must not
-// rely on CR5 being private across CALL boundaries.
-//
-// CR5 points to a region where this instance keeps
-// its bookkeeping (here: the current heap offset).
-// The read/write operations go through CR5's Golden
-// Token, so access is hardware-enforced.
-//
-// TPERM is a flag-setting instruction — it checks
-// permissions, validity, and bounds in one cycle,
-// then sets the Z flag. It never traps. Subsequent
-// instructions carry EQ/NE suffixes for zero-cost
-// try-catch: the happy path runs as if errors don't
-// exist, and the hardware silently skips instructions
-// when TPERM failed.
-
-abstraction Memory {
-    capabilities {
-    }
-
-    // Allocate: reserve 'size' bytes of memory.
-    // Rounds up to 256-byte alignment (>> 8, << 8).
-    // Returns (location, actual_size) on success,
-    // or (0, 0) if CR5 lacks permissions or space.
-    method Allocate(size) {
-        // TPERM checks R+W perms, valid, and offset 0
-        // in one instruction. Z=1 if all pass.
-        TPERM CR5, RW, 0
-
-        // happy path (EQ = fires only when Z=1)
-        readEQ location, CR5, 0
-        neededEQ = size + 255
-        neededEQ = neededEQ >> 8
-        neededEQ = neededEQ << 8
-        TPERMEQ CR5, RW, location + needed
-        writeEQ CR5, 0, location + needed
-        returnEQ(location, needed)
-
-        // catch path (NE = fires only when Z=0)
-        // TPERM set Z=0 → every EQ was skipped
-        MOVNE DR1, 0
-        MOVNE DR2, 0
-        returnNE(DR1, DR2)
-    }
-
-    // Free: placeholder — bump allocators don't free.
-    // A real deallocator would be a separate abstraction.
-    method Free(location) {
-        return(0)
-    }
-}`,
         'mint': `// ============================================================
 // Abstraction:  Mint
 // Description:  Creates and validates Golden Token capability words
@@ -2476,83 +2404,7 @@ abstraction ChurchNumerals {
     -- IF-THEN-ELSE: λp.λa.λb.p a b  (CHURCH PATH)
     method ifthenelse(p, a, b) = if p == 0 then b else a
 }`,
-        'REMOVED_lambda_church_vs_compiled': `-- LAMBDA CALCULUS
--- Church vs Compiled \u2014 control flow by CALL vs BRANCH
--- \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
---
--- COMPILED PATH (if/then/else):
---   Each conditional compiles to:
---     MCMP \u2192 BRANCH \u2192 then-body \u2192 MOV \u2192 BRANCH \u2192 else-body \u2192 MOV
---   = 7+ instructions per conditional, branch misprediction risk
---
--- CHURCH PATH (\u03BB-application as selector):
---   A Church boolean IS the if/then/else. It is a function:
---     TRUE  = \u03BBx.\u03BBy.x  \u2192 CALL TRUE(a)(b) returns a
---     FALSE = \u03BBx.\u03BBy.y  \u2192 CALL FALSE(a)(b) returns b
---   Selection is two CALL instructions \u2014 no compare, no branch.
---   Avoids branch misprediction; more predictable control flow.
---   (Arithmetic still uses SlideRule / hardware FPU when needed.)
---
--- Each pair solves the same problem:
---   compiled_X uses if/then/else  \u2192 MCMP + BRANCH
---   church_X   uses \u03BB-application \u2192 CALL + CALL
---
--- Press Assemble to see the instruction-count comparison!
---
--- \u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
-
-abstraction ChurchVsCompiled {
-    capabilities { }
-
-    -- \u2500\u2500 COMPILED PATH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    -- Uses if/then/else \u2192 generates MCMP + BRANCH
-
-    -- Select a or b based on flag (1=a, 0=b)
-    method compiled_select(flag, a, b) =
-        if flag == 0 then b else a
-
-    -- Guarded add: add x+y only when flag is set
-    method compiled_guard(flag, x, y) =
-        if flag == 0 then x else x + y
-
-    -- Nested conditional: three-way branch
-    method compiled_classify(n) =
-        if n == 0 then 0
-        else if n == 1 then 10
-        else 20
-
-    -- Double conditional: sign function
-    method compiled_sign(n, pos, neg) =
-        if n == 0 then 0
-        else if n > 0 then pos
-        else neg
-
-    -- \u2500\u2500 CHURCH PATH \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-    -- Uses \u03BB-application as control flow. Each selector
-    -- is a function applied to two choices via CALL.
-    -- selector a b \u2192 CALL(CALL(selector, a), b)
-    -- No MCMP, no BRANCH, constant-time execution.
-
-    -- Select a or b: apply the selector to both choices
-    -- selector = TRUE(\u03BBx.\u03BBy.x) returns a, FALSE(\u03BBx.\u03BBy.y) returns b
-    method church_select(selector, a, b) =
-        selector a b
-
-    -- Guarded add: apply selector to choose x or x+y
-    -- selector(x + y)(x) picks the right outcome
-    method church_guard(selector, x, y) =
-        selector (x + y) x
-
-    -- Classify: chain two selectors for three-way choice
-    -- s1 picks between 0 and (s2 picks between 10 and 20)
-    method church_classify(s1, s2) =
-        s1 0 (s2 10 20)
-
-    -- Sign: chain two selectors for three outcomes
-    method church_sign(s1, s2, pos, neg) =
-        s1 0 (s2 pos neg)
-}`,
-        'lambda_church_encoding': `-- ============================================================
+'lambda_church_encoding': `-- ============================================================
 -- Abstraction:  ChurchEncoding
 -- Description:  Church booleans and Church pairs as pure functions
 -- Author:       Church Machine Educational Platform
@@ -2813,51 +2665,6 @@ abstraction SlideRule {
 
     -- Min: \u03BBa.\u03BBb.if a < b then a else b
     method Min(a, b) = if a < b then a else b
-}`,
-        'lambda_fixedpoint': `-- LAMBDA CALCULUS
--- Fixed-Point Arithmetic \u2014 decimal precision on integer hardware
--- Scale factor = 100 (two decimal places)
--- 3.14 is stored as 314, 0.5 as 50, 1.0 as 100
--- All operations maintain the scale invariant
-
-abstraction FixedPointMath {
-    capabilities { Constants }
-
-    -- Convert integer to fixed-point: n \u2192 n * 100
-    -- \u03BBn.n \u00d7 100
-    method toFixed(n) = n * 100
-
-    -- Convert fixed-point back to integer (truncates): f \u2192 f / 100
-    -- \u03BBf.f \u00f7 100
-    method fromFixed(f) = f / 100
-
-    -- Add two fixed-point values (both already scaled)
-    -- \u03BBa.\u03BBb.a + b  (scale preserved)
-    method addFixed(a, b) = a + b
-
-    -- Subtract two fixed-point values
-    -- \u03BBa.\u03BBb.a - b  (scale preserved)
-    method subFixed(a, b) = a - b
-
-    -- Multiply fixed-point: (a * b) / 100
-    -- Rescale after multiply to avoid double-scaling
-    -- \u03BBa.\u03BBb.(a \u00d7 b) / scale
-    method mulFixed(a, b) = (a * b) / 100
-
-    -- Divide fixed-point: (a * 100) / b
-    -- Pre-scale numerator to preserve precision
-    -- \u03BBa.\u03BBb.(a \u00d7 scale) / b
-    method divFixed(a, b) =
-        if b == 0 then 0
-        else (a * 100) / b
-
-    -- Percentage: what is pct% of whole?
-    -- \u03BBw.\u03BBp.(w \u00d7 p) / 100
-    method percent(whole, pct) = (whole * pct) / 100
-
-    -- Round fixed-point to nearest integer
-    -- \u03BBf.(f + 50) / 100  (banker\u2019s rounding approx)
-    method roundFixed(f) = (f + 50) / 100
 }`,
         'lambda_rational': `-- ============================================================
 -- Abstraction:  RationalArith
@@ -3342,7 +3149,7 @@ abstraction DMABuffer {
 }`,
     };
 
-    editor.value = examples[name] || examples['hello'];
+    editor.value = examples[name] || examples['integer_ops'];
     updateLineNumbers();
     saveEditorState();
 
