@@ -25,7 +25,7 @@ This document traces each correspondence in detail, giving educators, students, 
 
 ## 2. The Environment Model (Γ) — Boot C-List
 
-In lambda calculus, the environment Γ maps variable names to their values. On the Church Machine, the environment is a **C-List**: a flat array of Golden Tokens, one per slot, indexed by a word offset.
+In lambda calculus, the environment Γ maps variable names to their values. On the Church Machine, the environment is an **Abstraction** in a **Namespace**: directional hierarchy array of Golden Tokens, the DNA structure of a functional software application structures the fault-tolerant configuration using one per slot of meta-data per Golden Token, indexed by a word offset in the immutable Golden Token.
 
 At boot the hardware loads the **Boot C-List** into CR6. This 18-slot array is the initial Γ for every program that runs from boot code. It is the complete set of names the boot abstraction can see — no other capabilities exist at this point.
 
