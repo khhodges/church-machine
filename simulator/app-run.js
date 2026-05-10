@@ -2087,15 +2087,18 @@ function showFaultModal(f) {
         }
     }
 
-    // ── Malformed GT callout (DOMAIN_PURITY from hand-crafted GT) ────────────
+    // ── Malformed GT callout (any fault carrying a malformedReason) ──────────
     let malformedGTSection = '';
-    if (f.type === 'DOMAIN_PURITY' && f.malformedReason) {
+    if (f.malformedReason) {
         malformedGTSection = `
-        <div class="fault-scope-section">
+        <div class="fault-scope-section fault-malformed-gt-section">
             <div class="fault-scope-label">&#x26A0; Malformed Golden Token</div>
+            <div class="fault-detail-row fault-malformed-reason-row">
+                <span class="fault-detail-label fault-malformed-reason-label">Malformed GT reason:</span>
+                <span class="fault-detail-value fault-malformed-reason-value"><code class="fault-malformed-reason-code">${f.malformedReason}</code></span>
+            </div>
             <div class="fault-scope-detail">
-                The GT in the C-List was rejected before mLoad ran:
-                <code>${f.malformedReason}</code>.
+                The GT in the C-List was rejected before mLoad ran.
                 Hand-crafted or STORE-written GTs must satisfy both
                 domain-purity (no mixing of Turing {R,W,X} and Church {L,S,E} bits)
                 and single-permission rules.

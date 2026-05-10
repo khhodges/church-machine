@@ -393,6 +393,37 @@
     font-family: var(--font-mono, monospace);
 }
 
+.fault-malformed-reason-row {
+    margin-bottom: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.fault-malformed-reason-label {
+    color: #ffaa33;
+    font-weight: 700;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.fault-malformed-reason-value {
+    display: inline-flex;
+    align-items: center;
+}
+
+.fault-malformed-reason-code {
+    background: rgba(255, 140, 0, 0.2);
+    border: 1px solid rgba(255, 170, 50, 0.5);
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: #ffcc55;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .fault-trace-section {
     margin-bottom: 0.85rem;
     border: 1px solid rgba(100,180,220,0.18);
