@@ -210,6 +210,42 @@ DEFAULT_ABSTRACTION_CATALOG = [
 ]
 assert len(DEFAULT_ABSTRACTION_CATALOG) == 50, "catalog drift vs simulator.js"
 
+# Service abstraction c-list capability table (Task #971).
+# Single-authority model:
+#   Navana  (slot 5)  — sole NS table writer; holds R|W token to namespace lump
+#   Memory  (slot 7)  — sole physical allocator; calls GC under pressure
+#   Mint    (slot 6)  — sole GT lifecycle manager; delegates NS writes to Navana
+# Each entry: ns_slot -> [ GT descriptor, ... ]
+#   GT descriptor is a tuple:
+#     ("inform",   ns_slot_ref, perms_dict)          -> create_gt(0, ns_slot_ref, perms_dict, 1)
+#     ("abstract", ab_type, rw_perms_dict, ab_data)  -> create_abstract_gt(ab_type, rw_perms_dict, 0, ab_data)
+SERVICE_CLIST_DEFS = {
+    4:  [("inform", 5,  {"E":1})],                                     # Salvation:    Navana E
+    5:  [("inform", 0,  {"R":1,"W":1}),                                # Navana:       namespace lump R|W (scoped to NS physical block)
+         ("inform", 6,  {"E":1}),                                      #               Mint E
+         ("inform", 7,  {"E":1})],                                     #               Memory E
+    6:  [("inform", 5,  {"E":1})],                                     # Mint:         Navana E
+    7:  [("inform", 44, {"E":1})],                                     # Memory:       GC E
+    8:  [("inform", 45, {"E":1}),                                      # Scheduler:    Thread E
+         ("inform", 7,  {"E":1})],                                     #               Memory E
+    9:  [("inform", 7,  {"E":1})],                                     # Stack:        Memory E
+    10: [("inform", 8,  {"E":1})],                                     # DijkstraFlag: Scheduler E
+    15: [("abstract", AB_TYPE_IO, {"R":1,"W":1},                       # Display:      Abstract I/O GT (device_class=DISPLAY)
+         (DEVICE_CLASS_DISPLAY << 8) | 0)],
+    17: [("inform", 18, {"E":1}),                                      # Abacus:       Constants E
+         ("inform", 15, {"E":1})],                                     #               Display E
+    44: [("inform", 5,  {"E":1}),                                      # GC:           Navana E
+         ("inform", 7,  {"E":1})],                                     #               Memory E
+    45: [("inform", 8,  {"E":1}),                                      # Thread:       Scheduler E
+         ("inform", 7,  {"E":1})],                                     #               Memory E
+    47: [("inform", 7,  {"E":1}),                                      # Billing:      Memory E
+         ("inform", 5,  {"E":1})],                                     #               Navana E
+    48: [("inform", 7,  {"E":1}),                                      # TuringMemory: Memory E
+         ("inform", 47, {"E":1})],                                     #               Billing E
+    49: [("inform", 7,  {"E":1}),                                      # ChurchMemory: Memory E
+         ("inform", 47, {"E":1})],                                     #               Billing E
+}
+
 
 # ----- bit-packing helpers (mirror simulator.js exactly) ---------------------
 
@@ -731,6 +767,38 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     startup_config_ns_base  = ns_table_base + STARTUP_CONFIG_NS_SLOT * NS_ENTRY_WORDS
     mem[startup_config_ns_base + 1] = pack_ns_word1(startup_config_cr_limit, 0, 0, 0, 0, 1, 1)
     mem[startup_config_ns_base + 2] = make_version_seals(0, startup_config_loc, startup_config_cr_limit)
+
+    # ----- Service abstraction c-lists (Task #971) --------------------------------
+    # Populate c-lists for the 14 service abstractions that have declared capability
+    # requirements. All are handler-based (cw=0 — no CLOOMC code), so only the
+    # lump header and c-list GT tail are written. The NS entry word1/word2 are
+    # updated to reflect the new lim17 (= lump_size − cc − 1) and cc.
+    # Pure Church-calculus slots (SUCC/PRED/ADD/SUB/MUL/ISZERO/TRUE/FALSE/PAIR)
+    # intentionally keep cc=0 and are absent from SERVICE_CLIST_DEFS.
+    for _cslot, _entries in SERVICE_CLIST_DEFS.items():
+        _cc = len(_entries)
+        _loc = locations.get(_cslot)
+        if _loc is None or _cc == 0:
+            continue
+        _sz = slot_sizes.get(_cslot, SLOT_SIZE)
+        _lim17 = (_sz - _cc - 1) & 0x1FFFF
+        # lump header: cw=0 (handler-only, no code), cc=_cc, typ=0
+        mem[_loc] = pack_lump_header(_ns_n_minus_6(_sz), 0, _cc, 0)
+        # c-list GT words at lump tail
+        for _ci, _entry in enumerate(_entries):
+            if _entry[0] == "abstract":
+                _, _ab_type, _rw_perms, _ab_data = _entry
+                _gt = create_abstract_gt(_ab_type, _rw_perms, 0, _ab_data)
+            else:  # "inform"
+                _, _ref_slot, _perms = _entry
+                _gt = create_gt(0, _ref_slot, _perms, 1)
+            mem[_loc + _sz - _cc + _ci] = _gt & 0xFFFFFFFF
+        # Update NS entry: word1 (lim17 + cc) and word2 (seal)
+        _cat = DEFAULT_ABSTRACTION_CATALOG[_cslot]
+        _chainable = 1 if (_cat and _cat[2]) else 0
+        _ns_base = ns_table_base + _cslot * NS_ENTRY_WORDS
+        mem[_ns_base + 1] = pack_ns_word1(_lim17, 0, 0, 0, _chainable, 1, _cc)
+        mem[_ns_base + 2] = make_version_seals(0, _loc, _lim17)
 
     # Boot-entry slot: stored at NS_TABLE_BASE - 2 so that loadBootImage()
     # can restore the user's selected boot entry when loading the image.

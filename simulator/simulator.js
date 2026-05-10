@@ -1160,6 +1160,76 @@ class ChurchSimulator {
         this.memory[startupConfigNSBase + 1] = this.packNSWord1(startupConfigCRLimit, 0, 0, 0, 0, 1, 1);
         this.memory[startupConfigNSBase + 2] = this.makeVersionSeals(0, startupConfigLoc, startupConfigCRLimit);
 
+        // ── Service abstraction c-lists (Task #971) ──────────────────────────────
+        // Populate c-lists for the 14 service abstractions that have declared
+        // capability requirements.  All are handler-based (cw=0 — no CLOOMC code);
+        // only the lump header and c-list GT tail are written.  NS entry word1/word2
+        // are corrected to reflect lim17 = lump_size − cc − 1 and the new cc.
+        // Pure Church-calculus slots (SUCC/PRED/ADD/SUB/MUL/ISZERO/TRUE/FALSE/PAIR)
+        // intentionally keep cc=0 and are absent from SERVICE_CLIST_DEFS.
+        //
+        // Single-authority model:
+        //   Navana (5)  sole NS writer — holds R|W token to the namespace lump
+        //   Memory (7)  sole physical allocator — calls GC (44) under pressure
+        //   Mint   (6)  sole GT lifecycle manager — delegates NS writes to Navana
+        //
+        // Entry format: [ns_slot, [ descriptor, ... ]]
+        //   Inform descriptor:   { type: 'inform',   ref: N,       perms: {E:1} }
+        //   Abstract descriptor: { type: 'abstract', abType: T, rwPerms: {...}, abData: D }
+        const SERVICE_CLIST_DEFS = [
+            [ 4, [{ type:'inform', ref:5,  perms:{E:1} }]],                                                    // Salvation:    Navana E
+            [ 5, [{ type:'inform', ref:0,  perms:{R:1,W:1} },                                                  // Navana:       namespace lump R|W
+                  { type:'inform', ref:6,  perms:{E:1} },                                                      //               Mint E
+                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
+            [ 6, [{ type:'inform', ref:5,  perms:{E:1} }]],                                                    // Mint:         Navana E
+            [ 7, [{ type:'inform', ref:44, perms:{E:1} }]],                                                    // Memory:       GC E
+            [ 8, [{ type:'inform', ref:45, perms:{E:1} },                                                      // Scheduler:    Thread E
+                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
+            [ 9, [{ type:'inform', ref:7,  perms:{E:1} }]],                                                    // Stack:        Memory E
+            [10, [{ type:'inform', ref:8,  perms:{E:1} }]],                                                    // DijkstraFlag: Scheduler E
+            [15, [{ type:'abstract', abType:ChurchSimulator.AB_TYPE_IO, rwPerms:{R:1,W:1},                     // Display:      Abstract I/O GT
+                   abData: (ChurchSimulator.DEVICE_CLASS_DISPLAY << 8) | 0 }]],
+            [17, [{ type:'inform', ref:18, perms:{E:1} },                                                      // Abacus:       Constants E
+                  { type:'inform', ref:15, perms:{E:1} }]],                                                    //               Display E
+            [44, [{ type:'inform', ref:5,  perms:{E:1} },                                                      // GC:           Navana E
+                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
+            [45, [{ type:'inform', ref:8,  perms:{E:1} },                                                      // Thread:       Scheduler E
+                  { type:'inform', ref:7,  perms:{E:1} }]],                                                    //               Memory E
+            [47, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // Billing:      Memory E
+                  { type:'inform', ref:5,  perms:{E:1} }]],                                                    //               Navana E
+            [48, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // TuringMemory: Memory E
+                  { type:'inform', ref:47, perms:{E:1} }]],                                                    //               Billing E
+            [49, [{ type:'inform', ref:7,  perms:{E:1} },                                                      // ChurchMemory: Memory E
+                  { type:'inform', ref:47, perms:{E:1} }]],                                                    //               Billing E
+        ];
+        for (const [cslot, entries] of SERVICE_CLIST_DEFS) {
+            const cc  = entries.length;
+            const loc = this.memory[this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS];
+            if (!loc || !cc) continue;
+            const sz    = slotSizes[cslot] || this.SLOT_SIZE;
+            const lim17 = (sz - cc - 1) & 0x1FFFF;
+            // lump header: cw=0 (handler-only), cc, typ=0
+            const nm6 = Math.max(0, Math.ceil(Math.log2(sz)) - 6);
+            this.memory[loc] = this.packLumpHeader(nm6, 0, cc, 0) >>> 0;
+            // c-list GT words at lump tail
+            for (let ci = 0; ci < entries.length; ci++) {
+                const e = entries[ci];
+                let gt;
+                if (e.type === 'abstract') {
+                    gt = this.createAbstractGT(e.abType, e.rwPerms, 0, e.abData);
+                } else {
+                    gt = this.createGT(0, e.ref, e.perms, 1);
+                }
+                this.memory[loc + sz - cc + ci] = gt >>> 0;
+            }
+            // Update NS entry word1 (lim17 + cc) and word2 (seal)
+            const catEntry  = abstractions[cslot];
+            const chainable = (catEntry && catEntry.chainable) ? 1 : 0;
+            const nsBase    = this.NS_TABLE_BASE + cslot * this.NS_ENTRY_WORDS;
+            this.memory[nsBase + 1] = this.packNSWord1(lim17, 0, 0, 0, chainable, 1, cc) >>> 0;
+            this.memory[nsBase + 2] = this.makeVersionSeals(0, loc, lim17) >>> 0;
+        }
+
         // Boot-entry slot: written at NS_TABLE_BASE - 2 (mirrors boot_image.py).
         // loadBootImage() reads this word and restores bootEntrySlot from the image.
         this.memory[this.NS_TABLE_BASE - 2] = this.bootEntrySlot >>> 0;
