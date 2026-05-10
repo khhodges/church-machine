@@ -1258,7 +1258,33 @@ function updateCRDetail() {
     html += '<table class="cr-table cr-detail-words"><thead><tr>';
     html += '<th>Word</th><th>Value</th><th>Decoded</th>';
     html += '</tr></thead><tbody>';
-    html += `<tr><td>R0: GT</td><td class="cr-gt">0x${cr.word0_gt}</td><td>[${cr.perms}] Seq=${cr.gtSeq} Idx=${cr.gtIndex} Type=${cr.gtTypeName}</td></tr>`;
+    {
+        const _gt32 = sim.cr[crIdx].word0 >>> 0;
+        const _parsed = sim.parseGT(_gt32);
+        const _p = { ..._parsed.permissions, F: _parsed.type === 2 ? 1 : 0 };
+        let _permHtml = '';
+        for (const _bit of ['B','R','W','X','E','L','S','F']) {
+            const _cls = _p[_bit] ? 'perm-on' : 'perm-off';
+            _permHtml += `<span class="abs-perm-badge ${_cls}">${_bit}</span>`;
+        }
+        const _gtHex = '0x' + _gt32.toString(16).toUpperCase().padStart(8, '0');
+        let _gtDecoded;
+        if (_parsed.type === 3) {
+            const _ab = sim.parseAbstractGT(_gt32);
+            const _AB_TYPE = { 0: 'I/O', 1: 'M-Elevation' };
+            const _DC = { 1: 'LED', 2: 'UART', 3: 'Button', 4: 'Timer', 5: 'Display' };
+            const _abDetail = _ab.ab_type === 0
+                ? `${_DC[_ab.device_class] || 'dc' + _ab.device_class}[${_ab.device_data}]`
+                : `${_AB_TYPE[_ab.ab_type] || 'ab' + _ab.ab_type} 0x${_ab.ab_data.toString(16).toUpperCase()}`;
+            _gtDecoded = `<span class="abs-clist-perms">${_permHtml}</span> <span class="abs-clist-type">${_parsed.typeName}</span> <span class="abs-clist-name">${_abDetail}</span><span style="color:#555;font-size:0.68rem;"> seq${_parsed.gt_seq}</span>`;
+        } else {
+            const _gtNsIdx2 = _parsed.index;
+            const _gtLabel = (sim.nsLabels && sim.nsLabels[_gtNsIdx2]) || null;
+            const _gtNameStr = _gtLabel ? `NS[${_gtNsIdx2}] \u2014 ${_gtLabel}` : `NS[${_gtNsIdx2}]`;
+            _gtDecoded = `<span class="abs-clist-perms">${_permHtml}</span> <span class="abs-clist-type">${_parsed.typeName}</span> <span class="abs-clist-name">${_gtNameStr}</span><span style="color:#555;font-size:0.68rem;"> seq${_parsed.gt_seq}</span>`;
+        }
+        html += `<tr><td>R0: GT</td><td class="abs-clist-gt">${_gtHex}</td><td>${_gtDecoded}</td></tr>`;
+    }
     html += `<tr><td>R1: Location</td><td>0x${cr.word1_location.toString(16).toUpperCase().padStart(8,'0')}</td><td>Base address in memory</td></tr>`;
     html += `<tr><td>R2: Limit</td><td>F=${cr.limitF} Limit=0x${cr.limit17.toString(16).toUpperCase().padStart(5,'0')}</td><td>Far=${cr.limitF} Size=${cr.limit17 + 1} words</td></tr>`;
     html += `<tr><td>R3: Seals</td><td>Seq=${cr.sealGtSeq} CRC=0x${cr.sealCRC.toString(16).toUpperCase().padStart(4,'0')}</td><td>Integrity seal (CRC-16/CCITT)</td></tr>`;
