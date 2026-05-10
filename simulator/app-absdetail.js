@@ -146,7 +146,42 @@ function showAbstractionDetail(index) {
         html += '<div class="abs-detail-label">C-List</div>';
 
         if (!clistLoaded) {
-            html += '<div class="abs-clist-empty">C-List not yet loaded \u2014 boot the simulator to read live lump data.</div>';
+            const bootEntry = (typeof BOOT_UPLOADS !== 'undefined')
+                ? BOOT_UPLOADS.find(u => u.index === abs.index) : null;
+            const staticCaps = (bootEntry && bootEntry.capabilities) ? bootEntry.capabilities : [];
+            if (staticCaps.length === 0) {
+                html += '<div class="abs-clist-empty">Empty (cc\u00a0=\u00a00) \u2014 this abstraction holds no capabilities.</div>';
+            } else {
+                html += `<div class="abs-clist-count">cc\u00a0=\u00a0${staticCaps.length} slot${staticCaps.length !== 1 ? 's' : ''}`;
+                html += ` <span class="abs-clist-static-badge">static \u00b7 live after boot</span></div>`;
+                html += '<table class="abs-clist-table"><thead><tr>';
+                html += '<th>#</th><th>Name</th><th>Target</th><th>Grants</th>';
+                html += '</tr></thead><tbody>';
+                for (let si = 0; si < staticCaps.length; si++) {
+                    const cap = staticCaps[si];
+                    const capName = cap.name || cap.type || '\u2014';
+                    let targetStr = '\u2014';
+                    if (cap.target != null) {
+                        const regLabel = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
+                            abstractionRegistry.abstractions && abstractionRegistry.abstractions[cap.target] &&
+                            abstractionRegistry.abstractions[cap.target].name) || null;
+                        targetStr = regLabel ? `NS[${cap.target}] \u2014 ${regLabel}` : `NS[${cap.target}]`;
+                    }
+                    const grants = Array.isArray(cap.grants) ? cap.grants : [];
+                    let grantsHtml = '';
+                    for (const bit of ['B','R','W','X','E','L','S','F']) {
+                        const on = grants.includes(bit);
+                        grantsHtml += `<span class="abs-perm-badge ${on ? 'perm-on' : 'perm-off perm-static'}">${bit}</span>`;
+                    }
+                    html += `<tr>`;
+                    html += `<td class="abs-clist-idx">${si}</td>`;
+                    html += `<td class="abs-clist-name">${capName}</td>`;
+                    html += `<td class="abs-clist-name abs-clist-target">${targetStr}</td>`;
+                    html += `<td class="abs-clist-perms">${grantsHtml}</td>`;
+                    html += `</tr>`;
+                }
+                html += '</tbody></table>';
+            }
         } else if (cc === 0) {
             html += '<div class="abs-clist-empty">Empty (cc\u00a0=\u00a00) \u2014 this abstraction holds no capabilities.</div>';
         } else {

@@ -4528,6 +4528,30 @@ a.next-step-link:hover {
     border: 1px solid var(--border);
 }
 
+.abs-perm-badge.perm-static {
+    opacity: 0.4;
+}
+
+.abs-clist-static-badge {
+    display: inline-block;
+    font-size: 0.58rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary, #888);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    opacity: 0.75;
+}
+
+.abs-clist-target {
+    font-size: 0.72rem;
+    color: var(--text-secondary, #888);
+}
+
 .lumps-layout {
     display: grid;
     grid-template-columns: 340px 1fr;
