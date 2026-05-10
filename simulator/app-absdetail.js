@@ -160,9 +160,9 @@ function showAbstractionDetail(index) {
                     html += `<tr><td class="abs-clist-idx">${si}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty slot)</td></tr>`;
                 } else {
                     const parsed = sim.parseGT(gt32);
-                    const p = parsed.permissions;
+                    const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
                     let permHtml = '';
-                    for (const bit of ['R','W','X','E','L','S']) {
+                    for (const bit of ['B','R','W','X','E','L','S','F']) {
                         const cls = p[bit] ? 'perm-on' : 'perm-off';
                         permHtml += `<span class="abs-perm-badge ${cls}">${bit}</span>`;
                     }
