@@ -33,7 +33,7 @@
     <link rel="stylesheet" href="styles-lumps.css?v=20260430a">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260510b">
     <link rel="stylesheet" href="styles-fault.css?v=20260426a">
-    <link rel="stylesheet" href="styles-tools.css?v=20260423">
+    <link rel="stylesheet" href="styles-tools.css?v=20260510a">
     <style>
         .app-loading {
             position: fixed; inset: 0; z-index: 99999;
@@ -114,6 +114,7 @@
                                 <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
                                 <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
                                 <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
+                                <button class="ham-item" id="hamItem-gt-view" onclick="switchView('gt-view');closeHamburger()">GT Inspector</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title">Review</div>
@@ -1632,6 +1633,7 @@
     <script src="app-misc.js?v=20260501a"></script>
     <script src="asm-instruction-picker.js"></script>
     <script src="clist-viewer.js?v=20260510d"></script>
+    <script src="app-gt-view.js?v=20260510a"></script>
     <script src="abstraction-wizard.js?v=20260509a"></script>
     <!-- jsQR — client-side QR code decoder (camera scanning for Hello Mum panel) -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
@@ -2015,6 +2017,17 @@
         </div>
     </div>
 </div>
+<div id="gt-view" class="view">
+    <div class="gtv-panel">
+        <div class="gtv-panel-title">GT Inspector — Golden Tokens by Type</div>
+        <div class="gtv-panel-sub">Every GT currently found in loaded c-lists and live CRs, grouped by type. Click any row to see where it appears.</div>
+        <div class="gtv-toolbar">
+            <button class="btn btn-primary btn-sm" onclick="renderGTView()">Refresh</button>
+        </div>
+        <div id="gt-view-body"></div>
+    </div>
+</div>
+
 <div id="sitemap" class="view">
     <div style="max-width:900px;margin:0 auto;padding:1.5rem 1rem;">
         <h2 style="color:#d4a843;font-size:1.25rem;margin-bottom:0.25rem;">Site Map</h2>

@@ -353,7 +353,7 @@ function init() {
         }
     }
 
-    sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); });
+    sim.on('stateChange', () => { updateDashboard(); updateLedStrip(); updateToolbarIdeBadge(); if (currentView === 'gt-view') renderGTView(); });
     sim.on('step', _traceRecordStep);
     sim.on('reset', clearTrace);
     // Task #217: every reset rebuilds memory[] from scratch via
@@ -795,6 +795,7 @@ function switchView(viewId) {
         if (typeof switchLumpWsTab === 'function' && !_selectedLumpToken) switchLumpWsTab('logic');
         renderLumps();
     }
+    if (viewId === 'gt-view') renderGTView();
     if (viewId === 'pipeline') pipelineViz.render();
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
     if (viewId === 'builder') {
