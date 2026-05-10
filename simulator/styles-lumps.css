@@ -5058,19 +5058,96 @@ pre:hover .code-copy-btn {
     font-family: inherit;
 }
 
-.abs-nsdecoder-addr {
+.abs-nsdecoder-hint {
+    font-size: 0.62rem;
+    color: #4b5563;
+    margin: -4px 0 6px;
+    font-style: italic;
+}
+
+.abs-nsdecoder-word {
     color: rgba(206, 145, 120, 0.90);
-    min-width: 5rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.69rem;
+    cursor: help;
+    white-space: nowrap;
+    border-bottom: 1px dashed rgba(206, 145, 120, 0.25);
+    padding-bottom: 1px;
 }
 
-.abs-nsdecoder-num {
-    color: #a0c4ff;
-    text-align: center;
+.abs-nsdecoder-word:hover {
+    color: #ffb07a;
+    background: rgba(206, 145, 120, 0.08);
+    border-bottom-color: rgba(206, 145, 120, 0.55);
 }
 
-.abs-nsdecoder-flag {
+.abs-nsdecoder-word-res {
+    color: #374151;
+}
+
+.abs-nsdecoder-word-res:hover {
     color: #6b7280;
-    text-align: center;
+    background: rgba(107, 114, 128, 0.08);
+    border-bottom-color: rgba(107, 114, 128, 0.35);
+}
+
+/* ── Word-cell decode popup ───────────────────────────────────────────────── */
+.abs-nsdecoder-wordtip {
+    position: fixed;
+    z-index: 9999;
+    background: #111827;
+    border: 1px solid rgba(200, 168, 75, 0.35);
+    border-radius: 6px;
+    padding: 8px 12px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    color: #c8d4e8;
+    min-width: 210px;
+    max-width: 300px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+    pointer-events: none;
+}
+
+.abs-nsdecoder-wordtip .nsdtip-hdr {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--church-gold, #c8a84b);
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(200, 168, 75, 0.18);
+}
+
+.abs-nsdecoder-wordtip .nsdtip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(100, 160, 255, 0.05);
+}
+
+.abs-nsdecoder-wordtip .nsdtip-row:last-of-type {
+    border-bottom: none;
+}
+
+.abs-nsdecoder-wordtip .nsdtip-row span:first-child {
+    color: #6b7280;
+    flex-shrink: 0;
+}
+
+.abs-nsdecoder-wordtip .nsdtip-row span:last-child {
+    color: rgba(206, 145, 120, 0.95);
+    text-align: right;
+}
+
+.abs-nsdecoder-wordtip .nsdtip-note {
+    margin-top: 6px;
+    font-size: 0.62rem;
+    color: #4b5563;
+    font-style: italic;
+    line-height: 1.45;
+    font-family: inherit;
 }
 
 .abs-nsdecoder-empty {

@@ -88,6 +88,38 @@ function _refreshSignedReturnReadout() {
     }
 }
 
+// ── Boot.NS word-cell hover tooltip ──────────────────────────────────────────
+function _nsdGetTip() {
+    let tip = document.getElementById('_nsd-tip');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = '_nsd-tip';
+        tip.className = 'abs-nsdecoder-wordtip';
+        tip.style.display = 'none';
+        document.body.appendChild(tip);
+    }
+    return tip;
+}
+
+function _nsdShowTip(el) {
+    const raw = el.getAttribute('data-nsdtip');
+    if (!raw) return;
+    const tip = _nsdGetTip();
+    tip.innerHTML = raw;
+    tip.style.display = 'block';
+    const r = el.getBoundingClientRect();
+    const tw = tip.offsetWidth || 220;
+    let left = r.left + window.scrollX;
+    if (left + tw > window.innerWidth - 8) left = window.innerWidth - tw - 8;
+    tip.style.left = left + 'px';
+    tip.style.top  = (r.bottom + window.scrollY + 5) + 'px';
+}
+
+function _nsdHideTip() {
+    const tip = document.getElementById('_nsd-tip');
+    if (tip) tip.style.display = 'none';
+}
+
 function _renderBootNSDecoder(contentEl, abs) {
     let html = '';
     const simReady = typeof sim !== 'undefined' && sim && typeof sim.readNSEntry === 'function';
@@ -107,7 +139,8 @@ function _renderBootNSDecoder(contentEl, abs) {
         (abstractionRegistry && abstractionRegistry.abstractions && abstractionRegistry.abstractions[bootSlot] &&
          abstractionRegistry.abstractions[bootSlot].name) || `NS[${bootSlot}]`;
 
-    const fmtAddr = a => '0x' + ((a >>> 0) >>> 0).toString(16).toUpperCase().padStart(4, '0');
+    const fmtAddr = a => '0x' + ((a >>> 0)).toString(16).toUpperCase().padStart(4, '0');
+    const fmtW    = v => '0x' + ((v >>> 0)).toString(16).toUpperCase().padStart(8, '0');
 
     html += '<div class="abs-nsdecoder-section">';
     html += '<div class="abs-nsdecoder-heading">Hardware Boot Sequence</div>';
@@ -141,42 +174,63 @@ function _renderBootNSDecoder(contentEl, abs) {
 
     html += '<div class="abs-nsdecoder-section">';
     html += '<div class="abs-nsdecoder-heading">Namespace Lump \u2014 4-Word Slots</div>';
+    html += '<div class="abs-nsdecoder-hint">Hover W1\u2013W4 for decoded fields</div>';
     html += '<div class="abs-nsdecoder-table-wrap">';
     html += '<table class="abs-nsdecoder-ns-table"><thead><tr>';
-    html += '<th>Slot</th><th>Name</th><th>Location</th><th>Limit</th><th>cc</th><th>Chain</th><th>F</th>';
+    html += '<th>Slot</th><th>Name</th><th>W1</th><th>W2</th><th>W3</th><th>W4</th>';
     html += '</tr></thead><tbody>';
 
     const count = (typeof sim.nsCount === 'number') ? sim.nsCount : 0;
     for (let i = 0; i < count; i++) {
-        const entry = sim.readNSEntry(i);
-        if (!entry) {
-            html += `<tr><td class="abs-nsdecoder-slot">${i}</td><td colspan="6" class="abs-nsdecoder-empty">\u2014 (empty)</td></tr>`;
+        const memBase = sim.NS_TABLE_BASE + i * sim.NS_ENTRY_WORDS;
+        const rw0 = sim.memory[memBase + 0] >>> 0;
+        const rw1 = sim.memory[memBase + 1] >>> 0;
+        const rw2 = sim.memory[memBase + 2] >>> 0;
+        const rw3 = sim.memory[memBase + 3] >>> 0;
+
+        if (rw0 === 0 && rw1 === 0) {
+            html += `<tr><td class="abs-nsdecoder-slot">${i}</td><td colspan="5" class="abs-nsdecoder-empty">\u2014 (empty)</td></tr>`;
             continue;
         }
-        const w1f = sim.parseNSWord1(entry.word1_limit);
+
+        const w1f = sim.parseNSWord1(rw1);
         const slotName = (sim.nsLabels && sim.nsLabels[i]) ||
             (abstractionRegistry && abstractionRegistry.abstractions && abstractionRegistry.abstractions[i] &&
-             abstractionRegistry.abstractions[i].name) || `NS[${i}]`;
+             abstractionRegistry.abstractions[i].name) || `Slot ${i}`;
 
         let badges = '';
-        if (i === 1) badges += ' <span class="abs-nsdecoder-badge-thread">Thread</span>';
+        if (i === 1)        badges += ' <span class="abs-nsdecoder-badge-thread">Thread</span>';
         if (i === bootSlot) badges += ' <span class="abs-nsdecoder-badge-boot">&#x26A1;</span>';
 
-        const location = fmtAddr(entry.word0_location);
-        const limit = '0x' + w1f.limit.toString(16).toUpperCase().padStart(5, '0');
-        const cc = w1f.clistCount;
-        const chain = w1f.chainable ? '\u2714' : '\u2014';
-        const fBit = w1f.f ? '\u2714' : '\u2014';
+        // ── Decoded popup content for each word ──────────────────────────────
+        const tipW1 = `<div class='nsdtip-hdr'>W1 — Location</div>` +
+            `<div class='nsdtip-row'><span>Base address</span><span>${fmtAddr(rw0)}</span></div>` +
+            `<div class='nsdtip-row'><span>Raw</span><span>${fmtW(rw0)}</span></div>`;
+
+        const tipW2 = `<div class='nsdtip-hdr'>W2 — Limit &amp; Flags</div>` +
+            `<div class='nsdtip-row'><span>lim17</span><span>0x${w1f.limit.toString(16).toUpperCase()} (${w1f.limit})</span></div>` +
+            `<div class='nsdtip-row'><span>cc</span><span>${w1f.clistCount}</span></div>` +
+            `<div class='nsdtip-row'><span>Chainable</span><span>${w1f.chainable ? 'Yes' : 'No'}</span></div>` +
+            `<div class='nsdtip-row'><span>F (far)</span><span>${w1f.f ? 'Yes' : 'No'}</span></div>` +
+            `<div class='nsdtip-row'><span>B (bind)</span><span>${(w1f.b !== undefined ? w1f.b : '—')}</span></div>` +
+            `<div class='nsdtip-row'><span>Raw</span><span>${fmtW(rw1)}</span></div>`;
+
+        const tipW3 = `<div class='nsdtip-hdr'>W3 — Version Seal</div>` +
+            `<div class='nsdtip-row'><span>Seal</span><span>${fmtW(rw2)}</span></div>` +
+            `<div class='nsdtip-note'>Tamper-evidence seal computed from location and lim17. Hardware rejects mismatched seals.</div>`;
+
+        const tipW4 = rw3
+            ? `<div class='nsdtip-hdr'>W4 — Extended</div><div class='nsdtip-row'><span>Value</span><span>${fmtW(rw3)}</span></div>`
+            : `<div class='nsdtip-hdr'>W4 — Reserved</div><div class='nsdtip-row'><span>Value</span><span>0x00000000</span></div>`;
 
         const rowClass = i === 0 ? ' class="abs-nsdecoder-ns-row-self"' : (i === bootSlot ? ' class="abs-nsdecoder-ns-row-boot"' : '');
         html += `<tr${rowClass}>`;
         html += `<td class="abs-nsdecoder-slot">${i}</td>`;
         html += `<td class="abs-nsdecoder-name-cell">${slotName}${badges}</td>`;
-        html += `<td class="abs-nsdecoder-addr">${location}</td>`;
-        html += `<td class="abs-nsdecoder-addr">${limit}</td>`;
-        html += `<td class="abs-nsdecoder-num">${cc}</td>`;
-        html += `<td class="abs-nsdecoder-flag">${chain}</td>`;
-        html += `<td class="abs-nsdecoder-flag">${fBit}</td>`;
+        html += `<td class="abs-nsdecoder-word" data-nsdtip="${tipW1.replace(/"/g, '&quot;')}" onmouseenter="_nsdShowTip(this)" onmouseleave="_nsdHideTip()">${fmtW(rw0)}</td>`;
+        html += `<td class="abs-nsdecoder-word" data-nsdtip="${tipW2.replace(/"/g, '&quot;')}" onmouseenter="_nsdShowTip(this)" onmouseleave="_nsdHideTip()">${fmtW(rw1)}</td>`;
+        html += `<td class="abs-nsdecoder-word" data-nsdtip="${tipW3.replace(/"/g, '&quot;')}" onmouseenter="_nsdShowTip(this)" onmouseleave="_nsdHideTip()">${fmtW(rw2)}</td>`;
+        html += `<td class="abs-nsdecoder-word abs-nsdecoder-word-res" data-nsdtip="${tipW4.replace(/"/g, '&quot;')}" onmouseenter="_nsdShowTip(this)" onmouseleave="_nsdHideTip()">${fmtW(rw3)}</td>`;
         html += '</tr>';
     }
 
