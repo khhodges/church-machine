@@ -2993,6 +2993,16 @@ class ChurchSimulator {
             this.fault('NULL_CAP', `SAVE: CR${d.crDst} is NULL`);
             return null;
         }
+        // Defence-in-depth: reject malformed GT words that were placed directly
+        // into a CR (e.g. by a boot bug or a future vulnerability), bypassing
+        // createGT().  parseGT() sets the 'malformed' flag for any GT whose
+        // permission bits violate isDomainPure or isSinglePerm — catch it here
+        // before the GT propagates into any C-List slot in memory.
+        const srcGTParsed = this.parseGT(srcGT);
+        if (srcGTParsed.malformed) {
+            this.fault('DOMAIN_PURITY', `SAVE: CR${d.crDst} contains malformed GT — ${srcGTParsed.malformedReason}`);
+            return null;
+        }
         // Resolve the destination C-list NS index before calling mSave so that
         // the Far-bit (F=1) policy is enforced symmetrically with CALL/LOAD.
         // A SAVE that would write a capability into a Far-namespace C-list slot
