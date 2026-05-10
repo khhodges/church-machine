@@ -17,3 +17,6 @@ dependencies = [
     "resend>=2.21.0",
     "fpdf2>=2.8.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
