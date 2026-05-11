@@ -3,19 +3,6 @@ from amaranth import *
 from .hw_types import *
 from .integrity32 import integrity32
 
-# Startup.Config lump layout constants — imported from the single source of truth.
-# JS mirror: simulator/startup_config_layout.js
-try:
-    from startup_config_layout import (
-        SC_DATA_OFFSET, SC_LAST_DATA_KEY, SC_OOB_KEY,
-        SC_FLAGS_WORD, SC_FAULT_COUNT_WORD,
-    )
-except ImportError:
-    from server.startup_config_layout import (
-        SC_DATA_OFFSET, SC_LAST_DATA_KEY, SC_OOB_KEY,
-        SC_FLAGS_WORD, SC_FAULT_COUNT_WORD,
-    )
-
 
 def encode_church(opcode, cond=CondCode.AL, cr_dst=0, cr_src=0, imm=0):
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23) | \
@@ -79,33 +66,6 @@ BOOT_PROGRAM = [
 while len(BOOT_PROGRAM) < 256:
     BOOT_PROGRAM.append(0x00000000)
 
-
-# ---------------------------------------------------------------------------
-# STARTUP_CONFIG_PROGRAM — CLOOMC code region for Startup.Config lump (Task #512)
-#
-# Placed in the Startup.Config lump (NS slot 2) code region (lump words 1–3).
-# Executed by the FPGA on every reset, invoked via CALL from Boot.Abstr (B:04).
-#
-# After CALL enters Startup.Config:
-#   CR6  = Startup.Config c-list (L perm) — c-list[0] holds configured entry E-GT
-#   CR14 = Startup.Config code region (R+X perm)
-#
-# Program:
-#   LOAD  AL, CR0, CR6[0]  — load configured entry E-GT from c-list[0] into CR0
-#   TPERM AL, CR0, #E      — restrict CR0 to E permission only
-#   CALL  AL, CR0, CR0     — enter configured entry abstraction
-#
-# c-list[0] defaults to Salvation E-GT (NS slot 4); changeable via SetEntry().
-# Boot path: Boot.Abstr → CALL Startup.Config → CALL <configured entry>.
-#
-# Must stay in sync with server/startup_config_layout.py (SC_DATA_OFFSET et al.)
-# and its JS mirror simulator/startup_config_layout.js.
-# ---------------------------------------------------------------------------
-STARTUP_CONFIG_PROGRAM = [
-    encode_church(ChurchOpcode.LOAD,  CondCode.AL, cr_dst=0, cr_src=6, imm=0),  # LOAD  AL, CR0, CR6[0]
-    encode_church(ChurchOpcode.TPERM, CondCode.AL, cr_dst=0, imm=TpermPreset.E), # TPERM AL, CR0, #E
-    encode_church(ChurchOpcode.CALL,  CondCode.AL, cr_dst=0, cr_src=0),          # CALL  AL, CR0, CR0
-]
 
 
 # ---------------------------------------------------------------------------
@@ -293,37 +253,9 @@ SLIDERULE_LUMP_HEADER = (0x1F << 27) | (SLIDERULE_N_MINUS_6 << 23) | (SLIDERULE_
 
 SLIDERULE_METHOD_OFFSETS = {name: off for name, off in zip(_SR_METHOD_NAMES, _sr_offsets)}
 
-# ---------------------------------------------------------------------------
-# Startup.Config lump initialisation — Task #512
-#
-# NS slot 2, lump base byte address 0x0200, ROM word index 128.
-# 64-word lump layout:
-#   word  0: lump header (magic=0x1F, cw=3, cc=1, n_minus_6=0, typ=0)
-#   words 1-3: STARTUP_CONFIG_PROGRAM (LOAD/TPERM/CALL)
-#   word  4: data[0] = entry_slot (default 4 = Salvation, NS slot 4)
-#   word  5: data[1] = config_version = 0x00000001
-#   words 6-62: zero (flags=0, fault_count=0, user params=0)
-#   word 63: c-list[0] = Salvation E-GT (NS slot 4, E perm)
-# ---------------------------------------------------------------------------
-_STARTUP_CONFIG_LUMP_WORD    = 2 * 0x100 // 4   # = 128 (ROM word index of lump base)
-_STARTUP_CONFIG_DEFAULT_ENTRY = 4                # Salvation, NS slot 4
-_STARTUP_CONFIG_VERSION       = 0x00000001
-_STARTUP_CONFIG_LUMP_HEADER   = (0x1F << 27) | (3 << 10) | 1  # cw=3, cc=1, n_minus_6=0, typ=0
-_STARTUP_CONFIG_SALVATION_E_GT = make_gt(GT_TYPE_INFORM, PERM_MASK_E, _STARTUP_CONFIG_DEFAULT_ENTRY, 0)
-
 FULL_ROM = BOOT_PROGRAM + _NUC_PADDED + list(SLIDERULE_CODE)
 while len(FULL_ROM) < 1024:
     FULL_ROM.append(0x00000000)
-
-# Inject Startup.Config lump data into ROM words 128-191
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 0]  = _STARTUP_CONFIG_LUMP_HEADER
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 1]  = STARTUP_CONFIG_PROGRAM[0]   # LOAD  AL, CR0, CR6[0]
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 2]  = STARTUP_CONFIG_PROGRAM[1]   # TPERM AL, CR0, #E
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 3]  = STARTUP_CONFIG_PROGRAM[2]   # CALL  AL, CR0, CR0
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + SC_DATA_OFFSET]      = _STARTUP_CONFIG_DEFAULT_ENTRY  # data[0] = entry_slot = 4
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + SC_DATA_OFFSET + 1]  = _STARTUP_CONFIG_VERSION        # data[1] = config_version
-# words 6-62 remain zero (flags=0, fault_count=0, user params all zero)
-FULL_ROM[_STARTUP_CONFIG_LUMP_WORD + 63] = _STARTUP_CONFIG_SALVATION_E_GT  # c-list[0] = Salvation E-GT
 
 # ---------------------------------------------------------------------------
 # Navana lump header + method table (Task #17 / D-5 close)
@@ -415,7 +347,7 @@ def _make_ns_entry(gt_type, perms, slot_id, gt_seq, location, alloc_size, cw=0, 
 #
 #   Slot 0:  Boot.NS (NS root)
 #   Slot 1:  Boot.Thread
-#   Slot 2:  Boot.Abstr
+#   Slot 2:  (freed — Startup.Config removed, Task #989; boot via Thread.CR[0] directly)
 #   Slot 3:  (empty)
 #   Slot 4:  Salvation (E)     — first user abstraction; NUC_PROGRAM on hardware
 #   Slot 5:  Navana (E)        — namespace controller
@@ -503,7 +435,7 @@ _MMIO_ENTRIES = {
 # CLOOMC listing cross-ref: simulator/secure_boot_tutorial.js §"Boot ROM Cross-Reference"
 #   Slot  0: Boot.NS      — NS root (location=NS_TABLE_BASE, limit = full phys space)
 #   Slot  1: Boot.Thread  — Thread Abstraction lump (base = 0x0100)
-#   Slot  2: Startup.Config — cw=3/cc=1 lump (base = 0x0200); CLOOMC calls configured entry (Task #512)
+#   Slot  2: (freed — Startup.Config removed, Task #989; boot via Thread.CR[0] directly)
 #   Slot  3: (empty)      — placeholder
 #   Slot  4: Salvation     — first user abstraction (NUC_PROGRAM on hardware), E-perm
 #   Slot  5: Navana        — namespace controller, E-perm
@@ -555,12 +487,6 @@ for _i in range(NS_SLOT_COUNT):
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
                                 NS_TABLE_BASE, 64,
                                 abstract_gt=_abstract_gt_word(PERM_MASK_R | PERM_MASK_W))
-    elif _i == 2:
-        # Startup.Config lump (Task #512): E-perm, alloc=64 words, cw=3, cc=1
-        # Lump data (header + code + data + c-list) baked into FULL_ROM at word 128.
-        _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
-                                _i * 0x100, 64,
-                                abstract_gt=_abstract_gt_word(PERM_MASK_E))
     elif _i == 4:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_E, _i, 0,
                                 NUC_LUMP_BASE, 64,
@@ -578,8 +504,8 @@ for _i in range(NS_SLOT_COUNT):
         _entry = _make_ns_entry(GT_TYPE_INFORM, _perms, _i, 0,
                                 _i * 0x100, 64,
                                 abstract_gt=_abstract_gt_word(_perms))
-    elif _i == 3:
-        _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)
+    elif _i == 2 or _i == 3:
+        _entry = _make_ns_entry(GT_TYPE_NULL, 0, _i, 0, 0, 0)  # freed/empty slot
     else:
         _entry = _make_ns_entry(GT_TYPE_INFORM, PERM_MASK_R | PERM_MASK_W, _i, 0,
                                 _i * 0x100, 64,
@@ -588,7 +514,7 @@ for _i in range(NS_SLOT_COUNT):
 
 
 # ---------------------------------------------------------------------------
-# DEMO_CLIST — initial C-List for the boot abstraction (Slot 2)
+# DEMO_CLIST — initial C-List for the boot abstraction (Boot.Abstr, Slot 3)
 #
 # Aligned with simulator boot c-list (simulator.js _initBootState).
 #
@@ -596,7 +522,7 @@ for _i in range(NS_SLOT_COUNT):
 #   idx  1: make_gt(Inform, X,   slot_id=4, gt_seq=0)          — boot-internal: boot code exec-only GT
 #   idx  2: make_gt(NULL,   0,   0,         0)                  — boot-internal: filled by SAVE epilogue (Thread GT)
 #   idx  3: make_gt(Inform, E,   slot_id=2, gt_seq=0)          — boot-internal: Boot.Abstr E-GT (return channel)
-#   idx  4: make_gt(Inform, E,   slot_id=4, gt_seq=0)          — Salvation E-GT (first user abstr) ← B:04
+#   idx  4: make_gt(NULL,   0,   0,         0)                  — freed (was Startup.Config E-GT, Task #989)
 #   idx  5: make_gt(Inform, E,   slot_id=5, gt_seq=0)          — Navana E-GT
 #   idx  6: make_gt(Inform, E,   slot_id=6, gt_seq=0)          — Mint E-GT
 #   idx  7: make_gt(Inform, E,   slot_id=7, gt_seq=0)          — Memory E-GT
@@ -619,7 +545,7 @@ DEMO_CLIST = [
     make_gt(GT_TYPE_INFORM, PERM_MASK_X, 4, 0),                       # idx 1: boot-internal boot code X-only
     make_gt(GT_TYPE_NULL, 0, 0, 0),                                    # idx 2: boot-internal → Thread GT after SAVE
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),                       # idx 3: boot-internal Boot.Abstr E-GT
-    make_gt(GT_TYPE_INFORM, PERM_MASK_E, 2, 0),                       # idx 4: Startup.Config E-GT, Slot 2 (B:04 → Task #512)
+    make_gt(GT_TYPE_NULL, 0, 0, 0),                                    # idx 4: freed — Slot 2 no longer Startup.Config (Task #989)
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 5, 0),                       # idx 5: Navana E-GT, Slot 5
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 6, 0),                       # idx 6: Mint E-GT, Slot 6
     make_gt(GT_TYPE_INFORM, PERM_MASK_E, 7, 0),                       # idx 7: Memory E-GT, Slot 7

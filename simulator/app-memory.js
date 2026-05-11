@@ -250,8 +250,7 @@ function updateCRDetail() {
                 { addr: 'B:04', desc: 'CALL_HOME',   decomp: 'Tunnel.Register \u2192 23-byte packet [0xCE11, board, FW, HMAC(4), UID(8), reason, fault, NIA(4)] \u00b7 await ACK' },
                 { addr: 'B:05', desc: 'INIT_ABSTR',  decomp: `CR6(E) \u2190 NS[${bootEntrySlot}] \u26a1 ${_beLabel} (M=1, pre-CALL token)` },
                 { addr: 'B:06', desc: 'NUC_CLIST',   decomp: `CR6(M=1, E) \u2190 ${_beLabel} c-list \u00b7 push sentinel` },
-                { addr: 'B:07', desc: 'NUC_CODE',    decomp: 'CR14(M=1, R+X) \u2190 lump code \u00b7 PC\u21900' },
-                { addr: 'B:08', desc: 'COMPLETE',    decomp: 'bootComplete \u2190 true \u00b7 M-elevation OFF \u00b7 dispatch begins' },
+                { addr: 'B:07', desc: 'NUC_CODE',    decomp: 'CR14(M=1, R+X) \u2190 lump code \u00b7 PC\u21900 \u00b7 CALL CR0 \u2192 dispatch begins' },
             ];
             const _arrowTd = _brArrows.hasBranches ? '<td class="br-arrow-col"></td>' : '';
             for (const bp of _bootPreamble) {

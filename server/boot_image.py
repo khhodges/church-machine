@@ -57,8 +57,7 @@ BOOT_ABSTR_NS_SLOT   = 3   # NS slot holding the Boot Abstraction lump (Boot.Abs
 _MANDATORY_NS_SLOTS = (0, 1, BOOT_ABSTR_NS_SLOT)  # slots 0, 1, 3
 
 # Format-version tag written to mem[NS_TABLE_BASE - 1] so loadBootImage()
-# can reject stale binaries. Bumped to 0x396 (Task #396) when Startup.Config
-# was added at NS slot 2 and Boot.Abstr's c-list[4] was rewired to it.
+# can reject stale binaries.
 BOOT_IMAGE_FORMAT_TAG = 0xB0070563  # "BOOT 0563" — must match simulator.js; bumped Task #563/568 (dynamic Boot.Abstr placement)
 
 # Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
@@ -634,7 +633,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # Thread lump (NS slot 1): cw=32, cc=12, typ=2.
     # cc=12: c-list spans words +244..+255 (256-12=244=THREAD_CAPS_OFFSET).
     # thread[+244] = CR0 home slot for the programmable Entry E-GT (Task #651).
-    # This word is NULL (0x00000000) at boot — written only via Startup.Config.SetEntry.
+    # This word is NULL (0x00000000) at boot — written only via setBootEntrySlot() in the IDE.
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
 
@@ -717,6 +716,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # Slot 2 freed — Startup.Config removed. The hardware ISA owns M-state per CR register;
     # CALL through a non-M E-GT (BOOT_ROM_WORDS[2]) drops M automatically.
     # Thread.CR[0] entry E-GT is written by setBootEntrySlot(); no intermediary lump needed.
+
 
     # ----- Service abstraction c-lists (Task #971) --------------------------------
     # Populate c-lists for the 14 service abstractions that have declared capability

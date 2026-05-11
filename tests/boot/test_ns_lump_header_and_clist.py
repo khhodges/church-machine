@@ -157,12 +157,11 @@ def test_boot_thread_gt_at_clist_1(boot_words):
     )
 
 
-def test_startup_config_gt_at_clist_2(boot_words):
-    """memory[19] clist[2] == E-perm Inform GT for NS slot 2 (Startup.Config)."""
-    expected = create_gt(0, 2, {"E": 1}, 1)
+def test_slot2_gt_at_clist_2_is_null(boot_words):
+    """clist[2] == null GT (slot 2 freed — Startup.Config removed, Task #989)."""
     actual = boot_words[CLIST_BASE + 2]
-    assert actual == expected, (
-        f"clist[2] (Startup.Config GT) 0x{actual:08X} != expected 0x{expected:08X}"
+    assert actual == 0, (
+        f"clist[2] (freed slot 2) should be null (0x00000000), got 0x{actual:08X}"
     )
 
 

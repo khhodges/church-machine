@@ -77,7 +77,8 @@ def test_call_home_offline_safe():
     image = generate_boot_image(cfg, LUMPS_DIR)
     status = _run_harness(cfg, image)
 
-    # ---- (4) must not halt; must complete all 8 phases --------------------
+    # ---- (4) must not halt; must complete all 7 phases --------------------
+    # B:08 (Startup.Config) removed in Task #989; boot now ends at B:07 (NUC_CODE/CALL CR0).
     assert status["halted"] is False, (
         f"simulator halted during boot — CALL_HOME may have blocked; "
         f"status={status}"
@@ -86,20 +87,19 @@ def test_call_home_offline_safe():
         f"bootComplete is False after driving _bootStep(); "
         f"reached bootStep={status['bootStep']}, iterations={status['iterations']}"
     )
-    assert status["bootStep"] == 8, (
-        f"expected bootStep=8 after full boot (case 8 / B:08 COMPLETE does not "
-        f"increment bootStep, it sets bootComplete=true instead), "
-        f"got {status['bootStep']}"
+    assert status["bootStep"] == 7, (
+        f"expected bootStep=7 after full boot (B:07 NUC_CODE is now the final step; "
+        f"B:08 removed — Task #989), got {status['bootStep']}"
     )
-    assert status["iterations"] == 9, (
-        f"expected exactly 9 _bootStep() calls, got {status['iterations']}"
+    assert status["iterations"] == 8, (
+        f"expected exactly 8 _bootStep() calls (B:00–B:07), got {status['iterations']}"
     )
 
     # ---- (1) & (2) CALL_HOME is its own atomic step -----------------------
     # Iteration 5 (1-indexed) drives bootStep from 4 → 5 (case 4 = CALL_HOME).
     snapshots = status["stepSnapshots"]
-    assert len(snapshots) == 9, (
-        f"expected 9 step snapshots, got {len(snapshots)}"
+    assert len(snapshots) == 8, (
+        f"expected 8 step snapshots (B:00–B:07), got {len(snapshots)}"
     )
     call_home_snap = snapshots[4]   # 0-indexed: the 5th call
     assert call_home_snap["bootStepBefore"] == 4, (

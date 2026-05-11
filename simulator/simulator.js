@@ -1105,6 +1105,7 @@ class ChurchSimulator {
         // Thread.CR[0] entry E-GT is set by the boot image / setBootEntrySlot(); no
         // intermediary lump is needed.
 
+
         // ── Service abstraction c-lists (Task #971) ──────────────────────────────
         // Populate c-lists for the 14 service abstractions that have declared
         // capability requirements.  All are handler-based (cw=0 — no CLOOMC code);
