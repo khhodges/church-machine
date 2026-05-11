@@ -15,7 +15,7 @@ The Church Machine is an educational platform providing a web-based IDE for lear
 
 ## Key Terminology
 
-- **CTMM** — Church-Turing Meta-Machine. The Lambda Calculus core of the Church Machine. The hardware execution engine that enforces capability-based security through Golden Tokens.
+- **CM** — Church Machine. The Lambda Calculus core of the Church Machine. The hardware execution engine that enforces capability-based security through Golden Tokens.
 - **CLOOMC** — Capability-Limited / Object-Oriented / Machine-Code. The assembly language and compiler target for the Church Machine ISA. Source files use the `.cloomc` extension.
 
 ## System Architecture
