@@ -502,7 +502,7 @@ function showAbstractionDetail(index) {
                 const active = mi === 0 ? ' abs-method-tab-active' : '';
                 const mStatus = _implStatusGet(`${uid}:${m}`);
                 const badgeLabel = IMPL_STATUS_SHORT[mStatus] || mStatus;
-                html += `<span class="abs-method-tab${active}" onclick="absOpenMethodInEditor(${uid},${JSON.stringify(m)},this,'abs-panel-${uid}-${mi}')">`;
+                html += `<span class="abs-method-tab${active}" onclick="absOpenMethodInEditor(${uid},'${m}',this,'abs-panel-${uid}-${mi}')">`;
                 html += `${m}`;
                 html += `<span class="abs-method-status-badge abs-method-status-badge-${mStatus}" onclick="event.stopPropagation();absToggleStatusDropdown(${uid},${mi},event)" title="Status: ${IMPL_STATUS_LABELS[mStatus]} — click to change">`;
                 html += `<span class="abs-method-status-badge-dot"></span>${badgeLabel}`;
