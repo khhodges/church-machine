@@ -180,33 +180,44 @@ function _renderBootNSDecoder(contentEl, abs) {
     html += '<th>CR</th><th>GT (HEX)</th><th>PERMS</th><th>TYPE</th><th>RESOLVED NAME</th>';
     html += '</tr></thead><tbody>';
 
-    for (const [crIdx, crLabel] of [[15, 'CR15 \u00b7 Step\u00a01'], [12, 'CR12 \u00b7 Step\u00a02']]) {
-        const crObj = sim.cr && sim.cr[crIdx];
-        const word  = crObj ? (crObj.word0 >>> 0) : 0;
-        if (word === 0) {
-            html += `<tr><td class="abs-clist-idx">${crLabel}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (not yet loaded \u2014 boot the simulator)</td></tr>`;
-        } else {
-            const parsed = sim.parseGT(word);
-            const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
-            let permHtml = '';
-            for (const bit of ['B','R','W','X','E','L','S','F']) {
-                permHtml += `<span class="abs-perm-badge ${p[bit] ? 'perm-on' : 'perm-off'}">${bit}</span>`;
-            }
-            const nsIdx = parsed.index;
-            const lbl = (sim.nsLabels && sim.nsLabels[nsIdx]) ||
-                (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
-                 abstractionRegistry.abstractions && abstractionRegistry.abstractions[nsIdx] &&
-                 abstractionRegistry.abstractions[nsIdx].name) || null;
-            const nameStr = lbl ? `NS[${nsIdx}] \u2014 ${lbl}` : `NS[${nsIdx}]`;
-            const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
-            html += `<tr>`;
-            html += `<td class="abs-clist-idx">${crLabel}</td>`;
-            html += `<td class="abs-clist-gt">${gtHex}</td>`;
-            html += `<td class="abs-clist-perms">${permHtml}</td>`;
-            html += `<td class="abs-clist-type">${parsed.typeName}</td>`;
-            html += `<td class="abs-clist-name">${nameStr}</td>`;
-            html += `</tr>`;
+    // Hardwired GT values are architectural constants defined by the boot ROM spec:
+    //   createGT(gt_seq=0, slotId, perms=0x00, type=1/Inform)
+    //   GT word = (permBits<<25)|(type<<23)|(gt_seq<<16)|slotId
+    //   CR15: (0<<25)|(1<<23)|(0<<16)|0 = 0x00800000  (NS root,    Slot 0)
+    //   CR12: (0<<25)|(1<<23)|(0<<16)|1 = 0x00800001  (Thread stack, Slot 1)
+    const HW_GTS = [
+        [15, 'CR15 \u00b7 Step\u00a01', 0x00800000],
+        [12, 'CR12 \u00b7 Step\u00a02', 0x00800001],
+    ];
+    for (const [crIdx, crLabel, hwWord] of HW_GTS) {
+        // Prefer the live runtime value when the sim is booted; fall back to the
+        // architectural constant so the table is always populated.
+        const crObj  = sim.cr && sim.cr[crIdx];
+        const liveW  = crObj ? (crObj.word0 >>> 0) : 0;
+        const word   = liveW || hwWord;
+        const isLive = !!liveW;
+
+        const parsed = sim.parseGT(word);
+        const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
+        let permHtml = '';
+        for (const bit of ['B','R','W','X','E','L','S','F']) {
+            permHtml += `<span class="abs-perm-badge ${p[bit] ? 'perm-on' : 'perm-off'}">${bit}</span>`;
         }
+        const nsIdx = parsed.index;
+        const lbl = (sim.nsLabels && sim.nsLabels[nsIdx]) ||
+            (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
+             abstractionRegistry.abstractions && abstractionRegistry.abstractions[nsIdx] &&
+             abstractionRegistry.abstractions[nsIdx].name) || null;
+        const nameStr = lbl ? `NS[${nsIdx}] \u2014 ${lbl}` : `NS[${nsIdx}]`;
+        const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
+        const liveTag = isLive ? '' : ' <span style="color:#6b7280;font-size:0.7em;">(architectural)</span>';
+        html += `<tr>`;
+        html += `<td class="abs-clist-idx">${crLabel}</td>`;
+        html += `<td class="abs-clist-gt">${gtHex}${liveTag}</td>`;
+        html += `<td class="abs-clist-perms">${permHtml}</td>`;
+        html += `<td class="abs-clist-type">${parsed.typeName}</td>`;
+        html += `<td class="abs-clist-name">${nameStr}</td>`;
+        html += `</tr>`;
     }
     html += '</tbody></table>';
     html += '</div>';
