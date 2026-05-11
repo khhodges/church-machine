@@ -338,6 +338,7 @@ function showAbstractionDetail(index) {
         let clistLoaded = false;
         let cc = 0;
         const clistSlots = [];
+        let isThreadLump = false;
 
         if (typeof sim !== 'undefined' && sim && typeof sim.readNSEntry === 'function') {
             const nsEntry = sim.readNSEntry(abs.index);
@@ -349,6 +350,7 @@ function showAbstractionDetail(index) {
                     if (hdr.valid) {
                         clistLoaded = true;
                         if (hdr.typ === 2) {
+                            isThreadLump = true;
                             const capsOff = (typeof THREAD_CAPS_OFFSET !== 'undefined') ? THREAD_CAPS_OFFSET : 244;
                             cc = 12;
                             const clistStart = lumpBase + capsOff;
@@ -421,8 +423,9 @@ function showAbstractionDetail(index) {
             html += '</tr></thead><tbody>';
             for (let si = 0; si < clistSlots.length; si++) {
                 const gt32 = clistSlots[si];
+                const slotLabel = isThreadLump ? `CR${si}` : `${si}`;
                 if (gt32 === 0) {
-                    html += `<tr><td class="abs-clist-idx">${si}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty slot)</td></tr>`;
+                    html += `<tr><td class="abs-clist-idx">${slotLabel}</td><td colspan="4" class="abs-clist-empty-slot">\u2014 (empty slot)</td></tr>`;
                 } else {
                     const parsed = sim.parseGT(gt32);
                     const p = { ...parsed.permissions, F: parsed.type === 2 ? 1 : 0 };
@@ -439,7 +442,7 @@ function showAbstractionDetail(index) {
                     const nameStr = label ? `NS[${nsIdx}] \u2014 ${label}` : `NS[${nsIdx}]`;
                     const gtHex = '0x' + gt32.toString(16).toUpperCase().padStart(8, '0');
                     html += `<tr>`;
-                    html += `<td class="abs-clist-idx">${si}</td>`;
+                    html += `<td class="abs-clist-idx">${slotLabel}</td>`;
                     html += `<td class="abs-clist-gt">${gtHex}</td>`;
                     html += `<td class="abs-clist-perms">${permHtml}</td>`;
                     html += `<td class="abs-clist-type">${parsed.typeName}</td>`;
