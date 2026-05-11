@@ -12,6 +12,18 @@
 
     var INSTR_CATEGORIES = [
         {
+            name: 'Capability', icon: '\uD83D\uDD11', items: [
+                { label: 'LOAD destCR srcCR idx', instr: 'LOAD',   ops: 'destCR srcCR idx' },
+                { label: 'SAVE destCR srcDR',     instr: 'SAVE',   ops: 'destCR srcDR' },
+                { label: 'CALL cr',               instr: 'CALL',   ops: 'cr' },
+                { label: 'RETURN',                instr: 'RETURN', ops: '' },
+                { label: 'CHANGE offset',         instr: 'CHANGE', ops: 'offset' },
+                { label: 'SWITCH cr',             instr: 'SWITCH', ops: 'cr' },
+                { label: 'TPERM cr mask',         instr: 'TPERM',  ops: 'cr mask' },
+                { label: 'LAMBDA cr',             instr: 'LAMBDA', ops: 'cr' },
+            ]
+        },
+        {
             name: 'Arithmetic', icon: '+', items: [
                 { label: 'ADD dest src',   instr: 'ADD',  ops: 'dest src' },
                 { label: 'SUB dest src',   instr: 'SUB',  ops: 'dest src' },
@@ -32,8 +44,10 @@
         },
         {
             name: 'Move', icon: '\u2192', items: [
-                { label: 'MOV dest src', instr: 'MOV', ops: 'dest src' },
-                { label: 'MVN dest src', instr: 'MVN', ops: 'dest src' },
+                { label: 'MOV dest src',        instr: 'MOV',    ops: 'dest src' },
+                { label: 'MVN dest src',        instr: 'MVN',    ops: 'dest src' },
+                { label: 'DREAD dr cr addr',    instr: 'DREAD',  ops: 'dr cr addr' },
+                { label: 'DWRITE dr cr addr',   instr: 'DWRITE', ops: 'dr cr addr' },
             ]
         },
         {
@@ -60,20 +74,6 @@
                 { label: 'B GT offset',   instr: 'B',  ops: 'GT offset' },
                 { label: 'B LT offset',   instr: 'B',  ops: 'LT offset' },
                 { label: 'BL offset',     instr: 'BL', ops: 'offset' },
-            ]
-        },
-        {
-            name: 'Capability', icon: '\uD83D\uDD11', items: [
-                { label: 'LOAD destCR srcCR idx', instr: 'LOAD',   ops: 'destCR srcCR idx' },
-                { label: 'SAVE destCR srcDR',     instr: 'SAVE',   ops: 'destCR srcDR' },
-                { label: 'CALL cr',               instr: 'CALL',   ops: 'cr' },
-                { label: 'RETURN',                instr: 'RETURN', ops: '' },
-                { label: 'CHANGE offset',         instr: 'CHANGE', ops: 'offset' },
-                { label: 'SWITCH cr',             instr: 'SWITCH', ops: 'cr' },
-                { label: 'TPERM cr mask',         instr: 'TPERM',  ops: 'cr mask' },
-                { label: 'LAMBDA cr',             instr: 'LAMBDA', ops: 'cr' },
-                { label: 'DREAD dr cr addr',      instr: 'DREAD',  ops: 'dr cr addr' },
-                { label: 'DWRITE dr cr addr',     instr: 'DWRITE', ops: 'dr cr addr' },
             ]
         },
     ];
@@ -166,11 +166,6 @@
         // ── Category tabs ──────────────────────────────────────────────────
         pickerTabsEl = document.createElement('div');
         pickerTabsEl.className = 'asm-picker-tabs';
-        var allTabBtn = document.createElement('button');
-        allTabBtn.className = 'asm-picker-tab' + (activeCatName === null ? ' asm-picker-tab--active' : '');
-        allTabBtn.textContent = 'All';
-        allTabBtn.addEventListener('mousedown', function (e) { e.preventDefault(); onTabSelect(null); });
-        pickerTabsEl.appendChild(allTabBtn);
         INSTR_CATEGORIES.forEach(function (cat) {
             var tab = document.createElement('button');
             tab.className = 'asm-picker-tab' + (activeCatName === cat.name ? ' asm-picker-tab--active' : '');
@@ -195,7 +190,7 @@
         pickerBodyEl.className = 'asm-picker-body';
         picker.appendChild(pickerBodyEl);
 
-        renderGrouped();
+        renderByCategory(activeCatName);
 
         filterInputEl.addEventListener('input', function () {
             renderFiltered(filterInputEl.value);
@@ -212,15 +207,12 @@
         if (pickerTabsEl) {
             var tabs = pickerTabsEl.querySelectorAll('.asm-picker-tab');
             tabs.forEach(function (tab, i) {
-                var thisCat = i === 0 ? null : INSTR_CATEGORIES[i - 1].name;
-                tab.classList.toggle('asm-picker-tab--active', thisCat === catName);
+                tab.classList.toggle('asm-picker-tab--active', INSTR_CATEGORIES[i].name === catName);
             });
         }
         var q = filterInputEl ? filterInputEl.value.trim() : '';
         if (q) {
             renderFiltered(filterInputEl.value);
-        } else if (catName === null) {
-            renderGrouped();
         } else {
             renderByCategory(catName);
         }
@@ -502,7 +494,7 @@
     }
 
     function showPicker(textarea) {
-        activeCatName = null;
+        activeCatName = INSTR_CATEGORIES[0].name;
         activeEditorEl = textarea;
         buildPickerContent(function (item) { insertIntoEditor(item); });
         var picker = getOrCreatePicker();
