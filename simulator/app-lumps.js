@@ -2885,6 +2885,12 @@ async function openLumpInEditor(token) {
     if (typeof _updateMtbfIndicator    === 'function') _updateMtbfIndicator();
     var outEl = document.getElementById('assemblyOutput');
     if (outEl) outEl.innerHTML = '';
+
+    // Expose this lump's token so the C-List viewer can show its baked-in
+    // c-list without requiring a recompile.  The compile-start path already
+    // clears this to null (app-compile.js line ~1158) so mid-edit state is
+    // never stale.
+    window._editorLastSavedToken = token;
 }
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
