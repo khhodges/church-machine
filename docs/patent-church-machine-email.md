@@ -3,17 +3,17 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-**Subject:** CIP Filing — Pure Church Lambda Machine: New Claims for CTMM Patent
+**Subject:** CIP Filing — Pure Church Lambda Machine: New Claims for CM Patent
 
 ---
 
 Dear [Attorney Name],
 
-I am writing regarding my pending CTMM patent application (filed February 12, 2026) to discuss a continuation-in-part (CIP) filing based on a significant new development in the architecture.
+I am writing regarding my pending CM patent application (filed February 12, 2026) to discuss a continuation-in-part (CIP) filing based on a significant new development in the architecture.
 
 **Summary of Discovery**
 
-Since filing, I have demonstrated that the Church domain of the CTMM architecture is computationally complete — meaning that all software can execute using only lambda calculus instructions, with zero Turing-domain instructions available to programs. This is not merely a theoretical observation; I have built three working proof implementations:
+Since filing, I have demonstrated that the Church domain of the CM architecture is computationally complete — meaning that all software can execute using only lambda calculus instructions, with zero Turing-domain instructions available to programs. This is not merely a theoretical observation; I have built three working proof implementations:
 
 1. **HP-35 Scientific Calculator** — A complete recreation of the 1972 Hewlett-Packard HP-35, the world's first handheld scientific calculator, implemented in 179 instructions using exclusively Church-domain opcodes (LOAD, SAVE, CALL, RETURN, LAMBDA, TPERM). It performs all arithmetic, trigonometry (Taylor series), logarithms, exponentiation, and stack operations — zero ADD, SUB, MUL, MOV, CMP, or branch instructions.
 

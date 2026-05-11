@@ -291,7 +291,7 @@ Foundational services required within 3 months of launch: persistent storage, wa
 - IDE policy download + validation (3 days)
 - Telemetry serialization (2 days)
 
-**Deliverable**: CTMMs can reach IDE via Home Base tunnel; MTBF qualification gating abstractions.
+**Deliverable**: CMs can reach IDE via Home Base tunnel; MTBF qualification gating abstractions.
 
 **Duration**: 3 weeks  
 **Critical Path**: Yes (enables all Layer 5+ abstractions)
@@ -423,7 +423,7 @@ Foundational services required within 3 months of launch: persistent storage, wa
 | 8 | 2w | 1 | 4 | GC + security hardening |
 | 9 | 4w | 8 | 107 | Integration + full system test |
 | **Tier A** | **≤12w post-launch** | **4** | **16** | Store + Clock + Notify + Identity |
-| **TOTAL** | **24w + Tier A** | **49** | **229** | End-to-end CTMM + Tier A |
+| **TOTAL** | **24w + Tier A** | **49** | **229** | End-to-end CM + Tier A |
 
 ---
 
@@ -514,7 +514,7 @@ Phase 0 (Unblock) ──→ Phase 1 (Hardware) ──→ Phase 2 (Concurrency) �
 **Phase 0**: ✅ Abstract GTs validated by hardware, Navana writes NS entries, peripherals probed at boot  
 **Phase 1**: ✅ UART send/receive, LED patterns, Button events, Timer interrupts, Display output  
 **Phase 2**: ✅ Multi-threaded programs run; lazy loading; synchronization primitives work  
-**Phase 3**: ✅ CTMMs reach IDE; MTBF gating abstractions; telemetry flowing  
+**Phase 3**: ✅ CMs reach IDE; MTBF gating abstractions; telemetry flowing  
 **Phase 4**: ✅ Church numerals compute correctly (SUCC/PRED/ADD verified)  
 **Phase 5**: ✅ Trigonometry matches reference (HP-35 comparison); geometric calculations correct  
 **Phase 6**: ✅ Family isolation enforced; Schoolroom lessons delivered; Tunnel messaging works  

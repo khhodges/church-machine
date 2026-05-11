@@ -136,7 +136,7 @@ Prevents MTBF counter reset attacks.
   - Telemetry packet: `(abstraction_id, invocation_count, failure_count, timescale_data, timestamp, HMAC-SHA256)`
   - HMAC key derived from Home Base tunnel key
   - Send via Home Base W permission
-  - IDE maintains permanent MTBF record; compares CTMM-reported scores to IDE record + expected delta
+  - IDE maintains permanent MTBF record; compares CM-reported scores to IDE record + expected delta
 - **Tests**: Generate telemetry, verify HMAC matches on IDE side (test vector)
 - **Effort**: 2 days
 
@@ -204,7 +204,7 @@ Detects bit-flip attacks and hardware degradation.
 - **Deliverable**: `docs/crc-recovery-protocol.md`:
   - Once an entry is Poisoned, it cannot be used until manually cleared
   - Clearing: IDE can issue a revocation (bump gt_seq) to clear the Poisoned flag
-  - Or: operator can reboot CTMM (Poisoned flags reset on next boot, but underlying lump may still be corrupt)
+  - Or: operator can reboot CM (Poisoned flags reset on next boot, but underlying lump may still be corrupt)
 - **Effort**: 1 day
 
 ---
@@ -236,7 +236,7 @@ Prevents routing loops and rogue fallback endpoints.
 - **Deliverable**: `firmware/backup_failover_log.c` with:
   - On every fallback to Word 2 or Word 3, log: `(timestamp, tunnel_gt_slot, primary_address, backup_used, attempt_count, reason)`
   - User-space query: `get_backup_failover_history()` returns list
-  - IDE can correlate failover patterns across CTMMs to detect rogue endpoints
+  - IDE can correlate failover patterns across CMs to detect rogue endpoints
 - **Tests**: Simulate primary failure; verify fallback is logged with correct data
 - **Effort**: 2 days
 

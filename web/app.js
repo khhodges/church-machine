@@ -522,7 +522,7 @@ function buildGTFromCList(entry) {
 const bootNamespace = {
     name: "Boot",
     location: 0x3000,
-    description: "Root abstraction of the CTMM system",
+    description: "Root abstraction of the CM system",
     clist: bootCList.entries.map(e => ({ name: e.name, type: e.type, perms: e.perms, ref: `ns.offset.${e.nsOffset}` }))
 };
 
@@ -1637,7 +1637,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let _ctmmStart = _ctmmViews.includes(_ctmmHash) ? _ctmmHash : null;
     if (!_ctmmStart) { try { const s = localStorage.getItem('ctmm_lastView'); if (s && _ctmmViews.includes(s)) _ctmmStart = s; } catch(e) {} }
     if (_ctmmStart) switchView(_ctmmStart);
-    log('CTMM Simulator Ready', 'info');
+    log('CM Simulator Ready', 'info');
     
     // CR7 click handler - switch to Assembly Editor
     const cr7Row = document.getElementById('cr7Row');
@@ -3628,7 +3628,7 @@ SUB 2 3       ; counter = counter - 1
 ; NZCV FLAG DEMONSTRATION
 ; =============================================
 ; Purpose: Show how condition flags are set by
-; arithmetic and compare operations in CTMM.
+; arithmetic and compare operations in CM.
 ;
 ; The four flags:
 ;   N (Negative) - Result is negative (sign bit set)
@@ -3805,7 +3805,7 @@ LOAD 4 6 2    ; CR4 = GT_DELETE from our C-List
 ;
 ; Key rule: Capabilities stay in CR registers!
 ; Never try to store a GT in a DR register.
-; This separation is fundamental to CTMM security.
+; This separation is fundamental to CM security.
 ; ============================================
 
 ADDI 0 0      ; DR0 = 0 (STATUS_OK)
@@ -4622,7 +4622,7 @@ function sendCtmmReply(replyText) {
         timestamp: Date.now(),
         seen: false,
         details: {
-            from: '<b>Kenneth</b> (CTMM Sim-64)',
+            from: '<b>Kenneth</b> (CM Sim-64)',
             to: '<b>Priscilla</b> (Capability Sim-32)',
             items: [
                 { label: 'Instruction', value: 'CALL(CONNECT(me, mymother))' },
@@ -4786,7 +4786,7 @@ function executeMethodSelector(absName, methodSelector) {
             case 'REGISTER': {
                 const nameCode = dr1;
                 const archCode = dr2;
-                const archName = archCode === 1 ? 'CTMM-64' : archCode === 2 ? 'Capability' : `arch-${archCode}`;
+                const archName = archCode === 1 ? 'CM-64' : archCode === 2 ? 'Capability' : `arch-${archCode}`;
                 const remoteAddr = 0xC7440000 + nameCode;
                 window._familyRegistry[nameCode] = { name: nameCode, arch: archName, archCode: archCode, addr: remoteAddr, bound: false };
                 desc = `REGISTER(name=${nameCode}, arch=${archName}) → registered at 0x${remoteAddr.toString(16).toUpperCase()}, tunnel key pair created`;
@@ -5118,7 +5118,7 @@ function executeEditorInstruction(instr) {
                             timestamp: Date.now(),
                             seen: false,
                             details: {
-                                from: '<b>Kenneth</b> (CTMM Sim-64)',
+                                from: '<b>Kenneth</b> (CM Sim-64)',
                                 to: '<b>Priscilla</b> (Capability Sim-32)',
                                 items: [
                                     { label: 'Instruction', value: 'CALL(CONNECT(me, mymother))' },
@@ -5241,7 +5241,7 @@ function executeEditorInstruction(instr) {
                     setTimeout(() => {
                         showTunnelMessage('receive', 'Hello Son', {
                             from: '<b>Priscilla</b> (Capability Sim-32)',
-                            to: '<b>Kenneth</b> (CTMM Sim-64)',
+                            to: '<b>Kenneth</b> (CM Sim-64)',
                             items: [
                                 { label: 'Source', value: 'Reverse tunnel from mymother' },
                                 { label: 'Golden Tokens', value: '3 (Tunnel Key + Reply + ABI)' },
@@ -5607,7 +5607,7 @@ function setupHelloMumNamespace() {
     const abiDescriptor = simulator.createCapability("ABI_Mum", ["R"]);
     abiDescriptor.type = "Inform";
     abiDescriptor.abiMap = {
-        src_arch: "CTMM-64", src_regs: "DR0-DR15 (64-bit)",
+        src_arch: "CM-64", src_regs: "DR0-DR15 (64-bit)",
         dst_arch: "Capability", dst_regs: "x0-x31 (32-bit)",
         arg_map: "DR0→x10, DR1→x11, DR2→x12, DR3→x13, DR4→x14, DR5→x15, DR6→x16, DR7→x17, DR8→x18",
         ret_map: "x10→DR0"
@@ -5695,7 +5695,7 @@ function setupHelloMumNamespace() {
     log('placed there by FamilyRegistry at bind time.', 'info');
     log('No DNS. No IP lookup. The capability IS the address.', 'info');
     log('', 'info');
-    log('"me" (Kenneth) = CTMM Sim-64 (DR0-DR15, 64-bit)', 'info');
+    log('"me" (Kenneth) = CM Sim-64 (DR0-DR15, 64-bit)', 'info');
     log('"mymother" (Priscilla) = Capability Sim-32 (x0-x31, 32-bit)', 'info');
     log('', 'info');
     log('PART 1: Send "Hello Mum" → mymother (Priscilla)', 'info');
@@ -5797,7 +5797,7 @@ const lessons = [
             {
                 text: `<h3>What is a Capability?</h3>
                 <p>In traditional security systems, access control is managed through <strong>Access Control Lists (ACLs)</strong> - lists that define who can access what resources.</p>
-                <p>The CTMM uses a fundamentally different approach: <strong>Capability-Based Security</strong>.</p>
+                <p>The CM uses a fundamentally different approach: <strong>Capability-Based Security</strong>.</p>
                 <div class="key-concept">
                     <strong>Key Concept:</strong> A capability is an unforgeable token that grants specific rights to a resource. If you have the token, you have the access - no need to check lists or permissions separately.
                 </div>`,
@@ -5817,7 +5817,7 @@ const lessons = [
             },
             {
                 text: `<h3>The Ten Permissions</h3>
-                <p>Each capability grants specific permissions encoded in the GT. The CTMM uses ten permission types organized into mutually exclusive domains:</p>
+                <p>Each capability grants specific permissions encoded in the GT. The CM uses ten permission types organized into mutually exclusive domains:</p>
                 <ul>
                     <li><code>R</code> - <strong>Read</strong>: View data or code</li>
                     <li><code>W</code> - <strong>Write</strong>: Modify data</li>
@@ -5992,8 +5992,8 @@ const lessons = [
         title: "The Boot Sequence",
         steps: [
             {
-                text: `<h3>Starting the CTMM</h3>
-                <p>When the CTMM powers on, it goes through a <strong>4-step boot sequence</strong> to establish a secure foundation.</p>
+                text: `<h3>Starting the CM</h3>
+                <p>When the CM powers on, it goes through a <strong>4-step boot sequence</strong> to establish a secure foundation.</p>
                 <p>This sequence ensures that the system starts in a known, secure state with proper capabilities in place.</p>
                 <div class="key-concept">
                     <strong>Why it matters:</strong> Each step builds upon the previous one, creating a chain of trust from hardware to user space. This sequence runs for all double-faults (unrecovered).</div>`,
@@ -6064,7 +6064,7 @@ const lessons = [
         steps: [
             {
                 text: `<h3>Two Types of Registers</h3>
-                <p>The CTMM has two distinct register types, each serving a different purpose:</p>
+                <p>The CM has two distinct register types, each serving a different purpose:</p>
                 <ul>
                     <li><strong>Context GT Registers (CR0-CR7)</strong>: Hold capabilities (programmer contoled security)</li>
                     <li><strong>Meta-Machine Registers (CR8-CR15)</strong>: Reserved for hardware (Lambda Calculus functions)</li>
@@ -6154,7 +6154,7 @@ const lessons = [
         steps: [
             {
                 text: `<h3>Working with Capabilities</h3>
-                <p>The CTMM provides special instructions for capability manipulation:</p>
+                <p>The CM provides special instructions for capability manipulation:</p>
                 <ul>
                     <li><code>LOAD d s i</code> - Load capability from memory into register</li>
                     <li><code>SAVE d s</code> - Save capability from register to memory</li>
@@ -6208,7 +6208,7 @@ const lessons = [
             },
             {
                 text: `<h3>Capability-Based Math: Integer vs Float</h3>
-                <p>In the CTMM, even basic arithmetic is controlled by capabilities. Programs distinguish between integer and floating-point math by <strong>which abstraction they CALL</strong>:</p>
+                <p>In the CM, even basic arithmetic is controlled by capabilities. Programs distinguish between integer and floating-point math by <strong>which abstraction they CALL</strong>:</p>
                 <ul>
                     <li><strong style="color: #e67e22;">Abacus</strong> - 64-bit integer arithmetic (ADD, SUB, MUL, DIV, MOD, ABS, NEG)</li>
                     <li><strong style="color: #3498db;">SlideRule</strong> - IEEE 754 floating-point (ADD, SUB, MUL, DIV, LOG, EXP, SQRT, POW)</li>
@@ -6261,7 +6261,7 @@ const lessons = [
         steps: [
             {
                 text: `<h3>How Capabilities Enforce Security</h3>
-                <p>The CTMM's security comes from strict capability checking at every operation:</p>
+                <p>The CM's security comes from strict capability checking at every operation:</p>
                 <ul>
                     <li><strong>No capability = No access</strong>: Without the right token, operations fail</li>
                     <li><strong>Permission checking</strong>: Each operation requires specific permissions</li>
@@ -6323,7 +6323,7 @@ const lessons = [
                     <li><strong>Lateral movement</strong>: Compromising one process aids attacking others at same level</li>
                 </ul>
                 <div class="key-concept">
-                    <strong>CTMM Solution:</strong> No shared privileges exist. Each Golden Token grants specific access to specific resources. There is no "privilege level" - only individual capabilities.
+                    <strong>CM Solution:</strong> No shared privileges exist. Each Golden Token grants specific access to specific resources. There is no "privilege level" - only individual capabilities.
                 </div>`,
                 demo: `<div class="demo-title">Shared Privileges vs Capabilities</div>
                 <div class="demo-content">
@@ -6352,9 +6352,9 @@ const lessons = [
                     <li><strong>Executable code reuse</strong>: Any code in memory can be "jumped to"</li>
                 </ul>
                 <div class="key-concept">
-                    <strong>CTMM Solution:</strong> The CALL/RETURN mechanism uses Golden Tokens, not memory addresses. You cannot CALL code without holding a valid capability with E (Enter) permission. Return addresses are protected by hardware - there is no stack to overflow.
+                    <strong>CM Solution:</strong> The CALL/RETURN mechanism uses Golden Tokens, not memory addresses. You cannot CALL code without holding a valid capability with E (Enter) permission. Return addresses are protected by hardware - there is no stack to overflow.
                 </div>`,
-                demo: `<div class="demo-title">ROP Attack vs CTMM Protection</div>
+                demo: `<div class="demo-title">ROP Attack vs CM Protection</div>
                 <div class="demo-content">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div style="background: rgba(248, 113, 113, 0.15); padding: 1rem; border-radius: 6px;">
@@ -6366,7 +6366,7 @@ const lessons = [
                             </div>
                         </div>
                         <div style="background: rgba(74, 222, 128, 0.15); padding: 1rem; border-radius: 6px;">
-                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CTMM Protected</div>
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CM Protected</div>
                             <div style="font-size: 0.8rem; color: var(--text-secondary); font-family: monospace;">
                                 CALL requires GT with [E]<br/>
                                 No GT = No execution<br/>
@@ -6412,7 +6412,7 @@ const lessons = [
         steps: [
             {
                 text: `<h3>Lambda Calculus and Capabilities</h3>
-                <p>Alonzo Church's <strong>lambda calculus</strong> is the theoretical foundation for all computation. In CTMM, lambda expressions become Golden Tokens:</p>
+                <p>Alonzo Church's <strong>lambda calculus</strong> is the theoretical foundation for all computation. In CM, lambda expressions become Golden Tokens:</p>
                 <ul>
                     <li><strong>Lambda abstraction</strong> (λx.body) = A GT pointing to executable code</li>
                     <li><strong>Application</strong> (f x) = CALL instruction with arguments in registers</li>
@@ -6429,7 +6429,7 @@ const lessons = [
                             <code style="font-size: 0.9rem;">λf.λx. f x</code>
                         </div>
                         <div style="background: rgba(234, 179, 8, 0.15); padding: 1rem; border-radius: 6px; border-left: 3px solid #eab308;">
-                            <div style="color: #eab308; font-weight: bold; margin-bottom: 0.5rem;">CTMM Assembly</div>
+                            <div style="color: #eab308; font-weight: bold; margin-bottom: 0.5rem;">CM Assembly</div>
                             <code style="font-size: 0.85rem;">LOAD CR0, [CR6+0]<br/>CALL CR0</code>
                         </div>
                     </div>
@@ -6443,7 +6443,7 @@ const lessons = [
                     <li><strong>FALSE</strong> = λx.λy.y (returns second argument)</li>
                     <li><strong>IF-THEN-ELSE</strong> = λb.λt.λf. b t f (applies boolean to branches)</li>
                 </ul>
-                <p>In CTMM, each boolean is a GT. Calling it with two argument GTs returns one of them.</p>`,
+                <p>In CM, each boolean is a GT. Calling it with two argument GTs returns one of them.</p>`,
                 demo: `<div class="demo-title">Church Boolean Implementation</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem; overflow-x: auto;">
@@ -6498,7 +6498,7 @@ succ:
                 <div class="highlight">
                     Y = λf. (λx. f (x x)) (λx. f (x x))
                 </div>
-                <p>In CTMM, a GT in the C-List can point back to the current code block, enabling the self-application pattern (x x) through CALL.</p>`,
+                <p>In CM, a GT in the C-List can point back to the current code block, enabling the self-application pattern (x x) through CALL.</p>`,
                 demo: `<div class="demo-title">Y Combinator Pattern</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.8rem; overflow-x: auto;">
@@ -6561,7 +6561,7 @@ fst:
                 </div>`,
                 interactive: {
                     type: "quiz",
-                    question: "How does CTMM implement lambda application (f x)?",
+                    question: "How does CM implement lambda application (f x)?",
                     options: [
                         "Using the APPLY instruction",
                         "Using the CALL instruction with the function GT",
@@ -6571,7 +6571,7 @@ fst:
                     correct: 1,
                     feedback: {
                         correct: "Correct! Lambda application becomes CALL with the function's Golden Token. Arguments are passed in registers.",
-                        incorrect: "Not quite. In CTMM, lambda application (f x) is implemented using CALL with the function's GT."
+                        incorrect: "Not quite. In CM, lambda application (f x) is implemented using CALL with the function's GT."
                     }
                 }
             }
@@ -6582,9 +6582,9 @@ fst:
         steps: [
             {
                 text: `<h3>The Assembly Editor</h3>
-                <p>The Assembly Editor is where you write and execute CTMM programs. It provides:</p>
+                <p>The Assembly Editor is where you write and execute CM programs. It provides:</p>
                 <ul>
-                    <li><strong>Code Editor</strong> - Write CTMM assembly with syntax highlighting</li>
+                    <li><strong>Code Editor</strong> - Write CM assembly with syntax highlighting</li>
                     <li><strong>Example Programs</strong> - Pre-built examples in Turing and Lambda tabs</li>
                     <li><strong>Output Panel</strong> - See execution results and logs</li>
                     <li><strong>Instruction Palette</strong> - Quick reference for available instructions</li>
@@ -6608,7 +6608,7 @@ fst:
             },
             {
                 text: `<h3>Instruction Syntax</h3>
-                <p>CTMM assembly uses a simple syntax:</p>
+                <p>CM assembly uses a simple syntax:</p>
                 <ul>
                     <li><strong>Comments</strong>: Lines starting with <code>;</code></li>
                     <li><strong>Labels</strong>: Names ending with <code>:</code> (e.g., <code>loop:</code>)</li>
@@ -6810,7 +6810,7 @@ B NE loop     ; loop until counter = 0
                     <strong>The Problem:</strong> To write factorial(n), you need factorial to call factorial. But how does a function know its own name?<br><br>
                     <strong>Y-Combinator Solution:</strong> Pass the function a reference to itself as a parameter. The function doesn't need a name - it has a <em>capability</em> to invoke itself.
                 </div>`,
-                demo: `<div class="demo-title">Y-Combinator in CTMM</div>
+                demo: `<div class="demo-title">Y-Combinator in CM</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.85rem;">
 ; Y-COMBINATOR for recursion
@@ -6836,7 +6836,7 @@ RETURN</pre>
                     <li><strong>Recursive case</strong>: n × fact(n-1)</li>
                     <li>Uses LOAD to get self-reference, CALL to recurse</li>
                 </ul>
-                <p>This demonstrates <strong>real recursive algorithms</strong> in CTMM assembly.</p>`,
+                <p>This demonstrates <strong>real recursive algorithms</strong> in CM assembly.</p>`,
                 demo: `<div class="demo-title">Factorial Implementation</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.85rem;">
@@ -6907,7 +6907,7 @@ FAULT             ; Uniform failure</pre>
         steps: [
             {
                 text: `<h3>Why Golden Tokens Improve Performance</h3>
-                <p>Traditional systems waste cycles on <strong>security checks at every operation</strong>. CTMM's capability architecture provides performance advantages:</p>
+                <p>Traditional systems waste cycles on <strong>security checks at every operation</strong>. CM's capability architecture provides performance advantages:</p>
                 <ul>
                     <li><strong>Single validation</strong> - Permissions checked once when GT is created, not on every use</li>
                     <li><strong>Hardware-enforced</strong> - No software overhead for access control</li>
@@ -6930,7 +6930,7 @@ FAULT             ; Uniform failure</pre>
 6. Return to user</pre>
                         </div>
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
-                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CTMM (Fast)</div>
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CM (Fast)</div>
                             <pre style="font-size: 0.75rem; margin: 0;">1. LOAD/CALL with GT
    (hardware validates
     permissions in
@@ -6958,7 +6958,7 @@ FAULT             ; Uniform failure</pre>
                 <div class="key-concept" style="border-color: var(--success);">
                     <strong>Result:</strong> 100+ cycles per call → 1-3 cycles per call. For factorial(10), that's 1000+ cycles saved!
                 </div>`,
-                demo: `<div class="demo-title">Traditional vs CTMM Recursion</div>
+                demo: `<div class="demo-title">Traditional vs CM Recursion</div>
                 <div class="demo-content">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
@@ -6973,7 +6973,7 @@ FAULT             ; Uniform failure</pre>
 ; PER CALL: ~150 cycles</pre>
                         </div>
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
-                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CTMM + GT (FAST)</div>
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CM + GT (FAST)</div>
                             <pre style="font-size: 0.75rem; margin: 0;">LOAD 0 6 0    ; Get GT (1 cycle)
 CALL 0        ; Jump via GT (2 cycles)
 ; → GT has address + permissions
@@ -7047,7 +7047,7 @@ loop:
                     <li><strong>Speculate</strong> - Begin execution knowing permissions are valid</li>
                     <li><strong>Parallelize</strong> - Independent GTs can execute concurrently</li>
                 </ul>
-                <p>Traditional systems must serialize through security checkpoints. CTMM's design enables modern CPU optimizations.</p>`,
+                <p>Traditional systems must serialize through security checkpoints. CM's design enables modern CPU optimizations.</p>`,
                 demo: `<div class="demo-title">Hardware Optimization</div>
                 <div class="demo-content">
                     <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px;">
@@ -7068,7 +7068,7 @@ CALL GT →
                         "GTs use less memory than function pointers",
                         "The recursive GT is pre-validated, eliminating per-call security checks",
                         "Church calculus is inherently faster than imperative code",
-                        "CTMM uses a faster CPU clock"
+                        "CM uses a faster CPU clock"
                     ],
                     correct: 1,
                     feedback: {
@@ -7115,7 +7115,7 @@ CALL GT →
             },
             {
                 text: `<h3>URL Paging</h3>
-                <p><strong>URL Paging</strong> extends virtual memory to the network. Just as traditional paging loads memory pages from disk, CTMM can load capability pages from remote URLs:</p>
+                <p><strong>URL Paging</strong> extends virtual memory to the network. Just as traditional paging loads memory pages from disk, CM can load capability pages from remote URLs:</p>
                 <ul>
                     <li><strong>Page fault</strong> - When accessing a remote GT, the system fetches the page</li>
                     <li><strong>Caching</strong> - Remote pages are cached locally for performance</li>
@@ -7203,7 +7203,7 @@ Client side:
             },
             {
                 text: `<h3>Performance Considerations</h3>
-                <p>Remote GTs introduce <strong>network latency</strong>, but CTMM optimizes this:</p>
+                <p>Remote GTs introduce <strong>network latency</strong>, but CM optimizes this:</p>
                 <ul>
                     <li><strong>Aggressive caching</strong> - Immutable objects cached indefinitely</li>
                     <li><strong>Prefetching</strong> - Predict and fetch remote GTs before they're needed</li>
@@ -7226,7 +7226,7 @@ Client side:
 10 calls = 10× overhead</pre>
                         </div>
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
-                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CTMM Remote (Fast)</div>
+                            <div style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">CM Remote (Fast)</div>
                             <pre style="font-size: 0.7rem; margin: 0;">First call:
   - Open connection
   - GT = auth token
@@ -7298,7 +7298,7 @@ RETURN</pre>
             },
             {
                 text: `<h3>The Failsafe Solution: Single Failure Mode</h3>
-                <p>CTMM's failsafe pattern ensures <strong>all failures look identical</strong>:</p>
+                <p>CM's failsafe pattern ensures <strong>all failures look identical</strong>:</p>
                 <ul>
                     <li><strong>One handler</strong> - All failures branch to FAULT</li>
                     <li><strong>No codes</strong> - No information returned</li>
@@ -7546,7 +7546,7 @@ RETURN mask
         steps: [
             {
                 text: `<h3>Church Instructions Overview</h3>
-                <p>The <strong>Church instructions</strong> are the capability-manipulation half of the CTMM instruction set. Named after Alonzo Church, they embody the <strong>lambda calculus</strong> philosophy: everything is a function reference (capability).</p>
+                <p>The <strong>Church instructions</strong> are the capability-manipulation half of the CM instruction set. Named after Alonzo Church, they embody the <strong>lambda calculus</strong> philosophy: everything is a function reference (capability).</p>
                 <p>There are <strong>7 Church instructions</strong> plus a test instruction (<strong>TPERM</strong> - Test the permission and scope of a Golden Token):</p>
                 <ul>
                     <li><strong>LOAD</strong> - Read a Golden Token from memory into a Context Register</li>
@@ -7560,7 +7560,7 @@ RETURN mask
                 <div class="key-concept">
                     <strong>Key Insight:</strong> Church instructions operate on <em>capabilities</em> (GTs), not raw data. Every memory access, every function call, every context switch requires a valid GT.
                 </div>`,
-                demo: `<div class="demo-title">Church vs Turing Machines interwork through the Lambda Calculus Meta-Machine as a CTMM</div>
+                demo: `<div class="demo-title">Church vs Turing Machines interwork through the Lambda Calculus Meta-Machine as a CM</div>
                 <div class="demo-content">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
@@ -7655,7 +7655,7 @@ SAVE 0 1 0      ; Store CR1 as entry 0
             },
             {
                 text: `<h3>CALL: Invoking Lambda Calculus function abstractions</h3>
-                <p>The <strong>CALL</strong> instruction is the heart of CTMM threaded execution. A Thread is a secure, private execution through the application Namespace with confidential variables (both GT and data). It transfers control to helper functions (code) specified by a Golden Token that identifies a node in the application's DNA hierarchy.</p>
+                <p>The <strong>CALL</strong> instruction is the heart of CM threaded execution. A Thread is a secure, private execution through the application Namespace with confidential variables (both GT and data). It transfers control to helper functions (code) specified by a Golden Token that identifies a node in the application's DNA hierarchy.</p>
                 <p><strong>What happens during CALL:</strong></p>
                 <ol>
                     <li><strong>Permission Check</strong> - GT[source] must have Enter (E) permission</li>
@@ -7703,7 +7703,7 @@ CALL 0          ; Dispatch: Access reads DR0, performs ADD</pre>
                 </ol>
                 <p><strong>Return Values:</strong> By convention, results are left in DR0 (data) or CR0 (capability). The called function sets these before RETURN.</p>
                 <div class="key-concept">
-                    <strong>Hardware Stack:</strong> CTMM uses a hardware-managed return stack, not software. This prevents stack smashing attacks - you cannot overwrite return addresses.
+                    <strong>Hardware Stack:</strong> CM uses a hardware-managed return stack, not software. This prevents stack smashing attacks - you cannot overwrite return addresses.
                 </div>`,
                 demo: `<div class="demo-title">RETURN Instruction Examples</div>
                 <div class="demo-content">
@@ -7892,7 +7892,7 @@ B NE fault
                         </tr>
                     </table>
                 </div>
-                <p>Together with the Turing instructions (arithmetic, logic, branching), these form the complete CTMM instruction set.</p>`,
+                <p>Together with the Turing instructions (arithmetic, logic, branching), these form the complete CM instruction set.</p>`,
                 demo: `<div class="demo-title">Complete Program Example</div>
                 <div class="demo-content">
                     <pre style="background: var(--bg-tertiary); padding: 1rem; border-radius: 6px; font-size: 0.75rem;">
@@ -8083,7 +8083,7 @@ myFunction:
         steps: [
             {
                 text: `<h3>Church Indicators Overview</h3>
-                <p>The CTMM has two sets of condition flags:</p>
+                <p>The CM has two sets of condition flags:</p>
                 <ul>
                     <li><strong>Turing Flags (NZCV)</strong> - Set by arithmetic and comparison instructions</li>
                     <li><strong>Church Flags (P, B)</strong> - Set by capability validation instructions</li>
@@ -8100,7 +8100,7 @@ myFunction:
                 <div class="key-concept" style="border-color: var(--warning); margin-top: 0.5rem;">
                     <strong>Important:</strong> When sharing unknown or untrusted data variables with an abstraction, always test them before use. Validate permissions with TPERM before passing capabilities to other code.
                 </div>`,
-                demo: `<div class="demo-title">Two Flag Sets in the CTMM</div>
+                demo: `<div class="demo-title">Two Flag Sets in the CM</div>
                 <div class="demo-content">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div style="background: var(--bg-tertiary); padding: 0.8rem; border-radius: 6px;">
@@ -8253,7 +8253,7 @@ first_fault:
                 text: `<h3>Creating New Golden Tokens</h3>
                 <p>The <strong>CapabilityManager</strong> abstraction creates new Golden Tokens for objects. Unlike other abstractions that perform computations, CapabilityManager allocates and initializes new capabilities.</p>
                 <div class="key-concept">
-                    <strong>Key Concept:</strong> To create objects in CTMM, you CALL the CapabilityManager with the object type and size. It returns a new GT in CR0 with full type-appropriate permissions.
+                    <strong>Key Concept:</strong> To create objects in CM, you CALL the CapabilityManager with the object type and size. It returns a new GT in CR0 with full type-appropriate permissions.
                 </div>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 1rem 0;">
                     <tr style="background: var(--bg-tertiary);"><th style="padding: 0.5rem; text-align: left;">Property</th><th style="padding: 0.5rem; text-align: left;">Value</th></tr>
@@ -8473,7 +8473,7 @@ CALL 1               ; GT_RESTRICT
             {
                 text: `<h3>Lock-Free Synchronization</h3>
                 <p>In multi-threaded systems, multiple threads may try to update the same capability simultaneously. Traditional locks are slow and can deadlock.</p>
-                <p>CTMM provides <strong>atomic load/store operations</strong> for lock-free synchronization:</p>
+                <p>CM provides <strong>atomic load/store operations</strong> for lock-free synchronization:</p>
                 <ul>
                     <li><code>LOADX</code> - Load Exclusive: Load a GT and set an exclusive monitor</li>
                     <li><code>SAVEX</code> - Store Exclusive: Conditionally store if monitor is still valid</li>
@@ -8598,14 +8598,14 @@ retry:
             },
             {
                 text: `<h3>16 Per-Thread Monitors</h3>
-                <p>CTMM supports <strong>16 concurrent threads</strong>, each with its own exclusive monitor:</p>
+                <p>CM supports <strong>16 concurrent threads</strong>, each with its own exclusive monitor:</p>
                 <ul>
                     <li>Thread ID is stored in CR8 (Thread identity register)</li>
                     <li>Each thread can have exactly ONE active monitor</li>
                     <li>A new LOADX replaces the previous monitor</li>
                 </ul>
                 <div class="highlight">
-                    This design enables true parallel lock-free programming on multi-core CTMM systems.
+                    This design enables true parallel lock-free programming on multi-core CM systems.
                 </div>`,
                 interactive: {
                     type: "quiz",
@@ -8631,7 +8631,7 @@ retry:
             {
                 text: `<h3>Efficient Bulk Transfers</h3>
                 <p>Context switches and procedure calls often need to save/restore multiple Context Registers. Doing this one at a time is slow.</p>
-                <p>CTMM provides bulk operations:</p>
+                <p>CM provides bulk operations:</p>
                 <ul>
                     <li><code>LDM</code> - Load Multiple: Load several CRs from consecutive C-List slots</li>
                     <li><code>STM</code> - Store Multiple: Store several CRs to consecutive C-List slots</li>
@@ -8975,8 +8975,8 @@ SAVE CR1, [CR0+1]    ; Save to it</pre>
                 text: `<h3>Two Machines, Two Architectures</h3>
                 <p>The proof-of-concept uses <strong>both simulators</strong> to demonstrate architecture independence:</p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 0.5rem 0;">
-                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.3rem;">Property</th><th>"me" (CTMM Sim-64)</th><th>"mymother" (Capability Sim-32)</th></tr>
-                    <tr><td>ISA</td><td>ARM-inspired CTMM</td><td>RISC-V RV32I + cap extensions</td></tr>
+                    <tr style="background: var(--bg-tertiary);"><th style="padding: 0.3rem;">Property</th><th>"me" (CM Sim-64)</th><th>"mymother" (Capability Sim-32)</th></tr>
+                    <tr><td>ISA</td><td>ARM-inspired CM</td><td>RISC-V RV32I + cap extensions</td></tr>
                     <tr style="background: var(--bg-tertiary);"><td>Data registers</td><td>DR0-DR15 (64-bit)</td><td>x0-x31 (32-bit)</td></tr>
                     <tr><td>Capability regs</td><td>CR0-CR15 (64-bit GTs)</td><td>CR0-CR15 (32-bit GTs)</td></tr>
                     <tr style="background: var(--bg-tertiary);"><td>GT format</td><td>64-bit Golden Token</td><td>32-bit Golden Token</td></tr>
@@ -9331,14 +9331,14 @@ RETURN                     ; Back through tunnel</pre>
         steps: [
             {
                 text: `<h3>Three Levels of Method-Selector Security</h3>
-                <p>When you CALL an abstraction, the Access code at slot [1] dispatches to the requested method. In CTMM, the <strong>method selector itself is programmable</strong> &mdash; the abstraction author chooses the security level:</p>
+                <p>When you CALL an abstraction, the Access code at slot [1] dispatches to the requested method. In CM, the <strong>method selector itself is programmable</strong> &mdash; the abstraction author chooses the security level:</p>
                 <ol>
                     <li><strong>Integer selector</strong> (DR0 = 0, 1, 2&hellip;) &mdash; simple, fast, but an attacker who gains the capability could walk the selector space</li>
                     <li><strong>Text string selector</strong> (DR0 points to a data region) &mdash; the Access dispatcher matches a string, optionally obfuscated. Much harder to enumerate</li>
                     <li><strong>Abstract GT selector</strong> (a CR holds an Abstract GT) &mdash; the dispatcher validates the GT before dispatching. You need a valid capability just to <em>select</em> the method</li>
                 </ol>
                 <div class="key-concept">
-                    <strong>Key Insight:</strong> This is programmable security that <em>cannot exist</em> without CTMM technology. In von Neumann machines, method dispatch is always by name or offset &mdash; structural, never secured. In CTMM, dispatch happens inside the abstraction's scope behind the Access code, so the author has complete freedom to program the security level of the selector itself.
+                    <strong>Key Insight:</strong> This is programmable security that <em>cannot exist</em> without CM technology. In von Neumann machines, method dispatch is always by name or offset &mdash; structural, never secured. In CM, dispatch happens inside the abstraction's scope behind the Access code, so the author has complete freedom to program the security level of the selector itself.
                 </div>`,
                 demo: `<div class="demo-title">Three Dispatch Security Levels</div>
                 <div class="demo-content">
@@ -9366,7 +9366,7 @@ RETURN                     ; Back through tunnel</pre>
             },
             {
                 text: `<h3>The Abstract GT Type</h3>
-                <p>The CTMM GT type field encodes four types:</p>
+                <p>The CM GT type field encodes four types:</p>
                 <ul>
                     <li><strong>Inform (00)</strong> &mdash; local resource (data, code, C-List)</li>
                     <li><strong>Outform (01)</strong> &mdash; remote resource (network-transparent)</li>
@@ -9465,11 +9465,11 @@ RETURN                     ; Back through tunnel</pre>
             {
                 text: `<h3>Why Constants Need Protection</h3>
                 <p>In conventional computers, a constant like <strong>&pi;</strong> is just a number sitting in memory or a register. Any bug, buffer overflow, or injection attack could <strong>corrupt it</strong> &mdash; and corrupted constants produce wrong answers silently.</p>
-                <p>The CTMM takes a different approach: physical and mathematical constants are <strong>Abstract Golden Tokens</strong> &mdash; unforgeable identity tokens that the Constants abstraction issued via Mint.</p>
+                <p>The CM takes a different approach: physical and mathematical constants are <strong>Abstract Golden Tokens</strong> &mdash; unforgeable identity tokens that the Constants abstraction issued via Mint.</p>
                 <div class="key-concept">
                     <strong>Key Insight:</strong> Constants never exist as bare data. Each constant is an Abstract GT (type 0b11) with <em>no permissions</em>. It carries only identity &mdash; the Constants abstraction knows what value that identity maps to.
                 </div>`,
-                demo: `<div class="demo-title">Conventional vs CTMM Constants</div>
+                demo: `<div class="demo-title">Conventional vs CM Constants</div>
                 <div class="demo-content">
                     <div style="font-size: 0.75rem;">
                         <div style="margin-bottom: 0.8rem;">
@@ -9482,7 +9482,7 @@ RETURN                     ; Back through tunnel</pre>
                             </div>
                         </div>
                         <div>
-                            <div style="color: #f472b6; font-weight: bold; margin-bottom: 0.3rem;">CTMM (Abstract GT)</div>
+                            <div style="color: #f472b6; font-weight: bold; margin-bottom: 0.3rem;">CM (Abstract GT)</div>
                             <div style="padding: 0.4rem; background: #f472b622; border-radius: 4px; font-family: monospace; font-size: 0.7rem; color: #94a3b8;">
                                 LOAD CR1, CR0, #2  ; GT_PI<br>
                                 ; Abstract GT in CR1<br>
@@ -9569,7 +9569,7 @@ RETURN                     ; Back through tunnel</pre>
         steps: [
             {
                 text: `<h3>Building a Calculator from Nothing</h3>
-                <p>The HP-35 was the world's first handheld scientific calculator (Hewlett-Packard, 1972). We rebuild it as a CTMM abstraction using <strong>pure lambda calculus</strong> &mdash; no hardware ALU, no floating-point unit.</p>
+                <p>The HP-35 was the world's first handheld scientific calculator (Hewlett-Packard, 1972). We rebuild it as a CM abstraction using <strong>pure lambda calculus</strong> &mdash; no hardware ALU, no floating-point unit.</p>
                 <p>Every operation &mdash; addition, square root, sine &mdash; is composed from three foundations:</p>
                 <div class="key-concept">
                     <strong>The Three Foundations:</strong><br>
@@ -13520,7 +13520,7 @@ RETURN
     'hello_mum': `; ================================================
 ; HELLO MUM / HELLO SON — Bidirectional Tunnel
 ; ================================================
-; Kenneth's machine (CTMM Sim-64) — "me"
+; Kenneth's machine (CM Sim-64) — "me"
 ;
 ; PART 1: Send "Hello Mum" → mymother (Priscilla)
 ;   CALL(CONNECT(me, mymother)) — one Church instruction
@@ -14180,7 +14180,7 @@ RETURN
 ; Every computation is a capability-mediated
 ; lambda application. The HP-35 proves that a
 ; complete scientific calculator can be built
-; from pure Church lambda calculus on CTMM,
+; from pure Church lambda calculus on CM,
 ; secured by Golden Tokens at every step.
 ;
 ; Dependencies (all entered via CALL with E perm):
@@ -16455,7 +16455,7 @@ function showTunnelNotification() {
 
     const items = (notif.details && notif.details.items) || [];
     const from = (notif.details && notif.details.from) || '<b>Priscilla</b> (Capability Sim-32)';
-    const to = (notif.details && notif.details.to) || '<b>Kenneth</b> (CTMM Sim-64)';
+    const to = (notif.details && notif.details.to) || '<b>Kenneth</b> (CM Sim-64)';
     const message = notif.message || 'Hello Son';
 
     showTunnelMessage('receive', message, {
@@ -16731,7 +16731,7 @@ function renderHP35Calculator() {
         <div class="hp35-info-card">
             <div class="hp35-info-title">HP-35 Scientific Calculator</div>
             <div class="hp35-info-subtitle">Hewlett-Packard, 1972</div>
-            <div class="hp35-info-desc">The world's first handheld scientific calculator, reimplemented as a CTMM abstraction using pure lambda calculus.</div>
+            <div class="hp35-info-desc">The world's first handheld scientific calculator, reimplemented as a CM abstraction using pure lambda calculus.</div>
             <div class="hp35-info-section">
                 <div class="hp35-info-label">Architecture</div>
                 <div class="hp35-info-detail">RPN (Reverse Polish Notation) — no equals key, no parentheses. Enter operands first, then apply the operator.</div>

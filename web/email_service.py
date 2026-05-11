@@ -93,9 +93,9 @@ def send_welcome_email(user_email, first_name):
     </style>
 </head>
 <body>
-    <h1>Hi{' ' + first_name if first_name else ''}, Welcome to the CTMM Open Source community!</h1>
+    <h1>Hi{' ' + first_name if first_name else ''}, Welcome to the CM Open Source community!</h1>
     
-    <p>Thank you for exploring the Church-Turing Thesis using our Lambda Calculus Meta-Machine, developed by <a href="https://sipantic.com">SIPantic.com</a>, the blog on fail-safe cybersecurity. CTMM is the revolutionary, secure solution to traditional binary computers that share memory, allowing catastrophic breakdowns. We cannot build a surviving democratic cyber-society this way when the brands of centralised operating systems only lead to an Orwellian surveillance state and global digital dictatorships.</p>
+    <p>Thank you for exploring the Church-Turing Thesis using our Lambda Calculus Meta-Machine, developed by <a href="https://sipantic.com">SIPantic.com</a>, the blog on fail-safe cybersecurity. CM is the revolutionary, secure solution to traditional binary computers that share memory, allowing catastrophic breakdowns. We cannot build a surviving democratic cyber-society this way when the brands of centralised operating systems only lead to an Orwellian surveillance state and global digital dictatorships.</p>
     
     <p>You can now explore capability-based security using <span class="highlight">CLOOMC</span> (Capability-Limited/Object-Oriented/Machine-Code) built from the immutable gold of cyberspace. Golden Tokens are the keys to democracy in the Information Age, when everything is driven by software. Vulnerable computers inherited vulnerability from a shared-memory architecture created by John von Neumann in the 1940s, as the Mechanical Age of World War II ended. The decades of Cold War mentality encouraged binary computers to proliferate.</p>
     
@@ -108,7 +108,7 @@ def send_welcome_email(user_email, first_name):
     <div class="footer">
         <p>Best regards,</p>
         <p><strong>Ken Hamer-Hodges</strong><br>
-        The CTMM Simulator Team</p>
+        The CM Simulator Team</p>
     </div>
 </body>
 </html>
@@ -118,7 +118,7 @@ def send_welcome_email(user_email, first_name):
         params = {
             "from": from_email,
             "to": [user_email],
-            "subject": "Welcome to the CTMM Open Source Community!",
+            "subject": "Welcome to the CM Open Source Community!",
             "html": html_content,
         }
         

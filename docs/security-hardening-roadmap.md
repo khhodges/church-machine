@@ -35,7 +35,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 **Action 1b: Immutable Threshold History Log (Boot Sequence)**
 - On first boot, allocate a fixed **append-only ledger in NVM** (e.g., last 64 KB of SPI flash).
 - Every MTBF threshold change is logged with: `(timestamp, hash(new_threshold), signing_key_version)`.
-- On boot, CTMM verifies that the current threshold matches the latest ledger entry.
+- On boot, CM verifies that the current threshold matches the latest ledger entry.
 - A compromised Home Base cannot silently change thresholds without appending to the log.
 - Ledger is readable by user code (read-only) for transparency and forensics.
 - **Effort**: Low — NVM driver + ledger append logic.
@@ -43,8 +43,8 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 1c: Home Base Compromise Alert Protocol (IDE Communication)**
 - Define a **secondary, firmware-hardened alert channel** independent of the Home Base tunnel.
-- If Home Base returns invalid signatures repeatedly, CTMM enters **Safe Mode**: all network access blocked, S=0 on all network GTs, MTBF thresholds frozen.
-- CTMM blinks LED or emits acoustic signal (if available) to alert operator.
+- If Home Base returns invalid signatures repeatedly, CM enters **Safe Mode**: all network access blocked, S=0 on all network GTs, MTBF thresholds frozen.
+- CM blinks LED or emits acoustic signal (if available) to alert operator.
 - Operator can use **local recovery serial console** (UART) to query last-known-good threshold from ledger.
 - **Effort**: Medium — requires secondary communication path (may already exist for debug/serial access).
 - **Blocking**: No — adds error handling path, doesn't change normal operation.
@@ -58,7 +58,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 - Both must sign policy updates using a **2-of-2 threshold scheme**:
   - MTBF threshold is split into two shares (e.g., XOR of halves).
   - Root1 signs Share1, Root2 signs Share2.
-  - CTMM reconstructs threshold only if both signatures are valid.
+  - CM reconstructs threshold only if both signatures are valid.
 - Neither root can unilaterally corrupt policy; both must conspire or be compromised simultaneously.
 - Hardware implements automatic failover: Primary tunnel → if unreachable (> 3 retries) → Secondary tunnel.
 - **Effort**: High — requires key management infrastructure, threshold split/merge logic, dual provisioning.
@@ -67,7 +67,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 2b: Time-Limited MTBF Threshold Validity**
 - Add a 32-bit **threshold_ttl** field to the MTBF config payload.
-- On every CTMM boot, check: `current_time > threshold_timestamp + threshold_ttl → reject threshold, enter Safe Mode`.
+- On every CM boot, check: `current_time > threshold_timestamp + threshold_ttl → reject threshold, enter Safe Mode`.
 - Prevents Home Base from delivering arbitrarily old / stale thresholds indefinitely.
 - Threshold becomes invalid after X days (e.g., 30 days) unless refreshed by a fresh signature.
 - **Effort**: Low — mostly timestamp comparison logic.
@@ -83,7 +83,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 1a: Immutable MTBF Snapshot in NVM**
 - When an abstraction first runs, store a **snapshot of its MTBF counters in NVM** with a hash of the abstraction's identity.
-- On every CTMM boot, compare running counters to the snapshot.
+- On every CM boot, compare running counters to the snapshot.
 - If counters reset to zero mid-session (sign of tampering or GC), mark abstraction as **Suspicious**.
 - Suspicious abstractions: S=0 (cannot be propagated), but E=1 (still callable locally).
 - **Effort**: Low — NVM logging + counter comparison.
@@ -102,9 +102,9 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 1c: Cryptographic Attestation of Counters (Home Base Telemetry)**
 - MTBF telemetry sent to IDE via Home Base W permission is signed with **HMAC-SHA256** derived from the tunnel key.
-- IDE maintains a **permanent MTBF score record** per abstraction per CTMM.
-- CTMM cannot claim a higher score than what the IDE has recorded for it.
-- If CTMM reports counters that don't match IDE record + expected delta, IDE flags as tampered.
+- IDE maintains a **permanent MTBF score record** per abstraction per CM.
+- CM cannot claim a higher score than what the IDE has recorded for it.
+- If CM reports counters that don't match IDE record + expected delta, IDE flags as tampered.
 - **Effort**: Medium — HMAC computation + IDE-side record keeping.
 - **Blocking**: No — adds verification, doesn't change provisioning.
 
@@ -114,9 +114,9 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 2a: Tamper-Proof Hardware Counter Registers**
 - Move `invocation_count` and `failure_count` out of **writable NS entry** into **dedicated hardware counter registers**.
-- One 48-bit counter pair per abstraction (up to 256 abstractions per CTMM, ~1.5 KB silicon).
+- One 48-bit counter pair per abstraction (up to 256 abstractions per CM, ~1.5 KB silicon).
 - Counters are:
-  - **Readable** by CTMM (for local MTBF calculation) via TPERM query.
+  - **Readable** by CM (for local MTBF calculation) via TPERM query.
   - **Writable only by CALL/RETURN microcode path** — no other instruction can touch them.
   - **Persistent across GC** — GC cannot reset them.
   - **Persistent across revocation/re-provisioning** — history is preserved.
@@ -253,7 +253,7 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 **Action 1c: Telemetry on Exception Patterns**
 - Count and report SWITCH/mLoad FAULT rates back to IDE.
 - Pattern detection: if `(retries/success_ratio) > threshold`, report "possible timing side-channel attack."
-- IDE can correlate with other CTMMs to detect coordinated attacks.
+- IDE can correlate with other CMs to detect coordinated attacks.
 - **Effort**: Low — telemetry logging.
 - **Blocking**: No — purely observability.
 
@@ -303,9 +303,9 @@ Each weakness includes one Phase 1 mitigation (immediate) and one or more Phase 
 
 **Action 2b: Per-Recipient Revocation via Bloom Filter**
 - NS entry includes a **32-bit recipient bloom filter**.
-- When recipient receives GT via mSave, their CTMM ID is added to the bloom filter.
-- Sender issues **revoke-recipient** command to IDE, which clears the CTMM ID from the filter.
-- On next mLoad on that CTMM, CRC fails (filter changed), GT faults.
+- When recipient receives GT via mSave, their CM ID is added to the bloom filter.
+- Sender issues **revoke-recipient** command to IDE, which clears the CM ID from the filter.
+- On next mLoad on that CM, CRC fails (filter changed), GT faults.
 - Enables fine-grained per-recipient revocation.
 - **Effort**: Medium — bloom filter integration, NS layout change.
 - **Blocking**: Yes — NS entry size.

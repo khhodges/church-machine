@@ -1,9 +1,9 @@
-# CTMM Memory Map — Authoritative Reference
+# CM Memory Map — Authoritative Reference
 
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-> **Principle:** The CTMM is defined by the memory, always, no more and no less.
+> **Principle:** The CM is defined by the memory, always, no more and no less.
 > The simulator must follow the memory, no more and no less.
 
 All data in this document are computed from a live simulator run using
@@ -529,7 +529,7 @@ CRs 0–5, 7–11, 13 are null after boot.
 
 ### 10.1 State backed by `memory[]`
 
-These are the only authoritative CTMM state sources:
+These are the only authoritative CM state sources:
 
 | Memory range | Content |
 |:-------------|:--------|

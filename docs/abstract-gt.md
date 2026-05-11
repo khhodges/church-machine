@@ -267,7 +267,7 @@ DR15 / XR15 holds the advisory seals word; writeback validates `GT.version == se
 
 ### FSM states
 
-The M-window FSM lives inside `ChurchCore` / `CTMMCapCore`:
+The M-window FSM lives inside `ChurchCore` / `CMCapCore`:
 
 ```
 IDLE ──(trigger + valid DR11)──→ WRITEBACK ──→ IDLE

@@ -36,7 +36,7 @@
 <div class="nav"><a href="/">&#8592; Church Machine</a></div>
 
 <h1>Figure 10 &mdash; Atomic Abstraction Architecture: The 7 Zeroes</h1>
-<p class="subtitle">Conventional architectures stack layers of complexity, each introducing attack surface. The CTMM eliminates all seven: no central OS, no VM/hypervisor, no privilege rings, no superuser, no ACLs, no MMU/TLB, no ambient authority. Every system service is an atomic abstraction accessed only through Golden Tokens validated by the dual-gate TSB.</p>
+<p class="subtitle">Conventional architectures stack layers of complexity, each introducing attack surface. The CM eliminates all seven: no central OS, no VM/hypervisor, no privilege rings, no superuser, no ACLs, no MMU/TLB, no ambient authority. Every system service is an atomic abstraction accessed only through Golden Tokens validated by the dual-gate TSB.</p>
 
 <svg viewBox="0 0 1100 1380" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -126,9 +126,9 @@
   <text x="265" y="380" class="mono-b" fill="#cc3333">4 attack surfaces, billions of LOC trusted</text>
 
   <!-- ════════════════════════════════════════════════════════════ -->
-  <!-- CTMM ARCHITECTURE (RIGHT)                                   -->
+  <!-- CM ARCHITECTURE (RIGHT)                                   -->
   <!-- ════════════════════════════════════════════════════════════ -->
-  <text x="810" y="20" class="title-lg" fill="#27864a">CTMM / Church Machine</text>
+  <text x="810" y="20" class="title-lg" fill="#27864a">CM / Church Machine</text>
   <text x="810" y="40" class="label-s" fill="#27864a">Flat architecture = zero attack surface layers</text>
 
   <!-- Atomic Abstractions (all equal, no hierarchy) -->
@@ -195,7 +195,7 @@
   <rect x="80" y="500" width="940" height="32" rx="6" fill="#444" stroke="#333" stroke-width="1"/>
   <text x="120" y="516" class="hdr" text-anchor="start">#</text>
   <text x="280" y="516" class="hdr" text-anchor="middle">Conventional Component</text>
-  <text x="550" y="516" class="hdr" text-anchor="middle">CTMM Replacement</text>
+  <text x="550" y="516" class="hdr" text-anchor="middle">CM Replacement</text>
   <text x="810" y="516" class="hdr" text-anchor="middle">Why It's Zero</text>
 
   <!-- Row 1 -->
@@ -296,9 +296,9 @@
   <rect x="110" y="1105" width="400" height="24" rx="4" fill="#fde8e8" stroke="#cc3333" stroke-width="0.5"/>
   <text x="310" y="1117" class="mono-s" fill="#cc3333">Security = mitigations stacked on mitigations</text>
 
-  <!-- CTMM side -->
+  <!-- CM side -->
   <rect x="560" y="940" width="460" height="200" rx="10" fill="#e8fde8" stroke="#27864a" stroke-width="1.5"/>
-  <text x="790" y="965" class="title-sm" fill="#27864a">CTMM: Flat Peers + Single Gate</text>
+  <text x="790" y="965" class="title-sm" fill="#27864a">CM: Flat Peers + Single Gate</text>
 
   <rect x="590" y="985" width="400" height="24" rx="4" fill="#d5f0d5" stroke="#27864a" stroke-width="0.5"/>
   <text x="790" y="997" class="mono-s" fill="#27864a">Every abstraction is a peer (no hierarchy)</text>
@@ -328,7 +328,7 @@
 
 <div class="legend">
   <div class="legend-item"><div class="legend-swatch" style="background:#cc3333;"></div> Conventional (attack surfaces)</div>
-  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> CTMM (eliminated by construction)</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#27864a;"></div> CM (eliminated by construction)</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#2a6db5;"></div> Dual-gate TSB (single trust point)</div>
   <div class="legend-item"><div class="legend-swatch" style="background:#b8860b;"></div> Architecture principle</div>
 </div>

@@ -1,4 +1,4 @@
-# CTMM Amaranth HDL — Technical Summary for ChipFlow Integration
+# CM Amaranth HDL — Technical Summary for ChipFlow Integration
 
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
@@ -11,7 +11,7 @@
 
 ## 1. Architecture Overview
 
-The Church-Turing Meta-Machine (CTMM) is a capability-based processor architecture that enforces security through hardware-validated Golden Tokens. It eliminates the need for an operating system, virtual memory, privilege rings, and superuser accounts.
+The Church-Turing Meta-Machine (CM) is a capability-based processor architecture that enforces security through hardware-validated Golden Tokens. It eliminates the need for an operating system, virtual memory, privilege rings, and superuser accounts.
 
 **Core Principles:**
 
@@ -151,21 +151,21 @@ All instructions use a **32-bit fixed-width format** with a 4-bit condition code
 
 | Module | File | Lines | Status | Description |
 |--------|------|------:|--------|-------------|
-| CTMMCore | core.py | 463 | Complete | Top-level integration, state machine, 5-phase boot sequencer |
-| CTMMDecoder | decoder.py | 136 | Complete | 32-bit instruction decode, Church/Turing split, 3-bit CR / 4-bit DR addressing |
-| CTMMRegisters | registers.py | 114 | Complete | CR0-CR15 (96-bit capability, 3×32-bit words: GT + location + W2) + DR0-DR15 (32-bit data) + NZCV flags. |
-| CTMMPermCheck | perm_check.py | 96 | Complete | 6-bit permission validation (R/W/X/L/S/E) |
-| CTMMMLoad | mload.py | 217 | Complete | The Golden Rule gate — permission, bounds, G-bit reset, thread shadow |
-| CTMMMSave | msave.py | 90 | Complete | Namespace write path with permission check |
-| CTMMLoad | load.py | 96 | Complete | LOAD instruction — CR write via mLoad |
-| CTMMSave | save.py | 124 | Complete | SAVE instruction — data write via capability |
-| CTMMCall | call.py | 205 | Complete | CALL — push frame, validate E, switch CR6/CR14 |
-| CTMMReturn | ret.py | 245 | Complete | RETURN — pop frame, revalidate, restore context |
-| CTMMChange | change.py | 256 | Complete | Thread creation into CR8 |
-| CTMMSwitch | switch.py | 140 | Complete | Capability copy to system registers CR8-15 |
-| CTMMLoadxSavex | loadx_savex.py | 207 | Complete | Exclusive (atomic) load/store with monitor |
-| CTMMLdmStm | ldm_stm.py | 163 | Complete | Load/store multiple registers |
-| CTMMGCUnit | gc_unit.py | 126 | Partial | Mark-Scan-Sweep: mark and count implemented; sweep reclaim pending |
+| CMCore | core.py | 463 | Complete | Top-level integration, state machine, 5-phase boot sequencer |
+| CMDecoder | decoder.py | 136 | Complete | 32-bit instruction decode, Church/Turing split, 3-bit CR / 4-bit DR addressing |
+| CMRegisters | registers.py | 114 | Complete | CR0-CR15 (96-bit capability, 3×32-bit words: GT + location + W2) + DR0-DR15 (32-bit data) + NZCV flags. |
+| CMPermCheck | perm_check.py | 96 | Complete | 6-bit permission validation (R/W/X/L/S/E) |
+| CMMLoad | mload.py | 217 | Complete | The Golden Rule gate — permission, bounds, G-bit reset, thread shadow |
+| CMMSave | msave.py | 90 | Complete | Namespace write path with permission check |
+| CMLoad | load.py | 96 | Complete | LOAD instruction — CR write via mLoad |
+| CMSave | save.py | 124 | Complete | SAVE instruction — data write via capability |
+| CMCall | call.py | 205 | Complete | CALL — push frame, validate E, switch CR6/CR14 |
+| CMReturn | ret.py | 245 | Complete | RETURN — pop frame, revalidate, restore context |
+| CMChange | change.py | 256 | Complete | Thread creation into CR8 |
+| CMSwitch | switch.py | 140 | Complete | Capability copy to system registers CR8-15 |
+| CMLoadxSavex | loadx_savex.py | 207 | Complete | Exclusive (atomic) load/store with monitor |
+| CMLdmStm | ldm_stm.py | 163 | Complete | Load/store multiple registers |
+| CMGCUnit | gc_unit.py | 126 | Partial | Mark-Scan-Sweep: mark and count implemented; sweep reclaim pending |
 | Types | types.py | 147 | Complete | Opcodes, permission masks, fault types, enums |
 | Layouts | layouts.py | 35 | Complete | GT, CR, namespace entry, flags struct layouts |
 | Testbench | testbench.py | 99 | Complete | Basic verification harness |
@@ -189,7 +189,7 @@ All instructions use a **32-bit fixed-width format** with a 4-bit condition code
 
 ## 5. Detailed Module Interfaces
 
-### 5.1 CTMMCore — Top-Level
+### 5.1 CMCore — Top-Level
 
 The core exposes four memory interfaces plus control/status signals:
 
@@ -239,7 +239,7 @@ nia            : Signal(32)    # out — next instruction address
 flags          : Signal(4)     # out — NZCV condition flags
 ```
 
-### 5.2 CTMMMLoad — The Golden Rule Gate
+### 5.2 CMMLoad — The Golden Rule Gate
 
 This is the security-critical module. Every capability register write passes through mLoad.
 
@@ -292,7 +292,7 @@ thread_wr_idx  : Signal(3)     # out — which CR0-CR7 slot
 thread_wr_data : Signal(64)    # out — GT to shadow
 ```
 
-### 5.3 CTMMCall — Procedure Invocation
+### 5.3 CMCall — Procedure Invocation
 
 ```python
 # Control
@@ -313,7 +313,7 @@ dr_clear_mask  : Signal(16)    # out — DRs to clear on entry
 cr_clear_mask  : Signal(16)    # out — CRs to clear on entry
 ```
 
-### 5.4 CTMMGCUnit — Deterministic Garbage Collection (PP250)
+### 5.4 CMGCUnit — Deterministic Garbage Collection (PP250)
 
 ```python
 # Control
@@ -387,7 +387,7 @@ Five-phase hardware boot:
 
 ## 8. Integration Options with ChipFlow RISC-V SoC
 
-### Option A: CTMM as Co-Processor
+### Option A: CM as Co-Processor
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -399,7 +399,7 @@ Five-phase hardware boot:
 │  └──────────┘                └──────┬────────┘  │
 │                                     │            │
 │  ┌──────────┐    Wishbone     ┌─────┴────────┐  │
-│  │  CTMM    │◄──────────────►│              │  │
+│  │  CM    │◄──────────────►│              │  │
 │  │  Core    │                │  BRAM/SRAM   │  │
 │  │ (Golden  │     mLoad      │  (Namespace) │  │
 │  │  Tokens) │────────────────►│              │  │
@@ -412,10 +412,10 @@ Five-phase hardware boot:
 ```
 
 - RV32I handles boot, I/O, and conventional tasks
-- CTMM handles all capability-secured operations
+- CM handles all capability-secured operations
 - Shared memory namespace via bus fabric
 - Fastest integration path (~2-3 weeks)
-- Note: CTMMCore currently exposes raw memory interfaces (addr/rd_en/wr_en/data); a thin bus adapter module (~200 lines) would bridge to Wishbone
+- Note: CMCore currently exposes raw memory interfaces (addr/rd_en/wr_en/data); a thin bus adapter module (~200 lines) would bridge to Wishbone
 
 ### Option B: Replace RV32I Pipeline (Pure [CLOOMC](https://sipantic.blogspot.com/2025/03/xx.html))
 
@@ -424,7 +424,7 @@ Five-phase hardware boot:
 │                 ChipFlow SoC                     │
 │                                                  │
 │  ┌──────────────────────────────────────────┐   │
-│  │              CTMM Core                    │   │
+│  │              CM Core                    │   │
 │  │  ┌─────────┐  ┌────────┐  ┌──────────┐  │   │
 │  │  │ Decoder  │  │  ALU   │  │  mLoad   │  │   │
 │  │  │(Church + │  │(Turing)│  │(Golden   │  │   │
@@ -448,7 +448,7 @@ Five-phase hardware boot:
 └─────────────┴─────────┴──────────────────────────┘
 ```
 
-- CTMM replaces the RV32I pipeline entirely
+- CM replaces the RV32I pipeline entirely
 - Uses ChipFlow's peripheral and bus infrastructure
 - Pure capability-secure execution from boot
 - More work (~4-6 weeks) but cleaner architecture
@@ -475,7 +475,7 @@ Five-phase hardware boot:
 | Target frequency | 100-200 MHz |
 | Power | <100 mW (estimated) |
 
-The CTMM is notably compact because it has **no MMU, no TLB, no cache coherency logic, no privilege ring hardware** — all of which are substantial in conventional processors.
+The CM is notably compact because it has **no MMU, no TLB, no cache coherency logic, no privilege ring hardware** — all of which are substantial in conventional processors.
 
 ---
 

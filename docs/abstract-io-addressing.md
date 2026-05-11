@@ -176,7 +176,7 @@ IDE endpoints that the hardware will try in order if the primary address is unre
 
 ### Purpose
 
-A developer can configure their CTMM to fall back to a private or secondary IDE server
+A developer can configure their CM to fall back to a private or secondary IDE server
 — for example a local development machine, a team server, or a geographically closer
 cloud region — without any degradation in security. The backup addresses are unforgeable
 (provisioned at boot by the IDE), hardware-validated (must be in the tunnel range),
@@ -243,7 +243,7 @@ Permissions:          R | W | E
 b_flag:               0  (not propagable)
 ```
 
-All three are set in a single IDE provisioning write at boot. The CTMM will try them
+All three are set in a single IDE provisioning write at boot. The CM will try them
 in order whenever the primary is unreachable — transparently, without any change to
 the user's code or the permission model.
 
@@ -299,24 +299,24 @@ fast hardware routing without a full 32-bit address compare.
 
 ## Local Peripheral Security (Autonomous Operation)
 
-**Each CTMM can identify and secure locally attached equipment independently —
+**Each CM can identify and secure locally attached equipment independently —
 without any IDE connection, network access, or remote authority.**
 
 The local peripheral range (Abstract Addresses `0xFE000000–0xFEFFFFFF`) is populated
-entirely by the CTMM's own hardware boot sequence, based on equipment physically
+entirely by the CM's own hardware boot sequence, based on equipment physically
 detected during startup. No IDE request is made. No network round-trip occurs. The
-CTMM is the sole authority for its own local peripherals.
+CM is the sole authority for its own local peripherals.
 
 This has three important consequences:
 
 ### Air-gapped and offline operation
-A CTMM with no network connection still enforces full capability-based I/O security.
+A CM with no network connection still enforces full capability-based I/O security.
 Peripherals (UART, GPIO, display, storage) are each represented by an Abstract GT
 provisioned locally. Code that has not been given the UART GT cannot access the UART —
 regardless of whether a network or IDE is present.
 
 ### Local trust decisions made in hardware
-When a new peripheral is connected, the CTMM's hardware probe assigns it an Abstract
+When a new peripheral is connected, the CM's hardware probe assigns it an Abstract
 Address from the local range and provisions an Abstract GT. The security decision —
 which abstractions receive the GT, with what permissions — is made by the local boot
 policy, not by any remote party. A remote IDE has no ability to override this.
@@ -329,8 +329,8 @@ deliberately absent:
 
 | Resource type | Provisioned by | Requires IDE / network? |
 |:--------------|:---------------|:------------------------|
-| Local peripherals (UART, GPIO, Timer, Display) | CTMM hardware boot | **No** |
-| SWITCH PassKeys (CR13, CR15) | CTMM hardware boot | **No** |
+| Local peripherals (UART, GPIO, Timer, Display) | CM hardware boot | **No** |
+| SWITCH PassKeys (CR13, CR15) | CM hardware boot | **No** |
 | Home Base tunnel | IDE at boot | Yes |
 | IDE-allocated tunnel channels | IDE at boot | Yes |
 
@@ -418,13 +418,13 @@ sentinel for each resource, validated by hardware before the GT is installed.
 
 Every Secure Abstraction carries an **MTBF qualification** — a hardware-tracked
 reliability metric (Mean Time Between Failures) that determines whether the abstraction
-may be distributed beyond the local CTMM and, if so, to whom. The parent IDE assists
+may be distributed beyond the local CM and, if so, to whom. The parent IDE assists
 in setting the thresholds for each tier and may update them remotely via the Home Base
 tunnel.
 
 ### Why MTBF gates downloadability
 
-A distributed abstraction becomes part of the capability structure of every CTMM that
+A distributed abstraction becomes part of the capability structure of every CM that
 receives it. A poorly qualified abstraction — one with a high failure rate — degrades
 the reliability of every system it enters. MTBF qualification makes reliability a
 first-class architectural property: an abstraction that has not demonstrated sufficient
@@ -435,7 +435,7 @@ GT. The MTBF tier determines whether the hardware permits `mSave` on that GT:
 
 | Tier | MTBF condition | S permission | Scope |
 |:-----|:---------------|:-------------|:------|
-| **Isolated** | Below minimum threshold, or unvalidated | Blocked — hardware denies mSave | Local CTMM only; cannot be copied or distributed |
+| **Isolated** | Below minimum threshold, or unvalidated | Blocked — hardware denies mSave | Local CM only; cannot be copied or distributed |
 | **User-regulated** | Meets user-tier threshold | Permitted — user-level abstractions may receive a copy | Individual user distribution via the Home Base tunnel |
 | **Namespace-regulated** | Meets namespace-tier threshold | Permitted — all abstractions in the namespace may receive it | Full namespace distribution; CR15 (Namespace) validates each download |
 
@@ -460,7 +460,7 @@ perspective, writable only by the hardware invocation path.
 ### Downloadability tiers in detail
 
 #### Isolated
-The abstraction exists only on the local CTMM. The S bit on its GT is hardware-locked
+The abstraction exists only on the local CM. The S bit on its GT is hardware-locked
 to 0 — `mSave` of this GT faults unconditionally. An abstraction enters the Isolated
 tier when:
 - It has fewer than the minimum invocation count for any tier (freshly installed,
@@ -473,8 +473,8 @@ They simply cannot leave the c-list (abstraction) they are provisioned for.
 #### User-regulated
 The abstraction's MTBF score meets the user-tier threshold preventing downloads, remote access and propagation. The S bit is enabled for
 GTs held by user-level abstractions. Distribution is mediated by the Home Base tunnel:
-the sending CTMM packages the abstraction via `mSave` and the receiving CTMM installs
-it via `mLoad` after the tunnel delivers it. The receiving CTMM recalculates a fresh
+the sending CM packages the abstraction via `mSave` and the receiving CM installs
+it via `mLoad` after the tunnel delivers it. The receiving CM recalculates a fresh
 MTBF score from zero — history from the sending machine does not transfer.
 
 #### Namespace-regulated
@@ -486,8 +486,8 @@ and the IDE validates the threshold before permitting the transfer.
 ### IDE threshold management
 
 The parent IDE sets and updates the MTBF thresholds for all three tiers. Thresholds
-are delivered to the CTMM as a signed configuration payload via the Home Base tunnel
-(`R` permission on the Home Base GT — the CTMM receives the threshold data):
+are delivered to the CM as a signed configuration payload via the Home Base tunnel
+(`R` permission on the Home Base GT — the CM receives the threshold data):
 
 ```
 Threshold config payload (delivered via Home Base R):
@@ -503,7 +503,7 @@ cycle — they do not retroactively revoke existing distributed copies, but do p
 further distribution of abstractions that no longer qualify.
 
 MTBF telemetry flows back to the IDE via the Home Base tunnel (`W` permission):
-the CTMM periodically sends `invocation_count` and `failure_count` for each
+the CM periodically sends `invocation_count` and `failure_count` for each
 abstraction so the IDE can track fleet-wide reliability and adjust thresholds
 accordingly.
 
@@ -558,7 +558,7 @@ there is no path to the network.
 
 ### Local operation
 
-The browser abstraction runs entirely on the local CTMM. It does not delegate security
+The browser abstraction runs entirely on the local CM. It does not delegate security
 decisions to any remote server, cloud authority, or certificate authority. The GT for
 each trusted endpoint is the proof of trust — provisioned at boot, held in the
 browser's c-list, unforgeable by any code the browser might invoke on behalf of the
@@ -609,9 +609,9 @@ is as close to a structural guarantee as computing can provide.
 ### Scoping by profession
 
 Each professional domain is a distinct set of GTs provisioned by the IDE into a
-professional abstraction. A medical professional's CTMM holds GTs for medical
+professional abstraction. A medical professional's CM holds GTs for medical
 databases, clinical references, and regulated communication channels. A legal
-professional's CTMM holds GTs for court records, legal databases, and bar-accredited
+professional's CM holds GTs for court records, legal databases, and bar-accredited
 services. No code running inside a professional abstraction can reach services outside
 its provisioned GT set — not because those services are filtered, but because the
 abstraction was never given a GT for them.
@@ -631,12 +631,12 @@ could be bypassed or confused.
 ### Scoping by nationality and jurisdiction
 
 Jurisdictional compliance (data residency, legal authority, regulatory boundary) is
-enforced by provisioning jurisdiction-specific tunnel channels. A CTMM registered
+enforced by provisioning jurisdiction-specific tunnel channels. A CM registered
 in one jurisdiction receives GTs for the services and data stores licensed in that
 jurisdiction. Cross-jurisdictional access requires a GT for the foreign service —
 which is provisioned (or withheld) by the IDE in accordance with the applicable
 legal framework. The hardware enforces what the IDE provisions; no software running
-on the CTMM can circumvent it.
+on the CM can circumvent it.
 
 ### Scoping by age group, including children
 
@@ -645,9 +645,9 @@ inspects traffic and blocks prohibited content. Filters can be bypassed, fooled 
 encoding tricks, or circumvented by VPNs. None of these attacks are possible in the
 Church Machine architecture.
 
-A child's CTMM is provisioned at boot with GTs only for age-appropriate services.
+A child's CM is provisioned at boot with GTs only for age-appropriate services.
 There is no GT for adult content, no GT for unmoderated communication, no GT for
-gambling or financial services. No code running on the child's CTMM — including
+gambling or financial services. No code running on the child's CM — including
 injected scripts, malicious links, or peer-to-peer messages — can obtain a GT it was
 never given. The child's abstraction has no path to prohibited services, structurally
 and permanently, for as long as the IDE controls provisioning.
@@ -658,7 +658,7 @@ reach the content from ever existing.
 
 ### Summary
 
-| Scoping dimension | Conventional mechanism | CTMM mechanism |
+| Scoping dimension | Conventional mechanism | CM mechanism |
 |:------------------|:-----------------------|:---------------|
 | Profession | Role-based access control, policy enforcement | Profession-specific GT set provisioned at boot |
 | Language | Content negotiation, server-side localisation | Language-specific tunnel channel GT |
@@ -666,7 +666,7 @@ reach the content from ever existing.
 | Age group / children | Content filters, age verification forms | Child GT set excludes prohibited services structurally; no filter to bypass |
 
 In each case, the scoping is a property of the GT structure — defined by the IDE,
-enforced by hardware, and inaccessible to any software running on the CTMM. This is
+enforced by hardware, and inaccessible to any software running on the CM. This is
 what makes the service guarantee structural rather than policy-based, and what
 distinguishes the Church Machine from all conventional security architectures.
 ---

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Figure 10: Conventional vs CTMM Architecture — Attack Surface Elimination</title>
+<title>Figure 10: Conventional vs CM Architecture — Attack Surface Elimination</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -23,8 +23,8 @@
 </head>
 <body>
 
-<h1>Figure 10 &mdash; Conventional vs CTMM: Attack Surface Elimination</h1>
-<p class="subtitle">Conventional architecture has four structural attack surfaces that malware, ransomware, and AI breakout exploit. CTMM eliminates all four — not by patching, but by architectural absence.</p>
+<h1>Figure 10 &mdash; Conventional vs CM: Attack Surface Elimination</h1>
+<p class="subtitle">Conventional architecture has four structural attack surfaces that malware, ransomware, and AI breakout exploit. CM eliminates all four — not by patching, but by architectural absence.</p>
 
 <svg viewBox="0 0 1100 1700" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -55,7 +55,7 @@
     .zero-num { font-family:'Segoe UI',system-ui,sans-serif; font-size:11px; font-weight:700; fill:#0a0e17; text-anchor:middle; dominant-baseline:central; }
   </style>
 
-  <!-- ========== TWO COLUMNS: CONVENTIONAL vs CTMM ========== -->
+  <!-- ========== TWO COLUMNS: CONVENTIONAL vs CM ========== -->
 
   <text class="ph" x="550" y="25" text-anchor="middle" fill="#f5c842">ARCHITECTURAL COMPARISON</text>
 
@@ -130,10 +130,10 @@
   <rect x="420" y="580" width="65" height="22" rx="4" fill="#fce0e0" stroke="#e74c3c" stroke-width="1"/>
   <text class="atk" x="452" y="591" fill="#e74c3c">APTs</text>
 
-  <!-- ===== RIGHT: CTMM Architecture ===== -->
+  <!-- ===== RIGHT: CM Architecture ===== -->
   <rect x="580" y="45" width="500" height="580" rx="12" fill="#f0f8f5" stroke="#2ecc71" stroke-width="2"/>
   <rect x="580" y="45" width="500" height="50" rx="12" fill="#eaf5ee" stroke="#2ecc71" stroke-width="2"/>
-  <text class="ph" x="830" y="65" text-anchor="middle" fill="#2ecc71">CTMM ARCHITECTURE</text>
+  <text class="ph" x="830" y="65" text-anchor="middle" fill="#2ecc71">CM ARCHITECTURE</text>
   <text class="ls" x="830" y="82" fill="#2ecc71">Capability-Based Meta Machine</text>
 
   <!-- Atomic Abstractions -->
@@ -208,7 +208,7 @@
   <text class="col-hdr" x="435" y="694" fill="#e74c3c">Attack Vector</text>
 
   <rect x="550" y="678" width="270" height="32" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
-  <text class="col-hdr" x="685" y="694" fill="#2ecc71">CTMM Replacement</text>
+  <text class="col-hdr" x="685" y="694" fill="#2ecc71">CM Replacement</text>
 
   <rect x="820" y="678" width="260" height="32" rx="4" fill="#eaf5ee" stroke="#2ecc71" stroke-width="1"/>
   <text class="col-hdr" x="950" y="694" fill="#2ecc71">Why Attack Fails</text>
@@ -296,7 +296,7 @@
   <!-- ========== THE 7 ZEROES ========== -->
 
   <text class="ph" x="550" y="985" text-anchor="middle" fill="#f5c842">THE SEVEN ZEROES</text>
-  <text class="ls" x="550" y="1003" fill="#666666">Each zero represents an attack vector that is structurally absent from CTMM</text>
+  <text class="ls" x="550" y="1003" fill="#666666">Each zero represents an attack vector that is structurally absent from CM</text>
 
   <rect x="20" y="1018" width="1060" height="410" rx="10" fill="#f5f8fc" stroke="#f5c842" stroke-width="1.5"/>
 
@@ -367,7 +367,7 @@
   <text class="lt" x="50" y="1515" fill="#555555" font-size="12">Every CVE is a patch on top of structurally flawed components. The kernel, VM, rings, and superuser exist</text>
   <text class="lt" x="50" y="1533" fill="#555555" font-size="12">because von Neumann assumed a single trusted operator. That assumption is 78 years obsolete.</text>
 
-  <text class="lt" x="50" y="1563" fill="#2ecc71" font-size="13" font-weight="bold">CTMM security is architectural absence, not patching:</text>
+  <text class="lt" x="50" y="1563" fill="#2ecc71" font-size="13" font-weight="bold">CM security is architectural absence, not patching:</text>
   <text class="lt" x="50" y="1583" fill="#555555" font-size="12">You cannot exploit what does not exist. There is no kernel to compromise, no page to leak, no ring to</text>
   <text class="lt" x="50" y="1601" fill="#555555" font-size="12">escalate, no root to hijack. mLoad is the single gate — validated by hardware at every access.</text>
 

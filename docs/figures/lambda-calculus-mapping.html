@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Figure 6: Lambda Calculus to CTMM Hardware Mapping</title>
+<title>Figure 6: Lambda Calculus to CM Hardware Mapping</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -23,8 +23,8 @@
 </head>
 <body>
 
-<h1>Figure 6 &mdash; Lambda Calculus to CTMM Hardware Mapping</h1>
-<p class="subtitle">How Church's lambda calculus concepts map directly to CTMM hardware elements via the LAMBDA instruction</p>
+<h1>Figure 6 &mdash; Lambda Calculus to CM Hardware Mapping</h1>
+<p class="subtitle">How Church's lambda calculus concepts map directly to CM hardware elements via the LAMBDA instruction</p>
 
 <svg viewBox="0 0 980 920" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -56,7 +56,7 @@
   <rect x="30" y="20" width="920" height="40" rx="8" fill="#f0f4f8" stroke="#cccccc" stroke-width="1.5"/>
   <text class="col-hdr" x="110" y="40" fill="#c39bd3">Lambda Calculus</text>
   <text class="col-hdr" x="280" y="40" fill="#666666">Notation</text>
-  <text class="col-hdr" x="450" y="40" fill="#5dade2">CTMM Hardware</text>
+  <text class="col-hdr" x="450" y="40" fill="#5dade2">CM Hardware</text>
   <text class="col-hdr" x="650" y="40" fill="#2ecc71">Permission/Domain</text>
   <text class="col-hdr" x="850" y="40" fill="#f39c12">Cycle Cost</text>
 
@@ -199,9 +199,9 @@
   <line x1="460" y1="625" x2="510" y2="625" stroke="#f5c842" stroke-width="2" marker-end="url(#ah-y)"/>
   <text class="cell-s" x="485" y="612" fill="#f5c842">maps to</text>
 
-  <!-- CTMM hardware side -->
+  <!-- CM hardware side -->
   <rect x="515" y="555" width="420" height="140" rx="8" fill="#f0f5fa" stroke="#5dade2" stroke-width="1"/>
-  <text class="col-hdr" x="725" y="575" fill="#5dade2">CTMM Hardware</text>
+  <text class="col-hdr" x="725" y="575" fill="#5dade2">CM Hardware</text>
 
   <text class="cell mono" x="540" y="600" fill="#2ecc71" text-anchor="start" font-size="13">MOV  DR1, #5        ; x = 5</text>
   <text class="cell mono" x="540" y="620" fill="#2ecc71" text-anchor="start" font-size="13">LAMBDA CR2, addOne  ; apply &#955;</text>

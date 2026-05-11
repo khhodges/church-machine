@@ -6,7 +6,7 @@
 **Status**: Architectural specification. February 14, 2026.
 
 ## Overview
-LAMBDA is a lightweight, in-scope code application instruction. It is Church's function application (λx.body applied to argument) implemented as a native CTMM instruction. LAMBDA achieves macro-like code reuse — code exists once in memory, invoked from multiple call sites with near-zero overhead — without code duplication.
+LAMBDA is a lightweight, in-scope code application instruction. It is Church's function application (λx.body applied to argument) implemented as a native CM instruction. LAMBDA achieves macro-like code reuse — code exists once in memory, invoked from multiple call sites with near-zero overhead — without code duplication.
 
 LAMBDA is also one of the three **dispatch styles** for abstraction method resolution (see `docs/dispatch-styles.md`). When an abstraction uses LAMBDA dispatch, CR7's code uses `LAMBDA CRn` to jump directly to method bodies — the fastest path for lightweight compute operations like those in SlideRule, Abacus, and Circle.
 

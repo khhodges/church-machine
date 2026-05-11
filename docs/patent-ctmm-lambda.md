@@ -23,7 +23,7 @@ Church-Turing Meta-Machine: Hardware-Enforced Lambda Calculus with the LAMBDA In
 
 ## CROSS-REFERENCE TO RELATED APPLICATIONS
 
-This application relates to capability-based computer architecture, hardware-enforced security through unforgeable tokens ("Golden Tokens"), and the integration of Church's lambda calculus and Turing's computational model into a unified processor architecture known as the Church-Turing Meta-Machine (CTMM).
+This application relates to capability-based computer architecture, hardware-enforced security through unforgeable tokens ("Golden Tokens"), and the integration of Church's lambda calculus and Turing's computational model into a unified processor architecture known as the Church-Turing Meta-Machine (CM).
 
 ---
 
@@ -128,7 +128,7 @@ Beyond the PP250 patent family, academic capability architectures including Camb
 
 ## SUMMARY OF THE INVENTION
 
-The present invention provides a processor architecture, the Church-Turing Meta-Machine (CTMM), that implements Church's lambda calculus in hardware through a clean separation of concerns and a lightweight code application mechanism:
+The present invention provides a processor architecture, the Church-Turing Meta-Machine (CM), that implements Church's lambda calculus in hardware through a clean separation of concerns and a lightweight code application mechanism:
 
 1. **Golden Token (GT) Type Field**: A 2-bit field in every capability token that architecturally classifies four categories: Inform (local reference), Outform (remote reference), NULL (empty/invalid), and Abstract (unforgeable constant value, e.g., pi). The Type field determines the hardware execution path at every instruction. The clean architectural rule is: capability registers (CRs) hold capabilities only, data registers (DRs) hold values only. No mixing.
 
@@ -150,7 +150,7 @@ The architecture achieves macro-like code reuse efficiency — code exists once 
 
 ### 1. Architecture Overview
 
-The Church-Turing Meta-Machine (CTMM) is a processor architecture built on the principle that every computational resource — code, data, I/O, network objects, cryptographic keys — is accessed exclusively through unforgeable capability tokens called **Golden Tokens (GTs)**. The architecture integrates two foundational computational models with a clean separation:
+The Church-Turing Meta-Machine (CM) is a processor architecture built on the principle that every computational resource — code, data, I/O, network objects, cryptographic keys — is accessed exclusively through unforgeable capability tokens called **Golden Tokens (GTs)**. The architecture integrates two foundational computational models with a clean separation:
 
 - **Turing's model**: Data registers (x0-x31 in the 32-bit implementation, DR0-DR15 in the 64-bit implementation) hold numeric values and perform arithmetic, logic, comparison, and branching. This is the computational substrate. Data registers hold values — and only values.
 
@@ -337,7 +337,7 @@ The distinction is Church's: application within a domain (λ-application, X perm
 
 #### 3.9 The Golden Rule — Strengthened
 
-The **Golden Rule** of the CTMM architecture is: mLoad is the sole trusted path for all capability register writes that involve namespace dereferencing. The LAMBDA instruction strengthens this rule because LAMBDA does not write to capability registers at all. It branches to code and returns. Arguments and results flow through data registers, not capability registers. The capability register file is untouched by LAMBDA execution.
+The **Golden Rule** of the CM architecture is: mLoad is the sole trusted path for all capability register writes that involve namespace dereferencing. The LAMBDA instruction strengthens this rule because LAMBDA does not write to capability registers at all. It branches to code and returns. Arguments and results flow through data registers, not capability registers. The capability register file is untouched by LAMBDA execution.
 
 This makes LAMBDA safe by construction: it cannot forge, modify, or create capabilities. It merely executes code (verified by X permission check) on values (in data registers). The capability register file's integrity is preserved without any validation overhead.
 
@@ -345,7 +345,7 @@ This makes LAMBDA safe by construction: it cannot forge, modify, or create capab
 
 #### 4.1 Clean Separation: CRs = Capabilities, DRs = Values
 
-The CTMM architecture enforces a clean separation between the capability domain and the value domain:
+The CM architecture enforces a clean separation between the capability domain and the value domain:
 
 - **Capability registers (CRs)** hold Golden Tokens exclusively. Every GT in a CR has a Type field (Inform, Outform, NULL, or Abstract) and is subject to hardware type checking at every instruction. CRs never hold raw numeric values.
 
@@ -385,7 +385,7 @@ The LAMBDA instruction maintains capability security through several mechanisms:
 
 ### 5. The mLoad Master Validation Path
 
-The mLoad function is the single trusted path for all namespace access in the CTMM architecture. Every Church instruction (CAP.LOAD, CAP.SAVE, CAP.CALL, CAP.RETURN, CAP.CHANGE, CAP.SWITCH) routes through mLoad. This is the **Golden Rule**: mLoad is the sole path for all capability register writes that involve namespace dereferencing.
+The mLoad function is the single trusted path for all namespace access in the CM architecture. Every Church instruction (CAP.LOAD, CAP.SAVE, CAP.CALL, CAP.RETURN, CAP.CHANGE, CAP.SWITCH) routes through mLoad. This is the **Golden Rule**: mLoad is the sole path for all capability register writes that involve namespace dereferencing.
 
 The mLoad master validation sequence performs five checks in order:
 
@@ -410,7 +410,7 @@ This strengthens the Golden Rule rather than violating it: mLoad remains the sol
 
 The architecture implements a direct hardware correspondence with Church's lambda calculus:
 
-| Lambda Calculus Concept | CTMM Hardware Element |
+| Lambda Calculus Concept | CM Hardware Element |
 |------------------------|----------------------|
 | Abstraction (λx.body) | GT with X permission referencing code object in a CR |
 | Variable (bound name) | Data register x holding the argument value |
@@ -610,7 +610,7 @@ The three dispatch styles demonstrate that LAMBDA is not merely an optimization 
 
 ### 11. Atomic Abstraction Architecture
 
-The CTMM eliminates four architectural pillars that every major cyberattack exploits:
+The CM eliminates four architectural pillars that every major cyberattack exploits:
 
 1. **No central operating system**: All system services are atomic abstractions accessed through Golden Tokens. There is no monolithic kernel with unrestricted hardware access.
 
@@ -642,7 +642,7 @@ CALL(CONNECT(me, mymother))
 
 This single Church instruction uses 3 Golden Tokens and achieves all 7 Zeroes: zero OS, zero VM, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, zero containment escape. The escalation paths exploited by malware, ransomware, and AI breakout are structurally eliminated — not mitigated by software, but absent from the hardware.
 
-The Hello Mum example is implemented as a bidirectional messaging system ("Hello Mum / Hello Son") between two simulated CTMM machines — Kenneth (CTMM, Sim-64) and Priscilla (Capability, Sim-32) — demonstrating secure cross-architecture communication through an encrypted capability tunnel with interactive notifications, timestamps, and reply capabilities.
+The Hello Mum example is implemented as a bidirectional messaging system ("Hello Mum / Hello Son") between two simulated CM machines — Kenneth (CM, Sim-64) and Priscilla (Capability, Sim-32) — demonstrating secure cross-architecture communication through an encrypted capability tunnel with interactive notifications, timestamps, and reply capabilities.
 
 ### 13. Abstraction Nesting and Resource Management
 
@@ -722,7 +722,7 @@ A parallel implementation in SystemVerilog provides the same architectural cover
 
 #### 16.3 FPGA Target
 
-Resource estimates for Intel Cyclone V 5CSEBA6 (41,910 ALMs, 553 M10K blocks) indicate the CTMM core uses approximately 10% of chip resources, leaving substantial headroom for peripherals and memory controllers. The architecture is designed for integration with a RISC-V SoC base design, with two integration paths: (a) CTMM as a co-processor alongside an RV32I core, or (b) CTMM as a replacement for the RV32I pipeline using the existing peripheral infrastructure.
+Resource estimates for Intel Cyclone V 5CSEBA6 (41,910 ALMs, 553 M10K blocks) indicate the CM core uses approximately 10% of chip resources, leaving substantial headroom for peripherals and memory controllers. The architecture is designed for integration with a RISC-V SoC base design, with two integration paths: (a) CM as a co-processor alongside an RV32I core, or (b) CM as a replacement for the RV32I pipeline using the existing peripheral infrastructure.
 
 ### 17. Performance Analysis
 
@@ -848,7 +848,7 @@ The architecture of Claim 1, wherein the operation to create new Golden Tokens (
 
 ## ABSTRACT
 
-A processor architecture, the Church-Turing Meta-Machine (CTMM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Abstract (unforgeable constant). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The architecture eliminates the four pillars of conventional insecurity — operating system, virtual memory, privilege rings, and superuser — replacing them with atomic abstractions accessed exclusively through Golden Tokens and a single trusted gate (mLoad) that performs five-check validation (permission, bounds, MAC, G-bit reset, thread shadow update) on every namespace access. A transient M (Meta/Microcode) permission, never stored in GTs, provides privileged microcode access to metadata objects without requiring a privileged hardware mode. Three dispatch styles — symbolic resolver (maximum security), LAMBDA fast-path (maximum performance), and traditional compiled binary (compatibility) — give abstraction creators control over the security/performance tradeoff while presenting a uniform interface to callers. The Mint operation enforces domain purity (Turing or Church permissions, never mixed) and is accessed through a chain of abstraction nesting hidden behind capability boundaries. A five-phase hardware boot sequence initializes all capability registers to NULL before loading valid GTs through mLoad. The architecture achieves seven security zeros: zero OS, zero virtual memory, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape. The architecture is implemented in synthesizable Amaranth HDL (16 modules, ~3,000 lines) and SystemVerilog, targeting FPGA implementation on Intel Cyclone V.
+A processor architecture, the Church-Turing Meta-Machine (CM), that integrates Church's lambda calculus with Turing's computational model through a clean separation of capabilities and values and a lightweight code application mechanism. Each Golden Token (GT) contains a 2-bit Type field classifying capabilities as: Inform (local reference), Outform (remote reference), NULL (empty/invalid), or Abstract (unforgeable constant). The NULL type provides an unambiguous hardware-enforced representation for empty, uninitialized, or revoked capability registers, causing an immediate fault on any operation. Capability registers hold capabilities exclusively; data registers hold values exclusively. A LAMBDA instruction applies a code body (GT with Execute permission in a capability register) to an argument (value in a data register), executing within the same protection domain without stack frame allocation, capability list switching, or namespace revalidation — a macro that doesn't replicate the code base. A machine-status fast path stores the return address and LAMBDA-active flag in dedicated machine status registers, achieving zero stack access for the common LAMBDA → body → RETURN pattern. Self-describing stack frames with a 1-bit tag distinguish CALL frames from LAMBDA frames, enabling correct restoration on return. The architecture eliminates the four pillars of conventional insecurity — operating system, virtual memory, privilege rings, and superuser — replacing them with atomic abstractions accessed exclusively through Golden Tokens and a single trusted gate (mLoad) that performs five-check validation (permission, bounds, MAC, G-bit reset, thread shadow update) on every namespace access. A transient M (Meta/Microcode) permission, never stored in GTs, provides privileged microcode access to metadata objects without requiring a privileged hardware mode. Three dispatch styles — symbolic resolver (maximum security), LAMBDA fast-path (maximum performance), and traditional compiled binary (compatibility) — give abstraction creators control over the security/performance tradeoff while presenting a uniform interface to callers. The Mint operation enforces domain purity (Turing or Church permissions, never mixed) and is accessed through a chain of abstraction nesting hidden behind capability boundaries. A five-phase hardware boot sequence initializes all capability registers to NULL before loading valid GTs through mLoad. The architecture achieves seven security zeros: zero OS, zero virtual memory, zero privilege escalation, zero superuser, zero unauthorized code execution, zero unauthorized data access, and zero containment escape. The architecture is implemented in synthesizable Amaranth HDL (16 modules, ~3,000 lines) and SystemVerilog, targeting FPGA implementation on Intel Cyclone V.
 
 ---
 
@@ -876,7 +876,7 @@ Sequence diagram showing: LAMBDA (sets LAMBDA-active) → body → CALL (saves L
 
 ### Figure 6: Lambda Calculus Correspondence
 
-Table mapping Church's lambda calculus concepts (abstraction, variable, application, substitution, result) to CTMM hardware elements (GT with X permission, data register argument, LAMBDA instruction, code body execution, data register result).
+Table mapping Church's lambda calculus concepts (abstraction, variable, application, substitution, result) to CM hardware elements (GT with X permission, data register argument, LAMBDA instruction, code body execution, data register result).
 
 ### Figure 7: Constructive Example — Clamp Function
 
@@ -892,7 +892,7 @@ Three-column comparison showing the same caller instruction `CALL(Abstraction.Me
 
 ### Figure 10: Atomic Abstraction Architecture — 7 Zeroes
 
-Diagram contrasting conventional architecture (OS kernel, virtual memory, privilege rings, superuser — four attack surfaces) with CTMM architecture (atomic abstractions, namespace entries, mLoad trusted gate, Golden Tokens — zero attack surfaces). Shows the 7 Zeroes security properties and how each conventional attack vector is structurally eliminated.
+Diagram contrasting conventional architecture (OS kernel, virtual memory, privilege rings, superuser — four attack surfaces) with CM architecture (atomic abstractions, namespace entries, mLoad trusted gate, Golden Tokens — zero attack surfaces). Shows the 7 Zeroes security properties and how each conventional attack vector is structurally eliminated.
 
 ### Figure 11: Five-Phase Boot Sequence
 
@@ -908,6 +908,6 @@ Nested box diagram showing the caller's view (`CALL(Thread.Mint(type, size, acce
 
 ### Figure 14: Hello Mum — Secure Cross-Architecture Communication
 
-Diagram showing Kenneth's CTMM machine (Sim-64) and Priscilla's Capability machine (Sim-32) connected by an encrypted capability tunnel. Shows the single Church instruction `CALL(CONNECT(me, mymother))`, the 3 Golden Tokens involved, and the 7 Zeroes achieved. Annotated with the absence of OS, VM, privilege hardware, and superuser at every layer.
+Diagram showing Kenneth's CM machine (Sim-64) and Priscilla's Capability machine (Sim-32) connected by an encrypted capability tunnel. Shows the single Church instruction `CALL(CONNECT(me, mymother))`, the 3 Golden Tokens involved, and the 7 Zeroes achieved. Annotated with the absence of OS, VM, privilege hardware, and superuser at every layer.
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*

@@ -23,7 +23,7 @@ Pure Church Lambda Processor: Architectural Exclusion of Turing-Domain Instructi
 
 ## CROSS-REFERENCE TO RELATED APPLICATIONS
 
-This application is a continuation-in-part of the CTMM patent application filed February 12, 2026, which discloses the Golden Token capability architecture, domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions, the LAMBDA instruction for lightweight in-scope code application, and the atomic abstraction architecture. The present application extends that disclosure by demonstrating that the Turing domain can be entirely eliminated from the software instruction set without loss of computational completeness, and that this elimination constitutes a novel security enforcement mechanism.
+This application is a continuation-in-part of the CM patent application filed February 12, 2026, which discloses the Golden Token capability architecture, domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions, the LAMBDA instruction for lightweight in-scope code application, and the atomic abstraction architecture. The present application extends that disclosure by demonstrating that the Turing domain can be entirely eliminated from the software instruction set without loss of computational completeness, and that this elimination constitutes a novel security enforcement mechanism.
 
 ---
 
@@ -43,11 +43,11 @@ Software mitigations (ASLR, stack canaries, DEP/W^X, control flow integrity) red
 
 ### The Capability Limitation
 
-Capability-based architectures (Cambridge CAP, IBM System/38, CHERI, and the parent CTMM application) enforce access control through unforgeable tokens, requiring valid capabilities for every memory access. However, all prior capability architectures retain Turing-domain instructions for computation. While capabilities prevent unauthorized access to memory regions, they do not prevent misuse of legitimate access — a program with a valid write capability can still overflow a buffer within its authorized region, and Turing-domain branch instructions can still be chained for ROP attacks within the program's own code space.
+Capability-based architectures (Cambridge CAP, IBM System/38, CHERI, and the parent CM application) enforce access control through unforgeable tokens, requiring valid capabilities for every memory access. However, all prior capability architectures retain Turing-domain instructions for computation. While capabilities prevent unauthorized access to memory regions, they do not prevent misuse of legitimate access — a program with a valid write capability can still overflow a buffer within its authorized region, and Turing-domain branch instructions can still be chained for ROP attacks within the program's own code space.
 
 ### The Discovery
 
-The parent CTMM application discloses domain purity enforcement: Golden Token permissions are separated into Turing domain (R, W, X) and Church domain (L, S, E), and a GT cannot have permissions from both domains simultaneously. This separation was designed for architectural cleanliness.
+The parent CM application discloses domain purity enforcement: Golden Token permissions are separated into Turing domain (R, W, X) and Church domain (L, S, E), and a GT cannot have permissions from both domains simultaneously. This separation was designed for architectural cleanliness.
 
 The present invention recognizes that domain purity can be extended to its logical conclusion: **an entire processor can operate with only Church-domain instructions available to software.** The inventor has demonstrated this through three complete proof implementations:
 
@@ -116,7 +116,7 @@ The pure Church processor comprises three hardware blocks:
 
 1. **Lambda Reducer**: Executes LOAD, SAVE, CALL, RETURN, LAMBDA, TPERM. Performs Church-encoded lambda reduction. Contains no arithmetic logic unit (ALU), no barrel shifter, no condition flag register, no branch prediction unit.
 
-2. **Capability Validator**: Checks Golden Token permissions, verifies domain purity, validates version seals (FNV), performs the mLoad five-check validation sequence. This module is unchanged from the parent CTMM architecture.
+2. **Capability Validator**: Checks Golden Token permissions, verifies domain purity, validates version seals (FNV), performs the mLoad five-check validation sequence. This module is unchanged from the parent CM architecture.
 
 3. **I/O Mediator**: Translates capability-secured SAVE/LOAD operations on device GTs (F=1) into physical bus transactions. The sole interface between pure lambda software and hardware peripherals.
 
@@ -295,7 +295,7 @@ A method of programming the pure Church lambda processor of Claim 17, wherein al
 | CHERI (Cambridge) | No | Yes | No | No |
 | Reduceron | Yes | No | No | No |
 | GRIP | Yes | No | No | No |
-| CTMM (parent application) | Yes | Yes | No | No |
+| CM (parent application) | Yes | Yes | No | No |
 | **Pure Church Machine (this CIP)** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 No prior system combines all four properties. The present invention is the first to use the architectural exclusion of Turing-domain instructions as a security enforcement mechanism within a capability-based architecture.

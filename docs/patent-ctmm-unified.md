@@ -29,7 +29,7 @@ Church-Turing Meta-Machine: Dual-Gate Trusted Security Base with Hardware-Enforc
 
 This application consolidates and extends two related filings:
 
-1. The CTMM patent application filed February 12, 2026, which discloses the Golden Token capability architecture, domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions, the LAMBDA instruction for lightweight in-scope code application, and the atomic abstraction architecture.
+1. The CM patent application filed February 12, 2026, which discloses the Golden Token capability architecture, domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions, the LAMBDA instruction for lightweight in-scope code application, and the atomic abstraction architecture.
 
 2. The continuation-in-part filed February 2026, which discloses the Pure Church Lambda Machine — demonstrating that the Turing domain can be entirely eliminated from the software instruction set without loss of computational completeness, and that this elimination constitutes a novel security enforcement mechanism.
 
@@ -63,7 +63,7 @@ Prior capability architectures do not control capability propagation at the hard
 
 ### The Discovery: Pure Church Computational Completeness
 
-The parent CTMM application discloses domain purity enforcement: Golden Token permissions are separated into Turing domain (R, W, X) and Church domain (L, S, E), and a GT cannot have permissions from both domains simultaneously. The present invention recognizes that domain purity can be extended to its logical conclusion: an entire processor can operate with only Church-domain instructions available to software, achieving computational completeness through Church-encoded lambda calculus and eliminating entire classes of vulnerabilities by construction.
+The parent CM application discloses domain purity enforcement: Golden Token permissions are separated into Turing domain (R, W, X) and Church domain (L, S, E), and a GT cannot have permissions from both domains simultaneously. The present invention recognizes that domain purity can be extended to its logical conclusion: an entire processor can operate with only Church-domain instructions available to software, achieving computational completeness through Church-encoded lambda calculus and eliminating entire classes of vulnerabilities by construction.
 
 ### Prior Art — PP250 Capability Architecture
 
@@ -118,13 +118,13 @@ The above prior art establishes capability registers, capability-mediated memory
 | CHERI (Cambridge) | No | No | Yes | No | No |
 | LISP Machines | No | Yes | No | No | No |
 | Reduceron | No | Yes | No | No | No |
-| CTMM (this invention) | **Yes** | **Yes** | **Yes** | **Yes** (Pure Church variant) | **Yes** |
+| CM (this invention) | **Yes** | **Yes** | **Yes** | **Yes** (Pure Church variant) | **Yes** |
 
 ---
 
 ## SUMMARY OF THE INVENTION
 
-The present invention provides a processor architecture, the Church-Turing Meta-Machine (CTMM), that implements capability-based security through a dual-gate Trusted Security Base and integrates Church's lambda calculus with Turing's computational model:
+The present invention provides a processor architecture, the Church-Turing Meta-Machine (CM), that implements capability-based security through a dual-gate Trusted Security Base and integrates Church's lambda calculus with Turing's computational model:
 
 ### 1. Golden Token (GT) Architecture
 
@@ -178,7 +178,7 @@ Memory (MSB 0x00-0xFD), attached devices (MSB 0xFE), and machine register bank (
 
 ### 1. Architecture Overview
 
-The CTMM is a processor architecture built on the principle that every computational resource — code, data, I/O, network objects, cryptographic keys — is accessed exclusively through unforgeable capability tokens called Golden Tokens (GTs). The architecture integrates two foundational computational models with clean separation:
+The CM is a processor architecture built on the principle that every computational resource — code, data, I/O, network objects, cryptographic keys — is accessed exclusively through unforgeable capability tokens called Golden Tokens (GTs). The architecture integrates two foundational computational models with clean separation:
 
 - **Turing's model**: Data registers hold numeric values and perform arithmetic, logic, comparison, and branching. Data registers hold values — and only values.
 
@@ -235,7 +235,7 @@ GT [63:0]:
 
 ### 3. The Dual-Gate Trusted Security Base
 
-The CTMM architecture's security is enforced by two hardware gates that form the complete Trusted Security Base (TSB). Every capability operation must pass through one or both gates. The total TSB is approximately 329 lines of synthesizable Amaranth HDL.
+The CM architecture's security is enforced by two hardware gates that form the complete Trusted Security Base (TSB). Every capability operation must pass through one or both gates. The total TSB is approximately 329 lines of synthesizable Amaranth HDL.
 
 #### 3.1 mLoad — The Read Gate
 
@@ -339,7 +339,7 @@ In both implementations, the security guarantee is identical:
 
 **No instruction, no microcode sequence, no hardware path can read a Golden Token from the namespace without passing through mLoad's complete validation pipeline. No instruction can write a Golden Token to a C-List without passing through mSave's complete validation pipeline. If either gate rejects an operation, it faults. Period.**
 
-This dual-gate architecture is novel: all prior capability systems validate only on the read path. The CTMM validates on both read and write paths, with the B-bit providing hardware-enforced control over capability propagation.
+This dual-gate architecture is novel: all prior capability systems validate only on the read path. The CM validates on both read and write paths, with the B-bit providing hardware-enforced control over capability propagation.
 
 ### 4. The B (Bind) Bit
 
@@ -487,7 +487,7 @@ Memory (MSB 0x00-0xFD), attached devices (MSB 0xFE), and machine register bank (
 
 ### 13. Atomic Abstraction Architecture
 
-The CTMM eliminates four architectural pillars that every major cyberattack exploits:
+The CM eliminates four architectural pillars that every major cyberattack exploits:
 
 1. **No central operating system**: All system services are atomic abstractions accessed through Golden Tokens.
 2. **No virtual memory**: Namespace entries are the memory model.
@@ -555,7 +555,7 @@ A Haskell implementation (~1,000 lines, 6 modules) providing an interactive prog
 
 ### Web Simulators
 
-Three web-based simulators (CTMM Sim-64, Capability Sim-32, Pure Church Machine) demonstrate all architectural features interactively, including the dual-gate TSB, B-bit enforcement, PP250 garbage collection, LAMBDA execution, and cross-architecture tunnel messaging.
+Three web-based simulators (CM Sim-64, Capability Sim-32, Pure Church Machine) demonstrate all architectural features interactively, including the dual-gate TSB, B-bit enforcement, PP250 garbage collection, LAMBDA execution, and cross-architecture tunnel messaging.
 
 ---
 
@@ -827,7 +827,7 @@ The architecture of Claim 3, wherein the LAMBDA instruction enables a code body 
 
 ## ABSTRACT
 
-A processor architecture, the Church-Turing Meta-Machine (CTMM), enforcing capability-based security through a dual-gate Trusted Security Base (TSB) comprising an mLoad read gate and an mSave write gate. Every Golden Token (GT) contains a 2-bit Type field (Inform, Outform, NULL, Abstract) and 6 permission bits organized into mutually exclusive Turing (R, W, X) and Church (L, S, E) domains. mLoad validates every read-side capability operation through permission, bounds, version, MAC, and G-bit checks; mSave validates every write of a capability to a C-List through version, seal, target bounds, B-bit (bind), and F-bit (far/foreign) checks. The B (Bind) bit, defaulting to 0, provides hardware-enforced control over capability propagation — CALL auto-clears B on preserved capabilities, and explicit TPERM is required to allow bind. A LAMBDA instruction provides lightweight in-scope code application with machine-status fast path and zero stack access. Self-describing stack frames with a 1-bit tag distinguish CALL from LAMBDA frames. The architecture eliminates the OS, virtual memory, privilege rings, and superuser, replacing them with atomic abstractions and 7 security zeros. Deterministic PP250 garbage collection uses bidirectional G-bit integrated into both mLoad and mSave. In its Pure Church variant, the processor operates with only 6 Church-domain instructions, architecturally excluding all Turing-domain instructions to eliminate buffer overflows, ROP attacks, code injection, and privilege escalation by construction. Three software proofs (HP-35 calculator, SlideRule engine, interactive REPL) and synthesizable FPGA implementations (Amaranth HDL, SystemVerilog) demonstrate computational completeness and practical realizability. The total TSB is fewer than 400 lines of synthesizable HDL — five orders of magnitude smaller than Linux, two orders of magnitude smaller than seL4.
+A processor architecture, the Church-Turing Meta-Machine (CM), enforcing capability-based security through a dual-gate Trusted Security Base (TSB) comprising an mLoad read gate and an mSave write gate. Every Golden Token (GT) contains a 2-bit Type field (Inform, Outform, NULL, Abstract) and 6 permission bits organized into mutually exclusive Turing (R, W, X) and Church (L, S, E) domains. mLoad validates every read-side capability operation through permission, bounds, version, MAC, and G-bit checks; mSave validates every write of a capability to a C-List through version, seal, target bounds, B-bit (bind), and F-bit (far/foreign) checks. The B (Bind) bit, defaulting to 0, provides hardware-enforced control over capability propagation — CALL auto-clears B on preserved capabilities, and explicit TPERM is required to allow bind. A LAMBDA instruction provides lightweight in-scope code application with machine-status fast path and zero stack access. Self-describing stack frames with a 1-bit tag distinguish CALL from LAMBDA frames. The architecture eliminates the OS, virtual memory, privilege rings, and superuser, replacing them with atomic abstractions and 7 security zeros. Deterministic PP250 garbage collection uses bidirectional G-bit integrated into both mLoad and mSave. In its Pure Church variant, the processor operates with only 6 Church-domain instructions, architecturally excluding all Turing-domain instructions to eliminate buffer overflows, ROP attacks, code injection, and privilege escalation by construction. Three software proofs (HP-35 calculator, SlideRule engine, interactive REPL) and synthesizable FPGA implementations (Amaranth HDL, SystemVerilog) demonstrate computational completeness and practical realizability. The total TSB is fewer than 400 lines of synthesizable HDL — five orders of magnitude smaller than Linux, two orders of magnitude smaller than seL4.
 
 ---
 
@@ -871,7 +871,7 @@ Table showing each vulnerability class (buffer overflow, ROP, code injection, pr
 
 ### Figure 10: Atomic Abstraction Architecture — 7 Zeroes
 
-Conventional architecture (OS, VM, privilege rings, superuser — four attack surfaces) contrasted with CTMM (atomic abstractions, namespace entries, dual-gate TSB, Golden Tokens — zero attack surfaces).
+Conventional architecture (OS, VM, privilege rings, superuser — four attack surfaces) contrasted with CM (atomic abstractions, namespace entries, dual-gate TSB, Golden Tokens — zero attack surfaces).
 
 ### Figure 11: Safe Turing Abstractions
 

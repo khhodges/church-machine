@@ -7,7 +7,7 @@
 
 G (Garbage) is a liveness flag used in the garbage collection process. It is **not** a GT permission bit -- it is part of the GC infrastructure. The two simulators implement G differently:
 
-- **Sim-64 (CTMM)**: G is a 1-bit field in the 64-bit GT layout (bit 57). It is reset (cleared to 0) on every namespace access through mLoad, and set to 1 during the Mark phase.
+- **Sim-64 (CM)**: G is a 1-bit field in the 64-bit GT layout (bit 57). It is reset (cleared to 0) on every namespace access through mLoad, and set to 1 during the Mark phase.
 - **Church Machine (Sim-32)**: G is tracked in the namespace entry (`WORD2_LAYOUT.g_bit`, bit 28), not in the GT itself. Liveness is determined by version matching — when a namespace entry is swept, its 7-bit `gt_seq` is bumped, instantly invalidating all stale GTs whose `gt_seq` no longer matches.
 
 In both implementations, the liveness signal is integrated into the mLoad validation path:

@@ -8158,7 +8158,7 @@ const WELCOME_SLIDES = [
     {
         html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">The Church Machine &mdash; 32-bit clean-start architecture</div>` +
         `<p style="font-size:0.88rem;line-height:1.6;margin-bottom:0.75rem;">` +
-        `The Church-Turing Meta-Machine (CTMM) is a <strong>32-bit clean-start architecture</strong> devised by Kenneth J Hamer-Hodges, FIEE. ` +
+        `The Church-Turing Meta-Machine (CM) is a <strong>32-bit clean-start architecture</strong> devised by Kenneth J Hamer-Hodges, FIEE. ` +
         `It replaces the legacy von Neumann model with hardware-enforced Church instructions &mdash; ` +
         `every capability access goes through an unforgeable Golden Token.</p>` +
         `<div style="font-weight:600;color:var(--church-gold);font-size:0.88rem;margin-bottom:0.45rem;">The 11 Church Instructions</div>` +

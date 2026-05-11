@@ -31,7 +31,7 @@ O(1) Lambda Recursion Through Idempotent Self-Invocation via Capability List Reg
 
 ## CROSS-REFERENCE TO RELATED APPLICATIONS
 
-This application is a continuation-in-part of the CTMM patent applications filed February–March 2026, which disclose: the Golden Token (GT) capability architecture with domain purity enforcement; the LAMBDA instruction for lightweight in-scope code application with machine-status fast path; self-describing stack frames with 1-bit CALL/LAMBDA tag; non-nestable LAMBDA with CALL-mediated nesting; the CALL lump split creating CR14 (code, X-only) and CR6 (c-list, L-only); and the CLOOMC++ multi-language compiler with JavaScript and Haskell front-ends.
+This application is a continuation-in-part of the CM patent applications filed February–March 2026, which disclose: the Golden Token (GT) capability architecture with domain purity enforcement; the LAMBDA instruction for lightweight in-scope code application with machine-status fast path; self-describing stack frames with 1-bit CALL/LAMBDA tag; non-nestable LAMBDA with CALL-mediated nesting; the CALL lump split creating CR14 (code, X-only) and CR6 (c-list, L-only); and the CLOOMC++ multi-language compiler with JavaScript and Haskell front-ends.
 
 The present application extends those disclosures with five innovations:
 
@@ -61,7 +61,7 @@ All known processor architectures implement recursion through stack frames. Each
 
 ### The Parent Architecture's Recursion Model
 
-The parent CTMM application discloses two code invocation mechanisms:
+The parent CM application discloses two code invocation mechanisms:
 
 - **CALL** (E permission): Crosses a protection domain boundary. Pushes a 2-word stack frame (E-GT + machine word with NIA). Performs namespace gate swap, creating new CR14 (code) and CR6 (c-list). Full mLoad validation on return. Heavyweight but secure.
 
@@ -562,8 +562,8 @@ A method of representing mathematical constants in a capability-based processor,
 | LISP Machines | TCO (compiler) | No | No | No | No | No | Stack |
 | Reduceron | Graph reduction | No | No | No | No | No | Heap |
 | CHERI | Same as base ISA | No | No | No | No | No | Capability cache |
-| CTMM (parent) | CALL only (LAMBDA FAULTs) | No | No | No | No | No | — |
-| **CTMM (this CIP)** | **CALL CR6 + LAMBDA CR6** | **Yes** | **Yes** | **Yes (2 RETURNs)** | **Yes** | **Yes** | **None** |
+| CM (parent) | CALL only (LAMBDA FAULTs) | No | No | No | No | No | — |
+| **CM (this CIP)** | **CALL CR6 + LAMBDA CR6** | **Yes** | **Yes** | **Yes (2 RETURNs)** | **Yes** | **Yes** | **None** |
 
 ### Tail-Call Optimization (TCO) — Closest Prior Art
 

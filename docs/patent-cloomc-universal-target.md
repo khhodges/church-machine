@@ -27,7 +27,7 @@ Language-Independent Capability-Secured Instruction Set Architecture with Multi-
 
 ## CROSS-REFERENCE TO RELATED APPLICATIONS
 
-This application is a continuation-in-part of the CTMM patent applications filed February 2026, which disclose: the Golden Token (GT) capability architecture with domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions; the LAMBDA instruction for lightweight in-scope code application; the atomic abstraction architecture; the dual-gate Trusted Security Base (mLoad + mSave); and the Pure Church variant demonstrating that Turing-domain instructions can be architecturally excluded without loss of computational completeness.
+This application is a continuation-in-part of the CM patent applications filed February 2026, which disclose: the Golden Token (GT) capability architecture with domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions; the LAMBDA instruction for lightweight in-scope code application; the atomic abstraction architecture; the dual-gate Trusted Security Base (mLoad + mSave); and the Pure Church variant demonstrating that Turing-domain instructions can be architecturally excluded without loss of computational completeness.
 
 The present application extends those disclosures by demonstrating that the capability-secured instruction set constitutes a **universal computation target** — a fixed, language-independent instruction set to which multiple programming paradigms (imperative, functional, declarative) can be compiled while preserving the hardware security guarantees of the parent architecture. The invention introduces: (1) a multi-language compiler with paradigm-specific front-ends and a shared capability-aware back-end; (2) a Resident Object Model that maps source-language capability references to hardware c-list offsets; (3) a single-lump abstraction model where one namespace entry describes both code and capability list, split by hardware at CALL time; (4) an upload-driven abstraction lifecycle managed by a sole namespace authority (Navana); and (5) the architectural separation of correctness (compiler domain) from security (hardware domain).
 
@@ -55,7 +55,7 @@ This coupling has three consequences:
 
 ### The Discovery: Language-Independent Capability Target
 
-The parent CTMM application discloses 20 instructions divided into two domains: 10 Church-domain (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA) and 10 Turing-domain (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR), plus a shared RETURN. Domain purity is enforced by hardware: a GT cannot hold permissions from both domains simultaneously.
+The parent CM application discloses 20 instructions divided into two domains: 10 Church-domain (LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA) and 10 Turing-domain (DREAD, DWRITE, BFEXT, BFINS, MCMP, IADD, ISUB, BRANCH, SHL, SHR), plus a shared RETURN. Domain purity is enforced by hardware: a GT cannot hold permissions from both domains simultaneously.
 
 The present invention recognizes that this 20-instruction set is not merely "sufficient" for computation — it is a **universal computation target** in the following precise sense: source programs from fundamentally different programming paradigms (imperative and functional) compile to the same instruction set, producing semantically equivalent machine code, while the hardware security model (capability validation, domain purity, bounds checking) applies identically regardless of source language.
 
@@ -511,7 +511,7 @@ The processor of Claim 24, wherein:
 | WebAssembly (W3C) | Yes (C, Rust, Go) | No (sandbox only) | No | No | No |
 | LISP Machines | No (LISP only) | No | No | No | No |
 | Reduceron | No (Haskell only) | No | No | No | No |
-| CTMM (parent) | No (single language) | Yes | Partially | No | Partially |
+| CM (parent) | No (single language) | Yes | Partially | No | Partially |
 | **Church Machine (this CIP)** | **Yes** | **Yes** | **Yes** | **Yes** | **Yes** |
 
 **Key distinctions from JVM/CLR/LLVM**: These are multi-language compilation targets, but they lack hardware capability security. The compiler is inside the trusted computing base — a compiler bug can produce code that violates the security model (buffer overflows in JVM native methods, unsafe blocks in .NET, undefined behavior in LLVM-compiled C).

@@ -17,7 +17,7 @@
 
 ## SUMMARY OF THE INVENTION
 
-The Church-Turing Meta-Machine (CTMM) uses CLOOMC, fail-safe, machine code in a processor architecture that enforces all access control through unforgeable capability tokens called **Golden Tokens (GTs)**, validated by a dual-gate Trusted Security Base. The architecture integrates Church's lambda calculus with Turing's computational model through clean domain separation that flawlessly eliminates entire classes of known vulnerabilities in computer science by proactive design construction rather than by reactive software mitigation.
+The Church-Turing Meta-Machine (CM) uses CLOOMC, fail-safe, machine code in a processor architecture that enforces all access control through unforgeable capability tokens called **Golden Tokens (GTs)**, validated by a dual-gate Trusted Security Base. The architecture integrates Church's lambda calculus with Turing's computational model through clean domain separation that flawlessly eliminates entire classes of known vulnerabilities in computer science by proactive design construction rather than by reactive software mitigation.
 
 ### Core Principles
 
@@ -540,7 +540,7 @@ An I/O virtualisation mechanism wherein a single Abstract GT (Home Base tunnel a
 
 **Claim 39 — Local Peripheral Autonomy Without IDE Assistance**
 
-A hardware bootstrap mechanism wherein attached peripherals (UART, GPIO, Timer, Display, Storage) are identified and Abstract GTs are provisioned entirely during local hardware boot, before any user code runs and before any IDE connection is established, such that the CTMM maintains full security control over local I/O without any remote authority, enabling air-gapped, offline operation where the CTMM is the sole authority for its own hardware security policy.
+A hardware bootstrap mechanism wherein attached peripherals (UART, GPIO, Timer, Display, Storage) are identified and Abstract GTs are provisioned entirely during local hardware boot, before any user code runs and before any IDE connection is established, such that the CM maintains full security control over local I/O without any remote authority, enabling air-gapped, offline operation where the CM is the sole authority for its own hardware security policy.
 
 ---
 
@@ -552,7 +552,7 @@ A hardware-tracked reliability mechanism wherein every Secure Abstraction carrie
 
 **Claim 41 — Structural Capability Scoping for Crime-Free Services**
 
-A service provisioning architecture wherein a CTMM provisioned for a specific profession, language, nationality, or age group receives only Abstract GTs for services within that scope, such that any code running on the CTMM cannot access services outside the scope because the capability token does not exist, providing a structural guarantee (not a policy-based filter) that access is impossible regardless of exploits, VPN tunnels, or code injection — because the hardware rejects any operation without a valid GT.
+A service provisioning architecture wherein a CM provisioned for a specific profession, language, nationality, or age group receives only Abstract GTs for services within that scope, such that any code running on the CM cannot access services outside the scope because the capability token does not exist, providing a structural guarantee (not a policy-based filter) that access is impossible regardless of exploits, VPN tunnels, or code injection — because the hardware rejects any operation without a valid GT.
 
 ---
 
@@ -564,7 +564,7 @@ An extension of Claim 38 wherein the Home Base GT includes word2_backup1 and wor
 
 **Claim 43 — MTBF Telemetry and Distributed Reputation**
 
-An extension of Claim 40 wherein MTBF counters are sent to the IDE via Home Base W permission, signed with HMAC-SHA256, and the IDE maintains a permanent reputation record per abstraction per CTMM, such that an abstraction's reliability history is shared across the fleet: low MTBF on one CTMM lowers the threshold for all CTMMs through policy update, and high MTBF qualifies abstractions for namespace-tier distribution.
+An extension of Claim 40 wherein MTBF counters are sent to the IDE via Home Base W permission, signed with HMAC-SHA256, and the IDE maintains a permanent reputation record per abstraction per CM, such that an abstraction's reliability history is shared across the fleet: low MTBF on one CM lowers the threshold for all CMs through policy update, and high MTBF qualifies abstractions for namespace-tier distribution.
 
 ---
 
@@ -594,7 +594,7 @@ A rate-limiting mechanism wherein critical paths (mLoad for namespace access, SW
 
 **Claim 48 — MTBF Qualification as DoS Containment**
 
-An extension of Claim 40 wherein an abstraction that fails frequently is automatically downgraded to Isolated tier and cannot be propagated to other CTMMs, such that DoS-prone or malicious abstractions cannot spread across the fleet through normal capability propagation, and fleet-wide policy updates further tighten MTBF thresholds to quarantine unreliable abstractions.
+An extension of Claim 40 wherein an abstraction that fails frequently is automatically downgraded to Isolated tier and cannot be propagated to other CMs, such that DoS-prone or malicious abstractions cannot spread across the fleet through normal capability propagation, and fleet-wide policy updates further tighten MTBF thresholds to quarantine unreliable abstractions.
 
 ---
 
@@ -796,7 +796,7 @@ A method of representing mathematical constants in a capability-based processor,
 
 ## ABSTRACT
 
-The Church-Turing Meta-Machine (CTMM) is a processor architecture enforcing all access control through unforgeable capability tokens (Golden Tokens, GTs), validated by a dual-gate Trusted Security Base comprising an mLoad read gate and an mSave write gate — together fewer than 400 lines of synthesisable HDL. Every GT contains a 2-bit Type field (Inform, Outform, NULL, Abstract) and six permission bits organised into mutually exclusive Turing-domain (R, W, X) and Church-domain (L, S, E) sets. A LAMBDA instruction provides lightweight in-scope code application (Church's function application as a hardware primitive), with a machine-status fast path and zero stack access in the common case.
+The Church-Turing Meta-Machine (CM) is a processor architecture enforcing all access control through unforgeable capability tokens (Golden Tokens, GTs), validated by a dual-gate Trusted Security Base comprising an mLoad read gate and an mSave write gate — together fewer than 400 lines of synthesisable HDL. Every GT contains a 2-bit Type field (Inform, Outform, NULL, Abstract) and six permission bits organised into mutually exclusive Turing-domain (R, W, X) and Church-domain (L, S, E) sets. A LAMBDA instruction provides lightweight in-scope code application (Church's function application as a hardware primitive), with a machine-status fast path and zero stack access in the common case.
 
 The architecture operates without an OS, virtual memory, privilege rings, or superuser: all system services are atomic abstractions accessed through GTs. In its Pure Church variant, all Turing-domain instructions are architecturally excluded from the software instruction set, eliminating buffer overflows, ROP attacks, code injection, and privilege escalation **by construction** — not by mitigation. Three software proofs (HP-35 calculator in 179 instructions, SlideRule in 98 instructions, interactive REPL) and synthesisable FPGA implementations demonstrate computational completeness and practical realisation.
 

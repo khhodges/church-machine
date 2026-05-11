@@ -1035,7 +1035,7 @@ def release_r1_index():
     html = f"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8">
-<title>CTMM Release 1 — Document Set</title>
+<title>CM Release 1 — Document Set</title>
 <style>
   body{{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;padding:32px;max-width:860px;margin:0 auto}}
   h1{{color:#daa520;margin-bottom:4px}}
@@ -1048,7 +1048,7 @@ def release_r1_index():
   a{{color:#4ade80;text-decoration:none}} a:hover{{text-decoration:underline}}
   .sz{{color:#64748b;font-family:monospace}}
 </style></head><body>
-<h1>CTMM Release 1 — Document Set</h1>
+<h1>CM Release 1 — Document Set</h1>
 <p class="sub">Church-Turing Meta-Machine &middot; Kenneth J Hamer-Hodges &middot; May 2026 &middot; 14 documents</p>
 <table>
 <thead><tr><th>Document</th><th>Size</th><th>Download</th></tr></thead>
@@ -1116,7 +1116,7 @@ def ctmm_index():
     filepath = os.path.join(WEB_DIR, "index.html")
     if os.path.isfile(filepath):
         return _serve_file(filepath, "index.html")
-    return make_response("CTMM simulator not found", 404)
+    return make_response("CM simulator not found", 404)
 
 _CTMM_ALLOWED_EXTENSIONS = {
     ".html", ".js", ".css", ".json", ".png", ".jpg", ".jpeg",

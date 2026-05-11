@@ -25,7 +25,7 @@ Church-Turing Meta-Machine: Abstract Golden Token I/O and Network Addressing Arc
 
 ## CROSS-REFERENCE TO RELATED APPLICATIONS
 
-This continuation-in-part extends the CTMM patent applications filed February 2026, which disclosed:
+This continuation-in-part extends the CM patent applications filed February 2026, which disclosed:
 
 1. The Golden Token capability architecture and dual-gate trusted security base (mLoad / mSave)
 2. Domain purity enforcement separating Turing-domain (R, W, X) from Church-domain (L, S, E) permissions
@@ -37,9 +37,9 @@ The present application extends that disclosure with:
 
 1. **Abstract Golden Tokens** — a novel capability token class (`gt_type = 11₂`) whose `word1_location` field holds a hardware-routed sentinel address instead of a namespace slot index
 2. **The Abstract Address Space** — a 32-bit reserved range (0xFE000000–0xFFFFFFFF) controlled exclusively by the IDE for I/O peripherals, network tunnels, and system resources
-3. **The Home Base Tunnel** (0xFF000000) — the single outbound network gateway through which all CTMM network connectivity flows, with optional programmer-defined backup IDE addresses (Word 2/3)
+3. **The Home Base Tunnel** (0xFF000000) — the single outbound network gateway through which all CM network connectivity flows, with optional programmer-defined backup IDE addresses (Word 2/3)
 4. **MTBF Qualification and Downloadability Regulation** — hardware-tracked reliability metrics that gate whether abstractions may propagate beyond their provisioning c-list, with three tiers: Isolated (local only), User-regulated (individual distribution), Namespace-regulated (full namespace access)
-5. **Local Peripheral Autonomy** — CTMMs identify and secure locally attached hardware (UART, GPIO, Timer, Display) without any IDE connection, enabling air-gapped and offline operation
+5. **Local Peripheral Autonomy** — CMs identify and secure locally attached hardware (UART, GPIO, Timer, Display) without any IDE connection, enabling air-gapped and offline operation
 6. **Guaranteed Crime-Free Business Services** — structural capability scoping (not policy-based filtering) that prevents access to out-of-scope services without any bypass path, enabling verifiable safety for professional, language-specific, jurisdictional, and age-appropriate service isolation
 7. **Secure Individuality of Abstractions** — each abstraction's identity is its unique GT set in its c-list, eliminating the "privileged superuser" attack window and preventing confused deputy attacks entirely
 
@@ -47,7 +47,7 @@ The present application extends that disclosure with:
 
 ## FIELD OF THE INVENTION
 
-The present invention relates to a processor architecture that provides a unified capability-token-based mechanism for hardware-routed I/O and remote network access, eliminating the need for separate I/O subsystems, device drivers, or network protocol stacks. The architecture enables the IDE to establish deterministic, verifiable service scoping at the architectural level — not through runtime policy enforcement, but through structural capabilities — such that a user's CTMM provisioned for a specific profession, language, jurisdiction, or age group cannot access any service outside that scope, regardless of what code runs on the machine.
+The present invention relates to a processor architecture that provides a unified capability-token-based mechanism for hardware-routed I/O and remote network access, eliminating the need for separate I/O subsystems, device drivers, or network protocol stacks. The architecture enables the IDE to establish deterministic, verifiable service scoping at the architectural level — not through runtime policy enforcement, but through structural capabilities — such that a user's CM provisioned for a specific profession, language, jurisdiction, or age group cannot access any service outside that scope, regardless of what code runs on the machine.
 
 ---
 
@@ -84,17 +84,17 @@ No conventional system provides a **structural guarantee** that access is imposs
 
 ### The Trusted Network Gateway Problem
 
-In contemporary architectures, the network is accessed through a single privileged gateway (the TCP/IP stack, the hypervisor's network device, the cloud provider's edge router). If this gateway is compromised — or if the entity controlling it becomes adversarial — all network access can be monitored, throttled, or redirected. There is no way for the user or the CTMM to detect or prevent this.
+In contemporary architectures, the network is accessed through a single privileged gateway (the TCP/IP stack, the hypervisor's network device, the cloud provider's edge router). If this gateway is compromised — or if the entity controlling it becomes adversarial — all network access can be monitored, throttled, or redirected. There is no way for the user or the CM to detect or prevent this.
 
 ### The Discovery
 
-The parent CTMM application's Abstract GT type field opens a new possibility: a capability token that is not a namespace reference, but a **hardware-routed sentinel address**. This token type can be provisioned by the IDE exclusively at boot time — before any user code runs — and cannot be forged or synthesized by software.
+The parent CM application's Abstract GT type field opens a new possibility: a capability token that is not a namespace reference, but a **hardware-routed sentinel address**. This token type can be provisioned by the IDE exclusively at boot time — before any user code runs — and cannot be forged or synthesized by software.
 
-By extending this principle to a full Abstract Address Space, the CTMM can:
+By extending this principle to a full Abstract Address Space, the CM can:
 
 1. **Make I/O resources unforgeable capabilities** — no code can access a peripheral without holding the Abstract GT for it
 2. **Make network access an unforgeable capability** — the Home Base tunnel (0xFF000000) is the only outbound connection; all network access flows through it
-3. **Enable structural service scoping** — a child CTMM provisioned without the GT for adult services has no path to them, regardless of what code it runs
+3. **Enable structural service scoping** — a child CM provisioned without the GT for adult services has no path to them, regardless of what code it runs
 4. **Enable local autonomy** — peripherals are identified and secured during local hardware boot, not by IDE decree
 5. **Enable offline operation** — local services (UART, GPIO, storage) work with no IDE connection; the Home Base tunnel is optional
 
@@ -129,7 +129,7 @@ The 32-bit `word1_location` range is reserved exclusively for the IDE:
 0x00000000 – 0xFDFFFFFF    Real RAM — never an Abstract GT address
 0xFE000000 – 0xFEFFFFFF    Local hardware peripheral range (64K entries)
                             UART, GPIO, Timer, Display, Storage identified by 
-                            CTMM during local hardware boot
+                            CM during local hardware boot
 0xFF000000                 Home Base tunnel — primary outbound network gateway
 0xFF000001 – 0xFF0000FE    IDE-allocated tunnel channels (254 named remote services)
                             Each is a distinct encrypted tunnel to a named endpoint
@@ -157,7 +157,7 @@ A program that was not given a GT for a resource cannot obtain one — period.
 
 ### What It Is
 
-The Home Base Tunnel (Abstract Address 0xFF000000) is an Abstract GT that represents the CTMM's outbound connection to the IDE and cloud infrastructure. It is the **sole network interface** through which all CTMMs communicate with the outside world.
+The Home Base Tunnel (Abstract Address 0xFF000000) is an Abstract GT that represents the CM's outbound connection to the IDE and cloud infrastructure. It is the **sole network interface** through which all CMs communicate with the outside world.
 
 The Home Base GT is provisioned at boot by the IDE with:
 - `word1_location = 0xFF000000`
@@ -194,7 +194,7 @@ Backup #2: word3_backup2 = 0xFF000002 (team fallback)
 
 Hardware implements failover: if the primary is unreachable, try Backup #1; if that fails, try Backup #2. All three are provisioned atomically at boot — user code cannot change them.
 
-**Novel advantage**: A developer can ensure their CTMM falls back to a trusted private IDE, not a compromised public one, without any degradation in security. The backup addresses are unforgeable, hardware-validated, and immutable.
+**Novel advantage**: A developer can ensure their CM falls back to a trusted private IDE, not a compromised public one, without any degradation in security. The backup addresses are unforgeable, hardware-validated, and immutable.
 
 ---
 
@@ -202,9 +202,9 @@ Hardware implements failover: if the primary is unreachable, try Backup #1; if t
 
 ### The Core Insight
 
-**Each CTMM can identify and secure locally attached equipment entirely on its own — without any IDE connection, network access, or remote authority.**
+**Each CM can identify and secure locally attached equipment entirely on its own — without any IDE connection, network access, or remote authority.**
 
-During the CTMM's hardware boot sequence (before any software runs):
+During the CM's hardware boot sequence (before any software runs):
 
 1. The hardware probe enumerates attached peripherals (UART, GPIO, Timer, Display, Storage)
 2. For each peripheral, the boot sequence assigns it an Abstract Address from the local range (0xFE000000+)
@@ -213,20 +213,20 @@ During the CTMM's hardware boot sequence (before any software runs):
 
 ### Security Advantages
 
-| Scenario | Conventional System | CTMM with Local Autonomy |
+| Scenario | Conventional System | CM with Local Autonomy |
 |:---------|:-------------------|:--------------------------|
 | Air-gapped operation (no network) | I/O locked until network available | All local I/O fully functional |
 | Offline mode | Peripherals inaccessible without cloud | Peripherals secured locally with full GT enforcement |
-| Malicious IDE | IDE controls peripheral access; IDE can deny all I/O | IDE did not provision local peripherals; CTMM controls them |
+| Malicious IDE | IDE controls peripheral access; IDE can deny all I/O | IDE did not provision local peripherals; CM controls them |
 | Autonomous agent in remote location | Must phone home for every I/O operation | Operates independently for all local resources |
 
-### CTMM is the Authority for Its Own Hardware
+### CM is the Authority for Its Own Hardware
 
 The security decision — "which abstractions receive the peripheral GTs, with what permissions" — is made by the **local boot policy, not by any remote party**. A remote IDE has no ability to:
 - Revoke access to a locally attached UART
 - Deny GPIO access
 - Block storage operations
-- Isolate the CTMM from its own hardware
+- Isolate the CM from its own hardware
 
 This is a fundamental shift from conventional architectures, where the OS (a privileged entity) mediates all I/O access.
 
@@ -236,13 +236,13 @@ This is a fundamental shift from conventional architectures, where the OS (a pri
 
 ### The Problem
 
-When an abstraction is propagated from one CTMM to another via mSave, the receiving CTMM accepts it without question. But what if the abstraction is unreliable? What if it crashes frequently, corrupts data, or is malicious?
+When an abstraction is propagated from one CM to another via mSave, the receiving CM accepts it without question. But what if the abstraction is unreliable? What if it crashes frequently, corrupts data, or is malicious?
 
 Contemporary systems rely on **trust relationships** (code signing, sandboxing, user reputation) to decide what to accept. All of these can be forged or manipulated.
 
 ### The Solution: Hardware-Tracked MTBF Qualification
 
-Every Secure Abstraction carries a hardware-tracked **MTBF qualification** — a reliability metric that determines whether it may be distributed beyond its local CTMM and, if so, to whom.
+Every Secure Abstraction carries a hardware-tracked **MTBF qualification** — a reliability metric that determines whether it may be distributed beyond its local CM and, if so, to whom.
 
 The hardware tracks two counters per abstraction in the namespace entry:
 - `invocation_count` — number of times the abstraction has been called
@@ -256,7 +256,7 @@ MTBF score = invocation_count / (failure_count + 1)
 
 | Tier | MTBF Condition | S Permission | Scope |
 |:-----|:---------------|:-------------|:------|
-| **Isolated** | Below threshold or unvalidated | Hardware-locked S=0 | Local CTMM only; cannot propagate |
+| **Isolated** | Below threshold or unvalidated | Hardware-locked S=0 | Local CM only; cannot propagate |
 | **User-regulated** | Meets user-tier MTBF | S enabled | Individual user distribution via Home Base tunnel |
 | **Namespace-regulated** | Meets namespace-tier MTBF | S enabled | Full namespace access; CR15 validates each download |
 
@@ -276,9 +276,9 @@ The IDE can raise thresholds (tighten quality requirements) or lower them withou
 
 ### Telemetry and Trust
 
-The CTMM sends MTBF telemetry (counters + timescale data) back to the IDE via Home Base W permission, signed with HMAC-SHA256. The IDE maintains a **permanent MTBF record per abstraction per CTMM**, creating a distributed reputation system:
+The CM sends MTBF telemetry (counters + timescale data) back to the IDE via Home Base W permission, signed with HMAC-SHA256. The IDE maintains a **permanent MTBF record per abstraction per CM**, creating a distributed reputation system:
 
-- An abstraction that fails on one CTMM (low MTBF score) becomes less trustworthy on all CTMMs through IDE policy update
+- An abstraction that fails on one CM (low MTBF score) becomes less trustworthy on all CMs through IDE policy update
 - A highly reliable abstraction (high MTBF score) qualifies for namespace distribution, allowing others to receive and use it
 - A freshly installed, unvalidated abstraction starts at Isolated tier and must earn its way to User or Namespace tier through demonstrated reliability
 
@@ -300,7 +300,7 @@ In conventional systems, crime prevention relies on **policy layers** (filters, 
 
 The Church Machine achieves guarantees through **structural capability scoping**:
 
-> A CTMM provisioned without a GT for a service cannot access it, regardless of what code runs on the machine or what exploits are discovered.
+> A CM provisioned without a GT for a service cannot access it, regardless of what code runs on the machine or what exploits are discovered.
 
 There is no filter to bypass, no gate to trick, no policy to manipulate. **The capability does not exist.**
 
@@ -309,7 +309,7 @@ There is no filter to bypass, no gate to trick, no policy to manipulate. **The c
 Each professional domain is a distinct GT set:
 
 ```
-Medical Professional CTMM holds:
+Medical Professional CM holds:
   - GT for medical database (namespace reference)
   - GT for clinical reference service (tunnel channel)
   - GT for regulated comms (tunnel channel)
@@ -338,21 +338,21 @@ An abstraction provisioned for French-language service cannot reach English-lang
 Data residency and legal boundaries are GT boundaries:
 
 ```
-EU CTMM holds:
+EU CM holds:
   - GT for EU data center (tunnel channel)
   - GT for GDPR-compliant services (tunnel channel)
   - NO GT for US-only services
   - NO GT for non-GDPR endpoints
 ```
 
-An EU-provisioned CTMM cannot reach non-GDPR-compliant services because it was never given the GT for them. The IDE enforces this at provisioning time, and hardware enforces it at runtime.
+An EU-provisioned CM cannot reach non-GDPR-compliant services because it was never given the GT for them. The IDE enforces this at provisioning time, and hardware enforces it at runtime.
 
 ### Scoping by Age Group
 
 Child-safe operation is structural:
 
 ```
-Child CTMM (age 8) holds:
+Child CM (age 8) holds:
   - GT for educational content services
   - GT for parental-approved websites
   - GT for homework-helper endpoints
@@ -362,7 +362,7 @@ Child CTMM (age 8) holds:
   - NO GT for unvetted remote services
 ```
 
-A child's CTMM has no capability to reach adult services. Injected JavaScript cannot conjure a GT. Malicious links cannot create tunnels. VPN tools cannot bypass this — the capability is missing at the hardware level.
+A child's CM has no capability to reach adult services. Injected JavaScript cannot conjure a GT. Malicious links cannot create tunnels. VPN tools cannot bypass this — the capability is missing at the hardware level.
 
 **This is qualitatively different from any filter-based child protection system.** A filter examines content *after* the child already has the capability to fetch it. The Church Machine prevents the capability from existing in the first place.
 
@@ -374,7 +374,7 @@ A child's CTMM has no capability to reach adult services. Injected JavaScript ca
 
 To address identified security gaps, the following Phase 1 mitigations are non-blocking and ready for implementation:
 
-1. **Home Base Threshold Signing** — MTBF threshold payloads are signed by IDE public key; CTMM validates signatures before installing
+1. **Home Base Threshold Signing** — MTBF threshold payloads are signed by IDE public key; CM validates signatures before installing
 2. **Immutable Threshold Ledger** — Every threshold change logged to append-only NVM; boot verifies current threshold matches latest ledger entry
 3. **MTBF Snapshot Validation** — Counters are captured in NVM on first abstraction run; reset attempts are detected and flagged as Suspicious
 4. **CRC Failure Watchdog** — CRC validation failures per NS entry tracked; Poisoned entries FAULT on all access after 3 failures
@@ -407,7 +407,7 @@ An I/O virtualization mechanism wherein a single Abstract GT (Home Base tunnel a
 
 ### Claim 3: Local Peripheral Autonomy Without IDE Assistance (Independent)
 
-A hardware bootstrap mechanism wherein attached peripherals (UART, GPIO, Timer, Display, Storage) are identified and Abstract GTs are provisioned entirely during local hardware boot, before any user code runs and before any IDE connection is established, such that the CTMM maintains full security control over local I/O without any remote authority, enabling air-gapped, offline operation where the CTMM is the sole authority for its own hardware security policy.
+A hardware bootstrap mechanism wherein attached peripherals (UART, GPIO, Timer, Display, Storage) are identified and Abstract GTs are provisioned entirely during local hardware boot, before any user code runs and before any IDE connection is established, such that the CM maintains full security control over local I/O without any remote authority, enabling air-gapped, offline operation where the CM is the sole authority for its own hardware security policy.
 
 ### Claim 4: MTBF Qualification as Hardware-Enforced Downloadability Gate (Independent)
 
@@ -415,7 +415,7 @@ A hardware-tracked reliability mechanism wherein every Secure Abstraction carrie
 
 ### Claim 5: Structural Capability Scoping for Crime-Free Services (Novel)
 
-A service provisioning architecture wherein a CTMM provisioned for a specific profession, language, nationality, or age group receives only Abstract GTs for services within that scope, such that any code running on the CTMM cannot access services outside the scope because the capability token does not exist, providing a structural guarantee (not a policy-based filter) that access is impossible regardless of exploits, VPN tunnels, or code injection — because the hardware rejects any operation without a valid GT.
+A service provisioning architecture wherein a CM provisioned for a specific profession, language, nationality, or age group receives only Abstract GTs for services within that scope, such that any code running on the CM cannot access services outside the scope because the capability token does not exist, providing a structural guarantee (not a policy-based filter) that access is impossible regardless of exploits, VPN tunnels, or code injection — because the hardware rejects any operation without a valid GT.
 
 ### Claim 6: Two-Tier Backup IDE Fallback with Atomic Provisioning (Dependent)
 
@@ -423,7 +423,7 @@ An extension of Claim 2 wherein the Home Base GT includes `word2_backup1` and `w
 
 ### Claim 7: MTBF Telemetry and Distributed Reputation (Dependent)
 
-An extension of Claim 4 wherein MTBF counters are sent to the IDE via Home Base W permission, signed with HMAC-SHA256, and the IDE maintains a permanent reputation record per abstraction per CTMM, such that an abstraction's reliability history is shared across the fleet: low MTBF on one CTMM lowers the threshold for all CTMMs through policy update, and high MTBF qualifies abstractions for namespace-tier distribution.
+An extension of Claim 4 wherein MTBF counters are sent to the IDE via Home Base W permission, signed with HMAC-SHA256, and the IDE maintains a permanent reputation record per abstraction per CM, such that an abstraction's reliability history is shared across the fleet: low MTBF on one CM lowers the threshold for all CMs through policy update, and high MTBF qualifies abstractions for namespace-tier distribution.
 
 ### Claim 8: Secure Individuality via Unique GT Sets (Dependent)
 
@@ -447,7 +447,7 @@ Denial of Service attacks exploit several fundamental weaknesses in contemporary
 
 5. **Cascade Failures** — When one service is DoS'd, dependent services starve. The attack propagates through the system.
 
-### How CTMM Prevents DoS
+### How CM Prevents DoS
 
 The Church Machine architecture prevents or drastically limits DoS attacks through structural mechanisms:
 
@@ -518,7 +518,7 @@ An attacker cannot force rapid privilege switching that could disrupt scheduling
 
 #### Mechanism 5: MTBF Qualification Prevents DoS Propagation
 
-An abstraction that crashes or fails frequently (high failure_count) is marked Isolated by hardware and cannot be propagated to other CTMMs.
+An abstraction that crashes or fails frequently (high failure_count) is marked Isolated by hardware and cannot be propagated to other CMs.
 
 ```
 Malicious abstraction crashes 50% of the time:
@@ -539,9 +539,9 @@ After 10,000 invocations:
   S bit locks to 0: no further propagation
 ```
 
-A DoS-prone abstraction cannot escape its origin and infect other CTMMs.
+A DoS-prone abstraction cannot escape its origin and infect other CMs.
 
-**Impact**: DoS attacks are quarantined to the originating CTMM.
+**Impact**: DoS attacks are quarantined to the originating CM.
 
 #### Mechanism 6: Local Peripheral Rate Limiting
 
@@ -563,7 +563,7 @@ The Home Base tunnel (single network gateway) implements flow control at the har
 
 ```
 Home Base tunnel bandwidth management:
-- Per-CTMM outbound quota: X Mbps max
+- Per-CM outbound quota: X Mbps max
 - Per-abstraction outbound quota: Y Kbps max
 - Per-connection timeout: Z seconds
 - If quota exceeded, further sends are deferred (backpressured)
@@ -618,7 +618,7 @@ A rate-limiting mechanism wherein critical paths (mLoad for namespace access, SW
 
 ### Claim 12: MTBF Qualification as DoS Containment (Dependent)
 
-An extension of Claim 4 wherein an abstraction that fails frequently (high failure_count) is automatically downgraded to Isolated tier and cannot be propagated to other CTMMs, such that DoS-prone or malicious abstractions cannot spread across the fleet through normal capability propagation, and fleet-wide policy updates further tighten MTBF thresholds to quarantine unreliable abstractions.
+An extension of Claim 4 wherein an abstraction that fails frequently (high failure_count) is automatically downgraded to Isolated tier and cannot be propagated to other CMs, such that DoS-prone or malicious abstractions cannot spread across the fleet through normal capability propagation, and fleet-wide policy updates further tighten MTBF thresholds to quarantine unreliable abstractions.
 
 ### Claim 13: Per-Abstraction Bandwidth Quotas on Tunnel Access (Dependent)
 
@@ -646,7 +646,7 @@ Three-tier progression diagram showing how hardware-tracked Mean Time Between Fa
 
 ### Figure A4: Local Peripheral Autonomy
 
-Boot-time peripheral discovery diagram. During Phase 5, the CTMM probes IDE address range (0xFE______) for locally attached hardware (UART, GPIO, SPI, Timer, Display). Present peripherals receive valid Abstract GTs; absent ones receive NULL GTs (accessing NULL triggers FAULT). Side-by-side comparison of Connected mode (IDE provisions Home Base Tunnel, remote namespaces accessible), Air-gapped mode (no IDE, Home Base = NULL, local peripherals still work), and Security guarantee (no outbound data leakage possible). The peripheral access model: abstraction holds Abstract GT in c-list → CALL routes to peripheral hardware → TPERM checks permissions → direct register access. No device driver, no kernel, no system call.
+Boot-time peripheral discovery diagram. During Phase 5, the CM probes IDE address range (0xFE______) for locally attached hardware (UART, GPIO, SPI, Timer, Display). Present peripherals receive valid Abstract GTs; absent ones receive NULL GTs (accessing NULL triggers FAULT). Side-by-side comparison of Connected mode (IDE provisions Home Base Tunnel, remote namespaces accessible), Air-gapped mode (no IDE, Home Base = NULL, local peripherals still work), and Security guarantee (no outbound data leakage possible). The peripheral access model: abstraction holds Abstract GT in c-list → CALL routes to peripheral hardware → TPERM checks permissions → direct register access. No device driver, no kernel, no system call.
 
 ---
 
@@ -656,14 +656,14 @@ The Abstract Golden Token I/O and Network Addressing architecture represents a f
 
 1. **Structural safety**: Services can be scoped at the capability level, guaranteeing that certain code cannot access certain services because the token doesn't exist.
 
-2. **Offline autonomy**: Local peripherals work without any IDE connection, making CTMMs suitable for air-gapped, autonomous, and edge-deployed scenarios.
+2. **Offline autonomy**: Local peripherals work without any IDE connection, making CMs suitable for air-gapped, autonomous, and edge-deployed scenarios.
 
-3. **Trusted fallback**: Programmers can configure backup IDE addresses, enabling local-first or team-first development without compromising CTMM security.
+3. **Trusted fallback**: Programmers can configure backup IDE addresses, enabling local-first or team-first development without compromising CM security.
 
 4. **Distributed reputation**: MTBF qualification creates a mesh-style trust model where reliability is tracked and propagated, replacing centralized app stores.
 
 5. **Crime-free guarantees**: For the first time, a computer system can structurally guarantee that a user's device cannot access prohibited services — not through filters or policies, but through the absence of capability tokens.
 
-This invention builds on the CTMM foundation while opening entirely new application domains: edge computing, offline-first systems, autonomous agents, and the first genuinely crime-free platforms.
+This invention builds on the CM foundation while opening entirely new application domains: edge computing, offline-first systems, autonomous agents, and the first genuinely crime-free platforms.
 ---
 *Confidential — Kenneth Hamer-Hodges — April 2026*
