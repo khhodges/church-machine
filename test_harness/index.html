@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CTMM Tunnel Test Harness</title>
+    <title>CM Tunnel Test Harness</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -224,7 +224,7 @@
     </div>
     <div class="harness-body">
         <div class="sim-panel">
-            <div class="sim-panel-header ctmm">Kenneth (CTMM Sim-64) &mdash; "me"</div>
+            <div class="sim-panel-header ctmm">Kenneth (CM Sim-64) &mdash; "me"</div>
             <iframe id="ctmm-frame" class="sim-iframe" src="/ctmm/"></iframe>
         </div>
         <div class="sim-panel">
@@ -286,7 +286,7 @@
                 timestamp: Date.now(),
                 seen: false,
                 details: {
-                    from: '<b>Kenneth</b> (CTMM Sim-64)',
+                    from: '<b>Kenneth</b> (CM Sim-64)',
                     to: '<b>Priscilla</b> (Capability Sim-32)',
                     items: [
                         { label: 'Instruction', value: 'CALL(CONNECT(me, mymother))' },
@@ -311,7 +311,7 @@
                 seen: false,
                 details: {
                     from: '<b>Priscilla</b> (Capability Sim-32)',
-                    to: '<b>Kenneth</b> (CTMM Sim-64)',
+                    to: '<b>Kenneth</b> (CM Sim-64)',
                     items: [
                         { label: 'Instruction', value: 'CALL(CONNECT(mymother, son))' },
                         { label: 'Golden Tokens', value: '3 (Tunnel Key + ABI + Reply Tunnel)' },
@@ -382,7 +382,7 @@
             const ctmmNotif = checkDelivery('rv32cap-tunnel-notification');
             if (ctmmNotif && ctmmNotif.message === 'Hello Son') {
                 log('Notification stored in localStorage', 'success');
-                log('CTMM should show badge (check iframe)', 'info');
+                log('CM should show badge (check iframe)', 'info');
             } else {
                 log('Notification delivery check: stored OK', 'success');
             }
@@ -466,7 +466,7 @@
             await sleep(1000);
 
             log('TEST 5: Payload integrity', 'step');
-            const payloadMsg = 'CTMM<>RV32 "test" & verify';
+            const payloadMsg = 'CM<>RV32 "test" & verify';
             sendKennethToP(payloadMsg);
             await sleep(500);
             const stored = checkDelivery('ctmm-tunnel-notification');

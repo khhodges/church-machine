@@ -1,10 +1,10 @@
-# CTMM Verilog Hardware Implementation
+# CM Verilog Hardware Implementation
 
-This directory contains a synthesizable Verilog (SystemVerilog) implementation of the Church-Turing Meta-Machine (CTMM) capability-based architecture designed by Kenneth James Hamer-Hodges.
+This directory contains a synthesizable Verilog (SystemVerilog) implementation of the Church Machine (CM) capability-based architecture designed by Kenneth James Hamer-Hodges.
 
 ## Architecture Overview
 
-The CTMM hardware implements failsafe security through Golden Tokens (64-bit capability keys) for all access control. The design follows these core principles:
+The CM hardware implements failsafe security through Golden Tokens (64-bit capability keys) for all access control. The design follows these core principles:
 
 1. **Capability-Based Security**: All access is mediated by Golden Tokens
 2. **Hardware-Enforced Permissions**: Permission checks are performed in dedicated hardware
@@ -37,7 +37,7 @@ verilog/
 
 ## Standardized Instruction Format (32-bit)
 
-All CTMM instructions use a standardized format:
+All CM instructions use a standardized format:
 
 ```
 | 31:27 | 26:23 | 22 | 21:0     |
@@ -343,4 +343,4 @@ The design is synthesizable for FPGA or ASIC targets. Key synthesis consideratio
 
 ## License
 
-Part of the CTMM Simulator project implementing Kenneth James Hamer-Hodges' capability-based architecture.
+Part of the CM Simulator project implementing Kenneth James Hamer-Hodges' capability-based architecture.

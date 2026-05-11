@@ -408,7 +408,7 @@ done:
 # ================================================
 # Priscilla's machine (Capability Sim-32) — "mymother"
 #
-# PART 1: Receive "Hello Mum" from Kenneth (CTMM)
+# PART 1: Receive "Hello Mum" from Kenneth (CM)
 #   Kenneth's CALL(CONNECT(me, mymother)) arrives
 #   via encrypted tunnel. ABI maps DR0-DR5 → x10-x15.
 #
@@ -531,7 +531,7 @@ function setupHelloMumNamespace() {
     appendConsole('HELLO MUM / HELLO SON — Bidirectional Tunnel');
     appendConsole('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     appendConsole('"mymother" (Priscilla) = Capability Sim-32');
-    appendConsole('"me" (Kenneth)        = CTMM Sim-64');
+    appendConsole('"me" (Kenneth)        = CM Sim-64');
     appendConsole('');
     appendConsole('--- BINDING PROVENANCE (FamilyRegistry) ---');
     appendConsole('The FamilyRegistry abstraction created these');
@@ -561,7 +561,7 @@ function setupHelloMumNamespace() {
     appendConsole('PART 2: Send "Hello Son" back to Kenneth');
     appendConsole('');
     appendConsole('Click Assemble → Load → Step to trace.');
-    appendConsole('Open CTMM Simulator for Kenneth side.');
+    appendConsole('Open CM Simulator for Kenneth side.');
     appendConsole('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
@@ -702,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 seen: false,
                 details: {
                     from: '<b>Priscilla</b> (Capability Sim-32)',
-                    to: '<b>Kenneth</b> (CTMM Sim-64)',
+                    to: '<b>Kenneth</b> (CM Sim-64)',
                     items: [
                         { label: 'Instruction', value: 'CALL(CONNECT(mymother, son))' },
                         { label: 'Golden Tokens', value: '3 (Tunnel Key + ABI + Reply Tunnel)' },
@@ -713,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
             localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(notification));
-            appendConsole('[NOTIFICATION] "' + displayMsg + '" sent to Kenneth (CTMM) \u2014 notification posted');
+            appendConsole('[NOTIFICATION] "' + displayMsg + '" sent to Kenneth (CM) \u2014 notification posted');
         }
     });
 
@@ -969,7 +969,7 @@ function checkTunnelNotifications() {
                 pendingTunnelMessages.push(notif);
                 notif.seen = true;
                 changed = true;
-                appendConsole('[TUNNEL] Incoming message from Kenneth (CTMM) — click notification to view');
+                appendConsole('[TUNNEL] Incoming message from Kenneth (CM) — click notification to view');
             }
         }
         if (changed) {
@@ -1000,7 +1000,7 @@ function sendHelloSon() {
         seen: false,
         details: {
             from: '<b>Priscilla</b> (Capability Sim-32)',
-            to: '<b>Kenneth</b> (CTMM Sim-64)',
+            to: '<b>Kenneth</b> (CM Sim-64)',
             items: [
                 { label: 'Instruction', value: 'CALL(CONNECT(mymother, son))' },
                 { label: 'Golden Tokens', value: '3 (Tunnel Key + ABI + Reply Tunnel)' },
@@ -1014,8 +1014,8 @@ function sendHelloSon() {
     const sendQ = Array.isArray(existingQ) ? existingQ : [];
     sendQ.push(notification);
     localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(sendQ));
-    appendConsole('[TUNNEL] "Hello Son" sent to Kenneth (CTMM) via encrypted tunnel');
-    appendConsole('[TUNNEL] Notification posted — Kenneth\'s CTMM page will show badge');
+    appendConsole('[TUNNEL] "Hello Son" sent to Kenneth (CM) via encrypted tunnel');
+    appendConsole('[TUNNEL] Notification posted — Kenneth\'s CM page will show badge');
 }
 
 window.sendHelloSon = sendHelloSon;
@@ -1029,7 +1029,7 @@ function sendRv32Reply(replyText) {
         seen: false,
         details: {
             from: '<b>Priscilla</b> (Capability Sim-32)',
-            to: '<b>Kenneth</b> (CTMM Sim-64)',
+            to: '<b>Kenneth</b> (CM Sim-64)',
             items: [
                 { label: 'Instruction', value: 'CALL(CONNECT(mymother, son))' },
                 { label: 'Golden Tokens', value: '3 (Tunnel Key + ABI + Reply Tunnel)' },
@@ -1044,7 +1044,7 @@ function sendRv32Reply(replyText) {
     localStorage.setItem('rv32cap-tunnel-notification', JSON.stringify(replyQ));
     const overlay = document.getElementById('tunnelMsgOverlay');
     if (overlay) overlay.remove();
-    appendConsole('[NOTIFICATION] "' + replyText.trim() + '" sent to Kenneth (CTMM)');
+    appendConsole('[NOTIFICATION] "' + replyText.trim() + '" sent to Kenneth (CM)');
 }
 
 function showTunnelNotification() {
@@ -1065,7 +1065,7 @@ function showTunnelNotification() {
         { label: 'Golden Tokens', value: '3 (Tunnel Key + Service + ABI)' },
         { label: 'ABI Mapping', value: 'DR0-DR5 (64-bit) \u2192 x10-x15 (32-bit)' }
     ];
-    const from = (notif.details && notif.details.from) || '<b>Kenneth</b> (CTMM Sim-64)';
+    const from = (notif.details && notif.details.from) || '<b>Kenneth</b> (CM Sim-64)';
     const to = (notif.details && notif.details.to) || '<b>Priscilla</b> (Capability Sim-32)';
     const message = notif.message || 'Hello Mum';
     const safeMessage = escapeTunnelHtml(message);

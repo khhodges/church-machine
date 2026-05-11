@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church-Turing Meta-Machine (CTMM) Simulator</title>
+    <title>Church Machine (CM) Simulator</title>
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="stylesheet" href="styles.css?v=20260218b">
 </head>
@@ -12,7 +12,7 @@
     <div class="fixed-toolbar">
         <header>
             <a href="/" class="btn btn-swap-sim" title="Return to Home">Home</a>
-            <h1>CTMM</h1>
+            <h1>CM</h1>
             <nav class="controls">
                 <div class="view-buttons">
                     <button onclick="switchView('dashboard')" class="btn btn-view tooltip-bottom active" id="viewBtn-dashboard" data-tooltip="View registers and system state">Dashboard</button>
@@ -22,7 +22,7 @@
                     <button onclick="switchView('abstractionZoom')" class="btn btn-view tooltip-bottom" id="viewBtn-abstractionZoom" data-tooltip="Zoom into an abstraction — view its C-List and active CR6 entries">Zoom</button>
                     <button onclick="switchView('hp35calc')" class="btn btn-view tooltip-bottom" id="viewBtn-hp35calc" data-tooltip="HP-35 Scientific Calculator — pure lambda calculus RPN engine">HP-35</button>
                     <button onclick="switchView('instructions')" class="btn btn-view tooltip-bottom" id="viewBtn-instructions" data-tooltip="Hardware instruction set reference">ISA Ref</button>
-                    <button onclick="switchView('tutorial')" class="btn btn-view tooltip-bottom" id="viewBtn-tutorial" data-tooltip="Learn CTMM concepts">Tutorial</button>
+                    <button onclick="switchView('tutorial')" class="btn btn-view tooltip-bottom" id="viewBtn-tutorial" data-tooltip="Learn CM concepts">Tutorial</button>
                     <button onclick="switchView('code')" class="btn btn-view tooltip-bottom" id="viewBtn-code" data-tooltip="Browse simulator source code">Code</button>
                 </div>
                 <div class="header-right">
@@ -64,7 +64,7 @@
                             <img src="images/author-thumb.jpg" alt="Kenneth J Hamer-Hodges" class="author-image">
                             <div class="author-info">
                                 <h3>Kenneth J Hamer-Hodges</h3>
-                                <p>Author & CTMM Architect</p>
+                                <p>Author & CM Architect</p>
                             </div>
                         </div>
                         <a href="https://sipantic.blogspot.com/p/industrial-strength-computer-science_7.html" target="_blank" class="book-image-link">
@@ -72,9 +72,9 @@
                         </a>
                     </div>
                     <div class="landing-description" id="landingWelcome" data-section="welcome">
-                        <h2>Welcome to the CTMM Simulator</h2>
+                        <h2>Welcome to the CM Simulator</h2>
                         <p>
-                            The Church-Turing Meta-Machine (CTMM) is a <strong>32-bit clean-start architecture</strong>
+                            The Church Machine (CM) is a <strong>32-bit clean-start architecture</strong>
                             devised by <strong><a href="https://sipantic.blogspot.com/p/industrial-strength-computer-science_7.html">Kenneth J Hamer-Hodges, FIEE</a></strong>. It enforces failsafe 
                             security through <strong>Golden Tokens</strong> — capability keys that 
                             govern all access control.
@@ -139,7 +139,7 @@
                             <span class="text-success">hard surface of universal cyberspace</span>.
                         </p>
                         <p>
-                            CLOOMC is designed for the <strong>32-bit clean-start CTMM</strong> — an architecture that replaces 
+                            CLOOMC is designed for the <strong>32-bit clean-start CM</strong> — an architecture that replaces 
                             the legacy von Neumann model with eleven hardware-enforced Church instructions, each operating 
                             exclusively on Golden Tokens rather than raw memory addresses.
                         </p>
@@ -647,7 +647,7 @@
                         </div>
                         <div class="code-container">
                             <div class="line-numbers" id="lineNumbers">1</div>
-                            <textarea id="codeEditor" spellcheck="false" placeholder="; Write your CTMM assembly here
+                            <textarea id="codeEditor" spellcheck="false" placeholder="; Write your CM assembly here
 ; Example:
 ADDI 0 10    ; DR0 = 10
 ADDI 1 5     ; DR1 = 5
@@ -681,7 +681,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                             <button class="output-tab" onclick="switchOutputTab('trace')" data-tooltip="Last 127 instructions executed with result comments">Trace</button>
                         </div>
                         <div class="output-content" id="editorConsole">
-                            <div class="console-line info">CTMM Assembly Editor Ready</div>
+                            <div class="console-line info">CM Assembly Editor Ready</div>
                             <div class="console-line info">Write code and click Run or Step to execute</div>
                         </div>
                         <div class="output-content hidden" id="editorTrace">
@@ -809,7 +809,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                                     <span class="file-icon">📊</span> Dispatch Styles Comparison
                                 </div>
                                 <div class="file-item" data-file="figures/conv-vs-ctmm" onclick="loadFigure('/figures/conventional-vs-ctmm')">
-                                    <span class="file-icon">📊</span> Conventional vs CTMM
+                                    <span class="file-icon">📊</span> Conventional vs CM
                                 </div>
                                 <div class="file-item" data-file="figures/boot-seq" onclick="loadFigure('/figures/boot-sequence-state-machine')">
                                     <span class="file-icon">📊</span> Boot Sequence State Machine
@@ -843,7 +843,7 @@ ADD 0 1      ; DR0 = DR0 + DR1"></textarea>
                     </div>
                     <div class="code-viewer-content" id="codeViewerContent">
                         <div class="code-welcome">
-                            <h2>CTMM Simulator Source Code</h2>
+                            <h2>CM Simulator Source Code</h2>
                             <p>Click on a file in the left panel to browse the source code.</p>
                             <div class="code-stats">
                                 <div class="stat-item">
