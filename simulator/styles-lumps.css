@@ -692,12 +692,30 @@
 }
 .lump-code-row {
     display: flex;
-    gap: 0.75rem;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
     padding: 0.1rem 0.2rem;
     border-radius: 2px;
     line-height: 1.6;
 }
 .lump-code-row:hover { background: rgba(100, 160, 255, 0.06); }
+.lump-code-left-group {
+    display: flex;
+    align-items: baseline;
+    flex: 1;
+    min-width: 0;
+    gap: 0.4rem;
+    overflow: hidden;
+}
+.lump-code-binary-group {
+    display: flex;
+    align-items: baseline;
+    flex-shrink: 0;
+    gap: 0.4rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+}
 .lump-code-addr {
     color: #6b7280;
     min-width: 5.2rem;
@@ -711,7 +729,6 @@
 .lump-code-instr {
     color: var(--text-secondary, #8a9aaa);
     white-space: nowrap;
-    margin-left: auto;
     flex-shrink: 0;
     font-size: 0.68rem;
 }
@@ -1209,17 +1226,17 @@
     padding-left: 0.75rem;
 }
 
-/* Binary spans hidden by default; shown when card data-binary="1" */
-.lump-code-binary,
+/* Binary group hidden by default; shown when card data-binary="1" */
+.lump-code-binary-group,
 .lump-code-binary-hidden {
     display: none;
     opacity: 0;
     max-width: 0;
     overflow: hidden;
 }
-.lump-method-card[data-binary="1"] .lump-code-binary,
+.lump-method-card[data-binary="1"] .lump-code-binary-group,
 .lump-method-card[data-binary="1"] .lump-code-binary-hidden {
-    display: inline;
+    display: flex;
     opacity: 1;
     max-width: none;
     overflow: visible;

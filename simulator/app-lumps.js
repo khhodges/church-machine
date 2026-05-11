@@ -1899,11 +1899,15 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 : (_lumpBrArrows.hasBranches ? `<span class="lump-code-branch-svg lump-code-branch-svg-empty" style="width:${(_lumpBrArrows.svgW||14)}px;"></span>` : '');
 
             html += `<div class="lump-code-row">` +
+                    `<span class="lump-code-left-group">` +
                     _brSvgHtml +
-                    `<span class="lump-code-addr lump-code-binary">\u00A00x${addr}</span>` +
-                    `<span class="lump-code-hex lump-code-binary">${hex}</span>` +
-                    `<span class="lump-code-comment">${_colorizeComment(commentText)}</span>` +
                     `<span class="lump-code-instr">${disHtml !== null ? disHtml : _injectCondTooltip(e(disText), cond)}${ann ? ' ' + ann : ''}</span>` +
+                    `<span class="lump-code-comment">${_colorizeComment(commentText)}</span>` +
+                    `</span>` +
+                    `<span class="lump-code-binary-group">` +
+                    `<span class="lump-code-addr">\u00A00x${addr}</span>` +
+                    `<span class="lump-code-hex">${hex}</span>` +
+                    `</span>` +
                     `</div>`;
 
             instrRelIdx++;
