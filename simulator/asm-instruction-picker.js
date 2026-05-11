@@ -71,6 +71,9 @@
                 { label: 'CHANGE offset',         instr: 'CHANGE', ops: 'offset' },
                 { label: 'SWITCH cr',             instr: 'SWITCH', ops: 'cr' },
                 { label: 'TPERM cr mask',         instr: 'TPERM',  ops: 'cr mask' },
+                { label: 'LAMBDA cr',             instr: 'LAMBDA', ops: 'cr' },
+                { label: 'DREAD dr cr addr',      instr: 'DREAD',  ops: 'dr cr addr' },
+                { label: 'DWRITE dr cr addr',     instr: 'DWRITE', ops: 'dr cr addr' },
             ]
         },
     ];
@@ -82,6 +85,15 @@
             cat.items.forEach(function (item) { acc.push(item); });
         });
         return acc;
+    }());
+
+    // WeakMap: item object → category name (for category-tab filtering)
+    var itemCategoryMap = (function () {
+        var map = new WeakMap();
+        INSTR_CATEGORIES.forEach(function (cat) {
+            cat.items.forEach(function (item) { map.set(item, cat.name); });
+        });
+        return map;
     }());
 
     // ── Configurable shortcut ────────────────────────────────────────────────
@@ -114,10 +126,12 @@
     var pickerEl = null;
     var filterInputEl = null;
     var pickerBodyEl = null;
+    var pickerTabsEl = null;
     var activeEditorEl = null;
     var selectedIndex = -1;
     var allFlatItems = [];   // items currently visible (filtered or all)
     var currentOnSelect = null;
+    var activeCatName = null;  // null = All; otherwise the active category name string
 
     // ── DOM helpers ─────────────────────────────────────────────────────────
 
@@ -142,11 +156,29 @@
         selectedIndex = -1;
         filterInputEl = null;
         pickerBodyEl = null;
+        pickerTabsEl = null;
 
         var header = document.createElement('div');
         header.className = 'asm-picker-header';
         header.textContent = 'Insert instruction \u00b7 \u2191\u2193 navigate \u00b7 Enter confirm \u00b7 Esc dismiss';
         picker.appendChild(header);
+
+        // ── Category tabs ──────────────────────────────────────────────────
+        pickerTabsEl = document.createElement('div');
+        pickerTabsEl.className = 'asm-picker-tabs';
+        var allTabBtn = document.createElement('button');
+        allTabBtn.className = 'asm-picker-tab' + (activeCatName === null ? ' asm-picker-tab--active' : '');
+        allTabBtn.textContent = 'All';
+        allTabBtn.addEventListener('mousedown', function (e) { e.preventDefault(); onTabSelect(null); });
+        pickerTabsEl.appendChild(allTabBtn);
+        INSTR_CATEGORIES.forEach(function (cat) {
+            var tab = document.createElement('button');
+            tab.className = 'asm-picker-tab' + (activeCatName === cat.name ? ' asm-picker-tab--active' : '');
+            tab.textContent = cat.name;
+            tab.addEventListener('mousedown', function (e) { e.preventDefault(); onTabSelect(cat.name); });
+            pickerTabsEl.appendChild(tab);
+        });
+        picker.appendChild(pickerTabsEl);
 
         // Filter input
         filterInputEl = document.createElement('input');
@@ -172,6 +204,52 @@
         filterInputEl.addEventListener('keydown', function (e) {
             handleFilterKeydown(e);
         });
+    }
+
+    // Switch active tab and re-render body accordingly
+    function onTabSelect(catName) {
+        activeCatName = catName;
+        if (pickerTabsEl) {
+            var tabs = pickerTabsEl.querySelectorAll('.asm-picker-tab');
+            tabs.forEach(function (tab, i) {
+                var thisCat = i === 0 ? null : INSTR_CATEGORIES[i - 1].name;
+                tab.classList.toggle('asm-picker-tab--active', thisCat === catName);
+            });
+        }
+        var q = filterInputEl ? filterInputEl.value.trim() : '';
+        if (q) {
+            renderFiltered(filterInputEl.value);
+        } else if (catName === null) {
+            renderGrouped();
+        } else {
+            renderByCategory(catName);
+        }
+        if (filterInputEl) filterInputEl.focus();
+    }
+
+    // Render items from one category in a flat vertical list
+    function renderByCategory(catName) {
+        pickerBodyEl.innerHTML = '';
+        allFlatItems = [];
+        selectedIndex = -1;
+        pickerBodyEl.className = 'asm-picker-body asm-picker-body--flat';
+        var cat = null;
+        for (var ci = 0; ci < INSTR_CATEGORIES.length; ci++) {
+            if (INSTR_CATEGORIES[ci].name === catName) { cat = INSTR_CATEGORIES[ci]; break; }
+        }
+        if (!cat || !cat.items.length) {
+            var empty = document.createElement('div');
+            empty.className = 'asm-picker-empty';
+            empty.textContent = 'No items';
+            pickerBodyEl.appendChild(empty);
+            return;
+        }
+        cat.items.forEach(function (item) {
+            var flatIdx = allFlatItems.length;
+            allFlatItems.push(item);
+            pickerBodyEl.appendChild(makeItemRow(item, flatIdx));
+        });
+        if (allFlatItems.length > 0) setSelected(0);
     }
 
     // Render all instructions in the standard grouped horizontal layout
@@ -239,12 +317,16 @@
 
         var q = query.trim().toLowerCase();
         if (!q) {
-            renderGrouped();
+            if (activeCatName === null) renderGrouped();
+            else renderByCategory(activeCatName);
             return;
         }
 
+        var sourceItems = activeCatName
+            ? allSourceItems.filter(function (item) { return itemCategoryMap.get(item) === activeCatName; })
+            : allSourceItems;
         var scored = [];
-        allSourceItems.forEach(function (item) {
+        sourceItems.forEach(function (item) {
             var result = fuzzyScore(item.label, q);
             if (result) scored.push({ item: item, positions: result.positions, score: result.score });
         });
@@ -420,6 +502,7 @@
     }
 
     function showPicker(textarea) {
+        activeCatName = null;
         activeEditorEl = textarea;
         buildPickerContent(function (item) { insertIntoEditor(item); });
         var picker = getOrCreatePicker();

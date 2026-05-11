@@ -1012,7 +1012,7 @@
     border-radius: 6px;
     box-shadow: 0 8px 28px rgba(0,0,0,0.7);
     width: 580px;
-    max-height: 300px;
+    max-height: 360px;
     display: none;
     flex-direction: column;
     animation: asmPickerIn 0.12s ease;
@@ -1122,6 +1122,44 @@
 .asm-picker-match {
     color: #f4b942;
     font-weight: 700;
+}
+
+/* ── Instruction picker — category tabs ─────────────────────────────────── */
+.asm-picker-tabs {
+    display: flex;
+    flex-direction: row;
+    gap: 3px;
+    padding: 4px 8px;
+    border-bottom: 1px solid #2a2a4a;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+}
+.asm-picker-tabs::-webkit-scrollbar { display: none; }
+
+.asm-picker-tab {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #555;
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    flex-shrink: 0;
+    line-height: 1.5;
+}
+.asm-picker-tab:hover {
+    color: #c9d1d9;
+    border-color: #333;
+    background: rgba(255,255,255,0.05);
+}
+.asm-picker-tab--active {
+    color: #f4b942;
+    border-color: rgba(244,185,66,0.45);
+    background: rgba(244,185,66,0.1);
 }
 
 .asm-picker-toolbar {
