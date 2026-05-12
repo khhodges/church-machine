@@ -316,6 +316,15 @@ class ChurchAssembler {
         // 1. Currently loaded into a CR (e.g. after  LOAD CR6, LED)
         if (this.nsLoaded[name] !== undefined) return this.nsLoaded[name];
 
+        // 1.5. Capabilities-block pre-pass — every capability declared in this
+        //      assembly's  capabilities { }  block gets its 0-based position as its
+        //      c-list offset.  This covers LED devices, NS-based abstractions, and
+        //      null-GT rows alike.  A program with a capabilities block defines its
+        //      OWN c-list layout; the DEMO_CLIST slots (paths 2–3) must not override.
+        //      For programs without a capabilities block, _capBlockSlots is {}.
+        if (this._capBlockSlots && this._capBlockSlots[name] !== undefined)
+            return this._capBlockSlots[name];
+
         // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
         if (this.nsSymbols[name] !== undefined) return this.nsSymbols[name];
 
@@ -324,13 +333,6 @@ class ChurchAssembler {
         //      c-list offset used in  LOAD  CRd, CR6[0x0005].
         if (this._clistSlots && this._clistSlots[name] !== undefined)
             return this._clistSlots[name];
-
-        // 2.6. Capabilities-block pre-pass — non-NS, non-device capabilities declared
-        //      in this assembly's  capabilities { }  block, assigned to free c-list
-        //      slots 1, 2, 3, … in declaration order.  The GT at that slot may be
-        //      null at runtime; the assembler still emits LOAD CRd, CR6[0x000N].
-        if (this._capBlockSlots && this._capBlockSlots[name] !== undefined)
-            return this._capBlockSlots[name];
 
         // 3. LED<N> Abstract GT shorthand — LED0–LED5 are boot-loaded AGTs at
         //    c-list slots 8–13.  LOAD CR3, LED0  →  LOAD CR3, CR6, #8
@@ -482,19 +484,14 @@ class ChurchAssembler {
         // Fixed hardware-device slot names — already resolved by other paths.
         const _deviceRE = /^(UART|BTN|SlideRule|Timer|Display)$/i;
 
-        // Assign each non-NS, non-device capability its 0-based position in the
-        // FULL capabilities list.  NS-based and device entries are skipped for
-        // the slot assignment but the counter still advances, so that "Mum" at
-        // position 2 (e.g. after Tunnel) correctly gets slot 2 = CR6[0x0002].
-        let nextSlot = 0;  // 0-based: matches CR6[0x0000] ISA offsets
-        for (const name of capNames) {
-            const isNS  = this.nsSymbols[name] !== undefined;
-            const isDev = _deviceRE.test(name);
-            const ledM  = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
-            const isLED = ledM && parseInt(ledM[1], 10) <= 5;
-            if (!isNS && !isDev && !isLED && slots[name] === undefined)
-                slots[name] = nextSlot;
-            nextSlot++;   // always advance — position in full list drives the slot
+        // Every capability declared in the block — LED devices, NS-based abstractions,
+        // and null-GT rows alike — gets its 0-based position as its c-list offset.
+        // The program's LUMP c-list is sized to the capabilities block, so offset 0
+        // is the first entry regardless of its type.
+        for (let i = 0; i < capNames.length; i++) {
+            const name = capNames[i];
+            if (slots[name] === undefined)   // first declaration wins on duplicates
+                slots[name] = i;
         }
         return slots;
     }
