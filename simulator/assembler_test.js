@@ -2892,6 +2892,40 @@ HALT`;
         assert('CD28 ELOADCALL CR8, Constants, One — method=5 (One index 4, stored 1-based)',
             method === 5, `got method=${method}`);
     }
+
+    // CD29–CD31: word[12] = ELOADCALL CR8, Constants, Phi  (index 2, stored 1-based → method=3)
+    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=3  →  full imm=(3<<8)|11=0x030B=779
+    {
+        const w      = result.words[12] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('CD29 ELOADCALL CR8, Constants, Phi — opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('CD30 ELOADCALL CR8, Constants, Phi — c-list row=11 (nsLoaded[Constants]=11)',
+            row === 11, `got row=${row}`);
+        assert('CD31 ELOADCALL CR8, Constants, Phi — method=3 (Phi index 2, stored 1-based)',
+            method === 3, `got method=${method}`);
+    }
+
+    // CD32–CD34: word[13] = ELOADCALL CR8, Constants, Zero  (index 3, stored 1-based → method=4)
+    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=4  →  full imm=(4<<8)|11=0x040B=1035
+    {
+        const w      = result.words[13] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('CD32 ELOADCALL CR8, Constants, Zero — opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('CD33 ELOADCALL CR8, Constants, Zero — c-list row=11 (nsLoaded[Constants]=11)',
+            row === 11, `got row=${row}`);
+        assert('CD34 ELOADCALL CR8, Constants, Zero — method=4 (Zero index 3, stored 1-based)',
+            method === 4, `got method=${method}`);
+    }
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
