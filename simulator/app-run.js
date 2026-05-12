@@ -7894,6 +7894,15 @@ function closeSettings() {
 
 function showReleaseHistory() {
     const history = [
+        { date: '2026-05-12 UTC', title: 'Capability Access Rights, Console Improvements & Navigation', changes: [
+            'Access rights declarations in capabilities: write <code>capabilities { LED0 RW }</code> to declare R/W access — assembler and CLOOMC++ compiler parse rights tokens (R/W/X/E) and carry them as structured objects throughout the pipeline',
+            'Cross-check in Draft output: declared rights are compared against sidecar grants; the draft shows a warning when declared rights exceed what the sidecar permits; fault-tolerant — a runtime error in the check can no longer prevent the draft from displaying',
+            'Rights flow through all four LUMP save payloads (CLOOMC++ build, assembly save, NS slot save, server save); editor injection shows <code>capabilities { LED0 RW }</code> with rights pulled from sidecar grants',
+            'LUMP disassembly summary line extended: header comment now reads <code>(N words, cc=M, F free)</code> — code words, C-list slot count, and freespace visible at a glance in both the CR-register editor path and the Lumps panel path',
+            'C-list section appended to console listing after a successful assemble or CLOOMC++ compile — each capability shown as <code>; row N  name</code>',
+            'CTMM → CM rename completed in ctmm_cap_amaranth Amaranth HDL source: 15 classes (CTMMCapCore→CMCapCore, etc.) and 6 enums (CTMMOpcode→CMOpcode, etc.) renamed across all import sites',
+            'Navigation shortcut: double-clicking any group heading (Develop / Test / Review / Hardware / Configure / Install) in the landing-page nav or IDE hamburger menu navigates directly to that group\'s primary view',
+        ] },
         { date: '2026-05-02 UTC', title: 'Doc Audit, ISA Corrections & Hardware Alignment', changes: [
             'Full 14-item stale-documentation audit completed: all stale claims corrected across docs, simulator comments, and figures',
             'RETURN mask: marked as not implemented in all docs (call-stack.md, church-instructions.md, boot-rom-layout.md, instruction-matrix.md) — mask field silently ignored by hardware; assembler now warns on any non-zero mask (Task #888)',
@@ -8295,6 +8304,28 @@ function welcomeSkip() {
 }
 
 const WHATS_NEW_FEATURES = [
+    {
+        title: "Capability access rights",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F512; capabilities { LED0 RW } &mdash; declare what you need</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `You can now declare access rights directly in the <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">capabilities { }</code> block. ` +
+            `Write <code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">LED0 RW</code> to declare read-write access, ` +
+            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">Memory E</code> for execute-only, and so on. ` +
+            `Rights tokens (R / W / X / E) are parsed by both the assembler and the CLOOMC++ compiler and carried through to Draft output, save payloads, and editor injection.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `Draft now cross-checks declared rights against sidecar grants and warns if you claimed more than the capability allows.</p>`
+    },
+    {
+        title: "C-list in console & extended LUMP summary",
+        html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4CB; See your C-list and LUMP layout at a glance</div>` +
+            `<p style="font-size:0.9rem;line-height:1.65;margin-bottom:0.75rem;">` +
+            `After a successful assemble or compile the console now appends a <strong>c-list section</strong> listing every capability by row index. ` +
+            `The LUMP disassembly header comment is also extended: ` +
+            `<code style="background:#1a1a2e;padding:0.15rem 0.4rem;border-radius:3px;color:var(--church-gold);">(17 words, cc=1, 46 free)</code> ` +
+            `shows code-word count, C-list slot count, and freespace in a single line.</p>` +
+            `<p style="font-size:0.88rem;color:#aaa;line-height:1.5;margin:0;">` +
+            `Both the CR-register editor path and the Lumps panel disassembly path show the extended summary.</p>`
+    },
     {
         title: "Named method syntax",
         html: `<div style="font-weight:700;color:var(--church-gold);font-size:1.05rem;margin-bottom:0.75rem;">&#x1F4AC; CALL SlideRule.Multiply &mdash; write what you mean</div>` +
