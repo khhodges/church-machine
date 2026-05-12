@@ -2994,6 +2994,125 @@ HALT`;
     }
 }
 
+// ── Bare-call sugar BC tests (task-1050) ─────────────────────────────────────
+// Tests for the Abs.Method(args) desugaring in pass 1.
+//
+// Expansion rule:
+//   Tunnel.Connect(Mum)  →  LOAD CR2, Mum
+//                            ELOADCALL CR0, Tunnel, Connect
+//
+// Encoding reference (TUNNEL_NS: Tunnel→3, Mum→5):
+//   LOAD CR2, Mum      — opcode=0, cond=14, crDst=2, crSrc=6, imm=5
+//     word = (0<<27)|(14<<23)|(2<<19)|(6<<15)|5 = 0x07130005
+//   ELOADCALL CR0, Tunnel, Connect — Connect index=5 stored 1-based=6; Tunnel slot=3
+//     imm = (6<<8)|3 = 0x0603;  opcode=8, cond=14, crDst=0, crSrc=6
+//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0603 = 0x47030603
+
+const TUNNEL_CONVENTIONS_BC = {
+    'Tunnel': {
+        'Connect': { index: 5, input: 'CR2=remote GT (Outform/far-end abstraction)', output: 'DR0 = far-end return value' },
+        'Send':    { index: 1, input: 'DR1=FourCC tag, DR2=word count',               output: 'DR0 = 0 ok | 1 overrun' },
+    }
+};
+const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
+
+{
+    // BC1–BC9: Tunnel.Connect(Mum) — single CR argument expansion
+    const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
+    a.setNamespace(TUNNEL_NS_BC);
+    const result = a.assemble('Tunnel.Connect(Mum)\nHALT');
+
+    assert('BC1 Tunnel.Connect(Mum) assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC2 Tunnel.Connect(Mum) expands to 3 words (LOAD + ELOADCALL + HALT)',
+        result.words.length === 3, `got ${result.words.length}`);
+
+    // word[0] = LOAD CR2, Mum
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const crSrc  = (w >>> 15) & 0xF;
+        const imm    = w & 0x7FFF;
+        assert('BC3 Tunnel.Connect(Mum) word[0] LOAD — opcode=0',
+            opcode === 0, `got opcode=${opcode}`);
+        assert('BC4 Tunnel.Connect(Mum) word[0] LOAD — crDst=2 (CR2 from input spec)',
+            crDst === 2, `got crDst=${crDst}`);
+        assert('BC5 Tunnel.Connect(Mum) word[0] LOAD — crSrc=6 (c-list root)',
+            crSrc === 6, `got crSrc=${crSrc}`);
+        assert('BC6 Tunnel.Connect(Mum) word[0] LOAD — imm=5 (Mum NS slot)',
+            imm === 5, `got imm=${imm}`);
+    }
+
+    // word[1] = ELOADCALL CR0, Tunnel, Connect
+    {
+        const w      = result.words[1] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const crSrc  = (w >>> 15) & 0xF;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC7 Tunnel.Connect(Mum) word[1] ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC8 Tunnel.Connect(Mum) word[1] ELOADCALL — crDst=0 (scratch CR0)',
+            crDst === 0, `got crDst=${crDst}`);
+        assert('BC9 Tunnel.Connect(Mum) word[1] ELOADCALL — crSrc=6 (c-list root)',
+            crSrc === 6, `got crSrc=${crSrc}`);
+        assert('BC10 Tunnel.Connect(Mum) word[1] ELOADCALL — row=3 (Tunnel NS slot)',
+            row === 3, `got row=${row}`);
+        assert('BC11 Tunnel.Connect(Mum) word[1] ELOADCALL — method=6 (Connect index 5, 1-based)',
+            method === 6, `got method=${method}`);
+    }
+}
+
+{
+    // BC12: pre-loaded CR argument — explicit CRn skips the LOAD
+    const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
+    a.setNamespace(TUNNEL_NS_BC);
+    // CR2 is explicitly supplied — no LOAD should be emitted; result is 2 words
+    const result = a.assemble('Tunnel.Connect(CR2)\nHALT');
+    assert('BC12 Tunnel.Connect(CR2) assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC13 Tunnel.Connect(CR2) skips LOAD — 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w = result.words[0] >>> 0;
+        assert('BC14 Tunnel.Connect(CR2) word[0] is ELOADCALL — opcode=8',
+            ((w >>> 27) & 0x1F) === 8, `got opcode=${(w >>> 27) & 0x1F}`);
+    }
+}
+
+{
+    // BC15: DR argument gives a clear error
+    const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
+    a.setNamespace(TUNNEL_NS_BC);
+    a.assemble('Tunnel.Send(payload, count)');
+    assert('BC15 Tunnel.Send(name, name) — DR args give errors',
+        a.errors.length >= 1 && a.errors[0].message.includes('DR1'),
+        a.errors.map(e => e.message).join('; '));
+}
+
+{
+    // BC16: unknown abstraction gives targeted error (not "unrecognised instruction")
+    const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
+    a.setNamespace(TUNNEL_NS_BC);
+    a.assemble('Ghost.Method(arg)');
+    assert('BC16 Ghost.Method(arg) — unknown abstraction error',
+        a.errors.length >= 1 && a.errors[0].message.includes('"Ghost"'),
+        a.errors.map(e => e.message).join('; '));
+}
+
+{
+    // BC17: unknown method gives targeted error listing known methods
+    const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
+    a.setNamespace(TUNNEL_NS_BC);
+    a.assemble('Tunnel.Bogus(Mum)');
+    assert('BC17 Tunnel.Bogus(Mum) — unknown method error listing known methods',
+        a.errors.length >= 1 && a.errors[0].message.includes('Connect') && a.errors[0].message.includes('Send'),
+        a.errors.map(e => e.message).join('; '));
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

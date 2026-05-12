@@ -513,6 +513,72 @@ class ChurchAssembler {
                 continue;
             }
 
+            // ── Bare-call sugar: Abs.Method(args) ─────────────────────────────
+            // "Tunnel.Connect(Mum)" expands to:
+            //   LOAD   CR2, Mum             ; per method convention input spec
+            //   ELOADCALL CR0, Tunnel, Connect
+            //
+            // Rules:
+            //   · CR arguments: resolved from namespace by name (LOAD CRn, Name).
+            //     If the user supplies an explicit CRn, the LOAD is skipped.
+            //   · DR arguments: data values — must be pre-loaded before the call.
+            //     The sugar emits a clear error pointing to IADD/ISUB pre-loading.
+            //   · Extra arguments (beyond the method's input spec) are ignored.
+            //   · Unknown abstraction or method → targeted error, no fall-through.
+            //   · ELOADCALL always uses CR0 as the scratch destination.
+            {
+                const bcMatch = line.match(/^([A-Za-z]\w*)\.([A-Za-z]\w*)\s*\(([^)]*)\)$/);
+                if (bcMatch) {
+                    const absName    = bcMatch[1];
+                    const methodName = bcMatch[2];
+                    const argsStr    = bcMatch[3].trim();
+                    const conv       = this.methodConventions[absName];
+                    if (!conv) {
+                        this.errors.push({ line: lineNum + 1, message:
+                            `"${absName}" is not a known abstraction in the bare-call form "${absName}.${methodName}(...)". ` +
+                            `Use LOAD to bind it first or check the method conventions.` });
+                        continue;
+                    }
+                    if (!conv[methodName]) {
+                        const known = Object.keys(conv).join(', ');
+                        this.errors.push({ line: lineNum + 1, message:
+                            `"${methodName}" is not a known method of ${absName}. Known methods: ${known}.` });
+                        continue;
+                    }
+                    const methodEntry = conv[methodName];
+                    const inputSpec   = methodEntry.input || '';
+                    // Extract ordered register slots from input spec: CR2=..., DR1=...
+                    const regOrder = [];
+                    const regRe = /\b(CR|DR)(\d+)=/g;
+                    let rm;
+                    while ((rm = regRe.exec(inputSpec)) !== null) {
+                        regOrder.push({ type: rm[1], n: parseInt(rm[2]) });
+                    }
+                    const args = argsStr ? argsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+                    for (let ai = 0; ai < args.length; ai++) {
+                        const arg = args[ai];
+                        const reg = regOrder[ai];
+                        if (!reg) continue; // extra arg — no register mapping, silently skipped
+                        if (reg.type === 'CR') {
+                            if (/^CR\d+$/i.test(arg)) {
+                                // Explicit CRn supplied — caller pre-loaded it; no LOAD needed.
+                            } else {
+                                instructions.push({ line: `LOAD CR${reg.n}, ${arg}`, lineNum: lineNum + 1 });
+                            }
+                        } else {
+                            // DR argument — data value, cannot be auto-loaded from a name.
+                            this.errors.push({ line: lineNum + 1, message:
+                                `Argument ${ai + 1} of ${absName}.${methodName}() maps to DR${reg.n}, which holds a data value. ` +
+                                `"${arg}" cannot be auto-loaded into a DR — pre-load it before the call:\n` +
+                                `  IADD  DR${reg.n}, DR${reg.n}, #${arg}   ; small literal (fits in 14 bits)\n` +
+                                `  ; — or — load a full 32-bit constant via a DREAD from an embedded constant` });
+                        }
+                    }
+                    instructions.push({ line: `ELOADCALL CR0, ${absName}, ${methodName}`, lineNum: lineNum + 1 });
+                    continue;
+                }
+            }
+
             // ── MVN pseudo-instruction ─────────────────────────────────────────
             // MVN DRd, DRs  →  ~DRs  (ARM-style move-bitwise-NOT)
             // The Church Machine ISA has no native bitwise complement opcode, so
