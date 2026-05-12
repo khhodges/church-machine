@@ -961,8 +961,28 @@ function showCListPopup(evt, clistBase, cc) {
             const lbl = (typeof _gtPetName === 'function') ? _gtPetName(gtWord) : '';
             const safeLbl = lbl ? lbl.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
             if (lbl) {
+                let _permsStr = '';
+                if (sim.parseGT) {
+                    const _p = sim.parseGT(gtWord);
+                    if (_p.type === 3 && sim.parseAbstractGT) {
+                        const _ab = sim.parseAbstractGT(gtWord);
+                        if (_ab.R) _permsStr += 'R';
+                        if (_ab.W) _permsStr += 'W';
+                    } else {
+                        const _pm = _p.permissions || {};
+                        if (_pm.R) _permsStr += 'R';
+                        if (_pm.W) _permsStr += 'W';
+                        if (_pm.X) _permsStr += 'X';
+                        if (_pm.E) _permsStr += 'E';
+                    }
+                }
+                const _insertStr  = _permsStr ? `${lbl} ${_permsStr}` : lbl;
+                const _safeInsert = _insertStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const _permsBadge = _permsStr
+                    ? ` <span class="clist-sel-perms">${_permsStr}</span>`
+                    : '';
                 html += `<tr>` +
-                    `<td class="clist-sel-name" onclick="clistSelectName('${safeLbl}')" title="Insert '${lbl}' at cursor">${lbl} <span class="clist-sel-arrow">&#x2B9E;</span></td>` +
+                    `<td class="clist-sel-name" onclick="clistSelectName('${_safeInsert}')" title="Insert '${_insertStr}'">${lbl}${_permsBadge} <span class="clist-sel-arrow">&#x2B9E;</span></td>` +
                     `<td class="zdp-hex" style="font-size:0.71rem;">${hexW(gtWord)}</td>` +
                     `<td class="clist-sel-idx popup-sub-id">[${j}]</td>` +
                     `</tr>`;

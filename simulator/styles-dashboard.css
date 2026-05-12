@@ -3368,6 +3368,19 @@ a.next-step-link:hover {
     opacity: 1;
     color: #7dd3fc;
 }
+.clist-sel-perms {
+    font-size: 0.63rem;
+    font-weight: 700;
+    font-family: var(--font-mono, monospace);
+    color: var(--church-gold, #f4b942);
+    background: rgba(244, 185, 66, 0.12);
+    border: 1px solid rgba(244, 185, 66, 0.25);
+    border-radius: 3px;
+    padding: 0 3px;
+    margin-left: 3px;
+    vertical-align: middle;
+    letter-spacing: 0.04em;
+}
 
 /* ── mLoad check result badges ────────────────────────────────────────── */
 .mload-section-hdr {
