@@ -761,7 +761,7 @@ function _applyPendingSimLoad() {
     const slot2Base  = sim.bootComplete ? (sim.memory[abstrBase2] || (2 * sim.SLOT_SIZE)) : 0;
     const progBase   = (slot3Base >= 0x0400) ? slot3Base + 1 : slot2Base;
     sim.programBaseAddr = progBase;
-    // ── LAZY-LOAD c-list: cc === 0 → inject full DEMO_CLIST ─────────────────────
+    // ── LAZY-LOAD c-list: cc === 0 OR user-compiled program → inject full DEMO_CLIST ──
     // Boot.Abstr boots with cc=0 when boot_image.py determined that the saved
     // lump's c-list is incomplete (e.g. assembler-generated cc=1 placeholder
     // whose code references slots ≥ cc).  That path strips cc → 0 so this guard
@@ -774,11 +774,21 @@ function _applyPendingSimLoad() {
     // guard does NOT fire for those, preserving the POLA slot-index mapping.
     // Using clistCount < 18 here would overwrite the POLA c-list with the full
     // DEMO_CLIST at its original positions, corrupting POLA-rewritten slot indices.
+    //
+    // User-compiled programs (lastAssembledCapabilities non-empty) also need the
+    // DEMO_CLIST injected regardless of the compiled cc value.  The assembler emits
+    // LOAD CR, CR6[N] using the NS-slot number N as the c-list offset (e.g. LED0 →
+    // slot 8).  A two-entry cc=2 c-list only spans positions 0–1, so LOAD CR6[8]
+    // would fail the mLoad range check and cause a fault-reset ("stale values").
+    // Forcing the DEMO_CLIST injection expands the c-list to 18 entries (covering
+    // all device slots 0–17); the named-abstraction injection below then extends
+    // further for slots ≥ 18 (e.g. Tunnel at slot 31).
+    const _hasUserCaps = !!(lastAssembledCapabilities && lastAssembledCapabilities.length > 0);
     if (sim.bootComplete && sim.demoClistGTs && sim.demoClistGTs.length > 0) {
         const BOOT_ABSTR_SLOT = 3;
         const nsBase  = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
         const w1f     = sim.parseNSWord1(sim.memory[nsBase + 1]);
-        if (w1f.clistCount === 0) {
+        if (w1f.clistCount === 0 || _hasUserCaps) {
             // B:06 cc=0 leaves CR6 NULL (correct: no c-list at HALT).
             // Read lumpBase from NS entry word0 directly — do NOT use cr[6].word1 (= 0).
             const lumpBase  = sim.memory[nsBase] >>> 0;     // NS word0 = physical lump base (0x180)
@@ -810,18 +820,47 @@ function _applyPendingSimLoad() {
             };
         }
     }
-    // ── Sequential capabilities (CLOOMC compiler path) ──────────────────────────
-    if (sim.bootComplete && lastAssembledCapabilities && lastAssembledCapabilities.length > 0) {
+    // ── Named-abstraction capabilities (user capabilities { } block) ─────────────
+    // Capabilities declared in the source  capabilities { LED0 RW, Tunnel }  are
+    // stored in lastAssembledCapabilities as {name, rights} objects (from the
+    // assembler's _parseCapItem).  Device-class capabilities (LED0–LED5, UART,
+    // BTN, Timer) have no NS slot and are already in place from the DEMO_CLIST
+    // injection above, so they resolve to nsIdx = -1 here and are skipped.
+    //
+    // Non-device abstractions (e.g. Tunnel at NS slot 31) are NOT in the 18-entry
+    // DEMO_CLIST.  Write their E-GT at clistBase + nsIdx so the LOAD CR, CR6[nsIdx]
+    // instruction finds it at the correct offset.  Then extend clistCount to cover
+    // the largest nsIdx used, keeping the mLoad range check happy.
+    if (sim.bootComplete && _hasUserCaps) {
+        const BOOT_ABSTR_SLOT = 3;
+        const nsBase    = sim.NS_TABLE_BASE + BOOT_ABSTR_SLOT * sim.NS_ENTRY_WORDS;
         const clistBase = sim.cr[6].word1;
+        let   maxNsIdx  = -1;
         for (let ci = 0; ci < lastAssembledCapabilities.length; ci++) {
-            const capName = lastAssembledCapabilities[ci];
+            const cap     = lastAssembledCapabilities[ci];
+            const capName = typeof cap === 'string' ? cap : (cap.name || '');
+            if (!capName) continue;
             let nsIdx = -1;
             for (const [idx, lbl] of Object.entries(sim.nsLabels)) {
                 if (lbl.toUpperCase() === capName.toUpperCase()) { nsIdx = parseInt(idx); break; }
             }
             if (nsIdx >= 0) {
                 const gt = sim.createGT(0, nsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                sim.memory[clistBase + ci + 1] = gt;
+                sim.memory[clistBase + nsIdx] = gt;
+                if (nsIdx > maxNsIdx) maxNsIdx = nsIdx;
+            }
+        }
+        // Extend clistCount if any named abstraction lives beyond the current window.
+        if (maxNsIdx >= 0) {
+            const w1fNow      = sim.parseNSWord1(sim.memory[nsBase + 1]);
+            const neededCount = maxNsIdx + 1;
+            if (neededCount > w1fNow.clistCount) {
+                const nsWord1Ext = sim.packNSWord1(
+                    w1fNow.limit, w1fNow.b, w1fNow.f, w1fNow.g,
+                    w1fNow.chainable, w1fNow.gtType, neededCount
+                );
+                sim.memory[nsBase + 1] = nsWord1Ext;
+                sim.cr[6] = { ...sim.cr[6], word2: nsWord1Ext };
             }
         }
     }
