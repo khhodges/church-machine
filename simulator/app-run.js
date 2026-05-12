@@ -317,7 +317,7 @@ function assembleAndLoad() {
                 const cap = result.capabilities[i];
                 const capName   = typeof cap === 'string' ? cap : (cap.name || String(cap));
                 const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-                const permsStr  = capRights.length > 0 ? capRights.join('') : '\u2014';
+                const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
                 const typeStr   = _clistTypeLabel(capName);
                 listing += `  * [${i + 1}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
             }
@@ -386,7 +386,7 @@ function assembleAndLoad() {
             const cap = result.capabilities[i];
             const capName   = typeof cap === 'string' ? cap : (cap.name || String(cap));
             const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-            const permsStr  = capRights.length > 0 ? capRights.join('') : '\u2014';
+            const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
             const typeStr   = _clistTypeLabel(capName);
             listing += `  * [${i + 1}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
         }
