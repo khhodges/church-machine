@@ -1210,6 +1210,10 @@ function runSim() {
     _runStopped = false;
     _showStopBtn(true);
 
+    // Switch to the dashboard with CR14 open so the user sees live execution state
+    switchView('dashboard');
+    openCRDetail(14);
+
     if (con) {
         con.textContent += '\nRunning…';
         con.scrollTop = con.scrollHeight;
