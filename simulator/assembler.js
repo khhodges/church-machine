@@ -523,24 +523,30 @@ class ChurchAssembler {
             // DRd must differ from DRs: if they are the same register, step 1
             // zeroes out DRs before it can be read, producing the wrong result.
             // A compile-time error is emitted in that case.
-            if (/^MVN\b/i.test(line)) {
-                const mvnParts = line.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
-                const drDst = (mvnParts[1] || 'DR0').replace(/,/g, '').trim();
-                const drSrc = (mvnParts[2] || 'DR0').replace(/,/g, '').trim();
-                // Check for same-register aliasing (DR0..DR15 exact form only;
-                // aliases are accepted and resolved later — trust the programmer).
-                const dstMatch = drDst.match(/^DR(\d+)$/i);
-                const srcMatch = drSrc.match(/^DR(\d+)$/i);
-                if (dstMatch && srcMatch && parseInt(dstMatch[1]) === parseInt(srcMatch[1])) {
-                    this.errors.push({ line: lineNum + 1,
-                        message: `MVN: destination and source must be different registers (both are ${drDst.toUpperCase()}). ` +
-                            `Use a scratch register, e.g.  MVN DR1, DR2  then copy DR1 → DR2 if needed.` });
+            // Conditional variants (MVNEQ, MVNNE, MVNMI, etc.) are supported;
+            // the condition suffix is propagated to all three expanded instructions.
+            {
+                const mvnMatch = line.match(/^MVN([A-Z]{2})?\b/i);
+                if (mvnMatch) {
+                    const cc = (mvnMatch[1] || '').toUpperCase();
+                    const mvnParts = line.replace(/,/g, ' ').split(/\s+/).filter(Boolean);
+                    const drDst = (mvnParts[1] || 'DR0').replace(/,/g, '').trim();
+                    const drSrc = (mvnParts[2] || 'DR0').replace(/,/g, '').trim();
+                    // Check for same-register aliasing (DR0..DR15 exact form only;
+                    // aliases are accepted and resolved later — trust the programmer).
+                    const dstMatch = drDst.match(/^DR(\d+)$/i);
+                    const srcMatch = drSrc.match(/^DR(\d+)$/i);
+                    if (dstMatch && srcMatch && parseInt(dstMatch[1]) === parseInt(srcMatch[1])) {
+                        this.errors.push({ line: lineNum + 1,
+                            message: `MVN${cc}: destination and source must be different registers (both are ${drDst.toUpperCase()}). ` +
+                                `Use a scratch register, e.g.  MVN${cc} DR1, DR2  then copy DR1 → DR2 if needed.` });
+                        continue;
+                    }
+                    instructions.push({ line: `ISUB${cc} ${drDst}, ${drSrc}, ${drSrc}`, lineNum: lineNum + 1 });
+                    instructions.push({ line: `ISUB${cc} ${drDst}, ${drDst}, ${drSrc}`, lineNum: lineNum + 1 });
+                    instructions.push({ line: `IADD${cc} ${drDst}, ${drDst}, #-1`,      lineNum: lineNum + 1 });
                     continue;
                 }
-                instructions.push({ line: `ISUB ${drDst}, ${drSrc}, ${drSrc}`, lineNum: lineNum + 1 });
-                instructions.push({ line: `ISUB ${drDst}, ${drDst}, ${drSrc}`, lineNum: lineNum + 1 });
-                instructions.push({ line: `IADD ${drDst}, ${drDst}, #-1`,      lineNum: lineNum + 1 });
-                continue;
             }
 
             instructions.push({ line, lineNum: lineNum + 1 });
@@ -627,9 +633,9 @@ class ChurchAssembler {
             if (mnemonic === 'HALT' || mnemonic === 'NOP') {
                 return 0;
             }
-            // MVN is intercepted in pass 1 and never reaches here; listed as a hint
+            // MVN/MVNcc is intercepted in pass 1 and never reaches here; listed as a hint
             // for completeness so the suggestion is accurate if this path is ever hit.
-            const pseudoHint = ' Pseudo-instructions (handled before encoding): NOP, HALT, MVN.';
+            const pseudoHint = ' Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE).';
             this.errors.push({ line: lineNum, message: `Oops! I don't recognise the instruction "${mnemonic}". Check your spelling — every letter matters!${pseudoHint}` });
             return null;
         }
