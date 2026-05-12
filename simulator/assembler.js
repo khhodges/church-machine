@@ -238,7 +238,9 @@ class ChurchAssembler {
         this.nsLoaded   = {};  // name → CR index (updated during assembly)
         // Null-GT row pet names: name → c-list slot index (e.g. {Mum: 5}).
         // Set via setClistSlots(); inherited class-wide like nsSymbols.
-        this._clistSlots = Object.assign({}, ChurchAssembler._sharedClistSlots || {});
+        this._clistSlots    = Object.assign({}, ChurchAssembler._sharedClistSlots || {});
+        // Capabilities-block slots — rebuilt each assemble() call; always fresh.
+        this._capBlockSlots = {};
     }
 
     // setClistSlots(nameToSlot) — register null-GT row pet names so the assembler
@@ -322,6 +324,13 @@ class ChurchAssembler {
         //      c-list offset used in  LOAD  CRd, CD[0x0005].
         if (this._clistSlots && this._clistSlots[name] !== undefined)
             return this._clistSlots[name];
+
+        // 2.6. Capabilities-block pre-pass — non-NS, non-device capabilities declared
+        //      in this assembly's  capabilities { }  block, assigned to free c-list
+        //      slots 1, 2, 3, … in declaration order.  The GT at that slot may be
+        //      null at runtime; the assembler still emits LOAD CRd, CD[0x000N].
+        if (this._capBlockSlots && this._capBlockSlots[name] !== undefined)
+            return this._capBlockSlots[name];
 
         // 3. LED<N> Abstract GT shorthand — LED0–LED5 are boot-loaded AGTs at
         //    c-list slots 8–13.  LOAD CR3, LED0  →  LOAD CR3, CR6, #8
@@ -418,6 +427,73 @@ class ChurchAssembler {
         return { dr: Object.assign({}, this._drAliases), cr: Object.assign({}, this._crAliases) };
     }
 
+    // _parseCapBlockSlots(lines) — pre-pass over source lines to assign c-list
+    // slot indices to non-NS capabilities declared in the  capabilities { }  block.
+    //
+    // NS-based abstractions (e.g. Tunnel at NS slot 31) already have a fixed slot
+    // via nsSymbols and are skipped.  Hardware-device shorthand (LED0–LED5, UART,
+    // BTN, SlideRule, Timer) are also skipped — their slots are fixed.
+    //
+    // Every other capability is a null-GT row: it occupies a free c-list slot
+    // (1, 2, 3, …) assigned in declaration order, matching the runtime layout
+    // produced by _applyPendingSimLoad.  The GT at that slot may be null at
+    // runtime — that is a runtime concern, not a compile-time concern.
+    //
+    // Returns { name → slot } for all non-NS, non-device capabilities.
+    _parseCapBlockSlots(lines) {
+        const slots = {};
+        let inCapBlock = false;
+        const capNames = [];
+
+        for (const rawLine of lines) {
+            let line = rawLine.trim();
+            const ci = line.indexOf(';'); if (ci >= 0) line = line.substring(0, ci).trim();
+            const di = line.indexOf('--'); if (di >= 0) line = line.substring(0, di).trim();
+            const si = line.indexOf('//'); if (si >= 0) line = line.substring(0, si).trim();
+            if (!line) continue;
+
+            if (!inCapBlock && /^capabilities\s*\{/i.test(line)) {
+                const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
+                if (inline) {
+                    for (const item of inline[1].split(',')) {
+                        const cap = ChurchAssembler._parseCapItem(item);
+                        if (cap) capNames.push(cap.name);
+                    }
+                } else {
+                    inCapBlock = true;
+                    const tail = line.replace(/^capabilities\s*\{/i, '').trim();
+                    if (tail) for (const item of tail.split(',')) {
+                        const cap = ChurchAssembler._parseCapItem(item);
+                        if (cap) capNames.push(cap.name);
+                    }
+                }
+                continue;
+            }
+            if (inCapBlock) {
+                if (line.includes('}')) { inCapBlock = false; }
+                else for (const item of line.split(',')) {
+                    const cap = ChurchAssembler._parseCapItem(item);
+                    if (cap) capNames.push(cap.name);
+                }
+                continue;
+            }
+        }
+
+        // Fixed hardware-device slot names — already resolved by other paths.
+        const _deviceRE = /^(UART|BTN|SlideRule|Timer|Display)$/i;
+
+        let nextSlot = 1;
+        for (const name of capNames) {
+            if (slots[name] !== undefined) continue;        // already assigned
+            if (this.nsSymbols[name] !== undefined) continue; // NS-based: use path 2
+            if (_deviceRE.test(name)) continue;             // device: use path 3/4
+            const ledM = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
+            if (ledM && parseInt(ledM[1], 10) <= 5) continue; // LED0-5: use path 3
+            slots[name] = nextSlot++;
+        }
+        return slots;
+    }
+
     assemble(source) {
         this.labels = {};
         this.errors = [];
@@ -429,7 +505,8 @@ class ChurchAssembler {
         this._crAliases = Object.assign({}, ChurchAssembler._sharedCrAliases || {});
         this.nsLoaded = {};   // reset per-assembly loaded-CR tracking
         const lines = source.split('\n');
-        this._parsePetDirectives(lines);  // pre-pass: collect all .pet aliases
+        this._parsePetDirectives(lines);               // pre-pass: .pet aliases
+        this._capBlockSlots = this._parseCapBlockSlots(lines); // pre-pass: capabilities {} → slot map
         const instructions = [];
 
         // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
