@@ -425,6 +425,10 @@ function _clistTypeLabel(name) {
     if (reg) {
         const abs = reg.getByName(name);
         if (abs !== null) {
+            // Callable abstractions (have methods) are always shown as 'Abstr'
+            // regardless of architectural layer — the layer numbering (0=HW, 1=Mem,
+            // 2=Mint, 3=IO, …) does not map cleanly to display intent.
+            if (abs.methods && abs.methods.length > 0) return 'Abstr';
             const layerLabels = ['HW', 'Mem', 'Mint', 'IO', 'Math', 'Data', 'App', 'User', 'Sys'];
             return layerLabels[abs.layer] || 'Abstr';
         }
