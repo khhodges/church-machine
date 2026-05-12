@@ -404,6 +404,7 @@ class ChurchAssembler {
         this.labels = {};
         this.errors = [];
         this.warnings = [];
+        this.capabilities = [];   // names declared in capabilities { } header (if present)
         // Reset to shared conventions — local .pet directives for this lump are
         // re-collected by _parsePetDirectives below and shadow these.
         this._drAliases = Object.assign({}, ChurchAssembler._sharedDrAliases || {});
@@ -414,6 +415,8 @@ class ChurchAssembler {
         const instructions = [];
 
         // ── Pass 1: scan lines, record label offsets, collect instruction stubs ──
+        let _inCapBlock   = false;  // inside a multi-line  capabilities { } block
+        let _inConstBlock = false;  // inside a multi-line  constants     { } block
         for (let lineNum = 0; lineNum < lines.length; lineNum++) {
             let line = lines[lineNum].trim();
             const commentIdx = line.indexOf(';');
@@ -423,6 +426,45 @@ class ChurchAssembler {
             const slashComment = line.indexOf('//');
             if (slashComment >= 0) line = line.substring(0, slashComment).trim();
             if (!line) continue;
+
+            // ── capabilities { } block ─────────────────────────────────────────
+            // CLOOMC-format header section listing the CRs this lump needs.
+            // Produces no machine words; capability names are collected for callers.
+            // Accepts single-line  capabilities { LED0, SlideRule }
+            // or multi-line        capabilities {\n  LED0\n  SlideRule\n}
+            if (!_inCapBlock && !_inConstBlock && /^capabilities\s*\{/i.test(line)) {
+                const inline = line.match(/^capabilities\s*\{\s*(.*?)\s*\}\s*$/i);
+                if (inline) {
+                    for (const n of inline[1].split(/[\s,]+/).filter(s => /^[A-Za-z]/.test(s)))
+                        this.capabilities.push(n);
+                } else {
+                    _inCapBlock = true;
+                    const tail = line.replace(/^capabilities\s*\{/i, '').trim();
+                    for (const n of tail.split(/[\s,]+/).filter(s => /^[A-Za-z]/.test(s)))
+                        this.capabilities.push(n);
+                }
+                continue;
+            }
+            if (_inCapBlock) {
+                if (line.includes('}')) { _inCapBlock = false; }
+                else {
+                    for (const n of line.split(/[\s,]+/).filter(s => /^[A-Za-z]/.test(s)))
+                        this.capabilities.push(n);
+                }
+                continue;
+            }
+
+            // ── constants { } block ───────────────────────────────────────────
+            // CLOOMC-format named-constant declarations; not used in raw assembly.
+            // Skip silently — produces no machine words.
+            if (!_inCapBlock && !_inConstBlock && /^constants\s*\{/i.test(line)) {
+                if (!line.includes('}')) _inConstBlock = true;
+                continue;
+            }
+            if (_inConstBlock) {
+                if (line.includes('}')) _inConstBlock = false;
+                continue;
+            }
 
             if (line.endsWith(':')) {
                 // Label definition — store word offset (= current instruction count)
@@ -512,7 +554,8 @@ class ChurchAssembler {
         }
 
         this._lastLineNums = lineNums.slice();
-        return { words, errors: this.errors, warnings: this.warnings, labels: this.labels };
+        return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
+                 capabilities: this.capabilities.slice() };
     }
 
     getLastLineNums() {

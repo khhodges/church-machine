@@ -3110,11 +3110,13 @@ const _TURING_DR_TEST_SOURCE = `; ==============================================
 ; Abstraction:  TuringDRTest
 ; Description:  Full ISA visual test across all DR0-DR15 registers
 ; Author:       Church Machine Educational Platform
-; Version:      1.0
+; Version:      1.1
 ; Created:      2026-05-09
 ; Language:     Assembly
-; Dependencies: LED device (C-List[8])
+; Dependencies: LED device (Abstract GT — boot C-List slot 8)
 ; ============================================================
+; Capabilities required by this lump:
+capabilities { LED0, LED1, LED2, LED3, LED4, LED5 }
 ; Methods:
 ;   1. main — 6-phase visual test; all pass → 6 LEDs blink 3×; fault → LED2 latches
 ; ============================================================
@@ -3152,7 +3154,7 @@ const _TURING_DR_TEST_SOURCE = `; ==============================================
 ; ============================================================
 
 ; ── Setup ────────────────────────────────────────────────────
-LOAD CR3, CR6, 8          ; CR3 = LED device (C-List[8], R+W)
+LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (boot C-List slot 8, R+W)
 IADD DR1, DR0, #1         ; DR1 = 1 (LED on-constant throughout)
 DWRITE DR0, CR3, 0        ; clear all LEDs
 DWRITE DR0, CR3, 1
@@ -5131,11 +5133,13 @@ HALT`,
 ; Abstraction:  LedControl
 ; Description:  LED control — Section 1: LED blink (Ti60 F225 nucleus) / Section 2: Turing DR Test (full ISA exercise)
 ; Author:       Church Machine Educational Platform
-; Version:      1.0
+; Version:      1.1
 ; Created:      2026-05-09
 ; Language:     Assembly
-; Dependencies: LED device (C-List[8])
+; Dependencies: LED device (Abstract GT — boot C-List slot 8)
 ; ============================================================
+; Capabilities required by this lump:
+capabilities { LED0 }
 ; Methods:
 ;   1. blink — toggle LED0 at 1 Hz using nested delay loops (Ti60 F225 nucleus program)
 ;   2. turingDRTest — full visual ISA exercise across all DR0–DR15 registers
@@ -5155,19 +5159,20 @@ HALT`,
 ;    LED strip: LED0 (green) toggles with each
 ;    DWRITE, exactly as on the physical board.
 ;
-; Path: LOAD CR3, CR6, 8  → loads LED_DEV GT
+; Path: LOAD CR3, LED0   → resolves LED0 → C-List[8] → LED_DEV GT
 ;       DWRITE DR1, CR3, 0 → LED0 on
 ;       DWRITE DR0, CR3, 0 → LED0 off
 ;
-; C-List[8] = LED_DEV (W) in the simulator boot,
-; so this code runs identically to the FPGA.
+; LED0 is an Abstract GT at boot C-List slot 8 (W-perm).
+; LOAD CR3, LED0 is equivalent to LOAD CR3, CR6, 8 and
+; runs identically to the FPGA binary.
 ;
 ; On the FPGA (50 MHz): 380 × 16383 iters ≈ 0.5 s
 ; per phase → 1 Hz blink total.
 ; ============================================
 
-; --- Load LED device capability from C-List slot 8 ---
-LOAD CR3, CR6, 8          ; C-List[8] = LED_DEV (W-perm, NS slot 12)
+; --- Load LED0 Abstract GT from the boot C-List ---
+LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (boot C-List slot 8)
 
 ; --- DR1 = 1 (the "on" value) ---
 IADD DR1, DR0, #1
