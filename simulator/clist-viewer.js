@@ -350,16 +350,35 @@
             var capSrcRe = /capabilities\s*\{([^}]*)\}/;
             var capSrcM  = capSrcRe.exec(srcEd.value);
             if (capSrcM) {
-                var capSrcNames = capSrcM[1].split(/[\s,]+/)
-                    .map(function (n) { return n.trim(); })
-                    .filter(function (n) { return n && !/^[;/]/.test(n); });
-                if (capSrcNames.length > 0) {
+                // Parse line-by-line: each non-blank, non-comment line is ONE capability.
+                // First token = name; remaining tokens = rights (R, W, X, L, S, E).
+                var KNOWN_RIGHTS = /^[RWXLSErwxlse]+$/;
+                var capSrcEntries = capSrcM[1].split('\n')
+                    .map(function (line) { return line.replace(/[;,].*$/, '').trim(); })
+                    .filter(function (line) { return line && !/^[;/]/.test(line); })
+                    .map(function (line) {
+                        var tokens = line.split(/\s+/).filter(Boolean);
+                        var name   = tokens[0] || '';
+                        var rights = tokens.slice(1).filter(function (t) { return KNOWN_RIGHTS.test(t); });
+                        return name ? { name: name, rights: rights } : null;
+                    })
+                    .filter(Boolean);
+                if (capSrcEntries.length > 0) {
                     var srcRows = '';
-                    for (var si = 0; si < capSrcNames.length; si++) {
-                        var sn = capSrcNames[si];
+                    for (var si = 0; si < capSrcEntries.length; si++) {
+                        var se = capSrcEntries[si];
+                        var rightsHtml = se.rights.length > 0
+                            ? '<span class="clist-perms">' +
+                              se.rights.join('').split('').map(function (ch) {
+                                  var col = PERM_COLORS[ch.toUpperCase()] || '#666';
+                                  return '<span class="clist-perm-chip clist-perm-chip--on" style="background:' + col + '22;color:' + col + ';border-color:' + col + '55;">' + ch.toUpperCase() + '</span>';
+                              }).join('') +
+                              '</span>'
+                            : '';
                         srcRows += '<div class="clist-row" data-slot="' + si + '" tabindex="-1">' +
                             '<span class="clist-slot" title="declared in source">src</span>' +
-                            '<span class="clist-name">' + escHtml(sn) + '</span>' +
+                            rightsHtml +
+                            '<span class="clist-name">' + escHtml(se.name) + '</span>' +
                             '</div>';
                     }
                     return _wrapRows('source', srcRows);
