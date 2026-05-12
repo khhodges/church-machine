@@ -1280,11 +1280,15 @@ function runSim() {
                 con.scrollTop = con.scrollHeight;
             }
 
-            // Live-update the fault-free counter badge during the run
+            // Live-update the fault-free counter badge during the run.
+            // _isSourceStale() is NOT checked here — _simRunHash is only set by
+            // patchSimulator(), so it is always empty on a normal run; checking
+            // staleness would permanently block the live update.
             {
                 const _ffEl = document.getElementById('faultFreeCounter');
-                if (_ffEl && typeof _isSourceStale === 'function' && !_isSourceStale()) {
-                    const _liveFfi = _faultFreeInstrTotal + (sim.faultLog.length === 0 ? totalSteps : 0);
+                if (_ffEl) {
+                    const _liveClean = sim.faultLog.length === 0;
+                    const _liveFfi = _faultFreeInstrTotal + (_liveClean ? totalSteps : 0);
                     if (_liveFfi >= 1000) {
                         _ffEl.textContent = '\u2713 MTBF 0.0001';
                         _ffEl.className = 'fault-free-badge ff-eligible';
