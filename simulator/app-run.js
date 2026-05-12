@@ -2049,6 +2049,7 @@ function showFaultModal(f) {
     // it in the fault description.
     let _faultCListSlot = null;
     let _faultCListPetName = null;
+    let _faultCListGT = null;
     {
         const _op = (word >>> 27) & 0x1F;
         const _isLoadOrCall = (_op === 0 || _op === 2); // LOAD=0, CALL=2
@@ -2064,10 +2065,21 @@ function showFaultModal(f) {
                     if (_name) {
                         _faultCListSlot = _slotIdx;
                         _faultCListPetName = _name;
+                        _faultCListGT = _slotGT;
                     }
                 }
             }
         }
+    }
+
+    // ── C-List slot permissions badge (precomputed for template clarity) ─────
+    let _faultCListPermsHTML = '';
+    if (_faultCListGT !== null) {
+        try {
+            const _p = sim.parseGT(_faultCListGT);
+            const _perms = ['R','W','X','L','S','E'].filter(k => _p.permissions[k]).join('');
+            if (_perms) _faultCListPermsHTML = ' ' + _permsHTML(_perms);
+        } catch(e) {}
     }
 
     // ── Capability register snapshot ──────────────────────────────────────
@@ -2376,7 +2388,7 @@ function showFaultModal(f) {
                     </div>
                     ${_faultCListPetName != null ? `<div class="fault-detail-row">
                         <span class="fault-detail-label">C-List</span>
-                        <span class="fault-detail-value"><code>clist[${_faultCListSlot}]</code> <span class="fault-clist-petname">${_faultCListPetName}</span></span>
+                        <span class="fault-detail-value"><code>clist[${_faultCListSlot}]</code> <span class="fault-clist-petname">${_faultCListPetName}</span>${_faultCListPermsHTML}</span>
                     </div>` : ''}
                     <div class="fault-detail-row">
                         <span class="fault-detail-label">Location</span>
