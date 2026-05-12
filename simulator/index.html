@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="styles-base.css?v=20260425">
     <link rel="stylesheet" href="styles-toolbar.css?v=20260511d">
     <link rel="stylesheet" href="styles-editor.css?v=20260511b">
-    <link rel="stylesheet" href="styles-dashboard.css?v=20260511b">
+    <link rel="stylesheet" href="styles-dashboard.css?v=20260512c">
     <link rel="stylesheet" href="styles-lumps.css?v=20260511b">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260510b">
     <link rel="stylesheet" href="styles-fault.css?v=20260426a">
@@ -173,7 +173,6 @@
                     </div>
                     <div class="run-wrap" id="runWrap">
                         <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
-                        <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
                         <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
                         <div class="run-popover" id="runPopover" style="display:none;">
                             <div class="run-popover-title">Run Settings <button class="run-close-btn" onclick="hideRunPopover()" title="Close">&times;</button></div>
@@ -189,6 +188,7 @@
                             <button class="btn btn-sm btn-success run-go-btn" onclick="runSimGo()">Go</button>
                         </div>
                     </div>
+                    <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
                     <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
                     <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
                     <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
