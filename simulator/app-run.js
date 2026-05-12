@@ -429,6 +429,17 @@ function _clistTypeLabel(name) {
             return layerLabels[abs.layer] || 'Abstr';
         }
     }
+    // Peripheral name patterns — hardware capabilities not backed by a lump
+    const up = name.toUpperCase();
+    if (/^LED\d*$/.test(up) || /^GPIO\d*$/.test(up))             return 'IO';
+    if (/^UART\d*$/.test(up) || /^USART\d*$/.test(up))           return 'IO';
+    if (/^SPI\d*$/.test(up) || /^I2C\d*$/.test(up))              return 'IO';
+    if (/^PWM\d*$/.test(up) || /^TIMER\d*$/.test(up) || /^TIM\d*$/.test(up)) return 'IO';
+    if (/^ADC\d*$/.test(up) || /^DAC\d*$/.test(up))              return 'IO';
+    if (/^CAN\d*$/.test(up) || /^USB\d*$/.test(up))              return 'IO';
+    if (/^FLASH\d*$/.test(up) || /^SDRAM\d*$/.test(up))          return 'Mem';
+    if (/^CLOCK\d*$/.test(up) || /^CLK\d*$/.test(up) || /^PLL\d*$/.test(up)) return 'HW';
+    if (/^FPGA\d*$/.test(up) || /^JTAG\d*$/.test(up))            return 'HW';
     return '\u2014';
 }
 
