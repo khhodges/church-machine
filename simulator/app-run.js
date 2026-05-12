@@ -339,6 +339,7 @@ function assembleAndLoad() {
         if (con) con.textContent = `Assembly errors:\n${errText}`;
         window._assemblerSymbols = null;
         lastAssembledWords = null;
+        lastAssembledCapabilities = null;
         const _errSaveBtn = document.getElementById('btnSaveNS');
         if (_errSaveBtn) _errSaveBtn.disabled = true;
         switchCodeTab('console');
@@ -349,6 +350,8 @@ function assembleAndLoad() {
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
 
     lastAssembledWords = result.words.slice();
+    lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
+        ? result.capabilities.slice() : null;
     _defaultProgramLoaded = true;
     sim.programLabels = result.labels || {};
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
@@ -1126,14 +1129,16 @@ function _autoLoadDefaultProgram() {
             if (sim.bootComplete && lastAssembledCapabilities && lastAssembledCapabilities.length > 0) {
                 const clistBase = sim.cr[6].word1;
                 for (let ci = 0; ci < lastAssembledCapabilities.length; ci++) {
-                    const capName = lastAssembledCapabilities[ci];
+                    const cap     = lastAssembledCapabilities[ci];
+                    const capName = typeof cap === 'string' ? cap : (cap.name || '');
+                    if (!capName) continue;
                     let nsIdx = -1;
                     for (const [idx, lbl] of Object.entries(sim.nsLabels)) {
                         if (lbl.toUpperCase() === capName.toUpperCase()) { nsIdx = parseInt(idx); break; }
                     }
                     if (nsIdx >= 0) {
                         const gt = sim.createGT(0, nsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
-                        sim.memory[clistBase + ci + 1] = gt;
+                        sim.memory[clistBase + nsIdx] = gt;
                     }
                 }
             }
