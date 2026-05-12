@@ -84,7 +84,7 @@
             if (addBtn) { showPicker(); return; }
 
             var pickerRow = e.target.closest('.clist-picker-row[data-cap-name]');
-            if (pickerRow) { _insertCapability(pickerRow.dataset.capName); return; }
+            if (pickerRow) { _insertCapability(pickerRow.dataset.capName, pickerRow.dataset.capRights || ''); return; }
 
             var row = e.target.closest('.clist-row[data-slot]');
             if (!row) return;
@@ -141,7 +141,7 @@
             e.preventDefault();
             if (focusedRow >= 0 && focusedRow < rows.length) {
                 if (inPicker) {
-                    _insertCapability(rows[focusedRow].dataset.capName);
+                    _insertCapability(rows[focusedRow].dataset.capName, rows[focusedRow].dataset.capRights || '');
                 } else {
                     insertCROperand(parseInt(rows[focusedRow].dataset.slot, 10));
                 }
@@ -488,16 +488,16 @@
 
     // ── GT Picker ─────────────────────────────────────────────────────────────
     var PICKER_DEVICES = [
-        { name: 'LED0',     hint: 'LED \u00b7 device 0' },
-        { name: 'LED1',     hint: 'LED \u00b7 device 1' },
-        { name: 'LED2',     hint: 'LED \u00b7 device 2' },
-        { name: 'LED3',     hint: 'LED \u00b7 device 3' },
-        { name: 'LED4',     hint: 'LED \u00b7 device 4' },
-        { name: 'LED5',     hint: 'LED \u00b7 device 5' },
-        { name: 'UART0',    hint: 'UART \u00b7 device 0' },
-        { name: 'Button0',  hint: 'Button \u00b7 device 0' },
-        { name: 'Timer0',   hint: 'Timer \u00b7 device 0' },
-        { name: 'Display0', hint: 'Display \u00b7 device 0' },
+        { name: 'LED0',     hint: 'LED \u00b7 device 0',     rights: 'RW' },
+        { name: 'LED1',     hint: 'LED \u00b7 device 1',     rights: 'RW' },
+        { name: 'LED2',     hint: 'LED \u00b7 device 2',     rights: 'RW' },
+        { name: 'LED3',     hint: 'LED \u00b7 device 3',     rights: 'RW' },
+        { name: 'LED4',     hint: 'LED \u00b7 device 4',     rights: 'RW' },
+        { name: 'LED5',     hint: 'LED \u00b7 device 5',     rights: 'RW' },
+        { name: 'UART0',    hint: 'UART \u00b7 device 0',    rights: 'RW' },
+        { name: 'Button0',  hint: 'Button \u00b7 device 0',  rights: 'R'  },
+        { name: 'Timer0',   hint: 'Timer \u00b7 device 0',   rights: 'RW' },
+        { name: 'Display0', hint: 'Display \u00b7 device 0', rights: 'W'  },
     ];
 
     async function buildPickerContentAsync() {
@@ -517,10 +517,10 @@
                     bodyRows += '<div class="clist-picker-section-header">Abstractions</div>';
                     withSlots.forEach(function (l) {
                         var name = escHtml(l.abstraction || l.name);
-                        bodyRows += '<div class="clist-picker-row" data-cap-name="' + name + '">' +
+                        bodyRows += '<div class="clist-picker-row" data-cap-name="' + name + '" data-cap-rights="E">' +
                             '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
                             '<span class="clist-picker-name">' + name + '</span>' +
-                            '<span class="clist-picker-hint">NS[' + l.ns_slot + ']</span>' +
+                            '<span class="clist-picker-hint">NS[' + l.ns_slot + '] \u00b7 E</span>' +
                             '</div>';
                     });
                 }
@@ -530,10 +530,10 @@
         // Section 2: Devices — Abstract GTs (hardcoded device capability names)
         bodyRows += '<div class="clist-picker-section-header">Devices</div>';
         PICKER_DEVICES.forEach(function (d) {
-            bodyRows += '<div class="clist-picker-row" data-cap-name="' + d.name + '">' +
+            bodyRows += '<div class="clist-picker-row" data-cap-name="' + d.name + '" data-cap-rights="' + (d.rights || '') + '">' +
                 '<span class="clist-picker-type clist-picker-type--abstract">Abstract</span>' +
                 '<span class="clist-picker-name">' + d.name + '</span>' +
-                '<span class="clist-picker-hint">' + escHtml(d.hint) + '</span>' +
+                '<span class="clist-picker-hint">' + escHtml(d.hint) + (d.rights ? ' \u00b7 ' + d.rights : '') + '</span>' +
                 '</div>';
         });
 
@@ -547,10 +547,10 @@
                     var onp = s.parseNSWord1(oentry.word1_limit);
                     if (onp && onp.f === 1) {
                         var olbl = escHtml((s.nsLabels && s.nsLabels[oi]) || ('NS[' + oi + ']'));
-                        outRows += '<div class="clist-picker-row" data-cap-name="' + olbl + '">' +
+                        outRows += '<div class="clist-picker-row" data-cap-name="' + olbl + '" data-cap-rights="X">' +
                             '<span class="clist-picker-type clist-picker-type--outform">Outform</span>' +
                             '<span class="clist-picker-name">' + olbl + '</span>' +
-                            '<span class="clist-picker-hint">NS[' + oi + '] F-bit</span>' +
+                            '<span class="clist-picker-hint">NS[' + oi + '] F-bit \u00b7 X</span>' +
                             '</div>';
                     }
                 } catch (e3) { /* skip */ }
@@ -597,28 +597,33 @@
         ed.scrollTop = Math.max(0, paddingTop + lineIndex * lineH - ed.clientHeight / 3);
     }
 
-    function _insertCapability(capName) {
+    function _insertCapability(capName, rights) {
         if (!capName) { hideViewer(); return; }
         var ed = activeEditor || document.getElementById('asmEditor');
         if (!ed) { hideViewer(); return; }
         var src = ed.value;
         var insertPos = -1;
 
+        // The token written into the capabilities block: "Name RIGHTS" (e.g. "Tunnel E")
+        var rightsStr = (rights && rights.trim()) ? rights.trim().toUpperCase() : '';
+        var token = rightsStr ? capName + ' ' + rightsStr : capName;
+
         // Find the first capabilities { ... } block
         var capRe = /capabilities\s*\{([^}]*)\}/;
         var cm = capRe.exec(src);
         if (cm) {
             var inner = cm[1];
-            // Strip comment tokens (tokens starting with ; or /) so a
-            // commented-out capability name doesn't cause a false-positive
-            // "already exists" and silently swallow the insertion.
-            var existing = inner.split(/[\s,]+/)
-                .map(function (n) { return n.trim(); })
+            // Check for existing entry: parse line-by-line so "LED0 RW" is
+            // recognised as name=LED0 (not two separate tokens).
+            var existingNames = inner.split('\n')
+                .map(function (line) { return line.replace(/[;,].*$/, '').trim(); })
+                .filter(Boolean)
+                .map(function (line) { return line.split(/\s+/)[0]; })
                 .filter(function (n) { return n && !/^[;/]/.test(n); });
-            if (existing.indexOf(capName) === -1) {
+            if (existingNames.indexOf(capName) === -1) {
                 var closingBrace = cm.index + cm[0].lastIndexOf('}');
-                var sep = inner.trim().length > 0 ? ',\n        ' : '\n        ';
-                ed.value = src.slice(0, closingBrace) + sep + capName + '\n    ' + src.slice(closingBrace);
+                var sep = inner.trim().length > 0 ? '\n        ' : '\n        ';
+                ed.value = src.slice(0, closingBrace) + sep + token + '\n    ' + src.slice(closingBrace);
                 insertPos = closingBrace + sep.length;
                 ed.dispatchEvent(new Event('input', { bubbles: true }));
             } else {
@@ -635,11 +640,11 @@
             if (am) {
                 var pos = am.index + am[0].length;
                 var prefix = '\n    capabilities {\n        ';
-                ed.value = src.slice(0, pos) + prefix + capName + '\n    }' + src.slice(pos);
+                ed.value = src.slice(0, pos) + prefix + token + '\n    }' + src.slice(pos);
                 insertPos = pos + prefix.length;
             } else {
                 var topPrefix = 'capabilities {\n    ';
-                ed.value = topPrefix + capName + '\n}\n\n' + src;
+                ed.value = topPrefix + token + '\n}\n\n' + src;
                 insertPos = topPrefix.length;
             }
             ed.dispatchEvent(new Event('input', { bubbles: true }));
@@ -651,7 +656,7 @@
         // When the cap was already present, close the popup and refocus the editor.
         if (insertPos >= 0) {
             _scrollEditorToPos(ed, insertPos);
-            ed.setSelectionRange(insertPos, insertPos + capName.length);
+            ed.setSelectionRange(insertPos, insertPos + token.length);
         }
         if (src !== ed.value) {
             showViewer();
