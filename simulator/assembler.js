@@ -562,8 +562,20 @@ class ChurchAssembler {
                         if (reg.type === 'CR') {
                             if (/^CR\d+$/i.test(arg)) {
                                 // Explicit CRn supplied — caller pre-loaded it; no LOAD needed.
-                            } else {
+                            } else if (this._resolveNSName(arg) !== null) {
+                                // Known namespace abstraction or LED shorthand — Level-1 LOAD works.
                                 instructions.push({ line: `LOAD CR${reg.n}, ${arg}`, lineNum: lineNum + 1 });
+                            } else {
+                                // Runtime GT / c-list entry not in the namespace — emit a targeted
+                                // error immediately rather than generating a broken LOAD that fails
+                                // later with a confusing "Expected a capability register" message.
+                                this.errors.push({ line: lineNum + 1, message:
+                                    `Argument ${ai + 1} of ${absName}.${methodName}() maps to CR${reg.n}, which holds a capability GT. ` +
+                                    `"${arg}" is not a known namespace abstraction — it cannot be auto-loaded by name.\n` +
+                                    `If "${arg}" is in your c-list, load it first:\n` +
+                                    `  LOAD  CR${reg.n}, CR6, #<slot>   ; load "${arg}" from your c-list\n` +
+                                    `Then pass the register directly:\n` +
+                                    `  ${absName}.${methodName}(CR${reg.n})` });
                             }
                         } else {
                             // DR argument — data value, cannot be auto-loaded from a name.
