@@ -1260,6 +1260,24 @@ function runSim() {
                 con.scrollTop = con.scrollHeight;
             }
 
+            // Live-update the fault-free counter badge during the run
+            {
+                const _ffEl = document.getElementById('faultFreeCounter');
+                if (_ffEl && typeof _isSourceStale === 'function' && !_isSourceStale()) {
+                    const _liveFfi = _faultFreeInstrTotal + (sim.faultLog.length === 0 ? totalSteps : 0);
+                    if (_liveFfi >= 1000) {
+                        _ffEl.textContent = '\u2713 MTBF 0.0001';
+                        _ffEl.className = 'fault-free-badge ff-eligible';
+                    } else if (_liveFfi > 0) {
+                        _ffEl.textContent = `${_liveFfi.toLocaleString()}\u202F/\u202F1K`;
+                        _ffEl.className = 'fault-free-badge ff-progress';
+                    } else {
+                        _ffEl.textContent = '0\u202F/\u202F1K';
+                        _ffEl.className = 'fault-free-badge ff-zero';
+                    }
+                }
+            }
+
             // Absent-lump: sim suspended mid-run waiting for a lazy fetch.
             if (sim.awaitingLump) {
                 _showStopBtn(false);
