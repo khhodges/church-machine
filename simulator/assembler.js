@@ -482,11 +482,11 @@ class ChurchAssembler {
         // Fixed hardware-device slot names — already resolved by other paths.
         const _deviceRE = /^(UART|BTN|SlideRule|Timer|Display)$/i;
 
-        // Assign each non-NS, non-device capability its 1-based position in the
+        // Assign each non-NS, non-device capability its 0-based position in the
         // FULL capabilities list.  NS-based and device entries are skipped for
         // the slot assignment but the counter still advances, so that "Mum" at
-        // position 2 (e.g. after Tunnel) correctly gets slot 2.
-        let nextSlot = 1;
+        // position 2 (e.g. after Tunnel) correctly gets slot 2 = CR6[0x0002].
+        let nextSlot = 0;  // 0-based: matches CR6[0x0000] ISA offsets
         for (const name of capNames) {
             const isNS  = this.nsSymbols[name] !== undefined;
             const isDev = _deviceRE.test(name);

@@ -320,7 +320,7 @@ function assembleAndLoad() {
                 const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
                 const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
                 const typeStr   = _clistTypeLabel(capName);
-                listing += `  * [${i + 1}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
+                listing += `  * [${i}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
             }
         }
         if (con) con.innerHTML = _capRightsHTML(listing);
@@ -408,7 +408,7 @@ function assembleAndLoad() {
             const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
             const permsStr  = capRights.length > 0 ? '  [' + capRights.join('') + ']' : '';
             const typeStr   = _clistTypeLabel(capName);
-            listing += `  * [${i + 1}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
+            listing += `  * [${i}]  ${capName.padEnd(14)}${typeStr.padEnd(8)}${permsStr}\n`;
         }
     }
     if (con) con.innerHTML = _capRightsHTML(listing);
