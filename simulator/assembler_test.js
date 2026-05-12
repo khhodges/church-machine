@@ -2802,6 +2802,96 @@ HALT`;
         assert('CD10 ELOADCALL CR8, Constants, Pi — method=1 (Pi index 0, stored 1-based)',
             method === 1, `got method=${method}`);
     }
+
+    // CD11–CD13: word[3] = CALL Constants.E  (index 1, stored 1-based → imm=2)
+    {
+        const w      = result.words[3] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        assert('CD11 CALL Constants.E — opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('CD12 CALL Constants.E — crDst=11 (bound by preceding LOAD CR11)',
+            crDst === 11, `got crDst=${crDst}`);
+        assert('CD13 CALL Constants.E — imm=2 (E index 1, stored 1-based)',
+            imm === 2, `got imm=${imm}`);
+    }
+
+    // CD14–CD16: word[4] = CALL Constants.Phi  (index 2, stored 1-based → imm=3)
+    {
+        const w      = result.words[4] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        assert('CD14 CALL Constants.Phi — opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('CD15 CALL Constants.Phi — crDst=11 (bound by preceding LOAD CR11)',
+            crDst === 11, `got crDst=${crDst}`);
+        assert('CD16 CALL Constants.Phi — imm=3 (Phi index 2, stored 1-based)',
+            imm === 3, `got imm=${imm}`);
+    }
+
+    // CD17–CD19: word[5] = CALL Constants.Zero  (index 3, stored 1-based → imm=4)
+    {
+        const w      = result.words[5] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        assert('CD17 CALL Constants.Zero — opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('CD18 CALL Constants.Zero — crDst=11 (bound by preceding LOAD CR11)',
+            crDst === 11, `got crDst=${crDst}`);
+        assert('CD19 CALL Constants.Zero — imm=4 (Zero index 3, stored 1-based)',
+            imm === 4, `got imm=${imm}`);
+    }
+
+    // CD20–CD22: word[6] = CALL Constants.One  (index 4, stored 1-based → imm=5)
+    {
+        const w      = result.words[6] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        assert('CD20 CALL Constants.One — opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('CD21 CALL Constants.One — crDst=11 (bound by preceding LOAD CR11)',
+            crDst === 11, `got crDst=${crDst}`);
+        assert('CD22 CALL Constants.One — imm=5 (One index 4, stored 1-based)',
+            imm === 5, `got imm=${imm}`);
+    }
+
+    // CD23–CD25: word[11] = ELOADCALL CR8, Constants, E  (index 1, stored 1-based → method=2)
+    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=2  →  full imm=(2<<8)|11=0x020B=523
+    {
+        const w      = result.words[11] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('CD23 ELOADCALL CR8, Constants, E — opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('CD24 ELOADCALL CR8, Constants, E — c-list row=11 (nsLoaded[Constants]=11)',
+            row === 11, `got row=${row}`);
+        assert('CD25 ELOADCALL CR8, Constants, E — method=2 (E index 1, stored 1-based)',
+            method === 2, `got method=${method}`);
+    }
+
+    // CD26–CD28: word[14] = ELOADCALL CR8, Constants, One  (index 4, stored 1-based → method=5)
+    // imm[7:0]=11 (nsLoaded[Constants]), imm[14:8]=5  →  full imm=(5<<8)|11=0x050B=1291
+    {
+        const w      = result.words[14] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const crDst  = (w >>> 19) & 0xF;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('CD26 ELOADCALL CR8, Constants, One — opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('CD27 ELOADCALL CR8, Constants, One — c-list row=11 (nsLoaded[Constants]=11)',
+            row === 11, `got row=${row}`);
+        assert('CD28 ELOADCALL CR8, Constants, One — method=5 (One index 4, stored 1-based)',
+            method === 5, `got method=${method}`);
+    }
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
