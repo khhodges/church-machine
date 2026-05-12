@@ -2,10 +2,10 @@ from amaranth import *
 
 from .types import *
 from .layouts import CAP_REG_LAYOUT
-from .mload import CTMMCapMLoad
+from .mload import CMCapMLoad
 
 
-class CTMMCapLoad(Elaboratable):
+class CMCapLoad(Elaboratable):
     def __init__(self):
         self.load_start = Signal()
         self.cr_src = Signal(4)
@@ -36,7 +36,7 @@ class CTMMCapLoad(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        u_mload = CTMMCapMLoad()
+        u_mload = CMCapMLoad()
         m.submodules.u_mload = u_mload
 
         sub_start = Signal()

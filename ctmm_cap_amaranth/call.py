@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
-from .mload import CTMMCapMLoad
+from .mload import CMCapMLoad
 
 
-class CTMMCapCall(Elaboratable):
+class CMCapCall(Elaboratable):
     def __init__(self):
         self.call_start = Signal()
         self.cr_src = Signal(4)
@@ -55,7 +55,7 @@ class CTMMCapCall(Elaboratable):
         B_BIT_POS = 31
         LIMIT_WIDTH = 32
 
-        u_mload = CTMMCapMLoad()
+        u_mload = CMCapMLoad()
         m.submodules.u_mload = u_mload
 
         phase = Signal()

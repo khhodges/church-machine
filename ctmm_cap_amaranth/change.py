@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .mload import CTMMCapMLoad
+from .mload import CMCapMLoad
 
 
-class CTMMCapChange(Elaboratable):
+class CMCapChange(Elaboratable):
     def __init__(self):
         self.change_start = Signal()
         self.cr_src = Signal(4)
@@ -55,7 +55,7 @@ class CTMMCapChange(Elaboratable):
 
         RESERVED_MASK = 0b1000_0001_1000_0000
 
-        u_mload = CTMMCapMLoad()
+        u_mload = CMCapMLoad()
         m.submodules.u_mload = u_mload
 
         cr_index = Signal(4)

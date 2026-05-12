@@ -5,8 +5,8 @@ import argparse
 
 from amaranth.back.verilog import convert
 
-from .fpga_top import CTMMCapFPGATop
-from .core import CTMMCapCore
+from .fpga_top import CMCapFPGATop
+from .core import CMCapCore
 
 
 def _flatten_port(sig):
@@ -21,7 +21,7 @@ def _flatten_port(sig):
 
 
 def generate_core_verilog(output_dir):
-    core = CTMMCapCore()
+    core = CMCapCore()
     raw_ports = [
         core.imem_addr, core.imem_data, core.imem_valid,
         core.dmem_addr, core.dmem_rd_en, core.dmem_rd_data,
@@ -48,7 +48,7 @@ def generate_core_verilog(output_dir):
 
 
 def generate_top_verilog(output_dir, uart_divisor=868):
-    top = CTMMCapFPGATop(uart_divisor=uart_divisor)
+    top = CMCapFPGATop(uart_divisor=uart_divisor)
     ports = [top.uart_tx, top.leds]
 
     verilog_text = convert(top, name="ctmm_cap_fpga_top", ports=ports)
@@ -60,7 +60,7 @@ def generate_top_verilog(output_dir, uart_divisor=868):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate Verilog from CTMMCap Amaranth HDL")
+    parser = argparse.ArgumentParser(description="Generate Verilog from CMCap Amaranth HDL")
     parser.add_argument("-o", "--output-dir", default="fpga_output",
                         help="Output directory for generated files (default: fpga_output)")
     parser.add_argument("--uart-divisor", type=int, default=868,
@@ -71,7 +71,7 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    print("CTMMCap Verilog Generation")
+    print("CMCap Verilog Generation")
     print("=" * 50)
 
     print("\n[1/2] Generating core Verilog...")

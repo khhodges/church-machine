@@ -16,7 +16,7 @@ from .layouts import NS_ENTRY_LAYOUT, NS_LIMIT_LAYOUT, SEALS_LAYOUT
 #   word0: location (32 bits)
 #   word1: limit[16:0] | reserved[28:17] | G[29] | F[30] | B[31]
 #   word2: seal[24:0] | version[31:25]
-class CTMMCapGCUnit(Elaboratable):
+class CMCapGCUnit(Elaboratable):
     def __init__(self):
         self.gc_start = Signal()
         self.gc_mark_en = Signal()

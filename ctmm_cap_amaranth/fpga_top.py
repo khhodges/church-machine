@@ -3,7 +3,7 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT
-from .core import CTMMCapCore
+from .core import CMCapCore
 
 
 class UARTTransmitter(Elaboratable):
@@ -118,7 +118,7 @@ NS_DEPTH = 256
 CLIST_DEPTH = 256
 
 
-class CTMMCapFPGATop(Elaboratable):
+class CMCapFPGATop(Elaboratable):
     def __init__(self, uart_divisor=868, program=None):
         self.uart_divisor = uart_divisor
         self.program = program or []
@@ -129,7 +129,7 @@ class CTMMCapFPGATop(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        core = CTMMCapCore()
+        core = CMCapCore()
         m.submodules.core = core
 
         reporter = StatusReporter(divisor=self.uart_divisor)

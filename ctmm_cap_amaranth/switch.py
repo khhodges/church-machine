@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
-from .mload import CTMMCapMLoad
+from .mload import CMCapMLoad
 
 
-class CTMMCapSwitch(Elaboratable):
+class CMCapSwitch(Elaboratable):
     def __init__(self):
         self.switch_start = Signal()
         self.cr_src = Signal(3)
@@ -38,7 +38,7 @@ class CTMMCapSwitch(Elaboratable):
 
         CR8_BASE = 8
 
-        u_mload = CTMMCapMLoad()
+        u_mload = CMCapMLoad()
         m.submodules.u_mload = u_mload
 
         dest_cr = Signal(4)

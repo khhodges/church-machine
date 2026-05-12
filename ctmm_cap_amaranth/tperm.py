@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 
-class CTMMCapTperm(Elaboratable):
+class CMCapTperm(Elaboratable):
     def __init__(self):
         self.tperm_start = Signal()
         self.cr_target = Signal(4)

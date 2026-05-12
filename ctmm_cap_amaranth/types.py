@@ -60,7 +60,7 @@ FNV_PRIME_32  = 0x01000193
 FNV_SEAL_MASK = (1 << SEAL_BITS) - 1
 
 
-class CTMMOpcode(IntEnum):
+class CMOpcode(IntEnum):
     LUI    = 0b0110111
     AUIPC  = 0b0010111
     JAL    = 0b1101111
@@ -74,7 +74,7 @@ class CTMMOpcode(IntEnum):
     SYSTEM = 0b1110011
 
 
-class CTMMFunct3Branch(IntEnum):
+class CMFunct3Branch(IntEnum):
     BEQ  = 0b000
     BNE  = 0b001
     BLT  = 0b100
@@ -83,7 +83,7 @@ class CTMMFunct3Branch(IntEnum):
     BGEU = 0b111
 
 
-class CTMMFunct3Load(IntEnum):
+class CMFunct3Load(IntEnum):
     LB  = 0b000
     LH  = 0b001
     LW  = 0b010
@@ -91,13 +91,13 @@ class CTMMFunct3Load(IntEnum):
     LHU = 0b101
 
 
-class CTMMFunct3Store(IntEnum):
+class CMFunct3Store(IntEnum):
     SB = 0b000
     SH = 0b001
     SW = 0b010
 
 
-class CTMMFunct3ArithI(IntEnum):
+class CMFunct3ArithI(IntEnum):
     ADDI  = 0b000
     SLTI  = 0b010
     SLTIU = 0b011
@@ -108,7 +108,7 @@ class CTMMFunct3ArithI(IntEnum):
     SRLI  = 0b101
 
 
-class CTMMFunct3Arith(IntEnum):
+class CMFunct3Arith(IntEnum):
     ADD  = 0b000
     SLL  = 0b001
     SLT  = 0b010

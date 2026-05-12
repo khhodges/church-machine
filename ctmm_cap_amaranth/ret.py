@@ -3,10 +3,10 @@ from amaranth.lib.data import View
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
-from .mload import CTMMCapMLoad
+from .mload import CMCapMLoad
 
 
-class CTMMCapReturn(Elaboratable):
+class CMCapReturn(Elaboratable):
     def __init__(self):
         self.return_start = Signal()
         self.cr_src = Signal(3)
@@ -38,7 +38,7 @@ class CTMMCapReturn(Elaboratable):
     def elaborate(self, platform):
         m = Module()
 
-        u_mload = CTMMCapMLoad()
+        u_mload = CMCapMLoad()
         m.submodules.u_mload = u_mload
 
         return_cap = Signal(CAP_REG_LAYOUT)

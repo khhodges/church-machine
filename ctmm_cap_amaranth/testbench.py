@@ -3,7 +3,7 @@ from amaranth.sim import Simulator
 
 from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
-from .core import CTMMCapCore
+from .core import CMCapCore
 from hardware.integrity32 import integrity32
 
 
@@ -41,18 +41,18 @@ def encode_church(church_op, cr_dst=0, cr_src=0, index=0):
 
 
 def run_testbench():
-    dut = CTMMCapCore()
+    dut = CMCapCore()
     sim = Simulator(dut)
     sim.add_clock(1e-6)
 
     imem = [0] * 256
 
-    imem[0] = encode_ctmm_i(42, 0, int(CTMMFunct3ArithI.ADDI), 1, int(CTMMOpcode.ARITHI))
-    imem[1] = encode_ctmm_r(0, 1, 1, int(CTMMFunct3Arith.ADD), 2, int(CTMMOpcode.ARITH))
+    imem[0] = encode_ctmm_i(42, 0, int(CMFunct3ArithI.ADDI), 1, int(CMOpcode.ARITHI))
+    imem[1] = encode_ctmm_r(0, 1, 1, int(CMFunct3Arith.ADD), 2, int(CMOpcode.ARITH))
 
     async def testbench(ctx):
         print("=" * 60)
-        print("CTMMCap Amaranth Testbench — Design Validation")
+        print("CMCap Amaranth Testbench — Design Validation")
         print("=" * 60)
 
         print("\n[TEST 1] Boot Sequence & CR Permissions")
@@ -410,7 +410,7 @@ def run_testbench():
         assert ctx.get(dut.cr15_m_flag) == 1, "M should still be 1 entering 12D"
         corrupt_integrity = 0x42
         addi_corrupt = encode_ctmm_i(
-            corrupt_integrity, 0, int(CTMMFunct3ArithI.ADDI), 14, int(CTMMOpcode.ARITHI))
+            corrupt_integrity, 0, int(CMFunct3ArithI.ADDI), 14, int(CMOpcode.ARITHI))
         ctx.set(dut.imem_data, addi_corrupt)
         ctx.set(dut.imem_valid, 1)
         await ctx.tick()          # ADDI fires: XR14 ← 0x42 (corrupted integrity tag)
@@ -496,7 +496,7 @@ def run_testbench():
 
         null_gt_val = build_null_gt()   # = GT_TYPE_NULL encoded = 0b10 = 2
         addi_null_xr11 = encode_ctmm_i(
-            null_gt_val, 0, int(CTMMFunct3ArithI.ADDI), 11, int(CTMMOpcode.ARITHI))
+            null_gt_val, 0, int(CMFunct3ArithI.ADDI), 11, int(CMOpcode.ARITHI))
         ctx.set(dut.imem_data, addi_null_xr11)
         ctx.set(dut.imem_valid, 1)
         await ctx.tick()          # ADDI fires: XR11 ← null_gt_val = 2 (NULL GT)
@@ -860,7 +860,7 @@ def run_testbench():
               "seal-valid / seal-invalid)")
 
         print("\n" + "=" * 60)
-        print("CTMMCap Amaranth Testbench — All Tests Complete")
+        print("CMCap Amaranth Testbench — All Tests Complete")
         print("=" * 60)
 
     sim.add_testbench(testbench)
@@ -875,12 +875,12 @@ if __name__ == "__main__":
 
 # ── #303: mSave and mLoad pipeline unit tests ─────────────────────────────────
 #
-# CTMMCapMSave and CTMMCapMLoad are standalone pipeline units (not yet wired
-# into CTMMCapCore).  Each test drives one module directly with a small Amaranth
+# CMCapMSave and CMCapMLoad are standalone pipeline units (not yet wired
+# into CMCapCore).  Each test drives one module directly with a small Amaranth
 # simulator so the internal FSM states and memory buses are fully observable.
 
-from ctmm_cap_amaranth.mload import CTMMCapMLoad
-from ctmm_cap_amaranth.msave import CTMMCapMSave
+from ctmm_cap_amaranth.mload import CMCapMLoad
+from ctmm_cap_amaranth.msave import CMCapMSave
 from ctmm_cap_amaranth.types import (
     FNV_OFFSET_32, FNV_PRIME_32,
     PERM_L, PERM_S, PERM_MASK_L, PERM_MASK_S,
@@ -891,7 +891,7 @@ from ctmm_cap_amaranth.types import (
 # ── mSave happy-path ──────────────────────────────────────────────────────────
 
 def test_msave_happy_path():
-    """CTMMCapMSave writes src_gt to dst.location + index*4 when all checks pass.
+    """CMCapMSave writes src_gt to dst.location + index*4 when all checks pass.
 
     Setup
     -----
@@ -927,7 +927,7 @@ def test_msave_happy_path():
     INDEX  = 3
     EXP_WRITE_ADDR = LOCATION + (INDEX << 2)   # = 0x10C
 
-    dut = CTMMCapMSave()
+    dut = CMCapMSave()
 
     async def process(ctx):
         ctx.set(dut.sub_dst_cap, DST_CAP)
@@ -977,7 +977,7 @@ def test_msave_happy_path():
 # ── mLoad direct-mode + mSave/mLoad round-trip ────────────────────────────────
 
 def test_mload_direct_mode():
-    """CTMMCapMLoad loads an NS entry into a cap register (direct-mode).
+    """CMCapMLoad loads an NS entry into a cap register (direct-mode).
 
     Direct mode skips the CR read and L-perm check (FETCH_SRC → CHECK_NS
     directly), so this test exercises the pure NS pipeline:
@@ -1033,7 +1033,7 @@ def test_mload_direct_mode():
         NS_ENTRY_ADDR + 12: SEALS_VAL,
     }
 
-    dut = CTMMCapMLoad()
+    dut = CMCapMLoad()
 
     async def _drive_mem_read(ctx):
         """Wait for mem_rd_en, serve one response, then deassert mem_rd_valid."""
@@ -1138,7 +1138,7 @@ def test_mload_msave_round_trip():
     # ── Step 1: mSave ─────────────────────────────────────────────────────────
     backing_store: dict = {}   # addr → data, filled by mSave
 
-    dut_save = CTMMCapMSave()
+    dut_save = CMCapMSave()
 
     async def save_process(ctx):
         ctx.set(dut_save.sub_dst_cap, CLIST_DST_CAP)
@@ -1205,7 +1205,7 @@ def test_mload_msave_round_trip():
         NS_ENTRY_ADDR + 12: SEALS_VAL,
     }
 
-    dut_load = CTMMCapMLoad()
+    dut_load = CMCapMLoad()
 
     async def load_process(ctx):
         ctx.set(dut_load.cr15_namespace, CR15_NS)

@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
 
 
-class CTMMCapLambda(Elaboratable):
+class CMCapLambda(Elaboratable):
     def __init__(self):
         self.lambda_start = Signal()
         self.cr_target = Signal(4)

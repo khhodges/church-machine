@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT
 
 
-class CTMMCapRegisters(Elaboratable):
+class CMCapRegisters(Elaboratable):
     def __init__(self):
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)

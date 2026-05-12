@@ -5,7 +5,7 @@ from .types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_LIMIT_LAYOUT
 
 
-class CTMMCapMSave(Elaboratable):
+class CMCapMSave(Elaboratable):
     def __init__(self):
         self.sub_start = Signal()
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)

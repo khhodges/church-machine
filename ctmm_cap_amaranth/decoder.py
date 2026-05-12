@@ -5,7 +5,7 @@ from .types import *
 from .layouts import COND_FLAGS_LAYOUT
 
 
-class CTMMCapDecoder(Elaboratable):
+class CMCapDecoder(Elaboratable):
     def __init__(self):
         self.instruction = Signal(32)
         self.instr_valid = Signal()
@@ -71,17 +71,17 @@ class CTMMCapDecoder(Elaboratable):
 
         is_standard_ctmm = Signal()
         m.d.comb += is_standard_ctmm.eq(
-            (opcode == CTMMOpcode.LUI) |
-            (opcode == CTMMOpcode.AUIPC) |
-            (opcode == CTMMOpcode.JAL) |
-            (opcode == CTMMOpcode.JALR) |
-            (opcode == CTMMOpcode.BRANCH) |
-            (opcode == CTMMOpcode.LOAD) |
-            (opcode == CTMMOpcode.STORE) |
-            (opcode == CTMMOpcode.ARITHI) |
-            (opcode == CTMMOpcode.ARITH) |
-            (opcode == CTMMOpcode.FENCE) |
-            (opcode == CTMMOpcode.SYSTEM)
+            (opcode == CMOpcode.LUI) |
+            (opcode == CMOpcode.AUIPC) |
+            (opcode == CMOpcode.JAL) |
+            (opcode == CMOpcode.JALR) |
+            (opcode == CMOpcode.BRANCH) |
+            (opcode == CMOpcode.LOAD) |
+            (opcode == CMOpcode.STORE) |
+            (opcode == CMOpcode.ARITHI) |
+            (opcode == CMOpcode.ARITH) |
+            (opcode == CMOpcode.FENCE) |
+            (opcode == CMOpcode.SYSTEM)
         )
 
         is_custom0 = Signal()
