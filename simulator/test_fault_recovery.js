@@ -849,6 +849,225 @@ console.log('\n--- T011: Multi-thread pause — Thread 0 sleeps, Thread 1 keeps 
     check('T011-E12: machine NOT halted after step() timer phase', !sim.halted);
 }
 
+// ── T012: Two threads both calling Scheduler.pause with different durations ────
+//
+// Verifies the exact edge-cases called out in Task #1118:
+//   (a) Only the thread whose wakeStep has expired is woken at the first deadline.
+//   (b) The thread with the later deadline stays sleeping until its own deadline.
+//   (c) A second (and third) timer alarm is correctly armed and fires after the first.
+//
+// Both threads call the real Scheduler.pause() API via registry.dispatchMethod,
+// with state.currentThread switched between calls (the public scheduler convention).
+// The simulation is then driven by a step() loop (mirroring the UI Run button) to
+// verify wake points at the natural step deadlines.
+//
+// Key scheduler invariant exercised here:
+//   When pause() is called a second time while the timer is already armed, the
+//   shared timerDeadline must be the MINIMUM of the two deadlines so the earlier
+//   sleeper is woken on time. After waking the first sleeper the IRQ handler
+//   auto-re-arms to the next pending wakeStep.
+//
+// Setup:
+//   DURATION_A = 3 (Thread A / Thread 0 — wakes first)
+//   DURATION_B = 7 (Thread B / Thread 1 — wakes second)
+//   NOP words fill memory so the step() loop can keep incrementing stepCount
+//   without reaching a HALT before both IRQs fire.
+//
+// NOP word:  cond=NV (0xF) → always skipped, PC++.  = (0xF << 23) | 1 = 0x07800001
+// CALL CR0 legacy: opcode=2, cond=AL=0xE, crDst=0, crSrc=0, imm=0 = 0x17000000
+console.log('\n--- T012: Two threads with different pause durations — step() driven ---');
+{
+    const { sim, registry, sysAbs } = makeTestSim();
+    const state = sysAbs._schedulerState;
+
+    const DURATION_A = 3;
+    const DURATION_B = 7;
+    const MAX_STEPS  = 80;
+    const NOP_WORD   = (0xF << 23) | 0x00000001;
+
+    // ── Phase A: two-thread setup ─────────────────────────────────────────────
+    state.threads[0].state = 'running';
+    state.currentThread    = 0;
+    state.threads.push({ id: 1, state: 'running', name: 'lateWorker' });
+
+    check('T012-A1: Thread 0 starts as "running"', state.threads[0].state === 'running');
+    check('T012-A2: Thread 1 starts as "running"', state.threads[1].state === 'running');
+
+    // ── Phase B: both threads call Scheduler.pause via the real API ───────────
+    // Thread 0 (currentThread=0) calls pause(DURATION_A=3).
+    const stepAtBase = sim.stepCount;
+    state.currentThread = 0;
+    const pauseA = registry.dispatchMethod(8, 'pause', sim, { duration: DURATION_A });
+
+    check('T012-B1: Thread 0 Scheduler.pause(3) returns ok=true', pauseA && pauseA.ok === true);
+    check('T012-B2: Thread 0 state is "sleeping" after pause(3)', state.threads[0].state === 'sleeping');
+    check('T012-B3: Thread 0 wakeStep = stepAtBase + 3',
+        state.threads[0].wakeStep === stepAtBase + DURATION_A);
+    check('T012-B4: timerArmed=true after first pause()', sim.irqState.timerArmed === true);
+    check('T012-B5: timerDeadline = stepAtBase + 3 after first pause()',
+        sim.irqState.timerDeadline === stepAtBase + DURATION_A);
+
+    // Thread 1 (currentThread=1) calls pause(DURATION_B=7).
+    // With the min-deadline fix, timerDeadline must remain stepAtBase + 3 (the earlier deadline).
+    state.currentThread = 1;
+    const pauseB = registry.dispatchMethod(8, 'pause', sim, { duration: DURATION_B });
+
+    check('T012-B6: Thread 1 Scheduler.pause(7) returns ok=true', pauseB && pauseB.ok === true);
+    check('T012-B7: Thread 1 state is "sleeping" after pause(7)', state.threads[1].state === 'sleeping');
+    check('T012-B8: Thread 1 wakeStep = stepAtBase + 7',
+        state.threads[1].wakeStep === stepAtBase + DURATION_B);
+    check('T012-B9: timerDeadline still = stepAtBase + 3 (min-deadline preserved after second pause)',
+        sim.irqState.timerDeadline === stepAtBase + DURATION_A);
+    check('T012-B10: timerArmed still true', sim.irqState.timerArmed === true);
+    check('T012-B11: machine NOT halted after both pause() calls', !sim.halted);
+
+    // ── Phase C: step() loop — drive to first deadline (DURATION_A = +3) ──────
+    // Uses the same bootComplete-toggle pattern as T010:
+    //   bootComplete=false → step() reads instructions from memory[pc] directly
+    //   (pre-boot path, no CR14 lump required), executing NOP words to increment
+    //   stepCount naturally.  When the loop guard detects stepCount has reached the
+    //   next armed deadline, bootComplete is flipped to true so the NEXT step()
+    //   call triggers the hardware timer check BEFORE any instruction fetch, injects
+    //   the Scheduler.IRQ, and returns a timerIRQ sentinel.  After each timer fires,
+    //   bootComplete is flipped back to false so NOP execution resumes for the
+    //   next leg.  No manual stepCount assignment is made in either leg.
+    for (let i = 0; i < MAX_STEPS; i++) sim.memory[i] = NOP_WORD;
+    sim.bootComplete = false;   // pre-boot mode: reads memory[pc] directly
+
+    const deadlineA = stepAtBase + DURATION_A;
+    const deadlineB = stepAtBase + DURATION_B;
+
+    let firstTimerResult = null;
+    let firstTimerStep   = null;
+    let secondTimerResult = null;
+    let secondTimerStep   = null;
+    const sweepBefore = state._irqSweepCount;
+
+    // Snapshots captured immediately after each timer fires, before the loop
+    // continues — the only correct way to assert mid-loop thread state.
+    let snapAfterFirst = null;   // { t0, t1, timerArmed, timerDeadline, sweep }
+    let snapAfterSecond = null;
+
+    for (let iteration = 0; iteration < MAX_STEPS; iteration++) {
+        // When stepCount reaches (or exceeds) the current armed deadline, flip
+        // bootComplete so the NEXT step() triggers the timer check.
+        if (sim.irqState.timerArmed &&
+            sim.stepCount >= sim.irqState.timerDeadline) {
+            sim.bootComplete = true;
+        }
+
+        const r = sim.step();
+
+        if (r && r.timerIRQ === true) {
+            if (firstTimerResult === null) {
+                firstTimerResult = r;
+                firstTimerStep   = sim.stepCount;
+                // Capture state immediately after first timer fires.
+                snapAfterFirst = {
+                    t0state:      state.threads[0].state,
+                    t0wakeStep:   state.threads[0].wakeStep,
+                    t1state:      state.threads[1].state,
+                    t1wakeStep:   state.threads[1].wakeStep,
+                    timerArmed:   sim.irqState.timerArmed,
+                    timerDeadline:sim.irqState.timerDeadline,
+                    sweep:        state._irqSweepCount
+                };
+                // Re-enter pre-boot mode to drive NOPs to the second deadline.
+                sim.bootComplete = false;
+                // Do NOT break — continue loop to catch the second alarm.
+            } else {
+                secondTimerResult = r;
+                secondTimerStep   = sim.stepCount;
+                // Capture state immediately after second timer fires.
+                snapAfterSecond = {
+                    t0state:    state.threads[0].state,
+                    t1state:    state.threads[1].state,
+                    t1wakeStep: state.threads[1].wakeStep,
+                    timerArmed: sim.irqState.timerArmed,
+                    sweep:      state._irqSweepCount
+                };
+                break;
+            }
+        }
+        if (sim.halted || r === null) break;
+    }
+
+    // First timer fires at deadline_A (+3) — checked against snapAfterFirst
+    check('T012-C1: first timer IRQ fired (deadline_A = stepAtBase + 3)',
+        firstTimerResult !== null);
+    check('T012-C2: first timerIRQ sentinel is true', firstTimerResult && firstTimerResult.timerIRQ === true);
+    check('T012-C3: first timer fired at stepCount == deadline_A',
+        firstTimerStep !== null && firstTimerStep === deadlineA);
+    check('T012-C4: Thread 0 woken to "ready" at deadline_A',
+        snapAfterFirst && snapAfterFirst.t0state === 'ready');
+    check('T012-C5: Thread 0 wakeStep cleared after first timer',
+        snapAfterFirst && snapAfterFirst.t0wakeStep == null);
+    check('T012-C6: Thread 1 STILL "sleeping" after first timer (wakeStep 7 > stepCount 3)',
+        snapAfterFirst && snapAfterFirst.t1state === 'sleeping');
+    check('T012-C7: Thread 1 wakeStep unchanged after first timer (still = stepAtBase + 7)',
+        snapAfterFirst && snapAfterFirst.t1wakeStep === deadlineB);
+    check('T012-C8: timerArmed re-armed to deadline_B by IRQ handler after first fire',
+        snapAfterFirst && snapAfterFirst.timerArmed === true &&
+        snapAfterFirst.timerDeadline === deadlineB);
+    check('T012-C9: _irqSweepCount incremented by first sweep',
+        snapAfterFirst && snapAfterFirst.sweep === sweepBefore + 1);
+    check('T012-C10: no faults logged during first timer phase', sim.faultLog.length === 0);
+
+    // Second timer fires at deadline_B (+7) — checked against snapAfterSecond
+    check('T012-D1: second timer IRQ fired (deadline_B = stepAtBase + 7)',
+        secondTimerResult !== null);
+    check('T012-D2: second timerIRQ sentinel is true', secondTimerResult && secondTimerResult.timerIRQ === true);
+    check('T012-D3: second timer fired at stepCount == deadline_B',
+        secondTimerStep !== null && secondTimerStep === deadlineB);
+    check('T012-D4: Thread 1 woken to "ready" at deadline_B',
+        snapAfterSecond && snapAfterSecond.t1state === 'ready');
+    check('T012-D5: Thread 1 wakeStep cleared after second timer',
+        snapAfterSecond && snapAfterSecond.t1wakeStep == null);
+    check('T012-D6: Thread 0 remains "ready" (undisturbed by second timer)',
+        snapAfterSecond && snapAfterSecond.t0state === 'ready');
+    check('T012-D7: timerArmed cleared — no more sleeping threads',
+        snapAfterSecond && !snapAfterSecond.timerArmed);
+    check('T012-D8: _irqSweepCount incremented by second sweep',
+        snapAfterSecond && snapAfterSecond.sweep === sweepBefore + 2);
+    check('T012-D9: no faults logged during second timer phase', sim.faultLog.length === 0);
+    check('T012-D10: machine NOT halted after full two-thread pause cycle', !sim.halted);
+
+    // ── Phase E: re-arm a third alarm — proves sequential alarm lifecycle ──────
+    // Reset Thread 0 to 'running', call pause() again, drive via step().
+    state.threads[0].state = 'running';
+    state.currentThread    = 0;
+    const DURATION_C = 5;
+    const stepAtC = sim.stepCount;
+    const pauseC = registry.dispatchMethod(8, 'pause', sim, { duration: DURATION_C });
+
+    check('T012-E1: third Scheduler.pause() returns ok=true', pauseC && pauseC.ok === true);
+    check('T012-E2: timerArmed=true for third alarm', sim.irqState.timerArmed === true);
+    check('T012-E3: timerDeadline = stepAtC + 5', sim.irqState.timerDeadline === stepAtC + DURATION_C);
+    check('T012-E4: Thread 0 sleeping for third alarm', state.threads[0].state === 'sleeping');
+
+    let thirdTimerResult = null;
+    const sweepBeforeE = state._irqSweepCount;
+    sim.bootComplete = false;   // pre-boot NOP mode for third leg
+    for (let i = 0; i < MAX_STEPS; i++) {
+        if (sim.irqState.timerArmed &&
+            sim.stepCount >= sim.irqState.timerDeadline) {
+            sim.bootComplete = true;
+        }
+        const r = sim.step();
+        if (r && r.timerIRQ === true) { thirdTimerResult = r; break; }
+        if (sim.halted || r === null) break;
+    }
+
+    check('T012-E5: third alarm fires via step() loop', thirdTimerResult !== null);
+    check('T012-E6: third timerIRQ sentinel is true', thirdTimerResult && thirdTimerResult.timerIRQ === true);
+    check('T012-E7: Thread 0 woken to "ready" after third alarm', state.threads[0].state === 'ready');
+    check('T012-E8: timerArmed cleared after third alarm', !sim.irqState.timerArmed);
+    check('T012-E9: _irqSweepCount incremented for third alarm',
+        state._irqSweepCount === sweepBeforeE + 1);
+    check('T012-E10: no faults at any point in three-alarm sequence', sim.faultLog.length === 0);
+    check('T012-E11: machine NOT halted throughout', !sim.halted);
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

@@ -1904,16 +1904,21 @@ class SystemAbstractions {
                 return { ok: false, fault: 'INVALID_OP', message: 'Scheduler.pause: duration must be > 0 (pass in DR1 or args.duration)' };
             }
 
-            // Arm the simulator timer
+            // Arm the simulator timer, preserving the nearest (minimum) deadline
+            // when multiple threads call pause() with different durations.
+            const newDeadline = sim.stepCount + duration;
             if (sim.irqState) {
-                sim.irqState.timerArmed = true;
-                sim.irqState.timerDeadline = sim.stepCount + duration;
+                const prevArmed    = sim.irqState.timerArmed;
+                const prevDeadline = sim.irqState.timerDeadline || Infinity;
+                sim.irqState.timerArmed    = true;
+                sim.irqState.timerDeadline = prevArmed ? Math.min(prevDeadline, newDeadline) : newDeadline;
                 sim.irqState.timerDuration = duration;
             }
             // Also mirror into timerRegs for DREAD visibility
+            const effectiveDeadline = sim.irqState ? sim.irqState.timerDeadline : newDeadline;
             if (sim.timerRegs) {
-                sim.timerRegs[3] = (sim.stepCount + duration) >>> 0;  // ALARM_CMP
-                sim.timerRegs[4] = 1;                                  // CTL: armed
+                sim.timerRegs[3] = effectiveDeadline >>> 0;  // ALARM_CMP
+                sim.timerRegs[4] = 1;                         // CTL: armed
             }
 
             const current = state.threads[state.currentThread];
@@ -1996,6 +2001,25 @@ class SystemAbstractions {
                     sim.irqState.pendingWakeFlags = (sim.irqState.pendingWakeFlags || [])
                         .filter(f => !consumed.has(f));
                 }
+                // Re-arm the timer for the next sleeping thread whose wakeStep
+                // has not yet been reached (multi-thread support: each thread calls
+                // pause() independently; after waking the earliest sleeper the
+                // scheduler must advance the alarm to the next pending deadline).
+                const nextDeadline = state.threads.reduce((min, t) => {
+                    if (t.state === 'sleeping' && !t.waitFlag && t.wakeStep != null) {
+                        return Math.min(min, t.wakeStep);
+                    }
+                    return min;
+                }, Infinity);
+                if (nextDeadline !== Infinity && sim.irqState) {
+                    sim.irqState.timerArmed    = true;
+                    sim.irqState.timerDeadline = nextDeadline;
+                    if (sim.timerRegs) {
+                        sim.timerRegs[3] = nextDeadline >>> 0;
+                        sim.timerRegs[4] = 1;
+                    }
+                }
+
                 state._irqSweepCount = (state._irqSweepCount || 0) + 1;
                 return {
                     ok: true,
