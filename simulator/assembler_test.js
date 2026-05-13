@@ -4239,6 +4239,176 @@ function symCompile(body, caps) {
         a.errors.map(e => e.message).join('; '));
 }
 
+// ── BC77–BC83: UART, LED, and Display bare-calls (task-1062) ─────────────────
+//
+// Dedicated regression tests for the three remaining system abstractions that
+// hold fixed NS slots in the boot table but had no BC-numbered encoding tests.
+//   UART    — NS slot 11  (Send=0 → method=1, Receive=1 → method=2)
+//   LED     — NS slot 12  (Set=0 → method=1, Toggle=2 → method=3)
+//   Display — NS slot 15  (Write=0 → method=1, Clear=1 → method=2)
+//
+// All tests reuse NEW_ABS_CONVENTIONS_BC / NEW_ABS_NS_BC (defined at BC43 block)
+// which mirror the matching _ABSTRACTION_CONVENTIONS entries in app-absdetail.js.
+
+// BC77: UART.Send() — no-arg bare-call → 2 words (ELOADCALL + HALT)
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('UART.Send()\nHALT');
+    assert('BC77 UART.Send() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC77 UART.Send() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC77 UART.Send() ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC77 UART.Send() ELOADCALL — row=11 (UART NS slot)',
+            row === 11, `got row=${row}`);
+        assert('BC77 UART.Send() ELOADCALL — method=1 (Send index 0, 1-based)',
+            method === 1, `got method=${method}`);
+    }
+}
+
+// BC78: UART.Receive() — no-arg bare-call → 2 words, method=2
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('UART.Receive()\nHALT');
+    assert('BC78 UART.Receive() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC78 UART.Receive() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC78 UART.Receive() ELOADCALL — row=11 (UART NS slot)',
+            row === 11, `got row=${row}`);
+        assert('BC78 UART.Receive() ELOADCALL — method=2 (Receive index 1, 1-based)',
+            method === 2, `got method=${method}`);
+    }
+}
+
+// BC79: UART.Send(byte) pre-load pattern — 3 words (IADD + ELOADCALL + HALT)
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('IADD DR1, DR1, #0x41\nUART.Send()\nHALT');
+    assert('BC79 UART.Send(byte) pre-load pattern — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC79 UART.Send(byte) emits 3 words (IADD + ELOADCALL + HALT)',
+        result.words.length === 3, `got ${result.words.length}`);
+    {
+        const w      = result.words[1] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC79 UART.Send(byte) word[1] ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC79 UART.Send(byte) word[1] ELOADCALL — row=11 (UART NS slot)',
+            row === 11, `got row=${row}`);
+        assert('BC79 UART.Send(byte) word[1] ELOADCALL — method=1 (Send index 0, 1-based)',
+            method === 1, `got method=${method}`);
+    }
+}
+
+// BC80: LED.Set() — no-arg bare-call → 2 words (ELOADCALL + HALT), row=12, method=1
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('LED.Set()\nHALT');
+    assert('BC80 LED.Set() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC80 LED.Set() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC80 LED.Set() ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC80 LED.Set() ELOADCALL — row=12 (LED NS slot)',
+            row === 12, `got row=${row}`);
+        assert('BC80 LED.Set() ELOADCALL — method=1 (Set index 0, 1-based)',
+            method === 1, `got method=${method}`);
+    }
+}
+
+// BC81: LED.Toggle() — no-arg bare-call, method=3 (Toggle index 2, 1-based)
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('LED.Toggle()\nHALT');
+    assert('BC81 LED.Toggle() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC81 LED.Toggle() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC81 LED.Toggle() ELOADCALL — row=12 (LED NS slot)',
+            row === 12, `got row=${row}`);
+        assert('BC81 LED.Toggle() ELOADCALL — method=3 (Toggle index 2, 1-based)',
+            method === 3, `got method=${method}`);
+    }
+}
+
+// BC82: Display.Write() — no-arg bare-call → 2 words, row=15, method=1
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('Display.Write()\nHALT');
+    assert('BC82 Display.Write() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC82 Display.Write() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC82 Display.Write() ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC82 Display.Write() ELOADCALL — row=15 (Display NS slot)',
+            row === 15, `got row=${row}`);
+        assert('BC82 Display.Write() ELOADCALL — method=1 (Write index 0, 1-based)',
+            method === 1, `got method=${method}`);
+    }
+}
+
+// BC83: Display.Clear() — no-arg bare-call, method=2 (Clear index 1, 1-based)
+{
+    const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
+    a.setNamespace(NEW_ABS_NS_BC);
+    const result = a.assemble('Display.Clear()\nHALT');
+    assert('BC83 Display.Clear() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC83 Display.Clear() emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+    {
+        const w      = result.words[0] >>> 0;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC83 Display.Clear() ELOADCALL — row=15 (Display NS slot)',
+            row === 15, `got row=${row}`);
+        assert('BC83 Display.Clear() ELOADCALL — method=2 (Clear index 1, 1-based)',
+            method === 2, `got method=${method}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
