@@ -5269,10 +5269,40 @@ HALT
         result.words.length === 8, `got ${result.words.length}`);
 }
 
+// EX-SY: scheduler_yield — LOAD + TPERM + LOAD + IADD + Spawn + Yield + Yield + HALT
+// Verifies that Scheduler.Spawn and Scheduler.Yield assemble correctly when
+// the Scheduler method conventions and NS slot are supplied.
+{
+    const EX_SY_CONVENTIONS = {
+        'Scheduler': {
+            'Yield':  { index: 0, input: '',                        output: 'DR1' },
+            'Spawn':  { index: 1, input: 'CR2=code_GT, DR1=entry',  output: 'DR1=threadID' },
+        },
+    };
+    const EX_SY_NS = { 'Scheduler': 8 };
+    const EX_SY_SRC = `
+LOAD CR0, Scheduler
+TPERM CR0, E
+LOAD CR2, Scheduler
+IADD DR1, DR0, #0
+CALL Scheduler.Spawn
+CALL Scheduler.Yield
+CALL Scheduler.Yield
+HALT
+`;
+    const a = new ChurchAssembler(EX_SY_CONVENTIONS);
+    a.setNamespace(EX_SY_NS);
+    const result = a.assemble(EX_SY_SRC);
+    assert('EX-SY scheduler_yield assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('EX-SY scheduler_yield produces 8 words (LOAD+TPERM+LOAD+IADD+Spawn+Yield+Yield+HALT)',
+        result.words.length === 8, `got ${result.words.length}`);
+}
+
 // EX16: LANG_EXAMPLE_GROUPS.assembly coverage guard
 // Asserts that the assembly key list in app-compile.js is exactly the set
-// covered by EX1–EX15 + CD1–CD10 + EX-SP.  If a new example is added to
-// LANG_EXAMPLE_GROUPS.assembly without a corresponding EX test, this list
+// covered by EX1–EX15 + CD1–CD10 + EX-SP + EX-SY.  If a new example is added
+// to LANG_EXAMPLE_GROUPS.assembly without a corresponding EX test, this list
 // must be updated — that's the deliberate friction that prompts adding a test.
 {
     const COVERED_ASSEMBLY_EXAMPLES = new Set([
@@ -5286,10 +5316,11 @@ HALT
         'perm_attack',
         'bind_attack',
         'scheduler_pause',
+        'scheduler_yield',
     ]);
-    // These are the ten keys in LANG_EXAMPLE_GROUPS.assembly as of task-1093.
+    // These are the eleven keys in LANG_EXAMPLE_GROUPS.assembly as of task-1101.
     // Update both this set AND add an EX test whenever a new example is added.
-    const EXPECTED_COUNT = 10;
+    const EXPECTED_COUNT = 11;
     assert('EX16 LANG_EXAMPLE_GROUPS.assembly coverage set has expected count',
         COVERED_ASSEMBLY_EXAMPLES.size === EXPECTED_COUNT,
         `expected ${EXPECTED_COUNT}, got ${COVERED_ASSEMBLY_EXAMPLES.size}`);
@@ -5304,6 +5335,8 @@ HALT
         COVERED_ASSEMBLY_EXAMPLES.has('constants_dot'), 'missing');
     assert('EX16 coverage set contains scheduler_pause (covered by EX-SP)',
         COVERED_ASSEMBLY_EXAMPLES.has('scheduler_pause'), 'missing');
+    assert('EX16 coverage set contains scheduler_yield (covered by EX-SY)',
+        COVERED_ASSEMBLY_EXAMPLES.has('scheduler_yield'), 'missing');
 }
 
 // EX17–EX19: salvation dot-notation produces identical encoding to raw form

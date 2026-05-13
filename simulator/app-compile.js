@@ -383,7 +383,7 @@ function renderSyntaxRef(lang) {
    examples need only one addition here (plus the HTML tab in index.html). */
 const LANG_EXAMPLE_GROUPS = {
     english:    ['cloomc_english_integer_ops', 'cloomc_english_packed_string', 'cloomc_english_loops', 'cloomc_english_contact', 'cloomc_english_contact_stage2'],
-    assembly:   ['ada_note_g', 'capability_test', 'system_patterns', 'compute_demo', 'led_control', 'salvation', 'constants_dot', 'perm_attack', 'bind_attack', 'scheduler_pause'],
+    assembly:   ['ada_note_g', 'capability_test', 'system_patterns', 'compute_demo', 'led_control', 'salvation', 'constants_dot', 'perm_attack', 'bind_attack', 'scheduler_pause', 'scheduler_yield'],
     javascript: ['cloomc_integer_ops', 'cloomc_packed_string', 'cloomc_memory', 'cloomc_heap', 'cloomc_mint', 'cloomc_sliderule', 'cloomc_contact', 'cloomc_contact_stage2', 'cloomc_contact_call', 'cloomc_stack_overflow', 'cloomc_recall_demo', 'cloomc_billing', 'cloomc_turing_memory', 'cloomc_church_memory', 'cloomc_physical_pool'],
     haskell:    ['cloomc_church_math', 'cloomc_church_pair', 'cloomc_church_case', 'cloomc_sliderule_hs'],
     symbolic:   ['cloomc_ada_note_g', 'cloomc_ada_note_g_published_bug', 'cloomc_bernoulli_numbers'],

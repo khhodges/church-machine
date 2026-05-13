@@ -5527,6 +5527,63 @@ SAVE CR0, CR6, 3       ; FAULT: B=0, cannot bind to empty slot 3
 
 ; --- If we get here, B-bit default failed ---
 HALT`,
+        'scheduler_yield': `; ============================================================
+; Abstraction:  SchedulerYield
+; Description:  Cooperative multi-threading — voluntarily yield
+;               the time slice so other ready threads can run
+; Author:       Church Machine Educational Platform
+; Version:      1.0
+; Created:      2026-05-13
+; Language:     Assembly
+; Dependencies: Scheduler (NS[8])
+; ============================================================
+; Methods demonstrated:
+;   Scheduler.Spawn(code_GT, entry) — create a new thread
+;   Scheduler.Yield()               — cooperatively yield time slice
+; ============================================================
+;
+; ============================================================
+; Cooperative multi-threading pattern
+; ============================================================
+;
+; Scheduler.Yield() saves the calling thread's register state and
+; switches immediately to the next ready thread in round-robin
+; order.  The calling thread is re-queued and will resume at the
+; instruction after CALL Scheduler.Yield when its turn arrives.
+;
+; Scheduler.Spawn creates a new thread given a code_GT (the
+; abstraction body) and an entry offset (DR1).  The new thread
+; starts with an isolated CR set and its own stack.
+;
+; Input convention for Spawn:
+;   CR2 = code_GT  (Golden Token for the thread body abstraction)
+;   DR1 = entry    (instruction offset within that abstraction)
+;
+; This example reuses the Scheduler GT as a stand-in code_GT so
+; the program assembles and shows the calling convention without
+; requiring additional NS entries.  In production code CR2 would
+; hold the GT of the actual worker abstraction.
+;
+; ── Load and verify Scheduler capability ─────────────────────
+LOAD CR0, Scheduler    ; CR0 = Scheduler capability (E, NS[8])
+TPERM CR0, E           ; Verify E permission  (Z=1 on success)
+
+; ── Section 1: Spawn a worker thread ─────────────────────────
+;   In a real program, LOAD CR2, MyWorker to supply the thread
+;   body.  Here we reuse Scheduler as a code_GT placeholder so
+;   the example runs with a single NS entry (Scheduler → 8).
+LOAD CR2, Scheduler    ; CR2 = code_GT (placeholder — see note)
+IADD DR1, DR0, #0      ; DR1 = entry offset 0 (first instruction)
+CALL Scheduler.Spawn   ; create thread → DR1 = new threadID
+
+; ── Section 2: Cooperative yields ────────────────────────────
+;   After spawning, yield so the new thread gets to run.
+;   Each CALL Scheduler.Yield is one voluntary preemption point.
+;   The scheduler resumes this thread when its turn comes around.
+CALL Scheduler.Yield   ; give up time slice — new thread runs
+CALL Scheduler.Yield   ; yield again — round-robin through ready threads
+
+HALT`,
         'scheduler_pause': `; ============================================================
 ; Abstraction:  SchedulerPause
 ; Description:  Timer-sleep pattern — suspend calling thread for
@@ -11393,7 +11450,7 @@ function showAbstractionRefDetail(id) {
        Fall back to an inline list only as a safety net if load order changes. */
     const asmKeys = (window._cloomcLangExampleGroups || {}).assembly ||
         ['ada_note_g', 'capability_test', 'system_patterns', 'compute_demo',
-         'led_control', 'salvation', 'constants_dot', 'perm_attack', 'bind_attack', 'scheduler_pause'];
+         'led_control', 'salvation', 'constants_dot', 'perm_attack', 'bind_attack', 'scheduler_pause', 'scheduler_yield'];
     const seed = {};
     for (const key of asmKeys) seed[key] = '';
     window._asmExampleSources = seed;
