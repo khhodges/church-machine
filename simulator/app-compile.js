@@ -673,10 +673,12 @@ function compileDraftAssembly(source, con) {
 
     const _slotNames = ChurchAssembler.buildSlotNames(caps,
         (typeof sim !== 'undefined' && sim) ? sim.nsLabels : null);
+    const _wordComments = result.wordComments || {};
     for (let i = 0; i < words.length; i++) {
         const hex = '0x' + words[i].toString(16).padStart(8, '0');
         const dis = assembler.disassemble(words[i], _slotNames);
-        draft += `  ${i.toString().padStart(4)}: ${hex}  ${dis}\n`;
+        const cmt = _wordComments[i] ? `  ; ${_wordComments[i]}` : '';
+        draft += `  ${i.toString().padStart(4)}: ${hex}  ${dis}${cmt}\n`;
     }
 
     draft += `\n═══════════════════════════════════════════════════\n`;

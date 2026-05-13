@@ -661,7 +661,8 @@ class ChurchAssembler {
                                 // Explicit CRn supplied — caller pre-loaded it; no LOAD needed.
                             } else if (this._resolveNSName(arg) !== null) {
                                 // Known namespace abstraction or LED shorthand — Level-1 LOAD works.
-                                instructions.push({ line: `LOAD CR${reg.n}, ${arg}`, lineNum: lineNum + 1 });
+                                instructions.push({ line: `LOAD CR${reg.n}, ${arg}`, lineNum: lineNum + 1,
+                                    comment: `${absName}.${methodName}(${argsStr}) \u2190 LOAD ${arg}` });
                             } else {
                                 // Runtime GT / c-list entry not in the namespace — emit a targeted
                                 // error immediately rather than generating a broken LOAD that fails
@@ -690,7 +691,8 @@ class ChurchAssembler {
                                 `  ; — or — load a full 32-bit constant via a DREAD from an embedded constant` });
                         }
                     }
-                    instructions.push({ line: `ELOADCALL CR0, ${absName}, ${methodName}`, lineNum: lineNum + 1 });
+                    instructions.push({ line: `ELOADCALL CR0, ${absName}, ${methodName}`, lineNum: lineNum + 1,
+                        comment: `API: ${absName}.${methodName}(${argsStr})` });
                     continue;
                 }
             }
@@ -754,6 +756,7 @@ class ChurchAssembler {
         // bounds-check pass to report accurate error locations.
         const words = [];
         const lineNums = [];
+        const wordComments = {};  // word_offset → comment string (from sugar expansion)
         for (let i = 0; i < instructions.length; i++) {
             const inst = instructions[i];
             if (inst.rawWord !== undefined) {
@@ -769,6 +772,7 @@ class ChurchAssembler {
             // addr = i = word offset of this instruction (matches label offsets stored in pass 1)
             const word = this._assembleLine(inst.line, inst.lineNum, i);
             if (word !== null) {
+                if (inst.comment) wordComments[words.length] = inst.comment;
                 words.push(word);
                 lineNums.push(inst.lineNum);
             }
@@ -796,7 +800,7 @@ class ChurchAssembler {
 
         this._lastLineNums = lineNums.slice();
         return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
-                 capabilities: this.capabilities.slice() };
+                 capabilities: this.capabilities.slice(), wordComments };
     }
 
     getLastLineNums() {
