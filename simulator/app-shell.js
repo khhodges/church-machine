@@ -394,7 +394,18 @@ function init() {
         // resolved) so _reapplyStickyPatches() ran with the stale patch still live.
         if (!sim.bootComplete) {
             const _abChk = document.getElementById('autoBootChk');
-            if (_abChk && _abChk.checked) resetSim();
+            if (_abChk && _abChk.checked) {
+                // Capture any user-chosen default view so slowBoot() can
+                // land there instead of the hardcoded 'lumps' after boot
+                // completes.  Only the startup auto-boot sets this flag;
+                // user-triggered resets leave it null and get 'lumps' as
+                // before.
+                try {
+                    window._autoBootStartupDefaultView =
+                        localStorage.getItem('church_defaultView') || null;
+                } catch(e) { window._autoBootStartupDefaultView = null; }
+                resetSim();
+            }
         }
     });
     sim.on('programLoaded', () => {

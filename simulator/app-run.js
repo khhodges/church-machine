@@ -1233,7 +1233,15 @@ function slowBoot() {
                     _autoLoadDefaultProgram();
                 }
                 updateDashboard();
-                if (!sim.halted) switchView('lumps');
+                if (!sim.halted) {
+                    // Respect a startup default view set by the ⚡ bolt
+                    // drag-and-drop, then clear the one-shot flag so that
+                    // subsequent user-triggered resets land on 'lumps' as
+                    // normal.
+                    const _postBootView = window._autoBootStartupDefaultView || 'lumps';
+                    window._autoBootStartupDefaultView = null;
+                    switchView(_postBootView);
+                }
                 return;
             }
             const _slowPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
