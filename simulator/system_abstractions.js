@@ -2145,10 +2145,12 @@ class SystemAbstractions {
 
             if (flag.signaled) {
                 flag.signaled = false;
+                const msg = `DijkstraFlag.Wait: flag ${flagId} was signaled, consumed immediately`;
+                if (sim && sim.output !== undefined) sim.output += msg + '\n';
                 return {
                     ok: true,
                     result: { flagId: flagId, waited: false },
-                    message: `DijkstraFlag.Wait: flag ${flagId} was signaled, consumed immediately`
+                    message: msg
                 };
             }
 
@@ -2160,10 +2162,12 @@ class SystemAbstractions {
                 }
             }
 
+            const msg = `DijkstraFlag.Wait: thread blocked on flag ${flagId}`;
+            if (sim && sim.output !== undefined) sim.output += msg + '\n';
             return {
                 ok: true,
                 result: { flagId: flagId, waited: true, blocked: true },
-                message: `DijkstraFlag.Wait: thread blocked on flag ${flagId}`
+                message: msg
             };
         });
 
@@ -2180,28 +2184,34 @@ class SystemAbstractions {
                     const thread = schedulerState.threads.find(t => t.id === wokenId);
                     if (thread) thread.state = 'ready';
                 }
+                const msg = `DijkstraFlag.Signal: flag ${flagId} woke thread ${wokenId}`;
+                if (sim && sim.output !== undefined) sim.output += msg + '\n';
                 return {
                     ok: true,
                     result: { flagId: flagId, wokenThread: wokenId },
-                    message: `DijkstraFlag.Signal: flag ${flagId} woke thread ${wokenId}`
+                    message: msg
                 };
             }
 
             flag.signaled = true;
+            const msg = `DijkstraFlag.Signal: flag ${flagId} signaled (no waiters)`;
+            if (sim && sim.output !== undefined) sim.output += msg + '\n';
             return {
                 ok: true,
                 result: { flagId: flagId, signaled: true },
-                message: `DijkstraFlag.Signal: flag ${flagId} signaled (no waiters)`
+                message: msg
             };
         });
 
         this.registry.bindMethod(10, 'Reset', function(sim, args) {
             const flagId = args.flagId !== undefined ? args.flagId : 0;
             flagState.flags[flagId] = { signaled: false, waitQueue: [] };
+            const msg = `DijkstraFlag.Reset: flag ${flagId} cleared`;
+            if (sim && sim.output !== undefined) sim.output += msg + '\n';
             return {
                 ok: true,
                 result: { flagId: flagId },
-                message: `DijkstraFlag.Reset: flag ${flagId} cleared`
+                message: msg
             };
         });
 
@@ -2210,10 +2220,12 @@ class SystemAbstractions {
             const flag = flagState.flags[flagId];
             const signaled = flag ? flag.signaled : false;
             const waiters = flag ? flag.waitQueue.length : 0;
+            const msg = `DijkstraFlag.Test: flag ${flagId} signaled=${signaled}, waiters=${waiters}`;
+            if (sim && sim.output !== undefined) sim.output += msg + '\n';
             return {
                 ok: true,
                 result: { flagId: flagId, signaled: signaled, waiters: waiters },
-                message: `DijkstraFlag.Test: flag ${flagId} signaled=${signaled}, waiters=${waiters}`
+                message: msg
             };
         });
     }

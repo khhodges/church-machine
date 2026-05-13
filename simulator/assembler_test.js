@@ -5715,6 +5715,30 @@ HALT
         t3.ok && t3.result.signaled === false,
         `ok=${t3.ok} signaled=${t3.result && t3.result.signaled}`);
 
+    // ── Phase B-OUT: sim.output trace content ────────────────────────────────
+    // After the six-step RunSequence, bSim.output must contain one line per
+    // dispatch in the correct order: Test→0, Signal, Test→1, Wait→consumed,
+    // Reset, Test→0.
+    const outLines = bSim.output.split('\n').filter(l => l.trim() !== '');
+    assert('EX-JDF-RUN-BO1: sim.output contains Test line with signaled=false (step 1)',
+        outLines.some(l => l.includes('DijkstraFlag.Test') && l.includes('signaled=false')),
+        `output was:\n${bSim.output}`);
+    assert('EX-JDF-RUN-BO2: sim.output contains Signal line (step 2)',
+        outLines.some(l => l.includes('DijkstraFlag.Signal')),
+        `output was:\n${bSim.output}`);
+    assert('EX-JDF-RUN-BO3: sim.output contains Test line with signaled=true (step 3)',
+        outLines.some(l => l.includes('DijkstraFlag.Test') && l.includes('signaled=true')),
+        `output was:\n${bSim.output}`);
+    assert('EX-JDF-RUN-BO4: sim.output contains Wait line (consumed immediately) (step 4)',
+        outLines.some(l => l.includes('DijkstraFlag.Wait') && l.includes('consumed immediately')),
+        `output was:\n${bSim.output}`);
+    assert('EX-JDF-RUN-BO5: sim.output contains Reset line (step 5)',
+        outLines.some(l => l.includes('DijkstraFlag.Reset')),
+        `output was:\n${bSim.output}`);
+    assert('EX-JDF-RUN-BO6: sim.output has exactly 6 DijkstraFlag trace lines (one per dispatch)',
+        outLines.filter(l => l.includes('DijkstraFlag.')).length === 6,
+        `got ${outLines.filter(l => l.includes('DijkstraFlag.')).length} line(s):\n${bSim.output}`);
+
     // ── Phase JS: example tab registration ───────────────────────────────────
     // cloomc_dijkstra_flag must be listed in LANG_EXAMPLE_GROUPS.javascript in
     // app-compile.js so the tab is visible when JS mode is active.
