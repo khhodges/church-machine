@@ -43,6 +43,10 @@ args = "boot-image-serve-endpoints"
 task = "workflow.run"
 args = "e2e-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "assembler-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -119,6 +123,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "CHROMIUM=$(which chromium) && mkdir -p .cache/ms-playwright/chromium-1217/chrome-linux64 && ln -sf \"$CHROMIUM\" .cache/ms-playwright/chromium-1217/chrome-linux64/chrome && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npx --yes playwright test"
+
+[[workflows.workflow]]
+name = "assembler-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/assembler_test.js"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [[ports]]
 localPort = 5000
