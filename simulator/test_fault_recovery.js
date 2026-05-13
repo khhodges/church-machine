@@ -11,6 +11,8 @@
 //   T006 — Structured fault record: all new fields populated on an unhandled fault
 //   T008 — Scheduler.pause method-table index 4: assembled ELOADCALL encodes index 4,
 //           dispatch chain resolves to pause handler, thread transitions to sleeping
+//   T010 — Multi-thread pause: Thread 0 sleeps via Scheduler.pause while Thread 1
+//           continues running; timer fires and wakes Thread 0; Thread 1 never sleeps
 
 const ChurchSimulator   = require('./simulator.js');
 const AbstractionRegistry = require('./abstractions.js');
@@ -555,6 +557,150 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
         !t9sim.halted);
     check('T009-C9: no new faults logged during timer IRQ phase',
         t9sim.faultLog.length === 0);
+}
+
+// ── T010: Multi-thread pause — Thread 0 sleeps, Thread 1 keeps running ────────
+//
+// Verifies the realistic multi-thread scenario that T004 and T009 do not cover:
+//
+//   Phase A — Setup: two threads registered; Thread 0 is currentThread.
+//   Phase B — Thread 0 calls Scheduler.pause(N): transitions to 'sleeping';
+//             Thread 1 state is unaffected ('running').
+//   Phase C — Mid-sleep: advance stepCount partway (< deadline); fire the IRQ
+//             sweep early to confirm Thread 0 remains 'sleeping' and Thread 1
+//             remains 'running'.
+//   Phase D — Timer fires at deadline: _fireSchedulerIRQ('TIMER') wakes
+//             Thread 0 to 'ready'; Thread 1 was never put to sleep.
+//
+// This test directly exercises the "suspends calling thread" invariant of
+// Scheduler.pause in a multi-thread environment.
+console.log('\n--- T010: Multi-thread pause — Thread 0 sleeps, Thread 1 keeps running ---');
+{
+    const { sim, registry, sysAbs } = makeTestSim();
+    const state = sysAbs._schedulerState;
+
+    // ── Phase A: two-thread setup ─────────────────────────────────────────────
+    // Thread 0 already exists (created by SystemAbstractions as the boot thread).
+    // Set its state to 'running' explicitly so the baseline is clear.
+    state.threads[0].state = 'running';
+    state.currentThread = 0;
+
+    // Add Thread 1 as a second independently-running thread.
+    state.threads.push({ id: 1, state: 'running', name: 'worker' });
+
+    check('T010-A1: Thread 0 starts as running', state.threads[0].state === 'running');
+    check('T010-A2: Thread 1 starts as running', state.threads[1].state === 'running');
+    check('T010-A3: currentThread is 0 (Thread 0 is the caller)', state.currentThread === 0);
+
+    // ── Phase B: Thread 0 calls Scheduler.pause(DURATION) ────────────────────
+    const DURATION = 10;
+    const stepAtCall = sim.stepCount;
+    const pauseResult = registry.dispatchMethod(8, 'pause', sim, { duration: DURATION });
+
+    check('T010-B1: Scheduler.pause returns ok=true', pauseResult && pauseResult.ok === true);
+    check('T010-B2: Thread 0 state is now "sleeping"', state.threads[0].state === 'sleeping');
+    check('T010-B3: Thread 0 wakeStep set to stepAtCall + DURATION',
+        state.threads[0].wakeStep === stepAtCall + DURATION);
+    check('T010-B4: Thread 1 state is still "running" (pause only affects the caller)',
+        state.threads[1].state === 'running');
+    check('T010-B5: irqState.timerArmed set to true', sim.irqState.timerArmed === true);
+    check('T010-B6: timerDeadline equals stepAtCall + DURATION',
+        sim.irqState.timerDeadline === stepAtCall + DURATION);
+    check('T010-B7: machine did NOT halt (pause is not a fault)', !sim.halted);
+
+    // ── Phase C: mid-sleep inspection — Thread 0 must NOT wake early ─────────
+    // In real execution step() only calls _fireSchedulerIRQ after confirming
+    // stepCount >= timerDeadline.  Simulate several mid-sleep steps by advancing
+    // stepCount partway — no IRQ is fired yet, matching what step() would do.
+    sim.stepCount = stepAtCall + Math.floor(DURATION / 2);
+
+    check('T010-C1: Thread 0 still "sleeping" at mid-point (wakeStep not reached)',
+        state.threads[0].state === 'sleeping');
+    check('T010-C2: Thread 0 wakeStep unchanged at mid-point',
+        state.threads[0].wakeStep === stepAtCall + DURATION);
+    check('T010-C3: Thread 1 still "running" at mid-point (unaffected by pause)',
+        state.threads[1].state === 'running');
+    check('T010-C4: timerArmed still true at mid-point (deadline not yet reached)',
+        sim.irqState.timerArmed === true);
+    check('T010-C5: machine still NOT halted at mid-point', !sim.halted);
+
+    // ── Phase D: advance to deadline — timer fires and wakes Thread 0 ─────────
+    sim.stepCount = sim.irqState.timerDeadline;
+
+    const sweptAtDeadline = state._irqSweepCount;
+    const deadlineFired = sim._fireSchedulerIRQ('TIMER', null);
+
+    check('T010-D1: _fireSchedulerIRQ at deadline returns true', deadlineFired === true);
+    check('T010-D2: _irqSweepCount incremented by deadline sweep',
+        state._irqSweepCount === sweptAtDeadline + 1);
+    check('T010-D3: Thread 0 woken to "ready" after timer fires',
+        state.threads[0].state === 'ready');
+    check('T010-D4: Thread 0 waitFlag cleared after wake', !state.threads[0].waitFlag);
+    check('T010-D5: Thread 1 is still "running" — was never put to sleep',
+        state.threads[1].state === 'running');
+    check('T010-D6: timerArmed cleared after deadline IRQ fires',
+        !sim.irqState.timerArmed);
+    check('T010-D7: machine still NOT halted after full pause cycle', !sim.halted);
+    check('T010-D8: no faults logged during the multi-thread pause cycle',
+        sim.faultLog.length === 0);
+
+    // ── Phase E: step()-level timer injection in a two-thread environment ─────
+    //
+    // Re-arms the scenario and verifies the simulator.js timer-check path
+    // (bootComplete=true; step() fires the IRQ before fetching any instruction)
+    // behaves correctly when two threads are registered.  This mirrors T009's
+    // Phase C but exercises it with Thread 1 present.
+    //
+    // Steps:
+    //   1. Reset Thread 0 back to 'running'; Thread 1 remains 'running'.
+    //   2. Re-arm Scheduler.pause via registry.dispatchMethod (pre-boot path,
+    //      bootComplete=false so the timer check does not fire prematurely).
+    //   3. Enable bootComplete=true and advance stepCount to the new deadline.
+    //   4. Call step() — the timer check fires before instruction fetch, injects
+    //      a hidden Scheduler.IRQ, wakes Thread 0, and returns a timerResult.
+    //
+    // bootComplete is toggled off for the pause call so the timer check inside
+    // step() cannot fire during Phase E setup, then toggled back on before the
+    // final step() call — matching the T009 Phase C pattern exactly.
+    state.threads[0].state = 'running';
+    state.threads[0].wakeStep = undefined;
+    sim.bootComplete = false;   // mask the timer check during re-arm
+
+    const E_DURATION = 8;
+    const eStepAtCall = sim.stepCount;
+    registry.dispatchMethod(8, 'pause', sim, { duration: E_DURATION });
+
+    check('T010-E1: Thread 0 re-armed to "sleeping" for step() phase',
+        state.threads[0].state === 'sleeping');
+    check('T010-E2: Thread 1 still "running" after re-arm',
+        state.threads[1].state === 'running');
+    check('T010-E3: timerArmed=true after re-arm', sim.irqState.timerArmed === true);
+
+    // Enable the step()-level timer check and advance to the deadline.
+    sim.bootComplete = true;
+    sim.stepCount = sim.irqState.timerDeadline;
+
+    const eSweepBefore = state._irqSweepCount;
+    const eStepResult = sim.step();
+
+    check('T010-E4: step() returned a non-null result (timer IRQ injected)',
+        eStepResult !== null);
+    check('T010-E5: step() result carries timerIRQ=true sentinel',
+        eStepResult && eStepResult.timerIRQ === true);
+    check('T010-E6: step() result desc mentions Timer or Scheduler.IRQ',
+        eStepResult && eStepResult.desc &&
+        (eStepResult.desc.includes('Timer') || eStepResult.desc.includes('Scheduler.IRQ')));
+    check('T010-E7: timerArmed cleared by step() timer path',
+        !sim.irqState.timerArmed);
+    check('T010-E8: _irqSweepCount incremented by step() timer IRQ',
+        state._irqSweepCount === eSweepBefore + 1);
+    check('T010-E9: Thread 0 woken to "ready" via step() timer path',
+        state.threads[0].state === 'ready');
+    check('T010-E10: Thread 1 still "running" after step() timer IRQ',
+        state.threads[1].state === 'running');
+    check('T010-E11: no faults logged during step() timer phase',
+        sim.faultLog.length === 0);
+    check('T010-E12: machine NOT halted after step() timer phase', !sim.halted);
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────
