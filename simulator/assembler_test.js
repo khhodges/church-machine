@@ -5471,6 +5471,74 @@ HALT
         /method\s+Peek\s*\(/.test(src), 'missing');
 }
 
+// EX-HDF: dijkstra_flag_hs.cloomc — structural content test (Haskell front-end)
+// Verifies that simulator/cloomc/dijkstra_flag_hs.cloomc:
+//   1. Declares abstraction FlagSyncHS
+//   2. Lists DijkstraFlag in the capabilities block
+//   3. Contains all four DijkstraFlag method calls (Wait, Signal, Reset, Test)
+//   4. Declares the four public methods: RunSequence, Produce, Consume, Peek
+{
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+        path.join(__dirname, 'cloomc', 'dijkstra_flag_hs.cloomc'), 'utf8');
+
+    assert('EX-HDF dijkstra_flag_hs.cloomc declares abstraction FlagSyncHS',
+        /abstraction\s+FlagSyncHS\s*\{/.test(src), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc lists DijkstraFlag in capabilities block',
+        /capabilities\s*\{[^}]*DijkstraFlag[^}]*\}/.test(src), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc calls DijkstraFlag.Wait()',
+        src.includes('DijkstraFlag.Wait()'), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc calls DijkstraFlag.Signal()',
+        src.includes('DijkstraFlag.Signal()'), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc calls DijkstraFlag.Reset()',
+        src.includes('DijkstraFlag.Reset()'), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc calls DijkstraFlag.Test()',
+        src.includes('DijkstraFlag.Test()'), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc declares method RunSequence',
+        /method\s+RunSequence\s*\(/.test(src), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc declares method Produce',
+        /method\s+Produce\s*\(/.test(src), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc declares method Consume',
+        /method\s+Consume\s*\(/.test(src), 'missing');
+    assert('EX-HDF dijkstra_flag_hs.cloomc declares method Peek',
+        /method\s+Peek\s*\(/.test(src), 'missing');
+}
+
+// EX-EDF: english/dijkstra_flag.cloomc — structural content test (English front-end)
+// Verifies that simulator/cloomc/english/dijkstra_flag.cloomc:
+//   1. Declares abstraction FlagSyncEN
+//   2. References DijkstraFlag in the dependency declaration
+//   3. Contains all four DijkstraFlag operations (Wait, Signal, Reset, Test)
+//   4. Declares the four public methods: RunSequence, Produce, Consume, Peek
+{
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+        path.join(__dirname, 'cloomc', 'english', 'dijkstra_flag.cloomc'), 'utf8');
+
+    assert('EX-EDF english/dijkstra_flag.cloomc declares abstraction FlagSyncEN',
+        src.includes('FlagSyncEN'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc references DijkstraFlag dependency',
+        src.includes('DijkstraFlag'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc calls DijkstraFlag.Wait',
+        src.includes('DijkstraFlag.Wait'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc calls DijkstraFlag.Signal',
+        src.includes('DijkstraFlag.Signal'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc calls DijkstraFlag.Reset',
+        src.includes('DijkstraFlag.Reset'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc calls DijkstraFlag.Test',
+        src.includes('DijkstraFlag.Test'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc declares method RunSequence',
+        src.includes('RunSequence'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc declares method Produce',
+        src.includes('Produce'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc declares method Consume',
+        src.includes('Consume'), 'missing');
+    assert('EX-EDF english/dijkstra_flag.cloomc declares method Peek',
+        src.includes('Peek'), 'missing');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

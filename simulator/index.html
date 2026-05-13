@@ -381,6 +381,7 @@
                         <button class="example-tab" onclick="loadCLOOMCExample('contact_stage2')" data-example="cloomc_contact_stage2" style="color:#C89B3C;" data-tooltip="JS: Contact Stage 2 — Stage 2 caller: platform abstractions (Identity, WordString, Mint) without the Contact seal">JS: Contact Stage 2</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('contact_call')" data-example="cloomc_contact_call" style="color:#C89B3C;" data-tooltip="JS: Contact Call — Stage 3 caller program: Contact.Connect as a complete application">JS: Contact Call</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('sliderule_hs')" data-example="cloomc_sliderule_hs" style="color:#a78bfa;" data-tooltip="HS: SlideRule — Slide rule simulation in Haskell CLOOMC++">HS: SlideRule</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('dijkstra_flag_hs')" data-example="cloomc_dijkstra_flag_hs" style="color:#a78bfa;" data-tooltip="HS: FlagSyncHS (NS 10) — DijkstraFlag Wait/Signal/Reset/Test in Haskell CLOOMC++; mirrors JS FlagSync and assembly dijkstra_flag">HS: FlagSync</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('ada_note_g')" data-example="cloomc_ada_note_g" style="color:#e8a87c;" data-tooltip="Ada: Note G — Ada Lovelace's algorithm in high-level CLOOMC++">Ada: Note G</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('ada_note_g_published_bug')" data-example="cloomc_ada_note_g_published_bug" style="color:#e8a87c;" data-tooltip="Ada: Note G — Published Bug — Ada&#39;s original buggy Op 4 path; confirms DR24 = 139/630">Ada: Note G — Published Bug</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('bernoulli_numbers')" data-example="cloomc_bernoulli_numbers" style="color:#e8a87c;" data-tooltip="Bernoulli Numbers — SlideRule.Bernoulli(n) single-instruction demo">Bernoulli</button>
@@ -389,6 +390,7 @@
                         <button class="example-tab" onclick="loadCLOOMCExample('english_loops')" data-example="cloomc_english_loops" style="color:#4fc3f7;" data-tooltip="EN: Loops — While loops vs recursive repeat in plain English">EN: Loops</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('english_contact')" data-example="cloomc_english_contact" style="color:#4fc3f7;" data-tooltip="EN: Contact — Stage 3 application-level abstraction in plain English CLOOMC++">EN: Contact</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('english_contact_stage2')" data-example="cloomc_english_contact_stage2" style="color:#4fc3f7;" data-tooltip="EN: Contact Stage 2 — pet-name abstractions without the Contact seal, in plain English CLOOMC++">EN: Contact Stage 2</button>
+                        <button class="example-tab" onclick="loadCLOOMCExample('english_dijkstra_flag')" data-example="cloomc_english_dijkstra_flag" style="color:#4fc3f7;" data-tooltip="EN: FlagSyncEN (NS 10) — DijkstraFlag Wait/Signal/Reset/Test in plain-English CLOOMC++; mirrors JS FlagSync and Haskell FlagSyncHS">EN: FlagSync</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('lambda_church_numerals')" data-example="cloomc_lambda_church_numerals" style="color:#81c784;" data-tooltip="LC: Church Numerals — Church numeral encoding and selector methods">LC: Church Numerals</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('lambda_church_encoding')" data-example="cloomc_lambda_church_encoding" style="color:#81c784;" data-tooltip="LC: Church Encoding — Church booleans and Church pairs as pure functions">LC: Church Encoding</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('lambda_sliderule')" data-example="cloomc_lambda_sliderule" style="color:#81c784;" data-tooltip="LC: Slide Rule — Slide rule operations in Lambda Calculus">LC: Slide Rule</button>
@@ -1694,7 +1696,7 @@
     <script src="app-absdetail.js?v=20260513d"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=20260513g"></script>
+    <script src="app-compile.js?v=20260513h"></script>
     <script src="app-run.js?v=20260513w"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260501a"></script>

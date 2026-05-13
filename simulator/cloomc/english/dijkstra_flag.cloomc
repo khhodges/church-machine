@@ -1,0 +1,93 @@
+-- ============================================================
+-- Abstraction:  FlagSyncEN
+-- Description:  Plain-English CLOOMC++ for DijkstraFlag synchronisation
+-- Author:       Church Machine Educational Platform
+-- Version:      1.0
+-- Created:      2026-05-13
+-- Language:     English
+-- Dependencies: DijkstraFlag (NS slot 10)
+-- ============================================================
+-- Methods:
+--   1. RunSequence() — exercise all four operations in order
+--   2. Produce()     — V() operation: signal the flag
+--   3. Consume()     — P() then Reset: wait, then clear the flag
+--   4. Peek()        — non-blocking Test, flag unchanged
+-- ============================================================
+-- ENGLISH: FlagSync — DijkstraFlag Synchronisation Primitive
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--
+-- DijkstraFlag is a one-bit synchronisation primitive that
+-- implements Dijkstra's classic semaphore operations:
+--
+--   Signal — V(): raise the flag (wake one blocked waiter, or
+--             set it for the next Wait caller to consume)
+--   Wait   — P(): block until the flag is signaled; consumes
+--             the signal immediately if already raised
+--   Reset  — Lower the flag without consuming the signal;
+--             use to clear a flag after inspecting it
+--   Test   — Non-blocking read; returns 1 if signaled, 0 if not
+--
+-- FlagSyncEN is the same abstraction as the JavaScript FlagSync
+-- and the Haskell FlagSyncHS, written in plain-English CLOOMC++.
+-- Load all three front-ends side by side to see how the same
+-- synchronisation logic looks in each notation.
+--
+-- Typical producer/consumer pattern:
+--
+--   producer:  call Produce  -- data is ready
+--   consumer:  call Consume  -- blocks until data arrives, then clears
+--
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create an abstraction called FlagSyncEN
+
+It needs DijkstraFlag
+
+-- Peek: non-blocking read of the flag state.
+-- Returns 1 if the flag is currently signaled, 0 otherwise.
+-- The flag is left unchanged — no signal is consumed.
+Add a method called Peek
+
+Set state to the result of calling DijkstraFlag.Test
+
+Return state
+
+-- Produce: V() — signal the flag.
+-- Raises the flag so the next Wait call returns immediately.
+-- Returns 1 if a sleeping waiter was woken, 0 if the flag was simply set.
+Add a method called Produce
+
+Set result to the result of calling DijkstraFlag.Signal
+
+Return result
+
+-- Consume: P() then Reset — wait until signaled, then clear.
+-- Blocks the calling thread until the flag is raised.
+-- Resets the flag so the next Consume call will also block.
+-- Returns the Wait result (always 1 when the flag was signaled).
+Add a method called Consume
+
+Set waited to the result of calling DijkstraFlag.Wait
+Call DijkstraFlag.Reset
+
+Return waited
+
+-- RunSequence: exercise all four DijkstraFlag operations in order.
+-- Mirrors the assembly dijkstra_flag example step for step:
+--   Step 1: Test   -> 0  (flag unsignaled at boot)
+--   Step 2: Signal       raise flag
+--   Step 3: Test   -> 1  (flag now signaled)
+--   Step 4: Wait   -> 1  (flag already up, returns immediately)
+--   Step 5: Reset        lower flag
+--   Step 6: Test   -> 0  (flag cleared)
+-- Returns the final Test result (0 = cleared, 1 = still raised).
+Add a method called RunSequence
+
+Set before to the result of calling DijkstraFlag.Test
+Call DijkstraFlag.Signal
+Set afterSignal to the result of calling DijkstraFlag.Test
+Set afterWait to the result of calling DijkstraFlag.Wait
+Call DijkstraFlag.Reset
+Set afterReset to the result of calling DijkstraFlag.Test
+
+Return afterReset
