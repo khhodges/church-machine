@@ -1935,11 +1935,21 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
             const _gType = (_wVal >>> 23) & 0x3;
             const _gSeq  = (_wVal >>> 16) & 0x7F;
             if (!_wVal) {
-                html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty">` +
-                        `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
-                        `<span class="lump-gt-chip-name lump-gt-name-null">\u2014 empty \u2014</span>` +
-                        `<span class="lump-gt-chip-meta lump-gt-meta-null">#${_gs}</span>` +
-                        `</div>`;
+                const _capMeta = lump.capabilities && lump.capabilities[_gs];
+                const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
+                if (_capName) {
+                    html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-declared" title="#${_gs} \u2014 ${_capName} (declared in capabilities block; GT assigned at runtime)">` +
+                            `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
+                            `<span class="lump-gt-chip-name">${e(_capName)}</span>` +
+                            `<span class="lump-gt-chip-meta lump-gt-meta-null">#${_gs}\u00B7declared</span>` +
+                            `</div>`;
+                } else {
+                    html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty">` +
+                            `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
+                            `<span class="lump-gt-chip-name lump-gt-name-null">\u2014 empty \u2014</span>` +
+                            `<span class="lump-gt-chip-meta lump-gt-meta-null">#${_gs}</span>` +
+                            `</div>`;
+                }
             } else if (_gType === 3) {
                 const _abType  = (_wVal >>> 27) & 0x1F;
                 const _rBit    = (_wVal >>> 26) & 1;
@@ -2109,12 +2119,22 @@ async function _loadLumpTokens(token, lump) {
         const gtSeq  = (wVal >>> 16) & 0x7F;
 
         if (!wVal) {
-            html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty" title="Slot ${s} is empty \u2014 click to assign a capability" onclick="_openGTSlotPicker(${JSON.stringify(token || '')},${s},this)">` +
-                    `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
-                    `<span class="lump-gt-chip-name lump-gt-name-null">\u2014 empty \u2014</span>` +
-                    `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}</span>` +
-                    `<span class="lump-gt-empty-btn" title="Assign capability">+</span>` +
-                    `</div>`;
+            const _capMeta = lump.capabilities && lump.capabilities[s];
+            const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
+            if (_capName) {
+                html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-declared" title="#${s} \u2014 ${e(_capName)} (declared in capabilities block; GT assigned at runtime)">` +
+                        `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
+                        `<span class="lump-gt-chip-name">${e(_capName)}</span>` +
+                        `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}\u00B7declared</span>` +
+                        `</div>`;
+            } else {
+                html += `<div class="lump-gt-chip lump-gt-chip-null lump-gt-chip-empty" title="Slot ${s} is empty \u2014 click to assign a capability" onclick="_openGTSlotPicker(${JSON.stringify(token || '')},${s},this)">` +
+                        `<span class="lump-gt-chip-dot lump-gt-dot-null"></span>` +
+                        `<span class="lump-gt-chip-name lump-gt-name-null">\u2014 empty \u2014</span>` +
+                        `<span class="lump-gt-chip-meta lump-gt-meta-null">#${s}</span>` +
+                        `<span class="lump-gt-empty-btn" title="Assign capability">+</span>` +
+                        `</div>`;
+            }
         } else if (gtType === 3) {
             const abType   = (wVal >>> 27) & 0x1F;
             const rBit     = (wVal >>> 26) & 1;
