@@ -5748,6 +5748,60 @@ HALT
         'cloomc_dijkstra_flag not found in the javascript example group');
 }
 
+// EX-VLC: var/let/const prefix on call(Abs.Method()) — task-1124
+// Verifies that var x = call(...), let x = call(...), and const x = call(...)
+// all compile without errors and emit the correct ELOADCALL instruction.
+{
+    const CLOOMCCompiler = require('./cloomc_compiler.js');
+    const ELOADCALL_OPCODE = 8;
+
+    const BASE_SRC = (keyword) => `
+abstraction VlcTest {
+  capabilities { DijkstraFlag }
+  method Run() {
+    ${keyword} result = call(DijkstraFlag.Test())
+  }
+}
+`.trim();
+
+    const CONVENTIONS = {
+        'DIJKSTRAFLAG': {
+            Wait:   { index: 0 },
+            Signal: { index: 1 },
+            Reset:  { index: 2 },
+            Test:   { index: 3 },
+        }
+    };
+
+    for (const kw of ['var', 'let', 'const']) {
+        const compiler = new CLOOMCCompiler();
+        Object.assign(compiler.methodConventions, CONVENTIONS);
+        const compiled = compiler.compile(BASE_SRC(kw), []);
+
+        assert(`EX-VLC-${kw}: compiles without errors`,
+            compiled.errors.length === 0,
+            compiled.errors.map(e => e.message || JSON.stringify(e)).join('; '));
+
+        const runMethod = compiled.methods && compiled.methods.find(m => m.name === 'Run');
+        assert(`EX-VLC-${kw}: Run method present`,
+            runMethod !== undefined, 'Run method not found');
+
+        const eloadWords = runMethod
+            ? (runMethod.code || []).filter(w => ((w >>> 27) & 0x1F) === ELOADCALL_OPCODE)
+            : [];
+        assert(`EX-VLC-${kw}: Run emits exactly 1 ELOADCALL`,
+            eloadWords.length === 1,
+            `got ${eloadWords.length} ELOADCALL word(s)`);
+
+        if (eloadWords.length === 1) {
+            const methodIdx = (eloadWords[0] >>> 8) & 0x7F;
+            assert(`EX-VLC-${kw}: ELOADCALL targets Test (method index 4, 1-based)`,
+                methodIdx === 4,
+                `got methodIdx=${methodIdx}`);
+        }
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

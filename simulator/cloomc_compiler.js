@@ -1223,7 +1223,7 @@ class CLOOMCCompiler {
             return;
         }
 
-        const callMatch = text.match(/^(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/);
+        const callMatch = text.match(/^(?:(?:var|let|const)\s+)?(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/);
         if (callMatch) {
             const resultVar = callMatch[1] || null;
             const absName = callMatch[2].toUpperCase();

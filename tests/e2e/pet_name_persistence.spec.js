@@ -32,10 +32,12 @@ const { test, expect } = require('@playwright/test');
 // It is a reliable anchor label that is always set by _initNamespaceTable().
 const CATALOG_LABEL = 'Navana';
 
-// A custom label injected into a free slot (slot 50 is above the ~50-entry
-// catalog and starts as empty/null after _initNamespaceTable).
+// A custom label injected into a free slot (slot 64 is above the catalog and
+// pool range 50–63, and starts as empty/null after _initNamespaceTable).
+// Slot 50 was previously used here but is now allocated to Scheduler.IRQ.Thread
+// (task-1077) and Identity (catalog), so 64 is used instead.
 const CUSTOM_LABEL    = 'TestPetLabel';
-const CUSTOM_NS_SLOT  = 50;
+const CUSTOM_NS_SLOT  = 64;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

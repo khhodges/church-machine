@@ -103,17 +103,18 @@ def _cfg_no_window():
 
 # (config, skip_window, expected_ns_count)
 # expected_ns_count is the exact nsCount loadBootImage() should report:
-#   * The default abstraction catalog defines 50 named slots (slots 0..49),
-#     so any default+catalog image yields 50.
-#     (Task #760 Stage 1 added Billing/TuringMemory/ChurchMemory at NS[47..49])
+#   * The default abstraction catalog defines 51 named slots (slots 0..50),
+#     so any default+catalog image yields 51.
+#     (Task #760 Stage 1 added Billing/TuringMemory/ChurchMemory at NS[47..49];
+#      Task #1077 added Scheduler.IRQ.Thread at NS[50])
 #   * Step-3 emptySlotCount adds reserved-but-empty entries on top of the
 #     catalog count.
 CONFIGS = [
-    pytest.param(_cfg_default(),           False, 50, id="default"),
-    pytest.param(_cfg_custom_step1(),      False, 50, id="custom_step1"),
-    pytest.param(_cfg_step2_resident(),    False, 50, id="step2_resident"),
-    pytest.param(_cfg_step3_reservation(), False, 58, id="step3_reservation"),
-    pytest.param(_cfg_no_window(),         True,  50, id="no_window_bootconfig"),
+    pytest.param(_cfg_default(),           False, 51, id="default"),
+    pytest.param(_cfg_custom_step1(),      False, 51, id="custom_step1"),
+    pytest.param(_cfg_step2_resident(),    False, 51, id="step2_resident"),
+    pytest.param(_cfg_step3_reservation(), False, 59, id="step3_reservation"),
+    pytest.param(_cfg_no_window(),         True,  51, id="no_window_bootconfig"),
 ]
 
 
