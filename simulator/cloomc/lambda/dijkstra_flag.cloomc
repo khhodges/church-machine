@@ -1,0 +1,85 @@
+-- ============================================================
+-- Abstraction:  FlagSyncLC
+-- Description:  Lambda Calculus front-end for DijkstraFlag synchronisation
+-- Author:       Church Machine Educational Platform
+-- Version:      1.0
+-- Created:      2026-05-13
+-- Language:     Lambda
+-- Dependencies: DijkstraFlag (NS slot 10)
+-- ============================================================
+-- DijkstraFlag exposes four primitive operations:
+--
+--   Signal()  — V(): raise the flag (wake one blocked waiter,
+--                or set it for the next Wait caller to consume)
+--   Wait()    — P(): block until the flag is signaled; consumes
+--                the signal immediately if already raised
+--   Reset()   — Lower the flag without consuming the signal;
+--                use to clear a flag after inspecting it
+--   Test()    — Non-blocking read; returns 1 if signaled, 0 if not
+--
+-- FlagSyncLC is the Lambda Calculus companion to the JavaScript FlagSync,
+-- Haskell FlagSyncHS, and English FlagSyncEN abstractions.  All four
+-- front-ends compile to the same Church Machine hardware target — compare
+-- them side by side to see how Dijkstra's semaphore idiom looks across
+-- every notation supported by the platform.
+--
+-- In the Lambda Calculus reading, each method is a pure function:
+--   Peek      ≡ λ().Test()                       (non-blocking observer)
+--   Produce   ≡ λ().Signal()                      (V: raise the flag)
+--   Consume   ≡ λ().let w = Wait() in Reset(); w  (P then clear)
+--   RunSequence ≡ λ().sequence of six applications
+--
+-- Methods:
+--   1. RunSequence() — exercise all four operations in order
+--   2. Produce()     — V() operation: signal the flag
+--   3. Consume()     — P() then Reset: wait, then clear the flag
+--   4. Peek()        — non-blocking Test, flag unchanged
+-- ============================================================
+-- LAMBDA CALCULUS
+-- DijkstraFlag Synchronisation — Dijkstra's semaphore as pure functions
+-- Signal = λ().V()   Wait = λ().P()   Reset = λ().↓   Test = λ().?
+
+abstraction FlagSyncLC {
+    capabilities { DijkstraFlag }
+
+    -- Peek: λ().Test()
+    -- Non-blocking read of the flag state.
+    -- Returns 1 if the flag is currently signaled, 0 otherwise.
+    -- The flag is left unchanged — no signal is consumed.
+    method Peek() = call(DijkstraFlag.Test())
+
+    -- Produce: λ().Signal()
+    -- V() — raise the flag.
+    -- If a waiter is sleeping, it is woken immediately.
+    -- If no waiter, the flag is latched so the next Wait() returns at once.
+    -- Returns 1 if a sleeping waiter was woken, 0 if the flag was simply set.
+    method Produce() = call(DijkstraFlag.Signal())
+
+    -- Consume: λ().let w = Wait() in Reset(); w
+    -- P() then Reset — wait until signaled, then clear.
+    -- Blocks the calling thread until the flag is raised.
+    -- Resets the flag so the next Consume() call will also block.
+    -- Returns the Wait result (always 1 when the flag was signaled).
+    method Consume() =
+        let waited = call(DijkstraFlag.Wait())
+        let _      = call(DijkstraFlag.Reset())
+        in waited
+
+    -- RunSequence: λ().Test ∘ Reset ∘ Wait ∘ Signal ∘ Test ∘ ()
+    -- Exercise all four DijkstraFlag operations in the canonical order.
+    -- Mirrors the assembly dijkstra_flag example step for step:
+    --   Step 1: Test   → 0  (flag unsignaled at boot)
+    --   Step 2: Signal       raise the flag (V)
+    --   Step 3: Test   → 1  (flag now signaled)
+    --   Step 4: Wait   → 1  (flag already up — returns immediately, P)
+    --   Step 5: Reset        lower the flag
+    --   Step 6: Test   → 0  (flag cleared)
+    -- Returns the final Test result (0 = cleared, 1 = still raised).
+    method RunSequence() =
+        let before      = call(DijkstraFlag.Test())
+        let _           = call(DijkstraFlag.Signal())
+        let afterSignal = call(DijkstraFlag.Test())
+        let afterWait   = call(DijkstraFlag.Wait())
+        let _           = call(DijkstraFlag.Reset())
+        in call(DijkstraFlag.Test())
+}

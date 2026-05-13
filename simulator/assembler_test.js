@@ -5539,6 +5539,40 @@ HALT
         src.includes('Peek'), 'missing');
 }
 
+// EX-LDF: lambda/dijkstra_flag.cloomc — structural content test (Lambda Calculus front-end)
+// Verifies that simulator/cloomc/lambda/dijkstra_flag.cloomc:
+//   1. Declares abstraction FlagSyncLC
+//   2. Lists DijkstraFlag in the capabilities block
+//   3. Contains all four DijkstraFlag method calls (Wait, Signal, Reset, Test)
+//   4. Declares the four public methods: RunSequence, Produce, Consume, Peek
+{
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(
+        path.join(__dirname, 'cloomc', 'lambda', 'dijkstra_flag.cloomc'), 'utf8');
+
+    assert('EX-LDF lambda/dijkstra_flag.cloomc declares abstraction FlagSyncLC',
+        /abstraction\s+FlagSyncLC\s*\{/.test(src), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc lists DijkstraFlag in capabilities block',
+        /capabilities\s*\{[^}]*DijkstraFlag[^}]*\}/.test(src), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc calls DijkstraFlag.Wait()',
+        src.includes('DijkstraFlag.Wait()'), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc calls DijkstraFlag.Signal()',
+        src.includes('DijkstraFlag.Signal()'), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc calls DijkstraFlag.Reset()',
+        src.includes('DijkstraFlag.Reset()'), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc calls DijkstraFlag.Test()',
+        src.includes('DijkstraFlag.Test()'), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc declares method RunSequence',
+        /method\s+RunSequence\s*\(/.test(src), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc declares method Produce',
+        /method\s+Produce\s*\(/.test(src), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc declares method Consume',
+        /method\s+Consume\s*\(/.test(src), 'missing');
+    assert('EX-LDF lambda/dijkstra_flag.cloomc declares method Peek',
+        /method\s+Peek\s*\(/.test(src), 'missing');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
