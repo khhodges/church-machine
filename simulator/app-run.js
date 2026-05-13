@@ -4994,7 +4994,7 @@ HALT
 ; Abstraction:  CapabilityTest
 ; Description:  Church Machine capability-based self-test: LOAD, TPERM, CALL
 ; Author:       Church Machine Educational Platform
-; Version:      1.0
+; Version:      1.1
 ; Created:      2026-05-09
 ; Language:     Assembly
 ; Dependencies: None
@@ -5006,7 +5006,7 @@ HALT
 ;   4. test4_conditional — LOADEQ/LOADNE conditional loads
 ;   5. test5_switch — SWITCH register swap
 ;   6. test6_turing — IADD, ISUB, MCMP, SHL, SHR arithmetic
-;   7. test7_call — CALL Salvation via direct mode
+;   7. test7_call — CALL Salvation via dot-notation
 ;   8. test8_eloadcall — ELOADCALL fused Load+TPERM+Call
 ; ============================================================
 ; ============================================
@@ -5015,19 +5015,22 @@ HALT
 ; Boot must complete before assembling
 ; ============================================
 ;
+; Dot-notation style is used throughout (recommended).
+; Each line shows the raw equivalent in the trailing comment.
+;
 ; Boot C-List layout:
 ;   [0] Boot.NS  [1] Thread  [2] Boot.Abstr (E)
 ;   [3] (empty)  [4] Salvation (E)  [5] Navana (E)
 ;   [6] Mint (E) [7] Memory (E)
 ;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
 
-; --- TEST 1: LOAD system abstractions ---
-LOAD CR0, CR6, 4       ; CR0 = Salvation (E)
-LOAD CR1, CR6, 5       ; CR1 = Navana    (E)
-LOAD CR2, CR6, 6       ; CR2 = Mint      (E)
-LOAD CR3, CR6, 7       ; CR3 = Memory    (E)
-LOAD CR4, CR6, 8       ; CR4 = LED       (RW)
-LOAD CR5, CR6, 9       ; CR5 = UART      (RW)
+; --- TEST 1: LOAD system abstractions (dot-notation) ---
+LOAD CR0, Salvation    ; CR0 = Salvation (E)   — equiv: LOAD CR0, CR6, 4
+LOAD CR1, Navana       ; CR1 = Navana    (E)   — equiv: LOAD CR1, CR6, 5
+LOAD CR2, Mint         ; CR2 = Mint      (E)   — equiv: LOAD CR2, CR6, 6
+LOAD CR3, Memory       ; CR3 = Memory    (E)   — equiv: LOAD CR3, CR6, 7
+LOAD CR4, LED          ; CR4 = LED       (RW)  — equiv: LOAD CR4, CR6, 8
+LOAD CR5, UART         ; CR5 = UART      (RW)  — equiv: LOAD CR5, CR6, 9
 
 ; --- TEST 2: TPERM - permission checks ---
 TPERM CR0, E           ; Salvation has E? PASS (Z=1)
@@ -5038,10 +5041,10 @@ TPERM CR5, RW          ; UART has R+W? PASS (Z=1)
 ; --- TEST 3: TPERM failure ---
 TPERM CR0, L           ; Salvation has L? FAIL (Z=0)
 
-; --- TEST 4: Conditional execution ---
+; --- TEST 4: Conditional execution (dot-notation) ---
 ; Z=0 from failed TPERM above
-LOADEQ CR0, CR6, 5     ; SKIP (Z=0, not equal)
-LOADNE CR0, CR6, 4     ; EXEC (Z=0, is not-equal) -> Salvation
+LOADEQ CR0, Navana     ; SKIP (Z=0, not equal)    — equiv: LOADEQ CR0, CR6, 5
+LOADNE CR0, Salvation  ; EXEC (Z=0, is not-equal) — equiv: LOADNE CR0, CR6, 4
 
 ; --- TEST 5: SWITCH - swap registers ---
 SWITCH CR0, 1          ; CR0 <-> CR1
@@ -5058,12 +5061,12 @@ IADD DR4, DR0, #1      ; DR4 = 1
 SHL DR4, DR4, 3        ; DR4 = 8
 SHR DR4, DR4, 1        ; DR4 = 4
 
-; --- TEST 7: CALL/RETURN ---
-LOAD CR0, CR6, 4       ; CR0 = Salvation
-CALL CR0, 0xF          ; Direct mode: enter Salvation (atomic dispatch)
+; --- TEST 7: CALL (dot-notation) ---
+LOAD CR0, Salvation    ; CR0 = Salvation          — equiv: LOAD CR0, CR6, 4
+CALL Salvation.main    ; enter Salvation (atomic) — equiv: CALL CR0, 0xF
 
-; --- TEST 8: ELOADCALL - fused Load+TPERM+Call ---
-ELOADCALL CR0, CR6, 4  ; Load Salvation + check E + call
+; --- TEST 8: ELOADCALL - fused Load+TPERM+Call (dot-notation) ---
+ELOADCALL CR0, Salvation, main  ; Load + E check + call — equiv: ELOADCALL CR0, CR6, 4
 
 ; --- All tests complete ---
 HALT
