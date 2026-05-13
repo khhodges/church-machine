@@ -1031,6 +1031,37 @@ class ChurchAssembler {
                     }
                     break;
                 }
+                // Namespace-slot bare-call: CALL Scheduler, pause
+                // When parts[1] names an abstraction that lives in the namespace
+                // symbol table but has NOT been explicitly LOAD-ed into a CR, and
+                // parts[2] is a known method name, emit ELOADCALL (opcode 8) with
+                // the correct row/method encoding instead of a plain CALL.
+                // If the abstraction IS already in nsLoaded (loaded into a CR) the
+                // existing CALL path handles it correctly — do not intercept.
+                if (parts[2] && !rawDotTok.includes('.')) {
+                    const _nsSlot = (this.nsLoaded[rawDotTok] === undefined &&
+                                     this.nsSymbols[rawDotTok] !== undefined)
+                                    ? this.nsSymbols[rawDotTok] : null;
+                    if (_nsSlot !== null && this.methodConventions[rawDotTok]) {
+                        const _methName = (parts[2] || '').replace(/,/g, '').trim();
+                        const _methEntry = this.methodConventions[rawDotTok][_methName];
+                        if (_methEntry !== undefined) {
+                            opcode = 8;
+                            crDst  = 0;
+                            crSrc  = 6;
+                            const _methIdx = typeof _methEntry === 'object' ? _methEntry.index : _methEntry;
+                            if (_methIdx < 0 || _methIdx > 126) {
+                                this.errors.push({ line: lineNum, message: `Method "${_methName}" of ${rawDotTok} has index ${_methIdx} which is out of range (0–126 allowed for ELOADCALL).` });
+                            } else {
+                                imm = ((_methIdx + 1) << 8) | (_nsSlot & 0xFF);
+                            }
+                        } else {
+                            const _known = Object.keys(this.methodConventions[rawDotTok]).join(', ');
+                            this.errors.push({ line: lineNum, message: `"${_methName}" is not a known method of ${rawDotTok}. Known methods: ${_known}.` });
+                        }
+                        break;
+                    }
+                }
                 crDst = this._parseCR(parts[1], lineNum);
                 this._checkPrivCR(crDst, 'CALL', lineNum);
                 if (parts[2]) {

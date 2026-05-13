@@ -938,7 +938,7 @@ function getMethodPurposes(abs) {
         'Navana': { 'Init': 'Initialize all abstractions', 'Manage': 'Abstraction lifecycle management', 'Monitor': 'System health monitoring', 'IDS': 'Intrusion Detection via GT anomalies' },
         'Mint': { 'Encode': 'Mint.Encode(base, exp, permsBits, bindable, far) — preconditions: (1) domain purity (permsBits must be Turing-only or Church-only, never mixed), (2) E isolation (E perm may not be combined with R/W/X), (3) non-NULL type (base type 00 is rejected). CALL Memory.Allocate for backing storage, find free NS entry, increment version, write NS entry, forge ready-to-use GT', 'Revoke': 'Mint.Revoke(nsIndex) — increment version, kill all GT copies instantly', 'Transfer': 'Mint.Transfer(gt, target_clist, slot) — move GT between c-lists' },
         'Memory': { 'Allocate': 'Memory.Allocate(size) — reserve a memory region, return location and size', 'Free': 'Memory.Free(location) — release a memory region, zero its contents', 'Resize': 'Memory.Resize(location, newSize) — adjust the size of an existing allocation' },
-        'Scheduler': { 'Yield': 'Scheduler.Yield() — save thread state, switch to next ready thread', 'Spawn': 'Scheduler.Spawn(code_GT, entry) — create thread with isolated CR set', 'Wait': 'Scheduler.Wait(flag_GT) — block thread on DijkstraFlag', 'Stop': 'Scheduler.Stop(threadID) — terminate thread, release CRs' },
+        'Scheduler': { 'Yield': 'Scheduler.Yield() — save thread state, switch to next ready thread', 'Spawn': 'Scheduler.Spawn(code_GT, entry) — create thread with isolated CR set', 'Wait': 'Scheduler.Wait(flag_GT) — block thread on DijkstraFlag', 'Stop': 'Scheduler.Stop(threadID) — terminate thread, release CRs', 'pause': 'Scheduler.pause(ticks) — suspend calling thread for ticks steps; Scheduler.IRQ wakes it when the timer fires' },
         'Stack': { 'Push': 'Stack.Push(value) — DWRITE to stack location, increment depth', 'Pop': 'Stack.Pop() — decrement depth, DREAD from stack location', 'Peek': 'Stack.Peek() — DREAD top without decrementing', 'Depth': 'Stack.Depth() — return current entry count' },
         'DijkstraFlag': { 'Wait': 'DijkstraFlag.Wait() — P() operation: block if unsignaled', 'Signal': 'DijkstraFlag.Signal() — V() operation: wake one waiter or set flag', 'Reset': 'DijkstraFlag.Reset() — clear flag to unsignaled state', 'Test': 'DijkstraFlag.Test() — non-blocking read of flag state' },
         'UART': { 'Send': 'UART.Send(byte) — SAVE byte to device (S perm)', 'Receive': 'UART.Receive() — LOAD byte from device (L perm)', 'SetBaud': 'UART.SetBaud(rate) — configure via CALL (E perm)' },
@@ -2868,6 +2868,7 @@ const _ABSTRACTION_CONVENTIONS = {
         'Spawn':  { index: 1, input: 'CR2=code_GT, DR1=entry',  output: 'DR1=threadID' },
         'Wait':   { index: 2, input: 'CR2=flag_GT',             output: 'DR1' },
         'Stop':   { index: 3, input: 'DR1=threadID',            output: 'DR1' },
+        'pause':  { index: 4, input: 'DR1=ticks',               output: 'DR1' },
     },
     'DijkstraFlag': {
         'Wait':   { index: 0, input: '',  output: 'DR1' },

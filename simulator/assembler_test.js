@@ -3185,10 +3185,11 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
 
 const SCHED_CONVENTIONS_BC = {
     'Scheduler': {
-        'Yield':  { index: 0, input: '',             output: 'DR1' },
+        'Yield':  { index: 0, input: '',                       output: 'DR1' },
         'Spawn':  { index: 1, input: 'CR2=code_GT, DR1=entry', output: 'DR1=threadID' },
-        'Wait':   { index: 2, input: 'CR2=flag_GT',  output: 'DR1' },
-        'Stop':   { index: 3, input: 'DR1=threadID', output: 'DR1' },
+        'Wait':   { index: 2, input: 'CR2=flag_GT',            output: 'DR1' },
+        'Stop':   { index: 3, input: 'DR1=threadID',           output: 'DR1' },
+        'pause':  { index: 4, input: 'DR1=ticks',              output: 'DR1' },
     },
     'DijkstraFlag': {
         'Wait':   { index: 0, input: '',  output: 'DR1' },
@@ -4407,6 +4408,111 @@ function symCompile(body, caps) {
         assert('BC83 Display.Clear() ELOADCALL — method=2 (Clear index 1, 1-based)',
             method === 2, `got method=${method}`);
     }
+}
+
+// ── BC84–BC89: Scheduler.pause (task-1078) ────────────────────────────────────
+//
+// Scheduler.pause() — no inline args (caller pre-loads DR1=ticks) → ELOADCALL only.
+//
+// Encoding:
+//   ELOADCALL — pause index=4 → 1-based=5; Scheduler slot=8; imm=(5<<8)|8=0x0508
+//     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0508 = 0x47030508
+
+{
+    // BC84–BC88: Scheduler.pause() bare-call
+    const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
+    a.setNamespace(SCHED_NS_BC);
+    const result = a.assemble('Scheduler.pause()\nHALT');
+
+    assert('BC84 Scheduler.pause() assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC85 Scheduler.pause() emits 2 words (ELOADCALL + HALT) — no LOAD for DR1 input',
+        result.words.length === 2, `got ${result.words.length}`);
+
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC86 Scheduler.pause() word[0] ELOADCALL — opcode=8',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC87 Scheduler.pause() word[0] ELOADCALL — row=8 (Scheduler NS slot)',
+            row === 8, `got row=${row}`);
+        assert('BC88 Scheduler.pause() word[0] ELOADCALL — method=5 (pause index 4, 1-based)',
+            method === 5, `got method=${method}`);
+    }
+}
+
+{
+    // BC89: _sharedMethodConventions inheritance — Scheduler.pause is present with index 4
+    const registrar = new ChurchAssembler({});
+    registrar.setSharedMethodConventions({
+        'Scheduler': SCHED_CONVENTIONS_BC['Scheduler'],
+    });
+    const fresh = new ChurchAssembler();
+    assert('BC89 _sharedMethodConventions inheritance — Scheduler.pause index is 4',
+        fresh.methodConventions['Scheduler'] !== undefined &&
+        fresh.methodConventions['Scheduler']['pause'] !== undefined &&
+        fresh.methodConventions['Scheduler']['pause'].index === 4,
+        `pause entry: ${JSON.stringify(fresh.methodConventions['Scheduler'] && fresh.methodConventions['Scheduler']['pause'])}`);
+}
+
+{
+    // BC90–BC94: CALL Scheduler, pause — namespace-slot bare-call path → ELOADCALL
+    //
+    // Encoding: pause index=4 → 1-based=5; Scheduler slot=8; imm=(5<<8)|8=0x0508
+    //   word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0508
+    const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
+    a.setNamespace(SCHED_NS_BC);
+    const result = a.assemble('CALL Scheduler, pause\nHALT');
+
+    assert('BC90 CALL Scheduler, pause assembles without errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC91 CALL Scheduler, pause emits 2 words (ELOADCALL + HALT)',
+        result.words.length === 2, `got ${result.words.length}`);
+
+    {
+        const w      = result.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('BC92 CALL Scheduler, pause word[0] — opcode=8 (ELOADCALL, not CALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC93 CALL Scheduler, pause word[0] — row=8 (Scheduler NS slot)',
+            row === 8, `got row=${row}`);
+        assert('BC94 CALL Scheduler, pause word[0] — method=5 (pause index 4, 1-based)',
+            method === 5, `got method=${method}`);
+    }
+}
+
+{
+    // BC95: CALL Scheduler, UnknownMethod — error lists known methods including pause
+    const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
+    a.setNamespace(SCHED_NS_BC);
+    a.assemble('CALL Scheduler, UnknownMethod');
+    assert('BC95 CALL Scheduler, UnknownMethod — error produced',
+        a.errors.length >= 1, 'expected an error');
+    assert('BC95 CALL Scheduler, UnknownMethod — error lists "pause" in known methods',
+        a.errors.length >= 1 && a.errors[0].message.includes('pause'),
+        a.errors.map(e => e.message).join('; '));
+}
+
+{
+    // BC96: CALL Scheduler, 4 (numeric selector on unloaded NS symbol)
+    // Numeric selectors are not named methods; the new branch intercepts the
+    // abstraction and emits an error naming known methods.  This documents
+    // that numeric-indexed ELOADCALL for NS-slot abstractions requires the
+    // explicit ELOADCALL instruction (not CALL).
+    const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
+    a.setNamespace(SCHED_NS_BC);
+    a.assemble('CALL Scheduler, 4');
+    assert('BC96 CALL Scheduler, 4 (numeric, unloaded) — error produced',
+        a.errors.length >= 1, 'expected an error');
+    assert('BC96 CALL Scheduler, 4 (numeric, unloaded) — error mentions Scheduler',
+        a.errors.length >= 1 && a.errors[0].message.includes('Scheduler'),
+        a.errors.map(e => e.message).join('; '));
 }
 
 // ── EX1–EX19: Assembly example smoke tests (task-1063) ───────────────────────
