@@ -2203,5 +2203,62 @@
         </div>
     </div>
 </div>
+
+<!-- ── Keyboard Shortcuts Help Overlay ─────────────────────────────────── -->
+<div id="shortcutsModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)closeShortcutsHelp()">
+    <div class="modal-dialog shortcuts-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle">
+        <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between;" id="shortcutsModalTitle">
+            <span>Keyboard Shortcuts</span>
+            <button class="btn shortcuts-close-btn" onclick="closeShortcutsHelp()" aria-label="Close">&times;</button>
+        </div>
+        <div class="shortcuts-platform-note">Ctrl = Cmd on Mac &nbsp;&middot;&nbsp; press <kbd style="font-size:0.72rem;padding:0.1rem 0.35rem;">?</kbd> or <kbd style="font-size:0.72rem;padding:0.1rem 0.35rem;">Ctrl+/</kbd> to open anytime</div>
+        <div class="shortcuts-body">
+            <div class="shortcuts-section">
+                <div class="shortcuts-section-title">Navigation</div>
+                <div class="shortcuts-grid">
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>A</kbd></span><span>Abstractions view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>B</kbd></span><span>Builder / Hardware view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>D</kbd></span><span>Dashboard / Simulator view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>F</kbd></span><span>Reference Docs view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>G</kbd></span><span>Garbage Collector view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>L</kbd></span><span>Lumps Repository view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>M</kbd></span><span>Math / REPL view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>N</kbd></span><span>Namespace Viewer</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>P</kbd></span><span>Pipeline Visualiser</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>T</kbd></span><span>Trace Log</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>U</kbd></span><span>Tutorial</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>V</kbd></span><span>Devices view</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Y</kbd></span><span>Docs view</span>
+                </div>
+            </div>
+            <div class="shortcuts-section">
+                <div class="shortcuts-section-title">Toolbar &amp; Editor</div>
+                <div class="shortcuts-grid">
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>S</kbd></span><span>Save active assembly tab</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>S</kbd></span><span>Download source as .cloomc</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span><span>Toggle C-List Viewer</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></span><span>New Abstraction Wizard</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>L</kbd></span><span>Jump to Source Library</span>
+                    <span class="shortcuts-keys"><kbd>Ctrl</kbd><kbd>R</kbd></span><span>Reboot / reset simulation</span>
+                </div>
+            </div>
+            <div class="shortcuts-section">
+                <div class="shortcuts-section-title">Simulation</div>
+                <div class="shortcuts-grid">
+                    <span class="shortcuts-keys"><kbd>F5</kbd></span><span>Run</span>
+                    <span class="shortcuts-keys"><kbd>F8</kbd></span><span>Step (single instruction)</span>
+                    <span class="shortcuts-keys"><kbd>Escape</kbd></span><span>Stop / halt execution</span>
+                </div>
+            </div>
+            <div class="shortcuts-section">
+                <div class="shortcuts-section-title">Help</div>
+                <div class="shortcuts-grid">
+                    <span class="shortcuts-keys"><kbd>?</kbd></span><span>Open this shortcuts overlay</span>
+                    <span class="shortcuts-keys"><kbd>Escape</kbd></span><span>Close this overlay</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>

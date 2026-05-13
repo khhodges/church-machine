@@ -2168,6 +2168,101 @@ a.next-step-link:hover {
     width: 90vw;
 }
 
+/* ── Keyboard Shortcuts Help Overlay ───────────────────────────────────── */
+.shortcuts-dialog {
+    max-width: 560px;
+    min-width: 320px;
+    width: 94vw;
+}
+
+.shortcuts-close-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    line-height: 1;
+    padding: 0 0.25rem;
+    cursor: pointer;
+}
+
+.shortcuts-close-btn:hover {
+    color: var(--text-primary);
+}
+
+.shortcuts-platform-note {
+    font-size: 0.73rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    opacity: 0.8;
+}
+
+.shortcuts-body {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.shortcuts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.shortcuts-section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--church-gold);
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.2rem;
+}
+
+.shortcuts-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.3rem 0.6rem;
+}
+
+.shortcuts-keys {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex-wrap: nowrap;
+}
+
+.shortcuts-dialog kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-input, #1a1a2e);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15rem 0.45rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    box-shadow: 0 1px 0 var(--border);
+}
+
+.shortcuts-grid span {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 480px) {
+    .shortcuts-dialog {
+        width: 98vw;
+        padding: 1rem;
+    }
+    .shortcuts-grid {
+        gap: 0.2rem 0.3rem;
+    }
+}
+
 .intro-body-wrap {
     position: relative;
 }

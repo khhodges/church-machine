@@ -595,6 +595,16 @@ function init() {
         }
     });
 
+    // "?" — open keyboard shortcuts help overlay (only when not in a text field)
+    document.addEventListener('keydown', function _shortcutsHelpKey(e) {
+        if (e.key !== '?' && !(e.key === '/' && (e.ctrlKey || e.metaKey))) return;
+        const tag = document.activeElement ? document.activeElement.tagName : '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' ||
+            (document.activeElement && document.activeElement.isContentEditable)) return;
+        e.preventDefault();
+        openShortcutsHelp();
+    });
+
     requestAnimationFrame(() => {
         updateDashboard();
         pipelineViz.render();
@@ -605,6 +615,30 @@ function init() {
         // Do NOT call resetSim() here — the fetch hasn't returned yet and the
         // stale sticky-patch eviction hasn't happened.
     });
+}
+
+function openShortcutsHelp() {
+    const modal = document.getElementById('shortcutsModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.addEventListener('keydown', _shortcutsEscHandler, true);
+    const closeBtn = modal.querySelector('.shortcuts-close-btn');
+    if (closeBtn) closeBtn.focus();
+}
+
+function closeShortcutsHelp() {
+    const modal = document.getElementById('shortcutsModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    document.removeEventListener('keydown', _shortcutsEscHandler, true);
+}
+
+function _shortcutsEscHandler(e) {
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeShortcutsHelp();
+    }
 }
 
 function initTooltipAutoFlip() {
