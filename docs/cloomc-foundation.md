@@ -318,13 +318,25 @@ There are no other configuration parameters.
 - **limit17** (17 bits) caps the pool at 131,071 words — enough headroom above
   the Ti60's 64 KB to make the Ti60 a clean subset, not a tight fit.
 
-### The Three LUMPs
+### LUMP Types
 
-| Slot | LUMP | What the programmer decides |
-|------|------|-----------------------------|
-| 0 | **NS LUMP** | Size; header encodes `totalNamespaceWords` — the board's physical memory envelope. Everything else about the address space follows from this one value. |
-| 1 | **Thread LUMP** | Any size desired. Heap and stack regions are declared inside the lump to whatever depth the application requires. |
-| 2 | **Application LUMP** | Size determined by the abstraction's method body and c-list (e.g. Ethernet Locator on XC7A100T, UART Locator on Tang Nano 20K). |
+The `typ` field (bits [9:8] of the header word) identifies one of three LUMP types:
+
+| `typ` | Type | What it defines |
+|-------|------|-----------------|
+| `00` | **Abstraction** | Executable CLOOMC code body + freespace + GT c-list |
+| `01` | **Namespace object** | Memory size and namespace size |
+| `10` | **Thread** | Stack size and heap size |
+
+### The Three Foundation LUMPs
+
+One of each type, in slot order:
+
+| Slot | `typ` | LUMP | Programmer decides |
+|------|-------|------|--------------------|
+| 0 | `01` | **NS LUMP** | `totalNamespaceWords` — the board's physical memory envelope; everything else follows from this one value |
+| 1 | `10` | **Thread LUMP** | Any stack and heap size desired |
+| 2 | `00` | **Application LUMP** | Method body and c-list (e.g. Ethernet Locator on XC7A100T, UART Locator on Tang Nano 20K) |
 
 ### What Follows Automatically
 
