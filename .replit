@@ -59,6 +59,10 @@ args = "fault-recovery-tests"
 task = "workflow.run"
 args = "catalog-compile-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "version-telemetry-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -179,6 +183,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_catalog_compile.js"
+
+[[workflows.workflow]]
+name = "version-telemetry-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_version_telemetry.py -v"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000
