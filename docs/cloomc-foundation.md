@@ -325,7 +325,7 @@ The `typ` field (bits [9:8] of the header word) identifies one of three LUMP typ
 | `typ` | Type | What it defines |
 |-------|------|-----------------|
 | `00` | **Abstraction** | Executable CLOOMC code body + freespace + GT c-list |
-| `01` | **Namespace object** | Memory size and namespace size |
+| `01` | **Namespace object** *(reserved)* | Memory size and namespace size — not yet implemented |
 | `10` | **Thread** | Stack size and heap size |
 
 ### The Three Foundation LUMPs
@@ -334,7 +334,7 @@ One of each type, in slot order:
 
 | Slot | `typ` | LUMP | Programmer decides |
 |------|-------|------|--------------------|
-| 0 | `01` | **NS LUMP** | `totalNamespaceWords` — the board's physical memory envelope; everything else follows from this one value |
+| 0 | `00` *(01 reserved)* | **NS LUMP** | `totalNamespaceWords` — the board's physical memory envelope; everything else follows from this one value |
 | 1 | `10` | **Thread LUMP** | Any stack and heap size desired |
 | 2 | `00` | **Application LUMP** | Method body and c-list (e.g. Ethernet Locator on XC7A100T, UART Locator on Tang Nano 20K) |
 
