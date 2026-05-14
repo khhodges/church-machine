@@ -477,14 +477,23 @@ Silicon is silicon.
 | 2 | Thread LUMP | Boot execution context; PC, register file, call stack | Yes — logically prior to first instruction |
 | 3 | Application LUMP | First thing the thread calls; content is board-dependent | Yes — the entry point |
 
-On the **XC7A100T** the Application LUMP is the Ethernet abstraction — the
-moment the board is powered, the thread calls Ethernet.Init and begins
-accepting connections from the IDE. Everything else (Memory Manager, Mint,
-Navana, the full catalogue) arrives via lazy load over the Ethernet
-connection.
+On the **XC7A100T** the Application LUMP is the **Locator** — a CLOOMC
+abstraction that runs on the FPGA itself, not on the IDE server. The Locator
+holds three capabilities in its C-list: an Ethernet GT (for network I/O), a
+Mint GT (for installing fetched LUMPs), and a NamespaceWrite GT (for
+promoting Outform NS entries to Live). The moment the board is powered, the
+thread calls the Locator, which opens the Ethernet link to the IDE. Everything
+else (Memory Manager, Mint, Navana, the full catalogue) arrives via lazy load
+over that Ethernet connection.
+
+The Ethernet abstraction (NS slot 51) is the transport layer the Locator
+uses — a separate, lower-level CLOOMC abstraction that wraps the RMII PHY
+hardware on the QMTECH Wukong board. The Locator calls Ethernet.Send /
+Ethernet.Receive; the Ethernet abstraction talks to the silicon.
 
 On the **Tang Nano 20K** the transport is UART, and the Application LUMP
-is the UART bridge abstraction.
+is the UART Locator abstraction — structurally identical to the XC7A100T
+Locator but holding a UART GT instead of an Ethernet GT.
 
 ### Why This Is Correct
 
@@ -534,8 +543,10 @@ network is the library.
 > 4-region demo layout (NS 64 w + Thread 256 w + free slot 2 64 w +
 > Boot.Abstr 64 w = 448 words = 0x01C0). Lump sizes are programmer choices,
 > not board choices — a programmer using the same sizes on both boards gets
-> the same `foundation_end`. Once Task #1159 removes free slot 2, the true
-> 3-LUMP foundation_end drops to 0x0180 (384 words) on both boards.
+> the same `foundation_end`. Once Task #1161 removes free slot 2 and
+> implements the clean 3-LUMP boot image, the true 3-LUMP foundation_end
+> drops to 0x0180 (384 words = NS 64 w + Thread 256 w + Application 64 w)
+> on both boards.
 
 ### Why limit17 Matters
 
