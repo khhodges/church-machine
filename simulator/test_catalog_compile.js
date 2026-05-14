@@ -14,6 +14,7 @@
 const fs   = require('fs');
 const path = require('path');
 const vm   = require('vm');
+const { BRANCH_OPCODE } = require('./lump_assembler.js');
 
 // ── Counters ───────────────────────────────────────────────────────────────────
 let pass = 0;
@@ -431,16 +432,20 @@ console.log('\n--- T7: _assembleLumpFromCatalog word count for 2-method abstract
     check('T7b: word count (excl header) = N + bodyLen',
           stored !== null && stored.length === N + bodyLen);  // 7
 
-    // Verify method table entries — each points to the start of the body
-    // (1-indexed word address within the lump).
-    // method 0 body starts at lump-word 1 + N = 3 → methodTable[0] = 3 + 1 = 4? 
-    // Actually: bodyOffset starts at N, body0 at offset N → lump word N+1 (1-indexed).
-    //   methodTable[0] = bodyOffset + 1 = N + 1 = 3
-    //   methodTable[1] = N + 1 + words1.length = 3 + 3 = 6
+    // Verify method table entries — each is a BRANCH word (opcode 17).
+    // Body offsets (lump-relative 0-indexed PC, table occupies PCs 0..N-1):
+    //   body0 starts at PC N=2, body1 starts at PC N+words1.length=5
+    // BRANCH word i encodes branchOffset = bodyOffset_i - i (PC-relative).
+    //   entry 0: branchOffset = 2 - 0 = 2 → word = (BRANCH_OPCODE << 27) | 2
+    //   entry 1: branchOffset = 5 - 1 = 4 → word = (BRANCH_OPCODE << 27) | 4
+    const body0PC = N;                                 // 2
+    const body1PC = N + words1.length;                 // 5
+    const entry0  = ((BRANCH_OPCODE << 27) | (body0PC - 0)) >>> 0;
+    const entry1  = ((BRANCH_OPCODE << 27) | (body1PC - 1)) >>> 0;
     check('T7c: method table entry 0 points past header+table',
-          stored[0] === N + 1);           // lump word 3 (1-indexed)
+          stored[0] === entry0);
     check('T7d: method table entry 1 follows body of method 0',
-          stored[1] === N + 1 + words1.length);  // lump word 6
+          stored[1] === entry1);
 
     // Verify body words are present in order after the table.
     check('T7e: first word of method 0 body at table offset',

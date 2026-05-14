@@ -304,6 +304,8 @@ function showLumpDetail(token) {
         const _srcAbsIdx = _srcAbs ? _srcAbs.index : null;
         const _srcMethods = _srcAbs ? (_srcAbs.methods || []) : [];
         const _srcAnnotate = typeof _annotateAbsCodeHtml === 'function' ? _annotateAbsCodeHtml : e;
+        const _srcStaticExamples = (typeof getMethodExamples === 'function' && _srcAbs)
+            ? getMethodExamples(_srcAbs) : {};
         const _srcFmtTs = ts => {
             if (!ts) return '\u2014';
             const d = new Date(ts);
@@ -316,17 +318,24 @@ function showLumpDetail(token) {
             for (const mName of _srcMethods) {
                 const mKey = `${_srcAbsIdx}:${mName}`;
                 const md = _umd[mKey] || {};
+                const _staticEx = _srcStaticExamples[mName] || null;
+                const _srcText = md.example || _staticEx;
                 _srcHtml += `<div class="lump-source-method">`;
                 _srcHtml += `<div class="lump-source-method-name">${e(mName)}</div>`;
-                if (md.example) {
-                    _srcHtml += `<pre class="abs-method-panel-code">${_srcAnnotate(md.example)}</pre>`;
+                if (_srcText) {
+                    _srcHtml += `<pre class="abs-method-panel-code">${_srcAnnotate(_srcText)}</pre>`;
                     _srcHtml += `<div class="lump-source-meta">`;
                     if (md.compileError) {
                         _srcHtml += `<span class="lump-source-status-error">\u2022Error</span> \u2014 ${e(md.compileError.split('\n')[0])}`;
                     } else if (md.compiled && md.compiled.length > 0) {
                         _srcHtml += `<span class="lump-source-status-compiled">\u2022Compiled</span> \u2014 ${md.compiled.length} word${md.compiled.length !== 1 ? 's' : ''}, ${e(md.compiledLang || 'unknown')}, ${e(_srcFmtTs(md.compiledAt))}`;
                     } else {
-                        _srcHtml += `<span class="lump-source-status-pseudo">\u2022Pseudo</span> \u2014 source stored, not yet compiled`;
+                        _srcHtml += `<span class="lump-source-status-pseudo">\u2022Pseudo</span>`;
+                        if (md.example) {
+                            _srcHtml += ` \u2014 source stored, not yet compiled`;
+                        } else {
+                            _srcHtml += ` \u2014 built-in example`;
+                        }
                     }
                     _srcHtml += `</div>`;
                 } else {
