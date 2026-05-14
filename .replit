@@ -55,6 +55,10 @@ args = "lump-consistency"
 task = "workflow.run"
 args = "fault-recovery-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "catalog-compile-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -164,6 +168,17 @@ args = "node simulator/test_fault_recovery.js"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "catalog-compile-tests"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_catalog_compile.js"
 
 [[ports]]
 localPort = 5000
