@@ -690,16 +690,57 @@
     flex-direction: column;
 }
 .lump-source-method {
-    padding: 0.7rem 1rem 0.65rem;
     border-bottom: 1px solid rgba(100, 160, 255, 0.10);
 }
 .lump-source-method:last-child { border-bottom: none; }
+.lump-source-method-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 1rem 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 0.5rem;
+}
+.lump-source-method-header:hover {
+    background: rgba(200, 168, 75, 0.07);
+}
 .lump-source-method-name {
     font-size: 0.73rem;
     font-weight: 700;
     color: var(--church-gold, #c8a84b);
     letter-spacing: 0.4px;
-    margin-bottom: 0.45rem;
+    flex: 1;
+}
+.lump-source-method-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+.lump-source-edit-btn {
+    background: none;
+    border: 1px solid rgba(200, 168, 75, 0.35);
+    color: var(--church-gold, #c8a84b);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.72rem;
+    cursor: pointer;
+    line-height: 1.4;
+    opacity: 0.75;
+    transition: opacity 0.15s, background 0.15s;
+}
+.lump-source-edit-btn:hover {
+    opacity: 1;
+    background: rgba(200, 168, 75, 0.15);
+}
+.lump-source-chevron {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    width: 0.9rem;
+    text-align: center;
+}
+.lump-source-method-body {
+    padding: 0 1rem 0.65rem;
 }
 .lump-source-meta {
     font-size: 0.67rem;

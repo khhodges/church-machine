@@ -315,13 +315,29 @@ function showLumpDetail(token) {
         let _srcHtml = `<div class="lump-tab-panel" id="lumpTabSource_${_tk}"><div class="lump-source-panel">`;
         if (_srcAbsIdx !== null && _srcMethods.length > 0) {
             const _umd = (typeof userMethodData !== 'undefined' && userMethodData) ? userMethodData : {};
-            for (const mName of _srcMethods) {
+            _srcMethods.forEach((mName, _mi) => {
                 const mKey = `${_srcAbsIdx}:${mName}`;
                 const md = _umd[mKey] || {};
                 const _staticEx = _srcStaticExamples[mName] || null;
                 const _srcText = md.example || _staticEx;
+                const _bodyId = `lumpSrcBody_${_tk}_${_mi}`;
+                const _open = _mi === 0;
+                // Status badge for header
+                let _hdrBadge;
+                if (md.compileError)                          _hdrBadge = `<span class="lump-source-status-error">\u2022Error</span>`;
+                else if (md.compiled && md.compiled.length)   _hdrBadge = `<span class="lump-source-status-compiled">\u2022Compiled</span>`;
+                else                                          _hdrBadge = `<span class="lump-source-status-pseudo">\u2022Pseudo</span>`;
                 _srcHtml += `<div class="lump-source-method">`;
-                _srcHtml += `<div class="lump-source-method-name">${e(mName)}</div>`;
+                // ── Clickable header row ─────────────────────────────────
+                _srcHtml += `<div class="lump-source-method-header" onclick="_lumpSrcToggle('${_bodyId}',this)">`;
+                _srcHtml += `<span class="lump-source-method-name">${e(mName)}</span>`;
+                _srcHtml += `<div class="lump-source-method-actions">`;
+                _srcHtml += `${_hdrBadge}`;
+                _srcHtml += `<button class="lump-source-edit-btn" title="Open in editor" onclick="event.stopPropagation();_lumpSrcEditMethod(${_srcAbsIdx},'${mName.replace(/'/g,"\\'")}')">\u270f</button>`;
+                _srcHtml += `<span class="lump-source-chevron">${_open ? '\u25bc' : '\u25b6'}</span>`;
+                _srcHtml += `</div></div>`;
+                // ── Collapsible body ─────────────────────────────────────
+                _srcHtml += `<div class="lump-source-method-body" id="${_bodyId}"${_open ? '' : ' style="display:none"'}>`;
                 if (_srcText) {
                     _srcHtml += `<pre class="abs-method-panel-code">${_srcAnnotate(_srcText)}</pre>`;
                     _srcHtml += `<div class="lump-source-meta">`;
@@ -331,15 +347,11 @@ function showLumpDetail(token) {
                         _srcHtml += `<span class="lump-source-status-compiled">\u2022Compiled</span> \u2014 ${md.compiled.length} word${md.compiled.length !== 1 ? 's' : ''}, ${e(md.compiledLang || 'unknown')}, ${e(_srcFmtTs(md.compiledAt))}`;
                     } else {
                         _srcHtml += `<span class="lump-source-status-pseudo">\u2022Pseudo</span>`;
-                        if (md.example) {
-                            _srcHtml += ` \u2014 source stored, not yet compiled`;
-                        } else {
-                            _srcHtml += ` \u2014 built-in example`;
-                        }
+                        _srcHtml += md.example ? ` \u2014 source stored, not yet compiled` : ` \u2014 built-in example`;
                     }
                     _srcHtml += `</div>`;
                 } else {
-                    _srcHtml += `<div class="lump-source-empty">No source yet \u2014 open this method in the editor to add code.</div>`;
+                    _srcHtml += `<div class="lump-source-empty">No source yet \u2014 click \u270f to open in the editor.</div>`;
                 }
                 const hist = md.history || [];
                 if (hist.length > 0) {
@@ -358,8 +370,9 @@ function showLumpDetail(token) {
                     });
                     _srcHtml += `</div>`;
                 }
-                _srcHtml += `</div>`;
-            }
+                _srcHtml += `</div>`; // close body
+                _srcHtml += `</div>`; // close method
+            });
         } else if (_srcAbsIdx === null) {
             _srcHtml += `<div class="lump-source-empty lump-source-empty-pad">No abstraction registry entry found for \u201c${e(lump.abstraction || '')}\u201d \u2014 open the Abstractions view and add methods to see source here.</div>`;
         } else {
@@ -809,6 +822,44 @@ async function _populateLumpSourceTab(lump) {
     } catch (err) {
         el.innerHTML = `<div class="lump-source-status err">Error loading source: ${e(err.message)}</div>`;
     }
+}
+
+// Toggle a Source-tab method body open/closed
+function _lumpSrcToggle(bodyId, headerEl) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const open = body.style.display === 'none';
+    body.style.display = open ? '' : 'none';
+    const chev = headerEl && headerEl.querySelector('.lump-source-chevron');
+    if (chev) chev.textContent = open ? '\u25bc' : '\u25b6';
+}
+
+// Open a LUMP method in the assembly editor (without requiring Abstractions tab DOM)
+function _lumpSrcEditMethod(absIdx, mName) {
+    const key = `${absIdx}:${mName}`;
+    const abs = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
+        ? abstractionRegistry.getAbstraction(absIdx) : null;
+    let code;
+    if (userMethodData && userMethodData[key] && userMethodData[key].example) {
+        code = userMethodData[key].example;
+    } else {
+        const examples = (abs && typeof getMethodExamples === 'function')
+            ? getMethodExamples(abs) : {};
+        code = (examples && examples[mName])
+            || `; ${abs ? abs.name + '.' : ''}${mName}\n; Write CLOOMC++ assembly here and click Compile & Save.\n`;
+    }
+    if (typeof switchView === 'function') switchView('editor');
+    const sel = document.getElementById('langSelector');
+    if (sel) sel.value = 'assembly';
+    const asmEd = document.getElementById('asmEditor');
+    if (asmEd) {
+        asmEd.value = code;
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+    }
+    const outEl = document.getElementById('assemblyOutput');
+    if (outEl) outEl.innerHTML = '';
+    window._pseudoEditContext = { absIdx: absIdx, methodName: mName };
+    if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
 }
 
 function _lumpSourceProxyEdit(fn) {
