@@ -13,7 +13,13 @@
   "version": "",
   "methods": [],
   "capabilities": [
-    {"name": "LED0", "grants": ["R", "W"]}
+    {
+      "name": "LED0",
+      "grants": [
+        "R",
+        "W"
+      ]
+    }
   ],
   "pet_names": {
     "DR": {},
@@ -35,5 +41,6 @@
   },
   "grants": [
     "E"
-  ]
+  ],
+  "lump_version": 0
 }

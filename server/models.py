@@ -70,6 +70,13 @@ def register_models(db):
         fault_nia = Column(Integer, nullable=False, default=0)
         boot_reason = Column(Integer, default=0)
         timestamp = Column(Float, default=0.0)
+        lump_token = Column(String(16), default=None)
+        lump_version = Column(Integer, default=0)
+        fault_code = Column(String(32), default="")
+        mnemonic = Column(String(32), default="")
+        pipeline_stage = Column(String(32), default="")
+        recovery_tier = Column(Integer, default=0)
+        step_count = Column(Integer, default=0)
 
     class LaunchTest(db.Model):
         __tablename__ = "launch_tests"

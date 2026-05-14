@@ -222,7 +222,11 @@ class TestR6_SidecarMatchesBinary:
 
 
 class TestR7_SidecarMatchesManifest:
-    """R7: sidecar fields agree with manifest where both are present."""
+    """R7: sidecar fields agree with manifest where both are present.
+
+    Checked fields: cw, cc, lump_size, ns_slot, abstraction, lump_version.
+    lump_version is the integer LUMP version (0 = system baseline, 1+ = user-compiled).
+    """
 
     @pytest.mark.parametrize("entry", MANIFEST, ids=lambda e: e["token"])
     def test_sidecar_vs_manifest(self, entry):
@@ -230,7 +234,7 @@ class TestR7_SidecarMatchesManifest:
         sc = _load_sidecar(token)
         if sc is None:
             return
-        for field in ("cw", "cc", "lump_size", "ns_slot", "abstraction"):
+        for field in ("cw", "cc", "lump_size", "ns_slot", "abstraction", "lump_version"):
             m_val = entry.get(field)
             s_val = sc.get(field)
             if m_val is not None and s_val is not None:

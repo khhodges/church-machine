@@ -310,6 +310,115 @@ def _get_test_results():
     return results
 
 
+def _get_version_telemetry(db_path):
+    """Return per-abstraction version summary for the daily report.
+
+    For each abstraction that has more than one LUMP version recorded in the
+    manifest, returns: abstraction name, current (max) version, prior version
+    fault rate vs current, device count on older versions.
+    """
+    import json as _json
+
+    _lumps_dir = os.path.join(_SERVER_DIR, "lumps")
+    _manifest_path = os.path.join(_lumps_dir, "manifest.json")
+    try:
+        with open(_manifest_path) as _f:
+            _manifest = _json.load(_f)
+    except Exception:
+        return []
+
+    by_abstraction = {}
+    for entry in _manifest:
+        abs_name = entry.get("abstraction") or ""
+        if not abs_name:
+            continue
+        ver = entry.get("lump_version")
+        if ver is None:
+            continue
+        by_abstraction.setdefault(abs_name, []).append({
+            "token": entry.get("token", ""),
+            "lump_version": int(ver),
+        })
+
+    summaries = []
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        for abs_name, versions in sorted(by_abstraction.items()):
+            if len(versions) < 2:
+                continue
+            versions_sorted = sorted(versions, key=lambda v: v["lump_version"])
+            current = versions_sorted[-1]
+            prior = versions_sorted[-2]
+
+            def _token_stats(tok):
+                try:
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT COUNT(*), SUM(step_count), recovery_tier "
+                        "FROM fault_events WHERE lump_token=? "
+                        "GROUP BY recovery_tier", (tok,)
+                    )
+                    rows = cur.fetchall()
+                    total_faults = 0
+                    total_steps = 0
+                    tier3 = 0
+                    unrecovered = 0
+                    for r in rows:
+                        cnt = r[0] or 0
+                        steps = r[1] or 0
+                        rt = r[2]
+                        total_faults += cnt
+                        total_steps += steps
+                        if rt == 3:
+                            tier3 += cnt
+                        elif rt not in (1, 2, 3):
+                            unrecovered += cnt
+                    rate = (total_faults / total_steps) if total_steps > 0 else 0.0
+                    if unrecovered > 0:
+                        stable_status = "red"
+                    elif tier3 > 0:
+                        stable_status = "amber"
+                    else:
+                        stable_status = "stable"
+                    return {"rate": rate, "stable_status": stable_status,
+                            "tier3": tier3, "unrecovered": unrecovered}
+                except Exception:
+                    return {"rate": 0.0, "stable_status": "stable", "tier3": 0, "unrecovered": 0}
+
+            cur_stats = _token_stats(current["token"])
+            prior_stats = _token_stats(prior["token"])
+            cur_rate = cur_stats["rate"]
+            prior_rate = prior_stats["rate"]
+
+            try:
+                cur2 = conn.cursor()
+                cur2.execute(
+                    "SELECT COUNT(DISTINCT device_uid) FROM device_lump_versions "
+                    "WHERE abstraction_name=? AND lump_version < ?",
+                    (abs_name, current["lump_version"])
+                )
+                row2 = cur2.fetchone()
+                older_device_count = row2[0] if row2 else 0
+            except Exception:
+                older_device_count = 0
+
+            summaries.append({
+                "abstraction": abs_name,
+                "current_version": current["lump_version"],
+                "prior_version": prior["lump_version"],
+                "current_fault_rate": cur_rate,
+                "prior_fault_rate": prior_rate,
+                "current_stable_status": cur_stats["stable_status"],
+                "older_device_count": older_device_count,
+            })
+        conn.close()
+    except Exception as exc:
+        log.debug("_get_version_telemetry error: %s", exc)
+
+    return summaries
+
+
 def _get_ti60_status(db_path):
     """Return Ti60 call-home status from the devices table."""
     try:
@@ -421,6 +530,29 @@ def update_task_status(db_path, task_id, title, status):
         log.warning("Could not update task status: %s", exc)
 
 
+def _format_version_telemetry_plain(version_telemetry):
+    """Format the per-abstraction version summary for the plain-text report."""
+    if not version_telemetry:
+        return "  (no multi-version abstractions recorded yet)"
+    lines = []
+    for s in version_telemetry:
+        abs_name = s["abstraction"]
+        cur_ver = s["current_version"]
+        prior_ver = s["prior_version"]
+        cur_rate = s["current_fault_rate"]
+        prior_rate = s["prior_fault_rate"]
+        older = s["older_device_count"]
+        rate_str = f"{cur_rate*1000:.4f}/1k steps" if cur_rate > 0 else "0 (no faults)"
+        prior_str = f"{prior_rate*1000:.4f}/1k steps" if prior_rate > 0 else "0"
+        stable_status = s.get("current_stable_status", "stable")
+        stable_tag = {"stable": "STABLE", "amber": "AMBER", "red": "RED"}.get(stable_status, "STABLE")
+        older_str = f"{older} device(s) on older version(s)" if older > 0 else "all devices on current"
+        lines.append(
+            f"  {abs_name}: v{cur_ver} [{stable_tag}] (rate={rate_str}) vs v{prior_ver} prior (rate={prior_str}) | {older_str}"
+        )
+    return "\n".join(lines)
+
+
 def generate_report(db_path):
     """
     Build the daily report.
@@ -434,6 +566,7 @@ def generate_report(db_path):
     test_results = _get_test_results()
     ti60 = _get_ti60_status(db_path)
     cost = _get_cost_summary(db_path)
+    version_telemetry = _get_version_telemetry(db_path)
 
     cost_today = cost["cost_today"]
     cost_month = cost["cost_month"]
@@ -494,6 +627,9 @@ Generated: {now_utc.strftime('%Y-%m-%d %H:%M')} UTC
   Estimated cost this month:   ${cost_month:.2f}
   Replit billing dashboard:    {BILLING_URL}
 
+7. LUMP VERSION SUMMARY
+{_format_version_telemetry_plain(version_telemetry)}
+
 {'='*60}
 This report is sent automatically at 05:00 UTC every day.
 """
@@ -537,6 +673,49 @@ This report is sent automatically at 05:00 UTC every day.
         )
     else:
         ti60_html = "<p><em>Not yet connected &mdash; Stage 2 bitstream not yet flashed</em></p>"
+
+    def _version_telemetry_html(vt, h):
+        if not vt:
+            return "<p><em>No multi-version abstractions recorded yet.</em></p>"
+        rows = []
+        STABLE_COLORS = {"stable": "#2e7d32", "amber": "#e65100", "red": "#c62828"}
+        for s in vt:
+            cur_ver = s["current_version"]
+            prior_ver = s["prior_version"]
+            cur_rate = s["current_fault_rate"]
+            prior_rate = s["prior_fault_rate"]
+            older = s["older_device_count"]
+            cur_per1k = f"{cur_rate*1000:.4f}/1k" if cur_rate > 0 else "0"
+            prior_per1k = f"{prior_rate*1000:.4f}/1k" if prior_rate > 0 else "0"
+            stable_status_html = s.get("current_stable_status", "stable")
+            _sb_colors = {"stable": "#2e7d32", "amber": "#e65100", "red": "#c62828"}
+            _sb_icons = {"stable": "&#10003;", "amber": "&#9888;", "red": "&#10007;"}
+            _sb_labels = {"stable": "STABLE", "amber": "AMBER", "red": "RED"}
+            stable_badge = (
+                f"<span style='color:{_sb_colors.get(stable_status_html,'#2e7d32')};font-weight:600'>"
+                f"{_sb_icons.get(stable_status_html,'&#10003;')} "
+                f"{_sb_labels.get(stable_status_html,'STABLE')}</span>"
+            )
+            trend = ""
+            if prior_rate > 0 and cur_rate < prior_rate:
+                trend = " <span style='color:#2e7d32'>&darr; improved</span>"
+            elif prior_rate > 0 and cur_rate > prior_rate:
+                trend = " <span style='color:#c62828'>&uarr; worse</span>"
+            older_str = f"{older} on older" if older > 0 else "all current"
+            rows.append(
+                f"<tr><td><strong>{h(s['abstraction'])}</strong></td>"
+                f"<td>v{cur_ver}</td><td>{stable_badge}</td>"
+                f"<td>{h(cur_per1k)}{trend}</td>"
+                f"<td>v{prior_ver} &rarr; {h(prior_per1k)}</td>"
+                f"<td>{h(older_str)}</td></tr>"
+            )
+        header = (
+            "<table><thead><tr>"
+            "<th>Abstraction</th><th>Current Ver</th><th>Stable?</th>"
+            "<th>Faults/1k steps</th><th>Prior Rate</th><th>Devices</th>"
+            "</tr></thead><tbody>"
+        )
+        return header + "\n".join(rows) + "</tbody></table>"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -602,6 +781,9 @@ This report is sent automatically at 05:00 UTC every day.
   <span class="cost-label">Replit billing dashboard:</span>
   <span class="cost-value"><a href="{BILLING_URL}">{BILLING_URL}</a></span>
 </div>
+
+<h2>7. LUMP Version Summary</h2>
+{_version_telemetry_html(version_telemetry, _h)}
 
 <div class="footer">
   This report is sent automatically at 05:00 UTC every day.

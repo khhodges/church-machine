@@ -3141,10 +3141,6 @@ def save_lump():
         "grants": metadata.get("grants", ["E"])
     }
 
-    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
-    with open(sidecar_path, 'w') as fh:
-        json.dump(sidecar, fh, indent=2)
-
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     manifest = []
     if os.path.isfile(manifest_path):
@@ -3156,18 +3152,48 @@ def save_lump():
 
     manifest = [e for e in manifest if e.get('token') != token8]
 
-    manifest.append({
-        "token":       token8,
-        "abstraction": abs_name,
-        "ns_slot":     ns_slot,
-        "lump_size":   len(words),
-        "cw":          sidecar["cw"],
-        "cc":          sidecar["cc"],
-        "author":      sidecar.get("author", ""),
-        "version":     sidecar.get("version", ""),
-        "methods":     sidecar["methods"],
-        "grants":      sidecar["grants"]
-    })
+    existing_versions_for_abs = [
+        int(e.get("lump_version", 0))
+        for e in manifest
+        if e.get("abstraction") == abs_name and e.get("lump_version") is not None
+    ]
+    next_lump_version = (max(existing_versions_for_abs) + 1) if existing_versions_for_abs else 1
+
+    sidecar["lump_version"] = next_lump_version
+
+    import time as _time_save
+    _compiled_at = _time_save.time()
+    sidecar["compiled_at"] = _compiled_at
+
+    sidecar_path = os.path.join(lumps_dir, f'{token8}.json')
+    with open(sidecar_path, 'w') as fh:
+        json.dump(sidecar, fh, indent=2)
+
+    vg_key = f"compiled_{abs_name.lower().replace(' ', '_')}"
+    if ns_slot is not None:
+        for prev_entry in manifest:
+            if (prev_entry.get("abstraction") == abs_name
+                    and prev_entry.get("ns_slot") == ns_slot
+                    and not prev_entry.get("variant_group")):
+                prev_entry["variant_group"] = vg_key
+
+    new_entry = {
+        "token":         token8,
+        "abstraction":   abs_name,
+        "ns_slot":       ns_slot,
+        "lump_size":     len(words),
+        "cw":            sidecar["cw"],
+        "cc":            sidecar["cc"],
+        "author":        sidecar.get("author", ""),
+        "version":       sidecar.get("version", ""),
+        "lump_version":  next_lump_version,
+        "compiled_at":   _compiled_at,
+        "methods":       sidecar["methods"],
+        "grants":        sidecar["grants"],
+    }
+    if ns_slot is not None:
+        new_entry["variant_group"] = vg_key
+    manifest.append(new_entry)
 
     with open(manifest_path, 'w') as fh:
         json.dump(manifest, fh, indent=2)
@@ -4526,6 +4552,33 @@ def device_register():
     _run_hello_mum_flow(dev)
     db.session.commit()
 
+    lump_versions_inline = data.get("lump_versions")
+    if isinstance(lump_versions_inline, list):
+        from sqlalchemy import text as _sa_text_reg
+        _ts_reg = _time.time()
+        for entry in lump_versions_inline:
+            if not isinstance(entry, dict):
+                continue
+            _abs = str(entry.get("abstraction_name", "")).strip()
+            _tok = str(entry.get("lump_token", "")).strip()
+            try:
+                _ver = int(entry.get("lump_version", 0))
+            except (ValueError, TypeError):
+                _ver = 0
+            if not _abs or not _tok:
+                continue
+            db.session.execute(_sa_text_reg("""
+                INSERT INTO device_lump_versions
+                    (device_uid, abstraction_name, lump_token, lump_version, deployed_at)
+                VALUES (:uid, :abs, :tok, :ver, :ts)
+                ON CONFLICT(device_uid, abstraction_name) DO UPDATE SET
+                    lump_token=excluded.lump_token,
+                    lump_version=excluded.lump_version,
+                    deployed_at=excluded.deployed_at
+            """), {"uid": uid, "abs": _abs, "tok": _tok, "ver": _ver, "ts": _ts_reg})
+        db.session.commit()
+        logging.info("Inline lump_versions recorded for device=%s count=%d", uid, len(lump_versions_inline))
+
     logging.info("Device registered: %s (%s) via %s:%s tunnel=%s",
                  uid, dev.board_name, bridge_host, bridge_port, dev.tunnel_status)
     return jsonify({
@@ -4600,6 +4653,315 @@ def device_list():
         })
     db.session.commit()
     return jsonify({"ok": True, "devices": result})
+
+
+@app.route("/api/device/fault", methods=["POST"])
+def device_fault_submit():
+    """Accept a detailed fault telemetry record from a device.
+
+    Body fields (all optional except device_uid):
+      device_uid, lump_token, lump_version, fault_code, mnemonic,
+      pipeline_stage, recovery_tier, instruction_address (=fault_nia),
+      step_count
+    """
+    data = request.get_json(silent=True) or {}
+    uid = data.get("device_uid", "").strip()
+    if not uid:
+        return jsonify({"ok": False, "error": "missing device_uid"}), 400
+    now = _time.time()
+    try:
+        fault_nia = int(data.get("instruction_address", data.get("fault_nia", 0))) & 0xFFFFFFFF
+    except (ValueError, TypeError):
+        fault_nia = 0
+    try:
+        fault_type = int(data.get("fault_type", 0)) & 0xFF
+    except (ValueError, TypeError):
+        fault_type = 0
+    try:
+        lump_version = int(data.get("lump_version", 0))
+    except (ValueError, TypeError):
+        lump_version = 0
+    try:
+        recovery_tier = int(data.get("recovery_tier", data.get("tier", 0)))
+    except (ValueError, TypeError):
+        recovery_tier = 0
+    try:
+        step_count = int(data.get("step_count", 0))
+    except (ValueError, TypeError):
+        step_count = 0
+    fe = FaultEvent(
+        device_uid=uid,
+        fault_type=fault_type,
+        fault_nia=fault_nia,
+        boot_reason=0,
+        timestamp=now,
+        lump_token=data.get("lump_token", None),
+        lump_version=lump_version,
+        fault_code=str(data.get("fault_code", ""))[:32],
+        mnemonic=str(data.get("mnemonic", ""))[:32],
+        pipeline_stage=str(data.get("pipeline_stage", ""))[:32],
+        recovery_tier=recovery_tier,
+        step_count=step_count,
+    )
+    db.session.add(fe)
+    db.session.commit()
+    logging.info("Fault telemetry: device=%s token=%s ver=%s tier=%s nia=0x%08X",
+                 uid, fe.lump_token, lump_version, recovery_tier, fault_nia)
+    return jsonify({"ok": True, "id": fe.id})
+
+
+@app.route("/api/device/lump-versions", methods=["POST"])
+def device_lump_versions_update():
+    """Record the currently deployed LUMP token+version for each abstraction on a device.
+
+    Body: { device_uid, lumps: [{abstraction_name, lump_token, lump_version}] }
+    """
+    data = request.get_json(silent=True) or {}
+    uid = data.get("device_uid", "").strip()
+    if not uid:
+        return jsonify({"ok": False, "error": "missing device_uid"}), 400
+    lumps = data.get("lumps", [])
+    now = _time.time()
+    from sqlalchemy import text as _sa_text2
+    for entry in lumps:
+        abs_name = str(entry.get("abstraction_name", "")).strip()
+        token = str(entry.get("lump_token", "")).strip()
+        try:
+            ver = int(entry.get("lump_version", 0))
+        except (ValueError, TypeError):
+            ver = 0
+        if not abs_name or not token:
+            continue
+        db.session.execute(_sa_text2("""
+            INSERT INTO device_lump_versions (device_uid, abstraction_name, lump_token, lump_version, deployed_at)
+            VALUES (:uid, :abs, :tok, :ver, :ts)
+            ON CONFLICT(device_uid, abstraction_name) DO UPDATE SET
+                lump_token=excluded.lump_token,
+                lump_version=excluded.lump_version,
+                deployed_at=excluded.deployed_at
+        """), {"uid": uid, "abs": abs_name, "tok": token, "ver": ver, "ts": now})
+    db.session.commit()
+    return jsonify({"ok": True, "updated": len(lumps)})
+
+
+@app.route("/api/device/upgrade-lump", methods=["POST"])
+def device_upgrade_lump():
+    """Record that a device has been upgraded to a new LUMP version.
+
+    Body: { device_uid, abstraction_name, lump_token, lump_version }
+    This is an operator action (no forced push); it just updates the registry.
+    """
+    data = request.get_json(silent=True) or {}
+    uid = data.get("device_uid", "").strip()
+    abs_name = str(data.get("abstraction_name", "")).strip()
+    token = str(data.get("lump_token", "")).strip()
+    try:
+        ver = int(data.get("lump_version", 0))
+    except (ValueError, TypeError):
+        ver = 0
+    if not uid or not abs_name or not token:
+        return jsonify({"ok": False, "error": "missing required fields"}), 400
+    now = _time.time()
+    from sqlalchemy import text as _sa_text3
+    db.session.execute(_sa_text3("""
+        INSERT INTO device_lump_versions (device_uid, abstraction_name, lump_token, lump_version, deployed_at)
+        VALUES (:uid, :abs, :tok, :ver, :ts)
+        ON CONFLICT(device_uid, abstraction_name) DO UPDATE SET
+            lump_token=excluded.lump_token,
+            lump_version=excluded.lump_version,
+            deployed_at=excluded.deployed_at
+    """), {"uid": uid, "abs": abs_name, "tok": token, "ver": ver, "ts": now})
+    db.session.commit()
+    logging.info("Upgrade recorded: device=%s abstraction=%s token=%s ver=%s", uid, abs_name, token, ver)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/device/bulk-upgrade-lump", methods=["POST"])
+def device_bulk_upgrade_lump():
+    """Record that ALL devices running an old LUMP version have been upgraded.
+
+    Body: { abstraction_name, from_version, to_token, to_version }
+    Updates every row in device_lump_versions where abstraction_name matches
+    and lump_version == from_version.  Returns the count of updated rows.
+    No forced push — this is purely a registry update.
+    """
+    data = request.get_json(silent=True) or {}
+    abs_name = str(data.get("abstraction_name", "")).strip()
+    to_token = str(data.get("to_token", "")).strip()
+    try:
+        from_version = int(data.get("from_version", -1))
+        to_version = int(data.get("to_version", 0))
+    except (ValueError, TypeError):
+        return jsonify({"ok": False, "error": "invalid version numbers"}), 400
+    if not abs_name or not to_token or from_version < 0:
+        return jsonify({"ok": False, "error": "missing required fields"}), 400
+    if to_version <= from_version:
+        return jsonify({"ok": False, "error": f"to_version ({to_version}) must be greater than from_version ({from_version})"}), 400
+    now = _time.time()
+    from sqlalchemy import text as _sa_text4
+    result = db.session.execute(_sa_text4("""
+        UPDATE device_lump_versions
+        SET lump_token=:tok, lump_version=:to_ver, deployed_at=:ts
+        WHERE abstraction_name=:abs AND lump_version=:from_ver
+    """), {"abs": abs_name, "tok": to_token, "to_ver": to_version,
+           "from_ver": from_version, "ts": now})
+    db.session.commit()
+    updated = result.rowcount if hasattr(result, 'rowcount') else 0
+    logging.info("Bulk upgrade: abstraction=%s from_ver=%s to_ver=%s rows=%s",
+                 abs_name, from_version, to_version, updated)
+    return jsonify({"ok": True, "updated_count": updated})
+
+
+FAULT_RATE_THRESHOLD = 0.001
+
+
+def _compute_version_telemetry(abstraction_name):
+    """Aggregate per-version fault stats for an abstraction.
+
+    Returns list of dicts: version, token, compiled_at, device_count,
+    total_faults, fault_rate, tier1_count, tier2_count, tier3_count,
+    unrecovered_count, mtbf, stable_status.
+    """
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(db_path)
+        conn.row_factory = _sqlite3.Row
+
+        manifest_entries = {}
+        try:
+            with open(LUMPS_MANIFEST_PATH) as _mf:
+                _manifest = json.load(_mf)
+            for e in _manifest:
+                if e.get("abstraction") == abstraction_name:
+                    tok = e.get("token", "")
+                    manifest_entries[tok] = e
+        except Exception:
+            pass
+
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT lump_token, lump_version, recovery_tier, step_count,
+                   COUNT(*) as fault_count
+            FROM fault_events
+            WHERE lump_token IS NOT NULL
+            GROUP BY lump_token, lump_version, recovery_tier
+        """)
+        raw_rows = cur.fetchall()
+
+        ver_data = {}
+        for row in raw_rows:
+            tok = row["lump_token"]
+            ver = row["lump_version"]
+            if tok not in manifest_entries:
+                continue
+            key = (tok, ver)
+            if key not in ver_data:
+                ver_data[key] = {
+                    "lump_token": tok, "lump_version": ver,
+                    "tier1": 0, "tier2": 0, "tier3": 0, "unrecovered": 0,
+                    "total_faults": 0, "total_steps": 0,
+                }
+            d = ver_data[key]
+            tier = row["recovery_tier"]
+            cnt = row["fault_count"]
+            d["total_faults"] += cnt
+            if tier == 1:
+                d["tier1"] += cnt
+            elif tier == 2:
+                d["tier2"] += cnt
+            elif tier == 3:
+                d["tier3"] += cnt
+            else:
+                d["unrecovered"] += cnt
+
+        cur.execute("""
+            SELECT lump_token, lump_version, SUM(step_count) as total_steps
+            FROM fault_events
+            WHERE lump_token IS NOT NULL AND step_count > 0
+            GROUP BY lump_token, lump_version
+        """)
+        for row in cur.fetchall():
+            key = (row["lump_token"], row["lump_version"])
+            if key in ver_data:
+                ver_data[key]["total_steps"] = row["total_steps"] or 0
+
+        cur.execute("""
+            SELECT abstraction_name, lump_token, lump_version, COUNT(*) as dev_count
+            FROM device_lump_versions
+            GROUP BY abstraction_name, lump_token, lump_version
+        """)
+        dev_counts = {}
+        for row in cur.fetchall():
+            dev_counts[(row["lump_token"], row["lump_version"])] = row["dev_count"]
+
+        cur.execute("""
+            SELECT DISTINCT lump_token, lump_version
+            FROM device_lump_versions
+            WHERE abstraction_name = ?
+        """, (abstraction_name,))
+        known_pairs = [(r["lump_token"], r["lump_version"]) for r in cur.fetchall()]
+        conn.close()
+
+        for tok, entry in manifest_entries.items():
+            ver = entry.get("lump_version", 0)
+            key = (tok, ver)
+            if key not in ver_data:
+                ver_data[key] = {
+                    "lump_token": tok, "lump_version": ver,
+                    "tier1": 0, "tier2": 0, "tier3": 0, "unrecovered": 0,
+                    "total_faults": 0, "total_steps": 0,
+                }
+
+        result = []
+        for (tok, ver), d in sorted(ver_data.items(), key=lambda x: x[0][1]):
+            entry = manifest_entries.get(tok, {})
+            total_faults = d["total_faults"]
+            total_steps = d["total_steps"]
+            fault_rate = (total_faults / total_steps) if total_steps > 0 else 0.0
+            tier3 = d["tier3"]
+            unrecovered = d["unrecovered"]
+            if unrecovered > 0:
+                stable_status = "red"
+            elif tier3 > 0:
+                stable_status = "amber"
+            else:
+                stable_status = "stable"
+            device_count = dev_counts.get((tok, ver), 0)
+            compiled_at = (
+                entry.get("compiled_at")
+                or entry.get("deployment", {}).get("built_at")
+            )
+            result.append({
+                "lump_version": ver,
+                "lump_token": tok,
+                "compiled_at": compiled_at,
+                "device_count": device_count,
+                "total_faults": total_faults,
+                "fault_rate": round(fault_rate, 6),
+                "fault_rate_per_1000": round(fault_rate * 1000, 4),
+                "tier1_count": d["tier1"],
+                "tier2_count": d["tier2"],
+                "tier3_count": tier3,
+                "unrecovered_count": unrecovered,
+                "mtbf": round(total_steps / total_faults, 1) if total_faults > 0 else None,
+                "stable_status": stable_status,
+                "production_stable": (
+                    total_faults == 0
+                    or fault_rate < FAULT_RATE_THRESHOLD
+                    or (tier3 == 0 and unrecovered == 0)
+                ),
+            })
+        return result
+    except Exception as exc:
+        logging.warning("_compute_version_telemetry error: %s", exc)
+        return []
+
+
+@app.route("/api/lump/version-telemetry/<abstraction_name>")
+def lump_version_telemetry(abstraction_name):
+    """Return per-version fault telemetry for an abstraction."""
+    data = _compute_version_telemetry(abstraction_name)
+    return jsonify({"ok": True, "abstraction": abstraction_name, "versions": data})
 
 
 @app.route("/api/device/faults")
@@ -4844,6 +5206,35 @@ with app.app_context():
         db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN tunnel_status VARCHAR(16) DEFAULT 'pending'"))
         db.session.commit()
         logging.info("Migrated: added tunnel_status column to devices table")
+
+    _existing_fe_cols = {c["name"] for c in _inspector.get_columns("fault_events")}
+    for _fe_col, _fe_def in [
+        ("lump_token",     "VARCHAR(16) DEFAULT NULL"),
+        ("lump_version",   "INTEGER DEFAULT 0"),
+        ("fault_code",     "VARCHAR(32) DEFAULT ''"),
+        ("mnemonic",       "VARCHAR(32) DEFAULT ''"),
+        ("pipeline_stage", "VARCHAR(32) DEFAULT ''"),
+        ("recovery_tier",  "INTEGER DEFAULT 0"),
+        ("step_count",     "INTEGER DEFAULT 0"),
+    ]:
+        if _fe_col not in _existing_fe_cols:
+            db.session.execute(_sa_text(f"ALTER TABLE fault_events ADD COLUMN {_fe_col} {_fe_def}"))
+            db.session.commit()
+            logging.info("Migrated: added %s column to fault_events table", _fe_col)
+
+    db.session.execute(_sa_text("""
+        CREATE TABLE IF NOT EXISTS device_lump_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_uid TEXT NOT NULL,
+            abstraction_name TEXT NOT NULL,
+            lump_token TEXT NOT NULL,
+            lump_version INTEGER NOT NULL DEFAULT 0,
+            deployed_at REAL NOT NULL DEFAULT 0,
+            UNIQUE(device_uid, abstraction_name)
+        )
+    """))
+    db.session.commit()
+    logging.info("device_lump_versions table ready")
 
     _existing_launch = {t.test_id: t for t in LaunchTest.query.all()}
     for seed_id, seed_name, seed_desc, _auto in LAUNCH_TESTS_SEED:
