@@ -301,102 +301,47 @@ small enough to actually audit.
 
 ---
 
-## 5. Memory Architecture — Decisions and Constraints
+## 5. Memory Architecture
 
-Every value in the boot image is either hardware-forced, an IDE
-(programmer) choice, or a natural consequence of the other two. Confusing
-these categories leads to incorrect implementations. Each is labelled below.
+The memory architecture is defined entirely by the three foundation LUMPs.
+There are no other configuration parameters.
 
-### Hardware-Forced (Cannot Change Without Silicon Revision)
+### Hardware Rules
 
-**Lump sizes are powers of 2, minimum 64 words.**
-*Forcing reason:* The mLoad pipeline computes lump boundaries using bit-shift
-operations, not addition. Shift registers are simpler, smaller, and faster
-than adders. The hardware cannot express "lump starts at 0x0180, ends at
-0x0180 + 73" — it can only express "lump starts at 0x0180, size is 2^n".
-The minimum exponent corresponds to 64 words (n_minus_6 = 0, so n = 6,
-size = 2^6 = 64). This constraint propagates everywhere: every lump must
-be placed at an address that is a multiple of its size (power-of-2
-alignment).
+- **Lump sizes** are powers of 2, minimum 64 words. The mLoad pipeline uses
+  bit-shifts to find lump boundaries — not addition.
+- **NS table** sits at the top of memory: `NS_TABLE_BASE = totalRamWords − 1,024`.
+  The boot ROM computes this without a stored pointer — no chicken-and-egg.
+- **NS_TABLE_RESERVE** = 1,024 words (256 entries × 4 words per entry, wired
+  into the boot ROM).
+- **cc field** (8 bits) limits c-list rows to 255 per lump. It does not limit
+  NS slots — the GT `slot_id` field is 16 bits, allowing up to 65,535 slots.
+- **limit17** (17 bits) caps the pool at 131,071 words — enough headroom above
+  the Ti60's 64 KB to make the Ti60 a clean subset, not a tight fit.
 
-**cc field is 8 bits: maximum 255 c-list rows per lump.**
-*Forcing reason:* The cc (c-list count) field in the lump header is 8 bits
-wide — 8 wires on the gate array. You cannot add a ninth wire without a
-silicon change. This limits a single lump to 255 capability entries in its
-c-list — not the number of NS slots. NS slots are addressed by the GT
-`slot_id` field, which is 16 bits (bits [15:0]), allowing up to 65,535
-distinct NS slots. cc and NS slot count are independent quantities.
+### The Three LUMPs
 
-**limit17 is 17 bits.**
-*Forcing reason:* The mLoad pipeline contains a 17-bit adder that computes
-`base + offset`. The adder is 17 bits wide in the gate array. This means
-the maximum addressable offset from any lump base is 2^17 − 1 = 131,071
-words. This was chosen deliberately to be 17 (not 16) to give headroom above
-the Ti60 F225's 65,536-word address space, making the Ti60 profile a proper
-subset of the hardware's capability rather than a tight fit.
+| Slot | LUMP | What the programmer decides |
+|------|------|-----------------------------|
+| 0 | **NS LUMP** | Size; header encodes `totalNamespaceWords` — the board's physical memory envelope. Everything else about the address space follows from this one value. |
+| 1 | **Thread LUMP** | Any size desired. Heap and stack regions are declared inside the lump to whatever depth the application requires. |
+| 2 | **Application LUMP** | Size determined by the abstraction's method body and c-list (e.g. Ethernet Locator on XC7A100T, UART Locator on Tang Nano 20K). |
 
-**NS table at the top of memory.**
-*Forcing reason:* At cold boot, the processor has no stored pointer to the
-NS table — it has not yet executed any instruction that could have written
-one. The boot ROM computes the NS table address by subtracting
-`NS_TABLE_RESERVE` from the total RAM size. This is possible using only the
-hardware's knowledge of its own memory size (wired into the chip at
-fabrication time). A stored pointer would create a chicken-and-egg problem:
-the pointer would have to live somewhere, and the processor would need a
-capability to reach it before the namespace is initialised.
+### What Follows Automatically
 
-**NS_TABLE_RESERVE = 1,024 words.**
-*Forcing reason:* The value 1,024 is a fixed constant wired into the boot
-ROM: `NS_TABLE_BASE = totalRamWords − 1,024`. This cannot be changed without
-rewriting the boot ROM. The arithmetic is 256 entries × 4 words per entry =
-1,024. The 256-entry limit is a fixed implementation constant chosen for the
-current design — not a consequence of the cc field (which governs c-list rows
-per lump, not NS slot count). The stride is 4 words per entry.
+```
+foundation_end  = NS_LUMP_SIZE + THREAD_LUMP_SIZE + APP_LUMP_SIZE
+                = 64 + 256 + 64 = 384 words = 0x0180  (3-LUMP starter kit)
 
-### The Programmer Makes Exactly Three LUMPs
+Dynamic pool    = foundation_end  →  NS_TABLE_BASE − 1
 
-The memory architecture is entirely defined by the three foundation LUMPs.
-There are no separate configuration parameters. The programmer's choices
-are the three LUMP sizes — nothing else.
+Pool ceiling    = totalNamespaceWords − 1,025
+                = 64,511  (Ti60 F225)
+                = 130,047 (XC7A100T)
+```
 
-**NS LUMP size** (NS slot 0, minimum 64 words).
-The NS LUMP header encodes `totalNamespaceWords` — the physical memory
-envelope for the board. This single value determines the NS table base
-(`totalNamespaceWords − 1,024`) and the pool ceiling
-(`totalNamespaceWords − 1,025`). The programmer chooses the LUMP size based
-on how many NS entries the design will need over its lifetime. Everything
-that describes the address space flows from this one header field.
-
-**Thread LUMP size** (NS slot 1, minimum 64 words).
-The boot execution context — PC, register file, call stack, heap. The
-programmer designs this to any size desired: heap and stack regions are
-declared inside the Thread LUMP to whatever depth the application requires.
-The only constraint is the hardware minimum of 64 words.
-
-**Application LUMP size** (NS slot 2, minimum 64 words).
-The first abstraction the thread calls — on XC7A100T this is the Ethernet
-Locator; on Tang Nano 20K this is the UART Locator. Size chosen based on
-the method body and c-list of that abstraction.
-
-### Natural Consequences (Not Decisions)
-
-**foundation_end (dynamic pool base).**
-Once the three LUMP sizes are known, `foundation_end` is determined
-arithmetically: `NS_LUMP_SIZE + THREAD_LUMP_SIZE + APP_LUMP_SIZE`.
-In the 3-LUMP starter kit (64 + 256 + 64 = 384 words), `foundation_end =
-0x0180`. This is not a choice — it is the sum of the three LUMPs.
-
-**Dynamic pool in the middle.**
-Once the top of memory is occupied by the NS table (hardware-forced) and the
-bottom is occupied by the foundation lumps (programmer-chosen), the middle
-is whatever is left. The dynamic pool is not independently sized. It is the
-remainder after the two fixed regions are subtracted from the total.
-
-**Pool ceiling.**
-`totalNamespaceWords − NS_TABLE_RESERVE − 1` — the highest word address
-the pool allocator can return. On the Ti60 F225: 65,536 − 1,024 − 1 =
-64,511. On the XC7A100T: 131,072 − 1,024 − 1 = 130,047. These are
-arithmetic, not choices.
+Nothing else needs to be set. The programmer makes three LUMPs; the memory
+map is determined.
 
 ---
 
