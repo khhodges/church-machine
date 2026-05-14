@@ -24,8 +24,8 @@
 //           fetch through mLoad(X) validation, word matches expected sentinel
 
 const ChurchSimulator = require('./simulator.js');
+const { assembleLump, decodeBranchEntry, BRANCH_OPCODE } = require('./lump_assembler.js');
 
-const BRANCH_OPCODE = 17;   // opcode index for BRANCH instruction
 const BRANCH_BASE   = (BRANCH_OPCODE << 27) >>> 0;  // 0x88000000
 
 // Build an unsigned BRANCH word — always >>> 0 so comparisons against
@@ -45,54 +45,6 @@ function check(label, cond) {
         console.log(`FAIL ${label}`);
         fail++;
     }
-}
-
-// ── Helper: decode the lump-relative PC from a BRANCH method-table entry ─────
-// Mirrors what the simulator CALL dispatcher does for methodIndex > 0.
-// tableEntryLumpPC = methodIndex - 1 (the lump-relative PC of the table entry).
-// new pc = tableEntryLumpPC + branchOffset = bodyOffset.
-function decodeBranchEntry(tableEntryWord, methodIndex) {
-    const opcode = (tableEntryWord >>> 27) & 0x1F;
-    if (opcode !== BRANCH_OPCODE) return null;   // not a BRANCH — legacy format
-    const soff = (tableEntryWord & 0x4000)
-        ? ((tableEntryWord & 0x7FFF) | 0xFFFF8000)
-        : (tableEntryWord & 0x7FFF);
-    return (methodIndex - 1) + soff;   // = bodyOffset (lump-relative PC of body)
-}
-
-// ── Helper: assemble a LUMP binary with BRANCH-encoded method table ───────────
-// Replicates the fixed logic from _assembleLumpFromCatalog / _tryAutoAssembleLump
-// (Task #1134): method-table entries are BRANCH instruction words.
-function assembleLump(methodBodies) {
-    const N = methodBodies.length;
-    const methodTable = [];
-    const bodies = [];
-    let bodyOffset = N;  // lump-relative PC of first body (table occupies PCs 0..N-1)
-    for (let i = 0; i < N; i++) {
-        const branchOffset = bodyOffset - i;   // relative to this entry's lump PC (= i)
-        methodTable.push(((BRANCH_OPCODE << 27) | (branchOffset & 0x7FFF)) >>> 0);
-        bodies.push(methodBodies[i]);
-        bodyOffset += methodBodies[i].length;
-    }
-
-    const totalWords = 1 + N + bodies.reduce(function(s, b) { return s + b.length; }, 0);
-    const buf = new Uint32Array(totalWords);
-
-    let lumpSize = 64;
-    while (lumpSize < totalWords) lumpSize *= 2;
-    const n_minus_6 = Math.max(0, Math.round(Math.log2(lumpSize)) - 6);
-    const cw = totalWords - 1;
-    const cc = 0;
-    buf[0] = ((0x1F << 27) | ((n_minus_6 & 0xF) << 23) | ((cw & 0x1FFF) << 10) | (cc & 0xFF)) >>> 0;
-
-    for (let i = 0; i < N; i++) buf[1 + i] = methodTable[i] >>> 0;
-
-    let wp = 1 + N;
-    for (const body of bodies) {
-        for (const w of body) buf[wp++] = w >>> 0;
-    }
-
-    return { buf, methodTable, totalWords, N, bodies };
 }
 
 // ── T001: Header magic ─────────────────────────────────────────────────────────

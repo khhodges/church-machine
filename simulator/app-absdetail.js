@@ -998,6 +998,10 @@ function _tryAutoAssembleLump(absIdx) {
 }
 
 // Assemble a LUMP binary from all compiled methods and offer download + Load into Sim
+// NOTE: The pure encoding logic below mirrors simulator/lump_assembler.js (assembleLump).
+// Browser code cannot use require(), so this is an inline copy.
+// Any change to the BRANCH-encoding formula or header packing MUST also be applied
+// to lump_assembler.js in the same commit.
 function _assembleLumpFromCatalog(absIdx) {
     const abs = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
         ? abstractionRegistry.getAbstraction(absIdx) : null;

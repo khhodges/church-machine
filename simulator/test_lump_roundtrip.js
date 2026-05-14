@@ -26,54 +26,12 @@
 //             a freshly assembled LUMP (method table must use BRANCH opcode)
 
 const ChurchSimulator = require('./simulator.js');
+const { assembleLump, BRANCH_OPCODE } = require('./lump_assembler.js');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BRANCH_OPCODE = 17;
 const CALL_OPCODE   = 2;
 const LUMP_SLOT     = 3;    // Boot.Abstr NS slot (same as simulator default)
 const LUMP_BASE     = 0x80; // arbitrary physical base for tests
-
-// ── Pure assembler (mirrors _assembleLumpFromCatalog, DOM-free) ───────────────
-// methodBodies: array of arrays of 32-bit words (one array per method).
-// Returns { buf: Uint32Array, totalWords, N, bodyOffsets }.
-function assembleLump(methodBodies) {
-    const N = methodBodies.length;
-    const methodTable = [];
-    const bodies = [];
-    let bodyOffset = N;
-    for (let i = 0; i < N; i++) {
-        const branchOffset = bodyOffset - i;
-        methodTable.push(((BRANCH_OPCODE << 27) | (branchOffset & 0x7FFF)) >>> 0);
-        bodies.push(methodBodies[i]);
-        bodyOffset += methodBodies[i].length;
-    }
-
-    const totalWords = 1 + N + bodies.reduce(function(s, b) { return s + b.length; }, 0);
-    const buf = new Uint32Array(totalWords);
-
-    let lumpSize = 64;
-    while (lumpSize < totalWords) lumpSize *= 2;
-    const n_minus_6 = Math.max(0, Math.round(Math.log2(lumpSize)) - 6);
-    const cw = totalWords - 1;
-    const cc = 0;
-    buf[0] = ((0x1F << 27) | ((n_minus_6 & 0xF) << 23) | ((cw & 0x1FFF) << 10) | (cc & 0xFF)) >>> 0;
-
-    for (let i = 0; i < N; i++) buf[1 + i] = methodTable[i] >>> 0;
-    let wp = 1 + N;
-    for (const body of bodies) {
-        for (const w of body) buf[wp++] = w >>> 0;
-    }
-
-    // Compute expected bodyOffsets (lump-relative PC of each method's first word)
-    const bodyOffsets = [];
-    let off = N;
-    for (let i = 0; i < N; i++) {
-        bodyOffsets.push(off);
-        off += methodBodies[i].length;
-    }
-
-    return { buf, totalWords, N, bodyOffsets };
-}
 
 // ── Encode a CALL instruction targeting CR0 with a given method index ─────────
 // CALL_AL CR0, imm=methodIndex  (cond=14=AL=Always, crDst=0, crSrc=0)
