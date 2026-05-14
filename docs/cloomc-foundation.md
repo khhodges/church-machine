@@ -368,9 +368,10 @@ on how many NS entries the design will need over its lifetime. Everything
 that describes the address space flows from this one header field.
 
 **Thread LUMP size** (NS slot 1, minimum 64 words).
-The boot execution context — PC, register file, call stack. Size chosen
-based on expected stack depth and number of capability registers the boot
-thread needs.
+The boot execution context — PC, register file, call stack, heap. The
+programmer designs this to any size desired: heap and stack regions are
+declared inside the Thread LUMP to whatever depth the application requires.
+The only constraint is the hardware minimum of 64 words.
 
 **Application LUMP size** (NS slot 2, minimum 64 words).
 The first abstraction the thread calls — on XC7A100T this is the Ethernet
