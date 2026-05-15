@@ -253,11 +253,10 @@
                     '<input type="number" class="le-number" id="le-ns-slots-num" min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
                 '</div>' +
             '</div>' +
+            '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
+            bar +
             '<div class="le-divider"></div>' +
             grid +
-            '<div class="le-divider"></div>' +
-            '<div class="le-bar-label-row"><span>Memory layout</span></div>' +
-            bar +
         '</div>';
     }
 
