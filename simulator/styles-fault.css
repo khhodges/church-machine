@@ -714,6 +714,33 @@
 
 .le-overflow { color: #f87171; font-weight: 600; }
 
+.le-field-readonly .le-label { color: var(--text-muted, #666); }
+
+.le-readonly-val {
+    flex: 1;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    font-family: var(--mono);
+    padding: 0.2rem 0.5rem;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    background: rgba(0,0,0,0.18);
+    min-height: 1.8rem;
+    display: flex;
+    align-items: center;
+}
+
+.le-overcap-warning {
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.25);
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
 .le-bar-label-row {
     display: flex;
     justify-content: space-between;

@@ -65,8 +65,10 @@
         { label: '512 M words (max, n=15)',         n: 15 }
     ];
 
+    // state.thread.lumpPow2: exponent for lump size (e.g. 8 = 256 words)
+    // state.thread.stackFrames: number of stack frames (each frame = 2 words)
     var state = {
-        thread: { heap: 256, stack: 32, count: 1 },
+        thread: { lumpPow2: 8, stackFrames: 16, count: 1 },
         ns: { n_minus_6: 3, slots: 2000 }
     };
 
@@ -74,11 +76,18 @@
         try {
             var s = JSON.parse(localStorage.getItem('lump_editor_state') || '{}');
             if (s.thread) {
-                state.thread.heap  = s.thread.heap  || 256;
-                state.thread.stack = s.thread.stack || 32;
+                if (s.thread.lumpPow2 !== undefined) {
+                    state.thread.lumpPow2 = clamp(s.thread.lumpPow2, 6, 13);
+                }
+                if (s.thread.stackFrames !== undefined) {
+                    state.thread.stackFrames = clamp(s.thread.stackFrames, 10, 255);
+                }
                 state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 10) : 1;
             }
-            if (s.ns) { state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3; state.ns.slots = s.ns.slots || 2000; }
+            if (s.ns) {
+                state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3;
+                state.ns.slots = s.ns.slots || 2000;
+            }
         } catch (e) {}
     }
 
@@ -132,6 +141,8 @@
 
     var DR_WORDS  = 16;   // DR0–DR15, static
     var CAP_WORDS = 12;   // CR0–CR11 GT home slots, static
+    var MIN_EXP   = 6;    // 64 words minimum lump
+    var MAX_EXP   = 13;   // 8192 words cap
 
     var BOARD_PROFILES = {
         'tang-nano-20k':     { label: 'Tang Nano 20K',      totalRamWords: 16384,  singleThread: true  },
@@ -146,64 +157,104 @@
         return BOARD_PROFILES[board] || BOARD_PROFILES['tang-nano-20k'];
     }
 
+    // Returns the largest exponent e such that 2^e ≤ n, bounded to [MIN_EXP, MAX_EXP]
+    function maxExpForWords(n) {
+        if (n <= 0) return MIN_EXP;
+        var e = Math.floor(Math.log2(n));
+        return Math.max(MIN_EXP, Math.min(MAX_EXP, e));
+    }
+
     function renderThreadPanel() {
-        var heap  = clamp(state.thread.heap,  1, 8191);
-        var stack = clamp(state.thread.stack, 1, 255);
-        var needed    = 1 + DR_WORDS + heap + stack + CAP_WORDS;
-        var lumpSize  = nextPow2(needed);
-        var n         = log2Exact(lumpSize) - 6;
-        var free      = lumpSize - 1 - DR_WORDS - heap - stack - CAP_WORDS;
-        var word      = packHdr(n, heap, stack, 2);
-        var wordHex   = hex8(word);
+        var profile      = getBoardProfile();
+        var budget       = Math.floor(profile.totalRamWords / 2);
 
-        var profile   = getBoardProfile();
-        var budget    = Math.floor(profile.totalRamWords / 2);
-        var maxHeap   = Math.max(1, budget - 1 - DR_WORDS - stack - CAP_WORDS);
-        heap  = clamp(heap, 1, maxHeap);
-        var needed2   = 1 + DR_WORDS + heap + stack + CAP_WORDS;
-        lumpSize  = nextPow2(needed2);
-        n         = log2Exact(lumpSize) - 6;
-        free      = lumpSize - 1 - DR_WORDS - heap - stack - CAP_WORDS;
-        var maxCount  = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / lumpSize)));
-        var count     = clamp(state.thread.count, 1, maxCount);
-        var totalMem  = lumpSize * count;
-        var overBudget = totalMem > budget;
+        // Count is bounded by singleThread rule; compute preliminary max
+        var count        = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
 
-        var zones = [
-            { label: 'Header',      words: 1,         cls: 'le-zone-hdr'   },
-            { label: 'Data Regs',   words: DR_WORDS,  cls: 'le-zone-dr'    },
-            { label: 'Heap',        words: heap,       cls: 'le-zone-heap'  },
-            { label: 'Free',        words: free,       cls: 'le-zone-free'  },
-            { label: 'Stack',       words: stack,      cls: 'le-zone-stack' },
-            { label: 'Cap Regs',    words: CAP_WORDS,  cls: 'le-zone-caps'  }
-        ];
+        // Max lump size = floor(budget / count), capped at 8192 words
+        var maxLumpWords = Math.max(64, Math.floor(budget / count));
+        var maxLumpPow2  = maxExpForWords(Math.min(maxLumpWords, 8192));
+
+        // Clamp stored exponent to valid range
+        var lumpPow2     = clamp(state.thread.lumpPow2, MIN_EXP, maxLumpPow2);
+        var lumpSize     = Math.pow(2, lumpPow2);
+        var n            = lumpPow2 - 6;
+
+        // Stack frames: 10–255
+        var stackFrames  = clamp(state.thread.stackFrames, 10, 255);
+        var stackWords   = stackFrames * 2;
+
+        // Heap is derived — may go negative (over-capacity)
+        var heap         = lumpSize - 1 - DR_WORDS - stackWords - CAP_WORDS;
+        var overCapacity = heap <= 0;
+
+        // cw encodes heap words; cc encodes frame count
+        var cw = overCapacity ? 0 : heap;
+        var cc = stackFrames;
+        var word    = packHdr(n, cw, cc, 2);
+        var wordHex = hex8(word);
+
+        // Thread count max recalculated with actual lump size
+        var maxCount    = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / lumpSize)));
+        count           = clamp(count, 1, maxCount);
+        var totalMem    = lumpSize * count;
+        var overBudget  = totalMem > budget;
+
+        // Build lump size dropdown options (powers of 2 from MIN_EXP to maxLumpPow2)
+        var lumpOpts = '';
+        for (var e = MIN_EXP; e <= maxLumpPow2; e++) {
+            var words = Math.pow(2, e);
+            var optLabel = fmtWords(words) + ' words  (2^' + e + ')';
+            lumpOpts += '<option value="' + e + '"' + (e === lumpPow2 ? ' selected' : '') + '>' + esc(optLabel) + '</option>';
+        }
+
+        var heapDisplay = overCapacity
+            ? '<span class="le-overflow">⚠ over capacity — increase lump size or reduce stack</span>'
+            : esc(heap.toLocaleString() + ' words');
 
         var memStatus = overBudget
             ? '<span class="le-overflow">⚠ ' + esc(fmtWords(totalMem) + ' words — exceeds 50 % budget') + '</span>'
             : esc(fmtWords(totalMem) + ' words  (' + count + ' × ' + fmtWords(lumpSize) + ')');
 
+        var zones = overCapacity ? [] : [
+            { label: 'Header',    words: 1,           cls: 'le-zone-hdr'   },
+            { label: 'Data Regs', words: DR_WORDS,    cls: 'le-zone-dr'    },
+            { label: 'Heap',      words: heap,         cls: 'le-zone-heap'  },
+            { label: 'Stack',     words: stackWords,   cls: 'le-zone-stack' },
+            { label: 'Cap Regs',  words: CAP_WORDS,   cls: 'le-zone-caps'  }
+        ];
+
         var grid = renderGrid([
             ['Target board',   esc(profile.label), 'le-val-gold'],
             ['Physical RAM',   esc(profile.totalRamWords.toLocaleString() + ' words'), ''],
             ['Thread budget',  esc(fmtWords(budget) + ' words  (50 % of RAM)'), ''],
-            ['Lump size',      esc(fmtWords(lumpSize) + ' words  (2^' + (n + 6) + ')'), ''],
+            ['Lump size',      esc(fmtWords(lumpSize) + ' words  (2^' + lumpPow2 + ')'), 'le-val-gold'],
             ['Thread count',   esc(String(count) + (profile.singleThread ? '  (max 1 — single-thread board)' : '  (max ' + maxCount + ')')), ''],
             ['Total memory',   memStatus, overBudget ? '' : 'le-val-gold'],
             ['n_minus_6',      esc(String(n)), ''],
             ['typ field',      '10  (Thread)', ''],
             ['Header',         '1 word', ''],
             ['Data Regs',      esc(DR_WORDS + ' words  (DR0–DR15, static)'), ''],
-            ['Heap (cw)',      esc(heap.toLocaleString() + ' words'), ''],
-            ['Freespace',      esc(free.toLocaleString() + ' words'), ''],
-            ['Stack (cc)',     esc(stack.toLocaleString() + ' frames'), ''],
+            ['Heap (cw)',      heapDisplay, overCapacity ? '' : ''],
+            ['Stack (cc)',     esc(stackFrames + ' frames  (' + stackWords + ' words)'), ''],
             ['Cap Regs',       esc(CAP_WORDS + ' words  (CR0–CR11 GT slots, static)'), ''],
             ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
 
         var countHint = profile.singleThread ? ' (single-thread board)' : ' 1\u2013' + maxCount;
 
+        var overCapWarning = overCapacity
+            ? '<p class="le-overflow le-overcap-warning">&#x26A0; Stack + static zones exceed lump size — heap would be negative. Increase lump size or reduce stack frames.</p>'
+            : '';
+
         return '<div class="le-panel">' +
-            '<p class="le-panel-desc">Set heap and stack sizes. Lump allocation rounds up to the next power of two. Thread budget = 50 % of board RAM.</p>' +
+            '<p class="le-panel-desc">Choose lump size first (power of two, bounded by board thread budget). Set stack frames. Heap is derived automatically — no wasted freespace.</p>' +
+            '<div class="le-field-row">' +
+                '<label class="le-label">Lump size<span class="le-range-hint"> 2^' + MIN_EXP + '\u2013' + maxLumpPow2 + ', max ' + fmtWords(Math.pow(2, maxLumpPow2)) + ' w</span></label>' +
+                '<div class="le-input-group le-input-group-wide">' +
+                    '<select class="le-select" id="le-t-lump-sel" onchange="lumpEditorThreadLumpSize(this.value)">' + lumpOpts + '</select>' +
+                '</div>' +
+            '</div>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Thread count<span class="le-range-hint">' + esc(countHint) + '</span></label>' +
                 '<div class="le-input-group">' +
@@ -212,22 +263,22 @@
                 '</div>' +
             '</div>' +
             '<div class="le-field-row">' +
-                '<label class="le-label">Heap words<span class="le-range-hint"> 1\u2013' + maxHeap.toLocaleString() + '</span></label>' +
+                '<label class="le-label">Stack frames<span class="le-range-hint"> 10\u2013255  (' + stackWords + ' words)</span></label>' +
                 '<div class="le-input-group">' +
-                    '<input type="range"  class="le-slider" id="le-t-heap-sl"  min="1" max="' + maxHeap + '" value="' + heap  + '" oninput="lumpEditorThreadHeap(this.value)">' +
-                    '<input type="number" class="le-number" id="le-t-heap-num" min="1" max="' + maxHeap + '" value="' + heap  + '" oninput="lumpEditorThreadHeap(this.value)">' +
+                    '<input type="range"  class="le-slider" id="le-t-stack-sl"  min="10" max="255" value="' + stackFrames + '" oninput="lumpEditorThreadStack(this.value)">' +
+                    '<input type="number" class="le-number" id="le-t-stack-num" min="10" max="255" value="' + stackFrames + '" oninput="lumpEditorThreadStack(this.value)">' +
                 '</div>' +
             '</div>' +
-            '<div class="le-field-row">' +
-                '<label class="le-label">Stack frames<span class="le-range-hint"> 1 – 255</span></label>' +
+            '<div class="le-field-row le-field-readonly">' +
+                '<label class="le-label">Heap words<span class="le-range-hint"> (derived)</span></label>' +
                 '<div class="le-input-group">' +
-                    '<input type="range"  class="le-slider" id="le-t-stack-sl"  min="1" max="255" value="' + stack + '" oninput="lumpEditorThreadStack(this.value)">' +
-                    '<input type="number" class="le-number" id="le-t-stack-num" min="1" max="255" value="' + stack + '" oninput="lumpEditorThreadStack(this.value)">' +
+                    '<div class="le-readonly-val">' + heapDisplay + '</div>' +
                 '</div>' +
             '</div>' +
+            overCapWarning +
             '<div class="le-bar-label-row"><span>Single thread memory layout</span><span class="le-bar-label-count">' + esc(lumpSize.toLocaleString() + ' words') + '</span></div>' +
-            renderBar(zones) +
-            renderMagBar(zones) +
+            (zones.length ? renderBar(zones) : '') +
+            (zones.length ? renderMagBar(zones) : '') +
             '<div class="le-divider"></div>' +
             grid +
         '</div>';
@@ -322,6 +373,17 @@
 
     // ── public handlers ───────────────────────────────────────────────────────
 
+    window.lumpEditorThreadLumpSize = function (exp) {
+        var profile  = getBoardProfile();
+        var budget   = Math.floor(profile.totalRamWords / 2);
+        var count    = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var maxWords = Math.min(Math.floor(budget / count), 8192);
+        var maxExp   = Math.max(MIN_EXP, Math.min(MAX_EXP, Math.floor(Math.log2(maxWords))));
+        state.thread.lumpPow2 = clamp(exp, MIN_EXP, maxExp);
+        saveState();
+        render();
+    };
+
     window.lumpEditorThreadCount = function (v) {
         state.thread.count = clamp(v, 1, 10);
         saveState();
@@ -332,23 +394,13 @@
         render();
     };
 
-    window.lumpEditorThreadHeap = function (v) {
-        state.thread.heap = clamp(v, 1, 8191);
-        saveState();
-        var sl  = document.getElementById('le-t-heap-sl');
-        var num = document.getElementById('le-t-heap-num');
-        if (sl  && sl  !== document.activeElement) sl.value  = state.thread.heap;
-        if (num && num !== document.activeElement) num.value = state.thread.heap;
-        render();
-    };
-
     window.lumpEditorThreadStack = function (v) {
-        state.thread.stack = clamp(v, 1, 255);
+        state.thread.stackFrames = clamp(v, 10, 255);
         saveState();
         var sl  = document.getElementById('le-t-stack-sl');
         var num = document.getElementById('le-t-stack-num');
-        if (sl  && sl  !== document.activeElement) sl.value  = state.thread.stack;
-        if (num && num !== document.activeElement) num.value = state.thread.stack;
+        if (sl  && sl  !== document.activeElement) sl.value  = state.thread.stackFrames;
+        if (num && num !== document.activeElement) num.value = state.thread.stackFrames;
         render();
     };
 
