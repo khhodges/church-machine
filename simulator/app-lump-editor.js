@@ -67,7 +67,7 @@
 
     var state = {
         activeType: 'thread',
-        thread: { heap: 256, stack: 32 },
+        thread: { heap: 256, stack: 32, count: 1 },
         ns: { n_minus_6: 3, slots: 2000 }
     };
 
@@ -75,8 +75,12 @@
         try {
             var s = JSON.parse(localStorage.getItem('lump_editor_state') || '{}');
             if (s.activeType) state.activeType = s.activeType;
-            if (s.thread) { state.thread.heap = s.thread.heap || 256; state.thread.stack = s.thread.stack || 32; }
-            if (s.ns)     { state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3; state.ns.slots = s.ns.slots || 2000; }
+            if (s.thread) {
+                state.thread.heap  = s.thread.heap  || 256;
+                state.thread.stack = s.thread.stack || 32;
+                state.thread.count = (s.thread.count !== undefined) ? clamp(s.thread.count, 1, 10) : 1;
+            }
+            if (s.ns) { state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3; state.ns.slots = s.ns.slots || 2000; }
         } catch (e) {}
     }
 
@@ -116,21 +120,25 @@
     function renderThreadPanel() {
         var heap  = clamp(state.thread.heap,  1, 8191);
         var stack = clamp(state.thread.stack, 1, 255);
-        var needed   = 1 + heap + stack;
-        var lumpSize = nextPow2(needed);
-        var n        = log2Exact(lumpSize) - 6;
-        var free     = lumpSize - 1 - heap - stack;
-        var word     = packHdr(n, heap, stack, 2);
-        var wordHex  = hex8(word);
+        var count = clamp(state.thread.count, 1, 10);
+        var needed    = 1 + heap + stack;
+        var lumpSize  = nextPow2(needed);
+        var n         = log2Exact(lumpSize) - 6;
+        var free      = lumpSize - 1 - heap - stack;
+        var totalMem  = lumpSize * count;
+        var word      = packHdr(n, heap, stack, 2);
+        var wordHex   = hex8(word);
 
         var grid = renderGrid([
-            ['Lump size',    esc(fmtWords(lumpSize) + ' words  (2^' + (n + 6) + ')'), 'le-val-gold'],
-            ['n_minus_6',    esc(String(n)), ''],
-            ['typ field',    '10  (Thread)', ''],
-            ['Heap (cw)',     esc(heap.toLocaleString() + ' words'), ''],
-            ['Freespace',    esc(free.toLocaleString() + ' words'), ''],
-            ['Stack (cc)',   esc(stack.toLocaleString() + ' frames'), ''],
-            ['Header word',  '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
+            ['Lump size',      esc(fmtWords(lumpSize) + ' words  (2^' + (n + 6) + ')'), 'le-val-gold'],
+            ['Thread count',   esc(String(count)), ''],
+            ['Total memory',   esc(fmtWords(totalMem) + ' words  (' + count + ' × ' + fmtWords(lumpSize) + ')'), 'le-val-gold'],
+            ['n_minus_6',      esc(String(n)), ''],
+            ['typ field',      '10  (Thread)', ''],
+            ['Heap (cw)',      esc(heap.toLocaleString() + ' words'), ''],
+            ['Freespace',      esc(free.toLocaleString() + ' words'), ''],
+            ['Stack (cc)',     esc(stack.toLocaleString() + ' frames'), ''],
+            ['Header word',    '<span id="le-thread-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-thread-hex'), 'le-val-mono']
         ]);
 
         var bar = renderBar([
@@ -142,6 +150,13 @@
 
         return '<div class="le-panel">' +
             '<p class="le-panel-desc">Set heap and stack sizes. Lump allocation rounds up to the next power of two.</p>' +
+            '<div class="le-field-row">' +
+                '<label class="le-label">Thread count<span class="le-range-hint"> 1 – 10</span></label>' +
+                '<div class="le-input-group">' +
+                    '<input type="range"  class="le-slider" id="le-t-count-sl"  min="1" max="10" value="' + count + '" oninput="lumpEditorThreadCount(this.value)">' +
+                    '<input type="number" class="le-number" id="le-t-count-num" min="1" max="10" value="' + count + '" oninput="lumpEditorThreadCount(this.value)">' +
+                '</div>' +
+            '</div>' +
             '<div class="le-field-row">' +
                 '<label class="le-label">Heap words<span class="le-range-hint"> 1 – 8,191</span></label>' +
                 '<div class="le-input-group">' +
@@ -159,7 +174,7 @@
             '<div class="le-divider"></div>' +
             grid +
             '<div class="le-divider"></div>' +
-            '<div class="le-bar-label-row"><span>Memory layout</span></div>' +
+            '<div class="le-bar-label-row"><span>Single thread memory layout</span></div>' +
             bar +
         '</div>';
     }
@@ -244,6 +259,16 @@
     window.lumpEditorSetType = function (t) {
         state.activeType = t;
         saveState();
+        render();
+    };
+
+    window.lumpEditorThreadCount = function (v) {
+        state.thread.count = clamp(v, 1, 10);
+        saveState();
+        var sl  = document.getElementById('le-t-count-sl');
+        var num = document.getElementById('le-t-count-num');
+        if (sl  && sl  !== document.activeElement) sl.value  = state.thread.count;
+        if (num && num !== document.activeElement) num.value = state.thread.count;
         render();
     };
 
