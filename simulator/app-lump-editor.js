@@ -438,10 +438,17 @@
         var baseNs = _rl.limits.baseNamedNsCount || 47;
 
         // 3-LUMP starter kit — always shown at top, locked as Boot
+        var bootSlot = parseInt(localStorage.getItem('bootEntrySlot'), 10);
+        if (!Number.isFinite(bootSlot) || bootSlot < 0) bootSlot = 3;
+        var bootCatEntry = null;
+        for (var bi = 0; bi < _rl.catalog.length; bi++) {
+            if (_rl.catalog[bi].nsSlot === bootSlot) { bootCatEntry = _rl.catalog[bi]; break; }
+        }
+        var bootLabel = bootCatEntry ? (bootCatEntry.abstraction || 'Slot ' + bootSlot) : 'Slot ' + bootSlot;
         var BOOT_STARTER = [
-            { label: 'Boot.NS',     nsSlot: 0, note: 'Namespace root' },
-            { label: 'Boot.Thread', nsSlot: 1, note: 'Initial thread' },
-            { label: 'Boot.Abstr',  nsSlot: 3, note: 'Boot code entry' }
+            { label: 'Boot.NS',     nsSlot: 0,        note: 'Namespace root' },
+            { label: 'Boot.Thread', nsSlot: 1,        note: 'Initial thread' },
+            { label: bootLabel,     nsSlot: bootSlot, note: 'Boot entry \u00b7 change via \u26a1 in Namespace' }
         ];
         var rows = BOOT_STARTER.map(function(b) {
             return '<tr class="le-rl-row le-rl-boot-row">' +

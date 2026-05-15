@@ -109,7 +109,10 @@ test.describe('Resident Lumps tab — table loads', () => {
         // All three foundational lumps must be present.
         await expect(panel.locator('text=Boot.NS')).toBeVisible();
         await expect(panel.locator('text=Boot.Thread')).toBeVisible();
-        await expect(panel.locator('text=Boot.Abstr')).toBeVisible();
+        // Boot.Abstr row is dynamic: label comes from catalog (by nsSlot) or falls
+        // back to "Slot N". The stub catalog has no slot-3 entry so we get "Slot 3".
+        // The row is identified by its unique note text regardless of label.
+        await expect(panel.locator('text=Boot entry')).toBeVisible();
     });
 
     test('shows catalog lumps returned by /api/boot-config', async ({ page }) => {
