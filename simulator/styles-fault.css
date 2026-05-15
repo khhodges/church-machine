@@ -892,6 +892,197 @@
     opacity: 0.85;
 }
 
+/* ── Resident Lumps panel ─────────────────────────────────────────────────── */
+
+.le-panel-wide {
+    max-width: 860px;
+}
+
+.le-rl-table-wrap {
+    overflow-x: auto;
+    border: 1px solid rgba(218,165,32,0.12);
+    border-radius: 5px;
+}
+
+.le-rl-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+
+.le-rl-th {
+    padding: 6px 10px;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.22);
+    border-bottom: 1px solid rgba(218,165,32,0.14);
+    white-space: nowrap;
+}
+
+.le-rl-th-narrow { width: 56px; }
+.le-rl-th-mode   { width: 120px; }
+
+.le-rl-row {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.12s;
+}
+
+.le-rl-row:last-child { border-bottom: none; }
+.le-rl-row:nth-child(even) { background: rgba(0,0,0,0.08); }
+.le-rl-row:hover { background: rgba(218,165,32,0.05); }
+
+.le-rl-boot-row {
+    background: rgba(218,165,32,0.06) !important;
+    border-bottom: 1px solid rgba(218,165,32,0.12);
+}
+.le-rl-boot-row:hover { background: rgba(218,165,32,0.10) !important; }
+
+.le-rl-boot-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: rgba(218,165,32,0.18);
+    border: 1px solid rgba(218,165,32,0.45);
+    color: var(--church-gold);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.le-rl-boot-note {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    margin-left: 0.4rem;
+}
+
+.le-rl-addr-na {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.le-rl-td {
+    padding: 6px 10px;
+    color: var(--text-primary);
+    vertical-align: middle;
+}
+
+.le-rl-td-num {
+    font-family: var(--mono);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.le-rl-mode-label {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    user-select: none;
+}
+
+.le-rl-mode-resident {
+    color: #6ee7b7;
+    font-weight: 600;
+}
+
+.le-rl-check {
+    accent-color: var(--church-gold);
+    margin-right: 0.3rem;
+    cursor: pointer;
+}
+
+.le-rl-addr {
+    width: 110px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-family: var(--mono);
+    text-align: right;
+}
+
+.le-rl-addr:focus { outline: none; border-color: rgba(218,165,32,0.5); }
+.le-rl-addr:disabled { opacity: 0.35; background: rgba(0,0,0,0.18); }
+
+.le-rl-empty-msg {
+    padding: 14px 10px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-style: italic;
+}
+
+.le-rl-hint {
+    font-size: 0.74rem;
+    color: var(--text-muted, #666);
+    margin-left: 0.4rem;
+}
+
+.le-rl-status {
+    font-size: 0.8rem;
+    color: #6ee7b7;
+    display: inline-block;
+}
+
+.le-rl-btn-row {
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.le-rl-gen-btn {
+    background: rgba(96,165,250,0.1);
+    border: 1px solid rgba(96,165,250,0.35);
+    border-radius: 5px;
+    color: #93c5fd;
+    cursor: pointer;
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding: 0.45rem 1.0rem;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+
+.le-rl-gen-btn:hover:not(:disabled) {
+    background: rgba(96,165,250,0.2);
+    border-color: rgba(96,165,250,0.6);
+}
+
+.le-rl-gen-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.le-rl-drop-zone {
+    margin-top: 0.85rem;
+    border: 2px dashed rgba(255,255,255,0.2);
+    border-radius: 5px;
+    padding: 12px 14px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.14);
+    cursor: default;
+    transition: border-color 0.15s, background 0.15s;
+    max-width: 480px;
+}
+
+.le-rl-drop-zone code {
+    color: var(--text-primary);
+}
+
+.le-rl-drop-active {
+    border-color: #93c5fd;
+    background: rgba(96,165,250,0.08);
+    color: #93c5fd;
+}
+
 /* ────────────────────────────────────────────────────────────────────────── */
 
 .builder-view-tab-row {

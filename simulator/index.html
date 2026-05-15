@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="styles-dashboard.css?v=20260513a">
     <link rel="stylesheet" href="styles-lumps.css?v=20260514d">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
-    <link rel="stylesheet" href="styles-fault.css?v=20260515o">
+    <link rel="stylesheet" href="styles-fault.css?v=20260515p">
     <link rel="stylesheet" href="styles-tools.css?v=20260514b">
     <style>
         .app-loading {
@@ -147,9 +147,7 @@
                                 <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">BRAM</button>
                                 <button class="ham-item" id="hamItem-hw-wukong" onclick="setSelectedBoard('wukong-xc7a100t');switchView('builder');closeHamburger()">Wukong Artix-7 XC7A100T</button>
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
-                                <button class="ham-item" id="hamItem-hw-tang20k" onclick="setSelectedBoard('tang-nano-20k');switchView('builder');closeHamburger()">Tang Nano 20K</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K IoT</button>
-                                <button class="ham-item" id="hamItem-hw-tang9k" onclick="setSelectedBoard('tang-nano-9k');switchView('builder');closeHamburger()">Tang Nano 9K (IoT)</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'configure','Open Devices')">Configure</div>
@@ -508,7 +506,6 @@
             <div class="ns-toolbar">
                 <button class="btn btn-primary btn-sm" onclick="exportAllNamespace()" data-tooltip="Export All — Download all namespace entries as a JSON file">Export All</button>
                 <button class="btn btn-primary btn-sm" onclick="importNamespaceFile()" data-tooltip="Import — Load namespace entries from a JSON or binary file">Import</button>
-                <button class="btn btn-primary btn-sm" onclick="openBootDesigner()" data-tooltip="Boot Image Designer — Programmer-controlled boot image configuration (Step 1: foundational lump sizes)">Boot Image Designer</button>
                 <button class="btn btn-primary btn-sm" onclick="downloadNamespaceLump()" data-tooltip="Download Namespace JSON — Export a self-describing manifest of every namespace slot">Download Namespace JSON</button>
                 <input type="file" id="nsImportFile" style="display:none;" accept=".json,.bin" onchange="handleNSImport(event)">
             </div>
@@ -661,104 +658,6 @@
         </div>
     </div>
 
-    <!-- Boot Image Designer modal (Task #214 — Step 1: memory allocation) -->
-    <div id="bootDesignerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
-        <div style="background:#1e1e1e;color:#ddd;border:1px solid #444;border-radius:6px;width:min(720px,92vw);max-height:90vh;overflow:auto;padding:18px 22px;font-family:inherit;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <h2 style="margin:0;font-size:1.1rem;color:#fff;">Boot Image Designer — Steps 1 &amp; 2 of 3: Memory + Resident Lumps</h2>
-                <button onclick="closeBootDesigner()" style="background:transparent;color:#ccc;border:none;font-size:1.4rem;cursor:pointer;">×</button>
-            </div>
-            <div style="font-size:0.85rem;color:#aaa;margin-bottom:14px;">
-                You are designing the boot image. The IDE shows the target board's memory budget;
-                <em>you</em> choose the sizes. See <code>docs/foundation-lump-design.md §4</code>.
-                Steps 2 (resident lumps) and 3 (reserved empty NS slots) come next.
-            </div>
-
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-                <label style="min-width:140px;">Target board:</label>
-                <select id="bdTargetBoard" onchange="bdRefreshHwInfo()" style="background:#111;color:#ddd;border:1px solid #555;padding:4px 8px;flex:1;"></select>
-            </div>
-
-            <div id="bdHwInfo" style="background:#111;border:1px solid #333;border-radius:4px;padding:10px 12px;margin-bottom:14px;font-size:0.85rem;color:#cfcfcf;"></div>
-
-            <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-                <thead>
-                    <tr style="text-align:left;color:#aaa;border-bottom:1px solid #333;">
-                        <th style="padding:6px 4px;">Field</th>
-                        <th style="padding:6px 4px;width:160px;">Words (power of 2, ≥ 64)</th>
-                        <th style="padding:6px 4px;">Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td style="padding:6px 4px;">Total namespace memory</td>
-                        <td><input type="number" id="bdTotal" min="64" step="1" style="width:140px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;"></td>
-                        <td style="color:#888;">Must fit inside the board RAM budget above.</td></tr>
-                    <tr><td style="padding:6px 4px;">Namespace Lump</td>
-                        <td><input type="number" id="bdNs" min="64" step="1" style="width:140px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;"></td>
-                        <td style="color:#888;">Anchors NS slot 0; size driven by how many NS entries you'll need.</td></tr>
-                    <tr><td style="padding:6px 4px;">Thread Lump</td>
-                        <td><input type="number" id="bdThread" min="64" step="1" style="width:140px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;"></td>
-                        <td style="color:#888;">Initial thread's registers, stack, heap.</td></tr>
-                </tbody>
-            </table>
-
-            <div id="bdSummary" style="margin-top:12px;font-size:0.85rem;color:#aaa;"></div>
-
-            <h3 style="margin:18px 0 6px;font-size:0.95rem;color:#fff;border-top:1px solid #333;padding-top:14px;">Step 2: Resident Lumps</h3>
-            <div style="font-size:0.82rem;color:#aaa;margin-bottom:8px;">
-                Pick which catalog lumps are baked into the boot image (Resident — body present at reset)
-                and which are fetched on first <code>CALL</code> (Lazy). Resident lumps need a physical
-                address inside the usable region (after the foundational lumps, before the NS table).
-            </div>
-            <table id="bdLumpTable" style="width:100%;border-collapse:collapse;font-size:0.85rem;">
-                <thead>
-                    <tr style="text-align:left;color:#aaa;border-bottom:1px solid #333;">
-                        <th style="padding:6px 4px;">Lump</th>
-                        <th style="padding:6px 4px;width:60px;">NS</th>
-                        <th style="padding:6px 4px;width:80px;">Size (w)</th>
-                        <th style="padding:6px 4px;width:90px;">Mode</th>
-                        <th style="padding:6px 4px;">Phys addr (resident)</th>
-                    </tr>
-                </thead>
-                <tbody id="bdLumpTbody"></tbody>
-            </table>
-            <div id="bdLumpEmpty" style="font-size:0.82rem;color:#888;margin-top:6px;"></div>
-
-            <h3 style="margin:18px 0 6px;font-size:0.95rem;color:#fff;border-top:1px solid #333;padding-top:14px;">Step 3: Empty NS Slots</h3>
-            <div style="font-size:0.82rem;color:#aaa;margin-bottom:8px;">
-                Reserve N empty NS slots at the end of the namespace table for lumps that don't
-                exist yet at design time. The runtime lazy loader claims one of these on demand
-                when a new lump is created. Pure headroom — the IDE doesn't decide what goes here.
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;font-size:0.85rem;color:#ddd;">
-                <label for="bdEmptySlots">Reserve</label>
-                <input type="number" id="bdEmptySlots" min="0" step="1" value="0"
-                       style="width:90px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;">
-                <span style="color:#aaa;">empty NS slots for runtime growth.</span>
-            </div>
-
-            <div id="bdError" style="margin-top:12px;font-size:0.85rem;color:#f55;min-height:1.2em;"></div>
-
-            <div id="bdDropZone"
-                 ondragover="event.preventDefault();event.dataTransfer.dropEffect='copy';this.style.borderColor='#9bd';this.style.background='#162436';"
-                 ondragleave="this.style.borderColor='#555';this.style.background='#111';"
-                 ondrop="event.preventDefault();this.style.borderColor='#555';this.style.background='#111';var f=event.dataTransfer.files&&event.dataTransfer.files[0];if(f){if(!f.name.toLowerCase().endsWith('.bin')&&f.type!=='application/octet-stream'){document.getElementById('bdError').textContent='Only .bin boot image files are accepted. Please drop a valid .bin file.';}else{document.getElementById('bdError').textContent='';uploadBootImageFile(f);}}"
-                 style="margin-top:14px;border:2px dashed #555;border-radius:5px;padding:14px;text-align:center;font-size:0.83rem;color:#888;background:#111;cursor:default;transition:border-color 0.15s,background 0.15s;">
-                Drop a <code style="color:#aaa;">.bin</code> boot image file here to upload
-            </div>
-
-            <input type="file" id="bdUploadInput" accept=".bin,application/octet-stream" style="display:none;" onchange="handleBootImageUpload(this)">
-            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
-                <button class="btn btn-sm" onclick="closeBootDesigner()" style="background:#333;color:#ddd;border:1px solid #555;">Cancel</button>
-                <button class="btn btn-primary btn-sm" id="bdSaveBtn" onclick="saveBootDesigner()">Save boot config</button>
-                <button class="btn btn-sm" id="bdUploadBtn" onclick="document.getElementById('bdUploadInput').click()" style="background:#243;color:#cdc;border:1px solid #575;" data-tooltip="Upload a pre-built boot-image.bin from your computer">Upload boot image</button>
-                <button class="btn btn-sm" id="bdGenBtn" onclick="generateBootImage()" style="background:#234;color:#cdf;border:1px solid #557;" data-tooltip="Generate the binary boot image from the saved config and produce a downloadable .bin">Generate Boot Image</button>
-            </div>
-            <div id="bdStatus" style="margin-top:8px;font-size:0.8rem;color:#7c7;min-height:1em;"></div>
-            <div id="bdGenResult" style="margin-top:6px;font-size:0.82rem;color:#9bd;min-height:1em;"></div>
-        </div>
-    </div>
-
     <div id="abstractions" class="view">
         <div class="abs-subtabbar">
             <button class="abs-subtab abs-subtab-active" id="absSubtab-catalog" onclick="switchAbsSubtab('catalog')" data-tooltip="Logic Catalog — Browse all 47 abstractions by layer">Logic Catalog</button>
@@ -901,10 +800,8 @@
             <div class="hardware-build-controls">
                 <label class="hardware-build-label" for="hardwareBoardSel">Target</label>
                 <select id="hardwareBoardSel" class="lang-selector" onchange="setSelectedBoard(this.value); updateHardwarePanelLabel()" title="Target FPGA board">
-                    <option value="wukong-xc7a100t">QMTECH Wukong Artix-7 XC7A100T (Vivado)</option>
-                    <option value="tang-nano-20k">Sipeed Tang Nano 20K (Gowin GW2AR-18)</option>
+                    <option value="wukong-xc7a100t" selected>QMTECH Wukong Artix-7 XC7A100T (Vivado)</option>
                     <option value="tang-nano-20k-iot">Sipeed Tang Nano 20K IoT (Gowin GW2AR-18)</option>
-                    <option value="tang-nano-9k">Sipeed Tang Nano 9K IoT (Gowin GW1NR-9C)</option>
                     <option value="ti60-f225">Efinix Ti60 F225</option>
                 </select>
                 <button class="btn btn-deploy" id="btnHWBuild" onclick="buildFPGAOnly()" data-tooltip="Build — Run Amaranth elaboration + Yosys synthesis and save RTL artifacts to server">Build</button>
@@ -922,10 +819,12 @@
             <button class="builder-view-tab" id="builderViewTab-buildlog" onclick="switchBuilderViewTab('buildlog')">&#x1F9F1; Build Details</button>
             <button class="builder-view-tab" id="builderViewTab-lump-thread" onclick="switchBuilderViewTab('lump-thread')">&#x1F9F5; Thread LUMP</button>
             <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')">&#x1F9E9; Namespace LUMP</button>
+            <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')">&#x1F3E0; Resident Lumps</button>
         </div>
         <div id="builderView"></div>
-        <div id="lumpThreadPanel" style="display:none;" class="lump-editor-wrap"></div>
-        <div id="lumpNSPanel"     style="display:none;" class="lump-editor-wrap"></div>
+        <div id="lumpThreadPanel"   style="display:none;" class="lump-editor-wrap"></div>
+        <div id="lumpNSPanel"       style="display:none;" class="lump-editor-wrap"></div>
+        <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
         <div id="buildDetailsPanel" style="display:none;" class="build-details-panel">
             <div class="build-details-status-bar">
                 <span class="build-status-dot" id="buildStatusDot"></span>
@@ -1477,16 +1376,14 @@
                         <div class="settings-section-title">Hardware Target</div>
                         <label class="settings-label">FPGA Board
                             <select id="settingFPGABoard" class="modal-input">
-                                <option value="wukong-xc7a100t">QMTECH Wukong Artix-7 XC7A100T (Vivado, 100 MHz)</option>
-                                <option value="tang-nano-20k">Sipeed Tang Nano 20K (Gowin GW2AR-18)</option>
+                                <option value="wukong-xc7a100t" selected>QMTECH Wukong Artix-7 XC7A100T (Vivado, 100 MHz)</option>
                                 <option value="tang-nano-20k-iot">Sipeed Tang Nano 20K IoT (Gowin GW2AR-18)</option>
-                                <option value="tang-nano-9k">Sipeed Tang Nano 9K IoT (Gowin GW1NR-9C)</option>
                                 <option value="ti60-f225">Efinix Ti60 F225 (Titanium, 50 MHz)</option>
                             </select>
                         </label>
                         <div style="color:#888;font-size:0.78rem;margin-top:0.3rem;">
                             Selects the synthesis target for Download FPGA Package and Deploy to FPGA.
-                            Tang Nano 20K uses Yosys/nextpnr + OSS CAD Suite.
+                            QMTECH Wukong uses Vivado. Tang Nano 20K IoT uses Yosys/nextpnr + OSS CAD Suite.
                             Ti60 F225 uses Yosys synth_efinix + Efinity IDE for P&amp;R.
                         </div>
                     </div>
@@ -1704,8 +1601,8 @@
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
     <script src="app-compile.js?v=20260514a"></script>
-    <script src="app-lump-editor.js?v=20260515r"></script>
-    <script src="app-run.js?v=20260515d"></script>
+    <script src="app-lump-editor.js?v=20260515w"></script>
+    <script src="app-run.js?v=20260515f"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260501a"></script>
     <script src="app-misc.js?v=20260512e"></script>

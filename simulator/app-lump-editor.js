@@ -139,6 +139,329 @@
         return ' <button class="le-copy-btn" onclick="lumpEditorCopy(\'' + esc(id) + '\')" title="Copy to clipboard">copy</button>';
     }
 
+    // ── step1 boot-config POST helper ────────────────────────────────────────
+
+    function _getStep1Payload() {
+        var board    = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
+        var profile  = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
+        var boardRam = profile.totalRamWords;
+        var validPresets = NS_PRESETS.filter(function(p) {
+            return Math.pow(2, p.n + 14) <= boardRam;
+        });
+        if (!validPresets.length) validPresets = [NS_PRESETS[0]];
+        var maxN               = validPresets[validPresets.length - 1].n;
+        var n                  = clamp(state.ns.n_minus_6, 0, maxN);
+        var totalNamespaceWords = Math.pow(2, n + 14);
+        var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
+        return {
+            targetBoard: board,
+            step1: {
+                totalNamespaceWords: totalNamespaceWords,
+                namespaceLumpWords:  64,
+                threadLumpWords:     threadLumpWords
+            }
+        };
+    }
+
+    function _postStep1(statusEl, errEl) {
+        var s1payload = _getStep1Payload();
+        if (statusEl) statusEl.textContent = 'Saving step 1\u2026';
+        if (errEl)    errEl.textContent    = '';
+        return fetch('/api/boot-config')
+        .then(function(r) { return r.json(); })
+        .then(function(current) {
+            var merged = {
+                targetBoard: s1payload.targetBoard,
+                step1:       s1payload.step1,
+                step2:       (current && current.config && current.config.step2) || { lumps: [] },
+                step3:       (current && current.config && current.config.step3) || { emptySlotCount: 0 }
+            };
+            return fetch('/api/boot-config', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(merged)
+            });
+        })
+        .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
+        .then(function(res) {
+            if (!res.ok || res.body.ok === false) {
+                if (statusEl) statusEl.textContent = '';
+                if (errEl)    errEl.textContent    = (res.body && res.body.error) || 'Save failed.';
+                return false;
+            }
+            window.bootConfig = res.body.config;
+            if (statusEl) statusEl.textContent = 'Step 1 saved. Reset the simulator to apply.';
+            return true;
+        })
+        .catch(function(err) {
+            if (statusEl) statusEl.textContent = '';
+            if (errEl)    errEl.textContent    = 'Save failed: ' + err;
+            return false;
+        });
+    }
+
+    // ── Resident Lumps panel state ────────────────────────────────────────────
+
+    var _rl = {
+        catalog:        [],
+        step2State:     {},
+        emptySlotCount: 0,
+        limits:         { maxNsEntries: 256, baseNamedNsCount: 47 },
+        loaded:         false,
+        loading:        false,
+        errorMsg:       '',
+        statusMsg:      ''
+    };
+
+    function _rlLoad() {
+        if (_rl.loading) return;
+        _rl.loading   = true;
+        _rl.loaded    = false;
+        _rl.errorMsg  = '';
+        _rl.statusMsg = '';
+        var el = document.getElementById('lumpResidentPanel');
+        if (el) el.innerHTML = '<div class="le-panel"><p class="le-panel-desc">Loading catalog\u2026</p></div>';
+        fetch('/api/boot-config')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                _rl.loading = false;
+                _rl.loaded  = true;
+                _rl.catalog = (data && data.lumpCatalog) || [];
+                _rl.limits  = (data && data.limits) || { maxNsEntries: 256, baseNamedNsCount: 47 };
+                var cfg = (data && data.config) || (data && data.defaults) || {};
+                _rlInitStep2(cfg);
+                var s3 = cfg.step3 || {};
+                _rl.emptySlotCount = Number.isFinite(s3.emptySlotCount) ? s3.emptySlotCount : 0;
+                renderResidentPanel();
+            })
+            .catch(function(err) {
+                _rl.loading  = false;
+                _rl.loaded   = false;
+                _rl.errorMsg = 'Failed to load boot config: ' + err;
+                renderResidentPanel();
+            });
+    }
+
+    function _rlInitStep2(cfg) {
+        _rl.step2State = {};
+        var savedLumps = (cfg && cfg.step2 && cfg.step2.lumps) || [];
+        var savedMap = {};
+        for (var i = 0; i < savedLumps.length; i++) {
+            savedMap[savedLumps[i].nsSlot] = savedLumps[i];
+        }
+        for (var j = 0; j < _rl.catalog.length; j++) {
+            var cat = _rl.catalog[j];
+            var saved = savedMap[cat.nsSlot];
+            _rl.step2State[cat.nsSlot] = {
+                resident:    !!(saved && saved.resident),
+                physAddr:    (saved && Number.isFinite(saved.physAddr)) ? saved.physAddr : null,
+                lumpSize:    cat.lumpSize,
+                abstraction: cat.abstraction
+            };
+        }
+    }
+
+    function _rlValidate() {
+        var p    = _getStep1Payload();
+        var s1   = p.step1;
+        var BOOT_ABSTR_SZ   = 64;
+        var NS_TABLE_RESERVE = 0x300;
+        var sum    = (s1.namespaceLumpWords || 0) + (s1.threadLumpWords || 0) + BOOT_ABSTR_SZ;
+        var total  = s1.totalNamespaceWords || 0;
+        var usable = total - NS_TABLE_RESERVE;
+        var occ = [];
+        for (var slotStr in _rl.step2State) {
+            var st = _rl.step2State[slotStr];
+            if (!st.resident) continue;
+            var lbl = (st.abstraction || '?') + ' (NS ' + slotStr + ')';
+            if (!Number.isFinite(st.physAddr) || st.physAddr < 0) {
+                return lbl + ': physAddr is required for resident lumps.';
+            }
+            var sz = st.lumpSize || 0;
+            if (sz <= 0) return lbl + ': missing lumpSize.';
+            if (st.physAddr < sum) {
+                return lbl + ': physAddr ' + st.physAddr + ' overlaps the foundational region (0\u2026' + (sum - 1) + ').';
+            }
+            if (st.physAddr + sz > usable) {
+                return lbl + ': ' + sz + '-word lump at ' + st.physAddr + ' extends past usable region (' + usable + ').';
+            }
+            for (var k = 0; k < occ.length; k++) {
+                if (!(st.physAddr + sz <= occ[k].start || st.physAddr >= occ[k].end)) {
+                    return lbl + ': overlaps ' + occ[k].label + '.';
+                }
+            }
+            occ.push({ start: st.physAddr, end: st.physAddr + sz, label: lbl });
+        }
+        var maxNs   = _rl.limits.maxNsEntries   || 256;
+        var baseNs  = _rl.limits.baseNamedNsCount || 47;
+        var emptyCount = _rl.emptySlotCount || 0;
+        if (!Number.isFinite(emptyCount) || emptyCount < 0) {
+            return 'Empty NS slot count must be a non-negative integer.';
+        }
+        var need = baseNs + emptyCount;
+        if (need > maxNs) {
+            return 'Reserving ' + emptyCount + ' empty slots after the ' + baseNs +
+                   ' named slots would need ' + need + ' entries but the NS table only holds ' +
+                   maxNs + '. Max reservable: ' + (maxNs - baseNs) + '.';
+        }
+        return '';
+    }
+
+    function _rlOnChange(ev) {
+        var slot  = parseInt(ev.target.getAttribute('data-rl-slot'), 10);
+        var field = ev.target.getAttribute('data-rl-field');
+        var st    = _rl.step2State[slot] || {};
+        if (field === 'resident') {
+            st.resident = !!ev.target.checked;
+        } else if (field === 'physAddr') {
+            var v = ev.target.value;
+            st.physAddr = (v === '' ? null : parseInt(v, 10));
+        }
+        _rl.step2State[slot] = st;
+        renderResidentPanel();
+    }
+
+    function renderResidentPanel() {
+        var el = document.getElementById('lumpResidentPanel');
+        if (!el) return;
+
+        if (!_rl.loaded && !_rl.errorMsg) {
+            _rlLoad();
+            return;
+        }
+
+        var err    = _rlValidate();
+        var maxNs  = _rl.limits.maxNsEntries    || 256;
+        var baseNs = _rl.limits.baseNamedNsCount || 47;
+
+        // 3-LUMP starter kit — always shown at top, locked as Boot
+        var BOOT_STARTER = [
+            { label: 'Boot.NS',     nsSlot: 0, note: 'Namespace root' },
+            { label: 'Boot.Thread', nsSlot: 1, note: 'Initial thread' },
+            { label: 'Boot.Abstr',  nsSlot: 3, note: 'Boot code entry' }
+        ];
+        var rows = BOOT_STARTER.map(function(b) {
+            return '<tr class="le-rl-row le-rl-boot-row">' +
+                '<td class="le-rl-td">' + esc(b.label) +
+                    ' <span class="le-rl-boot-note">' + esc(b.note) + '</span></td>' +
+                '<td class="le-rl-td le-rl-td-num">' + esc(String(b.nsSlot)) + '</td>' +
+                '<td class="le-rl-td le-rl-td-num">64</td>' +
+                '<td class="le-rl-td"><span class="le-rl-boot-badge">Boot</span></td>' +
+                '<td class="le-rl-td le-rl-addr-na">\u2014</td>' +
+                '</tr>';
+        }).join('');
+
+        if (!_rl.catalog.length) {
+            rows += '<tr><td colspan="5" class="le-rl-empty-msg">No catalog lumps available ' +
+                   '(server/lumps/manifest.json has no assignable entries).</td></tr>';
+        } else {
+            for (var i = 0; i < _rl.catalog.length; i++) {
+                var cat = _rl.catalog[i];
+                var st  = _rl.step2State[cat.nsSlot] || {};
+                var physVal = (st.physAddr != null && Number.isFinite(st.physAddr))
+                              ? st.physAddr : '';
+                rows +=
+                    '<tr class="le-rl-row">' +
+                    '<td class="le-rl-td">' + esc(cat.abstraction || '?') + '</td>' +
+                    '<td class="le-rl-td le-rl-td-num">' + esc(String(cat.nsSlot)) + '</td>' +
+                    '<td class="le-rl-td le-rl-td-num">' + esc(cat.lumpSize != null ? String(cat.lumpSize) : '?') + '</td>' +
+                    '<td class="le-rl-td">' +
+                      '<label class="le-rl-mode-label' + (st.resident ? ' le-rl-mode-resident' : '') + '">' +
+                        '<input type="checkbox" class="le-rl-check"' +
+                          ' data-rl-slot="' + cat.nsSlot + '"' +
+                          ' data-rl-field="resident"' +
+                          (st.resident ? ' checked' : '') + '> ' +
+                        (st.resident ? 'Resident' : 'Lazy') +
+                      '</label>' +
+                    '</td>' +
+                    '<td class="le-rl-td">' +
+                      '<input type="number" min="0" step="1"' +
+                        ' class="le-rl-addr"' +
+                        ' data-rl-slot="' + cat.nsSlot + '"' +
+                        ' data-rl-field="physAddr"' +
+                        ' value="' + esc(String(physVal)) + '"' +
+                        (st.resident ? '' : ' disabled') + '>' +
+                    '</td>' +
+                    '</tr>';
+            }
+        }
+
+        var errorBanner  = err
+            ? '<div class="le-error-banner">\u26A0 ' + esc(err) + '</div>'
+            : '';
+        var rlErrorMsg   = _rl.errorMsg
+            ? '<div class="le-error-banner">' + esc(_rl.errorMsg) + '</div>'
+            : '';
+        var statusBanner = (_rl.statusMsg && !err)
+            ? '<div class="le-rl-status">' + esc(_rl.statusMsg) + '</div>'
+            : '';
+
+        el.innerHTML =
+            '<div class="le-panel le-panel-wide">' +
+            '<p class="le-panel-desc">Pick which catalog lumps are baked into the boot image at a fixed physical address ' +
+            '(<strong style="color:var(--church-gold)">Resident</strong>) and which are fetched on first ' +
+            '<code>CALL</code> (<strong>Lazy</strong>). Resident lumps require a physical address inside the usable ' +
+            'region (after the foundational lumps, before the NS table).</p>' +
+            rlErrorMsg +
+            '<div class="le-rl-table-wrap">' +
+            '<table class="le-rl-table">' +
+            '<thead><tr>' +
+            '<th class="le-rl-th">Lump</th>' +
+            '<th class="le-rl-th le-rl-th-narrow">NS</th>' +
+            '<th class="le-rl-th le-rl-th-narrow">Size&nbsp;(w)</th>' +
+            '<th class="le-rl-th le-rl-th-mode">Mode</th>' +
+            '<th class="le-rl-th">Phys addr&nbsp;(resident only)</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table>' +
+            '</div>' +
+            '<div class="le-divider"></div>' +
+            '<div class="le-field-row">' +
+                '<label class="le-label">Empty NS slots<span class="le-range-hint">Reserve N extra slots at boot for runtime growth</span></label>' +
+                '<div class="le-input-group">' +
+                    '<input type="number" class="le-number" id="le-rl-empty-slots" min="0" step="1"' +
+                        ' value="' + esc(String(_rl.emptySlotCount)) + '"' +
+                        ' oninput="lumpEditorRLEmptySlots(this.value)">' +
+                    '<span class="le-rl-hint">baseline ' + baseNs + ' named + reserve \u2264 ' + maxNs + ' total</span>' +
+                '</div>' +
+            '</div>' +
+            errorBanner +
+            statusBanner +
+            '<div id="le-rl-save-status" class="le-rl-status" style="min-height:1.2em;"></div>' +
+            '<div id="le-rl-gen-result" class="le-rl-status" style="min-height:1em;"></div>' +
+            '<div class="le-save-row le-rl-btn-row">' +
+                '<button class="le-save-btn"' + (err ? ' disabled' : '') + ' onclick="lumpEditorRLSave()">' +
+                    '\u2714\ufe0e Save boot config' +
+                '</button>' +
+                '<button class="le-rl-gen-btn" id="le-rl-gen-btn" onclick="lumpEditorRLGenerate()"' +
+                    ' title="Generate the binary boot image from the saved config and produce a downloadable .bin">' +
+                    '\u2699\ufe0e Generate Boot Image' +
+                '</button>' +
+                '<button class="le-rl-gen-btn" onclick="lumpEditorRLUpload()"' +
+                    ' title="Upload a pre-built boot-image.bin from your computer">' +
+                    '\u2B06\ufe0e Upload .bin' +
+                '</button>' +
+            '</div>' +
+            '<div class="le-rl-drop-zone" id="le-rl-drop-zone"' +
+                ' ondragover="event.preventDefault();event.dataTransfer.dropEffect=\'copy\';this.classList.add(\'le-rl-drop-active\')"' +
+                ' ondragleave="this.classList.remove(\'le-rl-drop-active\')"' +
+                ' ondrop="event.preventDefault();this.classList.remove(\'le-rl-drop-active\');' +
+                          'var _f=event.dataTransfer.files&&event.dataTransfer.files[0];' +
+                          'if(_f){if(!_f.name.toLowerCase().endsWith(\'.bin\')&&_f.type!==\'application/octet-stream\'){' +
+                          'document.getElementById(\'le-rl-gen-result\').textContent=\'Only .bin boot image files are accepted.\';' +
+                          '}else{document.getElementById(\'le-rl-gen-result\').textContent=\'\';' +
+                          'if(typeof uploadBootImageFile===\'function\')uploadBootImageFile(_f);}}">' +
+                'Drop a <code>.bin</code> boot image file here to upload' +
+            '</div>' +
+            '<input type="file" id="le-rl-upload-input" accept=".bin,application/octet-stream"' +
+                ' style="display:none;" onchange="lumpEditorRLHandleUpload(this)">' +
+            '</div>';
+
+        el.querySelectorAll('.le-rl-check, .le-rl-addr').forEach(function(inp) {
+            inp.oninput = inp.onchange = _rlOnChange;
+        });
+    }
+
     // ── Thread panel ──────────────────────────────────────────────────────────
 
     var DR_WORDS  = 16;   // DR0–DR15, static
@@ -155,8 +478,8 @@
     };
 
     function getBoardProfile() {
-        var board = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'tang-nano-20k';
-        return BOARD_PROFILES[board] || BOARD_PROFILES['tang-nano-20k'];
+        var board = (typeof localStorage !== 'undefined' && localStorage.getItem('fpga_board_target')) || 'wukong-xc7a100t';
+        return BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
     }
 
     // Returns the largest exponent e such that 2^e ≤ n, bounded to [MIN_EXP, MAX_EXP]
@@ -251,10 +574,12 @@
 
         var saveBtn = '<div class="le-save-row">' +
             '<button class="le-save-btn"' + (overCapacity ? ' disabled' : '') +
-            ' onclick="buildAndDownloadLump()"' +
-            ' title="Build and download a .lump binary with the current Thread LUMP header">' +
+            ' onclick="lumpEditorSaveThread()"' +
+            ' title="Build and download a .lump binary with the current Thread LUMP header, and save step 1 sizes to boot config">' +
             '\u2B07 Save\u00a0/\u00a0Build LUMP' +
             '</button>' +
+            '<span id="le-t-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
+            '<span id="le-t-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
             '</div>';
 
         return '<div class="le-panel">' +
@@ -337,7 +662,7 @@
             threadZones.push({ label: 'T' + t, words: threadLump, cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" });
         }
         var allZones = [
-            { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
+            { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr' },
             { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap', onclick: "switchView('namespace')" }
         ].concat(threadZones).concat([
             { label: 'Pool',       words: Math.max(pool, 0), cls: 'le-zone-free' }
@@ -391,6 +716,14 @@
             renderMagBar(allZones) +
             '<div class="le-divider"></div>' +
             grid +
+            '<div class="le-save-row">' +
+                '<button class="le-save-btn" onclick="lumpEditorPostStep1()"' +
+                ' title="Save current NS + Thread lump sizes as step 1 in the boot config">' +
+                '\u2714\ufe0e Save to boot config' +
+                '</button>' +
+                '<span id="le-ns-step1-status" class="le-rl-status" style="margin-left:0.75rem;"></span>' +
+                '<span id="le-ns-step1-err" class="le-rl-status" style="margin-left:0.5rem;color:#f77;"></span>' +
+            '</div>' +
         '</div>';
     }
 
@@ -482,6 +815,121 @@
     window.initLumpEditor = function () {
         loadState();
         render();
+    };
+
+    // ── Thread + NS step1 save helpers ────────────────────────────────────────
+
+    window.lumpEditorSaveThread = function () {
+        if (typeof buildAndDownloadLump === 'function') buildAndDownloadLump();
+        var statusEl = document.getElementById('le-t-step1-status');
+        var errEl    = document.getElementById('le-t-step1-err');
+        _postStep1(statusEl, errEl);
+    };
+
+    window.lumpEditorPostStep1 = function () {
+        var statusEl = document.getElementById('le-ns-step1-status');
+        var errEl    = document.getElementById('le-ns-step1-err');
+        _postStep1(statusEl, errEl);
+    };
+
+    // ── Resident Lumps panel public handlers ──────────────────────────────────
+
+    window.lumpEditorRLEmptySlots = function (v) {
+        _rl.emptySlotCount = Math.max(0, parseInt(v, 10) || 0);
+        var err = _rlValidate();
+        _rl.errorMsg = err || '';
+        var errBanner = document.querySelector('#lumpResidentPanel .le-error-banner');
+        var saveBtn   = document.querySelector('#lumpResidentPanel .le-save-row .le-save-btn');
+        if (errBanner) {
+            errBanner.textContent = err ? '\u26A0 ' + err : '';
+        } else {
+            renderResidentPanel();
+        }
+        if (saveBtn) saveBtn.disabled = !!err;
+    };
+
+    window.lumpEditorRLSave = function () {
+        var err = _rlValidate();
+        if (err) return;
+
+        var step2Lumps = [];
+        for (var slotStr in _rl.step2State) {
+            var st = _rl.step2State[slotStr];
+            var row = { nsSlot: parseInt(slotStr, 10), resident: !!st.resident };
+            if (st.resident) {
+                row.physAddr = st.physAddr;
+                if (st.lumpSize) row.lumpSize = st.lumpSize;
+            }
+            step2Lumps.push(row);
+        }
+
+        var p = _getStep1Payload();
+        var payload = {
+            targetBoard: p.targetBoard,
+            step1:       p.step1,
+            step2:       { lumps: step2Lumps },
+            step3:       { emptySlotCount: _rl.emptySlotCount || 0 }
+        };
+
+        var statusEl = document.getElementById('le-rl-save-status');
+        var errEl    = document.querySelector('#lumpResidentPanel .le-error-banner');
+        if (statusEl) statusEl.textContent = 'Saving\u2026';
+        if (errEl)    errEl.textContent    = '';
+
+        fetch('/api/boot-config', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json().then(function(j) { return { ok: r.ok, body: j }; }); })
+        .then(function(res) {
+            if (!res.ok || res.body.ok === false) {
+                if (statusEl) statusEl.textContent = '';
+                _rl.errorMsg = (res.body && res.body.error) || 'Save failed.';
+                renderResidentPanel();
+                return;
+            }
+            window.bootConfig = res.body.config;
+            _rl.statusMsg = 'Saved. Reset the simulator to apply the new boot config.';
+            _rl.errorMsg  = '';
+            renderResidentPanel();
+        })
+        .catch(function(saveErr) {
+            _rl.errorMsg = 'Save failed: ' + saveErr;
+            renderResidentPanel();
+        });
+    };
+
+    window.lumpEditorRLGenerate = function () {
+        if (typeof generateBootImage === 'function') generateBootImage();
+    };
+
+    window.lumpEditorRLUpload = function () {
+        var inp = document.getElementById('le-rl-upload-input');
+        if (inp) inp.click();
+    };
+
+    window.lumpEditorRLHandleUpload = function (input) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        input.value = '';
+        if (!file.name.toLowerCase().endsWith('.bin') && file.type !== 'application/octet-stream') {
+            var genRes = document.getElementById('le-rl-gen-result');
+            if (genRes) genRes.textContent = 'Only .bin boot image files are accepted.';
+            return;
+        }
+        if (typeof uploadBootImageFile === 'function') {
+            uploadBootImageFile(file);
+        }
+    };
+
+    window.initResidentPanel = function () {
+        loadState();
+        _rl.loaded    = false;
+        _rl.loading   = false;
+        _rl.statusMsg = '';
+        _rl.errorMsg  = '';
+        _rlLoad();
     };
 
 }());

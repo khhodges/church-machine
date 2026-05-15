@@ -2226,12 +2226,6 @@ function renderMemoryDump(location, limit, nsIndex) {
 let _hardwareProfiles = null;
 let _lumpCatalog = [];          // [{abstraction, nsSlot, lumpSize, token}]
 let _bdLimits = { maxNsEntries: 256, baseNamedNsCount: 47 };
-// In-memory mirror of the Step 2 lump grid while the modal is open.
-// Keyed by nsSlot → {resident, physAddr, lumpSize, abstraction}.
-let _bdStep2State = {};
-
-function _bdIsPow2(n) { return Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0; }
-
 // Used by the modal to refresh state. The DOMContentLoaded handler
 // performs the *initial* prefetch so window.bootConfig is set before
 // the simulator boots; this function just refreshes from the server.
@@ -2251,296 +2245,7 @@ function _loadBootConfig() {
         });
 }
 
-function openBootDesigner() {
-    const overlay = document.getElementById('bootDesignerOverlay');
-    if (!overlay) return;
-    overlay.style.display = 'flex';
-    document.getElementById('bdStatus').textContent = '';
-    document.getElementById('bdError').textContent = '';
-    _loadBootConfig().then(data => {
-        const sel = document.getElementById('bdTargetBoard');
-        sel.innerHTML = '';
-        const profiles = _hardwareProfiles || {};
-        Object.keys(profiles).forEach(key => {
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = profiles[key].label || key;
-            sel.appendChild(opt);
-        });
-        // Prefill from saved config when present, otherwise from server
-        // defaults so the programmer has a reasonable starting point.
-        const cfg = window.bootConfig || (data && data.defaults) || {};
-        sel.value = cfg.targetBoard || sel.value;
-        const s1 = cfg.step1 || {};
-        document.getElementById('bdTotal').value  = s1.totalNamespaceWords  || 16384;
-        document.getElementById('bdNs').value     = s1.namespaceLumpWords   || 64;
-        document.getElementById('bdThread').value = s1.threadLumpWords      || 256;
-        bdRefreshHwInfo();
-        ['bdTotal','bdNs','bdThread'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.oninput = _bdValidate;
-        });
-        _bdInitStep2(cfg);
-        // Step 3 (Task #216): empty NS slot reservation. Prefill from saved
-        // config or fall back to 0 (historical behaviour: no extra slots).
-        const s3 = (cfg.step3) || (data && data.defaults && data.defaults.step3) || {};
-        const emptyEl = document.getElementById('bdEmptySlots');
-        if (emptyEl) {
-            emptyEl.value = Number.isFinite(s3.emptySlotCount) ? s3.emptySlotCount : 0;
-            emptyEl.oninput = _bdValidate;
-        }
-        _bdValidate();
-    });
-}
 
-// ---------------------------------------------------------------------------
-// Step 2 (resident lumps) — table render + state
-// ---------------------------------------------------------------------------
-function _bdInitStep2(cfg) {
-    _bdStep2State = {};
-    const savedLumps = ((cfg && cfg.step2 && cfg.step2.lumps) || []);
-    const savedMap = {};
-    for (const e of savedLumps) savedMap[e.nsSlot] = e;
-    // Suggested default phys addresses grow upward from the foundational
-    // region; each row falls back to a sensible default if the user toggles
-    // resident without picking an address.
-    const BOOT_ABSTR_DEFAULT_SIZE = 64; // Boot.Abstr size is always 64w min (Task #568/569)
-    let cursor = (parseInt(document.getElementById('bdNs').value, 10) || 0)
-               + (parseInt(document.getElementById('bdThread').value, 10) || 0)
-               + BOOT_ABSTR_DEFAULT_SIZE;
-    for (const cat of _lumpCatalog) {
-        const saved = savedMap[cat.nsSlot];
-        const resident = !!(saved && saved.resident);
-        const physAddr = (saved && Number.isFinite(saved.physAddr))
-                          ? saved.physAddr : cursor;
-        if (resident) cursor = physAddr + (cat.lumpSize || 0);
-        _bdStep2State[cat.nsSlot] = {
-            resident, physAddr,
-            lumpSize: cat.lumpSize,
-            abstraction: cat.abstraction,
-        };
-    }
-    _bdRenderStep2();
-}
-
-function _bdRenderStep2() {
-    const tbody = document.getElementById('bdLumpTbody');
-    const empty = document.getElementById('bdLumpEmpty');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    if (!_lumpCatalog.length) {
-        empty.textContent = 'No catalog lumps available (server/lumps/manifest.json is empty).';
-        return;
-    }
-    empty.textContent = '';
-    for (const cat of _lumpCatalog) {
-        const st = _bdStep2State[cat.nsSlot] || {};
-        const tr = document.createElement('tr');
-        tr.style.borderBottom = '1px solid #2a2a2a';
-        const residentChecked = st.resident ? 'checked' : '';
-        const physVal = (st.physAddr != null) ? st.physAddr : '';
-        const physDisabled = st.resident ? '' : 'disabled';
-        const physStyle = st.resident ? '' : 'opacity:0.4;';
-        tr.innerHTML =
-            `<td style="padding:5px 4px;color:#ddd;">${cat.abstraction || '?'}</td>` +
-            `<td style="padding:5px 4px;color:#aaa;">${cat.nsSlot}</td>` +
-            `<td style="padding:5px 4px;color:#aaa;">${cat.lumpSize || '?'}</td>` +
-            `<td style="padding:5px 4px;">` +
-              `<label style="cursor:pointer;color:${st.resident?'#9c9':'#aaa'};">` +
-                `<input type="checkbox" data-bd-slot="${cat.nsSlot}" data-bd-field="resident" ${residentChecked}> ` +
-                `${st.resident ? 'Resident' : 'Lazy'}` +
-              `</label>` +
-            `</td>` +
-            `<td style="padding:5px 4px;">` +
-              `<input type="number" min="0" step="1" data-bd-slot="${cat.nsSlot}" data-bd-field="physAddr" ` +
-                     `value="${physVal}" ${physDisabled} ` +
-                     `style="width:120px;background:#111;color:#ddd;border:1px solid #555;padding:3px 6px;${physStyle}">` +
-            `</td>`;
-        tbody.appendChild(tr);
-    }
-    tbody.querySelectorAll('input[data-bd-slot]').forEach(inp => {
-        inp.oninput = inp.onchange = _bdOnStep2Change;
-    });
-}
-
-function _bdOnStep2Change(ev) {
-    const slot = parseInt(ev.target.getAttribute('data-bd-slot'), 10);
-    const field = ev.target.getAttribute('data-bd-field');
-    const st = _bdStep2State[slot] || {};
-    if (field === 'resident') {
-        st.resident = !!ev.target.checked;
-    } else if (field === 'physAddr') {
-        const v = ev.target.value;
-        st.physAddr = (v === '' ? null : parseInt(v, 10));
-    }
-    _bdStep2State[slot] = st;
-    _bdRenderStep2();
-    _bdValidate();
-}
-
-function closeBootDesigner() {
-    const overlay = document.getElementById('bootDesignerOverlay');
-    if (overlay) overlay.style.display = 'none';
-}
-
-function bdRefreshHwInfo() {
-    const sel = document.getElementById('bdTargetBoard');
-    const info = document.getElementById('bdHwInfo');
-    if (!sel || !info) return;
-    const p = (_hardwareProfiles || {})[sel.value];
-    if (!p) { info.textContent = 'No hardware profile data.'; return; }
-    info.innerHTML =
-        `<strong>${p.label}</strong><br>` +
-        `Total RAM available for namespace: <strong>${p.totalRamWords} words</strong> ` +
-        `(${(p.totalRamWords*4/1024).toFixed(1)} KB at 32-bit)<br>` +
-        `Address bits: ${p.addressBits}` +
-        (p.addressRange ? `<br>Address range: <code>${p.addressRange}</code>` : '') +
-        `<br><span style="color:#888;">${p.notes || ''}</span>`;
-    _bdValidate();
-}
-
-function _bdValidate() {
-    const sel = document.getElementById('bdTargetBoard');
-    const p = (_hardwareProfiles || {})[sel.value] || { totalRamWords: 0, label: '?' };
-    const total  = parseInt(document.getElementById('bdTotal').value, 10);
-    const nsLump = parseInt(document.getElementById('bdNs').value, 10);
-    const thrLump = parseInt(document.getElementById('bdThread').value, 10);
-    const errEl = document.getElementById('bdError');
-    const sumEl = document.getElementById('bdSummary');
-    const saveBtn = document.getElementById('bdSaveBtn');
-    let err = '';
-    const fields = [['Total namespace memory', total],
-                    ['Namespace Lump', nsLump],
-                    ['Thread Lump', thrLump]];
-    for (const [name, v] of fields) {
-        if (!Number.isFinite(v) || v <= 0) { err = `${name} must be a positive integer.`; break; }
-        if (!_bdIsPow2(v))                  { err = `${name} must be a power of 2.`; break; }
-        if (v < 64)                         { err = `${name} must be at least 64 words.`; break; }
-    }
-    if (!err && total > p.totalRamWords) {
-        err = `Total namespace memory (${total}) exceeds ${p.label} budget (${p.totalRamWords} words).`;
-    }
-    const BOOT_ABSTR_DEFAULT_SIZE = 64; // Boot.Abstr always 64w minimum (Task #568/569)
-    const sum = (nsLump||0) + (thrLump||0) + BOOT_ABSTR_DEFAULT_SIZE;
-    const NS_TABLE_RESERVE = 0x300; // 768 words; keep in sync with simulator.js
-    const usable = (total||0) - NS_TABLE_RESERVE;
-    if (!err && sum > total) {
-        err = `Foundational lumps sum to ${sum} words but only ${total} are budgeted.`;
-    }
-    if (!err && sum > usable) {
-        err = `Foundational lumps (${sum} words) exceed the ${usable}-word usable space ` +
-              `(total ${total} minus ${NS_TABLE_RESERVE} reserved for the namespace table).`;
-    }
-    // Step 2 — validate resident lump placements: each phys addr must sit
-    // after the foundational region, before the NS-table reserve, and not
-    // overlap any other resident lump.
-    if (!err) {
-        const occ = []; // [{start, end, label}]
-        for (const slotStr of Object.keys(_bdStep2State)) {
-            const st = _bdStep2State[slotStr];
-            if (!st.resident) continue;
-            const lbl = `${st.abstraction} (NS ${slotStr})`;
-            if (!Number.isFinite(st.physAddr) || st.physAddr < 0) {
-                err = `${lbl}: physAddr is required for resident lumps.`; break;
-            }
-            const sz = st.lumpSize || 0;
-            if (sz <= 0) { err = `${lbl}: missing lumpSize.`; break; }
-            if (st.physAddr < sum) {
-                err = `${lbl}: physAddr ${st.physAddr} overlaps the foundational region (0..${sum-1}).`;
-                break;
-            }
-            if (st.physAddr + sz > usable) {
-                err = `${lbl}: ${sz}-word lump at ${st.physAddr} extends past usable region (ends at ${usable}).`;
-                break;
-            }
-            for (const o of occ) {
-                if (!(st.physAddr + sz <= o.start || st.physAddr >= o.end)) {
-                    err = `${lbl}: overlaps ${o.label}.`; break;
-                }
-            }
-            if (err) break;
-            occ.push({start: st.physAddr, end: st.physAddr + sz, label: lbl});
-        }
-    }
-    // Step 3 — validate empty NS slot reservation count. Capacity rule
-    // matches the server (_validate_step3): the simulator unconditionally
-    // writes baseNamedNsCount entries from the default abstraction
-    // catalog at boot, so Step 3 reserves slots ON TOP of that baseline.
-    const maxNs = _bdLimits.maxNsEntries || 256;
-    const baseNs = _bdLimits.baseNamedNsCount || 47;
-    const emptyEl = document.getElementById('bdEmptySlots');
-    const emptyCount = emptyEl ? parseInt(emptyEl.value, 10) : 0;
-    if (!err && (!Number.isFinite(emptyCount) || emptyCount < 0)) {
-        err = 'Empty NS slot count must be a non-negative integer.';
-    }
-    if (!err) {
-        const need = baseNs + emptyCount;
-        if (need > maxNs) {
-            err = `Reserving ${emptyCount} empty NS slots after the ${baseNs} ` +
-                  `named slots written at boot would need ${need} entries but ` +
-                  `the NS table only holds ${maxNs}. Max reservable: ${maxNs - baseNs}.`;
-        }
-    }
-    errEl.textContent = err;
-    saveBtn.disabled = !!err;
-    saveBtn.style.opacity = err ? '0.5' : '1';
-    const free = (total||0) - NS_TABLE_RESERVE - sum;
-    sumEl.innerHTML =
-        `Foundational lumps total: <strong>${sum}</strong> words. ` +
-        `Free for resident lumps + reserved slots (Steps 2 & 3): ` +
-        `<strong>${free >= 0 ? free : 0}</strong> words ` +
-        `<span style="color:#888;">(total ${total||0} − ${NS_TABLE_RESERVE} NS table − ${sum} foundational)</span>.`;
-    return !err;
-}
-
-function saveBootDesigner() {
-    if (!_bdValidate()) return;
-    const step2Lumps = [];
-    for (const slotStr of Object.keys(_bdStep2State)) {
-        const st = _bdStep2State[slotStr];
-        const row = { nsSlot: parseInt(slotStr, 10), resident: !!st.resident };
-        if (st.resident) {
-            row.physAddr = st.physAddr;
-            if (st.lumpSize) row.lumpSize = st.lumpSize;
-        }
-        step2Lumps.push(row);
-    }
-    const payload = {
-        targetBoard: document.getElementById('bdTargetBoard').value,
-        step1: {
-            totalNamespaceWords:  parseInt(document.getElementById('bdTotal').value, 10),
-            namespaceLumpWords:   parseInt(document.getElementById('bdNs').value, 10),
-            threadLumpWords:      parseInt(document.getElementById('bdThread').value, 10),
-        },
-        step2: { lumps: step2Lumps },
-        step3: {
-            emptySlotCount: parseInt(document.getElementById('bdEmptySlots').value, 10) || 0,
-        },
-    };
-    const status = document.getElementById('bdStatus');
-    const errEl = document.getElementById('bdError');
-    status.textContent = 'Saving…';
-    errEl.textContent = '';
-    fetch('/api/boot-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    })
-        .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
-        .then(({ ok, body }) => {
-            if (!ok || body.ok === false) {
-                status.textContent = '';
-                errEl.textContent = (body && body.error) || 'Save failed.';
-                return;
-            }
-            window.bootConfig = body.config;
-            status.textContent = 'Saved. Reset the simulator to apply the new lump sizes.';
-        })
-        .catch(err => {
-            status.textContent = '';
-            errEl.textContent = 'Save failed: ' + err;
-        });
-}
 
 // Task #217 — fetch the saved boot-image.bin (if any) without triggering
 // a 404 console error noise. Returns ArrayBuffer or null.
@@ -2580,11 +2285,9 @@ function _maybeApplyBootImage() {
 // download / inline-binary URLs; we surface the download link and arm
 // the simulator to load the image on the next reset.
 function generateBootImage() {
-    const result = document.getElementById('bdGenResult');
-    const errEl  = document.getElementById('bdError');
-    const btn    = document.getElementById('bdGenBtn');
-    if (result) result.textContent = 'Generating…';
-    if (errEl)  errEl.textContent  = '';
+    const result = document.getElementById('le-rl-gen-result');
+    const btn    = document.getElementById('le-rl-gen-btn');
+    if (result) result.textContent = 'Generating\u2026';
     if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
     fetch('/api/boot-image/generate', {
         method: 'POST',
@@ -2594,15 +2297,14 @@ function generateBootImage() {
         .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
         .then(({ ok, body }) => {
             if (!ok || body.ok === false) {
-                if (result) result.textContent = '';
-                if (errEl)  errEl.textContent  = (body && body.error) || 'Generation failed.';
+                if (result) result.textContent = (body && body.error) || 'Generation failed.';
                 return;
             }
             const kib = (body.bytes / 1024).toFixed(1);
             if (result) {
                 result.innerHTML =
                     `Generated <strong>${body.bytes.toLocaleString()}</strong> bytes ` +
-                    `(${body.words.toLocaleString()} words, ${kib} KiB) — ` +
+                    `(${body.words.toLocaleString()} words, ${kib}\u00a0KiB) \u2014 ` +
                     `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
                     `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
                     `Reset the simulator to apply this image at boot.`;
@@ -2620,8 +2322,7 @@ function generateBootImage() {
             });
         })
         .catch(err => {
-            if (result) result.textContent = '';
-            if (errEl)  errEl.textContent  = 'Generation failed: ' + err;
+            if (result) result.textContent = 'Generation failed: ' + err;
         })
         .finally(() => {
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -2630,14 +2331,10 @@ function generateBootImage() {
 
 function uploadBootImageFile(file) {
     if (!file) return;
-    const result  = document.getElementById('bdGenResult');
-    const errEl   = document.getElementById('bdError');
-    const upBtn   = document.getElementById('bdUploadBtn');
-    const genBtn  = document.getElementById('bdGenBtn');
-    if (result) result.textContent = 'Uploading…';
-    if (errEl)  errEl.textContent  = '';
-    if (upBtn)  { upBtn.disabled = true;  upBtn.style.opacity  = '0.6'; }
-    if (genBtn) { genBtn.disabled = true; genBtn.style.opacity = '0.6'; }
+    const result  = document.getElementById('le-rl-gen-result');
+    const btn     = document.getElementById('le-rl-gen-btn');
+    if (result) result.textContent = 'Uploading\u2026';
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
     const reader = new FileReader();
     reader.onload = function(e) {
         const arrayBuf = e.target.result;
@@ -2653,15 +2350,14 @@ function uploadBootImageFile(file) {
             .then(r => r.json().then(j => ({ ok: r.ok, body: j })))
             .then(({ ok, body }) => {
                 if (!ok || body.ok === false) {
-                    if (result) result.textContent = '';
-                    if (errEl)  errEl.textContent  = (body && body.error) || 'Upload failed.';
+                    if (result) result.textContent = (body && body.error) || 'Upload failed.';
                     return;
                 }
                 const kib = (body.bytes / 1024).toFixed(1);
                 if (result) {
                     result.innerHTML =
                         `Uploaded <strong>${body.bytes.toLocaleString()}</strong> bytes ` +
-                        `(${body.words.toLocaleString()} words, ${kib} KiB) — ` +
+                        `(${body.words.toLocaleString()} words, ${kib}\u00a0KiB) \u2014 ` +
                         `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
                         `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
                         `Reset the simulator to apply this image at boot.`;
@@ -2675,19 +2371,15 @@ function uploadBootImageFile(file) {
                 });
             })
             .catch(err => {
-                if (result) result.textContent = '';
-                if (errEl)  errEl.textContent  = 'Upload failed: ' + err;
+                if (result) result.textContent = 'Upload failed: ' + err;
             })
             .finally(() => {
-                if (upBtn)  { upBtn.disabled = false;  upBtn.style.opacity  = '1'; }
-                if (genBtn) { genBtn.disabled = false; genBtn.style.opacity = '1'; }
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             });
     };
     reader.onerror = function() {
-        if (result) result.textContent = '';
-        if (errEl)  errEl.textContent  = 'Failed to read file.';
-        if (upBtn)  { upBtn.disabled = false;  upBtn.style.opacity  = '1'; }
-        if (genBtn) { genBtn.disabled = false; genBtn.style.opacity = '1'; }
+        if (result) result.textContent = 'Failed to read file.';
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     };
     reader.readAsArrayBuffer(file);
 }

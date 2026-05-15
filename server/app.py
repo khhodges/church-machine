@@ -346,7 +346,7 @@ HARDWARE_PROFILES = {
 
 DEFAULT_BOOT_CONFIG = {
     "schemaVersion": BOOT_CONFIG_SCHEMA_VERSION,
-    "targetBoard": "tang-nano-20k",
+    "targetBoard": "wukong-xc7a100t",
     "step1": {
         "totalNamespaceWords": 16384,
         "namespaceLumpWords": 64,

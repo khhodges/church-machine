@@ -8274,7 +8274,7 @@ function getStudentSettings() {
         language: 'english',
         nationality: 'us',
         ageTier: '13-17',
-        fpgaBoard: 'tang-nano-20k',
+        fpgaBoard: 'wukong-xc7a100t',
         selectedSubjects: []
     };
 }
@@ -8383,7 +8383,7 @@ function nativeShare() {
 }
 
 function getSelectedBoard() {
-    return localStorage.getItem('fpga_board_target') || 'tang-nano-20k';
+    return localStorage.getItem('fpga_board_target') || 'wukong-xc7a100t';
 }
 
 function getBoardShortLabel(board) {
@@ -8422,11 +8422,14 @@ function switchBuilderViewTab(tab) {
     const details     = document.getElementById('buildDetailsPanel');
     const lumpThread  = document.getElementById('lumpThreadPanel');
     const lumpNS      = document.getElementById('lumpNSPanel');
-    if (cyberspace) cyberspace.style.display = (tab === 'cyberspace')   ? '' : 'none';
-    if (details)    details.style.display    = (tab === 'buildlog')     ? '' : 'none';
-    if (lumpThread) lumpThread.style.display = (tab === 'lump-thread')  ? '' : 'none';
-    if (lumpNS)     lumpNS.style.display     = (tab === 'lump-ns')      ? '' : 'none';
+    const lumpResident = document.getElementById('lumpResidentPanel');
+    if (cyberspace)   cyberspace.style.display   = (tab === 'cyberspace')     ? '' : 'none';
+    if (details)      details.style.display      = (tab === 'buildlog')       ? '' : 'none';
+    if (lumpThread)   lumpThread.style.display   = (tab === 'lump-thread')    ? '' : 'none';
+    if (lumpNS)       lumpNS.style.display       = (tab === 'lump-ns')        ? '' : 'none';
+    if (lumpResident) lumpResident.style.display = (tab === 'lump-resident')  ? '' : 'none';
     if ((tab === 'lump-thread' || tab === 'lump-ns') && typeof initLumpEditor === 'function') initLumpEditor();
+    if (tab === 'lump-resident' && typeof initResidentPanel === 'function') initResidentPanel();
 }
 
 function _setBuildStatus(state, label, board) {
@@ -8547,7 +8550,7 @@ function updateHardwarePanelLabel() {
         info.textContent = '';
         if (buildBtn) buildBtn.dataset.tooltip = BASE_BUILD_TIP + '  |  Output: church_wukong_xc7a100t.v + wukong_xc7a100t.xdc + wukong_xc7a100t.tcl \u2014 source tcl in Vivado to build + program';
     } else {
-        info.textContent = 'Output: church_tang_nano_20k.v + Makefile + tang_nano_20k.cst  \u2014  run make pnr pack, then make prog';
+        info.textContent = '';
         if (buildBtn) buildBtn.dataset.tooltip = BASE_BUILD_TIP;
     }
 }
@@ -8721,7 +8724,7 @@ function saveSettings() {
         language: document.getElementById('settingLanguage')?.value || 'english',
         nationality: document.getElementById('settingNationality')?.value || 'us',
         ageTier: document.getElementById('settingAgeTier')?.value || '13-17',
-        fpgaBoard: document.getElementById('settingFPGABoard')?.value || 'tang-nano-20k',
+        fpgaBoard: document.getElementById('settingFPGABoard')?.value || 'wukong-xc7a100t',
         openSource: !!document.getElementById('settingOpenSource')?.checked,
         selectedSubjects: getSelectedSubjects()
     };
@@ -10243,7 +10246,7 @@ async function uploadToTang() {
     }
     con.textContent += '. Proceeding with flash…\n\n';
 
-    if (board === 'tang-nano-20k' && typeof checkUploadProfile === 'function') {
+    if (board === 'tang-nano-20k-iot' && typeof checkUploadProfile === 'function') {
         const fullNames = [];
         if (typeof BOOT_UPLOADS !== 'undefined') {
             for (const u of BOOT_UPLOADS) {
@@ -10391,7 +10394,7 @@ async function testUART() {
     switchView('builder');
     switchBuilderViewTab('buildlog');
 
-    const board = getSelectedBoard ? getSelectedBoard() : 'tang-nano-20k';
+    const board = getSelectedBoard ? getSelectedBoard() : 'wukong-xc7a100t';
     const boardLabel = getBoardLabel ? getBoardLabel(board) : 'FPGA';
 
     function log(text) { _buildLogAppend(text); }
