@@ -95,11 +95,12 @@
             state.ns.n_minus_6 = maxN;
             var newMaxSl = Math.pow(2, maxN + 14) / 64;
             if (state.ns.slots > newMaxSl) state.ns.slots = newMaxSl;
-            saveState();
             _nsSizeClampedInfo = { savedN: savedN, clampedN: maxN, boardLabel: profile.label };
+            saveState();
         } else {
             // Current size fits the new board — clear any stale clamp warning.
             _nsSizeClampedInfo = null;
+            saveState();
         }
     }
 
@@ -126,11 +127,25 @@
                 state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3;
                 state.ns.slots = s.ns.slots || 2000;
             }
+            // Restore the board-switch clamp warning if it is still applicable.
+            // It is applicable when the current n_minus_6 still matches what the
+            // clamp forced it to, meaning the user has not explicitly chosen a new size.
+            if (s.nsSizeClampedInfo &&
+                    typeof s.nsSizeClampedInfo.savedN    === 'number' &&
+                    typeof s.nsSizeClampedInfo.clampedN  === 'number' &&
+                    typeof s.nsSizeClampedInfo.boardLabel === 'string' &&
+                    state.ns.n_minus_6 === s.nsSizeClampedInfo.clampedN) {
+                _nsSizeClampedInfo = s.nsSizeClampedInfo;
+            }
         } catch (e) {}
     }
 
     function saveState() {
-        try { localStorage.setItem('lump_editor_state', JSON.stringify(state)); } catch (e) {}
+        try {
+            var payload = JSON.parse(JSON.stringify(state));
+            payload.nsSizeClampedInfo = _nsSizeClampedInfo || null;
+            localStorage.setItem('lump_editor_state', JSON.stringify(payload));
+        } catch (e) {}
     }
 
     // ── memory bar ────────────────────────────────────────────────────────────
@@ -876,6 +891,7 @@
 
     window.lumpEditorDismissNSWarning = function () {
         _nsSizeClampedInfo = null;
+        saveState();
         render();
     };
 
