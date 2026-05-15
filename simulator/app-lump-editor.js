@@ -509,9 +509,20 @@
                   '<input type="checkbox" onchange="lumpEditorBootShowAllToggle(this.checked)"' +
                   (showAll ? ' checked' : '') + '> show all (' + hiddenCount + ' hidden)</label>'
                 : '';
+            var bootWarn = '';
+            if (bootCatEntry && !validBootTarget(bootCatEntry)) {
+                var warnReasons = [];
+                if (bootCatEntry.nsSlotPolicy === 'dynamic') {
+                    warnReasons.push('dynamic-policy lump \u2014 NS slot is ephemeral and cannot serve as the boot entry');
+                }
+                if (!bootCatEntry.hasExecutableMethods) {
+                    warnReasons.push('no executable methods \u2014 nothing to run at boot');
+                }
+                bootWarn = '<div class="le-rl-boot-warn">\u26a0\ufe0f ' + esc(warnReasons.join('; ')) + '</div>';
+            }
             bootEntryCell = '<td class="le-rl-td">' +
                 '<select class="le-rl-boot-select" onchange="lumpEditorBootEntryChange(parseInt(this.value,10))">' +
-                selectOpts + '</select>' + showAllToggle + '</td>';
+                selectOpts + '</select>' + showAllToggle + bootWarn + '</td>';
         }
 
         var rows =

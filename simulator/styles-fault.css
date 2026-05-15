@@ -1042,6 +1042,13 @@
     cursor: pointer;
 }
 
+.le-rl-boot-warn {
+    color: var(--church-gold);
+    font-size: 0.75rem;
+    margin-top: 0.35rem;
+    opacity: 0.85;
+}
+
 .le-rl-addr-na {
     color: var(--text-secondary);
     font-size: 0.82rem;
