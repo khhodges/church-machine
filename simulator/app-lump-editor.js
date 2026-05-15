@@ -255,6 +255,11 @@
             '</div>' +
             '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
             bar +
+            renderMagBar([
+                { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr'  },
+                { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap' },
+                { label: 'Pool',       words: Math.max(pool, 0), cls: 'le-zone-free' }
+            ]) +
             '<div class="le-divider"></div>' +
             grid +
         '</div>';
