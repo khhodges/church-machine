@@ -944,6 +944,7 @@ function _applyPendingSimLoad() {
     if (!_pendingSimLoad || !lastAssembledWords || !lastAssembledWords.length) return;
     console.log('[applyPendingSimLoad] v20260513k caps=', JSON.stringify(lastAssembledCapabilities));
     sim.loadProgram(lastAssembledWords, 0);
+    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
     // Skip past the lump header (word 0) and method table so PC starts at the
     // first real instruction, matching _autoLoadDefaultProgram() on boot/reset.
     if (lastMethodTableSize > 0) sim.pc = lastMethodTableSize;
@@ -1223,6 +1224,7 @@ function _autoLoadDefaultProgram() {
         if (!lastAssembledWords || lastAssembledWords.length === 0) {
             _applyBootLumpPetNames();
         }
+        if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
         return;
     }
     _defaultProgramLoaded = true;
@@ -2978,6 +2980,7 @@ function runLazyLoadTest() {
     //    Encoding: (14<<23)|(3<<19)|(6<<15)|3 = 0x071B0003
     const LOAD_CR3_CR6_3 = (14 << 23) | (3 << 19) | (6 << 15) | 3;   // 0x071B0003
     sim.loadProgram([LOAD_CR3_CR6_3, 0x00000000 /*HALT*/], 0);
+    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
     // loadProgram resets: pc=0, halted=false, callStack=[], stepCount=0
 
     log('[LazyTest] ──────────────────────────────────────────────────');

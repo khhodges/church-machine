@@ -1125,6 +1125,7 @@ function _loadCatalogLumpIntoSim() {
 
     // Call loadProgram() directly — handles NS-slot 3 redirect + CR14 wiring.
     sim.loadProgram(words, 0);
+    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
 
     // Mirror into lastAssembledWords so C-list injection and other
     // post-load machinery (save-to-NS, code-view labels, etc.) still work.
