@@ -87,95 +87,30 @@ const BOOT_SEQ_CODE = {
         '      ; Identical behaviour to CHANGE CR12 — no extra boot step required',
     ].join('\n'),
 
-    // ── Slot 2: Boot.Abstr ───────────────────────────────────────────────────
+    // ── Slot 3: Boot entry (default: LED Flash demo) ─────────────────────────
     // Covers boot phases B:03 (INIT_ABSTR), B:04 (LOAD_NUC), B:05 (COMPLETE).
+    // The boot entry is user-configurable via ⚡ (bootEntrySlot, default 3).
     // B:03 and B:04 are indivisible — they always execute in the same Step.
     // B:04 and B:05 are also indivisible.
     //
     // This is the most complex phase: it replicates what the CALL microcode does
     // at runtime (push sentinel frame, derive CR14/CR6 from lump header, set PC=0)
     // while M-elevation is still active.
-    2: [
-        '; Boot.Abstr — Boot Abstraction: code + c-list in one NS slot (Slot 2)',
-        '; B:03, B:04 (LOAD_NUC) and B:05 (COMPLETE) are indivisible — they',
-        '; all execute in the same STEP controller cycle.',
-        '',
-        '; ━━━ B:03  INIT_ABSTR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        '; Temporarily load an E-type token for Slot 2 into CR6.  This value is',
-        '; a transient snapshot — B:04 immediately reads it back as "oldCR6GT"',
-        '; and saves it into the sentinel stack frame before overwriting CR6.',
-        'B:03  INIT_ABSTR',
-        '      GT6a  ← createGT(Slot=2, perms=[E], type=Inform)',
-        '                                     ; E-perm Inform GT for Slot 2 (Boot.Abstr)',
-        '      entry ← mLoad(GT6a, perm=none) ; boot-mode — bypasses perm check',
-        '      CR6   ← { word0=GT6a, M=1, … } ; temporary E-type token (M=1) — saved to stack frame in B:04',
-        '      ; falls through immediately into B:04 — no Step boundary here',
-        '',
-        '; ━━━ B:04  LOAD_NUC ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        '; "Load Nucleus" — the hardware CALL microcode for the Boot Abstraction.',
-        '; Step 1: TPERM — walk Boot.Abstr C-List via E-perm mLoad',
-        'B:04  LOAD_NUC',
-        '      GT2   ← createGT(Slot=2, perms=[E], type=Inform)',
-        '                                     ; re-issue E-GT; triggers TPERM check',
-        '      entry ← mLoad(GT2, perm=E)    ; E-perm mLoad validates NS entry + returns C-List base',
-        '      assert entry.F-bit = 0        ; Far-lumps not allowed at boot (cross-chip)',
-        '      assert entry.type = Inform    ; Abstract GTs are forbidden at boot',
-        '',
-        ';     Step 2: Read lump header (word 0) to extract cc and lumpSize',
-        '      base     = entry.word0_location         ; physical base of Boot.Abstr lump',
-        '      hdrWord  = memory[base]                 ; raw 32-bit lump header word',
-        '      cc       = parseLumpHeader(hdrWord).cc  ; c-list word count (tail of lump)',
-        '      cw       = parseLumpHeader(hdrWord).cw  ; code-word count (used by heap alloc)',
-        '      lumpSz   = parseLumpHeader(hdrWord).lumpSize  ; total lump size in 32-bit words',
-        '      cStart   = lumpSz − cc                  ; c-list offset from lump base',
-        '',
-        ';     Step 3: Push sentinel CALL frame',
-        ';     Before overwriting CR6/CR14, save the caller state exactly as CALL',
-        ';     microcode does — so RETURN from the root abstraction reboots cleanly.',
-        '      sp_max        = 243                     ; lumpSize(256) − caps(12) − 1',
-        '      oldCR6GT      = CR6.word0               ; E-type GT snapshot from B:03',
-        '      sentinelFW    = packFrameWord(          ; build sentinel frame word:',
-        '                        NIA    = 0x7FFF,      ;   all 15 NIA bits = 1 (poison marker)',
-        '                        sz     = 1,           ;   CALL-type frame (not LAMBDA)',
-        '                        prevSTO= sp_max)      ;   previous STO = 243 (empty-stack value)',
-        '      callStack.push({                        ; push to call-stack mirror:',
-        '          sentinel = true,                    ;   RETURN handler detects this → reboot',
-        '          returnPC = 0x7FFF,                  ;   poison address — never executed',
-        '          savedSTO = sp_max })                ;   prev STO saved for stack unwind',
-        '      memory[threadBase + sp_max]     = sentinelFW    ; lump[+243] = frame word',
-        '      memory[threadBase + sp_max − 1] = oldCR6GT     ; lump[+242] = saved E-type CR6',
-        '      STO = sp_max − 2                        ; STO = 241 (two words consumed)',
-        '',
-        ';     Step 4: Derive CR14 (code, R+X) and CR6 (c-list, L) from lump header',
-        ';     Hardware does both simultaneously from the header word.',
-        '      CR14 ← { GT2, M=1,                       ; R+X Inform GT for Slot 2 (M=1: boot-stamped)',
-        '               base  = base,                  ; lump word 0 = first instruction',
-        '               limit = lumpSz − cc − 2,       ; excludes header word and c-list',
-        '               perms = [R, X] }               ; code-execution token',
-        '      CR6  ← { GT2, M=1,                      ; L-perm Inform GT for Slot 2 (M=1: boot-stamped)',
-        '               base  = base + cStart,         ; c-list starts at physical end of lump',
-        '               limit = cc − 1,                ; covers all c-list words',
-        '               perms = [L] }                  ; capability-list token',
-        '      ; CR6 is NOT written to caps zone (+250) — it lives in the stack frame',
-        '',
-        ';     Step 5: Start execution',
-        '      PC ← 0                                  ; first instruction at lump base + 0',
-        '',
-        '; ━━━ B:05  COMPLETE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-        '; Drop M-elevation and hand control to the Boot Abstraction.',
-        'B:05  COMPLETE',
-        '      bootComplete ← true                     ; step-loop stops; instruction dispatch begins',
-        '      ; New CRs written after this point get M=0 (normal perm checks apply)',
-        '      ; Boot-stamped CRs (CR6, CR12, CR14, CR15) retain M=1 permanently',
-        '      ; All Layer 0–1 abstractions initialized — boot ROM done',
-        '; ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    ].join('\n'),
-
-    // ── Slot 3: LED Flash ────────────────────────────────────────────────────
-    // Boot demo abstraction — combined code (CR14) + c-list (CR6) in one lump.
+    //
+    // ── B:03 / B:04 / B:05 hardware sequence ────────────────────────────────
+    // B:03  INIT_ABSTR — temporarily load an E-type token for the boot entry
+    //       slot into CR6.  This transient snapshot is saved into the sentinel
+    //       stack frame by B:04 before CR6 is overwritten.
+    // B:04  LOAD_NUC   — E-perm mLoad validates the boot entry NS entry, reads
+    //       the lump header to derive CR14 (code, RX) and CR6 (c-list, L),
+    //       pushes the sentinel CALL frame, and sets PC = 0.
+    // B:05  COMPLETE   — drops M-elevation; instruction dispatch begins.
+    //
+    // ── Boot demo abstraction — combined code (CR14) + c-list (CR6) in one lump.
     // c-list[0] = LED[0] Abstract GT (device_class=LED, device_data=0).
     // Flashes the on-board LED to confirm hardware is alive, then RETURNs.
     // User-selectable boot entry: does NOT chain to Navana.
+    // ─────────────────────────────────────────────────────────────────────────
     3: [
         '; LED Flash — boot demo (Slot 3)',
         '; Combined code + c-list lump.  Entered via ELOADCALL from Boot.Abstr.',
@@ -265,10 +200,10 @@ function _implStatusLoad() {
 
 function _implStatusSeed() {
     if (localStorage.getItem('cm_implStatus')) return;
-    // Boot.NS (0), Boot.Thread (1), Boot.Abstr (2) — already installed in NS table
+    // Boot.NS (0), Boot.Thread (1), Boot.Abstr (3) — already installed in NS table
     absImplStatus['abs:0'] = 'installed';
     absImplStatus['abs:1'] = 'installed';
-    absImplStatus['abs:2'] = 'installed';
+    absImplStatus['abs:3'] = 'installed';
     // GC (44) has a live JavaScript handler in simulator.js
     for (const m of ['Scan', 'Identify', 'Clear', 'Flip']) {
         absImplStatus[`44:${m}`] = 'js';

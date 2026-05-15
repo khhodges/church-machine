@@ -5159,9 +5159,9 @@ HALT
 ; Dot-notation style is used throughout (recommended).
 ; Each line shows the raw equivalent in the trailing comment.
 ;
-; Boot C-List layout:
-;   [0] Boot.NS  [1] Thread  [2] Boot.Abstr (E)
-;   [3] (empty)  [4] Salvation (E)  [5] Navana (E)
+; Boot C-List layout (indices into the boot thread's c-list; NS slot in parens):
+;   [0] Boot.NS (NS 0)  [1] Thread (NS 1)  [2] Boot.Abstr E-GT (NS 3)
+;   [3] (empty)  [4] Salvation (E, NS 4)  [5] Navana (E, NS 5)
 ;   [6] Mint (E) [7] Memory (E)
 ;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
 

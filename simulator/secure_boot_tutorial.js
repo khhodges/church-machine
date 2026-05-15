@@ -292,7 +292,7 @@ LOAD_NUC:
 ;   0    make_gt(Inform, R|X, slot_id=3, gt_seq=0) Code/constants read+exec
 ;   1    make_gt(Inform, X,   slot_id=4, gt_seq=0) Boot code exec-only
 ;   2    make_gt(NULL,   0,   0,         0)         Empty (filled by SAVE above)
-;   3    make_gt(Inform, E,   slot_id=2, gt_seq=0) Boot.Abstr E-GT
+;   3    make_gt(Inform, E,   slot_id=3, gt_seq=0) Boot.Abstr E-GT
 ;   4    make_gt(Inform, E,   slot_id=5, gt_seq=0) Secondary abstraction E-GT
 ;   5    make_gt(Inform, L,   slot_id=6, gt_seq=0) C-List L-GT (for BIND)
 ;   6    make_gt(Inform, E,   slot_id=4, gt_seq=0) First user abstraction E-GT
@@ -353,7 +353,7 @@ LOAD_NUC:
 ; points here:
 ;
 ; idx  Contents                              Role
-;  0   make_gt(Inform, E, slot_id=2, gt_seq=0) Boot.Abstr E-GT (return channel)
+;  0   make_gt(Inform, E, slot_id=3, gt_seq=0) Boot.Abstr E-GT (return channel)
 ;  1   make_gt(Inform, L, slot_id=6, gt_seq=0) NS C-List L-GT (for later BIND)
 ;  2   (filled by boot SAVE: Thread GT)        Thread lump capability (R|W)
 ;  3   make_gt(Inform, E, slot_id=5, gt_seq=0) Navana system abstraction E-GT
