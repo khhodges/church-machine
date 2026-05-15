@@ -30,8 +30,10 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 //     word0  location   — base address of the abstraction's lump (Golden Token)
 //     word1  limit/meta — bits[16:0] lump size in words; bits[25:17] c-list
 //                         count; bits[27:26] GT type (Null/Inform/Outform/
-//                         Abstract); bit[28] chainable; bit[29] f-flag;
-//                         bit[30] b-flag; bit[31] G-bit (GC liveness)
+//                         Abstract); bit[28] G-bit (GC liveness — matches
+//                         hardware Word1[28], excluded from CRC/integrity32
+//                         by design so GC can set/clear without resealing);
+//                         bit[29] chainable; bit[30] f-flag; bit[31] b-flag
 //     word2  seals      — bits[31:25] version; bits[15:0] CRC-16 seal
 //     word3  reserved   — must be zero; reserved for future Navana per-slot GT
 //
@@ -665,10 +667,10 @@ class ChurchSimulator {
         return (
             ((bFlag & 1) << 31) |
             ((fFlag & 1) << 30) |
-            ((gBit & 1) << 29) |
-            ((chainable & 1) << 28) |
-            ((gtType & 3) << 26) |
-            (((clistCount || 0) & 0x1FF) << 17) |
+            ((chainable & 1) << 29) |
+            ((gBit & 1) << 28) |        // G-bit at bit[28] — matches hardware Word1[28].
+            ((gtType & 3) << 26) |      // Excluded from CRC-16 (seal covers location+limit17
+            (((clistCount || 0) & 0x1FF) << 17) | // only) so GC can flip it without resealing.
             (limit17 & 0x1FFFF)
         ) >>> 0;
     }
@@ -677,8 +679,8 @@ class ChurchSimulator {
         return {
             b: (word1 >>> 31) & 1,
             f: (word1 >>> 30) & 1,
-            g: (word1 >>> 29) & 1,
-            chainable: (word1 >>> 28) & 1,
+            chainable: (word1 >>> 29) & 1,
+            g: (word1 >>> 28) & 1,      // G-bit at bit[28] — matches hardware Word1[28]
             gtType: (word1 >>> 26) & 3,
             clistCount: (word1 >>> 17) & 0x1FF,
             limit: word1 & 0x1FFFF,
@@ -2061,28 +2063,32 @@ class ChurchSimulator {
     }
 
     markLive(idx) {
+        // Matches hardware mload.py RESET_GBIT: clears G-bit (Word1[28]) on successful load.
+        // G-bit at bit[28] — excluded from CRC-16 seal (seal covers location+limit17 only),
+        // so this write requires no seal recomputation. Real-time update matches hardware.
         const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 | (1 << 29)) >>> 0;
+            this.memory[base + 1] = (w1 | (1 << 28)) >>> 0;
         } else {
-            this.memory[base + 1] = (w1 & ~(1 << 29)) >>> 0;
+            this.memory[base + 1] = (w1 & ~(1 << 28)) >>> 0;
         }
     }
 
     markGarbage(idx) {
+        // Matches hardware GC mark phase: sets G-bit (Word1[28]) to suspect.
         const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
         const w1 = this.memory[base + 1];
         if (this.gcPolarity === 0) {
-            this.memory[base + 1] = (w1 & ~(1 << 29)) >>> 0;
+            this.memory[base + 1] = (w1 & ~(1 << 28)) >>> 0;
         } else {
-            this.memory[base + 1] = (w1 | (1 << 29)) >>> 0;
+            this.memory[base + 1] = (w1 | (1 << 28)) >>> 0;
         }
     }
 
     getGBit(idx) {
         const base = this.NS_TABLE_BASE + idx * this.NS_ENTRY_WORDS;
-        return (this.memory[base + 1] >>> 29) & 1;
+        return (this.memory[base + 1] >>> 28) & 1;
     }
 
     isGarbage(idx) {

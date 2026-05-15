@@ -118,11 +118,19 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
 
 ---
 
-## Simulator vs Hardware NS Entry Word Packing (informational)
+## G-bit Placement — Canonical Design Decision (May 2026) — CLOSED
 
-- **Hardware** (`layouts.py`): NS Word 1 = `limit_offset[20:0] | gt_seq[6:0] | spare[3:0]`. NS Word 2 = `crc[15:0] | g_bit[16] | spare[31:17]`. `gt_seq` is in Word 1.
-- **Simulator** (`app.js`): `word2_seals` stores `version[31:25] | spare[24:16] | CRC-16[15:0]`. `gBit` from Word 1.
-- **Status**: `namespace-json.md` updated to note divergence. Not tracked as a formal deviation since `namespace-json.md` documents the simulator JSON format, not hardware.
+**Decision**: G-bit lives in **NS Entry Word 1 at bit [28]** on both hardware and simulator.
+
+**Rationale**: NS Entry Word 2 holds the full 32-bit `integrity32(W0, W1)` output — no spare bits available there. Word 1 has 3 spare bits [31:29]; placing G-bit at bit [28] and excluding it from the integrity32 input by masking (`w1 & ~(1 << 28)`) means the GC can set or clear the G-bit with a single word write to Word 1 at any time, with no recomputation of Word 2 and no memory access to Word 2. This eliminates all synchronization risk.
+
+**Hardware** (`layouts.py`, `integrity32.py`, `mload.py`): G-bit at Word1[28]. `integrity32` masks bit [28] before computing. `mload.py` RESET_GBIT state clears it on every successful load. Already correct — no hardware change.
+
+**Simulator** (`simulator.js`, May 2026): G-bit corrected from bit [29] → bit [28] to match hardware. `packNSWord1`, `parseNSWord1`, `markLive`, `markGarbage`, `getGBit` all updated. `mLoad` already called `markLive` in real-time (line 1974) — no change needed there. The simulator's CRC-16 seal covers only `location + limit17` (bits [16:0]) so bit [28] was already outside the seal input regardless of position — now bit positions are aligned.
+
+The broader NS Word 1 bit layout is intentionally different between hardware and simulator: the simulator carries additional fields (`chainable`, `clistCount`, `gtType`, `bFlag`, `fFlag`) in Word 1 that the hardware derives by reading the lump header. This is an accepted implementation difference, not a functional deviation. The G-bit position (bit [28] in both) is now aligned.
+
+**Status**: **CLOSED**.
 ---
 
 ## Hardware Method-Table Dispatch (Task #837)
