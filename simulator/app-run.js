@@ -8403,6 +8403,7 @@ function setSelectedBoard(board) {
     const lbl = document.getElementById('hwLedBoardLabel');
     if (lbl) lbl.textContent = getBoardShortLabel(board);
     if (typeof window.lumpEditorRender === 'function') window.lumpEditorRender();
+    if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
 }
 
 function getBoardLabel(board) {

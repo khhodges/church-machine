@@ -261,6 +261,25 @@
         }
     }
 
+    function _rlAddrRange() {
+        var p    = _getStep1Payload();
+        var s1   = p.step1;
+        var board        = p.targetBoard || 'wukong-xc7a100t';
+        var boardProfile = BOARD_PROFILES[board] || BOARD_PROFILES['wukong-xc7a100t'];
+        var BOOT_ABSTR_SZ    = 64;
+        var FREE_SLOT_SZ     = 64;
+        var NS_TABLE_RESERVE = 0x300;
+        var sum    = (s1.namespaceLumpWords || 0) + (s1.threadLumpWords || 0) + FREE_SLOT_SZ + BOOT_ABSTR_SZ;
+        var total  = s1.totalNamespaceWords || 0;
+        var usable = total - NS_TABLE_RESERVE;
+        var boardTotalWords = boardProfile.totalRamWords;
+        return {
+            min:        sum,
+            max:        Math.min(usable, boardTotalWords) - 1,
+            boardLabel: boardProfile.label
+        };
+    }
+
     function _rlValidate() {
         var p    = _getStep1Payload();
         var s1   = p.step1;
@@ -363,6 +382,11 @@
                 '</tr>';
         }).join('');
 
+        var addrRange    = _rlAddrRange();
+        var addrHintText = 'Valid range: 0x' + addrRange.min.toString(16).toUpperCase() +
+                           '\u20130x' + addrRange.max.toString(16).toUpperCase() +
+                           ' for ' + addrRange.boardLabel;
+
         if (!_rl.catalog.length) {
             rows += '<tr><td colspan="5" class="le-rl-empty-msg">No catalog lumps available ' +
                    '(server/lumps/manifest.json has no assignable entries).</td></tr>';
@@ -387,12 +411,15 @@
                       '</label>' +
                     '</td>' +
                     '<td class="le-rl-td">' +
-                      '<input type="number" min="0" step="1"' +
+                      '<input type="number" min="' + addrRange.min + '" max="' + addrRange.max + '" step="1"' +
                         ' class="le-rl-addr"' +
                         ' data-rl-slot="' + cat.nsSlot + '"' +
                         ' data-rl-field="physAddr"' +
                         ' value="' + esc(String(physVal)) + '"' +
                         (st.resident ? '' : ' disabled') + '>' +
+                      '<div class="le-rl-addr-hint' + (st.resident ? '' : ' le-rl-addr-hint-inactive') + '">' +
+                        esc(addrHintText) +
+                      '</div>' +
                     '</td>' +
                     '</tr>';
             }
@@ -823,6 +850,10 @@
     };
 
     window.lumpEditorRender = function () { render(); };
+    window.lumpEditorRenderResidentPanel = function () {
+        var panel = document.getElementById('lumpResidentPanel');
+        if (panel && panel.offsetParent !== null) renderResidentPanel();
+    };
 
     window.initLumpEditor = function () {
         loadState();
@@ -943,5 +974,14 @@
         _rl.errorMsg  = '';
         _rlLoad();
     };
+
+    window.addEventListener('storage', function (ev) {
+        if (ev.key === 'fpga_board_target') {
+            var panel = document.getElementById('lumpResidentPanel');
+            if (panel && panel.offsetParent !== null) {
+                renderResidentPanel();
+            }
+        }
+    });
 
 }());

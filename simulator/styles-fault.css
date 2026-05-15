@@ -1011,6 +1011,21 @@
 .le-rl-addr:focus { outline: none; border-color: rgba(218,165,32,0.5); }
 .le-rl-addr:disabled { opacity: 0.35; background: rgba(0,0,0,0.18); }
 
+.le-rl-addr-hint {
+    font-size: 0.70rem;
+    font-family: var(--mono);
+    color: var(--church-gold, #DAA520);
+    opacity: 0.75;
+    margin-top: 3px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.le-rl-addr-hint-inactive {
+    color: var(--text-muted, #888);
+    opacity: 0.5;
+}
+
 .le-rl-empty-msg {
     padding: 14px 10px;
     color: var(--text-secondary);
