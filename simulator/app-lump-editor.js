@@ -300,6 +300,7 @@
     function renderNSPanel() {
         var profile    = getBoardProfile();
         var boardRam   = profile.totalRamWords;
+        var budget     = Math.floor(boardRam / 2);
         var validPresets = NS_PRESETS.filter(function (p) {
             return Math.pow(2, p.n + 14) <= boardRam;
         });
@@ -313,7 +314,8 @@
         var nsWords = slots * 4;
         var FOUND        = 384;
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var threadCount  = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var maxCount     = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / threadLump)));
+        var threadCount  = clamp(state.thread.count, 1, maxCount);
         var threadTotal  = threadLump * threadCount;
         var pool    = total - nsWords - FOUND - threadTotal;
         var cw      = (slots >>> 8) & 0x1FFF;
@@ -328,6 +330,18 @@
         var boardInfo = noFit
             ? '<span class="le-overflow">⚠ ' + esc(profile.label + ' (' + boardRam.toLocaleString() + ' w) is smaller than the minimum NS LUMP (16,384 w)') + '</span>'
             : esc(profile.label + '  (' + boardRam.toLocaleString() + ' words total)');
+
+        // Individual thread zones — one segment per thread, all clickable
+        var threadZones = [];
+        for (var t = 0; t < threadCount; t++) {
+            threadZones.push({ label: 'T' + t, words: threadLump, cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" });
+        }
+        var allZones = [
+            { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
+            { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap', onclick: "switchView('namespace')" }
+        ].concat(threadZones).concat([
+            { label: 'Pool',       words: Math.max(pool, 0), cls: 'le-zone-free' }
+        ]);
 
         var grid = renderGrid([
             ['Target board',   boardInfo, 'le-val-gold'],
@@ -344,12 +358,17 @@
             ['Header word',    '<span id="le-ns-hex" class="le-hex">' + esc(wordHex) + '</span>' + copyBtn('le-ns-hex'), 'le-val-mono']
         ]);
 
-        var bar = renderBar([
-            { label: 'Foundation', words: FOUND,                         cls: 'le-zone-hdr',   onclick: 'openBootDesigner()' },
-            { label: 'NS Table',   words: nsWords,                        cls: 'le-zone-heap',  onclick: "switchView('namespace')" },
-            { label: 'Threads',    words: threadTotal,                    cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" },
-            { label: 'Pool',       words: Math.max(pool, 0),             cls: 'le-zone-free'  }
-        ]);
+        var decDisabled = threadCount <= 1       ? ' disabled' : '';
+        var incDisabled = threadCount >= maxCount ? ' disabled' : '';
+        var threadStepper =
+            '<div class="le-field-row">' +
+                '<label class="le-label">Thread count<span class="le-range-hint"> 1\u2013' + maxCount + '\u00a0\u00a0' + esc(fmtWords(threadLump) + ' w each') + '</span></label>' +
+                '<div class="le-input-group le-stepper-group">' +
+                    '<button class="le-stepper-btn"' + decDisabled + ' onclick="lumpEditorThreadCount(' + (threadCount - 1) + ')">\u2212</button>' +
+                    '<span class="le-stepper-val">' + threadCount + '</span>' +
+                    '<button class="le-stepper-btn"' + incDisabled + ' onclick="lumpEditorThreadCount(' + (threadCount + 1) + ')">+</button>' +
+                '</div>' +
+            '</div>';
 
         return '<div class="le-panel">' +
             '<p class="le-panel-desc">Choose total namespace memory and slot capacity. Slot count is encoded across cw and cc as <code>(cw&lt;&lt;8)|cc</code>.</p>' +
@@ -366,14 +385,10 @@
                     '<input type="number" class="le-number" id="le-ns-slots-num" min="1" max="' + maxSl + '" value="' + slots + '" oninput="lumpEditorNSSlots(this.value)">' +
                 '</div>' +
             '</div>' +
+            threadStepper +
             '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
-            bar +
-            renderMagBar([
-                { label: 'Foundation', words: FOUND,                      cls: 'le-zone-hdr',   onclick: 'openBootDesigner()' },
-                { label: 'NS Table',   words: nsWords,                     cls: 'le-zone-heap',  onclick: "switchView('namespace')" },
-                { label: 'Threads',    words: threadTotal,                 cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" },
-                { label: 'Pool',       words: Math.max(pool, 0),          cls: 'le-zone-free' }
-            ]) +
+            renderBar(allZones) +
+            renderMagBar(allZones) +
             '<div class="le-divider"></div>' +
             grid +
         '</div>';
