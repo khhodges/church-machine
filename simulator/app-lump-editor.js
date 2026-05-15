@@ -88,22 +88,41 @@
     // Cleared by an explicit user lump-size pick or banner dismissal.
     var _threadLumpClampedInfo = null;  // { savedExp, clampedExp, boardLabel } | null
 
+    // Set when clampThreadStateToBoard() reduces thread count due to a board switch.
+    // Cleared by an explicit user count change or banner dismissal.
+    var _threadCountClampedInfo = null;  // { savedCount, clampedCount, boardLabel } | null
+
     // Clamps lumpPow2 to the maximum valid value for the current board.
     // Call this whenever the board selection changes to keep state consistent.
     function clampThreadStateToBoard() {
-        var profile     = getBoardProfile();
-        var budget      = Math.floor(profile.totalRamWords / 2);
-        var count       = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var profile  = getBoardProfile();
+        var budget   = Math.floor(profile.totalRamWords / 2);
+
+        // Step 1: compute effective max count from saved lump size and board budget,
+        // then clamp count and record a warning if it was reduced.
+        var savedLumpSize = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
+        var maxCount = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / savedLumpSize)));
+        if (state.thread.count > maxCount) {
+            var savedCount = state.thread.count;
+            state.thread.count = maxCount;
+            _threadCountClampedInfo = { savedCount: savedCount, clampedCount: maxCount, boardLabel: profile.label };
+        } else {
+            _threadCountClampedInfo = null;
+        }
+
+        // Step 2: clamp lump size using the (possibly clamped) count.
+        var count        = clamp(state.thread.count, 1, maxCount);
         var maxLumpWords = Math.max(64, Math.floor(budget / count));
-        var maxExp      = maxExpForWords(Math.min(maxLumpWords, 8192));
+        var maxExp       = maxExpForWords(Math.min(maxLumpWords, 8192));
         if (state.thread.lumpPow2 > maxExp) {
             var savedExp = state.thread.lumpPow2;
             state.thread.lumpPow2 = maxExp;
-            saveState();
             _threadLumpClampedInfo = { savedExp: savedExp, clampedExp: maxExp, boardLabel: profile.label };
         } else {
             _threadLumpClampedInfo = null;
         }
+
+        saveState();
     }
 
     // Clamps n_minus_6 to the maximum valid preset for the current board.
@@ -690,6 +709,18 @@
             ? '<div class="le-error-banner">&#x26A0; <strong>Over capacity</strong> \u2014 stack + static zones exceed lump size; heap would be negative. Increase the lump size or reduce stack frames to unlock Save\u00a0/\u00a0Build LUMP.</div>'
             : '';
 
+        var threadCountClampBanner = '';
+        if (_threadCountClampedInfo) {
+            var tcci = _threadCountClampedInfo;
+            threadCountClampBanner = '<div class="le-warn-banner">' +
+                '\u26A0 Your saved thread count (' + tcci.savedCount + ') ' +
+                'exceeds the maximum for <strong>' + esc(tcci.boardLabel) + '</strong> and has been ' +
+                'reduced to ' + tcci.clampedCount + '. ' +
+                'Adjust the thread count below to confirm.' +
+                '<button class="le-warn-dismiss" onclick="lumpEditorDismissThreadCountWarning()" title="Dismiss">\u00d7</button>' +
+            '</div>';
+        }
+
         var threadClampBanner = '';
         if (_threadLumpClampedInfo) {
             var tci = _threadLumpClampedInfo;
@@ -715,6 +746,7 @@
             '</div>';
 
         return '<div class="le-panel">' +
+            threadCountClampBanner +
             threadClampBanner +
             overCapWarning +
             '<p class="le-panel-desc">Choose lump size first (power of two, bounded by board thread budget). Set stack frames. Heap is derived automatically — no wasted freespace.</p>' +
@@ -907,6 +939,7 @@
 
     window.lumpEditorThreadCount = function (v) {
         state.thread.count = clamp(v, 1, 10);
+        _threadCountClampedInfo = null;
         saveState();
         var sl  = document.getElementById('le-t-count-sl');
         var num = document.getElementById('le-t-count-num');
@@ -942,6 +975,11 @@
 
     window.lumpEditorDismissThreadWarning = function () {
         _threadLumpClampedInfo = null;
+        render();
+    };
+
+    window.lumpEditorDismissThreadCountWarning = function () {
+        _threadCountClampedInfo = null;
         render();
     };
 
