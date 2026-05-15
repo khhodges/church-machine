@@ -364,6 +364,8 @@
         }
     };
 
+    window.lumpEditorRender = function () { render(); };
+
     window.initLumpEditor = function () {
         loadState();
         render();
