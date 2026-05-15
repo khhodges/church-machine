@@ -8417,9 +8417,12 @@ function switchBuilderViewTab(tab) {
     const btn = document.getElementById('builderViewTab-' + tab);
     if (btn) btn.classList.add('active');
     const cyberspace = document.getElementById('builderView');
-    const details = document.getElementById('buildDetailsPanel');
-    if (cyberspace) cyberspace.style.display = (tab === 'cyberspace') ? '' : 'none';
-    if (details) details.style.display = (tab === 'buildlog') ? '' : 'none';
+    const details    = document.getElementById('buildDetailsPanel');
+    const lumpEd     = document.getElementById('lumpEditorPanel');
+    if (cyberspace) cyberspace.style.display = (tab === 'cyberspace')  ? '' : 'none';
+    if (details)    details.style.display    = (tab === 'buildlog')    ? '' : 'none';
+    if (lumpEd)     lumpEd.style.display     = (tab === 'lumpeditor') ? '' : 'none';
+    if (tab === 'lumpeditor' && typeof initLumpEditor === 'function') initLumpEditor();
 }
 
 function _setBuildStatus(state, label, board) {
