@@ -103,7 +103,8 @@
         return '<div class="le-bar">' + zones.map(function (z) {
             if (z.words <= 0) return '';
             var pct = (z.words / total * 100).toFixed(2);
-            return '<div class="le-bar-zone ' + esc(z.cls) + '" style="flex:' + z.words + '" title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words') + '">' +
+            var clickAttr = z.onclick ? ' onclick="' + z.onclick + '" style="flex:' + z.words + ';cursor:pointer"' : ' style="flex:' + z.words + '"';
+            return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words' + (z.onclick ? ' — click to open' : '')) + '">' +
                    '<span class="le-bar-label">' + esc(z.label) + '</span>' +
                    '<span class="le-bar-pct">' + esc(pct + '%') + '</span></div>';
         }).join('') + '</div>';
@@ -118,7 +119,8 @@
             if (z.words <= 0) return '';
             var flex = Math.max(z.words, floor);
             var realPct = (z.words / total * 100).toFixed(2);
-            return '<div class="le-bar-zone ' + esc(z.cls) + '" style="flex:' + flex + '" title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words  (' + realPct + '%)') + '">' +
+            var clickAttr = z.onclick ? ' onclick="' + z.onclick + '" style="flex:' + flex + ';cursor:pointer"' : ' style="flex:' + flex + '"';
+            return '<div class="le-bar-zone ' + esc(z.cls) + '"' + clickAttr + ' title="' + esc(z.label + ': ' + z.words.toLocaleString() + ' words  (' + realPct + '%)' + (z.onclick ? ' — click to open' : '')) + '">' +
                    '<span class="le-bar-label">' + esc(z.label) + '</span>' +
                    '<span class="le-bar-pct">' + esc(z.words.toLocaleString() + ' w') + '</span></div>';
         }).join('') + '</div>';
@@ -339,8 +341,8 @@
         ]);
 
         var bar = renderBar([
-            { label: 'Foundation', words: FOUND,              cls: 'le-zone-hdr'   },
-            { label: 'NS Table',   words: nsWords,             cls: 'le-zone-heap'  },
+            { label: 'Foundation', words: FOUND,              cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
+            { label: 'NS Table',   words: nsWords,             cls: 'le-zone-heap', onclick: "switchView('namespace')" },
             { label: 'Pool',       words: Math.max(pool, 0),  cls: 'le-zone-free'  }
         ]);
 
@@ -362,8 +364,8 @@
             '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
             bar +
             renderMagBar([
-                { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr'  },
-                { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap' },
+                { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
+                { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap', onclick: "switchView('namespace')" },
                 { label: 'Pool',       words: Math.max(pool, 0), cls: 'le-zone-free' }
             ]) +
             '<div class="le-divider"></div>' +
