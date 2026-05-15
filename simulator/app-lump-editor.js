@@ -49,10 +49,10 @@
     var NS_PRESETS = [
         { label: '16 K words  (min, n=0)',          n: 0  },
         { label: '32 K words  (n=1)',               n: 1  },
-        { label: '64 K words  (Ti60 F225, n=2)',    n: 2  },
-        { label: '128 K words (Tang Nano 20K, n=3)',n: 3  },
+        { label: '64 K words  (n=2)',               n: 2  },
+        { label: '128 K words (n=3)',               n: 3  },
         { label: '256 K words (n=4)',               n: 4  },
-        { label: '512 K words (XC7A100T, n=5)',     n: 5  },
+        { label: '512 K words (n=5)',               n: 5  },
         { label: '1 M words   (n=6)',               n: 6  },
         { label: '2 M words   (n=7)',               n: 7  },
         { label: '4 M words   (n=8)',               n: 8  },
