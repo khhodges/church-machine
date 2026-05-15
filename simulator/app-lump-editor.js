@@ -558,14 +558,16 @@
 
         var _bootBadge = function (cat) {
             if (cat.nsSlotPolicy === 'dynamic') {
-                return '<span class="le-rl-badge le-rl-badge-floating">\u2014 Floating</span>';
+                return '<span class="le-rl-badge le-rl-badge-floating"' +
+                    ' data-tooltip="Allocated dynamically at runtime — NS slot assigned on first use">\u2014 Floating</span>';
             }
             if (cat.hasExecutableMethods) {
                 return '<span class="le-rl-badge le-rl-badge-bootable le-rl-badge-bootable-click"' +
                     ' onclick="lumpEditorBootBadgeClick(' + cat.nsSlot + ')"' +
                     ' data-tooltip="Click to set as boot entry">\u2713 Bootable</span>';
             }
-            return '<span class="le-rl-badge le-rl-badge-data">\u2014 Data only</span>';
+            return '<span class="le-rl-badge le-rl-badge-data"' +
+                ' data-tooltip="No executable methods — cannot be set as boot entry">\u2014 Data only</span>';
         };
 
         if (!_rl.catalog.length) {
