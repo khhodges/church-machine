@@ -812,13 +812,15 @@
         var total  = Math.pow(2, n + 14);
         var maxSl  = total / 64;
         var slots  = clamp(state.ns.slots, 1, maxSl);
-        var BOOT_OVERHEAD  = 128;
         var NS_TABLE_FIXED = 768;
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
         var maxCount     = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / threadLump)));
         var threadCount  = clamp(state.thread.count, 1, maxCount);
-        var threadTotal  = threadLump * threadCount;
-        var pool    = total - BOOT_OVERHEAD - NS_TABLE_FIXED - threadTotal;
+        // Boot overhead = Boot.NS lump (64 w) + Boot.Thread lump (threadLump w).
+        // Null slot 2 has been removed — no 64-word gap between Thread and Boot.Abstr.
+        var namespaceLumpWords = 64;
+        var bootOverhead = namespaceLumpWords + threadLump;
+        var pool    = total - bootOverhead - NS_TABLE_FIXED;
         var cw      = (slots >>> 8) & 0x1FFF;
         var cc      =  slots & 0xFF;
         var word    = packHdr(n, cw, cc, 1);
@@ -832,17 +834,11 @@
             ? '<span class="le-overflow">⚠ ' + esc(profile.label + ' (' + boardRam.toLocaleString() + ' w) is smaller than the minimum NS LUMP (16,384 w)') + '</span>'
             : esc(profile.label + '  (' + boardRam.toLocaleString() + ' words total)');
 
-        // Individual thread zones — one segment per thread, all clickable
-        var threadZones = [];
-        for (var t = 0; t < threadCount; t++) {
-            threadZones.push({ label: 'T' + t, words: threadLump, cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" });
-        }
         var allZones = [
-            { label: 'Boot Overhead', words: BOOT_OVERHEAD,         cls: 'le-zone-hdr' }
-        ].concat(threadZones).concat([
+            { label: 'Boot.NS + Boot.Thread', words: bootOverhead, cls: 'le-zone-hdr' },
             { label: 'Pool',          words: Math.max(pool, 0),     cls: 'le-zone-free' },
             { label: 'NS Table',      words: NS_TABLE_FIXED,        cls: 'le-zone-heap', onclick: "switchView('namespace')" }
-        ]);
+        ];
 
         var grid = renderGrid([
             ['Target board',   boardInfo, 'le-val-gold'],
@@ -851,8 +847,7 @@
             ['typ field',     '01  (Namespace, reserved)', ''],
             ['Max slots',      esc(maxSl.toLocaleString() + '  (total ÷ 64)'), ''],
             ['NS table',       '768 words (fixed reservation)', ''],
-            ['Boot Overhead',  '128 words (Boot.NS + Null slot)', ''],
-            ['Threads',        esc(threadCount + ' × ' + threadLump.toLocaleString() + ' = ' + threadTotal.toLocaleString() + ' words'), ''],
+            ['Boot overhead',  esc(bootOverhead.toLocaleString() + ' words (Boot.NS 64 + Boot.Thread ' + threadLump.toLocaleString() + ')'), ''],
             ['Pool available', pool >= 0 ? esc(pool.toLocaleString() + ' words') : '<span class="le-overflow">overflow</span>', ''],
             ['cw field',       esc(String(cw) + '  (slots >> 8)'), ''],
             ['cc field',       esc(String(cc) + '  (slots & 0xFF)'), ''],

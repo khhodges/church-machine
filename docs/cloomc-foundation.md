@@ -1,6 +1,6 @@
 # CLOOMC ISA Foundation Document
 
-**v1.0 — 2026-05-14**
+**v1.1 — 2026-05-15**
 **CONFIDENTIAL**
 
 > This document records the design session held in May 2026 between the
@@ -335,83 +335,82 @@ One of each type, in slot order:
 | Slot | `typ` | LUMP | Programmer decides |
 |------|-------|------|--------------------|
 | 0 | `00` *(01 reserved)* | **NS LUMP** | `totalNamespaceWords` — the board's physical memory envelope; everything else follows from this one value |
-| 1 | `10` | **Thread LUMP** | Any stack and heap size desired |
-| 2 | `00` | **Application LUMP** | Method body and c-list (e.g. Ethernet Locator on XC7A100T, UART Locator on Tang Nano 20K) |
+| 1 | `10` | **Thread LUMP** | Any stack and heap size desired; `Thread.CR0` holds the E-GT for Boot.Abstr |
+| 3 | `00` | **Boot.Abstr** | First abstraction called via `Thread.CR0`; a 3-instruction boot trampoline (CHANGE → TPERM → CALL). Physical address 0x0140 (immediately after Boot.Thread, no gap). |
+
+Slot 2 is the first available catalog slot. Boot.Abstr occupies slot 3 (NS
+entry generated automatically by the boot image builder).
 
 ### What Follows Automatically
 
 ```
-foundation_end  = NS_LUMP_SIZE + THREAD_LUMP_SIZE + APP_LUMP_SIZE
-                = 64 + 256 + 64 = 384 words = 0x0180  (3-LUMP starter kit)
+foundation_end  = NS_LUMP_SIZE + THREAD_LUMP_SIZE
+                = 64 + 256 = 320 words = 0x0140  (2-lump boot overhead)
 
-Dynamic pool    = foundation_end  →  totalNamespaceWords − 1
+Boot.Abstr base = foundation_end (Thread.CR0 points here; NS slot 3)
+
+Dynamic pool    = Boot.Abstr end  →  totalNamespaceWords − 1
 
 Pool ceiling    = totalNamespaceWords − 1
                 = 65,535  (Ti60 F225)
                 = 131,071 (XC7A100T)
 ```
 
-Nothing else needs to be set. The programmer makes three LUMPs; the memory
-map is determined.
+Nothing else needs to be set. The programmer makes the NS LUMP and Thread
+LUMP; the Boot.Abstr LUMP (slot 3) is generated automatically. Slot 2 is the
+first available catalog slot; slot 3 is reserved for Boot.Abstr; slot 4
+onward is the dynamic pool.
 
 ---
 
-## 6. The Old Boot Layout — Explained and Superseded
+## 6. The Boot Layout — Rationalized (Task #1205)
 
-The current demo boot image uses a 6-region layout:
+The boot image now uses a 5-region layout. Null slot 2 has been removed:
 
 ```
 Address     Region              Words   Status
 ────────────────────────────────────────────────────────────
 0x0000      NS Lump              64     Necessary — NS root
 0x0040      Thread Lump         256     Necessary — boot thread
-0x0140      Free slot 2          64     HISTORICAL REMNANT (see below)
-0x0180      Boot.Abstr           64     Necessary — first abstraction
-0x01C0      Dynamic Pool          ∞     Necessary — allocatable heap
+0x0140      Boot.Abstr           64     Necessary — first abstraction (NS slot 3)
+0x0180      Dynamic Pool          ∞     Necessary — allocatable heap
 top−0x400   NS Table          1,024     Necessary — capability table
 ────────────────────────────────────────────────────────────
 ```
 
-### Problems with This Layout
+NS slot 2 is null (NS entry all-zeros; no physical lump reservation). The
+first user-authored abstraction is placed at slot 2 by the IDE or Navana.
 
-**Free slot 2 fails the TSB test.**
-Slot 2 (address range 0x0140–0x017F) is dead space left behind when
-Startup.Config was removed (Task #247). It occupies 64 words in the boot
-image at a fixed address. It is not logically prior to the first CLOOMC
-instruction (it contains no code or data that the boot sequence needs), and
-it is not a CLOOMC abstraction (it has no c-list, no method table, and no
-meaningful lump header). It fails the TSB test on both counts. Its only
-justification is historical — it was once something, it is now nothing, and
-"nothing" should not occupy a fixed reservation in the Trusted Security Base.
+### What Was Removed and Why
 
-**The 3-instruction NUC program is a workaround.**
+**Free slot 2 failed the TSB test.**
+Slot 2 (formerly address range 0x0140–0x017F) was dead space left behind when
+Startup.Config was removed (Task #247). It contained no code or data the
+boot sequence needed and had no c-list, no method table, and no meaningful
+lump header. It failed the TSB test on both counts. Removing it eliminates
+64 words of dead space from the boot image and gives slot 2 back as the
+first available catalog slot.
+
+**The three hardware boot steps are:**
+1. Load Namespace lump from slot 0 into CR15 (Boot.NS).
+2. Load Thread lump from slot 1 (Boot.Thread).
+3. Load first abstraction from Thread.CR0 — whichever slot the IDE has set
+   via ⚡ in the Namespace table.
+
+**The NUC_PROGRAM conflates boot sequence with application demo.**
 Boot.Abstr (slot 3) currently contains 3 instructions: CHANGE (switch to
 thread context), TPERM (restrict permissions), and CALL (enter the first
 user abstraction). These instructions are needed, but they are implemented
-as a fixed boot ROM program rather than as a CLOOMC-native construct
-authored by the programmer. The NUC_PROGRAM in the hardware boot ROM
+as a fixed boot ROM program. The NUC_PROGRAM in the hardware boot ROM
 conflates the boot sequence with an application demo (the LED blink program
-lives in the same NUC_PROGRAM region). These concerns should be separated.
+lives in the same NUC_PROGRAM region). These concerns should be separated in
+future work.
 
-**The NUC_PROGRAM conflates boot sequence with application demo.**
-The LED blink demo (NS slot 4, Salvation) is hardwired into the Boot ROM
-alongside the boot sequence. A clean design would have the boot sequence
-as a minimal, fixed piece of hardware logic and the application as an
-ordinary LUMP delivered by the programmer. The current arrangement requires
-the hardware to know about the application demo — which is a TSB violation
-in spirit if not in letter.
+### Path to Correctness (remaining)
 
-### Path to Correctness
-
-The 3-LUMP model (Section 7) resolves all three problems:
-
-- Slot 2 disappears — the 3-LUMP starter kit has no gaps
 - The boot sequence becomes part of the ROM image, not a CLOOMC program
-- The application LUMP is the third LUMP, separately authored, cleanly
-  separated from the hardware boot logic
-
-The current demo boot image is preserved as-is for simulator compatibility.
-Task #1159 and follow-on work will implement the clean image.
+- The application LUMP is separately authored, cleanly separated from the
+  hardware boot logic (see Section 7)
 
 ---
 
@@ -425,11 +424,21 @@ Silicon is silicon.
 
 **Part 2 — Read-only RAM image**: exactly three LUMPs.
 
-| # | LUMP | Role | Must be in ROM? |
-|---|------|------|-----------------|
-| 1 | Namespace LUMP | Total physical memory envelope; start + size; owned under M authority | Yes — logically prior to everything |
-| 2 | Thread LUMP | Boot execution context; PC, register file, call stack | Yes — logically prior to first instruction |
-| 3 | Application LUMP | First thing the thread calls; content is board-dependent | Yes — the entry point |
+| # | LUMP | NS Slot | Role | Must be in ROM? |
+|---|------|---------|------|-----------------|
+| 1 | Namespace LUMP | 0 | Total physical memory envelope; start + size; owned under M authority | Yes — logically prior to everything |
+| 2 | Thread LUMP | 1 | Boot execution context; PC, register file, call stack; `Thread.CR0` = E-GT for Boot.Abstr | Yes — logically prior to first instruction |
+| 3 | Boot.Abstr | 3 | First thing the thread calls (via `Thread.CR0`); 3-instruction trampoline at 0x0140; content is board-dependent | Yes — the entry point |
+
+**Boot sequence (three hardware steps):**
+1. Load Namespace lump from NS slot 0 into CR15 (defines physical memory).
+2. Load Thread lump from NS slot 1 (establishes execution context).
+3. Load first abstraction from Thread.CR0 — the IDE sets this via ⚡ in the
+   Namespace table; currently points to Boot.Abstr (NS slot 3).
+
+**Slot 2 onward is available for catalog abstractions** (Boot.Abstr at slot 3
+is the only reserved slot above slot 1). Boot.Abstr sits at physical address
+0x0140 immediately after Boot.Thread — no gap.
 
 On the **XC7A100T** the Application LUMP is the **Locator** — a CLOOMC
 abstraction that runs on the FPGA itself, not on the IDE server. The Locator
@@ -485,20 +494,18 @@ network is the library.
 | Field | Ti60 F225 | XC7A100T |
 |-------|-----------|----------|
 | `totalNamespaceWords` | 65,536 | 131,072 |
-| `foundation_end` (current 4-region demo) | 0x01C0 (448) | 0x01C0 (448) |
-| Pool base | 0x01C0 (448) | 0x01C0 (448) |
+| `foundation_end` (NS + Thread only) | 0x0140 (320) | 0x0140 (320) |
+| Application LUMP base (slot 2) | 0x0140 (320) | 0x0140 (320) |
+| Pool base (after Application LUMP) | 0x0180 (384) | 0x0180 (384) |
 | Pool ceiling | 65,535 (`0xFFFF`) | 131,071 (`0x1FFFF`) |
 | `limit17` (Memory pool GT) | `0x0FFFF` | `0x1FFFF` |
 | Allocatable pool words | ~65,087 (~254 KB) | ~130,623 (~511 KB) |
 
-> **Note:** `foundation_end` is identical on both boards for the current
-> 4-region demo layout (NS 64 w + Thread 256 w + free slot 2 64 w +
-> Boot.Abstr 64 w = 448 words = 0x01C0). Lump sizes are programmer choices,
-> not board choices — a programmer using the same sizes on both boards gets
-> the same `foundation_end`. Once Task #1161 removes free slot 2 and
-> implements the clean 3-LUMP boot image, the true 3-LUMP foundation_end
-> drops to 0x0180 (384 words = NS 64 w + Thread 256 w + Application 64 w)
-> on both boards.
+> **Note:** `foundation_end` is identical on both boards (NS 64 w + Thread
+> 256 w = 320 words = 0x0140). Null slot 2 has been removed (Task #1205).
+> Lump sizes are programmer choices, not board choices — a programmer using
+> the same sizes on both boards gets the same `foundation_end`. The
+> Application LUMP (slot 2) begins immediately at `foundation_end`.
 
 ### Why limit17 Matters
 

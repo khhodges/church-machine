@@ -2,14 +2,16 @@ class NamespaceTutorial {
     constructor() {
         this.currentStep = -1;
         this.TOTAL_WORDS    = 65536;
-        this.SLOT_SIZE      = 256;
+        this.SLOT_SIZE      = 64;   // 64 words per slot — hardware minimum (Task #1205)
         this.NS_ENTRY_WORDS = 3;
-        // Zone 1 — Bootstrap: NS root (slot 0) + boot thread (slot 1) + boot abstraction (slot 2)
-        this.BOOTSTRAP_SLOTS = 3;
-        this.BOOTSTRAP_WORDS = this.BOOTSTRAP_SLOTS * this.SLOT_SIZE;   // 768
+        // Zone 1 — Bootstrap: NS root (slot 0) + boot thread (slot 1)
+        // First abstraction is loaded from Thread.CR0 — set via ⚡ in the Namespace table.
+        // Slot 2 is null (freed); Boot.Abstr occupies slot 3 at physical address 0x0140.
+        this.BOOTSTRAP_SLOTS = 2;
+        this.BOOTSTRAP_WORDS = this.BOOTSTRAP_SLOTS * this.SLOT_SIZE;   // 2 × 64 = 128
         // Zone 2 — Resident: always-loaded IDE abstractions (IDE-set count)
         this.RESIDENT_SLOTS  = 10;
-        this.RESIDENT_WORDS  = this.RESIDENT_SLOTS  * this.SLOT_SIZE;   // 2560
+        this.RESIDENT_WORDS  = this.RESIDENT_SLOTS  * this.SLOT_SIZE;   // 640
         // Zone 4 — NS Table: sits at the top, grows downward
         this.NS_TABLE_BASE   = 0xFD00;
         this.NS_CW           = this.TOTAL_WORDS - this.NS_TABLE_BASE;   // 768 = 256 entries × 3 words
@@ -57,7 +59,7 @@ class NamespaceTutorial {
             {
                 id: 'bootstrap',
                 label: '\u2460 Bootstrap',
-                sub: `0x0000 \u00b7 design-fixed \u00b7 ${this.BOOTSTRAP_SLOTS} slots (NS root \u00b7 boot thread \u00b7 boot abstr.) \u00b7 \u2026 ${h(B-1)}`,
+                sub: `0x0000 \u00b7 design-fixed \u00b7 ${this.BOOTSTRAP_SLOTS} slots (NS root \u00b7 Boot Thread) \u00b7 \u2026 ${h(B-1)}`,
                 bg: '#1a0030', border: '#8040c0', text: '#b080f0'
             },
             {
@@ -125,7 +127,7 @@ ${this._memMap(null)}
 <p>The ${hex(this.TOTAL_WORDS)}-word physical address space is divided into four IDE-set zones, top to bottom:</p>
 <table class="sr-table" style="margin-top:4px;">
 <tr><th>Zone</th><th>Start</th><th>Size</th><th>Purpose</th></tr>
-<tr><td><strong>\u2460 Bootstrap</strong></td><td><code>0x0000</code> \u2191</td><td>IDE-set</td><td>NS root + boot thread + boot abstraction (fixed slots)</td></tr>
+<tr><td><strong>\u2460 Bootstrap</strong></td><td><code>0x0000</code> \u2191</td><td>IDE-set</td><td>NS root (Slot\u202f0) \u00b7 Boot Thread (Slot\u202f1) \u2014 First Abstraction loaded from Thread.CR0 (set via \u26a1 in NS table)</td></tr>
 <tr><td><strong>\u2461 Resident Lumps</strong></td><td>${hex(this.BOOTSTRAP_WORDS)} \u2191</td><td>IDE-set</td><td>Always-loaded abstractions \u2014 never evicted</td></tr>
 <tr><td><strong>\u2462 Freespace</strong></td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)} \u2195</td><td>IDE-set</td><td>Cache for lazy-loaded lumps \u2014 dynamic, grows from both ends</td></tr>
 <tr><td><strong>\u2463 NS Table</strong></td><td>0xFFFF \u2191</td><td>cw words</td><td>3-word metadata entry per slot \u2014 slot\u202f1 at 0xFFFF, each new slot steps up toward freespace; base = 2^cc\u2212cw</td></tr>
@@ -171,9 +173,9 @@ ${this._memMap(null)}
 <p>The three lump zones each serve a distinct purpose. All sizes are <strong>IDE-set</strong>; every slot is ${SLOT} words (one abstraction or thread per slot). The hardware locates any lump from its NS entry\u2019s <code>word0_location</code> = slot\u202f\u00d7\u202f${SLOT}.</p>
 <table class="sr-table">
 <tr><th>Zone</th><th>Slots</th><th>Base</th><th>Purpose</th></tr>
-<tr><td><strong>\u2460 Bootstrap</strong></td><td>0\u20132 (fixed)</td><td><code>0x0000</code></td><td>NS root (Slot\u202f0), boot thread (Slot\u202f1), boot abstraction (Slot\u202f2) \u2014 loaded at power-on</td></tr>
-<tr><td><strong>\u2461 Resident Lumps</strong></td><td>3\u2026${2 + this.RESIDENT_SLOTS} (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS)}</td><td>Always-loaded abstractions: installed at boot, <em>never</em> evicted from namespace memory</td></tr>
-<tr><td><strong>\u2462 Freespace</strong></td><td>${3 + this.RESIDENT_SLOTS}\u2026 (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)}</td><td>Cache pool for lazy-loaded lumps: allocated on first CALL, evicted when memory pressure demands</td></tr>
+<tr><td><strong>\u2460 Bootstrap</strong></td><td>0\u20131 (fixed)</td><td><code>0x0000</code></td><td>NS root (Slot\u202f0), Boot Thread (Slot\u202f1) \u2014 First Abstraction loaded from Thread.CR0 (set via \u26a1 in NS table)</td></tr>
+<tr><td><strong>\u2461 Resident Lumps</strong></td><td>2\u2026${1 + this.RESIDENT_SLOTS} (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS)}</td><td>Always-loaded abstractions: installed at boot, <em>never</em> evicted from namespace memory</td></tr>
+<tr><td><strong>\u2462 Freespace</strong></td><td>${2 + this.RESIDENT_SLOTS}\u2026 (IDE)</td><td>${hex(this.BOOTSTRAP_WORDS + this.RESIDENT_WORDS)}</td><td>Cache pool for lazy-loaded lumps: allocated on first CALL, evicted when memory pressure demands</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">Lazy Loading via Freespace</div>
 <p>When the hardware raises <code>FaultType.ABSENT_OUTFORM</code> (0x11) on a CALL to an unloaded abstraction, the SW trap handler downloads and deflates the lump into a free slot in Zone\u202f\u2462. The slot remains warm for subsequent calls. If freespace runs out, the IDE evicts the least-recently-used cached lump before loading the new one. Bootstrap and Resident zones are <em>never</em> eligible for eviction.</p></div>
@@ -305,7 +307,7 @@ ELOADCALL CR8, Constants, Phi   <span style="color:#666">; DR1 &larr; &phi; (gol
                 type: 'lifecycle',
                 content: `<p>The namespace evolves through a sequence of operations from system boot to runtime:</p>
 <div class="sr-security-list">
-<div class="sr-sec-item"><span class="sr-sec-num">1</span><strong>Initialisation.</strong> The simulator calls <code>_initNamespaceTable()</code> on hard reset. It writes all built-in abstraction entries into the NS Table at ${NS}, sets Slot\u202f0 with <code>location=${hex(0)}</code>, <code>limit=${this.TOTAL_WORDS - 1}</code>, and <code>clistCount=N</code> (number of entries). The Boot.Abstr c-list GTs are packed into Slot\u202f2\u2019s lump.</div>
+<div class="sr-sec-item"><span class="sr-sec-num">1</span><strong>Initialisation.</strong> The simulator calls <code>_initNamespaceTable()</code> on hard reset. It writes all built-in abstraction entries into the NS Table at ${NS}, sets Slot\u202f0 with <code>location=${hex(0)}</code>, <code>limit=${this.TOTAL_WORDS - 1}</code>, and <code>clistCount=N</code> (number of entries). Boot.Abstr GTs are packed into the Boot.Thread lump c-list; Slot\u202f2 is null (available for catalog abstractions).</div>
 <div class="sr-sec-item"><span class="sr-sec-num">2</span><strong>Boot B:01 \u2014 LOAD_NS.</strong> <code>sim._bootStep()</code> calls mLoad on a zero-perm GT for Slot\u202f0. The result is written into <strong>CR15</strong>: the thread now knows the full physical namespace extent and the live entry count.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">3</span><strong>Upload.</strong> When the user uploads a new abstraction via the IDE, a new NS entry is written at index <em>N</em>, the lump is placed at <code>N\u202f\u00d7\u202f${SLOT}</code>, and Slot\u202f0\u2019s <code>clistCount</code> is incremented to <em>N+1</em>. An E-GT for the new slot is issued and can be bound into any c-list that holds an S-permissioned GT for the target c-list.</div>
 <div class="sr-sec-item"><span class="sr-sec-num">4</span><strong>mLoad (at runtime).</strong> Any instruction that loads a capability reads the NS entry, verifies the seal and version, then derives the correct GT fields. CR15\u2019s version and seal are re-checked on every use to ensure the namespace root has not been tampered with.</div>

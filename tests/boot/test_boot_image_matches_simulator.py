@@ -93,14 +93,13 @@ CONFIGS = [
 
 # ---- helpers --------------------------------------------------------------
 
-STARTUP_CONFIG_LUMP_SIZE = 64  # Slot 2 (Startup.Config) is always 64 words (Task #396)
 BOOT_ABSTR_DEFAULT_SIZE  = 64  # Boot.Abstr default size when no saved lump (Task #568)
 
 def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
     """Human-readable name for the foundation region containing word_index.
 
-    After Task #396: slot 2 (0x0140-0x017F, 64 words) is Startup.Config;
-    Boot.Abstr (NS slot 3) takes entry_size words (64w default, Task #568).
+    After Task #1205: null slot 2 gap removed; Boot.Abstr (NS slot 3) starts
+    immediately after Boot.Thread at ns_size + thread_size.
     """
     ns_table_base = total_words - NS_TABLE_RESERVE
     if word_index >= ns_table_base:
@@ -112,10 +111,8 @@ def _region_of(word_index, total_words, ns_size, thread_size, entry_size):
         return "Boot.NS lump"
     if word_index < ns_size + thread_size:
         return "Boot.Thread lump"
-    startup_config_end = ns_size + thread_size + 64  # slot 2: Startup.Config (64 words, Task #396)
-    if word_index < startup_config_end:
-        return "Startup.Config lump (slot 2, 64 words)"
-    if word_index < startup_config_end + entry_size:
+    boot_abstr_end = ns_size + thread_size + entry_size
+    if word_index < boot_abstr_end:
         return "Boot.Abstr lump (slot 3)"
     return "resident / free region"
 
@@ -280,8 +277,8 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
     ns_base = ns_table_base + BOOT_ABSTR_NS_SLOT * NS_ENTRY_WORDS
     boot_loc = words[ns_base]
 
-    # Expected physical address: after Boot.NS(64) + Boot.Thread(256) + Startup.Config(64)
-    expected_loc = 64 + 256 + 64
+    # Expected physical address: after Boot.NS(64) + Boot.Thread(256) — null slot 2 gap removed (Task #1205)
+    expected_loc = 64 + 256
     assert boot_loc == expected_loc, (
         f"Boot.Abstr physical address {boot_loc} != expected {expected_loc}"
     )

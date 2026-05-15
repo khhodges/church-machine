@@ -23,15 +23,18 @@ Layout (all words 32-bit little-endian):
 
     [0 .. NS_LUMP_SIZE)                      Namespace lump body (header @0)
     [NS_LUMP_SIZE .. +THREAD_LUMP_SIZE)      Thread lump body    (header @0)
-    [.. +SLOT_SIZE)                          Boot.Abstr director (header @0,
-                                              free/null slot 2)
     [.. +ABSTR_LUMP_SIZE)                    Boot.Abstr body     (header @0,
-                                              code + c-list at physical end)
+                                              code + c-list at physical end;
+                                              NS slot 3, no gap before it)
     [resident lump bodies at programmer
      -chosen physAddr]
     [NS_TABLE_BASE .. +NS_TABLE_RESERVE)     Namespace table
        (256 entries × 4 words; named slots followed by Step-3 reserved
         empties; remainder zero)
+
+Note: NS slot 2 is null (no physical lump reservation).  Boot.Abstr
+occupies NS slot 3 and sits immediately after the Thread lump body.
+Slot 2 is the first slot available for catalog abstractions.
 """
 import json
 import os
@@ -530,13 +533,12 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     step2_lumps = []
     if isinstance(cfg.get("step2"), dict):
         step2_lumps = cfg["step2"].get("lumps") or []
-    # Foundational slots (NS, Thread, free/null slot 2, Boot.Abstr) and
+    # Foundational slots (NS slot 0, Thread slot 1, Boot.Abstr slot 3) and
     # MMIO device-register windows must not be overridden by caller-supplied
     # physAddr values, even when generate_boot_image() is called directly
     # (bypassing the app-layer _validate_step2 guard).
-    # Slot 2 is a free/null entry (Boot.Abstr eliminated — Task #247) but is
-    # still guarded so no external caller can claim it at boot time.
-    _FOUNDATIONAL_SLOTS = set(range(0, BOOT_ABSTR_NS_SLOT + 1))  # slots 0..3
+    # Slot 2 is intentionally excluded — it is available for catalog use.
+    _FOUNDATIONAL_SLOTS = {0, 1, BOOT_ABSTR_NS_SLOT}  # slots 0, 1, 3 — slot 2 is free for catalog use
     _DEVICE_REG_SLOTS   = set(range(11, 16))                      # slots 11..15
     _RESERVED_SLOTS     = _FOUNDATIONAL_SLOTS | _DEVICE_REG_SLOTS
 
@@ -570,11 +572,13 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
 
         if entry is None:
-            # Free/null slot: advance offset but leave NS entry all-zeros.
+            # Null catalog slot: leave NS entry all-zeros.
+            # Slot 2 (and all other null slots) do NOT consume physical address
+            # space — no lump body is placed for them, so running_offset is
+            # unchanged.  (Formerly slot 2 advanced by SLOT_SIZE, producing a
+            # 64-word dead gap before Boot.Abstr; that gap is now removed.)
             if i == 0:
-                running_offset = ns_size
-            else:
-                running_offset += my_size
+                running_offset = ns_size   # degenerate: slot 0 is never None
             clist_gts.append(0)              # null GT in c-list at this position
             continue
 

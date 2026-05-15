@@ -935,11 +935,9 @@ class ChurchSimulator {
             const mySize = slotSizes[i] || this.SLOT_SIZE;
 
             if (!a) {
-                // Free/null slot (slot 2 after Boot.Abstr elimination, Task #247).
-                // Still advance runningOffset so subsequent slots keep their addresses.
+                // Free/null slot — no physical lump, no address space consumed.
+                // Task #1205: null slot 2 gap removed; runningOffset not advanced.
                 // Leave the NS table entry as all-zeros (null/free).
-                if (i > 0) runningOffset += mySize;
-                else runningOffset = NS_LUMP_SIZE;
                 clistGTs.push(0);           // null GT in c-list at this position
                 this.nsLabels[i] = '(free)';
                 continue;
