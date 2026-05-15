@@ -2,7 +2,8 @@
 tests/server/test_boot_config_validation.py
 
 Automated test coverage for _validate_step2 — specifically the
-physAddr-vs-board-RAM ceiling checks introduced in Task #1183.
+physAddr-vs-board-RAM ceiling checks introduced in Task #1183, and the
+usable-namespace-region check introduced in Task #1188.
 
 Tests cover:
   - Lump within range (no error)
@@ -11,6 +12,10 @@ Tests cover:
   - Error message content for out-of-range cases
   - Two board profiles: Tang Nano 20K (16 384 words) and Wukong XC7A100T (131 072 words)
   - General _validate_step2 input-validation guards
+  - Lump within usable namespace region (no error)
+  - Lump ending exactly at usable_end boundary (no error — boundary is inclusive)
+  - Lump extending one word past usable_end (error — "usable namespace region")
+  - Two distinct totalNamespaceWords values to parameterise the usable-end ceiling
 """
 
 import os
@@ -295,3 +300,118 @@ class TestValidateStep2General:
             err = _validate_step2({"lumps": [entry_a, entry_b]}, self._step1(), TANG_BOARD)
         assert err is not None
         assert "overlap" in err
+
+
+# ---------------------------------------------------------------------------
+# Usable namespace region check (Task #1188)
+#
+# usable_end = totalNamespaceWords - NS_TABLE_RESERVE  (NS_TABLE_RESERVE = 0x300 = 768)
+# A resident lump fails when:  phys + lump_size > usable_end
+#
+# Two distinct totalNamespaceWords values are exercised so the ceiling is
+# parameterised rather than hard-coded.  The physAddr values used here are
+# all far below the Tang Nano 20K board-RAM ceiling (16 384 words), so the
+# board-RAM check never fires first — the usable-end check is the binding
+# constraint throughout this class.
+# ---------------------------------------------------------------------------
+
+# Profile A — small namespace window
+# usable_end_A = FOUNDATION_END + LUMP_SIZE + 100  = 448 + 64 + 100 = 612
+_SMALL_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 100 + _NS_TABLE_RESERVE   # 1380
+_USABLE_END_A   = _SMALL_NS_TOTAL - _NS_TABLE_RESERVE                    # 612
+
+# Profile B — medium namespace window (distinct totalNamespaceWords)
+# usable_end_B = FOUNDATION_END + LUMP_SIZE + 500  = 448 + 64 + 500 = 1012
+_MEDIUM_NS_TOTAL = FOUNDATION_END + LUMP_SIZE + 500 + _NS_TABLE_RESERVE  # 1780
+_USABLE_END_B    = _MEDIUM_NS_TOTAL - _NS_TABLE_RESERVE                  # 1012
+
+
+class TestUsableNamespaceRegion:
+    """
+    Tests for the usable-namespace-region guard in _validate_step2.
+
+    The check is: phys + lump_size > usable_end → error containing
+    "usable namespace region".
+
+    Two distinct totalNamespaceWords values (small / medium) are exercised
+    so the ceiling boundary is parameterised rather than implied by a single
+    constant.
+    """
+
+    # --- Profile A (totalNamespaceWords = 1380, usable_end = 612) -----------
+
+    def test_within_usable_region_profile_a_passes(self):
+        """Lump well inside usable_end for the small namespace profile → no error."""
+        phys = FOUNDATION_END               # 448; end = 512 < 612
+        step1 = _make_step1(_SMALL_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is None, f"expected no error but got: {err!r}"
+
+    def test_exactly_at_usable_boundary_profile_a_passes(self):
+        """Lump whose last word is exactly usable_end → boundary is inclusive, no error."""
+        phys = _USABLE_END_A - LUMP_SIZE    # 548; end = 612 == usable_end_A
+        step1 = _make_step1(_SMALL_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is None, f"expected no error but got: {err!r}"
+
+    def test_one_word_past_usable_boundary_profile_a_fails(self):
+        """Lump extending one word past usable_end → validation error."""
+        phys = _USABLE_END_A - LUMP_SIZE + 1  # 549; end = 613 > 612
+        step1 = _make_step1(_SMALL_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is not None, "expected a validation error but got None"
+        assert "usable namespace region" in err, f"unexpected error text: {err!r}"
+
+    def test_error_names_the_usable_end_profile_a(self):
+        """Out-of-range error message includes the numeric usable_end address."""
+        phys = _USABLE_END_A - LUMP_SIZE + 1
+        step1 = _make_step1(_SMALL_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is not None
+        assert str(_USABLE_END_A) in err, (
+            f"usable_end ({_USABLE_END_A}) not mentioned in error: {err!r}"
+        )
+
+    def test_error_names_the_abstraction_profile_a(self):
+        """Out-of-range error message includes the abstraction name."""
+        phys = _USABLE_END_A - LUMP_SIZE + 1
+        step1 = _make_step1(_SMALL_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is not None
+        assert FAKE_CATALOG_ENTRY["abstraction"] in err, (
+            f"abstraction name not in error: {err!r}"
+        )
+
+    # --- Profile B (totalNamespaceWords = 1780, usable_end = 1012) ----------
+
+    def test_within_usable_region_profile_b_passes(self):
+        """Lump well inside usable_end for the medium namespace profile → no error."""
+        phys = FOUNDATION_END               # 448; end = 512 < 1012
+        step1 = _make_step1(_MEDIUM_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is None, f"expected no error but got: {err!r}"
+
+    def test_exactly_at_usable_boundary_profile_b_passes(self):
+        """Lump ending exactly at usable_end for profile B → boundary is inclusive, no error."""
+        phys = _USABLE_END_B - LUMP_SIZE    # 948; end = 1012 == usable_end_B
+        step1 = _make_step1(_MEDIUM_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is None, f"expected no error but got: {err!r}"
+
+    def test_one_word_past_usable_boundary_profile_b_fails(self):
+        """Lump extending one word past usable_end for profile B → validation error."""
+        phys = _USABLE_END_B - LUMP_SIZE + 1  # 949; end = 1013 > 1012
+        step1 = _make_step1(_MEDIUM_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is not None, "expected a validation error but got None"
+        assert "usable namespace region" in err, f"unexpected error text: {err!r}"
+
+    def test_error_names_the_usable_end_profile_b(self):
+        """Out-of-range error message includes the numeric usable_end address for profile B."""
+        phys = _USABLE_END_B - LUMP_SIZE + 1
+        step1 = _make_step1(_MEDIUM_NS_TOTAL)
+        err = _validate_step2(_make_step2(phys), step1, TANG_BOARD)
+        assert err is not None
+        assert str(_USABLE_END_B) in err, (
+            f"usable_end ({_USABLE_END_B}) not mentioned in error: {err!r}"
+        )
