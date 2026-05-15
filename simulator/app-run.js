@@ -8414,6 +8414,7 @@ function getBoardLabel(board) {
 }
 
 function switchBuilderViewTab(tab) {
+    try { localStorage.setItem('church_builderTab', tab); } catch(e) {}
     document.querySelectorAll('.builder-view-tab').forEach(b => b.classList.remove('active'));
     const btn = document.getElementById('builderViewTab-' + tab);
     if (btn) btn.classList.add('active');
