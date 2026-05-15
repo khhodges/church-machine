@@ -311,8 +311,11 @@
         var maxSl  = total / 64;
         var slots  = clamp(state.ns.slots, 1, maxSl);
         var nsWords = slots * 4;
-        var FOUND   = 384;
-        var pool    = total - nsWords - FOUND;
+        var FOUND        = 384;
+        var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
+        var threadCount  = clamp(state.thread.count, 1, profile.singleThread ? 1 : 10);
+        var threadTotal  = threadLump * threadCount;
+        var pool    = total - nsWords - FOUND - threadTotal;
         var cw      = (slots >>> 8) & 0x1FFF;
         var cc      =  slots & 0xFF;
         var word    = packHdr(n, cw, cc, 1);
@@ -334,6 +337,7 @@
             ['Max slots',      esc(maxSl.toLocaleString() + '  (total ÷ 64)'), ''],
             ['NS table',       esc(nsWords.toLocaleString() + ' words  (slots × 4)'), ''],
             ['Foundation',     esc(FOUND + ' words (est.)'), ''],
+            ['Threads',        esc(threadCount + ' × ' + threadLump.toLocaleString() + ' = ' + threadTotal.toLocaleString() + ' words'), ''],
             ['Pool available', pool >= 0 ? esc(pool.toLocaleString() + ' words') : '<span class="le-overflow">overflow</span>', ''],
             ['cw field',       esc(String(cw) + '  (slots >> 8)'), ''],
             ['cc field',       esc(String(cc) + '  (slots & 0xFF)'), ''],
@@ -341,9 +345,10 @@
         ]);
 
         var bar = renderBar([
-            { label: 'Foundation', words: FOUND,              cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
-            { label: 'NS Table',   words: nsWords,             cls: 'le-zone-heap', onclick: "switchView('namespace')" },
-            { label: 'Pool',       words: Math.max(pool, 0),  cls: 'le-zone-free'  }
+            { label: 'Foundation', words: FOUND,                         cls: 'le-zone-hdr',   onclick: 'openBootDesigner()' },
+            { label: 'NS Table',   words: nsWords,                        cls: 'le-zone-heap',  onclick: "switchView('namespace')" },
+            { label: 'Threads',    words: threadTotal,                    cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" },
+            { label: 'Pool',       words: Math.max(pool, 0),             cls: 'le-zone-free'  }
         ]);
 
         return '<div class="le-panel">' +
@@ -364,9 +369,10 @@
             '<div class="le-bar-label-row"><span>Memory layout</span><span class="le-bar-label-count">' + esc(total.toLocaleString() + ' words') + '</span></div>' +
             bar +
             renderMagBar([
-                { label: 'Foundation', words: FOUND,             cls: 'le-zone-hdr',  onclick: 'openBootDesigner()' },
-                { label: 'NS Table',   words: nsWords,            cls: 'le-zone-heap', onclick: "switchView('namespace')" },
-                { label: 'Pool',       words: Math.max(pool, 0), cls: 'le-zone-free' }
+                { label: 'Foundation', words: FOUND,                      cls: 'le-zone-hdr',   onclick: 'openBootDesigner()' },
+                { label: 'NS Table',   words: nsWords,                     cls: 'le-zone-heap',  onclick: "switchView('namespace')" },
+                { label: 'Threads',    words: threadTotal,                 cls: 'le-zone-stack', onclick: "switchBuilderViewTab('lump-thread')" },
+                { label: 'Pool',       words: Math.max(pool, 0),          cls: 'le-zone-free' }
             ]) +
             '<div class="le-divider"></div>' +
             grid +
