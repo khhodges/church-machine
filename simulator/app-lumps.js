@@ -68,11 +68,15 @@ function showLumpDetail(token) {
     }
     _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','hexdump')">Hex Dump</button></div>`;
 
-    // ── Action bar (Edit + Audit + Delete) shown below the header strip ──────
+    // ── Action bar (Edit + Audit + Load into Sim + Delete) shown below the header strip ──────
     let _actionBar = `<div class="lump-action-bar">`;
     if (!isNamespace) {
         _actionBar += `<button class="btn lump-edit-btn" data-edit-token="${_e(token)}" title="Edit \u2014 Open the code editor (Create page)">&#9998; Edit</button>`;
         _actionBar += `<button class="btn lump-audit-btn" data-audit-token="${_e(token)}" title="Audit \u2014 Run pre-save consistency checks on this LUMP binary">\u2699 Audit</button>`;
+        const _isCodeLump = lump.content_type === 'code' || lump.language === 'assembly' || lump.language === 'cloomc';
+        if (_isCodeLump) {
+            _actionBar += `<button class="btn lump-loadsim-btn" id="lumpLoadSimBtn_${_e(token)}" onclick="_loadLumpBinaryIntoSim('${_e(token)}','${_e((lump.abstraction || token).replace(/'/g,''))}',this)" title="Load into Sim \u2014 Fetch this LUMP binary and load it into the simulator">Load into Sim &#x25b6;</button>`;
+        }
     }
     _actionBar += `<button class="btn lump-delete-btn lump-delete-top-btn" data-delete-token="${_e(token)}" title="Delete this lump">Delete</button>`;
     _actionBar += `</div>`;
@@ -3391,6 +3395,110 @@ async function _gtPickCommit(lumpToken, slotIndex) {
     } catch (err) {
         if (btn) { btn.disabled = false; btn.textContent = 'Assign GT'; }
         alert(`Failed to assign GT: ${err.message}`);
+    }
+}
+
+// ── Load a saved LUMP binary into the simulator ───────────────────────────────
+// Fetches raw words from /api/lump/<token>/words, calls sim.loadProgram(),
+// then syncs the boot-entry UI so the Resident panel stays consistent.
+// Works for any code-type LUMP (assembly, cloomc, etc.).
+async function _loadLumpBinaryIntoSim(token, name, btn) {
+    if (!token) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
+    try {
+        const resp = await fetch(`/api/lump/${token}/words`);
+        if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+        const data = await resp.json();
+        const words = data.words || [];
+        if (!words.length) throw new Error('Empty LUMP \u2014 no words returned');
+
+        if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
+        if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
+
+        sim.loadProgram(words, 0);
+        if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+        if (typeof lastAssembledWords !== 'undefined') lastAssembledWords = words.slice();
+        if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
+        if (typeof _injectClistNow === 'function') {
+            _injectClistNow();
+            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = false;
+        } else {
+            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = true;
+        }
+        if (sim.programName !== undefined) sim.programName = name || token;
+
+        if (btn) { btn.textContent = 'Loaded \u2713'; }
+        const con = document.getElementById('editorConsole');
+        if (con) {
+            con.className = '';
+            con.textContent = `Loaded LUMP \u201c${name || token}\u201d \u2014 ${words.length} words \u2014 click Step or Run`;
+        }
+        switchView('dashboard');
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Load into Sim \u25b6'; }
+        alert(`Failed to load LUMP into simulator: ${err.message}`);
+    }
+}
+
+// ── Run Selftest shortcut ─────────────────────────────────────────────────────
+// Loads the PostFlashSelftest LUMP (token 82f5ef56) into the simulator, runs
+// it to completion, and reports DR0 (0 = all 81 tests passed).
+async function runSelftestLump() {
+    const SELFTEST_TOKEN = '82f5ef56';
+    const SELFTEST_NAME  = 'PostFlashSelftest';
+    const MAX_STEPS = 500000;
+
+    const btn = document.getElementById('dashSelftestBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
+    try {
+        const resp = await fetch(`/api/lump/${SELFTEST_TOKEN}/words`);
+        if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+        const data = await resp.json();
+        const words = data.words || [];
+        if (!words.length) throw new Error('Empty LUMP');
+
+        if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
+        if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
+
+        sim.loadProgram(words, 0);
+        if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+        if (typeof lastAssembledWords !== 'undefined') lastAssembledWords = words.slice();
+        if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
+        if (typeof _injectClistNow === 'function') {
+            _injectClistNow();
+            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = false;
+        } else {
+            if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = true;
+        }
+        if (sim.programName !== undefined) sim.programName = SELFTEST_NAME;
+
+        if (btn) btn.textContent = 'Running\u2026';
+
+        let steps = 0;
+        while (!sim.halted && steps < MAX_STEPS) {
+            sim.step();
+            steps++;
+        }
+
+        const dr0 = (sim.DR && sim.DR[0] !== undefined) ? (sim.DR[0] >>> 0) : null;
+        const passed = dr0 === 0;
+        const resultText = passed
+            ? 'PASS \u2014 all 81 tests passed (DR0=0)'
+            : (dr0 === null ? 'Could not read DR0' : `FAIL \u2014 first failing test: #${dr0} (DR0=${dr0})`);
+        const resultClass = passed ? 'selftest-pass' : 'selftest-fail';
+
+        const resultEl = document.getElementById('dashSelftestResult');
+        if (resultEl) {
+            resultEl.textContent = resultText;
+            resultEl.className = `dash-selftest-result ${resultClass}`;
+        }
+
+        if (btn) { btn.disabled = false; btn.textContent = 'Run Selftest'; }
+        if (typeof updateDisplay === 'function') updateDisplay();
+        switchDashTab('dr');
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Run Selftest'; }
+        alert(`Selftest failed: ${err.message}`);
     }
 }
 

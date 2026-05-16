@@ -618,6 +618,36 @@ async function renderLumps() {
         html += `</div>`;
         html += `</div>`;
 
+        // Diagnostic LUMPs section — floating catalog entries (ns_slot_policy=dynamic)
+        // These are surfaced from the lumpCatalog returned by /api/boot-config.
+        const _SELFTEST_TOKEN = '82f5ef56';
+        const _SELFTEST_NAME  = 'PostFlashSelftest';
+        const _selftestInList = (lumps || []).find(l => l.token === _SELFTEST_TOKEN || l.abstraction === _SELFTEST_NAME);
+        const _stToken = (_selftestInList && _selftestInList.token) ? _selftestInList.token : _SELFTEST_TOKEN;
+        const _stCw    = (_selftestInList && _selftestInList.cw  != null) ? _selftestInList.cw   : 512;
+        const _stCc    = (_selftestInList && _selftestInList.cc  != null) ? _selftestInList.cc   : 0;
+        const _stSize  = (_selftestInList && _selftestInList.lump_size != null) ? _selftestInList.lump_size : 1024;
+        html += `<div class="lump-tier-a-section">`;
+        html += `<div class="lump-tier-a-header">Diagnostic LUMPs &mdash; Floating Catalog <span class="lump-tier-a-header-sub">(load on demand, no fixed NS slot)</span></div>`;
+        html += `<div class="lump-tier-a-row lump-diag-row">`;
+        if (_selftestInList) {
+            const _stTk = _escHtml(_stToken);
+            html += `<span class="lump-tier-a-name"><a class="lump-tier-a-link" href="#" onclick="event.preventDefault();showLumpDetail('${_stTk}')">${_escHtml(_SELFTEST_NAME)}</a></span>`;
+        } else {
+            html += `<span class="lump-tier-a-name">${_escHtml(_SELFTEST_NAME)}</span>`;
+        }
+        html += `<span class="lump-tier-a-slot lump-diag-slot">floating</span>`;
+        html += `<span class="lump-tier-a-status${_selftestInList ? ' lump-tier-a-status-present' : ''}">${_selftestInList ? 'Available' : 'Missing'}</span>`;
+        html += `<span class="lump-tier-a-milestone" style="font-family:monospace;font-size:0.68rem;">0x${_escHtml(_stToken)} &nbsp; cw=${_stCw} &nbsp; cc=${_stCc} &nbsp; ${_stSize}w</span>`;
+        if (_selftestInList) {
+            const _stTk2 = _escHtml(_stToken);
+            html += `<button class="lump-diag-load-btn" onclick="event.preventDefault();_loadLumpBinaryIntoSim('${_stTk2}','${_escHtml(_SELFTEST_NAME)}',this)" title="Load PostFlashSelftest into the simulator">Load &#x25b6;</button>`;
+        } else {
+            html += `<span class="lump-tier-a-test-id" style="color:#6b7280;">not compiled</span>`;
+        }
+        html += `</div>`;
+        html += `</div>`;
+
         listEl.innerHTML = html;
 
         if (_selectedLumpToken) {

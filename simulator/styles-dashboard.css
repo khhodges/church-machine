@@ -5542,3 +5542,41 @@ a.next-step-link:hover {
 }
 
 
+
+/* ── PostFlashSelftest quick-action (Dashboard > State tab) ─────────────── */
+.dash-selftest-btn {
+    background: rgba(80, 160, 80, 0.14);
+    color: #7ec97e;
+    border: 1px solid rgba(80, 180, 80, 0.3);
+    font-size: 0.72rem;
+    padding: 3px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-right: 0.5rem;
+}
+.dash-selftest-btn:hover:not(:disabled) {
+    background: rgba(80, 200, 80, 0.26);
+    color: #a0e0a0;
+    border-color: rgba(100, 220, 100, 0.5);
+}
+.dash-selftest-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+.dash-selftest-result {
+    font-size: 0.72rem;
+    font-family: 'Courier New', monospace;
+}
+.dash-selftest-result.selftest-pass {
+    color: #66bb6a;
+    font-weight: 600;
+}
+.dash-selftest-result.selftest-fail {
+    color: #ef5350;
+    font-weight: 600;
+}
+.info-item-selftest {
+    align-items: center;
+    padding: 0.35rem 0;
+}

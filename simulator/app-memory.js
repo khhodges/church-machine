@@ -1594,6 +1594,14 @@ function updateInfoDisplay() {
             return `<div class="info-item"><span class="info-label">Scheduler Timer</span><span class="info-value">${timerHtml}</span></div>`
                  + `<div class="info-item"><span class="info-label">Scheduler.IRQ</span><span class="info-value">${irqHtml} &mdash; <span style="color:#ffb74d;font-weight:600;">${_sweepCount}</span> sweep${_sweepCount !== 1 ? 's' : ''}, ${_threads} thread${_threads !== 1 ? 's' : ''} &mdash; <a href="#" onclick="event.preventDefault();switchView('abstractions');showAbstractionDetail(8);" style="color:#c89b3c;text-decoration:none;font-size:0.8rem;">view detail</a></span></div>`;
         })()}
+        <div class="info-item info-item-selftest">
+            <span class="info-label">Post-Flash Selftest</span>
+            <span class="info-value">
+                <button id="dashSelftestBtn" class="btn btn-sm dash-selftest-btn" onclick="runSelftestLump()" title="Load PostFlashSelftest LUMP and run all 81 hardware correctness tests \u2014 DR0=0 on pass">Run Selftest</button>
+                <span id="dashSelftestResult" class="dash-selftest-result"></span>
+                <a href="#" onclick="event.preventDefault();switchView('lumps');setTimeout(()=>showLumpDetail('82f5ef56'),200);" style="color:#c89b3c;text-decoration:none;font-size:0.78rem;margin-left:0.5rem;">view LUMP</a>
+            </span>
+        </div>
     `;
 }
 

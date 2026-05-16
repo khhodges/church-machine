@@ -379,9 +379,14 @@ LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 def _load_lump_catalog():
     """Return the subset of server/lumps/manifest.json suitable for Step 2.
 
-    Drops entries with no `ns_slot` (utility lumps without a fixed namespace
-    home) and entries that target reserved slots (foundational + device
-    MMIO). The rest is what the programmer can choose to bake in.
+    Fixed-slot lumps (ns_slot is an integer) and entries that target reserved
+    slots (foundational + device MMIO) are dropped. The rest is what the
+    programmer can choose to bake in.
+
+    Floating lumps (ns_slot_policy == "dynamic", ns_slot == null) are included
+    with a "floating": True flag and nsSlot: None so the IDE can surface them
+    in diagnostic/utility catalog sections without treating them as Step 2
+    resident candidates (the _validate_step2 path still filters by nsSlot).
     """
     try:
         with open(LUMPS_MANIFEST_PATH, "r") as f:
@@ -389,9 +394,25 @@ def _load_lump_catalog():
     except Exception:
         return []
     out = []
+    floating = []
     for entry in raw if isinstance(raw, list) else []:
         slot = entry.get("ns_slot")
+        policy = entry.get("ns_slot_policy", "static")
         if not isinstance(slot, int):
+            # Floating lump — include in catalog with floating flag
+            if policy == "dynamic" and entry.get("token"):
+                e = {
+                    "abstraction": entry.get("abstraction"),
+                    "nsSlot": None,
+                    "lumpSize": entry.get("lump_size"),
+                    "token": entry.get("token"),
+                    "nsSlotPolicy": policy,
+                    "hasExecutableMethods": bool(entry.get("methods")),
+                    "floating": True,
+                    "grants": entry.get("grants", []),
+                    "description": entry.get("description"),
+                }
+                floating.append(e)
             continue
         if slot in RESERVED_NS_SLOTS:
             continue
@@ -400,7 +421,7 @@ def _load_lump_catalog():
             "nsSlot": slot,
             "lumpSize": entry.get("lump_size"),
             "token": entry.get("token"),
-            "nsSlotPolicy": entry.get("ns_slot_policy", "static"),
+            "nsSlotPolicy": policy,
             "hasExecutableMethods": bool(entry.get("methods")),
         }
         if entry.get("media_tags"):
@@ -408,7 +429,9 @@ def _load_lump_catalog():
         out.append(e)
     # Stable ordering: by ns_slot, then abstraction name.
     out.sort(key=lambda e: (e["nsSlot"], e["abstraction"] or ""))
-    return out
+    # Floating lumps appended after fixed-slot entries, sorted by name.
+    floating.sort(key=lambda e: e["abstraction"] or "")
+    return out + floating
 
 def _validate_step2(step2, step1, target_board):
     """Validate the optional Step 2 (resident lumps) section.
