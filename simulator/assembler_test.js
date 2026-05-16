@@ -5887,6 +5887,86 @@ abstraction VlcTest {
     }
 }
 
+// ── Inline-vs-canonical round-trip: app-run.js ↔ examples/ ──────────────────
+// Verifies that the inline source strings embedded in app-run.js for
+// post_flash_selftest and gt_v1_1_test assemble to exactly the same word
+// array as the canonical .cloomc source files in simulator/examples/.
+// A divergence here means the two copies have silently drifted apart.
+{
+    const path = require('path');
+    const fs   = require('fs');
+
+    const appRunSrc = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+
+    function extractInline(key) {
+        // Match:  'key': `...content...`,
+        // CLOOMC source never contains backticks, so a lazy [\s\S]*? is safe.
+        const re = new RegExp("'" + key + "'\\s*:\\s*`([\\s\\S]*?)`\\s*,");
+        const m  = appRunSrc.match(re);
+        if (!m) throw new Error('Could not find inline source for key: ' + key);
+        return m[1];
+    }
+
+    function asmSrc(src) {
+        const a      = new ChurchAssembler({});
+        const result = a.assemble(src);
+        return { errors: a.errors, words: result.words || [] };
+    }
+
+    function asmFile(relPath) {
+        const src = fs.readFileSync(path.join(__dirname, relPath), 'utf8');
+        return asmSrc(src);
+    }
+
+    // ── EX-GT11 inline vs canonical ─────────────────────────────────────────
+    {
+        const inlineSrc    = extractInline('gt_v1_1_test');
+        const { errors: inlineErr, words: inlineWords } = asmSrc(inlineSrc);
+        const { errors: fileErr,   words: fileWords   } = asmFile('examples/gt_v1_1_test.cloomc');
+
+        assert('EX-GT11-INLINE: inline source assembles without errors',
+            inlineErr.length === 0,
+            inlineErr.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+
+        assert('EX-GT11-INLINE: inline word count equals canonical word count',
+            inlineWords.length === fileWords.length,
+            `inline=${inlineWords.length} canonical=${fileWords.length}`);
+
+        const firstMismatch = inlineWords.findIndex((w, i) => w !== fileWords[i]);
+        assert('EX-GT11-INLINE: every assembled word matches the canonical file',
+            firstMismatch === -1,
+            firstMismatch === -1
+                ? ''
+                : `first mismatch at word[${firstMismatch}]: ` +
+                  `inline=0x${(inlineWords[firstMismatch] >>> 0).toString(16)} ` +
+                  `canonical=0x${(fileWords[firstMismatch] >>> 0).toString(16)}`);
+    }
+
+    // ── EX-PFS inline vs canonical ───────────────────────────────────────────
+    {
+        const inlineSrc    = extractInline('post_flash_selftest');
+        const { errors: inlineErr, words: inlineWords } = asmSrc(inlineSrc);
+        const { errors: fileErr,   words: fileWords   } = asmFile('examples/post_flash_selftest.cloomc');
+
+        assert('EX-PFS-INLINE: inline source assembles without errors',
+            inlineErr.length === 0,
+            inlineErr.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+
+        assert('EX-PFS-INLINE: inline word count equals canonical word count',
+            inlineWords.length === fileWords.length,
+            `inline=${inlineWords.length} canonical=${fileWords.length}`);
+
+        const firstMismatch = inlineWords.findIndex((w, i) => w !== fileWords[i]);
+        assert('EX-PFS-INLINE: every assembled word matches the canonical file',
+            firstMismatch === -1,
+            firstMismatch === -1
+                ? ''
+                : `first mismatch at word[${firstMismatch}]: ` +
+                  `inline=0x${(inlineWords[firstMismatch] >>> 0).toString(16)} ` +
+                  `canonical=0x${(fileWords[firstMismatch] >>> 0).toString(16)}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
