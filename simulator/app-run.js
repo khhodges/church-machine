@@ -8470,7 +8470,7 @@ function _renderBuildFiles(files, isTi60) {
         list.innerHTML = '<div class="build-file-empty">No files reported.</div>';
         return;
     }
-    const iconMap = { v: '📄', edif: '🔌', il: '⚙️', json: '📋', cst: '📍', makefile: '🛠️', md: '📖' };
+    const iconMap = { v: '📄', edif: '🔌', il: '⚙️', json: '📋', cst: '📍', makefile: '🛠️', md: '📖', isf: '📌', xdc: '📌', tcl: '📜', xml: '🗂️', sh: '🖥️', py: '🐍' };
     list.innerHTML = files.map(f => {
         const ext = f.split('.').pop().toLowerCase();
         const icon = iconMap[ext] || '📄';
@@ -9936,10 +9936,13 @@ async function downloadFPGAPackage() {
         _buildLogAppend(`[${doneTs}] Downloaded ${zipName} (${(blob.size / 1024).toFixed(0)} KB)\n`);
         _buildLogAppend('\nPackage contents:\n');
         if (isTi60) {
-            _buildLogAppend('  church_ti60_f225.v    — Synthesisable Verilog\n');
-            _buildLogAppend('  church_ti60_f225.edif — Yosys EDIF netlist (synth_efinix)\n');
-            _buildLogAppend('  ti60_f225.isf         — Pin constraints (Efinity IDE)\n');
-            _buildLogAppend('  BUILD.md              — Instructions\n');
+            _buildLogAppend('  church_ti60_f225.xml      — Efinity project file (open this in Efinity IDE)\n');
+            _buildLogAppend('  church_ti60_f225.v        — Synthesisable Verilog\n');
+            _buildLogAppend('  church_ti60_f225.sdc      — Timing constraints\n');
+            _buildLogAppend('  church_ti60_f225.peri.xml — Periphery I/O configuration\n');
+            _buildLogAppend('  setup_ti60_peri.py        — DesignAPI script to add PLL (run once)\n');
+            _buildLogAppend('  ti60_f225.isf             — Pin constraints (Efinity IDE)\n');
+            _buildLogAppend('  BUILD.md                  — Instructions\n');
             _buildLogAppend('\n' +
                 '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
                 '  NEXT STEPS — Ti60 F225\n' +
@@ -9957,6 +9960,7 @@ async function downloadFPGAPackage() {
             _buildLogAppend('  church_wukong_xc7a100t.v   — Synthesisable Verilog (Yosys from RTLIL)\n');
             _buildLogAppend('  wukong_xc7a100t.xdc        — Vivado XDC pin constraints\n');
             _buildLogAppend('  wukong_xc7a100t.tcl        — Vivado project creation + build script\n');
+            _buildLogAppend('  local_bridge.py            — Serial bridge server (used by bridge.sh)\n');
             _buildLogAppend('  BUILD.md                   — Instructions\n');
             _buildLogAppend('\n' +
                 '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n' +
@@ -9982,12 +9986,14 @@ async function downloadFPGAPackage() {
                 '  See BUILD.md inside the zip for full details.\n' +
                 '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n');
         } else {
-            _buildLogAppend('  church_tang_nano_20k.v    — Synthesisable Verilog\n');
-            _buildLogAppend('  church_tang_nano_20k.json — Yosys netlist\n');
+            _buildLogAppend('  church_tang_nano_20k.il   — Amaranth RTLIL (authoritative)\n');
+            _buildLogAppend('  church_tang_nano_20k.v    — Synthesisable Verilog (when Yosys synthesis succeeded)\n');
+            _buildLogAppend('  church_tang_nano_20k.json — Yosys netlist (when Yosys synthesis succeeded)\n');
             _buildLogAppend('  tang_nano_20k.cst         — Pin constraints\n');
+            _buildLogAppend('  Makefile                  — Build targets\n');
             _buildLogAppend('  flash.sh                  — One-command build + flash\n');
             _buildLogAppend('  bridge.sh                 — Connect board to IDE\n');
-            _buildLogAppend('  Makefile                  — Build targets\n');
+            _buildLogAppend('  local_bridge.py           — Serial bridge server (used by bridge.sh)\n');
             _buildLogAppend('  BUILD.md                  — Instructions\n');
             _buildLogAppend('\n' +
                 '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
