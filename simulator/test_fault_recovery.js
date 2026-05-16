@@ -359,7 +359,7 @@ console.log('\n--- T008-step: sim.step() executes Scheduler.pause (method index 
     // Write a valid NS entry for Scheduler at slot 8 so mLoad can pass.
     // location=0 (no code lump) causes lumpIsResident=false → system-abstraction
     // fast path fires; limit17=1, gtType=1(Inform) gives a valid non-null entry.
-    stepSim.writeNSEntry(8, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0);
+    stepSim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
 
     // Create an E-permission Inform GT for NS slot 8 (Scheduler).
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
@@ -484,7 +484,7 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
     // Write a valid NS entry for Scheduler at slot 8.
     // location=0, gtType=1 (Inform) → lumpIsResident=false triggers the
     // system-abstraction fast path in _execCall rather than code execution.
-    t9sim.writeNSEntry(8, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0);
+    t9sim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
 
     // Create an E-permission Inform GT for NS slot 8 (Scheduler) and put it in CR0.
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
@@ -605,7 +605,7 @@ console.log('\n--- T010: continuous step() loop — timer fires without manual s
 
     // ── Phase A: write program into memory and set up Scheduler in CR0 ────────
     // Slot 8 (Scheduler): no code lump → system-abstraction fast path in _execCall.
-    t10sim.writeNSEntry(8, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0);
+    t10sim.writeNSEntry(8, 0, 1, 0, 0, 0, 1, 0, 0);
     // gt_seq=1 matches version=1 written by writeNSEntry above (mLoad VERSION check).
     const t10schedGT = t10sim.createGT(1, 8, { E: 1 }, 1);
     t10sim.cr[0] = { word0: t10schedGT, word1: 0, word2: 0, word3: 0, m: 0 };

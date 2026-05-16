@@ -471,7 +471,7 @@ function injectCRCode(logEl) {
         const w1fnl         = sim.parseNSWord1(oldW1nl);
         const existingGtSeq = (oldW2nl >>> 25) & 0x7F;
         sim.memory[nsBase2 + 0] = newLumpBase >>> 0;
-        sim.memory[nsBase2 + 1] = sim.packNSWord1(newCW, w1fnl.b, w1fnl.f, w1fnl.g, w1fnl.chainable, w1fnl.gtType, 0);
+        sim.memory[nsBase2 + 1] = sim.packNSWord1(newCW, w1fnl.b, w1fnl.g, w1fnl.chainable, w1fnl.gtType, 0);
         sim.memory[nsBase2 + 2] = sim.makeVersionSeals(existingGtSeq, newLumpBase, newCW);
 
         // Update the patched CR (word1 = new base, word2/word3 = updated NS words)
@@ -493,7 +493,7 @@ function injectCRCode(logEl) {
             }
             const updatedHdr = sim.memory[newLumpBase] >>> 0;
             sim.memory[newLumpBase] = ((updatedHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-            const nsW1Updated = sim.packNSWord1(newCW, w1fnl.b, w1fnl.f, w1fnl.g, w1fnl.chainable, w1fnl.gtType, cc);
+            const nsW1Updated = sim.packNSWord1(newCW, w1fnl.b, w1fnl.g, w1fnl.chainable, w1fnl.gtType, cc);
             sim.memory[nsBase2 + 1] = nsW1Updated;
             const cr6GT = sim.createGT(0, nsIdx, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1);
             sim.cr[6] = { word0: cr6GT, word1: clistBase >>> 0, word2: nsW1Updated >>> 0, word3: sim.memory[nsBase2 + 2] >>> 0, m: 0 };
@@ -530,7 +530,7 @@ function injectCRCode(logEl) {
         const oldW2 = sim.memory[nsBase + 2] >>> 0;
         const w1f = sim.parseNSWord1(oldW1);
         const newLimit17 = newCW;
-        const newW1 = sim.packNSWord1(newLimit17, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
+        const newW1 = sim.packNSWord1(newLimit17, w1f.b, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
         sim.memory[nsBase + 1] = newW1;
 
         const existingGtSeq = (oldW2 >>> 25) & 0x7F;
@@ -819,7 +819,7 @@ window._reapplyStickyPatches = function() {
             const w1fr      = sim.parseNSWord1(oldW1r);
             const gtSeqr    = (oldW2r >>> 25) & 0x7F;
             sim.memory[nsBase2r + 0] = newLumpBase >>> 0;
-            sim.memory[nsBase2r + 1] = sim.packNSWord1(newCW, w1fr.b, w1fr.f, w1fr.g, w1fr.chainable, w1fr.gtType, 0);
+            sim.memory[nsBase2r + 1] = sim.packNSWord1(newCW, w1fr.b, w1fr.g, w1fr.chainable, w1fr.gtType, 0);
             sim.memory[nsBase2r + 2] = sim.makeVersionSeals(gtSeqr, newLumpBase, newCW);
 
             if (patchCRIdx != null && sim.cr[patchCRIdx]) {
@@ -835,7 +835,7 @@ window._reapplyStickyPatches = function() {
                 for (let i = 0; i < cc; i++) sim.memory[clistBase + i] = sim.demoClistGTs[i] >>> 0;
                 const updHdr   = sim.memory[newLumpBase] >>> 0;
                 sim.memory[newLumpBase] = ((updHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
-                const nsW1r    = sim.packNSWord1(newCW, w1fr.b, w1fr.f, w1fr.g, w1fr.chainable, w1fr.gtType, cc);
+                const nsW1r    = sim.packNSWord1(newCW, w1fr.b, w1fr.g, w1fr.chainable, w1fr.gtType, cc);
                 sim.memory[nsBase2r + 1] = nsW1r;
                 const cr6GTr   = sim.createGT(0, nsIdx2, { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
                 sim.cr[6] = { word0: cr6GTr, word1: clistBase >>> 0, word2: nsW1r >>> 0, word3: sim.memory[nsBase2r + 2] >>> 0, m: 0 };
@@ -871,7 +871,7 @@ window._reapplyStickyPatches = function() {
             const oldW1   = sim.memory[nsBase2 + 1] >>> 0;
             const oldW2   = sim.memory[nsBase2 + 2] >>> 0;
             const w1f     = sim.parseNSWord1(oldW1);
-            const newW1   = sim.packNSWord1(newCW, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
+            const newW1   = sim.packNSWord1(newCW, w1f.b, w1f.g, w1f.chainable, w1f.gtType, w1f.clistCount);
             // Always keep NS slot word0 pointing at the actual lump base
             sim.memory[nsBase2 + 0] = baseLoc2 >>> 0;
             sim.memory[nsBase2 + 1] = newW1;

@@ -227,7 +227,7 @@ console.log('\n--- T006: loadProgram post-boot memory layout ---');
     const hdrWord = ((0x1F << 27) | (0 << 23) | (62 << 10) | 0) >>> 0;
     sim2.memory[lumpBase] = hdrWord;
     if (sim2.packNSWord1) {
-        sim2.memory[nsBase2 + 1] = sim2.packNSWord1(62, 0, 0, 0, 0, 0, 0);
+        sim2.memory[nsBase2 + 1] = sim2.packNSWord1(62, 0, 0, 0, 0, 0);
     }
     sim2.cr[14] = { word0: 0x00000001, word1: lumpBase, word2: 0, word3: 0, m: 0 };
 
@@ -284,7 +284,7 @@ console.log('\n--- T007: _fetchInstruction() end-to-end dispatch ---');
 
     const nsBase7 = sim7.NS_TABLE_BASE + LUMP_SLOT * sim7.NS_ENTRY_WORDS;
     sim7.memory[nsBase7 + 0] = LUMP_BASE;
-    sim7.memory[nsBase7 + 1] = sim7.packNSWord1(cw, 0, 0, 0, 0, 0, 0);
+    sim7.memory[nsBase7 + 1] = sim7.packNSWord1(cw, 0, 0, 0, 0, 0);
     sim7.memory[nsBase7 + 2] = sim7.makeVersionSeals(GT_SEQ, LUMP_BASE, cw);
 
     sim7.loadProgram(words, 0);  // writes words to LUMP_BASE+1..+5, re-syncs NS + CR14

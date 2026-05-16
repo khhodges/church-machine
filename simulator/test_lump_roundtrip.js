@@ -66,7 +66,7 @@ function setupSim(extWords) {
 
     const nsBase = sim.NS_TABLE_BASE + LUMP_SLOT * sim.NS_ENTRY_WORDS;
     sim.memory[nsBase + 0] = LUMP_BASE;
-    sim.memory[nsBase + 1] = sim.packNSWord1(INIT_CW, 0, 0, 0, 0, 0, 0);
+    sim.memory[nsBase + 1] = sim.packNSWord1(INIT_CW, 0, 0, 0, 0, 0);
     sim.memory[nsBase + 2] = sim.makeVersionSeals(GT_SEQ, LUMP_BASE, INIT_CW);
 
     // Give CR14 a valid initial RX GT so loadProgram can read/update it.

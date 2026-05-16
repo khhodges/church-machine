@@ -902,7 +902,7 @@ function _injectClistNow() {
 
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
         const nsWord1B = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, cc
+            w1f.limit, w1f.b, w1f.g, w1f.chainable, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1B;
         const cr6GTb = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
@@ -926,7 +926,7 @@ function _injectClistNow() {
         }
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;
         const nsWord1A = sim.packNSWord1(
-            w1f.limit, w1f.b, w1f.f, w1f.g, w1f.chainable, w1f.gtType, cc
+            w1f.limit, w1f.b, w1f.g, w1f.chainable, w1f.gtType, cc
         );
         sim.memory[nsBase + 1] = nsWord1A;
         const cr6GTa = sim.createGT(0, BOOT_ABSTR_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
@@ -10620,7 +10620,7 @@ function handleNSImport(event) {
                         const lim17 = Math.min(words.length - 1, 0x1FFFF);
                         const gtType = (item.entry && item.entry.gtType != null) ? item.entry.gtType : 1;
                         const chainable = (item.entry && item.entry.chainable) ? 1 : 0;
-                        sim.writeNSEntry(idx, loc, lim17, 0, 0, 0, chainable, gtType, 0);
+                        sim.writeNSEntry(idx, loc, lim17, 0, 0, chainable, gtType, 0);
                         sim.nsLabels[idx] = item.label || (item.entry && item.entry.label) || `import_${idx}`;
                         for (let j = 0; j < words.length; j++) {
                             sim.memory[loc + j] = words[j] >>> 0;
@@ -10634,7 +10634,7 @@ function handleNSImport(event) {
                 const lim17 = Math.min(Math.max(words.length - 1, 0), 0x1FFFF);
                 const gtType = (data.entry && data.entry.gtType != null) ? data.entry.gtType : 1;
                 const chainable = (data.entry && data.entry.chainable) ? 1 : 0;
-                sim.writeNSEntry(idx, loc, lim17, 0, 0, 0, chainable, gtType, 0);
+                sim.writeNSEntry(idx, loc, lim17, 0, 0, chainable, gtType, 0);
                 sim.nsLabels[idx] = data.label;
                 for (let j = 0; j < words.length; j++) {
                     sim.memory[loc + j] = words[j] >>> 0;
@@ -10695,7 +10695,7 @@ function loadNamespaceState() {
                 const restoredGtType = (item.entry.gtType === 3)
                     ? (console.warn(`[NS restore] slot ${i}: gtType=3 (Abstract) is not valid in NS table; treating as Inform (1)`), 1)
                     : (item.entry.gtType != null ? item.entry.gtType : 1);
-                sim.writeNSEntry(i, loc, lim.limit, lim.b, lim.f, item.entry.gBit || 0, item.entry.chainable ? 1 : 0, restoredGtType, 0);
+                sim.writeNSEntry(i, loc, lim.limit, lim.b, item.entry.gBit || 0, item.entry.chainable ? 1 : 0, restoredGtType, 0);
                 sim.nsLabels[i] = item.entry.label || '';
                 if (item.words && item.words.length > 0) {
                     for (let j = 0; j < item.words.length; j++) {
@@ -10999,7 +10999,7 @@ function runTuringSimGate() {
 
         // Update NS entry word1: new limit17, cc stays 0 (c-list lives elsewhere)
         const _newW1 = testSim.packNSWord1(
-            _newLimit17, _oldW1f.b, _oldW1f.f, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, 0
+            _newLimit17, _oldW1f.b, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, 0
         );
         testSim.memory[_nsBase + 1] = _newW1;
 
@@ -11025,7 +11025,7 @@ function runTuringSimGate() {
             // CR6: E-GT for Boot.Abstr (gt_seq=0 matches NS entry), c-list at _clistBase
             // word2 carries the clistCount (18) so _execLoad can bound-check slot offsets
             const _cr6W1 = testSim.packNSWord1(
-                _newLimit17, _oldW1f.b, _oldW1f.f, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, _cc
+                _newLimit17, _oldW1f.b, _oldW1f.g, _oldW1f.chainable, _oldW1f.gtType, _cc
             );
             const _cr6GT = testSim.createGT(0, BOOT_ABSTR_NS_SLOT, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
             testSim.cr[6] = {

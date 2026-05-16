@@ -3681,7 +3681,7 @@ window.applyPOLA = async function(nsIdx) {
     // Only update clistCount; preserve limit17 so the CRC seal stays coherent.
     // (The old code used lumpSize-1 here, which silently changed limit17 and
     //  invalidated the seal on every POLA run.)
-    const newW1P = sim.packNSWord1(w1fP.limit, w1fP.b, w1fP.f, w1fP.g, w1fP.chainable, w1fP.gtType, newCC);
+    const newW1P = sim.packNSWord1(w1fP.limit, w1fP.b, w1fP.g, w1fP.chainable, w1fP.gtType, newCC);
     sim.memory[nsBase + 1] = newW1P;
     // Recompute seal: baseLoc and limit17 are both unchanged so this is
     // equivalent to the original seal, but correct even if a prior POLA run

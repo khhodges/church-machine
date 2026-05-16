@@ -408,7 +408,7 @@ class SystemAbstractions {
                     const newClistCount = threadParsed.clistCount + 1;
                     const clistSlot = threadBase + allocSize - newClistCount;
                     sim.memory[clistSlot] = ledPK.gt;
-                    const newW1 = sim.packNSWord1(threadParsed.limit, threadParsed.b, threadParsed.f, threadParsed.g, threadParsed.chainable, threadParsed.gtType, newClistCount);
+                    const newW1 = sim.packNSWord1(threadParsed.limit, threadParsed.b, threadParsed.g, threadParsed.chainable, threadParsed.gtType, newClistCount);
                     const nsBase = sim.NS_TABLE_BASE + 1 * sim.NS_ENTRY_WORDS;
                     sim.memory[nsBase + 1] = newW1;
                 }
@@ -813,7 +813,7 @@ class SystemAbstractions {
             const oldVersion = (existingW2 >>> 25) & 0x7F;
             const newVersion = (oldVersion + 1) & 0x7F;
 
-            sim.writeNSEntry(freeSlot, location, limit, 0, 0, 0, 0, gtType, newVersion, clistCount);
+            sim.writeNSEntry(freeSlot, location, limit, 0, 0, 0, gtType, newVersion, clistCount);
             sim.nsLabels[freeSlot] = label;
 
             navanaState.managedAbstractions.push({ index: freeSlot, name: label, layer: -1 });
