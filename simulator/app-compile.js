@@ -431,10 +431,6 @@ function onLangChange(restoring) {
     const lang = sel.value;
     const btnSaveNS = document.getElementById('btnSaveNS');
     if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !lastAssembledWords);
-    const btnBuildLump = document.getElementById('btnBuildLump');
-    if (btnBuildLump) btnBuildLump.disabled = (lang === 'assembly');
-    const btnBuildLumpMenu = document.getElementById('btnBuildLumpMenu');
-    if (btnBuildLumpMenu) btnBuildLumpMenu.disabled = (lang === 'assembly');
 
     const langExampleGroups = LANG_EXAMPLE_GROUPS;
 
@@ -517,11 +513,7 @@ function smartCompile() {
     }
 
     try {
-        if (lang === 'assembly') {
-            assembleAndLoad();
-        } else {
-            compileCLOOMC();
-        }
+        compileAndBuild();
     } catch (e) {
         console.error('smartCompile error:', e);
         const con = document.getElementById('editorConsole');
@@ -609,132 +601,6 @@ function _checkCapAccessRights(caps) {
     return { errors, warnings };
 }
 
-function compileDraftAssembly(source, con) {
-    if (con) con.className = '';
-    switchCodeTab('console');
-    if (!source || !source.trim()) {
-        if (con) { con.textContent = 'Draft — no code to draft. Enter assembly code first.'; con.scrollTop = 0; }
-        return;
-    }
-    if (/^\s*const\s+\w+\s*=\s*[\[{]/m.test(source) ||
-        /^\s*(?:export\s+)?(?:default\s+)?class\s+\w+/m.test(source)) {
-        if (con) {
-            con.textContent =
-                'This looks like a JavaScript source file, not Church assembly.\n\n' +
-                'To write a CLOOMC++ abstraction, use the JavaScript format:\n\n' +
-                '  abstraction Name {\n' +
-                '      method MethodName() {\n' +
-                '          instruction\n' +
-                '      }\n' +
-                '  }\n\n' +
-                'Or use the English format:\n\n' +
-                '  Create an abstraction called Name\n' +
-                '  Add a method called MethodName\n' +
-                '    Write 1 to the output register';
-            con.scrollTop = 0;
-        }
-        return;
-    }
-    const result = assembler.assemble(source);
-    if (result.errors.length > 0) {
-        const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
-        const _asmSrc = _getActiveSourceLabel(); const _asmSrcH = _asmSrc ? ` · ${_asmSrc}` : '';
-        if (con) { con.textContent = `Assembly Draft${_asmSrcH} — errors:\n${errText}`; con.scrollTop = 0; }
-        if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors);
-        showNextSteps('error');
-        return;
-    }
-    if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
-    const words = result.words;
-    const caps  = result.capabilities || [];
-    const _afResult = _autoFillCapRights(caps);
-    const cc    = caps.length;
-    const codeSize = words.length;
-    const allocSize = Math.max(32, nextPow2(Math.max(1, codeSize + cc)));
-    const freespace = allocSize - codeSize - cc;
-
-    let draft = `═══════════════════════════════════════════════════\n`;
-    draft += `  ASSEMBLY DRAFT — ${codeSize} instruction(s) [Machine Code]\n`;
-    draft += `═══════════════════════════════════════════════════\n\n`;
-
-    if (cc > 0) {
-        draft += `  Capabilities (${cc}):\n`;
-        for (let i = 0; i < cc; i++) {
-            const _cap = caps[i];
-            const _capName = typeof _cap === 'string' ? _cap : (_cap.name || '?');
-            const _capRights = typeof _cap === 'string' ? [] : (_cap.rights || []);
-            const _rightsStr = _capRights.length > 0 ? `[${_capRights.join('')}]` : '(no rights declared)';
-            draft += `    [${i}] ${_capName}  ${_rightsStr}\n`;
-        }
-        draft += '\n';
-    }
-
-    draft += `  Lump Layout:\n`;
-    draft += `    ┌─────────────────────────────────────────┐\n`;
-    draft += `    │ Code             ${codeSize.toString().padStart(5)} words  (offset 0)  │\n`;
-    draft += `    │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │\n`;
-    draft += `    │ FREESPACE        ${freespace.toString().padStart(5)} words              │\n`;
-    if (cc > 0) {
-        draft += `    │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │\n`;
-        draft += `    │ C-List           ${cc.toString().padStart(5)} slot${cc !== 1 ? 's' : ' '}  (POLA)        │\n`;
-    }
-    draft += `    └─────────────────────────────────────────┘\n`;
-    draft += `    Total alloc: ${allocSize} words (power-of-2)\n\n`;
-
-    draft += `═══════════════════════════════════════════════════\n`;
-    draft += `  Instruction Listing:\n`;
-    draft += `═══════════════════════════════════════════════════\n\n`;
-
-    const _slotNames = ChurchAssembler.buildSlotNames(caps,
-        (typeof sim !== 'undefined' && sim) ? sim.nsLabels : null);
-    const _wordComments = result.wordComments || {};
-    for (let i = 0; i < words.length; i++) {
-        const hex = '0x' + words[i].toString(16).padStart(8, '0');
-        const dis = assembler.disassemble(words[i], _slotNames);
-        const cmt = _wordComments[i] ? `  ; ${_wordComments[i]}` : '';
-        draft += `  ${i.toString().padStart(4)}: ${hex}  ${dis}${cmt}\n`;
-    }
-
-    draft += `\n═══════════════════════════════════════════════════\n`;
-    if (con) { con.innerHTML = _capRightsHTML(draft); con.scrollTop = 0; }
-    if (cc > 0) {
-        let _aclExtra = '';
-        try {
-            const _acl = _checkCapAccessRights(caps);
-            if (_afResult && _afResult.filled.length > 0) {
-                _aclExtra += `  Auto-filled Permissions (from sidecar grants):\n`;
-                for (const f of _afResult.filled)
-                    _aclExtra += `    \u2139 ${f.name}: [${f.defaults.join('')}] inserted automatically\n`;
-                _aclExtra += '\n';
-            }
-            if (_acl.errors.length > 0 || _acl.warnings.length > 0) {
-                _aclExtra += `  Access Rights Check:\n`;
-                for (const e of _acl.errors)   _aclExtra += `    \u2717 ${e}\n`;
-                for (const w of _acl.warnings) _aclExtra += `    \u26a0 ${w}\n`;
-                _aclExtra += '\n';
-            }
-            const _capStrs = caps.map(c => {
-                const n = typeof c === 'string' ? c : (c.name || '');
-                const r = typeof c === 'string' ? '' : (c.rights || []).join('');
-                return r ? `${n} ${r}` : n;
-            });
-            _aclExtra += `  \u2139 capabilities { ${_capStrs.join(', ')} } declared\n`;
-            if (_acl.errors.length > 0) {
-                _aclExtra += `    \u2717 Fix rights errors before saving LUMP.\n`;
-            } else {
-                _aclExtra += `    \u2192 Compile & Load, then Save LUMP to embed C-List.\n`;
-            }
-            _aclExtra += `═══════════════════════════════════════════════════\n`;
-        } catch (_aclErr) { console.error('[ACL check] _checkCapAccessRights failed:', _aclErr); }
-        if (con && _aclExtra) con.innerHTML += _capRightsHTML(_aclExtra);
-    }
-    // Push live snippet history for each labelled section of the raw assembly source
-    if (typeof _pushAsmLabelSnippets === 'function') {
-        const _draftProgName = Object.keys(result.labels || {})[0] || 'Assembly';
-        _pushAsmLabelSnippets(source, result.labels || {}, _draftProgName);
-    }
-    showNextSteps('draft');
-}
 
 function _getActiveSourceLabel() {
     const tab = document.querySelector('.example-tab.active');
@@ -750,15 +616,6 @@ function compileDraft() {
 
     if (!cloomcCompiler) return;
     switchCodeTab('console');
-
-    const isHighLevel = cloomcCompiler._detectPetName(source) ||
-                        cloomcCompiler._detectEnglish(source) ||
-                        cloomcCompiler._detectHaskell(source) ||
-                        cloomcCompiler._detectSymbolic(source) ||
-                        /^\s*abstraction\s+\w+/m.test(source);
-    if (!isHighLevel) {
-        return compileDraftAssembly(source, con);
-    }
 
     const result = cloomcCompiler.compile(source, []);
 
@@ -813,7 +670,7 @@ function compileDraft() {
         }
     }
 
-    draft += `\n  Lump Layout (matches Build LUMP binary):\n`;
+    draft += `\n  Lump Layout (matches Compile binary):\n`;
     draft += `    ┌─────────────────────────────────────────────┐\n`;
     draft += `    │ Word 0:  Header (magic+n-6+cw+typ+cc)       │\n`;
     draft += `    │ Words 1..${codeSize}: Code (${result.methods.length} method${result.methods.length !== 1 ? 's' : ''} concatenated)${' '.repeat(Math.max(0, 13 - codeSize.toString().length - result.methods.length.toString().length))}│\n`;
@@ -908,7 +765,7 @@ function compileDraft() {
             if (_aclC.errors.length > 0) {
                 _aclExtraC += `  \u2717 Fix rights errors before saving LUMP.\n`;
             } else {
-                _aclExtraC += `  \u2192 Build LUMP to embed C-List in binary.\n`;
+                _aclExtraC += `  \u2192 Compile to embed C-List in binary.\n`;
             }
         } catch (_aclCErr) { console.error('[ACL check] _checkCapAccessRights failed:', _aclCErr); }
         if (con && _aclExtraC) con.innerHTML += _capRightsHTML(_aclExtraC);
@@ -1051,45 +908,33 @@ function _confirmLumpRelease() {
     if (data.appendMsg) appendOutput(data.appendMsg + ` \u00b7 v${ver}`, 'info');
 }
 
-function buildAndDownloadLump() {
+function compileAndBuild() {
     const editor = document.getElementById('asmEditor');
     if (!editor || !cloomcCompiler) return;
     const source = editor.value;
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
     switchCodeTab('console');
-
-    const isHighLevel = cloomcCompiler._detectPetName(source) ||
-                        cloomcCompiler._detectEnglish(source) ||
-                        cloomcCompiler._detectHaskell(source) ||
-                        cloomcCompiler._detectSymbolic(source) ||
-                        /^\s*abstraction\s+\w+/m.test(source);
-    if (!isHighLevel) {
-        const _asmR = assembler.assemble(source);
-        if (_asmR.errors.length > 0) {
-            const _asmErr = _asmR.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
-            if (con) { con.textContent = `Build LUMP — assembly errors:\n${_asmErr}`; con.scrollTop = 0; }
-            showNextSteps('error');
-            return;
-        }
-        if (!_asmR.capabilities || _asmR.capabilities.length === 0) {
-            if (con) con.textContent = 'Build LUMP requires a CLOOMC++ abstraction (JavaScript, Haskell, English, Lambda, or Symbolic).\nAssembly programs cannot be packaged as lumps — use Save to NS instead.\n\n(Tip: add  capabilities { LED0 }  to your assembly to declare the C-List and enable Save LUMP.)';
-            return;
-        }
-        return _buildAndDownloadAssemblyLump(source, _asmR, con);
-    }
+    window._editorLastSavedToken = null;
+    _runStopped = true;
+    sim.running = false;
 
     const result = cloomcCompiler.compile(source, []);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
-        if (con) { con.textContent = `Build LUMP — compilation errors:\n${errText}`; con.scrollTop = 0; }
+        if (con) { con.textContent = `Compile — compilation errors:\n${errText}`; con.scrollTop = 0; }
         showNextSteps('error');
         return;
     }
 
-    const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
+    const langNames = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus', assembly: 'Assembly' };
     const langLabel = langNames[result.language] || 'JavaScript';
+
+    // Store for Load-into-Sim button
+    window._lastCLOOMCResult = result;
+    if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
+
     const absName = result.abstractionName || 'Unnamed';
     const caps = result.capabilities || [];
     _autoFillCapRights(caps);
@@ -1354,175 +1199,60 @@ function buildAndDownloadLump() {
         }
     }
 
-    _queueLumpRelease({
-        absName, sizeBytes, binaryBuf, savePayload, con, listing,
-        absStats: `${lumpSize} words \u00b7 ${cw} code \u00b7 ${cc} c-list \u00b7 ${sizeBytes} bytes [${langLabel}]`,
-        trackKey: 'build_lump', trackData: { name: absName, lang: result.language, size: lumpSize },
-        appendMsg: `Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes`,
-    });
-}
+    // Direct download — no popup, no version prompt.  Auto-version from timestamp.
+    const _autoVer = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+    })();
+    savePayload.metadata.version = _autoVer;
 
-function _buildAndDownloadAssemblyLump(source, asmResult, con) {
-    const caps    = asmResult.capabilities || [];
-    _autoFillCapRights(caps);
-    const cc      = caps.length;
-    const codeWords = asmResult.words || [];
-    const cw      = codeWords.length;
+    const dlUrl = URL.createObjectURL(new Blob([binaryBuf], { type: 'application/octet-stream' }));
+    const _a = document.createElement('a');
+    _a.href = dlUrl; _a.download = absName + '.lump';
+    document.body.appendChild(_a); _a.click();
+    document.body.removeChild(_a);
+    URL.revokeObjectURL(dlUrl);
 
-    const _nameMatch = source.match(/^;\s*(?:Disassembly\s+of\s+\S+\s+)?([^\n@]+?)\s+(?:NS\[|\@\s*0x)/m);
-    const absName = _nameMatch ? _nameMatch[1].trim() : 'Assembly';
-
-    if (cc > 255) {
-        if (con) { con.textContent = `Build LUMP — C-List overflow: ${cc} capabilities exceed the 8-bit header limit (max 255).\nRemove ${cc - 255} capability reference${cc - 255 !== 1 ? 's' : ''} from the capabilities { } block.`; con.scrollTop = 0; }
-        return;
-    }
-
-    let lumpSize = 64;
-    while (lumpSize < 1 + cw + cc) lumpSize <<= 1;
-
-    let nMinus6 = 0;
-    while ((64 << nMinus6) < lumpSize) nMinus6++;
-
-    const header = ((0x1F & 0x1F) << 27) |
-                   ((nMinus6 & 0x0F) << 23) |
-                   ((cw & 0x1FFF) << 10) |
-                   ((0 & 0x03) << 8) |
-                   (cc & 0xFF);
-
-    const resolvedCaps = caps.map((cap, i) => {
-        const capName = typeof cap === 'string' ? cap : (cap.name || '');
-        const capRights = typeof cap === 'string' ? [] : (cap.rights || []);
-        let target = -1;
-        if (sim && sim.abstractionRegistry) {
-            const allAbs = sim.abstractionRegistry.abstractions || [];
-            for (let j = 0; j < allAbs.length; j++) {
-                if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === capName.toUpperCase()) {
-                    target = j; break;
+    fetch('/api/lumps/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(savePayload)
+    }).then(r => r.json()).then(resp => {
+        if (resp.ok) {
+            appendOutput(`Saved to library: lumps/${resp.lump} \u2014 token 0x${resp.token} \u00b7 v${_autoVer}`, 'info');
+            window._editorLastSavedToken = resp.token;
+            renderLumps && renderLumps();
+            const _savedToken = resp.token;
+            setTimeout(() => {
+                const _listEl = document.getElementById('lumpsListContent');
+                if (_listEl && _savedToken) {
+                    const _item = _listEl.querySelector(`.lump-item[data-token="${_savedToken}"]`);
+                    if (_item) { _item.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); showLumpDetail && showLumpDetail(_savedToken); }
                 }
-            }
-        }
-        return { name: capName, rights: capRights, nsIndex: target };
-    });
-
-    const lumpWords = new Uint32Array(lumpSize);
-    lumpWords[0] = header >>> 0;
-    for (let i = 0; i < cw; i++) lumpWords[1 + i] = (codeWords[i] >>> 0);
-    const clistStart = lumpSize - cc;
-    for (let i = 0; i < cc; i++) {
-        lumpWords[clistStart + i] = resolvedCaps[i].nsIndex >= 0 ? (resolvedCaps[i].nsIndex & 0xFFFFFFFF) : 0x00000000;
-    }
-
-    let _auditResults = [], _auditErrors = [], _auditWarns = [];
-    if (typeof lumpAudit === 'function') {
-        const _auditPnCR = {};
-        for (let _i = 0; _i < resolvedCaps.length; _i++) {
-            if (resolvedCaps[_i] && resolvedCaps[_i].name) _auditPnCR[String(_i)] = resolvedCaps[_i].name;
-        }
-        _auditResults = lumpAudit(Array.from(lumpWords), {
-            cw, cc, lump_size: lumpSize,
-            pet_names:    { CR: _auditPnCR },
-            capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.rights })),
-        });
-        _auditErrors = _auditResults.filter(r => r.severity === 'error');
-        _auditWarns  = _auditResults.filter(r => r.severity === 'warn');
-    }
-
-    if (_auditErrors.length > 0) {
-        let _errL = `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n`;
-        _errL += `  AUDIT FAILED \u2014 "${absName}" not downloaded or saved\n`;
-        _errL += `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n`;
-        for (const r of _auditResults) {
-            const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
-            _errL += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
-        }
-        _errL += `\n  \u2717 ${_auditErrors.length} error${_auditErrors.length !== 1 ? 's' : ''} \u2014 binary not downloaded or saved.\n`;
-        if (con) { con.textContent = _errL; con.scrollTop = 0; }
-        return;
-    }
-
-    const binaryBuf = new ArrayBuffer(lumpSize * 4);
-    const view = new DataView(binaryBuf);
-    for (let i = 0; i < lumpSize; i++) view.setUint32(i * 4, lumpWords[i], false);
-
-    const freespace   = lumpSize - 1 - cw - cc;
-    const sizeBytes   = lumpSize * 4;
-    const mtbfClean   = _getConsecutiveCleanRuns();
-    const mtbfTotal   = _simRunHash ? _simRunHistory.filter(r => r.hash === _simRunHash).length : 0;
-    const mtbfStatus  = mtbfTotal === 0 ? 'unknown' : (mtbfClean >= 5 ? 'green' : mtbfClean >= 3 ? 'amber' : 'red');
-
-    const _crNumericMap = {};
-    for (let _i = 0; _i < resolvedCaps.length; _i++) {
-        if (resolvedCaps[_i] && resolvedCaps[_i].name) _crNumericMap[String(_i)] = resolvedCaps[_i].name;
-    }
-
-    let resolvedNsSlot = null;
-    if (sim && sim.abstractionRegistry) {
-        const allAbs = sim.abstractionRegistry.abstractions || [];
-        for (let j = 0; j < allAbs.length; j++) {
-            if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === absName.toUpperCase()) {
-                resolvedNsSlot = j; break;
-            }
-        }
-    }
-
-    const savePayload = {
-        binary:   Array.from(lumpWords),
-        metadata: {
-            abstraction:     absName,
-            ns_slot:         resolvedNsSlot,
-            cw,
-            cc,
-            profile:         'IoT',
-            language:        'assembly',
-            methods:         [{ name: 'main', offset: 0, length: cw, pet_names: { CR: _crNumericMap } }],
-            capabilities:    resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.rights, nsIndex: rc.nsIndex })),
-            pet_names_dr:    {},
-            pet_names_cr:    { CR0: _crNumericMap['0'] || undefined },
-            mtbf_clean_runs: mtbfClean,
-            mtbf_total_runs: mtbfTotal,
-            mtbf_status:     mtbfStatus,
-            source_hash:     _simRunHash || _currentEditorHash(),
-            target_board:    'ti60-f225',
-            grants:          ['E'],
-        }
-    };
-
-
-    let listing = `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n`;
-    listing += `  LUMP BUILT \u2014 "${absName}" [Assembly]\n`;
-    listing += `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n`;
-    listing += `  Header:    0x${(header >>> 0).toString(16).padStart(8, '0')}\n`;
-    listing += `  Lump Size: ${lumpSize} words (2^${Math.log2(lumpSize)})\n`;
-    listing += `  Code:      ${cw} words\n`;
-    listing += `  C-List:    ${cc} slot${cc !== 1 ? 's' : ''} (cc)\n`;
-    listing += `  Freespace: ${freespace} words\n`;
-    listing += `  Profile:   IoT\n`;
-    listing += `  MTBF:      ${mtbfClean}/${mtbfTotal} clean runs (${mtbfStatus})\n\n`;
-    listing += `  Capabilities (C-List):\n`;
-    for (let i = 0; i < resolvedCaps.length; i++) {
-        const rc = resolvedCaps[i];
-        const status = rc.nsIndex >= 0 ? `NS[${rc.nsIndex}]` : 'unresolved (null GT)';
-        const _rcRStr = rc.rights && rc.rights.length > 0 ? ` [${rc.rights.join('')}]` : '';
-        listing += `    [${i}] ${rc.name}${_rcRStr} \u2192 ${status}\n`;
-    }
-    if (_auditResults.length > 0) {
-        listing += `\n  Pre-build Audit:\n`;
-        for (const r of _auditResults) {
-            const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
-            listing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
-        }
-        if (_auditWarns.length > 0) {
-            listing += `\n  \u26a0 Audit: ${_auditWarns.length} warning${_auditWarns.length !== 1 ? 's' : ''} \u2014 review before deploying.\n`;
+            }, 400);
         } else {
-            listing += `\n  \u2713 Audit passed \u2014 all checks OK.\n`;
+            appendOutput(`Server save failed: ${resp.error || 'unknown error'}`, 'error');
         }
+    }).catch(err => { appendOutput(`Server save error: ${err.message}`, 'error'); });
+
+    let _finalListing = listing;
+    _finalListing += `  Version:    v${_autoVer} (auto)\n`;
+    _finalListing += `\n  Downloaded: ${absName}.lump (${sizeBytes} bytes)\n`;
+    _finalListing += `  Saved to:   server/lumps/ (binary + metadata sidecar)\n`;
+
+    trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
+    appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer}`, 'info');
+
+    // Prepend "Load into Sim" button so it is immediately visible at the top of the console
+    if (con) {
+        con.innerHTML = _capRightsHTML(_finalListing);
+        con.scrollTop = 0;
+        const _loadDiv = document.createElement('div');
+        _loadDiv.className = 'cmp-load-toolbar';
+        _loadDiv.innerHTML = `<button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load compiled program into the simulator to Step or Walk through every instruction">Load into Sim \u25b6</button>`;
+        con.insertBefore(_loadDiv, con.firstChild);
     }
-    _queueLumpRelease({
-        absName, sizeBytes, binaryBuf, savePayload, con, listing,
-        absStats: `${lumpSize} words \u00b7 ${cw} code \u00b7 ${cc} c-list \u00b7 ${sizeBytes} bytes [Assembly]`,
-        trackKey: 'build_lump', trackData: { name: absName, lang: 'assembly', size: lumpSize },
-        appendMsg: `Built LUMP: "${absName}" [Assembly] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes`,
-    });
+    showNextSteps('compiled');
 }
 
 function auditLumpOnly() {
@@ -1533,16 +1263,6 @@ function auditLumpOnly() {
     const con = document.getElementById('editorConsole');
     if (con) con.className = '';
     switchCodeTab('console');
-
-    const isHighLevel = cloomcCompiler._detectPetName(source) ||
-                        cloomcCompiler._detectEnglish(source) ||
-                        cloomcCompiler._detectHaskell(source) ||
-                        cloomcCompiler._detectSymbolic(source) ||
-                        /^\s*abstraction\s+\w+/m.test(source);
-    if (!isHighLevel) {
-        if (con) con.textContent = 'Audit LUMP requires a CLOOMC++ abstraction (JavaScript, Haskell, English, Lambda, or Symbolic).';
-        return;
-    }
 
     const result = cloomcCompiler.compile(source, []);
     if (result.errors.length > 0) {
@@ -1556,7 +1276,7 @@ function auditLumpOnly() {
     _autoFillCapRights(caps);
     const cc      = caps.length;
 
-    // C-list overflow guard — same as buildAndDownloadLump (header cc field is 8 bits).
+    // C-list overflow guard — same as compileAndBuild (header cc field is 8 bits).
     if (cc > 255) {
         let _ovf = `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n`;
         _ovf += `  AUDIT FAILED \u2014 "${absName}"\n`;
@@ -1586,7 +1306,7 @@ function auditLumpOnly() {
     const lumpWords = new Uint32Array(lumpSize);
     lumpWords[0] = header >>> 0;
     for (let i = 0; i < cw; i++) { lumpWords[1 + i] = (allCode[i] >>> 0); }
-    // C-list slots populated with zero (unresolved NS indices) — same layout as buildAndDownloadLump.
+    // C-list slots populated with zero (unresolved NS indices) — same layout as compileAndBuild.
     const _auditClistStart = lumpSize - cc;
     for (let i = 0; i < cc; i++) { lumpWords[_auditClistStart + i] = 0; }
 
@@ -1613,159 +1333,14 @@ function auditLumpOnly() {
         listing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
     }
     if (auditErrors.length > 0) {
-        listing += `\n  \u2717 AUDIT FAILED: ${auditErrors.length} error${auditErrors.length !== 1 ? 's' : ''} \u2014 fix before Build LUMP.\n`;
+        listing += `\n  \u2717 AUDIT FAILED: ${auditErrors.length} error${auditErrors.length !== 1 ? 's' : ''} \u2014 fix before Compile.\n`;
     } else if (auditWarns.length > 0) {
         listing += `\n  \u26a0 Audit passed with ${auditWarns.length} warning${auditWarns.length !== 1 ? 's' : ''} \u2014 review before deploying.\n`;
     } else {
-        listing += `\n  \u2713 All checks passed \u2014 safe to Build LUMP.\n`;
+        listing += `\n  \u2713 All checks passed \u2014 safe to Compile.\n`;
     }
 
     if (con) { con.textContent = listing; con.scrollTop = 0; }
-}
-
-function compileCLOOMC() {
-    const editor = document.getElementById('asmEditor');
-    if (!editor || !cloomcCompiler) return;
-    const source = editor.value;
-    const con = document.getElementById('editorConsole');
-    if (con) con.className = '';
-    switchCodeTab('console');
-    window._editorLastSavedToken = null;
-
-    _runStopped = true;
-    sim.running = false;
-
-    const capabilities = [];
-    const result = cloomcCompiler.compile(source, capabilities);
-
-    if (result.errors.length > 0) {
-        const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
-        const _cmpSrc = _getActiveSourceLabel(); const _cmpSrcH = _cmpSrc ? ` · ${_cmpSrc}` : '';
-        if (con) { con.textContent = `CLOOMC++ compilation errors${_cmpSrcH}:\n${errText}`; con.scrollTop = 0; }
-        if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors);
-        showNextSteps('error');
-        return;
-    }
-
-    const langNames2 = { english: 'English', haskell: 'Haskell', symbolic: 'Symbolic Math (Ada)', javascript: 'JavaScript', lambda: 'Lambda Calculus' };
-    const lang = langNames2[result.language] || 'JavaScript';
-    const _compileSrcLabel = _getActiveSourceLabel();
-    const _compileSrcHint = _compileSrcLabel ? ` · ${_compileSrcLabel}` : '';
-
-    const _ec = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const _methodConv = m => {
-        if (m.name === 'Dispatch' || m.name === 'M00') return 'DR1\u202f=\u202fselector';
-        const ps = (m.params || []).slice(0, 3);
-        if (!ps.length) return '\u2192\u202fDR1';
-        return ps.map((p, i) => `DR${i+1}\u202f=\u202f${p}`).join(', ') + '\u2002\u2192\u202fDR1';
-    };
-
-    const manifestByMethod = {};
-    if (result.manifest) {
-        for (const entry of result.manifest) {
-            const comments = {};
-            if (entry.mapping) {
-                let seqIdx = 0;
-                for (const m of entry.mapping) {
-                    if (m.comment !== undefined) {
-                        comments[seqIdx++] = m.comment;
-                    } else if (m.addr !== undefined && m.desc) {
-                        comments[m.addr] = m.desc;
-                    }
-                }
-            }
-            manifestByMethod[entry.name] = comments;
-        }
-    }
-
-    // Store early so the Load button works even before innerHTML is committed.
-    window._lastCLOOMCResult = result;
-
-    // "Load into Sim" button sits at the TOP so it is immediately visible
-    // regardless of how many methods the listing contains (con.scrollTop = 0
-    // would otherwise hide a bottom-placed button under the fold).
-    let html = `<div class="cmp-load-toolbar"><button id="btnLoadIntoSim" class="cmp-load-sim-btn" onclick="loadCLOOMCIntoSim()" data-tooltip="Load this compiled lump into the simulator so you can Step or Walk through every instruction">Load into Sim \u25b6</button></div>`
-        + `<div class="cmp-file-hdr">; CLOOMC++ [${_ec(lang)}] compiled \u201c${_ec(result.abstractionName)}\u201d${_ec(_compileSrcHint)} \u2014 ${result.methods.length} method${result.methods.length !== 1 ? 's' : ''}</div>`;
-
-    // ── Method Table ──
-    // Layout: lump word 0 = header; words 1..N = method table; words N+1.. = bodies.
-    const _methodTableSize = result.methods.length;
-    let _bodyOffset = 0;
-    const _methodTableEntries = [];
-    for (const m of result.methods) {
-        _methodTableEntries.push(m.visibility === 'private' ? 0 : _methodTableSize + 1 + _bodyOffset);
-        _bodyOffset += (m.code || []).length;
-    }
-
-    let mtblHtml = `<div class="cmp-mtbl-word"><span class="cmp-mtbl-addr">[word&nbsp;&nbsp;0]</span>`
-        + ` <span class="cmp-mtbl-hex">0x00000000</span>`
-        + ` <span class="cmp-mtbl-label">(lump header)</span></div>`;
-    for (let i = 0; i < result.methods.length; i++) {
-        const m = result.methods[i];
-        const entry = _methodTableEntries[i];
-        const isPrivate = m.visibility === 'private';
-        const entryHex = `0x${entry.toString(16).padStart(8, '0').toUpperCase()}`;
-        const idxStr = String(i + 1).padStart(2);
-        if (isPrivate) {
-            mtblHtml += `<div class="cmp-mtbl-word cmp-mtbl-word--priv">`
-                + `<span class="cmp-mtbl-addr">[word&nbsp;${_ec(idxStr)}]</span>`
-                + ` <span class="cmp-mtbl-hex">${_ec(entryHex)}</span>`
-                + ` <span class="cmp-mtbl-idx">[${i}]</span>`
-                + ` <span class="cmp-priv">private</span>`
-                + ` <span class="cmp-mtbl-name">${_ec(m.name)}</span>`
-                + `</div>`;
-        } else {
-            mtblHtml += `<div class="cmp-mtbl-word cmp-mtbl-word--pub">`
-                + `<span class="cmp-mtbl-addr">[word&nbsp;${_ec(idxStr)}]</span>`
-                + ` <span class="cmp-mtbl-hex">${_ec(entryHex)}</span>`
-                + ` <span class="cmp-mtbl-idx">[${i}]</span>`
-                + ` <span class="cmp-mtbl-name">${_ec(m.name)}</span>`
-                + ` <span class="cmp-mtbl-arrow">\u2192 lump word ${entry}</span>`
-                + `</div>`;
-        }
-    }
-    html += `<details class="cmp-mtbl" open>`
-        + `<summary class="cmp-mtbl-hdr">Method Table <span class="cmp-conv">\u2014 ${result.methods.length} entr${result.methods.length !== 1 ? 'ies' : 'y'}</span></summary>`
-        + `<div class="cmp-mtbl-body">${mtblHtml}</div>`
-        + `</details>`;
-
-    // ── Method Bodies ──
-    let _lumpBodyBase = _methodTableSize + 1; // lump-word address of first body instruction
-    for (const m of result.methods) {
-        const visBadge = m.visibility === 'private' ? '<span class="cmp-priv">private</span> ' : '';
-        if (m.aliasOf) {
-            html += `<div class="cmp-method-alias">\u25c6 method ${visBadge}${_ec(m.name)} \u2192 alias of ${_ec(m.aliasOf)}</div>`;
-            continue;
-        }
-        const conv = _methodConv(m);
-        const mCode = m.code || [];
-        const comments = manifestByMethod[m.name] || {};
-        let bodyTxt = '';
-        for (let i = 0; i < mCode.length; i++) {
-            const word = mCode[i];
-            const mnem = _applyMethodDRNames(word === 0 ? 'NOP' : assembler.disassemble(word), m);
-            const comment = comments[i];
-            const lumpWord = _lumpBodyBase + i;
-            const addrLabel = `[word ${String(lumpWord).padStart(2)}] `;
-            bodyTxt += _ec(comment ? `${addrLabel}${mnem.padEnd(40)}; ${comment}` : `${addrLabel}${mnem}`) + '\n';
-        }
-        html += `<details class="cmp-method" open>`
-            + `<summary class="cmp-method-hdr">\u25c6 method ${visBadge}${_ec(m.name)}<span class="cmp-conv"> \u2014 ${_ec(conv)}</span></summary>`
-            + `<pre class="cmp-body">${bodyTxt}</pre>`
-            + `</details>`;
-        _lumpBodyBase += mCode.length;
-    }
-
-    // appendOutput uses textContent += which destroys child elements — call it
-    // BEFORE setting innerHTML so the HTML (including the Load into Sim button)
-    // is the final write to the console and is never clobbered.
-    const _outSrcLabel = _getActiveSourceLabel();
-    const _outSrcHint = _outSrcLabel ? ` · ${_outSrcLabel}` : '';
-    appendOutput(`CLOOMC++ compiled "${result.abstractionName}"${_outSrcHint} — ${result.methods.length} methods`, 'info');
-    trackAction('compile', { name: result.abstractionName, lang: result.language });
-
-    if (con) { con.className = 'cmp-html'; con.innerHTML = html; con.scrollTop = 0; }
-    showNextSteps('compiled');
 }
 
 // Load the most-recently-compiled CLOOMC++ lump into the simulator so the user

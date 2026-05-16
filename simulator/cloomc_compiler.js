@@ -92,6 +92,8 @@ class CLOOMCCompiler {
             result = this.compileSymbolic(cleanSource, capabilities);
         } else if (this._detectHaskell(cleanSource)) {
             result = this.compileHaskell(cleanSource, capabilities);
+        } else if (this._detectAssembly(cleanSource)) {
+            result = this.compileAssembly(cleanSource, capabilities);
         } else {
             result = this.compileJS(cleanSource, capabilities);
         }
@@ -637,6 +639,84 @@ class CLOOMCCompiler {
             if (t.match(/\bpure\b\s/)) return true;
         }
         return false;
+    }
+
+    _detectAssembly(source) {
+        const CM_MNEMONICS = /^(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|WORD|NOP)(\s|$|\.)/ ;
+        const lines = source.split('\n');
+        let score = 0;
+        for (const line of lines) {
+            const t = line.trim();
+            if (!t) continue;
+            if (t.startsWith(';')) { score++; continue; }
+            if (/^[A-Za-z_]\w*:\s*$/.test(t)) { score++; continue; }
+            if (CM_MNEMONICS.test(t)) { score += 2; continue; }
+            if (/^\.pet\s+/i.test(t) || /^\.word\s+/i.test(t)) { score += 2; continue; }
+            if (/^capabilities\s*\{/.test(t)) { score++; continue; }
+        }
+        return score >= 2;
+    }
+
+    compileAssembly(source, capabilities) {
+        const asm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
+        if (!asm) {
+            return {
+                abstractionName: 'Assembly',
+                language: 'assembly',
+                methods: [],
+                capabilities: [],
+                errors: [{ line: 1, message: 'ChurchAssembler not available' }],
+                profile: 'IoT'
+            };
+        }
+
+        const result = asm.assemble(source);
+
+        if (result.errors && result.errors.length > 0) {
+            const normErrors = result.errors.map(e =>
+                (e && typeof e === 'object' && 'line' in e && 'message' in e)
+                    ? e
+                    : { line: (e && e.line) || 0, message: String((e && e.message) || e) }
+            );
+            return {
+                abstractionName: 'Assembly',
+                language: 'assembly',
+                methods: [],
+                capabilities: [],
+                errors: normErrors,
+                profile: 'IoT'
+            };
+        }
+
+        // Extract abstraction name: try specific "Name NS[..." header first,
+        // then any first meaningful ; comment line, then first label, then default.
+        let absName = 'Assembly';
+        const headerMatch = source.match(/^;\s*(?:Disassembly\s+of\s+\S+\s+)?([^\n@]+?)\s+(?:NS\[|\@\s*0x)/m);
+        if (headerMatch) {
+            absName = headerMatch[1].trim();
+        } else {
+            // First non-empty ; comment line — strip leading ; and whitespace, truncate to 64 chars
+            const firstCommentMatch = source.match(/^;\s*(.+?)\s*$/m);
+            if (firstCommentMatch) {
+                absName = firstCommentMatch[1].slice(0, 64).trim();
+            } else {
+                const firstLabel = Object.keys(result.labels || {})[0];
+                if (firstLabel) absName = firstLabel;
+            }
+        }
+
+        const caps = result.capabilities || [];
+        const words = Array.from(result.words || []);
+
+        return {
+            abstractionName: absName,
+            language: 'assembly',
+            methods: [{ name: 'run', code: words, sourceLines: source }],
+            capabilities: caps,
+            errors: [],
+            profile: (typeof detectProfile === 'function') ? detectProfile([{ code: words }]) : 'IoT',
+            manifest: null
+        };
     }
 
     _buildROM(declaredCaps, uploadCaps) {

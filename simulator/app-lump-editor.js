@@ -1132,7 +1132,7 @@
     // ── Thread + NS step1 save helpers ────────────────────────────────────────
 
     window.lumpEditorSaveThread = function () {
-        if (typeof buildAndDownloadLump === 'function') buildAndDownloadLump();
+        if (typeof compileAndBuild === 'function') compileAndBuild();
         var statusEl = document.getElementById('le-t-step1-status');
         var errEl    = document.getElementById('le-t-step1-err');
         _postStep1(statusEl, errEl);

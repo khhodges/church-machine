@@ -323,7 +323,6 @@
                                 <button class="ham-item" onclick="showCreateNamespace();closeEditorActions()" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
                                 <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
                                 <button class="ham-item" onclick="auditLumpOnly();closeEditorActions()" data-tooltip="Audit LUMP — Compile and run structural consistency checks without downloading or saving">Audit LUMP</button>
-                                <button class="ham-item" id="btnBuildLumpMenu" onclick="buildAndDownloadLump();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Build LUMP — Compile any language and download a deployable binary .lump file">Build LUMP ↓</button>
                                 <button class="ham-item" onclick="exportLumpAsPatch();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Export Lump as Patch — Load a pre-built .lump file and convert to a .patch file for FPGA flashing">Lump → Patch ↓</button>
                                 <button class="ham-item" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor (Ctrl+Shift+C)">C-List</button>
                                 <div class="ham-divider"></div>
@@ -1573,7 +1572,7 @@
     <script src="repl.js"></script>
     <script src="hp35.js"></script>
     <script async src="history.js"></script>
-    <script src="cloomc_compiler.js?v=20260514b"></script>
+    <script src="cloomc_compiler.js?v=20260516d"></script>
 
     <script async src="abacus.js"></script>
     <script async src="sliderule.js"></script>
@@ -1602,7 +1601,7 @@
     <script src="app-absdetail.js?v=20260514b"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=20260516b"></script>
+    <script src="app-compile.js?v=20260516c"></script>
     <script src="app-lump-editor.js?v=20260516a"></script>
     <script src="app-run.js?v=20260516b"></script>
     <script src="app-source-library.js?v=20260509d"></script>

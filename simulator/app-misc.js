@@ -626,7 +626,7 @@ function showNextSteps(context) {
     const lumpBtn = () => {
         const _ffi = (typeof _faultFreeInstrTotal !== 'undefined') ? _faultFreeInstrTotal : 0;
         return _ffi >= 1000
-            ? btn('\uD83D\uDCBE', 'Save as LUMP', 'buildAndDownloadLump()', 'ns-btn-lump')
+            ? btn('\uD83D\uDCBE', 'Save as LUMP', 'compileAndBuild()', 'ns-btn-lump')
             : `<button class="next-step-btn ns-btn-lump ns-btn-lump-locked" disabled title="Run 1,000 fault-free instructions to unlock">\uD83D\uDCBE Save as LUMP</button>`;
     };
     const steps = {

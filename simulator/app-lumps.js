@@ -994,10 +994,10 @@ function _lumpSourceBuildLump() {
     if (status) { status.textContent = 'Building\u2026'; status.className = 'lump-source-status'; }
     try {
         const asmEd = document.getElementById('asmEditor');
-        if (asmEd && typeof buildAndDownloadLump === 'function') {
+        if (asmEd && typeof compileAndBuild === 'function') {
             const prev = asmEd.value;
             asmEd.value = src;
-            buildAndDownloadLump();
+            compileAndBuild();
             asmEd.value = prev;
         }
         if (status) { status.textContent = 'Build triggered. Check Programs view.'; status.className = 'lump-source-status ok'; }
