@@ -366,6 +366,8 @@
                         <button class="example-tab" onclick="loadExample('scheduler_yield')" data-example="scheduler_yield" style="color:#60a5fa;" data-tooltip="Scheduler Yield — Cooperative multi-threading: Scheduler.Spawn creates a thread, Scheduler.Yield voluntarily gives up the time slice">Scheduler Yield</button>
                         <button class="example-tab" onclick="loadExample('scheduler_wait')" data-example="scheduler_wait" style="color:#60a5fa;" data-tooltip="Scheduler Wait — Blocking synchronisation: DijkstraFlag.Signal pre-fires the semaphore, Scheduler.Wait blocks until signaled, Scheduler.Stop terminates the thread cleanly">Scheduler Wait</button>
                         <button class="example-tab" onclick="loadExample('dijkstra_flag')" data-example="dijkstra_flag" style="color:#60a5fa;" data-tooltip="DijkstraFlag — Flag-based synchronisation: Test, Signal, Wait, and Reset a shared flag object">DijkstraFlag</button>
+                        <button class="example-tab" onclick="loadExample('post_flash_selftest')" data-example="post_flash_selftest" style="color:#f0c674;" data-tooltip="Post-Flash Self-Test — 81-test exhaustive post-flash hardware self-test; DR0=0 on pass, DR0=N on first failure">Post-Flash Self-Test</button>
+                        <button class="example-tab" onclick="loadExample('gt_v1_1_test')" data-example="gt_v1_1_test" style="color:#f0c674;" data-tooltip="GT v1.1 Test — 5-test GT v1.1 dom+perm encoding smoke test with TPERM EXACT">GT v1.1 Test</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('integer_ops')" data-example="cloomc_integer_ops" style="color:#C89B3C;" data-tooltip="JS: IntegerOps — Clamp, Abs, Increment, Add, Double in JavaScript CLOOMC++">JS: IntegerOps</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('packed_string')" data-example="cloomc_packed_string" style="color:#C89B3C;" data-tooltip="JS: PackedString — Pack4, Unpack, IsLetter, ToUpper on 32-bit integer hardware">JS: PackedString</button>
                         <button class="example-tab" onclick="loadCLOOMCExample('memory')" data-example="cloomc_memory" style="color:#C89B3C;" data-tooltip="JS: Memory — Memory operations in JavaScript CLOOMC++">JS: Memory</button>
@@ -1600,9 +1602,9 @@
     <script src="app-absdetail.js?v=20260514b"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=20260514a"></script>
+    <script src="app-compile.js?v=20260516b"></script>
     <script src="app-lump-editor.js?v=20260515z7"></script>
-    <script src="app-run.js?v=20260516a"></script>
+    <script src="app-run.js?v=20260516b"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260501a"></script>
     <script src="app-misc.js?v=20260512e"></script>
