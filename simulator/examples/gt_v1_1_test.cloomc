@@ -1,6 +1,6 @@
 ; GT Encoding v1.1 Hardware Self-Test
 ; =====================================
-; A CLOOMC abstraction that exercises the live mLoad capability pipeline to
+; A CLOOMC program that exercises the live mLoad capability pipeline to
 ; verify that the dom+perm GT word layout is working correctly in hardware/sim.
 ;
 ; What is being tested:
@@ -30,68 +30,51 @@
 ;   Slot 3  (Boot.Abstr) — E-GT: Church domain, dom=1, perm[2]=E=1
 ;
 ; Result protocol:
-;   DR14 = 0        → all five tests passed
-;   DR14 = 1..5     → test N was the first to fail
+;   DR0 = 0        all five tests passed
+;   DR0 = 1..5     test N was the first to fail
 ;
 ; To run: paste into the simulator Code tab and click Run.
-; All five assertions should complete without fault; DR14 stays 0.
+; All five assertions should complete without fault; DR0 stays 0.
+;
+; Note: RETURN (bare, no operand) unwinds the call frame.
+;       RETURN CR8 is incorrect syntax — RETURN takes an optional mask, not a CR.
 
-; ── Load test GTs from the c-list ────────────────────────────────────────────
-; CR6 is the active c-list capability (installed by boot sequence).
-; LOAD CR1, CR6, 7  — pull the Turing X-GT (nucleus) into CR1
-; LOAD CR2, CR6, 3  — pull the Church E-GT (Boot.Abstr) into CR2
-; LOAD CR3, CR6, 7  — second handle to the X-GT for EXACT comparison
+    ISUB DR0, DR0, DR0
 
-    LOAD CR1, CR6, 7        ; CR1 ← X-GT  (dom=0, perm=0b100, Turing execute)
-    LOAD CR2, CR6, 3        ; CR2 ← E-GT  (dom=1, perm=0b100, Church invoke)
-    LOAD CR3, CR6, 7        ; CR3 ← X-GT  (same token as CR1, for EXACT test)
+    LOAD CR1, CR6, 7
+    LOAD CR2, CR6, 3
+    LOAD CR3, CR6, 7
 
 ; ── Test 1: X-GT satisfies TPERM X ──────────────────────────────────────────
-; TPERM checks perm[2:0] after decoding dom.  A Turing GT with perm[2]=1
-; carries X permission → Z=1 expected.
-
     TPERM CR1, X
-    BRANCHEQ t2             ; Z=1 = correct → proceed to test 2
-    DWRITE DR14, #1         ; Z=0 = FAIL — Turing X-GT did not satisfy TPERM X
-    RETURN CR8
-
-; ── Test 2: X-GT fails TPERM E ───────────────────────────────────────────────
-; A Turing GT (dom=0) can never carry Church E permission (dom=1 required).
-; TPERM E on a Turing GT must give Z=0.
+    BRANCHEQ t2
+    IADD DR0, DR0, #1
+    RETURN
 t2:
+; ── Test 2: X-GT fails TPERM E ───────────────────────────────────────────────
     TPERM CR1, E
-    BRANCHNE t3             ; Z=0 = correct → Turing GT correctly rejected Church check
-    DWRITE DR14, #2         ; Z=1 = FAIL — Turing GT incorrectly passed Church E check
-    RETURN CR8
-
-; ── Test 3: E-GT satisfies TPERM E ───────────────────────────────────────────
-; Church GT has dom=1, perm[2]=E=1 → TPERM E must give Z=1.
+    BRANCHNE t3
+    IADD DR0, DR0, #2
+    RETURN
 t3:
+; ── Test 3: E-GT satisfies TPERM E ───────────────────────────────────────────
     TPERM CR2, E
     BRANCHEQ t4
-    DWRITE DR14, #3         ; FAIL — Church E-GT did not satisfy TPERM E
-    RETURN CR8
-
-; ── Test 4: E-GT fails TPERM X ───────────────────────────────────────────────
-; A Church GT (dom=1) carries no Turing bits.  TPERM X on it must give Z=0.
+    IADD DR0, DR0, #3
+    RETURN
 t4:
+; ── Test 4: E-GT fails TPERM X ───────────────────────────────────────────────
     TPERM CR2, X
-    BRANCHNE t5             ; Z=0 = correct → Church GT correctly rejected Turing check
-    DWRITE DR14, #4         ; Z=1 = FAIL — Church GT incorrectly passed Turing X check
-    RETURN CR8
-
-; ── Test 5: TPERM EXACT — identical GTs match (Z=1, no fault) ───────────────
-; CR1 and CR3 both hold the same X-GT word (loaded from the same c-list slot).
-; TPERM EXACT is a credential-pinning assertion: 32-bit comparison of raw GT
-; words.  Identical credentials → Z=1 and execution continues.
-; A mismatch would raise a BIND fault — there is no Z=0 path.
+    BRANCHNE t5
+    IADD DR0, DR0, #4
+    RETURN
 t5:
+; ── Test 5: TPERM EXACT — identical GTs match  (Z=1, no fault) ──────────────
     TPERM CR1, EXACT, CR3
-    BRANCHEQ done           ; Z=1 = correct → identical credentials pinned successfully
-    DWRITE DR14, #5         ; Z=0 impossible by spec — EXACT has no alternative meaning
-    RETURN CR8
+    BRANCHEQ done
+    IADD DR0, DR0, #5
+    RETURN
 
-; ── All five tests passed ─────────────────────────────────────────────────────
 done:
-    DWRITE DR14, #0         ; 0 = all passed — dom+perm encoding and EXACT are correct
-    RETURN CR8
+    ISUB DR0, DR0, DR0
+    RETURN

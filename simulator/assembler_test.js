@@ -5814,6 +5814,79 @@ abstraction VlcTest {
         result.status !== null ? 'exit code ' + result.status : 'process did not complete');
 }
 
+// ── GT v1.1 test + Post-Flash Self-Test assembly regression ──────────────────
+// Verifies that the two new example CLOOMC files assemble without errors.
+// Neither file is in langExampleGroups (they are standalone hardware-test
+// programs), so they are validated here directly.
+{
+    const path = require('path');
+    const fs   = require('fs');
+
+    function asmFile(relPath) {
+        const src    = fs.readFileSync(path.join(__dirname, relPath), 'utf8');
+        const a      = new ChurchAssembler({});
+        const result = a.assemble(src);
+        return { errors: a.errors, warnings: a.warnings, words: result.words || [] };
+    }
+
+    // gt_v1_1_test.cloomc — 5-test GT v1.1 dom+perm + EXACT smoke test
+    {
+        const { errors, words } = asmFile('examples/gt_v1_1_test.cloomc');
+        assert('EX-GT11: gt_v1_1_test assembles without errors',
+            errors.length === 0,
+            errors.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+        assert('EX-GT11: gt_v1_1_test produces instructions',
+            words.length > 0,
+            `got ${words.length} words`);
+        // File must contain TPERM EXACT (preset 14) encoding — opcode=6, bits[3:0]=14 (0xE)
+        const TPERM_OP = 6;
+        const tpermWords = words.filter(w => ((w >>> 27) & 0x1F) === TPERM_OP);
+        assert('EX-GT11: gt_v1_1_test contains at least 5 TPERM instructions',
+            tpermWords.length >= 5,
+            `found ${tpermWords.length}`);
+        // TPERM EXACT encodes preset in bits[3:0] = 14 (0xE)
+        const exactWords = tpermWords.filter(w => (w & 0xF) === 14);
+        assert('EX-GT11: gt_v1_1_test contains exactly 1 TPERM EXACT',
+            exactWords.length === 1,
+            `found ${exactWords.length}`);
+    }
+
+    // post_flash_selftest.cloomc — 81-test exhaustive post-flash self-test
+    {
+        const { errors, words } = asmFile('examples/post_flash_selftest.cloomc');
+        assert('EX-PFS: post_flash_selftest assembles without errors',
+            errors.length === 0,
+            errors.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+        assert('EX-PFS: post_flash_selftest produces at least 150 words',
+            words.length >= 150,
+            `got ${words.length} words`);
+        // Must contain TPERM EXACT (credential-pinning assertions in Section J)
+        // TPERM EXACT encodes preset in bits[3:0] = 14 (0xE)
+        const TPERM_OP = 6;
+        const exactWords = words.filter(w =>
+            ((w >>> 27) & 0x1F) === TPERM_OP && (w & 0xF) === 14
+        );
+        assert('EX-PFS: post_flash_selftest contains at least 4 TPERM EXACT words',
+            exactWords.length >= 4,
+            `found ${exactWords.length}`);
+        // Must contain SHR ASR words (opcode=19, ASR flag encoded in bit 5 of imm field)
+        const SHR_OP = 19;
+        const asrWords = words.filter(w =>
+            ((w >>> 27) & 0x1F) === SHR_OP && (w >>> 5) & 1
+        );
+        assert('EX-PFS: post_flash_selftest contains at least 3 SHR ASR words',
+            asrWords.length >= 3,
+            `found ${asrWords.length}`);
+        // Must contain BFEXT (opcode=12) and BFINS (opcode=13)
+        const bfextCount = words.filter(w => ((w >>> 27) & 0x1F) === 12).length;
+        const bfinsCount = words.filter(w => ((w >>> 27) & 0x1F) === 13).length;
+        assert('EX-PFS: post_flash_selftest contains at least 3 BFEXT words',
+            bfextCount >= 3, `found ${bfextCount}`);
+        assert('EX-PFS: post_flash_selftest contains at least 2 BFINS words',
+            bfinsCount >= 2, `found ${bfinsCount}`);
+    }
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
