@@ -11,7 +11,8 @@
     "test": "node simulator/assembler_test.js && node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
     "test:e2e": "npx playwright test",
     "check:capabilities": "node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'",
-    "check:selftest-lump": "node scripts/check_selftest_lump_stale.js"
+    "check:selftest-lump": "node scripts/check_selftest_lump_stale.js",
+    "install-hooks": "cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit && echo 'pre-commit hook installed'"
   },
   "keywords": [],
   "author": "",
