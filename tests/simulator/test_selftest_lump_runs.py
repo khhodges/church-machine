@@ -110,10 +110,13 @@ def test_selftest_lump_dr0_is_zero():
 
     dr0 = report.get('dr0')
     fail_msg = report.get('failMessage')
+    fail_section = report.get('failSection')
+
+    section_hint = f' ({fail_section})' if fail_section else ''
 
     assert dr0 == 0, (
         f'Selftest lump FAILED: {fail_msg}. '
-        f'DR0={dr0} means test {dr0} was the first to fail. '
+        f'DR0={dr0} means test {dr0}{section_hint} was the first to fail. '
         f'terminatedBy={report.get("terminatedBy")!r}. '
         f'steps={report.get("steps")}.'
     )

@@ -25,7 +25,8 @@
 //     "faultMessage":  <fault message string>,
 //     "terminatedBy":  "RETURN" | "HALT" | "MAX_STEPS" | "UNEXPECTED_FAULT",
 //     "pass":          true | false,
-//     "failMessage":   null | "test N was the first to fail"
+//     "failSection":   null | "SECTION X <description> test N",
+//     "failMessage":   null | "SECTION X <description> test N was the first to fail (DR0=N)"
 //   }
 
 'use strict';
@@ -162,6 +163,32 @@ while (steps < MAX_STEPS && !sim.halted && sim.bootComplete) {
     if (!r) break;  // null result means a fault or skip
 }
 
+// ── DR0 → section name mapping ────────────────────────────────────────────────
+// Matches the section table in simulator/examples/post_flash_selftest.cloomc
+const SELFTEST_SECTIONS = [
+    { first: 1,  last: 15, name: 'SECTION A', desc: 'Data register independence' },
+    { first: 16, last: 23, name: 'SECTION B', desc: 'IADD arithmetic' },
+    { first: 24, last: 30, name: 'SECTION C', desc: 'ISUB arithmetic' },
+    { first: 31, last: 36, name: 'SECTION D', desc: 'SHL shift-left' },
+    { first: 37, last: 41, name: 'SECTION E', desc: 'SHR logical right' },
+    { first: 42, last: 45, name: 'SECTION F', desc: 'SHR arithmetic right' },
+    { first: 46, last: 57, name: 'SECTION G', desc: 'Branch conditions' },
+    { first: 58, last: 62, name: 'SECTION H', desc: 'BFEXT / BFINS bit-field operations' },
+    { first: 63, last: 73, name: 'SECTION I', desc: 'TPERM presets + domain purity' },
+    { first: 74, last: 77, name: 'SECTION J', desc: 'TPERM EXACT credential-pinning' },
+    { first: 78, last: 79, name: 'SECTION K', desc: 'CHANGE (CR swap) + permission verify' },
+    { first: 80, last: 81, name: 'SECTION L', desc: 'LOAD from multiple c-list slots' },
+];
+
+function drToSection(n) {
+    for (const s of SELFTEST_SECTIONS) {
+        if (n >= s.first && n <= s.last) {
+            return `${s.name} ${s.desc} test ${n}`;
+        }
+    }
+    return null;
+}
+
 // ── Determine termination reason and pass/fail ────────────────────────────────
 let terminatedBy;
 if (capturedDR0 !== null) {
@@ -179,11 +206,14 @@ if (capturedDR0 !== null) {
 
 const pass = (capturedDR0 === 0) && (terminatedBy === 'RETURN');
 
+let failSection = null;
 let failMessage = null;
 if (!pass) {
     if (terminatedBy === 'RETURN') {
         // Normal termination but DR0 != 0: a specific test failed
-        failMessage = `Test ${capturedDR0} was the first to fail (DR0=${capturedDR0})`;
+        failSection = drToSection(capturedDR0);
+        const sectionLabel = failSection || `test ${capturedDR0}`;
+        failMessage = `${sectionLabel} was the first to fail (DR0=${capturedDR0})`;
     } else if (terminatedBy === 'UNEXPECTED_FAULT') {
         failMessage = (
             `Unexpected fault [${capturedFaultType}] after ${steps} steps: ${capturedFaultMsg}. ` +
@@ -207,6 +237,7 @@ const out = {
     faultLog,
     terminatedBy,
     pass,
+    failSection,
     failMessage,
 };
 
