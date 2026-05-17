@@ -166,6 +166,34 @@
     border-bottom-color: rgba(20, 20, 40, 0.8);
 }
 
+.lump-ws-run-btn {
+    margin-left: auto;
+    align-self: center;
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 4px 12px;
+    border: 1px solid rgba(74, 222, 128, 0.35);
+    border-radius: 4px;
+    background: rgba(74, 222, 128, 0.08);
+    color: #4ade80;
+    cursor: pointer;
+    transition: background 0.14s, border-color 0.14s, color 0.14s;
+    white-space: nowrap;
+    bottom: 0;
+    position: relative;
+}
+.lump-ws-run-btn:hover {
+    background: rgba(74, 222, 128, 0.18);
+    border-color: rgba(74, 222, 128, 0.6);
+    color: #86efac;
+}
+.lump-ws-run-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
 .lump-ws-panel {
     display: none;
     overflow-y: auto;

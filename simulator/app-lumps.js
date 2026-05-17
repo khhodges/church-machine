@@ -563,6 +563,15 @@ function switchLumpWsTab(tab) {
     }
 }
 
+function _runSelectedLumpInSim(btn) {
+    if (!_selectedLumpToken) return;
+    const lump = _lumpsCache.find(l => l.token === _selectedLumpToken);
+    if (!lump) return;
+    const nsSlotParsed = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? Number(lump.ns_slot) : NaN;
+    const nsSlot = Number.isInteger(nsSlotParsed) ? nsSlotParsed : null;
+    _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, nsSlot);
+}
+
 function _showLumpWorkspaceTabs() {
     const bar = document.getElementById('lumpWsTabBar');
     if (bar) bar.style.display = 'flex';
