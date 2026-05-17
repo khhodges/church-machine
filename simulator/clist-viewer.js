@@ -511,6 +511,30 @@
     }
 
     // ── GT Picker ─────────────────────────────────────────────────────────────
+    // Built-in system Inform GTs — always present in the boot namespace.
+    // These are lump-backed abstractions with fixed NS slots; all require E to call.
+    var PICKER_SYSTEM = [
+        { name: 'Salvation',    slot: 4,  hint: 'First callable abstraction'      },
+        { name: 'Navana',       slot: 5,  hint: 'Namespace slot guardian'         },
+        { name: 'Mint',         slot: 6,  hint: 'GT issuance / encoding'          },
+        { name: 'Memory',       slot: 7,  hint: 'Physical RAM zone guardian'      },
+        { name: 'Scheduler',    slot: 8,  hint: 'Thread scheduling & IRQ'         },
+        { name: 'Stack',        slot: 9,  hint: 'Managed call stack'              },
+        { name: 'DijkstraFlag', slot: 10, hint: 'Semaphore / synchronisation'     },
+        { name: 'UART',         slot: 11, hint: 'Serial I/O namespace entry'      },
+        { name: 'LED',          slot: 12, hint: 'LED namespace entry'             },
+        { name: 'Button',       slot: 13, hint: 'Button namespace entry'          },
+        { name: 'Timer',        slot: 14, hint: 'Timer namespace entry'           },
+        { name: 'Display',      slot: 15, hint: 'Display namespace entry'         },
+        { name: 'SlideRule',    slot: 16, hint: 'Floating-point math'             },
+        { name: 'Abacus',       slot: 17, hint: 'Integer arithmetic'              },
+        { name: 'Constants',    slot: 18, hint: 'Mathematical constants (Pi…)'    },
+        { name: 'Loader',       slot: 19, hint: 'Lazy lump loader'                },
+        { name: 'Tunnel',       slot: 31, hint: 'FPGA \u2194 IDE I/O channel'     },
+        { name: 'GC',           slot: 44, hint: 'Garbage collector (PP250)'       },
+        { name: 'Circle',       slot: 46, hint: 'Geometry (inherits SlideRule)'   },
+    ];
+
     var PICKER_DEVICES = [
         { name: 'LED0',     hint: 'LED \u00b7 device 0',     rights: 'RW' },
         { name: 'LED1',     hint: 'LED \u00b7 device 1',     rights: 'RW' },
@@ -536,7 +560,17 @@
             '<span class="clist-picker-hint">named placeholder \u00b7 choose perms</span>' +
             '</div>';
 
-        // Section 1: Abstractions — Inform GTs from lump library (ns_slot != null)
+        // Section 1: System — built-in Inform GTs always present in the boot namespace
+        bodyRows += '<div class="clist-picker-section-header">System</div>';
+        PICKER_SYSTEM.forEach(function (a) {
+            bodyRows += '<div class="clist-picker-row" data-cap-name="' + a.name + '" data-cap-rights="E">' +
+                '<span class="clist-picker-type clist-picker-type--inform">Inform</span>' +
+                '<span class="clist-picker-name">' + escHtml(a.name) + '</span>' +
+                '<span class="clist-picker-hint">NS[' + a.slot + '] \u00b7 ' + escHtml(a.hint) + ' \u00b7 E</span>' +
+                '</div>';
+        });
+
+        // Section 2: Abstractions — Inform GTs from lump library (ns_slot != null)
         try {
             var lresp = await fetch('/api/lumps/list');
             if (lresp.ok) {
