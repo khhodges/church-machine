@@ -3,11 +3,14 @@
 **v1.1 — 2026-05-15**
 **CONFIDENTIAL**
 
-> This document records the design session held in May 2026 between the
-> original PP250 designer and the Church Machine team. It explains *why*
-> each decision was made, not just what the decision is — so that future
-> implementors understand the constraints they must respect and the
-> principles they must preserve.
+This document records the design session held in May 2026 between the original PP250 designer and the Church Machine team. It explains *why* important decisions were made, not just what the decision might be — so that future followers of this Church Machine movemext understand the constraints to respect and theprinciples to preserve. It starts with the The Six Laws of CLOOMC a one-page summation of the foundational principles of capability-based computer architecture.
+
+1. The Law of Capability where authority flows through unforgeable Golden Tokens
+2. The Law of Namespace Privacy whre every binding lives inside a Golden Token
+3. The Law of Delegation were rights are given, and cnnot be seized
+4. The Law of Confinement that guarantees computation cannot exceed transparent tokens
+5. The Law of Revocation to limit and withdraw any authority previously granted
+6. The Law of Integrity using seals to verify granted origin without disclosure 
 
 ---
 
