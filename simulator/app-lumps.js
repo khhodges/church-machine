@@ -3441,8 +3441,20 @@ async function _loadLumpBinaryIntoSim(token, name, btn) {
         const resp = await fetch(`/api/lump/${token}/words`);
         if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
         const data = await resp.json();
-        const words = data.words || [];
-        if (!words.length) throw new Error('Empty LUMP \u2014 no words returned');
+        const rawWords = data.words || [];
+        if (!rawWords.length) throw new Error('Empty LUMP \u2014 no words returned');
+
+        // The /words endpoint returns the full LUMP binary: header word (index 0) +
+        // code words + c-list.  loadProgram() expects pure code words and writes its
+        // own header at baseAddr, so passing rawWords[0] (the LUMP header) causes it
+        // to land in the first code slot and appear as a duplicate .header in Code View.
+        // Strip the header and extract only the cw code words.
+        let words = rawWords;
+        if (((rawWords[0] >>> 0) >>> 27) === 0x1F) {
+            const hdrWord = rawWords[0] >>> 0;
+            const cw      = (hdrWord >>> 10) & 0x1FFF;
+            words = rawWords.slice(1, 1 + Math.min(cw, rawWords.length - 1));
+        }
 
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
         if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();

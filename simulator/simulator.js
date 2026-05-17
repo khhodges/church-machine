@@ -6183,7 +6183,10 @@ class ChurchSimulator {
         const n_minus_6 = Math.max(0, Math.ceil(Math.log2(lumpSize)) - 6);
         // NS entry limit17 = index of last valid code/data word = lumpSize - cc - 1.
         const lim17 = Math.min(lumpSize - cc - 1, 0x1FFFF);
-        const abstractGtWord = (this.getPermBits(perms) << 25) >>> 0;
+        // Abstract GT word for NS entry word3: dom[27] | perm[30:28].
+        // getPermBits returns (perm3 << 1) | dom; shifting by 27 places
+        // dom at bit 27 and perm3 at bits [30:28] per the new GT layout.
+        const abstractGtWord = (this.getPermBits(perms) << 27) >>> 0;
         this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
@@ -6217,7 +6220,8 @@ class ChurchSimulator {
         for (let j = 0; j < lumpSize; j++) {
             if (loc + j < this.memory.length) this.memory[loc + j] = 0;
         }
-        const abstractGtWord = (this.getPermBits(perms) << 25) >>> 0;
+        // Abstract GT word for NS entry word3: dom[27] | perm[30:28] (same as above).
+        const abstractGtWord = (this.getPermBits(perms) << 27) >>> 0;
         this.writeNSEntry(idx, loc, lim17, 0, 0, 0, gtType, 0, cc || undefined, abstractGtWord);
         this.nsLabels[idx] = label;
         // Word 0: lump header (magic=0x1F, n_minus_6, cw=codeLen, cc, typ=0).
