@@ -572,12 +572,14 @@ async function renderLumps() {
             const _sortOptName     = _lumpSortOrder === 'name'     ? ' selected' : '';
             const _sortOptRecent   = _lumpSortOrder === 'recent'   ? ' selected' : '';
             const _sortOptCompiled = _lumpSortOrder === 'compiled'  ? ' selected' : '';
+            const _sortOptMtbf     = _lumpSortOrder === 'mtbf'     ? ' selected' : '';
             html += `<div class="lump-sort-bar">`;
             html += `<label class="lump-sort-label" for="lumpSortSelect">Sort</label>`;
             html += `<select id="lumpSortSelect" class="lump-sort-select" onchange="_lumpSortChanged(this.value)">`;
             html += `<option value="name"${_sortOptName}>Name (A\u2013Z)</option>`;
             html += `<option value="recent"${_sortOptRecent}>Most Recent</option>`;
             html += `<option value="compiled"${_sortOptCompiled}>Newest Compile</option>`;
+            html += `<option value="mtbf"${_sortOptMtbf}>Best MTBF</option>`;
             html += `</select></div>`;
             html += `<select id="lumpPickerSelect" class="lump-picker-select" onchange="lumpPickerChanged(this.value)">`;
             html += `<option value="">— pick a lump —</option>`;
@@ -704,6 +706,9 @@ window.lumpPickerChanged = function(token) {
     _selectedLumpToken = token;
     _lumpRecordView(token);
     showLumpDetail(token);
+    // Reset picker to placeholder so re-selecting the same item fires onchange next time.
+    const _pickerSel = document.getElementById('lumpPickerSelect');
+    if (_pickerSel) _pickerSel.value = '';
 };
 
 // Returns a sorted copy of the lumps array according to _lumpSortOrder.
@@ -713,6 +718,14 @@ function _lumpsSorted(lumps) {
         arr.sort((a, b) => _lumpGetLastViewed(b.token) - _lumpGetLastViewed(a.token));
     } else if (_lumpSortOrder === 'compiled') {
         arr.sort((a, b) => (b.compiled_at || 0) - (a.compiled_at || 0));
+    } else if (_lumpSortOrder === 'mtbf') {
+        const _rank = st => st === 'green' ? 0 : st === 'amber' ? 1 : st === 'red' ? 3 : 2;
+        arr.sort((a, b) => {
+            const ma = a.mtbf || {}, mb = b.mtbf || {};
+            const ra = _rank(ma.status), rb = _rank(mb.status);
+            if (ra !== rb) return ra - rb;
+            return (parseInt(mb.consecutive_clean) || 0) - (parseInt(ma.consecutive_clean) || 0);
+        });
     } else {
         arr.sort((a, b) =>
             (a.abstraction || a.token || '').localeCompare(b.abstraction || b.token || ''));
@@ -747,8 +760,7 @@ window._lumpSortChanged = function(val) {
         const ver     = lump.version   ? `v${lump.version}`    : '';
         const size    = lump.lump_size ? `${lump.lump_size}w`  : '';
         const label   = [name, ver, badge, nsSlot, size].filter(Boolean).join('  ');
-        const chosen  = _selectedLumpToken === token ? ' selected' : '';
-        opts += `<option value="${e(token)}"${chosen}>${e(label)}</option>`;
+        opts += `<option value="${e(token)}">${e(label)}</option>`;
     }
     sel.innerHTML = opts;
 };
