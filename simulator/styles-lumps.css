@@ -5315,29 +5315,3 @@ pre:hover .code-copy-btn {
     cursor: default;
 }
 
-/* ── Diagnostic LUMPs catalog section (Lumps tab sidebar) ───────────────── */
-.lump-diag-row { align-items: center; }
-.lump-diag-slot {
-    color: #c89b3c !important;
-    font-style: italic;
-}
-.lump-diag-load-btn {
-    background: rgba(80, 160, 80, 0.14);
-    color: #7ec97e;
-    border: 1px solid rgba(80, 180, 80, 0.3);
-    font-size: 0.68rem;
-    padding: 2px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-}
-.lump-diag-load-btn:hover:not(:disabled) {
-    background: rgba(80, 200, 80, 0.26);
-    color: #a0e0a0;
-    border-color: rgba(100, 220, 100, 0.5);
-}
-.lump-diag-load-btn:disabled {
-    opacity: 0.5;
-    cursor: default;
-}

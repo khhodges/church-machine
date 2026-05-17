@@ -556,14 +556,6 @@ async function renderLumps() {
             if (_liveMatch) _selectedLumpToken = _liveMatch.token;
         }
 
-        // Tier A post-launch tracking — always rendered regardless of saved-lump count
-        const _TIER_A_LUMPS = [
-            { name: 'Store',    slot: 47, testId: 'TEST-STORE',    docAnchor: '#41-store'    },
-            { name: 'Clock',    slot: 48, testId: 'TEST-CLOCK',    docAnchor: '#42-clock'    },
-            { name: 'Notify',   slot: 49, testId: 'TEST-NOTIFY',   docAnchor: '#43-notify'   },
-            { name: 'Identity', slot: 50, testId: 'TEST-IDENTITY', docAnchor: '#44-identity' },
-        ];
-
         let html = '';
         if (!lumps || lumps.length === 0) {
             html = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
@@ -607,33 +599,6 @@ async function renderLumps() {
             html += `</select>`;
         }
 
-        // Tier A section — always render all four rows unconditionally
-        html += `<div class="lump-tier-a-section">`;
-        html += `<div class="lump-tier-a-header">Tier A &mdash; Post-Launch Milestones <span class="lump-tier-a-header-sub">(&le;12 weeks post-launch)</span></div>`;
-        for (const ta of _TIER_A_LUMPS) {
-            const safeTestId = _escHtml(ta.testId);
-            const safeName   = _escHtml(ta.name);
-            const matchingLump = (lumps || []).find(l => l.abstraction === ta.name);
-            const isPresent = !!matchingLump;
-            html += `<div class="lump-tier-a-row">`;
-            if (isPresent) {
-                const safeToken = _escHtml(matchingLump.token);
-                html += `<span class="lump-tier-a-name"><a class="lump-tier-a-link" href="#" onclick="event.preventDefault();showLumpDetail('${safeToken}')">${safeName}</a></span>`;
-            } else {
-                html += `<span class="lump-tier-a-name">${safeName}</span>`;
-            }
-            html += `<span class="lump-tier-a-slot">slot&nbsp;${ta.slot}</span>`;
-            if (isPresent) {
-                html += `<span class="lump-tier-a-status lump-tier-a-status-present">In Progress</span>`;
-            } else {
-                html += `<span class="lump-tier-a-status">Missing</span>`;
-            }
-            html += `<span class="lump-tier-a-milestone">Tier A (&le;12 weeks post-launch)</span>`;
-            html += `<a class="lump-tier-a-test-id" href="#" onclick="openDocAnchor('launch.md','${ta.docAnchor}'); return false;" title="View acceptance test definition">${safeTestId}</a>`;
-            html += `</div>`;
-        }
-        html += `</div>`;
-
         // XC7A100T Hardware section — Ethernet LUMP catalog entry
         const _ETHERNET_LUMP = { name: 'Ethernet', slot: 51, token: '00003300', cw: 13, cc: 1, lump_size: 64 };
         html += `<div class="lump-tier-a-section">`;
@@ -654,36 +619,6 @@ async function renderLumps() {
         html += `<span class="lump-tier-a-status${_ethLump ? ' lump-tier-a-status-present' : ''}">${_ethLump ? 'Saved' : 'ROM only'}</span>`;
         html += `<span class="lump-tier-a-milestone" style="font-family:monospace;font-size:0.68rem;">0x${_escHtml(_ethToken)} &nbsp; cw=${_ethCw} &nbsp; cc=${_ethCc} &nbsp; ${_ethSize}w</span>`;
         html += `<a class="lump-tier-a-test-id" href="#" onclick="event.preventDefault();openDocAnchor('hardware-wukong-xc7a100t.md','#ethernet-abstraction-ns-slot-51')" title="View XC7A100T hardware documentation">DOCS</a>`;
-        html += `</div>`;
-        html += `</div>`;
-
-        // Diagnostic LUMPs section — floating catalog entries (ns_slot_policy=dynamic)
-        // These are surfaced from the lumpCatalog returned by /api/boot-config.
-        const _SELFTEST_TOKEN = '82f5ef56';
-        const _SELFTEST_NAME  = 'PostFlashSelftest';
-        const _selftestInList = (lumps || []).find(l => l.token === _SELFTEST_TOKEN || l.abstraction === _SELFTEST_NAME);
-        const _stToken = (_selftestInList && _selftestInList.token) ? _selftestInList.token : _SELFTEST_TOKEN;
-        const _stCw    = (_selftestInList && _selftestInList.cw  != null) ? _selftestInList.cw   : 512;
-        const _stCc    = (_selftestInList && _selftestInList.cc  != null) ? _selftestInList.cc   : 0;
-        const _stSize  = (_selftestInList && _selftestInList.lump_size != null) ? _selftestInList.lump_size : 1024;
-        html += `<div class="lump-tier-a-section">`;
-        html += `<div class="lump-tier-a-header">Diagnostic LUMPs &mdash; Floating Catalog <span class="lump-tier-a-header-sub">(load on demand, no fixed NS slot)</span></div>`;
-        html += `<div class="lump-tier-a-row lump-diag-row">`;
-        if (_selftestInList) {
-            const _stTk = _escHtml(_stToken);
-            html += `<span class="lump-tier-a-name"><a class="lump-tier-a-link" href="#" onclick="event.preventDefault();showLumpDetail('${_stTk}')">${_escHtml(_SELFTEST_NAME)}</a></span>`;
-        } else {
-            html += `<span class="lump-tier-a-name">${_escHtml(_SELFTEST_NAME)}</span>`;
-        }
-        html += `<span class="lump-tier-a-slot lump-diag-slot">floating</span>`;
-        html += `<span class="lump-tier-a-status${_selftestInList ? ' lump-tier-a-status-present' : ''}">${_selftestInList ? 'Available' : 'Missing'}</span>`;
-        html += `<span class="lump-tier-a-milestone" style="font-family:monospace;font-size:0.68rem;">0x${_escHtml(_stToken)} &nbsp; cw=${_stCw} &nbsp; cc=${_stCc} &nbsp; ${_stSize}w</span>`;
-        if (_selftestInList) {
-            const _stTk2 = _escHtml(_stToken);
-            html += `<button class="lump-diag-load-btn" onclick="event.preventDefault();_loadLumpBinaryIntoSim('${_stTk2}','${_escHtml(_SELFTEST_NAME)}',this)" title="Load PostFlashSelftest into the simulator">Load &#x25b6;</button>`;
-        } else {
-            html += `<span class="lump-tier-a-test-id" style="color:#6b7280;">not compiled</span>`;
-        }
         html += `</div>`;
         html += `</div>`;
 
