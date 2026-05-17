@@ -7737,6 +7737,18 @@ function _appendToTraceTab(command, result) {
     traceLog.scrollTop = traceLog.scrollHeight;
 }
 
+function _buildReplEchoWithUnderline(command, colStart, colEnd) {
+    if (colStart !== undefined && colEnd !== undefined && colEnd > colStart) {
+        var before = escapeHtml(command.substring(0, colStart));
+        var mid    = escapeHtml(command.substring(colStart, colEnd));
+        var after  = escapeHtml(command.substring(colEnd));
+        return convertCaretToSuperscript(before) +
+               '<span class="repl-error-underline">' + convertCaretToSuperscript(mid) + '</span>' +
+               convertCaretToSuperscript(after);
+    }
+    return convertCaretToSuperscript(escapeHtml(command));
+}
+
 function replExecute(cmdOverride) {
     const input = document.getElementById('replInput');
     const output = document.getElementById('replOutput');
@@ -7745,9 +7757,13 @@ function replExecute(cmdOverride) {
     const command = cmdOverride || input.value.trim();
     if (!command) return;
 
-    output.innerHTML += `<div class="repl-input-echo">\u03BB&gt; ${convertCaretToSuperscript(escapeHtml(command))}</div>`;
-
     const result = repl.execute(command);
+
+    var echoInner = (result && result.type === 'error')
+        ? _buildReplEchoWithUnderline(command, result.colStart, result.colEnd)
+        : convertCaretToSuperscript(escapeHtml(command));
+    output.innerHTML += `<div class="repl-input-echo">\u03BB&gt; ${echoInner}</div>`;
+
     if (result) {
         if (result.type === 'result') {
             output.innerHTML += `<div class="repl-result">${convertCaretToSuperscript(escapeHtml(result.text))}</div>`;
@@ -8790,6 +8806,24 @@ function replCompileSession() {
 
     if (result.type === 'info') {
         output.innerHTML += `<div class="repl-info">${escapeHtml(result.text)}</div>`;
+    } else if (result.type === 'compile_errors') {
+        const sourceLines = result.source.split('\n');
+        output.innerHTML += `<div class="repl-error">Compile errors (${result.errors.length}):</div>`;
+        for (const e of result.errors) {
+            const lineIdx = (e.line || 1) - 1;
+            const rawLine = sourceLines[lineIdx] || '';
+            var lineHtml;
+            if (e.colStart !== undefined && e.colEnd !== undefined && e.colEnd > e.colStart) {
+                var before = escapeHtml(rawLine.substring(0, e.colStart));
+                var mid    = escapeHtml(rawLine.substring(e.colStart, e.colEnd));
+                var after  = escapeHtml(rawLine.substring(e.colEnd));
+                lineHtml = before + '<span class="repl-error-underline">' + mid + '</span>' + after;
+            } else {
+                lineHtml = escapeHtml(rawLine);
+            }
+            output.innerHTML += `<div class="repl-input-echo" style="font-family:monospace;white-space:pre;">${lineHtml}</div>`;
+            output.innerHTML += `<div class="repl-error" style="padding-left:1rem;">\u2514\u2500 ${escapeHtml(e.message)}</div>`;
+        }
     } else if (result.type === 'result') {
         trackAction('repl', { name: 'Compile Session', lang: 'symbolic' });
         output.innerHTML += `<div class="repl-result" style="white-space:pre;font-family:monospace;">${escapeHtml(result.text)}</div>`;

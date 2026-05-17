@@ -88,18 +88,33 @@ class ChurchREPL {
     _parseLet(assignment) {
         const eqIdx = assignment.indexOf('=');
         if (eqIdx < 0) {
-            return { type: 'error', text: 'Syntax: let name = expression' };
+            // "let " prefix is 4 chars; underline the whole assignment
+            return { type: 'error', text: 'Syntax: let name = expression', colStart: 4, colEnd: 4 + assignment.length };
         }
         const name = assignment.substring(0, eqIdx).trim();
         const expr = assignment.substring(eqIdx + 1).trim();
 
         if (!name.match(/^[a-zA-Z_\u0391-\u03C9\u210F\u221A\u221E][a-zA-Z0-9_\u0391-\u03C9\u2080-\u209C\u2070-\u207F\u00B2\u00B3\u00B9\u207A\u207B]*$/)) {
-            return { type: 'error', text: `Invalid variable name: ${name}` };
+            // name starts after "let " (4 chars)
+            const nameStart = 4 + assignment.indexOf(name);
+            return { type: 'error', text: `Invalid variable name: ${name}`, colStart: nameStart, colEnd: nameStart + name.length };
         }
+
+        // Position of expr within the full command ("let " + assignment)
+        const exprPosInAssignment = assignment.indexOf(expr, eqIdx + 1);
+        const exprOffset = 4 + (exprPosInAssignment >= 0 ? exprPosInAssignment : eqIdx + 1);
 
         const result = this._evaluate(expr);
         if (result.error) {
-            return { type: 'error', text: result.error };
+            let colStart, colEnd;
+            if (result.errorToken !== undefined) {
+                const idx = expr.indexOf(result.errorToken);
+                if (idx >= 0) {
+                    colStart = exprOffset + idx;
+                    colEnd   = colStart + result.errorToken.length;
+                }
+            }
+            return { type: 'error', text: result.error, colStart, colEnd };
         }
 
         this.variables[name] = result.value;
@@ -122,7 +137,15 @@ class ChurchREPL {
     _evalExpr(input) {
         const result = this._evaluate(input);
         if (result.error) {
-            return { type: 'error', text: result.error };
+            let colStart, colEnd;
+            if (result.errorToken !== undefined) {
+                const idx = input.indexOf(result.errorToken);
+                if (idx >= 0) {
+                    colStart = idx;
+                    colEnd   = idx + result.errorToken.length;
+                }
+            }
+            return { type: 'error', text: result.error, colStart, colEnd };
         }
         this.ans = result.value;
         const displayVal = Number.isInteger(result.value) ? result.value : result.value.toFixed(6);
@@ -334,7 +357,7 @@ class ChurchREPL {
                 }
             }
 
-            return { error: `Unknown function: ${func}` };
+            return { error: `Unknown function: ${func}`, errorToken: func };
         }
 
         var opInfo = this._findOperator(expr);
@@ -354,13 +377,13 @@ class ChurchREPL {
                 case '-': result = left.value - right.value; abstraction = 'SUB'; break;
                 case '*': result = left.value * right.value; abstraction = 'MUL'; break;
                 case '/':
-                    if (right.value === 0) return { error: 'Division by zero' };
+                    if (right.value === 0) return { error: 'Division by zero', errorToken: op };
                     result = left.value / right.value; abstraction = 'DIV'; break;
                 case '%':
-                    if (right.value === 0) return { error: 'Modulo by zero' };
+                    if (right.value === 0) return { error: 'Modulo by zero', errorToken: op };
                     result = left.value % right.value; abstraction = 'MOD'; break;
                 case '^': result = Math.pow(left.value, right.value); abstraction = 'POW'; break;
-                default: return { error: `Unknown operator: ${op}` };
+                default: return { error: `Unknown operator: ${op}`, errorToken: op };
             }
 
             const displayResult = Number.isInteger(result) ? result : result.toFixed(6);
@@ -407,7 +430,7 @@ class ChurchREPL {
             return { value: parseFloat(expr), cycles: 0 };
         }
 
-        return { error: `Undefined: ${expr}` };
+        return { error: `Undefined: ${expr}`, errorToken: expr };
     }
 
     executeChain(abstraction, methods, args) {
@@ -575,8 +598,7 @@ class ChurchREPL {
 
         const result = cloomcCompiler.compileSymbolic(source, []);
         if (result.errors && result.errors.length > 0) {
-            const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
-            return { type: 'result', text: `Compile errors:\n${errText}\n\nSource:\n${source}` };
+            return { type: 'compile_errors', errors: result.errors, source };
         }
 
         let output = `═══ Pure Math Session → Church Machine Code ═══\n\n`;

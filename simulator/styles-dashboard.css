@@ -1100,6 +1100,10 @@ a.next-step-link:hover {
 .repl-result { color: var(--church-green); font-weight: 600; }
 .repl-error { color: var(--error); }
 .repl-info { color: var(--church-blue); white-space: pre-wrap; }
+.repl-error-underline {
+    border-bottom: 2px solid #ef4444;
+    padding-bottom: 1px;
+}
 
 .repl-trace {
     margin: 0.25rem 0 0.5rem 1rem;
