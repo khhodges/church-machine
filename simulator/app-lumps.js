@@ -576,6 +576,13 @@ function _hideLumpWorkspaceTabs() {
     });
 }
 
+let _logicCatalogSearch = '';
+
+function _lumpLogicCatalogSearchInput() {
+    _logicCatalogSearch = document.getElementById('lumpLogicCatalogSearch')?.value || '';
+    _populateLumpLogicCatalog();
+}
+
 function _populateLumpLogicCatalog() {
     const el = document.getElementById('lumpWsLogicContent');
     if (!el) return;
@@ -583,45 +590,62 @@ function _populateLumpLogicCatalog() {
         el.innerHTML = '<div class="lump-logic-section"><div class="lump-logic-desc">Abstraction catalog not loaded.</div></div>';
         return;
     }
-    const layerNames = abstractionRegistry.getLayerNames ? abstractionRegistry.getLayerNames() : {};
-    let html = '<div class="lump-logic-catalog-header">Logic Catalog &mdash; double-click any entry to jump to its LUMP</div>';
-    for (let layer = 0; layer <= 8; layer++) {
-        const abstractions = abstractionRegistry.getLayer ? abstractionRegistry.getLayer(layer) : [];
-        if (!abstractions || abstractions.length === 0) continue;
-        const layerName = layerNames[layer] || `Layer ${layer}`;
-        html += `<div class="abs-layer-group">`;
-        html += `<div class="abs-layer-header"><span class="abs-layer-title">Layer ${layer} \u2014 ${layerName}</span>`;
-        html += `<span class="abs-layer-count">(${abstractions.length})</span></div>`;
-        html += `<div class="abs-layer-items">`;
-        for (const abs of abstractions) {
-            const best = (typeof _implStatusBest === 'function') ? _implStatusBest(abs) : 'pseudo';
-            const dotColor = (typeof IMPL_STATUS_COLORS !== 'undefined') ? (IMPL_STATUS_COLORS[best] || '#9ca3af') : '#9ca3af';
-            const dotTitle = (typeof IMPL_STATUS_LABELS !== 'undefined') ? (IMPL_STATUS_LABELS[best] || best) : best;
-            const absProfile = (typeof _getAbstractionProfile === 'function') ? _getAbstractionProfile(abs) : 'IoT';
-            const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
-            const _matchLump = (typeof _lumpsCache !== 'undefined' ? _lumpsCache : []).find(l => l.abstraction === abs.name);
-            const _lumpVer = _matchLump ? (_matchLump.lump_version != null ? _matchLump.lump_version : (_matchLump.version != null ? _matchLump.version : 0)) : 0;
-            const _lumpTk = _matchLump ? _escHtml(_matchLump.token || '') : '';
-            const _isGold = _lumpVer > 0;
-            const _badgeClass = _isGold ? 'lump-ver-badge lump-ver-badge-gold' : 'lump-ver-badge lump-ver-badge-grey';
-            const _clickHandler = _lumpTk
-                ? `event.stopPropagation();showLumpDetail('${_lumpTk}');_switchLumpTab('${_lumpTk}','versions')`
-                : 'event.stopPropagation()';
-            const _badgeCursor = _lumpTk ? '' : ' style="cursor:default"';
-            const _badgeTitle = _lumpTk ? 'LUMP version \u2014 click to open Versions tab' : 'LUMP version \u2014 not yet compiled';
-            const _verBadgeHtml = `<span class="${_badgeClass}" onclick="${_clickHandler}"${_badgeCursor} title="${_badgeTitle}">v${_lumpVer}</span>`;
-            html += `<div class="abs-item" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
-            html += `<span class="abs-item-idx">${abs.index}</span>`;
-            html += `<span class="abs-item-name">${abs.name}</span>`;
-            html += _verBadgeHtml;
-            html += `<span class="abs-profile-badge ${profileBadgeClass}">${absProfile}</span>`;
-            html += `<span class="abs-item-dot" style="background:${dotColor};box-shadow:0 0 4px ${dotColor}80" title="${dotTitle}"></span>`;
-            html += `<span class="abs-item-desc">${abs.description}</span>`;
-            html += `</div>`;
-        }
-        html += `</div></div>`;
+
+    const all = Object.values(abstractionRegistry.abstractions)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    const q = _logicCatalogSearch.toLowerCase().trim();
+    const filtered = q
+        ? all.filter(a => a.name.toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q))
+        : all;
+
+    let html = `<div class="lump-logic-catalog-header" style="display:flex;align-items:center;gap:0.5rem;padding:8px 10px;">`;
+    html += `<input type="text" id="lumpLogicCatalogSearch" class="abs-search-input" style="flex:1;font-size:0.72rem;" placeholder="Search abstractions\u2026" oninput="_lumpLogicCatalogSearchInput()" value="${q.replace(/"/g, '&quot;')}">`;
+    html += `<span class="abs-search-count">${filtered.length}\u202f/\u202f${all.length}</span>`;
+    html += `</div>`;
+
+    html += `<div class="abs-layer-items">`;
+    for (const abs of filtered) {
+        const best = (typeof _implStatusBest === 'function') ? _implStatusBest(abs) : 'pseudo';
+        const dotColor = (typeof IMPL_STATUS_COLORS !== 'undefined') ? (IMPL_STATUS_COLORS[best] || '#9ca3af') : '#9ca3af';
+        const dotTitle = (typeof IMPL_STATUS_LABELS !== 'undefined') ? (IMPL_STATUS_LABELS[best] || best) : best;
+        const absProfile = (typeof _getAbstractionProfile === 'function') ? _getAbstractionProfile(abs) : 'IoT';
+        const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
+        const matchLump = (typeof _lumpsCache !== 'undefined' ? _lumpsCache : []).find(l => l.abstraction === abs.name);
+        const compiledAt = matchLump?.compiled_at
+            ? new Date(matchLump.compiled_at * 1000).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+            : null;
+        const mtbf = matchLump?.mtbf || {};
+        const mtbfSt = mtbf.status || 'unknown';
+        const isUnknownMtbf = mtbfSt === 'unknown' || mtbfSt === 'untested';
+        const mtbfClass = mtbfSt === 'green' ? 'mtbf-green' : mtbfSt === 'amber' ? 'mtbf-amber' : mtbfSt === 'red' ? 'mtbf-red' : 'mtbf-unknown';
+        const mtbfLabel = isUnknownMtbf ? '?' : mtbfSt.toUpperCase();
+        const _lumpVer = matchLump ? (matchLump.lump_version != null ? matchLump.lump_version : (matchLump.version != null ? matchLump.version : 0)) : 0;
+        const _lumpTk = matchLump ? _escHtml(matchLump.token || '') : '';
+        const _isGold = _lumpVer > 0;
+        const _badgeClass = _isGold ? 'lump-ver-badge lump-ver-badge-gold' : 'lump-ver-badge lump-ver-badge-grey';
+        const _clickHandler = _lumpTk
+            ? `event.stopPropagation();showLumpDetail('${_lumpTk}');_switchLumpTab('${_lumpTk}','versions')`
+            : 'event.stopPropagation()';
+        const _badgeCursor = _lumpTk ? '' : ' style="cursor:default"';
+        const _badgeTitle = _lumpTk ? 'LUMP version \u2014 click to open Versions tab' : 'LUMP version \u2014 not yet compiled';
+        const _verBadgeHtml = `<span class="${_badgeClass}" onclick="${_clickHandler}"${_badgeCursor} title="${_badgeTitle}">v${_lumpVer}</span>`;
+
+        html += `<div class="abs-item" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
+        html += `<div class="abs-item-row1">`;
+        html += `<span class="abs-item-idx">${abs.index}</span>`;
+        html += `<span class="abs-item-name">${abs.name}</span>`;
+        html += _verBadgeHtml;
+        html += `<span class="abs-profile-badge ${profileBadgeClass}">${absProfile}</span>`;
+        if (compiledAt) html += `<span class="abs-item-date" title="Compiled ${compiledAt}">${compiledAt}</span>`;
+        if (matchLump) html += `<span class="mtbf-badge lump-mtbf-badge ${mtbfClass}" title="MTBF: ${mtbfSt}">${mtbfLabel}</span>`;
+        html += `<span class="abs-item-dot" style="background:${dotColor};box-shadow:0 0 4px ${dotColor}80" title="${dotTitle}"></span>`;
+        html += `</div>`;
+        html += `<div class="abs-item-desc">${abs.description}</div>`;
+        html += `</div>`;
     }
+    html += `</div>`;
     el.innerHTML = html;
+    if (q) document.getElementById('lumpLogicCatalogSearch')?.focus();
 }
 
 function _populateLumpLogicTab(lump) {
@@ -640,7 +664,7 @@ function _populateLumpLogicTab(lump) {
         const methods = lump.methods || [];
         const caps = lump.capabilities || [];
         let html = '<div class="lump-logic-section">';
-        html += `<div class="lump-logic-layer-badge">No logic metadata</div>`;
+        html += `<div class="lump-logic-meta-badge">No catalog entry</div>`;
         html += `<div class="lump-logic-desc">No abstraction catalog entry found for <strong>${e(absName || 'this lump')}</strong>. Showing binary-derived interface below.</div>`;
         html += '</div>';
         const realMethods = methods.filter(m => !m.aliasOf);
@@ -666,16 +690,23 @@ function _populateLumpLogicTab(lump) {
         return;
     }
 
-    const layerNames = abstractionRegistry.getLayerNames ? abstractionRegistry.getLayerNames() : {};
-    const layerName = layerNames[abs.layer] || `Layer ${abs.layer}`;
     const profile = (typeof _getAbstractionProfile === 'function') ? _getAbstractionProfile(abs) : (abs.profile || 'IoT');
     const profileClass = profile === 'Full' ? 'profile-badge-full' : profile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
     const perms = abs.perms || {};
     const permStr = (perms.B?'B':'')+(perms.R?'R':'')+(perms.W?'W':'')+(perms.X?'X':'')+(perms.L?'L':'')+(perms.S?'S':'')+(perms.E?'E':'') || 'none';
+    const _compiledAt = lump.compiled_at
+        ? new Date(lump.compiled_at * 1000).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+        : null;
+    const _lMtbf = lump.mtbf || {};
+    const _lMtbfSt = _lMtbf.status || 'unknown';
+    const _lMtbfUnknown = _lMtbfSt === 'unknown' || _lMtbfSt === 'untested';
+    const _lMtbfClass = _lMtbfSt === 'green' ? 'mtbf-green' : _lMtbfSt === 'amber' ? 'mtbf-amber' : _lMtbfSt === 'red' ? 'mtbf-red' : 'mtbf-unknown';
+    const _lMtbfLabel = _lMtbfUnknown ? 'UNKNOWN' : _lMtbfSt.toUpperCase();
 
     let html = '<div class="lump-logic-section">';
-    html += `<span class="lump-logic-layer-badge">Layer ${abs.layer} \u2014 ${e(layerName)}</span>`;
-    html += ` <span class="abs-profile-badge ${profileClass}" style="font-size:0.62rem;">${e(profile)}</span>`;
+    html += `<span class="abs-profile-badge ${profileClass}" style="font-size:0.62rem;">${e(profile)}</span>`;
+    if (_compiledAt) html += ` <span class="lump-logic-meta-badge">${e(_compiledAt)}</span>`;
+    html += ` <span class="mtbf-badge lump-mtbf-badge ${_lMtbfClass}" title="MTBF: ${_lMtbfSt}">${e(_lMtbfLabel)}</span>`;
     if (abs.description) {
         html += `<div class="lump-logic-desc">${e(abs.description)}</div>`;
     }

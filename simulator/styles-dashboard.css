@@ -4264,31 +4264,57 @@ a.next-step-link:hover {
     overflow-y: auto;
 }
 
-.abs-layer-header {
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: var(--church-gold);
-    padding: 0.6rem 0.5rem 0.3rem;
-    border-bottom: 1px solid var(--border);
-    margin-top: 0.25rem;
+.abs-search-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary, #1a1a2e);
+    z-index: 1;
 }
 
-.abs-layer-header .layer-count {
-    font-size: 0.6rem;
+.abs-search-input {
+    flex: 1;
+    background: var(--bg-primary, #0d0d1a);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    outline: none;
+    min-width: 0;
+}
+
+.abs-search-input:focus {
+    border-color: var(--church-gold);
+}
+
+.abs-search-count {
+    font-size: 0.62rem;
     color: var(--text-secondary);
-    font-weight: 400;
+    white-space: nowrap;
+}
+
+.abs-item-row1 {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.abs-item-date {
+    font-size: 0.62rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
 }
 
 .abs-item {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     padding: 0.45rem 0.5rem;
     border-radius: 4px;
     cursor: pointer;
@@ -4337,6 +4363,8 @@ a.next-step-link:hover {
     font-weight: 700;
     color: var(--church-gold);
     font-size: 0.8rem;
+    flex: 1;
+    min-width: 0;
 }
 
 .abs-item-type {
@@ -4383,12 +4411,12 @@ a.next-step-link:hover {
 }
 
 .abs-item-desc {
-    grid-column: 1 / -1;
     font-size: 0.68rem;
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    padding-left: 1.6rem;
 }
 
 .abs-placeholder {

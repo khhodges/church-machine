@@ -182,16 +182,17 @@
     border-bottom: 1px solid rgba(100, 160, 255, 0.08);
 }
 
-.lump-logic-layer-badge {
+.lump-logic-meta-badge {
     display: inline-block;
-    font-size: 0.68rem;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 12px;
-    background: rgba(100, 160, 255, 0.12);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(100, 160, 255, 0.10);
     color: #88aaee;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+    margin-right: 4px;
 }
 
 .lump-logic-desc {

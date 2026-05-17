@@ -377,58 +377,68 @@ function _implLegendHtml() {
     return `<div class="impl-legend">${items}</div>`;
 }
 
+let _absSearchQuery = '';
+
+function _absFilterInput() {
+    _absSearchQuery = document.getElementById('absSearchInput')?.value || '';
+    renderAbstractions();
+}
+
 function renderAbstractions() {
     if (!abstractionRegistry) return;
     const listEl = document.getElementById('absLayerList');
     if (!listEl) return;
 
-    const layerNames = abstractionRegistry.getLayerNames();
+    const all = Object.values(abstractionRegistry.abstractions)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    const q = _absSearchQuery.toLowerCase().trim();
+    const filtered = q
+        ? all.filter(a => a.name.toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q))
+        : all;
+
     let html = _implLegendHtml();
 
-    for (let layer = 0; layer <= 8; layer++) {
-        const abstractions = abstractionRegistry.getLayer(layer);
-        if (!abstractions || abstractions.length === 0) continue;
-        const layerName = layerNames[layer] || `Layer ${layer}`;
-        const isCollapsed = absCollapsedLayers[layer] === true;
+    html += `<div class="abs-search-bar">`;
+    html += `<input type="text" id="absSearchInput" class="abs-search-input" placeholder="Search by name or description\u2026" oninput="_absFilterInput()" value="${_absSearchQuery.replace(/"/g, '&quot;')}">`;
+    html += `<span class="abs-search-count">${filtered.length}\u202f/\u202f${all.length}</span>`;
+    html += `</div>`;
 
-        html += `<div class="abs-layer-group">`;
-        html += `<div class="abs-layer-header" onclick="toggleAbsLayer(${layer})">`;
-        html += `<span class="abs-layer-arrow">${isCollapsed ? '\u25b6' : '\u25bc'}</span>`;
-        html += `<span class="abs-layer-title">Layer ${layer} \u2014 ${layerName}</span>`;
-        html += `<span class="abs-layer-count">(${abstractions.length})</span>`;
+    html += `<div class="abs-layer-items">`;
+    for (const abs of filtered) {
+        const matchLump = (typeof _lumpsCache !== 'undefined' ? _lumpsCache : []).find(l => l.abstraction === abs.name);
+        const compiledAt = matchLump?.compiled_at
+            ? new Date(matchLump.compiled_at * 1000).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+            : null;
+        const mtbf = matchLump?.mtbf || {};
+        const mtbfSt = mtbf.status || 'unknown';
+        const isUnknownMtbf = mtbfSt === 'unknown' || mtbfSt === 'untested';
+        const mtbfClass = mtbfSt === 'green' ? 'mtbf-green' : mtbfSt === 'amber' ? 'mtbf-amber' : mtbfSt === 'red' ? 'mtbf-red' : 'mtbf-unknown';
+        const mtbfLabel = isUnknownMtbf ? '?' : mtbfSt.toUpperCase();
+
+        const isActive = selectedAbsIndex === abs.index;
+        const best = _implStatusBest(abs);
+        const dotColor = IMPL_STATUS_COLORS[best] || '#9ca3af';
+        const dotTitle = IMPL_STATUS_LABELS[best] || best;
+        const isBootEntry = abs.index === bootEntrySlot;
+        const absProfile = _getAbstractionProfile(abs);
+        const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
+        const profileTitle = absProfile === 'Full' ? 'Ti60 F225 only' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
+
+        html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
+        html += `<div class="abs-item-row1">`;
+        html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index})" title="${isBootEntry ? 'Current boot entry' : 'Set as boot entry'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
+        html += `<span class="abs-item-name">${abs.name}</span>`;
+        html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile \u2014 ${profileTitle}">${absProfile}</span>`;
+        if (compiledAt) html += `<span class="abs-item-date" title="Compiled ${compiledAt}">${compiledAt}</span>`;
+        if (matchLump) html += `<span class="mtbf-badge lump-mtbf-badge ${mtbfClass}" title="MTBF: ${mtbfSt}">${mtbfLabel}</span>`;
+        html += `<span class="abs-item-dot" style="background:${dotColor};box-shadow:0 0 4px ${dotColor}80" title="${dotTitle}"></span>`;
         html += `</div>`;
-
-        if (!isCollapsed) {
-            html += `<div class="abs-layer-items">`;
-            for (const abs of abstractions) {
-                const isActive = selectedAbsIndex === abs.index;
-                const best = _implStatusBest(abs);
-                const dotColor = IMPL_STATUS_COLORS[best] || '#9ca3af';
-                const dotTitle = IMPL_STATUS_LABELS[best] || best;
-                const isBootEntry = abs.index === bootEntrySlot;
-                html += `<div class="abs-item${isActive ? ' active' : ''}" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction&#39;s LUMP in the Repository">`;
-                const absProfile = _getAbstractionProfile(abs);
-                const profileBadgeClass = absProfile === 'Full' ? 'profile-badge-full' : absProfile === 'XC7A100T' ? 'profile-badge-xc7a100t' : 'profile-badge-iot';
-                const profileTitle = absProfile === 'Full' ? 'Ti60 F225 only' : absProfile === 'XC7A100T' ? 'QMTECH Wukong XC7A100T only' : 'runs on both boards';
-                html += `<span class="abs-item-idx abs-boot-entry-btn${isBootEntry ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${abs.index})" title="${isBootEntry ? 'Current boot entry' : 'Set as boot entry'}">${isBootEntry ? '\u26a1' : abs.index}</span>`;
-                html += `<span class="abs-item-name">${abs.name}</span>`;
-                html += `<span class="abs-profile-badge ${profileBadgeClass}" title="${absProfile} profile — ${profileTitle}">${absProfile}</span>`;
-                html += `<span class="abs-item-dot" style="background:${dotColor};box-shadow:0 0 4px ${dotColor}80" title="${dotTitle}"></span>`;
-                html += `<span class="abs-item-desc">${abs.description}</span>`;
-                html += `</div>`;
-            }
-            html += `</div>`;
-        }
-
+        html += `<div class="abs-item-desc">${abs.description}</div>`;
         html += `</div>`;
     }
+    html += `</div>`;
 
     listEl.innerHTML = html;
-}
-
-function toggleAbsLayer(layer) {
-    absCollapsedLayers[layer] = !absCollapsedLayers[layer];
-    renderAbstractions();
 }
 
 function setBootEntrySlot(idx) {
