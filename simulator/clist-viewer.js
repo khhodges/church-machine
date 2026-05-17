@@ -693,6 +693,35 @@
         ed.scrollTop = Math.max(0, paddingTop + lineIndex * lineH - ed.clientHeight / 3);
     }
 
+    // ── Format a capabilities block from an ordered list of [name, rights] pairs ──
+    // Produces clean 4-space-indented multi-line layout, no blank lines.
+    // Example output:
+    //   capabilities {
+    //       Salvation E
+    //       Navana E
+    //   }
+    function _formatCapBlock(entries) {
+        if (!entries.length) return 'capabilities {\n}';
+        return 'capabilities {\n' +
+            entries.map(function (e) {
+                return '    ' + e[0] + (e[1] ? ' ' + e[1] : '');
+            }).join('\n') +
+            '\n}';
+    }
+
+    // ── Parse all [name, rights] pairs from the interior of a capabilities block ──
+    // Strips blank lines, comments, and trailing commas; returns ordered list.
+    function _parseCapEntries(inner) {
+        return inner.split('\n')
+            .map(function (line) { return line.replace(/[;,].*$/, '').trim(); })
+            .filter(Boolean)
+            .map(function (line) {
+                var parts = line.split(/\s+/);
+                return parts[0] ? [parts[0], (parts[1] || '').toUpperCase()] : null;
+            })
+            .filter(function (e) { return e && !/^[;/]/.test(e[0]); });
+    }
+
     function _insertCapability(capName, rights) {
         if (!capName) { hideViewer(); return; }
         var ed = activeEditor || document.getElementById('asmEditor');
@@ -702,25 +731,22 @@
 
         // The token written into the capabilities block: "Name RIGHTS" (e.g. "Tunnel E")
         var rightsStr = (rights && rights.trim()) ? rights.trim().toUpperCase() : '';
-        var token = rightsStr ? capName + ' ' + rightsStr : capName;
 
         // Find the first capabilities { ... } block
         var capRe = /capabilities\s*\{([^}]*)\}/;
         var cm = capRe.exec(src);
         if (cm) {
-            var inner = cm[1];
-            // Check for existing entry: parse line-by-line so "LED0 RW" is
-            // recognised as name=LED0 (not two separate tokens).
-            var existingNames = inner.split('\n')
-                .map(function (line) { return line.replace(/[;,].*$/, '').trim(); })
-                .filter(Boolean)
-                .map(function (line) { return line.split(/\s+/)[0]; })
-                .filter(function (n) { return n && !/^[;/]/.test(n); });
-            if (existingNames.indexOf(capName) === -1) {
-                var closingBrace = cm.index + cm[0].lastIndexOf('}');
-                var sep = inner.trim().length > 0 ? '\n        ' : '\n        ';
-                ed.value = src.slice(0, closingBrace) + sep + token + '\n    ' + src.slice(closingBrace);
-                insertPos = closingBrace + sep.length;
+            var entries = _parseCapEntries(cm[1]);
+            var alreadyPresent = entries.some(function (e) { return e[0] === capName; });
+            if (!alreadyPresent) {
+                entries.push([capName, rightsStr]);
+                var newBlock = _formatCapBlock(entries);
+                var before = src.slice(0, cm.index);
+                var after  = src.slice(cm.index + cm[0].length);
+                ed.value = before + newBlock + after;
+                // Position cursor on the newly added entry (last line before closing })
+                var nameOffset = before.length + newBlock.lastIndexOf(capName);
+                insertPos = nameOffset >= before.length ? nameOffset : before.length;
                 ed.dispatchEvent(new Event('input', { bubbles: true }));
             } else {
                 // Already present — locate and select the existing entry so
@@ -731,17 +757,18 @@
             }
         } else {
             // No capabilities block — insert after the abstraction { opening line
+            var token = capName + (rightsStr ? ' ' + rightsStr : '');
             var absRe = /(abstraction\s+\w+\s*\{[^\n]*)/;
             var am = absRe.exec(src);
             if (am) {
                 var pos = am.index + am[0].length;
-                var prefix = '\n    capabilities {\n        ';
-                ed.value = src.slice(0, pos) + prefix + token + '\n    }' + src.slice(pos);
-                insertPos = pos + prefix.length;
+                var newBlock2 = '\n    ' + _formatCapBlock([[capName, rightsStr]]).replace(/\n/g, '\n    ');
+                ed.value = src.slice(0, pos) + newBlock2 + src.slice(pos);
+                insertPos = pos + newBlock2.indexOf(token);
             } else {
-                var topPrefix = 'capabilities {\n    ';
-                ed.value = topPrefix + token + '\n}\n\n' + src;
-                insertPos = topPrefix.length;
+                var newBlock3 = _formatCapBlock([[capName, rightsStr]]);
+                ed.value = newBlock3 + '\n\n' + src;
+                insertPos = newBlock3.indexOf(token);
             }
             ed.dispatchEvent(new Event('input', { bubbles: true }));
         }
