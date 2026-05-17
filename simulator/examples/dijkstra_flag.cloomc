@@ -15,6 +15,11 @@
 ;   DijkstraFlag.Wait()    — block until flag is signaled
 ;   DijkstraFlag.Reset()   — lower the flag (mark unsignaled)
 ; ============================================================
+
+capabilities {
+    DijkstraFlag E
+}
+
 ;
 ; DijkstraFlag is a one-bit synchronisation object.  A thread
 ; calls Signal to raise it and Wait to block until raised.

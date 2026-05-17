@@ -8,6 +8,11 @@
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8])
 ; ============================================================
+
+capabilities {
+    Scheduler E
+}
+
 ; Methods demonstrated:
 ;   Scheduler.Spawn(code_GT, entry) — create a new thread
 ;   Scheduler.Yield()               — cooperatively yield time slice

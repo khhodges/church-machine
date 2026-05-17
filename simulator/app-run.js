@@ -5340,6 +5340,16 @@ abstraction NoteGPublishedBug {
 ;   7. test7_call — CALL Salvation via dot-notation
 ;   8. test8_eloadcall — ELOADCALL fused Load+TPERM+Call
 ; ============================================================
+
+capabilities {
+    Salvation E,
+    Navana E,
+    Mint E,
+    Memory E,
+    LED RW,
+    UART RW
+}
+
 ; ============================================
 ; Church Machine Self-Test
 ; Tests opcodes using boot C-List (12 entries)
@@ -5572,6 +5582,11 @@ HALT`,
 ; Methods:
 ;   1. main \u2014 LOAD Salvation, TPERM check, CALL \u2192 transitions to Navana
 ; ============================================================
+
+capabilities {
+    Salvation E
+}
+
 ; ============================================
 ; Salvation \u2014 First Callable Abstraction
 ; Proves CALL works, transitions to Navana
@@ -5747,6 +5762,11 @@ HALT`,
 ;   DijkstraFlag.Wait()    — block until flag is signaled
 ;   DijkstraFlag.Reset()   — lower the flag (mark unsignaled)
 ; ============================================================
+
+capabilities {
+    DijkstraFlag E
+}
+
 ;
 ; DijkstraFlag is a one-bit synchronisation object.  A thread
 ; calls Signal to raise it and Wait to block until raised.
@@ -6658,6 +6678,11 @@ done:
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8])
 ; ============================================================
+
+capabilities {
+    Scheduler E
+}
+
 ; Methods demonstrated:
 ;   Scheduler.Spawn(code_GT, entry) — create a new thread
 ;   Scheduler.Yield()               — cooperatively yield time slice
@@ -6715,6 +6740,11 @@ HALT`,
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8])
 ; ============================================================
+
+capabilities {
+    Scheduler E
+}
+
 ; Methods demonstrated:
 ;   Scheduler.pause(ticks)  — suspend thread for DR1 ticks
 ;   Scheduler.Yield()       — voluntarily yield after waking
@@ -6768,6 +6798,12 @@ HALT`,
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8]), DijkstraFlag (NS[10])
 ; ============================================================
+
+capabilities {
+    Scheduler E,
+    DijkstraFlag E
+}
+
 ; Methods demonstrated:
 ;   DijkstraFlag.Signal()           — release the semaphore
 ;   Scheduler.Wait(flag_GT)         — block until flag signaled
@@ -6835,6 +6871,11 @@ HALT`,
 ; Language:     Assembly
 ; Dependencies: Constants (NS[18])
 ; ============================================================
+
+capabilities {
+    Constants E
+}
+
 ; TWO recommended calling styles are shown here:
 ;
 ;   Style A — two-step (LOAD then CALL dot-notation):

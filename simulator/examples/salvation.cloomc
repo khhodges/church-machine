@@ -10,6 +10,11 @@
 ; Methods:
 ;   1. main \u2014 LOAD Salvation, TPERM check, CALL \u2192 transitions to Navana
 ; ============================================================
+
+capabilities {
+    Salvation E
+}
+
 ; ============================================
 ; Salvation \u2014 First Callable Abstraction
 ; Proves CALL works, transitions to Navana

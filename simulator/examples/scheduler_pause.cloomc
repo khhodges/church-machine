@@ -8,6 +8,11 @@
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8])
 ; ============================================================
+
+capabilities {
+    Scheduler E
+}
+
 ; Methods demonstrated:
 ;   Scheduler.pause(ticks)  — suspend thread for DR1 ticks
 ;   Scheduler.Yield()       — voluntarily yield after waking

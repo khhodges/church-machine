@@ -8,6 +8,12 @@
 ; Language:     Assembly
 ; Dependencies: Scheduler (NS[8]), DijkstraFlag (NS[10])
 ; ============================================================
+
+capabilities {
+    Scheduler E,
+    DijkstraFlag E
+}
+
 ; Methods demonstrated:
 ;   DijkstraFlag.Signal()           — release the semaphore
 ;   Scheduler.Wait(flag_GT)         — block until flag signaled

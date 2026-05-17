@@ -8,6 +8,11 @@
 ; Language:     Assembly
 ; Dependencies: Constants (NS[18])
 ; ============================================================
+
+capabilities {
+    Constants E
+}
+
 ; TWO recommended calling styles are shown here:
 ;
 ;   Style A — two-step (LOAD then CALL dot-notation):

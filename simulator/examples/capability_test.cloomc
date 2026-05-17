@@ -17,6 +17,16 @@
 ;   7. test7_call — CALL Salvation via dot-notation
 ;   8. test8_eloadcall — ELOADCALL fused Load+TPERM+Call
 ; ============================================================
+
+capabilities {
+    Salvation E,
+    Navana E,
+    Mint E,
+    Memory E,
+    LED RW,
+    UART RW
+}
+
 ; ============================================
 ; Church Machine Self-Test
 ; Tests opcodes using boot C-List (12 entries)
