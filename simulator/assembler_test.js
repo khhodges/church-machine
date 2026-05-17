@@ -7259,6 +7259,50 @@ Add a method called Run
         e ? 'colEnd=' + e.colEnd + ' expected=' + (expectedStart + 'frobulate'.length) : 'no error');
 }
 
+// ── SM-COL: Symbolic Math (Ada) compiler errors carry colStart/colEnd ────────
+// Mirrors the LC-COL / HC-COL precision requirement for the Ada front-end.
+// Each test drives compileSymbolic() and checks that the error object carries
+// colStart/colEnd pointing at the offending token within its source line.
+
+// SM-COL-1: undefined variable in a symbolic method — colStart/colEnd point at the variable name.
+{
+    const cc = new CLOOMCCompiler();
+    const bodyLine = '  return ghostVar';
+    const src = 'abstraction T {\n  method compute() {\n' + bodyLine + '\n  }\n}';
+    const result = cc.compileSymbolic(src);
+    const e = result.errors.find(x => x.message && x.message.includes('ghostVar'));
+    assert('SM-COL-1: undefined variable produces an error', e != null);
+    const expectedStart = bodyLine.indexOf('ghostVar');
+    assert('SM-COL-1: colStart points at ghostVar', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart + ' expected=' + expectedStart : 'no error');
+    assert('SM-COL-1: colEnd covers ghostVar', e && e.colEnd === expectedStart + 'ghostVar'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// SM-COL-2: literal out of range in a symbolic method — colStart/colEnd point at the literal.
+{
+    const cc = new CLOOMCCompiler();
+    const bodyLine = '  return 9999999999';
+    const src = 'abstraction T {\n  method compute() {\n' + bodyLine + '\n  }\n}';
+    const result = cc.compileSymbolic(src);
+    const e = result.errors.find(x => x.message && x.message.includes('out of range'));
+    assert('SM-COL-2: out-of-range literal produces an error', e != null);
+    const expectedStart = bodyLine.indexOf('9999999999');
+    assert('SM-COL-2: colStart points at literal', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart + ' expected=' + expectedStart : 'no error');
+    assert('SM-COL-2: colEnd covers literal', e && e.colEnd === expectedStart + '9999999999'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// SM-COL-3: unknown statement in a symbolic method — colStart/colEnd point at the first token.
+{
+    const cc = new CLOOMCCompiler();
+    const bodyLine = '  xyzzy frobulate quux';
+    const src = 'abstraction T {\n  method compute() {\n' + bodyLine + '\n  }\n}';
+    const result = cc.compileSymbolic(src);
+    const e = result.errors.find(x => x.message && x.message.includes('Cannot parse symbolic statement'));
+    assert('SM-COL-3: unknown statement produces an error', e != null);
+    const expectedStart = bodyLine.indexOf('xyzzy');
+    assert('SM-COL-3: colStart points at first token', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart + ' expected=' + expectedStart : 'no error');
+    assert('SM-COL-3: colEnd covers first token', e && e.colEnd === expectedStart + 'xyzzy'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

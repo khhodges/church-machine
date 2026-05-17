@@ -2559,6 +2559,7 @@ class CLOOMCCompiler {
         const constants = [];
         const loopStack = [];
         let currentRawLine = '';
+        let currentLineNum = 0;
 
         for (const param of method.params) {
             const paramIdx = method.params.indexOf(param);
@@ -2590,6 +2591,10 @@ class CLOOMCCompiler {
 
         const getVar = (name) => {
             if (vars[name] !== undefined) return vars[name];
+            // Single-letter identifiers (traditional math variables: A, B, r …)
+            // and V-register aliases (V1, V2 …) are treated as implicit inputs.
+            if (name.length === 1 || /^V\d+$/.test(name)) return allocVar(name);
+            errors.push({ line: currentLineNum, message: `Undefined variable '${name}' — assign it first (e.g. let ${name} = …)`, ...CLOOMCCompiler._tokenCols(currentRawLine, name) });
             return allocVar(name);
         };
 
@@ -2606,7 +2611,7 @@ class CLOOMCCompiler {
 
         const emitLoadConst = (dr, value, lineNum) => {
             if (value > 2147483647 || value < -2147483648) {
-                errors.push({ line: lineNum || 0, message: `Literal ${value} is out of range for a 32-bit Church Machine register (must be between -2147483648 and 2147483647)` });
+                errors.push({ line: lineNum || 0, message: `Literal ${value} is out of range for a 32-bit Church Machine register (must be between -2147483648 and 2147483647)`, ...CLOOMCCompiler._tokenCols(currentRawLine, String(value)) });
                 return;
             }
             if (value < 0) {
@@ -2932,6 +2937,7 @@ class CLOOMCCompiler {
         for (const stmt of method.body) {
             if (stmt.comment) continue;
             const lineNum = stmt.line;
+            currentLineNum = lineNum;
             currentRawLine = stmt.rawLine || stmt.text || '';
             let text = stmt.text.trim();
 
