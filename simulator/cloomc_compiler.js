@@ -892,13 +892,13 @@ class CLOOMCCompiler {
                     if (trimmed === '}') {
                         braceDepth--;
                         if (braceDepth === 0) { i++; break; }
-                        method.body.push({ text: trimmed, lineNum: i });
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
                         i++;
                         continue;
                     }
                     if (trimmed === '{') {
                         braceDepth++;
-                        method.body.push({ text: trimmed, lineNum: i });
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
                         i++;
                         continue;
                     }
@@ -907,10 +907,10 @@ class CLOOMCCompiler {
                         else if (ch === '}') braceDepth--;
                     }
                     if (braceDepth > 0) {
-                        method.body.push({ text: trimmed, lineNum: i });
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
                     } else {
                         const beforeClose = trimmed.replace(/\}$/, '').trim();
-                        if (beforeClose) method.body.push({ text: beforeClose, lineNum: i });
+                        if (beforeClose) method.body.push({ text: beforeClose, lineNum: i, rawLine: lines[i] });
                     }
                     i++;
                 }
@@ -981,7 +981,7 @@ class CLOOMCCompiler {
         for (const ref of labelRefs) {
             const target = labels[ref.label];
             if (target === undefined || target === -1) {
-                errors.push({ line: ref.lineNum, message: `Undefined label: ${ref.label}` });
+                errors.push({ line: ref.lineNum, message: `Undefined label: ${ref.label}`, ...CLOOMCCompiler._tokenCols(ref.rawLine, ref.label) });
             } else {
                 const relOffset = target - ref.addr;
                 code[ref.addr] = (code[ref.addr] & ~0x7FFF) | (relOffset & 0x7FFF);
@@ -1020,7 +1020,7 @@ class CLOOMCCompiler {
         return 0;
     }
 
-    _resolveExpr(expr, code, locals, rom, errors, lineNum, method) {
+    _resolveExpr(expr, code, locals, rom, errors, lineNum, method, rawLine = null) {
         expr = expr.trim();
 
         const numMatch = expr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
@@ -1059,7 +1059,7 @@ class CLOOMCCompiler {
 
         const addMatch = expr.match(/^(\w+)\s*\+\s*(.+)$/);
         if (addMatch) {
-            const leftDR = this._resolveExpr(addMatch[1], code, locals, rom, errors, lineNum, method);
+            const leftDR = this._resolveExpr(addMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const rightExpr = addMatch[2].trim();
             const rightNum = rightExpr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
             if (rightNum) {
@@ -1073,7 +1073,7 @@ class CLOOMCCompiler {
                     return dr;
                 }
             }
-            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
+            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method, rawLine);
             const dr = this._allocTemp(locals);
             code.push(this.encode(this.opcodes.IADD, 14, dr, leftDR, rightDR));
             return dr;
@@ -1081,7 +1081,7 @@ class CLOOMCCompiler {
 
         const subMatch = expr.match(/^(\w+)\s*-\s*(.+)$/);
         if (subMatch) {
-            const leftDR = this._resolveExpr(subMatch[1], code, locals, rom, errors, lineNum, method);
+            const leftDR = this._resolveExpr(subMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const rightExpr = subMatch[2].trim();
             const rightNum = rightExpr.match(/^(0x[0-9a-fA-F]+|\d+)$/);
             if (rightNum) {
@@ -1095,7 +1095,7 @@ class CLOOMCCompiler {
                     return dr;
                 }
             }
-            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
+            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method, rawLine);
             const dr = this._allocTemp(locals);
             code.push(this.encode(this.opcodes.ISUB, 14, dr, leftDR, rightDR));
             return dr;
@@ -1103,9 +1103,9 @@ class CLOOMCCompiler {
 
         const mulMatch = expr.match(/^(\w+)\s*\*\s*(.+)$/);
         if (mulMatch) {
-            const leftDR = this._resolveExpr(mulMatch[1], code, locals, rom, errors, lineNum, method);
+            const leftDR = this._resolveExpr(mulMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const rightExpr = mulMatch[2].trim();
-            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method);
+            const rightDR = this._resolveExpr(rightExpr, code, locals, rom, errors, lineNum, method, rawLine);
             const accDR = this._allocTemp(locals);
             const cntDR = this._allocTemp(locals);
             const oneDR = this._allocTemp(locals);
@@ -1127,7 +1127,7 @@ class CLOOMCCompiler {
 
         const shlMatch = expr.match(/^(\w+)\s*<<\s*(\d+)$/);
         if (shlMatch) {
-            const srcDR = this._resolveExpr(shlMatch[1], code, locals, rom, errors, lineNum, method);
+            const srcDR = this._resolveExpr(shlMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const dr = this._allocTemp(locals);
             code.push(this.encode(this.opcodes.SHL, 14, dr, srcDR, parseInt(shlMatch[2])));
             return dr;
@@ -1136,7 +1136,7 @@ class CLOOMCCompiler {
         // Arithmetic (signed) shift right: x >>s n  — sets imm[5]=1 (ASR mode)
         const asrMatch = expr.match(/^(\w+)\s*>>s\s*(\d+)$/);
         if (asrMatch) {
-            const srcDR = this._resolveExpr(asrMatch[1], code, locals, rom, errors, lineNum, method);
+            const srcDR = this._resolveExpr(asrMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const dr = this._allocTemp(locals);
             const shamt = parseInt(asrMatch[2]) & 0x1F;
             code.push(this.encode(this.opcodes.SHR, 14, dr, srcDR, (1 << 5) | shamt));
@@ -1145,7 +1145,7 @@ class CLOOMCCompiler {
 
         const shrMatch = expr.match(/^(\w+)\s*>>\s*(\d+)$/);
         if (shrMatch) {
-            const srcDR = this._resolveExpr(shrMatch[1], code, locals, rom, errors, lineNum, method);
+            const srcDR = this._resolveExpr(shrMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const dr = this._allocTemp(locals);
             code.push(this.encode(this.opcodes.SHR, 14, dr, srcDR, parseInt(shrMatch[2])));
             return dr;
@@ -1163,7 +1163,7 @@ class CLOOMCCompiler {
 
         const bfextMatch = expr.match(/^bfext\s*\(\s*(\w+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
         if (bfextMatch) {
-            const srcDR = this._resolveExpr(bfextMatch[1], code, locals, rom, errors, lineNum, method);
+            const srcDR = this._resolveExpr(bfextMatch[1], code, locals, rom, errors, lineNum, method, rawLine);
             const pos = parseInt(bfextMatch[2]);
             const width = parseInt(bfextMatch[3]);
             if (width < 1) {
@@ -1180,7 +1180,7 @@ class CLOOMCCompiler {
             return dr;
         }
 
-        errors.push({ line: lineNum, message: `Cannot resolve expression: ${expr}` });
+        errors.push({ line: lineNum, message: `Cannot resolve expression: ${expr}`, ...CLOOMCCompiler._tokenCols(rawLine, expr) });
         return 0;
     }
 
@@ -1190,6 +1190,13 @@ class CLOOMCCompiler {
         if (name === 'CODE' || name === 'CR14') return 14;
         if (name === 'CLIST' || name === 'CR6') return 6;
         return 0;
+    }
+
+    static _tokenCols(rawLine, token) {
+        if (!rawLine || !token) return {};
+        const idx = rawLine.indexOf(token);
+        if (idx < 0) return {};
+        return { colStart: idx, colEnd: idx + token.length };
     }
 
     _compileStatement(stmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method) {
@@ -1202,7 +1209,7 @@ class CLOOMCCompiler {
                 const parts = returnMatch[1].split(',').map(s => s.trim());
                 for (let i = 0; i < parts.length && i + this.DR_ARGS_START <= this.DR_ARGS_END; i++) {
                     const targetDR = i + this.DR_ARGS_START;
-                    const valDR = this._resolveExpr(parts[i], code, locals, rom, errors, stmt.lineNum, method);
+                    const valDR = this._resolveExpr(parts[i], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
                     if (valDR !== targetDR) {
                         code.push(this.encode(this.opcodes.IADD, 14, targetDR, valDR, 0));
                     }
@@ -1217,7 +1224,7 @@ class CLOOMCCompiler {
         if (writeMatch) {
             const crIdx = this._parseCRFull(writeMatch[1]);
             const offset = parseInt(writeMatch[2]) || 0;
-            const valDR = this._resolveExpr(writeMatch[3], code, locals, rom, errors, stmt.lineNum, method);
+            const valDR = this._resolveExpr(writeMatch[3], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `DWRITE CR${crIdx}, ${offset}` });
             code.push(this.encode(this.opcodes.DWRITE, 14, valDR, crIdx, offset & 0x7FFF));
             return;
@@ -1225,8 +1232,8 @@ class CLOOMCCompiler {
 
         const bfinsMatch = text.match(/^bfins\s*\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
         if (bfinsMatch) {
-            const dstDR = this._resolveExpr(bfinsMatch[1], code, locals, rom, errors, stmt.lineNum, method);
-            const valDR = this._resolveExpr(bfinsMatch[2], code, locals, rom, errors, stmt.lineNum, method);
+            const dstDR = this._resolveExpr(bfinsMatch[1], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
+            const valDR = this._resolveExpr(bfinsMatch[2], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             const pos = parseInt(bfinsMatch[3]);
             const width = parseInt(bfinsMatch[4]);
             if (width < 1) {
@@ -1273,7 +1280,7 @@ class CLOOMCCompiler {
                 const args = argStr.split(',').map(s => s.trim()).filter(Boolean);
                 for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
                     const targetDR = a + this.DR_ARGS_START;
-                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method);
+                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
                     if (argDR !== targetDR) {
                         code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                     }
@@ -1292,7 +1299,7 @@ class CLOOMCCompiler {
                 const args = argStr.split(',').map(s => s.trim()).filter(Boolean);
                 for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
                     const targetDR = a + this.DR_ARGS_START;
-                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method);
+                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
                     if (argDR !== targetDR) {
                         code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                     }
@@ -1321,7 +1328,7 @@ class CLOOMCCompiler {
 
             const clistOffset = rom[absName];
             if (clistOffset === undefined) {
-                errors.push({ line: stmt.lineNum, message: `Unknown abstraction '${callMatch[2]}' — not in capabilities list. Available: ${Object.keys(rom).join(', ')}` });
+                errors.push({ line: stmt.lineNum, message: `Unknown abstraction '${callMatch[2]}' — not in capabilities list. Available: ${Object.keys(rom).join(', ')}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2]) });
                 return;
             }
 
@@ -1329,7 +1336,7 @@ class CLOOMCCompiler {
                 const args = argStr.split(',').map(s => s.trim());
                 for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
                     const targetDR = a + this.DR_ARGS_START;
-                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method);
+                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
                     if (argDR !== targetDR) {
                         code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
                     }
@@ -1341,12 +1348,12 @@ class CLOOMCCompiler {
             // Unresolved method names produce a compile error to prevent silent misdispatch.
             const convEntry = this.methodConventions[absName];
             if (!convEntry) {
-                errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callMatch[2]}'; cannot resolve '${methodName}'. Ensure the abstraction declares methods before compiling.` });
+                errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callMatch[2]}'; cannot resolve '${methodName}'. Ensure the abstraction declares methods before compiling.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2]) });
                 return;
             }
             if (convEntry[methodName] === undefined) {
                 const known = Object.keys(convEntry).join(', ');
-                errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callMatch[2]}'. Known methods: ${known}` });
+                errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callMatch[2]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName) });
                 return;
             }
             const rawEntry = convEntry[methodName];
@@ -1396,7 +1403,7 @@ class CLOOMCCompiler {
             const varName = assignMatch[1];
             const expr = assignMatch[2].trim();
             const dr = this._allocLocal(varName, locals, errors, stmt.lineNum);
-            const valDR = this._resolveExpr(expr, code, locals, rom, errors, stmt.lineNum, method);
+            const valDR = this._resolveExpr(expr, code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             if (valDR !== dr) {
                 manifest.push({ src: stmt.lineNum, addr: code.length, desc: `${varName} = DR${valDR}` });
                 code.push(this.encode(this.opcodes.IADD, 14, dr, valDR, 0));
@@ -1408,8 +1415,8 @@ class CLOOMCCompiler {
 
         const ifMatch = text.match(/^if\s*\(\s*(\w+)\s*(==|!=|<|>|<=|>=)\s*(\w+)\s*\)\s*\{$/);
         if (ifMatch) {
-            const leftDR = this._resolveExpr(ifMatch[1], code, locals, rom, errors, stmt.lineNum, method);
-            const rightDR = this._resolveExpr(ifMatch[3], code, locals, rom, errors, stmt.lineNum, method);
+            const leftDR = this._resolveExpr(ifMatch[1], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
+            const rightDR = this._resolveExpr(ifMatch[3], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             code.push(this.encode(this.opcodes.MCMP, 14, leftDR, rightDR, 0));
 
             let branchCond;
@@ -1480,8 +1487,8 @@ class CLOOMCCompiler {
         if (whileMatch) {
             const loopStart = code.length;
             labels[`__while_start_${loopStart}`] = loopStart;
-            const leftDR = this._resolveExpr(whileMatch[1], code, locals, rom, errors, stmt.lineNum, method);
-            const rightDR = this._resolveExpr(whileMatch[3], code, locals, rom, errors, stmt.lineNum, method);
+            const leftDR = this._resolveExpr(whileMatch[1], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
+            const rightDR = this._resolveExpr(whileMatch[3], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
             code.push(this.encode(this.opcodes.MCMP, 14, leftDR, rightDR, 0));
 
             let branchCond;
@@ -1508,12 +1515,13 @@ class CLOOMCCompiler {
         if (gotoMatch) {
             const branchAddr = code.length;
             code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, 0));
-            labelRefs.push({ addr: branchAddr, label: gotoMatch[1], lineNum: stmt.lineNum });
+            labelRefs.push({ addr: branchAddr, label: gotoMatch[1], lineNum: stmt.lineNum, rawLine: stmt.rawLine });
             manifest.push({ src: stmt.lineNum, addr: branchAddr, desc: `goto ${gotoMatch[1]}` });
             return;
         }
 
-        errors.push({ line: stmt.lineNum, message: `Cannot compile statement: ${text}` });
+        const _firstToken = text.split(/\s+/)[0];
+        errors.push({ line: stmt.lineNum, message: `Cannot compile statement: ${text}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, _firstToken) });
     }
 
     compileHaskell(source, capabilities) {

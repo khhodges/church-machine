@@ -6852,6 +6852,72 @@ abstraction VlcTest {
     assert('CR-COL-11: colEnd covers label name', e && e.colEnd === expectedStart + 'myLabel'.length, e ? 'colEnd=' + e.colEnd : 'no error');
 }
 
+// ── CC-COL: compiler error objects carry colStart/colEnd ─────────────────────
+// Verifies that CLOOMCCompiler errors on lines with identifiable tokens carry
+// correct column ranges so that _highlightAsmErrorLines can underline exactly
+// the right token — same precision as assembler errors.
+
+// CC-COL-1: unknown variable in assignment — colStart/colEnd point at the variable.
+{
+    const cc = new CLOOMCCompiler();
+    const src = '    x = unknownVar';
+    const result = cc.compile('abstraction T {\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('unknownVar'));
+    assert('CC-COL-1: unknown variable produces an error', e != null);
+    const expectedStart = src.indexOf('unknownVar');
+    assert('CC-COL-1: colStart points at unknownVar', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-1: colEnd covers unknownVar', e && e.colEnd === expectedStart + 'unknownVar'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// CC-COL-2: cannot compile statement — colStart/colEnd point at the first token.
+{
+    const cc = new CLOOMCCompiler();
+    const src = '    BADSTATEMENT x y z';
+    const result = cc.compile('abstraction T {\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('Cannot compile statement'));
+    assert('CC-COL-2: bad statement produces an error', e != null);
+    const expectedStart = src.indexOf('BADSTATEMENT');
+    assert('CC-COL-2: colStart points at first token', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-2: colEnd covers first token', e && e.colEnd === expectedStart + 'BADSTATEMENT'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// CC-COL-3: undefined goto label — colStart/colEnd point at the label name.
+{
+    const cc = new CLOOMCCompiler();
+    const src = '    goto missingLabel';
+    const result = cc.compile('abstraction T {\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('Undefined label') && x.message.includes('missingLabel'));
+    assert('CC-COL-3: undefined goto label produces an error', e != null);
+    const expectedStart = src.indexOf('missingLabel');
+    assert('CC-COL-3: colStart points at label', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-3: colEnd covers label name', e && e.colEnd === expectedStart + 'missingLabel'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// CC-COL-4: unknown abstraction in call() — colStart/colEnd point at the abstraction name.
+{
+    const cc = new CLOOMCCompiler();
+    const src = '    call(GhostAbs.Method())';
+    const result = cc.compile('abstraction T {\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('GhostAbs'));
+    assert('CC-COL-4: unknown abstraction produces an error', e != null);
+    const expectedStart = src.indexOf('GhostAbs');
+    assert('CC-COL-4: colStart points at abstraction name', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-4: colEnd covers abstraction name', e && e.colEnd === expectedStart + 'GhostAbs'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
+// CC-COL-5: unknown method in call() — colStart/colEnd point at the method name.
+{
+    const cc = new CLOOMCCompiler();
+    cc.methodConventions['MATH'] = { Add: 0, Sub: 1 };
+    const src = '    call(Math.UnknownOp())';
+    const result = cc.compile('abstraction T {\n  capabilities { Math }\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('UnknownOp'));
+    assert('CC-COL-5: unknown method produces an error', e != null);
+    const expectedStart = src.indexOf('UnknownOp');
+    assert('CC-COL-5: colStart points at method name', e && e.colStart === expectedStart, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-5: colEnd covers method name', e && e.colEnd === expectedStart + 'UnknownOp'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
