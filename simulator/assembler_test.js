@@ -6606,6 +6606,10 @@ abstraction VlcTest {
                 assert(`EX-OOB-JS-LIT: ${label} error mentions "out of range"`,
                     hasRangeMsg,
                     result.errors.map(e => e.message).join('; '));
+                const hasNonZeroLine = result.errors.some(e => e.line > 0);
+                assert(`EX-OOB-JS-LIT: ${label} error carries a non-zero line number`,
+                    hasNonZeroLine,
+                    result.errors.map(e => 'line=' + e.line + ': ' + e.message).join('; '));
             }
         }
 
@@ -6634,6 +6638,10 @@ abstraction VlcTest {
                 assert(`EX-OOB-HS-LIT: ${label} error mentions "out of range"`,
                     hasRangeMsg,
                     result.errors.map(e => e.message).join('; '));
+                const hasNonZeroLine = result.errors.some(e => e.line > 0);
+                assert(`EX-OOB-HS-LIT: ${label} error carries a non-zero line number`,
+                    hasNonZeroLine,
+                    result.errors.map(e => 'line=' + e.line + ': ' + e.message).join('; '));
             }
         }
 
