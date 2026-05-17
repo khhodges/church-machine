@@ -23,9 +23,9 @@ PP250 was accessed through a hardware-validated capability key, a descriptor; no
 
 The Church Machine is the PP250's direct and architectural complete successor. The lineage is not metaphorical — it is architectural. The key PP250 designer is also after half a century of binary computer failures the Church Machine designer.
 
-### What the Church Machine Inherits
+### What the Church Machine has Perfected
 
-Three things come directly from the PP250:
+Three things about flawless computation inherited from the PP250:
 
 1. **The capability model.** Every memory access is mediated by a
    hardware-validated token. There is no ambient authority; there is no
