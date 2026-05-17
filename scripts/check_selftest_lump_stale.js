@@ -194,12 +194,17 @@ if (!fs.existsSync(MANIFEST)) {
         manifest = null;
     }
     if (manifest !== null) {
-        const entry = manifest.find(e => e.abstraction === 'PostFlashSelftest');
-        if (!entry) {
+        const entries = manifest.filter(e => e.abstraction === 'PostFlashSelftest');
+        if (entries.length === 0) {
             console.error('\nFAIL: manifest.json has no PostFlashSelftest entry.');
+            console.error('      Run: node scripts/build_selftest_lump.js');
             stale = true;
-        } else if (entry.token !== token) {
-            console.error(`\nFAIL: manifest.json PostFlashSelftest entry has token "${entry.token}" but expected "${token}".`);
+        } else if (entries.length > 1) {
+            console.error(`\nFAIL: manifest.json has ${entries.length} PostFlashSelftest entries — expected exactly one.`);
+            console.error('      Tokens found: ' + entries.map(e => e.token).join(', '));
+            stale = true;
+        } else if (entries[0].token !== token) {
+            console.error(`\nFAIL: manifest.json PostFlashSelftest entry has token "${entries[0].token}" but expected "${token}".`);
             console.error('      Run: node scripts/build_selftest_lump.js');
             stale = true;
         } else {
