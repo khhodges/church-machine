@@ -7236,6 +7236,29 @@ Add a method called Run
     assert('LC-COL-2: colEnd covers literal', e && e.colEnd === expectedStart + '9999999999'.length, e ? 'colEnd=' + e.colEnd : 'no error');
 }
 
+// EN-COL-4: Unknown statement in block form — colStart/colEnd point at the
+//           first word of the unrecognised line.
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    run():
+        frobulate the thing
+}`;
+    const result = cc.compileEnglish(src);
+    const e = result.errors.find(x => x.message.includes('frobulate'));
+    assert('EN-COL-4: "Cannot understand" error is produced', e != null,
+        'errors: ' + result.errors.map(x => x.message).join('; '));
+    const rawLine = '        frobulate the thing';
+    const expectedStart = rawLine.indexOf('frobulate');
+    assert('EN-COL-4: colStart points at "frobulate"',
+        e && e.colStart === expectedStart,
+        e ? 'colStart=' + e.colStart + ' expected=' + expectedStart : 'no error');
+    assert('EN-COL-4: colEnd covers "frobulate"',
+        e && e.colEnd === expectedStart + 'frobulate'.length,
+        e ? 'colEnd=' + e.colEnd + ' expected=' + (expectedStart + 'frobulate'.length) : 'no error');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

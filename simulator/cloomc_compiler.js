@@ -3291,6 +3291,9 @@ class CLOOMCCompiler {
                 for (const s of stmts) {
                     currentMethod.body.push({ text: s, lineNum: i, rawLine: lines[i] });
                 }
+            } else {
+                const _firstWord = t.split(/\s+/)[0];
+                errors.push({ line: i + 1, message: `Cannot understand: "${t}"`, ...CLOOMCCompiler._tokenCols(lines[i], _firstWord) });
             }
         }
 
