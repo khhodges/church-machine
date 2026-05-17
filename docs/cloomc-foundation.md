@@ -18,17 +18,10 @@ This document records the design session held in May 2026 between the original P
 
 ### The First Immersive Capability Computer (PP250)
 
-The PP250 (Plessey UK, 1972) was the first immersive capability computer to
-be sucessfully fielded commercially. It operated for two decades without a single
-security breach attributable to the capability model. Every object in the
-PP250 was accessed through a hardware-validated descriptor; no program could
-reach memory it did not hold a descriptor for. The system survived in
-production long enough to accumulate the kind of operational evidence that
-turns a theoretical model into a proven engineering discipline.
+The PP250 (Plessey UK, 1972) was the first immersive capability computer to be sucessfully fielded commercially. It operated for two decades without a single reported security breach to the capability model. Every object in the
+PP250 was accessed through a hardware-validated capability key, a descriptor; no program could reach memory it did not hold a descriptor for. The system survived in production and served in the first Gulf War. It accumulated the necessary operational evidence to turn a theoretical model into a proven if incomplete engineering discipline.
 
-The Church Machine is the PP250's direct successor. The lineage is not
-metaphorical — it is architectural. The PP250 designer is the Church Machine
-designer.
+The Church Machine is the PP250's direct and architectural complete successor. The lineage is not metaphorical — it is architectural. The key PP250 designer is also after half a century of binary computer failures the Church Machine designer.
 
 ### What the Church Machine Inherits
 
@@ -37,15 +30,12 @@ Three things come directly from the PP250:
 1. **The capability model.** Every memory access is mediated by a
    hardware-validated token. There is no ambient authority; there is no
    privileged mode that bypasses the check. If you do not hold a valid
-   token, you cannot touch the memory.
+   token, you cannot touch the memory. These laws apply to Boot at the
+   instant power is applied
 
-2. **Hardware-enforced segment descriptors.** The NS table is the direct
-   descendant of the PP250's segment table. Each entry describes a region
-   of memory — its location, its size, and its current version. The
-   hardware recomputes the integrity check on every access and rejects any
-   entry that has been tampered with.
+3. **Hardware-enforced capability keys**, promoted to the digital gold of international cyberspace. The NS table is the direct descendant of the PP250's segment table. Each entry describes a region of memory — its location, its size, and its current version. The hardware recomputes the integrity check on every access and rejects anyentry that has been tampered with.
 
-3. **The principle that capabilities ARE the IDE.** In the PP250 the
+4. **The principle that capabilities ARE the IDE.** In the PP250 the
    descriptor table was the system map. In the Church Machine the Namespace
    table, viewed through the IDE, is the complete, live description of
    everything the running system can reach. There is no separate registry,
