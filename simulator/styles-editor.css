@@ -1,3 +1,22 @@
+/* ── Editor code name label (shown next to language dropdown) ────────────── */
+.editor-code-name {
+    display: inline-block;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--church-gold, #C89B3C);
+    opacity: 0.9;
+    vertical-align: middle;
+    padding: 0 4px;
+    letter-spacing: 0.01em;
+}
+.editor-code-name:empty {
+    display: none;
+}
+
 /* ── POLA-rewritten line gutter marker ───────────────────────────────────── */
 #lineNumbers span.line-num-pola {
     color: #f59e0b;

@@ -156,6 +156,7 @@ function deleteUserTab(id) {
     if (activeUserTabId === id) {
         activeUserTabId = null;
         userTabDirty = false;
+        _updateEditorCodeName('');
         const editor = document.getElementById('asmEditor');
         if (editor) editor.value = '';
         const sel = document.getElementById('langSelector');
@@ -174,6 +175,7 @@ function selectUserTab(id) {
     if (!tab) return;
     activeUserTabId = id;
     userTabDirty = false;
+    _updateEditorCodeName(tab.name);
     // Leaving catalog edit context when user picks a personal tab
     window._pseudoEditContext = null;
     const editor = document.getElementById('asmEditor');

@@ -6819,6 +6819,8 @@ BRANCH led_on             ; loop forever
         document.querySelectorAll('.example-tab').forEach(t => {
             t.classList.toggle('active', t.dataset.example === name);
         });
+        const activeBtn = document.querySelector(`.example-tab[data-example="${name}"]`);
+        _updateEditorCodeName(activeBtn ? activeBtn.textContent.trim() : name);
         const sel = document.getElementById('langSelector');
         if (sel) sel.value = 'assembly';
         if (typeof historySetCodeExample === 'function') historySetCodeExample(name);
@@ -8607,6 +8609,11 @@ function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function _updateEditorCodeName(name) {
+    const el = document.getElementById('editorCodeName');
+    if (el) el.textContent = name || '';
+}
+
 function saveEditorState() {
     const editor = document.getElementById('asmEditor');
     if (editor) {
@@ -8636,6 +8643,14 @@ function loadEditorState() {
         onLangChange(false);
     }
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+    // Restore code name label from active user tab or active example tab
+    if (typeof activeUserTabId !== 'undefined' && activeUserTabId) {
+        const tab = (typeof userTabs !== 'undefined') && userTabs.find(t => t.id === activeUserTabId);
+        if (tab) _updateEditorCodeName(tab.name);
+    } else {
+        const activeEx = document.querySelector('.example-tab.active');
+        if (activeEx) _updateEditorCodeName(activeEx.textContent.trim());
+    }
 }
 
 function showCreateNamespace() {
