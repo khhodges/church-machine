@@ -8,8 +8,9 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node simulator/assembler_test.js && node scripts/check-capabilities-blocks.js",
     "test:e2e": "npx playwright test",
+    "check:capabilities": "node scripts/check-capabilities-blocks.js",
     "check:selftest-lump": "node scripts/check_selftest_lump_stale.js"
   },
   "keywords": [],

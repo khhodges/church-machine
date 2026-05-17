@@ -133,12 +133,12 @@ args = "python -m ctmm_cap_amaranth.testbench && python -m hardware.test_mwin_se
 name = "assembler-tests"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/assembler_test.js"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm test"
 
 [[workflows.workflow]]
 name = "lump-consistency"
