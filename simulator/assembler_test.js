@@ -6918,6 +6918,29 @@ abstraction VlcTest {
     assert('CC-COL-5: colEnd covers method name', e && e.colEnd === expectedStart + 'UnknownOp'.length, e ? 'colEnd=' + e.colEnd : 'no error');
 }
 
+// CC-COL-6: aliased token — abstraction name is identical to the result variable.
+// The old indexOf found the first occurrence (the result variable); the fix must
+// land colStart on the abstraction name inside call(), not the earlier occurrence.
+{
+    const cc = new CLOOMCCompiler();
+    // "Math" appears twice on the same raw line: first as the result variable,
+    // then as the abstraction name inside call().  No methodConventions are
+    // registered for MATH, so the "No method conventions registered" error fires
+    // and must underline the second occurrence.
+    const src = '    Math = call(Math.Add())';
+    const result = cc.compile('abstraction T {\n  capabilities { Math }\n  method run() {\n' + src + '\n  }\n}');
+    const e = result.errors.find(x => x.message.includes('No method conventions'));
+    assert('CC-COL-6: aliased token — error produced', e != null);
+    const firstOccurrence = src.indexOf('Math');                      // result-var, wrong target
+    const absOccurrence   = src.indexOf('Math', src.indexOf('call(') + 'call('.length); // correct
+    assert('CC-COL-6: colStart does not land on the earlier result-variable occurrence',
+        e && e.colStart !== firstOccurrence, e ? 'colStart=' + e.colStart : 'no error');
+    assert('CC-COL-6: colStart lands on the abstraction name inside call()',
+        e && e.colStart === absOccurrence, e ? 'colStart=' + e.colStart + ' expected=' + absOccurrence : 'no error');
+    assert('CC-COL-6: colEnd covers the abstraction name',
+        e && e.colEnd === absOccurrence + 'Math'.length, e ? 'colEnd=' + e.colEnd : 'no error');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);

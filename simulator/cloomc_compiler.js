@@ -1192,9 +1192,9 @@ class CLOOMCCompiler {
         return 0;
     }
 
-    static _tokenCols(rawLine, token) {
+    static _tokenCols(rawLine, token, startOffset = 0) {
         if (!rawLine || !token) return {};
-        const idx = rawLine.indexOf(token);
+        const idx = rawLine.indexOf(token, startOffset);
         if (idx < 0) return {};
         return { colStart: idx, colEnd: idx + token.length };
     }
@@ -1319,16 +1319,23 @@ class CLOOMCCompiler {
             return;
         }
 
-        const callMatch = text.match(/^(?:(?:var|let|const)\s+)?(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/);
+        const _callRegex = /^(?:(?:var|let|const)\s+)?(?:(\w+)\s*=\s*)?call\s*\(\s*(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)\s*\)$/d;
+        const callMatch = _callRegex.exec(text);
         if (callMatch) {
             const resultVar = callMatch[1] || null;
             const absName = callMatch[2].toUpperCase();
             const methodName = callMatch[3];
             const argStr = callMatch[4];
 
+            // Compute the leading-whitespace offset so that positions from the
+            // trimmed `text` can be mapped back to columns in the raw source line.
+            const _leadingWS = stmt.rawLine ? stmt.rawLine.length - stmt.rawLine.trimStart().length : 0;
+            const _absNameOffset  = _leadingWS + callMatch.indices[2][0];
+            const _methodOffset   = _leadingWS + callMatch.indices[3][0];
+
             const clistOffset = rom[absName];
             if (clistOffset === undefined) {
-                errors.push({ line: stmt.lineNum, message: `Unknown abstraction '${callMatch[2]}' — not in capabilities list. Available: ${Object.keys(rom).join(', ')}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2]) });
+                errors.push({ line: stmt.lineNum, message: `Unknown abstraction '${callMatch[2]}' — not in capabilities list. Available: ${Object.keys(rom).join(', ')}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2], _absNameOffset) });
                 return;
             }
 
@@ -1348,12 +1355,12 @@ class CLOOMCCompiler {
             // Unresolved method names produce a compile error to prevent silent misdispatch.
             const convEntry = this.methodConventions[absName];
             if (!convEntry) {
-                errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callMatch[2]}'; cannot resolve '${methodName}'. Ensure the abstraction declares methods before compiling.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2]) });
+                errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${callMatch[2]}'; cannot resolve '${methodName}'. Ensure the abstraction declares methods before compiling.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, callMatch[2], _absNameOffset) });
                 return;
             }
             if (convEntry[methodName] === undefined) {
                 const known = Object.keys(convEntry).join(', ');
-                errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callMatch[2]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName) });
+                errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${callMatch[2]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName, _methodOffset) });
                 return;
             }
             const rawEntry = convEntry[methodName];
