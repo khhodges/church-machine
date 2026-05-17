@@ -234,6 +234,13 @@ function _getSyntaxSuggestion(msg) {
             example: '/* JavaScript / CLOOMC++ */\nabstraction MyIdea {\n    method DoSomething() {\n        Write 1 to the result\n    }\n}'
         };
     }
+    if (/cannot understand/i.test(msg)) {
+        return {
+            title: 'Unrecognised English statement',
+            body: 'The underlined word starts a statement the English compiler doesn\'t recognise. Try one of the forms below, or switch to the Reference tab for the full vocabulary.',
+            example: '-- Sentence form:\nSet result to x plus y\nIf x is greater than y:\n  Return x\nReturn the result\n\n-- Block form:\nMyMethod(x, y):\n    set result to x plus y\n    return result'
+        };
+    }
     if (/Expected a capability register like CR0/i.test(msg)) {
         return {
             title: 'Expected a capability register',
@@ -384,7 +391,8 @@ function _highlightAsmErrorLines(errors) {
             var colStart = 0, colEnd = 0;
 
             if (e.colStart !== undefined && e.colEnd !== undefined) {
-                // Assembler-supplied precise column range — use directly.
+                // Compiler/assembler-supplied precise column range (assembly, English,
+                // JavaScript, Haskell, Symbolic Math, Lambda Calculus) — use directly.
                 colStart = e.colStart;
                 colEnd   = e.colEnd;
             } else {

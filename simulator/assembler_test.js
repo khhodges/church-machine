@@ -7303,6 +7303,47 @@ Add a method called Run
     assert('SM-COL-3: colEnd covers first token', e && e.colEnd === expectedStart + 'xyzzy'.length, e ? 'colEnd=' + e.colEnd : 'no error');
 }
 
+// EN-COL-5: Multiple unrecognised block-form statements — each error carries
+//           its own colStart/colEnd pointing only at the bad keyword, not the
+//           whole statement.  This verifies that the squiggle renderer will draw
+//           a narrow underline (word-width) rather than a full-line underline for
+//           every offending token independently (task-1338).
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    run():
+        wiggle the thing
+        wobble with value
+}`;
+    const result = cc.compileEnglish(src);
+    const eWiggle = result.errors.find(x => x.message.includes('wiggle'));
+    const eWobble = result.errors.find(x => x.message.includes('wobble'));
+    assert('EN-COL-5: "wiggle" error is produced', eWiggle != null,
+        'errors: ' + result.errors.map(x => x.message).join('; '));
+    assert('EN-COL-5: "wobble" error is produced', eWobble != null,
+        'errors: ' + result.errors.map(x => x.message).join('; '));
+    const rawWiggle = '        wiggle the thing';
+    const rawWobble = '        wobble with value';
+    const wsWiggle = rawWiggle.indexOf('wiggle');
+    const wsWobble = rawWobble.indexOf('wobble');
+    assert('EN-COL-5: "wiggle" colStart points at keyword (not start of line)',
+        eWiggle && eWiggle.colStart === wsWiggle,
+        eWiggle ? 'colStart=' + eWiggle.colStart + ' expected=' + wsWiggle : 'no error');
+    assert('EN-COL-5: "wiggle" colEnd covers only the keyword, not the full statement',
+        eWiggle && eWiggle.colEnd === wsWiggle + 'wiggle'.length,
+        eWiggle ? 'colEnd=' + eWiggle.colEnd + ' expected=' + (wsWiggle + 'wiggle'.length) : 'no error');
+    assert('EN-COL-5: "wobble" colStart points at keyword',
+        eWobble && eWobble.colStart === wsWobble,
+        eWobble ? 'colStart=' + eWobble.colStart + ' expected=' + wsWobble : 'no error');
+    assert('EN-COL-5: "wobble" colEnd covers only the keyword',
+        eWobble && eWobble.colEnd === wsWobble + 'wobble'.length,
+        eWobble ? 'colEnd=' + eWobble.colEnd + ' expected=' + (wsWobble + 'wobble'.length) : 'no error');
+    assert('EN-COL-5: colEnd < full line length (narrow underline, not whole-line)',
+        eWiggle && eWiggle.colEnd < rawWiggle.length,
+        eWiggle ? 'colEnd=' + eWiggle.colEnd + ' lineLen=' + rawWiggle.length : 'no error');
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
