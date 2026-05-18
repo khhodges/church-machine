@@ -1358,6 +1358,7 @@ async function _saveLumpMeta(token, metaId) {
         if (!resp.ok) throw new Error(result.error || `HTTP ${resp.status}`);
         const lump = _lumpsCache.find(l => l.token === token);
         if (lump) { lump.author = author; lump.version = version; }
+        if (typeof _refreshLumpPickerOption === 'function') _refreshLumpPickerOption(token);
         if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = 'var(--accent-green, #4caf50)'; }
         if (saveBtn) saveBtn.disabled = false;
         const displayEl = document.getElementById(metaId + '_display');
@@ -2835,7 +2836,9 @@ function deleteLump(token) {
                 const contentEl = document.getElementById('lumpsDetailContent');
                 if (titleEl) titleEl.textContent = 'Select a lump';
                 if (contentEl) contentEl.innerHTML = '<div class="lumps-placeholder">Lump deleted.</div>';
-                renderLumps();
+                renderLumps().then(() => {
+                    if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel(_selectedLumpToken || '');
+                });
                 appendOutput(`Deleted lump 0x${token}`, 'info');
             } else {
                 appendOutput(`Delete failed: ${resp.error || 'unknown error'}`, 'error');

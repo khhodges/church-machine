@@ -677,6 +677,36 @@ function _updateLumpViewingLabel(token) {
     el.style.display = '';
 }
 
+// Refreshes the text of a single picker <option> after an in-place metadata
+// edit (e.g. version or pet-name change), without triggering a full re-render.
+// Also re-syncs the Viewing label if this token is currently selected.
+function _refreshLumpPickerOption(token) {
+    if (!token || !_lumpsCache) return;
+    const lump = _lumpsCache.find(l => l.token === token);
+    if (!lump) return;
+    const sel = document.getElementById('lumpPickerSelect');
+    if (!sel) return;
+    const opt = sel.querySelector(`option[value="${token}"]`);
+    if (!opt) return;
+    const lt      = (lump.lump_type    || '').toLowerCase();
+    const ct      = (lump.content_type || '').toLowerCase();
+    const typ     = lump.typ;
+    const isFloat = (lump.ns_slot === null || lump.ns_slot === undefined);
+    const badge   = lt === 'boot'                     ? '[BOOT]'
+                  : lt === 'namespace' || typ === 10  ? '[NS]'
+                  : ct === 'outform'   || typ === 3   ? '[OTF]'
+                  : ct === 'thread'    || typ === 2   ? '[THR]'
+                  : ct === 'inform'                   ? '[INF]'
+                  : isFloat && lt !== 'boot'          ? '[SAVED]'
+                  : '';
+    const nsSlot = !isFloat ? `NS ${lump.ns_slot}` : '';
+    const ver    = lump.version ? `v${lump.version}` : '';
+    const size   = lump.lump_size ? `${lump.lump_size}w` : '';
+    const name   = lump.abstraction || 'Unknown';
+    opt.textContent = [name, ver, badge, nsSlot, size].filter(Boolean).join('  ');
+    if (_selectedLumpToken === token) _updateLumpViewingLabel(token);
+}
+
 // Returns a sorted copy of the lumps array according to _lumpSortOrder.
 function _lumpsSorted(lumps) {
     const arr = lumps.slice();
