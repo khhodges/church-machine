@@ -113,6 +113,40 @@
     border-bottom: 1px solid rgba(100, 160, 255, 0.08);
 }
 
+.lump-hex-diff-changed {
+    background: rgba(200, 140, 20, 0.28) !important;
+    color: #f5c842 !important;
+    outline: 1px solid rgba(200, 140, 20, 0.5);
+    outline-offset: -1px;
+}
+
+.lump-hex-diff-summary {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+
+.lump-hex-diff-summary--changed {
+    background: rgba(200, 140, 20, 0.18);
+    color: #f5c842;
+    border: 1px solid rgba(200, 140, 20, 0.4);
+}
+
+.lump-hex-diff-summary--none {
+    background: rgba(60, 180, 100, 0.12);
+    color: #6ee78a;
+    border: 1px solid rgba(60, 180, 100, 0.3);
+}
+
+.lump-hex-diff-summary--warn {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 .lump-delete-btn {
     background: rgba(160, 30, 30, 0.5);
     color: #ff9999;

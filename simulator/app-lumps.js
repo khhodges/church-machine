@@ -1376,15 +1376,42 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
     };
     previewEl.innerHTML = `<div class="lump-hex-loading">Loading v${version} binary\u2026</div>`;
     try {
-        const resp = await fetch(`/api/lumps/${token}/words/${version}`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        const [archResp, curResp] = await Promise.all([
+            fetch(`/api/lumps/${token}/words/${version}`),
+            fetch(`/api/lump/${token}/words`)
+        ]);
+        if (!archResp.ok) throw new Error(`HTTP ${archResp.status}`);
+        const data = await archResp.json();
         const words = data.words || [];
         const numWords = words.length;
         if (!numWords) throw new Error('Empty lump');
+
+        let curWords = [];
+        let curFetchFailed = false;
+        if (curResp.ok) {
+            const curData = await curResp.json();
+            curWords = curData.words || [];
+        } else {
+            curFetchFailed = true;
+        }
+
+        let diffCount = 0;
+        for (let i = 0; i < numWords; i++) {
+            const a = words[i] >>> 0;
+            const b = i < curWords.length ? (curWords[i] >>> 0) : null;
+            if (a !== b) diffCount++;
+        }
+
         const COLS = 8;
         const rowCount = Math.ceil(numWords / COLS);
-        let t = `<div class="lump-detail-section"><div class="lump-section-title">Hex Preview \u2014 v${version}</div>`;
+        let t = `<div class="lump-detail-section"><div class="lump-section-title">Hex Diff \u2014 v${version} vs current</div>`;
+        if (curFetchFailed) {
+            t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--warn">Could not load current version \u2014 diff unavailable; showing archived words only</div>`;
+        } else if (diffCount === 0) {
+            t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--none">Identical to current version \u2014 no words changed</div>`;
+        } else {
+            t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--changed">${diffCount} word${diffCount === 1 ? '' : 's'} changed</div>`;
+        }
         t += '<table class="lump-hex-table lump-hex-table-wide"><thead><tr><th>Addr</th>';
         for (let c = 0; c < COLS; c++) t += `<th>+${c}</th>`;
         t += '<th>Pack4 ASCII</th></tr></thead><tbody>';
@@ -1392,14 +1419,18 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk) {
             const baseIdx  = row * COLS;
             const baseAddr = (baseIdx * 4).toString(16).toUpperCase().padStart(6, '0');
             let rowHex = '', rowAsc = '', rowClass = '';
-            if (baseIdx === 0)                          rowClass = 'lump-hex-hdr-row';
-            else if (cc > 0 && baseIdx >= lumpSize - cc) rowClass = 'lump-hex-clist-row';
-            else if (baseIdx >= cw + 1)                  rowClass = 'lump-hex-pad-row';
+            if (baseIdx === 0)                            rowClass = 'lump-hex-hdr-row';
+            else if (cc > 0 && baseIdx >= lumpSize - cc)  rowClass = 'lump-hex-clist-row';
+            else if (baseIdx >= cw + 1)                    rowClass = 'lump-hex-pad-row';
             for (let c = 0; c < COLS; c++) {
                 const i = baseIdx + c;
                 if (i < numWords) {
-                    rowHex += `<td>${hexw(words[i])}</td>`;
-                    rowAsc += pack4ascii(words[i]);
+                    const archVal = words[i] >>> 0;
+                    const curVal  = i < curWords.length ? (curWords[i] >>> 0) : null;
+                    const changed = !curFetchFailed && (curVal === null || archVal !== curVal);
+                    const cellClass = changed ? ' class="lump-hex-diff-changed"' : '';
+                    rowHex += `<td${cellClass}>${hexw(archVal)}</td>`;
+                    rowAsc += pack4ascii(archVal);
                 } else {
                     rowHex += '<td class="lump-hex-empty"></td>';
                 }
