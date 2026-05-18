@@ -1400,6 +1400,7 @@ def switch_lifecycle_html():
 BOOK_CHAPTERS = [
     ("Getting Started", [
         "quick-start.md",
+        "cloomc-foundation.md",
         "prologue.md",
         "contributing.md",
     ]),
