@@ -414,7 +414,7 @@ def _load_lump_catalog():
     floating = []
     for entry in raw if isinstance(raw, list) else []:
         slot = entry.get("ns_slot")
-        policy = entry.get("ns_slot_policy", "static")
+        policy = entry.get("ns_slot_policy", "dynamic" if not isinstance(slot, int) else "static")
         if not isinstance(slot, int):
             # Floating lump — include in catalog with floating flag
             if policy == "dynamic" and entry.get("token"):
@@ -3176,9 +3176,7 @@ def save_lump():
         "methods":       sidecar["methods"],
         "grants":        sidecar["grants"],
     }
-    if ns_slot is None:
-        new_entry["ns_slot_policy"] = "dynamic"
-    else:
+    if ns_slot is not None:
         new_entry["variant_group"] = vg_key
     manifest.append(new_entry)
 

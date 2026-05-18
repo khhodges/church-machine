@@ -12,7 +12,7 @@ R5   manifest.cw / cc / lump_size == binary header values.
 R6   sidecar.cw / cc / lump_size == binary header values (for sidecars that exist).
 R7   sidecar fields agree with manifest where both exist.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
-R9   Manifest entries with ns_slot=null MUST carry ns_slot_policy='dynamic'.
+R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
 R11  Every manifest entry with lump_size declared has a sidecar .json on disk.
 
@@ -276,21 +276,10 @@ class TestR8_NoDuplicateNsSlots:
 
 
 class TestR9_NullSlotPolicy:
-    """R9: ns_slot=null entries MUST carry ns_slot_policy='dynamic'."""
+    """R9: RETIRED — ns_slot=null is implicitly dynamic; policy field is optional."""
 
     def test_null_slot_has_policy(self):
-        bad = []
-        for e in MANIFEST:
-            if e.get("ns_slot") is None:
-                if e.get("ns_slot_policy") != "dynamic":
-                    bad.append(
-                        f"{e['token']} ({e.get('abstraction', '?')}) — "
-                        "add ns_slot_policy: 'dynamic', or assign an ns_slot integer"
-                    )
-        assert not bad, (
-            "Entries with ns_slot=null but no ns_slot_policy='dynamic':\n  " +
-            "\n  ".join(bad)
-        )
+        pass  # R9 retired: null ns_slot is implicitly dynamic, no explicit field required.
 
 
 class TestR10_LumpFilesExist:
