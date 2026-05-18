@@ -3708,18 +3708,20 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot) {
         if (sim.nsLabels) sim.nsLabels[_resolvedSlot] = name || token;
 
         if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
-        // Clear the assembler-path words so that _autoLoadDefaultProgram() cannot
-        // re-apply a previously assembled program on the next reset/reboot and silently
-        // overwrite this LUMP binary.  (Do NOT store the lump binary in lastAssembledWords
-        // either — loadProgram() interprets word[0] as an instruction, not a LUMP header,
-        // and would corrupt the boot-entry code-word on every subsequent reset.)
-        if (typeof window.lastAssembledWords !== 'undefined') window.lastAssembledWords = null;
-        if (typeof _defaultProgramLoaded !== 'undefined') window._defaultProgramLoaded = true;
+        // Clear the assembler-path state so that _applyPendingSimLoad() (called on every
+        // Step when bootComplete) and _autoLoadDefaultProgram() (called on every reset)
+        // do NOT overwrite this LUMP binary with a previously assembled program.
+        //
+        // CRITICAL: lastAssembledWords, _pendingSimLoad, and lastMethodTableSize are
+        // declared with `let` in app-shell.js.  `let` top-level declarations are NOT
+        // on window, so `window.X = null` from this file would write a SEPARATE window
+        // property that app-shell.js never reads.  The only correct cross-file write path
+        // is the setter function _clearAssembledProgramState() defined there.
+        if (typeof _clearAssembledProgramState === 'function') _clearAssembledProgramState();
         // Do NOT call _injectClistNow(): the c-list is already loaded verbatim inside the
         // lump binary by loadLumpBinary(), and CR6 has been updated to point to it.
         // Calling _injectClistNow() here would overwrite the loaded c-list and mutate the
         // header's cc field, destroying the LUMP integrity that this function now preserves.
-        if (typeof _pendingSimLoad !== 'undefined') window._pendingSimLoad = false;
         if (sim.programName !== undefined) sim.programName = name || token;
 
         const hdr = rawWords.length ? sim.parseLumpHeader(rawWords[0] >>> 0) : null;

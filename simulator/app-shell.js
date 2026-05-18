@@ -114,6 +114,21 @@ let lastAssembledWords = null;
 let lastAssembledCapabilities = null;
 let lastMethodTableSize = 0;
 let _pendingSimLoad = false;
+
+// Called by _loadLumpBinaryIntoSim (app-lumps.js) after a LUMP binary is
+// loaded directly into the simulator.  Clears the assembler-path state so
+// that _applyPendingSimLoad() (in stepSim) and _autoLoadDefaultProgram() (on
+// every reset) do not overwrite the freshly-loaded LUMP binary with whatever
+// was previously assembled.
+// IMPORTANT: these variables are declared with `let` and are therefore NOT
+// accessible via window.X from other files — a setter function is the only
+// correct cross-file write path.
+function _clearAssembledProgramState() {
+    lastAssembledWords    = null;
+    lastAssembledCapabilities = null;
+    lastMethodTableSize   = 0;
+    _pendingSimLoad       = false;
+}
 let _lumpManifests = {};
 let _petNameDRMap = {};
 let _petNameCRMap = {};
