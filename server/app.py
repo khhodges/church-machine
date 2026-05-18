@@ -390,6 +390,9 @@ RESERVED_NS_SLOTS = set(range(0, 4)) | set(range(11, 16))
 # Slot 2 is a free/null region (64 words) after Boot.Abstr director elimination (Task #247).
 # Still counted in the foundational footprint so Boot.Abstr (slot 3) stays at 0x0180.
 FREE_SLOT_SIZE = 64  # keep in sync with simulator.js SLOT_SIZE and boot_image.py
+LUMP_MAX_ARCHIVE_VERSIONS = 20  # max archived versions kept per token; oldest are pruned
+if LUMP_MAX_ARCHIVE_VERSIONS < 0:
+    raise ValueError(f"LUMP_MAX_ARCHIVE_VERSIONS must be >= 0, got {LUMP_MAX_ARCHIVE_VERSIONS}")
 LUMPS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                    "lumps", "manifest.json")
 
@@ -3144,6 +3147,29 @@ def save_lump():
         with open(_arch_json, 'w') as _afh:
             json.dump(_arch_sc, _afh, indent=2)
         print(f'[lumps] Archived {token8}.lump → {token8}-v{_arch_ver}.lump', flush=True)
+
+        # ── Prune oldest archives beyond LUMP_MAX_ARCHIVE_VERSIONS ────────────
+        _prune_pat = _re_arch.compile(rf'^{_re_arch.escape(token8)}-v(\d+)\.lump$')
+        _all_vers = sorted(
+            int(_m.group(1))
+            for _fn in os.listdir(lumps_dir)
+            for _m in [_prune_pat.match(_fn)] if _m
+        )
+        _excess = len(_all_vers) - LUMP_MAX_ARCHIVE_VERSIONS
+        if _excess > 0:
+            for _old_ver in _all_vers[:_excess]:
+                _old_lump = os.path.join(lumps_dir, f'{token8}-v{_old_ver}.lump')
+                _old_json = os.path.join(lumps_dir, f'{token8}-v{_old_ver}.json')
+                try:
+                    os.remove(_old_lump)
+                    logging.info('[lumps] Pruned old archive %s-v%d.lump', token8, _old_ver)
+                except OSError as _e:
+                    logging.warning('[lumps] Could not prune %s-v%d.lump: %s', token8, _old_ver, _e)
+                try:
+                    os.remove(_old_json)
+                    logging.info('[lumps] Pruned old archive sidecar %s-v%d.json', token8, _old_ver)
+                except OSError as _e:
+                    logging.warning('[lumps] Could not prune %s-v%d.json: %s', token8, _old_ver, _e)
 
     lump_bytes = _struct.pack(f'>{len(words)}I',
                               *[int(w) & 0xFFFFFFFF for w in words])
