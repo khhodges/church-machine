@@ -1072,6 +1072,90 @@
 }
 .lump-gt-chip-empty:hover .lump-gt-empty-btn { opacity: 1; }
 
+/* ── GT chip inline name input (Tokens tab) ──────────────── */
+.lump-gt-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed rgba(255, 238, 0, 0.3);
+    color: #ffee00;
+    font-weight: 600;
+    font-size: 0.72rem;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    outline: none;
+    cursor: text;
+    transition: border-color 0.15s, background 0.15s;
+}
+.lump-gt-name-input:hover {
+    border-bottom-color: rgba(255, 238, 0, 0.6);
+}
+.lump-gt-name-input:focus {
+    border-bottom: 1px solid #ffee00;
+    background: rgba(255, 238, 0, 0.05);
+    border-radius: 2px 2px 0 0;
+}
+.lump-gt-name-input.lump-gt-name-unresolved {
+    color: #b8c8d8;
+    font-weight: 500;
+    font-style: italic;
+    border-bottom-color: rgba(184, 200, 216, 0.3);
+}
+
+/* Apply Names → Sim button variant */
+.clist-names-btn {
+    color: #66b3ff !important;
+    border-color: rgba(100, 160, 255, 0.4) !important;
+    background: rgba(100, 160, 255, 0.06) !important;
+}
+.clist-names-btn:hover:not(:disabled) {
+    background: rgba(100, 160, 255, 0.15) !important;
+    border-color: #66b3ff !important;
+}
+.clist-names-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── Overview tab CR pet-name edit affordance ─────────────── */
+.lump-pn-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary, #888);
+    font-size: 0.72rem;
+    padding: 0 3px;
+    margin-left: 4px;
+    opacity: 0.4;
+    transition: opacity 0.15s, color 0.15s;
+    vertical-align: middle;
+}
+.lump-pn-edit-btn:hover {
+    opacity: 1;
+    color: var(--church-gold, #c8a84b);
+}
+.lump-pn-name-cell {
+    position: relative;
+    white-space: nowrap;
+}
+.lump-pn-cr-input {
+    background: rgba(255, 238, 0, 0.04);
+    border: 1px solid rgba(255, 238, 0, 0.4);
+    border-radius: 3px;
+    color: #ffee00;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    padding: 1px 5px;
+    outline: none;
+    width: 10rem;
+    max-width: 100%;
+}
+.lump-pn-cr-input:focus {
+    border-color: #ffee00;
+    background: rgba(255, 238, 0, 0.08);
+}
+
 /* ── GT Slot Picker modal ─────────────────────────────────── */
 .gtpick-backdrop {
     position: fixed;

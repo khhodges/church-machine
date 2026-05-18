@@ -236,12 +236,16 @@ function showLumpDetail(token) {
     if (hasPetNames) {
         html += '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Pet Names</div>';
-        html += '<table class="lump-detail-table"><thead><tr><th>Register</th><th>Name</th></tr></thead><tbody>';
+        html += '<table class="lump-detail-table"><thead><tr><th>Register</th><th>Name</th><th></th></tr></thead><tbody>';
         for (const [reg, name] of Object.entries(drNames)) {
-            html += `<tr><td>${e(reg)}</td><td>${e(name)}</td></tr>`;
+            html += `<tr><td>${e(reg)}</td><td>${e(name)}</td><td></td></tr>`;
         }
         for (const [reg, name] of Object.entries(crNames)) {
-            html += `<tr><td>${e(reg)}</td><td>${e(name)}</td></tr>`;
+            const _crSlot = reg.replace(/^CR/i, '');
+            html += `<tr><td>${e(reg)}</td>` +
+                `<td id="lump-pn-cr-cell-${_tk}-${e(_crSlot)}" class="lump-pn-name-cell">${e(name)}</td>` +
+                `<td><button class="lump-pn-edit-btn" onclick="_lumpOverviewCREdit('${e(token)}','${e(_crSlot)}',this)" title="Rename">&#9998;</button></td>` +
+                `</tr>`;
         }
         html += '</tbody></table>';
         html += '</div>';
@@ -2398,6 +2402,11 @@ async function _loadLumpTokens(token, lump) {
             `<span class="clist-pola-msg" style="color:var(--text-secondary,#888)">No NS slot assigned — POLA requires a loaded namespace entry.</span>` +
             `</div>`;
     }
+    html += `<div class="clist-pola-strip" style="margin-top:0.35rem;">` +
+        `<span class="clist-pola-label" style="color:#66b3ff">Names</span>` +
+        `<span class="clist-pola-msg">Push lump GT pet names into the running simulator&rsquo;s namespace map.</span>` +
+        `<button class="clist-pola-btn clist-names-btn" onclick="_applyLumpNamesToSim('${token}')">\u2B06\u202FApply Names \u2192 Sim</button>` +
+        `</div>`;
     html += `</div>`;
 
     // ── MyGoldenTokens (C-list viewer) ───────────────────────────────────────
@@ -2503,12 +2512,14 @@ async function _loadLumpTokens(token, lump) {
                 ? (sim.nsLabels[gtSlotId] || '')
                 : '';
             const displayName  = manifestName || tokenName || simNsName;
-            const nameHtml = displayName
-                ? `<span class="lump-gt-chip-name">${e(displayName)}</span>`
-                : `<span class="lump-gt-chip-name lump-gt-name-unresolved">NS[${gtSlotId}]</span>`;
-            html += `<div class="lump-gt-chip" data-slot="${s}">` +
+            const inputPlaceholder = `NS[${gtSlotId}]`;
+            html += `<div class="lump-gt-chip" data-slot="${s}" data-ns-slot="${gtSlotId}">` +
                     `<span class="lump-gt-chip-dot"></span>` +
-                    nameHtml +
+                    `<input class="lump-gt-name-input${displayName ? '' : ' lump-gt-name-unresolved'}" ` +
+                    `value="${e(displayName)}" placeholder="${e(inputPlaceholder)}" ` +
+                    `data-token="${e(token)}" data-cr-slot="${s}" data-orig="${e(displayName)}" ` +
+                    `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" ` +
+                    `onblur="_lumpGTNameCommit(this)">` +
                     `<span class="lump-gt-chip-meta">${permStr} \u00B7 ${gtTypeStr} \u00B7 #${gtSlotId} \u00B7 v${gtSeq}</span>` +
                     `</div>`;
         }
@@ -3735,5 +3746,151 @@ async function runSelftestLump() {
         if (btn) { btn.disabled = false; btn.textContent = 'Run Selftest'; }
         alert(`Selftest failed: ${err.message}`);
     }
+}
+
+// ── GT pet-name inline editing (Tokens tab) ──────────────────────────────────
+
+async function _lumpGTNameCommit(inputEl) {
+    const token   = inputEl.dataset.token;
+    const crSlot  = inputEl.dataset.crSlot;
+    const newName = inputEl.value.trim();
+    const orig    = inputEl.dataset.orig || '';
+    if (newName === orig) return;
+
+    inputEl.dataset.orig = newName;
+
+    if (newName) {
+        inputEl.classList.remove('lump-gt-name-unresolved');
+    } else {
+        inputEl.classList.add('lump-gt-name-unresolved');
+    }
+
+    const lump = (typeof _lumpsCache !== 'undefined' && _lumpsCache)
+        ? _lumpsCache.find(l => l.token === token) : null;
+    if (lump) {
+        if (!lump.pet_names) lump.pet_names = {};
+        if (!lump.pet_names.CR) lump.pet_names.CR = {};
+        if (newName) {
+            lump.pet_names.CR[String(crSlot)] = newName;
+        } else {
+            delete lump.pet_names.CR[String(crSlot)];
+        }
+    }
+
+    try {
+        const resp = await fetch(`/api/lump/${token}/meta`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pet_name_cr_slot: crSlot, pet_name_cr_value: newName })
+        });
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || `HTTP ${resp.status}`);
+        }
+        inputEl.style.transition = 'color 0.2s';
+        inputEl.style.color = '#88dd88';
+        setTimeout(() => { inputEl.style.color = ''; }, 700);
+    } catch (err) {
+        console.warn('[_lumpGTNameCommit] persist failed:', err);
+        inputEl.style.transition = 'color 0.2s';
+        inputEl.style.color = '#f87171';
+        setTimeout(() => { inputEl.style.color = ''; }, 1200);
+        inputEl.title = `Save failed: ${err.message}`;
+    }
+}
+
+function _applyLumpNamesToSim(token) {
+    if (typeof sim === 'undefined' || !sim) {
+        alert('Simulator is not running. Load a LUMP or boot the simulator first.');
+        return;
+    }
+    if (!sim.nsLabels) sim.nsLabels = {};
+    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const bodyEl = document.getElementById(`lumpTokensBody_${tk}`);
+    if (!bodyEl) return;
+    let count = 0;
+    bodyEl.querySelectorAll('.lump-gt-chip[data-ns-slot]').forEach(chip => {
+        const nsSlot = parseInt(chip.dataset.nsSlot, 10);
+        if (isNaN(nsSlot)) return;
+        const inp = chip.querySelector('.lump-gt-name-input');
+        const name = inp ? inp.value.trim() : '';
+        if (name) {
+            sim.nsLabels[nsSlot] = name;
+            count++;
+        }
+    });
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.className = '';
+        con.textContent = count
+            ? `Applied ${count} name${count === 1 ? '' : 's'} to simulator namespace.`
+            : 'No named GT slots found — nothing applied.';
+    }
+    if (typeof updateDisplay === 'function') updateDisplay();
+}
+
+// ── Overview tab CR pet-name inline editing ──────────────────────────────────
+
+async function _lumpOverviewCREdit(token, crSlot, btnEl) {
+    const tk     = (token || '').replace(/[^a-z0-9]/gi, '');
+    const cellId = `lump-pn-cr-cell-${tk}-${crSlot}`;
+    const cell   = document.getElementById(cellId);
+    if (!cell || cell.querySelector('input')) return;
+
+    const lump    = (typeof _lumpsCache !== 'undefined' && _lumpsCache)
+        ? _lumpsCache.find(l => l.token === token) : null;
+    const current = lump ? ((lump.pet_names || {}).CR || {})[String(crSlot)] || '' : '';
+
+    const inp = document.createElement('input');
+    inp.type  = 'text';
+    inp.value = current;
+    inp.className = 'lump-pn-cr-input';
+    inp.placeholder = 'pet name';
+
+    cell.textContent = '';
+    cell.appendChild(inp);
+    inp.focus();
+    inp.select();
+
+    async function commit() {
+        const newName = inp.value.trim();
+        cell.textContent = newName || '\u2014';
+        if (btnEl) cell.parentElement && cell.parentElement.querySelector('.lump-pn-edit-btn') && (cell.parentElement.querySelector('.lump-pn-edit-btn').disabled = false);
+
+        if (newName === current) return;
+
+        if (lump) {
+            if (!lump.pet_names) lump.pet_names = {};
+            if (!lump.pet_names.CR) lump.pet_names.CR = {};
+            if (newName) {
+                lump.pet_names.CR[String(crSlot)] = newName;
+            } else {
+                delete lump.pet_names.CR[String(crSlot)];
+            }
+        }
+
+        try {
+            const resp = await fetch(`/api/lump/${token}/meta`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pet_name_cr_slot: crSlot, pet_name_cr_value: newName })
+            });
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${resp.status}`);
+            }
+        } catch (err) {
+            console.warn('[_lumpOverviewCREdit] persist failed:', err);
+            cell.title = `Save failed: ${err.message}`;
+            cell.style.color = '#f87171';
+            setTimeout(() => { cell.style.color = ''; cell.title = ''; }, 2000);
+        }
+    }
+
+    inp.addEventListener('blur', commit, { once: true });
+    inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+        if (e.key === 'Escape') { inp.value = current; inp.blur(); }
+    });
 }
 

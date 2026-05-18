@@ -3453,6 +3453,19 @@ def patch_lump_meta(token):
             sidecar[field] = str(payload[field])
             updated = True
 
+    if 'pet_name_cr_slot' in payload:
+        cr_slot = str(payload['pet_name_cr_slot'])
+        cr_value = (str(payload.get('pet_name_cr_value', '')) or '').strip()
+        if 'pet_names' not in sidecar or not isinstance(sidecar.get('pet_names'), dict):
+            sidecar['pet_names'] = {}
+        if 'CR' not in sidecar['pet_names'] or not isinstance(sidecar['pet_names'].get('CR'), dict):
+            sidecar['pet_names']['CR'] = {}
+        if cr_value:
+            sidecar['pet_names']['CR'][cr_slot] = cr_value
+        else:
+            sidecar['pet_names']['CR'].pop(cr_slot, None)
+        updated = True
+
     if not updated:
         return jsonify({"ok": True, "token": key8, "message": "No fields updated"}), 200
 
