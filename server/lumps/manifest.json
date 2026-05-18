@@ -1709,6 +1709,7 @@
     "token": "6902f517",
     "abstraction": "LED Blink \u2014 Ti60 F225 Hardware Nucleus Code",
     "ns_slot": null,
+    "ns_slot_policy": "dynamic",
     "lump_size": 64,
     "cw": 17,
     "cc": 0,

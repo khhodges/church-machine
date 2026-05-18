@@ -3857,15 +3857,35 @@ a.next-step-link:hover {
 
 .ref-layout {
     display: grid;
-    grid-template-columns: 340px 1fr;
-    gap: 1rem;
+    grid-template-columns: var(--ref-col-width, 340px) 6px 1fr;
+    gap: 0;
     height: calc(100vh - 110px);
     overflow: hidden;
+}
+
+.ref-col-resizer {
+    width: 6px;
+    cursor: col-resize;
+    background: transparent;
+    border-left: 2px solid var(--border, #30363d);
+    border-right: 2px solid var(--border, #30363d);
+    margin: 0 0.25rem;
+    transition: border-color 0.15s, background 0.15s;
+    border-radius: 2px;
+    z-index: 10;
+    user-select: none;
+}
+
+.ref-col-resizer:hover,
+.ref-col-resizer.ref-col-resizer--active {
+    background: var(--church-gold, #c8a84b);
+    border-color: var(--church-gold, #c8a84b);
 }
 
 .ref-list-panel {
     overflow-y: auto;
     padding-right: 0.25rem;
+    min-width: 180px;
 }
 
 .ref-list-panel .panel {

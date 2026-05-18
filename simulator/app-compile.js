@@ -3961,3 +3961,87 @@ abstraction DMABuffer {
     window._cloomcExampleLanguages  = exampleLanguages;
     window._cloomcLangExampleGroups = LANG_EXAMPLE_GROUPS;
 })();
+
+/* ── Reference panel column resizer ─────────────────────────────────────── *
+ * Lets the user drag the divider between the abstraction list and the detail *
+ * panel. Width is persisted to localStorage as 'refColWidth' (px integer).  *
+ * ──────────────────────────────────────────────────────────────────────────*/
+(function _initRefColResizer() {
+    const LS_KEY   = 'refColWidth';
+    const MIN_W    = 160;
+    const MAX_W    = 700;
+    const DEFAULT  = 340;
+
+    function applyWidth(px) {
+        const layout = document.getElementById('refLayout');
+        if (!layout) return;
+        layout.style.setProperty('--ref-col-width', px + 'px');
+    }
+
+    function persist(px) {
+        try { localStorage.setItem(LS_KEY, px); } catch (_) {}
+    }
+
+    function restore() {
+        try {
+            const saved = parseInt(localStorage.getItem(LS_KEY), 10);
+            if (saved >= MIN_W && saved <= MAX_W) return saved;
+        } catch (_) {}
+        return DEFAULT;
+    }
+
+    function attachResizer() {
+        const handle = document.getElementById('refColResizer');
+        if (!handle) return;
+
+        applyWidth(restore());
+
+        let dragging = false;
+        let startX   = 0;
+        let startW   = DEFAULT;
+
+        handle.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            dragging = true;
+            startX   = e.clientX;
+            const layout = document.getElementById('refLayout');
+            startW   = layout
+                ? parseInt(getComputedStyle(layout).getPropertyValue('--ref-col-width') || DEFAULT, 10)
+                : DEFAULT;
+            handle.classList.add('ref-col-resizer--active');
+            document.body.style.cursor   = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!dragging) return;
+            const delta = e.clientX - startX;
+            const newW  = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
+            applyWidth(newW);
+        });
+
+        document.addEventListener('mouseup', function (e) {
+            if (!dragging) return;
+            dragging = false;
+            handle.classList.remove('ref-col-resizer--active');
+            document.body.style.cursor    = '';
+            document.body.style.userSelect = '';
+            const layout = document.getElementById('refLayout');
+            if (layout) {
+                const final = parseInt(layout.style.getPropertyValue('--ref-col-width') || DEFAULT, 10);
+                persist(final);
+            }
+        });
+
+        handle.addEventListener('dblclick', function () {
+            applyWidth(DEFAULT);
+            persist(DEFAULT);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachResizer);
+    } else {
+        attachResizer();
+    }
+})();
