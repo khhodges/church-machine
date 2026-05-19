@@ -974,7 +974,7 @@ class ChurchAssembler {
 
         this._lastLineNums = lineNums.slice();
         return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
-                 capabilities: this.capabilities.slice(), wordComments };
+                 capabilities: this.capabilities.slice(), wordComments, lineNums: lineNums.slice() };
     }
 
     getLastLineNums() {

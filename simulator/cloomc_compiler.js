@@ -728,13 +728,15 @@ class CLOOMCCompiler {
 
         const caps = result.capabilities || [];
         const words = Array.from(result.words || []);
+        const asmLineNums = result.lineNums || [];
 
         return {
             abstractionName: absName,
             language: 'assembly',
-            methods: [{ name: 'run', code: words, sourceLines: source }],
+            methods: [{ name: 'run', code: words, sourceLines: source, lineNums: asmLineNums }],
             capabilities: caps,
             errors: [],
+            lineNums: asmLineNums,
             profile: (typeof detectProfile === 'function') ? detectProfile([{ code: words }]) : 'IoT',
             manifest: null
         };
@@ -3575,6 +3577,7 @@ class CLOOMCCompiler {
     compilePetName(source, capabilities) {
         const errors = [];
         const code = [];
+        const codeLineNums = [];
         const manifest = [];
         const locals = {};
         const crLocals = {};
@@ -3891,8 +3894,12 @@ class CLOOMCCompiler {
                 }
             } else if (asmResult.words && asmResult.words.length > 0) {
                 manifest.push({ src: asmBlockSrcLines[0], addr: code.length, desc: asmBlock[0] + (asmBlock.length > 1 ? ` (+${asmBlock.length - 1} lines)` : '') });
-                for (const w of asmResult.words) {
-                    code.push(w);
+                for (let _wi = 0; _wi < asmResult.words.length; _wi++) {
+                    code.push(asmResult.words[_wi]);
+                    const _asmLn = asmResult.lineNums ? asmResult.lineNums[_wi] : null;
+                    const _origIdx = (_asmLn != null && _asmLn > 0) ? _asmLn - 1 : 0;
+                    const _srcLine = asmBlockSrcLines[_origIdx];
+                    codeLineNums.push(_srcLine != null ? _srcLine + 1 : null);
                 }
             }
             asmBlock = [];
@@ -3932,6 +3939,7 @@ class CLOOMCCompiler {
                         manifest.push({ src: i, addr: code.length,
                             desc: `LOAD CR${_cr}, CR6, #${_clistOffset}  (${petName} Abstract GT)` });
                         code.push(this.encode(this.opcodes.LOAD, 14, _cr, 6, _clistOffset));
+                        codeLineNums.push(i + 1);
                         continue;
                     }
                 }
@@ -3947,6 +3955,7 @@ class CLOOMCCompiler {
                 crLocals[petName] = cr;
                 manifest.push({ src: i, addr: code.length, desc: `LOAD CR${cr}, CR6, #${clistOffset}  (${petName} GT from c-list)` });
                 code.push(this.encode(this.opcodes.LOAD, 14, cr, 6, clistOffset));
+                codeLineNums.push(i + 1);
                 continue;
             }
 
@@ -3980,6 +3989,7 @@ class CLOOMCCompiler {
                     }
                     manifest.push({ src: i, addr: code.length, desc: `${bareFunc[1]}(${bareFunc[2]})` });
                     emitFuncCall(func, argDRs, i);
+                    while (codeLineNums.length < code.length) codeLineNums.push(i + 1);
                     const tmpKeys = Object.keys(locals).filter(k => k.startsWith('__'));
                     for (const k of tmpKeys) delete locals[k];
                     continue;
@@ -3998,6 +4008,7 @@ class CLOOMCCompiler {
                 } else {
                     manifest.push({ src: i, addr: code.length - 1, desc: `${destName} = ${exprStr} (in-place)` });
                 }
+                while (codeLineNums.length < code.length) codeLineNums.push(i + 1);
                 const tmpKeys = Object.keys(locals).filter(k => k.startsWith('__'));
                 for (const k of tmpKeys) delete locals[k];
                 continue;
@@ -4011,6 +4022,7 @@ class CLOOMCCompiler {
         if (code.length === 0 || (code[code.length - 1] !== 0)) {
             code.push(0);
         }
+        while (codeLineNums.length < code.length) codeLineNums.push(null);
 
         const capsArray = Object.values(neededCaps).sort((a, b) => a.capIndex - b.capIndex);
         const drMap = {};
@@ -4028,6 +4040,7 @@ class CLOOMCCompiler {
         const methods = [{
             name: 'run',
             code: code,
+            lineNums: codeLineNums,
             pet_names: { DR: drPetNamesNumeric, CR: crPetNamesNumeric }
         }];
         return {

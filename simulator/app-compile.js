@@ -1108,11 +1108,16 @@ function compileAndBuild() {
     }
 
     const allCode = [];
+    const allLineNums = [];
     const numMethods = result.methods.length;
 
     for (const m of result.methods) {
         const words = m.code || [];
+        const mLineNums = m.lineNums || [];
         allCode.push(...words);
+        for (let _mwi = 0; _mwi < words.length; _mwi++) {
+            allLineNums.push(mLineNums[_mwi] != null ? mLineNums[_mwi] : null);
+        }
     }
 
     const codeRegion = [...allCode];
@@ -1157,6 +1162,9 @@ function compileAndBuild() {
     }
 
     // ── Pre-save audit — run on assembled binary BEFORE download or server save ──
+    // Build LUMP-level lineNums: index 0 = header (null), indices 1..cw = per-word source lines.
+    const _lumpLineNums = [null, ...allLineNums];
+
     let _auditResults = [];
     let _auditErrors  = [];
     let _auditWarns   = [];
@@ -1169,7 +1177,7 @@ function compileAndBuild() {
             cw, cc, lump_size: lumpSize,
             pet_names:    { CR: _auditPnCR },
             capabilities: resolvedCaps.map(rc => ({ name: rc.name, rights: rc.rights, grants: rc.rights })),
-        });
+        }, _lumpLineNums);
         _auditErrors  = _auditResults.filter(r => r.severity === 'error');
         _auditWarns   = _auditResults.filter(r => r.severity === 'warn');
     }
@@ -1185,7 +1193,19 @@ function compileAndBuild() {
         }
         _errListing += `\n  \u2717 ${_auditErrors.length} error${_auditErrors.length !== 1 ? 's' : ''} \u2014 binary not downloaded or saved.\n`;
         if (con) { con.textContent = _errListing; con.scrollTop = 0; }
-        if (typeof _showAsmErrors === 'function') _showAsmErrors(_auditErrors.map(r => ({line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}`})), 'Audit error' + (_auditErrors.length > 1 ? 's' : '') + ' \u2014 code not applied');
+        if (typeof _showAsmErrors === 'function') {
+            const _showErrs = [];
+            for (const r of _auditErrors) {
+                if (r.ruleId === 'RCI' && Array.isArray(r.violations) && r.violations.length > 0) {
+                    for (const v of r.violations) {
+                        _showErrs.push({ line: v.sourceLine || null, message: `[RCI] ${v.msg}` });
+                    }
+                } else {
+                    _showErrs.push({ line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}` });
+                }
+            }
+            _showAsmErrors(_showErrs, 'Audit error' + (_auditErrors.length > 1 ? 's' : '') + ' \u2014 code not applied');
+        }
         return;
     }
 
@@ -1446,8 +1466,17 @@ function auditLumpOnly() {
     }
 
     const allCode = [];
-    for (const m of result.methods) { allCode.push(...(m.code || [])); }
+    const _aloLineNums = [];
+    for (const m of result.methods) {
+        const _mCode = m.code || [];
+        const _mLN   = m.lineNums || [];
+        for (let _mwi = 0; _mwi < _mCode.length; _mwi++) {
+            allCode.push(_mCode[_mwi]);
+            _aloLineNums.push(_mLN[_mwi] != null ? _mLN[_mwi] : null);
+        }
+    }
     const cw = allCode.length;
+    const _aloLumpLineNums = [null, ..._aloLineNums];
 
     let lumpSize = 64;
     while (lumpSize < 1 + cw + cc) lumpSize <<= 1;
@@ -1476,7 +1505,7 @@ function auditLumpOnly() {
         cw, cc, lump_size: lumpSize,
         pet_names:    { CR: _aloPnCR },
         capabilities: caps.map(c => ({ name: c.name || String(c) })),
-    });
+    }, _aloLumpLineNums);
     const auditErrors  = auditResults.filter(r => r.severity === 'error');
     const auditWarns   = auditResults.filter(r => r.severity === 'warn');
 
@@ -1489,9 +1518,28 @@ function auditLumpOnly() {
     for (const r of auditResults) {
         const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
         listing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
+        if (r.ruleId === 'RCI' && r.severity === 'error' && Array.isArray(r.violations)) {
+            for (const v of r.violations) {
+                const _lineHint = v.sourceLine != null ? ` (line ${v.sourceLine})` : '';
+                listing += `        \u2022 ${v.msg}${_lineHint}\n`;
+            }
+        }
     }
     if (auditErrors.length > 0) {
         listing += `\n  \u2717 AUDIT FAILED: ${auditErrors.length} error${auditErrors.length !== 1 ? 's' : ''} \u2014 fix before Compile.\n`;
+        if (typeof _showAsmErrors === 'function') {
+            const _aloShowErrs = [];
+            for (const r of auditErrors) {
+                if (r.ruleId === 'RCI' && Array.isArray(r.violations) && r.violations.length > 0) {
+                    for (const v of r.violations) {
+                        _aloShowErrs.push({ line: v.sourceLine || null, message: `[RCI] ${v.msg}` });
+                    }
+                } else {
+                    _aloShowErrs.push({ line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}` });
+                }
+            }
+            _showAsmErrors(_aloShowErrs, 'Audit LUMP \u2014 ' + auditErrors.length + ' error' + (auditErrors.length !== 1 ? 's' : ''));
+        }
     } else if (auditWarns.length > 0) {
         listing += `\n  \u26a0 Audit passed with ${auditWarns.length} warning${auditWarns.length !== 1 ? 's' : ''} \u2014 review before deploying.\n`;
     } else {

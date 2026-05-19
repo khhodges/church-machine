@@ -17,7 +17,7 @@
  *   RMC — if a manifest is supplied, its cw / cc / lump_size agree with the binary header
  */
 
-function lumpAudit(words, manifest) {
+function lumpAudit(words, manifest, lineNums) {
     const results = [];
 
     if (!words || words.length === 0) {
@@ -246,10 +246,10 @@ function lumpAudit(words, manifest) {
             // Slot-bounds check only applies when the LUMP has its own c-list.
             // cc=0 means ambient-boot-c-list — slots are resolved at load time.
             if (_rciChurchOps.has(op) && crSrc === 6 && cc > 0 && slot >= cc) {
-                _rciViolations.push(
-                    `word[${wi}] ${_rciOpName[op]}: c-list slot ${slot} out of range` +
-                    ` (cc=${cc}${_rciSlotHint})`
-                );
+                const _rciMsg = `word[${wi}] ${_rciOpName[op]}: c-list slot ${slot} out of range` +
+                    ` (cc=${cc}${_rciSlotHint})`;
+                const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
+                _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine });
             }
 
             if (op === _rciBranchOp) {
@@ -257,10 +257,9 @@ function lumpAudit(words, manifest) {
                 if (off & 0x4000) off = off - 0x8000;   // sign-extend 15-bit
                 const target = codeIdx + off;
                 if (target < 0 || target >= cw) {
-                    _rciViolations.push(
-                        `word[${wi}] BRANCH: offset ${off} \u2192 target code[${target}] ` +
-                        `out of range [0\u2013${cw - 1}]`
-                    );
+                    const _branchMsg = `word[${wi}] BRANCH: offset ${off} \u2192 target code[${target}] ` +
+                        `out of range [0\u2013${cw - 1}]`;
+                    _rciViolations.push({ msg: _branchMsg, sourceLine: null });
                 }
             }
         }
@@ -280,7 +279,8 @@ function lumpAudit(words, manifest) {
                 ruleId: 'RCI',
                 severity: 'error',
                 message: `${_rciViolations.length} range violation${_rciViolations.length !== 1 ? 's' : ''}`,
-                detail: _rciViolations.join('; '),
+                detail: _rciViolations.map(v => v.msg).join('; '),
+                violations: _rciViolations,
             });
         }
     } else {
