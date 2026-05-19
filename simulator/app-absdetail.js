@@ -1538,6 +1538,76 @@ const METHOD_REGISTER_CONVENTIONS = {
         'Fetch':    { index: 4, input: 'DR1=slot token, DR2=expected words, CR2=write-GT', output: 'DR0 = 0 (installed) | error code',       dispatch: 'CALL Tunnel.Fetch',    note: 'Download lump binary from IDE by NS slot token. Validates header (magic, CRC) before writing.' },
         'Connect':  { index: 5, input: 'CR2=remote GT (Outform/far-end abstraction)',      output: 'DR0 = far-end return value',              dispatch: 'CALL Tunnel.Connect', note: 'Hello Mum primitive: forward CALL via GTKN packet to far-end Mum.Greet().' },
     },
+    // ── System layer 1 abstractions ─────────────────────────────────────────────────────
+    // Indices match the methods[] array in abstractions.js createAbstraction() calls.
+    'Navana': {
+        'Create':  { index: 0, input: 'DR1=size, DR2=type, DR3=perms', output: 'DR1=ns_slot, DR2=expiry', dispatch: 'ELOADCALL Navana.Create',  note: 'Allocate a new NS slot; returns (ns_slot, expiry) pair.' },
+        'Add':     { index: 0, input: 'DR1=buf GT, DR2=size, DR3=type, DR4=perms', output: 'DR1=ns_slot, DR2=expiry', dispatch: 'ELOADCALL Navana.Add', note: 'Tutorial alias for Create — allocate NS slot for a buffer GT.' },
+        'Release': { index: 1, input: 'DR1=ns_slot', output: 'DR1=0 (released)', dispatch: 'ELOADCALL Navana.Release', note: 'Release a previously allocated NS slot.' },
+        'Find':    { index: 2, input: 'DR1=name GT', output: 'DR1=ns_slot (−1 if not found)', dispatch: 'ELOADCALL Navana.Find', note: 'Look up an NS slot by name token.' },
+        'Update':  { index: 3, input: 'DR1=ns_slot, DR2=new GT', output: 'DR1=0 (ok) | −1 (fault)', dispatch: 'ELOADCALL Navana.Update', note: 'Update the GT stored in an existing NS slot.' },
+        'Manage':  { index: 4, input: 'none', output: 'none (runs indefinitely)', dispatch: 'ELOADCALL Navana.Manage', note: 'Abstraction lifecycle management — not user-callable.' },
+        'Monitor': { index: 5, input: 'none', output: 'none', dispatch: 'ELOADCALL Navana.Monitor', note: 'System health monitoring loop.' },
+        'IDS':     { index: 6, input: 'none', output: 'none', dispatch: 'ELOADCALL Navana.IDS', note: 'Intrusion Detection via GT anomaly scanning.' },
+    },
+    'Mint': {
+        'Encode':   { index: 0, input: 'DR1=ns_slot, DR2=expiry, DR3=permsBits, DR4=bindable, DR5=far', output: 'DR1=GT word', dispatch: 'ELOADCALL Mint.Encode',   note: 'Forge a GT with bounded permissions. Domain purity + E-isolation enforced.' },
+        'Revoke':   { index: 1, input: 'DR1=ns_slot', output: 'DR1=0 (revoked)', dispatch: 'ELOADCALL Mint.Revoke',   note: 'Increment NS version — all existing GTs for this slot become invalid instantly.' },
+        'Transfer': { index: 2, input: 'DR1=GT, DR2=target_clist GT, DR3=slot', output: 'DR1=0 (ok)', dispatch: 'ELOADCALL Mint.Transfer', note: 'Move a GT into a target c-list slot.' },
+        'Create':   { index: 3, input: 'DR1=size, DR2=permsBits', output: 'DR1=GT word', dispatch: 'ELOADCALL Mint.Create',   note: 'Legacy shorthand: allocate memory + encode GT in one step.' },
+    },
+    'Memory': {
+        'Allocate': { index: 0, input: 'DR1=size (words)', output: 'DR1=memory GT', dispatch: 'ELOADCALL Memory.Allocate', note: 'Reserve a memory region and return a bounded GT.' },
+        'Free':     { index: 1, input: 'DR1=memory GT', output: 'DR1=0 (freed)', dispatch: 'ELOADCALL Memory.Free',     note: 'Release a memory region and zero its contents.' },
+        'Find':     { index: 2, input: 'DR1=name GT', output: 'DR1=memory GT (0 if not found)', dispatch: 'ELOADCALL Memory.Find', note: 'Look up a named allocation.' },
+        'Resize':   { index: 3, input: 'DR1=memory GT, DR2=new_size', output: 'DR1=new GT', dispatch: 'ELOADCALL Memory.Resize',   note: 'Adjust the size of an existing allocation; returns updated GT.' },
+        'Claim':    { index: 4, input: 'DR1=base_addr, DR2=size', output: 'DR1=memory GT', dispatch: 'ELOADCALL Memory.Claim',    note: 'Claim a specific address range (boot use only).' },
+    },
+    'Scheduler': {
+        'Yield': { index: 0, input: 'none', output: 'DR0=next thread id', dispatch: 'ELOADCALL Scheduler.Yield', note: 'Save thread state; switch to next ready thread.' },
+        'Spawn': { index: 1, input: 'CR1=code GT, DR1=entry offset', output: 'DR0=thread id', dispatch: 'ELOADCALL Scheduler.Spawn', note: 'Create thread with isolated CR set; begins at entry offset.' },
+        'Wait':  { index: 2, input: 'CR1=flag GT (DijkstraFlag)', output: 'DR0=1 (woken)', dispatch: 'ELOADCALL Scheduler.Wait',  note: 'Block calling thread until the flag is signaled.' },
+        'Stop':  { index: 3, input: 'DR1=thread id', output: 'DR0=0 (stopped)', dispatch: 'ELOADCALL Scheduler.Stop',  note: 'Terminate a thread and release its CR set.' },
+        'pause': { index: 4, input: 'DR1=ticks', output: 'none (resumes after ticks steps)', dispatch: 'ELOADCALL Scheduler.pause', note: 'Suspend calling thread for ticks steps; Scheduler.IRQ wakes it on timer fire.' },
+        'IRQ':   { index: 5, input: 'none (hardware-injected only)', output: 'none', dispatch: 'hidden ELOADCALL (NS slot 8)', note: 'Hardware timer/fault interrupt entry. Not user-callable — injected by step() before each instruction when timer fires.' },
+    },
+    'Stack': {
+        'Push':  { index: 0, input: 'DR1=value', output: 'DR0=depth after push', dispatch: 'ELOADCALL Stack.Push',  note: 'Push value; faults on overflow (max 256 entries).' },
+        'Pop':   { index: 1, input: 'none', output: 'DR0=popped value', dispatch: 'ELOADCALL Stack.Pop',   note: 'Pop and return top value; faults on underflow.' },
+        'Peek':  { index: 2, input: 'none', output: 'DR0=top value (stack unchanged)', dispatch: 'ELOADCALL Stack.Peek',  note: 'Read top without removing; faults on empty stack.' },
+        'Depth': { index: 3, input: 'none', output: 'DR0=current entry count', dispatch: 'ELOADCALL Stack.Depth', note: 'Return current stack depth (0 = empty).' },
+    },
+    'DijkstraFlag': {
+        'Wait':   { index: 0, input: 'none', output: 'DR0=1 (woken by signal)', dispatch: 'ELOADCALL DijkstraFlag.Wait',   note: 'P() — block if unsignaled; consume signal when it arrives.' },
+        'Signal': { index: 1, input: 'none', output: 'DR0=1 (woke a waiter) | 0 (flag set, no waiter)', dispatch: 'ELOADCALL DijkstraFlag.Signal', note: 'V() — wake one waiter or raise the flag.' },
+        'Reset':  { index: 2, input: 'none', output: 'DR0=0 (cleared)', dispatch: 'ELOADCALL DijkstraFlag.Reset',  note: 'Clear the flag to unsignaled state without blocking.' },
+        'Test':   { index: 3, input: 'none', output: 'DR0=1 (signaled) | 0 (unsignaled)', dispatch: 'ELOADCALL DijkstraFlag.Test',   note: 'Non-blocking read — flag state is not changed.' },
+    },
+    'UART': {
+        'Send':    { index: 0, input: 'DR1=byte value', output: 'DR0=0 (queued) | −1 (TX busy)', dispatch: 'ELOADCALL UART.Send',    note: 'Write one byte to the UART TX register.' },
+        'Receive': { index: 1, input: 'none', output: 'DR0=byte value | −1 (RX empty)', dispatch: 'ELOADCALL UART.Receive', note: 'Read one byte from the UART RX register; non-blocking.' },
+        'SetBaud': { index: 2, input: 'DR1=baud rate', output: 'DR0=0 (ok) | −1 (unsupported rate)', dispatch: 'ELOADCALL UART.SetBaud',  note: 'Configure baud rate; typical values: 9600, 115200.' },
+    },
+    // ── Tutorial / Stage-3 Contact abstractions ───────────────────────────────────────────
+    // These exist in the namespace vocabulary tutorial but have no simulator implementation.
+    'Identity': {
+        'Lookup':     { index: 0, input: 'DR1=identity token GT', output: 'DR1=address token GT', dispatch: 'ELOADCALL Identity.Lookup',     note: 'Resolve an identity token (person/device) to a network address token.' },
+        'GetAddress': { index: 1, input: 'DR1=address token GT', output: 'DR1=raw network address word', dispatch: 'ELOADCALL Identity.GetAddress', note: 'Map an address token to a raw network location word (internal helper).' },
+    },
+    'Routing': {
+        'SelectMedium': { index: 0, input: 'DR1=callerAddress GT, DR2=calleeAddress GT', output: 'DR1=medium GT (voice/text/email)', dispatch: 'ELOADCALL Routing.SelectMedium', note: 'Choose the best communication medium given two endpoint addresses.' },
+    },
+    'Media': {
+        'Open':        { index: 0, input: 'DR1=medium GT, DR2=callerAddress GT, DR3=calleeAddress GT', output: 'DR1=session GT', dispatch: 'ELOADCALL Media.Open',        note: 'Open a communication session on the chosen medium.' },
+        'Close':       { index: 1, input: 'DR1=sessionToken GT', output: 'DR1=0 (closed)', dispatch: 'ELOADCALL Media.Close',       note: 'Close and release the session identified by sessionToken.' },
+        'QueryStatus': { index: 2, input: 'DR1=sessionToken GT', output: 'DR1=status (0=offline, 1=active)', dispatch: 'ELOADCALL Media.QueryStatus', note: 'Query the current state of a session without modifying it.' },
+    },
+    'WordString': {
+        'GetCharCount': { index: 0, input: 'DR1=string GT', output: 'DR1=character count', dispatch: 'ELOADCALL WordString.GetCharCount', note: 'Return the number of characters in the string.' },
+        'GetChar':      { index: 1, input: 'DR1=string GT, DR2=index', output: 'DR1=character code (0 if out of range)', dispatch: 'ELOADCALL WordString.GetChar',      note: 'Return the character at the given 0-based index.' },
+        'Compare':      { index: 2, input: 'DR1=string GT A, DR2=string GT B', output: 'DR1=0 (equal) | 1 (A>B) | −1 (A<B)', dispatch: 'ELOADCALL WordString.Compare',      note: 'Lexicographic comparison of two strings.' },
+        'Concat':       { index: 3, input: 'DR1=string GT A, DR2=string GT B', output: 'DR1=new string GT', dispatch: 'ELOADCALL WordString.Concat',       note: 'Concatenate two strings; returns a new string GT.' },
+    },
 };
 
 function getMethodPurposes(abs) {

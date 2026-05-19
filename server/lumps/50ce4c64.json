@@ -1,0 +1,109 @@
+{
+  "token": "50ce4c64",
+  "abstraction": "StringOps",
+  "ns_slot": null,
+  "lump_size": 512,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 315,
+  "cc": 0,
+  "profile": "IoT",
+  "language": "english",
+  "author": "",
+  "version": "2026.05.19",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "Pack4",
+      "offset": 0,
+      "length": 15
+    },
+    {
+      "name": "Unpack",
+      "offset": 15,
+      "length": 42
+    },
+    {
+      "name": "IsLetter",
+      "offset": 57,
+      "length": 22
+    },
+    {
+      "name": "IsDigit",
+      "offset": 79,
+      "length": 13
+    },
+    {
+      "name": "IsUpper",
+      "offset": 92,
+      "length": 13
+    },
+    {
+      "name": "IsLower",
+      "offset": 105,
+      "length": 13
+    },
+    {
+      "name": "IsSpace",
+      "offset": 118,
+      "length": 10
+    },
+    {
+      "name": "ToUpper",
+      "offset": 128,
+      "length": 12
+    },
+    {
+      "name": "ToLower",
+      "offset": 140,
+      "length": 12
+    },
+    {
+      "name": "CharToDigit",
+      "offset": 152,
+      "length": 14
+    },
+    {
+      "name": "DigitToChar",
+      "offset": 166,
+      "length": 5
+    },
+    {
+      "name": "ReverseWord",
+      "offset": 171,
+      "length": 38
+    },
+    {
+      "name": "CompareWords",
+      "offset": 209,
+      "length": 15
+    },
+    {
+      "name": "CountLetters",
+      "offset": 224,
+      "length": 91
+    }
+  ],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "a7798d67"
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-05-19T13:18:59.800371Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "lump_version": 1,
+  "compiled_at": 1779196739.8008907
+}

@@ -1854,8 +1854,8 @@
     "cc": 1,
     "author": "",
     "version": "2026.05.19",
-    "lump_version": 1,
-    "compiled_at": 1779196425.0926192,
+    "lump_version": 2,
+    "compiled_at": 1779196700.2854762,
     "methods": [
       {
         "name": "compute",
@@ -1876,13 +1876,170 @@
     "cc": 1,
     "author": "",
     "version": "2026.05.19",
-    "lump_version": 1,
-    "compiled_at": 1779196431.7378151,
+    "lump_version": 2,
+    "compiled_at": 1779196707.4638784,
     "methods": [
       {
         "name": "compute",
         "offset": 0,
         "length": 15
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "19d3e599",
+    "abstraction": "IntegerOps",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 20,
+    "cc": 0,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196730.8395426,
+    "methods": [
+      {
+        "name": "Greet",
+        "offset": 0,
+        "length": 5
+      },
+      {
+        "name": "Increment",
+        "offset": 5,
+        "length": 5,
+        "aliasOf": "Greet"
+      },
+      {
+        "name": "Add",
+        "offset": 10,
+        "length": 5
+      },
+      {
+        "name": "Double",
+        "offset": 15,
+        "length": 5
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "50ce4c64",
+    "abstraction": "StringOps",
+    "ns_slot": null,
+    "lump_size": 512,
+    "cw": 315,
+    "cc": 0,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196739.8008907,
+    "methods": [
+      {
+        "name": "Pack4",
+        "offset": 0,
+        "length": 15
+      },
+      {
+        "name": "Unpack",
+        "offset": 15,
+        "length": 42
+      },
+      {
+        "name": "IsLetter",
+        "offset": 57,
+        "length": 22
+      },
+      {
+        "name": "IsDigit",
+        "offset": 79,
+        "length": 13
+      },
+      {
+        "name": "IsUpper",
+        "offset": 92,
+        "length": 13
+      },
+      {
+        "name": "IsLower",
+        "offset": 105,
+        "length": 13
+      },
+      {
+        "name": "IsSpace",
+        "offset": 118,
+        "length": 10
+      },
+      {
+        "name": "ToUpper",
+        "offset": 128,
+        "length": 12
+      },
+      {
+        "name": "ToLower",
+        "offset": 140,
+        "length": 12
+      },
+      {
+        "name": "CharToDigit",
+        "offset": 152,
+        "length": 14
+      },
+      {
+        "name": "DigitToChar",
+        "offset": 166,
+        "length": 5
+      },
+      {
+        "name": "ReverseWord",
+        "offset": 171,
+        "length": 38
+      },
+      {
+        "name": "CompareWords",
+        "offset": 209,
+        "length": 15
+      },
+      {
+        "name": "CountLetters",
+        "offset": 224,
+        "length": 91
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "d9454529",
+    "abstraction": "EnglishLoops",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 35,
+    "cc": 0,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196746.7156434,
+    "methods": [
+      {
+        "name": "WhileSum",
+        "offset": 0,
+        "length": 13
+      },
+      {
+        "name": "RecurseSum",
+        "offset": 13,
+        "length": 11
+      },
+      {
+        "name": "LambdaSum",
+        "offset": 24,
+        "length": 11
       }
     ],
     "grants": [
