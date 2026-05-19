@@ -82,12 +82,12 @@ function showLumpDetail(token) {
     let _tabBar = `<div class="lump-tabs-bar" id="lumpTabBar_${_tk}">`;
     if (!isNamespace) {
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','logic')">Logic</button>`;
-        _tabBar += `<button class="lump-tab" id="lumpTabBtnClooms_${_tk}" onclick="_switchLumpTab('${_tk}','clooms')">CLOOMC<span class="lump-tab-fork-dot" id="lumpTabForkDot_${_tk}" style="display:${lump.forked ? 'inline' : 'none'}" title="Uncompiled — fork in progress"></span></button>`;
+        _tabBar += `<button class="lump-tab${lump.forked ? ' lump-tab-active' : ''}" id="lumpTabBtnClooms_${_tk}" onclick="_switchLumpTab('${_tk}','clooms')">CLOOMC<span class="lump-tab-fork-dot" id="lumpTabForkDot_${_tk}" style="display:${lump.forked ? 'inline' : 'none'}" title="Uncompiled — fork in progress"></span></button>`;
     }
     _tabBar += `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
     if (!isNamespace) {
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','source')">Source</button>`;
-        _tabBar += `<button class="lump-tab lump-tab-active" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
+        _tabBar += `<button class="lump-tab${!lump.forked ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','content')">Content</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','tokens')">Tokens</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','versions')">Versions</button>`;
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','history')">History</button>`;
@@ -96,7 +96,7 @@ function showLumpDetail(token) {
 
     let html = _headerStrip + _tabBar +
         `<div class="lump-tab-panel" id="lumpTabLogic_${_tk}"></div>` +
-        `<div class="lump-tab-panel" id="lumpTabClooms_${_tk}"></div>` +
+        `<div class="lump-tab-panel${lump.forked && !isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabClooms_${_tk}"></div>` +
         `<div class="lump-tab-panel${isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
 
     const e = _escHtml;
@@ -404,7 +404,7 @@ function showLumpDetail(token) {
         _srcHtml += `</div></div>`;
         html += _srcHtml;
 
-        html += `<div class="lump-tab-panel${!isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabContent_${_tk}">` +
+        html += `<div class="lump-tab-panel${!isNamespace && !lump.forked ? ' lump-tab-panel-active' : ''}" id="lumpTabContent_${_tk}">` +
                 `<div id="lumpContentBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
         html += `<div class="lump-tab-panel" id="lumpTabTokens_${_tk}">` +
                 `<div id="lumpTokensBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
