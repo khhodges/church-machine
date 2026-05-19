@@ -1197,8 +1197,14 @@ function compileAndBuild() {
             const _showErrs = [];
             for (const r of _auditErrors) {
                 if (r.ruleId === 'RCI' && Array.isArray(r.violations) && r.violations.length > 0) {
+                    const _beforeLen = _showErrs.length;
                     for (const v of r.violations) {
-                        _showErrs.push({ line: v.sourceLine || null, message: `[RCI] ${v.msg}` });
+                        if (v.sourceLine != null && v.sourceLine > 0) {
+                            _showErrs.push({ line: v.sourceLine, message: `[RCI] ${v.msg}` });
+                        }
+                    }
+                    if (_showErrs.length === _beforeLen) {
+                        _showErrs.push({ line: null, message: `[RCI] ${r.message} \u2014 ${r.detail}` });
                     }
                 } else {
                     _showErrs.push({ line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}` });
@@ -1536,8 +1542,14 @@ function auditLumpOnly() {
             const _aloShowErrs = [];
             for (const r of auditErrors) {
                 if (r.ruleId === 'RCI' && Array.isArray(r.violations) && r.violations.length > 0) {
+                    const _beforeLen = _aloShowErrs.length;
                     for (const v of r.violations) {
-                        _aloShowErrs.push({ line: v.sourceLine || null, message: `[RCI] ${v.msg}` });
+                        if (v.sourceLine != null && v.sourceLine > 0) {
+                            _aloShowErrs.push({ line: v.sourceLine, message: `[RCI] ${v.msg}` });
+                        }
+                    }
+                    if (_aloShowErrs.length === _beforeLen) {
+                        _aloShowErrs.push({ line: null, message: `[RCI] ${r.message} \u2014 ${r.detail}` });
                     }
                 } else {
                     _aloShowErrs.push({ line: null, message: `[${r.ruleId}] ${r.message} \u2014 ${r.detail}` });
