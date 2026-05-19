@@ -116,9 +116,18 @@
             if (resolvePickerRow) {
                 var _rsSlot  = parseInt(resolvePickerRow.dataset.slot, 10);
                 var _rsNsIdx = parseInt(resolvePickerRow.dataset.nsIdx, 10);
+                var _rsName  = resolvePickerRow.dataset.name || '';
                 var _rsSim = (typeof sim !== 'undefined') ? sim : null;
                 if (_rsSim && _rsSim.resolvePendingSlot) {
-                    _rsSim.resolvePendingSlot(_rsSlot, _rsNsIdx);
+                    var _rsResult = _rsSim.resolvePendingSlot(_rsSlot, _rsNsIdx);
+                    if (_rsResult && _rsResult.ok && _rsName) {
+                        if (typeof _petNameCRMap !== 'undefined') {
+                            _petNameCRMap[_rsSlot] = _rsName;
+                        }
+                        if (_rsSim.nsLabels) {
+                            _rsSim.nsLabels[_rsNsIdx] = _rsName;
+                        }
+                    }
                 }
                 showViewer();
                 return;
@@ -749,7 +758,7 @@
         bodyRows += '<div class="clist-picker-section-header">System</div>';
         PICKER_SYSTEM.forEach(function (a) {
             bodyRows +=
-                '<div class="clist-resolve-row" data-slot="' + slotIdx + '" data-ns-idx="' + a.slot + '">' +
+                '<div class="clist-resolve-row" data-slot="' + slotIdx + '" data-ns-idx="' + a.slot + '" data-name="' + escHtml(a.name) + '">' +
                 '<span class="clist-resolve-ns-slot">NS[' + a.slot + ']</span>' +
                 '<span class="clist-resolve-name">' + escHtml(a.name) + '</span>' +
                 '<span class="clist-resolve-hint">' + escHtml(a.hint) + '</span>' +
@@ -768,7 +777,7 @@
                 try {
                     if (s.isNSEntryValid(li)) {
                         liveRows +=
-                            '<div class="clist-resolve-row" data-slot="' + slotIdx + '" data-ns-idx="' + li + '">' +
+                            '<div class="clist-resolve-row" data-slot="' + slotIdx + '" data-ns-idx="' + li + '" data-name="' + escHtml(_lbl) + '">' +
                             '<span class="clist-resolve-ns-slot">NS[' + li + ']</span>' +
                             '<span class="clist-resolve-name">' + escHtml(_lbl) + '</span>' +
                             '<span class="clist-resolve-hint">live</span>' +
