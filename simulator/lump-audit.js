@@ -224,6 +224,18 @@ function lumpAudit(words, manifest) {
         const _rciBranchOp  = 17;
         const _rciViolations = [];
 
+        // Build capability-name context for violation messages (e.g. "[0]='SlideRule'")
+        const _rciPetNames = manifest && manifest.pet_names && manifest.pet_names.CR
+            ? manifest.pet_names.CR : {};
+        const _rciDefinedSlots = [];
+        for (let _s = 0; _s < cc; _s++) {
+            const _n = _rciPetNames[String(_s)];
+            _rciDefinedSlots.push(_n ? `[${_s}]='${_n}'` : `[${_s}]`);
+        }
+        const _rciSlotHint = _rciDefinedSlots.length > 0
+            ? `; defined: ${_rciDefinedSlots.join(', ')}`
+            : '';
+
         for (let wi = 1; wi <= cw && wi < actualWords; wi++) {
             const ww     = words[wi] >>> 0;
             const op     = (ww >>> 27) & 0x1F;
@@ -235,7 +247,8 @@ function lumpAudit(words, manifest) {
             // cc=0 means ambient-boot-c-list — slots are resolved at load time.
             if (_rciChurchOps.has(op) && crSrc === 6 && cc > 0 && slot >= cc) {
                 _rciViolations.push(
-                    `word[${wi}] ${_rciOpName[op]}: c-list slot ${slot} \u2265 cc=${cc}`
+                    `word[${wi}] ${_rciOpName[op]}: c-list slot ${slot} out of range` +
+                    ` (cc=${cc}${_rciSlotHint})`
                 );
             }
 

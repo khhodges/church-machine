@@ -162,7 +162,7 @@ function _getSyntaxSuggestion(msg) {
             example: _escHtml(lbl) + ':               ; ← declare the label\n    DREAD  DR1, CR3, #0\n    IADD   DR1, DR1, #1\n    BRANCH #' + _escHtml(lbl) + '   ; ← jump to it'
         };
     }
-    if (/not a known method|no method conventions registered/i.test(msg)) {
+    if (/not a known method|no method conventions/i.test(msg)) {
         return {
             title: 'Unknown method name',
             body: 'The dot-name you used doesn\'t match any registered method. Use a numeric selector (0–15) or check the abstraction\'s C-list.',
