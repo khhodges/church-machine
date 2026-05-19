@@ -1071,6 +1071,139 @@ console.log('\n--- T012: Two threads with different pause durations — step() d
     check('T012-E11: machine NOT halted throughout', !sim.halted);
 }
 
+// ── T_RESOLVE: resolvePendingSlot() — interactive "Resolve Now" ──────────────
+console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
+{
+    // ── shared constants ────────────────────────────────────────────────────
+    const CLIST_BASE  = 0x0200;   // safe scratch area in memory
+    const CLIST_COUNT = 4;        // c-list has 4 slots
+    const PENDING_SLOT = 1;       // the slot we put the pending sentinel into
+    const NS_SLOT      = 5;       // the NS entry we will resolve toward
+    const PET_NAME     = 'TestCapability';
+
+    // Helper: build a fresh simulator wired with a minimal c-list + NS entry.
+    function makeResolveSim() {
+        const { sim } = makeTestSim();   // bootComplete=true, fresh registry
+
+        // CR6 — points at the c-list
+        if (!sim.cr) sim.cr = new Array(16).fill(null);
+        sim.cr[6] = {
+            word0: 1,                    // non-zero → CR6 is "present"
+            word1: CLIST_BASE,           // base address of c-list in memory
+            // word2 is parsed for clistCount via parseNSWord1()
+            word2: sim.packNSWord1(CLIST_COUNT, 0, 0, 0, CLIST_COUNT),
+            word3: 0,
+        };
+
+        // Valid NS entry at NS_SLOT — any non-zero word0 satisfies isNSEntryValid
+        const nsBase = sim.NS_TABLE_BASE + NS_SLOT * sim.NS_ENTRY_WORDS;
+        sim.memory[nsBase]     = 1;   // word0 non-zero → entry is valid
+        sim.memory[nsBase + 1] = sim.packNSWord1(64, 0, 0, 1, 0);
+
+        // Write a pending sentinel into the c-list at PENDING_SLOT
+        const pendingGT = ChurchSimulator.makePendingGT(PET_NAME);
+        sim.memory[CLIST_BASE + PENDING_SLOT] = pendingGT;
+
+        return { sim, pendingGT };
+    }
+
+    // ── T_RESOLVE_A: happy path — slot is overwritten with a live E-perm GT ─
+    {
+        const { sim } = makeResolveSim();
+        const result = sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);
+
+        check('T_RESOLVE_A1: returns ok=true', result.ok === true);
+        check('T_RESOLVE_A2: result.nsIdx matches requested NS_SLOT',
+              result.nsIdx === NS_SLOT);
+        check('T_RESOLVE_A3: result.pendingName matches pet name',
+              result.pendingName === PET_NAME);
+
+        const written = sim.memory[CLIST_BASE + PENDING_SLOT] >>> 0;
+        check('T_RESOLVE_A4: memory slot is no longer a pending sentinel',
+              !ChurchSimulator.isPendingGT(written));
+        check('T_RESOLVE_A5: written GT encodes NS_SLOT in low 16 bits',
+              (written & 0xFFFF) === NS_SLOT);
+
+        // E-perm GT: dom=1 (bit27), perm3=4 (bits30:28 = 0b100)
+        check('T_RESOLVE_A6: written GT has E-permission encoding',
+              ((written >>> 27) & 0x1F) === 0b01001);
+        check('T_RESOLVE_A7: result.gt matches the word written to memory',
+              (result.gt >>> 0) === written);
+    }
+
+    // ── T_RESOLVE_B: double-resolve rejected — slot is no longer pending ─────
+    {
+        const { sim } = makeResolveSim();
+        sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);   // first resolve succeeds
+        const result2 = sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);  // second
+
+        check('T_RESOLVE_B1: double-resolve returns ok=false',
+              result2.ok === false);
+        check('T_RESOLVE_B2: error mentions "pending"',
+              typeof result2.error === 'string' &&
+              result2.error.toLowerCase().includes('pending'));
+    }
+
+    // ── T_RESOLVE_C: invalid nsIdx — NS entry is empty (never written) ───────
+    {
+        const { sim } = makeResolveSim();
+        const EMPTY_NS_SLOT = 99;  // nothing written there → isNSEntryValid=false
+        const result = sim.resolvePendingSlot(PENDING_SLOT, EMPTY_NS_SLOT);
+
+        check('T_RESOLVE_C1: invalid nsIdx returns ok=false', result.ok === false);
+        check('T_RESOLVE_C2: error mentions the NS slot index',
+              typeof result.error === 'string' &&
+              result.error.includes(String(EMPTY_NS_SLOT)));
+    }
+
+    // ── T_RESOLVE_D: out-of-range slotIdx — beyond c-list bounds ─────────────
+    {
+        const { sim } = makeResolveSim();
+        const OUT_OF_RANGE = CLIST_COUNT + 2;  // clearly beyond the 4-slot list
+        const result = sim.resolvePendingSlot(OUT_OF_RANGE, NS_SLOT);
+
+        check('T_RESOLVE_D1: out-of-range slotIdx returns ok=false',
+              result.ok === false);
+        check('T_RESOLVE_D2: error mentions the slot index',
+              typeof result.error === 'string' &&
+              result.error.includes(String(OUT_OF_RANGE)));
+        check('T_RESOLVE_D3: error mentions "out of range" or "range"',
+              result.error.toLowerCase().includes('range') ||
+              result.error.toLowerCase().includes('out'));
+    }
+
+    // ── T_RESOLVE_E: unbooted sim rejected ────────────────────────────────────
+    {
+        const { sim } = makeResolveSim();
+        sim.bootComplete = false;
+        const result = sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);
+
+        check('T_RESOLVE_E1: unbooted sim returns ok=false', result.ok === false);
+        check('T_RESOLVE_E2: error mentions "not booted" or "boot"',
+              typeof result.error === 'string' &&
+              (result.error.toLowerCase().includes('boot') ||
+               result.error.toLowerCase().includes('not booted')));
+    }
+
+    // ── T_RESOLVE_F: sim.output contains [RESOLVE] log line on success ────────
+    {
+        const { sim } = makeResolveSim();
+        const outputBefore = sim.output;
+        sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);
+
+        check('T_RESOLVE_F1: sim.output grew after successful resolve',
+              sim.output.length > outputBefore.length);
+        check('T_RESOLVE_F2: sim.output contains [RESOLVE] tag',
+              sim.output.includes('[RESOLVE]'));
+        check('T_RESOLVE_F3: [RESOLVE] line mentions the slot index',
+              sim.output.includes(`CR${PENDING_SLOT}`));
+        check('T_RESOLVE_F4: [RESOLVE] line mentions the NS slot',
+              sim.output.includes(`NS[${NS_SLOT}]`));
+        check('T_RESOLVE_F5: [RESOLVE] line contains the pet name',
+              sim.output.includes(PET_NAME));
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
