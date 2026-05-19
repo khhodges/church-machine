@@ -34,8 +34,22 @@
     const _CHURCH_OPS = new Set([0, 1, 8, 9]);
     const _OP_NAME    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
 
+    function _isPendingGT(wVal) {
+        return ((wVal >>> 0) >>> 16) === 0xFEED;
+    }
+
+    function _pendingGTName(wVal) {
+        const idx = (wVal >>> 0) & 0xFFFF;
+        // Try global registry first (browser); fall back to tag-based name.
+        if (typeof ChurchSimulator !== 'undefined' && ChurchSimulator.PENDING_GT_NAMES) {
+            return ChurchSimulator.PENDING_GT_NAMES[idx] || ('pending#' + idx);
+        }
+        return 'pending#' + idx;
+    }
+
     function _deriveName(wVal, nsLabels) {
         if (!wVal) return '';
+        if (_isPendingGT(wVal)) return _pendingGTName(wVal);
         const gtType = (wVal >>> 23) & 0x3;
         if (gtType === 3) {
             const abType = (wVal >>> 27) & 0x1F;

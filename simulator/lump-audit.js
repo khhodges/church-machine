@@ -343,6 +343,24 @@ function lumpAudit(words, manifest, lineNums) {
                     if (!_rpnSlotName[i + 1] && cap && cap.name) _rpnSlotName[i + 1] = String(cap.name);
                 }
             }
+            // Also recognise pending GT sentinels embedded in the binary's c-list area.
+            // A pending sentinel (bits[31:16] = 0xFEED) carries the pet name internally;
+            // treat it as named so it is not flagged as an unexplained null.
+            if (actualWords >= lumpSize && lumpSize > cc) {
+                const _rpnClistBase = lumpSize - cc;
+                for (let _si = 0; _si < cc; _si++) {
+                    const _rpnGT = (words[_rpnClistBase + _si] >>> 0);
+                    if ((_rpnGT >>> 16) === 0xFEED && !_rpnSlotName[_si + 1]) {
+                        const _rpnPendIdx = _rpnGT & 0xFFFF;
+                        const _rpnPendName = (typeof ChurchSimulator !== 'undefined' &&
+                            ChurchSimulator.PENDING_GT_NAMES &&
+                            ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx])
+                            ? ChurchSimulator.PENDING_GT_NAMES[_rpnPendIdx]
+                            : ('pending#' + _rpnPendIdx);
+                        _rpnSlotName[_si + 1] = '\u29d6 ' + _rpnPendName + ' (pending)';
+                    }
+                }
+            }
 
             // Scan Church instructions for unnamed-slot references.
             const _rpnChurchOps = new Set([0, 1, 8, 9]);

@@ -1805,6 +1805,42 @@
     font-style: italic;
 }
 
+/* ── Pending GT slot (declared, not yet introduced to a live GT) ───────── */
+.clist-row--pending {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(200, 130, 30, 0.07);
+    border-left: 2px solid #b87820;
+    opacity: 0.85;
+    cursor: default;
+}
+.clist-row--pending:hover {
+    background: rgba(200, 130, 30, 0.14);
+}
+.clist-pending-name {
+    font-size: 0.72rem;
+    color: #c98c30;
+    font-style: italic;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.clist-pending-badge {
+    font-size: 0.6rem;
+    color: #7a5820;
+    background: rgba(200, 130, 30, 0.18);
+    border: 1px solid rgba(200, 130, 30, 0.35);
+    border-radius: 3px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 /* Null row with a user-set pet name: full opacity, pointer cursor */
 .clist-row--null.clist-row--named {
     opacity: 0.75;

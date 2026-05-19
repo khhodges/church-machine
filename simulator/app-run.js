@@ -906,7 +906,13 @@ function _injectClistNow() {
                 continue;
             }
 
-            sim.memory[clistBase + i] = 0;
+            // Unknown name → pending sentinel (named but not yet introduced to a live GT).
+            // This preserves the pet name so the c-list viewer and fault messages can
+            // display it, instead of silently writing NULL and losing the identity.
+            const _pendingWord = (typeof ChurchSimulator !== 'undefined' && ChurchSimulator.makePendingGT)
+                ? ChurchSimulator.makePendingGT(capName)
+                : 0;
+            sim.memory[clistBase + i] = _pendingWord >>> 0;
         }
 
         sim.memory[lumpBase] = ((lumpHdr & ~0xFF) | (cc & 0xFF)) >>> 0;

@@ -3102,13 +3102,39 @@ class ChurchSimulator {
             this.fault(check.fault, `LOAD: CR${d.crSrc}: ${check.message}`);
             return null;
         }
-        const slotGT = this.memory[clistLoc + d.imm] || 0;
+        let slotGT = this.memory[clistLoc + d.imm] || 0;
         if (slotGT === 0) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[d.imm];
             const _pcn = _pce ? (typeof _pce === 'string' ? _pce : (_pce.name || null)) : null;
             this.fault('NULL_CAP', `LOAD: c-list offset ${d.imm}${_pcn ? ` (${_pcn})` : ''} is empty (NULL GT)`);
             return null;
+        }
+        // ── Lazy-Resolve: pending GT intercept ────────────────────────────────
+        // A pending sentinel (0xFEED____) means the slot has a declared pet name
+        // but has not yet been introduced to a live GT.  Attempt instant resolution
+        // for system abstractions with a fixed NS label; fire a structured fault
+        // (LAZY_RESOLVE_PENDING) for instance-specific abstractions.
+        if (ChurchSimulator.isPendingGT(slotGT)) {
+            const _pendingName = ChurchSimulator.pendingGTName(slotGT);
+            let _resolvedNsIdx = -1;
+            for (const [_ridx, _rlbl] of Object.entries(this.nsLabels)) {
+                if (String(_rlbl).toUpperCase() === _pendingName.toUpperCase()) {
+                    _resolvedNsIdx = parseInt(_ridx, 10);
+                    break;
+                }
+            }
+            if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
+                const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                this.memory[clistLoc + d.imm] = _resolvedGT >>> 0;
+                slotGT = _resolvedGT >>> 0;
+                this.output += `[LAZY-RESOLVE] Slot ${d.imm} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
+            } else {
+                this.fault('LAZY_RESOLVE_PENDING',
+                    `LOAD: c-list slot ${d.imm} "${_pendingName}" is pending \u2014 not yet introduced to a live GT`,
+                    { petName: _pendingName, slot: d.imm });
+                return null;
+            }
         }
         const slotParsed = this.parseGT(slotGT);
 
@@ -6418,12 +6444,42 @@ ChurchSimulator.FAULT_CODES = {
     HANDLER: null, PERMISSION: null, TYPE: null, THREAD: null,
     LUMP_MAGIC: null, LUMP_SIZE: null, LUMP_LAYOUT: null, LUMP_OOM: null,
     NO_CODE: null, PRIVATE_METHOD: null, CODE_NOT_RESIDENT: null, PRIV_REG: null,
+    LAZY_RESOLVE_PENDING: null,
 };
 
 // Task #1077: Scheduler NS slot constants (also available as module-scope consts
 // above, but exposed on the class for external test code).
 ChurchSimulator.SCHEDULER_NS_SLOT     = SCHEDULER_NS_SLOT;
 ChurchSimulator.SCHEDULER_IRQ_NS_SLOT = SCHEDULER_IRQ_NS_SLOT;
+
+// ── Lazy-Resolve: Pending GT sentinel (Task #1446) ─────────────────────────
+// A pending GT carries the magic tag 0xFEED in bits[31:16] and a pet-name
+// index in bits[15:0].  The name index references PENDING_GT_NAMES[].
+// Sentinel values cannot appear as valid GTs:
+//   • Valid GT bits[31:25] = permission bits (max 0x7F = 0b1111111)
+//   • Valid GT bits[24:23] = type (0–3)
+//   • The upper 16 bits of a max-permission Inform GT = 0b1111111_11 = 0x1FF << 7… 
+//     but packed as (perm<<25)|(type<<23) the upper 16 bits can reach at most 0xFF80.
+//   • 0xFEED (>= 0xFF80 for the top byte 0xFE = 0b11111110) is safely distinct.
+ChurchSimulator.PENDING_GT_TAG   = 0xFEED;  // upper 16 bits of any pending sentinel
+ChurchSimulator.PENDING_GT_NAMES = [];       // static registry: index → pet name string
+
+ChurchSimulator.isPendingGT = function (word) {
+    return ((word >>> 0) >>> 16) === 0xFEED;
+};
+
+ChurchSimulator.makePendingGT = function (petName) {
+    const names = ChurchSimulator.PENDING_GT_NAMES;
+    let idx = names.indexOf(petName);
+    if (idx < 0) { idx = names.length; names.push(petName); }
+    if (idx > 0xFFFF) idx = 0xFFFF;  // clamp (won't happen in practice)
+    return (0xFEED0000 | (idx & 0xFFFF)) >>> 0;
+};
+
+ChurchSimulator.pendingGTName = function (word) {
+    const idx = (word >>> 0) & 0xFFFF;
+    return ChurchSimulator.PENDING_GT_NAMES[idx] || ('pending#' + idx);
+};
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ChurchSimulator;

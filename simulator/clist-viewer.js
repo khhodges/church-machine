@@ -296,6 +296,20 @@
             var rawWord = gtWords[i] >>> 0;
             var isNull  = rawWord === 0;
 
+            // ── Pending GT slot (named, not yet introduced to a live GT) ──────
+            var _CSSim  = (typeof ChurchSimulator !== 'undefined') ? ChurchSimulator : null;
+            var isPending = !isNull && _CSSim && _CSSim.isPendingGT && _CSSim.isPendingGT(rawWord);
+            if (isPending) {
+                var _pendingName = _CSSim.pendingGTName(rawWord);
+                html += '<div class="clist-row clist-row--pending" data-slot="' + i + '" tabindex="-1" ' +
+                    'title="' + escHtml(_pendingName) + ' \u2014 declared but not yet introduced to a live GT">' +
+                    '<span class="clist-slot">CR' + i + '</span>' +
+                    '<span class="clist-pending-name">' + escHtml(_pendingName) + '</span>' +
+                    '<span class="clist-pending-badge">not yet introduced</span>' +
+                    '</div>';
+                continue;
+            }
+
             if (isNull) {
                 var _nullPet = (petMap && (petMap[i] || petMap[String(i)])) ||
                                (_nullSlotPetNames && (_nullSlotPetNames[i] || _nullSlotPetNames[String(i)])) || '';
