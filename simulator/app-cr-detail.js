@@ -293,10 +293,22 @@ function _showAsmErrors(errors, titleOverride) {
                   + '</span>';
         }
         if (sugg) {
+            var absMatch = e.message.match(/on ['"]([^'"]+)['"]/i);
+            var absName = absMatch ? absMatch[1] : null;
+            var pickBtn = '';
+            if (absName && typeof apiLookupByName !== 'undefined' && apiLookupByName(absName)) {
+                pickBtn = '<button type="button" class="asm-error-pick-btn"'
+                    + ' data-abs="' + _escHtml(absName) + '"'
+                    + (e.colStart != null ? ' data-col-start="' + e.colStart + '"' : '')
+                    + (e.colEnd   != null ? ' data-col-end="'   + e.colEnd   + '"' : '')
+                    + (e.line     != null ? ' data-line-pick="'  + e.line     + '"' : '')
+                    + '>Browse ' + _escHtml(absName) + ' methods \u2192</button>';
+            }
             html += '<div class="asm-error-suggestion">'
                   + '<div class="aes-title">&#x1F4A1; ' + sugg.title + '</div>'
                   + '<div class="aes-body">' + sugg.body + '</div>'
                   + '<pre class="aes-example">' + _escHtml(sugg.example) + '</pre>'
+                  + pickBtn
                   + '</div>';
         }
         html += '</li>';
@@ -306,6 +318,31 @@ function _showAsmErrors(errors, titleOverride) {
     panel.querySelectorAll('.asm-error-item[data-line]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             _jumpToAsmLine(parseInt(btn.getAttribute('data-line'), 10));
+        });
+    });
+    panel.querySelectorAll('.asm-error-pick-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            var absName  = btn.getAttribute('data-abs');
+            var linePick = parseInt(btn.getAttribute('data-line-pick'), 10);
+            var colStart = parseInt(btn.getAttribute('data-col-start'), 10);
+            var colEnd   = parseInt(btn.getAttribute('data-col-end'),   10);
+            if (typeof window._showApiPopupForAbs === 'function') {
+                window._showApiPopupForAbs(absName, btn, function(methodName) {
+                    var editor = document.getElementById('asmEditor');
+                    if (!editor) return;
+                    if (!isNaN(linePick) && !isNaN(colStart) && !isNaN(colEnd)) {
+                        var lines = editor.value.split('\n');
+                        var idx = linePick - 1;
+                        if (lines[idx] !== undefined) {
+                            lines[idx] = lines[idx].slice(0, colStart) + methodName + lines[idx].slice(colEnd);
+                            editor.value = lines.join('\n');
+                            if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
+                            if (typeof assembleAndLoad === 'function') assembleAndLoad();
+                        }
+                    }
+                });
+            }
         });
     });
     panel.style.display = 'flex';

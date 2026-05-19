@@ -1,0 +1,44 @@
+{
+  "token": "4ea370af",
+  "abstraction": "Abstraction:  NoteGAssembly",
+  "ns_slot": null,
+  "lump_size": 256,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 141,
+  "cc": 0,
+  "profile": "IoT",
+  "language": "assembly",
+  "author": "",
+  "version": "2026.05.19",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "run",
+      "offset": 0,
+      "length": 141
+    }
+  ],
+  "capabilities": [],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "8e4928a9"
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-05-19T11:45:13.426223Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "lump_version": 1,
+  "compiled_at": 1779191113.4271011
+}

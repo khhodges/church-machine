@@ -1154,6 +1154,33 @@
     overflow-x: auto;
 }
 
+.asm-error-pick-btn {
+    align-self: flex-start;
+    margin-top: 0.3rem;
+    padding: 0.22rem 0.6rem;
+    font-family: system-ui, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--church-gold);
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.asm-error-pick-btn:hover {
+    background: rgba(251, 191, 36, 0.18);
+    border-color: rgba(251, 191, 36, 0.65);
+}
+.api-popup-method-row-pick {
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.12s;
+}
+.api-popup-method-row-pick:hover {
+    background: rgba(251, 191, 36, 0.12);
+}
+
 .hw-led-label {
     font-size: 0.62rem;
     font-weight: 700;

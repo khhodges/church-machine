@@ -1772,5 +1772,55 @@
     "grants": [
       "E"
     ]
+  },
+  {
+    "token": "ee298a27",
+    "abstraction": "Abstraction:  CapabilityTest",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 23,
+    "cc": 6,
+    "author": "",
+    "version": "2026.05.18",
+    "lump_version": 1,
+    "compiled_at": 1779134196.3786364,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 23,
+        "pet_names": {
+          "DR": {},
+          "CR": {
+            "0": "LED0"
+          }
+        }
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "4ea370af",
+    "abstraction": "Abstraction:  NoteGAssembly",
+    "ns_slot": null,
+    "lump_size": 256,
+    "cw": 141,
+    "cc": 0,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779191113.4271011,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 141
+      }
+    ],
+    "grants": [
+      "E"
+    ]
   }
 ]

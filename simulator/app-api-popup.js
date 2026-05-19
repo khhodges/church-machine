@@ -27,6 +27,7 @@
     let _hoverTimer = null;
     let _currentToken = null;
     let _mouseX = 0, _mouseY = 0;
+    let _pickCallback = null;
 
     // ── Create popup DOM element ──────────────────────────────────────────────
     function _getPopup() {
@@ -112,12 +113,16 @@
             const shownMethods = abs.methods.slice(0, 6);
             const more = abs.methods.length > 6 ? ` +${abs.methods.length - 6} more` : '';
             const methodsHtml = shownMethods.length > 0
-                ? `<div class="api-popup-method-list">${shownMethods.map(m =>
-                    `<div class="api-popup-method-row">
+                ? `<div class="api-popup-method-list">${shownMethods.map(m => {
+                    const pickAttr = _pickCallback
+                        ? ` data-pick-method="${_esc(m.name)}" role="button" tabindex="0" title="Insert ${_esc(m.name)}"`
+                        : '';
+                    const pickClass = _pickCallback ? ' api-popup-method-row-pick' : '';
+                    return `<div class="api-popup-method-row${pickClass}"${pickAttr}>
                       <code class="api-popup-method-sig">${_esc(m.name)}</code>
                       <span class="api-popup-method-brief">${_esc(m.description)}</span>
-                    </div>`
-                  ).join('')}${more ? `<div class="api-popup-method-more">${more}</div>` : ''}</div>`
+                    </div>`;
+                  }).join('')}${more ? `<div class="api-popup-method-more">${more}</div>` : ''}</div>`
                 : '<div class="api-popup-method-list api-popup-empty">No callable methods (boot / value type)</div>';
 
             return `
@@ -148,6 +153,28 @@ ${methodsHtml}
             .replace(/"/g, '&quot;');
     }
 
+    // ── Public: show popup for a named abstraction with optional pick callback ─
+    // Called from the "Unknown method" error button in the assembler error panel.
+    // absName  — canonical abstraction name, e.g. 'SlideRule'
+    // anchorEl — DOM element to position the popup near (optional)
+    // onPick   — called with the method name string when user clicks a method row
+    window._showApiPopupForAbs = function(absName, anchorEl, onPick) {
+        if (typeof apiLookupByName === 'undefined') return;
+        const abs = apiLookupByName(absName);
+        if (!abs) return;
+        _pickCallback = onPick || null;
+        const entry = { abs, method: null };
+        let x = Math.max(8, Math.floor(window.innerWidth / 2) - 160);
+        let y = Math.max(8, Math.floor(window.innerHeight / 4));
+        if (anchorEl) {
+            const r = anchorEl.getBoundingClientRect();
+            x = r.left;
+            y = r.bottom + 4;
+        }
+        _currentToken = absName;
+        _showPopup(entry, x, y);
+    };
+
     // ── Navigate to Reference panel for the given NS slot ─────────────────────
     window._apiPopupGoToRef = function(slot) {
         _hidePopup();
@@ -167,9 +194,20 @@ ${methodsHtml}
         const popup = _getPopup();
         popup.innerHTML = html;
         _positionPopup(popup, x, y);
+        if (_pickCallback) {
+            popup.querySelectorAll('[data-pick-method]').forEach(function(row) {
+                row.addEventListener('click', function() {
+                    const mName = row.getAttribute('data-pick-method');
+                    const cb = _pickCallback;
+                    _hidePopup();
+                    if (cb) cb(mName);
+                });
+            });
+        }
     }
 
     function _hidePopup() {
+        _pickCallback = null;
         _currentToken = null;
         const popup = _getPopup();
         popup.style.display = 'none';
