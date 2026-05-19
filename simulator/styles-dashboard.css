@@ -5126,7 +5126,7 @@ mark.abs-search-highlight {
 
 .lumps-detail-panel .panel {
     height: 100%;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 }

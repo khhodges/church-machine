@@ -287,6 +287,8 @@
     display: none;
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
+    padding-bottom: 1.5rem;
 }
 
 .lump-ws-panel-active {
