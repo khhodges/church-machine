@@ -586,9 +586,15 @@ function onLangChange(restoring) {
 
     const scroll = document.getElementById('exampleTabsScroll');
     if (scroll) {
+        const allowedSet = langExampleGroups[lang] || [];
+        // If this language has tabs, ensure the row container is visible — it may
+        // have been hidden by _applySealedLumpState while in Assembly mode.
+        if (allowedSet.length > 0) {
+            const tabsRow = document.querySelector('.example-tabs-row');
+            if (tabsRow) tabsRow.style.display = '';
+        }
         // Built-in example tabs: hide all when in personal mode, else show only this lang's set
         const tabs = scroll.querySelectorAll('.example-tab:not(.user-tab)');
-        const allowedSet = langExampleGroups[lang] || [];
         tabs.forEach(tab => {
             const ex = tab.getAttribute('data-example');
             tab.style.display = allowedSet.includes(ex) ? '' : 'none';
