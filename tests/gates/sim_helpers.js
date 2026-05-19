@@ -39,7 +39,7 @@ function setupCR6(sim) {
     sim.cr[6] = {
         word0: eGT,
         word1: 500,
-        word2: sim.packNSWord1(0, 0, 0, 0, 0, 1, 2),
+        word2: sim.packNSWord1(2, 0, 0, 0, 2),
         word3: 0,
         m:     0,
     };
