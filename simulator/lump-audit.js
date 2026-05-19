@@ -240,7 +240,9 @@ function lumpAudit(words, manifest, lineNums) {
             const ww     = words[wi] >>> 0;
             const op     = (ww >>> 27) & 0x1F;
             const crSrc  = (ww >>> 15) & 0xF;
-            const slot   =  ww         & 0x7FFF;
+            // ELOADCALL imm15 = (methodIdx<<8)|clistSlot — slot is only bits[7:0].
+            // All other Church ops (LOAD/SAVE/XLOADLAMBDA) use the full imm15 as slot.
+            const slot   = op === 8 ? (ww & 0xFF) : (ww & 0x7FFF);
             const codeIdx = wi - 1;   // 0-based index within the code section
 
             // Slot-bounds check only applies when the LUMP has its own c-list.

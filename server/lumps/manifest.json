@@ -1844,5 +1844,49 @@
     "grants": [
       "E"
     ]
+  },
+  {
+    "token": "0baf5e0e",
+    "abstraction": "NoteGPublishedBug",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 47,
+    "cc": 1,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196425.0926192,
+    "methods": [
+      {
+        "name": "compute",
+        "offset": 0,
+        "length": 47
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "5a93ce79",
+    "abstraction": "BernoulliNumbers",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 15,
+    "cc": 1,
+    "author": "",
+    "version": "2026.05.19",
+    "lump_version": 1,
+    "compiled_at": 1779196431.7378151,
+    "methods": [
+      {
+        "name": "compute",
+        "offset": 0,
+        "length": 15
+      }
+    ],
+    "grants": [
+      "E"
+    ]
   }
 ]

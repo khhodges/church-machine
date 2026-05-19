@@ -1,0 +1,51 @@
+{
+  "token": "0baf5e0e",
+  "abstraction": "NoteGPublishedBug",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 47,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "symbolic",
+  "author": "",
+  "version": "2026.05.19",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "compute",
+      "offset": 0,
+      "length": 47
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "SlideRule",
+      "rights": [],
+      "grants": [],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "d7a10ec0"
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-05-19T13:13:45.092151Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "lump_version": 1,
+  "compiled_at": 1779196425.0926192
+}
