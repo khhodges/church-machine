@@ -10,7 +10,7 @@
   "profile": "IoT",
   "language": "assembly",
   "author": "",
-  "version": "2026.05.20",
+  "version": "2026.05.19",
   "release_notes": "",
   "methods": [
     {
@@ -33,12 +33,13 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-05-20T13:24:57.204132Z",
+    "built_at": "2026-05-19T11:45:13.426223Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
-  "lump_version": 2,
-  "compiled_at": 1779283497.204894
+  "lump_version": 1,
+  "compiled_at": 1779191113.4271011,
+  "archived_version": 1
 }

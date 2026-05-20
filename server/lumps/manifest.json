@@ -1802,28 +1802,6 @@
     ]
   },
   {
-    "token": "4ea370af",
-    "abstraction": "Abstraction:  NoteGAssembly",
-    "ns_slot": null,
-    "lump_size": 256,
-    "cw": 141,
-    "cc": 0,
-    "author": "",
-    "version": "2026.05.19",
-    "lump_version": 1,
-    "compiled_at": 1779191113.4271011,
-    "methods": [
-      {
-        "name": "run",
-        "offset": 0,
-        "length": 141
-      }
-    ],
-    "grants": [
-      "E"
-    ]
-  },
-  {
     "token": "95a651e7",
     "abstraction": "NoteG",
     "ns_slot": null,
@@ -2062,6 +2040,28 @@
         "name": "run",
         "offset": 0,
         "length": 22
+      }
+    ],
+    "grants": [
+      "E"
+    ]
+  },
+  {
+    "token": "4ea370af",
+    "abstraction": "Abstraction:  NoteGAssembly",
+    "ns_slot": null,
+    "lump_size": 256,
+    "cw": 141,
+    "cc": 0,
+    "author": "",
+    "version": "2026.05.20",
+    "lump_version": 2,
+    "compiled_at": 1779283497.204894,
+    "methods": [
+      {
+        "name": "run",
+        "offset": 0,
+        "length": 141
       }
     ],
     "grants": [
