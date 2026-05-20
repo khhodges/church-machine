@@ -84,6 +84,7 @@ function showLumpDetail(token) {
     let _tabBar = `<div class="lump-tabs-bar" id="lumpTabBar_${_tk}">`;
     if (!isNamespace) {
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','logic')">Logic</button>`;
+        _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','api')">API</button>`;
         _tabBar += `<button class="lump-tab${lump.forked ? ' lump-tab-active' : ''}" id="lumpTabBtnClooms_${_tk}" onclick="_switchLumpTab('${_tk}','clooms')">CLOOMC<span class="lump-tab-fork-dot" id="lumpTabForkDot_${_tk}" style="display:${lump.forked ? 'inline' : 'none'}" title="Uncompiled — fork in progress"></span></button>`;
     }
     _tabBar += `<button class="lump-tab${isNamespace ? ' lump-tab-active' : ''}" onclick="_switchLumpTab('${_tk}','overview')">Overview</button>`;
@@ -98,6 +99,7 @@ function showLumpDetail(token) {
 
     let html = _headerStrip + _tabBar +
         `<div class="lump-tab-panel" id="lumpTabLogic_${_tk}"></div>` +
+        `<div class="lump-tab-panel" id="lumpTabApi_${_tk}"></div>` +
         `<div class="lump-tab-panel${lump.forked && !isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabClooms_${_tk}"></div>` +
         `<div class="lump-tab-panel${isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
 
@@ -1265,6 +1267,7 @@ function _switchLumpTab(tk, tab) {
     _lumpActiveTab[tk] = tab;
     const tabMap = {
         logic: `lumpTabLogic_${tk}`,
+        api: `lumpTabApi_${tk}`,
         clooms: `lumpTabClooms_${tk}`,
         overview: `lumpTabOverview_${tk}`,
         source: `lumpTabSource_${tk}`,
@@ -1282,7 +1285,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { logic: 'Logic', clooms: 'CLOOMC', overview: 'Overview', source: 'Source', content: 'Content', tokens: 'Tokens', versions: 'Versions', history: 'History', hexdump: 'Hex Dump' };
+            const labelMap = { logic: 'Logic', api: 'API', clooms: 'CLOOMC', overview: 'Overview', source: 'Source', content: 'Content', tokens: 'Tokens', versions: 'Versions', history: 'History', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -1290,6 +1293,9 @@ function _switchLumpTab(tk, tab) {
     const token = lump ? lump.token : tk;
     if (tab === 'logic' && lump) {
         _populateLumpLogicTab(lump, `lumpTabLogic_${tk}`);
+    }
+    if (tab === 'api' && lump) {
+        _populateLumpApiTab(lump, `lumpTabApi_${tk}`);
     }
     if (tab === 'clooms' && lump) {
         _populateLumpSourceTab(lump, `lumpTabClooms_${tk}`);
@@ -1314,6 +1320,123 @@ function _switchLumpTab(tk, tab) {
         _lumpHistoryLoaded[tk] = true;
         _fetchAndShowLumpHistory(token, lump);
     }
+}
+
+function _populateLumpApiTab(lump, panelId) {
+    const el = document.getElementById(panelId);
+    if (!el || el._apiLoaded) return;
+    el._apiLoaded = true;
+    const e = _escHtml;
+    const nsSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? parseInt(lump.ns_slot) : null;
+    const grants  = lump.grants || [];
+    const methods = lump.methods || [];
+    const caps    = lump.capabilities || [];
+    const cc      = parseInt(lump.cc) || 0;
+    const cw      = parseInt(lump.cw) || 0;
+    const sz      = parseInt(lump.lump_size) || 0;
+    const mtbf    = lump.mtbf || {};
+
+    let html = '<div class="lump-detail-sections">';
+
+    // ── 1. Call Contract ────────────────────────────────────────────────────
+    html += '<div class="lump-detail-section">';
+    html += '<div class="lump-section-title">Call Contract</div>';
+    html += '<table class="lump-detail-table"><tbody>';
+    if (nsSlot !== null) {
+        html += `<tr><td>NS Slot</td><td><strong>${nsSlot}</strong> \u2014 invoke via <code>CALL CRd, CR6, ${nsSlot}</code></td></tr>`;
+    } else {
+        html += `<tr><td>NS Slot</td><td><span style="color:var(--text-secondary);font-style:italic;">Floating \u2014 loaded by token 0x${e(lump.token || '')}</span></td></tr>`;
+    }
+    const permStr = grants.length ? grants.join('\u00a0|\u00a0') : '\u2014';
+    html += `<tr><td>Caller Grants</td><td><strong>${e(permStr)}</strong></td></tr>`;
+    html += `<tr><td>Token</td><td><code>0x${e(lump.token || '')}</code></td></tr>`;
+    if (lump.profile)  html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
+    if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
+    html += `<tr><td>Layout</td><td>${cw} code word${cw !== 1 ? 's' : ''} \u00b7 ${cc} c-list slot${cc !== 1 ? 's' : ''} \u00b7 ${sz} word${sz !== 1 ? 's' : ''} total</td></tr>`;
+    html += '</tbody></table>';
+    html += '</div>';
+
+    // ── 2. Methods ───────────────────────────────────────────────────────────
+    html += '<div class="lump-detail-section">';
+    html += `<div class="lump-section-title">Methods (${methods.length})</div>`;
+    if (methods.length === 0) {
+        html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">No methods declared in sidecar record.</div>';
+    } else {
+        html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>Offset</th><th>Words</th></tr></thead><tbody>';
+        methods.forEach((m, i) => {
+            const mname = m.name || `method_${i}`;
+            html += `<tr>`;
+            html += `<td style="color:var(--text-secondary);font-size:0.78rem;">${i}</td>`;
+            html += `<td><strong>${e(mname)}</strong>`;
+            if (m.description) html += `<br><span style="font-size:0.74rem;color:var(--text-secondary);">${e(m.description)}</span>`;
+            html += `</td>`;
+            html += `<td><code>+${m.offset !== undefined ? m.offset : i}</code></td>`;
+            html += `<td>${m.length !== undefined ? m.length : '\u2014'}</td>`;
+            html += `</tr>`;
+        });
+        html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    // ── 3. C-List / Capabilities ─────────────────────────────────────────────
+    html += '<div class="lump-detail-section">';
+    html += `<div class="lump-section-title">Capabilities \u2014 C-List (cc\u202f=\u202f${cc})</div>`;
+    if (cc === 0) {
+        html += '<div style="color:var(--text-secondary);font-style:italic;font-size:0.83rem;padding:0.25rem 0;">cc\u202f=\u202f0 \u2014 no private c-list; uses ambient boot c-list at runtime.</div>';
+    } else {
+        html += '<table class="lump-detail-table"><thead><tr><th>Slot</th><th>Name</th><th>GT Word</th><th>Role</th></tr></thead><tbody>';
+        for (let si = 0; si < cc; si++) {
+            const cap  = caps.find(c => c.slot === si);
+            const name = cap ? (cap.name || '\u2014') : '\u2014';
+            const gtRaw = cap ? (cap.gt || '') : '';
+            const isNull = !gtRaw || gtRaw === '0x00000000';
+            const gtDisplay = isNull
+                ? (cap && cap.initial === 'NULL_GT' ? '<span style="color:var(--text-secondary);font-style:italic;">NULL \u2014 runtime</span>' : '\u2014')
+                : `<code>${e(gtRaw)}</code>`;
+            const note  = cap ? (cap.filled_by ? `Filled by ${cap.filled_by}` : (cap.note || '')) : '';
+            const wired = cap && cap.wired_at_boot ? '\u00a0<span style="color:#22c55e;font-size:0.7rem;">\u26a1\u202fboot</span>' : '';
+            html += `<tr>`;
+            html += `<td style="font-family:monospace;color:#818cf8;">[${si}]</td>`;
+            html += `<td><strong style="color:#C89B3C;">${e(name)}</strong>${wired}</td>`;
+            html += `<td>${gtDisplay}</td>`;
+            html += `<td style="font-size:0.75rem;color:var(--text-secondary);">${e(note)}</td>`;
+            html += `</tr>`;
+        }
+        html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    // ── 4. Reliability ───────────────────────────────────────────────────────
+    if (mtbf.total_runs !== undefined || mtbf.status) {
+        html += '<div class="lump-detail-section">';
+        html += '<div class="lump-section-title">Reliability</div>';
+        html += '<table class="lump-detail-table"><tbody>';
+        const stColor = mtbf.status === 'stable' ? '#22c55e' : mtbf.status === 'amber' ? '#f59e0b' : mtbf.status === 'red' ? '#ef4444' : 'var(--text-secondary)';
+        html += `<tr><td>Status</td><td style="color:${stColor};font-weight:600;">${e(mtbf.status || 'unknown')}</td></tr>`;
+        if (mtbf.consecutive_clean !== undefined) html += `<tr><td>Clean runs</td><td>${parseInt(mtbf.consecutive_clean) || 0}</td></tr>`;
+        if (mtbf.total_runs       !== undefined) html += `<tr><td>Total runs</td><td>${parseInt(mtbf.total_runs) || 0}</td></tr>`;
+        if (mtbf.source_hash) html += `<tr><td>Source hash</td><td><code>${e(mtbf.source_hash)}</code></td></tr>`;
+        html += '</tbody></table>';
+        html += '</div>';
+    }
+
+    // ── 5. Identity ──────────────────────────────────────────────────────────
+    html += '<div class="lump-detail-section">';
+    html += '<div class="lump-section-title">Identity</div>';
+    html += '<table class="lump-detail-table"><tbody>';
+    html += `<tr><td>Abstraction</td><td>${e(lump.abstraction || '\u2014')}</td></tr>`;
+    if (lump.author)  html += `<tr><td>Author</td><td>${e(lump.author)}</td></tr>`;
+    if (lump.version) html += `<tr><td>Version</td><td>${e(lump.version)}</td></tr>`;
+    if (lump.compiled_at) {
+        const d = new Date(lump.compiled_at * 1000).toLocaleString(undefined, {month:'short', day:'numeric', year:'numeric'});
+        html += `<tr><td>Compiled</td><td>${e(d)}</td></tr>`;
+    }
+    if (lump.release_notes) html += `<tr><td>Notes</td><td>${e(lump.release_notes)}</td></tr>`;
+    html += '</tbody></table>';
+    html += '</div>';
+
+    html += '</div>';
+    el.innerHTML = html;
 }
 
 async function _fetchAndShowLumpVersions(token, lump) {

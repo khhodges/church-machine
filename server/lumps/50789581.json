@@ -9,7 +9,7 @@
   "cc": 2,
   "profile": "IoT",
   "language": "assembly",
-  "author": "",
+  "author": "KJHH",
   "version": "2026.05.19",
   "release_notes": "",
   "methods": [
@@ -25,7 +25,7 @@
       "name": "Tunnel.Send",
       "target_ns": 31,
       "wired_at_boot": true,
-      "note": "Tunnel E-GT (NS[31]) — wired at boot; used by Hello to forward the GTKN packet to the far-end Mum",
+      "note": "Tunnel E-GT (NS[31]) \u2014 wired at boot; used by Hello to forward the GTKN packet to the far-end Mum",
       "gt": "0x4880001f"
     },
     {
@@ -33,7 +33,7 @@
       "name": "Tunnel.mymother",
       "filled_by": "Connect",
       "initial": "NULL_GT",
-      "note": "Mum Outform E-GT — NULL at boot; injected by Keystone.Connect when a valid Mum identity word is presented"
+      "note": "Mum Outform E-GT \u2014 NULL at boot; injected by Keystone.Connect when a valid Mum identity word is presented"
     }
   ],
   "pet_names": {
