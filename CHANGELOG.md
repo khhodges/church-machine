@@ -53,6 +53,43 @@
 - **Sidecar**: `server/lumps/5e1f0081.json`. Manifest entry added to `server/lumps/manifest.json`.
 - **Consistency gate**: lump-consistency 126/126 passed (R1–R12 including the new token).
 
+### Service abstraction c-lists (Task #971)
+
+- **Single-authority model encoded in boot image**: 14 service abstractions (Salvation, Navana,
+  Mint, Memory, Scheduler, Stack, DijkstraFlag, Display, Abacus, GC, Thread, Billing,
+  TuringMemory, ChurchMemory) now have valid lump headers (`cw=0`, `cc>0`) and correctly
+  populated c-list GT tails written into the boot image at cold-boot time.
+- **`SERVICE_CLIST_DEFS` table** added to `server/boot_image.py` (line 230) — maps each
+  service slot to its POLA-minimum list of capability descriptors (Inform GTs or Abstract GTs).
+  `generate_boot_image()` iterates the table after the NS-loop, writes each lump header + c-list
+  tail, and corrects NS entry `word1` (`lim17 = lump_size − cc − 1`) and `word2` (seal).
+- **Mirrored in `simulator/simulator.js`** `_initNamespaceTable()` — parallel
+  `SERVICE_CLIST_DEFS` array at line 1198 uses the same format; applied after the main NS loop
+  and Boot.Abstr setup.
+- **Authority hierarchy**: Navana (5) sole NS writer — holds R|W token to namespace lump;
+  Memory (7) sole physical allocator — calls GC (44) under pressure; Mint (6) sole GT lifecycle
+  manager — delegates NS writes to Navana. All other service abstractions reach these three
+  exclusively through E-calls.
+- **`server/lumps/boot-image.bin` regenerated** to reflect all new c-lists.
+- **Files changed**: `server/boot_image.py`, `simulator/simulator.js`,
+  `server/lumps/boot-image.bin`.
+- **All tests green**: boot-image-matches-sim 6/6, boot-image-loads-and-boots 5/5,
+  lump-consistency 299/299, e2e-tests 44/44.
+
+### Keystone lump cc fix (token `50789581`)
+
+- **Dual-file drift corrected**: `server/lumps/50789581.lump` had `cc=0` in its binary header
+  (word[0] = `0xF8005800`) while the address-named reference copy `00002000.lump` correctly
+  has `cc=2`. This caused the lump viewer CC chip to display `0` for Keystone despite the
+  sidecar and manifest recording `cc=2`.
+- **Fix**: updated `50789581.lump` binary word[0] from `0xF8005800` → `0xF8005802` (cc: 0→2);
+  updated `50789581.json` sidecar `cc: 0 → 2`; updated `manifest.json` entry for token
+  `50789581` `cc: 0 → 2`.
+- **Files changed**: `server/lumps/50789581.lump`, `server/lumps/50789581.json`,
+  `server/lumps/manifest.json`.
+- **Consistency gate**: lump-consistency 299/299 passed including R5/R6 three-way cw/cc/lump_size
+  agreement for token `50789581`.
+
 ---
 
 ## Docs 1.2 — 2026-05-15
