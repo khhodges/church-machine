@@ -868,6 +868,32 @@ async function _populateLumpSourceTab(lump, targetId) {
                 constructs as building blocks) and place it in <code>simulator/cloomc/</code>.
             </div>
         </div>`;
+        // Async: check if a canonical source exists and append a Reset button if so.
+        if (absName) {
+            (async () => {
+                try {
+                    const _cr = await fetch(`/api/lump-source/${encodeURIComponent(absName)}`, { cache: 'no-store' });
+                    const _ct2 = _cr.headers.get('content-type') || '';
+                    if (_cr.ok && _ct2.includes('application/json')) {
+                        const _cj = await _cr.json();
+                        if (_cj && !_cj.binary_only && _cj.source) {
+                            const _notice = el.querySelector('.lump-source-binary-only-desc');
+                            if (_notice) {
+                                const _resetBtn = document.createElement('button');
+                                _resetBtn.className = 'btn lump-canonical-reset-btn';
+                                _resetBtn.textContent = 'Reset to canonical source';
+                                _resetBtn.style.marginTop = '0.75rem';
+                                _resetBtn.style.display = 'block';
+                                _resetBtn.addEventListener('click', () => {
+                                    _populateLumpSourceTab(lump, targetId);
+                                });
+                                _notice.appendChild(_resetBtn);
+                            }
+                        }
+                    }
+                } catch (_cfe) {}
+            })();
+        }
     };
 
     // No abstraction name → no source file can exist; show binary-only notice immediately
@@ -1703,7 +1729,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
 
     const editBtn = document.createElement('button');
     editBtn.className = 'btn lump-edit-btn';
-    editBtn.textContent = 'Edit';
+    editBtn.textContent = startOpen ? 'Close editor' : 'Edit';
     toolbar.appendChild(editBtn);
     wrapper.appendChild(toolbar);
 
@@ -1913,7 +1939,6 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     wrapper.appendChild(editorArea);
 
     if (startOpen) {
-        editBtn.style.display = 'none';
         preview.style.display = 'none';
         editorArea.style.display = '';
         restoreSplitRatio();
@@ -1932,14 +1957,24 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     });
 
     editBtn.addEventListener('click', () => {
-        _lumpEditDirty = true;
-        _lumpEditorOpen[tk] = true;
-        _draftLsSet(tk, ta.value);
-        editBtn.style.display = 'none';
-        preview.style.display = 'none';
-        editorArea.style.display = '';
-        restoreSplitRatio();
-        ta.focus();
+        const _editorVisible = editorArea.style.display !== 'none';
+        if (_editorVisible) {
+            // Toggle closed — hide editor, show preview, reset label (draft is preserved).
+            _lumpEditorOpen[tk] = false;
+            editorArea.style.display = 'none';
+            preview.style.display = '';
+            editBtn.textContent = 'Edit';
+        } else {
+            // Toggle open.
+            _lumpEditDirty = true;
+            _lumpEditorOpen[tk] = true;
+            _draftLsSet(tk, ta.value);
+            preview.style.display = 'none';
+            editorArea.style.display = '';
+            restoreSplitRatio();
+            ta.focus();
+            editBtn.textContent = 'Close editor';
+        }
     });
 
     cancelBtn.addEventListener('click', () => {
@@ -1955,7 +1990,7 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
         statusEl.textContent = '';
         editorArea.style.display = 'none';
         preview.style.display = '';
-        editBtn.style.display = '';
+        editBtn.textContent = 'Edit';
     });
 
     saveBtn.addEventListener('click', () => {
@@ -3549,13 +3584,45 @@ async function openLumpInEditor(token) {
 
     var asmEd = document.getElementById('asmEditor');
     if (asmEd) {
+        // Always clear any stale malformed-binary banner from a previous open.
+        var _existingMfBanner = document.getElementById('_lumpMalformedBanner');
+        if (_existingMfBanner) _existingMfBanner.remove();
+
         if (disasmLines) {
             asmEd.value = disasmLines.join('\n');
         } else {
-            var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
-            var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
-            asmEd.value = '; ' + lumpName + cwHint + ccHint +
-                          '\n; Boot the machine to edit live code\n';
+            // Binary parse failed — try canonical source as fallback.
+            var _malformedSrc = null;
+            var _absNameFb = lump.abstraction || '';
+            if (_absNameFb) {
+                try {
+                    var _sr = await fetch('/api/lump-source/' + encodeURIComponent(_absNameFb), { cache: 'no-store' });
+                    if (_sr.ok) {
+                        var _sj = await _sr.json();
+                        if (_sj && !_sj.binary_only && _sj.source) {
+                            _malformedSrc = _sj.source;
+                        }
+                    }
+                } catch (_sfe) {}
+            }
+            var _mfBannerMsg;
+            if (_malformedSrc) {
+                asmEd.value = _malformedSrc;
+                _mfBannerMsg = 'Binary is malformed \u2014 showing canonical source. Compile to rebuild the binary.';
+            } else {
+                var cwHint = (lump.cw  > 0) ? ('\n; Code region: ' + lump.cw  + ' word' + (lump.cw  !== 1 ? 's' : '')) : '';
+                var ccHint = (lump.cc  > 0) ? ('\n; C-List: '      + lump.cc  + ' GT slot' + (lump.cc  !== 1 ? 's' : '')) : '';
+                asmEd.value = '; ' + lumpName + cwHint + ccHint +
+                              '\n; Boot the machine to edit live code\n';
+                _mfBannerMsg = 'Binary is malformed \u2014 no canonical source found. Author a .cloomc file to enable source editing.';
+            }
+            // Show malformed-binary banner above the editor.
+            var _mfBanner = document.createElement('div');
+            _mfBanner.id = '_lumpMalformedBanner';
+            _mfBanner.className = 'lump-malformed-banner';
+            _mfBanner.innerHTML = _mfBannerMsg +
+                '<button class="lump-malformed-banner-dismiss" onclick="this.parentNode.remove()" title="Dismiss">\u00D7</button>';
+            if (asmEd.parentNode) asmEd.parentNode.insertBefore(_mfBanner, asmEd);
         }
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.

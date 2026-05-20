@@ -609,6 +609,32 @@
     border-bottom: 1px solid rgba(249, 168, 37, 0.2);
 }
 
+.lump-malformed-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 6px 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1a1000;
+    background: #f9a825;
+    border-bottom: 1px solid #c67c00;
+    border-radius: 3px 3px 0 0;
+    margin-bottom: 2px;
+}
+.lump-malformed-banner-dismiss {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #1a1000;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0 2px;
+    opacity: 0.7;
+    line-height: 1;
+}
+.lump-malformed-banner-dismiss:hover { opacity: 1; }
+
 .lump-source-status {
     padding: 5px 14px;
     font-size: 0.72rem;
