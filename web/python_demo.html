@@ -205,6 +205,69 @@
         footer a { color: #60a5fa; text-decoration: none; }
         footer a:hover { text-decoration: underline; }
 
+        /* ── Run demo button & output panel ─────────────────────────── */
+        .run-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .run-btn {
+            font-size: 0.8rem;
+            padding: 6px 18px;
+            border-radius: 5px;
+            border: 1px solid #daa520;
+            background: rgba(218,165,32,0.12);
+            color: #daa520;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 600;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .run-btn:hover:not(:disabled) { background: rgba(218,165,32,0.22); }
+        .run-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .run-status {
+            font-size: 0.75rem;
+            color: #60a5fa;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            min-height: 1.2em;
+        }
+        .run-status.err { color: #f87171; }
+        .output-panel {
+            background: #060a12;
+            border: 1px solid #1e2a3a;
+            border-left: 3px solid #daa520;
+            border-radius: 0 6px 6px 0;
+            padding: 16px 20px;
+            margin-bottom: 40px;
+            display: none;
+        }
+        .output-panel.visible { display: block; }
+        .output-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #daa520;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .output-pre {
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.78rem;
+            line-height: 1.65;
+            color: #c8d6e5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            margin: 0;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+        .output-pre.err { color: #f87171; }
+
         @media (max-width: 600px) {
             .page-wrap { padding: 20px 16px 28px; }
             pre { font-size: 0.7rem; }
@@ -646,6 +709,18 @@ Primitives: LOAD · SAVE · CALL · RETURN · CHANGE · SWITCH
 </pre>
     </div>
 
+    <!-- ── Run demo ─────────────────────────────────────────────── -->
+    <div class="run-bar">
+        <button class="run-btn" id="runBtn" onclick="runDemo()">
+            <span id="runIcon">▶</span> Run demo
+        </button>
+        <span class="run-status" id="runStatus"></span>
+    </div>
+    <div class="output-panel" id="outputPanel">
+        <div class="output-label">stdout</div>
+        <pre class="output-pre" id="outputPre"></pre>
+    </div>
+
 </div>
 
 <footer>
@@ -680,6 +755,74 @@ function copySource() {
             btn.classList.remove('copied');
         }, 2000);
     });
+}
+
+// ── Pyodide run demo ────────────────────────────────────────────────────────
+
+let _pyodide = null;
+
+function _setRunStatus(msg, isErr) {
+    const el = document.getElementById('runStatus');
+    el.textContent = msg;
+    el.className = 'run-status' + (isErr ? ' err' : '');
+}
+
+function _setRunBtn(loading) {
+    const btn = document.getElementById('runBtn');
+    const icon = document.getElementById('runIcon');
+    btn.disabled = loading;
+    icon.textContent = loading ? '⟳' : '▶';
+}
+
+async function _loadPyodide() {
+    if (_pyodide) return _pyodide;
+    _setRunStatus('Loading Python runtime…');
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+    document.head.appendChild(script);
+    await new Promise((res, rej) => { script.onload = res; script.onerror = rej; });
+    _setRunStatus('Initialising Pyodide…');
+    _pyodide = await loadPyodide();
+    _setRunStatus('');
+    return _pyodide;
+}
+
+async function runDemo() {
+    const runBtn = document.getElementById('runBtn');
+    const outputPanel = document.getElementById('outputPanel');
+    const outputPre = document.getElementById('outputPre');
+
+    _setRunBtn(true);
+    outputPanel.classList.remove('visible');
+    outputPre.className = 'output-pre';
+    outputPre.textContent = '';
+
+    try {
+        const pyodide = await _loadPyodide();
+        _setRunStatus('Running…');
+
+        // Extract plain Python source from the syntax-highlighted <pre>
+        const source = document.getElementById('sourceCode').innerText;
+
+        // Redirect stdout to a JS buffer
+        let stdout = '';
+        pyodide.setStdout({ batched: s => { stdout += s + '\n'; } });
+        pyodide.setStderr({ batched: s => { stdout += s + '\n'; } });
+
+        await pyodide.runPythonAsync(source);
+
+        outputPre.textContent = stdout.trimEnd();
+        outputPanel.classList.add('visible');
+        _setRunStatus('Done.');
+    } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        outputPre.textContent = msg;
+        outputPre.classList.add('err');
+        outputPanel.classList.add('visible');
+        _setRunStatus('Error — see output below.', true);
+    } finally {
+        _setRunBtn(false);
+    }
 }
 </script>
 </body>
