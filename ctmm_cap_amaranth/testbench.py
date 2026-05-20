@@ -1402,4 +1402,7 @@ def test_tperm_frame_exact():
 
 
 if __name__ == "__main__":
+    test_msave_happy_path()
+    test_mload_direct_mode()
+    test_mload_msave_round_trip()
     test_tperm_frame_exact()
