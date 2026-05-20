@@ -40,7 +40,7 @@ This document maps each instruction across all implementation layers for verific
 - [ ] RETURN: Verify stack pop, context restore (mask field not implemented — skip mask handling)
 - [ ] CHANGE: Verify thread switch, monitor clearing
 - [ ] SWITCH: Verify C-List context switch
-- [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Valid presets 0-9 (CLEAR through LS). Codes 10-15 reserved/ignored (Z=0, no FAULT): codes 10-12 violate E isolation (LE/SE/LSE expose abstraction internals); code 13 violates domain purity (cross-domain); codes 14-15 unassigned. Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-flag (bit 4 of imm) clears GT B-bit on pass. Named B-variants: RB, RWB, XB, RXB, RWXB, LB, SB, EB, LSB.
+- [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Valid presets 0-9 (CLEAR through LS). Codes 10-12 unconditionally reserved (RSV3/RSV4/RSV5, FAULT `TPERM_RSV`); code 13 = FRAME (call-stack query: Z=1 if real return frame present; no GT read); code 14 = EXACT (bit-exact identity check: Z=1 iff CRd.word0 == CRs.word0); code 15 = RSV1 (FAULT `TPERM_RSV`). Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-modifier (bit 4 of preset) recognised by assembler and simulator; hardware decoder currently reads only 4 bits — B-modifier clears GT B-bit in software only until the field is widened to silicon. Named B-variants: RB, RWB, XB, RXB, RWXB, LB, SB, EB, LSB.
 - [ ] LOADX: Verify monitor set, same validation as LOAD
 - [ ] SAVEX: Verify monitor check, conditional store, result in DR
 - [ ] LDM: Verify per-register mLoad validation, register list
@@ -96,12 +96,12 @@ This document maps each instruction across all implementation layers for verific
 | 7    | S     | S           | Lambda   | [ ]         | [x] Amaranth     |
 | 8    | E     | E           | Lambda   | [ ]         | [x] Amaranth     |
 | 9    | LS    | L,S         | Combo    | [ ]         | [x] Amaranth     |
-| 10   | —     | —           | Reserved — E+L illegal (E must be standalone) | [ ] | [x] Amaranth |
-| 11   | —     | —           | Reserved — E+S illegal (E must be standalone) | [ ] | [x] Amaranth |
-| 12   | —     | —           | Reserved — E+L+S illegal (E must be standalone) | [ ] | [x] Amaranth |
-| 13   | —     | —          | Reserved — cross-domain preset; illegal, raises FAULT | [ ] | [x] Amaranth |
-| 14   | RSVD  | FAULT       | Reserved | [ ]         | [x] Amaranth     |
-| 15   | RSVD  | FAULT       | Reserved | [ ]         | [x] Amaranth     |
+| 10   | RSV3  | FAULT (`TPERM_RSV`) | Unconditionally reserved | [ ] | [x] Amaranth |
+| 11   | RSV4  | FAULT (`TPERM_RSV`) | Unconditionally reserved | [ ] | [x] Amaranth |
+| 12   | RSV5  | FAULT (`TPERM_RSV`) | Unconditionally reserved | [ ] | [x] Amaranth |
+| 13   | FRAME | —           | Call-stack query: Z=1 if real return frame present; no GT read | [x] JS | [x] Amaranth |
+| 14   | EXACT | —           | Bit-exact identity check: Z=1 iff CRd.word0 == CRs.word0 | [x] JS | [x] Amaranth |
+| 15   | RSV1  | FAULT (`TPERM_RSV`) | Unconditionally reserved | [ ] | [x] Amaranth |
 
 ---
 

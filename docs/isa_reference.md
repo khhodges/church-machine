@@ -326,9 +326,9 @@ Flag-writing summary across all 20 instructions:
 > | 0x07 | S        | S                                  | No |
 > | 0x08 | E        | E                                  | No |
 > | 0x09 | LS       | L, S                               | No |
-> | 0x0A | —        | — (E isolation: LE)                | **Reserved** — FAULT(`TPERM_RSV`) |
-> | 0x0B | —        | — (E isolation: SE)                | **Reserved** — FAULT(`TPERM_RSV`) |
-> | 0x0C | —        | — (E isolation: LSE)               | **Reserved** — FAULT(`TPERM_RSV`) |
+> | 0x0A | RSV3     | — (unconditionally reserved)       | **Reserved** — FAULT(`TPERM_RSV`) |
+> | 0x0B | RSV4     | — (unconditionally reserved)       | **Reserved** — FAULT(`TPERM_RSV`) |
+> | 0x0C | RSV5     | — (unconditionally reserved)       | **Reserved** — FAULT(`TPERM_RSV`) |
 > | 0x0D | FRAME    | Call-stack query: Z=1 if real return frame exists; no GT read | No |
 > | 0x0E | EXACT    | Bit-exact identity: Z=1 iff `CRd.word0 == CRs.word0` | No |
 > | 0x0F | —        | — (reserved)                       | **Reserved** — FAULT(`TPERM_RSV`) |

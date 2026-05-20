@@ -216,7 +216,9 @@ TPERM CRs, #preset [, offset]
 - **Z = 1**: all checks passed (permissions present, valid, in bounds)
 - **Z = 0**: one or more checks failed
 
-**Faulting**: TPERM faults with `TPERM_RSV` if the preset code is reserved (codes 11–15 and their B-modifier variants 0x1B–0x1F). For all valid presets, TPERM does not fault — if a permission check fails the Z flag says so and software decides what to do via conditional execution. The actual LOAD/SAVE/CALL instructions that follow enforce safety. TPERM is the "ask first" instruction.
+**Faulting**: TPERM faults with `TPERM_RSV` if the preset code is reserved (codes 10–12 and 15, and their B-modifier variants 0x1A–0x1C and 0x1F). Codes 13 (FRAME) and 14 (EXACT) are valid non-permission presets and never fault. For all valid presets, TPERM does not fault — if a permission check fails the Z flag says so and software decides what to do via conditional execution. The actual LOAD/SAVE/CALL instructions that follow enforce safety. TPERM is the "ask first" instruction.
+
+**B-modifier hardware gap**: The B-modifier (bit 4 of the 5-bit preset field) is recognised by the assembler and simulator — it clears the GT B-bit (Busy bit, word0[31]) in the cached CR when the permission test passes. However, the hardware decoder currently reads only the lower 4 bits of the preset field; bit 4 is not yet synthesised to silicon. The B-modifier therefore operates in software only until the hardware field is widened in a future release.
 
 No namespace access occurs — TPERM is a register-local read-only operation. No G-bit reset.
 

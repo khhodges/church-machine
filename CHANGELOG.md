@@ -92,6 +92,42 @@
 
 ---
 
+## Docs 1.2.1 — 2026-05-20
+
+### TPERM documentation correction pass (Release 1.2 definitive design)
+
+Documentation-only correction across four files to match the definitive
+Release 1.2 TPERM preset table encoded in `hardware/hw_types.py`.
+
+**Changes**:
+
+- `docs/instruction-matrix.md` — TPERM verification bullet rewritten: codes
+  10–12 now described as unconditionally reserved (RSV3/RSV4/RSV5,
+  FAULT `TPERM_RSV`); code 13 = FRAME; code 14 = EXACT; code 15 = RSV1.
+  Preset table rows 10–15 updated with correct names and rationale.
+  B-modifier hardware gap noted in the bullet.
+
+- `docs/instruction-set.md` — Faulting paragraph corrected from
+  "codes 11–12 and 15" to "codes 10–12 and 15". Preset table rows 10/11/12
+  renamed from LE/SE/LSE to RSV3/RSV4/RSV5. "E isolation" explanatory
+  paragraph rewritten: the isolation rule is a **GT creation** rule (enforced
+  by Mint and domain-purity checks), not a TPERM preset rule; the former
+  LE/SE/LSE names were a design-history artefact.
+
+- `docs/church-instructions.md` — Faulting paragraph corrected from
+  "codes 11–15" to "codes 10–12 and 15". B-modifier hardware gap note added:
+  bit 4 of the preset field is recognised by the assembler and simulator but
+  the hardware decoder currently reads only 4 bits — B-modifier clears the
+  GT B-bit in software only until the field is widened to silicon.
+
+- `docs/isa_reference.md` (section A.7) — Rows 0x0A / 0x0B / 0x0C renamed
+  from "— (E isolation: LE/SE/LSE)" to RSV3/RSV4/RSV5 with description
+  "unconditionally reserved".
+
+No code, binary, or test changes.
+
+---
+
 ## Docs 1.2 — 2026-05-15
 
 ### Documentation corrections (audit items H-2 and M-1)
