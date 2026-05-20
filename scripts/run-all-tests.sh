@@ -2,8 +2,23 @@
 # run-all-tests.sh — runs every CI test suite, independent suites in parallel.
 # Prints every suite's output followed by a full pass/fail summary.
 # Exits non-zero if any suite fails.
+#
+# Usage: run-all-tests.sh [--progress]
+#   --progress   Print a live "[X/N done — waiting on: …]" status line to
+#                stderr every 5 s while suites are running.  Off by default
+#                so CI pipelines that capture stdout are not disrupted.
 
 set -uo pipefail
+
+# ---------------------------------------------------------------------------
+# Parse flags
+# ---------------------------------------------------------------------------
+SHOW_PROGRESS=0
+for arg in "$@"; do
+    case "$arg" in
+        --progress) SHOW_PROGRESS=1 ;;
+    esac
+done
 
 cd "$(dirname "$0")/.."
 
@@ -128,9 +143,40 @@ launch_suite "e2e-tests" \
 # ---------------------------------------------------------------------------
 declare -A EXIT_CODES
 
+TOTAL=${#SUITE_NAMES[@]}
+
 echo ""
-echo "  [parallel] Launched ${#SUITE_NAMES[@]} suites — waiting for results…"
+echo "  [parallel] Launched $TOTAL suites — waiting for results…"
 echo ""
+
+# ---------------------------------------------------------------------------
+# Optional live-progress background loop
+# ---------------------------------------------------------------------------
+PROGRESS_PID=""
+if [ "$SHOW_PROGRESS" -eq 1 ]; then
+    (
+        while [ ! -f "$WORK_DIR/all_done" ]; do
+            sleep 5
+            [ -f "$WORK_DIR/all_done" ] && break
+
+            done_count=0
+            waiting=()
+            for n in "${SUITE_NAMES[@]}"; do
+                if [ -f "$WORK_DIR/${n}.done" ]; then
+                    done_count=$((done_count + 1))
+                else
+                    waiting+=("$n")
+                fi
+            done
+
+            if [ "${#waiting[@]}" -gt 0 ]; then
+                waiting_str=$(IFS=", "; echo "${waiting[*]}")
+                echo "  [${done_count}/${TOTAL} done — waiting on: ${waiting_str}]" >&2
+            fi
+        done
+    ) &
+    PROGRESS_PID=$!
+fi
 
 for name in "${SUITE_NAMES[@]}"; do
     pid_file="$WORK_DIR/${name}.pid"
@@ -144,6 +190,9 @@ for name in "${SUITE_NAMES[@]}"; do
         EXIT_CODES["$name"]=$?
     fi
 
+    # Mark suite as done for the progress loop
+    touch "$WORK_DIR/${name}.done"
+
     # Stream the captured output immediately so slow suites don't stay silent
     cat "$out"
 
@@ -153,6 +202,12 @@ for name in "${SUITE_NAMES[@]}"; do
         echo "  ✘  $name FAILED (exit ${EXIT_CODES[$name]})"
     fi
 done
+
+# Signal the progress loop to stop and wait for it to exit cleanly
+touch "$WORK_DIR/all_done"
+if [ -n "$PROGRESS_PID" ]; then
+    wait "$PROGRESS_PID" 2>/dev/null || true
+fi
 
 # ---------------------------------------------------------------------------
 # Final summary
