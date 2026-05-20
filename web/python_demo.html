@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Capability Model — Church Machine</title>
+    <meta name="description" content="A pure-Python implementation of the Church Machine's core capability security primitives: CapabilityToken, ContextRegister, and ChurchMachineSimulator.">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0e17;
+            color: #c8d6e5;
+            min-height: 100vh;
+            padding: 20px 16px 40px;
+        }
+
+        .site-title {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto 0;
+            background: #0d1117;
+            border: 1px solid #1e2a3a;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            padding: 10px 20px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #daa520;
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .site-title a {
+            color: #daa520;
+            text-decoration: none;
+        }
+        .site-title a:hover { text-decoration: underline; }
+        .site-title .sep { color: #4a5568; font-weight: 400; }
+
+        .page-wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #0d1117;
+            border: 1px solid #1e2a3a;
+            border-radius: 0 0 10px 10px;
+            padding: 32px 32px 40px;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+        .tag-line {
+            font-size: 0.75rem;
+            color: #22d3ee;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            margin-bottom: 20px;
+        }
+        .intro {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: #94a3b8;
+            margin-bottom: 32px;
+            max-width: 720px;
+        }
+        .intro strong { color: #c8d6e5; }
+        .intro a { color: #22d3ee; text-decoration: none; }
+        .intro a:hover { text-decoration: underline; }
+
+        /* ── Annotation sections ─────────────────────────────────── */
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            color: #22d3ee;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .annotation {
+            background: #111827;
+            border: 1px solid #1e2a3a;
+            border-left: 3px solid #22d3ee;
+            border-radius: 0 6px 6px 0;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+        }
+        .annotation h2 {
+            font-size: 1rem;
+            color: #e2e8f0;
+            margin-bottom: 6px;
+        }
+        .annotation p {
+            font-size: 0.82rem;
+            line-height: 1.6;
+            color: #8892a4;
+        }
+        .annotation p + p { margin-top: 8px; }
+        .annotation code {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            background: #1e2a3a;
+            padding: 1px 5px;
+            border-radius: 3px;
+            color: #22d3ee;
+        }
+        .annotation .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+        .chip {
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 3px;
+            background: rgba(34,211,238,0.1);
+            color: #22d3ee;
+            border: 1px solid rgba(34,211,238,0.25);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        /* ── Code block ──────────────────────────────────────────── */
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #141a28;
+            border: 1px solid #1e2a3a;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            padding: 10px 16px;
+            margin-top: 32px;
+        }
+        .code-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .code-filename {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #60a5fa;
+        }
+        .lang-badge {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 3px;
+            background: rgba(34,211,238,0.1);
+            color: #22d3ee;
+            border: 1px solid rgba(34,211,238,0.2);
+        }
+        .copy-btn {
+            font-size: 0.75rem;
+            padding: 4px 12px;
+            border-radius: 4px;
+            border: 1px solid #2d3a4a;
+            background: #1e2a3a;
+            color: #c8d6e5;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .copy-btn:hover { background: #263347; border-color: #22d3ee; color: #22d3ee; }
+        .copy-btn.copied { background: rgba(34,211,238,0.1); border-color: #22d3ee; color: #22d3ee; }
+
+        .code-block {
+            background: #0a0e17;
+            border: 1px solid #1e2a3a;
+            border-radius: 0 0 8px 8px;
+            overflow-x: auto;
+            margin-bottom: 40px;
+        }
+        pre {
+            padding: 24px;
+            font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.78rem;
+            line-height: 1.65;
+            color: #c8d6e5;
+            white-space: pre;
+        }
+
+        /* ── Syntax colours ──────────────────────────────────────── */
+        .kw  { color: #c084fc; }   /* keywords */
+        .kw2 { color: #60a5fa; }   /* builtins / types */
+        .st  { color: #86efac; }   /* strings */
+        .cm  { color: #4a5568; font-style: italic; } /* comments */
+        .fn  { color: #fbbf24; }   /* function/method names */
+        .nm  { color: #22d3ee; }   /* class names */
+        .nu  { color: #fb923c; }   /* numbers */
+        .op  { color: #e2e8f0; }   /* operators / punctuation */
+
+        /* ── Jump anchors ────────────────────────────────────────── */
+        .anchor { display: block; position: relative; top: -16px; }
+
+        footer {
+            max-width: 900px;
+            margin: 24px auto 0;
+            font-size: 0.75rem;
+            color: #4a5568;
+            text-align: center;
+        }
+        footer a { color: #60a5fa; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        @media (max-width: 600px) {
+            .page-wrap { padding: 20px 16px 28px; }
+            pre { font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="site-title">
+    <span>λ</span>
+    <a href="/">Church Machine</a>
+    <span class="sep">/</span>
+    Python Capability Demo
+</div>
+
+<div class="page-wrap">
+
+    <h1>Python Capability Model</h1>
+    <div class="tag-line">Python &middot; Capability Model &middot; 6 Primitives</div>
+
+    <p class="intro">
+        This page presents a <strong>pure-Python reference implementation</strong> of the Church Machine's core security primitives.
+        It models the same concepts enforced in hardware by the CLOOMC ISA — using ordinary Python classes so that
+        anyone familiar with the language can read the capability model without learning assembly first.
+        The three classes (<code>CapabilityToken</code>, <code>ContextRegister</code>, and <code>ChurchMachineSimulator</code>)
+        implement the six fundamental operations: <strong>LOAD, SAVE, CALL, RETURN, CHANGE,</strong> and <strong>SWITCH</strong>.
+    </p>
+
+    <!-- ── CapabilityToken ──────────────────────────────────────── -->
+    <span id="CapabilityToken" class="anchor"></span>
+    <div class="section-label">Class 1 of 3</div>
+    <div class="annotation">
+        <h2>CapabilityToken</h2>
+        <p>
+            A <strong>Golden Token</strong> is the fundamental unit of authority in the Church Machine.
+            Every access — read, write, or execute — requires presenting a valid token. The token carries
+            the <code>base</code> address, <code>limit</code> (size), and a permission bitmask
+            (<code>READ</code>, <code>WRITE</code>, <code>EXECUTE</code>).
+        </p>
+        <p>
+            The hardware validates the token on every memory operation; this Python class models that contract.
+            Tokens are immutable value objects — you cannot widen a capability, only derive a narrower one.
+        </p>
+        <div class="chip-row">
+            <span class="chip">base</span>
+            <span class="chip">limit</span>
+            <span class="chip">READ</span>
+            <span class="chip">WRITE</span>
+            <span class="chip">EXECUTE</span>
+            <span class="chip">check_permission()</span>
+            <span class="chip">check_bounds()</span>
+        </div>
+    </div>
+
+    <!-- ── ContextRegister ──────────────────────────────────────── -->
+    <span id="ContextRegister" class="anchor"></span>
+    <div class="section-label">Class 2 of 3</div>
+    <div class="annotation">
+        <h2>ContextRegister</h2>
+        <p>
+            The Church Machine holds its security state in <strong>Context Registers (CRs)</strong> rather than
+            in ordinary data registers. A <code>ContextRegister</code> stores a capability token and the
+            associated label (e.g. <em>Namespace</em>, <em>Thread</em>, <em>C-List</em>).
+        </p>
+        <p>
+            <code>LOAD</code> and <code>SAVE</code> operate on context registers.
+            Only the instructions that explicitly name a register can read or update it —
+            there is no general-purpose pointer arithmetic that can reach the CR file.
+        </p>
+        <div class="chip-row">
+            <span class="chip">load()</span>
+            <span class="chip">save()</span>
+            <span class="chip">label</span>
+            <span class="chip">capability</span>
+        </div>
+    </div>
+
+    <!-- ── ChurchMachineSimulator ───────────────────────────────── -->
+    <span id="ChurchMachineSimulator" class="anchor"></span>
+    <div class="section-label">Class 3 of 3</div>
+    <div class="annotation">
+        <h2>ChurchMachineSimulator</h2>
+        <p>
+            The top-level simulator wires the registers and tokens together and exposes the six primitive
+            operations as Python methods. Each method enforces the same permission and bounds checks that
+            the CLOOMC ISA hardware pipeline performs.
+        </p>
+        <div class="chip-row">
+            <span id="LOAD_SAVE" class="anchor" style="position:static;top:auto;"></span>
+            <span class="chip">LOAD</span>
+            <span class="chip">SAVE</span>
+            <span id="CALL_RETURN" class="anchor" style="position:static;top:auto;"></span>
+            <span class="chip">CALL</span>
+            <span class="chip">RETURN</span>
+            <span id="CHANGE_SWITCH" class="anchor" style="position:static;top:auto;"></span>
+            <span class="chip">CHANGE</span>
+            <span class="chip">SWITCH</span>
+        </div>
+    </div>
+
+    <!-- ── Source listing ───────────────────────────────────────── -->
+    <div class="code-header">
+        <div class="code-header-left">
+            <span class="code-filename">church_machine_cap.py</span>
+            <span class="lang-badge">Python 3</span>
+        </div>
+        <button class="copy-btn" id="copyBtn" onclick="copySource()">Copy</button>
+    </div>
+    <div class="code-block">
+        <pre id="sourceCode"><span class="cm">"""
+church_machine_cap.py
+Pure-Python reference model of the Church Machine capability primitives.
+
+Classes
+-------
+CapabilityToken      — immutable Golden Token (base, limit, permissions)
+ContextRegister      — named capability holder (CR file slot)
+ChurchMachineSimulator — six-primitive capability engine
+
+Primitives: LOAD · SAVE · CALL · RETURN · CHANGE · SWITCH
+"""</span>
+
+<span class="kw">from</span> <span class="kw2">__future__</span> <span class="kw">import</span> annotations
+<span class="kw">import</span> dataclasses
+<span class="kw">from</span> dataclasses <span class="kw">import</span> dataclass, field
+<span class="kw">from</span> <span class="kw2">enum</span> <span class="kw">import</span> IntFlag, auto
+<span class="kw">from</span> <span class="kw2">typing</span> <span class="kw">import</span> Optional
+
+
+<span class="cm"># ─────────────────────────────────────────────────────────────────────────────
+# Permission flags  (match the CLOOMC ISA permission bit positions)
+# ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="kw">class</span> <span class="nm">Perm</span>(IntFlag):
+    <span class="st">"""Capability permission bits."""</span>
+    NONE    = <span class="nu">0</span>
+    READ    = auto()   <span class="cm"># R — data readable within bounds</span>
+    WRITE   = auto()   <span class="cm"># W — data writable within bounds</span>
+    EXECUTE = auto()   <span class="cm"># X — code executable (CALL / RETURN)</span>
+    RX      = READ | EXECUTE
+    RW      = READ | WRITE
+    RWX     = READ | WRITE | EXECUTE
+
+
+<span class="cm"># ─────────────────────────────────────────────────────────────────────────────
+# CapabilityToken  — the Golden Token
+# ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="kw">@dataclass</span>(frozen=<span class="kw">True</span>)
+<span class="kw">class</span> <span class="nm">CapabilityToken</span>:
+    <span class="st">"""
+    Immutable Golden Token.
+
+    Attributes
+    ----------
+    base  : int   Starting word address of the protected region.
+    limit : int   Size of the region in words (exclusive upper bound = base+limit).
+    perms : Perm  Permission flags granted by this token.
+    label : str   Human-readable name (namespace label, not enforced).
+    """</span>
+    base  : <span class="kw2">int</span>
+    limit : <span class="kw2">int</span>
+    perms : <span class="nm">Perm</span>
+    label : <span class="kw2">str</span> = <span class="st">""</span>
+
+    <span class="cm"># -- permission checks --------------------------------------------------</span>
+    <span class="kw">def</span> <span class="fn">check_permission</span>(<span class="kw">self</span>, required: <span class="nm">Perm</span>) -> <span class="kw2">bool</span>:
+        <span class="st">"""Return True if *all* required permission bits are present."""</span>
+        <span class="kw">return</span> (required & <span class="kw">self</span>.perms) == required
+
+    <span class="kw">def</span> <span class="fn">check_bounds</span>(<span class="kw">self</span>, offset: <span class="kw2">int</span>, length: <span class="kw2">int</span> = <span class="nu">1</span>) -> <span class="kw2">bool</span>:
+        <span class="st">"""Return True if [offset, offset+length) lies entirely within [0, limit)."""</span>
+        <span class="kw">return</span> <span class="nu">0</span> <= offset <span class="kw">and</span> (offset + length) <= <span class="kw">self</span>.limit
+
+    <span class="kw">def</span> <span class="fn">validate</span>(<span class="kw">self</span>, required: <span class="nm">Perm</span>, offset: <span class="kw2">int</span>, length: <span class="kw2">int</span> = <span class="nu">1</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""Raise CapabilityError if permission or bounds check fails."""</span>
+        <span class="kw">if not</span> <span class="kw">self</span>.check_permission(required):
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(
+                <span class="st">f"Permission denied: token '<span class="op">{</span><span class="kw">self</span>.label<span class="op">}</span>' has <span class="op">{</span><span class="kw">self</span>.perms<span class="op">}</span>, "</span>
+                <span class="st">f"but <span class="op">{</span>required<span class="op">}</span> required."</span>
+            )
+        <span class="kw">if not</span> <span class="kw">self</span>.check_bounds(offset, length):
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(
+                <span class="st">f"Bounds violation: token '<span class="op">{</span><span class="kw">self</span>.label<span class="op">}</span>' limit=<span class="op">{</span><span class="kw">self</span>.limit<span class="op">}</span>, "</span>
+                <span class="st">f"access offset=<span class="op">{</span>offset<span class="op">}</span> length=<span class="op">{</span>length<span class="op">}</span>."</span>
+            )
+
+    <span class="kw">def</span> <span class="fn">derive</span>(<span class="kw">self</span>, *, base_offset: <span class="kw2">int</span> = <span class="nu">0</span>, new_limit: Optional[<span class="kw2">int</span>] = <span class="kw">None</span>,
+               new_perms: Optional[<span class="nm">Perm</span>] = <span class="kw">None</span>, label: <span class="kw2">str</span> = <span class="st">""</span>) -> <span class="nm">CapabilityToken</span>:
+        <span class="st">"""
+        Derive a narrower capability from this one.
+        Cannot widen base, limit, or permissions beyond the parent.
+        """</span>
+        new_base  = <span class="kw">self</span>.base + base_offset
+        new_lim   = new_limit  <span class="kw">if</span> new_limit  <span class="kw">is not None else</span> <span class="kw">self</span>.limit - base_offset
+        new_p     = new_perms  <span class="kw">if</span> new_perms  <span class="kw">is not None else</span> <span class="kw">self</span>.perms
+        <span class="kw">if</span> new_base < <span class="kw">self</span>.base <span class="kw">or</span> (new_base + new_lim) > (<span class="kw">self</span>.base + <span class="kw">self</span>.limit):
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(<span class="st">"Cannot derive a capability wider than its parent."</span>)
+        <span class="kw">if</span> (new_p & ~<span class="kw">self</span>.perms) != <span class="nm">Perm</span>.NONE:
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(<span class="st">"Cannot grant permissions not held by parent."</span>)
+        <span class="kw">return</span> <span class="nm">CapabilityToken</span>(new_base, new_lim, new_p, label <span class="kw">or</span> <span class="kw">self</span>.label)
+
+
+<span class="kw">class</span> <span class="nm">CapabilityError</span>(<span class="nm">Exception</span>):
+    <span class="st">"""Raised when a capability check fails (permission or bounds)."""</span>
+
+
+<span class="cm"># ─────────────────────────────────────────────────────────────────────────────
+# ContextRegister  — a named slot in the CR file
+# ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="kw">class</span> <span class="nm">ContextRegister</span>:
+    <span class="st">"""
+    A named capability holder that models a Church Machine context register.
+
+    In hardware each CR is a 32-bit Golden Token plus type metadata.
+    Here we store the Python CapabilityToken directly.
+
+    Parameters
+    ----------
+    name : str   Register name, e.g. 'CR6 (C-List)', 'CR15 (Namespace)'.
+    """</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>, name: <span class="kw2">str</span>) -> <span class="kw2">None</span>:
+        <span class="kw">self</span>.name: <span class="kw2">str</span> = name
+        <span class="kw">self</span>._cap: Optional[<span class="nm">CapabilityToken</span>] = <span class="kw">None</span>
+
+    <span class="cm"># -- LOAD ------------------------------------------------------------------</span>
+    <span class="kw">def</span> <span class="fn">load</span>(<span class="kw">self</span>, token: <span class="nm">CapabilityToken</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        LOAD: Install *token* into this register.
+
+        The ISA's ELOAD instruction copies a capability from the C-List into
+        a context register; this method models that transfer.
+        """</span>
+        <span class="kw">if not</span> isinstance(token, <span class="nm">CapabilityToken</span>):
+            <span class="kw">raise</span> <span class="nm">TypeError</span>(<span class="st">f"Expected CapabilityToken, got <span class="op">{</span><span class="kw">type</span>(token)<span class="op">}</span>"</span>)
+        <span class="kw">self</span>._cap = token
+
+    <span class="cm"># -- SAVE ------------------------------------------------------------------</span>
+    <span class="kw">def</span> <span class="fn">save</span>(<span class="kw">self</span>) -> <span class="nm">CapabilityToken</span>:
+        <span class="st">"""
+        SAVE: Read the capability currently held in this register.
+
+        The ISA's ESAVE instruction copies from a context register back into
+        the C-List; this method models the source side of that transfer.
+        """</span>
+        <span class="kw">if</span> <span class="kw">self</span>._cap <span class="kw">is None</span>:
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(<span class="st">f"<span class="op">{</span><span class="kw">self</span>.name<span class="op">}</span> is empty — cannot SAVE."</span>)
+        <span class="kw">return</span> <span class="kw">self</span>._cap
+
+    @<span class="kw">property</span>
+    <span class="kw">def</span> <span class="fn">capability</span>(<span class="kw">self</span>) -> Optional[<span class="nm">CapabilityToken</span>]:
+        <span class="st">"""The token currently held in this register (None if empty)."""</span>
+        <span class="kw">return</span> <span class="kw">self</span>._cap
+
+    <span class="kw">def</span> <span class="fn">__repr__</span>(<span class="kw">self</span>) -> <span class="kw2">str</span>:
+        cap = <span class="kw">self</span>._cap
+        <span class="kw">if</span> cap <span class="kw">is None</span>:
+            <span class="kw">return</span> <span class="st">f"<span class="op">{</span><span class="kw">self</span>.name<span class="op">}</span>=NULL"</span>
+        <span class="kw">return</span> (
+            <span class="st">f"<span class="op">{</span><span class="kw">self</span>.name<span class="op">}</span>=[base=<span class="op">{</span>cap.base<span class="op">:#06x}</span> limit=<span class="op">{</span>cap.limit<span class="op">}</span> "</span>
+            <span class="st">f"perms=<span class="op">{</span>cap.perms.name<span class="op">}</span> '<span class="op">{</span>cap.label<span class="op">}</span>']"</span>
+        )
+
+
+<span class="cm"># ─────────────────────────────────────────────────────────────────────────────
+# ChurchMachineSimulator  — six primitive operations
+# ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="kw">class</span> <span class="nm">ChurchMachineSimulator</span>:
+    <span class="st">"""
+    Minimal Church Machine simulator exposing the six capability primitives.
+
+    Context registers
+    -----------------
+    CR6  — C-List (capability list for the current abstraction)
+    CR7  — Nucleus / kernel entry point
+    CR8  — Thread identity
+    CR14 — current code lump (Boot.Abstr)
+    CR15 — Namespace root
+
+    The six primitives
+    ------------------
+    LOAD   — copy a capability from the C-List into a named CR
+    SAVE   — copy a capability from a named CR back to the C-List
+    CALL   — transfer control to a capability-gated abstraction
+    RETURN — unwind from an abstraction, restoring saved CRs
+    CHANGE — replace the active C-List (namespace scope change)
+    SWITCH — swap thread identity (context switch)
+    """</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="kw">self</span>) -> <span class="kw2">None</span>:
+        <span class="cm"># Context register file</span>
+        <span class="kw">self</span>.CR6  = <span class="nm">ContextRegister</span>(<span class="st">"CR6 (C-List)"</span>)
+        <span class="kw">self</span>.CR7  = <span class="nm">ContextRegister</span>(<span class="st">"CR7 (Nucleus)"</span>)
+        <span class="kw">self</span>.CR8  = <span class="nm">ContextRegister</span>(<span class="st">"CR8 (Thread)"</span>)
+        <span class="kw">self</span>.CR14 = <span class="nm">ContextRegister</span>(<span class="st">"CR14 (Code)"</span>)
+        <span class="kw">self</span>.CR15 = <span class="nm">ContextRegister</span>(<span class="st">"CR15 (Namespace)"</span>)
+
+        <span class="cm"># Call stack — each frame saves (return_nia, CR6, CR7)</span>
+        <span class="kw">self</span>._stack: <span class="kw2">list</span>[<span class="kw2">tuple</span>] = []
+        <span class="cm"># Next instruction address (word offset within the current code lump)</span>
+        <span class="kw">self</span>.NIA: <span class="kw2">int</span> = <span class="nu">0</span>
+
+        <span class="cm"># Simple word-addressed memory (populated by tests / boot image)</span>
+        <span class="kw">self</span>.memory: <span class="kw2">dict</span>[<span class="kw2">int</span>, <span class="kw2">int</span>] = {}
+
+    <span class="cm"># ── LOAD ──────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">LOAD</span>(<span class="kw">self</span>, token: <span class="nm">CapabilityToken</span>, target_cr: <span class="nm">ContextRegister</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        LOAD a capability into a context register.
+
+        Models ELOAD in the CLOOMC ISA: the caller presents a token from its
+        C-List; the hardware validates it and installs it in the named CR.
+        READ permission is required on the source capability.
+        """</span>
+        token.validate(<span class="nm">Perm</span>.READ, offset=<span class="nu">0</span>)
+        target_cr.load(token)
+
+    <span class="cm"># ── SAVE ──────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">SAVE</span>(<span class="kw">self</span>, source_cr: <span class="nm">ContextRegister</span>, token: <span class="nm">CapabilityToken</span>) -> <span class="nm">CapabilityToken</span>:
+        <span class="st">"""
+        SAVE the capability from a context register.
+
+        Models ESAVE in the CLOOMC ISA: the capability is read from the CR and
+        written back to a C-List slot. WRITE permission is required on the
+        destination capability (the C-List slot being updated).
+        Returns the saved CapabilityToken.
+        """</span>
+        token.validate(<span class="nm">Perm</span>.WRITE, offset=<span class="nu">0</span>)
+        saved = source_cr.save()
+        <span class="kw">return</span> saved
+
+    <span class="cm"># ── CALL ──────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">CALL</span>(<span class="kw">self</span>, callee: <span class="nm">CapabilityToken</span>, method_offset: <span class="kw2">int</span> = <span class="nu">0</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        CALL an abstraction via a capability.
+
+        Models ELOADCALL / ECALL in the CLOOMC ISA:
+        1. Validates EXECUTE permission and bounds on the callee token.
+        2. Pushes a stack frame: (return_NIA, CR6, CR7).
+        3. Installs the callee's C-List into CR6.
+        4. Sets NIA to callee.base + method_offset.
+        """</span>
+        callee.validate(<span class="nm">Perm</span>.EXECUTE, offset=method_offset)
+        <span class="cm"># Save caller's frame</span>
+        <span class="kw">self</span>._stack.append((<span class="kw">self</span>.NIA, <span class="kw">self</span>.CR6._cap, <span class="kw">self</span>.CR7._cap))
+        <span class="cm"># Install callee context</span>
+        <span class="kw">self</span>.CR6.load(callee)
+        <span class="kw">self</span>.NIA = callee.base + method_offset
+
+    <span class="cm"># ── RETURN ────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">RETURN</span>(<span class="kw">self</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        RETURN from the current abstraction.
+
+        Models RETURN in the CLOOMC ISA:
+        1. Pops the top stack frame.
+        2. Restores CR6, CR7, and NIA to their caller values.
+        Raises CapabilityError if the stack is empty (return without CALL).
+        """</span>
+        <span class="kw">if not</span> <span class="kw">self</span>._stack:
+            <span class="kw">raise</span> <span class="nm">CapabilityError</span>(<span class="st">"RETURN with empty call stack — fault."</span>)
+        ret_nia, saved_cr6, saved_cr7 = <span class="kw">self</span>._stack.pop()
+        <span class="kw">self</span>.NIA = ret_nia
+        <span class="kw">if</span> saved_cr6 <span class="kw">is not None</span>: <span class="kw">self</span>.CR6.load(saved_cr6)
+        <span class="kw">if</span> saved_cr7 <span class="kw">is not None</span>: <span class="kw">self</span>.CR7.load(saved_cr7)
+
+    <span class="cm"># ── CHANGE ────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">CHANGE</span>(<span class="kw">self</span>, new_clist: <span class="nm">CapabilityToken</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        CHANGE the active C-List (namespace scope change).
+
+        Models CHANGE in the CLOOMC ISA: replaces CR6 with a new C-List
+        capability. This is used when an abstraction transfers control to a
+        sibling scope without a full CALL/RETURN round-trip.
+        READ permission is required on the new C-List token.
+        """</span>
+        new_clist.validate(<span class="nm">Perm</span>.READ, offset=<span class="nu">0</span>)
+        <span class="kw">self</span>.CR6.load(new_clist)
+
+    <span class="cm"># ── SWITCH ────────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">SWITCH</span>(<span class="kw">self</span>, new_thread: <span class="nm">CapabilityToken</span>) -> <span class="kw2">None</span>:
+        <span class="st">"""
+        SWITCH thread identity (context switch).
+
+        Models SWITCH in the CLOOMC ISA: replaces CR8 (Thread) with a
+        capability referencing the new thread's identity lump.
+        READ permission is required on the incoming thread token.
+        """</span>
+        new_thread.validate(<span class="nm">Perm</span>.READ, offset=<span class="nu">0</span>)
+        <span class="kw">self</span>.CR8.load(new_thread)
+
+    <span class="cm"># ── helpers ───────────────────────────────────────────────────────────</span>
+    <span class="kw">def</span> <span class="fn">state</span>(<span class="kw">self</span>) -> <span class="kw2">str</span>:
+        <span class="st">"""Return a one-line summary of current machine state."""</span>
+        <span class="kw">return</span> (
+            <span class="st">f"NIA=<span class="op">{</span><span class="kw">self</span>.NIA<span class="op">:#06x}</span>  stack_depth=<span class="op">{</span><span class="kw">len</span>(<span class="kw">self</span>._stack)<span class="op">}</span>  "</span>
+            <span class="st">f"CR6=<span class="op">{</span><span class="kw">self</span>.CR6<span class="op">}</span>  CR8=<span class="op">{</span><span class="kw">self</span>.CR8<span class="op">}</span>  CR15=<span class="op">{</span><span class="kw">self</span>.CR15<span class="op">}</span>"</span>
+        )
+
+
+<span class="cm"># ─────────────────────────────────────────────────────────────────────────────
+# Quick demo — run with:  python church_machine_cap.py
+# ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="kw">if</span> __name__ == <span class="st">"__main__"</span>:
+    cm = <span class="nm">ChurchMachineSimulator</span>()
+
+    <span class="cm"># Mint some Golden Tokens</span>
+    ns_token   = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0000</span>, limit=<span class="nu">64</span>,  perms=<span class="nm">Perm</span>.RW,  label=<span class="st">"Namespace"</span>)
+    code_token = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0100</span>, limit=<span class="nu">256</span>, perms=<span class="nm">Perm</span>.RX,  label=<span class="st">"Boot.Abstr"</span>)
+    data_token = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0200</span>, limit=<span class="nu">128</span>, perms=<span class="nm">Perm</span>.RW,  label=<span class="st">"DataRegion"</span>)
+    thrd_token = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0300</span>, limit=<span class="nu">32</span>,  perms=<span class="nm">Perm</span>.READ, label=<span class="st">"Thread.Kenneth"</span>)
+
+    <span class="cm"># LOAD — install tokens into context registers</span>
+    cm.LOAD(ns_token,   cm.CR15)
+    cm.LOAD(code_token, cm.CR14)
+    cm.LOAD(data_token, cm.CR6)
+    <span class="kw">print</span>(<span class="st">"After LOAD:"</span>, cm.state())
+
+    <span class="cm"># SAVE — read back the namespace token</span>
+    write_slot = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0010</span>, limit=<span class="nu">4</span>, perms=<span class="nm">Perm</span>.RW, label=<span class="st">"SaveSlot"</span>)
+    saved = cm.SAVE(cm.CR15, write_slot)
+    <span class="kw">print</span>(<span class="st">f"SAVE returned: <span class="op">{</span>saved.label<span class="op">}</span> base=<span class="op">{</span>saved.base<span class="op">:#06x}</span>"</span>)
+
+    <span class="cm"># CALL — enter Boot.Abstr at method offset 0</span>
+    cm.CALL(code_token, method_offset=<span class="nu">0</span>)
+    <span class="kw">print</span>(<span class="st">f"After CALL: NIA=<span class="op">{</span>cm.NIA<span class="op">:#06x}</span> stack_depth=<span class="op">{</span><span class="kw">len</span>(cm._stack)<span class="op">}</span>"</span>)
+
+    <span class="cm"># RETURN — unwind back to caller</span>
+    cm.RETURN()
+    <span class="kw">print</span>(<span class="st">f"After RETURN: NIA=<span class="op">{</span>cm.NIA<span class="op">:#06x}</span> stack_depth=<span class="op">{</span><span class="kw">len</span>(cm._stack)<span class="op">}</span>"</span>)
+
+    <span class="cm"># CHANGE — swap to a sibling C-List</span>
+    sibling_clist = <span class="nm">CapabilityToken</span>(base=<span class="nu">0x0400</span>, limit=<span class="nu">64</span>, perms=<span class="nm">Perm</span>.RW, label=<span class="st">"Sibling.CList"</span>)
+    cm.CHANGE(sibling_clist)
+    <span class="kw">print</span>(<span class="st">f"After CHANGE: CR6=<span class="op">{</span>cm.CR6<span class="op">}</span>"</span>)
+
+    <span class="cm"># SWITCH — install thread identity</span>
+    cm.SWITCH(thrd_token)
+    <span class="kw">print</span>(<span class="st">f"After SWITCH: CR8=<span class="op">{</span>cm.CR8<span class="op">}</span>"</span>)
+</pre>
+    </div>
+
+</div>
+
+<footer>
+    <p>Church-Turing Meta-Machine &middot; <a href="/">Home</a> &middot; <a href="/simulator/">IDE</a></p>
+</footer>
+
+<script>
+function copySource() {
+    const btn = document.getElementById('copyBtn');
+    const pre = document.getElementById('sourceCode');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+</script>
+</body>
+</html>

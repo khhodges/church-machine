@@ -1362,6 +1362,12 @@ def patents_index():
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return resp
 
+@app.route("/python-demo/")
+def python_demo():
+    resp = make_response(send_from_directory(WEB_DIR, "python_demo.html"))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
 @app.route("/patents/files/<path:filename>")
 def patents_file(filename):
     resp = make_response(send_from_directory(PATENTS_DIR, filename))
