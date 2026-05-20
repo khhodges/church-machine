@@ -9,9 +9,12 @@
 #   ./scripts/run-all-tests.sh --progress               # run all suites with live status
 #
 # Flags:
-#   --progress   Print a live "[X/N done — waiting on: …]" status line to
-#                stderr every 5 s while suites are running.  Off by default
-#                so CI pipelines that capture stdout are not disrupted.
+#   --progress              Print a live "[X/N done — waiting on: …]" status
+#                           line to stderr while suites are running.  Off by
+#                           default so CI pipelines that capture stdout are not
+#                           disrupted.
+#   --progress-interval=N   Seconds between progress lines (default 5).
+#                           Only meaningful when --progress is also set.
 
 set -uo pipefail
 
@@ -19,9 +22,11 @@ set -uo pipefail
 # Parse flags
 # ---------------------------------------------------------------------------
 SHOW_PROGRESS=0
+PROGRESS_INTERVAL=5
 for arg in "$@"; do
     case "$arg" in
         --progress) SHOW_PROGRESS=1 ;;
+        --progress-interval=*) PROGRESS_INTERVAL="${arg#--progress-interval=}" ;;
     esac
 done
 
@@ -221,7 +226,7 @@ PROGRESS_PID=""
 if [ "$SHOW_PROGRESS" -eq 1 ]; then
     (
         while [ ! -f "$WORK_DIR/all_done" ]; do
-            sleep 5
+            sleep "$PROGRESS_INTERVAL"
             [ -f "$WORK_DIR/all_done" ] && break
 
             done_count=0
