@@ -1479,6 +1479,267 @@ console.log('\n--- T014: Scheduler.IRQ LAZY_RESOLVE reason code ---');
     }
 }
 
+// ── T015: LAZY_LOAD wired from _execCall when lump cw=0 ──────────────────────
+//
+// Integration test: drives step() through a real CALL instruction targeting a
+// lump whose header has valid magic but cw=0 (code section evicted).  Confirms
+// that _fireSchedulerIRQ('LAZY_LOAD', null, slot) is invoked and the step()
+// result carries lazySuspended=true with kind='LAZY_LOAD' (Task #1527).
+console.log('\n--- T015: LAZY_LOAD wired from _execCall (cw=0 lump) ---');
+{
+    const { sim, registry, sysAbs } = makeTestSim();
+
+    // Use pre-boot fetch so the simulator reads memory[pc] directly,
+    // avoiding the CR14 code-lump setup needed in post-boot mode.
+    sim.bootComplete = false;
+
+    const LUMP_BASE = 0x200;
+    const NS_SLOT   = 20;
+
+    // Write NS entry at slot 20 (no system abstraction registered there).
+    // version=1, gtType=1 (Inform), location=LUMP_BASE, limit17=63.
+    sim.writeNSEntry(NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
+
+    // Write a valid lump header at LUMP_BASE with cw=0 (code evicted).
+    // cc=1 keeps lumpIsResident=true so the system-abstraction fast-path
+    // is skipped; the main CALL pipeline proceeds to the cw=0 check.
+    sim.memory[LUMP_BASE] = sim.packLumpHeader(0, 0, 1, 0); // n_minus_6=0, cw=0, cc=1
+
+    // Minimal lazy manifest so Scheduler.IRQ(LAZY_LOAD) succeeds.
+    sim.lazyManifest[NS_SLOT] = { loaded: false, label: 'EvictedAbstraction', priority: 'cold' };
+    let lazyLoadCalled = false;
+    sim.lazyLoad = function(slotIdx) {
+        lazyLoadCalled = true;
+        sim.lazyManifest[slotIdx].loaded = true;
+        return true;
+    };
+    sim.nsLabels[NS_SLOT] = 'EvictedAbstraction';
+
+    // Track calls to _fireSchedulerIRQ (intercept without disrupting it).
+    let irqReason = null;
+    let irqSlot   = null;
+    const origFire = sim._fireSchedulerIRQ.bind(sim);
+    sim._fireSchedulerIRQ = function(reason, faultRecord, slot) {
+        irqReason = reason;
+        irqSlot   = slot;
+        return origFire(reason, faultRecord, slot);
+    };
+
+    // Create an Inform GT for slot 20 with E permission; gt_seq=1 matches
+    // the version=1 written by writeNSEntry (passes mLoad VERSION check).
+    const slotGT = sim.createGT(1, NS_SLOT, {E:1}, 1);
+    sim.cr[0] = { word0: slotGT, word1: 0, word2: 0, word3: 0, m: 0 };
+
+    // CALL CR0 (opcode=2, cond=AL=14, crDst=0, crSrc=0, imm=0 legacy mode)
+    const CALL_CR0 = ((2 << 27) | (14 << 23) | (0 << 19) | (0 << 15) | 0) >>> 0;
+    sim.memory[0] = CALL_CR0;
+
+    const result = sim.step();
+
+    check('T015-A1: step() returned a non-null result (instruction executed)',
+        result !== null);
+    check('T015-A2: result.lazySuspended === true',
+        result && result.lazySuspended === true);
+    check('T015-A3: result.kind === "LAZY_LOAD"',
+        result && result.kind === 'LAZY_LOAD');
+    check('T015-A4: result.slot === NS_SLOT (20)',
+        result && result.slot === NS_SLOT);
+    check('T015-A5: result.instrName === "CALL"',
+        result && result.instrName === 'CALL');
+    check('T015-A6: _fireSchedulerIRQ was called with reason "LAZY_LOAD"',
+        irqReason === 'LAZY_LOAD');
+    check('T015-A7: _fireSchedulerIRQ received the correct NS slot (20)',
+        irqSlot === NS_SLOT);
+    check('T015-A8: Loader.Load was invoked (lazyLoad stub called)',
+        lazyLoadCalled === true);
+    check('T015-A9: machine NOT halted after LAZY_LOAD path',
+        !sim.halted);
+    check('T015-A10: no faults logged (LAZY_LOAD is not a fault)',
+        sim.faultLog.length === 0);
+    check('T015-A11: output contains [LAZY-LOAD] tag',
+        sim.output.includes('[LAZY-LOAD]'));
+    check('T015-A12: output mentions NS slot 20',
+        sim.output.includes(`NS[${NS_SLOT}]`));
+    // Retry-integrity: the callStack must NOT have grown during LAZY_LOAD suspension.
+    // Any frame pushed before the IRQ fires would be orphaned on retry,
+    // causing double-push and stack corruption (code review finding).
+    check('T015-A13: callStack is empty — no orphaned frame pushed before LAZY_LOAD',
+        sim.callStack.length === 0);
+    check('T015-A14: sto is unchanged — not decremented before LAZY_LOAD suspension',
+        sim.sto === 243);  // initial sp_max (hard-reset value)
+
+    // T015-B: when no IRQ handler is available, falls back to CODE_NOT_RESIDENT fault
+    {
+        const { sim: sim2 } = makeTestSim();
+        sim2.bootComplete = false;
+        sim2.writeNSEntry(NS_SLOT, LUMP_BASE, 63, 0, 0, 1, 1, 0, 0);
+        sim2.memory[LUMP_BASE] = sim2.packLumpHeader(0, 0, 1, 0);
+        // Remove abstractionRegistry so _fireSchedulerIRQ returns null (not fired)
+        sim2.abstractionRegistry = null;
+        const slotGT2 = sim2.createGT(1, NS_SLOT, {E:1}, 1);
+        sim2.cr[0] = { word0: slotGT2, word1: 0, word2: 0, word3: 0, m: 0 };
+        sim2.memory[0] = CALL_CR0;
+
+        const result2 = sim2.step();
+        check('T015-B1: without IRQ registry, step() returns null (fault path)',
+            result2 === null || (result2 && result2.fault));
+        check('T015-B2: CODE_NOT_RESIDENT fault logged when IRQ not available',
+            sim2.faultLog.some(f => f.faultCode === ChurchSimulator.FAULT_CODES.CODE_NOT_RESIDENT));
+    }
+}
+
+// ── T016: LAZY_RESOLVE wired from _execEloadcall (NULL GT + PENDING_GT) ──────
+//
+// Integration tests: drives step() through a real ELOADCALL instruction whose
+// target c-list slot holds a NULL GT (no pet name match) or a pending GT
+// (0xFEED sentinel).  Confirms _fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow)
+// is called in both cases (Task #1527).
+console.log('\n--- T016: LAZY_RESOLVE wired from _execEloadcall ---');
+{
+    // ── Shared helpers ──────────────────────────────────────────────────────
+    const C_SLOT    = 2;    // c-list slot holding the NULL / pending GT
+    const NS_SLOT5  = 5;    // NS slot backing CR6's GT
+    const CLIST_BASE = 0x400;
+
+    // ELOADCALL opcode=8, cond=AL=14, crDst=0, crSrc=6, imm=ecRow (C_SLOT=2)
+    const ELOADCALL_EC2 = ((8 << 27) | (14 << 23) | (0 << 19) | (6 << 15) | C_SLOT) >>> 0;
+
+    function makeEloadSim() {
+        const { sim, registry, sysAbs } = makeTestSim();
+        sim.bootComplete = false;
+
+        // NS slot 5 backs CR6 (the c-list GT); clistCount=10 so ecRow=2 is in range.
+        sim.writeNSEntry(NS_SLOT5, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
+
+        // CR6 = E-perm Inform GT for slot 5; word1 = c-list base; word2 encodes clistCount.
+        const cr6GT = sim.createGT(1, NS_SLOT5, {E:1}, 1);
+        sim.cr[6] = {
+            word0: cr6GT,
+            word1: CLIST_BASE,
+            word2: sim.packNSWord1(63, 0, 0, 1, 10),
+            word3: 0, m: 0
+        };
+
+        // Place ELOADCALL instruction at PC=0.
+        sim.memory[0] = ELOADCALL_EC2;
+
+        // Track _fireSchedulerIRQ.
+        let irqReason = null, irqSlot = null;
+        const origFire = sim._fireSchedulerIRQ.bind(sim);
+        sim._fireSchedulerIRQ = function(reason, faultRecord, slot) {
+            irqReason = reason;
+            irqSlot   = slot;
+            return origFire(reason, faultRecord, slot);
+        };
+
+        return { sim, registry, sysAbs, getIRQ: () => ({ reason: irqReason, slot: irqSlot }) };
+    }
+
+    // ── T016-A: NULL GT with unresolvable pet name → LAZY_RESOLVE fired ────
+    {
+        const { sim, getIRQ } = makeEloadSim();
+
+        // c-list slot C_SLOT = NULL GT (memory word = 0).
+        sim.memory[CLIST_BASE + C_SLOT] = 0;
+
+        // Declare a pet name for slot C_SLOT that has no matching NS label.
+        sim.programCapabilities = { [C_SLOT]: 'UnknownAbstraction' };
+        // Ensure no NS label matches 'UnknownAbstraction'.
+        delete sim.nsLabels['UnknownAbstraction'];
+
+        const result = sim.step();
+        const irq = getIRQ();
+
+        check('T016-A1: step() returned a non-null result',
+            result !== null);
+        check('T016-A2: result.lazySuspended === true (ELOADCALL NULL GT path)',
+            result && result.lazySuspended === true);
+        check('T016-A3: result.kind === "NULL_GT"',
+            result && result.kind === 'NULL_GT');
+        check('T016-A4: result.slot === C_SLOT (2)',
+            result && result.slot === C_SLOT);
+        check('T016-A5: _fireSchedulerIRQ was called with reason "LAZY_RESOLVE"',
+            irq.reason === 'LAZY_RESOLVE');
+        check('T016-A6: _fireSchedulerIRQ received the correct c-list slot (2)',
+            irq.slot === C_SLOT);
+        check('T016-A7: machine NOT halted after LAZY_RESOLVE',
+            !sim.halted);
+        check('T016-A8: no fault logged (LAZY_RESOLVE is not a halt-level fault)',
+            sim.faultLog.length === 0);
+        check('T016-A9: output contains [LAZY-RESOLVE] tag',
+            sim.output.includes('[LAZY-RESOLVE]'));
+    }
+
+    // ── T016-B: pending GT (0xFEED sentinel) with unresolvable name → LAZY_RESOLVE ─
+    {
+        const { sim, getIRQ } = makeEloadSim();
+
+        const PET_NAME = 'PendingAbstraction';
+        // Place a pending GT sentinel at c-list slot C_SLOT.
+        sim.memory[CLIST_BASE + C_SLOT] = ChurchSimulator.makePendingGT(PET_NAME);
+        // Ensure no NS label resolves 'PendingAbstraction'.
+        for (const k of Object.keys(sim.nsLabels)) {
+            if (String(sim.nsLabels[k]).toUpperCase() === PET_NAME.toUpperCase()) {
+                delete sim.nsLabels[k];
+            }
+        }
+
+        const result = sim.step();
+        const irq = getIRQ();
+
+        check('T016-B1: step() returned a non-null result (pending GT path)',
+            result !== null);
+        check('T016-B2: result.lazySuspended === true',
+            result && result.lazySuspended === true);
+        check('T016-B3: result.kind === "PENDING_GT"',
+            result && result.kind === 'PENDING_GT');
+        check('T016-B4: result.slot === C_SLOT (2)',
+            result && result.slot === C_SLOT);
+        check('T016-B5: result.petName matches the pending GT pet name',
+            result && result.petName === PET_NAME);
+        check('T016-B6: _fireSchedulerIRQ was called with reason "LAZY_RESOLVE"',
+            irq.reason === 'LAZY_RESOLVE');
+        check('T016-B7: _fireSchedulerIRQ received the correct c-list slot (2)',
+            irq.slot === C_SLOT);
+        check('T016-B8: machine NOT halted after LAZY_RESOLVE (PENDING_GT)',
+            !sim.halted);
+        check('T016-B9: output contains [LAZY-RESOLVE] tag',
+            sim.output.includes('[LAZY-RESOLVE]'));
+        check('T016-B10: output mentions PENDING_GT pet name',
+            sim.output.includes(PET_NAME));
+    }
+
+    // ── T016-C: pending GT with resolvable name → instant resolution, no IRQ ─
+    {
+        const { sim, getIRQ } = makeEloadSim();
+
+        const PET_NAME   = 'KnownAbstraction';
+        const TARGET_SLOT = 15;
+
+        // Write a valid NS entry at slot 15 so isNSEntryValid returns true.
+        sim.writeNSEntry(TARGET_SLOT, 0x300, 63, 0, 0, 1, 1, 0, 0);
+        sim.nsLabels[TARGET_SLOT] = PET_NAME;
+
+        // Place a pending GT in the c-list.
+        sim.memory[CLIST_BASE + C_SLOT] = ChurchSimulator.makePendingGT(PET_NAME);
+
+        // Need a valid lump at 0x300 for the ELOADCALL LOAD+CALL to proceed,
+        // but we only care that no LAZY_RESOLVE fires here; the call may fault
+        // for other reasons once the pending GT is resolved.
+        // (Keeping the test minimal: just verify no IRQ was invoked.)
+        sim.step();
+        const irq = getIRQ();
+
+        check('T016-C1: _fireSchedulerIRQ NOT called with LAZY_RESOLVE (name resolved instantly)',
+            irq.reason !== 'LAZY_RESOLVE');
+        check('T016-C2: output contains [LAZY-RESOLVE] instant-resolution tag',
+            sim.output.includes('[LAZY-RESOLVE]') && sim.output.includes('resolved instantly'));
+        check('T016-C3: pending slot was rewritten to an Inform GT',
+            !ChurchSimulator.isPendingGT(sim.memory[CLIST_BASE + C_SLOT]) &&
+            sim.memory[CLIST_BASE + C_SLOT] !== 0);
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

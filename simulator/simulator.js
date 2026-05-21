@@ -2890,7 +2890,7 @@ class ChurchSimulator {
     //   null  — IRQ frame was NOT entered (early guard: no registry, or already in IRQ frame)
     //   true  — IRQ frame was entered and handler returned ok=true (recovered / swept)
     //   false — IRQ frame was entered but handler returned ok=false (not recovered)
-    _fireSchedulerIRQ(reason, faultRecord) {
+    _fireSchedulerIRQ(reason, faultRecord, slot) {
         if (!this.abstractionRegistry) return null;
         if (!this.irqState || this.irqState.irqActive) return null;
 
@@ -2920,7 +2920,7 @@ class ChurchSimulator {
         // The handler represents the IRQ thread's sweep logic (wake sleeping threads,
         // process pending flags, and optionally handle Tier 2 fault recovery).
         const result = this.abstractionRegistry.dispatchMethod(
-            SCHEDULER_NS_SLOT, 'IRQ', this, { reason, faultRecord, savedContext: this.irqState.savedContext }
+            SCHEDULER_NS_SLOT, 'IRQ', this, { reason, faultRecord, slot, savedContext: this.irqState.savedContext }
         );
 
         // CHANGE back to the suspended thread's context (Task #1077 §3 restore).
@@ -3635,6 +3635,26 @@ class ChurchSimulator {
                     abstrResult.pipeline.unshift({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
                 }
                 return abstrResult;
+            }
+        }
+
+        // ── Lazy-Load: valid header but cw=0 means code section evicted ─────────
+        // Checked here — BEFORE callStack.push / sto decrement / _resetAllMBits —
+        // so that a LAZY_LOAD suspension leaves no partial call-frame in the stack
+        // and the retry can re-enter _execCall cleanly (Task #1527).
+        if (nsEntry.word0_location > 0) {
+            const _hdr = this.parseLumpHeader(this.memory[nsEntry.word0_location]);
+            if (_hdr.valid && _hdr.cw === 0) {
+                const lazySlot = check.index;
+                this.output += `[LAZY-LOAD] CALL CR${d.crDst}: NS[${lazySlot}] lump has cw=0 (code evicted) — firing Scheduler.IRQ(LAZY_LOAD, slot=${lazySlot})\n`;
+                const fired = this._fireSchedulerIRQ('LAZY_LOAD', null, lazySlot);
+                if (fired) {
+                    return { lazySuspended: true, slot: lazySlot, instrName: 'CALL', kind: 'LAZY_LOAD',
+                             pc: this.pc, instr: d,
+                             desc: `CALL: LAZY_LOAD — NS[${lazySlot}] code not resident; Scheduler.IRQ fired` };
+                }
+                this.fault('CODE_NOT_RESIDENT', `CALL CR${d.crDst}: cw=0 on NS[${lazySlot}] (LAZY_LOAD IRQ failed)`);
+                return null;
             }
         }
 
@@ -4790,11 +4810,43 @@ class ChurchSimulator {
                     this._lazySuspended = true;
                     this.output += `[LAZY-RESOLVE] ELOADCALL: c-list row ${ecRow} "${_pcn}" is NULL \u2014 thread suspended; link Pet name '${_pcn}' to a live NS entry to resume.\n`;
                     this.emit('lazyResolvePending', { petName: _pcn, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT' });
+                    // ── Fire Scheduler.IRQ(LAZY_RESOLVE) so the scheduler can suspend
+                    // this thread and wake it when the pending c-list slot is resolved
+                    // (Task #1527: wire LAZY_RESOLVE into the ELOADCALL pipeline).
+                    this._fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow);
                     return { lazySuspended: true, petName: _pcn, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT', pc: this.pc, instr: d, desc: `ELOADCALL: waiting for '${_pcn}' (slot ${ecRow})` };
                 }
             } else {
                 this.fault('NULL_CAP', `ELOADCALL: c-list row ${ecRow} is empty`);
                 return null;
+            }
+        }
+        // ── Lazy-Resolve: pending GT intercept (ELOADCALL) ────────────────────────
+        // A pending sentinel (0xFEED____) means the slot has a declared pet name
+        // but has not yet been introduced to a live GT.  Attempt instant resolution
+        // for system abstractions with a fixed NS label; fire a structured
+        // Scheduler.IRQ(LAZY_RESOLVE) for instance-specific abstractions (Task #1527).
+        if (ChurchSimulator.isPendingGT(slotGT)) {
+            const _pendingName = ChurchSimulator.pendingGTName(slotGT);
+            let _resolvedNsIdx = -1;
+            for (const [_ridx, _rlbl] of Object.entries(this.nsLabels)) {
+                if (String(_rlbl).toUpperCase() === _pendingName.toUpperCase()) {
+                    _resolvedNsIdx = parseInt(_ridx, 10);
+                    break;
+                }
+            }
+            if (_resolvedNsIdx >= 0 && this.isNSEntryValid(_resolvedNsIdx)) {
+                const _resolvedGT = this.createGT(0, _resolvedNsIdx, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);
+                this.memory[srcLoc + ecRow] = _resolvedGT >>> 0;
+                slotGT = _resolvedGT >>> 0;
+                this.output += `[LAZY-RESOLVE] ELOADCALL: Slot ${ecRow} "${_pendingName}" \u2192 NS[${_resolvedNsIdx}] resolved instantly.\n`;
+                // Fall through to continue ELOADCALL processing
+            } else {
+                this.output += `[LAZY-RESOLVE] ELOADCALL: c-list slot ${ecRow} "${_pendingName}" is pending \u2014 firing Scheduler.IRQ(LAZY_RESOLVE, slot=${ecRow})\n`;
+                this._fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow);
+                return { lazySuspended: true, petName: _pendingName, slot: ecRow, instrName: 'ELOADCALL',
+                         kind: 'PENDING_GT', pc: this.pc, instr: d,
+                         desc: `ELOADCALL: pending slot ${ecRow} ('${_pendingName}') — Scheduler.IRQ(LAZY_RESOLVE) fired` };
             }
         }
         let slotParsed = this.parseGT(slotGT);
