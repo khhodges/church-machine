@@ -5,7 +5,7 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT, SEALS_LAYOUT
 from .integrity32 import integrity32_amaranth
-from .boot_rom import NUC_LUMP_BASE, NUC_PROGRAM_CW
+from .boot_rom import NUC_LUMP_BASE, NUC_PROGRAM_CW, DEMO_CLIST_NAMED_SLOTS
 from .registers import ChurchRegisters
 from .decoder import ChurchDecoder
 from .perm_check import ChurchPermCheck
@@ -21,6 +21,7 @@ from .change import ChurchChange
 from .switch import ChurchSwitch
 from .fused_unit import ChurchELoadCall, ChurchXLoadLambda
 from .irq_dispatch import ChurchIRQDispatch
+from .pet_name_mem import PetNameMemory
 from .dread import ChurchDRead
 from .dwrite import ChurchDWrite
 from .cload import ChurchCLoad
@@ -190,6 +191,13 @@ class ChurchCore(Elaboratable):
             u_eloadcall = ChurchELoadCall()
             u_xloadlambda = ChurchXLoadLambda()
             u_irq_dispatch = ChurchIRQDispatch()
+            # Pre-mark named boot c-list slots from the authoritative set in
+            # boot_rom.DEMO_CLIST_NAMED_SLOTS.  Freed or anonymous slots (e.g.
+            # idx 4, formerly Startup.Config) are NOT in the set; a NULL GT
+            # there stays a hard NULL_CAP fault.  The DWRITE MMIO path
+            # (IO_PORT_PET_NAME_WR) lets the assembler/firmware annotate
+            # additional named slots at run time.
+            u_pet_name_mem = PetNameMemory(init_named=list(DEMO_CLIST_NAMED_SLOTS))
             m.submodules.u_gc_unit = u_gc
             m.submodules.u_lambda = u_lambda
             m.submodules.u_change = u_change
@@ -197,6 +205,7 @@ class ChurchCore(Elaboratable):
             m.submodules.u_eloadcall = u_eloadcall
             m.submodules.u_xloadlambda = u_xloadlambda
             m.submodules.u_irq_dispatch = u_irq_dispatch
+            m.submodules.u_pet_name_mem = u_pet_name_mem
 
         m.submodules.u_dread = u_dread
         m.submodules.u_dwrite = u_dwrite
@@ -1380,6 +1389,19 @@ class ChurchCore(Elaboratable):
                 u_xloadlambda.mem_rd_valid.eq(self.dmem_rd_valid),
             ]
 
+            # ── PetNameMemory wiring (Task #1526) ────────────────────────────
+            # Read port: ELoadCall and XLoadLambda are mutually exclusive, so
+            # mux their pet_name_rd_addr; both receive the same rd_data result.
+            m.d.comb += [
+                u_pet_name_mem.rd_addr.eq(
+                    Mux(u_eloadcall.busy,
+                        u_eloadcall.pet_name_rd_addr,
+                        u_xloadlambda.pet_name_rd_addr)
+                ),
+                u_eloadcall.pet_name_rd_data.eq(u_pet_name_mem.rd_data),
+                u_xloadlambda.pet_name_rd_data.eq(u_pet_name_mem.rd_data),
+            ]
+
             # ── ChurchIRQDispatch wiring (Task #1523) ────────────────────────
             from .hw_types import IRQ_REASON_TIMER, IRQ_REASON_LAZY_LOAD, IRQ_REASON_LAZY_RESOLVE
 
@@ -2255,11 +2277,29 @@ class ChurchCore(Elaboratable):
                 self.dmem_rd_en.eq(1),
             ]
         with m.Elif(u_dwrite.dmem_wr_en):
-            m.d.comb += [
-                self.dmem_addr.eq(u_dwrite.dmem_addr),
-                self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
-                self.dmem_wr_en.eq(1),
-            ]
+            if not self.iot_profile:
+                from .hw_types import IO_PORT_PET_NAME_WR
+                # Intercept DWRITE writes to IO_PORT_PET_NAME_WR: the written
+                # value's lower 6 bits encode the c-list slot to mark as named.
+                # The write does not propagate to external data memory.
+                with m.If(u_dwrite.dmem_addr == IO_PORT_PET_NAME_WR):
+                    m.d.comb += [
+                        u_pet_name_mem.wr_en.eq(1),
+                        u_pet_name_mem.wr_addr.eq(u_dwrite.dmem_wr_data[:6]),
+                        u_pet_name_mem.wr_data.eq(1),
+                    ]
+                with m.Else():
+                    m.d.comb += [
+                        self.dmem_addr.eq(u_dwrite.dmem_addr),
+                        self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
+                        self.dmem_wr_en.eq(1),
+                    ]
+            else:
+                m.d.comb += [
+                    self.dmem_addr.eq(u_dwrite.dmem_addr),
+                    self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
         with m.Elif(u_cload.mem_rd_en):
             m.d.comb += [
                 self.dmem_addr.eq(u_cload.mem_addr),

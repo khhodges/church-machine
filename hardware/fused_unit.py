@@ -9,7 +9,8 @@ from .mload_seq import mload_wait_body
 
 
 class ChurchELoadCall(Elaboratable):
-    def __init__(self):
+    def __init__(self, enable_seal_check=None):
+        self._enable_seal_check = enable_seal_check
         self.start = Signal()
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
@@ -48,12 +49,20 @@ class ChurchELoadCall(Elaboratable):
         self.lazy_resolve_irq  = Signal()
         self.lazy_resolve_slot = Signal(16)   # c-list row index of the NULL GT
 
+        # Pet-name memory interface (Task #1526): combinatorial read port.
+        # Core presents the c-list slot index on pet_name_rd_addr each cycle
+        # and drives pet_name_rd_data with the corresponding "has pet name" bit.
+        # CHECK_E only routes NULL GTs to LAZY_RESOLVE_ABORT when this is 1;
+        # otherwise the existing NULL_CAP hard fault is preserved.
+        self.pet_name_rd_addr = Signal(16)   # output: current c-list slot index
+        self.pet_name_rd_data = Signal(1)    # input:  1 = slot has a pet name
+
     def elaborate(self, platform):
         m = Module()
 
         MAX_SRC_REG = 5
 
-        u_mload = ChurchMLoad()
+        u_mload = ChurchMLoad(enable_seal_check=self._enable_seal_check)
         m.submodules.u_mload = u_mload
 
         phase = Signal(2)
@@ -209,8 +218,19 @@ class ChurchELoadCall(Elaboratable):
 
             with m.State("CHECK_E"):
                 with m.If(is_null):
-                    # NULL GT in c-list slot: route to Scheduler.IRQ (Task #1523).
-                    m.next = "LAZY_RESOLVE_ABORT"
+                    # NULL GT in c-list slot (Task #1523 / Task #1526).
+                    # Only route to Scheduler.IRQ when the slot has a pet name —
+                    # the assembler registers named slots in PetNameMemory.
+                    # Anonymous NULL GTs (no pet name) preserve the hard NULL_CAP
+                    # fault so accidental zero-slots still crash loudly.
+                    with m.If(self.pet_name_rd_data):
+                        m.next = "LAZY_RESOLVE_ABORT"
+                    with m.Else():
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.NULL_CAP),
+                        ]
+                        m.next = "FAULT"
                 with m.Elif(~has_e_perm):
                     m.d.sync += [
                         fault_latched.eq(1),
@@ -317,13 +337,15 @@ class ChurchELoadCall(Elaboratable):
             self.cr_clear_mask.eq(Mux(fsm.ongoing("COMPLETE"), cr_clear_computed, 0)),
             self.lazy_resolve_irq.eq(fsm.ongoing("LAZY_RESOLVE_ABORT")),
             self.lazy_resolve_slot.eq(index_latched),
+            self.pet_name_rd_addr.eq(index_latched),
         ]
 
         return m
 
 
 class ChurchXLoadLambda(Elaboratable):
-    def __init__(self):
+    def __init__(self, enable_seal_check=None):
+        self._enable_seal_check = enable_seal_check
         self.start = Signal()
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
@@ -358,10 +380,16 @@ class ChurchXLoadLambda(Elaboratable):
         self.lazy_resolve_irq  = Signal()
         self.lazy_resolve_slot = Signal(16)   # c-list row index of the NULL GT
 
+        # Pet-name memory interface (Task #1526): combinatorial read port.
+        # Mirrors the ELOADCALL interface — CHECK_X only fires LAZY_RESOLVE_ABORT
+        # when the c-list slot has a pet name; otherwise NULL_CAP hard fault.
+        self.pet_name_rd_addr = Signal(16)   # output: current c-list slot index
+        self.pet_name_rd_data = Signal(1)    # input:  1 = slot has a pet name
+
     def elaborate(self, platform):
         m = Module()
 
-        u_mload = ChurchMLoad()
+        u_mload = ChurchMLoad(enable_seal_check=self._enable_seal_check)
         m.submodules.u_mload = u_mload
 
         loaded_cap = Signal(CAP_REG_LAYOUT)
@@ -442,9 +470,17 @@ class ChurchXLoadLambda(Elaboratable):
 
             with m.State("CHECK_X"):
                 with m.If(is_null):
-                    # NULL GT: route to Scheduler.IRQ instead of hard NULL_CAP
-                    # fault (Task #1523, IRQ_REASON_LAZY_RESOLVE).
-                    m.next = "LAZY_RESOLVE_ABORT"
+                    # NULL GT in c-list slot (Task #1523 / Task #1526).
+                    # Only route to Scheduler.IRQ when the slot has a pet name.
+                    # Anonymous NULL GTs (no pet name) fault hard as NULL_CAP.
+                    with m.If(self.pet_name_rd_data):
+                        m.next = "LAZY_RESOLVE_ABORT"
+                    with m.Else():
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.NULL_CAP),
+                        ]
+                        m.next = "FAULT"
                 with m.Elif(~has_x_perm):
                     m.d.sync += [
                         fault_latched.eq(1),
@@ -480,6 +516,7 @@ class ChurchXLoadLambda(Elaboratable):
             self.fault_type.eq(fault_type_latched),
             self.lazy_resolve_irq.eq(fsm.ongoing("LAZY_RESOLVE_ABORT")),
             self.lazy_resolve_slot.eq(index_latched),
+            self.pet_name_rd_addr.eq(index_latched),
         ]
 
         return m

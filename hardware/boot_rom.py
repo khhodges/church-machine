@@ -619,6 +619,22 @@ while len(DEMO_CLIST) < 64:
     DEMO_CLIST.append(0)
 
 
+# ---------------------------------------------------------------------------
+# DEMO_CLIST_NAMED_SLOTS — the set of c-list slot indices that carry a
+# well-known named capability in the boot c-list.
+#
+# A slot is named iff it has a defined identity at design time, even if its
+# value is NULL at reset (e.g. idx 2 is the Thread GT slot, populated lazily
+# by the SAVE epilogue — it IS named).  Freed or truly anonymous slots are
+# excluded so that a NULL GT access there still produces a hard NULL_CAP fault
+# instead of triggering LAZY_RESOLVE.
+#
+# Excluded from DEMO_CLIST_NAMED_SLOTS:
+#   idx 4 — freed (was Startup.Config E-GT, Task #989; now permanently empty)
+# ---------------------------------------------------------------------------
+DEMO_CLIST_NAMED_SLOTS = frozenset({0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13})
+
+
 class BootRom(Elaboratable):
     """Instruction ROM for Church Machine boot, demo, and abstraction code.
 

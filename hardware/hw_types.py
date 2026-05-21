@@ -149,7 +149,8 @@ IO_PORT_TOUCH_X         = 0xFFFFFF34
 IO_PORT_TOUCH_Y         = 0xFFFFFF35
 IO_PORT_TOUCH_Z         = 0xFFFFFF36   # pressure
 IO_PORT_TOUCH_STATUS    = 0xFFFFFF37
-IO_PORT_NEXT            = 0xFFFFFF38   # next unallocated I/O port
+IO_PORT_PET_NAME_WR     = 0xFFFFFF38   # write slot-index N → mark c-list slot N as named
+IO_PORT_NEXT            = 0xFFFFFF39   # next unallocated I/O port
 
 # Segment 4 — Existing Sentinels (0xFFFFFFEF–0xFFFFFFFF)
 # Reserved hardware sentinel addresses used in word1_location of SWITCH PassKeys.
