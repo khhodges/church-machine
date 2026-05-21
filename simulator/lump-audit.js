@@ -264,39 +264,21 @@ function lumpAudit(words, manifest, lineNums) {
                     _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot });
                 }
             } else if (_rciChurchOps.has(op) && crSrc === 6 && cc > 0 && slot >= cc) {
-                // Slot is beyond the declared c-list (slot >= cc).
-                // Check the physical word the instruction would read if cc were slot+1.
-                // The c-list grows backward from the end of the lump, so with cc=slot+1
-                // slot S maps to words[lumpSize - (slot+1) + slot] = words[lumpSize - 1],
-                // which is the last word of the lump.  More generally, for arbitrary slot
-                // values we use the same formula as the in-range path (lumpSize - cc + slot).
-                // When that index is >= words.length, JavaScript returns undefined; >>> 0
-                // converts undefined to 0, which IS a NULL GT (no capability was written).
-                const _extWord = (words[lumpSize - cc + slot] >>> 0);
+                // Slot is beyond the declared c-list (slot >= cc) — always a structural error.
+                // Accessing a slot index >= cc is invalid regardless of what physical memory
+                // happens to contain at that address; the c-list header declares cc as the
+                // authoritative bound and the runtime enforces it.
                 const _capName = _rciPetNames[String(slot)] ||
                     (manifest && Array.isArray(manifest.capabilities) &&
                      manifest.capabilities[slot] && manifest.capabilities[slot].name) || null;
-                if (_extWord === 0) {
-                    // The physical word is zero — this is a NULL GT, not a structural
-                    // bounds error.  The cc field likely needs to be increased to slot+1
-                    // but the missing capability is absent (NULL), not garbage.
-                    const _nullNameHint = _capName ? ` ("${_capName}")` : '';
-                    const _nullMsg = `Instruction ${wi} (${_rciOpName[op]}) accesses capability slot ${slot}${_nullNameHint},` +
-                        ` but that slot contains a NULL GT (0x00000000) \u2014 cc is ${cc} but slot ${slot} requires cc \u2265 ${slot + 1}.` +
-                        ` The ${_capName || 'capability'} GT was not written into the c-list.`;
-                    const _nullSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
-                    _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot });
-                } else {
-                    // Non-zero garbage at an out-of-range position — genuine structural error.
-                    const _slotNameHint = _capName
-                        ? ` \u2014 "${_capName}" is referenced but not declared in this lump\u2019s c-list`
-                        : '';
-                    const _fixHint = ` Increase cc to at least ${slot + 1} to add slot [${slot}].`;
-                    const _rciMsg = `Instruction ${wi} (${_rciOpName[op]}) tries to access capability slot ${slot}` +
-                        `, but this lump only has ${cc} capability slot${cc !== 1 ? 's' : ''}${_slotNameHint}.${_fixHint}`;
-                    const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
-                    _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot });
-                }
+                const _slotNameHint = _capName
+                    ? ` \u2014 "${_capName}" is referenced but not declared in this lump\u2019s c-list`
+                    : '';
+                const _fixHint = ` Increase cc to at least ${slot + 1} to add slot [${slot}].`;
+                const _rciMsg = `Instruction ${wi} (${_rciOpName[op]}) tries to access capability slot ${slot}` +
+                    `, but this lump only has ${cc} capability slot${cc !== 1 ? 's' : ''}${_slotNameHint}.${_fixHint}`;
+                const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
+                _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot });
             }
 
             if (op === _rciBranchOp) {
