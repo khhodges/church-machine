@@ -86,6 +86,22 @@
 
 
 
+// SCHEDULER_IRQ_CLIST_SPEC — c-list capability spec for the Scheduler abstraction (NS slot 8).
+// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
+// Four E-perm GTs grant the IRQ handler authority to perform CHANGE CR12/CR13.
+// Layout (cc=4):
+//   idx 0: E-perm GT → NS[19]  CR12_PORT_CAP  (authority to CHANGE CR12)
+//   idx 1: E-perm GT → NS[20]  CR13_PORT_CAP  (authority to CHANGE CR13)
+//   idx 2: E-perm GT → NS[21]  CR12_MBIT_CAP  (authority for CR12 M-bit)
+//   idx 3: E-perm GT → NS[22]  CR13_MBIT_CAP  (authority for CR13 M-bit)
+// Cross-reference: simulator/simulator.js SCHEDULER_IRQ_CLIST (Task #1530).
+const SCHEDULER_IRQ_CLIST_SPEC = [
+    { name: 'CR12_PORT', target: 19, grants: { E: 1 } },
+    { name: 'CR13_PORT', target: 20, grants: { E: 1 } },
+    { name: 'CR12_MBIT', target: 21, grants: { E: 1 } },
+    { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
+];
+
 function nextPow2(n) {
     if (n <= 0) return 1;
     n = n - 1;
@@ -2152,6 +2168,15 @@ class SystemAbstractions {
         // this block only runs once, on first construction).
         state.faultRecoveryHandler = null;  // null = Tier 2 disabled (safe default)
         state._irqSweepCount = 0;
+
+        // Wire the simulated c-list into the Scheduler abstraction (Task #1530).
+        // _fireSchedulerIRQ reads schedulerAbs.capabilities to validate CR12/CR13
+        // authority GTs before performing the simulated CHANGE thread-stack swap.
+        // Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST.
+        const schedulerAbs = this.registry.abstractions[8];
+        if (schedulerAbs) {
+            schedulerAbs.capabilities = SCHEDULER_IRQ_CLIST_SPEC.slice();
+        }
     }
 
     _bindStack() {

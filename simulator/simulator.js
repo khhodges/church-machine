@@ -117,6 +117,22 @@ const TUNNEL_NS_SLOT          = 31; // NS slot of the Tunnel abstraction (call-h
 const SCHEDULER_NS_SLOT       = 8;  // NS slot of the Scheduler abstraction (Task #1077)
 const SCHEDULER_IRQ_NS_SLOT   = 50; // NS slot of the Scheduler.IRQ thread (fixed boot-image slot, Task #1077)
 
+// SCHEDULER_IRQ_CLIST — simulated c-list for the Scheduler abstraction (NS slot 8).
+// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
+// Four E-perm GTs grant the IRQ handler authority to perform CHANGE CR12/CR13.
+// Layout (cc=4):
+//   idx 0: E-perm GT → NS[19]  CR12_PORT_CAP  (authority to CHANGE CR12)
+//   idx 1: E-perm GT → NS[20]  CR13_PORT_CAP  (authority to CHANGE CR13)
+//   idx 2: E-perm GT → NS[21]  CR12_MBIT_CAP  (authority for CR12 M-bit)
+//   idx 3: E-perm GT → NS[22]  CR13_MBIT_CAP  (authority for CR13 M-bit)
+// Cross-reference: simulator/system_abstractions.js SCHEDULER_IRQ_CLIST_SPEC (Task #1530).
+const SCHEDULER_IRQ_CLIST = [
+    { name: 'CR12_PORT', target: 19, grants: { E: 1 } },
+    { name: 'CR13_PORT', target: 20, grants: { E: 1 } },
+    { name: 'CR12_MBIT', target: 21, grants: { E: 1 } },
+    { name: 'CR13_MBIT', target: 22, grants: { E: 1 } },
+];
+
 // Pre-computed 32-bit instruction words from hardware/boot_rom.py BOOT_PROGRAM
 // (Task #651 redesign). Written into Boot.Abstr lump code region during _initNamespaceTable()
 // so the binary matches the CLOOMC listing displayed in the code view.
@@ -2901,6 +2917,32 @@ class ChurchSimulator {
         if (reason === 'TIMER' && this.irqState.timerArmed) {
             this.irqState.timerArmed = false;
         }
+
+        // ── Authority check (Task #1530) ──────────────────────────────────────
+        // Before performing the simulated CHANGE CR12/CR13 thread-stack swap,
+        // verify that the Scheduler abstraction (NS slot 8) holds E-perm GTs
+        // for CR12_PORT (→ NS[19]) and CR13_PORT (→ NS[20]) in its c-list.
+        // Mirrors the hardware mLoad pipeline's capability validation for CHANGE.
+        // Cross-reference: hardware/boot_rom.py SCHEDULER_IRQ_CLIST (Task #1530).
+        const _schedulerAbs = this.abstractionRegistry.getAbstraction(SCHEDULER_NS_SLOT);
+        const _clist = _schedulerAbs ? (_schedulerAbs.capabilities || []) : [];
+        if (_clist.length > 0) {
+            const _cr12Auth = _clist[0];
+            const _cr13Auth = _clist[1];
+            const _hasCR12 = _cr12Auth && _cr12Auth.target === 19 &&
+                             _cr12Auth.grants && _cr12Auth.grants.E;
+            const _hasCR13 = _cr13Auth && _cr13Auth.target === 20 &&
+                             _cr13Auth.grants && _cr13Auth.grants.E;
+            if (!_hasCR12 || !_hasCR13) {
+                const _missing = [];
+                if (!_hasCR12) _missing.push('CR12_PORT\u2192NS[19]');
+                if (!_hasCR13) _missing.push('CR13_PORT\u2192NS[20]');
+                this.output += `  [IRQ] CHANGE authority check FAILED \u2014 missing E-perm GTs: ${_missing.join(', ')}\n`;
+                return false;
+            }
+            this.output += `  [IRQ] CHANGE authority check OK \u2014 CR12_PORT(NS[19]) + CR13_PORT(NS[20]) verified\n`;
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         this.irqState.irqActive = true;
         this.irqState.savedContext = {
@@ -6737,6 +6779,11 @@ ChurchSimulator.FAULT_CODES = {
 // above, but exposed on the class for external test code).
 ChurchSimulator.SCHEDULER_NS_SLOT     = SCHEDULER_NS_SLOT;
 ChurchSimulator.SCHEDULER_IRQ_NS_SLOT = SCHEDULER_IRQ_NS_SLOT;
+
+// Task #1530: Scheduler IRQ c-list — exposed for external test code.
+// Mirrors hardware/boot_rom.py SCHEDULER_IRQ_CLIST.
+// Parallel spec in simulator/system_abstractions.js SCHEDULER_IRQ_CLIST_SPEC.
+ChurchSimulator.SCHEDULER_IRQ_CLIST = SCHEDULER_IRQ_CLIST;
 
 // ── Lazy-Resolve: Pending GT sentinel (Task #1446) ─────────────────────────
 // A pending GT carries the magic tag 0xFEED in bits[31:16] and a pet-name

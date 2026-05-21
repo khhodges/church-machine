@@ -1740,6 +1740,121 @@ console.log('\n--- T016: LAZY_RESOLVE wired from _execEloadcall ---');
     }
 }
 
+// ── T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ────────────────────
+// Verifies that:
+//   (a) SystemAbstractions._bindScheduler() populates the Scheduler abstraction
+//       (NS slot 8) with capabilities matching SCHEDULER_IRQ_CLIST_SPEC.
+//   (b) _fireSchedulerIRQ succeeds (returns truthy) when the c-list is valid.
+//   (c) _fireSchedulerIRQ returns false when the c-list has invalid CR12/CR13
+//       authority entries (e.g. wrong target slot).
+//   (d) ChurchSimulator.SCHEDULER_IRQ_CLIST is a 4-entry array that matches
+//       the hardware/boot_rom.py layout.
+console.log('\n--- T017: SCHEDULER_IRQ_CLIST authority check (Task #1530) ---');
+{
+    // ── T017-A: capabilities wired by _bindScheduler ──────────────────────────
+    {
+        const { sim, registry } = makeTestSim();
+        const schedulerAbs = registry.abstractions[8];
+        check('T017-A1: Scheduler abstraction (NS[8]) exists',
+            !!schedulerAbs);
+        check('T017-A2: capabilities array has 4 entries (cc=4)',
+            schedulerAbs && schedulerAbs.capabilities.length === 4);
+        check('T017-A3: idx 0 → CR12_PORT, target=NS[19], E-perm',
+            schedulerAbs && schedulerAbs.capabilities[0] &&
+            schedulerAbs.capabilities[0].name === 'CR12_PORT' &&
+            schedulerAbs.capabilities[0].target === 19 &&
+            schedulerAbs.capabilities[0].grants.E === 1);
+        check('T017-A4: idx 1 → CR13_PORT, target=NS[20], E-perm',
+            schedulerAbs && schedulerAbs.capabilities[1] &&
+            schedulerAbs.capabilities[1].name === 'CR13_PORT' &&
+            schedulerAbs.capabilities[1].target === 20 &&
+            schedulerAbs.capabilities[1].grants.E === 1);
+        check('T017-A5: idx 2 → CR12_MBIT, target=NS[21], E-perm',
+            schedulerAbs && schedulerAbs.capabilities[2] &&
+            schedulerAbs.capabilities[2].name === 'CR12_MBIT' &&
+            schedulerAbs.capabilities[2].target === 21 &&
+            schedulerAbs.capabilities[2].grants.E === 1);
+        check('T017-A6: idx 3 → CR13_MBIT, target=NS[22], E-perm',
+            schedulerAbs && schedulerAbs.capabilities[3] &&
+            schedulerAbs.capabilities[3].name === 'CR13_MBIT' &&
+            schedulerAbs.capabilities[3].target === 22 &&
+            schedulerAbs.capabilities[3].grants.E === 1);
+    }
+
+    // ── T017-B: _fireSchedulerIRQ succeeds with valid c-list ──────────────────
+    {
+        const { sim, registry, sysAbs } = makeTestSim();
+        if (!sim.cr) sim.cr = new Array(16).fill(null);
+        sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
+        sim.irqState = { irqActive: false, timerArmed: false };
+
+        // Register a TIMER handler so IRQ returns ok=true
+        sysAbs._schedulerState.threads[0].state = 'sleeping';
+        sysAbs._schedulerState.threads[0].wakeStep = 0;
+
+        const result = sim._fireSchedulerIRQ('TIMER', null);
+        check('T017-B1: _fireSchedulerIRQ returns truthy with valid clist',
+            result === true);
+        check('T017-B2: output contains authority check OK message',
+            sim.output.includes('authority check OK'));
+    }
+
+    // ── T017-C: _fireSchedulerIRQ returns false when CR12_PORT authority missing ─
+    {
+        const { sim, registry, sysAbs } = makeTestSim();
+        if (!sim.cr) sim.cr = new Array(16).fill(null);
+        sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
+        sim.irqState = { irqActive: false, timerArmed: false };
+
+        // Tamper: set wrong target on CR12_PORT entry (not NS[19])
+        const schedulerAbs = registry.abstractions[8];
+        schedulerAbs.capabilities[0] = { name: 'CR12_PORT', target: 99, grants: { E: 1 } };
+
+        const result = sim._fireSchedulerIRQ('TIMER', null);
+        check('T017-C1: _fireSchedulerIRQ returns false when CR12_PORT target is wrong',
+            result === false);
+        check('T017-C2: output contains authority check FAILED message',
+            sim.output.includes('authority check FAILED'));
+        check('T017-C3: irqActive remains false after authority failure',
+            sim.irqState.irqActive === false);
+    }
+
+    // ── T017-D: _fireSchedulerIRQ returns false when CR13_PORT authority missing ─
+    {
+        const { sim, registry, sysAbs } = makeTestSim();
+        if (!sim.cr) sim.cr = new Array(16).fill(null);
+        sim.cr[14] = { word0: 3, word1: 0, word2: 0, word3: 0 };
+        sim.irqState = { irqActive: false, timerArmed: false };
+
+        // Tamper: strip E-perm from CR13_PORT entry
+        const schedulerAbs = registry.abstractions[8];
+        schedulerAbs.capabilities[1] = { name: 'CR13_PORT', target: 20, grants: {} };
+
+        const result = sim._fireSchedulerIRQ('TIMER', null);
+        check('T017-D1: _fireSchedulerIRQ returns false when CR13_PORT E-perm stripped',
+            result === false);
+        check('T017-D2: output mentions CR13_PORT in FAILED message',
+            sim.output.includes('CR13_PORT'));
+    }
+
+    // ── T017-E: ChurchSimulator.SCHEDULER_IRQ_CLIST static constant ──────────
+    {
+        const clist = ChurchSimulator.SCHEDULER_IRQ_CLIST;
+        check('T017-E1: ChurchSimulator.SCHEDULER_IRQ_CLIST is defined',
+            Array.isArray(clist));
+        check('T017-E2: static clist has 4 entries',
+            clist && clist.length === 4);
+        check('T017-E3: static clist[0] is CR12_PORT → NS[19]',
+            clist && clist[0] && clist[0].name === 'CR12_PORT' && clist[0].target === 19);
+        check('T017-E4: static clist[1] is CR13_PORT → NS[20]',
+            clist && clist[1] && clist[1].name === 'CR13_PORT' && clist[1].target === 20);
+        check('T017-E5: static clist[2] is CR12_MBIT → NS[21]',
+            clist && clist[2] && clist[2].name === 'CR12_MBIT' && clist[2].target === 21);
+        check('T017-E6: static clist[3] is CR13_MBIT → NS[22]',
+            clist && clist[3] && clist[3].name === 'CR13_MBIT' && clist[3].target === 22);
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);
