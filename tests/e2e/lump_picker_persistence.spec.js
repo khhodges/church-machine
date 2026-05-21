@@ -84,11 +84,14 @@ async function setupLumpsView(page) {
     await page.goto('/simulator/');
     await page.waitForLoadState('networkidle');
 
+    // Ensure app-shell.js has executed and switchView is in scope before
+    // calling it.  Uses the same defensive pattern as lump_history_tab.spec.js
+    // to avoid the silent no-op from the `if (typeof...)` guard.
+    await page.waitForFunction(() => typeof switchView === 'function');
+
     // Switch to the LUMP Repository view via JS — avoids dependence on the
     // hamburger menu structure.
-    await page.evaluate(() => {
-        if (typeof window.switchView === 'function') window.switchView('lumps');
-    });
+    await page.evaluate(() => switchView('lumps'));
 
     // Guard: the view and picker must be visible before we interact.
     await expect(page.locator('#lumps')).toBeVisible();

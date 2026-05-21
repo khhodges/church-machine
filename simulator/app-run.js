@@ -1337,6 +1337,12 @@ function slowBoot() {
                     // empty for user-code debugging after a clean boot.
                     sim.auditLog = [];
                     _autoLoadDefaultProgram();
+                    // Restore user-assigned namespace labels that sim.reset()
+                    // wiped (nsLabels = {}).  Must run after _autoLoadDefaultProgram
+                    // so any program-load-triggered NS writes have already landed.
+                    // Skips slots where isNSEntryValid() is true so boot-image
+                    // catalog entries always take precedence over saved labels.
+                    if (typeof loadNamespaceState === 'function') loadNamespaceState();
                 }
                 updateDashboard();
                 if (!sim.halted) {
