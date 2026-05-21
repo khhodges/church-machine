@@ -112,6 +112,7 @@ let currentView = 'dashboard';
 let previousView = null;
 let lastAssembledWords = null;
 let lastAssembledCapabilities = null;
+let lastAssembledNamedSlots = null;
 let lastMethodTableSize = 0;
 let _pendingSimLoad = false;
 
@@ -126,6 +127,7 @@ let _pendingSimLoad = false;
 function _clearAssembledProgramState() {
     lastAssembledWords    = null;
     lastAssembledCapabilities = null;
+    lastAssembledNamedSlots = null;
     lastMethodTableSize   = 0;
     _pendingSimLoad       = false;
 }

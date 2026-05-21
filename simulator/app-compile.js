@@ -1639,6 +1639,8 @@ function loadCLOOMCIntoSim() {
     lastAssembledWords      = words.slice();
     lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
         ? result.capabilities.slice() : null;
+    lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
+        ? result.namedSlots.slice() : null;
     lastMethodTableSize     = methodTableSize;
     _defaultProgramLoaded   = true;
     sim.programLabels       = labels;

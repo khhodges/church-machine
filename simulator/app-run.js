@@ -217,6 +217,7 @@ function assembleAndLoad() {
         }
         lastAssembledWords = words.slice();
         lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0) ? result.capabilities.slice() : null;
+        lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0) ? result.namedSlots.slice() : null;
         lastMethodTableSize = methodTableSize;
         _defaultProgramLoaded = true;
         sim.programLabels = labels;
@@ -415,6 +416,7 @@ function assembleAndLoad() {
         window._assemblerSymbols = null;
         lastAssembledWords = null;
         lastAssembledCapabilities = null;
+        lastAssembledNamedSlots = null;
         const _errSaveBtn = document.getElementById('btnSaveNS');
         if (_errSaveBtn) _errSaveBtn.disabled = true;
         const _errExpBtn = document.getElementById('btnExportLump');
@@ -431,6 +433,8 @@ function assembleAndLoad() {
     lastAssembledWords = result.words.slice();
     lastAssembledCapabilities = (result.capabilities && result.capabilities.length > 0)
         ? result.capabilities.slice() : null;
+    lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
+        ? result.namedSlots.slice() : null;
     _defaultProgramLoaded = true;
     sim.programLabels = result.labels || {};
     sim.programCapabilities = result.capabilities ? result.capabilities.slice() : [];
@@ -942,6 +946,12 @@ function _injectClistNow() {
             word3: sim.memory[nsBase + 2] >>> 0,
             m: 0,
         };
+        // Task #1531: mark every named capability slot in petNameMemory so that
+        // LAZY_RESOLVE fires instead of NULL_CAP hard fault on first access.
+        // Mirrors the DWRITE-to-IO_PORT_PET_NAME_WR hardware path.
+        if (lastAssembledNamedSlots && lastAssembledNamedSlots.length > 0) {
+            sim.markNamedSlots(lastAssembledNamedSlots);
+        }
 
     } else {
         // ── CASE A: no capabilities block → inject full DEMO_CLIST ──────────

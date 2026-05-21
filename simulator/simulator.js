@@ -639,16 +639,20 @@ class ChurchSimulator {
             pendingWakeFlags: [], // Set of signaled flags (array for ordered sweep)
         };
 
+        // PetNameMemory (Task #1531): tracks which c-list slot indices carry a known named
+        // capability, enabling LAZY_RESOLVE instead of NULL_CAP hard fault on those slots.
+        // Mirrors hardware/pet_name_mem.py and hardware/boot_rom.py DEMO_CLIST_NAMED_SLOTS.
+        // Initialised with the boot c-list named slots; updated by DWRITE to IO_PORT_PET_NAME_WR
+        // (0xFFFFFF38) and by markNamedSlots() when a program with a capabilities block loads.
+        // Boot named slots: {0,1,2,3,5,6,7,8,9,10,11,12,13} — matches DEMO_CLIST_NAMED_SLOTS.
+        this.petNameMemory = new Set([0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+
         // Lazy-Resolve: Transparent Thread Suspension (Task #1519)
         // Registry of pending NULL-GT or 0xFEED resolves, keyed by c-list slot index.
         // Each entry: { petName, slot, instrName, kind, pc, savedDRs, savedCRs, savedFlags, savedSto }
         this._pendingResolves = new Map();
         this._lazySuspended = false;
 
-        // PetNameMemory: tracks c-list slots marked as named via IO_PORT_PET_NAME_WR (Task #1532).
-        // A DWRITE to 0xFFFFFF38 registers slot (value & 0x3F) so that a subsequent NULL-GT
-        // access fires lazy_resolve_irq instead of a hard NULL_CAP fault.
-        this._petNamedSlots = new Set();
 
         this.lazyManifest = {};
         this._lastLoadTargetSlot = null;
@@ -4866,8 +4870,8 @@ class ChurchSimulator {
                     this._fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow);
                     return { lazySuspended: true, petName: _pcn, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT', pc: this.pc, instr: d, desc: `ELOADCALL: waiting for '${_pcn}' (slot ${ecRow})` };
                 }
-            } else if (this._petNamedSlots.has(ecRow)) {
-                // PetNameMemory: slot was registered via IO_PORT_PET_NAME_WR (Task #1532).
+            } else if (this.petNameMemory.has(ecRow)) {
+                // petNameMemory: slot was registered via IO_PORT_PET_NAME_WR or markNamedSlots().
                 // Fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP fault.
                 this._pendingResolves.set(ecRow, {
                     petName: `slot${ecRow}`, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT',
@@ -5112,8 +5116,8 @@ class ChurchSimulator {
                     this.emit('lazyResolvePending', { petName: _pcn, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT' });
                     return { lazySuspended: true, petName: _pcn, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT', pc: this.pc, instr: d, desc: `XLOADLAMBDA: waiting for '${_pcn}' (slot ${d.imm})` };
                 }
-            } else if (this._petNamedSlots.has(d.imm)) {
-                // PetNameMemory: slot was registered via IO_PORT_PET_NAME_WR (Task #1532).
+            } else if (this.petNameMemory.has(d.imm)) {
+                // petNameMemory: slot was registered via IO_PORT_PET_NAME_WR or markNamedSlots().
                 // Fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP fault.
                 this._pendingResolves.set(d.imm, {
                     petName: `slot${d.imm}`, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT',
@@ -5488,18 +5492,19 @@ class ChurchSimulator {
         const offset = d.imm;
         const absAddr = (loc + offset) >>> 0;
 
-        // IO_PORT_PET_NAME_WR intercept (Task #1532): a DWRITE whose computed address
-        // equals 0xFFFFFF38 registers c-list slot (DR value & 0x3F) as named.  Named
-        // slots fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP when the
-        // slot is accessed while still empty.
+        // IO_PORT_PET_NAME_WR intercept (Tasks #1531/#1532): a DWRITE whose computed address
+        // equals 0xFFFFFF38 registers c-list slot (DR value & 0x3F) as named.  Named slots
+        // fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP when accessed while empty.
+        // Mirrors hardware/core.py intercept: wr_addr = dmem_wr_data[5:0], wr_data = 1.
+        // Bypasses mLoad — the hardware address range is not a real memory lump.
         if (absAddr === IO_PORT_PET_NAME_WR) {
-            const petSlot = (this.dr[drIdx] >>> 0) & 0x3F;
-            this._petNamedSlots.add(petSlot);
-            const desc = `DWRITE DR${drIdx} → IO_PORT_PET_NAME_WR: c-list slot ${petSlot} marked as named`;
+            const slotIdx = (this.dr[drIdx] >>> 0) & 0x3F;
+            this.petNameMemory.add(slotIdx);
+            const desc = `DWRITE DR${drIdx} → IO_PORT_PET_NAME_WR: c-list slot ${slotIdx} marked as named`;
             this.output += desc + '\n';
             this.pc++;
             return { pc: this.pc - 1, instr: d, desc, pipeline: [
-                { stage: 'DWRITE', desc: `Mark c-list slot ${petSlot} as named (PET_NAME_WR)`, perm: 'W', status: 'pass' },
+                { stage: 'DWRITE', desc: `Mark c-list slot ${slotIdx} as named (PET_NAME_WR)`, perm: 'W', status: 'pass' },
             ]};
         }
 
@@ -6642,6 +6647,25 @@ class ChurchSimulator {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // markNamedSlots(slots) — out-of-band registration of named c-list slot indices.
+    // Called by _injectClistNow() (app-run.js) after loading a program whose capabilities
+    // block declares named slots.  Mirrors the DWRITE-to-IO_PORT_PET_NAME_WR hardware path
+    // without requiring a real capability pointing to 0xFFFFFF38.
+    // slots: array of 0-based c-list slot indices to mark as named.
+    markNamedSlots(slots) {
+        if (!slots) return;
+        for (const s of slots) {
+            if (typeof s === 'number' && s >= 0 && s < 64)
+                this.petNameMemory.add(s);
+        }
+    }
+
+    // isNamedSlot(slot) — returns true when the given c-list slot index is marked as named
+    // in petNameMemory, i.e. NULL_CAP access should use LAZY_RESOLVE instead of hard fault.
+    isNamedSlot(slot) {
+        return this.petNameMemory.has(slot);
+    }
+
     getState() {
         return {
             cr: this.cr.map(c => ({...c})),
@@ -6656,6 +6680,7 @@ class ChurchSimulator {
             halted: this.halted,
             output: this.output,
             namespaceTable: this.namespaceTable,
+            petNameMemory: Array.from(this.petNameMemory),
         };
     }
 

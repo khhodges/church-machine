@@ -973,8 +973,14 @@ class ChurchAssembler {
         }
 
         this._lastLineNums = lineNums.slice();
+        // namedSlots (Task #1531): slot indices (0-based) of every capability declared in
+        // the capabilities { } block.  All named capabilities are candidates for LAZY_RESOLVE
+        // rather than NULL_CAP hard fault; the simulator's petNameMemory is seeded from this
+        // list via markNamedSlots() when the program loads.  Slot index = position in block.
+        const namedSlots = this.capabilities.map((_, i) => i);
         return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
-                 capabilities: this.capabilities.slice(), wordComments, lineNums: lineNums.slice() };
+                 capabilities: this.capabilities.slice(), namedSlots,
+                 wordComments, lineNums: lineNums.slice() };
     }
 
     getLastLineNums() {
