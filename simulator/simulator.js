@@ -110,6 +110,7 @@ const M_BIT_PORT_CR12         = 0xFFFFFF1C; // M-bit authority port for CR12
 const M_BIT_PORT_CR13         = 0xFFFFFF1D; // M-bit authority port for CR13
 const M_BIT_PORT_CR14         = 0xFFFFFF1E; // M-bit authority port for CR14
 const M_BIT_PORT_CR15         = 0xFFFFFF1F; // M-bit authority port for CR15
+const IO_PORT_PET_NAME_WR     = 0xFFFFFF38; // DWRITE to this addr marks c-list slot (value & 0x3F) as named
 
 // Module-scope boot constants — referenced by loadProgram, _bootStep, etc.
 const BOOT_ABSTR_NS_SLOT      = 3;  // NS slot of the Boot Abstraction lump (Boot.Abstr)
@@ -643,6 +644,11 @@ class ChurchSimulator {
         // Each entry: { petName, slot, instrName, kind, pc, savedDRs, savedCRs, savedFlags, savedSto }
         this._pendingResolves = new Map();
         this._lazySuspended = false;
+
+        // PetNameMemory: tracks c-list slots marked as named via IO_PORT_PET_NAME_WR (Task #1532).
+        // A DWRITE to 0xFFFFFF38 registers slot (value & 0x3F) so that a subsequent NULL-GT
+        // access fires lazy_resolve_irq instead of a hard NULL_CAP fault.
+        this._petNamedSlots = new Set();
 
         this.lazyManifest = {};
         this._lastLoadTargetSlot = null;
@@ -4860,6 +4866,24 @@ class ChurchSimulator {
                     this._fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow);
                     return { lazySuspended: true, petName: _pcn, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT', pc: this.pc, instr: d, desc: `ELOADCALL: waiting for '${_pcn}' (slot ${ecRow})` };
                 }
+            } else if (this._petNamedSlots.has(ecRow)) {
+                // PetNameMemory: slot was registered via IO_PORT_PET_NAME_WR (Task #1532).
+                // Fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP fault.
+                this._pendingResolves.set(ecRow, {
+                    petName: `slot${ecRow}`, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT',
+                    pc: this.pc,
+                    savedDRs: [...this.dr],
+                    savedCRs: this.cr.map(c => ({ ...c })),
+                    savedFlags: { ...this.flags },
+                    savedSto: this.sto,
+                });
+                this._lazySuspended = true;
+                this.output += `[LAZY-RESOLVE] ELOADCALL: c-list slot ${ecRow} is named (PetNameMemory) \u2014 firing Scheduler.IRQ(LAZY_RESOLVE, slot=${ecRow})\n`;
+                this.emit('lazyResolvePending', { petName: `slot${ecRow}`, slot: ecRow, instrName: 'ELOADCALL', kind: 'NULL_GT' });
+                this._fireSchedulerIRQ('LAZY_RESOLVE', null, ecRow);
+                return { lazySuspended: true, petName: `slot${ecRow}`, slot: ecRow, instrName: 'ELOADCALL',
+                         kind: 'NULL_GT', pc: this.pc, instr: d,
+                         desc: `ELOADCALL: named slot ${ecRow} (PetNameMemory) \u2014 Scheduler.IRQ(LAZY_RESOLVE) fired` };
             } else {
                 this.fault('NULL_CAP', `ELOADCALL: c-list row ${ecRow} is empty`);
                 return null;
@@ -5088,6 +5112,24 @@ class ChurchSimulator {
                     this.emit('lazyResolvePending', { petName: _pcn, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT' });
                     return { lazySuspended: true, petName: _pcn, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT', pc: this.pc, instr: d, desc: `XLOADLAMBDA: waiting for '${_pcn}' (slot ${d.imm})` };
                 }
+            } else if (this._petNamedSlots.has(d.imm)) {
+                // PetNameMemory: slot was registered via IO_PORT_PET_NAME_WR (Task #1532).
+                // Fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP fault.
+                this._pendingResolves.set(d.imm, {
+                    petName: `slot${d.imm}`, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT',
+                    pc: this.pc,
+                    savedDRs: [...this.dr],
+                    savedCRs: this.cr.map(c => ({ ...c })),
+                    savedFlags: { ...this.flags },
+                    savedSto: this.sto,
+                });
+                this._lazySuspended = true;
+                this.output += `[LAZY-RESOLVE] XLOADLAMBDA: c-list slot ${d.imm} is named (PetNameMemory) \u2014 firing Scheduler.IRQ(LAZY_RESOLVE, slot=${d.imm})\n`;
+                this.emit('lazyResolvePending', { petName: `slot${d.imm}`, slot: d.imm, instrName: 'XLOADLAMBDA', kind: 'NULL_GT' });
+                this._fireSchedulerIRQ('LAZY_RESOLVE', null, d.imm);
+                return { lazySuspended: true, petName: `slot${d.imm}`, slot: d.imm, instrName: 'XLOADLAMBDA',
+                         kind: 'NULL_GT', pc: this.pc, instr: d,
+                         desc: `XLOADLAMBDA: named slot ${d.imm} (PetNameMemory) \u2014 Scheduler.IRQ(LAZY_RESOLVE) fired` };
             } else {
                 this.fault('NULL_CAP', `XLOADLAMBDA: c-list offset ${d.imm} is empty`);
                 return null;
@@ -5445,6 +5487,22 @@ class ChurchSimulator {
         const loc = srcCR.word1;
         const offset = d.imm;
         const absAddr = (loc + offset) >>> 0;
+
+        // IO_PORT_PET_NAME_WR intercept (Task #1532): a DWRITE whose computed address
+        // equals 0xFFFFFF38 registers c-list slot (DR value & 0x3F) as named.  Named
+        // slots fire Scheduler.IRQ(LAZY_RESOLVE) instead of a hard NULL_CAP when the
+        // slot is accessed while still empty.
+        if (absAddr === IO_PORT_PET_NAME_WR) {
+            const petSlot = (this.dr[drIdx] >>> 0) & 0x3F;
+            this._petNamedSlots.add(petSlot);
+            const desc = `DWRITE DR${drIdx} → IO_PORT_PET_NAME_WR: c-list slot ${petSlot} marked as named`;
+            this.output += desc + '\n';
+            this.pc++;
+            return { pc: this.pc - 1, instr: d, desc, pipeline: [
+                { stage: 'DWRITE', desc: `Mark c-list slot ${petSlot} as named (PET_NAME_WR)`, perm: 'W', status: 'pass' },
+            ]};
+        }
+
         const check = this.mLoad(dataGT, 'W', d.crSrc, absAddr);
         if (!check.ok) {
             this.fault(check.fault, `DWRITE: CR${d.crSrc}: ${check.message}`);
