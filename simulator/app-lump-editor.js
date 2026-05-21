@@ -134,7 +134,8 @@
         if (state.ns.n_minus_6 > maxN) {
             var savedN = state.ns.n_minus_6;
             state.ns.n_minus_6 = maxN;
-            var newMaxSl = Math.pow(2, maxN + 14) / 64;
+            var serverMaxCl = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+            var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl);
             if (state.ns.slots > newMaxSl) state.ns.slots = newMaxSl;
             _nsSizeClampedInfo = { savedN: savedN, clampedN: maxN, boardLabel: profile.label };
             saveState();
@@ -149,7 +150,7 @@
     // state.thread.stackFrames: number of stack frames (each frame = 2 words)
     var state = {
         thread: { lumpPow2: 8, stackFrames: 16, count: 1 },
-        ns: { n_minus_6: 3, slots: 2000 }
+        ns: { n_minus_6: 3, slots: 256 }
     };
 
     function loadState() {
@@ -166,7 +167,7 @@
             }
             if (s.ns) {
                 state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3;
-                state.ns.slots = s.ns.slots || 2000;
+                state.ns.slots = Math.min(s.ns.slots || 256, 256);
             }
             // Restore the board-switch clamp warning if it is still applicable.
             // It is applicable when the current n_minus_6 still matches what the
@@ -244,7 +245,8 @@
         var n                  = clamp(state.ns.n_minus_6, 0, maxN);
         var totalNamespaceWords = Math.pow(2, n + 14);
         var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var maxSl               = totalNamespaceWords / 64;
+        var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var maxSl               = Math.min(totalNamespaceWords / 64, serverMax);
         var nsSlotsMax          = Math.round(clamp(state.ns.slots, 1, maxSl));
         return {
             targetBoard: board,
@@ -961,9 +963,10 @@
                 '<button class="le-warn-dismiss" onclick="lumpEditorDismissNSWarning()" title="Dismiss">\u00d7</button>' +
             '</div>';
         }
-        var total  = Math.pow(2, n + 14);
-        var maxSl  = total / 64;
-        var slots  = clamp(state.ns.slots, 1, maxSl);
+        var total      = Math.pow(2, n + 14);
+        var serverMax  = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var maxSl      = Math.min(total / 64, serverMax);
+        var slots      = clamp(state.ns.slots, 1, maxSl);
         var NS_TABLE_COMPUTED = Math.max(16, Math.round(slots) * 4);
         var threadLump   = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
         var maxCount     = profile.singleThread ? 1 : Math.min(10, Math.max(1, Math.floor(budget / threadLump)));
@@ -998,7 +1001,7 @@
             ['Total words',    esc(total.toLocaleString() + '  (2^' + (n + 14) + ')'), noFit ? '' : 'le-val-gold'],
             ['n_minus_6',     esc(String(n)), ''],
             ['typ field',     '01  (Namespace, reserved)', ''],
-            ['Max slots',      esc(maxSl.toLocaleString() + '  (total ÷ 64)'), ''],
+            ['Max slots',      esc(maxSl.toLocaleString() + (total / 64 > serverMax ? '  (server limit)' : '  (total \u00f7 64)')), ''],
             ['NS table',       nsTableDesc, ''],
             ['Boot overhead',  esc(bootOverhead.toLocaleString() + ' words (Boot.NS 64 + Boot.Thread ' + threadLump.toLocaleString() + ')'), ''],
             ['Pool available', pool >= 0 ? esc(pool.toLocaleString() + ' words') : '<span class="le-overflow">overflow</span>', ''],
@@ -1108,7 +1111,8 @@
 
     window.lumpEditorNSSize = function (v) {
         state.ns.n_minus_6 = clamp(v, 0, 15);
-        var maxSl = Math.pow(2, state.ns.n_minus_6 + 14) / 64;
+        var serverMaxNS = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS);
         if (state.ns.slots > maxSl) state.ns.slots = maxSl;
         _nsSizeClampedInfo = null;
         saveState();
@@ -1132,7 +1136,8 @@
     };
 
     window.lumpEditorNSSlots = function (v) {
-        var maxSl = Math.pow(2, state.ns.n_minus_6 + 14) / 64;
+        var serverMaxSlots = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots);
         state.ns.slots = clamp(v, 1, maxSl);
         saveState();
         var sl  = document.getElementById('le-ns-slots-sl');
