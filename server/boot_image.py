@@ -510,11 +510,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     thread_size = int(step1["threadLumpWords"])
 
     # Dynamic NS table reserve (Task #1244): size follows configured slot capacity.
-    # nsSlotsMax defaults to 256 (→ 1024 words) when absent, preserving backward compat.
-    # MAX_NS_ENTRIES (1024) is the user-selectable cap, not the default.
-    # NS_TABLE_RESERVE is reassigned as a local below, so use 256 directly here
-    # (= module-level NS_TABLE_RESERVE 0x400 // NS_ENTRY_WORDS 4).
-    _ns_slots_max = int(step1.get("nsSlotsMax") or 256)
+    # nsSlotsMax defaults to MAX_NS_ENTRIES when absent.
+    _ns_slots_max = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
     if "abstractionLumpWords" in step1:
