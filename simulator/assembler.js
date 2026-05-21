@@ -159,6 +159,11 @@
 //   ; any text      — comment, stripped before encoding
 //   .pet <alias> DR<n>  — declare symbolic alias for data register DR<n>
 //   .pet <alias> CR<n>  — declare symbolic alias for capability register CR<n>
+//   .petname <n>    — register c-list slot n with PetNameMemory (PETNAME <n> also accepted)
+//                     Expands to: LOAD CR11, CR6, 18  (ChurchHW cap from boot c-list)
+//                                 IADD DR1, DR0, #n   (slot number)
+//                                 DWRITE DR1, CR11, 0 (write slot n to ChurchHW)
+//                     Clobbers: CR11, DR1.  Slot must be 0–63.
 //
 // PET DIRECTIVES  (.pet — register aliases)
 //   Aliases allow human-readable names in place of DR<n> / CR<n> tokens.
@@ -766,6 +771,49 @@ class ChurchAssembler {
             // .pet directives are pre-pass-only; skip them here so they produce
             // no machine words and do not shift label or word offsets.
             if (/^\.pet\b/i.test(line)) {
+                continue;
+            }
+
+            // ── .petname / PETNAME pseudo-instruction ──────────────────────────
+            // Syntax:  .petname <n>   or   PETNAME <n>   (n = c-list slot, 0–63)
+            //
+            // Registers c-list slot n with PetNameMemory so that a subsequent
+            // NULL-GT access fires Scheduler.IRQ(LAZY_RESOLVE) instead of a hard
+            // NULL_CAP fault.  This enables demand-loading patterns where the
+            // abstraction is fetched asynchronously via the Tunnel/Loader.
+            //
+            // Expands to three instructions (3 machine words):
+            //   LOAD  CR11, CR6, 18   ; ChurchHW cap from boot c-list slot 18 → CR11
+            //   IADD  DR1, DR0, #n    ; slot number n into DR1
+            //   DWRITE DR1, CR11, 0   ; write slot n through ChurchHW → PetNameMemory
+            //
+            // ChurchHW (boot c-list slot 18) is the hardware-control Abstract GT
+            // added in Task #1542.  DWRITE through it calls _dispatchAbstractDwrite
+            // with DEVICE_CLASS_CHURCHHW, which records the slot in _petNamedSlots.
+            //
+            // Clobbers: CR11 (ChurchHW capability), DR1 (slot number).
+            // Slot n must be in range 0–63.  The keyword is case-insensitive;
+            // the leading dot is optional (both .petname and PETNAME are valid).
+            if (/^\.petname\b/i.test(line) || /^PETNAME\b/i.test(line)) {
+                const pnMatch = line.match(/^(?:\.petname|PETNAME)\s+#?(\d+)\s*$/i);
+                if (!pnMatch) {
+                    const kwLen = (line.match(/^(?:\.petname|PETNAME)/i) || [''])[0].length;
+                    this.errors.push({ line: lineNum + 1, colStart: 0, colEnd: kwLen,
+                        message: `.petname requires a single slot number 0–63, e.g. ".petname 5" or "PETNAME 5"` });
+                    continue;
+                }
+                const pnSlot = parseInt(pnMatch[1], 10);
+                if (pnSlot < 0 || pnSlot > 63) {
+                    this.errors.push({ line: lineNum + 1, colStart: 0, colEnd: line.length,
+                        message: `.petname slot must be in range 0–63 (got ${pnSlot})` });
+                    continue;
+                }
+                instructions.push({ line: 'LOAD CR11, CR6, 18', lineNum: lineNum + 1,
+                    comment: `petname: load ChurchHW cap (boot c-list slot 18) → CR11` });
+                instructions.push({ line: `IADD DR1, DR0, #${pnSlot}`, lineNum: lineNum + 1,
+                    comment: `petname: slot ${pnSlot} → DR1` });
+                instructions.push({ line: 'DWRITE DR1, CR11, 0', lineNum: lineNum + 1,
+                    comment: `petname: mark c-list slot ${pnSlot} as named (PetNameMemory)` });
                 continue;
             }
 

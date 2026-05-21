@@ -1,0 +1,59 @@
+; ============================================================
+; Abstraction:  PetNameDemo
+; Description:  Demonstrates the .petname pseudo-instruction —
+;               marks c-list slots as named for lazy-resolve via
+;               Scheduler.IRQ instead of a hard NULL_CAP fault.
+; Author:       Church Machine Educational Platform
+; Version:      1.0
+; Created:      2026-05-21
+; Language:     Assembly
+; ============================================================
+;
+; BACKGROUND
+; ----------
+; When a LOAD or ELOADCALL targets a c-list slot that is still
+; NULL (not yet populated by the Tunnel/Loader), the normal
+; outcome is a NULL_CAP fault — the program crashes.
+;
+; Registering the slot with PetNameMemory changes this behaviour:
+; on a NULL access the simulator fires Scheduler.IRQ(LAZY_RESOLVE)
+; instead, which suspends the thread until the abstraction is
+; delivered.  This is the "demand-loading" pattern used by the
+; Church Machine's Tunnel fetch pipeline.
+;
+; HOW .petname WORKS
+; ------------------
+; .petname <n> is a three-instruction pseudo-instruction:
+;
+;   LOAD  CR11, CR6, 18   ; ChurchHW device cap (boot c-list slot 18)
+;   IADD  DR1,  DR0, #n   ; slot number n into DR1
+;   DWRITE DR1, CR11, 0   ; register slot n with PetNameMemory
+;
+; ChurchHW (slot 18) is the hardware-control Abstract GT added in
+; Task #1542.  A DWRITE through it invokes _dispatchAbstractDwrite
+; with DEVICE_CLASS_CHURCHHW, which calls _petNamedSlots.add(n).
+;
+; Clobbers: CR11 (ChurchHW cap), DR1 (slot number).
+; Slot must be in range 0–63.
+;
+; VARIANT SYNTAX
+; --------------
+; Both forms are accepted (case-insensitive):
+;   .petname 5       (directive-style, preferred)
+;   PETNAME  5       (pseudo-op style)
+;   .petname #5      (# prefix on immediate is also accepted)
+;
+; ============================================================
+
+; ── Register slot 5 as a named (lazily-resolved) c-list slot ──
+;
+; After this, accessing slot 5 while it is NULL suspends the
+; thread gracefully instead of faulting.
+.petname 5          ; mark c-list slot 5 as named (PetNameMemory)
+
+; ── Register another slot using the PETNAME (no-dot) form ────
+PETNAME 10          ; mark c-list slot 10 as named
+
+; ── Verify: normal execution continues after .petname ─────────
+IADD DR2, DR0, #2   ; DR2 = 2 (sentinel: both .petname calls returned)
+HALT

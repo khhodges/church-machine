@@ -119,11 +119,12 @@ def _abstract_gt_word(perms_dict):
 
 
 # Abstract GT device-class constants (Task #406) — must match simulator.js
-DEVICE_CLASS_LED     = 0x01
-DEVICE_CLASS_UART    = 0x02
-DEVICE_CLASS_BUTTON  = 0x03
-DEVICE_CLASS_TIMER   = 0x04
-DEVICE_CLASS_DISPLAY = 0x05
+DEVICE_CLASS_LED      = 0x01
+DEVICE_CLASS_UART     = 0x02
+DEVICE_CLASS_BUTTON   = 0x03
+DEVICE_CLASS_TIMER    = 0x04
+DEVICE_CLASS_DISPLAY  = 0x05
+DEVICE_CLASS_CHURCHHW = 0x06  # hardware-control device: PetNameMemory write port (Task #1542)
 
 AB_TYPE_IO          = 0x00
 AB_TYPE_M_ELEVATION = 0x01
@@ -712,10 +713,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
 
-    # Hardware device GTs (clist slots 8..17) — match simulator.js HW_DEVICE_SLOTS.
+    # Hardware device GTs (clist slots 8..18) — match simulator.js HW_DEVICE_SLOTS.
     # Slots 8–13: Abstract LED GTs (Task #406) — type=0b11, no NS slot, no lump.
     rw_perms = {"R":1,"W":1}
-    while len(clist_gts) < 18:
+    while len(clist_gts) < 19:
         clist_gts.append(0)
     for led_idx in range(6):
         ab_data = ((DEVICE_CLASS_LED & 0xFF) << 8) | (led_idx & 0xFF)
@@ -732,6 +733,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # Slot 17: TIMER_DEV moved from slot 16 (simulator-only; not in boot ROM image).
     clist_gts[17] = create_abstract_gt(AB_TYPE_IO, rw_perms,  0,
                         (DEVICE_CLASS_TIMER  << 8) | 0)   # TIMER_DEV R|W  reg0=TICKS_LO
+    # Slot 18: ChurchHW — hardware-control Abstract GT (W-only, Task #1542).
+    # Used by the .petname assembler pseudo-instruction to register c-list slots
+    # with PetNameMemory via IO_PORT_PET_NAME_WR (0xFFFFFF38).
+    clist_gts[18] = create_abstract_gt(AB_TYPE_IO, {"W":1},  0,
+                        (DEVICE_CLASS_CHURCHHW << 8) | 0) # ChurchHW  W   PET_NAME_WR
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)
@@ -751,6 +757,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     # Truncate to DEMO_CLIST_SIZE.
     # Slot 16 = SlideRule Inform GT; slot 17 = TIMER_DEV Abstract GT (moved from 16, Task #461).
+    # Slot 18 = ChurchHW Abstract GT (W-only, Task #1542).
     clist_gts = clist_gts[:DEMO_CLIST_SIZE]
 
     # ----- Boot.Abstr lump (NS slot 3) ------------------------------------

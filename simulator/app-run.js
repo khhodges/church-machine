@@ -11448,7 +11448,7 @@ function runTuringSimGate() {
 
         // Install DEMO_CLIST immediately after the last program word — no overlap
         if (testSim.demoClistGTs && testSim.demoClistGTs.length > 0) {
-            const _cc        = testSim.demoClistGTs.length;   // 18
+            const _cc        = testSim.demoClistGTs.length;   // 19 (slot 18 = ChurchHW, Task #1542)
             const _clistBase = _lumpBase + _progWords + 1;    // lumpBase + 864
 
             for (let i = 0; i < _cc; i++) {

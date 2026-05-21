@@ -5446,11 +5446,95 @@ HALT
         result.words.length === 9, `got ${result.words.length}`);
 }
 
+// EX-PN: petname_demo — .petname pseudo-instruction assembles correctly
+// Verifies that .petname <n> expands to 3 machine words (LOAD+IADD+DWRITE)
+// and that PETNAME <n> (no-dot form) produces identical output.
+// Also checks error paths: missing argument and out-of-range slot.
+{
+    const PN_SRC = `.petname 5\nHALT`;
+    const aPN = new ChurchAssembler();
+    const pnResult = aPN.assemble(PN_SRC);
+    assert('EX-PN petname_demo .petname 5 assembles without errors',
+        aPN.errors.length === 0, aPN.errors.map(e => e.message).join('; '));
+    assert('EX-PN petname_demo .petname 5 produces 4 words (LOAD+IADD+DWRITE+HALT)',
+        pnResult.words.length === 4, `got ${pnResult.words.length}`);
+
+    // Verify word 0 is a LOAD (opcode 0 = bits[31:27] = 0b00000)
+    const pnLoad = pnResult.words[0];
+    assert('EX-PN word 0 is LOAD opcode (bits[31:27] = 0)',
+        (pnLoad >>> 27) === 0, `got opcode ${pnLoad >>> 27}`);
+    // Verify word 1 is IADD (opcode 15 = 0b01111)
+    const pnIadd = pnResult.words[1];
+    assert('EX-PN word 1 is IADD opcode (bits[31:27] = 15)',
+        (pnIadd >>> 27) === 15, `got opcode ${pnIadd >>> 27}`);
+    // Verify word 2 is DWRITE (opcode 11 = 0b01011)
+    const pnDwrite = pnResult.words[2];
+    assert('EX-PN word 2 is DWRITE opcode (bits[31:27] = 11)',
+        (pnDwrite >>> 27) === 11, `got opcode ${pnDwrite >>> 27}`);
+
+    // PETNAME (no-dot form) must produce identical words
+    const aNoDot = new ChurchAssembler();
+    const ndResult = aNoDot.assemble(`PETNAME 5\nHALT`);
+    assert('EX-PN PETNAME (no-dot) assembles without errors',
+        aNoDot.errors.length === 0, aNoDot.errors.map(e => e.message).join('; '));
+    assert('EX-PN PETNAME word 0 matches .petname word 0 (LOAD identical)',
+        ndResult.words[0] === pnResult.words[0],
+        `0x${ndResult.words[0].toString(16)} !== 0x${pnResult.words[0].toString(16)}`);
+    assert('EX-PN PETNAME word 1 matches .petname word 1 (IADD identical)',
+        ndResult.words[1] === pnResult.words[1],
+        `0x${ndResult.words[1].toString(16)} !== 0x${pnResult.words[1].toString(16)}`);
+    assert('EX-PN PETNAME word 2 matches .petname word 2 (DWRITE identical)',
+        ndResult.words[2] === pnResult.words[2],
+        `0x${ndResult.words[2].toString(16)} !== 0x${pnResult.words[2].toString(16)}`);
+
+    // Different slot numbers produce different IADD words
+    const aPN63 = new ChurchAssembler();
+    const pn63Result = aPN63.assemble(`.petname 63\nHALT`);
+    assert('EX-PN .petname 63 assembles without errors',
+        aPN63.errors.length === 0, aPN63.errors.map(e => e.message).join('; '));
+    assert('EX-PN .petname 63 IADD word differs from .petname 5 IADD word',
+        pn63Result.words[1] !== pnResult.words[1], 'slot 63 and slot 5 produced identical IADD words');
+
+    // .petname 0 is valid
+    const aPN0 = new ChurchAssembler();
+    const pn0Result = aPN0.assemble(`.petname 0\nHALT`);
+    assert('EX-PN .petname 0 assembles without errors',
+        aPN0.errors.length === 0, aPN0.errors.map(e => e.message).join('; '));
+
+    // Error path: missing argument
+    const aErr = new ChurchAssembler();
+    aErr.assemble(`.petname\nHALT`);
+    assert('EX-PN .petname with no argument produces an error',
+        aErr.errors.length > 0, 'expected at least one error');
+
+    // Error path: slot > 63
+    const aOob = new ChurchAssembler();
+    aOob.assemble(`.petname 64\nHALT`);
+    assert('EX-PN .petname 64 (out of range) produces an error',
+        aOob.errors.length > 0, 'expected at least one error');
+
+    // petname_demo.cloomc: full example assembles without errors
+    {
+        const fs   = require('fs');
+        const path = require('path');
+        const src  = fs.readFileSync(
+            path.join(__dirname, 'examples', 'petname_demo.cloomc'), 'utf8');
+        const aDemo = new ChurchAssembler();
+        const demoResult = aDemo.assemble(src);
+        assert('EX-PN petname_demo.cloomc assembles without errors',
+            aDemo.errors.length === 0, aDemo.errors.map(e => e.message).join('; '));
+        // Two .petname calls + IADD + HALT = 2×3 + 1 + 1 = 8 words
+        assert('EX-PN petname_demo.cloomc produces 8 words (2×.petname + IADD + HALT)',
+            demoResult.words.length === 8, `got ${demoResult.words.length}`);
+    }
+}
+
 // EX16: LANG_EXAMPLE_GROUPS.assembly coverage guard
 // Asserts that the assembly key list in app-compile.js is exactly the set
-// covered by EX1–EX15 + CD1–CD10 + EX-SP + EX-SY + EX-SW + EX-DF.  If a new example
-// is added to LANG_EXAMPLE_GROUPS.assembly without a corresponding EX test,
-// this list must be updated — that's the deliberate friction that prompts adding a test.
+// covered by EX1–EX15 + CD1–CD10 + EX-SP + EX-SY + EX-SW + EX-DF + EX-PN.
+// If a new example is added to LANG_EXAMPLE_GROUPS.assembly without a
+// corresponding EX test, this list must be updated — that's the deliberate
+// friction that prompts adding a test.
 {
     const COVERED_ASSEMBLY_EXAMPLES = new Set([
         'ada_note_g',
@@ -5467,10 +5551,11 @@ HALT
         'scheduler_yield',
         'scheduler_wait',
         'dijkstra_flag',
+        'petname_demo',
     ]);
-    // These are the fourteen keys covered by EX tests as of the led_dr_test split.
+    // These are the fifteen keys covered by EX tests as of the petname_demo addition.
     // Update both this set AND add an EX test whenever a new example is added.
-    const EXPECTED_COUNT = 14;
+    const EXPECTED_COUNT = 15;
     assert('EX16 LANG_EXAMPLE_GROUPS.assembly coverage set has expected count',
         COVERED_ASSEMBLY_EXAMPLES.size === EXPECTED_COUNT,
         `expected ${EXPECTED_COUNT}, got ${COVERED_ASSEMBLY_EXAMPLES.size}`);

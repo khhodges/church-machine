@@ -1217,12 +1217,17 @@ class ChurchSimulator {
         // Slot 17: TIMER_DEV moved from slot 16 to avoid NS-slot conflict
         clistGTs[17] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {R:1,W:1}, 0,
             ((ChurchSimulator.DEVICE_CLASS_TIMER  & 0xFF) << 8) | 0);  // TIMER_DEV R|W  reg0=TICKS_LO
+        // Slot 18: ChurchHW — hardware-control Abstract GT (W-only).
+        // DWRITE through this GT marks a c-list slot (DR value & 0x3F) as named in PetNameMemory.
+        // Used by the .petname <n> assembler pseudo-instruction (Task #1542).
+        clistGTs[18] = this.createAbstractGT(ChurchSimulator.AB_TYPE_IO, {W:1}, 0,
+            ((ChurchSimulator.DEVICE_CLASS_CHURCHHW & 0xFF) << 8) | 0);  // ChurchHW  W   PET_NAME_WR
         // Memory-manager GT at c-list[0]: R|W Inform capability over NS slot 0 (full namespace).
         // Mirrors boot_image.py "Memory-manager GT at c-list[0]" so the NS lump c-list matches
         // the Python-generated boot image exactly (Task #694).
         clistGTs[0] = this.createGT(0, 0, {R:1, W:1}, 1);
         const NUC_CODE_WORDS    = 3;
-        const DEMO_CLIST_SIZE   = 18;
+        const DEMO_CLIST_SIZE   = 19;   // slots 0–18; slot 18 = ChurchHW (Task #1542)
 
         // ── NS lump header and c-list (Task #694) ────────────────────────────────────
         // Write a valid lump header at memory[0] for the NS lump (Slot 0):
@@ -1967,11 +1972,12 @@ class ChurchSimulator {
     static AB_TYPE_IO          = 0x00;   // I/O device (LED, UART, Button, Timer, Display)
     static AB_TYPE_M_ELEVATION = 0x01;   // M Abstraction — sets CRn(M=1)
 
-    static DEVICE_CLASS_LED     = 0x01;
-    static DEVICE_CLASS_UART    = 0x02;
-    static DEVICE_CLASS_BUTTON  = 0x03;
-    static DEVICE_CLASS_TIMER   = 0x04;
-    static DEVICE_CLASS_DISPLAY = 0x05;
+    static DEVICE_CLASS_LED       = 0x01;
+    static DEVICE_CLASS_UART      = 0x02;
+    static DEVICE_CLASS_BUTTON    = 0x03;
+    static DEVICE_CLASS_TIMER     = 0x04;
+    static DEVICE_CLASS_DISPLAY   = 0x05;
+    static DEVICE_CLASS_CHURCHHW  = 0x06;   // Church HW control (PetNameMemory write port)
 
     createAbstractGT(ab_type, perms, gt_seq, ab_data) {
         // Only R and W are valid perm bits for Abstract GTs (X/L/S/E/B are repurposed as ab_type).
@@ -3403,11 +3409,12 @@ class ChurchSimulator {
             if (!this._writeCR(d.crDst, slotGT, fakeEntry)) return null;
             const CLASS_NAMES = ['IO','M-Elev','','','',''];
             const DC_NAMES   = {
-                [ChurchSimulator.DEVICE_CLASS_LED]:     'LED',
-                [ChurchSimulator.DEVICE_CLASS_UART]:    'UART',
-                [ChurchSimulator.DEVICE_CLASS_BUTTON]:  'BTN',
-                [ChurchSimulator.DEVICE_CLASS_TIMER]:   'TIMER',
-                [ChurchSimulator.DEVICE_CLASS_DISPLAY]: 'DISPLAY',
+                [ChurchSimulator.DEVICE_CLASS_LED]:      'LED',
+                [ChurchSimulator.DEVICE_CLASS_UART]:     'UART',
+                [ChurchSimulator.DEVICE_CLASS_BUTTON]:   'BTN',
+                [ChurchSimulator.DEVICE_CLASS_TIMER]:    'TIMER',
+                [ChurchSimulator.DEVICE_CLASS_DISPLAY]:  'DISPLAY',
+                [ChurchSimulator.DEVICE_CLASS_CHURCHHW]: 'ChurchHW',
             };
             const dcName = DC_NAMES[info.device_class] || `dc=0x${info.device_class.toString(16).toUpperCase()}`;
             const abLabel = info.ab_type === ChurchSimulator.AB_TYPE_IO
@@ -5403,6 +5410,21 @@ class ChurchSimulator {
                 return { pc: this.pc - 1, desc, pipeline: [
                     { stage: 'M-Window', desc: `CR${crIdx}(M=1) → DR11 = GT descriptor`, status: 'pass' },
                     { stage: 'DWRITE',   desc: `Write Timer.${regName} ← ${value}`, perm: 'W', status: 'pass' },
+                ]};
+            }
+            // ChurchHW: PetNameMemory write port (Task #1542).
+            // DWRITE through this Abstract GT marks c-list slot (DR value & 0x3F) as named.
+            // Emitted by the .petname <n> assembler pseudo-instruction via boot c-list slot 18.
+            if (info.device_class === ChurchSimulator.DEVICE_CLASS_CHURCHHW) {
+                const petSlot = this.dr[drIdx] & 0x3F;
+                this._petNamedSlots.add(petSlot);
+                this._clearMWindow(crIdx);
+                const desc = `DWRITE DR${drIdx} → ChurchHW: c-list slot ${petSlot} marked as named (PetNameMemory)`;
+                this.output += desc + '\n';
+                this.pc++;
+                return { pc: this.pc - 1, instr: d, desc, pipeline: [
+                    { stage: 'M-Window', desc: `CR${crIdx}(M=1) → DR11 = ChurchHW GT descriptor`, status: 'pass' },
+                    { stage: 'DWRITE',   desc: `ChurchHW: mark c-list slot ${petSlot} as named (PET_NAME_WR)`, perm: 'W', status: 'pass' },
                 ]};
             }
         }
