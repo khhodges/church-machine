@@ -1140,7 +1140,7 @@ function switchView(viewId) {
         renderLumps();
     }
     if (viewId === 'gt-view') renderGTView();
-    if (viewId === 'pipeline') pipelineViz.render();
+    if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
     if (viewId === 'builder') {
         initHardwareBuildPanel();
