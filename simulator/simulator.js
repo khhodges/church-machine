@@ -155,10 +155,10 @@ class ChurchSimulator {
         this._listeners = {};
         // NS_TABLE_BASE is recomputed in reset() (and in the binary loaders) to
         // memory.length − NS_TABLE_RESERVE. For a 65536-word space: 0xFC00.
-        this.NS_TABLE_RESERVE = 0x400;   // 256 entries × 4 words
+        this.NS_TABLE_RESERVE = 0x400;   // default 256 entries × 4 words; updated in reset() from binary
         this.NS_TABLE_BASE = 0xFC00;
         this.NS_ENTRY_WORDS = 4;
-        this.MAX_NS_ENTRIES = 256;
+        this.MAX_NS_ENTRIES = 256;       // default; updated in reset() to match actual NS_TABLE_RESERVE
         this.SLOT_SIZE = 0x40;   // 64 words — FPGA minimum slot allocation (boot_rom.py line 339)
 
         // TPERM preset → required-permission array.
@@ -222,10 +222,11 @@ class ChurchSimulator {
         // Backwards-scan for BOOT_IMAGE_FORMAT_TAG (Task #1244).
         // The tag's position encodes the actual NS table reserve size dynamically,
         // so we discover the reserve by finding the tag rather than using a
-        // hardcoded offset. Limit: 2048 words from the end of the binary.
+        // hardcoded offset. Scan limit: 8192 words covers up to 1024-slot NS tables
+        // (4096 words) plus the 2 sentinel words and future headroom.
         const BOOT_IMAGE_FORMAT_TAG = 0xB0070563;  // must match boot_image.py; bumped Task #563/568
         let tagIdx = -1;
-        const scanLimit = Math.min(2048, src.length);
+        const scanLimit = Math.min(8192, src.length);
         for (let _si = 1; _si <= scanLimit; _si++) {
             const _pos = src.length - _si;
             if ((src[_pos] >>> 0) === BOOT_IMAGE_FORMAT_TAG) {
@@ -234,7 +235,7 @@ class ChurchSimulator {
             }
         }
         if (tagIdx < 0) {
-            this.output += `[BOOTIMG] WARNING: BOOT_IMAGE_FORMAT_TAG not found in last 2048 words; ignoring binary — using built-in namespace defaults.\n`;
+            this.output += `[BOOTIMG] WARNING: BOOT_IMAGE_FORMAT_TAG not found in last 8192 words; ignoring binary — using built-in namespace defaults.\n`;
             return false;
         }
         const discoveredNsTableBase    = tagIdx + 1;
@@ -247,6 +248,7 @@ class ChurchSimulator {
         // Update instance variables to match the loaded binary's actual layout.
         this.NS_TABLE_RESERVE = discoveredNsTableReserve;
         this.NS_TABLE_BASE    = this.memory.length - this.NS_TABLE_RESERVE;
+        this.MAX_NS_ENTRIES   = (discoveredNsTableReserve / this.NS_ENTRY_WORDS) | 0;
 
         // Boot-entry slot: stored at mem[NS_TABLE_BASE - 2] by the generator.
         const entrySlotIdx = tagIdx - 1;

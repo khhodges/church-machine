@@ -46,7 +46,7 @@ except ImportError:
 
 NS_TABLE_RESERVE = 0x400        # 1024 words = 256 entries × 4  (module constant; backward compat default)
 NS_ENTRY_WORDS   = 4
-MAX_NS_ENTRIES   = 256
+MAX_NS_ENTRIES   = 1024         # GT bits[15:0] support 65535; 1024 is the practical cap
 SLOT_SIZE        = 0x40         # 64 words
 
 
@@ -382,11 +382,13 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         )
     words = struct.unpack(f"<{n_words}I", image_bytes[: n_words * 4])
 
-    # Backwards-scan for BOOT_IMAGE_FORMAT_TAG (limit: 2048 words from end).
+    # Backwards-scan for BOOT_IMAGE_FORMAT_TAG.
     # The tag is written immediately before the NS table; its position encodes
     # the actual NS table reserve size dynamically (Task #1244).
+    # Scan limit: MAX_NS_ENTRIES × 4 words (NS table) + 2 sentinel words + margin.
+    # With MAX_NS_ENTRIES=1024 this is 4098 words; use 8192 for future headroom.
     tag_idx = -1
-    scan_limit = min(2048, n_words)
+    scan_limit = min(8192, n_words)
     for _i in range(1, scan_limit + 1):
         _pos = n_words - _i
         if words[_pos] == BOOT_IMAGE_FORMAT_TAG:
@@ -395,7 +397,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
 
     if tag_idx < 0:
         raise ValueError(
-            "validate_boot_image: BOOT_IMAGE_FORMAT_TAG not found in last 2048 words; "
+            "validate_boot_image: BOOT_IMAGE_FORMAT_TAG not found in last 8192 words; "
             "the boot image is stale or corrupt and must be regenerated"
         )
 
@@ -509,7 +511,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     # Dynamic NS table reserve (Task #1244): size follows configured slot capacity.
     # nsSlotsMax defaults to 256 (→ 1024 words) when absent, preserving backward compat.
-    _ns_slots_max = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
+    # MAX_NS_ENTRIES (1024) is the user-selectable cap, not the default.
+    # NS_TABLE_RESERVE is reassigned as a local below, so use 256 directly here
+    # (= module-level NS_TABLE_RESERVE 0x400 // NS_ENTRY_WORDS 4).
+    _ns_slots_max = int(step1.get("nsSlotsMax") or 256)
     NS_TABLE_RESERVE = ns_table_reserve_words(_ns_slots_max)   # local, shadows module constant
 
     if "abstractionLumpWords" in step1:

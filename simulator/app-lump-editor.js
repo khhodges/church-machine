@@ -134,7 +134,7 @@
         if (state.ns.n_minus_6 > maxN) {
             var savedN = state.ns.n_minus_6;
             state.ns.n_minus_6 = maxN;
-            var serverMaxCl = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+            var serverMaxCl = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
             var newMaxSl = Math.min(Math.pow(2, maxN + 14) / 64, serverMaxCl);
             if (state.ns.slots > newMaxSl) state.ns.slots = newMaxSl;
             _nsSizeClampedInfo = { savedN: savedN, clampedN: maxN, boardLabel: profile.label };
@@ -167,7 +167,7 @@
             }
             if (s.ns) {
                 state.ns.n_minus_6 = (s.ns.n_minus_6 !== undefined) ? s.ns.n_minus_6 : 3;
-                state.ns.slots = Math.min(s.ns.slots || 256, 256);
+                state.ns.slots = Math.min(s.ns.slots || 256, 1024);
             }
             // Restore the board-switch clamp warning if it is still applicable.
             // It is applicable when the current n_minus_6 still matches what the
@@ -245,7 +245,7 @@
         var n                  = clamp(state.ns.n_minus_6, 0, maxN);
         var totalNamespaceWords = Math.pow(2, n + 14);
         var threadLumpWords     = Math.pow(2, clamp(state.thread.lumpPow2, MIN_EXP, MAX_EXP));
-        var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var serverMax           = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl               = Math.min(totalNamespaceWords / 64, serverMax);
         var nsSlotsMax          = Math.round(clamp(state.ns.slots, 1, maxSl));
         return {
@@ -964,7 +964,7 @@
             '</div>';
         }
         var total      = Math.pow(2, n + 14);
-        var serverMax  = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var serverMax  = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl      = Math.min(total / 64, serverMax);
         var slots      = clamp(state.ns.slots, 1, maxSl);
         var NS_TABLE_COMPUTED = Math.max(16, Math.round(slots) * 4);
@@ -1111,7 +1111,7 @@
 
     window.lumpEditorNSSize = function (v) {
         state.ns.n_minus_6 = clamp(v, 0, 15);
-        var serverMaxNS = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var serverMaxNS = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxNS);
         if (state.ns.slots > maxSl) state.ns.slots = maxSl;
         _nsSizeClampedInfo = null;
@@ -1136,7 +1136,7 @@
     };
 
     window.lumpEditorNSSlots = function (v) {
-        var serverMaxSlots = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 256;
+        var serverMaxSlots = (_rl && _rl.limits && _rl.limits.maxNsEntries) || 1024;
         var maxSl = Math.min(Math.pow(2, state.ns.n_minus_6 + 14) / 64, serverMaxSlots);
         state.ns.slots = clamp(v, 1, maxSl);
         saveState();

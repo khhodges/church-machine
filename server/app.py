@@ -369,9 +369,10 @@ DEFAULT_BOOT_CONFIG = {
     },
 }
 
-# Hard ceiling on how many entries fit in the NS table (matches simulator
-# NS_TABLE_RESERVE / NS_ENTRY_WORDS = 0x400 / 4 = 256).
-MAX_NS_ENTRIES = 256
+# Hard ceiling on how many entries the NS table may hold.
+# GT bits[15:0] supports up to 65535 slots; 1024 is the practical cap.
+# At 4 words per entry this reserves up to 4096 words of the namespace LUMP.
+MAX_NS_ENTRIES = 1024
 # How many named NS entries the simulator's default abstraction catalog
 # writes during _initNamespaceTable() (Boot.NS, Boot.Thread, Boot.Abstr,
 # Salvation, …, Circle — slots 0..46). This is the baseline that Step 3
@@ -470,7 +471,7 @@ def _validate_step2(step2, step1, target_board):
     if not isinstance(lumps, list):
         return "step2.lumps must be a list"
     catalog = {e["nsSlot"]: e for e in _load_lump_catalog()}
-    _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or MAX_NS_ENTRIES)
+    _ns_slots_max_v2 = int(step1.get("nsSlotsMax") or 256)   # 256 = backward-compat default
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v2)
     total = step1["totalNamespaceWords"]
     # Determine actual Boot.Abstr size from saved 00000300.lump (Task #568).
@@ -511,7 +512,7 @@ def _validate_step2(step2, step1, target_board):
         if not isinstance(entry, dict):
             return "each step2.lumps entry must be an object"
         slot = entry.get("nsSlot")
-        if not isinstance(slot, int) or slot < 0 or slot >= 256:
+        if not isinstance(slot, int) or slot < 0 or slot >= MAX_NS_ENTRIES:
             return f"step2.lumps entry has invalid nsSlot: {slot!r}"
         if slot in RESERVED_NS_SLOTS:
             return (f"NS slot {slot} is reserved (foundational lump or device "
@@ -622,8 +623,8 @@ def _validate_step1(target_board, step1):
                     f"supported NS slot count ({MAX_NS_ENTRIES})")
     # The simulator reserves the top NS_TABLE_RESERVE words of the namespace
     # window for the namespace table itself.  Reserve size is now dynamic:
-    # nextPow2(nsSlotsMax × 4), defaulting to 1024 for backward compat.
-    _ns_slots_max_v1 = int(_raw_ns_slots_max or MAX_NS_ENTRIES)
+    # nextPow2(nsSlotsMax × 4), defaulting to 1024 words (256 slots) for backward compat.
+    _ns_slots_max_v1 = int(_raw_ns_slots_max or 256)
     NS_TABLE_RESERVE = _boot_image_gen.ns_table_reserve_words(_ns_slots_max_v1)
     usable = total - NS_TABLE_RESERVE
     if foundation_sum > usable:
@@ -876,7 +877,7 @@ def namespace_lump_json():
             return jsonify({"error": f"Failed to generate boot image: {_e}"}), 500
 
     words          = list(_st.unpack(f"<{total}I", img_bytes[:total * 4]))
-    _ns_slots_max_mf = int(step1.get("nsSlotsMax") or _boot_image_gen.MAX_NS_ENTRIES)
+    _ns_slots_max_mf = int(step1.get("nsSlotsMax") or 256)   # 256 = backward-compat default
     ns_table_base  = total - _boot_image_gen.ns_table_reserve_words(_ns_slots_max_mf)
     ns_entry_words = _boot_image_gen.NS_ENTRY_WORDS
     catalog        = _boot_image_gen.DEFAULT_ABSTRACTION_CATALOG
