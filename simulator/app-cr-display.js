@@ -1,4 +1,5 @@
 function updateCRDisplay() {
+    if (!sim) return;
     const container = document.getElementById('crRegs');
     if (!container) return;
     const localNames = {
