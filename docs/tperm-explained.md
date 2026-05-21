@@ -124,6 +124,114 @@ real silicon until the field is widened to 5 bits.
 
 ---
 
+## Instruction encoding
+
+All Church Machine instructions share the same 32-bit word layout:
+
+```
+ 31      27 26    23 22    19 18    15 14             0
+ ┌─────────┬────────┬────────┬────────┬────────────────┐
+ │ opcode  │  cond  │  CRd   │  CRs   │     imm15      │
+ │  5 bits │ 4 bits │ 4 bits │ 4 bits │    15 bits     │
+ └─────────┴────────┴────────┴────────┴────────────────┘
+```
+
+TPERM is **opcode 6** (`0b00110`).
+
+The four cases differ only in the CRs and imm15 fields.
+
+---
+
+### Case 1 — Mode 1 preset test  `TPERM CRd, <preset>`
+
+```
+ 31      27 26    23 22    19 18    15 14    5  4  3    0
+ ┌─────────┬────────┬────────┬────────┬─────────┬──┬──────┐
+ │  00110  │  cond  │  CRd   │  0000  │  zeros  │B │ pre  │
+ └─────────┴────────┴────────┴────────┴─────────┴──┴──────┘
+```
+
+- `CRs` field [18:15] = `0000` — no second register
+- imm15[14:5] = 0 — upper bits unused
+- imm15[4] = **B-modifier** (0 = plain test, 1 = test-and-consume B latch)
+- imm15[3:0] = **preset code** — which permissions to test for
+
+Preset codes (imm15[3:0], B=0):
+
+| Code | Mnemonic | Permissions tested |
+|------|----------|--------------------|
+| 0x0  | CLEAR    | none (always Z=1 if GT non-null) |
+| 0x1  | R        | Read               |
+| 0x2  | RW       | Read + Write       |
+| 0x3  | X        | Execute            |
+| 0x4  | RX       | Read + Execute     |
+| 0x5  | RWX      | Read + Write + Execute |
+| 0x6  | L        | Load               |
+| 0x7  | S        | Save               |
+| 0x8  | E        | Enter              |
+| 0x9  | LS       | Load + Save        |
+| 0xA–0xC | —    | reserved → `TPERM_RSV` fault |
+| 0xD  | FRAME    | *(special — see Case 3)* |
+| 0xE  | EXACT    | *(special — see Case 4)* |
+| 0xF  | —        | reserved → `TPERM_RSV` fault |
+
+Setting B=1 (imm15[4]) produces the named B-variants:
+`RB`=0x11, `RWB`=0x12, `XB`=0x13, `RXB`=0x14, `RWXB`=0x15,
+`LB`=0x16, `SB`=0x17, **`EB`=0x18**, `LSB`=0x19.
+B-variants of reserved codes (0x1A–0x1C, 0x1F) also fault.
+
+---
+
+### Case 2 — Mode 2 attenuation  `TPERM CRd, CRs, 0x7FFF`
+
+```
+ 31      27 26    23 22    19 18    15 14             0
+ ┌─────────┬────────┬────────┬────────┬────────────────┐
+ │  00110  │  cond  │  CRd   │  CRs   │  1111111111111 │
+ │         │        │ (R/W)  │ (mask) │   0x7FFF       │
+ └─────────┴────────┴────────┴────────┴────────────────┘
+```
+
+- imm15 = `0x7FFF` — all 15 bits set; this is the Mode 2 sentinel
+- CRd is both source and destination: the full-authority GT is read from CRd and the attenuated result is written back to CRd
+- CRs holds the permission-mask GT; only permissions present in both CRd and CRs survive
+
+The B-modifier and domain-purity checks from Case 1 do not apply here.
+
+---
+
+### Case 3 — FRAME query  `TPERM CRd, FRAME`
+
+```
+ 31      27 26    23 22    19 18    15 14             0
+ ┌─────────┬────────┬────────┬────────┬────────────────┐
+ │  00110  │  cond  │  CRd   │  0000  │  000000000 1101│
+ │         │        │(unused)│        │     0x000D     │
+ └─────────┴────────┴────────┴────────┴────────────────┘
+```
+
+- imm15 = `0x000D` (preset code 13)
+- Does **not** read the GT in CRd — checks the call stack instead
+- Z=1 if a real RETURN frame is present; Z=0 if the stack is empty or synthetic
+
+---
+
+### Case 4 — EXACT identity check  `TPERM CRd, CRs`  *(preset EXACT)*
+
+```
+ 31      27 26    23 22    19 18    15 14             0
+ ┌─────────┬────────┬────────┬────────┬────────────────┐
+ │  00110  │  cond  │  CRd   │  CRs   │  000000000 1110│
+ │         │        │        │        │     0x000E     │
+ └─────────┴────────┴────────┴────────┴────────────────┘
+```
+
+- imm15 = `0x000E` (preset code 14)
+- Z=1 if and only if `CRd.word0 == CRs.word0` (bit-exact GT match)
+- Used to verify that two CRs hold the same capability token
+
+---
+
 ## Why not a simple permission-mask field?
 
 A natural first reaction is: *why go to all this trouble? Just add a
