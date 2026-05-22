@@ -114,5 +114,6 @@
         <efxpt:comp_gpio name="led3" gpio_def="GPIOR_N_07" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
             <efxpt:output_config name="led3" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
         </efxpt:comp_gpio>
+        <efxpt:global_unused_config unused_gpio="FLOAT"/>
     </efxpt:gpio_info>
 </efxpt:design_db>
