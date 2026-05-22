@@ -99,6 +99,7 @@ for bank in ["BL", "BR", "TL", "TR"]:
 # with a null-dereference.  Phase A runs the core at 25 MHz directly.
 # The SDC (ti60_f225.sdc) already has Phase A active (create_clock period 40).
 design.create_input_gpio("clk")
+design.set_property("clk", "CONN_TYPE", "GCLK")
 design.assign_pkg_pin("clk", "B2")
 # ─────────────────────────────────────────────────────────────────────────────
 
