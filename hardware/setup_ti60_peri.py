@@ -9,7 +9,7 @@ Usage (from the Efinity project directory that contains church_ti60_f225.peri.xm
     <path-to-this-script>/setup_ti60_peri.py
 
 Pin map (confirmed from Ti60F225_kit.isf reference designs):
-  pll_refclk  B2  = 25 MHz on-board crystal  → PLL_TL0 → 50 MHz "clk" GCLK
+  clk         B2  = 25 MHz on-board crystal  → direct "clk" input (Phase A, no PLL)
   uart_tx     H14 = GPIOR_P_11  (external header, not FT4232H)
   uart_rx     M14 = GPIOR_P_02  (external header, not FT4232H)
   push_button A7  = GPIOT_N_06  USER_PB active-low (weak pull-up)
@@ -23,8 +23,11 @@ NOTE: The Ti60F225 devkit has NO UART path to the FT4232H.
       uart_tx/rx are routed to GPIO pins for use with an external
       USB-UART adapter if needed.
 
-Clock: B2 25 MHz oscillator → PLL (M=4, N=1, O=2) → 50 MHz "clk"
-       This matches the exact PLL settings from Ti60F225_kit.isf.
+Clock: Phase A — B2 25 MHz crystal → direct GPIO input "clk" (no PLL).
+       Efinity 2025.2 requires a TITANIUMPLL RTL primitive for peri-only
+       PLL configuration; without it check_design crashes.  The core runs
+       at 25 MHz; UART baud will be 57600 instead of 115200.  The SDC
+       (ti60_f225.sdc) Phase A constraint (period 40 ns) is already active.
 """
 
 import sys
@@ -90,38 +93,13 @@ for bank in ["BL", "BR", "TL", "TR"]:
     design.set_mode_sel_name(bank, f"{bank}_MODE_SEL", bank)
     design.set_device_property(bank, "VOLTAGE", "3.3", "IOBANK")
 
-# ── Clock: 25 MHz crystal at B2 → PLL_TL0 → 50 MHz GCLK "clk" ───────────────
-# These settings are identical to the verified Ti60F225_kit.isf reference.
-design.create_pll_input_clock_gpio("pll_refclk")
-design.create_block("pll_inst1", "PLL")
-
-design.set_property("pll_inst1", "CLKOUT0_EN",          "1",        "PLL")
-design.set_property("pll_inst1", "CLKOUT1_EN",          "0",        "PLL")
-design.set_property("pll_inst1", "CLKOUT2_EN",          "0",        "PLL")
-design.set_property("pll_inst1", "CLKOUT3_EN",          "0",        "PLL")
-design.set_property("pll_inst1", "CLKOUT4_EN",          "0",        "PLL")
-design.set_property("pll_inst1", "REFCLK_SOURCE",       "EXTERNAL", "PLL")
-design.set_property("pll_inst1", "CLKOUT0_CONN_TYPE",   "gclk",     "PLL")
-design.set_property("pll_inst1", "CLKOUT0_DIV",         "27",       "PLL")
-design.set_property("pll_inst1", "CLKOUT0_DYNPHASE_EN", "0",        "PLL")
-design.set_property("pll_inst1", "CLKOUT0_PHASE_STEP",  "0",        "PLL")
-design.set_property("pll_inst1", "CLKOUT0_PIN",         "clk",      "PLL")
-design.set_property("pll_inst1", "EXT_CLK",             "EXT_CLK0", "PLL")
-design.set_property("pll_inst1", "IS_CLKOUT0_INVERTED", "0",        "PLL")
-design.set_property("pll_inst1", "LOCKED_PIN",          "",         "PLL")
-design.set_property("pll_inst1", "M",                   "4",        "PLL")
-design.set_property("pll_inst1", "N",                   "1",        "PLL")
-design.set_property("pll_inst1", "O",                   "2",        "PLL")
-design.set_property("pll_inst1", "PHASE_SHIFT_ENA_PIN", "",         "PLL")
-design.set_property("pll_inst1", "PHASE_SHIFT_PIN",     "",         "PLL")
-design.set_property("pll_inst1", "PHASE_SHIFT_SEL_PIN", "",         "PLL")
-design.set_property("pll_inst1", "REFCLK_FREQ",         "25.0",     "PLL")
-design.set_property("pll_inst1", "RSTN_PIN",            "",         "PLL")
-design.set_property("pll_inst1", "FEEDBACK_MODE",       "LOCAL",    "PLL")
-design.set_property("pll_inst1", "FEEDBACK_CLK",        "CLK0",     "PLL")
-
-design.assign_pkg_pin("pll_refclk", "B2")
-design.assign_resource("pll_inst1", "PLL_TL0", "PLL")
+# ── Clock: 25 MHz crystal at B2 → direct GCLK input "clk" (Phase A) ─────────
+# No PLL instantiated here.  Efinity 2025.2 requires a TITANIUMPLL RTL cell
+# to configure a peri-only PLL via check_design; without it the tool crashes
+# with a null-dereference.  Phase A runs the core at 25 MHz directly.
+# The SDC (ti60_f225.sdc) already has Phase A active (create_clock period 40).
+design.create_input_gpio("clk")
+design.assign_pkg_pin("clk", "B2")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── GPIO signals ──────────────────────────────────────────────────────────────
