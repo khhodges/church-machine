@@ -83,9 +83,9 @@ DRY_RUN_TRANSCRIPT = [
     "CM free-run kick released.",
     "Monitoring CM NIA (Ctrl+C to stop host terminal):",
     "NIA=0x00000010",
-    'CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0x00000010","boot_ok":1,"fault":0,"fault_code":0}',
+    'CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0x00000010","boot_ok":1,"fault":0,"fault_code":0,"fw_major":1,"fw_minor":0}',
     "NIA=0x00000014",
-    'CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0x00000014","boot_ok":1,"fault":0,"fault_code":0}',
+    'CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0x00000014","boot_ok":1,"fault":0,"fault_code":0,"fw_major":1,"fw_minor":0}',
 ]
 
 # ---------------------------------------------------------------------------

@@ -4834,6 +4834,38 @@ def _ingest_lump_version_entries(device_uid, lump_versions, timestamp):
     return count
 
 
+# Reverse-lookup table: known board-name strings → numeric board_type ID.
+# Entries are lower-cased for case-insensitive matching.
+_BOARD_NAME_TO_ID = {
+    "ti60f225":                       0x03,
+    "ti60":                           0x03,
+    "ti60-full":                      0x03,
+    "tn20k-iot":                      0x01,
+    "tn20k":                          0x01,
+    "wukong xc7a100t (artix-7)":      0x06,
+    "wukong":                         0x06,
+    "xc7a100t":                       0x06,
+}
+
+
+def _parse_board_type(val):
+    """Return a numeric board_type ID from either an int, a numeric string, or a
+    known board-name string (e.g. "Ti60F225").  Returns 0 on unrecognised input."""
+    if isinstance(val, int):
+        return val
+    if isinstance(val, str):
+        stripped = val.strip()
+        try:
+            return int(stripped, 0)
+        except (ValueError, TypeError):
+            pass
+        return _BOARD_NAME_TO_ID.get(stripped.lower(), 0)
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return 0
+
+
 def _verify_build_sig(board_type, fw_major, fw_minor, sig_hex):
     key = os.environ.get("BUILD_SIGNING_KEY", "")
     if not key or not sig_hex or sig_hex == "00000000":
@@ -5017,7 +5049,7 @@ def device_register():
     uid = data.get("device_uid", "").strip()
     if not uid:
         return jsonify({"ok": False, "error": "missing device_uid"}), 400
-    board_type = int(data.get("board_type", 0))
+    board_type = _parse_board_type(data.get("board_type", 0))
     fw_major = int(data.get("fw_major", 1))
     fw_minor = int(data.get("fw_minor", 0))
     build_sig_hex = data.get("build_sig", "00000000")
@@ -5195,7 +5227,7 @@ def device_call_home():
     if not uid:
         return jsonify({"ok": False, "error": "missing device_uid"}), 400
 
-    board_type = int(data.get("board_type", 0))
+    board_type = _parse_board_type(data.get("board_type", 0))
     fw_major = int(data.get("fw_major", 1))
     fw_minor = int(data.get("fw_minor", 0))
     build_sig_hex = data.get("build_sig", "00000000")

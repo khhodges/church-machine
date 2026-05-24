@@ -79,9 +79,13 @@ static void delay_loops(uint32_t loops)
         __asm__ volatile("nop");
 }
 
+/* ── Firmware version ─────────────────────────────────────────────────────── */
+#define FW_MAJOR 1
+#define FW_MINOR 0
+
 /*
  * Emit a machine-parseable CALLHOME JSON line:
- *   CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0xNNNNNNNN","boot_ok":1,"fault":F,"fault_code":C}\r\n
+ *   CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0xNNNNNNNN","boot_ok":1,"fault":F,"fault_code":C,"fw_major":1,"fw_minor":0}\r\n
  *
  * Fields:
  *   board      — fixed "Ti60F225"
@@ -90,6 +94,8 @@ static void delay_loops(uint32_t loops)
  *   boot_ok    — 1 (always 1 in monitor loop; we only reach here after boot_complete)
  *   fault      — 1 if fault_latched sticky bit is set, 0 otherwise
  *   fault_code — fault code (0..31); valid when fault==1
+ *   fw_major   — firmware major version (FW_MAJOR)
+ *   fw_minor   — firmware minor version (FW_MINOR)
  */
 static void uart_emit_callhome(uint32_t nia, uint32_t status)
 {
@@ -106,6 +112,10 @@ static void uart_emit_callhome(uint32_t nia, uint32_t status)
         uart_putc('0' + (char)(fault_code / 10u));
     }
     uart_putc('0' + (char)(fault_code % 10u));
+    uart_puts(",\"fw_major\":");
+    uart_putc('0' + FW_MAJOR);
+    uart_puts(",\"fw_minor\":");
+    uart_putc('0' + FW_MINOR);
     uart_puts("}\r\n");
 }
 

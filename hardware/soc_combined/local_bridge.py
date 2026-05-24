@@ -113,6 +113,8 @@ def _handle_callhome_json(line):
         boot_ok     int   1 if boot complete
         fault       int   1 if fault_latched
         fault_code  int   fault code (0-31)
+        fw_major    int   firmware major version (default 1)
+        fw_minor    int   firmware minor version (default 0)
     """
     global _last_uid
     json_str = line[len("CALLHOME:"):].strip()
@@ -128,11 +130,13 @@ def _handle_callhome_json(line):
     boot_ok    = int(pkt.get("boot_ok", 0))
     fault      = int(pkt.get("fault", 0))
     fault_code = int(pkt.get("fault_code", 0))
+    fw_major   = int(pkt.get("fw_major", 1))
+    fw_minor   = int(pkt.get("fw_minor", 0))
 
     _last_uid = uid
 
     fault_str = f"  FAULT={fault_code}" if fault else ""
-    print(f"  [CALL HOME] {board}  UID={uid}  NIA={nia}  boot_ok={boot_ok}{fault_str}")
+    print(f"  [CALL HOME] {board}  UID={uid}  NIA={nia}  boot_ok={boot_ok}  FW={fw_major}.{fw_minor}{fault_str}")
 
     if _IDE_SERVER_URL:
         threading.Thread(
@@ -144,6 +148,8 @@ def _handle_callhome_json(line):
                 "boot_complete": boot_ok,
                 "fault_latched": fault,
                 "fault_code":    fault_code,
+                "fw_major":      fw_major,
+                "fw_minor":      fw_minor,
             },),
             daemon=True,
         ).start()
