@@ -90,12 +90,37 @@ accordingly.
 
 ---
 
-### Step 4 — Build the SoC firmware
+### Step 4 — Build the SoC firmware and ROM initialisation files
 
 ```bash
 make -C hardware/soc_combined/firmware
 cp hardware/soc_combined/firmware/firmware.hex hardware/soc_combined/
 ```
+
+`make` builds the ELF, strips it to a raw binary (`firmware.bin`), converts
+it to a plain hex file (`firmware.hex`), and then generates **four byte-lane
+binary files** required by `sapphire.v`:
+
+```
+hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
+hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
+hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+```
+
+> **Why four `.bin` files?**  `sapphire.v` initialises the on-chip ROM with
+> four `$readmemb(...)` calls — one per byte lane of the 32-bit data bus.
+> The `FIRMWARE_INIT_FILE` parameter visible in `top.v` is a **simulation-only**
+> artefact and is ignored by Efinity synthesis.  The `$readmemb` files are the
+> only mechanism that actually embeds firmware into the bitstream.
+
+Verify they were created:
+
+```bash
+ls -lh hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin
+```
+
+You should see four files of ~1.2 MB each (131 072 words × 9 chars/line).
 
 The firmware:
 1. Sends the boot greeting over UART.
@@ -128,7 +153,7 @@ The firmware:
 Click **Compile** (or run all three flows sequentially).
 
 Efinity will:
-1. Read `firmware.hex` and embed it in the SoC on-chip ROM.
+1. Read the four `*_symbol{0..3}.bin` files via `$readmemb` and embed the firmware in the SoC on-chip ROM.
 2. Synthesise both the Sapphire SoC and the Church Machine in a single pass.
 3. Place and route the combined design onto the Ti60F225 fabric.
 4. Generate the bitstream.
@@ -452,6 +477,13 @@ make check-util-ci     # same but --missing-ok (safe for CI)
 
 **`firmware.hex` not found during synthesis**
 → Re-run Step 4.
+
+**SoC UART silent after flashing / LED0 never lights**
+→ The four `*_symbol{0..3}.bin` files are missing.  Re-run Step 4 and confirm
+the files are present in `hardware/soc_combined/` before re-synthesising.
+`FIRMWARE_INIT_FILE` in `top.v` is a simulation-only parameter and is ignored
+by Efinity synthesis — only the `$readmemb` symbol files actually embed
+firmware into the bitstream.
 
 **LED1 never lights (CM boot_complete stays 0)**
 → Check that `church_ti60_f225.v` was generated without errors.  Confirm the
