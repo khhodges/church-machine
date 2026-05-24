@@ -495,8 +495,13 @@ def _get_version_telemetry(db_path):
     return summaries
 
 
-def _get_github_sync_status() -> dict:
-    """Return the last recorded GitHub sync status from github-sync-status.json."""
+def _get_github_sync_status(db_path=None) -> dict:
+    """Return the last recorded GitHub sync status plus rolling history metrics.
+
+    Most-recent result comes from github-sync-status.json (written on every
+    push attempt).  Rolling success rate is read from the github_sync_log table
+    (last 30 entries) created by github_sync_alert.log_sync_to_db().
+    """
     import json as _json
     status_file = os.path.join(_SERVER_DIR, "github-sync-status.json")
     try:
@@ -509,10 +514,41 @@ def _get_github_sync_status() -> dict:
             )
         else:
             data["timestamp_str"] = "unknown"
-        return data
     except (OSError, _json.JSONDecodeError):
-        return {"status": "never", "branch": "", "sha": "", "error": "",
+        data = {"status": "never", "branch": "", "sha": "", "error": "",
                 "timestamp": 0, "timestamp_str": "never"}
+
+    data["history_count"] = 0
+    data["history_ok"] = 0
+    data["history_fail"] = 0
+    data["success_rate"] = None
+    data["history_since"] = None
+
+    if db_path:
+        try:
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT status, ts FROM github_sync_log ORDER BY ts DESC LIMIT 30"
+            )
+            rows = cur.fetchall()
+            conn.close()
+            if rows:
+                total = len(rows)
+                ok_count = sum(1 for r in rows if r[0] == "ok")
+                data["history_count"] = total
+                data["history_ok"] = ok_count
+                data["history_fail"] = total - ok_count
+                data["success_rate"] = ok_count / total * 100
+                oldest_ts = rows[-1][1]
+                if oldest_ts:
+                    data["history_since"] = datetime.datetime.utcfromtimestamp(
+                        oldest_ts
+                    ).strftime("%Y-%m-%d %H:%M UTC")
+        except Exception as exc:
+            log.debug("_get_github_sync_status history query failed: %s", exc)
+
+    return data
 
 
 def _get_ti60_status(db_path):
@@ -663,7 +699,7 @@ def generate_report(db_path):
     ti60 = _get_ti60_status(db_path)
     cost = _get_cost_summary(db_path)
     version_telemetry = _get_version_telemetry(db_path)
-    gh_sync = _get_github_sync_status()
+    gh_sync = _get_github_sync_status(db_path)
 
     cost_today = cost["cost_today"]
     cost_month = cost["cost_month"]
@@ -675,16 +711,35 @@ def generate_report(db_path):
         branch = gs.get("branch", "")
         sha = gs.get("sha", "")
         error = gs.get("error", "")
+        history_count = gs.get("history_count", 0)
+        success_rate = gs.get("success_rate")
+        history_ok = gs.get("history_ok", 0)
+        history_fail = gs.get("history_fail", 0)
+        history_since = gs.get("history_since")
+
         if status == "never":
             return "  No sync recorded yet (first merge will populate this)."
+
         if status == "ok":
-            return f"  OK — pushed {branch} ({sha}) at {ts}"
-        lines = [f"  FAILED — attempted {branch} ({sha}) at {ts}"]
-        if error:
-            for line in error.strip().splitlines():
-                lines.append(f"    {line}")
-        lines.append("  Check that the GITHUB_PAT Replit secret is valid and has not expired.")
-        return "\n".join(lines)
+            recent_line = f"  OK — pushed {branch} ({sha}) at {ts}"
+        else:
+            lines = [f"  FAILED — attempted {branch} ({sha}) at {ts}"]
+            if error:
+                for line in error.strip().splitlines():
+                    lines.append(f"    {line}")
+            lines.append("  Check that the GITHUB_PAT Replit secret is valid and has not expired.")
+            recent_line = "\n".join(lines)
+
+        if history_count > 0 and success_rate is not None:
+            window = f" since {history_since}" if history_since else ""
+            rate_line = (
+                f"  Rolling history (last {history_count} syncs{window}): "
+                f"{success_rate:.0f}% success  "
+                f"({history_ok} ok / {history_fail} failed)"
+            )
+            return recent_line + "\n" + rate_line
+
+        return recent_line
 
     def _task_line(t):
         deps = t.get("deps", [])
@@ -840,25 +895,46 @@ This report is sent automatically at 05:00 UTC every day.
         branch = h(gs.get("branch", ""))
         sha = h(gs.get("sha", ""))
         error = h(gs.get("error", ""))
+        history_count = gs.get("history_count", 0)
+        success_rate = gs.get("success_rate")
+        history_ok = gs.get("history_ok", 0)
+        history_fail = gs.get("history_fail", 0)
+        history_since = h(gs.get("history_since") or "")
+
         if status == "never":
             return "<p><em>No sync recorded yet (first merge will populate this).</em></p>"
+
         if status == "ok":
-            return (
+            recent_html = (
                 f"<p style='color:#2e7d32;font-weight:600'>&#10003; OK</p>"
                 f"<p>Pushed <code>{branch}</code> ({sha}) at {ts}</p>"
             )
-        error_block = (
-            f"<pre style='background:#fbe9e7;padding:8px;border-radius:4px;"
-            f"white-space:pre-wrap;font-size:0.85em'>{error}</pre>"
-            if error else ""
-        )
-        return (
-            f"<p style='color:#c62828;font-weight:600'>&#10007; FAILED</p>"
-            f"<p>Attempted <code>{branch}</code> ({sha}) at {ts}</p>"
-            f"{error_block}"
-            f"<p style='color:#555'>Check that the <code>GITHUB_PAT</code> "
-            f"Replit secret is valid and has not expired.</p>"
-        )
+        else:
+            error_block = (
+                f"<pre style='background:#fbe9e7;padding:8px;border-radius:4px;"
+                f"white-space:pre-wrap;font-size:0.85em'>{error}</pre>"
+                if error else ""
+            )
+            recent_html = (
+                f"<p style='color:#c62828;font-weight:600'>&#10007; FAILED</p>"
+                f"<p>Attempted <code>{branch}</code> ({sha}) at {ts}</p>"
+                f"{error_block}"
+                f"<p style='color:#555'>Check that the <code>GITHUB_PAT</code> "
+                f"Replit secret is valid and has not expired.</p>"
+            )
+
+        if history_count > 0 and success_rate is not None:
+            rate_color = "#2e7d32" if success_rate >= 90 else ("#e65100" if success_rate >= 70 else "#c62828")
+            window = f" since {history_since}" if history_since else ""
+            history_html = (
+                f"<p style='margin-top:8px;font-size:0.9em;color:#555'>"
+                f"Rolling history (last {history_count} syncs{window}): "
+                f"<span style='color:{rate_color};font-weight:600'>{success_rate:.0f}% success</span>"
+                f" &mdash; {history_ok} ok / {history_fail} failed</p>"
+            )
+            return recent_html + history_html
+
+        return recent_html
 
     html = f"""<!DOCTYPE html>
 <html lang="en">

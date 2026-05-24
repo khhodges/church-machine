@@ -14,6 +14,7 @@ to the same address used by the daily report.
 import json
 import logging
 import os
+import sqlite3
 import sys
 import time
 
@@ -21,8 +22,52 @@ log = logging.getLogger(__name__)
 
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 STATUS_FILE = os.path.join(_SERVER_DIR, "github-sync-status.json")
+DB_PATH = os.path.join(_SERVER_DIR, "church_machine.db")
 
 REPORT_TO = "kenneth@hamer-hodges.us"
+
+_SYNC_LOG_KEEP = 30
+
+
+def _ensure_sync_log_table(db_path: str) -> None:
+    """Create github_sync_log table lazily if it does not exist."""
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS github_sync_log (
+                id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts     REAL    NOT NULL,
+                status TEXT    NOT NULL,
+                branch TEXT    NOT NULL DEFAULT '',
+                sha    TEXT    NOT NULL DEFAULT '',
+                error  TEXT    NOT NULL DEFAULT ''
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"github_sync_alert: could not create sync log table: {exc}", file=sys.stderr)
+
+
+def log_sync_to_db(db_path: str, status: str, branch: str, sha: str, error: str = "") -> None:
+    """Append a sync result to github_sync_log, keeping only the last _SYNC_LOG_KEEP rows."""
+    _ensure_sync_log_table(db_path)
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            "INSERT INTO github_sync_log (ts, status, branch, sha, error) VALUES (?, ?, ?, ?, ?)",
+            (time.time(), status, branch, sha, error),
+        )
+        conn.execute(
+            """DELETE FROM github_sync_log WHERE id NOT IN (
+                SELECT id FROM github_sync_log ORDER BY ts DESC LIMIT ?
+            )""",
+            (_SYNC_LOG_KEEP,),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        print(f"github_sync_alert: could not write to sync log: {exc}", file=sys.stderr)
 
 
 def write_status(status: str, branch: str, sha: str, error: str = "") -> None:
@@ -149,6 +194,7 @@ def main():
         sys.exit(1)
 
     write_status(status, branch, sha, error)
+    log_sync_to_db(DB_PATH, status, branch, sha, error)
 
     if status == "fail":
         send_failure_alert(branch, sha, error)
