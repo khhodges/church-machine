@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  hardware/soc_combined/church_soc_cm.peri.xml
+  Pin assignments for the combined Sapphire SoC + Church Machine bitstream — Ti60F225.
+
+  IO bank voltage assignments:
+    BL  3.3 V LVCMOS  (UART TX/RX lines → FT4232H)
+    BR  1.8 V LVCMOS  (LED outputs)
+    TL  1.8 V LVCMOS  (push button)
+    2A  1.8 V LVCMOS  (declared for completeness)
+    TR  1.8 V LVCMOS  (declared for completeness)
+
+  Pin mapping (matches Ti60F225 devkit schematic):
+    clk         — GPIOL_P_18   25 MHz crystal → CLKMUX_T ROUTE0
+    uart_tx     — GPIOL_02     FT4232H interface 2 TX (ttyUSB2)
+    uart_rx     — GPIOL_01     FT4232H interface 2 RX
+    push_button — GPIOT_N_06   USER_PB, active-low, weak pull-up
+    led0        — GPIOR_P_07   USER_LED0: SoC out of reset
+    led1        — GPIOR_P_08   USER_LED1: CM boot complete
+    led2        — GPIOR_P_09   USER_LED2: CM fault latched
+    led3        — GPIOR_P_10   USER_LED3: CM heartbeat
+
+  Generated for Efinity 2025.2.
+-->
+<efxpt:design_db
+    name="church_soc_cm"
+    device_def="Ti60F225"
+    version="2025.2.0"
+    db_version="20241999"
+    last_change_date="Sat May 24 00:00:00 2026"
+    xmlns:efxpt="http://www.efinixinc.com/peri_design_db"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.efinixinc.com/peri_design_db peri_design_db.xsd">
+
+    <efxpt:device_info>
+        <efxpt:iobank_info>
+            <efxpt:iobank name="BL" iostd="3.3 V LVCMOS" is_dyn_voltage="false" mode_sel_name="BL_MODE_SEL"/>
+            <efxpt:iobank name="BR" iostd="1.8 V LVCMOS" is_dyn_voltage="false" mode_sel_name="BR_MODE_SEL"/>
+            <efxpt:iobank name="TL" iostd="1.8 V LVCMOS" is_dyn_voltage="false" mode_sel_name="TL_MODE_SEL"/>
+            <efxpt:iobank name="TR" iostd="1.8 V LVCMOS" is_dyn_voltage="false" mode_sel_name="TR_MODE_SEL"/>
+            <efxpt:iobank name="2A" iostd="1.8 V LVCMOS" is_dyn_voltage="false" mode_sel_name="2A_MODE_SEL"/>
+        </efxpt:iobank_info>
+
+        <efxpt:ctrl_info>
+            <efxpt:ctrl name="cfg" ctrl_def="CONFIG_CTRL0" clock_name="" is_clk_invert="false"
+                cbsel_bus_name="cfg_CBSEL" config_ctrl_name="cfg_CONFIG"
+                ena_capture_name="cfg_ENA" error_status_name="cfg_ERROR"
+                um_signal_status_name="cfg_USR_STATUS"
+                is_remote_update_enable="false" is_user_mode_enable="false"/>
+        </efxpt:ctrl_info>
+
+        <efxpt:seu_info>
+            <efxpt:seu name="seu" block_def="CONFIG_SEU0" mode="auto" ena_detect="false" wait_interval="16500000">
+                <efxpt:gen_pin>
+                    <efxpt:pin name="seu_START"        type_name="START"        is_bus="false"/>
+                    <efxpt:pin name="seu_INJECT_ERROR" type_name="INJECT_ERROR" is_bus="false"/>
+                    <efxpt:pin name="seu_RST"          type_name="RST"          is_bus="false"/>
+                    <efxpt:pin name="seu_CONFIG"       type_name="CONFIG"       is_bus="false"/>
+                    <efxpt:pin name="seu_ERROR"        type_name="ERROR"        is_bus="false"/>
+                    <efxpt:pin name="seu_DONE"         type_name="DONE"         is_bus="false"/>
+                </efxpt:gen_pin>
+            </efxpt:seu>
+        </efxpt:seu_info>
+
+        <efxpt:clkmux_info>
+            <efxpt:clkmux name="CLKMUX_B" block_def="CLKMUX_B" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
+                <efxpt:gen_pin>
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE1"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE2"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE3"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_0" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_7" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_0" is_bus="true"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_7" is_bus="true"/>
+                </efxpt:gen_pin>
+            </efxpt:clkmux>
+            <efxpt:clkmux name="CLKMUX_L" block_def="CLKMUX_L" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
+                <efxpt:gen_pin>
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE1"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE2"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE3"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_0" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_7" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_0" is_bus="true"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_7" is_bus="true"/>
+                </efxpt:gen_pin>
+            </efxpt:clkmux>
+            <efxpt:clkmux name="CLKMUX_R" block_def="CLKMUX_R" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
+                <efxpt:gen_pin>
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE1"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE2"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE3"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_0" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_OUT_7" is_bus="false"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_0" is_bus="true"/>
+                    <efxpt:pin name="" type_name="DYN_MUX_SEL_7" is_bus="true"/>
+                </efxpt:gen_pin>
+            </efxpt:clkmux>
+            <efxpt:clkmux name="CLKMUX_T" block_def="CLKMUX_T" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
+                <efxpt:gen_pin>
+                    <!-- clk → ROUTE0 of CLKMUX_T (25 MHz crystal at GPIOL_P_18) -->
+                    <efxpt:pin name="clk" type_name="ROUTE0"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name=""    type_name="ROUTE1"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name=""    type_name="ROUTE2"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name=""    type_name="ROUTE3"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name=""    type_name="DYN_MUX_OUT_0" is_bus="false"/>
+                    <efxpt:pin name=""    type_name="DYN_MUX_OUT_7" is_bus="false"/>
+                    <efxpt:pin name=""    type_name="DYN_MUX_SEL_0" is_bus="true"/>
+                    <efxpt:pin name=""    type_name="DYN_MUX_SEL_7" is_bus="true"/>
+                </efxpt:gen_pin>
+            </efxpt:clkmux>
+        </efxpt:clkmux_info>
+    </efxpt:device_info>
+
+    <efxpt:gpio_info>
+
+        <!-- Clock: 25 MHz crystal at GPIOL_P_18 → CLKMUX_T ROUTE0 -->
+        <efxpt:comp_gpio name="clk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:input_config
+                name="clk"
+                name_ddio_lo=""
+                conn_type="clkin"
+                is_register="false"
+                clock_name=""
+                is_clock_inverted="false"
+                pull_option="none"
+                is_schmitt_trigger="false"
+                ddio_type="none"
+                is_bus_hold="false"
+                delay="0"
+                is_serial="false"
+                is_dyn_delay="false"
+                fastclk_name=""
+                pullup_ena_name="clk_PULL_UP_ENA"
+                dyn_delay_en_name="clk_DLY_ENA"
+                dyn_delay_reset_name="clk_DLY_RST"
+                dyn_delay_ctrl_name="clk_DLY_CTRL"
+                clkmux_buf_name="CLKMUX_T"/>
+        </efxpt:comp_gpio>
+
+        <!-- UART TX → GPIOL_02 (SoC console, FT4232H interface 2) -->
+        <efxpt:comp_gpio name="uart_tx" gpio_def="GPIOL_02" mode="output" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:output_config
+                name="uart_tx"
+                name_ddio_lo=""
+                register_option="none"
+                clock_name=""
+                is_clock_inverted="false"
+                is_slew_rate="false"
+                tied_option="none"
+                ddio_type="none"
+                delay="0"
+                is_serial="false"
+                drive_strength="4"
+                fastclk_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- UART RX ← GPIOL_01 (SoC console, FT4232H interface 2) -->
+        <efxpt:comp_gpio name="uart_rx" gpio_def="GPIOL_01" mode="input" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:input_config
+                name="uart_rx"
+                name_ddio_lo=""
+                conn_type="normal"
+                is_register="false"
+                clock_name=""
+                is_clock_inverted="false"
+                pull_option="none"
+                is_schmitt_trigger="false"
+                ddio_type="none"
+                is_bus_hold="false"
+                delay="0"
+                is_serial="false"
+                is_dyn_delay="false"
+                fastclk_name=""
+                pullup_ena_name="uart_rx_PULL_UP_ENA"
+                dyn_delay_en_name="uart_rx_DLY_ENA"
+                dyn_delay_reset_name="uart_rx_DLY_RST"
+                dyn_delay_ctrl_name="uart_rx_DLY_CTRL"
+                clkmux_buf_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- Push button (active-low, weak pull-up) at GPIOT_N_06, 1.8 V -->
+        <efxpt:comp_gpio name="push_button" gpio_def="GPIOT_N_06" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:input_config
+                name="push_button"
+                name_ddio_lo=""
+                conn_type="normal"
+                is_register="false"
+                clock_name=""
+                is_clock_inverted="false"
+                pull_option="weak_pullup"
+                is_schmitt_trigger="false"
+                ddio_type="none"
+                is_bus_hold="false"
+                delay="0"
+                is_serial="false"
+                is_dyn_delay="false"
+                fastclk_name=""
+                pullup_ena_name="push_button_PULL_UP_ENA"
+                dyn_delay_en_name="push_button_DLY_ENA"
+                dyn_delay_reset_name="push_button_DLY_RST"
+                dyn_delay_ctrl_name="push_button_DLY_CTRL"
+                clkmux_buf_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- LED0: USER_LED0 at GPIOR_P_07 — SoC out of reset -->
+        <efxpt:comp_gpio name="led0" gpio_def="GPIOR_P_07" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config
+                name="led0"
+                name_ddio_lo=""
+                register_option="none"
+                clock_name=""
+                is_clock_inverted="false"
+                is_slew_rate="false"
+                tied_option="none"
+                ddio_type="none"
+                delay="0"
+                is_serial="false"
+                drive_strength="4"
+                fastclk_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- LED1: USER_LED1 at GPIOR_P_08 — CM boot complete -->
+        <efxpt:comp_gpio name="led1" gpio_def="GPIOR_P_08" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config
+                name="led1"
+                name_ddio_lo=""
+                register_option="none"
+                clock_name=""
+                is_clock_inverted="false"
+                is_slew_rate="false"
+                tied_option="none"
+                ddio_type="none"
+                delay="0"
+                is_serial="false"
+                drive_strength="4"
+                fastclk_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- LED2: USER_LED2 at GPIOR_P_09 — CM fault latched -->
+        <efxpt:comp_gpio name="led2" gpio_def="GPIOR_P_09" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config
+                name="led2"
+                name_ddio_lo=""
+                register_option="none"
+                clock_name=""
+                is_clock_inverted="false"
+                is_slew_rate="false"
+                tied_option="none"
+                ddio_type="none"
+                delay="0"
+                is_serial="false"
+                drive_strength="4"
+                fastclk_name=""/>
+        </efxpt:comp_gpio>
+
+        <!-- LED3: USER_LED3 at GPIOR_P_10 — CM heartbeat -->
+        <efxpt:comp_gpio name="led3" gpio_def="GPIOR_P_10" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config
+                name="led3"
+                name_ddio_lo=""
+                register_option="none"
+                clock_name=""
+                is_clock_inverted="false"
+                is_slew_rate="false"
+                tied_option="none"
+                ddio_type="none"
+                delay="0"
+                is_serial="false"
+                drive_strength="4"
+                fastclk_name=""/>
+        </efxpt:comp_gpio>
+
+        <efxpt:global_unused_config state="input with weak pulldown"/>
+
+    </efxpt:gpio_info>
+
+    <efxpt:mipi_dphy_info/>
+
+</efxpt:design_db>
