@@ -40,6 +40,65 @@ if [ -z "${GITHUB_PAT:-}" ]; then
     exit 0
 fi
 
+# ---------------------------------------------------------------------------
+# Helper: verify a required PAT scope is present via the GitHub /user API.
+# GitHub returns granted scopes in X-OAuth-Scopes.  Fine-grained tokens omit
+# this header — we warn and continue rather than blocking them.
+# Usage: _require_pat_scope <scope> <script-name>
+# ---------------------------------------------------------------------------
+_require_pat_scope() {
+    local scope="$1"
+    local script_name="$2"
+
+    if ! command -v curl &>/dev/null; then
+        echo "${script_name}: WARNING — curl not found; skipping PAT scope preflight."
+        return 0
+    fi
+
+    local response_headers
+    response_headers=$(curl -s -I \
+        -H "Authorization: token ${GITHUB_PAT}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/user" 2>&1) || {
+        echo "${script_name}: WARNING — could not reach GitHub API to verify PAT scopes; proceeding anyway."
+        return 0
+    }
+
+    local http_status
+    http_status=$(echo "$response_headers" | grep -i '^HTTP/' | tail -1 | awk '{print $2}')
+
+    if [ "$http_status" = "401" ]; then
+        echo "${script_name}: GITHUB_PAT is invalid or expired (HTTP 401) — aborting."
+        echo "  Regenerate the PAT and update the GITHUB_PAT Replit secret."
+        exit 1
+    fi
+
+    if [ "$http_status" != "200" ]; then
+        echo "${script_name}: WARNING — GitHub API returned HTTP ${http_status}; skipping scope check."
+        return 0
+    fi
+
+    local scopes
+    scopes=$(echo "$response_headers" | grep -i '^X-OAuth-Scopes:' | sed 's/^X-OAuth-Scopes:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | tr -d '\r')
+
+    if [ -z "$scopes" ]; then
+        echo "${script_name}: WARNING — X-OAuth-Scopes header absent (fine-grained PAT or GitHub Apps token)."
+        echo "  Ensure the token has the appropriate permissions for ${REPO}."
+        return 0
+    fi
+
+    if echo "$scopes" | tr ',' '\n' | sed 's/^[[:space:]]*//' | grep -qx "${scope}"; then
+        echo "${script_name}: PAT scope check passed — '${scope}' scope confirmed. (scopes: ${scopes})"
+    else
+        echo "${script_name}: PAT is missing the '${scope}' scope — aborting."
+        echo "  Current scopes: ${scopes}"
+        echo "  Create a new classic GitHub PAT at https://github.com/settings/tokens"
+        echo "  and enable 'repo' and 'lfs' scopes, then update the GITHUB_PAT Replit secret."
+        exit 1
+    fi
+}
+
 # Add or update the github-sync remote (safe to re-run)
 if git remote get-url "$REMOTE_NAME" &>/dev/null; then
     git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
@@ -48,6 +107,7 @@ else
 fi
 
 if [ "$WITH_LFS" -eq 1 ]; then
+    _require_pat_scope "lfs" "sync-to-github"
     echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) + LFS objects → github.com/${REPO} ..."
 
     # Push regular git objects first

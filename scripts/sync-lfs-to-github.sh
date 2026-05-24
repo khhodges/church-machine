@@ -30,6 +30,66 @@ if [ -z "${GITHUB_PAT:-}" ]; then
     exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Preflight: verify the PAT has the 'lfs' scope via the GitHub /user API.
+# GitHub returns the granted scopes in the X-OAuth-Scopes response header.
+# A PAT with only 'repo' (no 'lfs') will silently fail the LFS upload leg,
+# so we catch the misconfiguration early with a clear error.
+# ---------------------------------------------------------------------------
+_check_pat_lfs_scope() {
+    local pat="$1"
+    if ! command -v curl &>/dev/null; then
+        echo "sync-lfs-to-github: WARNING — curl not found; skipping PAT scope preflight."
+        return 0
+    fi
+
+    local response_headers
+    response_headers=$(curl -s -I \
+        -H "Authorization: token ${pat}" \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/user" 2>&1) || {
+        echo "sync-lfs-to-github: WARNING — could not reach GitHub API to verify PAT scopes (network issue?); proceeding anyway."
+        return 0
+    }
+
+    local http_status
+    http_status=$(echo "$response_headers" | grep -i '^HTTP/' | tail -1 | awk '{print $2}')
+
+    if [ "$http_status" = "401" ]; then
+        echo "sync-lfs-to-github: GITHUB_PAT is invalid or expired (HTTP 401) — aborting."
+        echo "  Regenerate the PAT and update the GITHUB_PAT Replit secret."
+        exit 1
+    fi
+
+    if [ "$http_status" != "200" ]; then
+        echo "sync-lfs-to-github: WARNING — GitHub API returned HTTP ${http_status}; skipping scope check."
+        return 0
+    fi
+
+    local scopes
+    scopes=$(echo "$response_headers" | grep -i '^X-OAuth-Scopes:' | sed 's/^X-OAuth-Scopes:[[:space:]]*//' | tr '[:upper:]' '[:lower:]' | tr -d '\r')
+
+    if [ -z "$scopes" ]; then
+        echo "sync-lfs-to-github: WARNING — X-OAuth-Scopes header absent (fine-grained PAT or GitHub Apps token)."
+        echo "  Ensure the token has Contents read/write permission (which covers LFS) for ${REPO}."
+        return 0
+    fi
+
+    # Check that 'lfs' appears as a discrete scope token (not as a substring).
+    if echo "$scopes" | tr ',' '\n' | sed 's/^[[:space:]]*//' | grep -qx 'lfs'; then
+        echo "sync-lfs-to-github: PAT scope check passed — 'lfs' scope confirmed. (scopes: ${scopes})"
+    else
+        echo "sync-lfs-to-github: PAT is missing the 'lfs' scope — aborting."
+        echo "  Current scopes: ${scopes}"
+        echo "  Create a new classic GitHub PAT at https://github.com/settings/tokens"
+        echo "  and enable both 'repo' and 'lfs' scopes, then update the GITHUB_PAT Replit secret."
+        exit 1
+    fi
+}
+
+_check_pat_lfs_scope "${GITHUB_PAT}"
+
 if ! command -v git-lfs &>/dev/null && ! git lfs version &>/dev/null 2>&1; then
     echo "sync-lfs-to-github: git-lfs is not installed — aborting."
     echo "  Install git-lfs via the package manager or Nix environment."

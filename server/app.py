@@ -5952,12 +5952,13 @@ with app.app_context():
 
     logging.info("Database tables created")
 
-    from daily_report import _ensure_tracking_table as _dr_ensure_table, get_report_token as _get_report_token
+    from daily_report import _ensure_tracking_table as _dr_ensure_table, get_report_token as _get_report_token, check_github_pat_lfs_scope as _check_pat_lfs
     _dr_ensure_table(db_path)
     _report_token = _get_report_token()
     logging.info(
         "Report tracking table ready | auth enabled (set REPORT_TOKEN secret to persist token)"
     )
+    _check_pat_lfs()
 
     try:
         from apscheduler.schedulers.background import BackgroundScheduler

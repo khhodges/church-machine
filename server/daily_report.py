@@ -69,6 +69,82 @@ def check_report_auth(request) -> bool:
     return False
 
 
+def check_github_pat_lfs_scope() -> None:
+    """
+    Log a warning if GITHUB_PAT is set but missing the 'lfs' scope.
+
+    Called once at startup (or by send_daily_report).  Non-fatal: we only log
+    a warning so the server still starts even when the PAT is mis-scoped.
+    Fine-grained PATs omit X-OAuth-Scopes — we warn about that too.
+    """
+    pat = os.environ.get("GITHUB_PAT", "").strip()
+    if not pat:
+        log.debug("GITHUB_PAT not set — skipping LFS scope check.")
+        return
+
+    try:
+        import urllib.request as _urllib_req
+        import urllib.error as _urllib_err
+
+        req = _urllib_req.Request(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"token {pat}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "church-machine-daily-report/1.0",
+            },
+        )
+        try:
+            with _urllib_req.urlopen(req, timeout=10) as resp:
+                http_status = resp.status
+                scopes_raw = resp.headers.get("X-OAuth-Scopes", "")
+        except _urllib_err.HTTPError as http_exc:
+            http_status = http_exc.code
+            scopes_raw = http_exc.headers.get("X-OAuth-Scopes", "")
+    except Exception as exc:
+        log.warning(
+            "GitHub PAT LFS scope check skipped — could not reach GitHub API: %s", exc
+        )
+        return
+
+    if http_status == 401:
+        log.warning(
+            "GITHUB_PAT appears invalid or expired (HTTP 401). "
+            "Regenerate the PAT and update the GITHUB_PAT Replit secret."
+        )
+        return
+
+    if http_status != 200:
+        log.warning(
+            "GitHub API returned HTTP %s during PAT scope check — skipping.", http_status
+        )
+        return
+
+    if not scopes_raw:
+        log.warning(
+            "GITHUB_PAT X-OAuth-Scopes header is absent. "
+            "This is normal for fine-grained PATs, but verify that the token has "
+            "Contents read/write permission for khhodges/cloomc-project (which "
+            "covers LFS). Classic PATs must include the 'lfs' scope."
+        )
+        return
+
+    scopes = [s.strip().lower() for s in scopes_raw.split(",")]
+    if "lfs" not in scopes:
+        log.warning(
+            "GITHUB_PAT is missing the 'lfs' scope — nightly LFS backup will fail! "
+            "Current scopes: %s. Create a new classic PAT at "
+            "https://github.com/settings/tokens with 'repo' and 'lfs' scopes "
+            "and update the GITHUB_PAT Replit secret.",
+            scopes_raw,
+        )
+    else:
+        log.info(
+            "GITHUB_PAT LFS scope check passed (scopes: %s).", scopes_raw
+        )
+
+
 def _get_resend_credentials():
     """Fetch Resend API key and from_email via Replit connectors."""
     import requests as _req
