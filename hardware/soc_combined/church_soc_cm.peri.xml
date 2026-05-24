@@ -184,7 +184,7 @@
         </efxpt:comp_gpio>
 
         <!-- CM UART TX → GPIOL_P_03 (FT4232H interface 3, ttyUSB3) — CM debug UART -->
-        <efxpt:comp_gpio name="cm_uart_tx" gpio_def="GPIOL_P_03" mode="output" bus_name="" io_standard="3.3 V LVCMOS">
+        <efxpt:comp_gpio name="cm_uart_tx" gpio_def="GPIOL_P_03" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
             <efxpt:output_config
                 name="cm_uart_tx"
                 name_ddio_lo=""
