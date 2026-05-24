@@ -864,6 +864,29 @@ This report is sent automatically at 05:00 UTC every day.
     return plain, html, cost_today
 
 
+def run_lfs_backup():
+    """Run scripts/sync-lfs-to-github.sh. Module-level so APScheduler can serialize it."""
+    import subprocess
+    script = os.path.join(_BASE_DIR, "scripts", "sync-lfs-to-github.sh")
+    try:
+        result = subprocess.run(
+            ["bash", script],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if result.returncode == 0:
+            log.info("Nightly LFS backup completed successfully")
+        else:
+            log.warning(
+                "Nightly LFS backup exited %d: %s",
+                result.returncode,
+                (result.stdout + result.stderr).strip()[-500:],
+            )
+    except Exception as exc:
+        log.error("Nightly LFS backup job failed: %s", exc)
+
+
 def send_daily_report(db_path):
     """Generate and send the daily report via Resend. Returns (success, message)."""
     api_key, from_email = _get_resend_credentials()

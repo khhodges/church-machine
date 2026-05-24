@@ -229,6 +229,36 @@ def report_send_now():
         logging.exception("Error in /report/send-now")
         return jsonify({"sent": False, "message": str(exc)}), 500
 
+@app.route("/report/sync-lfs-now")
+def report_sync_lfs_now():
+    """Manually trigger the nightly LFS backup. Returns JSON confirmation.
+
+    Requires Authorization: Bearer <REPORT_TOKEN> header or ?token=<REPORT_TOKEN>.
+    """
+    from daily_report import check_report_auth as _check_auth
+    if not _check_auth(request):
+        return jsonify({"error": "Unauthorized — supply token via Authorization header or ?token="}), 401
+    try:
+        import subprocess
+        _script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "sync-lfs-to-github.sh")
+        result = subprocess.run(
+            ["bash", _script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        success = result.returncode == 0
+        output = (result.stdout + result.stderr).strip()
+        logging.info("Manual LFS sync triggered: success=%s", success)
+        return jsonify({
+            "success": success,
+            "returncode": result.returncode,
+            "output": output,
+        })
+    except Exception as exc:
+        logging.exception("Error in /report/sync-lfs-now")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
 @app.route("/report/task-run", methods=["POST"])
 def report_task_run():
     """Record a task agent run for cost tracking. POST {task_id, note?}.
@@ -5940,20 +5970,28 @@ with app.app_context():
         }
         _scheduler = BackgroundScheduler(jobstores=_jobstores, timezone="UTC")
 
-        def _scheduled_report_job():
-            from daily_report import send_daily_report as _send
-            ok, msg = _send(db_path)
-            logging.info("Scheduled daily report: ok=%s msg=%s", ok, msg)
+        from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup
 
         _scheduler.add_job(
-            _scheduled_report_job,
+            _send_report,
             CronTrigger(hour=5, minute=0, timezone="UTC"),
             id="daily_report",
             replace_existing=True,
             name="Daily progress and cost report",
+            args=[db_path],
+        )
+
+        _scheduler.add_job(
+            _run_lfs_backup,
+            CronTrigger(hour=3, minute=0, timezone="UTC"),
+            id="nightly_lfs_backup",
+            replace_existing=True,
+            name="Nightly LFS backup to GitHub",
         )
         _scheduler.start()
-        logging.info("APScheduler started — daily report scheduled at 05:00 UTC")
+        logging.info(
+            "APScheduler started — daily report at 05:00 UTC, LFS backup at 03:00 UTC"
+        )
     except Exception as _sched_exc:
         logging.warning("APScheduler could not start: %s", _sched_exc)
 
