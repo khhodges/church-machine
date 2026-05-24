@@ -103,7 +103,7 @@
             <efxpt:clkmux name="CLKMUX_T" block_def="CLKMUX_T" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
                 <efxpt:gen_pin>
                     <!-- clk → ROUTE0 of CLKMUX_T (25 MHz crystal at GPIOL_P_18) -->
-                    <efxpt:pin name=""    type_name="ROUTE0"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="clk" type_name="ROUTE0"   is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name=""    type_name="ROUTE1"   is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name=""    type_name="ROUTE2"   is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name=""    type_name="ROUTE3"   is_bus="false" is_clk="true" is_clk_invert="false"/>
