@@ -1,0 +1,199 @@
+# BUILD_SOC.md — Sapphire SoC Minimal UART Gate Test
+
+## What this builds
+
+A minimal Efinix Sapphire SoC bitstream for the Ti60F225 devkit.
+On power-on it sends `CHURCH Ti60 v1.0\r\n` over **ttyUSB2** at 115200 baud
+and then loops forever.  LED0 lights when the SoC is out of reset.
+
+This is the gate test confirming the physical UART path through the FT4232H
+chip (GPIOL_01/02 → FT4232H interface 2 → ttyUSB2).
+
+---
+
+## Prerequisites
+
+| Item | Notes |
+|---|---|
+| Efinity 2025.2 | Installed at `~/efinity/2025.2` |
+| Efinity RISC-V IDE 2025.2 | Toolchain at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin` |
+| Sapphire SoC IP | Ships with Efinity — path given in Step 1 |
+| `pyserial` | `pip install pyserial` — for the test step |
+
+---
+
+## Steps
+
+### Step 1 — Copy the Sapphire SoC IP files
+
+The Sapphire SoC source (`sapphire.v` and `sapphire_define.vh`) ships with
+Efinity and **must not be committed to the repo**.  Copy them into the project
+directory:
+
+```bash
+cp ~/efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire.v \
+   hardware/soc_minimal/
+
+cp ~/efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire_define.vh \
+   hardware/soc_minimal/
+```
+
+> **If the path above does not exist** on your installation, search for the
+> file:
+> ```bash
+> find ~/efinity -name "sapphire.v" 2>/dev/null
+> ```
+> Then update `top.v` if the UART0 base address in `sapphire_define.vh` differs
+> from `0xF0010000` (see the `UART_BASE` define in `firmware/main.c`).
+
+---
+
+### Step 2 — Verify addresses (optional but recommended)
+
+Open `hardware/soc_minimal/sapphire_define.vh` and confirm:
+
+- **ROM base address** — typically `` `define ONCHIP_MEM_BASE 32'h00000000 ``.
+  If different, update `ORIGIN` of the `ROM` section in `firmware/link.ld`.
+
+- **RAM base address** — typically `` `define ONCHIP_MEM_BASE_1 32'h00080000 ``.
+  If different, update `ORIGIN` of the `RAM` section in `firmware/link.ld`.
+
+- **UART0 base address** — typically `` `define APB_UART0_BASE 32'hF0010000 ``.
+  If different, update `UART_BASE` in `firmware/main.c`.
+
+No changes needed if the defaults match.
+
+---
+
+### Step 3 — Build the firmware
+
+```bash
+make -C hardware/soc_minimal/firmware
+```
+
+Expected output ends with a `firmware.hex` file.
+If the toolchain is installed elsewhere, override `TOOLCHAIN`:
+
+```bash
+make -C hardware/soc_minimal/firmware TOOLCHAIN=/path/to/riscv-none-embed/bin
+```
+
+Copy `firmware.hex` into the project directory so Efinity can find it during
+elaboration:
+
+```bash
+cp hardware/soc_minimal/firmware/firmware.hex hardware/soc_minimal/
+```
+
+---
+
+### Step 4 — Open the project in Efinity
+
+1. Launch Efinity 2025.2.
+2. **File → Open Project** → navigate to `hardware/soc_minimal/church_soc.xml`.
+3. In **Project Settings** confirm:
+   - Top module: `top`
+   - Device: `Ti60F225`
+4. Confirm the three source files are listed (`top.v`, `sapphire.v`,
+   `sapphire_define.vh`).
+
+---
+
+### Step 5 — Compile (Synthesis → Place & Route → Bitstream)
+
+Click the **Compile** button (or run all three flows sequentially).
+
+Efinity will:
+1. Read `firmware.hex` and embed it in the on-chip ROM during synthesis.
+2. Place and route the Sapphire SoC on the Ti60F225 fabric.
+3. Generate the programming bitstream.
+
+No SDC file is needed — the design runs at 25 MHz directly from the crystal
+and Efinity's default timing constraints are sufficient.
+
+---
+
+### Step 6 — Program the board
+
+1. Connect the Ti60F225 devkit via USB.
+2. In Efinity, open the **Programmer** tool.
+3. Select the `.hex` bitstream generated in the `outflow/` directory.
+4. Click **Program**.
+
+---
+
+### Step 7 — Test: receive the UART message
+
+After programming, within 3 seconds of power-on (or reset) the board sends the
+greeting.  Test it with either of these commands:
+
+**Quick Python one-liner:**
+
+```bash
+python3 -c "
+import serial
+s = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
+s.setRTS(False)
+s.setDTR(False)
+print(s.read(100))
+"
+```
+
+Expected output:
+
+```
+b'CHURCH Ti60 v1.0\r\n'
+```
+
+**Alternative — picocom:**
+
+```bash
+picocom -b 115200 /dev/ttyUSB2
+```
+
+You should see `CHURCH Ti60 v1.0` printed within 3 seconds of reset.
+Press `Ctrl+A Ctrl+X` to exit picocom.
+
+---
+
+## What each file does
+
+| File | Purpose |
+|---|---|
+| `top.v` | Top-level Verilog — instantiates the Sapphire SoC, wires UART and LEDs |
+| `church_soc.xml` | Efinity project file — device, sources, synthesis settings |
+| `church_soc.peri.xml` | Pin assignments — clock, UART TX/RX, push button, LEDs |
+| `firmware/main.c` | Bare-metal C — sends greeting string via UART, loops |
+| `firmware/crt0.S` | RISC-V startup — sets stack, zeroes BSS, calls main |
+| `firmware/link.ld` | Linker script — ROM at 0x00000000, RAM at 0x00080000 |
+| `firmware/Makefile` | Builds `firmware.elf` then `firmware.hex` |
+| `sapphire.v` | **(copy from Efinity IP — not in repo)** Sapphire SoC RTL |
+| `sapphire_define.vh` | **(copy from Efinity IP — not in repo)** Sapphire SoC defines |
+| `firmware.hex` | **(generated by make — not in repo)** ROM init file for synthesis |
+
+---
+
+## Troubleshooting
+
+**`sapphire.v` not found during synthesis**
+→ Re-run Step 1; the file must be in `hardware/soc_minimal/`.
+
+**`firmware.hex` not found during synthesis**
+→ Re-run Steps 3 and the copy sub-step; the hex must be in `hardware/soc_minimal/`.
+
+**ttyUSB2 not present**
+→ Check `ls /dev/ttyUSB*` with the board plugged in.  The FT4232H creates
+four interfaces; interface 2 (index 0) is the UART.  On some hosts it appears
+as `/dev/ttyUSB0` if no other FTDI devices are connected — adjust accordingly.
+
+**No output after programming**
+→ Confirm LED0 lights (SoC out of reset).  If it does not light, the SoC is
+still in reset; check that `io_asyncReset` is tied to `1'b0` in `top.v`.
+
+**FIRMWARE_INIT_FILE parameter not recognised**
+→ Open `sapphire.v` and search for `$readmemh` to find the exact parameter
+name, then update `top.v` accordingly.  Common alternative: `BOOT_HEX`.
+
+**Wrong UART address (garbage / no output, but LED0 lit)**
+→ Check `sapphire_define.vh` for the UART0 base address and update
+`UART_BASE` in `firmware/main.c`, then rebuild and re-synthesize.

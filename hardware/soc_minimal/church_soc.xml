@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<efx:project name="church_soc"
+             description="Church Machine — Sapphire SoC minimal UART gate test for Ti60F225"
+             last_change="0"
+             sw_version="2025.2"
+             last_run_state=""
+             last_run_flow=""
+             config_result_in_sync="false"
+             design_ood="sync"
+             place_ood="sync"
+             route_ood="sync"
+             xmlns:efx="http://www.efinixinc.com/enf_proj"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://www.efinixinc.com/enf_proj enf_proj.xsd">
+
+    <efx:device_info>
+        <efx:family name="Titanium"/>
+        <efx:device name="Ti60F225"/>
+        <efx:timing_model name="C3"/>
+    </efx:device_info>
+
+    <efx:design_info def_veri_version="verilog_2k" def_vhdl_version="vhdl_2008" unified_flow="false">
+        <efx:top_module name="top"/>
+        <!-- Source files: top.v is in-tree; sapphire.v and sapphire_define.vh
+             must be copied into this directory by the user — see BUILD_SOC.md -->
+        <efx:design_file name="top.v"              version="default" library="default"/>
+        <efx:design_file name="sapphire.v"         version="default" library="default"/>
+        <efx:design_file name="sapphire_define.vh" version="default" library="default"/>
+        <efx:top_vhdl_arch name=""/>
+    </efx:design_info>
+
+    <!-- No SDC: Efinity uses default timing constraints for 25 MHz direct clock -->
+    <efx:constraint_info>
+        <efx:sdc_file name=""/>
+        <efx:inter_file name=""/>
+    </efx:constraint_info>
+
+    <efx:sim_info/>
+    <efx:misc_info/>
+    <efx:ooc_info/>
+    <efx:ip_info/>
+
+    <efx:synthesis tool_name="efx_map">
+        <efx:param name="work_dir"             value="work_syn"  value_type="e_string"/>
+        <efx:param name="write_efx_verilog"    value="on"        value_type="e_bool"/>
+        <efx:param name="mode"                 value="speed"     value_type="e_option"/>
+        <efx:param name="max_ram"              value="-1"        value_type="e_integer"/>
+        <efx:param name="max_mult"             value="-1"        value_type="e_integer"/>
+        <efx:param name="infer_clk_enable"     value="3"         value_type="e_integer"/>
+        <efx:param name="infer_set_reset"      value="1"         value_type="e_integer"/>
+        <efx:param name="no_fanout_override"   value="0"         value_type="e_integer"/>
+        <efx:param name="fanout_limit"         value="100"       value_type="e_integer"/>
+        <efx:param name="seq_opt"              value="1"         value_type="e_integer"/>
+        <efx:param name="get_names_method"     value="0"         value_type="e_integer"/>
+        <efx:param name="logic_opting"         value="1"         value_type="e_bool"/>
+        <efx:param name="pack_lut_into_ram"    value="1"         value_type="e_bool"/>
+        <efx:param name="cpe_ins_register"     value="0"         value_type="e_bool"/>
+        <efx:param name="use_cpe_for_const_0"  value="0"         value_type="e_bool"/>
+        <efx:param name="use_cpe_for_const_1"  value="0"         value_type="e_bool"/>
+        <efx:param name="split_input_buf"      value="0"         value_type="e_bool"/>
+        <efx:param name="calc_mcw"             value="0"         value_type="e_bool"/>
+    </efx:synthesis>
+
+    <efx:place_and_route tool_name="efx_pnr">
+        <efx:param name="work_dir" value="work_pnr" value_type="e_string"/>
+        <efx:param name="verbose"  value="off"      value_type="e_bool"/>
+    </efx:place_and_route>
+
+    <efx:bitstream_generation tool_name="efx_pgm">
+        <efx:param name="mode"                          value="active"   value_type="e_string"/>
+        <efx:param name="width"                         value="1"        value_type="e_string"/>
+        <efx:param name="enable_roms"                   value="smart"    value_type="e_option"/>
+        <efx:param name="spi_low_power_mode"            value="on"       value_type="e_bool"/>
+        <efx:param name="io_weak_pullup"                value="on"       value_type="e_bool"/>
+        <efx:param name="oscillator_clock_divider"      value="DIV8"     value_type="e_option"/>
+        <efx:param name="bitstream_compression"         value="on"       value_type="e_bool"/>
+        <efx:param name="enable_external_master_clock"  value="off"      value_type="e_bool"/>
+        <efx:param name="active_capture_clk_edge"       value="posedge"  value_type="e_option"/>
+        <efx:param name="jtag_usercode"                 value="0xFFFFFFFF" value_type="e_string"/>
+        <efx:param name="release_tri_then_reset"        value="on"       value_type="e_bool"/>
+    </efx:bitstream_generation>
+
+    <efx:debugger>
+        <efx:param name="work_dir"            value="work_dbg" value_type="e_string"/>
+        <efx:param name="auto_instantiation"  value="off"      value_type="e_bool"/>
+        <efx:param name="profile"             value="NONE"     value_type="e_string"/>
+    </efx:debugger>
+
+    <efx:security>
+        <efx:param name="randomize_iv_value" value="on" value_type="e_bool"/>
+        <efx:param name="iv_value"           value=""   value_type="e_string"/>
+    </efx:security>
+
+</efx:project>
