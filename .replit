@@ -127,6 +127,10 @@ args = "pet-name-mem-tests"
 task = "workflow.run"
 args = "ti60-utilisation"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ti60-uart-dry-run"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -446,6 +450,17 @@ args = "python scripts/check_ti60_utilisation.py --missing-ok"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "ti60-uart-dry-run"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 scripts/test_ti60_uart.py --dry-run"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 5000

@@ -186,6 +186,9 @@ register_suite "sync-guard-tests" \
 register_suite "ti60-utilisation" \
     'python scripts/check_ti60_utilisation.py --missing-ok'
 
+register_suite "ti60-uart-dry-run" \
+    'python3 scripts/test_ti60_uart.py --dry-run'
+
 register_suite "pet-name-memory-tests" \
     'node simulator/test_pet_name_memory.js'
 
@@ -202,7 +205,7 @@ ALL_GROUPS["lump"]="lump-consistency lump-binary-tests lump-roundtrip"
 
 ALL_GROUPS["simulator"]="fault-recovery-tests assembler-tests catalog-compile-tests rci-threading-tests pending-gt-tests pet-name-mem-tests warning-panel-tests boot-entry-sync-tests selftest-lump-runs pet-name-memory-tests"
 
-ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation"
+ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabilities-blocks check-api-reference-stale ti60-utilisation ti60-uart-dry-run"
 
 ALL_GROUPS["hardware"]="hardware-sim"
 

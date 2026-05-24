@@ -79,6 +79,36 @@ static void delay_loops(uint32_t loops)
         __asm__ volatile("nop");
 }
 
+/*
+ * Emit a machine-parseable CALLHOME JSON line:
+ *   CALLHOME:{"board":"Ti60F225","uid":"0000000000000000","nia":"0xNNNNNNNN","boot_ok":1,"fault":F,"fault_code":C}\r\n
+ *
+ * Fields:
+ *   board      — fixed "Ti60F225"
+ *   uid        — 16-hex-digit device UID (all-zeros; no UID register in current bridge)
+ *   nia        — current CM next-instruction address as 0x hex string
+ *   boot_ok    — 1 (always 1 in monitor loop; we only reach here after boot_complete)
+ *   fault      — 1 if fault_latched sticky bit is set, 0 otherwise
+ *   fault_code — fault code (0..31); valid when fault==1
+ */
+static void uart_emit_callhome(uint32_t nia, uint32_t status)
+{
+    uint32_t fault_latched = (status & CM_STATUS_FAULT_LATCHED) ? 1u : 0u;
+    uint32_t fault_code    = fault_latched ? (CM_FAULT & 0x1Fu) : 0u;
+
+    uart_puts("CALLHOME:{\"board\":\"Ti60F225\",\"uid\":\"0000000000000000\",\"nia\":\"");
+    uart_puthex32(nia);
+    uart_puts("\",\"boot_ok\":1,\"fault\":");
+    uart_putc(fault_latched ? '1' : '0');
+    uart_puts(",\"fault_code\":");
+    /* emit fault_code as decimal (0-31, at most 2 digits) */
+    if (fault_code >= 10u) {
+        uart_putc('0' + (char)(fault_code / 10u));
+    }
+    uart_putc('0' + (char)(fault_code % 10u));
+    uart_puts("}\r\n");
+}
+
 /* ── Entry point ──────────────────────────────────────────────────────────── */
 
 void main(void)
@@ -120,6 +150,7 @@ void main(void)
         uint32_t nia    = CM_NIA;
         uint32_t status = CM_STATUS;
 
+        /* Human-readable NIA line (ttyUSB2 terminal) */
         uart_puts("NIA=");
         uart_puthex32(nia);
 
@@ -128,6 +159,9 @@ void main(void)
             uart_puthex32(CM_FAULT & 0x1F);
         }
         uart_puts("\r\n");
+
+        /* Machine-parseable call-home line for local_bridge.py */
+        uart_emit_callhome(nia, status);
 
         delay_loops(LOOPS_PER_SECOND);
     }

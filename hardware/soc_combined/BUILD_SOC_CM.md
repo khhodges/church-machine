@@ -151,27 +151,74 @@ Efinity will:
 
 ### Step 8 — Test
 
-**SoC UART greeting (ttyUSB2 — Sapphire SoC console):**
+#### 8a — Run the automated smoke-test
+
+After flashing, open a terminal and run the UART smoke-test:
 
 ```bash
-python3 -c "
-import serial
-s = serial.Serial('/dev/ttyUSB2', 115200, timeout=5)
-s.setRTS(False)
-s.setDTR(False)
-print(s.read(200).decode(errors='replace'))
-"
+python3 scripts/test_ti60_uart.py --port=/dev/ttyUSB2 --timeout=15
 ```
 
-Expected output (exact phrasing depends on firmware version):
+The script opens ttyUSB2 (the Sapphire SoC UART on FT4232H interface 2),
+waits up to 15 seconds, and checks five items:
 
-```
-CHURCH Ti60 SoC+CM v1.0
-CM boot_complete: 1
-CM NIA: 0x...
+| Check | What it looks for |
+|---|---|
+| GREETING | `CHURCH Ti60 SoC+CM` in the first output |
+| BOOT_COMPLETE | `CM boot_complete: 1` line |
+| NIA_LINES | At least one `NIA=0x...` line |
+| CALLHOME_JSON | At least one valid `CALLHOME:{...}` JSON line |
+| ACK (optional) | IDE device list contains `Ti60F225` (requires `--ide=URL`) |
+
+Exit code 0 = PASS; exit code 1 = FAIL (check per-check lines for diagnosis).
+
+To also verify IDE call-home registration:
+
+```bash
+python3 scripts/test_ti60_uart.py --port=/dev/ttyUSB2 --timeout=15 \
+    --ide=http://localhost:5000
 ```
 
-**CM debug UART (ttyUSB3 — Church Machine debug port):**
+> **No hardware?** Run with `--dry-run` to validate the parser logic against a
+> canned transcript without a serial port:
+> ```bash
+> python3 scripts/test_ti60_uart.py --dry-run
+> ```
+
+#### 8b — Start the call-home bridge (background)
+
+To forward call-home packets from the Ti60 to the Church Machine IDE, start
+the bridge in a separate terminal (or background it with `&`):
+
+```bash
+./hardware/soc_combined/bridge.sh --ide=http://localhost:5000
+```
+
+`bridge.sh` auto-detects ttyUSB2, validates that `pyserial` is installed, and
+launches `hardware/soc_combined/local_bridge.py`.  Once running, the Ti60
+will appear in the IDE Dashboard device list as **Ti60F225**.
+
+To specify the port explicitly:
+
+```bash
+./hardware/soc_combined/bridge.sh --port=/dev/ttyUSB3 --ide=http://localhost:5000
+```
+
+#### 8c — Verify LED pattern
+
+After ~3 seconds the LEDs should show:
+
+| LED | Expected | Meaning |
+|---|---|---|
+| LED0 | ON | SoC out of reset |
+| LED1 | ON | CM boot complete |
+| LED2 | OFF | No CM fault |
+| LED3 | Blinking | CM heartbeat |
+
+#### 8d — CM debug UART (ttyUSB3)
+
+The Church Machine's own debug UART is on ttyUSB3 (FT4232H interface 3).
+To inspect it manually:
 
 ```bash
 python3 -c "
@@ -183,19 +230,24 @@ print(s.read(400).decode(errors='replace'))
 "
 ```
 
-Expected output: NIA trace lines, call-home packets, and any fault codes emitted
-by the Church Machine during boot and free-run.  The exact format depends on the
-CM firmware version.  A silent ttyUSB3 after boot indicates no faults and a
-quiescent CM (heartbeat only visible on LED3).
+Expected output: NIA trace lines and any fault codes emitted by the Church
+Machine during boot and free-run.  A silent ttyUSB3 after boot is normal
+(heartbeat only visible on LED3).
 
-**LED pattern after ~3 seconds:**
+#### Troubleshooting — FT4232H port layout
 
-| LED | Expected | Meaning |
+The Ti60F225 devkit FT4232H exposes four USB-UART interfaces:
+
+| Device | FT4232H interface | Purpose |
 |---|---|---|
-| LED0 | ON | SoC out of reset |
-| LED1 | ON | CM boot complete |
-| LED2 | OFF | No CM fault |
-| LED3 | Blinking | CM heartbeat |
+| ttyUSB0 | Interface 0 | JTAG |
+| ttyUSB1 | Interface 1 | SPI / debug |
+| ttyUSB2 | Interface 2 | **Sapphire SoC UART** (bridge + smoke-test) |
+| ttyUSB3 | Interface 3 | Church Machine debug UART |
+
+If other USB-serial devices are present the numbers may be offset.  Use
+`ls /dev/ttyUSB*` to confirm, then pass `--port=/dev/ttyUSBN` explicitly to
+both `test_ti60_uart.py` and `bridge.sh`.
 
 ---
 
