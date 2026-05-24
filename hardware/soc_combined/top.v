@@ -186,14 +186,15 @@ module top (
         .led0        (cm_led0),
         .led1        (cm_led1),
         .led2        (cm_led2),
-        .led3        (cm_led3),
-
-        // Debug / status ports (read by APB3 bridge)
-        .dbg_nia          (cm_nia),
-        .dbg_fault        (cm_fault),
-        .dbg_fault_valid  (cm_fault_valid),
-        .dbg_boot_complete(cm_boot_complete)
+        .led3        (cm_led3)
     );
+
+    // Generated CM does not expose debug ports — derive status from LEDs.
+    // cm_led1 = boot_complete indicator in the CM RTL.
+    assign cm_boot_complete = cm_led1;
+    assign cm_fault_valid   = 1'b0;
+    assign cm_fault         = 5'b0;
+    assign cm_nia           = 32'b0;
 
     // ----------------------------------------------------------------
     // LED logic
