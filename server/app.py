@@ -1312,6 +1312,25 @@ def release_r12_index():
 
 _SIMULATOR_HTML_VERSION = "r20260501k"
 
+@app.route("/start")
+@app.route("/start/")
+@app.route("/starter")
+@app.route("/starter/")
+def starter_index():
+    filepath = os.path.join(SIMULATOR_DIR, "starter.html")
+    if os.path.isfile(filepath):
+        with open(filepath, 'r', encoding='utf-8') as f:
+            html = f.read()
+        # Inject <base> so relative script/CSS URLs resolve to /simulator/
+        html = html.replace('<head>', '<head><base href="/simulator/">', 1)
+        resp = make_response(html)
+        resp.headers['Content-Type'] = 'text/html; charset=utf-8'
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = '0'
+        return resp
+    return redirect("/simulator/", code=302)
+
 @app.route("/simulator")
 @app.route("/simulator/")
 def simulator_index():

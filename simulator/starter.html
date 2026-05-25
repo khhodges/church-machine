@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Church Machine — Start Here</title>
+    <meta name="description" content="Write your first capability-secured program. No setup. No download. Runs in your browser.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
+    <style>
+        /* ── Reset & Base ── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg:        #08080f;
+            --bg-panel:  #0e0e1c;
+            --bg-card:   #12121f;
+            --border:    #2a2a4a;
+            --gold:      #daa520;
+            --gold-dim:  #a07818;
+            --gold-glow: rgba(218,165,32,0.15);
+            --text:      #d0d0e8;
+            --text-dim:  #888;
+            --green:     #3a9e5a;
+            --red:       #c0392b;
+            --radius:    8px;
+        }
+        html, body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        /* ── Layout ── */
+        .s-wrap {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .s-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-panel);
+            flex-shrink: 0;
+        }
+        .s-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .s-logo-lambda {
+            font-family: Georgia, serif;
+            font-size: 1.7rem;
+            color: var(--gold);
+            line-height: 1;
+        }
+        .s-logo-text {
+            font-family: Georgia, serif;
+            font-size: 1rem;
+            color: var(--gold);
+            letter-spacing: 0.04em;
+        }
+        .s-logo-sub {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .s-full-link {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-decoration: none;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 0.3rem 0.8rem;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .s-full-link:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+        /* ── Welcome splash ── */
+        .s-welcome {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin: 1.5rem auto;
+            max-width: 680px;
+            width: calc(100% - 2rem);
+            text-align: center;
+        }
+        .s-welcome h1 {
+            font-family: Georgia, serif;
+            font-size: 1.5rem;
+            color: var(--gold);
+            margin-bottom: 0.75rem;
+        }
+        .s-welcome p {
+            color: var(--text-dim);
+            max-width: 520px;
+            margin: 0 auto 1.25rem;
+            font-size: 0.95rem;
+        }
+        .s-welcome.hidden { display: none; }
+        .s-start-btn {
+            background: var(--gold);
+            color: #08080f;
+            border: none;
+            border-radius: 6px;
+            padding: 0.65rem 2rem;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 0.03em;
+            transition: background 0.15s;
+        }
+        .s-start-btn:hover { background: #f0b830; }
+
+        /* ── Main two-column layout ── */
+        .s-main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 0;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        .s-main.hidden { display: none; }
+
+        /* ── Editor panel ── */
+        .s-editor-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            grid-row: 1 / 3;
+        }
+        .s-panel-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--text-dim);
+            padding: 0 0.25rem;
+        }
+        .s-editor {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: #c8d4f0;
+            font-family: 'Courier New', 'Fira Code', monospace;
+            font-size: 0.88rem;
+            line-height: 1.55;
+            padding: 1rem;
+            resize: none;
+            outline: none;
+            min-height: 340px;
+            tab-size: 4;
+            transition: border-color 0.15s;
+        }
+        .s-editor:focus { border-color: var(--gold-dim); }
+
+        .s-toolbar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .s-btn {
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            border-radius: 6px;
+            padding: 0.45rem 1rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+            font-weight: 500;
+        }
+        .s-btn:hover { background: #1a1a2e; border-color: var(--gold-dim); }
+        .s-btn:disabled { opacity: 0.4; cursor: default; }
+        .s-btn-primary {
+            background: var(--gold);
+            color: #08080f;
+            border-color: var(--gold);
+            font-weight: 700;
+        }
+        .s-btn-primary:hover { background: #f0b830; border-color: #f0b830; }
+        .s-btn-run {
+            background: #1a3a2a;
+            color: #5de28a;
+            border-color: #2a5a3a;
+        }
+        .s-btn-run:hover { background: #1e4a32; border-color: #3a7a4a; }
+
+        /* ── Right column ── */
+        .s-output-panel, .s-fault-panel, .s-status-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.9rem 1rem;
+        }
+        .s-output-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            min-height: 180px;
+        }
+        .s-output {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #9ab;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            max-height: 200px;
+            line-height: 1.5;
+        }
+        .s-output .out-gold { color: var(--gold); }
+        .s-output .out-green { color: #5de28a; }
+        .s-output .out-red { color: #f07060; }
+        .s-output .out-dim { color: var(--text-dim); }
+
+        /* ── Fault panel ── */
+        .s-fault-panel {
+            border-color: #5a2a2a;
+            background: #110808;
+        }
+        .s-fault-panel.hidden { display: none; }
+        .s-fault-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #f07060;
+            margin-bottom: 0.4rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .s-fault-body {
+            font-size: 0.83rem;
+            color: var(--text-dim);
+            line-height: 1.55;
+        }
+        .s-fault-body strong { color: var(--text); }
+        .s-fault-detail {
+            font-family: 'Courier New', monospace;
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 0.5rem;
+            padding: 0.4rem 0.6rem;
+            background: rgba(255,255,255,0.03);
+            border-radius: 4px;
+        }
+
+        /* ── Status / registers strip ── */
+        .s-status-panel { padding: 0.6rem 1rem; }
+        .s-status-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.25rem;
+            font-size: 0.78rem;
+            font-family: 'Courier New', monospace;
+        }
+        .s-reg { color: var(--text-dim); }
+        .s-reg span { color: var(--gold); font-weight: 600; }
+        .s-state-badge {
+            font-size: 0.72rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .badge-idle    { background: #1a1a2e; color: var(--text-dim); }
+        .badge-running { background: #1a3a2a; color: #5de28a; }
+        .badge-halted  { background: #2a2a0a; color: var(--gold); }
+        .badge-fault   { background: #3a0a0a; color: #f07060; }
+
+        /* ── Challenge banner ── */
+        .s-challenge-bar {
+            display: none;
+            background: linear-gradient(90deg, #1a1200, #1a1a00, #1a1200);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            padding: 0.55rem 1.25rem;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            align-items: center;
+            gap: 0.75rem;
+            flex-shrink: 0;
+        }
+        .s-challenge-bar.active { display: flex; }
+        .s-challenge-bar a { color: var(--gold); text-decoration: none; font-weight: 600; }
+        .s-challenge-bar a:hover { text-decoration: underline; }
+        .s-challenge-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--gold-dim);
+            font-weight: 700;
+        }
+
+        /* ── Footer ── */
+        .s-footer {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--border);
+            background: var(--bg-panel);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .s-footer a { color: var(--gold-dim); text-decoration: none; }
+        .s-footer a:hover { color: var(--gold); }
+        .s-footer-links { display: flex; gap: 1.25rem; }
+
+        /* ── Annotation tooltips on editor ── */
+        .s-annotation {
+            font-size: 0.75rem;
+            color: #556;
+            font-style: italic;
+            padding: 0.25rem 0.5rem 0.5rem;
+        }
+
+        /* ── Mobile ── */
+        @media (max-width: 700px) {
+            .s-main {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+                padding: 0.6rem;
+            }
+            .s-editor-panel { grid-row: auto; }
+            .s-editor { min-height: 220px; }
+            .s-header { padding: 0.6rem 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header class="s-header">
+    <div class="s-logo">
+        <span class="s-logo-lambda">λ</span>
+        <div>
+            <div class="s-logo-text">Church Machine</div>
+            <div class="s-logo-sub">Capability-Secured Computing</div>
+        </div>
+    </div>
+    <a class="s-full-link" href="/simulator/" title="Open the full Church Machine IDE">Full IDE →</a>
+</header>
+
+<!-- ── Challenge banner (shown when ?challenge=1) ── -->
+<div class="s-challenge-bar" id="challengeBar">
+    <span class="s-challenge-label">⚡ Challenge</span>
+    <span>Write the abstraction that matters. Best submission wins a Ti60 F225 FPGA board.</span>
+    <a href="/docs/developer-invitation" target="_blank">Learn more →</a>
+</div>
+
+<!-- ── Welcome splash ── -->
+<div class="s-welcome" id="welcomeCard">
+    <h1>Write your first secure program</h1>
+    <p>
+        The Church Machine is a computer where the hardware itself refuses
+        any instruction that breaks the security rules — no exceptions,
+        no overrides, no way around it. This is what it feels like to write
+        on a machine that cannot be hacked.
+    </p>
+    <p style="margin-bottom:1.5rem; font-size:0.85rem; color:#666;">
+        No download. No setup. Runs entirely in your browser.
+        Everything you build here runs unchanged on real silicon.
+    </p>
+    <button class="s-start-btn" onclick="startSession()">Boot the machine →</button>
+</div>
+
+<!-- ── Main IDE area ── -->
+<div class="s-main hidden" id="mainArea">
+
+    <!-- Left: editor -->
+    <div class="s-editor-panel">
+        <div class="s-panel-label">Your program</div>
+        <textarea class="s-editor" id="codeEditor" spellcheck="false">; Welcome to the Church Machine
+; ─────────────────────────────────────────────────────
+; Every line below runs inside a capability-secured lump.
+; The hardware checks every memory access before it happens.
+;
+; Let's add two numbers and see the result.
+
+    MOVI  DR0, #12      ; load the number 12
+    MOVI  DR1, #30      ; load the number 30
+    ADD   DR0, DR0, DR1 ; add them together → DR0 = 42
+    HALT                ; done — result is in DR0
+</textarea>
+        <div class="s-annotation">
+            ↑ Edit this freely. Click <strong>Run</strong> to see what happens.
+        </div>
+        <div class="s-toolbar">
+            <button class="s-btn s-btn-primary" id="btnBoot" onclick="starterBoot()">⟳ Boot</button>
+            <button class="s-btn s-btn-run"     id="btnRun"  onclick="starterRun()" disabled>▶ Run</button>
+            <button class="s-btn"               id="btnStep" onclick="starterStep()" disabled>› Step</button>
+            <button class="s-btn"               id="btnReset" onclick="starterReset()" disabled>↺ Reset</button>
+        </div>
+    </div>
+
+    <!-- Right: status + output + fault -->
+    <div class="s-status-panel" id="statusPanel">
+        <div class="s-status-row">
+            <span class="s-state-badge badge-idle" id="stateBadge">IDLE</span>
+            <span class="s-reg">PC <span id="regPC">—</span></span>
+            <span class="s-reg">DR0 <span id="regDR0">—</span></span>
+            <span class="s-reg">DR1 <span id="regDR1">—</span></span>
+            <span class="s-reg">DR2 <span id="regDR2">—</span></span>
+            <span class="s-reg">DR3 <span id="regDR3">—</span></span>
+            <span class="s-reg" id="haltedMsg" style="display:none; color: #daa520;">
+                ✓ Halted — program finished
+            </span>
+        </div>
+    </div>
+
+    <div class="s-output-panel" id="outputPanel">
+        <div class="s-panel-label">Output</div>
+        <div class="s-output" id="outputArea">
+            <span class="out-dim">— boot the machine to begin —</span>
+        </div>
+    </div>
+
+    <div class="s-fault-panel hidden" id="faultPanel">
+        <div class="s-fault-title">⚡ Capability Fault</div>
+        <div class="s-fault-body" id="faultBody"></div>
+        <div class="s-fault-detail" id="faultDetail"></div>
+    </div>
+
+</div>
+
+<!-- ── Footer ── -->
+<footer class="s-footer">
+    <span>The same security rules apply in this simulator as on real silicon.</span>
+    <div class="s-footer-links">
+        <a href="/simulator/">Full IDE</a>
+        <a href="/docs/quick-start" target="_blank">Getting started guide</a>
+        <a href="https://cloomc.org" target="_blank">cloomc.org</a>
+    </div>
+</footer>
+
+<!-- ── Simulator engine (same load order as full IDE) ── -->
+<script src="abstractions.js?v=20260511d"></script>
+<script src="system_abstractions.js?v=20260511a"></script>
+<script src="device_abstractions.js"></script>
+<script src="abstract_gt_manager.js"></script>
+<script src="simulator.js?v=20260521c"></script>
+<script src="assembler.js?v=20260521a"></script>
+<script src="cloomc_compiler.js?v=20260519c"></script>
+<script src="starter-app.js?v=20260525a"></script>
+
+</body>
+</html>
