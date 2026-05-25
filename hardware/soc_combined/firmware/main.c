@@ -49,14 +49,16 @@
 #endif
 
 /* ── Sapphire UART0 registers ─────────────────────────────────────────────── */
-#define UART_BASE       0xF0010000UL
+/* Base address from soc.h: SYSTEM_UART_0_IO_CTRL = 0xF8010000 */
+#define UART_BASE       0xF8010000UL
 #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
 #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
 #define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
 /* STATUS bits [23:16] = TX write-available count (Efinix Sapphire UART) */
 #define UART_TX_AVAIL   (((UART_STATUS) >> 16) & 0xFFu)
-/* UART_CLOCKDIV = clk_hz / baud - 1; for 115200 @ 25 MHz = 216 (0xD8) */
-#define UART_CLOCKDIV_115200  216u
+/* SYSTEM_CLINT_HZ = 50 MHz, 8x oversampling: divider = 50M/(8*115200)-1 = 53
+ * This matches the reset default (0x35); we still write it for clarity. */
+#define UART_CLOCKDIV_115200  53u
 
 /* ── Church Machine APB3 bridge registers ─────────────────────────────────── */
 #define CM_APB_BASE     0xF0040000UL
