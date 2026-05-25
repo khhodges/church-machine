@@ -647,54 +647,190 @@ patch. Each cycle takes under a minute.
 
 ## Getting Started: Efinix Ti60 F225
 
-The Ti60 follows the same write-compile-export-patch workflow, with a
-few differences in setup.
+The Ti60 is the full Church Machine — every feature, maximum memory,
+research-grade capability security. It is slightly larger and more
+expensive than the Tang Nano, but it is not harder to use. You still
+need only three things to get started.
 
-### Hardware differences
+### What you need
 
-- The Ti60 dev board does not have an on-board UART-to-USB converter.
-  You need an external UART adapter connected to pins H14 (TX) and
-  M14 (RX) at 115200 baud.
-- LEDs are active-HIGH (opposite polarity to the Tang Nano).
-- The toolchain requires the proprietary **Efinity IDE** from Efinix
-  for synthesis, place-and-route, and bitstream generation.
+| What | Where to get it |
+|------|-----------------|
+| **Efinix Ti60 F225 dev kit** | [Digi-Key](https://www.digikey.com/en/products/detail/efinix-inc/TI60F225C-DK/15672425) — ~£250 |
+| **USB-C cable** (data, not charge-only) | Any electronics shop |
+| **Google Chrome or Microsoft Edge** | Already on your computer |
 
-### Build and flash
+That is it. No compiler. No toolchain. No special software.
+The Church Machine IDE runs in your browser and does everything else.
 
-The Ti60 build has two stages: Amaranth-to-Verilog (runs in Replit),
-then synthesis through bitstream (runs in Efinity IDE on your machine).
+> **Note for parents and teachers:** The Ti60 is the research board.
+> If you are buying for a child or classroom just starting out,
+> the **Tang Nano 20K** (~£5) does exactly the same things and costs
+> much less. Start there. Upgrade to the Ti60 when you want the full
+> architecture — lambda calculus, garbage collection, and multi-threaded
+> secure contexts.
+
+---
+
+### Step 3 — Download the official bitstream from the IDE
+
+You do not need to build anything. The Church Machine IDE has already
+compiled and tested the Ti60 bitstream for you. Just download it.
+
+1. Open the **Church Machine IDE** in Chrome or Edge
+2. Click the **Builder** tab (the hard hat icon in the toolbar)
+3. Select **Ti60 F225** from the board menu
+4. Click **Download FPGA Package**
+
+A ZIP file downloads to your computer. It contains everything —
+the bitstream, the bridge script, and a `flash.sh` helper.
+
+---
+
+### Step 4 — Install the flasher (one time, takes two minutes)
+
+You need one small open-source tool to get the bitstream onto the board.
+It is free and takes about two minutes to install.
+
+**On Linux or ChromeOS (Linux container):**
 
 ```bash
-# Stage 1: Generate Verilog + resource report (in Replit)
-./build_ti60.sh build
-# Produces: build/church_ti60_f225.v, build/church_ti60_f225.il,
-#           build/ti60_resource_report.txt
+# Download the OSS CAD Suite (contains openFPGALoader)
+# https://github.com/YosysHQ/oss-cad-suite-build/releases
+# Download the latest release for your OS, then:
+tar -xf oss-cad-suite-*.tgz
+source oss-cad-suite/environment
 ```
 
-Then on your local machine:
+**On Windows:** Download OSS CAD Suite for Windows from the same page —
+it includes openFPGALoader as `openFPGALoader.exe`.
 
-1. Open the Efinity IDE and import `hardware/ti60_f225_project.xml`
-2. Add the generated `church_ti60_f225.v` as the top-level source
-3. Run the Efinity synthesis, placement, and routing flow
-4. Generate the bitstream (`.hex` or `.bit` file)
-5. Flash using the Efinity Programmer GUI
+You only do this once. After that, flashing is a single command.
 
-Note: unlike the Tang Nano, the Ti60 build cannot use open-source tools
-for synthesis and PnR. The `build_ti60.sh` script only prepares the
-Verilog — it does not produce a flashable bitstream.
+---
 
-### LED meanings (same signals, opposite polarity)
+### Step 5 — Plug in and flash
 
-| LED | Meaning | Ti60 (active-HIGH) | Tang Nano (active-LOW) |
-|-----|---------|--------------------|-----------------------|
-| Boot/Run | Boot complete | ON | ON |
-| Halt | Core halted | ON = halted | ON = halted |
-| Fault | Capability fault | ON = fault | ON = fault |
-| Heartbeat | Clock alive | Blinking | Blinking |
+1. Plug the Ti60 into your computer with the USB-C cable
+2. Check it appeared:
 
-After flashing, the patching workflow is identical: write code in the
-IDE, compile with Patch, export with Export Patch, patch with
-`patch_fpga.py` pointing at your UART adapter's serial port.
+```bash
+ls /dev/ttyUSB*
+# You should see /dev/ttyUSB0 and /dev/ttyUSB2
+```
+
+3. Extract the ZIP and flash:
+
+```bash
+mkdir -p ~/church-ti60 && cd ~/church-ti60
+unzip ~/Downloads/church-ti60-package.zip
+chmod +x flash.sh
+./flash.sh
+```
+
+`flash.sh` finds the board automatically and flashes it.
+The whole thing takes under a minute.
+
+**Permission error?** Run this once, then log out and back in:
+```bash
+sudo usermod -aG dialout $USER
+```
+
+---
+
+### Step 6 — Check the lights
+
+When the flash finishes, the Church Machine boots on its own.
+Look at the four LEDs on the board:
+
+| LED | What you should see | What it means |
+|-----|---------------------|---------------|
+| **LED 0** | Solid ON | Boot finished — Church Machine is running |
+| **LED 1** | Blinking | Core is ready and waiting for your code |
+| **LED 2** | OFF | No problems — all capability checks passing |
+| **LED 3** | Blinking | Clock running — the machine is alive |
+
+**One solid, two blinking, one off = success.**
+
+If LED 2 is on, something went wrong. Try flashing again with `./flash.sh`.
+If it still lights up, see the troubleshooting table below.
+
+---
+
+### Step 7 — Connect to the IDE and see your board
+
+Run the bridge script to connect the Ti60 to the Church Machine IDE:
+
+```bash
+cd ~/church-ti60
+./bridge.sh --ide=https://cloomc.org
+```
+
+Go back to the IDE, click **Devices** in the menu, and your Ti60
+will appear — labelled **Ti60 F225**, showing its firmware version
+and the number of times it has booted.
+
+You can give it a friendly name: click the name field and type
+something like "My Ti60" or "Lab Board 1".
+
+That is it. The Church Machine is running on real silicon and talking
+to the IDE. Now write some code, click **Deploy**, and watch it run.
+
+---
+
+### What success looks like
+
+```
+Board boots → prints greeting banner over USB
+           → sends CALLHOME packet to IDE
+           → LED 0 on, LED 1 blinking, LED 2 off, LED 3 blinking
+           → appears in IDE Devices panel
+           → ready for your first program
+```
+
+The smoke test that proves everything is working:
+
+```bash
+python3 ../../scripts/test_ti60_uart.py --port=/dev/ttyUSB2 --timeout=30
+```
+
+All four checks should say **PASS**:
+
+```
+[PASS]  GREETING: SoC boot greeting present
+[PASS]  BOOT_COMPLETE: CM boot_complete: 1 line seen
+[PASS]  NIA_LINES: At least one NIA=0x... line seen
+[PASS]  CALLHOME_JSON: At least one valid CALLHOME JSON line seen
+OVERALL: PASS
+```
+
+---
+
+### Troubleshooting
+
+| What you see | What to try |
+|--------------|-------------|
+| No LEDs at all | Check USB cable is data-capable (not charge-only) |
+| All LEDs on solid | Flash failed — run `./flash.sh` again |
+| LED 2 (Fault) on | Capability fault during boot — reflash the official bitstream |
+| Board not in Devices panel | Check `./bridge.sh` is running; verify IDE URL |
+| `/dev/ttyUSB*` not found | Try a different USB port; check `lsusb` for the board |
+| Permission denied | `sudo usermod -aG dialout $USER` then log out and back in |
+| Smoke test GREETING fails | Run test again — greeting re-prints every ~100 seconds |
+
+### LED meanings (same signals, opposite polarity to Tang Nano)
+
+| LED | Ti60 (lights when HIGH) | Tang Nano (lights when LOW) |
+|-----|-------------------------|-----------------------------|
+| Boot/Run | ON = boot complete | ON = boot complete |
+| Halt | Blinking = waiting for code | Blinking = waiting for code |
+| Fault | OFF = no fault | OFF = no fault |
+| Heartbeat | Blinking = clock alive | Blinking = clock alive |
+
+After flashing, writing and deploying code is identical to the Tang Nano —
+write in the IDE, click **Deploy**, and your abstraction runs on the Ti60
+under full capability enforcement. The code you tested in the simulator
+runs unchanged on silicon.
 
 ---
 
