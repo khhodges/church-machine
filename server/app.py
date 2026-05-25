@@ -1311,12 +1311,22 @@ def release_r12_index():
     return html
 
 _SIMULATOR_HTML_VERSION = "r20260501k"
+_STARTER_HTML_VERSION   = "r20260525b"
 
 @app.route("/start")
 @app.route("/start/")
 @app.route("/starter")
 @app.route("/starter/")
 def starter_index():
+    # Redirect to a versioned URL the proxy has never cached.
+    qs = request.query_string.decode()
+    dest = f"/start/~/{_STARTER_HTML_VERSION}"
+    if qs:
+        dest += "?" + qs
+    return redirect(dest, code=302)
+
+@app.route("/start/~/<version>")
+def starter_versioned(version):
     filepath = os.path.join(SIMULATOR_DIR, "starter.html")
     if os.path.isfile(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
