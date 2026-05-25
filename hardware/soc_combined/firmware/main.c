@@ -53,7 +53,7 @@
 #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
 #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
 #define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
-#define UART_TX_EMPTY   (1u << 0)   /* bit 0 of STATUS: TX FIFO has space */
+#define UART_TX_EMPTY   (1u << 16)  /* bit 16 of STATUS: TX write-available (SpinalHDL VexRiscv UART) */
 /* UART_CLOCKDIV = clk_hz / baud - 1; for 115200 @ 25 MHz = 216 (0xD8) */
 #define UART_CLOCKDIV_115200  216u
 
