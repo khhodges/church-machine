@@ -23,23 +23,31 @@ See **APB3 register map** below.
 
 **EFX_MAP on Efinix Titanium completely ignores `$readmemb`.**
 It is treated as simulation-only regardless of where the `.bin` files are placed.
-
-The `$readmemb` calls in `sapphire.v` do NOT embed firmware into the bitstream.
 Copying symbol files to `work_syn/` does NOT help.
 
-The correct flow is:
+The correct flow:
 
-1. Build firmware → generates four byte-lane `.bin` symbol files.
-2. **Run `scripts/patch_sapphire_init.py`** to replace the `$readmemb` calls in
-   `sapphire.v` with explicit inline `initial` block assignments.
-3. Set `optimize-zero-init-rom = 0` in `church_soc_cm.xml` (if EFX_MAP eliminates
-   a sparse BRAM it believes is zero, the firmware never executes).
-4. Synthesise → 64 EFX_RAM10 BRAM instances for system_ramA appear in `map.v`.
-5. **Run `scripts/patch_mapv_init.py`** to inject firmware bytes directly into the
-   `INIT_` defparam statements of those 64 instances.
-6. Place & route on the patched `map.v` → bitstream → flash.
+1. Build firmware → four byte-lane `.bin` symbol files.
+2. **Run `scripts/patch_sapphire_init.py`** — replaces `$readmemb` (or existing
+   inline assignments if already patched) with explicit `initial` block assignments.
+3. Set `optimize-zero-init-rom = 0` in `church_soc_cm.xml`.
+4. Synthesise → EFX_MAP creates 64 EFX_RAM10 instances for system_ramA **with
+   `INIT_` parameters already populated** from the inline assignments.
+5. Place & route.
+6. **Run `efx_pgm --project-xml church_soc_cm.xml`** — generates the SPI flash hex.
+7. Flash with `openFPGALoader`.
 
-Steps 2 and 5 are performed by scripts in `scripts/`. See **Steps** below.
+**There is no separate `patch_mapv_init.py` step.** The inline initial block
+approach means EFX_MAP propagates firmware bytes to the EFX_RAM10 `INIT_` params
+during synthesis.  Confirm with:
+```bash
+grep "INIT_0" outflow/church_soc_cm.map.v | grep "ram_symbol" | head -4
+# All four lanes must show non-zero hex values
+```
+
+**`patch_sapphire_init.py` must be re-run every time the firmware changes**
+before re-synthesising.  The script handles both the virgin case (`$readmemb`
+present) and the already-patched case (inline assignments already there).
 
 ---
 
@@ -49,9 +57,9 @@ Steps 2 and 5 are performed by scripts in `scripts/`. See **Steps** below.
 |---|---|
 | Efinity 2025.2 | Installed at `~/efinity/2025.2` |
 | Efinity RISC-V IDE 2025.2 | Toolchain at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin` |
-| Sapphire SoC IP | Ships with Efinity — path given in Step 1 |
+| Sapphire SoC IP | Ships with Efinity — see Step 1 |
 | Python 3 + Amaranth | Required to generate CM RTL in Step 2 |
-| `pyserial` | `pip install pyserial` — for the test step |
+| `pyserial` | `pip install pyserial` — for the smoke test |
 | `openFPGALoader` | `~/oss-cad-suite/bin/openFPGALoader` — for flashing |
 
 ---
@@ -68,10 +76,7 @@ cp ~/efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire_
    hardware/soc_combined/
 ```
 
-> **If the path does not exist**, search for the file:
-> ```bash
-> find ~/efinity -name "sapphire.v" 2>/dev/null
-> ```
+> If the path does not exist: `find ~/efinity -name "sapphire.v" 2>/dev/null`
 
 ---
 
@@ -90,61 +95,52 @@ cp build/church_ti60_f225.v hardware/soc_combined/
 make -C hardware/soc_combined/firmware
 ```
 
-This produces:
-- `firmware/firmware.bin` — raw binary
-- `firmware/firmware.hex` — plain hex
-- Four byte-lane symbol files in `hardware/soc_combined/`:
-  ```
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
-  ```
-
-Verify:
-```bash
-ls -lh hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin
-# Expect four files of ~1.2 MB each (131 072 words × 9 chars/line)
+Produces `firmware/firmware.bin` and four byte-lane symbol files in
+`hardware/soc_combined/`:
+```
+EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol{0,1,2,3}.bin
 ```
 
 ---
 
-### Step 4 — Patch sapphire.v (replace $readmemb with inline initial block)
-
-EFX_MAP ignores `$readmemb` entirely. Replace each call with explicit Verilog
-initial assignments so EFX_MAP creates the BRAM instances:
+### Step 4 — Patch sapphire.v (MUST re-run on every firmware change)
 
 ```bash
-cd hardware/soc_combined
-python3 ../../scripts/patch_sapphire_init.py \
-  sapphire.v \
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
-  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+cd ~/church-machine   # repo root
+python3 scripts/patch_sapphire_init.py \
+  hardware/soc_combined/sapphire.v \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
 ```
 
-**Re-run this step every time the firmware is rebuilt** before re-synthesising.
+Expected output:
+```
+symbol0: 131072 entries, NNN non-zero, [0]=0xXX
+  -> replaced $readmemb          ← first run
+  OR
+  -> updated N inline block(s)   ← subsequent runs
+...
+sapphire.v OK (+N chars, M total)
+```
 
-> **Why?** EFX_MAP's `optimize-zero-init-rom` option eliminates a BRAM that
-> appears zero-initialised. Replacing `$readmemb` with inline assignments
-> makes EFX_MAP produce the 64 EFX_RAM10 instances needed for system_ramA
-> (even though it still does not propagate the initial values to `INIT_` params).
+If you see `ERROR: no pattern found for ram_symbol0`, the sapphire.v is a
+different version of the Efinix IP — grep for `ram_symbol` to inspect it.
 
 ---
 
 ### Step 5 — Ensure optimize-zero-init-rom is off
 
-In `hardware/soc_combined/church_soc_cm.xml`, the synthesis section must have:
-
-```xml
-<efx:param name="optimize-zero-init-rom" value="0" value_type="e_option"/>
-```
-
-Set it if needed:
 ```bash
 grep "optimize-zero-init-rom" hardware/soc_combined/church_soc_cm.xml
-# If value="1", change to value="0"
+# Must show value="0"
+```
+
+If it shows `value="1"`:
+```bash
+sed -i 's/optimize-zero-init-rom" value="1"/optimize-zero-init-rom" value="0"/' \
+  hardware/soc_combined/church_soc_cm.xml
 ```
 
 ---
@@ -155,44 +151,20 @@ grep "optimize-zero-init-rom" hardware/soc_combined/church_soc_cm.xml
 bash hardware/soc_combined/work_syn/run_efx_map.sh 2>&1 | tail -5
 ```
 
-After synthesis, verify the 64 system_ramA BRAM instances are present:
-
+Verify all 4 BRAM lanes have non-zero INIT_0 (firmware confirmed embedded):
 ```bash
-grep "EFX_RAM10" hardware/soc_combined/outflow/church_soc_cm.map.v \
-  | grep -v "u_cm" | grep -c "system_ram\|ram_sym"
-# Must be > 0 (expect ~64)
+for sym in 0 1 2 3; do
+  LINENUM=$(grep -n "EFX_RAM10" hardware/soc_combined/outflow/church_soc_cm.map.v \
+    | grep "ram_symbol${sym}__D\\\$g1" | head -1 | cut -d: -f1)
+  echo "symbol${sym}: $(sed -n "${LINENUM},$((LINENUM+3))p" \
+    hardware/soc_combined/outflow/church_soc_cm.map.v | grep INIT_0)"
+done
+# All four must show non-zero hex strings
 ```
 
 ---
 
-### Step 7 — Patch map.v with firmware INIT_ values
-
-EFX_MAP creates the system_ramA EFX_RAM10 instances but leaves their `INIT_`
-parameters at zero. Inject the firmware bytes directly:
-
-```bash
-python3 scripts/patch_mapv_init.py \
-  hardware/soc_combined/outflow/church_soc_cm.map.v \
-  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
-  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
-  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
-  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
-```
-
-Verify non-zero INIT_ values now exist for system_ramA:
-```bash
-grep -A 50 "EFX_RAM10.*ram_sym" \
-  hardware/soc_combined/outflow/church_soc_cm.map.v | \
-  grep "INIT_" | grep -v "= 256'h0000" | head -5
-# Must show non-zero hex values
-```
-
-> **Note:** `scripts/patch_mapv_init.py` is the next script to be written.
-> See **Troubleshooting** for current status.
-
----
-
-### Step 8 — Place & Route
+### Step 7 — Place & Route
 
 ```bash
 bash hardware/soc_combined/work_pnr/run_efx_pnr.sh 2>&1 | tail -5
@@ -200,35 +172,58 @@ bash hardware/soc_combined/work_pnr/run_efx_pnr.sh 2>&1 | tail -5
 
 ---
 
-### Step 9 — Generate bitstream
+### Step 8 — Generate the SPI flash hex (efx_pgm)
 
 ```bash
-~/efinity/2025.2/bin/efx_pgm \
-  --project church_soc_cm \
-  --device Ti60F225 \
-  --family Titanium \
-  --active \
-  --bit_width 1 \
-  --spi_low_power_mode on \
-  --io_weak_pullup on \
-  --oscillator_clock_divider DIV8 \
-  --enable_roms smart \
-  2>&1 | tail -5
-
-ls -lh hardware/soc_combined/outflow/church_soc_cm.hex
+cd hardware/soc_combined
+~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml 2>&1 | tail -5
+ls -lh outflow/church_soc_cm.hex outflow/church_soc_cm.bit
+# Timestamps must be NEWER than the P&R run above
 ```
+
+> **Note:** The flag is `--project-xml`, NOT `--project`.
+> There is no `work_pgm/run_efx_pgm.sh` in this project — call efx_pgm directly.
+> P&R does **not** generate the hex; efx_pgm does.
 
 ---
 
-### Step 10 — Flash and test
+### Step 9 — Flash and test
 
 ```bash
+cd ~/church-machine
 sudo ~/oss-cad-suite/bin/openFPGALoader \
   -b titanium_ti60_f225_jtag \
   -f hardware/soc_combined/outflow/church_soc_cm.hex
 
 sleep 5 && python3 scripts/test_ti60_uart.py \
   --port=/dev/ttyUSB2 --timeout=30 --verbose
+```
+
+---
+
+## Rebuild-from-firmware-change checklist
+
+When only the firmware changes (no RTL changes), you can skip Steps 1–2:
+
+```bash
+cd ~/church-machine
+make -C hardware/soc_combined/firmware                    # Step 3
+python3 scripts/patch_sapphire_init.py \                  # Step 4 — MUST NOT SKIP
+  hardware/soc_combined/sapphire.v \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+bash hardware/soc_combined/work_syn/run_efx_map.sh        # Step 6  (~10-15 min)
+bash hardware/soc_combined/work_pnr/run_efx_pnr.sh        # Step 7  (~5-10 min)
+cd hardware/soc_combined && \
+  ~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml  # Step 8  (~2 min)
+cd ~/church-machine && \
+  sudo ~/oss-cad-suite/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag \
+    -f hardware/soc_combined/outflow/church_soc_cm.hex     # Step 9a
+python3 scripts/test_ti60_uart.py \
+  --port=/dev/ttyUSB2 --timeout=30 --verbose               # Step 9b
 ```
 
 ---
@@ -244,16 +239,22 @@ sleep 5 && python3 scripts/test_ti60_uart.py \
 
 ---
 
-## Firmware addresses (from BSP `soc.h`)
+## Firmware addresses
 
 | Symbol | Value | Used by |
 |---|---|---|
-| `SYSTEM_UART_0_IO_CTRL` | `0xF8010000` | `firmware/main.c` `UART_BASE` |
+| `UART_BASE` | `0xF8010000` | `firmware/main.c` |
+| `UART_DATA` | `0xF8010000` | write = TX, read = RX |
+| `UART_STATUS` | `0xF8010004` | bits[23:16] = TX avail (Sapphire UART) |
+| `UART_CLOCKDIV` | `0xF8010008` | 25 MHz / (8 × (div+1)) = baud rate |
 | APB slave 0 (CM bridge) | `0xF0040000` | `firmware/main.c` `CM_APB_BASE` |
 | Boot ROM base | `0xF9000000` | CPU reset vector, `link.ld` |
 
-> `sapphire_define.vh` does **not** contain address constants — addresses come
-> from the BSP `soc.h`, not from any Verilog header.
+UART baud rate: `CLOCKDIV = 26` → 25 000 000 / (8 × 27) = 115 741 baud (≈115200).
+
+**uart_putc design:** Uses unconditional write + 3000-NOP inter-character delay
+(~120 µs @ 25 MHz) rather than polling STATUS. This avoids infinite spins if
+the STATUS register bit layout differs between Sapphire IP versions.
 
 ---
 
@@ -272,71 +273,72 @@ The SoC accesses the CM bridge at `0xF0040000`.
 
 ---
 
-## Per-board UID
-
-```bash
-# Board #1 (default)
-make -C hardware/soc_combined/firmware
-
-# Board #2
-make -C hardware/soc_combined/firmware \
-    CFLAGS="-DBOARD_UID_HI=0xC0FFEE01 -DBOARD_UID_LO=0x00000002"
-```
-
----
-
 ## Troubleshooting
 
-**UART silent — 0 bytes received**
+### UART silent — 0 bytes on ttyUSB2
 
-Most likely cause: firmware is not in the bitstream. Check in order:
+Check in order:
 
-1. Did Step 4 (patch_sapphire_init.py) run successfully?
+1. **Was the hex regenerated after the latest synthesis?**
+   ```bash
+   ls -lh hardware/soc_combined/outflow/church_soc_cm.hex
+   # Timestamp must be AFTER the most recent P&R run
+   # If stale: cd hardware/soc_combined && ~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml
+   ```
+
+2. **Did patch_sapphire_init.py run before synthesis?**
    ```bash
    grep -c "ram_symbol0\[" hardware/soc_combined/sapphire.v
-   # Must be >> 2 (hundreds of assignments, not just 2 behavioural accesses)
+   # Must be >> 2 (hundreds of assignments)
    ```
 
-2. Is optimize-zero-init-rom set to 0?
+3. **Is optimize-zero-init-rom = 0?**
    ```bash
    grep "optimize-zero-init-rom" hardware/soc_combined/church_soc_cm.xml
-   # Must show value="0"
    ```
 
-3. After synthesis, do the 64 system_ramA EFX_RAM10 instances exist?
+4. **Do all 4 BRAM lanes have non-zero INIT_0?**
    ```bash
-   grep "EFX_RAM10" hardware/soc_combined/outflow/church_soc_cm.map.v \
-     | grep -v "u_cm" | grep -c "system_ram\|ram_sym"
-   # Must be > 0
+   for sym in 0 1 2 3; do
+     LINENUM=$(grep -n "EFX_RAM10" hardware/soc_combined/outflow/church_soc_cm.map.v \
+       | grep "ram_symbol${sym}__D\\\$g1" | head -1 | cut -d: -f1)
+     echo "sym${sym}: $(sed -n "${LINENUM},$((LINENUM+3))p" \
+       hardware/soc_combined/outflow/church_soc_cm.map.v | grep INIT_0)"
+   done
+   # All four must be non-zero
    ```
 
-4. Do those instances have non-zero INIT_ values?
-   ```bash
-   grep -A 50 "EFX_RAM10.*ram_sym" \
-     hardware/soc_combined/outflow/church_soc_cm.map.v | \
-     grep "INIT_" | grep -v "= 256'h0000" | head -3
-   # Must show non-zero hex — if empty, Step 7 (patch_mapv_init.py) is needed
-   ```
+5. **Is ttyUSB2 vs ttyUSB3 correct?**  SoC UART → ttyUSB2.  CM UART → ttyUSB3.
+   Both ports should show 0x00 glitch bytes on open; ttyUSB2 should have actual
+   ASCII text once the SoC firmware boots.
 
-**`work_pgm/run_efx_pgm.sh` not found**
-→ Use `~/efinity/2025.2/bin/efx_pgm` directly (see Step 9 above).
+### `efx_pgm` fails with "unrecognised option"
 
-**`openFPGALoader` not found**
-→ Use full path: `sudo ~/oss-cad-suite/bin/openFPGALoader`
+Use `--project-xml`, not `--project`:
+```bash
+~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml
+```
 
-**LED1 never lights (CM boot_complete stays 0)**
-→ CM RTL issue. Confirm `church_ti60_f225.v` was generated without errors.
+### patch_sapphire_init.py prints `ERROR: no pattern found`
 
-**LED2 lights immediately (CM fault at startup)**
-→ Boot ROM or namespace issue. Re-generate the Verilog.
+The sapphire.v does not contain either `$readmemb` or the expected inline
+assignments for `ram_symbol0`. This means the file is a different version of the
+Efinix Sapphire IP. Inspect it:
+```bash
+grep -n "ram_symbol\|readmemb" hardware/soc_combined/sapphire.v | head -20
+```
+
+### LED0 never lights after flash
+
+The SoC is stuck in reset. Check that `io_asyncReset` in `top.v` is tied to
+`1'b0` (not floating) and that the 25 MHz clock is reaching `CLKMUX_T ROUTE0`.
 
 ---
 
 ## Resource utilisation
 
-The Ti60F225 has ~60K logic elements and ~220 KB BRAM (176 EFX_RAM10 blocks).
-The combined SoC+CM design uses ~180 EFX_RAM10 blocks (CPU caches, register file,
-CM token store, system_ramA). Check utilisation after synthesis:
+The Ti60F225 has ~60 K logic elements and ~220 KB BRAM (176 EFX_RAM10 blocks).
+The combined SoC+CM design uses ~180 EFX_RAM10 blocks. Check after synthesis:
 
 ```bash
 python scripts/check_ti60_utilisation.py --missing-ok
