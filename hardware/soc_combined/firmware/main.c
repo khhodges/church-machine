@@ -52,7 +52,10 @@
 #define UART_BASE       0xF0010000UL
 #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
 #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
+#define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
 #define UART_TX_EMPTY   (1u << 0)   /* bit 0 of STATUS: TX FIFO has space */
+/* UART_CLOCKDIV = clk_hz / baud - 1; for 115200 @ 25 MHz = 216 (0xD8) */
+#define UART_CLOCKDIV_115200  216u
 
 /* ── Church Machine APB3 bridge registers ─────────────────────────────────── */
 #define CM_APB_BASE     0xF0040000UL
@@ -170,22 +173,32 @@ static void uart_emit_callhome(uint32_t nia, uint32_t status,
 void main(void)
 {
     /*
-     * Step 1 — Write the compile-time board UID into the APB3 bridge.
-     * Write LO before HI; order does not matter to the hardware but
-     * following a consistent convention aids readability.
+     * Step 1 — Set UART baud rate.
+     * sapphire.v resets the clockDivider to 0x35 (≈ 463 kbaud).
+     * Override it to 216 (= 25 MHz / 115200 - 1) before any UART use.
+     */
+    UART_CLOCKDIV = UART_CLOCKDIV_115200;
+
+    /*
+     * Step 2 — Greeting (uses compile-time UID constants so APB3 is not
+     * touched yet; this line appears even if the APB3 address is wrong).
+     */
+    uart_puts("CHURCH Ti60 SoC+CM v1.1\r\n");
+    uart_puts("UID=");
+    uart_puthex64_raw(BOARD_UID_HI, BOARD_UID_LO);
+    uart_puts("\r\n");
+
+    /*
+     * Step 3 — Write compile-time board UID into the APB3 bridge.
+     * Done after the greeting so the greeting is visible even if the
+     * APB3 peripheral address causes a RISC-V bus exception.
      */
     CM_UID_LO = BOARD_UID_LO;
     CM_UID_HI = BOARD_UID_HI;
 
-    /* Read back to confirm (also holds the values for later use) */
+    /* Read back for subsequent CALLHOME packets */
     uint32_t uid_lo = CM_UID_LO;
     uint32_t uid_hi = CM_UID_HI;
-
-    /* Greeting */
-    uart_puts("CHURCH Ti60 SoC+CM v1.1\r\n");
-    uart_puts("UID=");
-    uart_puthex64_raw(uid_hi, uid_lo);
-    uart_puts("\r\n");
 
     /* Ensure CM push_button starts released */
     CM_CTRL = CM_CTRL_RELEASED;
