@@ -73,12 +73,6 @@ function _updateRegisters() {
     _el('regDR1').textContent = sim.dr ? hex(sim.dr[1]) : '—';
     _el('regDR2').textContent = sim.dr ? hex(sim.dr[2]) : '—';
     _el('regDR3').textContent = sim.dr ? hex(sim.dr[3]) : '—';
-    var cr6El  = _el('capCR6');
-    var cr14El = _el('capCR14');
-    if (cr6El && cr14El && sim.cr) {
-        cr6El.textContent  = sim.cr[6]  ? hex(sim.cr[6].word0)  : '—';
-        cr14El.textContent = sim.cr[14] ? hex(sim.cr[14].word0) : '—';
-    }
 }
 
 function starterNext() {
