@@ -293,6 +293,12 @@
     background: rgba(218,165,32,0.12) !important;
     border-color: #daa520 !important;
 }
+.btn-ti60-connect.ti60-connect-active {
+    background: rgba(218,165,32,0.18) !important;
+    border-color: #daa520 !important;
+    box-shadow: 0 0 0 2px rgba(218,165,32,0.45);
+    color: #f0c040 !important;
+}
 
 .view {
     display: none;

@@ -9709,6 +9709,8 @@ function setSelectedBoard(board) {
     if (settingSel) settingSel.value = board;
     const lbl = document.getElementById('hwLedBoardLabel');
     if (lbl) lbl.textContent = getBoardShortLabel(board);
+    const ti60Btn = document.getElementById('toolbarTi60ConnectBtn');
+    if (ti60Btn) ti60Btn.classList.toggle('ti60-connect-active', board === 'ti60-f225');
     if (typeof window.lumpEditorRender === 'function') window.lumpEditorRender();
     if (typeof window.lumpEditorRenderResidentPanel === 'function') window.lumpEditorRenderResidentPanel();
 }
@@ -9857,6 +9859,8 @@ function initHardwareBuildPanel() {
     if (sel) sel.value = getSelectedBoard();
     const lbl = document.getElementById('hwLedBoardLabel');
     if (lbl) lbl.textContent = getBoardShortLabel(getSelectedBoard());
+    const ti60Btn = document.getElementById('toolbarTi60ConnectBtn');
+    if (ti60Btn) ti60Btn.classList.toggle('ti60-connect-active', getSelectedBoard() === 'ti60-f225');
     updateHardwarePanelLabel();
 }
 
