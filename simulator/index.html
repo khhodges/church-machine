@@ -124,11 +124,10 @@
                                 <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math<kbd class="ham-kbd">C+M</kbd></button>
                                 <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace<kbd class="ham-kbd">C+N</kbd></button>
                                 <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Hello Mum</button>
-                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'test','Open Simulator')">Test</div>
-                                <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Simulator<kbd class="ham-kbd">C+D</kbd></button>
+                                <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Context Registers<kbd class="ham-kbd">C+D</kbd></button>
                                 <button class="ham-item" id="hamItem-dashboard-dr" onclick="switchView('dashboard');switchDashTab('dr');closeHamburger()">Data Registers</button>
                                 <button class="ham-item" id="hamItem-dashboard-gatelog" onclick="switchView('dashboard');switchDashTab('gatelog');closeHamburger()">Gate Log</button>
                                 <button class="ham-item" id="hamItem-dashboard-state" onclick="switchView('dashboard');switchDashTab('state');closeHamburger()">Machine State</button>
@@ -156,6 +155,7 @@
                                 <button class="ham-item" id="hamItem-hw-wukong" onclick="setSelectedBoard('wukong-xc7a100t');switchView('builder');closeHamburger()">Wukong Artix-7 XC7A100T</button>
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K</button>
+                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
                             </div>
                             <div class="ham-group">
                                 <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'configure','Open Devices')">Configure</div>
