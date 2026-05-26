@@ -687,16 +687,24 @@ function init() {
     const hashParams = {};
     if (hashQuery) hashQuery.split('&').forEach(p => { const [k,v] = p.split('='); hashParams[k] = v; });
     let startView = views.includes(hashView) ? hashView : null;
-    // church_defaultView always wins over URL hash / lastView when set.
-    // Arms window._startupDefaultView so switchView() blocks the boot
-    // animation's intermediate redirects (dashboard, pipeline) until boot
-    // completes and slowBoot() clears the guard. Search: _startupDefaultView
+    // church_defaultView wins only when there is no explicit URL hash.
+    // An explicit hash (e.g. from a landing-page link) always takes priority.
+    // _startupDefaultView is set in both cases so the boot-animation guard in
+    // switchView() blocks intermediate redirects (dashboard, pipeline) until
+    // slowBoot() clears it. Search: _startupDefaultView
     window._startupDefaultView = null;
     try {
         const _def = localStorage.getItem('church_defaultView');
         if (_def && views.includes(_def)) {
-            window._startupDefaultView = _def;
-            startView = _def;
+            if (!startView) {
+                // No URL hash — honour the stored default view.
+                window._startupDefaultView = _def;
+                startView = _def;
+            } else {
+                // URL hash present — the link wins, but still arm the guard
+                // so boot animation cannot override the hash-chosen view.
+                window._startupDefaultView = startView;
+            }
         }
     } catch(e) {}
     if (!startView) {
