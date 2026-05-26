@@ -76,37 +76,40 @@ function _updateRegisters() {
     _el('regDR3').textContent = sim.dr ? hex(sim.dr[3]) : '—';
 }
 
+function _switchLesson(fromId, toId, label, outputHtml, nextPhase, disableNext) {
+    _el(fromId).classList.add('hidden');
+    _el(toId).classList.remove('hidden');
+    _el('lessonLabel').textContent = '\u2014 ' + label;
+    if (disableNext) {
+        _el('btnNext').disabled = true;
+    }
+    var caps = _el('capsSection');
+    caps.classList.remove('hidden');
+    caps.classList.add('active');
+    _el('statusPanel').classList.add('s-panel-lit');
+    _el('outputPanel').classList.add('s-panel-lit');
+    if (sim) {
+        sim.reset();
+        _runBootSequence();
+        sim._programLoaded = false;
+    }
+    _hideHexListing();
+    _el('haltedMsg').style.display = 'none';
+    _setBadge('IDLE');
+    _updateRegisters();
+    _lessonPhase = nextPhase;
+    _setOutput(outputHtml);
+}
+
 function starterNext() {
     if (_lessonPhase === 1) {
-        // Advance to Lesson 2: reveal abstraction + capabilities { (none) } block
-        _el('capsInline').classList.remove('hidden');
-        var caps = _el('capsSection');
-        caps.classList.remove('hidden');
-        caps.classList.add('active');
-        _el('statusPanel').classList.add('s-panel-lit');
-        _el('outputPanel').classList.add('s-panel-lit');
-        _el('lessonLabel').textContent = '\u2014 Lesson 2 of 3';
-        _el('btnNext').textContent = 'Next \u2192';
-        _lessonPhase = 2;
-        _setOutput('<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>');
-        _updateRegisters();
+        _switchLesson('lesson1Code', 'lesson2Code', 'Lesson 2 of 3',
+            '<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>',
+            2, false);
     } else if (_lessonPhase === 2) {
-        // Advance to Lesson 3: switch to myScratchPad code
-        _el('lesson1Code').classList.add('hidden');
-        _el('lesson2Code').classList.remove('hidden');
-        _el('lessonLabel').textContent = '\u2014 Lesson 3 of 3';
-        _el('btnNext').disabled = true;
-        if (sim) {
-            sim.reset();
-            _runBootSequence();
-            sim._programLoaded = false;
-        }
-        _hideHexListing();
-        _el('haltedMsg').style.display = 'none';
-        _setBadge('IDLE');
-        _updateRegisters();
-        _lessonPhase = 3;
-        _setOutput('<span class="out-dim">The programmer adds new capability defined objects using Pet Names. <strong>myScratchPad RW</strong> grants this abstraction read/write access to a private memory region. The <strong>LOAD</strong> instruction fetches that capability from the c-list ready for use.</span>');
+        _switchLesson('lesson2Code', 'lesson3Code', 'Lesson 3 of 3',
+            '<span class="out-dim">The programmer adds new capability defined objects using Pet Names. <strong>myScratchPad RW</strong> grants this abstraction read/write access to a private memory region. The <strong>LOAD</strong> instruction fetches that capability from the c-list ready for use.</span>',
+            3, true);
     }
 }
 
@@ -233,10 +236,21 @@ function starterStep() {
     // If not yet loaded, assemble and load first
     if (sim.pc === 0 && !sim._programLoaded) {
         var src;
-        if (_lessonPhase >= 3) {
-            // Lesson 2 — strip caps block and LOAD (display-only, pet name not wired in sim)
+        if (_lessonPhase === 1) {
+            // Lesson 1 — plain traditional procedural A+B
             src =
-                '; The programmer adds new capability defined objects using Pet Names\n' +
+                '; Simple A + B program\n' +
+                '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
+                '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
+                '\n' +
+                '    IADD  DR1, DR1, #12  ; A = 12\n' +
+                '    IADD  DR2, DR2, #30  ; B = 30\n' +
+                '    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
+                '    HALT                 ; done \u2014 result is in DR1\n';
+        } else if (_lessonPhase === 2) {
+            // Lesson 2 — caps block is display-only, compile clean IADD/HALT
+            src =
+                '; The Church Machine adds hardened symbolic addressing\n' +
                 '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
                 '; Simple A + B programs are unchanged\n' +
                 '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
@@ -246,11 +260,10 @@ function starterStep() {
                 '    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
                 '    HALT                 ; done \u2014 result is in DR1\n';
         } else {
-            // Lesson 1
+            // Lesson 3 — caps block + LOAD are display-only, compile clean IADD/HALT
             src =
-                '; The Church Machine adds hardened symbolic addressing\n' +
+                '; The programmer adds new capability defined objects using Pet Names\n' +
                 '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
-                '; Simple A + B programs are unchanged\n' +
                 '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
                 '\n' +
                 '    IADD  DR1, DR1, #12  ; A = 12\n' +
