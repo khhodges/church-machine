@@ -193,9 +193,7 @@ function starterBoot() {
         _enableControls(true);
         _setBadge('HALTED');
         _updateRegisters();
-        _setOutput('<span class="out-green">✓ Church Machine started</span>\n'
-            + '<span class="out-dim">Capability registers initialised. Namespace loaded.\n'
-            + 'Press › Step to walk through each instruction.</span>');
+        _setOutput('');
     } catch (e) {
         _setBadge('FAULT');
         _setOutput('<span class="out-red">Boot failed: ' + e.message + '</span>');
