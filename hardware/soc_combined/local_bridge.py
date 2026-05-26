@@ -22,6 +22,9 @@ Flags:
                    Enables call-home POSTs to /api/device/call-home.
     --reconnect    Automatically reconnect on serial errors (default: on)
     --no-reconnect Disable automatic reconnect.
+    --report-launch  After the first CALLHOME with boot_ok=1, PUT
+                   TEST-09 as passing to /api/launch-tests/TEST-09.
+                   Requires --ide=URL.
 """
 
 import sys
@@ -42,6 +45,7 @@ _SERIAL_PORT = '/dev/ttyUSB2'
 _BAUD = 115200
 _IDE_SERVER_URL = None
 _AUTO_RECONNECT = True
+_REPORT_LAUNCH = False
 
 for _a in sys.argv[1:]:
     if _a.startswith('--port='):
@@ -54,6 +58,8 @@ for _a in sys.argv[1:]:
         _AUTO_RECONNECT = False
     elif _a == '--reconnect':
         _AUTO_RECONNECT = True
+    elif _a == '--report-launch':
+        _REPORT_LAUNCH = True
     elif _a.startswith('--'):
         print(f"WARNING: unknown flag {_a!r} ignored", file=sys.stderr)
 
@@ -74,6 +80,41 @@ def _open_port(port, baud):
     s.setRTS(False)
     s.setDTR(False)
     return s
+
+
+_launch_test_reported = set()
+
+
+def _report_launch_test(test_id, status="passing", notes=""):
+    """PUT a launch-test result to /api/launch-tests/<test_id> on the IDE server."""
+    global _launch_test_reported
+    if not _IDE_SERVER_URL:
+        return
+    if test_id in _launch_test_reported and status == "passing":
+        return
+    import urllib.request
+    try:
+        body = json.dumps({
+            "status": status,
+            "device_uid": _last_uid or "",
+            "notes": notes,
+        }).encode()
+        req = urllib.request.Request(
+            f"{_IDE_SERVER_URL}/api/launch-tests/{test_id}",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="PUT",
+        )
+        resp = urllib.request.urlopen(req, timeout=10)
+        result = json.loads(resp.read())
+        if result.get("ok"):
+            print(f"  [LAUNCH] {test_id} reported as {status}")
+            if status == "passing":
+                _launch_test_reported.add(test_id)
+        else:
+            print(f"  [LAUNCH] {test_id} report failed: {result}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [LAUNCH] {test_id} report error: {e}", file=sys.stderr)
 
 
 def _post_callhome(payload):
@@ -137,6 +178,14 @@ def _handle_callhome_json(line):
 
     fault_str = f"  FAULT={fault_code}" if fault else ""
     print(f"  [CALL HOME] {board}  UID={uid}  NIA={nia}  boot_ok={boot_ok}  FW={fw_major}.{fw_minor}{fault_str}")
+
+    if _REPORT_LAUNCH and boot_ok and _IDE_SERVER_URL:
+        threading.Thread(
+            target=_report_launch_test,
+            args=("TEST-09",),
+            kwargs={"status": "passing", "notes": f"CALLHOME boot_ok=1 from {board} UID={uid} FW={fw_major}.{fw_minor}"},
+            daemon=True,
+        ).start()
 
     if _IDE_SERVER_URL:
         threading.Thread(
@@ -237,6 +286,11 @@ def main():
         print(f"  IDE    : {_IDE_SERVER_URL}")
     else:
         print("  IDE    : (not configured — use --ide=URL to enable call-home)")
+    if _REPORT_LAUNCH:
+        if _IDE_SERVER_URL:
+            print("  Launch : TEST-09 will be reported passing on first boot_ok=1 CALLHOME")
+        else:
+            print("  Launch : --report-launch set but --ide=URL missing; reporting disabled")
     print()
     print("Press Ctrl+C to stop.")
     print()
