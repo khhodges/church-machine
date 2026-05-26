@@ -886,7 +886,7 @@ const _hamCtxActions = {
     'develop':   () => { switchView('editor');       closeHamburger(); },
     'test':      () => { openSimulatorFromMenu(); },
     'review':    () => { switchView('abstractions'); closeHamburger(); },
-    'hardware':  () => { switchView('devices');      closeHamburger(); },
+    'hardware':  () => { switchView('memory');       closeHamburger(); },
     'configure': () => { switchView('devices');      closeHamburger(); },
     'install':   () => { switchView('builder');      closeHamburger(); },
 };
