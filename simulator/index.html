@@ -33,7 +33,7 @@
     })();
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
-    <link rel="stylesheet" href="styles-base.css?v=20260425">
+    <link rel="stylesheet" href="styles-base.css?v=20260526c">
     <link rel="stylesheet" href="styles-toolbar.css?v=20260526a">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260518e">
@@ -843,11 +843,56 @@
             <button class="builder-view-tab" id="builderViewTab-lump-thread" onclick="switchBuilderViewTab('lump-thread')">&#x1F9F5; Thread LUMP</button>
             <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')">&#x1F9E9; Namespace LUMP</button>
             <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')">&#x1F3E0; Resident Lumps</button>
+            <button class="builder-view-tab" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
         </div>
         <div id="builderView"></div>
         <div id="lumpThreadPanel"   style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpNSPanel"       style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
+        <div id="ti60ConnectPanel" style="display:none;" class="ti60-connect-panel">
+            <div class="ti60-connect-header">
+                <h2>Ti60 Proof-of-Life</h2>
+                <p>Power on your Ti60 F225, plug in the USB cable, then click Connect. The IDE will verify the full program &#x2192; test &#x2192; release loop automatically.</p>
+                <div class="ti60-port-hint">&#x1F4CC; The FT4232H shows 4 ports &#x2014; select the <strong>3rd one</strong> (SoC UART, interface&nbsp;2). If unsure, try each until you see firmware output.</div>
+            </div>
+            <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect</button>
+            <div class="ti60-steps">
+                <div class="ti60-step ti60-step-pending" id="ti60Step-uart">
+                    <div class="ti60-step-icon">&#x26A1;</div>
+                    <div class="ti60-step-body">
+                        <div class="ti60-step-title">Connect</div>
+                        <div class="ti60-step-desc">UART open &amp; firmware greeting received</div>
+                    </div>
+                    <div class="ti60-step-status" id="ti60StepStatus-uart">&#x2014;</div>
+                </div>
+                <div class="ti60-step ti60-step-pending" id="ti60Step-callhome">
+                    <div class="ti60-step-icon">&#x1F4E1;</div>
+                    <div class="ti60-step-body">
+                        <div class="ti60-step-title">Call Home</div>
+                        <div class="ti60-step-desc">CALLHOME JSON packet validated (boot_ok&nbsp;=&nbsp;1)</div>
+                    </div>
+                    <div class="ti60-step-status" id="ti60StepStatus-callhome">&#x2014;</div>
+                </div>
+                <div class="ti60-step ti60-step-pending" id="ti60Step-register">
+                    <div class="ti60-step-icon">&#x1F517;</div>
+                    <div class="ti60-step-body">
+                        <div class="ti60-step-title">Register</div>
+                        <div class="ti60-step-desc">IDE receives &amp; stores the device</div>
+                    </div>
+                    <div class="ti60-step-status" id="ti60StepStatus-register">&#x2014;</div>
+                </div>
+                <div class="ti60-step ti60-step-pending" id="ti60Step-release">
+                    <div class="ti60-step-icon">&#x2705;</div>
+                    <div class="ti60-step-body">
+                        <div class="ti60-step-title">Release</div>
+                        <div class="ti60-step-desc">TEST-09 confirmed passing in IDE database</div>
+                    </div>
+                    <div class="ti60-step-status" id="ti60StepStatus-release">&#x2014;</div>
+                </div>
+            </div>
+            <div id="ti60ConnectLog" class="ti60-connect-log"></div>
+            <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect()" style="display:none;">Disconnect</button>
+        </div>
         <div id="buildDetailsPanel" style="display:none;" class="build-details-panel">
             <div class="build-details-status-bar">
                 <span class="build-status-dot" id="buildStatusDot"></span>
@@ -1617,6 +1662,7 @@
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
+    <script async src="app-ti60-connect.js?v=20260526c"></script>
     <script src="app-shell.js?v=20260526b"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>

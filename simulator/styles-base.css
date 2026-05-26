@@ -125,3 +125,127 @@ header h1 a:hover {
     opacity: 1;
 }
 
+/* ── Ti60 Proof-of-Life Connect Panel ──────────────────────────── */
+.ti60-connect-panel {
+    padding: 1.5rem 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+    overflow-y: auto;
+}
+
+.ti60-connect-header { margin-bottom: 1.25rem; }
+
+.ti60-connect-header h2 {
+    font-size: 1.1rem;
+    color: var(--church-gold);
+    margin-bottom: 0.4rem;
+}
+
+.ti60-connect-header p {
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.ti60-connect-header .ti60-port-hint {
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--church-blue);
+    background: rgba(96,165,250,0.08);
+    border: 1px solid rgba(96,165,250,0.2);
+    border-radius: 5px;
+    padding: 0.35rem 0.65rem;
+}
+
+.ti60-connect-btn {
+    margin-bottom: 1.5rem;
+    font-size: 1rem;
+    padding: 0.55rem 1.4rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.ti60-connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ti60-connect-btn:not(:disabled):hover { opacity: 0.85; }
+
+.ti60-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.ti60-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    transition: border-color 0.25s, background 0.25s, opacity 0.25s;
+}
+
+.ti60-step-pending  { opacity: 0.45; }
+.ti60-step-active   { border-color: var(--church-gold); background: rgba(251,191,36,0.07); opacity: 1; }
+.ti60-step-pass     { border-color: var(--success);     background: rgba(74,222,128,0.08);  opacity: 1; }
+.ti60-step-fail     { border-color: var(--error);       background: rgba(248,113,113,0.08); opacity: 1; }
+
+.ti60-step-icon { font-size: 1.3rem; width: 2rem; text-align: center; flex-shrink: 0; }
+.ti60-step-body { flex: 1; }
+
+.ti60-step-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.15rem;
+}
+
+.ti60-step-desc { font-size: 0.78rem; color: var(--text-secondary); }
+
+.ti60-step-status {
+    font-size: 1.1rem;
+    font-weight: 700;
+    width: 1.5rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.ti60-step-pass .ti60-step-status { color: var(--success); }
+.ti60-step-fail .ti60-step-status { color: var(--error); }
+.ti60-step-active .ti60-step-status { color: var(--church-gold); }
+
+.ti60-connect-log {
+    max-height: 140px;
+    overflow-y: auto;
+    background: #0a0a14;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    font-family: 'Cascadia Code', 'Fira Mono', monospace;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+}
+
+.ti60-log-line { margin-bottom: 0.1rem; line-height: 1.4; }
+.ti60-log-line.log-pass { color: var(--success); }
+.ti60-log-line.log-fail { color: var(--error); }
+
+.ti60-disconnect-btn {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.8rem;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+}
+
+.ti60-disconnect-btn:hover { border-color: var(--error); color: var(--error); }
+

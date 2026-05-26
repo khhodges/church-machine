@@ -9729,14 +9729,17 @@ function switchBuilderViewTab(tab) {
     const details     = document.getElementById('buildDetailsPanel');
     const lumpThread  = document.getElementById('lumpThreadPanel');
     const lumpNS      = document.getElementById('lumpNSPanel');
-    const lumpResident = document.getElementById('lumpResidentPanel');
+    const lumpResident  = document.getElementById('lumpResidentPanel');
+    const ti60Connect   = document.getElementById('ti60ConnectPanel');
     if (cyberspace)   cyberspace.style.display   = (tab === 'cyberspace')     ? '' : 'none';
     if (details)      details.style.display      = (tab === 'buildlog')       ? '' : 'none';
     if (lumpThread)   lumpThread.style.display   = (tab === 'lump-thread')    ? '' : 'none';
     if (lumpNS)       lumpNS.style.display       = (tab === 'lump-ns')        ? '' : 'none';
     if (lumpResident) lumpResident.style.display = (tab === 'lump-resident')  ? '' : 'none';
+    if (ti60Connect)  ti60Connect.style.display  = (tab === 'ti60-connect')   ? '' : 'none';
     if ((tab === 'lump-thread' || tab === 'lump-ns') && typeof initLumpEditor === 'function') initLumpEditor();
     if (tab === 'lump-resident' && typeof initResidentPanel === 'function') initResidentPanel();
+    if (tab === 'ti60-connect' && typeof Ti60Connect !== 'undefined') Ti60Connect.onTabOpen();
 }
 
 function _setBuildStatus(state, label, board) {
