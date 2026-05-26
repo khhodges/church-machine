@@ -1120,6 +1120,103 @@ _RELEASE_1_MANIFEST = [
     ("ctmm-r1-14-hardware-deviations.pdf",  "Hardware Deviations — All Closed", "Conformance"),
 ]
 
+@app.route("/start")
+def start_here():
+    html = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Getting Started — Church Machine</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:system-ui,sans-serif;background:#0a0e17;color:#c8d6e5;margin:0;padding:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:48px 24px}
+  .wrap{max-width:640px;width:100%}
+  h1{color:#a78bfa;font-size:1.8rem;margin-bottom:.25rem}
+  .sub{color:#64748b;font-size:.85rem;margin-bottom:2.5rem}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:steps}
+  .step{counter-increment:steps;display:flex;gap:1.1rem;align-items:flex-start;margin-bottom:1.5rem}
+  .step-num{flex-shrink:0;width:2rem;height:2rem;border-radius:50%;background:#1a0e28;border:2px solid #a78bfa;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:#a78bfa;margin-top:.1rem}
+  .step-body{flex:1}
+  .step-title{font-size:1rem;font-weight:600;color:#e2e8f0;margin-bottom:.2rem}
+  .step-title a{color:#a78bfa;text-decoration:none}
+  .step-title a:hover{text-decoration:underline}
+  .step-desc{font-size:.83rem;color:#64748b;line-height:1.5}
+  .divider{border:none;border-top:1px solid #1e2a3a;margin:2rem 0}
+  .next-section h2{color:#daa520;font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;margin-bottom:1rem}
+  .next-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  @media(max-width:480px){.next-cards{grid-template-columns:1fr}}
+  .next-card{background:#0d1117;border:1px solid #1e2a3a;border-radius:8px;padding:14px 16px;text-decoration:none;display:block;transition:border-color .15s}
+  .next-card:hover{border-color:#a78bfa}
+  .next-card .nc-title{color:#a78bfa;font-size:.9rem;font-weight:600;margin-bottom:.3rem}
+  .next-card .nc-desc{color:#64748b;font-size:.78rem;line-height:1.4}
+  .back{margin-top:2.5rem;font-size:.8rem}
+  .back a{color:#4a5568;text-decoration:none}
+  .back a:hover{color:#a78bfa}
+</style></head><body>
+<div class="wrap">
+  <h1>Getting Started</h1>
+  <div class="sub">Church Machine &middot; Release 1.2 &middot; Ti60 F225</div>
+
+  <ol class="steps">
+    <li class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><a href="/simulator/#tutorial">Learn in the simulator</a></div>
+        <div class="step-desc">No hardware needed — runs in the browser. Work through the Bernoulli tutorial to see the capability pipeline in action.</div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><a href="/api/bitstream/download/ti60-f225">Download the Ti60 bitstream</a></div>
+        <div class="step-desc">Flash once to your Efinix Ti60 F225 board using Efinity Programmer. You only need to do this once — the firmware persists.</div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Power on the Ti60 and plug in the USB cable</div>
+        <div class="step-desc">On ChromeOS: Settings &rarr; Developers &rarr; Linux &rarr; Manage USB devices &rarr; enable FT4232H.</div>
+      </div>
+    </li>
+    <li class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title"><a href="/simulator/#builder?tab=ti60-connect">Open Builder &rarr; Connect tab</a></div>
+        <div class="step-desc">Click Connect, pick the 3rd port (SoC UART). Four steps light up green automatically — that&rsquo;s your proof of life.</div>
+      </div>
+    </li>
+  </ol>
+
+  <hr class="divider">
+
+  <div class="next-section">
+    <h2>Next steps</h2>
+    <div class="next-cards">
+      <a class="next-card" href="/release/r12">
+        <div class="nc-title">CM Release 1.2 &rarr;</div>
+        <div class="nc-desc">FPGA ZIP downloads for all 3 boards, changelog, and full build instructions.</div>
+      </a>
+      <a class="next-card" href="/release/r1">
+        <div class="nc-title">Release 1 Docs &rarr;</div>
+        <div class="nc-desc">14 PDFs — ISA reference, architecture overview, capability model, and more.</div>
+      </a>
+      <a class="next-card" href="/simulator/#tutorial">
+        <div class="nc-title">Simulator Tutorial &rarr;</div>
+        <div class="nc-desc">Interactive Bernoulli tutorial — lambda calculus proving in the browser.</div>
+      </a>
+      <a class="next-card" href="/simulator/#builder?tab=ti60-connect">
+        <div class="nc-title">Connect Hardware &rarr;</div>
+        <div class="nc-desc">One-click proof-of-life for the Ti60 F225 via WebSerial.</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="back"><a href="/">&larr; Back to home</a></div>
+</div>
+</body></html>"""
+    return html
+
 @app.route("/release/r1/")
 @app.route("/release/r1")
 def release_r1_index():
@@ -1215,15 +1312,6 @@ def release_r12_index():
 </style></head><body>
 <h1>CM Release 1.2</h1>
 <div class="tag">15 May 2026 &middot; Builder &middot; 3-Board FPGA ZIP Downloads</div>
-<div class="note" style="border-left-color:#daa520;margin-bottom:1rem">
-  <strong style="color:#daa520">Getting started</strong><br>
-  <ol style="margin:.5rem 0 0 0;padding-left:1.3rem;line-height:2.1;color:#c8d6e5">
-    <li><a href="/simulator/#tutorial" style="color:#a78bfa">Learn in the simulator</a> — no hardware needed, runs in the browser</li>
-    <li><a href="/api/bitstream/download/ti60-f225" style="color:#a78bfa">Download the Ti60 bitstream</a> and flash once with Efinity Programmer</li>
-    <li>Power on the Ti60, plug in the USB cable</li>
-    <li><a href="/simulator/#builder?tab=ti60-connect" style="color:#a78bfa">Open Builder &#x2192; Connect tab</a> — click Connect, four steps light up green</li>
-  </ol>
-</div>
 <div class="note">
   The Release 1 document set (14 PDFs) remains the definitive hardware specification.
   Release 1.2 adds verified FPGA package downloads for all three supported boards.
