@@ -17,15 +17,25 @@
             justify-content: center;
             padding: 40px 20px;
         }
+        .pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1100px;
+            width: 100%;
+        }
+        @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
         .card {
             background: #141a28;
             border: 1px solid #1e2a3a;
             border-radius: 12px;
-            padding: 40px 48px;
-            max-width: 580px;
+            padding: 40px 40px;
             width: 100%;
             text-align: center;
+            display: flex;
+            flex-direction: column;
         }
+        .card-patents { border-color: #3a1a2e; }
         .eyebrow {
             font-size: 0.75rem;
             letter-spacing: 0.12em;
@@ -33,6 +43,7 @@
             color: #5dade2;
             margin-bottom: 14px;
         }
+        .eyebrow-pink { color: #f472b6; }
         h1 {
             font-size: 1.9rem;
             font-weight: 700;
@@ -45,6 +56,7 @@
             color: #8892a4;
             line-height: 1.6;
             margin-bottom: 32px;
+            flex: 1;
         }
         .laws {
             list-style: none;
@@ -73,6 +85,21 @@
             color: #c8d6e5;
             font-size: 0.85rem;
         }
+        .patents-chips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+        .chip {
+            font-size: 0.78rem;
+            padding: 5px 14px;
+            border-radius: 20px;
+            background: rgba(244,114,182,0.1);
+            border: 1px solid rgba(244,114,182,0.25);
+            color: #f472b6;
+        }
         .download-btn {
             display: inline-flex;
             align-items: center;
@@ -93,9 +120,26 @@
             border-color: #5dade2;
             transform: translateY(-1px);
         }
-        .download-btn svg {
-            flex-shrink: 0;
+        .browse-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(244,114,182,0.12);
+            border: 1px solid rgba(244,114,182,0.4);
+            color: #f472b6;
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 14px 32px;
+            border-radius: 8px;
+            transition: background 0.2s, transform 0.15s;
+            margin-bottom: 20px;
         }
+        .browse-btn:hover {
+            background: rgba(244,114,182,0.22);
+            transform: translateY(-1px);
+        }
+        .download-btn svg { flex-shrink: 0; }
         .meta {
             font-size: 0.78rem;
             color: #5a6475;
@@ -119,45 +163,84 @@
             transition: color 0.2s;
         }
         .footer-links a:hover { color: #85c8ef; text-decoration: underline; }
+        .footer-links-pink a { color: #f472b6; }
+        .footer-links-pink a:hover { color: #fb93c8; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <p class="eyebrow">Church Machine / CLOOMC</p>
-        <h1>The Six Laws of CLOOMC</h1>
-        <p class="subtitle">
-            A broadsheet-style one-pager covering the foundational principles
-            of the CLOOMC capability-based architecture — suitable for printing
-            or sharing as a reference document.
-        </p>
+    <div class="pair">
 
-        <ul class="laws">
-            <li><strong>Law of Capability</strong>Authority flows through unforgeable tokens</li>
-            <li><strong>Law of Namespace</strong>Every binding lives inside a capability</li>
-            <li><strong>Law of Delegation</strong>Rights are given, never seized</li>
-            <li><strong>Law of Confinement</strong>Computation cannot exceed its grant</li>
-            <li><strong>Law of Revocation</strong>Authority can always be withdrawn</li>
-            <li><strong>Law of Integrity</strong>Seals verify origin without disclosure</li>
-        </ul>
+        <!-- Six Laws card -->
+        <div class="card">
+            <p class="eyebrow">Church Machine / CLOOMC</p>
+            <h1>The Six Laws of CLOOMC</h1>
+            <p class="subtitle">
+                A broadsheet-style one-pager covering the foundational principles
+                of the CLOOMC capability-based architecture — suitable for printing
+                or sharing as a reference document.
+            </p>
 
-        <a class="download-btn" href="files/six-laws-review.pdf" download="six-laws-review.pdf">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Broadsheet PDF
-        </a>
+            <ul class="laws">
+                <li><strong>Law of Capability</strong>Authority flows through unforgeable tokens</li>
+                <li><strong>Law of Namespace</strong>Every binding lives inside a capability</li>
+                <li><strong>Law of Delegation</strong>Rights are given, never seized</li>
+                <li><strong>Law of Confinement</strong>Computation cannot exceed its grant</li>
+                <li><strong>Law of Revocation</strong>Authority can always be withdrawn</li>
+                <li><strong>Law of Integrity</strong>Seals verify origin without disclosure</li>
+            </ul>
 
-        <p class="meta">A4 · single page · print-ready · no external assets</p>
+            <a class="download-btn" href="files/six-laws-review.pdf" download="six-laws-review.pdf">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download Broadsheet PDF
+            </a>
 
-        <hr class="divider">
+            <p class="meta">A4 · single page · print-ready · no external assets</p>
 
-        <div class="footer-links">
-            <a href="/simulator/#docs">← Church Machine IDE</a>
-            <a href="https://cloomc.org" target="_blank" rel="noopener">cloomc.org ↗</a>
+            <hr class="divider">
+
+            <div class="footer-links">
+                <a href="/simulator/#docs">← Church Machine IDE</a>
+                <a href="https://cloomc.org" target="_blank" rel="noopener">cloomc.org ↗</a>
+            </div>
         </div>
+
+        <!-- Patent Portfolio card -->
+        <div class="card card-patents">
+            <p class="eyebrow eyebrow-pink">Church Machine / Intellectual Property</p>
+            <h1>Patent Portfolio</h1>
+            <p class="subtitle">
+                Complete patent portfolio: base filing, three CIPs, consolidated document,
+                and 45 interactive technical figures. All documents available as
+                print-ready PDFs on white backgrounds.
+            </p>
+
+            <div class="patents-chips">
+                <span class="chip">8 PDFs</span>
+                <span class="chip">45 Figures</span>
+                <span class="chip">Searchable</span>
+                <span class="chip">Print-Ready</span>
+                <span class="chip">April 2026</span>
+            </div>
+
+            <a class="browse-btn" href="/patents/">
+                Browse Patent Portfolio →
+            </a>
+
+            <p class="meta">Base filing · 3 CIPs · consolidated document · interactive figures</p>
+
+            <hr class="divider">
+
+            <div class="footer-links footer-links-pink">
+                <a href="/">← Home</a>
+                <a href="/patents/">patents/ ↗</a>
+            </div>
+        </div>
+
     </div>
 </body>
 </html>
