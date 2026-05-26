@@ -156,9 +156,26 @@ window.Ti60Connect = (function () {
         }
     }
 
+    function _noSerial() {
+        const log = document.getElementById('ti60ConnectLog');
+        if (log) {
+            log.innerHTML = '';
+            const line = document.createElement('div');
+            line.className = 'ti60-log-line log-fail';
+            line.innerHTML =
+                '<strong>WebSerial not available.</strong> ' +
+                'Open the app directly in Chrome/Edge — ' +
+                'WebSerial is blocked inside the Replit preview iframe. ' +
+                'Copy the URL from the address bar and paste it into a new tab.';
+            log.appendChild(line);
+        }
+        const btn = document.getElementById('ti60ConnectBtn');
+        if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+    }
+
     async function connect() {
         if (!('serial' in navigator)) {
-            alert('WebSerial is not supported in this browser.\nUse Chrome or Edge.');
+            _noSerial();
             return;
         }
         _reset();
