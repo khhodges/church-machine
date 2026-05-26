@@ -8,6 +8,8 @@ var sim        = null;
 var assembler  = null;
 var _booted    = false;
 var _lastFault = null;
+var _hexRows   = [];
+var _hexRowIdx = 0;
 
 // ── Friendly fault explanations ────────────────────────────────────────────
 
@@ -97,12 +99,13 @@ function _enableControls(booted) {
     _el('btnReset').disabled = !booted;
 }
 
-function _showHexListing(src, result) {
+function _buildHexRows(src, result) {
+    _hexRows   = [];
+    _hexRowIdx = 0;
     if (!result || !result.words) return;
     var words    = result.words;
     var lineNums = result.lineNums || [];
     var srcLines = src.split('\n');
-    var html = '';
     for (var i = 0; i < words.length; i++) {
         var hex     = '0x' + (words[i] >>> 0).toString(16).toUpperCase().padStart(8, '0');
         var lineIdx = lineNums[i] != null ? lineNums[i] - 1 : -1;
@@ -122,12 +125,13 @@ function _showHexListing(src, result) {
                 + '<span class="s-hex-cmt"> ; </span>'
                 + '<span class="s-hex-word">' + hex + '</span>';
         }
-        html += '<div class="s-hex-row">' + row + '</div>';
+        _hexRows.push('<div class="s-hex-row">' + row + '</div>');
     }
-    _setOutput(html);
 }
 
 function _hideHexListing() {
+    _hexRows   = [];
+    _hexRowIdx = 0;
     _setOutput('<span class="out-dim">— click Start to begin —</span>');
 }
 
@@ -208,7 +212,8 @@ function starterStep() {
         sim.output = '';
         sim.loadProgram(result.words || result);
         sim._programLoaded = true;
-        _showHexListing(src, result);
+        _buildHexRows(src, result);
+        _setOutput('');
     }
 
     if (sim.halted) {
@@ -217,6 +222,9 @@ function starterStep() {
     }
 
     var r = sim.step();
+    if (_hexRowIdx < _hexRows.length) {
+        _appendOutput(_hexRows[_hexRowIdx++]);
+    }
     _updateRegisters();
 
     if (sim.faultLog && sim.faultLog.length > 0) {
