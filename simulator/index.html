@@ -34,7 +34,7 @@
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles-base.css?v=20260526c">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260526a">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260526b">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260518e">
     <link rel="stylesheet" href="styles-lumps.css?v=20260521b">
@@ -152,6 +152,7 @@
                                 <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">FPGA</button>
                                 <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">Bridge</button>
                                 <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">BRAM</button>
+                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()" data-tooltip="Connect Ti60 — Open the Ti60 USB/UART connection panel">&#x1F50C; Connect Ti60</button>
                                 <button class="ham-item" id="hamItem-hw-wukong" onclick="setSelectedBoard('wukong-xc7a100t');switchView('builder');closeHamburger()">Wukong Artix-7 XC7A100T</button>
                                 <button class="ham-item" id="hamItem-hw-ti60" onclick="setSelectedBoard('ti60-f225');switchView('builder');closeHamburger()">Efinix Ti60 F225</button>
                                 <button class="ham-item" id="hamItem-hw-tang20k-iot" onclick="setSelectedBoard('tang-nano-20k-iot');switchView('builder');closeHamburger()">Tang Nano 20K</button>
@@ -234,6 +235,7 @@
                         </div>
                     </div>
                     <span id="toolbarIdeBadge"></span>
+                    <button class="btn btn-view btn-ti60-connect" id="toolbarTi60ConnectBtn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Connect Ti60 — Open the Ti60 USB/UART connection panel">&#x1F50C; Ti60</button>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
                 </div>
             </nav>

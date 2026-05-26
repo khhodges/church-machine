@@ -283,6 +283,17 @@
     white-space: nowrap;
 }
 
+.btn-ti60-connect {
+    border-color: rgba(218,165,32,0.45) !important;
+    color: #daa520 !important;
+    font-size: 0.68rem !important;
+    letter-spacing: 0.02em;
+}
+.btn-ti60-connect:hover {
+    background: rgba(218,165,32,0.12) !important;
+    border-color: #daa520 !important;
+}
+
 .view {
     display: none;
     position: fixed;
