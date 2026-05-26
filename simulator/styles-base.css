@@ -157,6 +157,61 @@ header h1 a:hover {
     padding: 0.35rem 0.65rem;
 }
 
+.ti60-help-details {
+    margin-top: 0.6rem;
+    border: 1px solid rgba(251,191,36,0.18);
+    border-radius: 6px;
+    background: rgba(251,191,36,0.04);
+    font-size: 0.82rem;
+}
+
+.ti60-help-details summary {
+    cursor: pointer;
+    padding: 0.4rem 0.7rem;
+    color: var(--church-gold);
+    user-select: none;
+    list-style: none;
+}
+
+.ti60-help-details summary::-webkit-details-marker { display: none; }
+
+.ti60-help-details[open] summary {
+    border-bottom: 1px solid rgba(251,191,36,0.15);
+    margin-bottom: 0.5rem;
+}
+
+.ti60-help-body {
+    padding: 0 0.85rem 0.65rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.ti60-help-body p { margin: 0.45rem 0; }
+
+.ti60-help-body strong { color: var(--text-primary); }
+
+.ti60-help-body code {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--church-gold);
+    background: rgba(251,191,36,0.08);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+
+.ti60-help-pre {
+    font-family: monospace;
+    font-size: 0.76rem;
+    background: #0a0a14;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.55rem 0.75rem;
+    color: #a0d4a0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0.5rem 0;
+}
+
 .ti60-connect-btn {
     margin-bottom: 1.5rem;
     font-size: 1rem;

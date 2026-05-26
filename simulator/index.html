@@ -866,7 +866,23 @@
             <div class="ti60-connect-header">
                 <h2>Ti60 Proof-of-Life</h2>
                 <p>Power on your Ti60 F225, plug in the USB cable, then click Connect. The IDE will verify the full program &#x2192; test &#x2192; release loop automatically.</p>
-                <div class="ti60-port-hint">&#x1F4CC; The FT4232H shows 4 ports &#x2014; select the <strong>3rd one</strong> (SoC UART, interface&nbsp;2). If unsure, try each until you see firmware output.</div>
+                <div class="ti60-port-hint">&#x1F4CC; The FT4232H shows <strong>4 ports</strong> &#x2014; select the <strong>3rd one</strong> (SoC UART, interface&nbsp;2, labelled <em>USB Serial Port</em> on Windows or <em>usbserial-&lt;id&gt;2</em> on Mac/Linux). If unsure, try each port in turn until you see output in the log.</div>
+                <details class="ti60-help-details">
+                    <summary>&#x2139;&#xFE0F; What to expect from the firmware</summary>
+                    <div class="ti60-help-body">
+                        <p>When the board boots correctly it sends two lines over UART:</p>
+                        <pre class="ti60-help-pre">CHURCH Ti60 SoC+CM v1.0 ready
+CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fault_code":0}</pre>
+                        <p><strong>Step 1 — Connect</strong> passes when the greeting line arrives.<br>
+                        If nothing appears: wrong port selected, wrong baud rate, or the board hasn't finished booting — power-cycle and try again.</p>
+                        <p><strong>Step 2 — Call Home</strong> passes when <code>boot_ok&nbsp;=&nbsp;1</code> is seen in the JSON.<br>
+                        If <code>boot_ok&nbsp;=&nbsp;0</code>: the firmware detected a fault on boot — check the <code>fault_code</code> field in the log.</p>
+                        <p><strong>Step 3 — Register</strong> passes when the IDE server stores the device UID.<br>
+                        If it fails: the IDE server may be unreachable — check that the app is running and not behind a firewall.</p>
+                        <p><strong>Step 4 — Release</strong> passes when TEST-09 is confirmed <em>passing</em> in the launch-test database.<br>
+                        This marks the board as production-released.</p>
+                    </div>
+                </details>
             </div>
             <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect</button>
             <div class="ti60-steps">
@@ -874,7 +890,7 @@
                     <div class="ti60-step-icon">&#x26A1;</div>
                     <div class="ti60-step-body">
                         <div class="ti60-step-title">Connect</div>
-                        <div class="ti60-step-desc">UART open &amp; firmware greeting received</div>
+                        <div class="ti60-step-desc">UART open &amp; <code>CHURCH Ti60 SoC+CM</code> greeting received</div>
                     </div>
                     <div class="ti60-step-status" id="ti60StepStatus-uart">&#x2014;</div>
                 </div>
@@ -882,7 +898,7 @@
                     <div class="ti60-step-icon">&#x1F4E1;</div>
                     <div class="ti60-step-body">
                         <div class="ti60-step-title">Call Home</div>
-                        <div class="ti60-step-desc">CALLHOME JSON packet validated (boot_ok&nbsp;=&nbsp;1)</div>
+                        <div class="ti60-step-desc"><code>CALLHOME:</code> JSON packet validated &mdash; <code>boot_ok&nbsp;=&nbsp;1</code></div>
                     </div>
                     <div class="ti60-step-status" id="ti60StepStatus-callhome">&#x2014;</div>
                 </div>
@@ -890,7 +906,7 @@
                     <div class="ti60-step-icon">&#x1F517;</div>
                     <div class="ti60-step-body">
                         <div class="ti60-step-title">Register</div>
-                        <div class="ti60-step-desc">IDE receives &amp; stores the device</div>
+                        <div class="ti60-step-desc">Device UID stored in IDE &mdash; <code>POST /api/device/call-home</code></div>
                     </div>
                     <div class="ti60-step-status" id="ti60StepStatus-register">&#x2014;</div>
                 </div>
@@ -898,7 +914,7 @@
                     <div class="ti60-step-icon">&#x2705;</div>
                     <div class="ti60-step-body">
                         <div class="ti60-step-title">Release</div>
-                        <div class="ti60-step-desc">TEST-09 confirmed passing in IDE database</div>
+                        <div class="ti60-step-desc">TEST-09 confirmed <em>passing</em> in IDE database</div>
                     </div>
                     <div class="ti60-step-status" id="ti60StepStatus-release">&#x2014;</div>
                 </div>
