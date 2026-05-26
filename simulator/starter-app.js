@@ -4,8 +4,9 @@
 
 'use strict';
 
-var sim        = null;
-var assembler  = null;
+var sim           = null;
+var assembler     = null;
+var cloomcCompiler = null;
 var _booted    = false;
 var _lastFault = null;
 var _hexRows   = [];
@@ -199,6 +200,7 @@ function starterBoot() {
             assembler = new ChurchAssembler(
                 typeof METHOD_REGISTER_CONVENTIONS !== 'undefined' ? METHOD_REGISTER_CONVENTIONS : {}
             );
+            cloomcCompiler = new CLOOMCCompiler();
         } else {
             sim.reset();
         }
@@ -228,22 +230,24 @@ function starterStep() {
 
     // If not yet loaded, assemble and load first
     if (sim.pc === 0 && !sim._programLoaded) {
-        var src = _el('codeEditor').value.replace(/\w+\s+capabilities\s*\{[^}]*\}/g, '');
+        var src = _el('codeEditor').value;
         var result;
-        try { result = assembler.assemble(src); } catch (e) {
-            _setOutput('<span class="out-red">Assembler error: ' + e.message + '</span>');
+        try { result = cloomcCompiler.compile(src, []); } catch (e) {
+            _setOutput('<span class="out-red">Compiler error: ' + e.message + '</span>');
             return;
         }
         if (result.errors && result.errors.length) {
-            _setOutput('<span class="out-red">Fix assembler errors before stepping.</span>');
+            _setOutput('<span class="out-red">Compiler error: ' + result.errors[0].message + '</span>');
             return;
         }
+        var m0 = result.methods && result.methods[0];
+        var normResult = { words: m0 ? (m0.code || []) : [], lineNums: m0 ? (m0.lineNums || []) : [] };
         sim.reset();
         _runBootSequence();
         sim.output = '';
-        sim.loadProgram(result.words || result);
+        sim.loadProgram(normResult.words);
         sim._programLoaded = true;
-        _buildHexRows(src, result);
+        _buildHexRows(src, normResult);
         _setOutput('');
     }
 
