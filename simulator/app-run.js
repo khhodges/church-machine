@@ -1717,13 +1717,25 @@ async function fpgaConnectToggle() {
         updateFPGAStatusBtn();
         return;
     }
-    // Guard: remind the user to plug in the board before the browser port picker opens
+    // Guard: board-specific connection guide before the browser port picker opens
+    const _board = getSelectedBoard();
+    const _boardHints = {
+        'ti60-f225':          { chip: 'FTDI FT2232H',  look: 'look for "Dual RS232-HS" or "USB Serial Port"',      driver: 'install the FTDI VCP driver from ftdichip.com' },
+        'tang-nano-20k-iot':  { chip: 'CH340 / CH341', look: 'look for "USB-SERIAL CH340" or "CH341 USB Bridge"',  driver: 'install the CH340 driver from wch-ic.com' },
+        'wukong-xc7a100t':    { chip: 'FTDI FT232',    look: 'look for "USB Serial Port" or "FT232R USB UART"',    driver: 'install the FTDI VCP driver from ftdichip.com' },
+    };
+    const _h = _boardHints[_board] || _boardHints['wukong-xc7a100t'];
+    const _label = getBoardLabel(_board);
     const _ready = window.confirm(
-        'Before connecting:\n\n' +
-        '1. Plug your FPGA board into a USB port\n' +
-        '2. Wait for the OS to recognise the device\n' +
-        '3. Click OK — then select the serial port in the browser dialog\n\n' +
-        'Click Cancel if the board is not yet connected.'
+        'Connecting to ' + _label + '\n' +
+        '─────────────────────────────────\n\n' +
+        'USB chip on this board: ' + _h.chip + '\n\n' +
+        'In the port picker that opens next:\n' +
+        '  \u2022 ' + _h.look + '\n' +
+        '  \u2022 If nothing appears, ' + _h.driver + '\n' +
+        '  \u2022 Try a different USB cable if the port is still missing\n' +
+        '  \u2022 Avoid choosing a built-in Intel or Bluetooth COM port\n\n' +
+        'Click OK to open the port picker, or Cancel to abort.'
     );
     if (!_ready) {
         updateFPGAStatusBtn();
