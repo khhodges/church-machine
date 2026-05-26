@@ -81,19 +81,26 @@ function _updateRegisters() {
 }
 
 function starterNext() {
-    // Show highlighted capabilities code block below the editor annotation
-    _el('capsCodeBlock').classList.remove('hidden');
+    _el('codeEditor').value =
+'; The Church Machine adds hardened symbolic addressing\n' +
+'; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
+'; Simple A + B programs are unchanged\n' +
+'; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
+'\n' +
+'MyCode capabilities {\n' +
+'    (none)\n' +
+'}\n' +
+'\n' +
+'    IADD  DR1, DR1, #12  ; A = 12\n' +
+'    IADD  DR2, DR2, #30  ; B = 30\n' +
+'    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
+'    HALT                 ; done \u2014 result is in DR1\n';
 
-    // Reveal capabilities section with active (highlighted) style
     var caps = _el('capsSection');
     caps.classList.remove('hidden');
     caps.classList.add('active');
-
-    // Add white border to registers panel, capabilities section, and output panel
     _el('statusPanel').classList.add('s-panel-lit');
     _el('outputPanel').classList.add('s-panel-lit');
-
-    // Disable Next (one-way tutorial step)
     _el('btnNext').disabled = true;
     _updateRegisters();
 }
