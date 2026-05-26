@@ -228,7 +228,7 @@ function starterStep() {
 
     // If not yet loaded, assemble and load first
     if (sim.pc === 0 && !sim._programLoaded) {
-        var src = _el('codeEditor').value;
+        var src = _el('codeEditor').value.replace(/\w+\s+capabilities\s*\{[^}]*\}/g, '');
         var result;
         try { result = assembler.assemble(src); } catch (e) {
             _setOutput('<span class="out-red">Assembler error: ' + e.message + '</span>');
