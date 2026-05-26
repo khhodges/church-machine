@@ -78,19 +78,23 @@ function _updateRegisters() {
 
 function starterNext() {
     if (_lessonPhase === 1) {
+        // Advance to Lesson 2: reveal abstraction + capabilities { (none) } block
         _el('capsInline').classList.remove('hidden');
         var caps = _el('capsSection');
         caps.classList.remove('hidden');
         caps.classList.add('active');
         _el('statusPanel').classList.add('s-panel-lit');
         _el('outputPanel').classList.add('s-panel-lit');
-        _el('btnNext').textContent = 'Lesson 2 \u2192';
+        _el('lessonLabel').textContent = '\u2014 Lesson 2 of 3';
+        _el('btnNext').textContent = 'Next \u2192';
         _lessonPhase = 2;
         _setOutput('<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>');
         _updateRegisters();
     } else if (_lessonPhase === 2) {
+        // Advance to Lesson 3: switch to myScratchPad code
         _el('lesson1Code').classList.add('hidden');
         _el('lesson2Code').classList.remove('hidden');
+        _el('lessonLabel').textContent = '\u2014 Lesson 3 of 3';
         _el('btnNext').disabled = true;
         if (sim) {
             sim.reset();
