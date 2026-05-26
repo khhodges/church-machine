@@ -82,21 +82,7 @@ function _updateRegisters() {
 }
 
 function starterNext() {
-    _el('codeEditor').value =
-'; The Church Machine adds hardened symbolic addressing\n' +
-'; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
-'; Simple A + B programs are unchanged\n' +
-'; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
-'\n' +
-'MyCode capabilities {\n' +
-'    (none)\n' +
-'}\n' +
-'\n' +
-'    IADD  DR1, DR1, #12  ; A = 12\n' +
-'    IADD  DR2, DR2, #30  ; B = 30\n' +
-'    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
-'    HALT                 ; done \u2014 result is in DR1\n';
-
+    _el('capsCodeBlock').classList.remove('hidden');
     var caps = _el('capsSection');
     caps.classList.remove('hidden');
     caps.classList.add('active');
@@ -230,7 +216,12 @@ function starterStep() {
 
     // If not yet loaded, assemble and load first
     if (sim.pc === 0 && !sim._programLoaded) {
-        var src = _el('codeEditor').value;
+        var line1El = _el('editorLine1');
+        var capsEl  = _el('capsCodeBlock');
+        var line1   = line1El ? line1El.textContent + '\n' : '';
+        var capsText = (capsEl && !capsEl.classList.contains('hidden'))
+            ? 'MyCode capabilities {\n    (none)\n}\n\n' : '';
+        var src = line1 + capsText + _el('codeEditor').value;
         var result;
         try { result = cloomcCompiler.compile(src, []); } catch (e) {
             _setOutput('<span class="out-red">Compiler error: ' + e.message + '</span>');

@@ -367,6 +367,19 @@
         }
         .s-reg-sub { font-size: 0.72rem; color: #556; margin: 0 0.15rem; }
 
+        /* ── Gold first-line caption above editor ── */
+        .s-editor-caption {
+            font-family: 'Courier New', 'Fira Code', monospace;
+            font-size: 0.88rem;
+            color: var(--gold);
+            background: #0d1117;
+            border: 1px solid #2a3040;
+            border-radius: var(--radius);
+            padding: 0.45rem 0.9rem;
+            white-space: pre;
+            margin-bottom: 0.25rem;
+        }
+
         /* ── Highlighted capabilities code block ── */
         .s-caps-code {
             background: rgba(218,165,32,0.07);
@@ -379,11 +392,12 @@
             color: var(--gold);
             line-height: 1.65;
             white-space: pre;
+            margin-bottom: 0.25rem;
         }
         .s-caps-code.hidden { display: none; }
 
-        /* ── White-border panel variant ── */
-        .s-panel-lit { border-color: rgba(255,255,255,0.28) !important; }
+        /* ── Thick white-border panel variant ── */
+        .s-panel-lit { border: 2px solid rgba(255,255,255,0.55) !important; }
 
         /* ── Mobile ── */
         @media (max-width: 700px) {
@@ -441,8 +455,11 @@
     <!-- Left: editor -->
     <div class="s-editor-panel">
         <div class="s-panel-label">Your program</div>
-        <textarea class="s-editor" id="codeEditor" spellcheck="false">; The Church Machine adds hardened symbolic addressing
-; ─────────────────────────────────────────────────────
+        <div class="s-editor-caption" id="editorLine1">; The Church Machine adds hardened symbolic addressing</div>
+        <div id="capsCodeBlock" class="s-caps-code hidden">MyCode capabilities {
+    (none)
+}</div>
+        <textarea class="s-editor" id="codeEditor" spellcheck="false">; ─────────────────────────────────────────────────────
 ; Simple A + B programs are unchanged
 ; DR1 holds A, DR2 holds B, result goes into DR1.
 
@@ -516,7 +533,7 @@
 <script src="simulator.js?v=20260521c"></script>
 <script src="assembler.js?v=20260521a"></script>
 <script src="cloomc_compiler.js?v=20260519c"></script>
-<script src="starter-app.js?v=20260526q"></script>
+<script src="starter-app.js?v=20260526r"></script>
 
 </body>
 </html>
