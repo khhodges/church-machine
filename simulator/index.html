@@ -34,7 +34,7 @@
     </script>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0a1a'/%3E%3Ctext x='16' y='23' font-family='serif' font-size='22' font-weight='bold' fill='%23daa520' text-anchor='middle'%3E%CE%BB%3C/text%3E%3C/svg%3E">
     <link rel="stylesheet" href="styles-base.css?v=20260526c">
-    <link rel="stylesheet" href="styles-toolbar.css?v=20260526b">
+    <link rel="stylesheet" href="styles-toolbar.css?v=20260526c">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260518e">
     <link rel="stylesheet" href="styles-lumps.css?v=20260521b">
@@ -172,52 +172,59 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                <div id="toolbarGroupSim" class="toolbar-group">
                     <button class="btn btn-view cr-cycle-btn" id="crCycleBtn"
                             onclick="cycleCRView()"
                             data-tooltip="CR0–15 — Context Registers · click to cycle: CR0-15 → CR14 CLOOMC → CR12 Thread">CRs</button>
-                </div>
-                <div class="sim-exec-btns">
-                    <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
-                    <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
-                    <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
-                    <div class="break-wrap" id="breakWrap">
-                        <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleBreakPopover()" data-tooltip="Breakpoint — Set/clear PC breakpoints for Run and Walk">&#x25CF;</button>
-                        <div class="break-popover" id="breakPopover" style="display:none;">
-                            <div class="break-popover-title">Breakpoints <button class="break-close-btn" onclick="toggleBreakPopover()" title="Close">&times;</button></div>
-                            <div id="breakList" class="break-list"></div>
-                            <div class="break-add-row">
-                                <input id="breakAddrInput" class="break-addr-input" type="text" placeholder="0x0100" maxlength="8" onkeydown="if(event.key==='Enter')addBreakpointFromInput()" />
-                                <button class="btn btn-sm btn-primary" onclick="addBreakpointFromInput()">Add</button>
+                    <div class="toolbar-group-divider"></div>
+                    <div class="sim-exec-btns">
+                        <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
+                        <button class="btn btn-success sim-icon-btn" id="toolStepBtn" onclick="stepSim()" data-tooltip="Step — Execute one instruction">&#x1F463;</button>
+                        <button class="btn btn-walk sim-icon-btn" id="toolWalkBtn" onclick="walkToggle()" data-tooltip="Walk — Animate step-by-step execution">&#x1F6B6;</button>
+                        <div class="break-wrap" id="breakWrap">
+                            <button class="btn btn-break sim-icon-btn" id="toolBreakBtn" onclick="toggleBreakPopover()" data-tooltip="Breakpoint — Set/clear PC breakpoints for Run and Walk">&#x25CF;</button>
+                            <div class="break-popover" id="breakPopover" style="display:none;">
+                                <div class="break-popover-title">Breakpoints <button class="break-close-btn" onclick="toggleBreakPopover()" title="Close">&times;</button></div>
+                                <div id="breakList" class="break-list"></div>
+                                <div class="break-add-row">
+                                    <input id="breakAddrInput" class="break-addr-input" type="text" placeholder="0x0100" maxlength="8" onkeydown="if(event.key==='Enter')addBreakpointFromInput()" />
+                                    <button class="btn btn-sm btn-primary" onclick="addBreakpointFromInput()">Add</button>
+                                </div>
+                                <button class="btn btn-sm break-clear-btn" onclick="clearAllBreakpoints()">Clear All</button>
                             </div>
-                            <button class="btn btn-sm break-clear-btn" onclick="clearAllBreakpoints()">Clear All</button>
                         </div>
-                    </div>
-                    <div class="run-wrap" id="runWrap">
-                        <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
-                        <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
-                        <div class="run-popover" id="runPopover" style="display:none;">
-                            <div class="run-popover-title">Run Settings <button class="run-close-btn" onclick="hideRunPopover()" title="Close">&times;</button></div>
-                            <label class="run-label">Batch size <span class="run-hint">(steps between UI refresh)</span></label>
-                            <select id="runBatchSelect" class="run-batch-select">
-                                <option value="1">1</option>
-                                <option value="10">10</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                                <option value="500" selected>500</option>
-                                <option value="1000">1000</option>
-                            </select>
-                            <button class="btn btn-sm btn-success run-go-btn" onclick="runSimGo()">Go</button>
+                        <div class="run-wrap" id="runWrap">
+                            <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run — single-click to run · double-click for options">&#x1F3C3;</button>
+                            <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
+                            <div class="run-popover" id="runPopover" style="display:none;">
+                                <div class="run-popover-title">Run Settings <button class="run-close-btn" onclick="hideRunPopover()" title="Close">&times;</button></div>
+                                <label class="run-label">Batch size <span class="run-hint">(steps between UI refresh)</span></label>
+                                <select id="runBatchSelect" class="run-batch-select">
+                                    <option value="1">1</option>
+                                    <option value="10">10</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                    <option value="500" selected>500</option>
+                                    <option value="1000">1000</option>
+                                </select>
+                                <button class="btn btn-sm btn-success run-go-btn" onclick="runSimGo()">Go</button>
+                            </div>
                         </div>
+                        <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
+                        <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
+                        <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
+                        <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
                     </div>
-                    <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
-                    <button class="btn btn-invoke sim-icon-btn" id="btnInvokeMethod" onclick="openInvokeModal()" style="display:none;" data-tooltip="Invoke Method — Set up a method call: choose method, fill in arguments, configure registers">&#x2609;</button>
-                    <button class="btn btn-warning sim-icon-btn" onclick="resetSim()" data-tooltip="Boot — Reset and run the boot sequence (C+R)">&#x21BA;</button>
-                    <button class="btn btn-lazy sim-icon-btn" onclick="runLazyLoadTest()" data-tooltip="Lazy Load Test — Load absent Math.Add lump on demand, verify end-to-end lazy fetch">&#x29BF;</button>
                 </div>
-                <div class="sim-controls">
+                <div id="toolbarGroupConfig" class="toolbar-group">
+                    <div class="toolbar-group-divider"></div>
+                    <button class="btn btn-view btn-ti60-connect" id="toolbarTi60ConnectBtn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Active board — click to open the build &amp; connect panel">&#x1F50C; Ti60</button>
                     <button class="btn btn-view btn-share-icon" onclick="openShareLink()" data-tooltip="Share — Copy link to open on another device">&#x1F517;</button>
+                </div>
+                <div id="toolbarGroupInfo" class="toolbar-group">
+                    <div class="toolbar-group-divider"></div>
                     <button class="btn btn-view sim-icon-btn" onclick="openShortcutsHelp()" data-tooltip="Keyboard Shortcuts — Press ? anytime">&#x2328;</button>
-
                     <div class="help-menu-wrap" id="helpMenuWrap">
                         <button class="btn btn-sm builder-help-btn" onclick="toggleHelpMenu()" data-tooltip="Help &amp; Guides — Access guides, welcome overview, and keyboard shortcuts">?</button>
                         <div class="help-dropdown" id="helpDropdown" style="display:none;">
@@ -234,8 +241,9 @@
                             <a class="help-dropdown-item" href="https://github.com/khhodges/cloomc-project/discussions/categories/q-a" target="_blank" rel="noopener" style="display:block;text-decoration:none;color:inherit;">Community Q&amp;A</a>
                         </div>
                     </div>
+                </div>
+                <div class="sim-controls">
                     <span id="toolbarIdeBadge"></span>
-                    <button class="btn btn-view btn-ti60-connect" id="toolbarTi60ConnectBtn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')" data-tooltip="Active board — click to open the build &amp; connect panel">&#x1F50C; Ti60</button>
                     <button class="btn btn-view btn-settings-icon" onclick="openSettings()" data-tooltip="Settings — Configure student profile, subjects, and family">&#9881;</button>
                 </div>
             </nav>
@@ -1665,7 +1673,7 @@
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
     <script async src="app-ti60-connect.js?v=20260526c"></script>
-    <script src="app-shell.js?v=20260526b"></script>
+    <script src="app-shell.js?v=20260526c"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
     <script src="app-cr-detail.js?v=20260520a"></script>

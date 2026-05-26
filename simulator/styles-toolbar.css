@@ -256,6 +256,26 @@
     font-weight: 600;
 }
 
+/* ── Toolbar context groups ───────────────────────────── */
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.toolbar-group--hidden {
+    display: none !important;
+}
+
+.toolbar-group-divider {
+    width: 1px;
+    height: 1.4rem;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+    margin: 0 0.1rem;
+}
+
 .sim-exec-btns {
     display: flex;
     align-items: center;

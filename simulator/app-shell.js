@@ -1214,6 +1214,26 @@ function switchView(viewId) {
     if (viewId === 'reference') renderReference();
     if (viewId === 'docs') loadDocsView();
     if (viewId === 'gc') renderToolsView();
+    _applyToolbarGroups(viewId);
+}
+
+const _TOOLBAR_SIM_VIEWS = new Set([
+    'dashboard','pipeline','namespace','abstractions','editor','repl',
+    'memory','gc','gt-view','trace','hello-mum'
+]);
+const _TOOLBAR_CONFIG_VIEWS = new Set(['builder','lumps','devices','github']);
+
+function _applyToolbarGroups(viewId) {
+    const simEl    = document.getElementById('toolbarGroupSim');
+    const configEl = document.getElementById('toolbarGroupConfig');
+    const infoEl   = document.getElementById('toolbarGroupInfo');
+    if (!simEl || !configEl || !infoEl) return;
+    let group = 'info';
+    if (_TOOLBAR_SIM_VIEWS.has(viewId))    group = 'sim';
+    else if (_TOOLBAR_CONFIG_VIEWS.has(viewId)) group = 'config';
+    simEl.classList.toggle('toolbar-group--hidden',    group !== 'sim');
+    configEl.classList.toggle('toolbar-group--hidden', group !== 'config');
+    infoEl.classList.toggle('toolbar-group--hidden',   group !== 'info');
 }
 
 let _lastGCResult   = null;
