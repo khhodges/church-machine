@@ -507,8 +507,8 @@
                 <div class="s-code-line"><span class="s-code-gold">    method add {</span></div>
                 <div class="s-code-line">        IADD  DR1, DR1, #12  <span class="s-code-comment">; A = 12</span></div>
                 <div class="s-code-line">        IADD  DR2, DR2, #30  <span class="s-code-comment">; B = 30</span></div>
-                <div class="s-code-line">        IADD  DR1, DR1, DR2  <span class="s-code-comment">; A + B  &#x2192;  DR1 = 42</span></div>
-                <div class="s-code-line">        RETURN               <span class="s-code-comment">; return to caller</span></div>
+                <div class="s-code-line"><span class="s-code-gold">        Result = SlideRule (A + B)</span>  <span class="s-code-comment">; A + B  &#x2192;  DR1 = 42</span></div>
+                <div class="s-code-line">        RETURN Result        <span class="s-code-comment">; return to caller</span></div>
                 <div class="s-code-line"><span class="s-code-gold">    }</span></div>
                 <div class="s-code-line"><span class="s-code-gold">}</span></div>
             </div>
