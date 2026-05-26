@@ -83,6 +83,7 @@ function starterNext() {
     _el('statusPanel').classList.add('s-panel-lit');
     _el('outputPanel').classList.add('s-panel-lit');
     _el('btnNext').disabled = true;
+    _setOutput('');
     _updateRegisters();
 }
 
