@@ -1,4 +1,4 @@
-const Ti60Connect = (function () {
+window.Ti60Connect = (function () {
     const BAUD        = 115200;
     const VENDOR_ID   = 0x0403;
     const PRODUCT_ID  = 0x6011;
