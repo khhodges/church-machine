@@ -157,6 +157,23 @@ header h1 a:hover {
     padding: 0.35rem 0.65rem;
 }
 
+.ti60-port-os-list {
+    margin: 0.35rem 0 0.35rem 1.1rem;
+    padding: 0;
+    line-height: 1.7;
+}
+
+.ti60-port-os-list li { font-size: 0.78rem; }
+
+.ti60-port-hint code {
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: var(--church-gold);
+    background: rgba(251,191,36,0.1);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+
 .ti60-help-details {
     margin-top: 0.6rem;
     border: 1px solid rgba(251,191,36,0.18);
