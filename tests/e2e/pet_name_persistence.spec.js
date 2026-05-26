@@ -71,7 +71,12 @@ async function openNamespaceView(page) {
  * Open the Gate Log dashboard tab and wait for it to become active.
  */
 async function openGateLogTab(page) {
-    await openHamburgerItem(page, 'hamItem-dashboard-gatelog');
+    // Gate Log was removed from the hamburger; navigate to Dashboard first
+    // then click the Gate Log tab inside the dashboard panel.
+    await openHamburgerItem(page, 'hamItem-dashboard');
+    const gateLogTabBtn = page.locator('#dashTab-gatelog');
+    await gateLogTabBtn.waitFor({ state: 'visible' });
+    await gateLogTabBtn.click();
     const panel = page.locator('#dashPanel-gatelog');
     await expect(panel).toHaveClass(/\bactive\b/);
 }

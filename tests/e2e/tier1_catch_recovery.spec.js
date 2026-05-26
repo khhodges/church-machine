@@ -58,9 +58,15 @@ async function openGateLogTab(page) {
     await hamBtn.waitFor({ state: 'visible' });
     await hamBtn.click();
 
-    const gateLogBtn = page.locator('#hamItem-dashboard-gatelog');
-    await gateLogBtn.waitFor({ state: 'visible' });
-    await gateLogBtn.click();
+    // Gate Log was removed from the hamburger; navigate to Dashboard first
+    // then click the Gate Log tab inside the dashboard panel.
+    const dashBtn = page.locator('#hamItem-dashboard');
+    await dashBtn.waitFor({ state: 'visible' });
+    await dashBtn.click();
+
+    const gateLogTabBtn = page.locator('#dashTab-gatelog');
+    await gateLogTabBtn.waitFor({ state: 'visible' });
+    await gateLogTabBtn.click();
 
     const panel = page.locator('#dashPanel-gatelog');
     await expect(panel).toHaveClass(/\bactive\b/);
