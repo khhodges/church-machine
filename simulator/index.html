@@ -897,21 +897,24 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                 </details>
             </div>
             <details class="ti60-help-details ti60-terminal-details">
-                <summary>&#x1F5A5;&#xFE0F; Can&#x2019;t use the browser? Run the terminal script instead</summary>
+                <summary>&#x1F309; Using Via Bridge (works from any tab including lab.cloomcy.org)</summary>
                 <div class="ti60-help-body">
-                    <p>On <strong>ChromeOS / Crostini</strong> the USB device is claimed by Linux, so Chrome WebSerial can&#x2019;t see it. Run this Python script directly from your Linux terminal instead &#x2014; it does the same four steps and registers the board with the IDE.</p>
-                    <p><strong>1. Download the script</strong></p>
-                    <pre class="ti60-help-pre" id="ti60PolCmd">curl -o ti60_pol.py <span id="ti60PolUrl"></span>/download/ti60_pol.py</pre>
-                    <p><strong>2. Run it</strong> (with your venv active)</p>
-                    <pre class="ti60-help-pre">pip install pyserial   # first time only
-python3 ti60_pol.py /dev/ttyUSB2 <span id="ti60PolUrl2"></span></pre>
-                    <p>The script prints each step result and exits 0 on full pass.</p>
+                    <p>The <strong>&#x1F309; Via Bridge</strong> button works even on ChromeOS where WebSerial is blocked, and works from the published site at <strong>lab.cloomcy.org</strong>. You run one command in your Linux terminal; the IDE does everything else from the browser.</p>
+                    <p><strong>1. Run the bridge</strong> in your Linux terminal (venv active):</p>
+                    <pre class="ti60-help-pre" id="ti60BridgeCmd">python3 server/local_bridge.py /dev/ttyUSB2 115200 8766</pre>
+                    <p><strong>2. First time only</strong> &#x2014; accept the self-signed cert so the browser can reach it:</p>
+                    <pre class="ti60-help-pre">Open in Chrome:  https://penguin.linux.test:8766/status
+Click Advanced &#x2192; Proceed to penguin.linux.test (unsafe)
+You should see: {"ok": true, "open": true, ...}</pre>
+                    <p><strong>3.</strong> Come back here and click <strong>&#x1F309; Via Bridge</strong>. The panel walks through all four steps automatically.</p>
+                    <p>The bridge runs a local HTTPS server on your machine. The page fetches from it directly &#x2014; no cloud relay needed &#x2014; so it works from any tab.</p>
                 </div>
             </details>
             <div class="ti60-action-row">
                 <div class="ti60-action-btns">
                     <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect</button>
-                    <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect()" style="display:none;">&#x1F50C; Disconnect</button>
+                    <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
+                    <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect()" style="display:none;">&#x2715; Stop</button>
                 </div>
                 <div id="ti60ConnectLog" class="ti60-connect-log"></div>
             </div>
@@ -1719,7 +1722,7 @@ python3 ti60_pol.py /dev/ttyUSB2 <span id="ti60PolUrl2"></span></pre>
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
-    <script async src="app-ti60-connect.js?v=20260527b"></script>
+    <script async src="app-ti60-connect.js?v=20260527c"></script>
     <script src="app-shell.js?v=20260526d"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>

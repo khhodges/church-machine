@@ -1,13 +1,14 @@
 window.Ti60Connect = (function () {
     const BAUD        = 115200;
-    const VENDOR_ID   = 0x0403;
-    const PRODUCT_ID  = 0x6011;
     const STEPS       = ['uart', 'callhome', 'register', 'release'];
+    const DEFAULT_BRIDGE = 'https://penguin.linux.test:8766';
 
     let _port    = null;
     let _reader  = null;
     let _running = false;
+    let _bridgeRunning = false;
 
+    // ── logging ────────────────────────────────────────────────────────────
     function _log(msg, cls) {
         const log = document.getElementById('ti60ConnectLog');
         if (!log) return;
@@ -37,11 +38,14 @@ window.Ti60Connect = (function () {
         const log = document.getElementById('ti60ConnectLog');
         if (log) log.innerHTML = '';
         const btn  = document.getElementById('ti60ConnectBtn');
-        if (btn)  { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect'; }
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
     }
 
+    // ── shared IDE calls ───────────────────────────────────────────────────
     function _parseCallhome(line) {
         if (!line.startsWith('CALLHOME:')) return null;
         try {
@@ -86,6 +90,41 @@ window.Ti60Connect = (function () {
         return t09 && t09.status === 'passing';
     }
 
+    async function _finishSteps(pkt, greetingSeen) {
+        if (!greetingSeen) {
+            _setStep('uart', 'pass', 'Board detected via CALLHOME (board=' + pkt.board + ')');
+        }
+        if (pkt.boot_ok !== 1) {
+            _setStep('callhome', 'fail', 'boot_ok=' + pkt.boot_ok + '  fault_code=' + pkt.fault_code + ' — firmware booted with fault');
+            return;
+        }
+        _setStep('callhome', 'pass',
+            'CALLHOME valid: board=' + pkt.board +
+            ' fw=' + (pkt.fw_major || 1) + '.' + (pkt.fw_minor || 0) +
+            ' nia=' + pkt.nia);
+        _setStep('register', 'active');
+
+        try {
+            const ok = await _registerWithIDE(pkt);
+            if (ok) {
+                _setStep('register', 'pass', 'Device registered in IDE (uid=' + pkt.uid + ')');
+                _setStep('release', 'active');
+                await _reportLaunchTest('passing', 'Ti60 CALLHOME confirmed');
+                const confirmed = await _confirmLaunchTest();
+                if (confirmed) {
+                    _setStep('release', 'pass', 'TEST-09 confirmed passing in IDE ✅');
+                } else {
+                    _setStep('release', 'fail', 'TEST-09 not confirmed in IDE DB');
+                }
+            } else {
+                _setStep('register', 'fail', 'IDE registration returned ok:false');
+            }
+        } catch (e) {
+            _setStep('register', 'fail', 'IDE call failed: ' + e.message);
+        }
+    }
+
+    // ── WebSerial mode ─────────────────────────────────────────────────────
     async function _readLoop() {
         const decoder = new TextDecoderStream();
         _port.readable.pipeTo(decoder.writable).catch(() => {});
@@ -115,36 +154,9 @@ window.Ti60Connect = (function () {
 
                     if (line.startsWith('CALLHOME:') && !registered) {
                         const pkt = _parseCallhome(line);
-                        if (pkt && pkt.boot_ok === 1) {
-                            if (!greetingSeen) {
-                                greetingSeen = true;
-                                _setStep('uart', 'pass', 'Board detected via CALLHOME (board=' + pkt.board + ')');
-                            }
-                            _setStep('callhome', 'pass',
-                                'CALLHOME valid: board=' + pkt.board +
-                                ' fw=' + (pkt.fw_major || 1) + '.' + (pkt.fw_minor || 0) +
-                                ' nia=' + pkt.nia);
-                            _setStep('register', 'active');
+                        if (pkt) {
                             registered = true;
-
-                            try {
-                                const ok = await _registerWithIDE(pkt);
-                                if (ok) {
-                                    _setStep('register', 'pass', 'Device registered in IDE (uid=' + pkt.uid + ')');
-                                    _setStep('release', 'active');
-                                    await _reportLaunchTest('passing', 'Ti60 CALLHOME confirmed via WebSerial');
-                                    const confirmed = await _confirmLaunchTest();
-                                    if (confirmed) {
-                                        _setStep('release', 'pass', 'TEST-09 confirmed passing in IDE ✅');
-                                    } else {
-                                        _setStep('release', 'fail', 'TEST-09 not confirmed in IDE DB');
-                                    }
-                                } else {
-                                    _setStep('register', 'fail', 'IDE registration returned ok:false');
-                                }
-                            } catch (e) {
-                                _setStep('register', 'fail', 'IDE call failed: ' + e.message);
-                            }
+                            await _finishSteps(pkt, greetingSeen);
                         }
                     }
                 }
@@ -163,10 +175,9 @@ window.Ti60Connect = (function () {
             const line = document.createElement('div');
             line.className = 'ti60-log-line log-fail';
             line.innerHTML =
-                '<strong>WebSerial not available.</strong> ' +
-                'Open the app directly in Chrome/Edge — ' +
-                'WebSerial is blocked inside the Replit preview iframe. ' +
-                'Copy the URL from the address bar and paste it into a new tab.';
+                '<strong>WebSerial not available</strong> in this context (iframe or unsupported browser). ' +
+                'Use <strong>🌉 Via Bridge</strong> instead — run the bridge script in your Linux terminal ' +
+                'and click "Via Bridge" to connect from any tab including the published site.';
             log.appendChild(line);
         }
         const btn = document.getElementById('ti60ConnectBtn');
@@ -183,10 +194,6 @@ window.Ti60Connect = (function () {
         if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
 
         try {
-            // No filter — show all available serial ports so the user can
-            // manually pick /dev/ttyUSB2 (or whichever port Chrome can see).
-            // A strict VID/PID filter hides the device if the driver hasn't
-            // presented it or if it's claimed by the Linux VM on ChromeOS.
             _port = await navigator.serial.requestPort({});
         } catch (e) {
             _log('Port selection cancelled.', 'log-fail');
@@ -214,25 +221,129 @@ window.Ti60Connect = (function () {
 
     async function disconnect() {
         _running = false;
+        _bridgeRunning = false;
         try { if (_reader) await _reader.cancel(); }  catch (e) {}
         try { if (_port)   await _port.close();    }  catch (e) {}
         _port   = null;
         _reader = null;
         _log('Disconnected.');
         const btn  = document.getElementById('ti60ConnectBtn');
-        if (btn)  { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect'; }
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
     }
 
+    // ── Bridge mode ────────────────────────────────────────────────────────
+    async function connectViaBridge() {
+        _reset();
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        if (bBtn) { bBtn.disabled = true; bBtn.textContent = 'Connecting…'; }
+
+        const bridgeUrl = DEFAULT_BRIDGE;
+
+        // Step 1: verify bridge is reachable and port is open
+        _setStep('uart', 'active');
+        _log('Connecting to bridge at ' + bridgeUrl + ' …');
+        let status;
+        try {
+            const r = await fetch(bridgeUrl + '/status');
+            status = await r.json();
+        } catch (e) {
+            _setStep('uart', 'fail',
+                'Bridge not reachable at ' + bridgeUrl + '. ' +
+                'Run: python3 server/local_bridge.py /dev/ttyUSB2 — ' +
+                'then accept the cert at ' + bridgeUrl + '/status');
+            if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+            return;
+        }
+
+        if (!status.open) {
+            // Try to open the port
+            _log('Bridge running but port closed — opening /dev/ttyUSB2 …');
+            try {
+                const r2 = await fetch(bridgeUrl + '/connect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ port: '/dev/ttyUSB2', baud: BAUD }),
+                });
+                const d2 = await r2.json();
+                if (!d2.ok) throw new Error(d2.error || 'connect failed');
+            } catch (e) {
+                _setStep('uart', 'fail', 'Could not open /dev/ttyUSB2 via bridge: ' + e.message);
+                if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+                return;
+            }
+        }
+
+        _setStep('uart', 'pass', 'Bridge connected — ' + (status.port || '/dev/ttyUSB2') + ' @ ' + (status.baud || BAUD));
+        _setStep('callhome', 'active');
+        _log('Waiting for firmware CALLHOME packet (up to 30 s)…');
+
+        const dBtn = document.getElementById('ti60DisconnectBtn');
+        if (dBtn) dBtn.style.display = '';
+
+        // Step 2: poll /drain for CALLHOME text (30 s timeout)
+        _bridgeRunning = true;
+        let buf          = '';
+        let greetingSeen = false;
+        let pkt          = null;
+        const deadline   = Date.now() + 30000;
+
+        while (_bridgeRunning && Date.now() < deadline && !pkt) {
+            await new Promise(r => setTimeout(r, 400));
+            try {
+                const dr = await fetch(bridgeUrl + '/drain');
+                const dd = await dr.json();
+                if (dd.bytes && dd.bytes.length) {
+                    buf += String.fromCharCode(...dd.bytes);
+                    const lines = buf.split('\n');
+                    buf = lines.pop();
+                    for (const raw of lines) {
+                        const line = raw.replace(/\r$/, '').trim();
+                        if (!line) continue;
+                        _log('← ' + line);
+                        if (line.includes('CHURCH Ti60 SoC+CM') && !greetingSeen) {
+                            greetingSeen = true;
+                            _setStep('uart', 'pass', 'Greeting received');
+                        }
+                        if (line.startsWith('CALLHOME:')) {
+                            pkt = _parseCallhome(line);
+                        }
+                    }
+                }
+            } catch (e) {
+                _log('Bridge read error: ' + e.message, 'log-fail');
+                break;
+            }
+        }
+
+        if (!_bridgeRunning) return;
+
+        if (!pkt) {
+            _setStep('callhome', 'fail', 'No CALLHOME received in 30 s — power-cycle the board and try again');
+            if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+            return;
+        }
+
+        await _finishSteps(pkt, greetingSeen);
+        _bridgeRunning = false;
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+        if (dBtn) dBtn.style.display = 'none';
+    }
+
     function onTabOpen() {
-        // Fill the terminal-script command with the current IDE origin
         const origin = window.location.origin;
         ['ti60PolUrl', 'ti60PolUrl2'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = origin;
         });
+        // Fill the bridge command spans
+        const bc = document.getElementById('ti60BridgeCmd');
+        if (bc) bc.textContent =
+            'python3 server/local_bridge.py /dev/ttyUSB2 115200 8766';
     }
 
-    return { connect, disconnect, onTabOpen };
+    return { connect, connectViaBridge, disconnect, onTabOpen };
 })();
