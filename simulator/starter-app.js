@@ -144,7 +144,7 @@ function _buildHexRows(src, result) {
 function _hideHexListing() {
     _hexRows   = [];
     _hexRowIdx = 0;
-    _setOutput('<span class="out-dim">— click Start to begin —</span>');
+    _setOutput('');
 }
 
 // ── Session start (from welcome card) ───────────────────────────────────────
