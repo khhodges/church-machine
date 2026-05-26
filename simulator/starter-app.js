@@ -83,7 +83,7 @@ function starterNext() {
     _el('statusPanel').classList.add('s-panel-lit');
     _el('outputPanel').classList.add('s-panel-lit');
     _el('btnNext').disabled = true;
-    _setOutput('');
+    _setOutput('<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>');
     _updateRegisters();
 }
 
