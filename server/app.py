@@ -2120,6 +2120,19 @@ _ALLOWED_BUILD_FILES = {
     "church_tang_nano_20k.il": "text/plain",
 }
 
+@app.route("/download/ti60_pol.py")
+def download_ti60_pol():
+    filepath = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'ti60_pol.py')
+    filepath = os.path.normpath(filepath)
+    if not os.path.isfile(filepath):
+        return make_response("Not found", 404)
+    with open(filepath, 'r') as f:
+        data = f.read()
+    resp = make_response(data, 200)
+    resp.headers['Content-Type'] = 'text/plain'
+    resp.headers['Content-Disposition'] = 'attachment; filename="ti60_pol.py"'
+    return resp
+
 @app.route("/download/<filename>")
 def download_build_file(filename):
     if filename not in _ALLOWED_BUILD_FILES:

@@ -896,6 +896,18 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                     </div>
                 </details>
             </div>
+            <details class="ti60-help-details ti60-terminal-details">
+                <summary>&#x1F5A5;&#xFE0F; Can&#x2019;t use the browser? Run the terminal script instead</summary>
+                <div class="ti60-help-body">
+                    <p>On <strong>ChromeOS / Crostini</strong> the USB device is claimed by Linux, so Chrome WebSerial can&#x2019;t see it. Run this Python script directly from your Linux terminal instead &#x2014; it does the same four steps and registers the board with the IDE.</p>
+                    <p><strong>1. Download the script</strong></p>
+                    <pre class="ti60-help-pre" id="ti60PolCmd">curl -o ti60_pol.py <span id="ti60PolUrl"></span>/download/ti60_pol.py</pre>
+                    <p><strong>2. Run it</strong> (with your venv active)</p>
+                    <pre class="ti60-help-pre">pip install pyserial   # first time only
+python3 ti60_pol.py /dev/ttyUSB2 <span id="ti60PolUrl2"></span></pre>
+                    <p>The script prints each step result and exits 0 on full pass.</p>
+                </div>
+            </details>
             <div class="ti60-action-row">
                 <div class="ti60-action-btns">
                     <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect</button>

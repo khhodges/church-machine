@@ -225,7 +225,14 @@ window.Ti60Connect = (function () {
         if (dBtn) dBtn.style.display = 'none';
     }
 
-    function onTabOpen() {}
+    function onTabOpen() {
+        // Fill the terminal-script command with the current IDE origin
+        const origin = window.location.origin;
+        ['ti60PolUrl', 'ti60PolUrl2'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = origin;
+        });
+    }
 
     return { connect, disconnect, onTabOpen };
 })();
