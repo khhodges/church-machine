@@ -103,11 +103,21 @@ function _switchLesson(fromId, toId, label, outputHtml, nextPhase, disableNext) 
 
 function starterNext() {
     if (_lessonPhase === 1) {
-        _switchLesson('lesson1Code', 'lesson2Code', 'Lesson 2 of 3',
-            '<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>',
-            2, false);
+        // Lesson 1 → 2: reveal abstraction + capabilities { (none) } inline
+        _el('capsInline').classList.remove('hidden');
+        var caps = _el('capsSection');
+        caps.classList.remove('hidden');
+        caps.classList.add('active');
+        _el('statusPanel').classList.add('s-panel-lit');
+        _el('outputPanel').classList.add('s-panel-lit');
+        _el('lessonLabel').textContent = '\u2014 Lesson 2 of 3';
+        _el('btnNext').textContent = 'Lesson 2 \u2192';
+        _lessonPhase = 2;
+        _setOutput('<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>');
+        _updateRegisters();
     } else if (_lessonPhase === 2) {
-        _switchLesson('lesson2Code', 'lesson3Code', 'Lesson 3 of 3',
+        // Lesson 2 → 3: full swap to myScratchPad lesson
+        _switchLesson('lesson1Code', 'lesson3Code', 'Lesson 3 of 3',
             '<span class="out-dim">The programmer adds new capability defined objects using Pet Names. <strong>myScratchPad RW</strong> grants this abstraction read/write access to a private memory region. The <strong>LOAD</strong> instruction fetches that capability from the c-list ready for use.</span>',
             3, true);
     }
@@ -236,23 +246,11 @@ function starterStep() {
     // If not yet loaded, assemble and load first
     if (sim.pc === 0 && !sim._programLoaded) {
         var src;
-        if (_lessonPhase === 1) {
-            // Lesson 1 — plain traditional procedural A+B
+        if (_lessonPhase >= 3) {
+            // Lesson 3 — caps block + LOAD are display-only, compile clean IADD/HALT
             src =
-                '; Simple A + B program\n' +
+                '; The programmer adds new capability defined objects using Pet Names\n' +
                 '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
-                '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
-                '\n' +
-                '    IADD  DR1, DR1, #12  ; A = 12\n' +
-                '    IADD  DR2, DR2, #30  ; B = 30\n' +
-                '    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
-                '    HALT                 ; done \u2014 result is in DR1\n';
-        } else if (_lessonPhase === 2) {
-            // Lesson 2 — caps block is display-only, compile clean IADD/HALT
-            src =
-                '; The Church Machine adds hardened symbolic addressing\n' +
-                '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
-                '; Simple A + B programs are unchanged\n' +
                 '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
                 '\n' +
                 '    IADD  DR1, DR1, #12  ; A = 12\n' +
@@ -260,10 +258,11 @@ function starterStep() {
                 '    IADD  DR1, DR1, DR2  ; A + B  \u2192  DR1 = 42\n' +
                 '    HALT                 ; done \u2014 result is in DR1\n';
         } else {
-            // Lesson 3 — caps block + LOAD are display-only, compile clean IADD/HALT
+            // Lessons 1 & 2 — caps block is display-only, compile clean IADD/HALT
             src =
-                '; The programmer adds new capability defined objects using Pet Names\n' +
+                '; The Church Machine adds hardened symbolic addressing\n' +
                 '; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n' +
+                '; Simple A + B programs are unchanged\n' +
                 '; DR1 holds A, DR2 holds B, result goes into DR1.\n' +
                 '\n' +
                 '    IADD  DR1, DR1, #12  ; A = 12\n' +
