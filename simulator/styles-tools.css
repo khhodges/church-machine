@@ -1299,6 +1299,23 @@
     font-weight: 600;
     margin-left: 0.25rem;
 }
+.dev-newcomer-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 0.78rem;
+    color: var(--church-gold, #daa520);
+    text-decoration: none;
+    border: 1px solid rgba(218,165,32,0.35);
+    border-radius: 14px;
+    padding: 0.2rem 0.65rem;
+    font-weight: 600;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.dev-newcomer-btn:hover {
+    background: rgba(218,165,32,0.12);
+    border-color: rgba(218,165,32,0.6);
+}
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 .dev-grid {

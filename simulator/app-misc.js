@@ -1549,7 +1549,8 @@ function loadDeviceList() {
                             '<strong>First boot!</strong> ' +
                             'Your Ti60 is online. ' +
                             '<span class="dev-newcomer-abstr">First Abstraction: Hello World ✓</span>' +
-                        '</span>';
+                        '</span>' +
+                        '<a href="/starter" class="dev-newcomer-btn" target="_blank">✏️ Write First Program →</a>';
                     wrap.appendChild(newcomer);
                 }
 

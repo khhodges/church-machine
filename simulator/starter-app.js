@@ -250,7 +250,7 @@ function starterBoot() {
         _enableControls(true);
         _setBadge('HALTED');
         _updateRegisters();
-        _setOutput('');
+        _setOutput('<span class="out-dim">Machine booted. Click <strong style="color:#daa520">›\u202fStep</strong> to walk through your first program one instruction at a time.</span>');
     } catch (e) {
         _setBadge('FAULT');
         _setOutput('<span class="out-red">Boot failed: ' + e.message + '</span>');
