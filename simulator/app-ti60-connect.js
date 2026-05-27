@@ -8,6 +8,7 @@ window.Ti60Connect = (function () {
     let _running = false;
     let _bridgeRunning = false;
     let _tunnelMode = false;
+    let _streamLineCount = 0;
     let _bridgeEverConfirmed = localStorage.getItem('ti60BridgeCertAccepted') === '1';
     let _detectedPort = null;
     let _activeBaud = BAUD;
@@ -72,6 +73,36 @@ window.Ti60Connect = (function () {
         line.textContent = new Date().toLocaleTimeString() + '  ' + msg;
         log.appendChild(line);
         log.scrollTop = log.scrollHeight;
+    }
+
+    function _streamLog(text, cls) {
+        const body = document.getElementById('ti60NiaStreamBody');
+        if (!body) return;
+        const line = document.createElement('div');
+        line.className = 'ti60-stream-line' + (cls ? ' ' + cls : '');
+        line.textContent = text;
+        body.appendChild(line);
+        // Keep last 500 lines to avoid unbounded growth
+        while (body.children.length > 500) body.removeChild(body.firstChild);
+        body.scrollTop = body.scrollHeight;
+        _streamLineCount++;
+        const cnt = document.getElementById('ti60NiaStreamCount');
+        if (cnt) cnt.textContent = _streamLineCount + ' line' + (_streamLineCount === 1 ? '' : 's');
+    }
+
+    function _showStreamPanel() {
+        const p = document.getElementById('ti60NiaStreamPanel');
+        if (p) p.style.display = '';
+    }
+
+    function _hideStreamPanel() {
+        const p = document.getElementById('ti60NiaStreamPanel');
+        if (p) p.style.display = 'none';
+        const body = document.getElementById('ti60NiaStreamBody');
+        if (body) body.innerHTML = '';
+        const cnt = document.getElementById('ti60NiaStreamCount');
+        if (cnt) cnt.textContent = '0 lines';
+        _streamLineCount = 0;
     }
 
     function _logHtml(html) {
@@ -493,6 +524,7 @@ window.Ti60Connect = (function () {
         let buf     = '';
         let lastNia = null;
         _log('— Live NIA stream active via server tunnel — (Disconnect to stop)', 'log-pass');
+        _showStreamPanel();
         while (_bridgeRunning) {
             await new Promise(r => setTimeout(r, 400));
             try {
@@ -509,6 +541,7 @@ window.Ti60Connect = (function () {
                         const niaMatch = line.match(/\bNIA=0x([0-9A-Fa-f]+)/i);
                         if (niaMatch) {
                             const nia = '0x' + niaMatch[1].toUpperCase().padStart(8, '0');
+                            _streamLog('NIA → ' + nia, 'sl-nia');
                             if (nia !== lastNia) {
                                 lastNia = nia;
                                 _log('NIA → ' + nia, 'log-nia');
@@ -519,10 +552,12 @@ window.Ti60Connect = (function () {
                             const newPkt = _parseCallhome(line);
                             if (newPkt) {
                                 _log('⟳ Board reboot detected', 'log-warn');
+                                _streamLog('── REBOOT ──', 'sl-boot');
                                 lastNia = null;
                                 await _finishSteps(newPkt, true, true);
                             }
                         } else {
+                            _streamLog('← ' + line);
                             _log('← ' + line);
                         }
                     }
@@ -534,6 +569,7 @@ window.Ti60Connect = (function () {
         }
         _bridgeRunning = false;
         _tunnelMode    = false;
+        _hideStreamPanel();
         if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         if (dBtn) dBtn.style.display = 'none';
     }
@@ -578,5 +614,5 @@ window.Ti60Connect = (function () {
         _log('Bridge cert memory cleared — setup guide will reappear on next connection attempt.');
     }
 
-    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, hideBridgeSetup: _hideBridgeSetup, resetBridgeCert };
+    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, hideBridgeSetup: _hideBridgeSetup, resetBridgeCert, get _streamLineCount() { return _streamLineCount; }, set _streamLineCount(v) { _streamLineCount = v; } };
 })();
