@@ -394,6 +394,7 @@ header h1 a:hover {
 .ti60-log-line { margin-bottom: 0.1rem; line-height: 1.4; }
 .ti60-log-line.log-pass { color: var(--success); }
 .ti60-log-line.log-fail { color: var(--error); }
+.ti60-log-line.log-warn { color: var(--warning, #e6a817); }
 
 .ti60-bridge-btn {
     font-size: 0.95rem;

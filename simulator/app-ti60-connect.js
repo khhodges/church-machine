@@ -333,13 +333,18 @@ window.Ti60Connect = (function () {
         _setActivePort(null);
         if (wasBridge) {
             let confirmedBaud = _activeBaud;
+            let bridgeReachable = true;
             try {
                 const r = await fetch(_bridgeUrl() + '/disconnect',
                     { method: 'POST', signal: AbortSignal.timeout(3000) });
                 const d = await r.json();
                 if (d && typeof d.baud === 'number') confirmedBaud = d.baud;
-            } catch (e) {}
-            _log('Disconnected from bridge (was ' + confirmedBaud + ' baud).');
+            } catch (e) { bridgeReachable = false; }
+            if (bridgeReachable) {
+                _log('Disconnected from bridge (was ' + confirmedBaud + ' baud).');
+            } else {
+                _log('Disconnected (bridge unreachable — port may still be held open).', 'log-warn');
+            }
         } else {
             _log('Disconnected (was ' + _activeBaud + ' baud).');
         }
