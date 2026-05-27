@@ -564,13 +564,19 @@ if __name__ == '__main__':
         _probe_bauds(port)
         sys.exit(0)
 
+    force_http = False
     for a in sys.argv[1:]:
         if a.startswith('--ide='):
             _IDE_SERVER_URL = a[6:].rstrip('/')
         elif a == '--report-launch':
             _REPORT_LAUNCH = True
+        elif a == '--http':
+            force_http = True
 
-    cert_path, key_path = _generate_self_signed_cert()
+    if force_http:
+        cert_path, key_path = None, None
+    else:
+        cert_path, key_path = _generate_self_signed_cert()
     use_https = cert_path is not None
 
     if use_https:
@@ -583,7 +589,11 @@ if __name__ == '__main__':
     print(f'Church Machine FPGA Bridge ({scheme.upper()})')
     print(f'  Serial : {SERIAL_PORT} @ {BAUD} baud')
     print(f'  {scheme.upper():7s}: {scheme}://0.0.0.0:{HTTP_PORT}')
-    print(f'  ChromeOS bridge URL: {scheme}://penguin.linux.test:{HTTP_PORT}')
+    if force_http:
+        print(f'  ChromeOS bridge URL: http://localhost:{HTTP_PORT}')
+        print(f'  NOTE: HTTP mode — enable port forwarding in ChromeOS Settings → Linux → Port forwarding → TCP {HTTP_PORT}')
+    else:
+        print(f'  ChromeOS bridge URL: {scheme}://penguin.linux.test:{HTTP_PORT}')
     if _IDE_SERVER_URL:
         print(f'  IDE Server: {_IDE_SERVER_URL}')
     else:
