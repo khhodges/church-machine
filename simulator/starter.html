@@ -496,6 +496,34 @@
             .s-method-2col { grid-template-columns: 1fr; }
         }
 
+        /* ── Resume draft banner ── */
+        .s-resume-banner {
+            display: none;
+            margin-top: 1.1rem;
+            padding: 0.75rem 1rem;
+            background: rgba(218,165,32,0.10);
+            border: 1px solid rgba(218,165,32,0.35);
+            border-radius: 7px;
+            font-size: 0.85rem;
+            color: #c8a84b;
+            text-align: left;
+        }
+        .s-resume-banner.active { display: block; }
+        .s-resume-banner strong { color: #daa520; }
+        .s-resume-btn {
+            display: inline-block;
+            margin-top: 0.6rem;
+            padding: 0.4rem 1.1rem;
+            background: #daa520;
+            color: #1a1508;
+            font-weight: 700;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .s-resume-btn:hover { background: #f0b800; }
+
         /* ── Mobile ── */
         @media (max-width: 700px) {
             .s-main {
@@ -543,6 +571,12 @@
         Everything you build here runs unchanged on real silicon.
     </p>
     <button class="s-start-btn" onclick="startSession()">Boot →</button>
+    <div class="s-resume-banner" id="resumeDraftBanner">
+        ✏️ You have an unsaved abstraction draft — <strong id="resumeDraftName"></strong>
+        <br>
+        <button class="s-resume-btn" onclick="resumeLesson5Draft()">Resume your draft →</button>
+        <button style="margin-left:0.6rem;background:none;border:none;color:#888;cursor:pointer;font-size:0.8rem;" onclick="discardLesson5Draft()">Discard</button>
+    </div>
 </div>
 
 <!-- ── Main IDE area ── -->
@@ -702,7 +736,7 @@
 <script src="simulator.js?v=20260521c"></script>
 <script src="assembler.js?v=20260521a"></script>
 <script src="cloomc_compiler.js?v=20260519c"></script>
-<script src="starter-app.js?v=20260527k"></script>
+<script src="starter-app.js?v=20260527m"></script>
 
 </body>
 </html>

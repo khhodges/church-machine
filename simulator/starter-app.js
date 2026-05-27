@@ -572,6 +572,35 @@ function starterSaveDraft() {
     window.location = '/simulator/#editor';
 }
 
+// ── Draft resume banner ──────────────────────────────────────────────────────
+
+function _checkResumeBanner() {
+    try {
+        var raw = localStorage.getItem(_L5_DRAFT_KEY);
+        if (!raw) return;
+        var d = JSON.parse(raw);
+        if (!d) return;
+        var banner = _el('resumeDraftBanner');
+        if (!banner) return;
+        var nameEl = _el('resumeDraftName');
+        var displayName = (d.name && d.name.trim()) ? d.name.trim() : 'unnamed abstraction';
+        if (nameEl) nameEl.textContent = displayName;
+        banner.classList.add('active');
+    } catch (e) {}
+}
+
+function resumeLesson5Draft() {
+    startSession();    // boot + show main area (synchronous)
+    _lessonPhase = 4;  // prime starterNext for the 4→5 transition
+    starterNext();     // jumps to Lesson 5, auto-restores the draft
+}
+
+function discardLesson5Draft() {
+    try { localStorage.removeItem(_L5_DRAFT_KEY); } catch (e) {}
+    var banner = _el('resumeDraftBanner');
+    if (banner) banner.classList.remove('active');
+}
+
 // ── Challenge mode ───────────────────────────────────────────────────────────
 
 (function() {
@@ -588,4 +617,7 @@ function starterSaveDraft() {
             startSession();
         });
     }
+
+    // Show "Resume your draft" banner if a Lesson 5 draft is saved
+    document.addEventListener('DOMContentLoaded', _checkResumeBanner);
 })();
