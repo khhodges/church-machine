@@ -326,6 +326,9 @@ window.Ti60Connect = (function () {
     async function testBridge() {
         const tBtn = document.getElementById('ti60TestBridgeBtn');
         if (tBtn) tBtn.disabled = true;
+        if (!_bridgeEverConfirmed) {
+            _showBridgeSetup();
+        }
         const url = _bridgeUrl();
         _log('Testing bridge at ' + url + ' …');
         try {
@@ -500,5 +503,11 @@ window.Ti60Connect = (function () {
         }
     }
 
-    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, hideBridgeSetup: _hideBridgeSetup };
+    function resetBridgeCert() {
+        localStorage.removeItem('ti60BridgeCertAccepted');
+        _bridgeEverConfirmed = false;
+        _log('Bridge cert memory cleared — setup guide will reappear on next connection attempt.');
+    }
+
+    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, hideBridgeSetup: _hideBridgeSetup, resetBridgeCert };
 })();

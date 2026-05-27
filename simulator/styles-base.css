@@ -466,6 +466,23 @@ header h1 a:hover {
     border-color: rgba(96,165,250,0.6);
     background: rgba(96,165,250,0.05);
 }
+.ti60-forget-bridge-btn {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid rgba(248,113,113,0.35);
+    color: rgba(248,113,113,0.75);
+    border-radius: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.ti60-forget-bridge-btn:hover {
+    background: rgba(248,113,113,0.1);
+    border-color: rgba(248,113,113,0.65);
+    color: rgba(248,113,113,1);
+}
 
 /* ── Bridge setup guide panel ──────────────────────────────────────────── */
 .ti60-bridge-setup-panel {
