@@ -636,7 +636,12 @@ function init() {
 
     const asmEd = document.getElementById('asmEditor');
     if (asmEd) {
-        asmEd.addEventListener('input', function() { updateLineNumbers(); markUserTabDirty(); updateSavePseudoBtn(); });
+        var _editorAutoSaveTimer = null;
+        asmEd.addEventListener('input', function() {
+            updateLineNumbers(); markUserTabDirty(); updateSavePseudoBtn();
+            clearTimeout(_editorAutoSaveTimer);
+            _editorAutoSaveTimer = setTimeout(saveEditorState, 800);
+        });
         asmEd.addEventListener('scroll', syncLineScroll);
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(function() { syncLineScroll(); _debouncedErrorRecalc(); }).observe(asmEd);
