@@ -329,6 +329,90 @@ Efinix Sapphire IP. Inspect it:
 grep -n "ram_symbol\|readmemb" hardware/soc_combined/sapphire.v | head -20
 ```
 
+### Boot loop — NIA=0x00000000 repeating in the IDE stream panel
+
+**Symptom** — The 📡 Live UART Stream panel shows this pattern repeating:
+```
+← CHURCH Ti60 SoC+CM v1.1
+NIA → 0x00000000
+── REBOOT ──
+← CHURCH Ti60 SoC+CM v1.1
+NIA → 0x00000000
+── REBOOT ──
+```
+
+**What it means** — The Church Machine starts, attempts its very first instruction at
+address `0x00000000` (the start of the boot LUMP), faults immediately, and the firmware
+reboots. The boot LUMP baked into the BRAM during synthesis is corrupted, stale, or
+was compiled from an incompatible firmware version.
+
+**Reading the fault data** — The IDE Connect tab CALLHOME line shows the fault detail:
+```
+CALLHOME valid: board=Ti60F225 fw=1.0 nia=0x00000000
+```
+The `nia=` field is the **fault NIA** from the previous boot stored in the CALLHOME
+packet (`fault_nia` bytes 19–22). The IDE fault popup (visible in the simulator) maps
+fault codes to mnemonics:
+
+| HW Code | Mnemonic | Meaning at boot |
+|---|---|---|
+| `0x07` | `NULL_CAP` | Boot LUMP capability slot is zeroed — BRAM not patched |
+| `0x08` | `BOUNDS` | Boot LUMP size field is wrong — firmware/LUMP mismatch |
+| `0x09` | `VERSION` | Golden Token version field invalid — stale BRAM init |
+| `0x0A` | `SEAL` | CRC seal on boot capability is broken — BRAM corrupted |
+| `0x0B` | `INVALID_OP` | Opcode at address 0 is not a valid CM instruction |
+| `0x0D` | `DOMAIN_PURITY` | Code/capability mixed in boot LUMP — layout error |
+
+**Capturing full fault detail** — in the IDE Connect log, the CALLHOME line includes
+`fault_code` (byte 18 of the packet). You can also read it directly via the APB3 bridge
+while the board is halted:
+
+```
+APB offset 0x04 (STATUS) bit[1] = fault_valid
+APB offset 0x0C (FAULT)  bits[4:0] = fault code  ← matches HW Code table above
+APB offset 0x08 (NIA)              = faulting instruction address
+```
+
+**Fix** — the BRAM init is wrong. Re-run Steps 3–9 (firmware-only rebuild):
+
+```bash
+cd ~/church-machine
+make -C hardware/soc_combined/firmware                    # Step 3
+python3 scripts/patch_sapphire_init.py \                  # Step 4 — MUST NOT SKIP
+  hardware/soc_combined/sapphire.v \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+bash hardware/soc_combined/work_syn/run_efx_map.sh        # Step 6
+bash hardware/soc_combined/work_pnr/run_efx_pnr.sh        # Step 7
+cd hardware/soc_combined && \
+  ~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml  # Step 8
+cd ~/church-machine && \
+  sudo ~/oss-cad-suite/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag \
+    -f hardware/soc_combined/outflow/church_soc_cm.hex     # Step 9
+```
+
+After a successful flash the stream panel should show:
+```
+← CHURCH Ti60 SoC+CM v1.1
+NIA → 0x00000002
+NIA → 0x00000005
+...
+```
+(incrementing NIA addresses, no REBOOT)
+
+Save the working hex as a good build:
+```bash
+cp hardware/soc_combined/outflow/church_soc_cm.hex \
+   hardware/soc_combined/good-builds/church_soc_cm-$(date +%Y-%m-%d).hex
+git add hardware/soc_combined/good-builds/
+git commit -m "good-build: Ti60 $(date +%Y-%m-%d) — boot loop fixed"
+```
+
+---
+
 ### LED0 never lights after flash
 
 The SoC is stuck in reset. Check that `io_asyncReset` in `top.v` is tied to
