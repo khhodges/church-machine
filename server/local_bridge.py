@@ -226,42 +226,72 @@ def _report_launch_test(test_id, status="passing", notes=""):
 # ── background reader ────────────────────────────────────────────────────────
 
 def _reader():
-    global _ser, _rx_buf
+    global _ser, _rx_buf, _active_baud
     callhome_scan = bytearray()
     last_rx_time = time.monotonic()
+    _RECONNECT_DELAY = 2.0
     while _reader_running:
         try:
             with _ser_lock:
                 s = _ser
             if s and s.is_open:
-                waiting = s.in_waiting
-                if waiting:
-                    chunk = s.read(waiting)
-                    callhome_scan.extend(chunk)
-                    last_rx_time = time.monotonic()
-                    while len(callhome_scan) >= 2:
-                        idx = callhome_scan.find(CALLHOME_MAGIC)
-                        if idx < 0:
-                            safe = max(0, len(callhome_scan) - 1)
-                            if safe > 0:
+                try:
+                    waiting = s.in_waiting
+                    if waiting:
+                        chunk = s.read(waiting)
+                        if not chunk:
+                            raise serial.SerialException(
+                                "device reports readiness to read but returned no data "
+                                "(device disconnected or multiple access on port?)")
+                        callhome_scan.extend(chunk)
+                        last_rx_time = time.monotonic()
+                        while len(callhome_scan) >= 2:
+                            idx = callhome_scan.find(CALLHOME_MAGIC)
+                            if idx < 0:
+                                safe = max(0, len(callhome_scan) - 1)
+                                if safe > 0:
+                                    with _rx_lock:
+                                        _rx_buf.extend(callhome_scan[:safe])
+                                    callhome_scan = callhome_scan[safe:]
+                                break
+                            if idx > 0:
                                 with _rx_lock:
-                                    _rx_buf.extend(callhome_scan[:safe])
-                                callhome_scan = callhome_scan[safe:]
-                            break
-                        if idx > 0:
+                                    _rx_buf.extend(callhome_scan[:idx])
+                                callhome_scan = callhome_scan[idx:]
+                            if len(callhome_scan) < CALLHOME_PKT_LEN:
+                                break
+                            _handle_callhome(bytes(callhome_scan[:CALLHOME_PKT_LEN]))
+                            callhome_scan = callhome_scan[CALLHOME_PKT_LEN:]
+                    else:
+                        if callhome_scan and (time.monotonic() - last_rx_time) > 0.005:
                             with _rx_lock:
-                                _rx_buf.extend(callhome_scan[:idx])
-                            callhome_scan = callhome_scan[idx:]
-                        if len(callhome_scan) < CALLHOME_PKT_LEN:
-                            break
-                        _handle_callhome(bytes(callhome_scan[:CALLHOME_PKT_LEN]))
-                        callhome_scan = callhome_scan[CALLHOME_PKT_LEN:]
-                else:
-                    if callhome_scan and (time.monotonic() - last_rx_time) > 0.005:
-                        with _rx_lock:
-                            _rx_buf.extend(callhome_scan)
-                        callhome_scan = bytearray()
-                    time.sleep(0.005)
+                                _rx_buf.extend(callhome_scan)
+                            callhome_scan = bytearray()
+                        time.sleep(0.005)
+                except serial.SerialException as exc:
+                    print(f'  [bridge] Serial error: {exc}')
+                    # Flush stale scan and rx buffers before reconnect to prevent
+                    # garbled CALLHOME JSON from mixing pre- and post-disconnect bytes
+                    callhome_scan = bytearray()
+                    with _rx_lock:
+                        _rx_buf.clear()
+                    with _ser_lock:
+                        try:
+                            if _ser:
+                                _ser.close()
+                        except Exception:
+                            pass
+                        _ser = None
+                    print(f'  [bridge] Reconnecting in {_RECONNECT_DELAY:.0f} s\u2026')
+                    time.sleep(_RECONNECT_DELAY)
+                    try:
+                        baud = _active_baud or BAUD
+                        new_ser = serial.Serial(SERIAL_PORT, baud, timeout=0)
+                        with _ser_lock:
+                            _ser = new_ser
+                        print(f'  [bridge] Reconnected to {SERIAL_PORT}')
+                    except Exception as re_exc:
+                        print(f'  [bridge] Reconnect failed: {re_exc}')
             else:
                 time.sleep(0.02)
         except Exception:
