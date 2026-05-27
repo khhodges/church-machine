@@ -149,14 +149,41 @@ header h1 a:hover {
     line-height: 1.5;
 }
 
+.ti60-pol-heading {
+    position: relative;
+    display: inline-block;
+}
+
+.ti60-pol-hint-icon {
+    font-size: 0.85em;
+    opacity: 0.6;
+    cursor: help;
+    vertical-align: middle;
+}
+
+.ti60-pol-heading:hover .ti60-pol-hint-icon {
+    opacity: 1;
+}
+
 .ti60-connect-header .ti60-port-hint {
-    margin-top: 0.5rem;
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 8000;
+    width: 420px;
     font-size: 0.78rem;
     color: var(--church-blue);
-    background: rgba(96,165,250,0.08);
-    border: 1px solid rgba(96,165,250,0.2);
-    border-radius: 5px;
-    padding: 0.35rem 0.65rem;
+    background: var(--bg-panel);
+    border: 1px solid rgba(96,165,250,0.35);
+    border-radius: 7px;
+    padding: 0.6rem 0.85rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.55);
+    pointer-events: none;
+}
+
+.ti60-pol-heading:hover .ti60-port-hint {
+    display: block;
 }
 
 .ti60-port-os-list {
