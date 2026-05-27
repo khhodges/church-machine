@@ -216,7 +216,16 @@ window.Ti60Connect = (function () {
         }
     }
 
+    function _showIframeBanner() {
+        const banner = document.getElementById('ti60IframeBanner');
+        if (banner) {
+            banner.style.display = 'flex';
+            banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
     async function connect() {
+        if (_isIframe()) { _showIframeBanner(); return; }
         if (!('serial' in navigator)) { _noSerial(); return; }
         _reset();
         const btn = document.getElementById('ti60ConnectBtn');
@@ -407,15 +416,15 @@ window.Ti60Connect = (function () {
             if (el) el.textContent = origin;
         });
 
-        // If we're in an iframe, immediately warn and suggest alternatives
+        // Show the persistent banner and a log hint when inside an iframe
         if (_isIframe()) {
+            _showIframeBanner();
             const log = document.getElementById('ti60ConnectLog');
             if (log && log.children.length === 0) {
                 _logHtml(
-                    '⚠️ <strong>Preview pane detected.</strong> WebSerial is blocked in iframes. ' +
-                    'Use <strong>🌉 Via Bridge</strong> below, or ' +
-                    '<a href="/simulator/" target="_blank" style="color:#daa520;">open IDE in a new tab</a> ' +
-                    'to use USB Connect directly.'
+                    '&#x26A0;&#xFE0F; <strong>Preview pane detected.</strong> ' +
+                    'Use <strong>&#x1F309; Via Bridge</strong> below, or click ' +
+                    '<strong>Open in full browser tab</strong> above to use USB Connect directly.'
                 );
             }
         }
