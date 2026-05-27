@@ -203,28 +203,61 @@ header h1 a:hover {
     border-radius: 3px;
 }
 
-.ti60-help-details {
-    margin-top: 0.6rem;
-    border: 1px solid rgba(251,191,36,0.18);
-    border-radius: 6px;
-    background: rgba(251,191,36,0.04);
+.ti60-help-menu {
+    position: relative;
+    margin-top: 0.5rem;
+    display: inline-block;
+}
+
+.ti60-help-toggle {
+    background: var(--bg-secondary);
+    border: 1px solid rgba(251,191,36,0.3);
+    color: var(--church-gold);
+    padding: 0.25rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.ti60-help-toggle:hover {
+    background: rgba(251,191,36,0.1);
+    border-color: var(--church-gold);
+}
+
+.ti60-help-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 8500;
+    width: 480px;
+    max-height: 420px;
+    overflow-y: auto;
+    background: var(--bg-panel);
+    border: 1px solid rgba(251,191,36,0.25);
+    border-radius: 7px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
     font-size: 0.82rem;
 }
+.ti60-help-dropdown.open { display: block; }
 
-.ti60-help-details summary {
-    cursor: pointer;
-    padding: 0.4rem 0.7rem;
-    color: var(--church-gold);
-    user-select: none;
-    list-style: none;
+.ti60-help-section {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    color: var(--text-secondary);
+    line-height: 1.55;
 }
+.ti60-help-section:last-child { border-bottom: none; }
 
-.ti60-help-details summary::-webkit-details-marker { display: none; }
-
-.ti60-help-details[open] summary {
-    border-bottom: 1px solid rgba(251,191,36,0.15);
+.ti60-help-section-title {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: var(--church-gold);
     margin-bottom: 0.5rem;
 }
+
+.ti60-help-section p { margin: 0.35rem 0; }
 
 .ti60-help-body {
     padding: 0 0.85rem 0.65rem;
@@ -406,8 +439,8 @@ header h1 a:hover {
 
 .ti60-connect-log {
     flex: 1;
-    min-height: 110px;
-    max-height: 160px;
+    min-height: 220px;
+    max-height: 420px;
     overflow-y: auto;
     background: #0a0a14;
     border: 1px solid var(--border);

@@ -885,37 +885,38 @@
                         </ul>
                     </div>
                 </div>
-                <details class="ti60-help-details">
-                    <summary>&#x2139;&#xFE0F; What to expect from the firmware</summary>
-                    <div class="ti60-help-body">
-                        <p>When the board boots correctly it sends two lines over UART:</p>
-                        <pre class="ti60-help-pre">CHURCH Ti60 SoC+CM v1.0 ready
+                <div class="ti60-help-menu" id="ti60HelpMenu">
+                    <button class="ti60-help-toggle" onclick="(function(b){var d=document.getElementById('ti60HelpDropdown');var open=d.classList.toggle('open');b.setAttribute('aria-expanded',open);})(this)" aria-expanded="false">&#x2630; Help</button>
+                    <div class="ti60-help-dropdown" id="ti60HelpDropdown">
+                        <div class="ti60-help-section">
+                            <div class="ti60-help-section-title">&#x2139;&#xFE0F; What to expect from the firmware</div>
+                            <p>When the board boots correctly it sends two lines over UART:</p>
+                            <pre class="ti60-help-pre">CHURCH Ti60 SoC+CM v1.0 ready
 CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fault_code":0}</pre>
-                        <p><strong>Step 1 — Connect</strong> passes when the greeting line arrives.<br>
-                        If nothing appears: wrong port selected, wrong baud rate, or the board hasn't finished booting — power-cycle and try again.</p>
-                        <p><strong>Step 2 — Call Home</strong> passes when <code>boot_ok&nbsp;=&nbsp;1</code> is seen in the JSON.<br>
-                        If <code>boot_ok&nbsp;=&nbsp;0</code>: the firmware detected a fault on boot — check the <code>fault_code</code> field in the log.</p>
-                        <p><strong>Step 3 — Register</strong> passes when the IDE server stores the device UID.<br>
-                        If it fails: the IDE server may be unreachable — check that the app is running and not behind a firewall.</p>
-                        <p><strong>Step 4 — Release</strong> passes when TEST-09 is confirmed <em>passing</em> in the launch-test database.<br>
-                        This marks the board as production-released.</p>
-                    </div>
-                </details>
-            </div>
-            <details class="ti60-help-details ti60-terminal-details">
-                <summary>&#x1F309; Using Via Bridge (works from any tab including lab.cloomcy.org)</summary>
-                <div class="ti60-help-body">
-                    <p>The <strong>&#x1F309; Via Bridge</strong> button works even on ChromeOS where WebSerial is blocked, and works from the published site at <strong>lab.cloomcy.org</strong>. You run one command in your Linux terminal; the IDE does everything else from the browser.</p>
-                    <p><strong>1. Run the bridge</strong> in your Linux terminal (venv active):</p>
-                    <pre class="ti60-help-pre" id="ti60BridgeCmd">python3 server/local_bridge.py /dev/ttyUSB2 115200 8766</pre>
-                    <p><strong>2. First time only</strong> &#x2014; accept the self-signed cert so the browser can reach it:</p>
-                    <pre class="ti60-help-pre">Open in Chrome:  https://penguin.linux.test:8766/status
+                            <p><strong>Step 1 — Connect</strong> passes when the greeting line arrives.<br>
+                            If nothing appears: wrong port selected, wrong baud rate, or the board hasn't finished booting — power-cycle and try again.</p>
+                            <p><strong>Step 2 — Call Home</strong> passes when <code>boot_ok&nbsp;=&nbsp;1</code> is seen in the JSON.<br>
+                            If <code>boot_ok&nbsp;=&nbsp;0</code>: the firmware detected a fault on boot — check the <code>fault_code</code> field in the log.</p>
+                            <p><strong>Step 3 — Register</strong> passes when the IDE server stores the device UID.<br>
+                            If it fails: the IDE server may be unreachable — check that the app is running and not behind a firewall.</p>
+                            <p><strong>Step 4 — Release</strong> passes when TEST-09 is confirmed <em>passing</em> in the launch-test database.<br>
+                            This marks the board as production-released.</p>
+                        </div>
+                        <div class="ti60-help-section">
+                            <div class="ti60-help-section-title">&#x1F309; Using Via Bridge (works from any tab including lab.cloomcy.org)</div>
+                            <p>The <strong>&#x1F309; Via Bridge</strong> button works even on ChromeOS where WebSerial is blocked, and works from the published site at <strong>lab.cloomcy.org</strong>. You run one command in your Linux terminal; the IDE does everything else from the browser.</p>
+                            <p><strong>1. Run the bridge</strong> in your Linux terminal (venv active):</p>
+                            <pre class="ti60-help-pre" id="ti60BridgeCmd">python3 server/local_bridge.py /dev/ttyUSB2 115200 8766</pre>
+                            <p><strong>2. First time only</strong> &#x2014; accept the self-signed cert so the browser can reach it:</p>
+                            <pre class="ti60-help-pre">Open in Chrome:  https://penguin.linux.test:8766/status
 Click Advanced &#x2192; Proceed to penguin.linux.test (unsafe)
 You should see: {"ok": true, "open": true, ...}</pre>
-                    <p><strong>3.</strong> Come back here and click <strong>&#x1F309; Via Bridge</strong>. The panel walks through all four steps automatically.</p>
-                    <p>The bridge runs a local HTTPS server on your machine. The page fetches from it directly &#x2014; no cloud relay needed &#x2014; so it works from any tab.</p>
+                            <p><strong>3.</strong> Come back here and click <strong>&#x1F309; Via Bridge</strong>. The panel walks through all four steps automatically.</p>
+                            <p>The bridge runs a local HTTPS server on your machine. The page fetches from it directly &#x2014; no cloud relay needed &#x2014; so it works from any tab.</p>
+                        </div>
+                    </div>
                 </div>
-            </details>
+            </div>
             <div id="ti60IframeBanner" class="ti60-iframe-banner" style="display:none;">
                 <span>&#x26A0;&#xFE0F; <strong>USB WebSerial requires a full browser tab.</strong> It is blocked inside the Replit preview pane.</span>
                 <a href="/simulator/" target="_blank" class="ti60-open-tab-btn">Open in full browser tab &#x2192;</a>
