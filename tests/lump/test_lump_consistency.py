@@ -4,10 +4,10 @@ CHANGE CONTROL GATE — this test must pass before any lump binary or metadata c
 
 Rules enforced
 --------------
-R1   Every .lump has valid header magic (bits[31:27] = 0x1F).
+R1   Every current .lump has valid header magic (bits[31:27] = 0x1F).
 R2   Binary file size in words == header-declared lump_size.
-R3   Every .lump token has a manifest.json entry.
-R4   No orphan sidecar .json (every <token>.json needs a matching .lump).
+R3   Every current .lump token has a manifest.json entry.
+R4   No orphan sidecar .json (every non-archive <stem>.json needs a matching .lump).
 R5   manifest.cw / cc / lump_size == binary header values.
 R6   sidecar.cw / cc / lump_size == binary header values (for sidecars that exist).
 R7   sidecar fields agree with manifest where both exist.
@@ -15,14 +15,26 @@ R8   No duplicate ns_slot values unless all claimants share the same non-null va
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
 R10  Every manifest entry with lump_size declared has a .lump file on disk.
 R11  Every manifest entry with lump_size declared has a sidecar .json on disk.
-R14  Every archive binary <token>-v<N>.lump has a matching <token>-v<N>.json sidecar.
+R14  Every archive binary has a matching sidecar .json (both old <token>-vN and new <Name>_vN).
 
 Failure messages are written to be self-diagnosing: they state what was found,
 what was expected, and which file to correct.
+
+Naming conventions supported
+-----------------------------
+Legacy:  <8hexchars>.lump        — primary file, <8hexchars>.json — sidecar
+         <8hexchars>-vN.lump     — archive binary
+New:     <AbsName>_vN.lump       — primary file (human-readable, N = current version)
+         <AbsName>_vN.json       — sidecar
+         <AbsName>_v(N-1).lump   — archive binary (previous versions)
+
+The manifest entry's optional 'filename' / 'sidecar_file' fields point to the
+actual files on disk.  When absent, the legacy <token>.*  naming is assumed.
 """
 
 import json
 import os
+import re as _re
 import struct
 
 import pytest
@@ -31,6 +43,53 @@ LUMPS_DIR = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", "..", "server", "lumps")
 )
 
+
+# ── Manifest + path helpers ────────────────────────────────────────────────────
+
+def _load_manifest():
+    with open(os.path.join(LUMPS_DIR, "manifest.json")) as f:
+        return json.load(f)
+
+
+MANIFEST = _load_manifest()
+
+# Build per-token path info from the manifest.
+# Keys: token.lower()  Values: dict(lump=path, sidecar=path, lump_stem=str)
+_TOKEN_PATHS: dict = {}
+for _me in MANIFEST:
+    _tok = _me.get("token", "").lower()
+    if not _tok:
+        continue
+    _fn  = _me.get("filename",     f"{_tok}.lump")
+    _sfn = _me.get("sidecar_file", f"{_tok}.json")
+    _TOKEN_PATHS[_tok] = {
+        "lump":      os.path.join(LUMPS_DIR, _fn),
+        "sidecar":   os.path.join(LUMPS_DIR, _sfn),
+        "lump_stem": _fn[:-5] if _fn.endswith(".lump") else _tok,
+    }
+
+# Lowercase stems of every file that IS a "current" (non-archive) lump.
+# A file is current if it is referenced by any manifest entry via 'filename'
+# or if it matches a legacy token basename.
+_MANIFEST_CURRENT_STEMS: set = set()
+for _tok, _info in _TOKEN_PATHS.items():
+    _MANIFEST_CURRENT_STEMS.add(_info["lump_stem"].lower())
+    _MANIFEST_CURRENT_STEMS.add(_tok)          # legacy fallback stem
+
+
+# ── Path-resolution helpers ────────────────────────────────────────────────────
+
+def _lump_path(token: str) -> str:
+    info = _TOKEN_PATHS.get(token.lower())
+    return info["lump"] if info else os.path.join(LUMPS_DIR, f"{token.lower()}.lump")
+
+
+def _sidecar_path(token: str) -> str:
+    info = _TOKEN_PATHS.get(token.lower())
+    return info["sidecar"] if info else os.path.join(LUMPS_DIR, f"{token.lower()}.json")
+
+
+# ── Header / sidecar accessors ─────────────────────────────────────────────────
 
 def _parse_header(word):
     magic   = (word >> 27) & 0x1F
@@ -42,8 +101,8 @@ def _parse_header(word):
     return dict(magic=magic, cw=cw, typ=typ, cc=cc, lump_sz=lump_sz, valid=(magic == 0x1F))
 
 
-def _read_header(token):
-    path = os.path.join(LUMPS_DIR, f"{token}.lump")
+def _read_header(token: str):
+    path = _lump_path(token)
     with open(path, "rb") as f:
         raw = f.read(4)
     if len(raw) < 4:
@@ -51,77 +110,119 @@ def _read_header(token):
     return _parse_header(struct.unpack(">I", raw)[0])
 
 
-def _word_count(token):
-    path = os.path.join(LUMPS_DIR, f"{token}.lump")
-    return os.path.getsize(path) // 4
+def _word_count(token: str) -> int:
+    return os.path.getsize(_lump_path(token)) // 4
 
 
-def _load_manifest():
-    with open(os.path.join(LUMPS_DIR, "manifest.json")) as f:
-        return json.load(f)
-
-
-def _load_sidecar(token):
-    path = os.path.join(LUMPS_DIR, f"{token}.json")
+def _load_sidecar(token: str):
+    path = _sidecar_path(token)
+    if not os.path.exists(path):
+        path = os.path.join(LUMPS_DIR, f"{token.lower()}.json")
     if not os.path.exists(path):
         return None
     with open(path) as f:
         return json.load(f)
 
 
-def _is_archive_filename(basename):
-    """Return True if basename matches the archive pattern <token>-v<N>."""
-    import re as _re
-    return bool(_re.match(r'^[0-9a-f]{8}-v\d+$', basename.lower()))
+def _lump_exists(token: str) -> bool:
+    return os.path.exists(_lump_path(token))
+
+
+def _sidecar_exists(token: str) -> bool:
+    return os.path.exists(_sidecar_path(token))
+
+
+# ── Archive detection ──────────────────────────────────────────────────────────
+
+def _is_archive_stem(stem: str) -> bool:
+    """Return True if *stem* (filename without extension) is an archive, not a current lump.
+
+    Recognises two patterns:
+      - Legacy:  <8hexchars>-v<N>  (e.g. 95a651e7-v4)
+      - New:     <AbsName>_v<N>    (e.g. NoteG_v5) when not a current manifest file
+    """
+    s = stem.lower()
+    if _re.match(r'^[0-9a-f]{8}-v\d+$', s):
+        return True
+    if _re.match(r'^.+_v\d+$', s):
+        return s not in _MANIFEST_CURRENT_STEMS
+    return False
 
 
 def _lump_tokens():
-    return sorted(
-        fn[:-5].lower()
-        for fn in os.listdir(LUMPS_DIR)
-        if fn.endswith(".lump") and not _is_archive_filename(fn[:-5])
-    )
+    """Return sorted list of manifest tokens for all non-archive .lump files on disk.
+
+    Files are mapped back to their manifest token where possible; otherwise the
+    lowercase file stem is used as the token.
+    """
+    stem_to_token = {info["lump_stem"].lower(): tok for tok, info in _TOKEN_PATHS.items()}
+    result = set()
+    for fn in os.listdir(LUMPS_DIR):
+        if not fn.endswith(".lump"):
+            continue
+        stem = fn[:-5]
+        if _is_archive_stem(stem):
+            continue
+        tok = stem_to_token.get(stem.lower()) or stem.lower()
+        result.add(tok)
+    return sorted(result)
 
 
 def _json_tokens():
-    return sorted(
-        fn[:-5].lower()
-        for fn in os.listdir(LUMPS_DIR)
-        if fn.endswith(".json")
-        and fn != "manifest.json"
-        and not _is_archive_filename(fn[:-5])
-    )
+    """Return sorted list of manifest tokens for all non-archive .json files (exc. manifest)."""
+    sc_stem_to_token: dict = {}
+    for tok, info in _TOKEN_PATHS.items():
+        sc_stem = info["sidecar"][len(LUMPS_DIR) + 1:]
+        if sc_stem.endswith(".json"):
+            sc_stem_to_token[sc_stem[:-5].lower()] = tok
+        sc_stem_to_token[tok] = tok  # legacy
+    result = set()
+    for fn in os.listdir(LUMPS_DIR):
+        if not fn.endswith(".json") or fn == "manifest.json":
+            continue
+        stem = fn[:-5]
+        if _is_archive_stem(stem):
+            continue
+        tok = sc_stem_to_token.get(stem.lower()) or stem.lower()
+        result.add(tok)
+    return sorted(result)
 
 
-def _archive_lump_basenames():
-    """Return every <token>-v<N> base name (without extension) found on disk."""
-    import re as _re
-    pattern = _re.compile(r'^[0-9a-f]{8}-v\d+$')
-    return sorted(
-        fn[:-5].lower()
-        for fn in os.listdir(LUMPS_DIR)
-        if fn.endswith(".lump") and pattern.match(fn[:-5].lower())
-    )
+def _archive_lump_stems():
+    """Return sorted list of archive base stems (without .lump) found on disk.
+
+    Includes both legacy <token>-vN and new <AbsName>_vN archives.
+    """
+    result = []
+    for fn in os.listdir(LUMPS_DIR):
+        if fn.endswith(".lump") and _is_archive_stem(fn[:-5]):
+            result.append(fn[:-5])
+    return sorted(result)
 
 
-MANIFEST = _load_manifest()
-LUMP_TOKENS = _lump_tokens()
-JSON_TOKENS = _json_tokens()
+# ── Module-level parametrize targets ──────────────────────────────────────────
+
+LUMP_TOKENS             = _lump_tokens()
+JSON_TOKENS             = _json_tokens()
 MANIFEST_ENTRIES_WITH_SIZE = [e for e in MANIFEST if e.get("lump_size")]
-ARCHIVE_LUMP_BASENAMES = _archive_lump_basenames()
+ARCHIVE_LUMP_STEMS      = _archive_lump_stems()
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Test classes
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class TestR1_ValidMagic:
-    """R1: Every .lump has valid header magic (0x1F)."""
+    """R1: Every current .lump has valid header magic (0x1F)."""
 
     @pytest.mark.parametrize("token", LUMP_TOKENS)
     def test_header_magic(self, token):
         h = _read_header(token)
         assert h is not None, (
-            f"{token}.lump is too short to contain a header word."
+            f"{token}: lump file is too short to contain a header word."
         )
         assert h["valid"], (
-            f"{token}.lump: header magic = {h['magic']:#04x}, expected 0x1F.\n"
+            f"{token}: header magic = {h['magic']:#04x}, expected 0x1F.\n"
             "  bits[31:27] must equal 11111b. Repack the binary with the correct header."
         )
 
@@ -134,18 +235,23 @@ class TestR2_FileSizeMatchesHeader:
         h = _read_header(token)
         actual = _word_count(token)
         assert actual == h["lump_sz"], (
-            f"{token}.lump: file has {actual} words but header declares "
+            f"{token}: file has {actual} words but header declares "
             f"lump_size = {h['lump_sz']} (n_minus_6 encodes a different size).\n"
             "  Repack the binary or correct the n_minus_6 field in the header word."
         )
 
 
 class TestR3_LumpHasManifestEntry:
-    """R3: Every .lump token has a manifest.json entry."""
+    """R3: Every current .lump file is accounted for in manifest.json."""
 
     def test_all_lumps_in_manifest(self):
-        manifest_tokens = {e["token"].lower() for e in MANIFEST}
-        orphans = set(LUMP_TOKENS) - manifest_tokens
+        manifest_keys: set = set()
+        for e in MANIFEST:
+            manifest_keys.add(e.get("token", "").lower())
+            fn = e.get("filename", "")
+            if fn and fn.endswith(".lump"):
+                manifest_keys.add(fn[:-5].lower())
+        orphans = set(LUMP_TOKENS) - manifest_keys
         assert not orphans, (
             f"Lump binaries with no manifest.json entry: {sorted(orphans)}\n"
             "  Add an entry to manifest.json or delete the stale .lump file."
@@ -153,7 +259,7 @@ class TestR3_LumpHasManifestEntry:
 
 
 class TestR4_NoOrphanSidecars:
-    """R4: No orphan sidecar .json without a matching .lump."""
+    """R4: No orphan sidecar .json without a matching current .lump."""
 
     def test_no_orphan_sidecars(self):
         orphans = set(JSON_TOKENS) - set(LUMP_TOKENS)
@@ -169,8 +275,8 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_cw(self, entry):
         token = entry["token"].lower()
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent (covered by R10)")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
         h = _read_header(token)
         assert entry["cw"] == h["cw"], (
             f"{token}: manifest.cw = {entry['cw']} but binary header cw = {h['cw']}.\n"
@@ -180,8 +286,8 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_cc(self, entry):
         token = entry["token"].lower()
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent (covered by R10)")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
         h = _read_header(token)
         assert entry["cc"] == h["cc"], (
             f"{token}: manifest.cc = {entry['cc']} but binary header cc = {h['cc']}.\n"
@@ -191,8 +297,8 @@ class TestR5_ManifestMatchesBinary:
     @pytest.mark.parametrize("entry", MANIFEST_ENTRIES_WITH_SIZE, ids=lambda e: e["token"])
     def test_manifest_lump_size(self, entry):
         token = entry["token"].lower()
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent (covered by R10)")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token} (covered by R10)")
         h = _read_header(token)
         assert entry["lump_size"] == h["lump_sz"], (
             f"{token}: manifest.lump_size = {entry['lump_size']} but binary header "
@@ -206,37 +312,37 @@ class TestR6_SidecarMatchesBinary:
 
     @pytest.mark.parametrize("token", JSON_TOKENS)
     def test_sidecar_cw(self, token):
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token}")
         sc = _load_sidecar(token)
         h  = _read_header(token)
-        if sc.get("cw") is not None:
+        if sc and sc.get("cw") is not None:
             assert sc["cw"] == h["cw"], (
-                f"{token}.json: sidecar.cw = {sc['cw']} but binary header cw = {h['cw']}.\n"
+                f"{token}: sidecar.cw = {sc['cw']} but binary header cw = {h['cw']}.\n"
                 "  Update the sidecar to match the compiled binary, then bump CHANGELOG."
             )
 
     @pytest.mark.parametrize("token", JSON_TOKENS)
     def test_sidecar_cc(self, token):
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token}")
         sc = _load_sidecar(token)
         h  = _read_header(token)
-        if sc.get("cc") is not None:
+        if sc and sc.get("cc") is not None:
             assert sc["cc"] == h["cc"], (
-                f"{token}.json: sidecar.cc = {sc['cc']} but binary header cc = {h['cc']}.\n"
+                f"{token}: sidecar.cc = {sc['cc']} but binary header cc = {h['cc']}.\n"
                 "  Update the sidecar to match the compiled binary, then bump CHANGELOG."
             )
 
     @pytest.mark.parametrize("token", JSON_TOKENS)
     def test_sidecar_lump_size(self, token):
-        if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
-            pytest.skip(f"{token}.lump absent")
+        if not _lump_exists(token):
+            pytest.skip(f"lump file absent for {token}")
         sc = _load_sidecar(token)
         h  = _read_header(token)
-        if sc.get("lump_size") is not None:
+        if sc and sc.get("lump_size") is not None:
             assert sc["lump_size"] == h["lump_sz"], (
-                f"{token}.json: sidecar.lump_size = {sc['lump_size']} but binary header "
+                f"{token}: sidecar.lump_size = {sc['lump_size']} but binary header "
                 f"lump_size = {h['lump_sz']}.\n"
                 "  Update the sidecar, then bump CHANGELOG."
             )
@@ -300,7 +406,7 @@ class TestR9_NullSlotPolicy:
     """R9: RETIRED — ns_slot=null is implicitly dynamic; policy field is optional."""
 
     def test_null_slot_has_policy(self):
-        pass  # R9 retired: null ns_slot is implicitly dynamic, no explicit field required.
+        pass
 
 
 class TestR10_LumpFilesExist:
@@ -310,10 +416,11 @@ class TestR10_LumpFilesExist:
         missing = []
         for e in MANIFEST_ENTRIES_WITH_SIZE:
             token = e["token"].lower()
-            if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.lump")):
+            if not _lump_exists(token):
                 missing.append(
                     f"{token} ({e.get('abstraction', '?')}) — "
-                    f"lump_size={e['lump_size']} declared but no .lump on disk"
+                    f"lump_size={e['lump_size']} declared but no .lump on disk at "
+                    f"{_lump_path(token)}"
                 )
         assert not missing, (
             "Manifest entries missing .lump binary:\n  " + "\n  ".join(missing)
@@ -324,21 +431,16 @@ ABSTRACT_LED_GT = 0x07800100
 
 
 class TestR12_LedPetName:
-    """R12: Any lump whose c-list[0] is the Abstract LED GT must name it 'LED0' in pet_names.CR.
-
-    The Abstract LED GT (0x07800100) is a self-defining capability — it carries no NS slot.
-    When a lump holds it at c-list[0], the sidecar must document that slot as 'LED0' so the
-    IDE can display the correct pet name rather than the bare GT hex value.
-    """
+    """R12: Any lump whose c-list[0] is the Abstract LED GT must name it 'LED0' in pet_names.CR."""
 
     @pytest.mark.parametrize("token", JSON_TOKENS)
     def test_led_clist0_pet_name(self, token):
-        path = os.path.join(LUMPS_DIR, f"{token}.lump")
-        if not os.path.exists(path):
-            pytest.skip(f"{token}.lump absent")
+        if not _lump_exists(token):
+            pytest.skip(f"lump absent for {token}")
         h = _read_header(token)
         if h["cc"] == 0:
             return
+        path = _lump_path(token)
         with open(path, "rb") as f:
             raw = f.read()
         words = struct.unpack(f">{len(raw) // 4}I", raw)
@@ -346,9 +448,9 @@ class TestR12_LedPetName:
         if words[clist_start] != ABSTRACT_LED_GT:
             return
         sc = _load_sidecar(token)
-        cr = sc.get("pet_names", {}).get("CR", {})
+        cr = (sc or {}).get("pet_names", {}).get("CR", {})
         assert cr.get("0") == "LED0", (
-            f"{token}.json: c-list[0] = Abstract LED GT (0x07800100) but "
+            f"{token}: c-list[0] = Abstract LED GT (0x07800100) but "
             f"pet_names.CR[\"0\"] = {cr.get('0')!r}, expected 'LED0'.\n"
             "  Add  \"0\": \"LED0\"  inside the pet_names.CR object in the sidecar."
         )
@@ -361,18 +463,19 @@ class TestR11_SidecarFilesExist:
         missing = []
         for e in MANIFEST_ENTRIES_WITH_SIZE:
             token = e["token"].lower()
-            if not os.path.exists(os.path.join(LUMPS_DIR, f"{token}.json")):
+            if not _sidecar_exists(token):
                 missing.append(
-                    f"{token} ({e.get('abstraction', '?')}) — no sidecar .json on disk"
+                    f"{token} ({e.get('abstraction', '?')}) — no sidecar .json on disk at "
+                    f"{_sidecar_path(token)}"
                 )
         assert not missing, (
             "Manifest entries missing sidecar .json:\n  " + "\n  ".join(missing)
         )
 
 
-def _read_clist_word(token, slot_index):
+def _read_clist_word(token: str, slot_index: int) -> int:
     """Return the raw 32-bit word at c-list[slot_index] for the named lump."""
-    path = os.path.join(LUMPS_DIR, f"{token}.lump")
+    path = _lump_path(token)
     with open(path, "rb") as f:
         raw = f.read()
     words = struct.unpack(f">{len(raw) // 4}I", raw)
@@ -382,14 +485,6 @@ def _read_clist_word(token, slot_index):
 
 
 def _decode_gt(word):
-    """Decode a Golden Token word using the Church Machine GT layout.
-
-    Layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom [26]=spare [25]=f_flag
-            [24:23]=gt_type [22:16]=gt_seq [15:0]=slot_id
-
-    Returns a dict with: type (0-3), type_name, dom (0=Turing/1=Church),
-    perm3 (raw 3-bit field), slot_id, and decoded permission flags.
-    """
     word = word & 0xFFFFFFFF
     gt_type = (word >> 23) & 0x3
     dom     = (word >> 27) & 0x1
@@ -422,19 +517,7 @@ SELFTEST_LUMP_CASES = [
 
 
 class TestR13_SelftestClistGTs:
-    """R13: Selftest lumps carry the expected Boot.Abstr and Boot.Nucs GT values.
-
-    PostFlashSelftest (d906a27f) and GT Encoding v1.1 (cb8739cf) each embed
-    Boot.Abstr E-GT (0x48800003) at c-list slot 3 and Boot.Nucs X-GT
-    (0x40800001) at c-list slot 7.  Any recompile that accidentally zeroes
-    one of these slots would silently break hardware self-tests; this test
-    catches that regression immediately.
-
-    The GT words are also verified to decode as Inform-type (type=1) with
-    the correct domain (Church for E, Turing for X) and permission bits (E
-    and X respectively), so encoding errors are distinguished from simple
-    slot-assignment errors.
-    """
+    """R13: Selftest lumps carry the expected Boot.Abstr and Boot.Nucs GT values."""
 
     @pytest.mark.parametrize("token,label", SELFTEST_LUMP_CASES)
     def test_slot3_raw_value(self, token, label):
@@ -516,20 +599,18 @@ class TestR13_SelftestClistGTs:
 
 
 class TestR14_ArchiveSidecarsExist:
-    """R14: Every archive binary <token>-v<N>.lump has a matching <token>-v<N>.json sidecar.
+    """R14: Every archive binary has a matching sidecar .json.
 
-    The LUMP version-history feature (Task #1394) writes a sidecar alongside every
-    archived binary.  An orphan archive binary (no sidecar) means the archive logic
-    failed mid-write and would leave the IDE history tab with incomplete metadata.
+    Supports both legacy <token>-vN.lump and new <AbsName>_vN.lump archive patterns.
     """
 
     def test_archive_lumps_have_sidecars(self):
         missing = []
-        for basename in ARCHIVE_LUMP_BASENAMES:
-            sidecar = os.path.join(LUMPS_DIR, f"{basename}.json")
+        for stem in ARCHIVE_LUMP_STEMS:
+            sidecar = os.path.join(LUMPS_DIR, f"{stem}.json")
             if not os.path.exists(sidecar):
                 missing.append(
-                    f"{basename}.lump — no matching {basename}.json sidecar.\n"
+                    f"{stem}.lump — no matching {stem}.json sidecar.\n"
                     "  Every archived LUMP binary must have a companion sidecar recording\n"
                     "  cw/cc/lump_size/compiled_at for that snapshot. Re-run the archive\n"
                     "  step or create the sidecar manually."
