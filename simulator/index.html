@@ -467,7 +467,7 @@
                 <div class="asm-picker-toolbar">
                     <button class="btn-instr-picker" title="Open instruction picker (Ctrl+Space)" data-tooltip="Instruction Picker — Browse and insert assembly instructions (Ctrl+Space)" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})()">&#x2295; Instructions</button>
                     <button class="btn-clist-viewer" title="View C-List capabilities (Ctrl+Shift+C)" data-tooltip="C-List Viewer — Browse Golden Tokens in CR6 (Ctrl+Shift+C)" onclick="window.CListViewer&&window.CListViewer.toggle()">&#x2295; C-List</button>
-                    <button class="btn-abswiz" title="New Abstraction wizard (Ctrl+Shift+N)" data-tooltip="New Abstraction — scaffold a new CLOOMC++ abstraction with name, methods, dependencies and docs (Ctrl+Shift+N)" onclick="window.AbstractionWizard&&window.AbstractionWizard.open()">&#x2295; New Abstraction</button>
+                    <button class="btn-abswiz" onclick="window.location='/start?abstraction=1'">&#x2295; New Abstraction</button>
                     <button id="btnSavePseudo" class="btn-abswiz" title="Download editor contents as .cloomc file" data-tooltip="Save Pseudo Code — download the current editor source as a .cloomc file (no compile step) (Ctrl+Shift+S)" onclick="savePseudoCode()" disabled>&#x2193; Save Pseudo Code</button>
                 </div>
                 <div id="compileFailedBanner" class="compile-failed-banner" role="alert" aria-live="assertive" style="display:none;">
