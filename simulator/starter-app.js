@@ -14,6 +14,50 @@ var _hexRowIdx   = 0;
 var _lessonPhase = 1;
 var _methodCount  = 0;
 
+var _L5_DRAFT_KEY = 'church_l5_draft';
+
+function _saveL5Draft() {
+    try {
+        var name = _el('absName') ? (_el('absName').value || '') : '';
+        var desc = _el('absDesc') ? (_el('absDesc').value || '') : '';
+        var rows = document.querySelectorAll('.s-method-row-wrap');
+        var methods = [];
+        rows.forEach(function(row) {
+            methods.push({
+                name: (row.querySelector('.s-method-name').value || ''),
+                desc: (row.querySelector('.s-method-desc').value || ''),
+                deps: (row.querySelector('.s-method-deps').value || '')
+            });
+        });
+        localStorage.setItem(_L5_DRAFT_KEY, JSON.stringify({ name: name, desc: desc, methods: methods }));
+    } catch (e) {}
+}
+
+function _restoreL5Draft() {
+    try {
+        var raw = localStorage.getItem(_L5_DRAFT_KEY);
+        if (!raw) return false;
+        var d = JSON.parse(raw);
+        if (!d || (!d.name && !d.desc && !(d.methods && d.methods.length))) return false;
+        if (_el('absName')) _el('absName').value = d.name || '';
+        if (_el('absDesc')) _el('absDesc').value = d.desc || '';
+        if (d.methods && d.methods.length) {
+            _el('methodList').innerHTML = '';
+            _methodCount = 0;
+            d.methods.forEach(function(m) {
+                starterAddMethod();
+                var row = _el('methodList').lastElementChild;
+                if (row) {
+                    row.querySelector('.s-method-name').value = m.name || '';
+                    row.querySelector('.s-method-desc').value = m.desc || '';
+                    row.querySelector('.s-method-deps').value = m.deps || '';
+                }
+            });
+        }
+        return true;
+    } catch (e) { return false; }
+}
+
 // ── Friendly fault explanations ────────────────────────────────────────────
 
 var FAULT_FRIENDLY = {
@@ -149,16 +193,21 @@ function starterNext() {
         ['lesson1Code', 'lesson3Code', 'lesson4Code'].forEach(function(id) {
             var el = _el(id); if (el) el.classList.add('hidden');
         });
-        _el('lesson5Form').classList.remove('hidden');
+        var form5 = _el('lesson5Form');
+        form5.classList.remove('hidden');
         _el('lessonLabel').textContent = '\u2014 Lesson 5 of 5 \u2014 Create Abstraction';
         _el('btnStep').disabled  = true;
         _el('btnReset').disabled = true;
         _el('btnNext').textContent = 'Save Draft \u2192';
         var ann = _el('starterAnnotation');
         if (ann) ann.innerHTML = 'Fill in the details, then click <strong>Save Draft \u2192</strong> to open the editor with your framework.';
-        _setOutput('<span class="out-dim">Plan your abstraction above. When you\'re ready, click <strong style="color:#daa520">Save Draft \u2192</strong> and the editor will open with your code framework pre-filled — one comment stub per function, ready to code.</span>');
+        _setOutput('<span class="out-dim">Plan your abstraction above. When you\'re ready, click <strong style="color:#daa520">Save Draft \u2192</strong> and the editor will open with your code framework pre-filled \u2014 one comment stub per function, ready to code.</span>');
         _lessonPhase = 5;
-        if (_methodCount === 0) starterAddMethod();
+        // Restore any saved draft first; if nothing saved, add the first blank row
+        var restored = _restoreL5Draft();
+        if (!restored && _methodCount === 0) starterAddMethod();
+        // Auto-save on every keystroke inside the form
+        form5.addEventListener('input', _saveL5Draft);
     }
 }
 
@@ -445,6 +494,7 @@ function starterAddMethod() {
 function starterRemoveMethod(idx) {
     var el = _el('s-method-' + idx);
     if (el) el.parentNode.removeChild(el);
+    _saveL5Draft();
 }
 
 function starterSaveDraft() {
@@ -516,6 +566,7 @@ function starterSaveDraft() {
     try {
         localStorage.setItem('church_editor_code', code);
         localStorage.setItem('church_editor_lang', 'cloomc');
+        localStorage.removeItem(_L5_DRAFT_KEY);
     } catch (e) {}
 
     window.location = '/simulator/#editor';
