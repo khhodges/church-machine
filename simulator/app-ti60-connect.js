@@ -249,7 +249,14 @@ window.Ti60Connect = (function () {
         try {
             while (_running) {
                 const { value, done } = await _reader.read();
-                if (done) break;
+                if (done) {
+                    if (_running) {
+                        _log('⚠ Serial port closed unexpectedly — port may still be held open.', 'log-warn');
+                        _running = false;
+                        _reset();
+                    }
+                    break;
+                }
                 buf += value;
                 const lines = buf.split('\n');
                 buf = lines.pop();
@@ -485,6 +492,7 @@ window.Ti60Connect = (function () {
         let buf          = '';
         let greetingSeen = false;
         let pkt          = null;
+        let bridgeDropped = false;
         const deadline   = Date.now() + 30000;
 
         while (_bridgeRunning && Date.now() < deadline && !pkt) {
@@ -510,12 +518,22 @@ window.Ti60Connect = (function () {
                     }
                 }
             } catch (e) {
-                _log('Bridge read error: ' + e.message, 'log-fail');
+                if (_bridgeRunning) {
+                    _log('⚠ Bridge dropped unexpectedly — port may still be held open. (' + e.message + ')', 'log-warn');
+                    bridgeDropped = true;
+                }
                 break;
             }
         }
 
         if (!_bridgeRunning) return;
+
+        if (bridgeDropped) {
+            _bridgeRunning = false;
+            if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+            if (dBtn) dBtn.style.display = 'none';
+            return;
+        }
 
         if (!pkt) {
             _setStep('callhome', 'fail',
