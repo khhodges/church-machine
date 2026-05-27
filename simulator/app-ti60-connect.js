@@ -7,7 +7,7 @@ window.Ti60Connect = (function () {
     let _reader  = null;
     let _running = false;
     let _bridgeRunning = false;
-    let _bridgeEverConfirmed = false;
+    let _bridgeEverConfirmed = localStorage.getItem('ti60BridgeCertAccepted') === '1';
 
     // ── bridge setup panel ─────────────────────────────────────────────────
     function _showBridgeSetup() {
@@ -308,6 +308,7 @@ window.Ti60Connect = (function () {
             const d = await r.json();
             if (d.ok) {
                 _bridgeEverConfirmed = true;
+                localStorage.setItem('ti60BridgeCertAccepted', '1');
                 _hideBridgeSetup();
                 _log('✓ Bridge is reachable. Port open: ' + d.open +
                      (d.port ? '  (' + d.port + ')' : ''), 'log-pass');
@@ -375,6 +376,7 @@ window.Ti60Connect = (function () {
         }
 
         _bridgeEverConfirmed = true;
+        localStorage.setItem('ti60BridgeCertAccepted', '1');
         _hideBridgeSetup();
         _setStep('uart', 'pass', 'Bridge connected — ' + (status.port || '/dev/ttyUSB2') + ' @ ' + (status.baud || BAUD));
         _setStep('callhome', 'active');
