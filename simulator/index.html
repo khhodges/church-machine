@@ -922,23 +922,28 @@ You should see: {"ok": true, "open": true, ...}</pre>
                 <a href="/simulator/" target="_blank" class="ti60-open-tab-btn">Open in full browser tab &#x2192;</a>
             </div>
             <div class="ti60-action-row">
-                <div class="ti60-action-btns">
-                    <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect</button>
-                    <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
-                    <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge()" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
-                    <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect()" style="display:none;">&#x2715; Stop</button>
-                </div>
-                <div class="ti60-bridge-url-row">
-                    <label class="ti60-bridge-url-label">Bridge URL</label>
-                    <input id="ti60BridgeUrl" class="ti60-bridge-url-input" type="text"
-                        value="https://penguin.linux.test:8766"
-                        placeholder="https://penguin.linux.test:8766"
-                        title="Edit if your bridge runs on a different port or host" />
-                    <button class="ti60-forget-bridge-btn" onclick="Ti60Connect.resetBridgeCert()" title="Clears the remembered cert-accepted flag so the setup guide reappears on the next connection attempt">&#x1F504; Re-run setup</button>
-                </div>
-                <div id="ti60ActivePortRow" class="ti60-active-port-row" style="display:none;">
-                    <span class="ti60-active-port-label">Active port</span>
-                    <span id="ti60ActivePortValue" class="ti60-active-port-value"></span>
+                <div class="ti60-action-bar">
+                    <div class="ti60-connect-menu" id="ti60ConnectMenu">
+                        <button class="ti60-connect-menu-toggle" onclick="(function(b){document.getElementById('ti60ConnectDropdown').classList.toggle('open');})(this)">&#x2630; Connect &#x25BE;</button>
+                        <div class="ti60-connect-dropdown" id="ti60ConnectDropdown">
+                            <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect();document.getElementById('ti60ConnectDropdown').classList.remove('open')">&#x1F50C; Connect</button>
+                            <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge();document.getElementById('ti60ConnectDropdown').classList.remove('open')">&#x1F309; Via Bridge</button>
+                            <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge();document.getElementById('ti60ConnectDropdown').classList.remove('open')" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
+                            <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect();document.getElementById('ti60ConnectDropdown').classList.remove('open')" style="display:none;">&#x2715; Stop</button>
+                        </div>
+                    </div>
+                    <div class="ti60-bridge-url-row">
+                        <label class="ti60-bridge-url-label">Bridge URL</label>
+                        <input id="ti60BridgeUrl" class="ti60-bridge-url-input" type="text"
+                            value="https://penguin.linux.test:8766"
+                            placeholder="https://penguin.linux.test:8766"
+                            title="Edit if your bridge runs on a different port or host" />
+                        <button class="ti60-forget-bridge-btn" onclick="Ti60Connect.resetBridgeCert()" title="Clears the remembered cert-accepted flag so the setup guide reappears on the next connection attempt">&#x1F504; Re-run setup</button>
+                    </div>
+                    <div id="ti60ActivePortRow" class="ti60-active-port-row" style="display:none;">
+                        <span class="ti60-active-port-label">Active port</span>
+                        <span id="ti60ActivePortValue" class="ti60-active-port-value"></span>
+                    </div>
                 </div>
                 <div id="ti60ConnectLog" class="ti60-connect-log"></div>
             </div>

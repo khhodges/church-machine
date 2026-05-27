@@ -329,32 +329,79 @@ header h1 a:hover {
 
 .ti60-action-row {
     display: flex;
-    gap: 1rem;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
     margin-bottom: 1rem;
 }
 
-.ti60-action-btns {
+/* compact top bar: hamburger + bridge URL + active port */
+.ti60-action-bar {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+/* ── Connect hamburger ─────────────────────────────────────────────────── */
+.ti60-connect-menu {
+    position: relative;
     flex-shrink: 0;
 }
 
-.ti60-connect-btn {
-    font-size: 1rem;
-    padding: 0.55rem 1.4rem;
+.ti60-connect-menu-toggle {
     background: var(--accent);
     color: white;
     border: none;
     border-radius: 6px;
+    padding: 0.38rem 0.85rem;
+    font-size: 0.85rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.2s;
     white-space: nowrap;
+    transition: opacity 0.2s;
 }
+.ti60-connect-menu-toggle:hover { opacity: 0.85; }
+
+.ti60-connect-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 9000;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 7px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+    min-width: 180px;
+    overflow: hidden;
+}
+.ti60-connect-dropdown.open { display: block; }
+
+.ti60-connect-dropdown button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: transparent;
+    color: var(--text-primary);
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s;
+}
+.ti60-connect-dropdown button:last-child { border-bottom: none; }
+.ti60-connect-dropdown button:hover { background: rgba(255,255,255,0.07); }
+.ti60-connect-dropdown button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* keep individual button colours inside the dropdown */
+.ti60-connect-dropdown .ti60-connect-btn    { color: #fff; }
+.ti60-connect-dropdown .ti60-bridge-btn     { color: var(--church-blue, #60a5fa); }
+.ti60-connect-dropdown .ti60-test-bridge-btn { color: #a78bfa; }
+.ti60-connect-dropdown .ti60-disconnect-btn { color: var(--error, #f87171); }
 
 .ti60-connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.ti60-connect-btn:not(:disabled):hover { opacity: 0.85; }
 
 .ti60-steps {
     display: grid;
