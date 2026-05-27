@@ -198,10 +198,10 @@ function starterNext() {
         _el('lessonLabel').textContent = '\u2014 Lesson 5 of 5 \u2014 Create Abstraction';
         _el('btnStep').disabled  = true;
         _el('btnReset').disabled = true;
-        _el('btnNext').textContent = 'Save Draft \u2192';
+        _el('btnNext').textContent = 'Save Draft';
         var ann = _el('starterAnnotation');
-        if (ann) ann.innerHTML = 'Fill in the details, then click <strong>Save Draft \u2192</strong> to open the editor with your framework.';
-        _setOutput('<span class="out-dim">Plan your abstraction above. When you\'re ready, click <strong style="color:#daa520">Save Draft \u2192</strong> and the editor will open with your code framework pre-filled \u2014 one comment stub per function, ready to code.</span>');
+        if (ann) ann.innerHTML = 'Fill in the details, then click <strong>Save Draft</strong>. When ready, click <strong>Code Edit \u2192</strong> to open the editor with your framework.';
+        _setOutput('<span class="out-dim">Plan your abstraction above. Click <strong style="color:#daa520">Save Draft</strong> to save your plan, then <strong style="color:#daa520">Code Edit \u2192</strong> when you\'re ready to start coding \u2014 the editor will open with your framework pre-filled.</span>');
         _lessonPhase = 5;
         // Restore any saved draft first; if nothing saved, add the first blank row
         var restored = _restoreL5Draft();
@@ -498,6 +498,11 @@ function starterRemoveMethod(idx) {
 }
 
 function starterSaveDraft() {
+    _saveL5Draft();
+    _setOutput('<span class="out-dim">\u2713 Draft saved. Click <strong style="color:#daa520">Code Edit \u2192</strong> when you\'re ready to start coding.</span>');
+}
+
+function starterOpenEditor() {
     var nameRaw = (_el('absName').value || '').trim().replace(/\s+/g, '');
     if (!nameRaw) {
         var inp = _el('absName');
