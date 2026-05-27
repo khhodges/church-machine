@@ -649,6 +649,13 @@ function onLangChange(restoring) {
     const sel = document.getElementById('langSelector');
     if (!sel) return;
     const lang = sel.value;
+
+    // Abstraction is not a code language — navigate to the Lesson 5 planning form
+    if (lang === 'abstraction') {
+        window.location = '/start?abstraction=1';
+        return;
+    }
+
     const btnSaveNS = document.getElementById('btnSaveNS');
     if (btnSaveNS) btnSaveNS.disabled = (lang !== 'assembly' || !lastAssembledWords);
     const btnExportLump = document.getElementById('btnExportLump');
