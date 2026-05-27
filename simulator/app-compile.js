@@ -1144,6 +1144,7 @@ function _confirmLumpRelease() {
             window._editorLastSavedToken = resp.token;
             const savedToken = resp.token;
             window._pendingLumpToken = savedToken;
+            if (typeof switchView === 'function') switchView('lumps');
             const _rlProm = renderLumps ? renderLumps() : Promise.resolve();
             (_rlProm && _rlProm.then ? _rlProm : Promise.resolve()).then(() => {
                 if (typeof showLumpDetail === 'function') showLumpDetail(savedToken);
@@ -1501,6 +1502,7 @@ function compileAndBuild() {
             window._editorLastSavedToken = resp.token;
             const _savedToken = resp.token;
             window._pendingLumpToken = _savedToken;
+            if (typeof switchView === 'function') switchView('lumps');
             const _rlProm2 = renderLumps ? renderLumps() : Promise.resolve();
             (_rlProm2 && _rlProm2.then ? _rlProm2 : Promise.resolve()).then(() => {
                 if (typeof showLumpDetail === 'function') showLumpDetail(_savedToken);
