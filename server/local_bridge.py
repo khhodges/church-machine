@@ -145,12 +145,38 @@ def _register_with_ide(uid, board_type, board_name, profile, fw_major, fw_minor,
         print(f'  [CALL HOME] IDE registration failed: {e}')
 
 
+def _prefetch_device_uid():
+    """On startup, ask the IDE server for the most recent device UID so the drain
+    thread can forward bytes even if the board has already booted."""
+    global _device_uid
+    if not _IDE_SERVER_URL or _device_uid:
+        return
+    try:
+        import urllib.request as _ureq
+        req = _ureq.Request(f"{_IDE_SERVER_URL}/api/device/latest-callhome", method="GET")
+        resp = _ureq.urlopen(req, timeout=5)
+        result = json.loads(resp.read())
+        ch = result.get("callhome") or {}
+        uid = ch.get("uid") or ch.get("device_uid")
+        if uid:
+            _device_uid = uid
+            print(f'  [bridge] Pre-fetched device UID from IDE: {uid}')
+        else:
+            print(f'  [bridge] No cached device UID from IDE yet — waiting for CALLHOME.')
+    except Exception as e:
+        print(f'  [bridge] Could not pre-fetch device UID: {e}')
+
+
 def _tunnel_drain_thread():
-    """Push serial RX bytes to the IDE server every 200 ms so the browser can poll them."""
+    """Push serial RX bytes to the IDE server every 200 ms so the browser can poll them.
+    Waits for _device_uid to be set (either by CALLHOME or pre-fetched on startup)."""
     global _tunnel_drain_running
     try:
         import urllib.request as _ureq
-        while _tunnel_drain_running and _IDE_SERVER_URL and _device_uid:
+        while _tunnel_drain_running and _IDE_SERVER_URL:
+            if not _device_uid:
+                time.sleep(0.2)
+                continue
             with _rx_lock:
                 chunk = bytes(_rx_buf)
                 _rx_buf.clear()
@@ -651,9 +677,19 @@ if __name__ == '__main__':
     print('Press Ctrl+C to stop.')
     print()
     if _IDE_SERVER_URL:
-        print('*** Power-cycle the board NOW (unplug/replug USB) to capture the boot stream. ***')
-        print('    The bridge must be running before the board boots to see NIA output.')
+        print('💡 NIA stream: bridge will forward all UART output to the IDE stream panel.')
+        print('   To see the boot sequence: power-cycle the board (unplug/replug USB) after this message.')
         print()
+
+    if _IDE_SERVER_URL:
+        _prefetch_device_uid()
+        global _tunnel_drain_running
+        if not _tunnel_drain_running:
+            _tunnel_drain_running = True
+            td = threading.Thread(target=_tunnel_drain_thread, daemon=True)
+            td.start()
+            print(f'  [bridge] Drain thread started — forwarding UART to IDE server.')
+            print()
 
     if _REPORT_LAUNCH and _IDE_SERVER_URL:
         _fetch_launch_summary()
