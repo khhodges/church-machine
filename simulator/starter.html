@@ -388,6 +388,114 @@
         /* ── Thick white-border panel variant ── */
         .s-panel-lit { border: 2px solid rgba(255,255,255,0.55) !important; }
 
+        /* ── Lesson 5: Create Abstraction form ── */
+        .s-lesson5-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.85rem;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 0.1rem 0 0.25rem;
+        }
+        .s-form-section-title {
+            font-size: 0.7rem;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+        .s-form-label {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            margin-bottom: 0.2rem;
+            margin-top: 0.4rem;
+        }
+        .s-form-input {
+            width: 100%;
+            background: #0e0e1c;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.86rem;
+            padding: 0.38rem 0.62rem;
+            outline: none;
+            transition: border-color 0.15s;
+            box-sizing: border-box;
+        }
+        .s-form-input:focus { border-color: var(--gold-dim); }
+        .s-form-input.s-input-error { border-color: var(--red) !important; }
+        .s-form-textarea {
+            width: 100%;
+            background: #0e0e1c;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.86rem;
+            padding: 0.38rem 0.62rem;
+            outline: none;
+            resize: vertical;
+            transition: border-color 0.15s;
+            box-sizing: border-box;
+            line-height: 1.5;
+        }
+        .s-form-textarea:focus { border-color: var(--gold-dim); }
+        .s-method-row-wrap {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0.55rem 0.7rem 0.5rem;
+            margin-bottom: 0.4rem;
+            position: relative;
+        }
+        .s-method-num {
+            font-size: 0.68rem;
+            color: var(--gold-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            font-weight: 600;
+            margin-bottom: 0.28rem;
+        }
+        .s-method-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.45rem;
+        }
+        .s-method-remove {
+            position: absolute;
+            top: 0.4rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 0.82rem;
+            cursor: pointer;
+            padding: 0;
+            opacity: 0.4;
+            transition: opacity 0.15s, color 0.15s;
+            line-height: 1;
+        }
+        .s-method-remove:hover { opacity: 1; color: #f07060; }
+        .s-btn-add-method {
+            background: transparent;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            color: var(--text-dim);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 0.8rem;
+            padding: 0.32rem 0.75rem;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .s-btn-add-method:hover { border-color: var(--gold-dim); color: var(--gold); }
+        @media (max-width: 700px) {
+            .s-method-2col { grid-template-columns: 1fr; }
+        }
+
         /* ── Mobile ── */
         @media (max-width: 700px) {
             .s-main {
@@ -442,7 +550,7 @@
 
     <!-- Left: editor -->
     <div class="s-editor-panel">
-        <div class="s-panel-label">Your program &nbsp;<span id="lessonLabel" style="font-size:0.78em; color:#daa520; font-weight:600; letter-spacing:0.04em;">— Lesson 1 of 4</span></div>
+        <div class="s-panel-label">Your program &nbsp;<span id="lessonLabel" style="font-size:0.78em; color:#daa520; font-weight:600; letter-spacing:0.04em;">— Lesson 1 of 5</span></div>
         <div class="s-code-display" id="codeDisplay">
 
             <!-- ── Lesson 1 / Lesson 2 (inline reveal) ── -->
@@ -512,8 +620,25 @@
                 <div class="s-code-line"><span class="s-code-gold">}</span></div>
             </div>
 
+            <!-- ── Lesson 5: Create Abstraction — planning form ── -->
+            <div id="lesson5Form" class="hidden s-lesson5-form">
+                <div>
+                    <div class="s-form-section-title">1 &middot; Your Idea</div>
+                    <label class="s-form-label">What is the name of your abstraction?</label>
+                    <input type="text" id="absName" class="s-form-input" placeholder="e.g. Calculator, WeatherReader, SecureVault" autocomplete="off" />
+                    <label class="s-form-label">What does it do?</label>
+                    <textarea id="absDesc" class="s-form-textarea" rows="2" placeholder="Describe what your abstraction does in one or two sentences&#x2026;"></textarea>
+                </div>
+                <div>
+                    <div class="s-form-section-title">2 &middot; Its Functions</div>
+                    <label class="s-form-label">Name each method, describe what it does, and list any other abstractions it depends on:</label>
+                    <div id="methodList"></div>
+                    <button class="s-btn-add-method" onclick="starterAddMethod()">+ Add another function</button>
+                </div>
+            </div>
+
         </div>
-        <div class="s-annotation">
+        <div class="s-annotation" id="starterAnnotation">
             Use <strong>› Step</strong> to walk through each instruction.
         </div>
         <div class="s-toolbar">
@@ -577,7 +702,7 @@
 <script src="simulator.js?v=20260521c"></script>
 <script src="assembler.js?v=20260521a"></script>
 <script src="cloomc_compiler.js?v=20260519c"></script>
-<script src="starter-app.js?v=20260527i"></script>
+<script src="starter-app.js?v=20260527j"></script>
 
 </body>
 </html>

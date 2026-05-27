@@ -12,6 +12,7 @@ var _lastFault   = null;
 var _hexRows     = [];
 var _hexRowIdx   = 0;
 var _lessonPhase = 1;
+var _methodCount  = 0;
 
 // ── Friendly fault explanations ────────────────────────────────────────────
 
@@ -106,9 +107,12 @@ function _switchLesson(fromId, toId, label, outputHtml, nextPhase, disableNext, 
 }
 
 function starterNext() {
+    if (_lessonPhase === 5) {
+        starterSaveDraft();
+        return;
+    }
     if (_lessonPhase === 1) {
         // Lesson 1 → 2: reveal abstraction + capabilities { (none) } inline
-        // Reset sim and clear output first
         _hideFault();
         _el('haltedMsg').style.display = 'none';
         if (sim) {
@@ -125,21 +129,36 @@ function starterNext() {
         caps.classList.add('active');
         _el('statusPanel').classList.add('s-panel-lit');
         _el('outputPanel').classList.add('s-panel-lit');
-        _el('lessonLabel').textContent = '\u2014 Lesson 2 of 4';
+        _el('lessonLabel').textContent = '\u2014 Lesson 2 of 5';
         _el('btnNext').textContent = 'Next Lesson \u2192';
         _lessonPhase = 2;
         _setOutput('<span class="out-dim">This simple example is a terminal atomic abstraction that needs nothing other than machine registers. The next lesson demonstrates local (private) memory access.</span>');
         _updateRegisters();
     } else if (_lessonPhase === 2) {
         // Lesson 2 → 3: full swap to myScratchPad lesson
-        _switchLesson('lesson1Code', 'lesson3Code', 'Lesson 3 of 4',
+        _switchLesson('lesson1Code', 'lesson3Code', 'Lesson 3 of 5',
             '<span class="out-dim">The programmer adds new capability defined objects using Pet Names. <strong>myScratchPad RW</strong> grants this abstraction read/write access to a private memory region. The <strong>LOAD</strong> instruction fetches that capability from the c-list ready for use.</span>\n\n<span class="out-dim">Symbolic addressing allows readable pet names in machine code statements!</span>',
             3, false, 'Next Lesson \u2192');
     } else if (_lessonPhase === 3) {
         // Lesson 3 → 4: full swap to LUMPs lesson
-        _switchLesson('lesson3Code', 'lesson4Code', 'Lesson 4 of 4',
+        _switchLesson('lesson3Code', 'lesson4Code', 'Lesson 4 of 5',
             '<span class="out-dim">The CLOOMC++ compiler understands Pet Names and makes machine code as readable as <strong>CONNECT (Me, MyMother)</strong></span>',
-            4, true, '');
+            4, false, 'Next Lesson \u2192');
+    } else if (_lessonPhase === 4) {
+        // Lesson 4 → 5: Create Abstraction planning form
+        ['lesson1Code', 'lesson3Code', 'lesson4Code'].forEach(function(id) {
+            var el = _el(id); if (el) el.classList.add('hidden');
+        });
+        _el('lesson5Form').classList.remove('hidden');
+        _el('lessonLabel').textContent = '\u2014 Lesson 5 of 5 \u2014 Create Abstraction';
+        _el('btnStep').disabled  = true;
+        _el('btnReset').disabled = true;
+        _el('btnNext').textContent = 'Save Draft \u2192';
+        var ann = _el('starterAnnotation');
+        if (ann) ann.innerHTML = 'Fill in the details, then click <strong>Save Draft \u2192</strong> to open the editor with your framework.';
+        _setOutput('<span class="out-dim">Plan your abstraction above. When you\'re ready, click <strong style="color:#daa520">Save Draft \u2192</strong> and the editor will open with your code framework pre-filled — one comment stub per function, ready to code.</span>');
+        _lessonPhase = 5;
+        if (_methodCount === 0) starterAddMethod();
     }
 }
 
@@ -260,6 +279,7 @@ function starterBoot() {
 // ── Single step ─────────────────────────────────────────────────────────────
 
 function starterStep() {
+    if (_lessonPhase >= 5) return;
     if (!sim || !_booted) return;
     _hideFault();
 
@@ -395,6 +415,110 @@ function _registerDump() {
     }
     out += '</span>\n';
     return out;
+}
+
+// ── Lesson 5 helpers ─────────────────────────────────────────────────────────
+
+function starterAddMethod() {
+    _methodCount++;
+    var idx = _methodCount;
+    var div = document.createElement('div');
+    div.className = 's-method-row-wrap';
+    div.id = 's-method-' + idx;
+    var removeBtn = idx > 1
+        ? '<button class="s-method-remove" onclick="starterRemoveMethod(' + idx + ')" title="Remove this function">\u00d7</button>'
+        : '';
+    div.innerHTML =
+        '<div class="s-method-num">Function ' + idx + '</div>' + removeBtn +
+        '<div class="s-method-2col">' +
+        '  <div><label class="s-form-label">Name</label>' +
+        '    <input type="text" class="s-form-input s-method-name" placeholder="e.g. add, save, validate" autocomplete="off" /></div>' +
+        '  <div><label class="s-form-label">What it does</label>' +
+        '    <input type="text" class="s-form-input s-method-desc" placeholder="Brief description" /></div>' +
+        '</div>' +
+        '<label class="s-form-label">Depends on (optional \u2014 comma-separated abstraction names)</label>' +
+        '<input type="text" class="s-form-input s-method-deps" placeholder="e.g. sliderule, myScratchPad \u2014 leave blank if none" />';
+    _el('methodList').appendChild(div);
+    div.querySelector('.s-method-name').focus();
+}
+
+function starterRemoveMethod(idx) {
+    var el = _el('s-method-' + idx);
+    if (el) el.parentNode.removeChild(el);
+}
+
+function starterSaveDraft() {
+    var nameRaw = (_el('absName').value || '').trim().replace(/\s+/g, '');
+    if (!nameRaw) {
+        var inp = _el('absName');
+        inp.classList.add('s-input-error');
+        inp.focus();
+        setTimeout(function() { inp.classList.remove('s-input-error'); }, 1800);
+        return;
+    }
+    // Capitalise first letter
+    var name = nameRaw.charAt(0).toUpperCase() + nameRaw.slice(1);
+    var desc = (_el('absDesc').value || '').trim();
+
+    // Collect methods
+    var rows = document.querySelectorAll('.s-method-row-wrap');
+    var methods = [];
+    rows.forEach(function(row) {
+        var mName = (row.querySelector('.s-method-name').value || '').trim().replace(/\s+/g, '');
+        var mDesc = (row.querySelector('.s-method-desc').value || '').trim();
+        var mDeps = (row.querySelector('.s-method-deps').value || '').trim();
+        if (mName) methods.push({ name: mName, desc: mDesc, deps: mDeps });
+    });
+    if (!methods.length) methods.push({ name: 'run', desc: 'Main function', deps: '' });
+
+    // Collect unique dep names for capabilities block
+    var allDeps = [];
+    methods.forEach(function(m) {
+        if (m.deps) {
+            m.deps.split(',').forEach(function(d) {
+                var dep = d.trim().replace(/\s+/g, '');
+                if (dep && allDeps.indexOf(dep) === -1) allDeps.push(dep);
+            });
+        }
+    });
+
+    // Build CLOOMC skeleton
+    var HR = '; ' + '\u2500'.repeat(49);
+    var lines = [];
+    if (desc) { lines.push('; ' + desc); lines.push(HR); }
+    else       { lines.push('; ' + name + ' abstraction'); lines.push(HR); }
+    lines.push('');
+    lines.push('abstraction ' + name + ' {');
+    lines.push('    capabilities {');
+    if (allDeps.length) {
+        allDeps.forEach(function(dep) { lines.push('        ' + dep + ' E'); });
+    } else {
+        lines.push('        ; (none \u2014 add capability grants here)');
+    }
+    lines.push('    }');
+    methods.forEach(function(m) {
+        lines.push('');
+        lines.push('    method ' + m.name + ' {');
+        if (m.desc)  lines.push('        ; ' + m.desc);
+        if (m.deps) {
+            var depList = m.deps.split(',').map(function(d) { return d.trim(); }).filter(Boolean);
+            if (depList.length) lines.push('        ; Depends on: ' + depList.join(', '));
+        }
+        lines.push('        ; ' + '\u2500'.repeat(35));
+        lines.push('        ; TODO: write your code here');
+        lines.push('');
+        lines.push('        RETURN');
+        lines.push('    }');
+    });
+    lines.push('}');
+
+    var code = lines.join('\n');
+    try {
+        localStorage.setItem('church_editor_code', code);
+        localStorage.setItem('church_editor_lang', 'cloomc');
+    } catch (e) {}
+
+    window.location = '/simulator/#editor';
 }
 
 // ── Challenge mode ───────────────────────────────────────────────────────────
