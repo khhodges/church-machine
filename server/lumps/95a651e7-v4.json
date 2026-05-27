@@ -22,12 +22,8 @@
   "capabilities": [
     {
       "name": "SlideRule",
-      "rights": [
-        "E"
-      ],
-      "grants": [
-        "E"
-      ],
+      "rights": [],
+      "grants": [],
       "nsIndex": -1
     }
   ],
@@ -44,12 +40,13 @@
   "deployment": {
     "target_board": "ti60-f225",
     "profile": "IoT",
-    "built_at": "2026-05-27T12:39:42.857007Z",
+    "built_at": "2026-05-27T12:09:30.629770Z",
     "builder": "CLOOMC++ IDE v1.0"
   },
   "grants": [
     "E"
   ],
-  "lump_version": 5,
-  "compiled_at": 1779885582.8575444
+  "lump_version": 4,
+  "compiled_at": 1779883770.630295,
+  "archived_version": 4
 }
