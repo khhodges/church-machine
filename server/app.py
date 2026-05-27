@@ -5859,6 +5859,26 @@ def device_heartbeat():
     dev.last_seen = now
     db.session.commit()
 
+    # Keep the in-memory tunnel callhome cache fresh so the browser sees a
+    # live timestamp even between real CALLHOME packets.
+    with _latest_callhome_lock:
+        if uid in _latest_callhome_data:
+            _latest_callhome_data[uid]["ts"] = now
+        else:
+            # First heartbeat for a device not yet in the cache — seed it.
+            _latest_callhome_data[uid] = {
+                "board":      dev.board_name or "Unknown",
+                "uid":        uid,
+                "nia":        "0x{:08X}".format(dev.fault_nia or 0),
+                "boot_ok":    0 if (dev.boot_reason or 0) == 2 else 1,
+                "fault":      dev.last_fault or 0,
+                "fault_code": dev.last_fault or 0,
+                "fw_major":   dev.fw_major or 1,
+                "fw_minor":   dev.fw_minor or 0,
+                "boot_count": dev.boot_count or 1,
+                "ts":         now,
+            }
+
     if was_offline:
         _run_hello_mum_flow(dev)
         db.session.commit()
