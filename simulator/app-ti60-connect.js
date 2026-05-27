@@ -418,7 +418,14 @@ window.Ti60Connect = (function () {
                 });
                 const d2 = await r2.json();
                 if (!d2.ok) throw new Error(d2.error || 'connect failed');
-                connectedPort = autoPort;
+                try {
+                    const r3 = await fetch(url + '/status', { signal: AbortSignal.timeout(6000) });
+                    const freshStatus = await r3.json();
+                    status = freshStatus;
+                    connectedPort = freshStatus.active_port || freshStatus.port || autoPort;
+                } catch (_) {
+                    connectedPort = autoPort;
+                }
             } catch (e) {
                 _setStep('uart', 'fail', 'Could not open ' + autoPort + ': ' + e.message);
                 if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
