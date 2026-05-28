@@ -1042,6 +1042,8 @@
                                 <ol class="sw-list">
                                     <li>Run <code>setup_ti60_peri.py</code> once to generate the PLL config &mdash; open a terminal and run the command from <code>BUILD.md</code> inside the ZIP:<br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
+                                    <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> in any text editor and switch from Phase A to Phase B by following the comments inside the file:<br>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Phase A = 25 MHz (safe default). Phase B = 50 MHz with SoC/UART enabled. The comments tell you exactly which lines to swap.</span></li>
                                     <li>Launch <strong>Efinity IDE</strong> from the Start menu (Windows) or Applications (Mac)</li>
                                     <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
                                     <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
@@ -1057,6 +1059,9 @@
 EFXPT_HOME=$HOME/efinity/2025.2/pt \
   $HOME/efinity/2025.2/bin/python3.11 setup_ti60_peri.py</pre>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
+                                    <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> and switch Phase A → Phase B per the comments (Phase B = 50 MHz with SoC/UART):<br>
+<pre style="margin:0.3rem 0 0.2rem;">nano church_ti60_f225.sdc</pre>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Comment out the Phase A line and uncomment Phase B exactly as the comments direct.</span></li>
                                     <li>Launch Efinity IDE:<br>
                                         <code>QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &amp;</code></li>
                                     <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
