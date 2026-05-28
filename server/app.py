@@ -178,24 +178,48 @@ def download_ti60v():
 
 @app.route("/dl/ti60zip")
 def download_ti60zip():
-    import zipfile, io
+    import zipfile, io, re as _re
     base = os.path.dirname(__file__)
-    files = [
-        (os.path.join(base, "..", "build",    "church_ti60_f225.v"),           "church_ti60_f225.v"),
-        (os.path.join(base, "..", "hardware", "ti60_f225_project.xml"),        "church_ti60_f225.xml"),
-        (os.path.join(base, "..", "hardware", "ti60_f225.sdc"),                "church_ti60_f225.sdc"),
-        (os.path.join(base, "..", "hardware", "ti60_f225.peri.xml"),           "church_ti60_f225.peri.xml"),
-        (os.path.join(base, "..", "docs",     "introducing-cloomc.pdf"),       "docs/Introducing CLOOMC.pdf"),
-        (os.path.join(base, "..", "docs",     "hardware-ti60-f225.pdf"),       "docs/Ti60 Hardware Guide.pdf"),
-        (os.path.join(base, "..", "docs",     "cloomc-foundation.pdf"),        "docs/Architecture Reference.pdf"),
-        (os.path.join(base, "..", "docs",     "instruction-set.pdf"),          "docs/Instruction Set Reference.pdf"),
-    ]
+    hw   = os.path.abspath(os.path.join(base, "..", "hardware"))
+    bld  = os.path.abspath(os.path.join(base, "..", "build"))
+    docs = os.path.abspath(os.path.join(base, "..", "docs"))
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for src, name in files:
-            src = os.path.abspath(src)
+        # Verilog source
+        v = os.path.join(bld, "church_ti60_f225.v")
+        if os.path.exists(v):
+            zf.write(v, "church_ti60_f225.v")
+        # Project XML — fix path so .v sits flat alongside .xml
+        xml_path = os.path.join(hw, "ti60_f225_project.xml")
+        if os.path.exists(xml_path):
+            with open(xml_path) as f:
+                xml = f.read()
+            xml = xml.replace("../build/church_ti60_f225.v", "church_ti60_f225.v")
+            xml = _re.sub(r'<efx:inter_file name="[^"]*"/>',
+                          '<efx:inter_file name="church_ti60_f225.peri.xml"/>', xml)
+            zf.writestr("church_ti60_f225.xml", xml)
+        # Constraints + periphery
+        for src, arc in [
+            (os.path.join(hw, "ti60_f225.sdc"),      "church_ti60_f225.sdc"),
+            (os.path.join(hw, "ti60_f225.peri.xml"), "church_ti60_f225.peri.xml"),
+        ]:
             if os.path.exists(src):
-                zf.write(src, name)
+                zf.write(src, arc)
+        # DesignAPI PLL script and build instructions (were missing before)
+        setup = os.path.join(hw, "setup_ti60_peri.py")
+        if os.path.exists(setup):
+            zf.write(setup, "setup_ti60_peri.py")
+        zf.writestr("BUILD.md", BUILD_MD_TI60)
+        # PDFs
+        for pdf, arc in [
+            ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
+            ("hardware-ti60-f225.pdf",  "docs/Ti60 Hardware Guide.pdf"),
+            ("cloomc-foundation.pdf",   "docs/Architecture Reference.pdf"),
+            ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
+        ]:
+            src = os.path.join(docs, pdf)
+            if os.path.exists(src):
+                zf.write(src, arc)
     buf.seek(0)
     return send_file(buf, as_attachment=True,
                      download_name="church_ti60_f225_project.zip",
