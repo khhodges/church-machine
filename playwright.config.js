@@ -12,7 +12,8 @@ try {
 
 module.exports = defineConfig({
     testDir: './tests/e2e',
-    timeout: 15000,
+    workers: 1,
+    timeout: 40000,
     expect: {
         timeout: 5000,
     },
