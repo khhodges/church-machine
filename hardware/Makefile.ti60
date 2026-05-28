@@ -6,6 +6,7 @@
 #
 # Usage:
 #   make peri     -- run setup_ti60_peri.py once with Efinity's Python (required before first build)
+#   make efinity  -- launch Efinity IDE
 #   make flash    -- flash outflow/church_ti60_f225.hex to the board via openFPGALoader
 #   make clean    -- remove generated outflow files
 #
@@ -18,7 +19,7 @@ EFINITY    ?= $(HOME)/efinity/2025.2
 EFINITY_PY := $(EFINITY)/bin/python3.11
 HEX        := outflow/church_ti60_f225.hex
 
-.PHONY: peri flash clean
+.PHONY: peri efinity flash clean
 
 peri:
 	@echo "=== Running setup_ti60_peri.py with Efinity's Python ==="
@@ -27,6 +28,10 @@ peri:
 	  PYTHONPATH=$(EFINITY)/lib:$(EFINITY)/pt/bin \
 	  EFXPT_HOME=$(EFINITY)/pt \
 	  $(EFINITY_PY) setup_ti60_peri.py
+
+efinity:
+	@echo "=== Launching Efinity IDE ==="
+	QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 $(EFINITY)/bin/efinity &
 
 flash:
 	@echo "=== Flashing $(HEX) to Ti60 F225 ==="
