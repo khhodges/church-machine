@@ -1868,7 +1868,7 @@ def release_r12_index():
 </body></html>"""
     return html
 
-_SIMULATOR_HTML_VERSION = "r20260528g"
+_SIMULATOR_HTML_VERSION = "r20260528h"
 _STARTER_HTML_VERSION   = "r20260527z"
 
 @app.route("/start")

@@ -930,14 +930,14 @@
 
                             <span class="sw-led-note">Board not connected</span>
                         </div>
-                        <div class="sw-action-row" style="flex-direction:column;align-items:flex-start;gap:0.75rem;">
-                            <div style="display:flex;flex-direction:column;gap:0.25rem;max-width:220px;">
+                        <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:0.6rem;">
+                            <div>
                                 <a id="swZipBtn" class="sw-btn sw-btn-primary" href="/dl/ti60zip">📦 Full project (.zip) — <em>Recommended</em></a>
-                                <span style="font-size:0.75rem;color:var(--text-secondary,#9ca3af);padding:0 0.25rem;">Includes the Efinity project file, constraints, and I/O config — just open <code>church_ti60_f225.xml</code> and click <strong>Synthesize</strong>.</span>
+                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Includes the Efinity project file, constraints &amp; I/O config — open <code>church_ti60_f225.xml</code> and click <strong>Synthesize</strong>.</p>
                             </div>
-                            <div style="display:flex;flex-direction:column;gap:0.25rem;max-width:200px;">
+                            <div>
                                 <a id="swDownloadBtn" class="sw-btn sw-btn-secondary" href="/dl/ti60v" download="church_ti60_f225.v">⬇ Verilog only (.v)</a>
-                                <span style="font-size:0.75rem;color:var(--text-secondary,#9ca3af);padding:0 0.25rem;">Just the RTL source — use this if you already have an Efinity project set up.</span>
+                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Just the RTL source — use this if you already have an Efinity project set up.</p>
                             </div>
                         </div>
                         <div class="sw-release-note" id="swReleaseNote">After synthesis completes (~30 min), the programming file appears at <code>outflow/church_ti60_f225.hex</code>.</div>
