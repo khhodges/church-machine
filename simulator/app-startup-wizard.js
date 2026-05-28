@@ -110,27 +110,28 @@ const StartupWizard = (function () {
     }
 
     function _checkBitstream() {
-        const btn    = _el('swBitstreamBtn');
-        const status = _el('swBitstreamStatus');
-        if (!status) return;
-        status.textContent = 'checking…';
-        status.className   = 'sw-bitstream-status sw-bitstream-checking';
+        var statuses = [_el('swBitstreamStatus'), _el('swBitstreamStatusScratch')];
+        statuses.forEach(function (s) {
+            if (s) { s.textContent = 'checking…'; s.className = 'sw-bitstream-status sw-bitstream-checking'; }
+        });
         fetch('/api/bitstream/list')
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 const entry = d.bitstreams && d.bitstreams.find(function (b) { return b.board === 'ti60-f225'; });
-                if (entry && entry.available) {
-                    const mb = (entry.size / 1048576).toFixed(2);
-                    status.textContent = '✓ Ready — ' + mb + ' MB';
-                    status.className   = 'sw-bitstream-status sw-bitstream-ready';
-                } else {
-                    status.textContent = '✗ Not yet uploaded';
-                    status.className   = 'sw-bitstream-status sw-bitstream-unavail';
-                }
+                statuses.forEach(function (s) {
+                    if (!s) return;
+                    if (entry && entry.available) {
+                        const mb = (entry.size / 1048576).toFixed(2);
+                        s.textContent = '✓ Ready — ' + mb + ' MB';
+                        s.className   = 'sw-bitstream-status sw-bitstream-ready';
+                    } else {
+                        s.textContent = '✗ Not yet uploaded';
+                        s.className   = 'sw-bitstream-status sw-bitstream-unavail';
+                    }
+                });
             })
             .catch(function () {
-                status.textContent = '';
-                status.className   = 'sw-bitstream-status';
+                statuses.forEach(function (s) { if (s) { s.textContent = ''; s.className = 'sw-bitstream-status'; } });
             });
     }
 

@@ -1044,14 +1044,17 @@
                                 </ol>
                             </div>
                             <div class="sw-os-linux" style="display:none;">
+                                <p class="sw-step-desc" style="margin:0 0 0.5rem;">Don't have the official bitstream yet? Download it here — no synthesis needed:</p>
+                                <div class="sw-prepack-dl-row" style="margin-bottom:0.9rem;">
+                                    <a class="sw-btn sw-btn-primary" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.bit">⬇ Download Bitstream</a>
+                                    <span id="swBitstreamStatusScratch" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
+                                </div>
                                 <ol class="sw-list">
-                                    <li>Activate OSS CAD Suite: <code>source ~/oss-cad-suite/environment</code></li>
-                                    <li>Check the JTAG port: <code>ls /dev/ttyUSB*</code> — you should see <code>/dev/ttyUSB0</code></li>
-                                    <li>Flash: <code>openFPGALoader -b titanium_ti60_f225 outflow/church_ti60_f225.bit</code></li>
-                                    <li>Wait for <em>"Programming done"</em> — takes about 30 seconds</li>
+                                    <li>Open a terminal and activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
+                                    <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
+                                    <li>Flash to the board:<br><code>openFPGALoader -b titanium_ti60_f225 ~/Downloads/church_ti60_f225.bit</code></li>
+                                    <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
                                 </ol>
-                                <p class="sw-step-note" style="margin:6px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ <em>Permission denied</em> on <code>/dev/ttyUSB*</code>? Run <code>sudo usermod -aG dialout $USER</code> then log out and back in.</p>
-                                <p class="sw-step-note" style="margin:4px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ Board not detected? Try <code>openFPGALoader --detect</code> to confirm the cable is seated.</p>
                             </div>
                         </div>
 
@@ -2227,7 +2230,7 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
     <script async src="app-ti60-connect.js?v=20260528b"></script>
-    <script defer src="app-startup-wizard.js?v=20260528h"></script>
+    <script defer src="app-startup-wizard.js?v=20260528i"></script>
     <script src="app-shell.js?v=20260527p"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
