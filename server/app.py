@@ -1847,7 +1847,9 @@ def release_r12_index():
           <li><strong>Step 1</strong> — Run <code>setup_ti60_peri.py</code> once to regenerate <code>church_ti60_f225.peri.xml</code></li>
           <li><strong>Step 1b</strong> — Open <code>church_ti60_f225.xml</code> in Efinity IDE → Synthesis → P&amp;R → Generate Bitstream<br>
               <em>Efinity writes <code>outflow/church_ti60_f225.hex</code> and <code>outflow/church_ti60_f225.bit</code></em></li>
-          <li><strong>Step 2</strong> — <strong>Tool → Programmer</strong>: load either output file and click <strong>Program</strong></li>
+          <li><strong>Step 2</strong> — Open Efinity IDE, then go to <strong>Tool → Programmer</strong>:<br>
+              <code>QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &amp;</code><br>
+              Load either output file and click <strong>Program</strong></li>
         </ol>
       </div>
     </div>
@@ -3008,7 +3010,13 @@ Use either in Step 2 below.
 
 ### Step 2 — Flash
 
-Open **Tool → Programmer**.  Select your cable
+Open Efinity IDE:
+
+```bash
+QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &
+```
+
+Then go to **Tool → Programmer**.  Select your cable
 (**Efinix USB2.0 Device**, JTAG mode) and choose your bitfile:
 
 | Source | File |
