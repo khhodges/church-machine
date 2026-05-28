@@ -1795,6 +1795,17 @@ def release_r12_index():
   a.doc-link{color:#4ade80;text-decoration:none} a.doc-link:hover{text-decoration:underline}
   .back{margin-top:2rem;font-size:.8rem;color:#4a5568}
   .back a{color:#64748b;text-decoration:none} .back a:hover{color:#a78bfa}
+  .next-steps{margin-top:1.1rem;border-top:1px solid #1e2a3a;padding-top:.9rem;display:flex;flex-direction:column;gap:.7rem}
+  .next-steps-title{font-size:.72rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.1rem}
+  .path-block{background:#0a0e17;border-radius:5px;padding:.65rem .8rem;border-left:3px solid #2d1f4e}
+  .path-label{display:block;font-size:.78rem;font-weight:600;margin-bottom:.4rem}
+  .path-a{color:#4ade80}
+  .path-b{color:#60a5fa}
+  .path-block ol{margin:.2rem 0 0 1.1rem;padding:0;font-size:.78rem;color:#8892a4;line-height:1.75}
+  .path-block ol li{margin-bottom:.15rem}
+  .path-block a{color:#a78bfa;text-decoration:none}
+  .path-block a:hover{text-decoration:underline}
+  .path-block em{color:#64748b;font-style:normal}
 </style></head><body>
 <h1>CM Release 1.2</h1>
 <div class="tag">15 May 2026 &middot; Builder &middot; 3-Board FPGA ZIP Downloads</div>
@@ -1820,6 +1831,26 @@ def release_r12_index():
       <li><code>BUILD.md</code> — Instructions</li>
     </ul>
     <a class="dl-btn" href="/api/download/fpga-zip?board=ti60-f225">Download church-ti60-package.zip</a>
+    <div class="next-steps">
+      <div class="next-steps-title">After downloading</div>
+      <div class="path-block">
+        <span class="path-label path-a">⚡ Path A — Flash preloaded bitstream</span>
+        <ol>
+          <li>Download the pre-built hex: <a href="/api/bitstream/download/ti60-f225"><code>church_ti60_f225.hex</code></a></li>
+          <li>Open <strong>Tool → Programmer</strong> in Efinity IDE</li>
+          <li>Select <em>Efinix USB2.0 Device</em>, JTAG mode — load the .hex and click <strong>Program</strong></li>
+        </ol>
+      </div>
+      <div class="path-block">
+        <span class="path-label path-b">🔧 Path B — Rebuild bitstream from ZIP</span>
+        <ol>
+          <li><strong>Step 1</strong> — Run <code>setup_ti60_peri.py</code> once to regenerate <code>church_ti60_f225.peri.xml</code></li>
+          <li><strong>Step 1b</strong> — Open <code>church_ti60_f225.xml</code> in Efinity IDE → Synthesis → P&amp;R → Generate Bitstream<br>
+              <em>Efinity writes <code>outflow/church_ti60_f225.hex</code> and <code>outflow/church_ti60_f225.bit</code></em></li>
+          <li><strong>Step 2</strong> — <strong>Tool → Programmer</strong>: load either output file and click <strong>Program</strong></li>
+        </ol>
+      </div>
+    </div>
   </div>
   <div class="board-card" id="wukong-card">
     <h3>QMTECH Wukong XC7A100T</h3>
