@@ -1868,7 +1868,7 @@ def release_r12_index():
 </body></html>"""
     return html
 
-_SIMULATOR_HTML_VERSION = "r20260528c"
+_SIMULATOR_HTML_VERSION = "r20260528d"
 _STARTER_HTML_VERSION   = "r20260527z"
 
 @app.route("/start")
@@ -3235,7 +3235,7 @@ os.makedirs(BITSTREAM_DIR, exist_ok=True)
 
 BITSTREAM_FILES = {
     "tang-nano-20k-iot": "church_tang_nano_20k_iot.fs",
-    "ti60-f225": "church_ti60_f225.bit",
+    "ti60-f225": "church_ti60_f225.hex",
     "wukong-xc7a100t": "church_wukong_xc7a100t.bit",
 }
 

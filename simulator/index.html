@@ -983,16 +983,16 @@
                             <p class="sw-step-desc sw-os-win">Download the official bitstream, then load it in Efinity Programmer and click <strong>Program</strong> — no synthesis needed.</p>
                             <p class="sw-step-desc sw-os-linux" style="display:none;">Download the official bitstream, then flash it to the board with three terminal commands — no Efinity IDE or synthesis needed.</p>
                             <div class="sw-prepack-dl-row">
-                                <a id="swBitstreamBtn" class="sw-btn sw-btn-primary" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.bit">⬇ Download Bitstream</a>
+                                <a id="swBitstreamBtn" class="sw-btn sw-btn-primary" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.hex">⬇ Download Bitstream</a>
                                 <span id="swBitstreamStatus" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
                             </div>
 
                             <!-- Windows / Mac steps -->
                             <div class="sw-os-win">
                                 <ol class="sw-list">
-                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.bit</code> to your Downloads folder</li>
+                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.hex</code> to your Downloads folder</li>
                                     <li>Open <strong>Efinity Programmer</strong> (standalone — <em>no IDE or synthesis needed</em>)</li>
-                                    <li>Select mode: <strong>JTAG</strong>, click <strong>Open Bit File</strong> → select the downloaded <code>church_ti60_f225.bit</code></li>
+                                    <li>Select mode: <strong>JTAG</strong>, click <strong>Open Bit File</strong> → select the downloaded <code>church_ti60_f225.hex</code></li>
                                     <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
                                 </ol>
                             </div>
@@ -1000,10 +1000,10 @@
                             <!-- Linux / Chromebook steps — starts with download, then explicit commands -->
                             <div class="sw-os-linux" style="display:none;">
                                 <ol class="sw-list">
-                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.bit</code> to <code>~/Downloads/</code></li>
+                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.hex</code> to <code>~/Downloads/</code></li>
                                     <li>Open a terminal and activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
-                                    <li>Flash to the board:<br><code>openFPGALoader -b titanium_ti60_f225 ~/Downloads/church_ti60_f225.bit</code></li>
+                                    <li>Flash to the board:<br><code>openFPGALoader -b titanium_ti60_f225 ~/Downloads/church_ti60_f225.hex</code></li>
                                     <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
                                 </ol>
                             </div>
@@ -1039,20 +1039,20 @@
                                 <ol class="sw-list">
                                     <li>Open <strong>Efinity Programmer</strong> (from the Efinity IDE toolbar)</li>
                                     <li>Select mode: <strong>JTAG</strong></li>
-                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_ti60_f225.bit</code></li>
+                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_ti60_f225.hex</code></li>
                                     <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
                                 </ol>
                             </div>
                             <div class="sw-os-linux" style="display:none;">
                                 <p class="sw-step-desc" style="margin:0 0 0.5rem;">Don't have the official bitstream yet? Download it here — no synthesis needed:</p>
                                 <div class="sw-prepack-dl-row" style="margin-bottom:0.9rem;">
-                                    <a class="sw-btn sw-btn-primary" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.bit">⬇ Download Bitstream</a>
+                                    <a class="sw-btn sw-btn-primary" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.hex">⬇ Download Bitstream</a>
                                     <span id="swBitstreamStatusScratch" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
                                 </div>
                                 <ol class="sw-list">
                                     <li>Open a terminal and activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
-                                    <li>Flash to the board:<br><code>openFPGALoader -b titanium_ti60_f225 ~/Downloads/church_ti60_f225.bit</code></li>
+                                    <li>Flash to the board:<br><code>openFPGALoader -b titanium_ti60_f225 ~/Downloads/church_ti60_f225.hex</code></li>
                                     <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
                                 </ol>
                             </div>
@@ -2230,7 +2230,7 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
     <script async src="app-ti60-connect.js?v=20260528b"></script>
-    <script defer src="app-startup-wizard.js?v=20260528i"></script>
+    <script defer src="app-startup-wizard.js?v=20260528j"></script>
     <script src="app-shell.js?v=20260527p"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>
