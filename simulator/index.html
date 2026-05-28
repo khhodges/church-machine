@@ -1029,23 +1029,52 @@
                             </div>
                         </div>
 
-                        <!-- Scratch path — user compiled their own bitstream -->
+                        <!-- Scratch path — user builds from ZIP then flashes -->
                         <div id="swFlashScratch">
-                            <div class="sw-step-heading">⚡ Step 2 — Program the Board <span class="sw-time-badge">~5 min</span></div>
+                            <div class="sw-step-heading">⚡ Step 2 — Build &amp; Program the Board <span class="sw-time-badge">~35 min</span></div>
+                            <p class="sw-step-desc">Build the bitstream from the downloaded ZIP using Efinity IDE, then flash it to your board. The board stores it permanently — it keeps it even after you unplug it.</p>
+
+                            <!-- ── Part A: Build the bitstream ── -->
+                            <div style="margin:0.8rem 0 0.4rem;font-weight:600;color:var(--text-secondary,#9ca3af);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;">Part A — Build the bitstream (~30 min)</div>
+
+                            <!-- Windows / Mac build steps -->
                             <div class="sw-os-win">
-                                <p class="sw-step-desc">Use <strong>Efinity Programmer</strong> to write the built file onto your board via the cable. This stores the Church Machine permanently — the board will keep it even after you unplug it.</p>
+                                <ol class="sw-list">
+                                    <li>Run <code>setup_ti60_peri.py</code> once to generate the PLL config &mdash; open a terminal and run the command from <code>BUILD.md</code> inside the ZIP:<br>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
+                                    <li>Launch <strong>Efinity IDE</strong> from the Start menu (Windows) or Applications (Mac)</li>
+                                    <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
+                                    <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_ti60_f225.hex</code> is the programming file.</span></li>
+                                </ol>
                             </div>
+
+                            <!-- Linux / Chromebook build steps -->
                             <div class="sw-os-linux" style="display:none;">
-                                <p class="sw-step-desc">Use <strong>openFPGALoader</strong> (from OSS CAD Suite) to write the built file onto your board. This stores the Church Machine permanently — the board will keep it even after you unplug it.</p>
+                                <ol class="sw-list">
+                                    <li>Run <code>setup_ti60_peri.py</code> once to generate the PLL config:<br>
+<pre style="margin:0.3rem 0 0.2rem;">PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \
+EFXPT_HOME=$HOME/efinity/2025.2/pt \
+  $HOME/efinity/2025.2/bin/python3.11 setup_ti60_peri.py</pre>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">You should see <em>"SUCCESS — church_ti60_f225.peri.xml written"</em></span></li>
+                                    <li>Launch Efinity IDE:<br>
+                                        <code>QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &amp;</code></li>
+                                    <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
+                                    <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_ti60_f225.hex</code> is the programming file.</span></li>
+                                </ol>
                             </div>
+
+                            <!-- ── Part B: Flash the board ── -->
+                            <div style="margin:1rem 0 0.4rem;font-weight:600;color:var(--text-secondary,#9ca3af);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;">Part B — Flash the board (~5 min)</div>
                             <div class="sw-led-guide">
                                 <span class="sw-led-label">LEDs right now:</span>
                                 <span class="sw-led sw-led-off" title="LED0">0</span>
                                 <span class="sw-led sw-led-off" title="LED1">1</span>
                                 <span class="sw-led sw-led-off" title="LED2">2</span>
-
                                 <span class="sw-led-note">Board is being programmed</span>
                             </div>
+
                             <div class="sw-os-win">
                                 <ol class="sw-list">
                                     <li>In Efinity IDE: go to <strong>Tool → Programmer</strong></li>
