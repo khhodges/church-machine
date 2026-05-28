@@ -334,33 +334,44 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Server guard — e2e-tests needs a live Flask server on port 5000.
-# playwright.config.js uses reuseExistingServer:true: if port 5000 is already
-# responding, Playwright will reuse it and NOT kill it on teardown.
+# Server guard — e2e-tests needs a live Flask server.
+# playwright.config.js uses reuseExistingServer:true: if the chosen port is
+# already responding, Playwright will reuse it and NOT kill it on teardown.
 # If the dev server (Church Machine IDE workflow) is down, we start Flask in
 # a detached session (setsid) so it survives this script's exit and the
 # workflow manager's SIGTERM, keeping the dev preview alive after all-tests.
+#
+# Port-collision prevention: when E2E_PORT is not already set in the
+# environment, pick a free ephemeral port so that a simultaneously running
+# e2e-tests workflow (which defaults to port 5000) cannot collide with us.
 # ---------------------------------------------------------------------------
 _RUN_E2E=0
 for _sn in "${SUITE_NAMES[@]}"; do
     [ "$_sn" = "e2e-tests" ] && _RUN_E2E=1 && break
 done
-if [ "$_RUN_E2E" -eq 1 ] && ! curl -sf http://localhost:5000/ -o /dev/null 2>&1; then
-    echo ""
-    echo "  [server-guard] Port 5000 not responding — starting Flask server..."
-    setsid python3 server/app.py >> /tmp/church_ide_preflight.log 2>&1 &
-    _sg_ready=0
-    for _sg_i in $(seq 1 30); do
-        sleep 1
-        if curl -sf http://localhost:5000/ -o /dev/null 2>&1; then
-            _sg_ready=1
-            break
+if [ "$_RUN_E2E" -eq 1 ]; then
+    if [ -z "${E2E_PORT:-}" ]; then
+        E2E_PORT=$(python3 -c \
+            "import socket; s=socket.socket(); s.bind(('',0)); p=s.getsockname()[1]; s.close(); print(p)")
+        export E2E_PORT
+    fi
+    if ! curl -sf "http://localhost:${E2E_PORT}/" -o /dev/null 2>&1; then
+        echo ""
+        echo "  [server-guard] Port ${E2E_PORT} not responding — starting Flask server..."
+        setsid python3 server/app.py >> /tmp/church_ide_preflight.log 2>&1 &
+        _sg_ready=0
+        for _sg_i in $(seq 1 30); do
+            sleep 1
+            if curl -sf "http://localhost:${E2E_PORT}/" -o /dev/null 2>&1; then
+                _sg_ready=1
+                break
+            fi
+        done
+        if [ "$_sg_ready" -eq 1 ]; then
+            echo "  [server-guard] Flask ready on port ${E2E_PORT}."
+        else
+            echo "  [server-guard] WARNING: Flask did not respond in 30s — e2e tests may fail."
         fi
-    done
-    if [ "$_sg_ready" -eq 1 ]; then
-        echo "  [server-guard] Flask ready on port 5000."
-    else
-        echo "  [server-guard] WARNING: Flask did not respond in 30s — e2e tests may fail."
     fi
 fi
 unset _RUN_E2E _sg_i _sg_ready _sn

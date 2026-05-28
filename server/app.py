@@ -7290,6 +7290,7 @@ def api_generate_method_available():
 
 
 if __name__ == "__main__":
-    _free_port(5000)
-    logging.info("Starting Church Machine server on port 5000")
-    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False, threaded=True)
+    _port = int(os.environ.get("E2E_PORT", 5000))
+    _free_port(_port)
+    logging.info("Starting Church Machine server on port %d", _port)
+    app.run(host="0.0.0.0", port=_port, debug=True, use_reloader=False, threaded=True)
