@@ -135,6 +135,10 @@ args = "ti60-uart-dry-run"
 task = "workflow.run"
 args = "port-collision-test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "playwright-port-wiring"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -473,6 +477,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node scripts/test_port_collision.js"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "playwright-port-wiring"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node scripts/test_playwright_port_wiring.js"
 
 [workflows.workflow.metadata]
 outputType = "console"

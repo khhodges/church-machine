@@ -186,6 +186,9 @@ register_suite "sync-guard-tests" \
 register_suite "port-collision-test" \
     'node scripts/test_port_collision.js'
 
+register_suite "playwright-port-wiring" \
+    'node scripts/test_playwright_port_wiring.js'
+
 register_suite "ti60-utilisation" \
     'python scripts/check_ti60_utilisation.py --missing-ok'
 
