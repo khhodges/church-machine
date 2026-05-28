@@ -498,8 +498,8 @@ function init() {
     deviceAbstractions = new DeviceAbstractions(abstractionRegistry);
     sim.initAbstractions(abstractionRegistry, systemAbstractions, deviceAbstractions);
     // Wire abstraction names into the assembler symbol table so the named
-    // shorthand syntax works:  LOAD CR11, SlideRule  (Level 1), and after
-    // that instruction any  CALL SlideRule  → CALL CR11  (Level 2).
+    // shorthand syntax works:  LOAD CR11, SlideRule  (two-operand shorthand),
+    // and after that instruction any  CALL SlideRule  → CALL CR11  (loaded-CR resolution).
     {
         const _nsSymMap = {};
         for (const [slot, abs] of Object.entries(abstractionRegistry.abstractions)) {

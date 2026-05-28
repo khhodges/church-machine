@@ -101,16 +101,16 @@
 //   The assembler accepts registered abstraction names wherever a CR source
 //   operand appears, in two complementary ways:
 //
-//   Level 1 — two-operand LOAD/SAVE/ELOADCALL/XLOADLAMBDA shorthand:
+//   Two-operand LOAD/SAVE/ELOADCALL/XLOADLAMBDA shorthand:
 //     LOAD  CRdst, Name          → LOAD  CRdst, CR6, slot
 //     SAVE  CRdst, Name          → SAVE  CRdst, CR6, slot
 //     ELOADCALL  CRdst, Name     → ELOADCALL  CRdst, CR6, slot
 //     XLOADLAMBDA  CRdst, Name   → XLOADLAMBDA  CRdst, CR6, slot
 //   CR6 is the c-list root by convention.  For LOAD and SAVE the assembler
-//   also records  Name → CRdst  in an internal map so the Level-2 rule kicks
-//   in immediately for subsequent instructions in the same program.
+//   also records  Name → CRdst  in an internal map so the loaded-CR resolution
+//   kicks in immediately for subsequent instructions in the same program.
 //
-//   Level 2 — loaded-CR resolution in any CR operand position:
+//   Loaded-CR resolution in any CR operand position:
 //   After  LOAD CR11, SlideRule  is assembled, the name SlideRule is known to
 //   be in CR11.  Any subsequent instruction that names SlideRule where a CR is
 //   expected resolves to CR11 automatically:
@@ -121,7 +121,7 @@
 //   Names are matched case-sensitively (SlideRule ≠ sliderule).
 //   Unknown names produce an error listing all known abstraction and loaded names.
 //
-//   Level 3 — named method selectors in CALL:
+//   Named method selectors in CALL:
 //   When the assembler is constructed with a methodConventions map (e.g.
 //   METHOD_REGISTER_CONVENTIONS), the second operand of CALL may be a method
 //   name instead of a raw integer.  Two equivalent syntaxes are accepted:
@@ -129,7 +129,7 @@
 //     CALL SlideRule.Multiply        → imm=1  (dot-notation form, identical)
 //     CALL SlideRule, Divide         → imm=2  (Divide index 1)
 //     CALL SlideRule.Sqrt            → imm=3  (Sqrt index 2)
-//   The abstraction name must have been previously bound via LOAD (Level 2).
+//   The abstraction name must have been previously bound via LOAD (loaded-CR resolution).
 //   Numeric selectors use 1-based encoding (selector+1 stored in imm15):
 //     CALL SlideRule, 0              → imm=1  (method 0, table slot 1)
 //     CALL CR11, 0                   → imm=1  (method 0, table slot 1)
@@ -137,7 +137,7 @@
 //   Supported range: 0–16383 (imm15 slots 1–16384).
 //   If the method name is not found a clear error lists the known methods.
 //
-//   Level 4 — method index in ELOADCALL:
+//   Method index in ELOADCALL:
 //   ELOADCALL imm15 is a two-part field: bits[14:8] = method index (1-based,
 //   0 = fast-path), bits[7:0] = c-list row.  An optional method name or
 //   0-based integer may follow the abstraction name / slot operand:
@@ -1620,7 +1620,7 @@ class ChurchAssembler {
             this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _mnTok), message: 'A capability register (like CR0, CR6, CR11, 6, or hex 0x0\u20130xF) is needed here, but nothing was given.' });
             return 0;
         }
-        // Preserve original-case token for Level 2 and error messages.
+        // Preserve original-case token for loaded-CR resolution and error messages.
         const rawTok = token.replace(/,/g, '').trim();
 
         // Explicit register syntax takes priority over any alias.
@@ -1647,7 +1647,7 @@ class ChurchAssembler {
             return 0;
         }
 
-        // Level 2: check if this token is an abstraction name already loaded into a CR.
+        // Loaded-CR resolution: check if this token is an abstraction name already loaded into a CR.
         if (this.nsLoaded[rawTok] !== undefined) return this.nsLoaded[rawTok];
 
         // .pet alias lookup — check CR aliases first, then give a helpful

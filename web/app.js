@@ -9340,23 +9340,23 @@ RETURN                     ; Back through tunnel</pre>
                 <div class="key-concept">
                     <strong>Key Insight:</strong> This is programmable security that <em>cannot exist</em> without CM technology. In von Neumann machines, method dispatch is always by name or offset &mdash; structural, never secured. In CM, dispatch happens inside the abstraction's scope behind the Access code, so the author has complete freedom to program the security level of the selector itself.
                 </div>`,
-                demo: `<div class="demo-title">Three Dispatch Security Levels</div>
+                demo: `<div class="demo-title">Three Dispatch Security Modes</div>
                 <div class="demo-content">
                     <div style="font-size: 0.75rem;">
                         <div style="margin-bottom: 0.8rem; padding: 0.5rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid #4ade80;">
-                            <div style="color: #4ade80; font-weight: bold; margin-bottom: 0.3rem;">Level 1: Integer (Simple)</div>
+                            <div style="color: #4ade80; font-weight: bold; margin-bottom: 0.3rem;">Integer Dispatch (Simple)</div>
                             <div style="font-family: monospace; color: #94a3b8;">MOV DR0, #3 &nbsp; ; method = DIV</div>
                             <div style="font-family: monospace; color: #94a3b8;">CALL CR0 &nbsp;&nbsp;&nbsp;&nbsp; ; dispatch</div>
                             <div style="color: #f87171; margin-top: 0.2rem; font-size: 0.7rem;">Risk: attacker can try DR0 = 0, 1, 2&hellip;</div>
                         </div>
                         <div style="margin-bottom: 0.8rem; padding: 0.5rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid #f59e0b;">
-                            <div style="color: #f59e0b; font-weight: bold; margin-bottom: 0.3rem;">Level 2: String (Obscured)</div>
+                            <div style="color: #f59e0b; font-weight: bold; margin-bottom: 0.3rem;">String Dispatch (Obscured)</div>
                             <div style="font-family: monospace; color: #94a3b8;">MOV DR0, #str_addr ; obfuscated name</div>
                             <div style="font-family: monospace; color: #94a3b8;">CALL CR0 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ; string match</div>
                             <div style="color: #f59e0b; margin-top: 0.2rem; font-size: 0.7rem;">Harder: must guess the string</div>
                         </div>
                         <div style="padding: 0.5rem; background: var(--bg-panel); border-radius: 4px; border-left: 3px solid #a78bfa;">
-                            <div style="color: #a78bfa; font-weight: bold; margin-bottom: 0.3rem;">Level 3: Abstract GT (Capability-Protected)</div>
+                            <div style="color: #a78bfa; font-weight: bold; margin-bottom: 0.3rem;">Abstract GT Dispatch (Capability-Protected)</div>
                             <div style="font-family: monospace; color: #94a3b8;">LOAD CR1, CR6, #key ; Abstract GT</div>
                             <div style="font-family: monospace; color: #94a3b8;">CALL CR0 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ; GT validated</div>
                             <div style="color: #4ade80; margin-top: 0.2rem; font-size: 0.7rem;">Secure: need valid GT to select method</div>
@@ -9503,7 +9503,7 @@ RETURN                     ; Back through tunnel</pre>
                     <li><strong>CALL</strong> the Constants abstraction &mdash; it validates the Abstract GT in CR1 and returns the value in DR0</li>
                 </ol>
                 <div class="key-concept">
-                    <strong>Level 3 Security:</strong> This is the highest method-selector dispatch level. The caller must hold the Abstract GT (capability gate) AND pass it via CR (hardware-enforced path). No integer or string guessing can bypass this.
+                    <strong>Abstract GT Dispatch:</strong> This is the most secure method-selector dispatch mode. The caller must hold the Abstract GT (capability gate) AND pass it via CR (hardware-enforced path). No integer or string guessing can bypass this.
                 </div>`,
                 demo: `<div class="demo-title">Constants Dispatch Pattern</div>
                 <div class="demo-content">
@@ -15465,11 +15465,11 @@ function renderGtTypesReference() {
             <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
                 <h4 style="color: var(--text); margin-bottom: 0.75rem;">Programmable Method-Selector Security</h4>
                 <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem;">
-                    Method dispatch executes inside the abstraction's protected scope. The abstraction author chooses the security level:
+                    Method dispatch executes inside the abstraction's protected scope. The abstraction author chooses the dispatch mode:
                 </p>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
                     <div style="background: var(--bg); border: 1px solid #4ade80; border-radius: 6px; padding: 0.75rem;">
-                        <div style="color: #4ade80; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">Level 1: Integer in DR0</div>
+                        <div style="color: #4ade80; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">Integer Dispatch: Integer in DR0</div>
                         <div style="color: var(--text-secondary); font-size: 0.8rem;">
                             Fast enumerable dispatch. Caller sets DR0 = method number, CALL enters abstraction.
                             Access code reads DR0 and branches.
@@ -15479,7 +15479,7 @@ function renderGtTypesReference() {
                         </div>
                     </div>
                     <div style="background: var(--bg); border: 1px solid #60a5fa; border-radius: 6px; padding: 0.75rem;">
-                        <div style="color: #60a5fa; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">Level 2: String in DR0</div>
+                        <div style="color: #60a5fa; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">String Dispatch: String in DR0</div>
                         <div style="color: var(--text-secondary); font-size: 0.8rem;">
                             Symbolic resolver matches method name string.
                             Harder to guess than integers but still data.
@@ -15489,7 +15489,7 @@ function renderGtTypesReference() {
                         </div>
                     </div>
                     <div style="background: var(--bg); border: 1px solid #f472b6; border-radius: 6px; padding: 0.75rem;">
-                        <div style="color: #f472b6; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">Level 3: Abstract GT in CR</div>
+                        <div style="color: #f472b6; font-weight: bold; font-size: 0.9rem; margin-bottom: 0.5rem;">Abstract GT Dispatch: Abstract GT in CR</div>
                         <div style="color: var(--text-secondary); font-size: 0.8rem;">
                             Two-layer protection: caller must hold the Abstract GT (capability gate)
                             AND pass it via CR (hardware-enforced path).
@@ -15642,7 +15642,7 @@ function renderGtTypesReference() {
                     </div>
                 </div>
                 <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;">
-                    <div style="color: var(--text); font-weight: bold; font-size: 0.85rem; margin-bottom: 0.5rem;">Usage Pattern (Level 3 Security)</div>
+                    <div style="color: var(--text); font-weight: bold; font-size: 0.85rem; margin-bottom: 0.5rem;">Usage Pattern (Abstract GT Dispatch)</div>
                     <pre style="color: var(--text-secondary); font-size: 0.8rem; margin: 0; font-family: monospace;">LOAD CR0, CR6, #9       ; Load Constants abstraction [E]
 LOAD CR1, CR0, #2       ; Load GT_PI Abstract GT into CR1
 CALL CR0                ; Enter Constants — validates CR1

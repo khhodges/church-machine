@@ -215,7 +215,7 @@ No capability in Γ leaks into Γ′ and no capability in Γ′ leaks back into 
 
 The Church Machine has three nested lambda environments, each a strict subset of the one above it:
 
-### Level 1 — Boot Environment (Γ₀)
+### Boot Environment (Γ₀)
 
 The DEMO_CLIST: 18 slots, populated at synthesis time, loaded into CR6 at boot. This is the widest environment — it names all kernel objects and all device abstractions. Only the boot abstraction runs in this environment. Its sole purpose is to call Salvation.
 
@@ -225,7 +225,7 @@ The DEMO_CLIST: 18 slots, populated at synthesis time, loaded into CR6 at boot. 
         LED[0..5], UART, Button, SlideRule, Timer }
 ```
 
-### Level 2 — Salvation's Environment (Γ₁)
+### Salvation's Environment (Γ₁)
 
 Salvation is a single-purpose security bootstrap abstraction. Its private C-List is a minimal subset of Γ₀ — just the capabilities needed to verify the security pipeline (LOAD, TPERM, LAMBDA correctness). Salvation does not hold the full boot environment. After proving the pipeline works, it calls Navana.
 
@@ -233,7 +233,7 @@ Salvation is a single-purpose security bootstrap abstraction. Its private C-List
 Γ₁ ⊂ Γ₀   (strict subset — fewer names, tighter scope)
 ```
 
-### Level 3 — Navana's Environment (Γ₂)
+### Navana's Environment (Γ₂)
 
 Navana is the permanent namespace controller. Its private C-List includes all abstractions it manages plus the privileged NS write capability. Navana never RETURNs — it becomes the permanent runtime environment. Every new abstraction Navana installs adds a name to the system, but that name appears in Navana's scope, not in the original Γ₀.
 
@@ -241,7 +241,7 @@ Navana is the permanent namespace controller. Its private C-List includes all ab
 Γ₂ ⊂ Γ₀   (different subset — runtime management names)
 ```
 
-**Principle of Least Authority as environment shrinkage:** each level in the chain sees a smaller, more tightly scoped set of names. The boot environment is intentionally the widest possible — a necessary evil of the cold-start problem. As control passes to Salvation and then to Navana, scope shrinks. User abstractions installed by Navana see only the capabilities Navana explicitly grants them, which are a small subset of Γ₂. The lambda calculus framing makes this hierarchy precise: each level is a distinct environment, and no term can reference a name outside its own environment without an explicit capability binding.
+**Principle of Least Authority as environment shrinkage:** each environment in the chain sees a smaller, more tightly scoped set of names. The boot environment is intentionally the widest possible — a necessary evil of the cold-start problem. As control passes to Salvation and then to Navana, scope shrinks. User abstractions installed by Navana see only the capabilities Navana explicitly grants them, which are a small subset of Γ₂. The lambda calculus framing makes this hierarchy precise: each environment is distinct, and no term can reference a name outside its own environment without an explicit capability binding.
 
 ---
 

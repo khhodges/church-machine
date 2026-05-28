@@ -2321,25 +2321,25 @@ This requires no new hardware — it is a refinement of the existing FAULT condi
 CALL enters LambdaSum → push CALL frame, lump split creates CR14 + CR6
   lambda_active = 0
 
-Level 0: DR_n=3, DR_total=0
+Step 0: DR_n=3, DR_total=0
   n≠0, skip base case
   total = 0+3 = 3, n = 3-1 = 2
   LAMBDA CR6: lambda_active was 0 → set lambda_active=1, lambda_pc=addr_after_lambda
   Branch to method entry
 
-Level 1: DR_n=2, DR_total=3
+Step 1: DR_n=2, DR_total=3
   n≠0, skip base case
   total = 3+2 = 5, n = 2-1 = 1
   LAMBDA CR6: lambda_active already 1 → overwrite lambda_pc with same value (idempotent)
   Branch to method entry
 
-Level 2: DR_n=1, DR_total=5
+Step 2: DR_n=1, DR_total=5
   n≠0, skip base case
   total = 5+1 = 6, n = 1-1 = 0
   LAMBDA CR6: lambda_active already 1 → idempotent
   Branch to method entry
 
-Level 3: DR_n=0, DR_total=6
+Step 3: DR_n=0, DR_total=6
   n==0! Base case.
   RETURN #1: lambda_active=1 → PC ← lambda_pc, clear lambda_active
     DR_total=6 (correct answer!)
