@@ -5940,6 +5940,35 @@ def device_pull_drain(uid):
     return jsonify({"ok": True, "bytes": list(data)})
 
 
+@app.route("/api/boot-rom-words")
+def boot_rom_words():
+    """Return the hardware boot ROM (FULL_ROM from hardware/boot_rom.py).
+
+    The FULL_ROM is the pre-synthesised instruction ROM baked into the FPGA
+    bitstream.  It covers NIA byte-addresses 0x0000–0x0FFC (1024 words).
+    The DEMO_CLIST is the static capability list used by NUC_PROGRAM (LED blink).
+
+    Used by the Connect tab NIA stream panel to decode instructions correctly:
+    NIA values within the ROM range are decoded from FULL_ROM, not from the
+    boot-image.bin LUMP (which covers a different address range).
+    """
+    try:
+        import sys as _sys
+        _repo = os.path.dirname(os.path.dirname(__file__))
+        if _repo not in _sys.path:
+            _sys.path.insert(0, _repo)
+        from hardware import boot_rom as _br
+        return jsonify({
+            "ok":                      True,
+            "rom":                     [int(w) for w in _br.FULL_ROM],
+            "nuc_lump_base_byte":      int(_br.NUC_LUMP_BASE),
+            "sliderule_lump_base_byte": int(_br.SLIDERULE_LUMP_BASE),
+            "demo_clist":              [int(w) for w in _br.DEMO_CLIST],
+        })
+    except Exception as _e:
+        return jsonify({"ok": False, "error": str(_e)})
+
+
 @app.route("/api/boot-lump-words")
 def boot_lump_words():
     """Return c-list and code words for Boot.Abstr (NS slot 3) from the boot image.

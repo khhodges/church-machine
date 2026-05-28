@@ -10,6 +10,7 @@ window.Ti60Connect = (function () {
     let _tunnelMode = false;
     let _streamLineCount = 0;
     let _bootLump = null;
+    let _bootRom  = null;   // { rom: uint32[], nuc_lump_base_byte, demo_clist: uint32[] }
     let _bridgeEverConfirmed = localStorage.getItem('ti60BridgeCertAccepted') === '1';
     let _detectedPort = null;
     let _activeBaud = BAUD;
@@ -533,12 +534,52 @@ window.Ti60Connect = (function () {
         return null;
     }
 
-    // Decode the instruction at NIA niaNum from lump and return a one-line annotation,
-    // e.g. "[0x1A004001]  ELOADCALL CR0, CR6[0x0001]   GT[1]: 0xFF803F01 Inform(E)"
-    // Returns null if the NIA is out of range or lump is unavailable.
-    function _decodeNIA(niaNum, lump) {
-        if (!lump || niaNum < 0 || niaNum >= lump.code.length) return null;
-        const word = lump.code[niaNum] >>> 0;
+    async function _fetchBootRom() {
+        try {
+            const r = await fetch('/api/boot-rom-words', { signal: AbortSignal.timeout(5000) });
+            const d = await r.json();
+            if (d.ok) { _bootRom = d; return d; }
+        } catch (_e) {}
+        _bootRom = null;
+        return null;
+    }
+
+    // Decode the instruction at NIA byte-address niaNum and return a one-line annotation,
+    // e.g. "[0x27660001]  CHANGE AL, CR12, CR12, #1"
+    // Source priority:
+    //   1. bootRom.rom — the FULL_ROM baked into the FPGA bitstream (NIA 0x0000–0x0FFC).
+    //      c-list GTs come from bootRom.demo_clist (used by NUC_PROGRAM via CR6).
+    //   2. lump.code   — Boot.Abstr LUMP from boot-image.bin (NIA range = lump_base+1..+cw).
+    //      c-list GTs come from lump.clist.
+    // Returns null if NIA is unrecognised.
+    function _decodeNIA(niaNum, bootRom, lump) {
+        let word      = null;
+        let activeClist = null;
+
+        // ── 1. Boot ROM (FULL_ROM, synthesised into the bitstream) ───────────────
+        if (bootRom && bootRom.rom && (niaNum & 3) === 0) {
+            const romIdx = niaNum >>> 2;
+            if (romIdx < bootRom.rom.length) {
+                word = bootRom.rom[romIdx] >>> 0;
+                // NUC_PROGRAM (starts at NUC_LUMP_BASE + 4 bytes = first code word)
+                // uses CR6 → DEMO_CLIST for GT lookups.
+                activeClist = bootRom.demo_clist || null;
+            }
+        }
+
+        // ── 2. Boot.Abstr LUMP (loaded from boot-image.bin via BOOT 0/4) ────────
+        if (word === null && lump && lump.code && (niaNum & 3) === 0) {
+            // lump_base is a word address; code starts at word lump_base+1
+            const codeStartByte = (lump.lump_base + 1) * 4;
+            const idx = (niaNum - codeStartByte) >>> 2;
+            if (idx >= 0 && idx < lump.code.length) {
+                word = lump.code[idx] >>> 0;
+                activeClist = lump.clist || null;
+            }
+        }
+
+        if (word === null) return null;
+
         let mnemonic;
         try {
             const asm = new ChurchAssembler();
@@ -546,6 +587,7 @@ window.Ti60Connect = (function () {
         } catch (_e) {
             mnemonic = '???';
         }
+
         // Find which c-list slot this instruction accesses (if any)
         const opcode = (word >>> 27) & 0x1F;
         const crSrc  = (word >>> 15) & 0xF;
@@ -561,8 +603,8 @@ window.Ti60Connect = (function () {
             }
         }
         let gtStr = '';
-        if (clSlot !== null && lump.clist && clSlot < lump.clist.length) {
-            const gt = lump.clist[clSlot] >>> 0;
+        if (clSlot !== null && activeClist && clSlot < activeClist.length) {
+            const gt = activeClist[clSlot] >>> 0;
             const bFlag  = (gt >>> 31) & 1;
             const perm3  = (gt >>> 28) & 0x7;
             const dom    = (gt >>> 27) & 0x1;
@@ -595,6 +637,7 @@ window.Ti60Connect = (function () {
         _log('— Live NIA stream active via server tunnel — (Disconnect to stop)', 'log-pass');
         _log('💡 No output yet? Power-cycle the board (unplug/replug USB) to capture the boot stream.', 'log-warn');
         _fetchBootLump();
+        _fetchBootRom();
         _showStreamPanel();
         while (_bridgeRunning) {
             await new Promise(r => setTimeout(r, 400));
@@ -613,7 +656,7 @@ window.Ti60Connect = (function () {
                         if (niaMatch) {
                             const nia    = '0x' + niaMatch[1].toUpperCase().padStart(8, '0');
                             const niaNum = parseInt(niaMatch[1], 16);
-                            const anno   = _decodeNIA(niaNum, _bootLump);
+                            const anno   = _decodeNIA(niaNum, _bootRom, _bootLump);
                             const label  = anno ? 'NIA → ' + nia + '  ' + anno
                                                 : 'NIA → ' + nia;
                             _streamLog(label, 'sl-nia');
