@@ -12,6 +12,65 @@ This guide connects your Ti60 F225 FPGA board to the Church Machine IDE when you
 
 ---
 
+## Step 0 — Flash the Ti60 (first time only)
+
+If your Ti60 does not yet have the Church Machine firmware on it, flash it now using **openFPGALoader** from OSS CAD Suite. You do not need the proprietary Efinix Efinity Programmer on a Chromebook.
+
+> **Already flashed?** Skip straight to [Step 1](#step-1--open-a-linux-terminal). The bridge steps are identical regardless of how the board was flashed.
+
+### Install OSS CAD Suite (one time)
+
+Download the latest OSS CAD Suite release for Linux (amd64) from
+[github.com/YosysHQ/oss-cad-suite-build/releases](https://github.com/YosysHQ/oss-cad-suite-build/releases),
+then extract and activate it:
+
+```bash
+# Extract (adjust filename to match the version you downloaded)
+tar -xf oss-cad-suite-linux-x64-*.tgz -C ~
+
+# Activate — add this line to ~/.bashrc to make it permanent
+source ~/oss-cad-suite/environment
+```
+
+### Download the bitstream
+
+Open the Church Machine IDE, go to **Builder → Ti60 F225**, click **⬇ Download Bitstream**, and save `church_ti60_f225.bit` to your Linux home folder.
+
+### Check the JTAG port
+
+```bash
+ls /dev/ttyUSB*
+```
+
+You should see at least `/dev/ttyUSB0` (JTAG). If nothing appears, unplug and replug the USB cable.
+
+### Flash
+
+```bash
+# Install (one time)
+source ~/oss-cad-suite/environment
+
+# Check JTAG port
+ls /dev/ttyUSB*
+
+# Flash
+openFPGALoader -b titanium_ti60_f225 church_ti60_f225.bit
+```
+
+Wait for `Programming done` — this takes about 30 seconds. The board will reboot automatically with the Church Machine firmware.
+
+### Troubleshooting (flash step)
+
+| Problem | Fix |
+|---|---|
+| `openFPGALoader: command not found` | Run `source ~/oss-cad-suite/environment` first |
+| `No device detected` | Check USB cable is data-capable; try `openFPGALoader --detect`; reseat the cable |
+| `Permission denied: '/dev/ttyUSB0'` | Run `sudo usermod -aG dialout $USER` then log out and back in (or `sudo chmod 666 /dev/ttyUSB*` for a quick fix) |
+| `Wrong device / ID mismatch` | Re-download the bitstream; do not use a `.bit` file built for Tang Nano or Wukong |
+| Device appears then disappears | 12 V power not connected — the Ti60 needs both USB and the external power brick |
+
+---
+
 ## Step 1 — Open a Linux terminal
 
 Open the **Terminal** app (the penguin icon, or search "Terminal").

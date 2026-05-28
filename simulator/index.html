@@ -957,20 +957,56 @@
                     <!-- ── Step 1: Flash ── -->
                     <div class="sw-body-step" id="swBody1">
 
+                        <!-- OS toggle tabs -->
+                        <div class="sw-os-tabs" id="swFlashOsTabs" style="display:flex;gap:6px;margin-bottom:12px;">
+                            <button class="sw-btn sw-os-tab sw-os-tab-active" id="swOsBtnWin" onclick="swSetFlashOs('win')" style="flex:1;font-size:0.85em;">🪟 Windows / Mac</button>
+                            <button class="sw-btn sw-os-tab" id="swOsBtnLinux" onclick="swSetFlashOs('linux')" style="flex:1;font-size:0.85em;opacity:0.65;">🐧 Linux / Chromebook</button>
+                        </div>
+                        <script>
+                        function swSetFlashOs(os) {
+                            document.querySelectorAll('.sw-os-win').forEach(function(el) { el.style.display = os === 'win' ? '' : 'none'; });
+                            document.querySelectorAll('.sw-os-linux').forEach(function(el) { el.style.display = os === 'linux' ? '' : 'none'; });
+                            var btnWin = document.getElementById('swOsBtnWin');
+                            var btnLinux = document.getElementById('swOsBtnLinux');
+                            btnWin.classList.toggle('sw-os-tab-active', os === 'win');
+                            btnLinux.classList.toggle('sw-os-tab-active', os === 'linux');
+                            btnWin.style.opacity = os === 'win' ? '1' : '0.65';
+                            btnLinux.style.opacity = os === 'linux' ? '1' : '0.65';
+                        }
+                        </script>
+
                         <!-- Prepackaged path — download pre-built bitstream + flash -->
                         <div id="swFlashPrepack" style="display:none;">
                             <div class="sw-step-heading">⚡ Step 2 — Flash the Prepackaged Bitstream <span class="sw-time-badge">~3 min</span></div>
-                            <p class="sw-step-desc">The approved Church Machine bitstream is ready to download — one file, no 30-minute synthesis needed. Download it, load it in Efinity Programmer, and click <strong>Program</strong>.</p>
+                            <div class="sw-os-win">
+                                <p class="sw-step-desc">The approved Church Machine bitstream is ready to download — one file, no 30-minute synthesis needed. Download it, load it in Efinity Programmer, and click <strong>Program</strong>.</p>
+                            </div>
+                            <div class="sw-os-linux" style="display:none;">
+                                <p class="sw-step-desc">The approved Church Machine bitstream is ready to download — one file, no synthesis needed. Download it, then flash with <strong>openFPGALoader</strong> from OSS CAD Suite.</p>
+                            </div>
                             <div class="sw-prepack-dl-row">
-                                <a id="swBitstreamBtn" class="sw-btn sw-btn-primary sw-btn-dl-disabled" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.hex">⬇ Download Bitstream</a>
+                                <a id="swBitstreamBtn" class="sw-btn sw-btn-primary sw-btn-dl-disabled" href="/api/bitstream/download/ti60-f225" download="church_ti60_f225.bit">⬇ Download Bitstream</a>
                                 <span id="swBitstreamStatus" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
                             </div>
-                            <ol class="sw-list">
-                                <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.hex</code> to your Downloads folder</li>
-                                <li>Open <strong>Efinity Programmer</strong> (standalone — <em>no IDE or synthesis needed</em>)</li>
-                                <li>Select mode: <strong>JTAG</strong>, click <strong>Open Bit File</strong> → select the downloaded <code>church_ti60_f225.hex</code></li>
-                                <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
-                            </ol>
+                            <div class="sw-os-win">
+                                <ol class="sw-list">
+                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.bit</code> to your Downloads folder</li>
+                                    <li>Open <strong>Efinity Programmer</strong> (standalone — <em>no IDE or synthesis needed</em>)</li>
+                                    <li>Select mode: <strong>JTAG</strong>, click <strong>Open Bit File</strong> → select the downloaded <code>church_ti60_f225.bit</code></li>
+                                    <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
+                                </ol>
+                            </div>
+                            <div class="sw-os-linux" style="display:none;">
+                                <ol class="sw-list">
+                                    <li>Click <strong>⬇ Download Bitstream</strong> above — saves <code>church_ti60_f225.bit</code> to your Downloads folder</li>
+                                    <li>Activate OSS CAD Suite: <code>source ~/oss-cad-suite/environment</code></li>
+                                    <li>Check the JTAG port: <code>ls /dev/ttyUSB*</code> — you should see <code>/dev/ttyUSB0</code></li>
+                                    <li>Flash: <code>openFPGALoader -b titanium_ti60_f225 church_ti60_f225.bit</code></li>
+                                    <li>Wait for <em>"Programming done"</em> — takes about 30 seconds</li>
+                                </ol>
+                                <p class="sw-step-note" style="margin:6px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ <em>Permission denied</em> on <code>/dev/ttyUSB*</code>? Run <code>sudo usermod -aG dialout $USER</code> then log out and back in.</p>
+                                <p class="sw-step-note" style="margin:4px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ Board not detected? Try <code>openFPGALoader --detect</code> to confirm the cable is seated.</p>
+                            </div>
                             <div class="sw-led-guide">
                                 <span class="sw-led-label">LEDs right now:</span>
                                 <span class="sw-led sw-led-off" title="LED0">0</span>
@@ -984,7 +1020,12 @@
                         <!-- Scratch path — user compiled their own bitstream -->
                         <div id="swFlashScratch">
                             <div class="sw-step-heading">⚡ Step 2 — Program the Board <span class="sw-time-badge">~5 min</span></div>
-                            <p class="sw-step-desc">Use <strong>Efinity Programmer</strong> to write the built file onto your board via the cable. This stores the Church Machine permanently — the board will keep it even after you unplug it.</p>
+                            <div class="sw-os-win">
+                                <p class="sw-step-desc">Use <strong>Efinity Programmer</strong> to write the built file onto your board via the cable. This stores the Church Machine permanently — the board will keep it even after you unplug it.</p>
+                            </div>
+                            <div class="sw-os-linux" style="display:none;">
+                                <p class="sw-step-desc">Use <strong>openFPGALoader</strong> (from OSS CAD Suite) to write the built file onto your board. This stores the Church Machine permanently — the board will keep it even after you unplug it.</p>
+                            </div>
                             <div class="sw-led-guide">
                                 <span class="sw-led-label">LEDs right now:</span>
                                 <span class="sw-led sw-led-off" title="LED0">0</span>
@@ -993,12 +1034,24 @@
                                 <span class="sw-led sw-led-off" title="LED3">3</span>
                                 <span class="sw-led-note">Board is being programmed</span>
                             </div>
-                            <ol class="sw-list">
-                                <li>Open <strong>Efinity Programmer</strong> (from the Efinity IDE toolbar)</li>
-                                <li>Select mode: <strong>JTAG</strong></li>
-                                <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_ti60_f225.bit</code></li>
-                                <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
-                            </ol>
+                            <div class="sw-os-win">
+                                <ol class="sw-list">
+                                    <li>Open <strong>Efinity Programmer</strong> (from the Efinity IDE toolbar)</li>
+                                    <li>Select mode: <strong>JTAG</strong></li>
+                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_ti60_f225.bit</code></li>
+                                    <li>Click <strong>Program</strong> and wait for <em>"Programming Done"</em></li>
+                                </ol>
+                            </div>
+                            <div class="sw-os-linux" style="display:none;">
+                                <ol class="sw-list">
+                                    <li>Activate OSS CAD Suite: <code>source ~/oss-cad-suite/environment</code></li>
+                                    <li>Check the JTAG port: <code>ls /dev/ttyUSB*</code> — you should see <code>/dev/ttyUSB0</code></li>
+                                    <li>Flash: <code>openFPGALoader -b titanium_ti60_f225 outflow/church_ti60_f225.bit</code></li>
+                                    <li>Wait for <em>"Programming done"</em> — takes about 30 seconds</li>
+                                </ol>
+                                <p class="sw-step-note" style="margin:6px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ <em>Permission denied</em> on <code>/dev/ttyUSB*</code>? Run <code>sudo usermod -aG dialout $USER</code> then log out and back in.</p>
+                                <p class="sw-step-note" style="margin:4px 0 0;font-size:0.82em;color:var(--gold,#c8a84b);">⚠ Board not detected? Try <code>openFPGALoader --detect</code> to confirm the cable is seated.</p>
+                            </div>
                         </div>
 
                         <!-- Shared: trouble panel, success banner, footer -->
@@ -1008,11 +1061,14 @@
                                 <li><strong>Efinity Programmer can't find the board</strong> — check the JTAG cable is fully seated, try a different USB port, confirm 12 V power is connected.</li>
                                 <li><strong>"Unknown device" error</strong> — install or reinstall the Efinix FT4232H JTAG driver from the Efinity installer.</li>
                                 <li><strong>Bit file rejected / wrong device</strong> — re-download the bit file and verify its SHA against the release notes; do not use a bit file built for a different board variant.</li>
+                                <li><strong>openFPGALoader: "No device detected"</strong> (Linux/Chromebook) — check the USB cable is a data cable, try <code>openFPGALoader --detect</code>, and confirm the cable is fully seated.</li>
+                                <li><strong>"Permission denied" on /dev/ttyUSB*</strong> (Linux/Chromebook) — run <code>sudo usermod -aG dialout $USER</code> then log out and back in (or <code>sudo chmod 666 /dev/ttyUSB*</code> for a quick fix).</li>
+                                <li><strong>openFPGALoader not found</strong> — run <code>source ~/oss-cad-suite/environment</code> first to activate the toolchain.</li>
                             </ul>
                         </div>
                         <div class="sw-step-success" id="swSuccess1">
                             <span class="sw-step-success-icon">✅</span>
-                            <span class="sw-step-success-text"><strong>Board flashed!</strong> Efinity Programmer reported "Programming Done".</span>
+                            <span class="sw-step-success-text"><strong>Board flashed!</strong> The Church Machine firmware is now on your board.</span>
                             <button class="sw-btn sw-btn-next" onclick="StartupWizard.advance()">→ Next step</button>
                         </div>
                         <div class="sw-footer-row">

@@ -3235,7 +3235,7 @@ os.makedirs(BITSTREAM_DIR, exist_ok=True)
 
 BITSTREAM_FILES = {
     "tang-nano-20k-iot": "church_tang_nano_20k_iot.fs",
-    "ti60-f225": "church_ti60_f225.hex",
+    "ti60-f225": "church_ti60_f225.bit",
     "wukong-xc7a100t": "church_wukong_xc7a100t.bit",
 }
 

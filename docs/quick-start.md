@@ -1063,6 +1063,20 @@ and bitstream generation. Extract the ZIP, then:
 4. Generate the bitstream (`.hex` or `.bit` file)
 5. Flash using the Efinity Programmer GUI
 
+> **On Linux or Chromebook?** You can flash the Ti60 with `openFPGALoader`
+> from OSS CAD Suite instead of the Efinity Programmer — no proprietary
+> tools required:
+>
+> ```bash
+> source ~/oss-cad-suite/environment
+> ls /dev/ttyUSB*                                           # check JTAG port
+> openFPGALoader -b titanium_ti60_f225 church_ti60_f225.bit
+> ```
+>
+> See **[docs/bridge-setup-chromeos.md](bridge-setup-chromeos.md)** for the
+> full install and troubleshooting guide (Step 0 covers flashing, Steps 1–8
+> cover the bridge).
+
 ### Summary: what runs where
 
 | Step | Where | How |
