@@ -867,7 +867,7 @@ class ChurchAssembler {
                             if (/^CR\d+$/i.test(arg)) {
                                 // Explicit CRn supplied — caller pre-loaded it; no LOAD needed.
                             } else if (this._resolveNSName(arg) !== null) {
-                                // Known namespace abstraction or LED shorthand — two-operand LOAD shorthand applies.
+                                // Known namespace abstraction or LED shorthand — two-operand shorthand applies.
                                 instructions.push({ line: `LOAD CR${reg.n}, ${arg}`, lineNum: lineNum + 1,
                                     comment: `${absName}.${methodName}(${argsStr}) \u2190 LOAD ${arg}` });
                             } else {
@@ -1349,7 +1349,7 @@ class ChurchAssembler {
                 this._checkPrivCR(crDst, 'ELOADCALL', lineNum);
                 const res8 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res8 !== null && (!parts[3] || res8.consumed)) {
-                    // Simple form: ELOADCALL CRdst, Name  (or ELOADCALL CRdst, LED[N])
+                    // Two-operand shorthand: ELOADCALL CRdst, Name  (or ELOADCALL CRdst, LED[N])
                     // imm15[7:0] = c-list row; imm15[14:8] = 0 (fast-path, NIA = lump word 1)
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
@@ -1358,7 +1358,7 @@ class ChurchAssembler {
                     }
                     imm   = res8.slot & 0xFF;
                 } else if (res8 !== null && parts[3] && !res8.consumed) {
-                    // Method-indexed form: ELOADCALL CRdst, Name, MethodName  or  ELOADCALL CRdst, Name, 0
+                    // Method index in ELOADCALL: ELOADCALL CRdst, Name, MethodName  or  ELOADCALL CRdst, Name, 0
                     // imm15[14:8] = method index (1-based, 1–127); imm15[7:0] = c-list row
                     this._checkCapDeclared(res8.key, lineNum);
                     crSrc = 6;
