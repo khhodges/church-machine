@@ -181,10 +181,14 @@ def download_ti60zip():
     import zipfile, io
     base = os.path.dirname(__file__)
     files = [
-        (os.path.join(base, "..", "build",    "church_ti60_f225.v"),          "church_ti60_f225.v"),
+        (os.path.join(base, "..", "build",    "church_ti60_f225.v"),           "church_ti60_f225.v"),
         (os.path.join(base, "..", "hardware", "ti60_f225_project.xml"),        "church_ti60_f225.xml"),
         (os.path.join(base, "..", "hardware", "ti60_f225.sdc"),                "church_ti60_f225.sdc"),
         (os.path.join(base, "..", "hardware", "ti60_f225.peri.xml"),           "church_ti60_f225.peri.xml"),
+        (os.path.join(base, "..", "docs",     "introducing-cloomc.pdf"),       "docs/Introducing CLOOMC.pdf"),
+        (os.path.join(base, "..", "docs",     "hardware-ti60-f225.pdf"),       "docs/Ti60 Hardware Guide.pdf"),
+        (os.path.join(base, "..", "docs",     "cloomc-foundation.pdf"),        "docs/Architecture Reference.pdf"),
+        (os.path.join(base, "..", "docs",     "instruction-set.pdf"),          "docs/Instruction Set Reference.pdf"),
     ]
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
