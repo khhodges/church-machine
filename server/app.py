@@ -1985,7 +1985,7 @@ function gsSwitch(e,id){
 </body></html>"""
     return html
 
-_SIMULATOR_HTML_VERSION = "r20260528k"
+_SIMULATOR_HTML_VERSION = "r20260528l"
 _STARTER_HTML_VERSION   = "r20260527z"
 
 @app.route("/start")
