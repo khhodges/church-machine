@@ -2966,17 +2966,25 @@ File → Open Project → church_ti60_f225.xml
 
 Run **Synthesis → Place & Route → Generate Bitstream**.
 
-The output bitstream is written to `outflow/church_ti60_f225.bit`.
+Efinity writes two output files to the `outflow/` folder:
+
+- `outflow/church_ti60_f225.bit` — raw bitstream (SPI active-serial format)
+- `outflow/church_ti60_f225.hex` — Intel HEX format, also suitable for flashing
+
+Use either in Step 2 below.
 
 ---
 
 ### Step 2 — Flash
 
 Open **Tool → Programmer**.  Select your cable
-(**Efinix USB2.0 Device**, JTAG mode) and set the bitfile to either:
+(**Efinix USB2.0 Device**, JTAG mode) and choose your bitfile:
 
-- `outflow/church_ti60_f225.bit` — if you rebuilt locally (Path B), or
-- `church_ti60_f225.hex` — if you downloaded the preloaded bitstream (Path A)
+| Source | File |
+|--------|------|
+| Path A — preloaded bitstream from server | `church_ti60_f225.hex` |
+| Path B — Efinity synthesis from ZIP (HEX) | `outflow/church_ti60_f225.hex` |
+| Path B — Efinity synthesis from ZIP (BIT) | `outflow/church_ti60_f225.bit` |
 
 Click **Program** to flash.
 
