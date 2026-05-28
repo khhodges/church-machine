@@ -5504,7 +5504,7 @@ abstraction NoteGPublishedBug {
 ;   4. test4_conditional — LOADEQ/LOADNE conditional loads
 ;   5. test5_switch — SWITCH register swap
 ;   6. test6_turing — IADD, ISUB, MCMP, SHL, SHR arithmetic
-;   7. test7_call — CALL Salvation via dot-notation
+;   7. test7_call — CALL Salvation via named method selectors
 ;   8. test8_eloadcall — ELOADCALL fused Load+TPERM+Call
 ; ============================================================
 
@@ -5523,7 +5523,7 @@ capabilities {
 ; Boot must complete before assembling
 ; ============================================
 ;
-; Dot-notation style is used throughout (recommended).
+; Two-operand shorthand and named method selectors are used throughout (recommended).
 ; Each line shows the raw equivalent in the trailing comment.
 ;
 ; Boot C-List layout (indices into the boot thread's c-list; NS slot in parens):
@@ -5532,7 +5532,7 @@ capabilities {
 ;   [6] Mint (E) [7] Memory (E)
 ;   [8] LED (RW) [9] UART (RW) [10] BTN (R) [11] TIMER (RW)
 
-; --- TEST 1: LOAD system abstractions (dot-notation) ---
+; --- TEST 1: LOAD system abstractions (two-operand shorthand) ---
 LOAD CR0, Salvation    ; CR0 = Salvation (E)   — equiv: LOAD CR0, CR6, 4
 LOAD CR1, Navana       ; CR1 = Navana    (E)   — equiv: LOAD CR1, CR6, 5
 LOAD CR2, Mint         ; CR2 = Mint      (E)   — equiv: LOAD CR2, CR6, 6
@@ -5549,7 +5549,7 @@ TPERM CR5, RW          ; UART has R+W? PASS (Z=1)
 ; --- TEST 3: TPERM failure ---
 TPERM CR0, L           ; Salvation has L? FAIL (Z=0)
 
-; --- TEST 4: Conditional execution (dot-notation) ---
+; --- TEST 4: Conditional execution (two-operand shorthand) ---
 ; Z=0 from failed TPERM above
 LOADEQ CR0, Navana     ; SKIP (Z=0, not equal)    — equiv: LOADEQ CR0, CR6, 5
 LOADNE CR0, Salvation  ; EXEC (Z=0, is not-equal) — equiv: LOADNE CR0, CR6, 4
@@ -5569,11 +5569,11 @@ IADD DR4, DR0, #1      ; DR4 = 1
 SHL DR4, DR4, 3        ; DR4 = 8
 SHR DR4, DR4, 1        ; DR4 = 4
 
-; --- TEST 7: CALL (dot-notation) ---
+; --- TEST 7: CALL (named method selectors) ---
 LOAD CR0, Salvation    ; CR0 = Salvation          — equiv: LOAD CR0, CR6, 4
 CALL Salvation.main    ; enter Salvation (atomic) — equiv: CALL CR0, 0xF
 
-; --- TEST 8: ELOADCALL - fused Load+TPERM+Call (dot-notation) ---
+; --- TEST 8: ELOADCALL - fused Load+TPERM+Call (two-operand shorthand + named method selectors) ---
 ELOADCALL CR0, Salvation, main  ; Load + E check + call — equiv: ELOADCALL CR0, CR6, 4
 
 ; --- All tests complete ---
@@ -5767,28 +5767,28 @@ capabilities {
 ; Then transitions to Navana (does not RETURN).
 ; Navana runs indefinitely as namespace controller.
 ;
-; ── Dot-notation calling style (recommended) ────────────────
+; ── Named method selectors, dot-notation form (recommended) ──────────
 ;
-;   LOAD CR0, Salvation       ; named load  — resolves NS[4] by name
-;   CALL Salvation.main       ; dot-notation — assembler encodes offset for you
+;   LOAD CR0, Salvation       ; two-operand shorthand  — resolves NS[4] by name
+;   CALL Salvation.main       ; named method selectors — assembler encodes method index for you
 ;
 ; Equivalent raw form (slot / offset numbers explicit):
 ;
 ;   LOAD CR0, CR6, 4          ; CR6 = boot C-List; slot 4 = Salvation
 ;   CALL CR0, 0xF             ; 0xF = method-offset index for main
 ;
-; Both forms produce identical machine code.  Use dot-notation in
-; new code — it stays correct even if NS slots are renumbered.
+; Both forms produce identical machine code.  Use two-operand shorthand and
+; named method selectors in new code — they stay correct even if NS slots are renumbered.
 ; ============================================
 
-; --- Load Salvation abstraction (dot-notation) ---
+; --- Load Salvation abstraction (two-operand shorthand) ---
 LOAD CR0, Salvation    ; CR0 = Salvation (E)  — equiv: LOAD CR0, CR6, 4
 TPERM CR0, E           ; Verify E permission
 
-; --- CALL Salvation (dot-notation) ---
-; CALL AbstrName.Method resolves the method offset automatically.
+; --- CALL Salvation (named method selectors) ---
+; CALL AbstrName.Method resolves the method index automatically via loaded-CR resolution.
 ; Equivalent raw form: CALL CR0, 0xF
-CALL Salvation.main    ; enter Salvation — dot-notation dispatches main (0xF)
+CALL Salvation.main    ; enter Salvation — named method selectors encode method index (0xF)
 ; Salvation transitions to Navana (no RETURN)
 ; Navana runs indefinitely managing all abstractions
 
@@ -7030,8 +7030,8 @@ CALL Scheduler.Stop    ; terminate thread 0 (clean self-stop)
 HALT`,
         'constants_dot': `; ============================================================
 ; Abstraction:  ConstantsDot
-; Description:  Recommended dot-notation style — CALL AbstrName.Method
-;               and ELOADCALL CRd, AbstrName, Method
+; Description:  Named method selectors (dot-notation form) — CALL AbstrName.Method
+;               and ELOADCALL with two-operand shorthand + named method selectors
 ; Author:       Church Machine Educational Platform
 ; Version:      1.1
 ; Created:      2026-05-12
@@ -7045,11 +7045,11 @@ capabilities {
 
 ; TWO recommended calling styles are shown here:
 ;
-;   Style A — two-step (LOAD then CALL dot-notation):
+;   Style A — two-step (two-operand shorthand LOAD, then CALL with named method selectors):
 ;     LOAD   CR11, Constants      ; bind CR11 to the abstraction
 ;     CALL   Constants.Pi         ; call method by name via CR11
 ;
-;   Style B — fused single instruction (ELOADCALL dot-notation):
+;   Style B — fused single instruction (ELOADCALL two-operand shorthand + named method selectors):
 ;     ELOADCALL CR8, Constants, Pi    ; load + TPERM + call in one op
 ;
 ; Both styles resolve method names automatically from
@@ -7141,9 +7141,9 @@ capabilities { LED0 RW }
 ;    LED strip: LED0 (green) toggles with each
 ;    DWRITE, exactly as on the physical board.
 ;
-; ── Dot-notation load style (recommended) ───────────────────
+; ── Two-operand shorthand for LOAD (recommended) ────────────
 ;
-;   LOAD CR3, LED0            ; named load — resolves by device name
+;   LOAD CR3, LED0            ; two-operand shorthand — resolves by device name
 ;
 ; Equivalent raw form (slot number explicit):
 ;
@@ -7153,8 +7153,8 @@ capabilities { LED0 RW }
 ; is preferred: it stays correct if the boot C-List is renumbered.
 ;
 ; LED0 is a device GT (W-perm only) — it is accessed with DWRITE,
-; not CALL.  Device GTs have no callable methods, so dot-notation
-; CALL does not apply here; dot-notation LOAD is still recommended.
+; not CALL.  Device GTs have no callable methods, so named method selectors
+; do not apply here; two-operand shorthand for LOAD is still recommended.
 ;
 ; Path: LOAD CR3, LED0   → resolves LED0 → C-List[8] → LED_DEV GT
 ;       DWRITE DR1, CR3, 0 → LED0 on
@@ -7164,7 +7164,7 @@ capabilities { LED0 RW }
 ; per phase → 1 Hz blink total.
 ; ============================================
 
-; --- Load LED0 Abstract GT from the boot C-List (dot-notation) ---
+; --- Load LED0 Abstract GT from the boot C-List (two-operand shorthand) ---
 ; Named load: equiv. to raw form  LOAD CR3, CR6, 8
 LOAD CR3, LED0            ; LED0 Abstract GT → CR3 (boot C-List slot 8)
 

@@ -278,10 +278,11 @@ Flag-writing summary across all 20 instructions:
 > | `CALL CRn, 1` | 2 | Table entry [2]: user method index 1 |
 > | `CALL CRn, N` | N + 1 | Table entry [N+1]: user method index N |
 >
-> Assembler: named methods (`CALL CRn, MethodName`) are resolved from the
+> Assembler: named method selectors (`CALL CRn, MethodName`) are resolved from the
 > registered method conventions table and encoded as `imm15 = method.index + 1`.
-> Dot-notation (`CALL SlideRule.Multiply`) resolves the object binding and method
-> name in one step. Numeric selector range: 0–16383 (imm15 range: 1–16384).
+> Named method selectors also accept dot-notation (`CALL SlideRule.Multiply`), which
+> applies loaded-CR resolution and resolves the method name in one step.
+> Numeric selector range: 0–16383 (imm15 range: 1–16384).
 >
 > **Disassembly note:** a disassembled CALL showing imm15 = 3 means user method
 > index 2, not 3. Always subtract 1 from the raw imm15 field to get the user-facing
@@ -446,7 +447,7 @@ Flag-writing summary across all 20 instructions:
 
 ---
 
-### A.15–A.16 — BFINS source masking; LOAD short form
+### A.15–A.16 — BFINS source masking; LOAD two-operand shorthand
 
 > **A.15 — BFINS uses only the low `width` bits of DRs.**
 >
@@ -461,10 +462,10 @@ Flag-writing summary across all 20 instructions:
 > There is no alignment requirement — `pos` and `width` may be any values
 > satisfying `width ≥ 1` and `pos + width ≤ 32`.
 
-> **A.16 — LOAD (and SAVE, ELOADCALL, XLOADLAMBDA) short form uses CR6 implicitly.**
+> **A.16 — LOAD (and SAVE, ELOADCALL, XLOADLAMBDA) two-operand shorthand uses CR6 implicitly.**
 >
-> Two-operand forms resolve the named abstraction from the assembler's NS binding
-> table and substitute CR6 as the c-list base:
+> Two-operand shorthand resolves the named abstraction from the assembler's NS binding
+> table and substitutes CR6 as the c-list base:
 >
 > ```
 > LOAD  CRd, SlideRule        →  LOAD  CRd, CR6, <slot>
@@ -474,9 +475,10 @@ Flag-writing summary across all 20 instructions:
 > ```
 >
 > CR6 is the c-list root by architectural convention. The slot is looked up from
-> the namespace binding established by a prior `LOAD CRd, Name` (which registers
-> the name → CR mapping in `nsLoaded`). Using the short form for a name that has
-> never been loaded is a hard assembler error.
+> the namespace binding established by a prior `LOAD CRd, Name` (which also triggers
+> loaded-CR resolution: the name → CR mapping is recorded so subsequent instructions
+> may use the abstraction name wherever a CR operand is expected). Using the
+> two-operand shorthand for a name that has never been loaded is a hard assembler error.
 
 ---
 
@@ -564,7 +566,7 @@ Flag-writing summary across all 20 instructions:
 
 ```
 Syntax:  LOAD CRd, CRs, #row
-         LOAD CRd, Name          (shorthand: CRs = CR6, row = NS slot — see A.16)
+         LOAD CRd, Name          (two-operand shorthand: CRs = CR6, row = NS slot — see A.16)
 Encoding: op[4:0]=0x00 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
@@ -599,7 +601,7 @@ LOAD AL, CR0, CR6, #5    ; opcode=0, cond=14, fld_a=0, fld_b=6, imm=5
 
 ```
 Syntax:  SAVE CRd, CRs, #row
-         SAVE CRd, Name          (shorthand: CRs = CR6, row = NS slot — see A.16)
+         SAVE CRd, Name          (two-operand shorthand: CRs = CR6, row = NS slot — see A.16)
 Encoding: op[4:0]=0x01 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
@@ -633,8 +635,8 @@ SAVE AL, CR0, CR1, #3    ; CRd=CR0 (S perm), CRs=CR1 (B=1), row=3
 
 ```
 Syntax:  CALL CRs [, #method_index]
-         CALL CRs, MethodName     (named method — assembler resolves to 1-based index)
-         CALL Name.Method         (dot-notation shorthand)
+         CALL CRs, MethodName     (named method selectors — assembler resolves to 1-based index)
+         CALL Name.Method         (named method selectors, dot-notation form)
 Encoding: op[4:0]=0x02 | cond[4] | CRs[4] | 0[4] | method[15]
 ```
 
@@ -887,7 +889,7 @@ LAMBDA AL, CR3           ; opcode=7, cond=14, fld_a=3, fld_b=0, imm=0
 
 ```
 Syntax:  ELOADCALL CRd, CRs, #row [, #method]
-         ELOADCALL CRd, Name [, Method]    (shorthand — see A.6 and A.16)
+         ELOADCALL CRd, Name [, Method]    (two-operand shorthand — see A.6 and A.16)
 Encoding: op[4:0]=0x08 | cond[4] | CRd[4] | CRs[4] | method[7] | row[8]
 ```
 
@@ -923,7 +925,7 @@ ELOADCALL AL, CR0, CR6, #2    ; row=2, method=0 (fast path)
 
 ```
 Syntax:  XLOADLAMBDA CRd, CRs, #row
-         XLOADLAMBDA CRd, Name       (shorthand — see A.16)
+         XLOADLAMBDA CRd, Name       (two-operand shorthand — see A.16)
 Encoding: op[4:0]=0x09 | cond[4] | CRd[4] | CRs[4] | row[15]
 ```
 
