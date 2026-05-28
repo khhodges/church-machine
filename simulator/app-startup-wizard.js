@@ -11,7 +11,7 @@ const StartupWizard = (function () {
     const TOTAL    = STEPS.length;
 
     let _currentStep  = 0;
-    let _open         = false;
+    let _open         = true;
     let _releaseData  = null;
     let _pollTimer    = null;
 
