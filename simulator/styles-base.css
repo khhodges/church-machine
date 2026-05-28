@@ -917,6 +917,18 @@ header h1 a:hover {
 
 .sw-release-note    { font-size: 0.75rem; color: var(--text-secondary,#9ca3af); margin-bottom: 0.6rem; }
 .sw-connect-hint    { font-size: 0.8rem; color: var(--text-secondary,#9ca3af); margin-bottom: 0.65rem; line-height: 1.6; }
+
+/* ── Connect-method decision guide ─────────────────────────────────────── */
+.sw-connect-choice  { margin-bottom: 0.75rem; }
+.sw-choice-title    { font-size: 0.8rem; font-weight: 600; color: var(--text-primary,#e5e7eb); margin-bottom: 0.45rem; }
+.sw-choice-row      { display: flex; gap: 0.55rem; flex-wrap: wrap; margin-bottom: 0.45rem; }
+.sw-choice-card     { flex: 1 1 140px; border-radius: 6px; padding: 0.55rem 0.7rem; border: 1px solid; }
+.sw-choice-direct   { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.3); }
+.sw-choice-bridge   { background: rgba(139,92,246,0.08); border-color: rgba(139,92,246,0.3); }
+.sw-choice-label    { font-size: 0.82rem; font-weight: 700; color: var(--text-primary,#e5e7eb); margin-bottom: 0.2rem; }
+.sw-choice-when     { font-size: 0.75rem; color: var(--text-secondary,#9ca3af); margin-bottom: 0.2rem; line-height: 1.5; }
+.sw-choice-note     { font-size: 0.72rem; color: rgba(156,163,175,0.7); font-style: italic; line-height: 1.4; }
+.sw-choice-footer   { font-size: 0.72rem; color: rgba(156,163,175,0.6); line-height: 1.5; }
 .sw-protocol-detail { font-size: 0.75rem; color: var(--text-secondary,#9ca3af); font-family: monospace; background: rgba(0,0,0,0.25); padding: 0.5rem 0.7rem; border-radius: 4px; margin-bottom: 0.6rem; line-height: 1.7; }
 .sw-auto-note       { font-size: 0.73rem; color: rgba(218,165,32,0.65); font-style: italic; margin-bottom: 0.3rem; }
 .sw-success-box {
