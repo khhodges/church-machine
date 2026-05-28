@@ -115,7 +115,6 @@ const StartupWizard = (function () {
         if (!status) return;
         status.textContent = 'checking…';
         status.className   = 'sw-bitstream-status sw-bitstream-checking';
-        if (btn) btn.classList.add('sw-btn-dl-disabled');
         fetch('/api/bitstream/list')
             .then(function (r) { return r.json(); })
             .then(function (d) {
@@ -124,16 +123,14 @@ const StartupWizard = (function () {
                     const mb = (entry.size / 1048576).toFixed(2);
                     status.textContent = '✓ Ready — ' + mb + ' MB';
                     status.className   = 'sw-bitstream-status sw-bitstream-ready';
-                    if (btn) btn.classList.remove('sw-btn-dl-disabled');
                 } else {
-                    status.textContent = '✗ Not yet uploaded — contact admin';
+                    status.textContent = '✗ Not yet uploaded';
                     status.className   = 'sw-bitstream-status sw-bitstream-unavail';
                 }
             })
             .catch(function () {
-                status.textContent = '? Server unreachable';
-                status.className   = 'sw-bitstream-status sw-bitstream-err';
-                if (btn) btn.classList.remove('sw-btn-dl-disabled');
+                status.textContent = '';
+                status.className   = 'sw-bitstream-status';
             });
     }
 
