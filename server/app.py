@@ -3070,6 +3070,13 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
             '<efx:inter_file name="church_ti60_f225.peri.xml"/>',
             project_xml
         )
+        docs_dir = os.path.join(BASE_DIR, "docs")
+        _doc_pdfs = [
+            ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
+            ("hardware-ti60-f225.pdf",  "docs/Ti60 Hardware Guide.pdf"),
+            ("cloomc-foundation.pdf",   "docs/Architecture Reference.pdf"),
+            ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
+        ]
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
             zf.write(paths["verilog"], "church_ti60_f225.v")
             zf.writestr("church_ti60_f225.xml",      project_xml)
@@ -3077,6 +3084,10 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
             zf.write(paths["peri"],    "church_ti60_f225.peri.xml")
             zf.write(paths["setup"],   "setup_ti60_peri.py")
             zf.writestr("BUILD.md", build_md)
+            for src_name, arc_name in _doc_pdfs:
+                src = os.path.join(docs_dir, src_name)
+                if os.path.isfile(src):
+                    zf.write(src, arc_name)
     else:
         json_path = paths["json"]
         has_json = os.path.isfile(json_path)
