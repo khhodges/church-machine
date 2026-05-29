@@ -55,7 +55,6 @@
         <efx:param name="mode"                 value="speed"     value_type="e_option"/>
         <efx:param name="max_ram"              value="-1"        value_type="e_integer"/>
         <efx:param name="max_mult"             value="-1"        value_type="e_integer"/>
-        <efx:param name="infer_clk_enable"     value="3"         value_type="e_integer"/>
         <efx:param name="fanout_limit"         value="100"       value_type="e_integer"/>
         <efx:param name="seq_opt"              value="1"         value_type="e_integer"/>
         <efx:param name="optimize-zero-init-rom" value="0"       value_type="e_bool"/>

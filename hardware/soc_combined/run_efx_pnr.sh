@@ -5,16 +5,19 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
 EFX_PNR="$EFINITY/bin/efx_pnr"
 
-PROJECT="${1:-SoC/church_soc_cm.xml}"
+PROJECT="${1:-$PROJECT_ROOT/SoC/church_soc_cm.xml}"
 
 echo "==> Place & Route $PROJECT with EFX_PNR..."
 echo "    EFX_PNR: $EFX_PNR"
 echo "    Project: $PROJECT"
 echo ""
 
-$EFX_PNR --project-xml "$PROJECT" 2>&1 | tee SoC/work_pnr/pnr.log
+mkdir -p "$PROJECT_ROOT/SoC/work_pnr"
+$EFX_PNR --project-xml "$PROJECT" 2>&1 | tee "$PROJECT_ROOT/SoC/work_pnr/pnr.log"
 echo ""
 echo "==> Place & Route complete. Output in SoC/work_pnr/"

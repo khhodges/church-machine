@@ -11,7 +11,9 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Script lives in SoC/; project root is the parent
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
 CHIPKIT="${CHIPKIT_HOME:-$HOME/efinity/efinity-riscv-ide-2025.2}"
 CHURCH_SCRIPTS="${CHURCH_MACHINE:-$HOME/church-machine}/scripts"
