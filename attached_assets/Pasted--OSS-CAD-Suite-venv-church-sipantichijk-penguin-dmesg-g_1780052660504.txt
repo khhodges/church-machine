@@ -1,0 +1,181 @@
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~$ dmesg | grep -i "ft4232\|ttyUSB\|usb.*serial"
+[    0.726981] usbcore: registered new interface driver usbserial_generic
+[    0.727011] usbserial: USB Serial support registered for generic
+[    0.727081] usbserial: USB Serial support registered for ch341-uart
+[    0.727155] usbserial: USB Serial support registered for cp210x
+[    0.727263] usbserial: USB Serial support registered for FTDI USB Serial Device
+[    0.727370] usbserial: USB Serial support registered for Keyspan - (without firmware)
+[    0.727419] usbserial: USB Serial support registered for Keyspan 1 port adapter
+[    0.727469] usbserial: USB Serial support registered for Keyspan 2 port adapter
+[    0.727519] usbserial: USB Serial support registered for Keyspan 4 port adapter
+[    0.727611] usbserial: USB Serial support registered for pl2303
+[    0.727658] usbcore: registered new interface driver usb_serial_simple
+[    0.727702] usbserial: USB Serial support registered for carelink
+[    0.727742] usbserial: USB Serial support registered for flashloader
+[    0.727785] usbserial: USB Serial support registered for funsoft
+[    0.727825] usbserial: USB Serial support registered for google
+[    0.727865] usbserial: USB Serial support registered for hp4x
+[    0.727905] usbserial: USB Serial support registered for kaufmann
+[    0.728119] usbserial: USB Serial support registered for libtransistor
+[    0.728159] usbserial: USB Serial support registered for moto_modem
+[    0.728207] usbserial: USB Serial support registered for motorola_tetra
+[    0.728253] usbserial: USB Serial support registered for nokia
+[    0.728296] usbserial: USB Serial support registered for novatel_gps
+[    0.728338] usbserial: USB Serial support registered for owon
+[    0.728383] usbserial: USB Serial support registered for siemens_mpi
+[    0.728460] usbserial: USB Serial support registered for suunto
+[    0.728503] usbserial: USB Serial support registered for vivopay
+[    0.728546] usbserial: USB Serial support registered for zio
+[  673.257801] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[  673.257886] usb 1-1: Detected FT4232H
+[  673.258414] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[  673.261985] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  673.262062] usb 1-1: Detected FT4232H
+[  673.262689] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  673.266381] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[  673.266463] usb 1-1: Detected FT4232H
+[  673.266919] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[  673.270682] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[  673.270866] usb 1-1: Detected FT4232H
+[  673.273281] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[  683.633311] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  683.736593] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  683.736795] usb 1-1: Detected FT4232H
+[  683.737985] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  683.758108] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  683.794232] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  683.794312] usb 1-1: Detected FT4232H
+[  683.794704] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  683.810190] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  683.846242] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  683.846324] usb 1-1: Detected FT4232H
+[  683.846733] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  683.862766] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  683.902586] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  683.902682] usb 1-1: Detected FT4232H
+[  683.903263] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  683.917260] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  683.969458] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  683.969547] usb 1-1: Detected FT4232H
+[  683.970076] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  710.638270] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  710.678101] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  710.678235] usb 1-1: Detected FT4232H
+[  710.678960] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  716.934297] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  716.976235] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  716.976315] usb 1-1: Detected FT4232H
+[  716.976726] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  716.990680] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  717.044627] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  717.044715] usb 1-1: Detected FT4232H
+[  717.045190] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  717.055470] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[  728.084680] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[  728.084793] usb 1-1: Detected FT4232H
+[  728.085547] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[  728.094123] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[  728.601371] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[  728.601489] usb 1-1: Detected FT4232H
+[  728.602157] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[  868.346262] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[  868.346511] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[  868.347456] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[  868.347762] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[  879.751174] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[  879.753736] usb 1-1: Detected FT4232H
+[  879.756078] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[  879.760172] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[  879.760441] usb 1-1: Detected FT4232H
+[  879.762304] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[  879.768681] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[  879.769700] usb 1-1: Detected FT4232H
+[  879.771790] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[  879.775866] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[  879.775976] usb 1-1: Detected FT4232H
+[  879.776670] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 1726.167315] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[ 1726.167581] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[ 1726.168136] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[ 1726.168632] ftdi_sio ttyUSB3: error from flowcontrol urb
+[ 1726.168744] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[ 1735.664582] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[ 1735.665974] usb 1-1: Detected FT4232H
+[ 1735.668643] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[ 1735.672891] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[ 1735.673087] usb 1-1: Detected FT4232H
+[ 1735.674060] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[ 1735.678562] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[ 1735.679481] usb 1-1: Detected FT4232H
+[ 1735.683646] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[ 1735.690344] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[ 1735.690499] usb 1-1: Detected FT4232H
+[ 1735.692120] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 2088.713177] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[ 2088.714213] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[ 2088.715483] ftdi_sio ttyUSB2: error from flowcontrol urb
+[ 2088.715904] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[ 2088.716778] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[ 2126.742709] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[ 2126.743399] usb 1-1: Detected FT4232H
+[ 2126.746557] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[ 2126.750478] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[ 2126.750579] usb 1-1: Detected FT4232H
+[ 2126.751819] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[ 2126.755706] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[ 2126.755943] usb 1-1: Detected FT4232H
+[ 2126.756725] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[ 2126.761223] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[ 2126.761373] usb 1-1: Detected FT4232H
+[ 2126.762168] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 2250.779774] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[ 2250.787375] ftdi_sio ttyUSB1: error from flowcontrol urb
+[ 2250.787598] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[ 2250.788359] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[ 2250.789193] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[ 2261.970656] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[ 2261.971867] usb 1-1: Detected FT4232H
+[ 2261.974931] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[ 2261.980130] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[ 2261.980349] usb 1-1: Detected FT4232H
+[ 2261.982393] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[ 2261.986681] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[ 2261.986858] usb 1-1: Detected FT4232H
+[ 2261.990853] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[ 2261.996278] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[ 2261.996598] usb 1-1: Detected FT4232H
+[ 2261.998585] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 3709.171943] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[ 3709.174107] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[ 3709.174392] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[ 3709.175424] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[ 3717.555729] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[ 3717.555917] usb 1-1: Detected FT4232H
+[ 3717.558390] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[ 3717.563746] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[ 3717.563963] usb 1-1: Detected FT4232H
+[ 3717.568336] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[ 3717.572825] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[ 3717.572995] usb 1-1: Detected FT4232H
+[ 3717.573997] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB2
+[ 3717.578324] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[ 3717.578612] usb 1-1: Detected FT4232H
+[ 3717.580000] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 6086.879768] ftdi_sio ttyUSB0: FTDI USB Serial Device converter now disconnected from ttyUSB0
+[ 6086.880606] ftdi_sio ttyUSB1: FTDI USB Serial Device converter now disconnected from ttyUSB1
+[ 6086.882583] ftdi_sio ttyUSB2: error from flowcontrol urb
+[ 6086.882845] ftdi_sio ttyUSB2: FTDI USB Serial Device converter now disconnected from ttyUSB2
+[ 6086.883313] ftdi_sio ttyUSB3: FTDI USB Serial Device converter now disconnected from ttyUSB3
+[ 6093.761355] ftdi_sio 1-1:1.0: FTDI USB Serial Device converter detected
+[ 6093.761437] usb 1-1: Detected FT4232H
+[ 6093.761993] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB0
+[ 6093.765550] ftdi_sio 1-1:1.1: FTDI USB Serial Device converter detected
+[ 6093.765609] usb 1-1: Detected FT4232H
+[ 6093.766004] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB1
+[ 6093.769647] ftdi_sio 1-1:1.2: FTDI USB Serial Device converter detected
+[ 6093.770028] usb 1-1: Detected FT4232H
+[ 6093.771482] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB3
+[ 6093.775151] ftdi_sio 1-1:1.3: FTDI USB Serial Device converter detected
+[ 6093.775224] usb 1-1: Detected FT4232H
+[ 6093.776023] usb 1-1: FTDI USB Serial Device converter now attached to ttyUSB4
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~$ 
