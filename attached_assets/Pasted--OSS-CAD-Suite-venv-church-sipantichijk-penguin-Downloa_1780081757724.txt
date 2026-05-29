@@ -1,0 +1,46 @@
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ cd ~/Downloads
+rm -rf church_ti60_f225_project
+curl -L -o church_ti60_f225_project.zip \
+  https://31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt.kirk.replit.dev/dl/ti60zip
+unzip -o church_ti60_f225_project.zip -d church_ti60_f225_project
+cd church_ti60_f225_project
+bash SoC/run_efx_pnr.sh
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100  995k  100  995k    0     0   287k      0  0:00:03  0:00:03 --:--:--  287k
+Archive:  church_ti60_f225_project.zip
+  inflating: church_ti60_f225_project/church_ti60_f225.v  
+  inflating: church_ti60_f225_project/church_ti60_f225.xml  
+  inflating: church_ti60_f225_project/church_ti60_f225.sdc  
+  inflating: church_ti60_f225_project/church_ti60_f225.peri.xml  
+  inflating: church_ti60_f225_project/setup_ti60_peri.py  
+  inflating: church_ti60_f225_project/Makefile  
+  inflating: church_ti60_f225_project/outflow/church_ti60_f225.hex  
+  inflating: church_ti60_f225_project/BUILD.md  
+  inflating: church_ti60_f225_project/local_bridge.py  
+  inflating: church_ti60_f225_project/SoC/bridge.sh  
+  inflating: church_ti60_f225_project/SoC/apb3_cm_bridge.v  
+  inflating: church_ti60_f225_project/SoC/top.v  
+  inflating: church_ti60_f225_project/SoC/church_soc_cm.peri.xml  
+  inflating: church_ti60_f225_project/SoC/Makefile  
+  inflating: church_ti60_f225_project/SoC/local_bridge.py  
+  inflating: church_ti60_f225_project/SoC/church_soc_cm.xml  
+  inflating: church_ti60_f225_project/SoC/BUILD_SOC_CM.md  
+  inflating: church_ti60_f225_project/SoC/run_efx_map.sh  
+  inflating: church_ti60_f225_project/SoC/build_soc_cm.sh  
+  inflating: church_ti60_f225_project/SoC/run_efx_pnr.sh  
+  inflating: church_ti60_f225_project/SoC/firmware/crt0.S  
+  inflating: church_ti60_f225_project/SoC/firmware/Makefile  
+  inflating: church_ti60_f225_project/SoC/firmware/link.ld  
+  inflating: church_ti60_f225_project/SoC/firmware/main.c  
+  inflating: church_ti60_f225_project/SoC/good-builds/README.md  
+  inflating: church_ti60_f225_project/docs/Introducing CLOOMC.pdf  
+  inflating: church_ti60_f225_project/docs/Ti60 Hardware Guide.pdf  
+  inflating: church_ti60_f225_project/docs/Architecture Reference.pdf  
+  inflating: church_ti60_f225_project/docs/Instruction Set Reference.pdf  
+==> Place & Route /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/church_soc_cm.xml with EFX_PNR...
+    EFX_PNR: /home/sipantichijk/efinity/2025.2/bin/efx_pnr
+    Project: /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/church_soc_cm.xml
+
+ERROR    : Circuit name must be defined
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ 

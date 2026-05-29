@@ -19,6 +19,6 @@ echo ""
 
 mkdir -p "$PROJECT_ROOT/SoC/work_pnr"
 cd "$PROJECT_ROOT/SoC"
-$EFX_PNR church_soc_cm.xml 2>&1 | tee "$PROJECT_ROOT/SoC/work_pnr/pnr.log"
+$EFX_PNR --project-xml church_soc_cm.xml 2>&1 | tee "$PROJECT_ROOT/SoC/work_pnr/pnr.log"
 echo ""
 echo "==> Place & Route complete. Output in SoC/work_pnr/"
