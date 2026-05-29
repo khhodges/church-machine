@@ -212,6 +212,11 @@ def download_ti60zip():
         makefile = os.path.join(hw, "Makefile.ti60")
         if os.path.exists(makefile):
             zf.write(makefile, "Makefile")
+        # Pre-built bitstream — user can flash immediately without synthesising
+        bitstreams = os.path.abspath(os.path.join(base, "..", "bitstreams"))
+        hex_src = os.path.join(bitstreams, "church_ti60_f225.hex")
+        if os.path.exists(hex_src):
+            zf.write(hex_src, "outflow/church_ti60_f225.hex")
         zf.writestr("BUILD.md", BUILD_MD_TI60)
         # PDFs
         for pdf, arc in [
