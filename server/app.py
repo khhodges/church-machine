@@ -3194,7 +3194,8 @@ sed -i 's/optimize-zero-init-rom" value="1"/optimize-zero-init-rom" value="0"/' 
 ### Step 6 — Synthesise
 
 ```bash
-bash SoC/work_syn/run_efx_map.sh 2>&1 | tail -5
+cd /path/to/church_ti60_f225_project
+~/efinity/2025.2/bin/efx_map --project-xml SoC/church_soc_cm.xml 2>&1 | tail -5
 ```
 
 Verify all 4 BRAM lanes have non-zero `INIT_0` (firmware confirmed embedded):
@@ -3211,7 +3212,8 @@ done
 ### Step 7 — Place & Route
 
 ```bash
-bash SoC/work_pnr/run_efx_pnr.sh 2>&1 | tail -5
+cd /path/to/church_ti60_f225_project
+~/efinity/2025.2/bin/efx_pnr --project-xml SoC/church_soc_cm.xml 2>&1 | tail -5
 ```
 
 ### Step 8 — Generate the SPI flash hex (`efx_pgm`)
