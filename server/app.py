@@ -218,6 +218,10 @@ def download_ti60zip():
         if os.path.exists(hex_src):
             zf.write(hex_src, "outflow/church_ti60_f225.hex")
         zf.writestr("BUILD.md", BUILD_MD_TI60)
+        # Serial bridge script (needed to connect the board to the IDE)
+        bridge = os.path.join(base, "local_bridge.py")
+        if os.path.exists(bridge):
+            zf.write(bridge, "local_bridge.py")
         # PDFs
         for pdf, arc in [
             ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
