@@ -1,0 +1,87 @@
+sipantichijk@penguin:~/Downloads/efinity-2025.2.288.4.15-linux-x64-patch$ cd ~/Downloads/church_ti60_f225_project
+bash SoC/build_soc_cm.sh
+========================================
+SoC+CM Full Rebuild Script
+========================================
+
+==> Step 1: Copy Sapphire IP files
+    SKIP — sapphire.v already present
+    OK — copied peri.xml to church_soc_cm.peri.xml
+
+==> Step 1b: Copy pre-built CM RTL
+    OK — copied church_ti60_f225.v from project root
+
+==> Step 2: Generate CM RTL (if Amaranth available)
+    SKIP — gen_verilog.py not found (use pre-built church_ti60_f225.v)
+
+==> Step 3: Build SoC firmware
+make: Entering directory '/home/sipantichijk/Downloads/church_ti60_f225_project/SoC/firmware'
+rm -f firmware.elf firmware.bin firmware.hex
+rm -f ../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin ../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin ../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin ../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+make: Leaving directory '/home/sipantichijk/Downloads/church_ti60_f225_project/SoC/firmware'
+make: Entering directory '/home/sipantichijk/Downloads/church_ti60_f225_project/SoC/firmware'
+/home/sipantichijk/efinity/efinity-riscv-ide-2025.2/toolchain/bin/riscv-none-embed-gcc -march=rv32im -mabi=ilp32 -O2 -nostdlib -ffreestanding -Wall -Wextra -T link.ld -o firmware.elf crt0.S main.c
+/home/sipantichijk/efinity/efinity-riscv-ide-2025.2/toolchain/bin/riscv-none-embed-objcopy -O binary firmware.elf firmware.bin
+python3 -c "\
+import struct, sys; \
+data = open('firmware.bin','rb').read(); \
+pad = (4 - len(data) % 4) % 4; \
+data += b'\x00' * pad; \
+[print(f'{struct.unpack_from(\"<I\",data,i)[0]:08x}') for i in range(0,len(data),4)]" \
+> firmware.hex
+python3 -c "\
+import struct; \
+ROM = 131072; \
+data = open('firmware.bin','rb').read(); \
+pad = (4 - len(data) % 4) % 4; \
+data += b'\x00' * pad; \
+words = [struct.unpack_from('<I',data,i)[0] for i in range(0,len(data),4)]; \
+words += [0] * (ROM - len(words)); \
+words = words[:ROM]; \
+lanes = [[], [], [], []]; \
+[[ lanes[l].append(format((w >> (l*8)) & 0xFF, '08b')) for l in range(4)] for w in words]; \
+names = ['../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin','../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin','../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin','../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin']; \
+[open(names[l],'w').write('\n'.join(lanes[l]) + '\n') for l in range(4)]; \
+print(f'Wrote 131072 words -> 4 symbol files in ../')"
+Wrote 131072 words -> 4 symbol files in ../
+make: Leaving directory '/home/sipantichijk/Downloads/church_ti60_f225_project/SoC/firmware'
+    OK — firmware built
+
+==> Step 4: Patch sapphire.v with firmware inline assignments
+  Reading symbol0: /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin ... 131072 entries, 803 non-zero
+  Reading symbol1: /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin ... 131072 entries, 757 non-zero
+  Reading symbol2: /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin ... 131072 entries, 705 non-zero
+  Reading symbol3: /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin ... 131072 entries, 502 non-zero
+  Updated inline symbol0 → 803 assignments  (was already-patched)
+  Updated inline symbol1 → 757 assignments  (was already-patched)
+  Updated inline symbol2 → 706 assignments  (was already-patched)
+  Updated inline symbol3 → 503 assignments  (was already-patched)
+
+Patched /home/sipantichijk/Downloads/church_ti60_f225_project/SoC/sapphire.v  (-16 chars, 927,317 total)
+
+Next steps:
+  1. bash work_syn/run_efx_map.sh   (re-synthesise)
+  2. bash work_pnr/run_efx_pnr.sh   (place & route — generates .hex)
+  3. sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+
+    OK — sapphire.v patched
+
+==> Step 5: Verify optimize-zero-init-rom = 0
+    OK — optimize-zero-init-rom is 0
+
+========================================
+Steps 1–5 complete.
+
+Next: run synthesis
+    bash SoC/run_efx_map.sh
+
+Then: place & route
+    bash SoC/run_efx_pnr.sh
+
+Then: generate hex
+    cd SoC && ~/efinity/2025.2/bin/efx_pgm
+
+Then: flash
+    sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f SoC/outflow/church_soc_cm.hex
+========================================
+sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ 
