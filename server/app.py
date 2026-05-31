@@ -222,6 +222,10 @@ def download_ti60zip():
         bridge = os.path.join(base, "local_bridge.py")
         if os.path.exists(bridge):
             zf.write(bridge, "local_bridge.py")
+        # Patch script (needed for SoC+CM firmware embedding)
+        patch_script = os.path.join(base, "..", "scripts", "patch_sapphire_init.py")
+        if os.path.exists(patch_script):
+            zf.write(patch_script, "scripts/patch_sapphire_init.py")
         # SoC+CM combined source (full rebuild path — see Case 3 in BUILD.md)
         soc_combined = os.path.join(hw, "soc_combined")
         if os.path.isdir(soc_combined):
