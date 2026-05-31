@@ -52,7 +52,7 @@ fi
 if [ -f "$PROJECT_ROOT/church_ti60_f225.peri.xml" ]; then
     cp "$PROJECT_ROOT/church_ti60_f225.peri.xml" "$SOC_DIR/church_soc_cm.peri.xml"
     # Fix design name to match project name
-    sed -i 's/designName="church_ti60_f225"/designName="church_soc_cm"/' "$SOC_DIR/church_soc_cm.peri.xml"
+    sed -i 's/name="church_ti60_f225"/name="church_soc_cm"/' "$SOC_DIR/church_soc_cm.peri.xml"
     echo "    OK — copied peri.xml to church_soc_cm.peri.xml (design name fixed)"
 else
     echo "    WARNING: church_ti60_f225.peri.xml not found at project root"
