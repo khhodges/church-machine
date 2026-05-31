@@ -1,0 +1,128 @@
+Last updated: Mar 17, 2026
+
+*** Errata ***
+
+
+*** Description ***
+
+This is a software patch for the Efinity 2025.2 release.
+
+It adds functionality and addresses the following issues found in the
+2025.2 release.
+
+*** 2025.2.288.4.# patch notes
+    -- [Titanium] Enables bitstreams for Ti135N576D2F4 [DEVINFRA-1148]
+    -- [Titanium] Adds I4, I4L timing models to various Ti85, Ti135, Ti165,
+       Ti240, Ti375 devices [DEVINFRA-1159]
+    -- (Windows only) Improves Programmer and Debugger tools libusb driver loading,
+       particularly in regards to new Efinix-built libusb driver for FTDI *232H
+       USB controllers [DEVINFRA-1124]
+       -- New driver can be downloaded from Efinix support web site, and users
+          are encouraged to use this instead of the Zadig tool's libusb driver
+    -- Updates Programmer's prebuilt "SPI Active using JTAG Bridge" flash loader images,
+       with focus on improved reliability at JTAG speeds up to 30 MHz [PROG-698]
+    -- [Titanium, Topaz] Fixes issues modeling HSIO DLY_ENA and DLY_INC dynamic
+       delay control ports (can be used across several LVDS, MIPI, GPIO primitives)
+       [PT-3232]
+       -- Removes "-clock_fall" option in related generated PT.SDC constraints
+       -- Updates HSIO block simulation models to sample on rising edges only
+    -- Fixes synthesis name preservation issue that could cause wizard Debugger
+       flow to fail [SYN-1062]
+    -- [Titanium, Topaz] Fixes SGMII APB reset state issue [PT-3195]
+    -- Fixes Debugger issue handling 1-bit signal buses [HD-503]
+
+
+*** 2025.2.288.3.# patch notes
+    -- [Titanium, Topaz] Adds Auto Low Power Settings to LPDDR4/4X Memory
+       Interfaces [PT-2805]
+    -- [Trion] Fixes unified flow compilation error on T8F49, T4F49 devices [PT-3127]
+    -- [Titanium, Topaz] Fixes unified flow compilation error when LVDS_RX
+       configured as a PLL reference clock [PT-3156]
+    -- Fixes issue where clock pin name driving GPIO (in registered mode) not editable
+       if the GPIO instantiated as part of a bus [PT-3106]
+    -- Fixes unified flow crash in logic synthesis when inout pins used in top-level
+       module interface [SYN-1037]
+    -- Updates initial logic synthesis steps, for improved QoR in some cases [SYN-1039]
+    -- Fixes crash in logic synthesis, when mult-auto-pipeline option is set but no
+       DSP output registers used [SYN-1029]
+    -- Fixes incorrect true dual port RAM inferencing when the two write addresses
+       differ only by LSB constant value [SYN-1050]
+
+*** 2025.2.288.2.# patch notes
+    -- [Titanium] Finalizes C4/C4L/C3/C3L/I3/I3L timing models for Ti135 / Ti85
+       devices [DEVINFRA-1112]
+    -- [Topaz] Finalizes C3/C2/I3/I2 timing models for Tz100 / Tz75 devices
+       [DEVINFRA-1112]
+    -- [Titanium, Topaz] Adds Interface Designer support for PCI-e Root Port
+       [PT-2788]
+    -- Fixes Debugger crash when adding or removing signals to Capture control
+       [HD-490]
+    -- [Titanium, Topaz] Fixes LPDDR4 interface incorrect setting for 12G, 16G
+       memory densities [PT-3077]
+    -- [Trion] Fixes Interface Designer crash when configuring PLL instances
+       for T20W280 device [PT-3078]
+    -- Fixes Interface Designer crash in timing generation, when using ISF
+       project creation [PT-3083] 
+    -- Restores "Core Resources" and "System Resources" summaries to Efinity
+       display after compilation [GUI-1520]
+    -- [Titanium, Topaz] Fixes displayed device resource counts for some devices
+       [VPR-2507]
+    -- Significantly improves JTAG SVF Player speed and efficiency, particularly
+       for bitstream programming [HD-494]
+    -- Fixes JTAG SVF Player chain directionality bug regarding HIR/HDR vs TIR/TDR
+       commands (option exists to restore previous behavior) [PROG-683]
+
+*** 2025.2.288.1.# patch notes
+    -- (Windows only) Fixes Programmer / Debugger issue related to certain USB
+       driver installations [PROG-684]
+    -- Fixes crash in place and route in some cases when placing unassigned
+       outputs [GUI-1518]
+
+
+
+*** Contents ***
+
+files/             : updated files to be copied into the Efinity installation
+run.sh             : patch installation script (Linux only)
+run.bat            : patch installation script (Windows only)
+PATCH_MANIFEST     : patch build information
+update_manifest.py : auxiliary python patching script
+patch_readme.txt   : This file
+
+
+
+*** Setup Requirements ***
+
+This patch release requires Efinity 2025.2 to be installed.
+
+
+       
+*** Patch Installation ***
+
+Linux patch installation:
+
+	1. Unzip the efinity patch into any temporary directory.
+		> unzip efinity-<version>-patch.zip
+	2. Setup environment variables
+		> source /path/to/efinity/2025.2/bin/setup.sh
+	3. Run patch installer
+		> cd efinity-<version>-patch
+		> ./run.sh
+	4. Follow on screen prompts to complete installation.
+
+
+
+Windows patch installation:
+
+	1. Unzip the efinity patch into any temporary directory.
+		a) From CMD shell
+			> unzip efinity-<version>-patch.zip
+		or b)  double-click on patch from Windows Explorer and "Extract all"
+	2. Open CMD shell
+	3. Setup environment variables
+		> \path\to\efinity\2025.2\bin\setup.bat
+	3. Run patch installer
+		> cd efinity-<version>-patch
+		> run.bat
+	4. Follow on screen prompts to complete installation.
+Explain
