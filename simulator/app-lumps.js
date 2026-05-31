@@ -1185,6 +1185,9 @@ async function _populateLumpSourceTab(lump, targetId) {
             if (_textarea && _previewEl) {
                 _updatePreview();
                 _textarea.addEventListener('input', _updatePreview);
+                _textarea.addEventListener('scroll', () => {
+                    _previewEl.scrollTop = _textarea.scrollTop;
+                });
             }
             if (_previewBtn && _previewEl) {
                 _previewBtn.addEventListener('click', () => {
