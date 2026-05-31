@@ -341,6 +341,8 @@ function showLumpDetail(token) {
             return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
         };
         let _srcHtml = `<div class="lump-tab-panel" id="lumpTabSource_${_tk}"><div class="lump-source-panel">`;
+        // Placeholder filled lazily when the tab is clicked (see _switchLumpTab → source)
+        _srcHtml += `<div id="lumpSavedSrc_${_tk}" class="lump-saved-src-placeholder"></div>`;
         if (_srcAbsIdx !== null && _srcMethods.length > 0) {
             const _umd = (typeof userMethodData !== 'undefined' && userMethodData) ? userMethodData : {};
             _srcMethods.forEach((mName, _mi) => {
@@ -1386,6 +1388,9 @@ function _switchLumpTab(tk, tab) {
         _lumpHistoryLoaded[tk] = true;
         _fetchAndShowLumpHistory(token, lump);
     }
+    if (tab === 'source' && lump) {
+        _fetchAndShowLumpSavedSource(token, lump, tk);
+    }
 }
 
 function _populateLumpApiTab(lump, panelId) {
@@ -1503,6 +1508,42 @@ function _populateLumpApiTab(lump, panelId) {
 
     html += '</div>';
     el.innerHTML = html;
+}
+
+const _lumpSavedSrcLoaded = {};
+async function _fetchAndShowLumpSavedSource(token, lump, tk) {
+    const _tk = (tk || token || '').replace(/[^a-z0-9]/gi, '');
+    if (_lumpSavedSrcLoaded[_tk]) return;
+    _lumpSavedSrcLoaded[_tk] = true;
+    const el = document.getElementById(`lumpSavedSrc_${_tk}`);
+    if (!el) return;
+    const e = _escHtml;
+    try {
+        const resp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.source && data.source.trim().length > 0) {
+            const _lang = e(data.language || lump.language || 'cloomc');
+            const _compiledAt = data.compiled_at
+                ? (() => {
+                    const d = new Date(typeof data.compiled_at === 'number'
+                        ? data.compiled_at * 1000 : data.compiled_at);
+                    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+                    return `${d.getDate()} ${mo} ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                })()
+                : null;
+            el.innerHTML =
+                `<div class="lump-saved-src-section">` +
+                `<div class="lump-section-title">Saved Source ` +
+                `<span class="lump-saved-src-meta">${_lang}${_compiledAt ? ' \u00b7 compiled ' + _compiledAt : ''}</span>` +
+                `</div>` +
+                `<pre class="lump-saved-src-pre">${e(data.source)}</pre>` +
+                `</div>`;
+        }
+        // If no source field, leave el empty — no noise for older LUMPs
+    } catch (_) {
+        // Fail silently; Source tab still shows per-method breakdown below
+    }
 }
 
 async function _fetchAndShowLumpVersions(token, lump) {

@@ -2073,16 +2073,16 @@
   {
     "token": "97cc8047",
     "abstraction": "Human_Hand",
-    "filename": "Human_Hand_v3.lump",
-    "sidecar_file": "Human_Hand_v3.json",
+    "filename": "Human_Hand_v4.lump",
+    "sidecar_file": "Human_Hand_v4.json",
     "ns_slot": null,
     "lump_size": 64,
     "cw": 12,
     "cc": 1,
     "author": "",
     "version": "2026.05.31",
-    "lump_version": 3,
-    "compiled_at": 1780251900.0993657,
+    "lump_version": 4,
+    "compiled_at": 1780255669.036714,
     "methods": [
       {
         "name": "Status",
