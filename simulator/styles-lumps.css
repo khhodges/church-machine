@@ -1,3 +1,14 @@
+/* ── CLOOMC++ / Assembly syntax-highlight token colours ─────────────────── */
+/* Used inside <pre class="abs-method-panel-code"> and .lump-stored-src-pre    */
+.lump-hl-keyword   { color: #c084fc; }          /* purple  — abstraction, method, call … */
+.lump-hl-mnemonic  { color: #60a5fa; }          /* blue    — mLoad, ELOADCALL, BEQ …     */
+.lump-hl-directive { color: #818cf8; }          /* indigo  — .abstraction, .method …     */
+.lump-hl-comment   { color: #6b7280; font-style: italic; } /* grey / italic */
+.lump-hl-string    { color: #34d399; }          /* green   — "string literals"           */
+.lump-hl-number    { color: #fb923c; }          /* amber   — 42, 0x1f …                  */
+.lump-hl-register  { color: #f9a8d4; }          /* pink    — CR6, DR0 …                  */
+.lump-hl-label     { color: #fde68a; }          /* yellow  — loop:, done: …              */
+
 /* ── Condition-code abbreviation tooltip ─────────────────────────────────── */
 .cond-abbr {
     border-bottom: 1px dotted #7aa2cc;

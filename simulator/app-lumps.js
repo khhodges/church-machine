@@ -369,7 +369,7 @@ function showLumpDetail(token) {
                 // ── Collapsible body ─────────────────────────────────────
                 _srcHtml += `<div class="lump-source-method-body" id="${_bodyId}"${_open ? '' : ' style="display:none"'}>`;
                 if (_srcText) {
-                    _srcHtml += `<pre class="abs-method-panel-code">${_srcAnnotate(_srcText)}</pre>`;
+                    _srcHtml += `<pre class="abs-method-panel-code">${_highlightCLOOMCSource(_srcText, lump.language)}</pre>`;
                     _srcHtml += `<div class="lump-source-meta">`;
                     if (md.compileError) {
                         _srcHtml += `<span class="lump-source-status-error">\u2022Error</span> \u2014 ${e(md.compileError.split('\n')[0])}`;
@@ -395,7 +395,7 @@ function showLumpDetail(token) {
                         _srcHtml += `<span class="abs-compile-state-badge abs-compile-state-${hvState}">${hvLabel}</span>`;
                         _srcHtml += `<span class="lump-source-history-ts">${e(_srcFmtTs(hv.savedAt))}</span>`;
                         if (hvWords > 0) _srcHtml += ` <span class="lump-source-history-words">${hvWords}w</span>`;
-                        if (hv.src) _srcHtml += `<pre class="abs-method-panel-code lump-source-history-code">${e(hv.src)}</pre>`;
+                        if (hv.src) _srcHtml += `<pre class="abs-method-panel-code lump-source-history-code">${_highlightCLOOMCSource(hv.src, lump.language)}</pre>`;
                         _srcHtml += `</div>`;
                     });
                     _srcHtml += `</div>`;
@@ -923,6 +923,137 @@ function _lumpBootSeqCodeHtml(lump) {
         `<pre class="abs-method-panel-code abs-boot-code-pre">${rendered}</pre>` +
         '</details>' +
         '</div>';
+}
+
+// ── CLOOMC++ / Assembly source syntax highlighter ─────────────────────────
+// Tokenises raw source text and wraps recognised tokens in <span class="lump-hl-*">
+// elements.  All characters are HTML-escaped; the result is safe inside <pre>.
+//
+// language: 'assembly'  → ASM-specific rules (mnemonics, directives, labels).
+//           anything else → CLOOMC++ keyword rules.
+
+const _CLOOMC_HL_KEYWORDS = new Set([
+    'abstraction','method','capabilities','call','return',
+    'let','const','if','else','while','for','new',
+    'public','private','protected','import','export',
+    'lambda','true','false','null','and','or','not',
+    'do','break','continue','in','of','this','self',
+    'bind','unbind','delegate','invoke','acquire','release'
+]);
+
+const _ASM_HL_MNEMONICS = new Set([
+    'mLoad','mSave','ELOADCALL','XLOADLAMBDA','TPERM','LAMBDA',
+    'CALL','RETURN','JUMP','BEQ','BNE','BLT','BGE','BGT','BLE',
+    'MASK','MOVI','ADDI','ADD','SUB','AND','OR','XOR','NOT','SHL','SHR',
+    'NOP','HALT','mLoadI','mSaveI','ELOAD','XLOAD','CALLR','JUMPR',
+    'PUSH','POP','MOV','CMP','TEST'
+]);
+
+function _highlightCLOOMCSource(rawText, language) {
+    if (!rawText) return '';
+    const isAsm = (language === 'assembly');
+    let html = rawText.split('\n').map(line => _hlCloomcLine(line, isAsm)).join('\n');
+    // NS[N] hover annotations — applied after tokenising (NS refs are still plain
+    // text at this point, so the regex inside _annotateNsRefInCode will find them).
+    if (typeof _annotateNsRefInCode === 'function') html = _annotateNsRefInCode(html);
+    return html;
+}
+
+function _hlCloomcLine(line, isAsm) {
+    let out = '';
+    let i = 0;
+    const len = line.length;
+
+    while (i < len) {
+        const ch = line[i];
+
+        // ── ; comment — rest of line ───────────────────────────────────────
+        if (ch === ';') {
+            out += `<span class="lump-hl-comment">${_hlEsc(line.slice(i))}</span>`;
+            break;
+        }
+
+        // ── Double-quoted string literal ───────────────────────────────────
+        if (ch === '"') {
+            let j = i + 1;
+            while (j < len) {
+                if (line[j] === '\\') { j += 2; continue; }
+                if (line[j] === '"') { j++; break; }
+                j++;
+            }
+            out += `<span class="lump-hl-string">${_hlEsc(line.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+
+        // ── Assembly directive: .identifier ───────────────────────────────
+        if (isAsm && ch === '.') {
+            let j = i + 1;
+            while (j < len && /[a-zA-Z_]/.test(line[j])) j++;
+            if (j > i + 1) {
+                out += `<span class="lump-hl-directive">${_hlEsc(line.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+        }
+
+        // ── Identifier: keyword / mnemonic / register / plain word ────────
+        if (/[a-zA-Z_]/.test(ch)) {
+            let j = i;
+            while (j < len && /[a-zA-Z0-9_]/.test(line[j])) j++;
+            const word = line.slice(i, j);
+            // Assembly label: word immediately followed by ':'
+            if (isAsm && j < len && line[j] === ':') {
+                out += `<span class="lump-hl-label">${_hlEsc(word)}:</span>`;
+                i = j + 1;
+                continue;
+            }
+            const cls = _hlCloomcWordClass(word, isAsm);
+            out += cls ? `<span class="${cls}">${_hlEsc(word)}</span>` : _hlEsc(word);
+            i = j;
+            continue;
+        }
+
+        // ── Hex literal: 0x… ──────────────────────────────────────────────
+        if (ch === '0' && i + 1 < len && (line[i + 1] === 'x' || line[i + 1] === 'X')) {
+            let j = i + 2;
+            while (j < len && /[0-9a-fA-F_]/.test(line[j])) j++;
+            out += `<span class="lump-hl-number">${_hlEsc(line.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+
+        // ── Decimal literal ────────────────────────────────────────────────
+        if (/[0-9]/.test(ch)) {
+            let j = i;
+            while (j < len && /[0-9_]/.test(line[j])) j++;
+            out += `<span class="lump-hl-number">${_hlEsc(line.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+
+        // ── HTML-special characters ────────────────────────────────────────
+        if (ch === '&') { out += '&amp;'; i++; continue; }
+        if (ch === '<') { out += '&lt;';  i++; continue; }
+        if (ch === '>') { out += '&gt;';  i++; continue; }
+
+        out += ch;
+        i++;
+    }
+    return out;
+}
+
+function _hlCloomcWordClass(word, isAsm) {
+    if (/^(CR|DR)\d+$/.test(word))              return 'lump-hl-register';
+    if (isAsm && _ASM_HL_MNEMONICS.has(word))   return 'lump-hl-mnemonic';
+    if (_CLOOMC_HL_KEYWORDS.has(word))          return 'lump-hl-keyword';
+    return null;
+}
+
+// Minimal HTML escaper for already-sliced source fragments (avoids touching
+// spans that the tokeniser has already emitted).
+function _hlEsc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function _isRawISASource(src) {
@@ -1537,7 +1668,7 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
                 `<div class="lump-section-title">Saved Source ` +
                 `<span class="lump-stored-src-meta">${_lang}${_compiledAt ? ' \u00b7 compiled ' + _compiledAt : ''}</span>` +
                 `</div>` +
-                `<pre class="lump-stored-src-pre">${e(data.source)}</pre>` +
+                `<pre class="lump-stored-src-pre">${_highlightCLOOMCSource(data.source, data.language || lump.language)}</pre>` +
                 `</div>`;
         } else {
             el.innerHTML = `<div class="lump-stored-src-empty">No stored source.</div>`;
