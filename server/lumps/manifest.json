@@ -2069,5 +2069,59 @@
     "grants": [
       "E"
     ]
+  },
+  {
+    "token": "97cc8047",
+    "abstraction": "Human_Hand",
+    "filename": "Human_Hand_v1.lump",
+    "sidecar_file": "Human_Hand_v1.json",
+    "ns_slot": null,
+    "lump_size": 64,
+    "cw": 12,
+    "cc": 1,
+    "author": "",
+    "version": "2026.05.31",
+    "lump_version": 1,
+    "compiled_at": 1780243660.4309585,
+    "methods": [
+      {
+        "name": "Status",
+        "offset": 0,
+        "length": 2
+      },
+      {
+        "name": "Close_Fist",
+        "offset": 2,
+        "length": 2,
+        "aliasOf": "Status"
+      },
+      {
+        "name": "Open_Hand",
+        "offset": 4,
+        "length": 2,
+        "aliasOf": "Status"
+      },
+      {
+        "name": "Grip",
+        "offset": 6,
+        "length": 2,
+        "aliasOf": "Status"
+      },
+      {
+        "name": "Point",
+        "offset": 8,
+        "length": 2,
+        "aliasOf": "Status"
+      },
+      {
+        "name": "Count",
+        "offset": 10,
+        "length": 2,
+        "aliasOf": "Status"
+      }
+    ],
+    "grants": [
+      "E"
+    ]
   }
 ]

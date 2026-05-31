@@ -3431,6 +3431,26 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
                         full = os.path.join(root, fn)
                         arc = os.path.join("SoC", os.path.relpath(full, soc_combined))
                         zf.write(full, arc)
+            # Pre-built bitstream — quick flash without synthesis
+            bitstreams_dir = os.path.join(BASE_DIR, "bitstreams")
+            hex_src = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
+            bit_src = os.path.join(bitstreams_dir, "church_ti60_f225.bit")
+            if os.path.isfile(hex_src):
+                zf.write(hex_src, "outflow/church_ti60_f225.hex")
+            if os.path.isfile(bit_src):
+                zf.write(bit_src, "outflow/church_ti60_f225.bit")
+            # Serial bridge script (needed to connect the board to the IDE)
+            bridge_path = os.path.join(BASE_DIR, "server", "local_bridge.py")
+            if os.path.isfile(bridge_path):
+                zf.write(bridge_path, "local_bridge.py")
+            else:
+                msg = "local_bridge.py not found — bridge.sh will not work until this file is present on the server"
+                logging.warning("FPGA zip: %s", msg)
+                warnings.append(msg)
+            # Patch script (needed for SoC+CM firmware embedding)
+            patch_script = os.path.join(BASE_DIR, "scripts", "patch_sapphire_init.py")
+            if os.path.isfile(patch_script):
+                zf.write(patch_script, "scripts/patch_sapphire_init.py")
             for src_name, arc_name in _doc_pdfs:
                 src = os.path.join(docs_dir, src_name)
                 if os.path.isfile(src):

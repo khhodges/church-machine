@@ -58,6 +58,15 @@ class TestTi60ZipContents:
                    'run_efx_pnr.sh', 'BUILD_SOC_CM.md'):
             _write_stub(os.path.join(soc_combined, fn))
 
+        # Bitstream + bridge + patch script stubs
+        bitstreams = str(tmp_path / 'bitstreams')
+        server_dir = str(tmp_path / 'server')
+        scripts_dir = str(tmp_path / 'scripts')
+        for fn in ('church_ti60_f225.hex', 'church_ti60_f225.bit'):
+            _write_stub(os.path.join(bitstreams, fn))
+        _write_stub(os.path.join(server_dir, 'local_bridge.py'))
+        _write_stub(os.path.join(scripts_dir, 'patch_sapphire_init.py'))
+
         paths = {
             'rtlil':   str(build_dir / 'church_ti60_f225.il'),
             'verilog': verilog,
@@ -90,6 +99,11 @@ class TestTi60ZipContents:
             'SoC/run_efx_map.sh',
             'SoC/run_efx_pnr.sh',
             'SoC/BUILD_SOC_CM.md',
+            # Quick-flash bitstream + bridge + patch script
+            'outflow/church_ti60_f225.hex',
+            'outflow/church_ti60_f225.bit',
+            'local_bridge.py',
+            'scripts/patch_sapphire_init.py',
         }
         names = _zip_namelist(buf)
         assert expected <= names

@@ -637,4 +637,18 @@ function discardLesson5Draft() {
 
     // Show "Resume your draft" banner if a Lesson 5 draft is saved
     document.addEventListener('DOMContentLoaded', _checkResumeBanner);
+
+    // Warn before leaving the page if the user has unsaved Lesson 5 draft data
+    window.addEventListener('beforeunload', function(e) {
+        try {
+            var raw = localStorage.getItem(_L5_DRAFT_KEY);
+            if (raw) {
+                var d = JSON.parse(raw);
+                if (d && (d.name || d.desc || (d.methods && d.methods.length))) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+            }
+        } catch (_) {}
+    });
 })();
