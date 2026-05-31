@@ -573,7 +573,9 @@ function starterOpenEditor() {
     try {
         localStorage.setItem('church_editor_code', code);
         localStorage.setItem('church_editor_lang', 'cloomc');
-        localStorage.removeItem(_L5_DRAFT_KEY);
+        // NOTE: Keep the draft in localStorage so the user can recover it
+        // even if the editor fails to load or the code is lost. The draft
+        // is only removed when the user explicitly clicks "Discard".
     } catch (e) {}
 
     window.location = '/simulator/#editor';
