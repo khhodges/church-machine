@@ -529,12 +529,16 @@ function starterOpenEditor() {
     if (!methods.length) methods.push({ name: 'run', desc: 'Main function', deps: '' });
 
     // Collect unique dep names for capabilities block
+    // Note: 'self' is filtered out because the abstraction already has
+    // access to itself via CR6 (the C-List holds its own GT). Including
+    // 'self' in capabilities would cause a compile error — no external
+    // abstraction named 'self' exists.
     var allDeps = [];
     methods.forEach(function(m) {
         if (m.deps) {
             m.deps.split(',').forEach(function(d) {
                 var dep = d.trim().replace(/\s+/g, '');
-                if (dep && allDeps.indexOf(dep) === -1) allDeps.push(dep);
+                if (dep && dep.toLowerCase() !== 'self' && allDeps.indexOf(dep) === -1) allDeps.push(dep);
             });
         }
     });
