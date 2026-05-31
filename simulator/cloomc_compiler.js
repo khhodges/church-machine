@@ -86,6 +86,8 @@ class CLOOMCCompiler {
             result = this.compilePetName(cleanSource, capabilities);
         } else if (this._detectEnglish(cleanSource)) {
             result = this.compileEnglish(cleanSource, capabilities);
+        } else if (this._detectCLOOMC(cleanSource)) {
+            result = this.compileJS(cleanSource, capabilities);
         } else if (this._detectAssembly(cleanSource)) {
             result = this.compileAssembly(cleanSource, capabilities);
         } else if (this._detectLambda(cleanSource)) {
@@ -657,6 +659,18 @@ class CLOOMCCompiler {
         return false;
     }
 
+    _detectCLOOMC(source) {
+        const lines = source.split('\n');
+        for (const line of lines) {
+            const t = line.trim();
+            if (!t || t.startsWith('//') || t.startsWith('--') || t.startsWith(';')) continue;
+            if (/^abstraction\s+\w+/i.test(t)) return true;
+            if (/^capabilities\s*\{/i.test(t)) return true;
+            if (/^(?:public\s+|private\s+)?method\s+\w+/i.test(t)) return true;
+        }
+        return false;
+    }
+
     _detectAssembly(source) {
         const CM_MNEMONICS = /^(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|WORD|NOP)(\s|$|\.)/ ;
         const lines = source.split('\n');
@@ -668,7 +682,6 @@ class CLOOMCCompiler {
             if (/^[A-Za-z_]\w*:\s*$/.test(t)) { score++; continue; }
             if (CM_MNEMONICS.test(t)) { score += 2; continue; }
             if (/^\.pet\s+/i.test(t) || /^\.word\s+/i.test(t)) { score += 2; continue; }
-            if (/^capabilities\s*\{/.test(t)) { score++; continue; }
         }
         return score >= 2;
     }
