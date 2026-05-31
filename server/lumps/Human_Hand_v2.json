@@ -1,0 +1,87 @@
+{
+  "token": "97cc8047",
+  "abstraction": "Human_Hand",
+  "filename": "Human_Hand_v2.lump",
+  "sidecar_file": "Human_Hand_v2.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 12,
+  "cc": 1,
+  "profile": "IoT",
+  "language": "javascript",
+  "author": "",
+  "version": "2026.05.31",
+  "release_notes": "",
+  "methods": [
+    {
+      "name": "Status",
+      "offset": 0,
+      "length": 2
+    },
+    {
+      "name": "Close_Fist",
+      "offset": 2,
+      "length": 2,
+      "aliasOf": "Status"
+    },
+    {
+      "name": "Open_Hand",
+      "offset": 4,
+      "length": 2,
+      "aliasOf": "Status"
+    },
+    {
+      "name": "Grip",
+      "offset": 6,
+      "length": 2,
+      "aliasOf": "Status"
+    },
+    {
+      "name": "Point",
+      "offset": 8,
+      "length": 2,
+      "aliasOf": "Status"
+    },
+    {
+      "name": "Count",
+      "offset": 10,
+      "length": 2,
+      "aliasOf": "Status"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "self",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown",
+    "source_hash": "dbfa1bb0"
+  },
+  "deployment": {
+    "target_board": "ti60-f225",
+    "profile": "IoT",
+    "built_at": "2026-05-31T16:27:19.357054Z",
+    "builder": "CLOOMC++ IDE v1.0"
+  },
+  "grants": [
+    "E"
+  ],
+  "lump_version": 2,
+  "compiled_at": 1780244839.3570733
+}
