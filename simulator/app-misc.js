@@ -1050,19 +1050,6 @@ document.addEventListener('DOMContentLoaded', () => {
         adjustViewTop();
         initCodeCopyButtons();
         updateFPGAStatusBtn();
-        const _sealedLumpJSON = localStorage.getItem('cm_sealed_lump');
-        if (_sealedLumpJSON) {
-            try {
-                const _sealedMeta = JSON.parse(_sealedLumpJSON);
-                if (_sealedMeta && _sealedMeta.abstraction) {
-                    if (typeof _applySealedLumpState === 'function') {
-                        _applySealedLumpState(_sealedMeta.abstraction);
-                    }
-                }
-            } catch (_e) {
-                console.warn('[sealed-editor] Malformed cm_sealed_lump in localStorage — ignoring:', _e && _e.message);
-            }
-        }
         const _asmEd = document.getElementById('asmEditor');
         if (_asmEd) {
             _asmEd.addEventListener('keydown', function(e) {

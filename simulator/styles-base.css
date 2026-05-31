@@ -86,7 +86,7 @@ header h1 a:hover {
 .view-buttons {
     display: flex;
     gap: 0.25rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .btn-view {

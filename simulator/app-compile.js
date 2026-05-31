@@ -1520,7 +1520,6 @@ function compileAndBuild() {
     trackAction('build_lump', { name: absName, lang: result.language, size: lumpSize });
     appendOutput(`Built LUMP: "${absName}" [${langLabel}] \u2014 ${cw} words, cc=${cc}, ${sizeBytes} bytes \u00b7 v${_autoVer}`, 'info');
     showNextSteps('compiled');
-    _applySealedLumpState(absName);
 }
 
 function _applySealedLumpState(absName) {
