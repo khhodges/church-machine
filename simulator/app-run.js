@@ -9084,7 +9084,7 @@ function loadEditorState() {
         sel.value = savedLang;
         onLangChange(true);
     } else if (sel) {
-        sel.value = 'symbolic';
+        sel.value = 'cloomc';
         onLangChange(false);
     }
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
@@ -9360,13 +9360,13 @@ RETURN                ; Return result</div>
             so it only runs when the condition is true.</p>
         `
     },
-    javascript: {
-        title: "JavaScript -- CLOOMC++ High-Level Language",
+    cloomc: {
+        title: "CLOOMC++ -- Abstraction Language",
         body: `
             <p><span class="intro-highlight">CLOOMC++</span> is the Church Machine's
-            high-level compiler. The JavaScript front-end lets you write programs
-            using familiar syntax -- curly braces, if/while, functions -- and the compiler
-            turns them into Church Machine instructions.</p>
+            high-level abstraction language. Write programs with
+            <em>abstraction</em> blocks, <em>capabilities</em> lists, and <em>method</em>
+            bodies -- the compiler turns them into Church Machine instructions.</p>
             <div class="intro-example">abstraction Hello {
     capabilities { }
 
