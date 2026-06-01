@@ -245,7 +245,8 @@ test.describe('LUMP History tab — table renders rows', () => {
 
         const restoreBtn = row.locator('button.lump-history-restore-btn');
         await expect(restoreBtn).toBeVisible();
-        await expect(restoreBtn).toBeEnabled();
+        // Restore is disabled until a Preview has been loaded for that row.
+        await expect(restoreBtn).toBeDisabled();
     });
 
 });
@@ -292,6 +293,13 @@ test.describe('LUMP History tab — save via UI then browse', () => {
                 body:        JSON.stringify(STUB_WORDS_V1),
             });
         });
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, async route => {
+            await route.fulfill({
+                status:      200,
+                contentType: 'application/json',
+                body:        JSON.stringify(STUB_WORDS_CURRENT),
+            });
+        });
         await page.route('**/api/lumps/save', async route => {
             await route.fulfill({
                 status:      200,
@@ -310,6 +318,10 @@ test.describe('LUMP History tab — save via UI then browse', () => {
 
         // Before save: exactly 1 history row (v1).
         await expect(histBody.locator('tr.lump-history-row')).toHaveCount(1, { timeout: 8000 });
+
+        // Click Preview to load the hex dump — this enables the Restore button.
+        await histBody.locator('button[title^="Preview hex dump"]').first().click();
+        await waitForHexTable(page);
 
         // Click the Restore button — this is the UI-level save action.
         // _restoreLumpFromHistory fetches the archived binary, POSTs it to
@@ -377,6 +389,13 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
                 body:        JSON.stringify(STUB_WORDS_V1),
             });
         });
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, async route => {
+            await route.fulfill({
+                status:      200,
+                contentType: 'application/json',
+                body:        JSON.stringify(STUB_WORDS_CURRENT),
+            });
+        });
         await page.route('**/api/lumps/save', async route => {
             capturedSaveBody = JSON.parse(route.request().postData() || '{}');
             await route.fulfill({
@@ -395,6 +414,10 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         const histBody = page.locator(`#lumpHistoryBody_${STUB_TK}`);
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
+
+        // Click Preview to load the hex dump — this enables the Restore button.
+        await row.locator('button[title^="Preview hex dump"]').click();
+        await waitForHexTable(page);
 
         // Click Restore.
         await row.locator('button.lump-history-restore-btn').click();
@@ -455,6 +478,20 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
                 body:        JSON.stringify(STUB_HISTORY_RESPONSE),
             });
         });
+        await page.route(`**/api/lumps/${STUB_TOKEN}/words/1`, async route => {
+            await route.fulfill({
+                status:      200,
+                contentType: 'application/json',
+                body:        JSON.stringify(STUB_WORDS_V1),
+            });
+        });
+        await page.route(`**/api/lump/${STUB_TOKEN}/words`, async route => {
+            await route.fulfill({
+                status:      200,
+                contentType: 'application/json',
+                body:        JSON.stringify(STUB_WORDS_CURRENT),
+            });
+        });
         await page.route('**/api/lumps/save', async route => {
             saveCallCount++;
             await route.continue();
@@ -469,6 +506,10 @@ test.describe('LUMP History tab — Restore fires /api/lumps/save', () => {
         const histBody = page.locator(`#lumpHistoryBody_${STUB_TK}`);
         const row = histBody.locator('tr.lump-history-row').first();
         await expect(row).toBeVisible({ timeout: 8000 });
+
+        // Click Preview to enable the Restore button, then click Restore (dialog dismissed).
+        await row.locator('button[title^="Preview hex dump"]').click();
+        await waitForHexTable(page);
 
         await row.locator('button.lump-history-restore-btn').click();
 
