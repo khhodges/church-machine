@@ -2853,6 +2853,27 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
         ? _computeBranchArrows(_lumpCodeWords)
         : { html: new Array(_lumpCodeWords.length).fill(''), hasBranches: false };
 
+    // Pre-scan: detect stub methods (only RETURN + padding, no real code body).
+    // A stub method is a compiler error — the method declaration was emitted but
+    // the body is missing, leaving a bare RETURN immediately after the boundary.
+    const sortedMBKeys = Object.keys(mb).map(Number).sort((a, b) => a - b);
+    const _stubMethods = new Set();
+    for (let _smk = 0; _smk < sortedMBKeys.length; _smk++) {
+        const _smStart = sortedMBKeys[_smk];
+        const _smEnd   = _smk + 1 < sortedMBKeys.length ? sortedMBKeys[_smk + 1] : effEnd;
+        let _hasRealCode = false;
+        let _hasReturn   = false;
+        for (let _j = _smStart; _j < _smEnd && _j < words.length; _j++) {
+            const _jw = words[_j] >>> 0;
+            if (_jw === 0) continue;
+            const _jop = (_jw >>> 27) & 0x1F;
+            if (_jop === 3) { _hasReturn = true; continue; }
+            _hasRealCode = true;
+            break;
+        }
+        if (!_hasRealCode && _hasReturn) _stubMethods.add(_smStart);
+    }
+
     let html = '<div class="lump-content-code">';
     html += '<div class="lump-methods-section">';
     html += '<div class="lump-methods-title">MyMethods</div>';
@@ -2865,6 +2886,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
         let instrRelIdx   = 0;
         let _methodCardOpen = false;
         let _methodCardIdx  = 0;
+        let _inStubMethod   = false;
 
         let _lumpCi = 0;  // code-region offset (0-based, used for branch label/arrow lookup)
         for (let i = 1; i < effEnd; i++, _lumpCi++) {
@@ -2873,9 +2895,14 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
                 if (_methodCardOpen) html += '</div></div>';  // close previous method body + card
                 const auto = autoDetected ? ' <span class="lump-meth-auto" title="Auto-detected boundary">[~]</span>' : '';
                 const cardId = `lump-mc-${_methodCardIdx++}`;
-                html += `<div class="lump-method-card" id="${cardId}">` +
+                _inStubMethod = _stubMethods.has(i);
+                const _stubBadge = _inStubMethod
+                    ? `<span class="lump-meth-stub-badge" title="Compiler error \u2014 method has no code body (bare RETURN stub)">&#x26A0; Empty stub</span>`
+                    : '';
+                html += `<div class="lump-method-card${_inStubMethod ? ' lump-method-card-stub' : ''}" id="${cardId}">` +
                         `<div class="lump-method-card-header">` +
                         `<span class="lump-method-card-name" onclick="(function(el){var card=el.closest('.lump-method-card');var c=card.getAttribute('data-collapsed')==='1';card.setAttribute('data-collapsed',c?'0':'1');})(this)">\u25c6 ${e(mb[i])}${auto}</span>` +
+                        _stubBadge +
                         `<button class="lump-method-toggle-btn" onclick="(function(btn){` +
                             `var card=btn.closest('.lump-method-card');` +
                             `var shown=card.getAttribute('data-binary')==='1';` +
@@ -2977,6 +3004,14 @@ function _renderLumpCodeContent(bodyEl, lump, words, token) {
             // Emit branch-target label row before this instruction if it's a target
             if (_lumpBrLabelMap.has(_lumpCi)) {
                 html += `<div class="lump-code-label-row">${_lumpBrLabelMap.get(_lumpCi)}:</div>`;
+            }
+
+            // Stub-method warning row: fired once, before the bare RETURN
+            if (_inStubMethod && op === 3 && instrRelIdx === 0) {
+                html += `<div class="lump-code-stub-warn-row">` +
+                        `<span class="lump-code-stub-warn-icon">&#x26A0;</span>` +
+                        `<span class="lump-code-stub-warn-text">Compiler error \u2014 method body is missing (bare RETURN stub)</span>` +
+                        `</div>`;
             }
 
             // Branch arrow SVG (from pre-computed _lumpBrArrows)

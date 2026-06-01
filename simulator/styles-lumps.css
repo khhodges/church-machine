@@ -1274,6 +1274,48 @@
     vertical-align: middle;
     margin-left: 0.25rem;
 }
+/* Stub-method warning badge (shown in method card header) */
+.lump-meth-stub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: #7c2d12;
+    color: #fcd34d;
+    border: 1px solid #f59e0b;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.05rem 0.35rem;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+    cursor: help;
+    letter-spacing: 0.02em;
+}
+/* Stub-method card: left accent stripe */
+.lump-method-card-stub {
+    border-left: 3px solid #f59e0b;
+}
+/* Stub-method inline warning row (shown in method body before the bare RETURN) */
+.lump-code-stub-warn-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    margin: 0.2rem 0 0.25rem 0;
+    background: rgba(124, 45, 18, 0.35);
+    border: 1px solid #f59e0b55;
+    border-radius: 3px;
+    font-size: 0.72rem;
+}
+.lump-code-stub-warn-icon {
+    color: #fbbf24;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+.lump-code-stub-warn-text {
+    color: #fcd34d;
+    font-style: italic;
+}
 .lump-sym-ann {
     color: #7dd3a8;
     font-size: 0.68rem;
