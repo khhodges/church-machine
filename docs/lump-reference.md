@@ -1,6 +1,6 @@
 # LUMP Reference
 
-**LUMP** — *Layered Unit of Machine Placement* — is the fundamental deployable unit of the Church Machine. A LUMP is always a power-of-two block of 32-bit words that bundles executable code, embedded data, and a private Capability List into a single, cryptographically sealed object. Every abstraction on the Church Machine is compiled to a LUMP and given a unique 32-bit token.
+**LUMP** — *Lazy Unit of Memory Placement* — is a self defined the fundamental deployable unit of the Church Machine. A LUMP is always a power-of-two block of 32-bit words that bundles executable code, embedded data, and a private Capability List into a single, cryptographically sealed object that can be independently loaded into memory by the Namespace manager. Every abstraction on the Church Machine is compiled to a LUMP and given a unique 32-bit token Golden Token with user specific access rights managed by the Church-Turing Meta Machine (RWX/LSE+FBG).
 
 ---
 
@@ -43,7 +43,7 @@ A LUMP is always `2^n` words long (`n ∈ 6..14`, i.e. 64–16 384 words).
 | Freespace    | cw+1 … lump_size−cc−1         | Zeroed padding. Provides room to grow code or c-list. |
 | C-List       | lump_size−cc … lump_size−1    | One GT Word 0 per row. |
 
-Data words (`dw`) live inside the code section immediately after the last instruction (`data_offset` in the sidecar gives the first data-word index relative to the lump base).
+Data words (`dw`) live inside the code section typically after the last instruction (`data_offset` in the sidecar gives the first data-word index relative to the lump base).
 
 ---
 
@@ -62,28 +62,28 @@ Bits 31:27 are always `11111` (opcode 0x1F — an invalid instruction), so the h
 | Field | Bits  | Meaning |
 |:------|:------|:--------|
 | magic | 31:27 | Always `0x1F`. Identifies word 0 as a LUMP header. |
-| n-6   | 26:23 | Size exponent minus 6. `lump_size = 2^(n-6 + 6)`. Range 0–8 → 64–16 384 words. |
+| n-6   | 26:23 | Size exponent minus 6. `lump_size = 2^(n-6 + 6)`. Range 0–8 → 64–16,384 words. |
 | cw    | 22:10 | **Code Word count.** Number of 32-bit instructions (max 8 191). |
 | typ   | 9:8   | Object type (see §3). |
 | cc    | 7:0   | **C-List count.** Number of GT rows at the lump's tail (0–255). |
 
-The hardware derives two root Capability Registers from these fields at load time:
+The hardware Church Instructions Call/Return/Change all derive two root Capability Registers from these fields dynamically at run time:
 
-- **CR6** (C-List Root): `base = NS_base + (lump_size − cc) × 4`, `limit = cc − 1`.
-- **CR14** (Code Root): `base = NS_base + 4`, `limit = cw − 1`.
+- **CR6** (C-List Root): `base = NS_base + (lump_size − cc) × 4`, `limit = cc − 1` and register permission code E (enter).
+- **CR14** (Code Root): `base = NS_base + 4`, `limit = cw − 1`and register permission code X (execute).
 
 ---
 
 ## 3. Object Types (`typ`)
 
-| `typ` | Name         | Description |
-|:------|:-------------|:------------|
-| `00`  | Code / Lump  | Standard executable abstraction. |
-| `01`  | Data         | Opaque data block (image, text, binary blob). No instructions. |
-| `10`  | Thread       | Captured thread state (PC + 16 DRs + call stack). |
-| `11`  | Outform      | Placeholder. Triggers an "Absent" event on first `LOAD`; the loader fetches the real lump from the Home Base. |
+| `typ` | Name              | Description |
+|:------|:------------------|:------------|
+| `00`  | Abstraction       | Standard executable CLOOMC code body — instructions, freespace, and a GT C-List tail. |
+| `01`  | Namespace         | Namespace configuration object. Encodes `totalNamespaceWords` (the board's physical memory envelope). *(Reserved — not user-authored.)* |
+| `10`  | Thread            | Captured thread state (PC + 16 DRs + call stack). Encodes stack/heap sizing. |
+| `11`  | Outform           | Placeholder. Triggers an "Absent" event on first `LOAD`; the loader fetches the real lump from the Home Base. |
 
-The `content_type` field in the sidecar further refines `typ=01` into `"text"`, `"markdown"`, `"image"`, `"grayscale"`, etc.
+The `content_type` field in the sidecar further refines `typ=00` data sub-variants into `"text"`, `"markdown"`, `"image"`, `"grayscale"`, etc. The `lump_type` field in the sidecar carries the semantic label (e.g. `"application_namespace"` for Namespace lumps).
 
 ---
 

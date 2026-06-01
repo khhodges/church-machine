@@ -282,7 +282,7 @@ function updateCRDetail() {
         }
 
         if (lumpHdr.valid) {
-            const typNames  = ['code', 'data', 'thread', 'outform'];
+            const typNames  = ['code', 'namespace', 'thread', 'outform'];
             const typStr    = typNames[lumpHdr.typ] || String(lumpHdr.typ);
             const hdrDisasm = `.header ${typStr} n\u22126=${lumpHdr.n_minus_6}\u2192${lumpHdr.lumpSize}w`
                             + ` cw=${lumpHdr.cw} cc=${lumpHdr.cc}`;
@@ -1397,7 +1397,7 @@ function updateCRDetail() {
             const clistStart = lumpSz - cc;
             const freeStart = 1 + cw;
             const freeWords = clistStart - freeStart;
-            const typNames = ['lump', 'data', 'thread', 'outform'];
+            const typNames = ['lump', 'namespace', 'thread', 'outform'];
             const typStr = typNames[lHdr.typ] || String(lHdr.typ);
             const hexW = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(8, '0');
             const hexA = n => '0x' + (n >>> 0).toString(16).toUpperCase().padStart(4, '0');
@@ -2141,7 +2141,7 @@ function renderMemoryDump(location, limit, nsIndex) {
             const clistStart = lumpSize - cc;  // c-list at physical end
             const hdrHex     = '0x' + (hdrWord >>> 0).toString(16).toUpperCase().padStart(8, '0');
             const hdrAddrHex = '0x' + location.toString(16).toUpperCase().padStart(4, '0');
-            const typNames   = ['lump','data','Thread','Outform'];
+            const typNames   = ['lump','namespace','Thread','Outform'];
             const nsEntry    = sim.readNSEntry(nsIndex);
             const lumpVer    = nsEntry ? ((nsEntry.word2_seals >>> 25) & 0x7F) : 0;
             const lumpSeal   = nsEntry ? (nsEntry.word2_seals & 0xFFFF) : 0;
@@ -3260,7 +3260,7 @@ window.lumpSaveLump = async function(nsIdx) {
     checks.push(`\u2139 All checks passed. Saving ${hdr.lumpSize}-word lump\u2026`);
     const words = [];
     for (let i = 0; i < hdr.lumpSize; i++) words.push(sim.memory[baseLoc + i] >>> 0);
-    const typeNames = ['code', 'data', 'thread', 'outform'];
+    const typeNames = ['code', 'namespace', 'thread', 'outform'];
     const metadata = {
         abstraction: absName,
         ns_slot:     nsIdx,

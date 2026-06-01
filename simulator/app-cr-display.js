@@ -261,7 +261,7 @@ function renderCListEntryDetail(nsIdx, entry) {
             const lumpSize  = hdr.lumpSize;    // physical slot size (2^(n_minus_6+6))
             const clistStart = lumpSize - cc;  // c-list at physical end
             const hdrHex    = '0x' + (hdrRaw >>> 0).toString(16).toUpperCase().padStart(8,'0');
-            const typNames  = ['lump','data','Thread','Outform'];
+            const typNames  = ['lump','namespace','Thread','Outform'];
             // ── Lump Header ──────────────────────────────────────────────────
             h += `<div class="clist-detail-title" style="margin-top:0.4rem;color:var(--church-gold);">Header`
                + ` <span style="font-size:0.72rem;">word 0 \u00b7 ${hdrHex}`
@@ -555,7 +555,7 @@ function showZonePopup(evt, zone, nsIdx) {
     if (zone === 'hdr') {
         const hdrWord = (sim.memory[slotBase] >>> 0) || TL.THREAD_HEADER;
         const hdr = sim.parseLumpHeader ? sim.parseLumpHeader(hdrWord) : {};
-        const typNames = ['lump','data','clist-only','outform'];
+        const typNames = ['lump','namespace','thread','outform'];
         html += `<div class="zdp-title" style="border-color:#6b7280;color:#9ca3af;">Lump Header · word +0</div>`;
         html += `<table>`;
         html += `<tr><td>raw</td><td class="zdp-hex">${hexW(hdrWord)}</td></tr>`;

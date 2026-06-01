@@ -18,7 +18,7 @@ function showLumpDetail(token) {
     const contentEl = document.getElementById('lumpsDetailContent');
     if (!titleEl || !contentEl) return;
 
-    const isNamespace = lump.lump_type === 'namespace' || lump.typ === 10;
+    const isNamespace = lump.lump_type === 'namespace' || lump.typ === 1;
     const _lumpTitleLabel = _lumpContentTypeLabel(lump);
     titleEl.textContent = (lump.abstraction || 'Unknown Lump') +
         (isNamespace ? ' — Namespace LUMP' : ` — ${_lumpTitleLabel}`);
@@ -1386,7 +1386,7 @@ function _lumpContentTypeLabel(lump) {
     const ct = (lump.content_type || '').toLowerCase();
     const lt = (lump.lump_type   || '').toLowerCase();
     const typ = lump.typ;
-    if (lt === 'namespace' || typ === 10) return 'Namespace';
+    if (lt === 'namespace' || typ === 1) return 'Namespace';
     if (ct === 'text')                    return 'Text';
     if (ct === 'markdown')                return 'Markdown';
     if (ct === 'image')                   return 'Image';
@@ -1405,7 +1405,7 @@ function _lumpTypeBadge(lump) {
     const lt = (lump.lump_type   || '').toLowerCase();
     const typ = lump.typ;
     if (lt === 'boot')                                 return '<span class="lump-ct-badge lump-ct-boot">BOOT</span>';
-    if (lt === 'namespace' || typ === 10)              return '<span class="lump-ct-badge lump-ct-ns">NS</span>';
+    if (lt === 'namespace' || typ === 1)               return '<span class="lump-ct-badge lump-ct-ns">NS</span>';
     if (ct === 'text')                                 return '<span class="lump-ct-badge lump-ct-text">TXT</span>';
     if (ct === 'markdown')                             return '<span class="lump-ct-badge lump-ct-md">MD</span>';
     if (ct === 'image')                                return '<span class="lump-ct-badge lump-ct-img">IMG</span>';
@@ -3663,7 +3663,7 @@ function _renderNsBuilderForm(contentEl) {
 
     let lumpOpts = '<option value="">-- select lump --</option>';
     for (const lump of _lumpsCache) {
-        if (lump.lump_type === 'namespace' || lump.typ === 10) continue;
+        if (lump.lump_type === 'namespace' || lump.typ === 1) continue;
         const tk = e(lump.token || '');
         const nm = e(lump.abstraction || lump.token || '');
         lumpOpts += `<option value="${tk}">${nm} (0x${tk})</option>`;
@@ -3695,7 +3695,7 @@ function _renderNsSlots(lumpOptsOverride) {
     if (!lumpOpts) {
         lumpOpts = '<option value="">-- select lump --</option>';
         for (const lump of _lumpsCache) {
-            if (lump.lump_type === 'namespace' || lump.typ === 10) continue;
+            if (lump.lump_type === 'namespace' || lump.typ === 1) continue;
             const tk = e(lump.token || '');
             const nm = e(lump.abstraction || lump.token || '');
             lumpOpts += `<option value="${tk}">${nm} (0x${tk})</option>`;
