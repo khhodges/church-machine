@@ -1123,6 +1123,7 @@ function _initNsDepGraphPanZoom(wrapId) {
     }
 
     svg.addEventListener('wheel', ev => {
+        if (!ev.ctrlKey && !ev.metaKey) return;
         ev.preventDefault();
         const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
         const rect = svg.getBoundingClientRect();
