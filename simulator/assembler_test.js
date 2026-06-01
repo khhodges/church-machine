@@ -5980,6 +5980,20 @@ abstraction VlcTest {
         result.status !== null ? 'exit code ' + result.status : 'process did not complete');
 }
 
+// ── Clist pet-name highlight regression suite ──────────────────────────────
+// Verifies that <span class="clist-petname-ref" …> annotations injected by
+// _annotateRawClistSlot survive _highlightCLOOMCSource / _hlCloomcLine and
+// _wrapRegHover without being HTML-escaped to &lt;span…
+{
+    const { spawnSync } = require('child_process');
+    const result = spawnSync(process.execPath,
+        [require('path').join(__dirname, 'test_clist_petname_highlight.js')],
+        { stdio: 'inherit' });
+    assert('CLIST-PETNAME-HL: clist pet-name highlight regression suite passes',
+        result.status === 0,
+        result.status !== null ? 'exit code ' + result.status : 'process did not complete');
+}
+
 // ── GT v1.1 test + Post-Flash Self-Test assembly regression ──────────────────
 // Verifies that the two new example CLOOMC files assemble without errors.
 // Neither file is in langExampleGroups (they are standalone hardware-test

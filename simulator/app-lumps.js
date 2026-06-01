@@ -1039,7 +1039,19 @@ function _hlCloomcLine(line, isAsm) {
 
         // ── HTML-special characters ────────────────────────────────────────
         if (ch === '&') { out += '&amp;'; i++; continue; }
-        if (ch === '<') { out += '&lt;';  i++; continue; }
+        // ── Clist pet-name span passthrough ────────────────────────────────
+        // _annotateRawClistSlot injects <span class="clist-petname-ref" …>
+        // BEFORE this function runs.  We pass through ONLY that exact class
+        // (whitelist, not a generic span passthrough) so that arbitrary user-
+        // authored '<span …>' tags in source text are still safely escaped.
+        if (ch === '<') {
+            const _tail  = line.slice(i);
+            const _openM = _tail.match(/^<span class="clist-petname-ref" [^>]*>/);
+            if (_openM)  { out += _openM[0];  i += _openM[0].length;  continue; }
+            const _closeM = _tail.match(/^<\/span>/);
+            if (_closeM) { out += _closeM[0]; i += _closeM[0].length; continue; }
+            out += '&lt;'; i++; continue;
+        }
         if (ch === '>') { out += '&gt;';  i++; continue; }
 
         out += ch;
