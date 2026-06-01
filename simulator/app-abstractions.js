@@ -1105,7 +1105,9 @@ function _initNsDepGraphPanZoom(wrapId) {
     const inner = svg.querySelector('g.nsdg-inner');
     if (!inner) return;
 
-    const st = { scale: 1, tx: 0, ty: 0, dragging: false, startX: 0, startY: 0, startTx: 0, startTy: 0, pinchDist: 0 };
+    const st = { scale: 1, tx: 0, ty: 0, dragging: false,
+                 startX: 0, startY: 0, startClientX: 0, startClientY: 0,
+                 startScrollTop: 0, startTx: 0, startTy: 0, pinchDist: 0 };
     _nsdgState[wrapId] = st;
 
     function applyTransform() {
@@ -1113,11 +1115,11 @@ function _initNsDepGraphPanZoom(wrapId) {
     }
 
     function clampTranslate() {
+        if (st.scale <= 1) { st.tx = 0; st.ty = 0; return; }
         const svgW = parseFloat(svg.getAttribute('viewBox').split(' ')[2]) || 660;
         const svgH = parseFloat(svg.getAttribute('viewBox').split(' ')[3]) || 300;
         const maxTx = svgW * (st.scale - 1) * 0.8;
         const maxTy = svgH * (st.scale - 1) * 0.8;
-        if (st.scale <= 1) { st.tx = 0; st.ty = 0; return; }
         st.tx = Math.max(-maxTx, Math.min(maxTx, st.tx));
         st.ty = Math.max(-maxTy, Math.min(maxTy, st.ty));
     }
@@ -1142,31 +1144,36 @@ function _initNsDepGraphPanZoom(wrapId) {
     svg.addEventListener('mousedown', ev => {
         if (ev.button !== 0) return;
         st.dragging = true;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.getAttribute('viewBox').split(' ').map(Number);
-        const scaleX = vb[2] / rect.width;
-        const scaleY = vb[3] / rect.height;
-        st.startX = ev.clientX * scaleX;
-        st.startY = ev.clientY * scaleY;
-        st.startTx = st.tx;
-        st.startTy = st.ty;
+        st.startClientX = ev.clientX;
+        st.startClientY = ev.clientY;
+        st.startScrollTop = wrap.scrollTop;
+        if (st.scale > 1) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+            st.startX = ev.clientX * (vb[2] / rect.width);
+            st.startY = ev.clientY * (vb[3] / rect.height);
+            st.startTx = st.tx;
+            st.startTy = st.ty;
+        }
         svg.style.cursor = 'grabbing';
     });
 
     window.addEventListener('mousemove', ev => {
         if (!st.dragging) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.getAttribute('viewBox').split(' ').map(Number);
-        const scaleX = vb[2] / rect.width;
-        const scaleY = vb[3] / rect.height;
-        st.tx = st.startTx + (ev.clientX * scaleX - st.startX);
-        st.ty = st.startTy + (ev.clientY * scaleY - st.startY);
-        clampTranslate();
-        applyTransform();
+        if (st.scale <= 1) {
+            wrap.scrollTop = st.startScrollTop - (ev.clientY - st.startClientY);
+        } else {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+            st.tx = st.startTx + (ev.clientX * (vb[2] / rect.width) - st.startX);
+            st.ty = st.startTy + (ev.clientY * (vb[3] / rect.height) - st.startY);
+            clampTranslate();
+            applyTransform();
+        }
     });
 
     window.addEventListener('mouseup', () => {
-        if (st.dragging) { st.dragging = false; svg.style.cursor = ''; }
+        if (st.dragging) { st.dragging = false; svg.style.cursor = 'grab'; }
     });
 
     svg.addEventListener('touchstart', ev => {
@@ -1175,12 +1182,16 @@ function _initNsDepGraphPanZoom(wrapId) {
             const dy = ev.touches[0].clientY - ev.touches[1].clientY;
             st.pinchDist = Math.hypot(dx, dy);
         } else if (ev.touches.length === 1) {
-            const rect = svg.getBoundingClientRect();
-            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
             st.dragging = true;
-            st.startX = ev.touches[0].clientX * (vb[2] / rect.width);
-            st.startY = ev.touches[0].clientY * (vb[3] / rect.height);
-            st.startTx = st.tx; st.startTy = st.ty;
+            st.startClientY = ev.touches[0].clientY;
+            st.startScrollTop = wrap.scrollTop;
+            if (st.scale > 1) {
+                const rect = svg.getBoundingClientRect();
+                const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+                st.startX = ev.touches[0].clientX * (vb[2] / rect.width);
+                st.startY = ev.touches[0].clientY * (vb[3] / rect.height);
+                st.startTx = st.tx; st.startTy = st.ty;
+            }
         }
     }, { passive: true });
 
@@ -1198,12 +1209,16 @@ function _initNsDepGraphPanZoom(wrapId) {
             }
             st.pinchDist = dist;
         } else if (ev.touches.length === 1 && st.dragging) {
-            const rect = svg.getBoundingClientRect();
-            const vb = svg.getAttribute('viewBox').split(' ').map(Number);
-            st.tx = st.startTx + (ev.touches[0].clientX * (vb[2] / rect.width) - st.startX);
-            st.ty = st.startTy + (ev.touches[0].clientY * (vb[3] / rect.height) - st.startY);
-            clampTranslate();
-            applyTransform();
+            if (st.scale <= 1) {
+                wrap.scrollTop = st.startScrollTop - (ev.touches[0].clientY - st.startClientY);
+            } else {
+                const rect = svg.getBoundingClientRect();
+                const vb = svg.getAttribute('viewBox').split(' ').map(Number);
+                st.tx = st.startTx + (ev.touches[0].clientX * (vb[2] / rect.width) - st.startX);
+                st.ty = st.startTy + (ev.touches[0].clientY * (vb[3] / rect.height) - st.startY);
+                clampTranslate();
+                applyTransform();
+            }
         }
     }, { passive: false });
 
