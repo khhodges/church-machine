@@ -1620,11 +1620,13 @@ async function _fetchAndShowLumpSavedSource(token, lump, tk) {
                 })()
                 : null;
             el.innerHTML =
-                `<div class="lump-stored-src-meta-bar">` +
+                `<div class="lump-stored-src-section">` +
+                `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${_lang}</span>` +
                 (_compiledAt ? `<span class="lump-stored-src-ts">compiled ${_compiledAt}</span>` : '') +
                 `</div>` +
-                `<pre class="lump-stored-src-pre lump-stored-src-pre-full">${_highlightCLOOMCSource(data.source, data.language || lump.language)}</pre>`;
+                `<pre class="lump-stored-src-pre lump-stored-src-pre-full">${_highlightCLOOMCSource(data.source, data.language || lump.language)}</pre>` +
+                `</div>`;
         } else {
             el.innerHTML = `<div class="lump-stored-src-empty">No stored source — this LUMP predates source persistence.</div>`;
         }
