@@ -168,20 +168,6 @@ function showLumpDetail(token) {
             html += '</div>';
         }
     } else {
-        html += '<div class="lump-detail-section">';
-        html += '<table class="lump-detail-table"><tbody>';
-        html += `<tr><td>Token</td><td>0x${e(lump.token)}</td></tr>`;
-        if (lump.ns_slot !== null && lump.ns_slot !== undefined) html += `<tr><td>NS Slot</td><td>${parseInt(lump.ns_slot) || 0}</td></tr>`;
-        html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
-        html += `<tr><td>Code Words</td><td>${parseInt(lump.cw) || 0}</td></tr>`;
-        html += `<tr><td>C-List Slots</td><td>${parseInt(lump.cc) || 0}</td></tr>`;
-        if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
-        if (lump.profile) html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
-        const grants = lump.grants || [];
-        if (grants.length > 0) html += `<tr><td>Grants</td><td>[${grants.map(g => e(g)).join(', ')}]</td></tr>`;
-        html += '</tbody></table>';
-        html += '</div>';
-
         {
             const _metaTk = e(lump.token);
             const _metaAuthor = lump.author || '';
@@ -210,38 +196,23 @@ function showLumpDetail(token) {
             html += '</div>';
             html += '</div>';
         }
-    }
 
-    if (!isNamespace) {
-    const methods = (lump.methods || []).filter(m => !m.aliasOf);
-    if (methods.length > 0) {
-        const anyMethodPN = methods.some(m => {
-            const dr = ((m.pet_names || {}).DR) || {};
-            return Object.keys(dr).length > 0;
-        });
         html += '<div class="lump-detail-section">';
-        html += '<div class="lump-section-title">Methods</div>';
-        if (anyMethodPN) {
-            html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>Offset</th><th>Len</th><th>DR Parameters</th></tr></thead><tbody>';
-        } else {
-            html += '<table class="lump-detail-table"><thead><tr><th>#</th><th>Name</th><th>Offset</th><th>Len</th></tr></thead><tbody>';
-        }
-        for (let i = 0; i < methods.length; i++) {
-            const m = methods[i];
-            if (anyMethodPN) {
-                const drMap = ((m.pet_names || {}).DR) || {};
-                const drStr = Object.entries(drMap)
-                    .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                    .map(([k, v]) => `DR${k}=${v}`)
-                    .join(', ');
-                html += `<tr><td>${i}</td><td>${e(m.name)}</td><td>${parseInt(m.offset) || 0}</td><td>${parseInt(m.length) || 0}</td><td style="color:#a855f7;font-size:0.78rem;">${e(drStr)}</td></tr>`;
-            } else {
-                html += `<tr><td>${i}</td><td>${e(m.name)}</td><td>${parseInt(m.offset) || 0}</td><td>${parseInt(m.length) || 0}</td></tr>`;
-            }
-        }
+        html += '<table class="lump-detail-table"><tbody>';
+        html += `<tr><td>Token</td><td>0x${e(lump.token)}</td></tr>`;
+        if (lump.ns_slot !== null && lump.ns_slot !== undefined) html += `<tr><td>NS Slot</td><td>${parseInt(lump.ns_slot) || 0}</td></tr>`;
+        html += `<tr><td>Lump Size</td><td>${parseInt(lump.lump_size) || 0} words (${(parseInt(lump.lump_size) || 0) * 4} bytes)</td></tr>`;
+        html += `<tr><td>Code Words</td><td>${parseInt(lump.cw) || 0}</td></tr>`;
+        html += `<tr><td>C-List Slots</td><td>${parseInt(lump.cc) || 0}</td></tr>`;
+        if (lump.language) html += `<tr><td>Language</td><td>${e(lump.language)}</td></tr>`;
+        if (lump.profile) html += `<tr><td>Profile</td><td>${e(lump.profile)}</td></tr>`;
+        const grants = lump.grants || [];
+        if (grants.length > 0) html += `<tr><td>Grants</td><td>[${grants.map(g => e(g)).join(', ')}]</td></tr>`;
         html += '</tbody></table>';
         html += '</div>';
     }
+
+    if (!isNamespace) {
 
     const petNames = lump.pet_names || {};
     const drNames = petNames.DR || {};
