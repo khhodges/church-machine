@@ -1978,17 +1978,35 @@ function _regName(pet, offset) {
     return (regs && offset >= 0 && offset < regs.length) ? regs[offset] : null;
 }
 
+/**
+ * Apply a text transform only to the text-node portions of an HTML string,
+ * skipping over HTML tags (<...>) and HTML entities (&...;) unchanged.
+ * This prevents hover-span injection into tag markup or attribute values,
+ * and ensures the transform cannot match across span boundaries even when
+ * _highlightCLOOMCSource has already split the text into .lump-hl-* spans.
+ */
+function _transformTextNodes(html, transform) {
+    return html.replace(/(<[^>]*>|&[^;]+;)|([^<&]+)/g, function(m, markup, text) {
+        if (markup !== undefined) return markup;
+        return text ? transform(text) : m;
+    });
+}
+
 function _wrapCRHover(html) {
-    return html.replace(/\bCR(1[0-5]|[0-9])\b/g, function(m, d) {
-        const n = parseInt(d, 10);
-        return `<span class="cr-hover-target" onmouseenter="showCRPopup(event,${n})" onmouseleave="hideCRPopup()">${m}</span>`;
+    return _transformTextNodes(html, function(text) {
+        return text.replace(/\bCR(1[0-5]|[0-9])\b/g, function(m, d) {
+            const n = parseInt(d, 10);
+            return `<span class="cr-hover-target" onmouseenter="showCRPopup(event,${n})" onmouseleave="hideCRPopup()">${m}</span>`;
+        });
     });
 }
 
 function _wrapDRHover(html) {
-    return html.replace(/\bDR(1[0-5]|[0-9])\b/g, function(m, d) {
-        const n = parseInt(d, 10);
-        return `<span class="dr-hover-target" onmouseenter="showDRPopup(event,${n})" onmouseleave="hideCRPopup()">${m}</span>`;
+    return _transformTextNodes(html, function(text) {
+        return text.replace(/\bDR(1[0-5]|[0-9])\b/g, function(m, d) {
+            const n = parseInt(d, 10);
+            return `<span class="dr-hover-target" onmouseenter="showDRPopup(event,${n})" onmouseleave="hideCRPopup()">${m}</span>`;
+        });
     });
 }
 
