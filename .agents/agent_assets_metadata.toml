@@ -216,3 +216,9 @@ id = "UMs84C-QvAP8an-sqBdc4"
 uri = "file://release/r1/ctmm-r1-14-hardware-deviations.pdf"
 type = "pdf"
 title = "14 — Hardware Deviations — All Closed (Conformance)"
+
+[[outputs]]
+id = "JsG90LKLaoGsbHxudxz39"
+uri = "file://docs/lump-reference.md"
+type = "text"
+title = "LUMP Reference"
