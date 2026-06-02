@@ -57,12 +57,7 @@ cd "$SOC_DIR"
     --device         "$DEVICE" \
     --operating_conditions "$OPCOND" \
     --pack --place --route \
-    --vdb_file       "work_pnr/top.vdb" \
-    --place_file     "outflow/${CIRCUIT}.place" \
-    --route_file     "outflow/${CIRCUIT}.troutingtraces" \
-    --sync_file      "outflow/${CIRCUIT}.interface.csv" \
-    --seed           "1" \
-    --max_threads    "-1" \
+    --vdb_file       "top.vdb" \
     --work_dir       "work_pnr" \
     --output_dir     "outflow" \
     2>&1 | tee "$SOC_DIR/work_pnr/pnr.log"
