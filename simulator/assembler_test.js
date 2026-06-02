@@ -8324,6 +8324,35 @@ Add a method called Run
         a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
 }
 
+// ── CAP-V23/24: case-insensitive hardware cap name matching (task-1700) ───────
+//
+// Path 3.2 resolves hardware names case-insensitively (uart → UART etc.).
+// _checkCapDeclared must accept a declaration whose capitalisation differs from
+// the usage — otherwise `capabilities { uart }` + `LOAD CR5, UART` fires a
+// false "not declared" error.
+
+// CAP-V23: capabilities { uart } + LOAD CR5, UART → no error.
+// Declared lowercase, used uppercase.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { uart }\nLOAD CR5, UART\nRETURN');
+    const capErrs = a.errors.filter(e => e.message.includes('not declared'));
+    assert('CAP-V23: capabilities { uart } + LOAD CR5, UART produces no not-declared error',
+        capErrs.length === 0,
+        capErrs.map(e => e.message).join('; '));
+}
+
+// CAP-V24: capabilities { UART } + LOAD CR5, uart → no error.
+// Declared uppercase, used lowercase.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { UART }\nLOAD CR5, uart\nRETURN');
+    const capErrs = a.errors.filter(e => e.message.includes('not declared'));
+    assert('CAP-V24: capabilities { UART } + LOAD CR5, uart produces no not-declared error',
+        capErrs.length === 0,
+        capErrs.map(e => e.message).join('; '));
+}
+
 // ── ABS-H: Abstractions panel search-highlight regression (task-1379) ────────
 // Tests for _absHighlightText / _absHighlightNodes as called by renderAbstractions().
 //

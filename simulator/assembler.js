@@ -407,6 +407,16 @@ class ChurchAssembler {
         const cleanName = (name || '').replace(/,/g, '').trim();
         if (!cleanName) return;
         if (this._capBlockSlots[cleanName] === undefined) {
+            // For hardware device shorthands (UART/BTN/SlideRule/Timer/Display/LED*),
+            // accept a case-insensitive match — `capabilities { uart }` + `LOAD CR5, UART`
+            // must not produce a "not declared" error.
+            if (ChurchAssembler._isHardwareCapName(cleanName)) {
+                const cleanUC = cleanName.toUpperCase();
+                const found = Object.keys(this._capBlockSlots).some(
+                    k => k.toUpperCase() === cleanUC
+                );
+                if (found) return;
+            }
             this.errors.push({
                 line: lineNum,
                 ...this._tokenCols(this._currentLineText, cleanName),
@@ -1815,7 +1825,7 @@ class ChurchAssembler {
     // These names are exempt from the bare-name (no rights letters) validation.
     static _isHardwareCapName(name) {
         return /^LED[0-5]$/i.test(name) ||
-               /^(UART|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/.test(name);
+               /^(UART|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
     }
 
     // Parse a single "NAME [RIGHTS]" capability item from a capabilities { } block.
