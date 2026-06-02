@@ -1,0 +1,65 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Pull the fixed peri.xml (no duplicate clk name, conn_type=normal, no clkmux_buf)
+curl -s "https://31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt.kirk.replit.dev/dl/peri-xml" \
+  -o church_soc_cm.peri.xml
+
+# Verify fixes landed
+grep -E "conn_type|clkmux_buf_name|ROUTE0" church_soc_cm.peri.xml | head -5
+
+# Retry
+$EFINITY_HOME/bin/python3 $EFINITY_HOME/scripts/efx_run_pt_unified.py \
+    church_soc_cm Titanium Ti60F225 \
+    --output_dir outflow --timing_model C3 \
+    --project_xml church_soc_cm.xml 2>&1
+
+find ~/church_project/SoC -name "*.lpf" 2>/dev/null
+ls -lt outflow/ | head -8
+
+$EFINITY_HOME/bin/efx_run church_soc_cm --prj \
+    --flow pgm --family Titanium --device Ti60F225 2>&1
+ls -lh outflow/church_soc_cm.hex 2>/dev/null
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name=""    type_name="ROUTE0"   is_bus="false" is_clk="true" is_clk_invert="false"/>
+        <!-- Clock: 50 MHz crystal at GPIOL_P_18 → CLKMUX_T ROUTE0 -->
+Load design file church_soc_cm.peri.xml
+Save db version: 20261009
+Save db version: 20261009
+Writing out summary report file
+Traceback (most recent call last):
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/writer/summary_report.py", line 1527, in write
+    self.generate_global_summary(outfile, ins_to_block_map)
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/writer/summary_report.py", line 1268, in generate_global_summary
+    block_obj.generate_global_summary(
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/an20_device/pll/writer/summary.py", line 85, in generate_global_summary
+    assert reg is not None
+           ^^^^^^^^^^^^^^^
+AssertionError
+
+Fail to generate summary report file
+Source exception : msg_level:MsgLevel.error msg: src_excp:None
+WARNING: Fail to generate summary report file
+WARNING: report generation skipped (headless patch)
+Writing out interface config file
+Writing out timing related file
+Writing out verilog template file
+Writing out option register file
+Writing out boundary scan description file
+Writing out LPF
+Unified Timing supported
+WARNING: timing netlist export skipped (headless patch)
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm.lpf
+total 5640
+-rw-r--r-- 1 sipantichijk sipantichijk  527041 Jun  2 16:51 church_soc_cm.lpf
+-rw-r--r-- 1 sipantichijk sipantichijk   47833 Jun  2 16:51 church_soc_cm-post.bsd
+-rw-r--r-- 1 sipantichijk sipantichijk     233 Jun  2 16:51 church_soc_cm_or.ini
+-rw-r--r-- 1 sipantichijk sipantichijk    1128 Jun  2 16:51 church_soc_cm_template.v
+-rw-r--r-- 1 sipantichijk sipantichijk    2377 Jun  2 16:51 church_soc_cm.pt.sdc
+-rw-r--r-- 1 sipantichijk sipantichijk    1684 Jun  2 16:51 church_soc_cm.pt_timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk     607 Jun  2 16:51 church_soc_cm.interface.csv
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1M Jun  2 16:51 outflow/church_soc_cm.hex
+sipantichijk@penguin:~/church_project/SoC$ 
