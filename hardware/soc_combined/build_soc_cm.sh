@@ -5,8 +5,8 @@
 # After it finishes, run: bash SoC/run_efx_map.sh
 #
 # Prerequisites:
-#   • Efinity 2025.2 at ~/efinity/2025.2
-#   • Efinity RISC-V toolchain at ~/efinity/efinity-riscv-ide-2025.2/toolchain/bin
+#   • Efinity 2026.1 at ~/efinity/2026.1
+#   • Efinity RISC-V toolchain at ~/efinity/efinity-riscv-ide-2026.1/toolchain/bin
 #   • patch_sapphire_init.py in ~/church-machine/scripts/
 
 set -euo pipefail
@@ -14,8 +14,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Script lives in SoC/; project root is the parent
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
-CHIPKIT="${CHIPKIT_HOME:-$HOME/efinity/efinity-riscv-ide-2025.2}"
+EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
+CHIPKIT="${CHIPKIT_HOME:-$HOME/efinity/efinity-riscv-ide-2026.1}"
 # Patch script: prefer local project scripts/, fall back to church-machine repo
 if [ -d "$PROJECT_ROOT/scripts" ]; then
     CHURCH_SCRIPTS="$PROJECT_ROOT/scripts"
@@ -88,7 +88,7 @@ if [ -f "$CHIPKIT/toolchain/bin/riscv-none-embed-gcc" ]; then
     echo "    OK — firmware built"
 else
     echo "    ERROR: RISC-V toolchain not found at $CHIPKIT/toolchain/bin/"
-    echo "    Fix: install Efinity RISC-V IDE 2025.2"
+    echo "    Fix: install Efinity RISC-V IDE 2026.1"
     exit 1
 fi
 
@@ -132,7 +132,7 @@ echo "Then: place & route"
 echo "    bash SoC/run_efx_pnr.sh"
 echo ""
 echo "Then: generate hex"
-echo "    cd SoC && ~/efinity/2025.2/bin/efx_pgm"
+echo "    cd SoC && ~/efinity/2026.1/bin/efx_pgm"
 echo ""
 echo "Then: flash"
 echo "    sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f SoC/outflow/church_soc_cm.hex"

@@ -3,9 +3,9 @@
 
 Usage (from the Efinity project directory that contains church_ti60_f225.peri.xml):
 
-  PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \\
-  EFXPT_HOME=$HOME/efinity/2025.2/pt \\
-    $HOME/efinity/2025.2/bin/python3.11 \\
+  PYTHONPATH=$HOME/efinity/2026.1/lib:$HOME/efinity/2026.1/pt/bin \\
+  EFXPT_HOME=$HOME/efinity/2026.1/pt \\
+    $HOME/efinity/2026.1/bin/python3.11 \\
     <path-to-this-script>/setup_ti60_peri.py
 
 Pin map (confirmed from Ti60F225_kit.isf reference designs):
@@ -26,7 +26,7 @@ NOTE: GPIOL_01 and GPIOL_02 are hardwired on the devkit PCB to FT4232H interface
       GPIOL_01/02 have no standard BGA ball coordinate accessible via
       assign_pkg_pin.  They are injected directly by XML post-processing
       below, matching the approach used in the Efinix TEMAC example for
-      this devkit (efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit).
+      this devkit (efinity/2026.1/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit).
 
 Clock: Phase A — B2 25 MHz crystal → CLKMUX_T ROUTE0 (no PLL).
        Efinity 2025.2 does NOT support create_input_clock_gpio for dedicated
@@ -55,9 +55,9 @@ if not _efxpt or _efinity_python not in _exe:
     print("  deactivate")
     print()
     print("Then run:")
-    print("  PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \\")
-    print("  EFXPT_HOME=$HOME/efinity/2025.2/pt \\")
-    print("    $HOME/efinity/2025.2/bin/python3.11 setup_ti60_peri.py")
+    print("  PYTHONPATH=$HOME/efinity/2026.1/lib:$HOME/efinity/2026.1/pt/bin \\")
+    print("  EFXPT_HOME=$HOME/efinity/2026.1/pt \\")
+    print("    $HOME/efinity/2026.1/bin/python3.11 setup_ti60_peri.py")
     sys.exit(1)
 
 sys.path.insert(0, os.path.join(_efxpt, "bin"))
@@ -74,7 +74,7 @@ if hasattr(design, "create"):
 else:
     _SEED = '''<?xml version="1.0" encoding="UTF-8"?>
 <efxpt:design_db name="church_ti60_f225" device_def="Ti60F225"
-  version="2025.2.0" db_version="20241001"
+  version="2026.1.0" db_version="20241001"
   last_change_date="Tue Apr 01 00:00:00 2026"
   xmlns:efxpt="http://www.efinixinc.com/peri_design_db"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

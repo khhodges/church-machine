@@ -7,7 +7,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
+EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_MAP="$EFINITY/bin/efx_map"
 
 PROJECT="${1:-$PROJECT_ROOT/SoC/church_soc_cm.xml}"

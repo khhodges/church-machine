@@ -3,19 +3,19 @@
 # Run from the project root (the folder containing SoC/)
 # Usage: bash SoC/run_efx_pnr.sh
 #
-# NOTE: Some Efinity installations (especially Chromebook Penguin) have a broken
-# command-line efx_pnr that crashes with "Unsupported value for family=".  If
-# that happens, use the Efinity GUI instead:
-#   1. Open Efinity GUI
-#   2. File → Open Project → select church_soc_cm.xml
-#   3. Project → Place & Route
-#   4. Project → Generate Bitstream
+# NOTE: Efinity 2025.2 with patch 2025.2.288.4.15 applied over base 2025.2.288.2.10
+# crashes with "Unsupported value for family=" + SIGSEGV on every P&R run.
+# Fix: upgrade to Efinity v2026.1 full release and set EFINITY_HOME:
+#   EFINITY_HOME=~/efinity/2026.1 bash SoC/run_efx_pnr.sh
+#
+# NOTE: The Efinity GUI is not supported on Chromebook Penguin (Debian container)
+# — the splash screen crashes immediately. Use headless CLI only (this script).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
+EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_PNR="$EFINITY/bin/efx_pnr"
 
 PROJECT="${1:-$PROJECT_ROOT/SoC/church_soc_cm.xml}"
