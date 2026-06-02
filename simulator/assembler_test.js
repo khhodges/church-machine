@@ -1547,6 +1547,38 @@ function findSHR(words) {
         'errors: ' + result.errors.map(e => e.message).join('; '));
 }
 
+// CC13: Abstraction.Method(args) — bare dot-notation (implied CALL) compiles to ELOADCALL.
+//   Scheduler.pause(10): Scheduler is at c-list offset 0; pause is index 4 → selector 5.
+{
+    const cc = new CLOOMCCompiler();
+    cc.methodConventions['SCHEDULER'] = {
+        Yield: {index:0}, Spawn: {index:1}, Wait: {index:2},
+        Stop: {index:3}, pause: {index:4}, IRQ: {index:5},
+    };
+    const src =
+`abstraction Test {
+    capabilities { Scheduler E }
+    method run() {
+        Scheduler.pause(10)
+    }
+}`;
+    const result = cc.compileJS(src);
+    assert('CC13 Scheduler.pause(10) bare dot-notation — no errors',
+        result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const eloadWord = words.find(w => ((w >>> 27) & 0x1F) === 8);
+    assert('CC13 Scheduler.pause(10) bare dot-notation — ELOADCALL (opcode 8) emitted',
+        eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
+    if (eloadWord !== undefined) {
+        const imm = eloadWord & 0x7FFF;
+        assert('CC13 bare dot-notation — row=0 (Scheduler at cap offset 0)',
+            (imm & 0xFF) === 0, `got row=${imm & 0xFF}`);
+        assert('CC13 bare dot-notation — method=5 (pause index 4, 1-based)',
+            ((imm >>> 8) & 0x7F) === 5, `got method=${(imm >>> 8) & 0x7F}`);
+    }
+}
+
 // ── SE: Simulator-level SHR / ASR execution tests ────────────────────────────
 // These tests instantiate ChurchSimulator directly and call _execShr so we can
 // confirm that the runtime actually sign-extends (ASR) or zero-extends (LSR)

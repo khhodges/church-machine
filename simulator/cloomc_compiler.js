@@ -1361,6 +1361,56 @@ class CLOOMCCompiler {
             return;
         }
 
+        // Abstraction.Method(args) — bare dot-notation; CALL is implied by the compiler.
+        // The most natural CLOOMC++ form: Scheduler.pause(10), Salvation.main(), etc.
+        const bareDotMatch = text.match(/^(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)$/);
+        if (bareDotMatch && !/^recall$/i.test(bareDotMatch[1]) && !/^relambda$/i.test(bareDotMatch[1])) {
+            const absName    = bareDotMatch[1].toUpperCase();
+            const methodName = bareDotMatch[2];
+            const argStr     = bareDotMatch[3];
+            const _leadingWS     = stmt.rawLine ? stmt.rawLine.length - stmt.rawLine.trimStart().length : 0;
+            const _absNameOffset = _leadingWS + (text.indexOf(bareDotMatch[1]));
+            const _methodOffset  = _leadingWS + (text.indexOf(bareDotMatch[1] + '.' + bareDotMatch[2]) + bareDotMatch[1].length + 1);
+            const clistOffset = rom[absName];
+            if (clistOffset === undefined) {
+                errors.push({ line: stmt.lineNum, message: `Unknown abstraction '${bareDotMatch[1]}' — not in capabilities list. Available: ${Object.keys(rom).join(', ')}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, bareDotMatch[1], _absNameOffset) });
+                return;
+            }
+            if (argStr) {
+                const args = argStr.split(',').map(s => s.trim()).filter(Boolean);
+                for (let a = 0; a < args.length && a + this.DR_ARGS_START <= this.DR_ARGS_END; a++) {
+                    const targetDR = a + this.DR_ARGS_START;
+                    const argDR = this._resolveExpr(args[a], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
+                    if (argDR !== targetDR) code.push(this.encode(this.opcodes.IADD, 14, targetDR, argDR, 0));
+                }
+            }
+            const convEntry = this.methodConventions[absName];
+            if (!convEntry) {
+                errors.push({ line: stmt.lineNum, message: `No method conventions registered for '${bareDotMatch[1]}'; cannot resolve '${methodName}'.`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, bareDotMatch[1], _absNameOffset) });
+                return;
+            }
+            if (convEntry[methodName] === undefined) {
+                const known = Object.keys(convEntry).filter(k => !k.startsWith('_reserved')).join(', ');
+                errors.push({ line: stmt.lineNum, message: `Unknown method '${methodName}' on '${bareDotMatch[1]}'. Known methods: ${known}`, ...CLOOMCCompiler._tokenCols(stmt.rawLine, methodName, _methodOffset) });
+                return;
+            }
+            const rawEntry = convEntry[methodName];
+            const methodSelector = typeof rawEntry === 'object' ? (rawEntry.index || 0) : rawEntry;
+            const eloadcallMethodIdx = methodSelector + 1;
+            if (methodSelector < 0 || methodSelector > 126) {
+                errors.push({ line: stmt.lineNum, message: `Method index ${methodSelector} for '${bareDotMatch[1]}.${methodName}' is out of range (0–126).` });
+                return;
+            }
+            if (clistOffset < 0 || clistOffset > 255) {
+                errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${bareDotMatch[1]}' is out of range (0–255).` });
+                return;
+            }
+            const eloadcallImm = (eloadcallMethodIdx << 8) | clistOffset;
+            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${bareDotMatch[1]}.${methodName} (implied call)` });
+            code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
+            return;
+        }
+
         // recall() — re-call the current abstraction (CR6) directly → CALL CR6
         const recallMatch = text.match(/^recall\s*\(\s*(.*?)\s*\)$/);
         if (recallMatch) {
