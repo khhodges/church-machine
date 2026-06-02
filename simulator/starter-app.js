@@ -529,13 +529,13 @@ function starterImportLump() {
         ml.innerHTML = '';
         _methodCount = 0;
         lump.methods.forEach(function(m) {
-            if (m.aliasOf) return;  // skip aliases — they share a body
             starterAddMethod();
             var row = ml.lastElementChild;
             if (!row) return;
             row.querySelector('.s-method-name').value = m.name || '';
             var d = m.description || '';
-            if (!d && m.inputs && m.inputs.length)  d = 'in: '  + m.inputs.join(', ');
+            if (!d && m.aliasOf)                     d = 'alias of ' + m.aliasOf;
+            if (!d && m.inputs && m.inputs.length)   d = 'in: '  + m.inputs.join(', ');
             if (!d && m.outputs && m.outputs.length) d = 'out: ' + m.outputs.join(', ');
             row.querySelector('.s-method-desc').value = d;
             // Deps: extract unique abstraction names from lump-level capabilities,
