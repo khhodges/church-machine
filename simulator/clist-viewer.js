@@ -887,6 +887,7 @@
 
         // The token written into the capabilities block: "Name RIGHTS" (e.g. "Tunnel E")
         var rightsStr = (rights && rights.trim()) ? rights.trim().toUpperCase() : '';
+        var token = capName + (rightsStr ? ' ' + rightsStr : '');
 
         // Find the first capabilities { ... } block
         var capRe = /capabilities\s*\{([^}]*)\}/;
