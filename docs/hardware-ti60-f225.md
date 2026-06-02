@@ -35,11 +35,15 @@ production synthesis on EFT90A silicon.
 
    # Extract into ~/efinity/2026.1/ alongside any existing 2025.x install
    mkdir -p ~/efinity/2026.1
-   tar -xjf efinity-2026.1.132-linux-x64.tar.bz2 \
+   tar -xjf /mnt/shared/MyFiles/Downloads/efinity-2026.1.132-linux-x64.tar.bz2 \
        --strip-components=1 \
        -C ~/efinity/2026.1/
    ```
    Result: `~/efinity/2025.2/` and `~/efinity/2026.1/` coexist independently.
+   > **Chromebook Penguin mount path:** ChromeOS shared files appear at
+   > `/mnt/shared/MyFiles/Downloads/` inside Penguin (not `/mnt/chromeos/`
+   > and not `~/Downloads/`). Enable sharing via **Files app → Linux files**
+   > or ChromeOS Settings → Linux → Share files.
 3. Register a licence — a 30-day evaluation licence is available at no cost
 4. Activate the version you want by sourcing its `setup.sh`:
    ```bash
