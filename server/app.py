@@ -176,6 +176,14 @@ def download_ti60v():
                      download_name="church_ti60_f225.v",
                      mimetype="text/plain")
 
+@app.route("/dl/pnr-sh")
+def download_pnr_sh():
+    p = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "run_efx_pnr.sh")
+    return send_file(os.path.abspath(p),
+                     as_attachment=True,
+                     download_name="run_efx_pnr.sh",
+                     mimetype="text/plain")
+
 @app.route("/dl/ti60zip")
 def download_ti60zip():
     import zipfile, io, re as _re

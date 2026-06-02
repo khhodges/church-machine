@@ -12,6 +12,13 @@
 #
 # NOTE: Efinity 2025.2 with patch 2025.2.288.4.15 over base 2025.2.288.2.10
 # crashes with the same SIGSEGV regardless of flags. Upgrade to v2026.1 full release.
+#
+# NOTE: Do NOT pass --use_vdb_file on unless a VDB already exists from a prior
+# PNR run. efx_map (synthesis) does not produce a VDB; passing --use_vdb_file on
+# with a non-existent file causes an immediate crash in libdevicedb.so.
+#
+# NOTE: --operating_conditions must match the XML timing_model ("C3" for Ti60F225).
+# Passing "C4" causes "Unsupported value for family=" crash in libPnROpts.so.
 
 set -euo pipefail
 
@@ -47,22 +54,13 @@ cd "$SOC_DIR"
     --device         "$DEVICE" \
     --operating_conditions "$OPCOND" \
     --pack --place --route \
-    --vdb_file       "work_syn/${CIRCUIT}.vdb" \
-    --use_vdb_file   "on" \
     --place_file     "outflow/${CIRCUIT}.place" \
     --route_file     "outflow/${CIRCUIT}.troutingtraces" \
     --sync_file      "outflow/${CIRCUIT}.interface.csv" \
-    --optimization_level "TIMING_1" \
     --seed           "1" \
-    --placer_effort_level "2" \
     --max_threads    "-1" \
-    --print_critical_path "10" \
-    --beneficial_skew "on" \
-    --suppress_info_msgs    "off" \
-    --suppress_warning_msgs "off" \
     --work_dir       "work_pnr" \
     --output_dir     "outflow" \
-    --timing_analysis "on" \
     2>&1 | tee "$SOC_DIR/work_pnr/pnr.log"
 
 echo ""
