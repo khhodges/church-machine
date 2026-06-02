@@ -1,0 +1,45 @@
+sipantichijk@penguin:~/church_project$ cd SoC
+source ~/efinity/2026.1/bin/setup.sh
+mkdir -p work_pnr outflow
+
+~/efinity/2026.1/bin/efx_pnr \
+  --prj church_soc_cm.xml \
+  --circuit church_soc_cm \
+  --family Titanium \
+  --device Ti60F225 \
+  --operating_conditions C4 \
+  --pack --place --route \
+  --vdb_file outflow/church_soc_cm.vdb \
+  --use_vdb_file on \
+  --place_file outflow/church_soc_cm.place \
+  --route_file outflow/church_soc_cm.troutingtraces \
+  --sync_file outflow/church_soc_cm.interface.csv \
+  --optimization_level TIMING_1 \
+  --seed 1 --placer_effort_level 2 --max_threads -1 \
+  --print_critical_path 10 --beneficial_skew on \
+  --work_dir work_pnr --output_dir outflow \
+  --timing_analysis on 2>&1 | head -20
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+INFO     : Reading project database "church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+           
+           Efinix FPGA Placement and Routing.
+           Version: 2026.1.132 
+           Compiled: May 29 2026.
+           
+           Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+           
+           The Tool Is Based on VPR of University of Toronto,
+           a free open source code under MIT license.
+           
+INFO     : Packing took 0.654895485 seconds [FlowMsg::StageDuration]
+INFO     :     Packing took 0.52 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Packing virtual memory usage: begin = 175.928 MB, end = 236.72 MB, delta = 60.792 MB [FlowMsg::VMUsage]
+INFO     : Packing resident set memory usage: begin = 86.144 MB, end = 150.912 MB, delta = 64.768 MB [FlowMsg::RSSUsage]
+INFO     :     Packing peak resident set memory usage = 151.04 MB [FlowMsg::RSSUsage::Peak]
+ERROR    : VDB file 'outflow/church_soc_cm.vdb' does not exist or is inaccessible.
+sipantichijk@penguin:~/church_project/SoC$ 
