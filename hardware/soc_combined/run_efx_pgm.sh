@@ -50,24 +50,32 @@ if [ ! -f "$LBF_FILE" ]; then
 fi
 
 echo "========================================"
-echo "efx_pgm — Generate SPI flash hex"
+echo "efx_pgm — Generate SPI flash hex (2026.1 unified flow)"
 echo "========================================"
 echo "  Input : $LBF_FILE ($(ls -lh "$LBF_FILE" | awk '{print $5}'))"
 echo "  Device: $FAMILY $DEVICE"
 echo "  Output: $OUTDIR/${CIRCUIT}.hex"
 echo ""
 
-"$EFINITY/bin/efx_pgm" \
-    --source                    "$LBF_FILE" \
-    --family                    "$FAMILY" \
-    --device                    "$DEVICE" \
-    --mode                      active \
-    --width                     1 \
-    --enable_roms               smart \
-    --spi_low_power_mode        on \
-    --io_weak_pullup            on \
-    --oscillator_clock_divider  DIV8 \
-    --bitstream_compression     on \
+# Step 1: Interface Designer — processes peri.xml, writes the LPF that efx_pgm needs.
+# In 2026.1, efx_pgm refuses to run without the Interface Designer LPF constraint file.
+# efx_run --flow interface generates it headlessly from the project XML + peri.xml.
+echo "==> Step 1/2: Interface Designer (generates LPF from peri.xml) ..."
+"$EFINITY/bin/efx_run" "$CIRCUIT" \
+    --prj \
+    --flow   interface \
+    --family "$FAMILY" \
+    -d       "$DEVICE" \
+    2>&1 | tee "$OUTDIR/interface.log"
+
+echo ""
+echo "==> Step 2/2: Bitstream generation ..."
+# Step 2: Bitstream generation — now that the LPF exists efx_run calls efx_pgm internally.
+"$EFINITY/bin/efx_run" "$CIRCUIT" \
+    --prj \
+    --flow   pgm \
+    --family "$FAMILY" \
+    -d       "$DEVICE" \
     2>&1 | tee "$OUTDIR/pgm.log"
 
 echo ""

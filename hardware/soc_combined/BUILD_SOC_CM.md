@@ -199,25 +199,19 @@ cd ~/church_project/SoC
 export EFINITY_HOME=~/efinity/2026.1
 source $EFINITY_HOME/bin/setup.sh 2>/dev/null
 
-$EFINITY_HOME/bin/efx_pgm \
-    --source       work_pnr/church_soc_cm.lbf \
-    --family       Titanium \
-    --device       Ti60F225 \
-    --mode         active \
-    --width        1 \
-    --enable_roms  smart \
-    --spi_low_power_mode  on \
-    --io_weak_pullup      on \
-    --oscillator_clock_divider DIV8 \
-    --bitstream_compression   on \
-    2>&1 | tail -10
+# Step 1: Interface Designer — generates the LPF that efx_pgm requires in 2026.1
+$EFINITY_HOME/bin/efx_run church_soc_cm --prj \
+    --flow interface --family Titanium --device Ti60F225 2>&1
+
+# Step 2: Bitstream generation — efx_run calls efx_pgm with the LPF in place
+$EFINITY_HOME/bin/efx_run church_soc_cm --prj \
+    --flow pgm --family Titanium --device Ti60F225 2>&1
 
 ls -lh outflow/church_soc_cm.hex
-# Timestamp must be NEWER than the P&R run above
 ```
 
-> **Note (Efinity 2026.1):** Must pass `--family Titanium` explicitly — the tool does NOT read family from the project XML or `--device` alone. Omitting it gives `ERROR: Unknown device family ""`.
-> The input is the `.lbf` written by `efx_pnr` to `work_pnr/`; output `.hex` goes to `outflow/`.
+> **Note (Efinity 2026.1):** `efx_pgm` alone gives `Missing Interface Designer LPF constraint file`.
+> The two-step `efx_run` approach above generates the LPF from `peri.xml` first (via `--flow interface`), then runs the bitstream generator (`--flow pgm`). `--prj` reads `church_soc_cm.xml` from the current directory.
 > Or use the companion script: `bash hardware/soc_combined/run_efx_pgm.sh`
 
 ---
