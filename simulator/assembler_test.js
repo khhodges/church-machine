@@ -8246,6 +8246,84 @@ Add a method called Run
         capErrs.map(e => e.message).join('; '));
 }
 
+// ── CAP-V16–22: hardware device shorthands (UART/BTN/SlideRule/Timer) and the
+//    capabilities block guard (task-1699) ──────────────────────────────────────
+//
+// Path 3.2 in _resolveNSName resolves UART→14, BTN→15, SlideRule→16, Timer→17
+// without a namespace table.  When a capabilities block IS present, _checkCapDeclared
+// must still fire for any hardware name that was not declared in that block.
+
+// CAP-V16: LOAD CR5, UART — cap block exists, UART absent → error.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { Navana E }\nLOAD CR5, UART\nRETURN');
+    const capErr = a.errors.find(e => e.message.includes('UART') && e.message.includes('not declared'));
+    assert('CAP-V16: LOAD UART with cap block that omits UART produces not-declared error',
+        capErr != null,
+        a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
+}
+
+// CAP-V17: LOAD CR5, BTN — cap block exists, BTN absent → error.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { Navana E }\nLOAD CR5, BTN\nRETURN');
+    const capErr = a.errors.find(e => e.message.includes('BTN') && e.message.includes('not declared'));
+    assert('CAP-V17: LOAD BTN with cap block that omits BTN produces not-declared error',
+        capErr != null,
+        a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
+}
+
+// CAP-V18: LOAD CR5, SlideRule — cap block exists, SlideRule absent → error.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { Navana E }\nLOAD CR5, SlideRule\nRETURN');
+    const capErr = a.errors.find(e => e.message.includes('SlideRule') && e.message.includes('not declared'));
+    assert('CAP-V18: LOAD SlideRule with cap block that omits SlideRule produces not-declared error',
+        capErr != null,
+        a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
+}
+
+// CAP-V19: LOAD CR5, Timer — cap block exists, Timer absent → error.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { Navana E }\nLOAD CR5, Timer\nRETURN');
+    const capErr = a.errors.find(e => e.message.includes('Timer') && e.message.includes('not declared'));
+    assert('CAP-V19: LOAD Timer with cap block that omits Timer produces not-declared error',
+        capErr != null,
+        a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
+}
+
+// CAP-V20: LOAD CR5, UART — NO capabilities block → no error (backward-compat).
+{
+    const a = new ChurchAssembler({});
+    a.assemble('LOAD CR5, UART\nRETURN');
+    const capErrs = a.errors.filter(e => e.message.includes('not declared'));
+    assert('CAP-V20: LOAD UART with no capabilities block produces no cap-declaration error',
+        capErrs.length === 0,
+        capErrs.map(e => e.message).join('; '));
+}
+
+// CAP-V21: LOAD CR5, UART — cap block exists AND declares UART → no error.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { UART }\nLOAD CR5, UART\nRETURN');
+    const capErrs = a.errors.filter(e => e.message.includes('not declared'));
+    assert('CAP-V21: LOAD UART with cap block that declares UART produces no cap-declaration error',
+        capErrs.length === 0,
+        capErrs.map(e => e.message).join('; '));
+}
+
+// CAP-V22: ELOADCALL CR0, UART, 0 — cap block exists, UART absent → error.
+// This exercises the res8 path (path 3.2 resolution) in the ELOADCALL encoder.
+{
+    const a = new ChurchAssembler({});
+    a.assemble('capabilities { Navana E }\nELOADCALL CR0, UART, 0\nRETURN');
+    const capErr = a.errors.find(e => e.message.includes('UART') && e.message.includes('not declared'));
+    assert('CAP-V22: ELOADCALL UART with cap block that omits UART produces not-declared error',
+        capErr != null,
+        a.errors.length > 0 ? a.errors.map(e => e.message).join('; ') : '(no error)');
+}
+
 // ── ABS-H: Abstractions panel search-highlight regression (task-1379) ────────
 // Tests for _absHighlightText / _absHighlightNodes as called by renderAbstractions().
 //
