@@ -2073,14 +2073,14 @@
   {
     "token": "97cc8047",
     "abstraction": "Human_Hand",
-    "filename": "Human_Hand_v9.lump",
-    "sidecar_file": "Human_Hand_v9.json",
+    "filename": "Human_Hand_v10.lump",
+    "sidecar_file": "Human_Hand_v10.json",
     "ns_slot": null,
     "lump_size": 64,
-    "cw": 6,
+    "cw": 7,
     "cc": 1,
-    "lump_version": 9,
-    "compiled_at": 1780399266.361252,
+    "lump_version": 10,
+    "compiled_at": 1780411554.330822,
     "status": "wip",
     "methods": [
       {
@@ -2118,6 +2118,12 @@
         "offset": 5,
         "length": 1,
         "description": "Display fingers as a number"
+      },
+      {
+        "name": "Pinch",
+        "offset": 6,
+        "length": 1,
+        "description": "close the thumb and finger to touch each other in a flat pinch"
       }
     ]
   }

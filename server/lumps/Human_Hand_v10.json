@@ -1,0 +1,82 @@
+{
+  "token": "97cc8047",
+  "abstraction": "Human_Hand",
+  "filename": "Human_Hand_v10.lump",
+  "sidecar_file": "Human_Hand_v10.json",
+  "ns_slot": null,
+  "lump_size": 64,
+  "typ": 0,
+  "content_type": "code",
+  "cw": 7,
+  "cc": 1,
+  "status": "wip",
+  "source": "; Provides: the functions of a Human hand\n; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nabstraction Human_Hand {\n    capabilities {\n        ; (none \u2014 add capability grants here)\n    }\n\n    method Status {\n        ; Return the status\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Close_Fist {\n        ; Close all fingers\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Open_Hand {\n        ; Extend all fingers\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Grip {\n        ; Close as a fist\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Point {\n        ; Point with forefinger\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Count {\n        ; Display fingers as a number\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n\n    method Pinch {\n        ; close the thumb and finger to touch each other in a flat pinch\n        ; Depends on: self\n        ; \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n        ; TODO: write your code here\n\n        RETURN\n    }\n}",
+  "description": "Provides: the functions of a Human hand",
+  "methods": [
+    {
+      "name": "Status",
+      "offset": 0,
+      "length": 1,
+      "description": "Return the status"
+    },
+    {
+      "name": "Close_Fist",
+      "offset": 1,
+      "length": 1,
+      "description": "Close all fingers"
+    },
+    {
+      "name": "Open_Hand",
+      "offset": 2,
+      "length": 1,
+      "description": "Extend all fingers"
+    },
+    {
+      "name": "Grip",
+      "offset": 3,
+      "length": 1,
+      "description": "Close as a fist"
+    },
+    {
+      "name": "Point",
+      "offset": 4,
+      "length": 1,
+      "description": "Point with forefinger"
+    },
+    {
+      "name": "Count",
+      "offset": 5,
+      "length": 1,
+      "description": "Display fingers as a number"
+    },
+    {
+      "name": "Pinch",
+      "offset": 6,
+      "length": 1,
+      "description": "close the thumb and finger to touch each other in a flat pinch"
+    }
+  ],
+  "capabilities": [
+    {
+      "name": "self",
+      "rights": [
+        "E"
+      ],
+      "grants": [
+        "E"
+      ],
+      "nsIndex": -1
+    }
+  ],
+  "pet_names": {
+    "DR": {},
+    "CR": {}
+  },
+  "mtbf": {
+    "consecutive_clean": 0,
+    "total_runs": 0,
+    "status": "unknown"
+  },
+  "lump_version": 10,
+  "compiled_at": 1780411554.330822
+}
