@@ -294,7 +294,9 @@ class AbstractionRegistry {
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 
         this.createAbstraction(4, 'Salvation', 1,
-            ['Create', 'Release', 'Find', 'Transfer', 'Validate', 'Audit'],
+            ['Create', 'Release', 'Find', 'Transfer', 'Validate', 'Audit',
+             '_reserved_6', '_reserved_7', '_reserved_8', '_reserved_9',
+             '_reserved_10', '_reserved_11', '_reserved_12', '_reserved_13', 'main'],
             'Golden Token guardian — issues, revokes, transfers, and audits GTs across the entire system. Every operation requires a PassKey GT that identifies the caller and bills resource usage against it.',
             { author: 'SIPantic', version: '1.0.0', perms: { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 } });
 

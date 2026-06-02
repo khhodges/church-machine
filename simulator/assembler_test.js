@@ -4586,6 +4586,151 @@ function symCompile(body, caps) {
         a.errors.map(e => e.message).join('; '));
 }
 
+// ── BC97–BC102: Hardware device shorthands + Salvation.main (task-1697) ───────
+//
+// Error 1 fix: UART→14, BTN→15, SLIDERULE→16, TIMER→17 added to _resolveNSName.
+//   Without a capabilities block these names previously fell through to _parseCR
+//   and emitted a false-positive "Expected a capability register" error.
+// Error 2+3 fix: 'main' added at method index 14 in Salvation's methods array in
+//   abstractions.js; CALL Salvation.main and ELOADCALL CR0, Salvation, main
+//   previously emitted false-positive "not a known method" errors.
+
+// BC97–BC100: Hardware device shorthands without a capabilities block
+//
+// These tests verify that UART/BTN/SlideRule/Timer resolve to their fixed boot
+// c-list slots (14–17) when no capabilities block is present.  The hardware
+// shorthand fires only when _resolveNSName path 2 (nsSymbols) has no entry for
+// the name.  Previous test suites (e.g. SCHED_NS_BC) leave stale entries like
+// Timer: 14 in ChurchAssembler._sharedNsSymbols, which would shadow the shorthand
+// and cause false results.  We save and restore _sharedNsSymbols around these
+// four tests so they run in a pristine namespace context.
+{
+    const _savedSharedNs = ChurchAssembler._sharedNsSymbols;
+    ChurchAssembler._sharedNsSymbols = {};
+
+    {
+        // BC97: LOAD CR5, UART — resolves to boot c-list slot 14
+        const a = new ChurchAssembler({});
+        const r = a.assemble('LOAD CR5, UART\nHALT');
+        assert('BC97 LOAD CR5, UART without cap block — no errors',
+            a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+        assert('BC97 LOAD CR5, UART emits 2 words (LOAD + HALT)',
+            r.words.length === 2, `got ${r.words.length}`);
+        {
+            const w = r.words[0] >>> 0;
+            const crSrc = (w >>> 15) & 0xF;  // crSrc at bits[18:15]; crDst at bits[22:19]
+            const imm   = w & 0x7FFF;
+            assert('BC97 LOAD CR5, UART — crSrc=6 (c-list root)',
+                crSrc === 6, `got crSrc=${crSrc}`);
+            assert('BC97 LOAD CR5, UART — imm=14 (UART boot c-list slot)',
+                imm === 14, `got imm=${imm}`);
+        }
+    }
+
+    {
+        // BC98: LOAD CR1, BTN — resolves to boot c-list slot 15
+        const a = new ChurchAssembler({});
+        const r = a.assemble('LOAD CR1, BTN\nHALT');
+        assert('BC98 LOAD CR1, BTN without cap block — no errors',
+            a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+        {
+            const w   = r.words[0] >>> 0;
+            const imm = w & 0x7FFF;
+            assert('BC98 LOAD CR1, BTN — imm=15 (BTN boot c-list slot)',
+                imm === 15, `got imm=${imm}`);
+        }
+    }
+
+    {
+        // BC99: LOAD CR2, SlideRule — resolves to boot c-list slot 16
+        const a = new ChurchAssembler({});
+        const r = a.assemble('LOAD CR2, SlideRule\nHALT');
+        assert('BC99 LOAD CR2, SlideRule without cap block — no errors',
+            a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+        {
+            const w   = r.words[0] >>> 0;
+            const imm = w & 0x7FFF;
+            assert('BC99 LOAD CR2, SlideRule — imm=16 (SlideRule boot c-list slot)',
+                imm === 16, `got imm=${imm}`);
+        }
+    }
+
+    {
+        // BC100: LOAD CR3, Timer — resolves to boot c-list slot 17
+        const a = new ChurchAssembler({});
+        const r = a.assemble('LOAD CR3, Timer\nHALT');
+        assert('BC100 LOAD CR3, Timer without cap block — no errors',
+            a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+        {
+            const w   = r.words[0] >>> 0;
+            const imm = w & 0x7FFF;
+            assert('BC100 LOAD CR3, Timer — imm=17 (Timer boot c-list slot)',
+                imm === 17, `got imm=${imm}`);
+        }
+    }
+
+    ChurchAssembler._sharedNsSymbols = _savedSharedNs;
+}
+
+// BC101–BC102: Salvation.main at method index 14 → 1-based selector 15 (0xF)
+
+const SALVATION_CONV_BC = {
+    'Salvation': {
+        'Create':       { index: 0 },
+        'Release':      { index: 1 },
+        'Find':         { index: 2 },
+        'Transfer':     { index: 3 },
+        'Validate':     { index: 4 },
+        'Audit':        { index: 5 },
+        'main':         { index: 14 },
+    }
+};
+const SALVATION_NS_BC = { 'Salvation': 4 };
+
+{
+    // BC101: CALL Salvation.main — dot-notation CALL, emits CALL with imm=15
+    // Program: LOAD CR0, Salvation (populates nsLoaded) then CALL Salvation.main
+    const a = new ChurchAssembler(SALVATION_CONV_BC);
+    a.setNamespace(SALVATION_NS_BC);
+    const r = a.assemble('LOAD CR0, Salvation\nCALL Salvation.main\nHALT');
+    assert('BC101 CALL Salvation.main — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC101 CALL Salvation.main emits 3 words (LOAD + CALL + HALT)',
+        r.words.length === 3, `got ${r.words.length}`);
+    {
+        const w      = r.words[1] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const imm    = w & 0x3FFF;
+        assert('BC101 CALL Salvation.main word[1] — opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('BC101 CALL Salvation.main word[1] — imm=15 (main index 14, 1-based)',
+            imm === 15, `got imm=${imm}`);
+    }
+}
+
+{
+    // BC102: ELOADCALL CR0, Salvation, main — method=15 (index 14, 1-based), row=4
+    const a = new ChurchAssembler(SALVATION_CONV_BC);
+    a.setNamespace(SALVATION_NS_BC);
+    const r = a.assemble('ELOADCALL CR0, Salvation, main\nHALT');
+    assert('BC102 ELOADCALL CR0, Salvation, main — no errors',
+        a.errors.length === 0, a.errors.map(e => e.message).join('; '));
+    assert('BC102 ELOADCALL CR0, Salvation, main emits 2 words (ELOADCALL + HALT)',
+        r.words.length === 2, `got ${r.words.length}`);
+    {
+        const w      = r.words[0] >>> 0;
+        const opcode = (w >>> 27) & 0x1F;
+        const row    = w & 0xFF;
+        const method = (w >>> 8) & 0x7F;
+        assert('BC102 ELOADCALL CR0, Salvation, main — opcode=8 (ELOADCALL)',
+            opcode === 8, `got opcode=${opcode}`);
+        assert('BC102 ELOADCALL CR0, Salvation, main — row=4 (Salvation NS slot)',
+            row === 4, `got row=${row}`);
+        assert('BC102 ELOADCALL CR0, Salvation, main — method=15 (main index 14, 1-based)',
+            method === 15, `got method=${method}`);
+    }
+}
+
 // ── EX1–EX19: Assembly example smoke tests (task-1063) ───────────────────────
 // End-to-end tests verifying each assembly example in LANG_EXAMPLE_GROUPS.assembly
 // (simulator/app-compile.js) assembles without errors.  Sources are mirrored

@@ -449,6 +449,27 @@ class ChurchAssembler {
             if (n >= 0 && n <= 5) return 8 + n;
         }
 
+        // 3.2. Hardware device shorthands — fixed boot c-list slots 14–17.
+        //      These are checked AFTER nsSymbols so that an explicit namespace table
+        //      (set via setNamespace) takes priority when the abstraction is mounted
+        //      in the Namespace Table for method dispatch (ELOADCALL).  When no
+        //      namespace entry is present — e.g. in bare LOAD instructions without a
+        //      capabilities block — the name falls through to here and resolves to the
+        //      fixed boot c-list slot for that hardware device.
+        //
+        //      UART→14, BTN→15, SlideRule→16, Timer→17  (case-insensitive)
+        //
+        //      Note: if the shared namespace happens to carry a stale Timer or UART
+        //      entry from a different test context, callers (BC97–BC100) should clear
+        //      ChurchAssembler._sharedNsSymbols before assembling to avoid shadowing.
+        {
+            const nameUC = name.toUpperCase();
+            if (nameUC === 'UART')      return 14;
+            if (nameUC === 'BTN')       return 15;
+            if (nameUC === 'SLIDERULE') return 16;
+            if (nameUC === 'TIMER')     return 17;
+        }
+
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
         //      regardless of which abstractions are installed.
         //      Boot.Nucs  — Nucleus/Turing-domain X-GT  (slot 7, dom=0, perm=X)
