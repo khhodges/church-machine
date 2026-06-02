@@ -1,0 +1,742 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# ── 1. Patch sapphire.v directly (bypass broken Makefile) ───────────────────
+SYM=EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol
+SCRIPTS=$(git rev-parse --show-toplevel)/scripts
+
+python3 $SCRIPTS/patch_sapphire_init.py sapphire.v \
+  ${SYM}0.bin ${SYM}1.bin ${SYM}2.bin ${SYM}3.bin
+
+# Must be > 0 before continuing:
+grep -c "mem\[" sapphire.v
+
+# ── 2. Synthesise with 2026.1 (your run_efx_map.sh on disk is stale/2025.2) ─
+export EFINITY_HOME=~/efinity/2026.1
+$EFINITY_HOME/bin/efx_map --project-xml church_soc_cm.xml \
+  2>&1 | tee work_syn/synthesis2.log
+echo "MAP EXIT: $?"
+
+# ── 3. Place & Route (already uses 2026.1, already works) ────────────────────
+bash run_efx_pnr.sh 2>&1 | tee outflow/pnr2.log
+
+# ── 4. Interface Designer + hex (pull fresh script from Replit server) ───────
+curl -s "https://31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt.kirk.replit.dev/dl/peri-xml" \
+  -o /tmp/check_peri.xml && echo "server reachable"
+
+# run_efx_pgm.sh directly (paste the two commands it contains):
+$EFINITY_HOME/bin/efx_run church_soc_cm \
+  --prj --flow interface --family Titanium -d Ti60F225 \
+  2>&1 | tee outflow/interface2.log
+
+$EFINITY_HOME/bin/efx_run church_soc_cm \
+  --prj --flow pgm --family Titanium -d Ti60F225 \
+  2>&1 | tee outflow/pgm2.log
+
+# ── 5. Flash ──────────────────────────────────────────────────────────────────
+ls -lh outflow/church_soc_cm.hex
+sudo openFPGALoader \
+  -b titanium_ti60_f225_jtag \
+  -f ~/church_project/SoC/outflow/church_soc_cm.hex
+fatal: not a git repository (or any of the parent directories): .git
+python3: can't open file '/scripts/patch_sapphire_init.py': [Errno 2] No such file or directory
+0
+INFO     : Efinix FPGA Synthesis.
+INFO     : Version: 2026.1.132
+INFO     : Compiled: May 29 2026.
+INFO     : 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+INFO     : Reading project database "church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+INFO     : Reading project database "church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : ***** Beginning Analysis ... *****
+INFO     : default VHDL library search path is now "/home/sipantichijk/efinity/2026.1/sim_models/vhdl/packages/vhdl_2008" [VHDL-1504]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/perilib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/maplib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/top.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/apb3_cm_bridge.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/church_ti60_f225.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/sapphire.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/sapphire_define.vh' [VERI-1482]
+INFO     : Analysis took 0.538209293 seconds [FlowMsg::StageDuration]
+INFO     :     Analysis took 0.47 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Analysis virtual memory usage: begin = 150.26 MB, end = 163.572 MB, delta = 13.312 MB [FlowMsg::VMUsage]
+INFO     : Analysis resident set memory usage: begin = 81.408 MB, end = 98.816 MB, delta = 17.408 MB [FlowMsg::RSSUsage]
+INFO     :     Analysis peak resident set memory usage = 98.816 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Analysis ... *****
+INFO     : ***** Beginning Elaboration ... *****
+WARNING  : /home/sipantichijk/church_project/SoC/top.v(188): port 'dbg_nia' remains unconnected for this instance [VERI-1927]
+INFO     : ../../vdb/src/efinix_peri_lib.v(8): compiling module 'EFX_IBUF' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(16): compiling module 'EFX_OBUF' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(23): compiling module 'EFX_IO_BUF' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(33): compiling module 'EFX_CLKOUT' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(41): compiling module 'EFX_IREG' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(51): compiling module 'EFX_OREG' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(60): compiling module 'EFX_IOREG' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(75): compiling module 'EFX_IDDIO' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(87): compiling module 'EFX_ODDIO' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(99): compiling module 'EFX_GPIO_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(124): compiling module 'EFX_GPIO_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(149): compiling module 'EFX_GPIO_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(186): compiling module 'EFX_PLL_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(205): compiling module 'EFX_PLL_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(231): compiling module 'EFX_PLL_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(279): compiling module 'EFX_OSC_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(285): compiling module 'EFX_OSC_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(294): compiling module 'EFX_FPLL_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(348): compiling module 'EFX_JTAG_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(357): compiling module 'EFX_JTAG_CTRL' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(364): compiling module 'EFX_LVDS_RX_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(381): compiling module 'EFX_LVDS_TX_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(399): compiling module 'EFX_LVDS_RX_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(426): compiling module 'EFX_LVDS_TX_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(446): compiling module 'EFX_LVDS_BIDIR_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(486): compiling module 'EFX_MIPI_TX_LN_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(509): compiling module 'EFX_MIPI_RX_LN_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(544): compiling module 'EFX_MIPI_RX_CLK_LN_V1' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(561): compiling module 'EFX_FPLL_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(628): compiling module 'EFX_LVDS_RX_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(663): compiling module 'EFX_LVDS_TX_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(685): compiling module 'EFX_LVDS_BIDIR_V3' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(734): compiling module 'EFX_MIPI_TX_LN_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_peri_lib.v(758): compiling module 'EFX_MIPI_RX_LN_V2' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(8): compiling module 'EFX_ADD' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(21): compiling module 'EFX_FF' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(38): compiling module 'EFX_COMB4' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(48): compiling module 'EFX_GBUFCE' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(57): compiling module 'EFX_LUT4' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(65): compiling module 'EFX_MULT' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(100): compiling module 'EFX_DSP48' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(156): compiling module 'EFX_DSP24' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(209): compiling module 'EFX_DSP12' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(262): compiling module 'EFX_RAM_4K' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(322): compiling module 'EFX_RAM_5K' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(394): compiling module 'EFX_DPRAM_5K' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(499): compiling module 'RAMB5' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(561): compiling module 'EFX_RAM_10K' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(653): compiling module 'EFX_RAM10' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(754): compiling module 'EFX_DPRAM10' [VERI-1018]
+INFO     : ../../vdb/src/efinix_maplib.v(884): compiling module 'EFX_SRL8' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/top.v(39): compiling module 'top' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(49): compiling module 'sapphire' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(131): compiling module 'EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11064): compiling module 'BufferCC_2_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11040): compiling module 'BufferCC_3_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5942): compiling module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(7245): extracting RAM for identifier 'RegFilePlugin_regFile' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(13351): compiling module 'InstructionCache_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(13457): extracting RAM for identifier 'banks_0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(13458): extracting RAM for identifier 'ways_0_tags' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12510): compiling module 'DataCache_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12723): extracting RAM for identifier 'ways_0_tags' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12724): extracting RAM for identifier 'ways_0_data_symbol0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12725): extracting RAM for identifier 'ways_0_data_symbol1' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12726): extracting RAM for identifier 'ways_0_data_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12727): extracting RAM for identifier 'ways_0_data_symbol3' [VERI-2571]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(13323): system task 'display' is ignored for synthesis [VERI-1142]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6008): net 'IBusCachedPlugin_cache_io_cpu_fetch_isRemoved' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6021): net 'dataCache_1_io_cpu_writeBack_fence_SW' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6022): net 'dataCache_1_io_cpu_writeBack_fence_SR' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6023): net 'dataCache_1_io_cpu_writeBack_fence_SO' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6024): net 'dataCache_1_io_cpu_writeBack_fence_SI' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6025): net 'dataCache_1_io_cpu_writeBack_fence_PW' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6026): net 'dataCache_1_io_cpu_writeBack_fence_PR' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6027): net 'dataCache_1_io_cpu_writeBack_fence_PO' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6028): net 'dataCache_1_io_cpu_writeBack_fence_PI' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6029): net 'dataCache_1_io_cpu_writeBack_fence_FM[3]' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6534): net 'IBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6549): net 'DBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6656): net 'IBusCachedPlugin_iBusRsp_output_payload_rsp_error' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(6658): net 'IBusCachedPlugin_iBusRsp_output_payload_isRvc' does not have a driver [VDB-1002]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5731): compiling module 'JtagBridgeNoTap_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12438): compiling module 'FlowCCByToggle_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(12471): system function call 'urandom' is not supported [VERI-1141]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(12472): system function call 'urandom' is not supported [VERI-1141]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(14170): compiling module 'BufferCC_1_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(14182): system function call 'urandom' is not supported [VERI-1141]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(14183): system function call 'urandom' is not supported [VERI-1141]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5644): compiling module 'SystemDebugger_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5620): compiling module 'BufferCC_4_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5454): compiling module 'BmbDecoder_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5402): compiling module 'BmbExclusiveMonitor_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5362): compiling module 'BmbDecoder_1_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(5226): compiling module 'BmbArbiter_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12334): compiling module 'StreamArbiter_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4940): compiling module 'BmbDecoder_2_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4840): compiling module 'BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4868): extracting RAM for identifier 'ram_symbol0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4869): extracting RAM for identifier 'ram_symbol1' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4870): extracting RAM for identifier 'ram_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4871): extracting RAM for identifier 'ram_symbol3' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4878): readmemb: reading from file '/home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' [VERI-2855]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(4878): illegal entry at /home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin:8193 for index 8192 in range [0:8191] [VERI-2588]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4879): readmemb: reading from file '/home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin' [VERI-2855]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(4879): illegal entry at /home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin:8193 for index 8192 in range [0:8191] [VERI-2588]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4880): readmemb: reading from file '/home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin' [VERI-2855]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(4880): illegal entry at /home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin:8193 for index 8192 in range [0:8191] [VERI-2588]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4881): readmemb: reading from file '/home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin' [VERI-2855]
+WARNING  : /home/sipantichijk/church_project/SoC/sapphire.v(4881): illegal entry at /home/sipantichijk/church_project/SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin:8193 for index 8192 in range [0:8191] [VERI-2588]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4608): compiling module 'BmbUnburstify_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4187): compiling module 'BmbDecoder_3_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4025): compiling module 'BmbClint_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(3550): compiling module 'BmbUartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12205): compiling module 'UartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(13943): compiling module 'UartCtrlTx_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(13649): compiling module 'UartCtrlRx_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(14196): compiling module 'BufferCC_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12054): compiling module 'StreamFifo_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(12098): extracting RAM for identifier 'logic_ram' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(3086): compiling module 'BmbSpiXdrMasterCtrl_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11403): compiling module 'TopLevel_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11239): compiling module 'StreamFifo_2_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11291): extracting RAM for identifier 'logic_ram' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11088): compiling module 'StreamFifo_3_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(11132): extracting RAM for identifier 'logic_ram' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(2935): compiling module 'BmbToApb3Bridge_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/top.v(111): actual bit length 32 differs from formal bit length 16 for port 'io_apbSlave_0_PADDR' [VERI-1330]
+INFO     : /home/sipantichijk/church_project/SoC/apb3_cm_bridge.v(48): compiling module 'apb3_cm_bridge(CLK_FREQ=50000000)' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(6): compiling module 'church_ti60f225' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7): using initial value of '$auto$verilog_backend.cc:2355:dump_module$41' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(621): extracting RAM for identifier 'dmem' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7088): compiling module 'top.boot_rom' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7089): using initial value of '$auto$verilog_backend.cc:2355:dump_module$42' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7500): compiling module 'top.core' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7502): using initial value of '$auto$verilog_backend.cc:2355:dump_module$43' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(15836): compiling module 'top.core.u_call' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(15839): using initial value of '$auto$verilog_backend.cc:2355:dump_module$44' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(18298): compiling module 'top.core.u_change' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(18300): using initial value of '$auto$verilog_backend.cc:2355:dump_module$45' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(18856): expression size 15 truncated to fit in target size 1 [VERI-1209]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(20055): compiling module 'top.core.u_change.u_mload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(20056): using initial value of '$auto$verilog_backend.cc:2355:dump_module$46' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21243): compiling module 'top.core.u_change.u_mload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21244): using initial value of '$auto$verilog_backend.cc:2355:dump_module$47' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21615): compiling module 'top.core.u_cload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21616): using initial value of '$auto$verilog_backend.cc:2355:dump_module$48' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(22369): compiling module 'top.core.u_cload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(22370): using initial value of '$auto$verilog_backend.cc:2355:dump_module$49' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(22739): compiling module 'top.core.u_decoder' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(22740): using initial value of '$auto$verilog_backend.cc:2355:dump_module$50' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23025): compiling module 'top.core.u_dread' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23026): using initial value of '$auto$verilog_backend.cc:2355:dump_module$51' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23395): compiling module 'top.core.u_dwrite' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23396): using initial value of '$auto$verilog_backend.cc:2355:dump_module$52' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23740): compiling module 'top.core.u_eloadcall' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(23741): using initial value of '$auto$verilog_backend.cc:2355:dump_module$53' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(24923): compiling module 'top.core.u_eloadcall.u_mload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(24925): using initial value of '$auto$verilog_backend.cc:2355:dump_module$54' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26113): compiling module 'top.core.u_eloadcall.u_mload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26114): using initial value of '$auto$verilog_backend.cc:2355:dump_module$55' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26485): compiling module 'top.core.u_gc_unit' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26486): using initial value of '$auto$verilog_backend.cc:2355:dump_module$56' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26858): compiling module 'top.core.u_irq_dispatch' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(26859): using initial value of '$auto$verilog_backend.cc:2355:dump_module$57' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27131): compiling module 'top.core.u_lambda' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27132): using initial value of '$auto$verilog_backend.cc:2355:dump_module$58' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27394): compiling module 'top.core.u_load' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27395): using initial value of '$auto$verilog_backend.cc:2355:dump_module$59' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27514): compiling module 'top.core.u_outform' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(27516): using initial value of '$auto$verilog_backend.cc:2355:dump_module$60' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(28084): extracting RAM for identifier 'win_mem' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(34532): compiling module 'top.core.u_outform_fsm' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(34533): using initial value of '$auto$verilog_backend.cc:2355:dump_module$61' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(35004): compiling module 'top.core.u_perm_check' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(35005): using initial value of '$auto$verilog_backend.cc:2355:dump_module$62' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(35258): compiling module 'top.core.u_pet_name_mem' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(35259): using initial value of '$auto$verilog_backend.cc:2355:dump_module$63' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(40482): compiling module 'top.core.u_registers' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(40486): using initial value of '$auto$verilog_backend.cc:2355:dump_module$64' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(43413): compiling module 'top.core.u_return' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(43415): using initial value of '$auto$verilog_backend.cc:2355:dump_module$65' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(44367): compiling module 'top.core.u_save' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(44368): using initial value of '$auto$verilog_backend.cc:2355:dump_module$66' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(44930): compiling module 'top.core.u_save.u_msave' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(44931): using initial value of '$auto$verilog_backend.cc:2355:dump_module$67' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(45543): compiling module 'top.core.u_shared_mload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(45545): using initial value of '$auto$verilog_backend.cc:2355:dump_module$68' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(46758): compiling module 'top.core.u_shared_mload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(46759): using initial value of '$auto$verilog_backend.cc:2355:dump_module$69' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(47130): compiling module 'top.core.u_switch' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(47131): using initial value of '$auto$verilog_backend.cc:2355:dump_module$70' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(47793): compiling module 'top.core.u_switch.u_mload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(47794): using initial value of '$auto$verilog_backend.cc:2355:dump_module$71' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(48985): compiling module 'top.core.u_switch.u_mload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(48986): using initial value of '$auto$verilog_backend.cc:2355:dump_module$72' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(49357): compiling module 'top.core.u_tperm' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(49358): using initial value of '$auto$verilog_backend.cc:2355:dump_module$73' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(50117): compiling module 'top.core.u_xloadlambda' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(50118): using initial value of '$auto$verilog_backend.cc:2355:dump_module$74' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(50810): compiling module 'top.core.u_xloadlambda.u_mload' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(50811): using initial value of '$auto$verilog_backend.cc:2355:dump_module$75' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52001): compiling module 'top.core.u_xloadlambda.u_mload.u_ns_gate' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52002): using initial value of '$auto$verilog_backend.cc:2355:dump_module$76' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52373): compiling module 'top.crc_mod' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52374): using initial value of '$auto$verilog_backend.cc:2355:dump_module$77' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52490): compiling module 'top.debug' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52491): using initial value of '$auto$verilog_backend.cc:2355:dump_module$78' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52791): compiling module 'top.debug.uart' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52792): using initial value of '$auto$verilog_backend.cc:2355:dump_module$79' since it is never assigned [VERI-1220]
+INFO     : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52954): compiling module 'top.uart_rx_mod' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(52955): using initial value of '$auto$verilog_backend.cc:2355:dump_module$80' since it is never assigned [VERI-1220]
+INFO     : Elaboration took 3.359944605 seconds [FlowMsg::StageDuration]
+INFO     :     Elaboration took 2.63 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Elaboration virtual memory usage: begin = 163.572 MB, end = 345.844 MB, delta = 182.272 MB [FlowMsg::VMUsage]
+INFO     : Elaboration resident set memory usage: begin = 98.944 MB, end = 281.728 MB, delta = 182.784 MB [FlowMsg::RSSUsage]
+INFO     :     Elaboration peak resident set memory usage = 281.728 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Elaboration ... *****
+WARNING  : Top module not specified. Using module 'top' as top module for the design. [EFX-0008]
+INFO     : ... Setting Synthesis Option: mode=speed
+INFO     : ***** Beginning Reading Mapping Library ... *****
+INFO     : Reading Mapping Library took 0.045269287 seconds [FlowMsg::StageDuration]
+INFO     :     Reading Mapping Library took 0.03 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Reading Mapping Library virtual memory usage: begin = 345.844 MB, end = 345.844 MB, delta = 0 MB [FlowMsg::VMUsage]
+INFO     : Reading Mapping Library resident set memory usage: begin = 284.16 MB, end = 284.16 MB, delta = 0 MB [FlowMsg::RSSUsage]
+INFO     :     Reading Mapping Library peak resident set memory usage = 284.16 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Reading Mapping Library ... *****
+INFO     : ... Pre-synthesis checks begin
+INFO     : ... Memory 'banks_0' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:13457) [EFX-0677]
+INFO     : ... Memory 'ways_0_tags' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:13458) [EFX-0677]
+WARNING  : Removing redundant signal : io_cpu_prefetch_isValid. (/home/sipantichijk/church_project/SoC/sapphire.v:13353) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_fetch_isRemoved. (/home/sipantichijk/church_project/SoC/sapphire.v:13358) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_decode_isValid. (/home/sipantichijk/church_project/SoC/sapphire.v:13371) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_decode_isUser. (/home/sipantichijk/church_project/SoC/sapphire.v:13380) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_prefetch_pc[31:12]. (/home/sipantichijk/church_project/SoC/sapphire.v:13355) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_prefetch_pc[1:0]. (/home/sipantichijk/church_project/SoC/sapphire.v:13355) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_fetch_pc[31:0]. (/home/sipantichijk/church_project/SoC/sapphire.v:13359) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_decode_pc[31:0]. (/home/sipantichijk/church_project/SoC/sapphire.v:13373) [EFX-0200]
+INFO     : ... Memory 'ways_0_tags' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12723) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol0' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12724) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol1' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12725) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol2' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12726) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol3' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12727) [EFX-0677]
+WARNING  : Removing redundant signal : io_cpu_writeBack_isFiring. (/home/sipantichijk/church_project/SoC/sapphire.v:12533) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_isUser. (/home/sipantichijk/church_project/SoC/sapphire.v:12534) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_SW. (/home/sipantichijk/church_project/SoC/sapphire.v:12544) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_SR. (/home/sipantichijk/church_project/SoC/sapphire.v:12545) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_SO. (/home/sipantichijk/church_project/SoC/sapphire.v:12546) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_SI. (/home/sipantichijk/church_project/SoC/sapphire.v:12547) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_PW. (/home/sipantichijk/church_project/SoC/sapphire.v:12548) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_PR. (/home/sipantichijk/church_project/SoC/sapphire.v:12549) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_PO. (/home/sipantichijk/church_project/SoC/sapphire.v:12550) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_fence_PI. (/home/sipantichijk/church_project/SoC/sapphire.v:12551) [EFX-0200]
+WARNING  : Removing redundant signal : io_cpu_writeBack_exclusiveOk. (/home/sipantichijk/church_project/SoC/sapphire.v:12553) [EFX-0200]
+WARNING  : Removing redundant signal : io_mem_rsp_payload_last. (/home/sipantichijk/church_project/SoC/sapphire.v:12569) [EFX-0200]
+WARNING  : (The above message was generated too many times, subsequent similar messages will be muted.) [EFX-0200]
+WARNING  : Re-wiring to GND non-driven net/port 'IBusCachedPlugin_cache_io_cpu_fetch_isRemoved' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6008) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_SW' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6021) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_SR' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6022) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_SO' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6023) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_SI' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6024) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_PW' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6025) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_PR' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6026) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_PO' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6027) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_PI' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6028) [EFX-0201]
+WARNING  : Re-wiring to GND non-driven net/port 'dataCache_1_io_cpu_writeBack_fence_FM[3]' in module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b'. (/home/sipantichijk/church_project/SoC/sapphire.v:6029) [EFX-0201]
+WARNING  : (The above message was generated too many times, subsequent similar messages will be muted.) [EFX-0201]
+INFO     : ... Memory 'RegFilePlugin_regFile' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:7245) [EFX-0677]
+INFO     : Module Instance 'memory_arbiter' input pin 'io_inputs_0_payload_fragment_source[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'memory_arbiter' input pin 'io_inputs_1_payload_fragment_source[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'memory_arbiter' input pin 'io_inputs_1_payload_fragment_context[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'tx' input pin 'io_cts' is tied to constant (=0). [EFX-0266]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:12098) [EFX-0677]
+INFO     : Module Instance 'bridge_write_streamUnbuffered_queueWithOccupancy' input pin 'io_flush' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'uartCtrl_1_io_read_queueWithOccupancy' input pin 'io_flush' is tied to constant (=0). [EFX-0266]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:11291) [EFX-0677]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:11132) [EFX-0677]
+INFO     : Module Instance 'mapping_cmdLogic_streamUnbuffered_queueWithAvailability' input pin 'io_flush' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'ctrl_io_rsp_queueWithOccupancy' input pin 'io_flush' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'bufferCC_5' input pin 'io_dataIn' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'bufferCC_6' input pin 'io_dataIn' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'bufferCC_7' input pin 'io_dataIn' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[1]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[2]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[3]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[4]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[5]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[6]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[7]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[8]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[9]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[10]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[11]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[12]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[13]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[14]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[15]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[16]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[17]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[18]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[19]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[20]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[21]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[22]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[23]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[24]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[25]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[26]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[27]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[28]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[29]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[30]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_data[31]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_mask[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_mask[1]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_mask[2]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'system_bridge_bmb_arbiter' input pin 'io_inputs_1_cmd_payload_fragment_mask[3]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[8]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[9]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[10]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[11]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[12]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[13]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[14]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_mload' input pin 'sub_index[15]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_perm_check' input pin 'required_perms[4]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[1]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[2]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[3]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[4]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[5]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[6]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[7]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[8]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[9]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[10]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[11]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[12]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[13]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[14]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[15]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[16]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[17]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[18]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[19]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[20]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[21]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[22]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[23]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[24]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[25]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[26]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[27]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[28]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[29]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[30]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_data[31]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr0_gt_wr_en' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[0]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[1]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[2]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[3]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[4]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[5]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[6]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[7]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[8]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[9]' is tied to constant (=0). [EFX-0266]
+INFO     : Module Instance 'u_registers' input pin 'cr1_gt_wr_data[10]' is tied to constant (=0). [EFX-0266]
+INFO     : (The above message was generated too many times, subsequent similar messages will be muted.) [EFX-0266]
+INFO     : ... Pre-synthesis checks end (Real time : 1s CPU user time : 4s CPU sys time : 1s MEM : 284544KB)
+INFO     : ... NameSpace init begin
+INFO     : ... NameSpace init end (Real time : 0s CPU user time : 4s CPU sys time : 1s MEM : 284672KB)
+INFO     : ... Mapping design "top"
+INFO     : ... Hierarchical pre-synthesis "BufferCC_2_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BufferCC_2_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 4s CPU sys time : 1s MEM : 285824KB)
+INFO     : ... Hierarchical pre-synthesis "BufferCC_3_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BufferCC_3_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 4s CPU sys time : 1s MEM : 285824KB)
+INFO     : ... Hierarchical pre-synthesis "InstructionCache_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "InstructionCache_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 4s CPU sys time : 1s MEM : 286336KB)
+INFO     : ... Hierarchical pre-synthesis "DataCache_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "DataCache_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 4s CPU sys time : 1s MEM : 286336KB)
+INFO     : ... Hierarchical pre-synthesis "VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 1s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BufferCC_1_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BufferCC_1_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "FlowCCByToggle_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "FlowCCByToggle_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "JtagBridgeNoTap_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "JtagBridgeNoTap_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "SystemDebugger_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "SystemDebugger_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BufferCC_4_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BufferCC_4_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbExclusiveMonitor_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbExclusiveMonitor_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_1_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_1_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "StreamArbiter_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "StreamArbiter_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbArbiter_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbArbiter_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_2_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_2_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbUnburstify_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbUnburstify_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_3_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbDecoder_3_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbClint_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbClint_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "UartCtrlTx_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "UartCtrlTx_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BufferCC_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BufferCC_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "UartCtrlRx_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "UartCtrlRx_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "UartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "UartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbUartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbUartCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "TopLevel_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "TopLevel_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_2_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_2_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_3_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "StreamFifo_3_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbSpiXdrMasterCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbSpiXdrMasterCtrl_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "BmbToApb3Bridge_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "BmbToApb3Bridge_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 0s CPU user time : 5s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b" begin
+INFO     : ... Hierarchical pre-synthesis "EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b" end (Real time : 2s CPU user time : 7s CPU sys time : 1s MEM : 286720KB)
+INFO     : ... Hierarchical pre-synthesis "sapphire" begin
+INFO     : ... Hierarchical pre-synthesis "sapphire" end (Real time : 0s CPU user time : 7s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "apb3_cm_bridge(CLK_FREQ=50000000)" begin
+INFO     : ... Hierarchical pre-synthesis "apb3_cm_bridge(CLK_FREQ=50000000)" end (Real time : 0s CPU user time : 7s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.boot_rom" begin
+INFO     : ... Hierarchical pre-synthesis "top.boot_rom" end (Real time : 0s CPU user time : 8s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_call" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_call" end (Real time : 1s CPU user time : 8s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change.u_mload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change.u_mload.u_ns_gate" end (Real time : 0s CPU user time : 8s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change.u_mload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change.u_mload" end (Real time : 1s CPU user time : 9s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_change" end (Real time : 2s CPU user time : 11s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_cload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_cload.u_ns_gate" end (Real time : 0s CPU user time : 11s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_cload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_cload" end (Real time : 1s CPU user time : 12s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_decoder" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_decoder" end (Real time : 0s CPU user time : 12s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_dread" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_dread" end (Real time : 0s CPU user time : 12s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_dwrite" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_dwrite" end (Real time : 0s CPU user time : 12s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall.u_mload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall.u_mload.u_ns_gate" end (Real time : 0s CPU user time : 12s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall.u_mload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall.u_mload" end (Real time : 0s CPU user time : 13s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_eloadcall" end (Real time : 2s CPU user time : 14s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_gc_unit" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_gc_unit" end (Real time : 0s CPU user time : 14s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_irq_dispatch" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_irq_dispatch" end (Real time : 0s CPU user time : 15s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_lambda" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_lambda" end (Real time : 0s CPU user time : 15s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_load" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_load" end (Real time : 0s CPU user time : 15s CPU sys time : 1s MEM : 288000KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_outform" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_outform" end (Real time : 2s CPU user time : 16s CPU sys time : 1s MEM : 288128KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_outform_fsm" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_outform_fsm" end (Real time : 0s CPU user time : 16s CPU sys time : 1s MEM : 288128KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_perm_check" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_perm_check" end (Real time : 0s CPU user time : 16s CPU sys time : 1s MEM : 288128KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_pet_name_mem" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_pet_name_mem" end (Real time : 0s CPU user time : 16s CPU sys time : 1s MEM : 288128KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_registers" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_registers" end (Real time : 1s CPU user time : 17s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_return" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_return" end (Real time : 0s CPU user time : 17s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_save.u_msave" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_save.u_msave" end (Real time : 0s CPU user time : 17s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_save" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_save" end (Real time : 0s CPU user time : 18s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_shared_mload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_shared_mload.u_ns_gate" end (Real time : 0s CPU user time : 18s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_shared_mload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_shared_mload" end (Real time : 1s CPU user time : 18s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch.u_mload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch.u_mload.u_ns_gate" end (Real time : 0s CPU user time : 18s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch.u_mload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch.u_mload" end (Real time : 1s CPU user time : 19s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_switch" end (Real time : 1s CPU user time : 20s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_tperm" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_tperm" end (Real time : 0s CPU user time : 20s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda.u_mload.u_ns_gate" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda.u_mload.u_ns_gate" end (Real time : 0s CPU user time : 20s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda.u_mload" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda.u_mload" end (Real time : 1s CPU user time : 21s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda" begin
+INFO     : ... Hierarchical pre-synthesis "top.core.u_xloadlambda" end (Real time : 1s CPU user time : 22s CPU sys time : 1s MEM : 288256KB)
+INFO     : ... Hierarchical pre-synthesis "top.core" begin
+INFO     : ... Hierarchical pre-synthesis "top.core" end (Real time : 7s CPU user time : 30s CPU sys time : 1s MEM : 295680KB)
+INFO     : ... Hierarchical pre-synthesis "top.crc_mod" begin
+INFO     : ... Hierarchical pre-synthesis "top.crc_mod" end (Real time : 0s CPU user time : 30s CPU sys time : 1s MEM : 295680KB)
+INFO     : ... Hierarchical pre-synthesis "top.debug.uart" begin
+INFO     : ... Hierarchical pre-synthesis "top.debug.uart" end (Real time : 0s CPU user time : 30s CPU sys time : 1s MEM : 295680KB)
+INFO     : ... Hierarchical pre-synthesis "top.debug" begin
+INFO     : ... Hierarchical pre-synthesis "top.debug" end (Real time : 0s CPU user time : 30s CPU sys time : 1s MEM : 295680KB)
+INFO     : ... Hierarchical pre-synthesis "top.uart_rx_mod" begin
+INFO     : ... Hierarchical pre-synthesis "top.uart_rx_mod" end (Real time : 0s CPU user time : 30s CPU sys time : 1s MEM : 295680KB)
+INFO     : ... Hierarchical pre-synthesis "church_ti60f225" begin
+INFO     : ... Hierarchical pre-synthesis "church_ti60f225" end (Real time : 14s CPU user time : 44s CPU sys time : 1s MEM : 348416KB)
+INFO     : ... Hierarchical pre-synthesis "top" begin
+INFO     : ... Clock Enable Synthesis Performed on 2042 flops.
+INFO     : ... Hierarchical pre-synthesis "top" end (Real time : 39s CPU user time : 85s CPU sys time : 2s MEM : 351104KB)
+INFO     : ... Flat optimizations begin
+INFO     : ... Flat optimizations end (Real time : 1s CPU user time : 87s CPU sys time : 2s MEM : 354944KB)
+INFO     : ... Flat synthesis begin
+INFO     : ... Flat synthesis end (Real time : 0s CPU user time : 88s CPU sys time : 2s MEM : 354944KB)
+INFO     : ... Flat optimizations begin
+INFO     : ... Flat optimizations end (Real time : 0s CPU user time : 91s CPU sys time : 2s MEM : 355072KB)
+INFO     : ... Check and break combinational loops begin
+INFO     : ... Check and break combinational loops end (Real time : 0s CPU user time : 91s CPU sys time : 2s MEM : 355072KB)
+INFO     : ... Sequential Optimization begin
+INFO     : ... Clock Network 'clk' with 10010 loads will be considered for sequential optimization.
+INFO     : ... Sequential Optimization deduced 22615 equivalent points.
+INFO     : ... Sequential Optimization end (Real time : 28s CPU user time : 122s CPU sys time : 3s MEM : 371676KB)
+INFO     : ... Setup for logic synthesis begin
+INFO     : ... Setup for logic synthesis end (Real time : 1s CPU user time : 124s CPU sys time : 3s MEM : 371676KB)
+INFO     : ... LUT mapping begin
+INFO     : ... LS, strategy: 3, nd: 13462, ed: 45417, lv: 16, pw: 21147.01
+INFO     : ... LUT mapping end (Real time : 119s CPU user time : 266s CPU sys time : 8s MEM : 371676KB)
+INFO     : ... Post-synthesis Verific netlist creation begin
+INFO     : ... Post-synthesis Verific netlist creation end (Real time : 1s CPU user time : 267s CPU sys time : 8s MEM : 371676KB)
+INFO     : ... Postmap Retiming Optimization begin
+INFO     : ... Using advanced retiming technique.
+INFO     : ... Clock Network 'clk~clk' with 8187 loads will be considered for retiming optimization.
+INFO     : ... Performed 4 retime moves.
+INFO     : ... Postmap Retiming Optimization end (Real time : 4s CPU user time : 271s CPU sys time : 8s MEM : 371676KB)
+INFO     : ***** Beginning VDB Netlist Checker ... *****
+WARNING  : /home/sipantichijk/church_project/SoC/top.v(44): Input/inout port push_button is unconnected. Place and route may remove this unconnected port. [VDB-8003]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[2] is dangling. [VDB-8009]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[1] is dangling. [VDB-8009]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[0] is dangling. [VDB-8009]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[4] is dangling. [VDB-8009]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[3] is dangling. [VDB-8009]
+WARNING  : Net u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[5] is dangling. [VDB-8009]
+WARNING  : Found 7 warnings in the post-synthesis netlist.
+INFO     : VDB Netlist Checker took 0.149691414 seconds [FlowMsg::StageDuration]
+INFO     :     VDB Netlist Checker took 0.23 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : VDB Netlist Checker virtual memory usage: begin = 499.456 MB, end = 499.456 MB, delta = 0 MB [FlowMsg::VMUsage]
+INFO     : VDB Netlist Checker resident set memory usage: begin = 282.132 MB, end = 282.132 MB, delta = 0 MB [FlowMsg::RSSUsage]
+INFO     :     VDB Netlist Checker peak resident set memory usage = 371.676 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending VDB Netlist Checker ... *****
+INFO     : Resource Summary 
+INFO     : ======================================= 
+INFO     : EFX_ADD                 :    1440
+INFO     : EFX_LUT4                :    13048
+INFO     : EFX_DSP48               :    5
+INFO     : EFX_DSP24               :    1
+INFO     : EFX_FF                  :    7811
+INFO     : EFX_SRL8                :    1
+INFO     : EFX_RAM10               :    59
+INFO     : ======================================= 
+INFO     : The entire flow of EFX_MAP took 249.347483644 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_MAP took 275.48 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.956 MB, end = 499.456 MB, delta = 391.5 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.048 MB, end = 287.892 MB, delta = 253.844 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 371.676 MB [FlowMsg::RSSUsage::Peak]
+MAP EXIT: 0
+==> Place & Route /home/sipantichijk/church_project/SoC/church_soc_cm.xml with EFX_PNR...
+    EFX_PNR:  /home/sipantichijk/efinity/2026.1/bin/efx_pnr
+    Project:  /home/sipantichijk/church_project/SoC/church_soc_cm.xml
+    Family:   Titanium / Ti60F225 / C3
+
+server reachable
+Could not find platform independent libraries <prefix>
+Could not find platform dependent libraries <exec_prefix>
+Python path configuration:
+  PYTHONHOME = (not set)
+  PYTHONPATH = (not set)
+  program name = 'python3'
+  isolated = 0
+  environment = 1
+  user site = 1
+  safe_path = 0
+  import site = 1
+  is in build tree = 0
+  stdlib dir = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11'
+  sys._base_executable = '/usr/bin/python3'
+  sys.base_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.base_exec_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.platlibdir = 'lib'
+  sys.executable = '/usr/bin/python3'
+  sys.prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.exec_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.path = [
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python311.zip',
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11',
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11/lib-dynload',
+  ]
+Fatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding
+Python runtime state: core initialized
+ModuleNotFoundError: No module named 'encodings'
+
+Current thread 0x00007fb2d6274740 (most recent call first):
+  <no Python frame>
+Could not find platform independent libraries <prefix>
+Could not find platform dependent libraries <exec_prefix>
+Python path configuration:
+  PYTHONHOME = (not set)
+  PYTHONPATH = (not set)
+  program name = 'python3'
+  isolated = 0
+  environment = 1
+  user site = 1
+  safe_path = 0
+  import site = 1
+  is in build tree = 0
+  stdlib dir = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11'
+  sys._base_executable = '/usr/bin/python3'
+  sys.base_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.base_exec_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.platlibdir = 'lib'
+  sys.executable = '/usr/bin/python3'
+  sys.prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.exec_prefix = '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c'
+  sys.path = [
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python311.zip',
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11',
+    '/home.local/jenkins/tools/linux_x86_64/python/3.11.10_PyQt6_commercial-6.8.0_gcc132_c/lib/python3.11/lib-dynload',
+  ]
+Fatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding
+Python runtime state: core initialized
+ModuleNotFoundError: No module named 'encodings'
+
+Current thread 0x00007f780c877740 (most recent call first):
+  <no Python frame>
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1M Jun  2 16:51 outflow/church_soc_cm.hex
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+sipantichijk@penguin:~/church_project/SoC$ 

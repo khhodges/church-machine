@@ -192,6 +192,22 @@ def download_pgm_sh():
                      download_name="run_efx_pgm.sh",
                      mimetype="text/plain")
 
+@app.route("/dl/patch-sapphire")
+def download_patch_sapphire():
+    p = os.path.join(os.path.dirname(__file__), "..", "scripts", "patch_sapphire_init.py")
+    return send_file(os.path.abspath(p),
+                     as_attachment=True,
+                     download_name="patch_sapphire_init.py",
+                     mimetype="text/plain")
+
+@app.route("/dl/map-sh")
+def download_map_sh():
+    p = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "run_efx_map.sh")
+    return send_file(os.path.abspath(p),
+                     as_attachment=True,
+                     download_name="run_efx_map.sh",
+                     mimetype="text/plain")
+
 @app.route("/dl/peri-xml")
 def download_peri_xml():
     p = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "church_soc_cm.peri.xml")
