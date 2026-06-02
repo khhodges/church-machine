@@ -1493,6 +1493,60 @@ function findSHR(words) {
         'errors: ' + result.errors.map(e => e.message).join('; '));
 }
 
+// CC11: CALL Abstraction.Method(args) — uppercase keyword form compiles to ELOADCALL.
+//   Scheduler.pause(10): Scheduler is at c-list offset 0; pause is index 4 → selector 5.
+//   Expected ELOADCALL imm = (5 << 8) | 0 = 0x0500.
+{
+    const cc = new CLOOMCCompiler();
+    cc.methodConventions['SCHEDULER'] = {
+        Yield: {index:0}, Spawn: {index:1}, Wait: {index:2},
+        Stop: {index:3}, pause: {index:4}, IRQ: {index:5},
+    };
+    const src =
+`abstraction Test {
+    capabilities { Scheduler E }
+    method run() {
+        CALL Scheduler.pause(10)
+    }
+}`;
+    const result = cc.compileJS(src);
+    assert('CC11 CALL Scheduler.pause(10) — no errors',
+        result.errors.length === 0,
+        result.errors.map(e => e.message).join('; '));
+    const words = (result.methods[0] || {}).code || [];
+    const eloadWord = words.find(w => ((w >>> 27) & 0x1F) === 8);
+    assert('CC11 CALL Scheduler.pause(10) — ELOADCALL (opcode 8) is emitted',
+        eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
+    if (eloadWord !== undefined) {
+        const imm = eloadWord & 0x7FFF;
+        const row    = imm & 0xFF;
+        const method = (imm >>> 8) & 0x7F;
+        assert('CC11 CALL Scheduler.pause(10) — row=0 (Scheduler at cap offset 0)',
+            row === 0, `got row=${row}`);
+        assert('CC11 CALL Scheduler.pause(10) — method=5 (pause index 4, 1-based)',
+            method === 5, `got method=${method}`);
+    }
+}
+
+// CC12: CALL UnknownAbs.Method() — abstraction not in capabilities → compiler error.
+{
+    const cc = new CLOOMCCompiler();
+    const src =
+`abstraction Test {
+    capabilities { Scheduler E }
+    method run() {
+        CALL UnknownAbs.foo()
+    }
+}`;
+    const result = cc.compileJS(src);
+    assert('CC12 CALL UnknownAbs.foo() — compiler produces ≥1 error',
+        result.errors.length > 0,
+        'expected ≥1 error, got 0');
+    assert('CC12 CALL UnknownAbs.foo() — error mentions capabilities list',
+        result.errors.some(e => /UnknownAbs/i.test(e.message) && /capabilities/i.test(e.message)),
+        'errors: ' + result.errors.map(e => e.message).join('; '));
+}
+
 // ── SE: Simulator-level SHR / ASR execution tests ────────────────────────────
 // These tests instantiate ChurchSimulator directly and call _execShr so we can
 // confirm that the runtime actually sign-extends (ASR) or zero-extends (LSR)
