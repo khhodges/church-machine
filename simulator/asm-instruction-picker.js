@@ -81,6 +81,9 @@
         {
             name: 'C-List', icon: '\uD83D\uDD11', items: []   // populated dynamically at showPicker()
         },
+        {
+            name: 'Namespace', icon: '\u25C6', items: []   // populated dynamically at showPicker() from sim.nsLabels
+        },
     ];
 
     // Flat list of every item across all categories (rebuilt by rebuildSourceIndex)
@@ -142,7 +145,58 @@
         rebuildSourceIndex();
     }
 
-    rebuildSourceIndex(); // initial build (static categories only; C-List empty until showPicker)
+    // Populate the Namespace category from sim.nsLabels (live simulator state) and
+    // METHOD_REGISTER_CONVENTIONS (abstraction names known before simulation starts).
+    // Each named GT slot becomes a LOAD snippet; the fuzzy filter narrows the list
+    // immediately when the picker opens with a prefill string.
+    function refreshNSItems() {
+        var nsCat = null;
+        for (var ci = 0; ci < INSTR_CATEGORIES.length; ci++) {
+            if (INSTR_CATEGORIES[ci].name === 'Namespace') { nsCat = INSTR_CATEGORIES[ci]; break; }
+        }
+        if (!nsCat) return;
+        nsCat.items = [];
+        var seen = Object.create(null);
+
+        // 1. Live namespace labels from the running simulator
+        var simObj = (typeof sim !== 'undefined') ? sim : null;
+        var liveLabels = (simObj && simObj.nsLabels) ? simObj.nsLabels : {};
+        var slots = Object.keys(liveLabels).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); });
+        slots.forEach(function (idx) {
+            var name = liveLabels[idx];
+            if (!name) return;
+            var key = name.toUpperCase();
+            if (seen[key]) return;
+            seen[key] = true;
+            nsCat.items.push({
+                label: name + '  \u00b7 NS ' + idx,
+                instr: 'LOAD',
+                ops: 'CR11, ' + name,
+                _nsSlot: parseInt(idx, 10),
+                _nsName: name
+            });
+        });
+
+        // 2. Abstraction names from METHOD_REGISTER_CONVENTIONS (pre-boot fallback)
+        var conv = (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') ? METHOD_REGISTER_CONVENTIONS : null;
+        if (conv) {
+            Object.keys(conv).sort().forEach(function (absName) {
+                var key = absName.toUpperCase();
+                if (seen[key]) return;
+                seen[key] = true;
+                nsCat.items.push({
+                    label: absName + '  \u00b7 abstraction',
+                    instr: 'LOAD',
+                    ops: 'CR11, ' + absName,
+                    _nsName: absName
+                });
+            });
+        }
+
+        rebuildSourceIndex();
+    }
+
+    rebuildSourceIndex(); // initial build (static categories only; C-List and Namespace empty until showPicker)
 
     // ── Configurable shortcut ────────────────────────────────────────────────
     // Override before or after the script loads via window.AsmInstructionPickerConfig:
@@ -555,17 +609,25 @@
         picker.style.top = top + 'px';
     }
 
-    function showPicker(textarea) {
+    // prefill: optional string — pre-populates the filter box and immediately
+    // narrows the results. Used when Ctrl+Space is pressed mid-word: the chars
+    // already typed (1–3+) are passed in so matching GT / instruction entries
+    // appear highlighted without any extra keypresses.
+    function showPicker(textarea, prefill) {
         refreshCListItems();  // rebuild C-List items from METHOD_REGISTER_CONVENTIONS
-        activeCatName = INSTR_CATEGORIES[0].name;
+        refreshNSItems();     // rebuild Namespace items from sim.nsLabels
+        activeCatName = null; // show "All" tab so Namespace items are visible
         activeEditorEl = textarea;
         buildPickerContent(function (item) { insertIntoEditor(item); });
         var picker = getOrCreatePicker();
         picker.style.display = 'flex';
         positionPicker(textarea);
-        // Auto-focus the filter input so the user can type immediately
         if (filterInputEl) {
-            filterInputEl.value = '';
+            var q = (prefill || '').trim();
+            filterInputEl.value = q;
+            if (q) {
+                renderFiltered(q);   // immediately apply prefix filter
+            }
             filterInputEl.focus();
         }
     }
@@ -669,7 +731,15 @@
                 if (isPickerVisible()) {
                     hidePicker();
                 } else {
-                    showPicker(textarea);
+                    // Extract trailing word characters before the cursor (1–3+ chars)
+                    // and pass them as a prefill so GT/instruction entries are
+                    // filtered immediately without extra keystrokes.
+                    var _val = textarea.value;
+                    var _pos = textarea.selectionStart;
+                    var _before = _val.slice(0, _pos);
+                    var _wm = _before.match(/(\w+)$/);
+                    var _prefill = _wm ? _wm[1] : '';
+                    showPicker(textarea, _prefill);
                 }
                 return;
             }
@@ -717,9 +787,10 @@
     // Public API (for debugging or future extension)
     window.AsmInstructionPicker = {
         attach: attachToEditor,
-        show: showPicker,
+        show: showPicker,         // showPicker(textarea, prefill?) — prefill pre-filters the list
         hide: hidePicker,
         isVisible: isPickerVisible,
+        refreshNS: refreshNSItems,
         shortcutDefaults: SHORTCUT_DEFAULTS,
         fuzzyScore: fuzzyScore,
     };
