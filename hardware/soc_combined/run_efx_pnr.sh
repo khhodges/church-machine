@@ -40,6 +40,9 @@ echo "    Project:  $PROJECT"
 echo "    Family:   $FAMILY / $DEVICE / $OPCOND"
 echo ""
 
+# efx_pnr checks EFINITY_HOME at startup — must be exported, not just set
+export EFINITY_HOME="$EFINITY"
+
 # Source Efinity environment so efx_pnr can find its shared libraries
 # shellcheck disable=SC1091
 source "$EFINITY/bin/setup.sh" 2>/dev/null || true
