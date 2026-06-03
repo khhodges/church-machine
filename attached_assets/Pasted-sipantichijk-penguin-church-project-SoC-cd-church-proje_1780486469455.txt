@@ -1,0 +1,31 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# 1. Firmware size vs BRAM capacity (each EFX_RAM10 = 256 bytes, 16 per lane = 4096 bytes/lane):
+ls -lh firmware/firmware.bin
+wc -l EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+
+# 2. Did 2025.2 efx_map log any BRAM init messages?
+grep -iE "initial|bram|init_|rom" work_syn/synthesis_2025.log | grep -v "VERI-1220\|VERI-1018\|VERI-1482\|WARNING" | head -20
+
+# 3. PLL parameters in sapphire.v (what input/output clock is the SoC using?):
+grep -A20 "EFX_PLL" sapphire.v | head -30
+
+# 4. How many lines does efx_map 2025.2 log? (confirms it ran fully)
+wc -l work_syn/synthesis_2025.log
+-rwxr-xr-x 1 sipantichijk sipantichijk 3.2K Jun  2 13:39 firmware/firmware.bin
+131072 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+INFO     : ... Memory 'banks_0' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:16222) [EFX-0677]
+INFO     : ... Memory 'ways_0_tags' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:16223) [EFX-0677]
+INFO     : ... Memory 'ways_0_tags' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:15488) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol0' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:15489) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol1' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:15490) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol2' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:15491) [EFX-0677]
+INFO     : ... Memory 'ways_0_data_symbol3' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:15492) [EFX-0677]
+INFO     : ... Memory 'RegFilePlugin_regFile' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:10010) [EFX-0677]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:14863) [EFX-0677]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:14056) [EFX-0677]
+INFO     : ... Memory 'logic_ram' is not initialized, assuming empty initial contents. (/home/sipantichijk/church_project/SoC/sapphire.v:13897) [EFX-0677]
+INFO     : ... Hierarchical pre-synthesis "top.boot_rom" begin
+INFO     : ... Hierarchical pre-synthesis "top.boot_rom" end (Real time : 0s CPU user time : 8s CPU sys time : 0s MEM : 283392KB)
+640 work_syn/synthesis_2025.log
+sipantichijk@penguin:~/church_project/SoC$ 
