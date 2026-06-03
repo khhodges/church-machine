@@ -1,0 +1,132 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Listen on ttyUSB3 FIRST, then flash:
+sudo fuser -k /dev/ttyUSB3 2>/dev/null; sleep 1
+stty -F /dev/ttyUSB3 115200 cs8 -cstopb -parenb raw
+timeout 20 cat /dev/ttyUSB3 &
+sleep 1
+
+sudo /usr/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_v4.hex
+wait
+[1] 6949
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000c0000
+UART debug initialized
+
+Erasing: [==================================                ] 66.67%Error: Reading Sensor ID failed!
+Erasing: [==================================================] 100.00%
+Done
+Writing: [                                                  ] 0.00%
+UVC: Completed 0 frames and 0 buffers
+Writing: [==                                                ] 2.89%
+UVC: Completed 0 frames and 0 buffers
+Writing: [===                                               ] 5.64%
+UVC: Completed 0 frames and 0 buffers
+Writing: [=====                                             ] 8.95%
+UVC: Completed 0 frames and 0 buffers
+Writing: [======                                            ] 11.87%
+UVC: Completed 0 frames and 0 buffers
+Writing: [========                                          ] 14.44%
+UVC: Completed 0 frames and 0 buffers
+Writing: [=========                                         ] 17.29%
+UVC: Completed 0 frames and 0 buffers
+Writing: [===========                                       ] 20.39%
+UVC: Completed 0 frames and 0 buffers
+Writing: [============                                      ] 22.96%
+UVC: Completed 0 frames and 0 buffers
+Writing: [=============                                     ] 25.29%
+UVC: Completed 0 frames and 0 buffers
+Writing: [===============                                   ] 28.35%
+UVC: Completed 0 frames and 0 buffers
+Writing: [================                                  ] 31.10%
+UVC: Completed 0 frames and 0 buffers
+Writing: [===================                               ] 36.28%
+UVC: Completed 0 frames and 0 buffers
+Writing: [=====================                             ] 41.03%
+UVC: Completed 0 frames and 0 buffers
+Writing: [=======================                           ] 44.06%
+UVC: Completed 0 frames and 0 buffers
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+[1]+  Exit 124                timeout 20 cat /dev/ttyUSB3
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Read whatever the board is sending RIGHT NOW on ttyUSB3:
+sudo fuser -k /dev/ttyUSB3 2>/dev/null; sleep 1
+stty -F /dev/ttyUSB3 115200 cs8 -cstopb -parenb raw
+timeout 8 cat /dev/ttyUSB3 | cat -v
+Terminated
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Step 1: Flash old v3.hex (known-working, had "UART debug initialized"):
+sudo fuser -k /dev/ttyUSB3 2>/dev/null; sleep 1
+stty -F /dev/ttyUSB3 115200 cs8 -cstopb -parenb raw
+timeout 12 cat /dev/ttyUSB3 | cat -v &
+sleep 1
+sudo /usr/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_v3.hex
+wait
+
+# Step 2: If we get "UART debug initialized" again, the problem is our bitstream.
+# Check how sapphire.v initialises BRAM — original $readmemb or inline?
+grep -n 'readmemb\|readmemh\|ram_symbol0\[0\]' sapphire.v | head -10
+[1] 7034
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000d0000
+Erasing: [===========================                       ] 53.85%UART debug initialized^M
+
+          ^MStatus:0 0 0 Error: Reading Sensor ID failed!^M
+Erasing: [==================================================] 100.00%
+Done
+Writing: [                                                  ] 0.00%^M
+                                                                     UVC: Completed 0 frames and 0 buffers^M
+Writing: [==                                                ] 2.51%^M
+                                                                     UVC: Completed 0 frames and 0 buffers^M
+Writing: [===                                               ] 4.96%^M
+                                                                     UVC: Completed 0 frames and 0 buffers^M
+Writing: [=====                                             ] 8.11%^M
+                                                                     UVC: Completed 0 frames and 0 buffers^M
+Writing: [======                                            ] 10.93%^M
+                                                                      UVC: Completed 0 frames and 0 buffers^M
+Writing: [========                                          ] 14.18%^M
+                                                                      UVC: Completed 0 frames and 0 buffers^M
+Writing: [=========                                         ] 17.04%^M
+                                                                      UVC: Completed 0 frames and 0 buffers^M
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+[1]+  Terminated              timeout 12 cat /dev/ttyUSB3 | cat -v
+4878:        ram_symbol0[0] = 8'h17;
+sipantichijk@penguin:~/church_project/SoC$ 
