@@ -1,0 +1,43 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Fixed efx_pgm — correct --periph flag + --enable_roms on:
+efx_pgm \
+    --source   work_pnr/church_soc_cm.lbf \
+    --dest     outflow/church_soc_cm_new.hex \
+    --device   Ti60F225 \
+    --family   Titanium \
+    --periph   church_soc_cm.peri.xml \
+    --enable_roms on \
+    2>&1 | tee outflow/pgm_new.log
+echo "PGM EXIT: $?"
+
+ls -lh outflow/church_soc_cm_new.hex
+INFO     : Efinix FPGA Bitstream Generator.
+INFO     : Version: 2026.1.132 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+INFO     : Compiled: May 29 2026.
+INFO     : Using source file "work_pnr/church_soc_cm.lbf"
+INFO     : Generating HEX programming file for device "Ti60F225", family "Titanium"
+WARNING  : Warning at file , line 0, char 0: unable to open primary document entity '/home/sipantichijk/church_project/SoC/peri_design_db.xsd'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: no declaration found for element 'efxpt:design_db'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: attribute 'name' is not declared for element 'efxpt:design_db'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: attribute 'device_def' is not declared for element 'efxpt:design_db'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: attribute 'version' is not declared for element 'efxpt:design_db'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: attribute 'db_version' is not declared for element 'efxpt:design_db'
+ERROR    : Error at file /home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml, line 2, char 337: attribute 'last_change_date' is not declared for element 'efxpt:design_db'
+INFO     : No block definitions found in "/home/sipantichijk/church_project/SoC/church_soc_cm.peri.xml"
+ERROR    : [Internal] Error: LPF bit length 0 does not match expected PCR size 13367 for device opx_218x322_b16_d10
+
+ERROR    : ******** STACK TRACE BEGIN ********
+ERROR    :     0x7faffc2d09ba: in libefx.so + 0xa09ba
+ERROR    :           0x44b93e: in efx_pgm + 0x44b93e
+ERROR    :           0x441767: in efx_pgm + 0x441767
+ERROR    :           0x487a7a: in efx_pgm + 0x487a7a
+ERROR    :           0x414267: in efx_pgm + 0x414267
+ERROR    :     0x7faffac35ca8: in libc.so.6 + 0x29ca8
+ERROR    :     0x7faffac35d65: in libc.so.6 + 0x29d65
+ERROR    :           0x4145ee: in efx_pgm + 0x4145ee
+ERROR    : ********* STACK TRACE END *********
+PGM EXIT: 0
+ls: cannot access 'outflow/church_soc_cm_new.hex': No such file or directory
+sipantichijk@penguin:~/church_project/SoC$ 
