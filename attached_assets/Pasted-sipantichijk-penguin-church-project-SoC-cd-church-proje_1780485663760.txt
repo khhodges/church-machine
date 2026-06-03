@@ -1,0 +1,80 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Check if project XML has a timing model field (written by 2025.2 efx_map):
+grep -i "timing\|model" church_soc_cm.xml | head -10
+
+# What timing models does 2026.1 have for Ti60?
+ls ~/efinity/2026.1/pt/db/timing_models/ 2>/dev/null | head -20
+
+# See more context around the comparison in the script (lines 185-232):
+sed -n '185,232p' ~/efinity/2026.1/scripts/efx_run_pt_unified.py
+        <efx:timing_model name="C3" />
+common_models
+oph_129x482_b12_d5.xml
+oph_129x482_b12_d5_brinho.xml
+oph_159x242_b17_d3.xml
+oph_159x242_b17_d3_100.xml
+oph_159x242_b17_d3_auto.xml
+oph_159x242_b17_d3_b80.xml
+oph_337x642_b33_d10.xml
+oph_337x642_b33_d10_brinho.xml
+oph_77x162_b3_d1.xml
+opx_218x322_b16_d10.xml
+opx_218x322_b16_d10_C3_only.xml
+opx_218x322_b16_d10_b100.xml
+opx_218x322_b16_d10_b225.xml
+opx_218x322_b16_d10_tz.xml
+opx_268x484_b24_d12.xml
+opx_268x484_b24_d12_ea.xml
+opx_333x642_b40_d20.xml
+opx_333x642_b40_d20_tz.xml
+opx_333x642_b40_d20_with_Q3.xml
+            design_path = str(Path(self.args.get('design_dir')))
+
+        if not design_file.exists():
+            if self.args.get('create', False):
+                print(f"Design file {design_file} doesn't exist, create a new one")
+                design_api.create(self.args.get('design'),
+                                  self.args.get('device'),
+                                  design_path)
+                design_api.save()
+                print(f"Design file created {design_file}")
+            else:
+                print(f"Design file {design_file} doesn't exist")
+                return PTFlowRunnerStatusCode.ERROR
+        else:
+            print(f"Load design file {design_file}")
+
+            # Sync project name
+            if proj_db is not None:
+                sync_design_file_efxproject(design_file, proj_file)
+
+            design_api.load(str(design_file))
+
+        design_name = design_api._get_design_db().name
+        
+        # Default location of the output_dir should be with respect to the design_dir
+        output_dir = self.args.get('output_dir', Path(self.args.get('design_dir')) / 'outflow')
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+        # Check device consistency if project file provided
+        proj_file = self.args.get('project_xml')
+        proj_db: Optional[EfxProjectDatabase] = None
+        if proj_file is not None:
+            proj_db = EfxProjectDatabase()
+            loaded = proj_db.load(proj_file)
+            if not loaded:
+                print(f"Fail to load Efinity project file {proj_file}")
+                return PTFlowRunnerStatusCode.ERROR
+            else:
+                if proj_db.device_family != family:
+                    print("ERROR: Device family mismatch between Efinity project file and Periphery design file")
+                    return PTFlowRunnerStatusCode.ERROR
+                if proj_db.device_model != device:
+                    print("ERROR: Device name mismatch between Efinity project file and Periphery design file")
+                    return PTFlowRunnerStatusCode.ERROR
+                if proj_db.device_timing_model != timing_model:
+                    print("ERROR: Timing model mismatch between Efinity project file and Periphery design file")
+                    return PTFlowRunnerStatusCode.ERROR
+
+sipantichijk@penguin:~/church_project/SoC$ 
