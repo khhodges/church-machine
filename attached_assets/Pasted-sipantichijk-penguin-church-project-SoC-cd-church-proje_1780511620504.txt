@@ -1,0 +1,56 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+export EFINITY_HOME=~/efinity/2025.2 && source $EFINITY_HOME/bin/setup.sh
+unset PYTHONHOME PYTHONPATH && export PATH=$EFINITY_HOME/bin:$PATH
+
+# Copy new VDB for PnR:
+cp top.vdb work_pnr/church_soc_cm.vdb
+
+# Run PnR:
+~/efinity/2025.2/bin/efx_pnr \
+  --family Titanium --device Ti60F225 \
+  --circuit church_soc_cm --prj church_soc_cm.xml \
+  --pack --place --route \
+  --max_threads 4 \
+  --work_dir work_pnr \
+  --output_dir outflow 2>&1 | tail -5
+
+# Generate hex with BRAM init:
+~/efinity/2025.2/bin/efx_pgm \
+  --project church_soc_cm.xml \
+  --source work_pnr/church_soc_cm.lbf \
+  --dest outflow/church_soc_cm_church.hex \
+  --enable_roms on 2>&1 | tail -5
+
+# Check hex size — should be ~2.4MB (not ~2.16MB):
+ls -la outflow/church_soc_cm_church.hex
+
+# Flash and listen:
+sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_church.hex && \
+python3 -c "
+import serial, time
+s = serial.Serial('/dev/ttyUSB3', 115200, timeout=10, exclusive=False)
+time.sleep(3); print(repr(s.read(500))); s.close()
+"
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+^[[1;2A^[[1;2AINFO     : The entire flow of EFX_PNR took 1531.707493336 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_PNR took 2846.22 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_PNR virtual memory usage: begin = 127.592 MB, end = 572.996 MB, delta = 445.404 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_PNR resident set memory usage: begin = 40.576 MB, end = 458.956 MB, delta = 418.38 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_PNR peak resident set memory usage = 458.956 MB [FlowMsg::RSSUsage::Peak]
+INFO     :      [--activate_tri_then_reset arg]                 :       tristate IO pins before chip resets during exit from user mode [on|off]
+INFO     :      [--osc_user_enable arg]                         :       Enable internal oscillator for user mode / core usage [on|off]
+INFO     :      [--osc_user_div_select arg]                     :       Select internal oscillator divider for user mode / core usage [DIV8|DIV4|DIV2|DIV1]
+ERROR    : unrecognised option '--project'
+ERROR    : Failed to process options, exiting.
+ls: cannot access 'outflow/church_soc_cm_church.hex': No such file or directory
+^[[1;2A^[[1;2Aempty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+FAIL: Error: fail to open outflow/church_soc_cm_church.hex
+Error: Failed to program FPGA: Error: fail to open outflow/church_soc_cm_church.hex
+sipantichijk@penguin:~/church_project/SoC$ 
