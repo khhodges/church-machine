@@ -1,0 +1,87 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Release ttyUSB2:
+fuser -k /dev/ttyUSB2 2>/dev/null; sleep 1
+
+# Check efx_pgm flags:
+export EFINITY_HOME=~/efinity/2026.1 && source $EFINITY_HOME/bin/setup.sh
+unset PYTHONHOME PYTHONPATH && export PATH=$EFINITY_HOME/bin:$PATH
+~/efinity/2026.1/bin/efx_pgm --help 2>&1 | head -20
+
+# Generate fresh bitstream from the Jun 3 09:xx PnR results:
+~/efinity/2026.1/bin/efx_pgm \
+    --family Titanium \
+    --device Ti60F225 \
+    --circuit church_soc_cm \
+    --prj church_soc_cm.xml \
+    --work_dir outflow --output_dir outflow 2>&1 | tail -8
+
+# Verify hex is now fresh (should be Jun 3 09:xx):
+ls -la outflow/church_soc_cm.hex outflow/church_soc_cm.bit
+
+# Stamp and reflash with CORRECT bitstream:
+cp outflow/church_soc_cm.hex outflow/church_soc_cm_v4.hex
+sudo /usr/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_v4.hex
+
+# Wait for board boot then test UART:
+sleep 3
+timeout 8 cat /dev/ttyUSB2
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+INFO     : Usage: efx_pgm [Options ...]
+INFO     : Primary Options
+INFO     :      [--project-xml arg]                             :       Project XML file
+INFO     :      [--source arg]                                  :       Input LBF/HEX file
+INFO     :      [--periph arg]                                  :       Input periphery config (from periphery tool) file
+INFO     :      [--dest arg]                                    :       Output HEX file
+INFO     :      [--query_bitstreams]                            :       Program exits immediately, with exit code 0 indicating bitstreams enabled for given device, 1 if not
+INFO     :      [--query_security_version]                      :       Program exits immediately, with printed value for security layer device version
+INFO     :      [--help]                                        :       Produce help message
+INFO     : General Options
+INFO     :      [--device arg]                                  :       FPGA device
+INFO     :      [--family arg]                                  :       FPGA family
+INFO     :      [--displayed_device arg]                        :       FPGA device name written to bitstream header
+INFO     :      [--generate_header arg]                         :       Write optional header to bitstream file [on|off]
+INFO     :      [--timestamp arg]                               :       Write timestamp to bitstream file header [on|off]
+INFO     :      [--width arg]                                   :       Programming width [1|2|4|8|16|32]
+INFO     :      [--settings_file arg]                           :       Settings file
+INFO     :      [--interface_designer_settings arg]             :       Settings file generated from Interface Designer
+INFO     :      [--periph_override arg]                         :       CSV file to override Interface Designer LPF settings
+INFO     :      [--mode]                                        :       FPGA configuration mode
+INFO     :      [--seu_correction_clearable arg]                :       Select if SEU Correction UNFIXABLE status clearable or not [on|off]
+INFO     :      [--seu_correction_err_inject arg]               :       Enable SEU Correction error injection feature [on|off]
+INFO     :      [--release_tri_then_reset arg]                  :       release IO tristates before reset upon entering user mode [on|off]
+INFO     :      [--activate_tri_then_reset arg]                 :       tristate IO pins before chip resets during exit from user mode [on|off]
+INFO     :      [--osc_user_enable arg]                         :       Enable internal oscillator for user mode / core usage [on|off]
+INFO     :      [--osc_user_div_select arg]                     :       Select internal oscillator divider for user mode / core usage [DIV8|DIV4|DIV2|DIV1]
+ERROR    : unrecognised option '--circuit'
+ERROR    : Failed to process options, exiting.
+-rw-r--r-- 1 sipantichijk sipantichijk 2157147 Jun  2 18:03 outflow/church_soc_cm.bit
+-rw-r--r-- 1 sipantichijk sipantichijk 2157207 Jun  2 18:03 outflow/church_soc_cm.hex
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+cat: /dev/ttyUSB2: Device or resource busy
+sipantichijk@penguin:~/church_project/SoC$ 
