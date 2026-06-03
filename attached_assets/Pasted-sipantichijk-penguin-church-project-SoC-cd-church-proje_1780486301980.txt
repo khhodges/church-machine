@@ -1,0 +1,47 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Check LPF format and uart_tx assignment:
+head -10 outflow/church_soc_cm.lpf
+grep -i "uart_tx" outflow/church_soc_cm.lpf | head -5
+grep -i "uart_tx" church_soc_cm.peri.xml | head -10
+
+# Check what GPIOL_02 is connected to in the LPF:
+grep -B5 -A5 "GPIOL_02" outflow/church_soc_cm.lpf | head -30
+<?xml version="1.0" ?>
+<efxpt:periphery design="church_soc_cm" device="Ti60F225" xmlns:efxpt="http://www.efinixinc.com/peri_device_db" xmlns:efxutil="http://www.efinixinc.com/peri_tool" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.efinixinc.com/peri_device_db lpf.xsd" checksum="64ad81ca">
+  <!-- Efinity Logical Peripheral File -->
+  <!-- Version: 2026.1.132 -->
+  <!-- Date: 2026-06-03 07:22 -->
+  <!-- Copyright (C) 2013 - 2026 Efinix Inc. All rights reserved. -->
+  <efxpt:sequence size="119">
+    <efxpt:instance id="BG_1A" index="0" type="hsio_bg"/>
+    <efxpt:instance id="GPIOL_PN_00" index="1" type="hsio"/>
+    <efxpt:instance id="GPIOL_PN_01" index="2" type="hsio"/>
+        <efxpt:comp_gpio name="cm_uart_tx" gpio_def="GPIOL_P_03" mode="output" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:output_config name="cm_uart_tx" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+        <efxpt:comp_gpio name="uart_tx" gpio_def="GPIOL_02" mode="output" bus_name="" io_standard="3.3 V LVCMOS">
+            <efxpt:output_config name="uart_tx" name_ddio_lo="" register_option="none" clock_name="" is_clock_inverted="false" is_slew_rate="false" tied_option="none" ddio_type="none" delay="0" is_serial="false" drive_strength="4" fastclk_name=""/>
+    <efxpt:instance id="GPIOB_PN_02" index="111" type="hsio"/>
+    <efxpt:instance id="GPIOB_PN_01" index="112" type="hsio"/>
+    <efxpt:instance id="GPIOB_PN_00" index="113" type="hsio"/>
+    <efxpt:instance id="BG_4B" index="114" type="hsio_bg"/>
+    <efxpt:instance id="GPIOL_01" index="115" type="gpio"/>
+    <efxpt:instance id="GPIOL_02" index="116" type="gpio"/>
+    <efxpt:instance id="GPIOBL_CTRL" index="117" type="hvio_poc"/>
+    <efxpt:instance id="PLL_BL0" index="118" type="pll"/>
+  </efxpt:sequence>
+  <efxpt:block_def bitsize="31" name="gpio" paramsize="20">
+    <efxpt:sequence>
+--
+    <efxpt:parameter name="PCR_TX_DLY" value="0"/>
+    <efxpt:parameter name="PCR_WKPD" value="DISABLE"/>
+    <efxpt:parameter name="PCR_WKPU" value="DISABLE"/>
+    <efxpt:parameter name="UNUSED" value="ENABLE"/>
+  </efxpt:instance>
+  <efxpt:instance id="GPIOL_02" type="gpio">
+    <efxpt:parameter name="PCR_CLK_OUT" value="DISABLE"/>
+    <efxpt:parameter name="PCR_IE" value="DISABLE"/>
+    <efxpt:parameter name="PCR_IN_BYP" value="REGISTER"/>
+    <efxpt:parameter name="PCR_IN_MODE" value="OPP_EDGE"/>
+    <efxpt:parameter name="PCR_OE_BYP" value="REGISTER"/>
+sipantichijk@penguin:~/church_project/SoC$ 
