@@ -1,0 +1,70 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Kill whatever is holding ttyUSB2:
+sudo fuser -k /dev/ttyUSB2 2>/dev/null; sleep 1
+fuser /dev/ttyUSB2 2>/dev/null && echo "still busy" || echo "free"
+
+# Check what the last PnR wrote and find peri.xml:
+ls -la work_pnr/church_soc_cm.lbf
+ls -la church_soc_cm.peri.xml 2>/dev/null || find . -name "*.peri.xml" 2>/dev/null | head -3
+
+# Correct efx_pgm command (--source LBF, --periph peri.xml, --dest hex):
+export EFINITY_HOME=~/efinity/2026.1 && source $EFINITY_HOME/bin/setup.sh
+unset PYTHONHOME PYTHONPATH && export PATH=$EFINITY_HOME/bin:$PATH
+
+~/efinity/2026.1/bin/efx_pgm \
+    --family Titanium \
+    --device Ti60F225 \
+    --project-xml church_soc_cm.xml \
+    --source work_pnr/church_soc_cm.lbf \
+    --periph church_soc_cm.peri.xml \
+    --dest outflow/church_soc_cm_v4.hex 2>&1 | tail -8
+
+# Verify fresh hex:
+ls -la outflow/church_soc_cm_v4.hex
+
+# Flash the CORRECT new bitstream:
+sudo /usr/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_v4.hex
+
+# Test UART immediately after reset:
+sleep 3
+stty -F /dev/ttyUSB2 115200 raw && timeout 8 cat /dev/ttyUSB2
+free
+-rw-r--r-- 1 sipantichijk sipantichijk 1242841 Jun  3 09:23 work_pnr/church_soc_cm.lbf
+-rw-r--r-- 1 sipantichijk sipantichijk 11247 Jun  2 16:51 church_soc_cm.peri.xml
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+ERROR    :           0x44b93e: in efx_pgm + 0x44b93e
+ERROR    :           0x441767: in efx_pgm + 0x441767
+ERROR    :           0x487a7a: in efx_pgm + 0x487a7a
+ERROR    :           0x414267: in efx_pgm + 0x414267
+ERROR    :     0x7ff1cb435ca8: in libc.so.6 + 0x29ca8
+ERROR    :     0x7ff1cb435d65: in libc.so.6 + 0x29d65
+ERROR    :           0x4145ee: in efx_pgm + 0x4145ee
+ERROR    : ********* STACK TRACE END *********
+-rw-r--r-- 1 sipantichijk sipantichijk 2157207 Jun  3 09:29 outflow/church_soc_cm_v4.hex
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+stty: /dev/ttyUSB2: Device or resource busy
+sipantichijk@penguin:~/church_project/SoC$ 
