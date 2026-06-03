@@ -1,0 +1,80 @@
+/home/sipantichijk/efinity/2026.1/bin/efx_map
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4870): extracting RAM for identifier 'ram_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4871): extracting RAM for identifier 'ram_symbol3' [VERI-2571]
+INFO     : EFX_RAM10               :    59
+INFO     : The entire flow of EFX_MAP took 267.173378735 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_MAP took 304.66 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.968 MB, end = 500.764 MB, delta = 392.796 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.176 MB, end = 289.288 MB, delta = 255.112 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 372.7 MB [FlowMsg::RSSUsage::Peak]
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+export EFINITY_HOME=~/efinity/2026.1 && source $EFINITY_HOME/bin/setup.sh
+unset PYTHONHOME PYTHONPATH && export PATH=$EFINITY_HOME/bin:$PATH
+
+cp top.vdb work_pnr/church_soc_cm.vdb
+
+~/efinity/2026.1/bin/efx_pnr \
+    --family Titanium --device Ti60F225 --circuit church_soc_cm \
+    --prj church_soc_cm.xml --pack --place --route \
+    --max_threads 4 --work_dir work_pnr --output_dir outflow 2>&1 | grep -E "ERROR|Routing Succeeded|Bitstream" | tail -3
+
+~/efinity/2026.1/bin/efx_pgm \
+    --family Titanium --device Ti60F225 \
+    --project-xml church_soc_cm.xml \
+    --source work_pnr/church_soc_cm.lbf \
+    --periph outflow/church_soc_cm.lpf \
+    --dest outflow/church_soc_cm_v4.hex 2>&1 | grep -E "Finished|ERROR|enable_roms|ROM" | head -5
+
+# Check size — should be ~2.4MB like v3.hex:
+wc -c outflow/church_soc_cm_v4.hex outflow/church_soc_cm_v3.hex
+
+# Flash + listen immediately:
+sudo /usr/bin/openFPGALoader \
+    -b titanium_ti60_f225_jtag -f outflow/church_soc_cm_v4.hex && \
+python3 -c "
+import serial, time
+s = serial.Serial('/dev/ttyUSB3', 115200, timeout=15, exclusive=False)
+time.sleep(3)
+data = s.read(1000)
+print(repr(data))
+s.close()
+"
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+INFO     : Bitstream generation virtual memory usage: begin = 536.116 MB, end = 549.932 MB, delta = 13.816 MB [FlowMsg::VMUsage]
+INFO     : Bitstream generation resident set memory usage: begin = 317.072 MB, end = 430.864 MB, delta = 113.792 MB [FlowMsg::RSSUsage]
+INFO     :     Bitstream generation peak resident set memory usage = 430.864 MB [FlowMsg::RSSUsage::Peak]
+INFO     : Finished generating "outflow/church_soc_cm_v4.hex"
+2157249 outflow/church_soc_cm_v4.hex
+2416272 outflow/church_soc_cm_v3.hex
+4573521 total
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [===================================================] 100.00%
+Done
+Reset DONE
+b''
+sipantichijk@penguin:~/church_project/SoC$ 
