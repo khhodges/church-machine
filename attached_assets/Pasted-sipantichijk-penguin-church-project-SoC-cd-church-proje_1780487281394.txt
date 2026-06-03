@@ -1,0 +1,36 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# 1. VexRiscv reset vector parameter in sapphire.v:
+grep -n "resetVector\|reset_vector\|rstVector\|0xF9" sapphire.v | head -10
+
+# 2. system_ramA base address in the address decoder:
+grep -n "0xF9000000\|F9000000\|system_ramA\|mainRam\|ioRange\|axiCross" sapphire.v | head -15 
+
+# 3. Symbol.bin vs firmware.bin timestamps:
+ls -la firmware/firmware.bin EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol*.bin
+
+# 4. Verify firmware starts with AUIPC (0x17) - first 4 bytes of firmware.bin:
+od -An -tx1 -N16 firmware/firmware.bin
+291:  wire                system_ramA_logic_io_bus_cmd_ready;
+292:  wire                system_ramA_logic_io_bus_rsp_valid;
+293:  wire                system_ramA_logic_io_bus_rsp_payload_last;
+294:  wire       [0:0]    system_ramA_logic_io_bus_rsp_payload_fragment_opcode;
+295:  wire       [31:0]   system_ramA_logic_io_bus_rsp_payload_fragment_data;
+296:  wire       [3:0]    system_ramA_logic_io_bus_rsp_payload_fragment_context;
+863:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_valid;
+864:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_ready;
+865:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_last;
+866:  wire       [0:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_opcode;
+867:  wire       [14:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address;
+868:  wire       [1:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_length;
+869:  wire       [31:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_data;
+870:  wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_mask;
+871:  wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_context;
+grep: write error: Broken pipe
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  2 13:39 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  2 13:39 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  2 13:39 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  2 13:39 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+-rwxr-xr-x 1 sipantichijk sipantichijk    3252 Jun  2 13:39 firmware/firmware.bin
+ 17 81 00 00 13 01 01 00 97 72 00 00 93 82 82 ff
+sipantichijk@penguin:~/church_project/SoC$ 
