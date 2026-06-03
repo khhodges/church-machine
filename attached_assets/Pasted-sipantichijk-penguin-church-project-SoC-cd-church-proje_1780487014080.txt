@@ -1,0 +1,61 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# 1. Does the VDB have non-zero EFX_RAM10 INIT data?
+grep -a "INIT_0\|init_val\|EFX_RAM10" top.vdb 2>/dev/null | head -10
+
+# 2. What files did 2025.2 synthesis produce?
+ls work_syn/ | head -20
+
+# 3. Find boot_rom across all .v files (which file defines it, what address?):
+grep -rn "boot_rom\|boot_address\|resetVector" *.v | grep -v "IBusCachedPlugin_fetchPc_booted" | head -15
+
+# 4. Firmware linker script - what's the load address?
+find firmware -name "*.ld" -exec head -30 {} \;
+
+# 5. Verify hex has actual firmware - search for first RISC-V opcode bytes:
+grep -c "17139793" outflow/church_soc_cm_v3.hex
+synthesis.log
+synthesis2.log
+synthesis3.log
+synthesis_2025.log
+church_ti60_f225.v:269:  (* src = "/home/runner/workspace/hardware/boot_rom.py:669" *)
+church_ti60_f225.v:365:  (* src = "/home/runner/workspace/hardware/boot_rom.py:670" *)
+church_ti60_f225.v:3087:  \top.boot_rom  boot_rom (
+church_ti60_f225.v:7086:(* src = "/home/runner/workspace/hardware/boot_rom.py:673" *)
+church_ti60_f225.v:7088:module \top.boot_rom (clk, data, addr);
+church_ti60_f225.v:7090:  (* src = "/home/runner/workspace/hardware/boot_rom.py:669" *)
+church_ti60_f225.v:7095:  (* src = "/home/runner/workspace/hardware/boot_rom.py:670" *)
+church_ti60_f225.v:7098:  (* src = "/home/runner/workspace/hardware/boot_rom.py:675" *)
+church_ti60_f225.v:7100:  (* src = "/home/runner/workspace/hardware/boot_rom.py:670" *)
+/*
+ * hardware/soc_combined/firmware/link.ld
+ *
+ * Memory map from sapphire.v (address decoder):
+ *   BRAM  0xF9000000  32 KB  r/w  (code + data, CPU resets to 0xF9000000)
+ *   APB   0xF8000000  16 MB  r/w  (peripherals — UART at 0xF8010000)
+ *
+ * We split the single 32 KB BRAM into:
+ *   ROM  0xF9000000  28 KB  .text + .rodata
+ *   RAM  0xF9007000   4 KB  .data + .bss + stack
+ *
+ * The .data section is VMA 0xF9007000, LMA immediately after .rodata
+ * (AT > ROM in the SECTIONS block), so crt0 copies it at boot.
+ */
+
+MEMORY
+{
+    ROM (rx)  : ORIGIN = 0xF9000000, LENGTH = 28K
+    RAM (rwx) : ORIGIN = 0xF9007000, LENGTH = 4K
+}
+
+ENTRY(_start)
+
+SECTIONS
+{
+    .text : {
+        *(.text.startup)
+        *(.text*)
+        *(.rodata*)
+        . = ALIGN(4);
+0
+sipantichijk@penguin:~/church_project/SoC$ 
