@@ -1,0 +1,111 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+export EFINITY_HOME=~/efinity/2026.1
+source $EFINITY_HOME/bin/setup.sh
+unset PYTHONHOME PYTHONPATH
+export PATH=$EFINITY_HOME/bin:$PATH
+
+# Step 1 — Interface Designer (re-applies pin constraints from peri.xml):
+python3 $EFINITY_HOME/scripts/efx_run_pt_unified.py \
+    church_soc_cm Titanium Ti60F225 \
+    --output_dir outflow \
+    --timing_model C3 \
+    --project_xml church_soc_cm.xml \
+    2>&1 | tee outflow/interface_new.log
+echo "IFACE EXIT: $?"
+
+# Step 2 — Generate hex from the fresh 18:44 LBF:
+efx_pgm \
+    --source  work_pnr/church_soc_cm.lbf \
+    --dest    outflow/church_soc_cm_new.hex \
+    --device  Ti60F225 \
+    --family  Titanium \
+    --periph_xml church_soc_cm.peri.xml \
+    2>&1 | tee outflow/pgm_new.log
+echo "PGM EXIT: $?"
+
+ls -lh outflow/church_soc_cm_new.hex
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+Traceback (most recent call last):
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/writer/summary_report.py", line 1527, in write
+    self.generate_global_summary(outfile, ins_to_block_map)
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/writer/summary_report.py", line 1268, in generate_global_summary
+    block_obj.generate_global_summary(
+  File "/home/sipantichijk/efinity/2026.1/pt/bin/an20_device/pll/writer/summary.py", line 85, in generate_global_summary
+    assert reg is not None
+           ^^^^^^^^^^^^^^^
+AssertionError
+
+Fail to generate summary report file
+Source exception : msg_level:MsgLevel.error msg: src_excp:None
+Load design file church_soc_cm.peri.xml
+Writing out summary report file
+WARNING: Fail to generate summary report file
+WARNING: report generation skipped (headless patch)
+Writing out interface config file
+Writing out timing related file
+Writing out verilog template file
+Writing out option register file
+Writing out boundary scan description file
+Writing out LPF
+Unified Timing supported
+WARNING: timing netlist export skipped (headless patch)
+IFACE EXIT: 0
+INFO     : Usage: efx_pgm [Options ...]
+INFO     : Primary Options
+INFO     :      [--project-xml arg]                             :       Project XML file
+INFO     :      [--source arg]                                  :       Input LBF/HEX file
+INFO     :      [--periph arg]                                  :       Input periphery config (from periphery tool) file
+INFO     :      [--dest arg]                                    :       Output HEX file
+INFO     :      [--query_bitstreams]                            :       Program exits immediately, with exit code 0 indicating bitstreams enabled for given device, 1 if not
+INFO     :      [--query_security_version]                      :       Program exits immediately, with printed value for security layer device version
+INFO     :      [--help]                                        :       Produce help message
+INFO     : General Options
+INFO     :      [--device arg]                                  :       FPGA device
+INFO     :      [--family arg]                                  :       FPGA family
+INFO     :      [--displayed_device arg]                        :       FPGA device name written to bitstream header
+INFO     :      [--generate_header arg]                         :       Write optional header to bitstream file [on|off]
+INFO     :      [--timestamp arg]                               :       Write timestamp to bitstream file header [on|off]
+INFO     :      [--width arg]                                   :       Programming width [1|2|4|8|16|32]
+INFO     :      [--settings_file arg]                           :       Settings file
+INFO     :      [--interface_designer_settings arg]             :       Settings file generated from Interface Designer
+INFO     :      [--periph_override arg]                         :       CSV file to override Interface Designer LPF settings
+INFO     :      [--mode]                                        :       FPGA configuration mode
+INFO     : HEX Generation Options
+INFO     :      [--oscillator_clock_divider arg]                :       SPI active programming clock divider [DIV8|DIV4|DIV2|DIV1]
+INFO     :      [--bitstream_compression arg]                   :       enable compressed bitstream [on|off]
+INFO     :      [--optimize_bram_data arg]                      :       Optimize BRAM frames [on|off]
+INFO     :      [--spi_low_power_mode arg]                      :       power down flash device after programming [on|off]
+INFO     :      [--io_weak_pullup arg]                          :       enable IO weak pullup during configuration [on|off]
+INFO     :      [--jtag_usercode arg]                           :       specify JTAG USERCODE [unsigned integer]
+INFO     :      [--enable_roms arg]                             :       enable initialized memory in user RAMs [on|off|smart]
+INFO     :      [--enable_crc_check arg]                        :       enable crc checking of bitstream during programming [on|off]
+INFO     :      [--enable_pcr_crc_check arg]                    :       enable PCR crc checking of bitstream during programming [on|off]
+INFO     :      [--enable_seu_crc_check arg]                    :       enable SEU crc checking of bitstream during user mode [on|off]
+INFO     :      [--enable_cbsel arg]                            :       enable SPI Active image selection using CBSEL[1:0] pins [on|off]
+INFO     :      [--enable_remote_update arg]                    :       enable remote update [on|off]
+INFO     :      [--remote_update_retries arg]                   :       select number of retry attempts for remote update [unsigned integer]
+INFO     :      [--flash_addr_2 arg]                            :       flash byte address for multi-image selection #2 [unsigned integer]
+INFO     :      [--flash_addr_3 arg]                            :       flash byte address for multi-image selection #3 [unsigned integer]
+INFO     :      [--flash_addr_4 arg]                            :       flash byte address for multi-image selection #4 [unsigned integer]
+INFO     :      [--enable_daisy_chain arg]                      :       enable SPI Active/Passive daisy chain [on|off]
+INFO     :      [--daisy_chain_length arg]                      :       Daisy chain total bit count [unsigned integer]
+INFO     :      [--four_byte_addressing arg]                    :       use 4 byte addressing during active mode configuration from SPI flash [on|off]
+INFO     :      [--active_capture_clk_edge arg]                 :       SPI Active sampling clock edge [posedge|negedge]
+INFO     :      [--enable_external_master_clock arg]            :       Select external clock source for SPI Active configuration [on|off]
+INFO     :      [--seu_mode arg]                                :       Select automatic or manual user mode SEU CRC checking [automatic|manual]
+INFO     :      [--seu_wait_interval arg]                       :       Wait interval between automatic mode SEU CRC checks [unsigned integer]
+INFO     :      [--seu_enable_correction arg]                   :       Enable SEU Correction feature (invalid unless enable_seu_crc_check also enabled) [on|off]
+INFO     :      [--seu_correction_mode arg]                     :       SEU Correction mode [manual|timer|monitor|autofix]
+INFO     :      [--seu_correction_timer arg]                    :       Maximum wait time for SEU Correction timer mode [unsigned integer]
+INFO     :      [--seu_correction_clearable arg]                :       Select if SEU Correction UNFIXABLE status clearable or not [on|off]
+INFO     :      [--seu_correction_err_inject arg]               :       Enable SEU Correction error injection feature [on|off]
+INFO     :      [--release_tri_then_reset arg]                  :       release IO tristates before reset upon entering user mode [on|off]
+INFO     :      [--activate_tri_then_reset arg]                 :       tristate IO pins before chip resets during exit from user mode [on|off]
+INFO     :      [--osc_user_enable arg]                         :       Enable internal oscillator for user mode / core usage [on|off]
+INFO     :      [--osc_user_div_select arg]                     :       Select internal oscillator divider for user mode / core usage [DIV8|DIV4|DIV2|DIV1]
+ERROR    : unrecognised option '--periph_xml'
+ERROR    : Failed to process options, exiting.
+PGM EXIT: 0
+ls: cannot access 'outflow/church_soc_cm_new.hex': No such file or directory
+sipantichijk@penguin:~/church_project/SoC$ 
