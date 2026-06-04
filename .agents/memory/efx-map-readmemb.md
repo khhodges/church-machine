@@ -99,15 +99,25 @@ cd hardware/soc_combined
 - INIT_0[k] = bit-plane value at word address k, for k = 0..255
 - Non-zero INIT_0 confirmed for all four lanes (symbol0–3)
 
-## uart_putc: unconditional write + delay
+## uart_putc: TWO requirements — both must be satisfied
 
-The Sapphire UART STATUS bit layout (TX-available in bits[23:16] vs bit 0)
-varies between Sapphire IP configurations. Polling the wrong bit causes an
-infinite spin and silent UART TX.
+### 1. No STATUS polling
+STATUS TX-ready bit position varies between Efinix IP configs (bit 0 vs
+bits[23:16]). Polling wrong bit = infinite spin = silent UART. Skip STATUS.
 
-**Fix:** Skip STATUS polling entirely. Write UART_DATA unconditionally and
-wait 3000 NOPs (~120 µs @ 25 MHz) between characters. This is ~38% margin
-over the 115200-baud character time (86.8 µs). The UART FIFO never overflows.
+### 2. Bit 8 of UART_DATA is SpinalHDL write-valid flag — MUST be set
+Writing just `UART_DATA = c` (bits[7:0] only) is silently ignored — no TX,
+no error, identical symptom to the STATUS-poll hang (`b''` for 8+ seconds).
+**Always write `UART_DATA = (1u << 8) | (uint32_t)(unsigned char)c;`**
+
+**Correct uart_putc (confirmed working pattern):**
+```c
+static void uart_putc(char c) {
+    UART_DATA = (1u << 8) | (uint32_t)(unsigned char)c;
+    for (volatile uint32_t i = 0; i < 3000u; i++) __asm__("nop");
+}
+```
+3000 NOPs ≈ 120 µs @ 25 MHz = 1.38× margin over 86.8 µs char time.
 
 ## Other confirmed facts
 
