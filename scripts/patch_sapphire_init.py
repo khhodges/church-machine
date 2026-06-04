@@ -87,8 +87,10 @@ def patch_lane(content, var, fname, assignments, lane_idx):
     Raises SystemExit if neither pattern is found.
     """
     # ── Case 1: virgin sapphire.v still has $readmemb ────────────────────────
+    # Match any path prefix before the filename (handles absolute paths like
+    # "/home/user/.../EfxSapphireSoc...bin" as well as bare filenames).
     pattern_rmb = (
-        r'\$readmemb\("'
+        r'\$readmemb\("[^"]*'
         + re.escape(fname)
         + r'",'
         + r'\s*'
