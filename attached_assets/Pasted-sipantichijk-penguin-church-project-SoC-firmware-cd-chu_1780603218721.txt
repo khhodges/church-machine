@@ -1,0 +1,55 @@
+sipantichijk@penguin:~/church_project/SoC/firmware$ cd ~/church_project/SoC/firmware
+cat > full_uart.c << 'EOF'
+#include <stdint.h>
+static inline void D(uint32_t n){__asm__ volatile("1: addi %0,%0,-1\n bne %0,zero,1b\n":"+r"(n));}
+void main(void){
+volatile uint32_t*u=(volatile uint32_t*)0xF8010000;
+u[2]=53;
+#define P(c) u[0]=(1u<<8)|(unsigned char)(c);D(3000)
+for(;;){
+P('C');P('H');P('U');P('R');P('C');P('H');P(' ');
+P('T');P('i');P('6');P('0');P(' ');P('S');P('o');P('C');
+P('+');P('C');P('M');P(' ');P('v');P('1');P('.');P('1');
+P('\r');P('\n');
+}}
+EOF
+$T/riscv-none-embed-gcc -march=rv32i -mabi=ilp32 -O2 -nostartfiles -nodefaultlibs -T link.ld -o full_uart.elf crt0.S full_uart.c && $T/riscv-none-embed-objcopy -O binary full_uart.elf full_uart.bin && ls -la full_uart.bin
+sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag --external-flash -o 0x380000 full_uart.bin && echo FLASHED
+sudo chmod a+rw /dev/ttyUSB* && python3 -c "
+import os,time,serial
+port='/dev/ttyUSB2'
+print('UNPLUG...')
+while os.path.exists(port): time.sleep(0.05)
+print('Gone. Replug...')
+while not os.path.exists(port): time.sleep(0.05)
+time.sleep(0.8); s=serial.Serial(port,230400,timeout=15)
+print(repr(s.read(300))); s.close()
+"
+-rwxr-xr-x 1 sipantichijk sipantichijk 624 Jun  4 15:59 full_uart.bin
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00380000, end_addr: 00390000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+FLASHED
+UNPLUG...
+Gone. Replug...
+b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00CHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti60 SoC+CM v1.1\r\nCHURCH Ti'
+sipantichijk@penguin:~/church_project/SoC/firmware$ 
