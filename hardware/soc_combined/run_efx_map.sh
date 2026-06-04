@@ -1,28 +1,27 @@
 #!/bin/bash
 # run_efx_map.sh — Efinix synthesis for SoC+CM combined project
-# Run from the project root (the folder containing SoC/)
-# Usage: bash SoC/run_efx_map.sh
+# Run from anywhere — paths resolve relative to this script's location.
+# Usage: bash hardware/soc_combined/run_efx_map.sh
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_MAP="$EFINITY/bin/efx_map"
 
-PROJECT="${1:-$PROJECT_ROOT/SoC/church_soc_cm.xml}"
+PROJECT="${1:-$SCRIPT_DIR/church_soc_cm.xml}"
 
 echo "==> Synthesising $PROJECT with EFX_MAP..."
 echo "    EFX_MAP: $EFX_MAP"
 echo "    Project: $PROJECT"
 echo ""
 
-mkdir -p "$PROJECT_ROOT/SoC/work_syn"
-cd "$PROJECT_ROOT/SoC"
-$EFX_MAP --project-xml church_soc_cm.xml 2>&1 | tee "$PROJECT_ROOT/SoC/work_syn/synthesis.log"
+mkdir -p "$SCRIPT_DIR/work_syn"
+cd "$SCRIPT_DIR"
+$EFX_MAP --project-xml "$PROJECT" 2>&1 | tee "$SCRIPT_DIR/work_syn/synthesis.log"
 echo ""
-echo "==> Synthesis complete. Output in SoC/work_syn/"
+echo "==> Synthesis complete. Output in work_syn/"
 echo "    Verify firmware embedded in BRAM:"
 echo "    for sym in 0 1 2 3; do"
-echo "      grep \"ram_symbol\${sym}__D\\\$g1\" SoC/outflow/church_soc_cm.map.v | head -1"
+echo "      grep \"ram_symbol\${sym}__D\\\$g1\" outflow/church_soc_cm.map.v | head -1"
 echo "    done"

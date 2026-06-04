@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_efx_pnr.sh — Place & Route for SoC+CM combined project
-# Run from the project root (the folder containing SoC/)
-# Usage: bash SoC/run_efx_pnr.sh
+# Run from anywhere — paths resolve relative to this script's location.
+# Usage: bash hardware/soc_combined/run_efx_pnr.sh
 #
 # NOTE: efx_pnr requires explicit --family/--device flags; it does NOT auto-read
 # them from the project XML.  Omitting them causes an immediate SIGSEGV crash
@@ -23,11 +23,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_PNR="$EFINITY/bin/efx_pnr"
 
-SOC_DIR="$PROJECT_ROOT/SoC"
+SOC_DIR="$SCRIPT_DIR"
 PROJECT="${1:-$SOC_DIR/church_soc_cm.xml}"
 CIRCUIT="church_soc_cm"
 FAMILY="Titanium"
@@ -63,5 +62,5 @@ cd "$SOC_DIR"
     2>&1 | tee "$SOC_DIR/work_pnr/pnr.log"
 
 echo ""
-echo "==> Place & Route complete. Output in SoC/work_pnr/ and SoC/outflow/"
-echo "    Bitstream: SoC/outflow/${CIRCUIT}.hex"
+echo "==> Place & Route complete. Output in work_pnr/ and outflow/"
+echo "    Bitstream: outflow/${CIRCUIT}.bit  (run run_efx_pgm.sh to produce the .hex)"

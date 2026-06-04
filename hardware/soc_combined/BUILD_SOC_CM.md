@@ -55,7 +55,7 @@ present) and the already-patched case (inline assignments already there).
 
 | Item | Notes |
 |---|---|
-| Efinity 2025.2 | Installed at `~/efinity/2025.2` |
+| Efinity 2026.1 | Installed at `~/efinity/2026.1` (scripts default to this; set `EFINITY_HOME` to override) |
 | Efinity RISC-V IDE 2025.2 | Toolchain at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin` |
 | Sapphire SoC IP | Ships with Efinity — see Step 1 |
 | Python 3 + Amaranth | Required to generate CM RTL in Step 2 |
@@ -148,7 +148,7 @@ sed -i 's/optimize-zero-init-rom" value="1"/optimize-zero-init-rom" value="0"/' 
 ### Step 6 — Synthesise
 
 ```bash
-bash hardware/soc_combined/work_syn/run_efx_map.sh 2>&1 | tail -5
+bash hardware/soc_combined/run_efx_map.sh 2>&1 | tail -5
 ```
 
 Verify all 4 BRAM lanes have non-zero INIT_0 (firmware confirmed embedded):
@@ -168,7 +168,7 @@ done
 
 **Option A — Command-line (preferred):**
 ```bash
-bash hardware/soc_combined/work_pnr/run_efx_pnr.sh 2>&1 | tail -5
+bash hardware/soc_combined/run_efx_pnr.sh 2>&1 | tail -5
 ```
 
 **Option B — GUI (if command-line crashes):**
