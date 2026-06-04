@@ -3,16 +3,27 @@ name: EFX_MAP $readmemb and system_ramA on Ti60
 description: Definitive confirmed findings — how to embed Sapphire SoC firmware into a Ti60F225 bitstream using Efinity 2025.2. Covers $readmemb, optimize-zero-init-rom, the inline-initial-block approach, efx_pgm syntax, and uart_putc pitfalls.
 ---
 
-## Confirmed working flow (May 2026, Efinity 2025.2, Ti60F225)
+## Confirmed working flow (June 2026, Efinity 2025.2, Ti60F225)
 
+```bash
+# From ~/church_project/SoC/
+cd firmware && touch main.c && make && cd ..
+python3 scripts/patch_sapphire_init.py sapphire.v \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol{0..3}.bin
+source ~/efinity/2025.2/bin/setup.sh
+efx_map --prj church_soc_cm.xml            # ~10 min; output: top.vdb
+cp top.vdb work_pnr/church_soc_cm.vdb
+/home/sipantichijk/efinity/2025.2/bin/efx_pnr --prj church_soc_cm.xml   # ~10 min
+/home/sipantichijk/efinity/2025.2/bin/efx_pgm --prj church_soc_cm.xml   # generates hex
+sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
 ```
-make -C hardware/soc_combined/firmware
-python3 scripts/patch_sapphire_init.py sapphire.v symbol{0..3}.bin
-bash work_syn/run_efx_map.sh
-bash work_pnr/run_efx_pnr.sh
-~/efinity/2025.2/bin/efx_pgm --project-xml church_soc_cm.xml   ← generates the hex
-sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
-```
+
+Key path facts:
+- `work_syn/run_efx_map.sh` and `work_pnr/run_efx_pnr.sh` do NOT exist — use commands above
+- `~/oss-cad-suite` does NOT exist — use `/usr/bin/openFPGALoader`
+- efx_pgm flag is `--prj` (not `--project-xml`) when running from project directory
+- efx_map outputs `top.vdb` to CWD (not `work_syn/`); must `cp top.vdb work_pnr/` before PnR
+- `source ~/efinity/2025.2/bin/setup.sh` sets EFINITY_HOME (required for efx_pnr/efx_pgm)
 
 ## $readmemb is completely ignored by EFX_MAP on Titanium
 
@@ -45,15 +56,23 @@ Replace $readmemb with explicit `mem[i] = 8'hXX;` assignments in sapphire.v
 an earlier test run before the correct synthesis parameters were in place.
 No `patch_mapv_init.py` step is needed.
 
-## patch_sapphire_init.py must handle both virgin and re-patch cases
+## patch_sapphire_init.py: absolute-path $readmemb bug (fixed June 2026)
 
-After the first run, sapphire.v no longer has `$readmemb` — it has inline
-assignments. The script must match EITHER pattern. Updated script (as of May
-2026) handles both: tries `$readmemb` regex first, then tries the inline
-`ram_symbolN[i] = 8'hXX;` pattern (any leading whitespace).
+The $readmemb pattern originally matched only the bare filename
+(`EfxSapphireSoc...bin`) but sapphire.v on Penguin has an **absolute path**
+(`/home/sipantichijk/.../EfxSapphireSoc...bin`). Regex failed → fell through
+to Case 2 (inline) → updated *other* initial blocks (not system_ramA) while
+reporting "0 block(s), NNN assignments". Firmware was never embedded.
 
-**Run from repo root with full paths.** Running from `hardware/soc_combined/`
-with relative paths like `hardware/soc_combined/sapphire.v` causes file-not-found.
+**Fix (applied June 2026):** Case 1 regex now uses `[^"]*` prefix:
+```python
+r'\$readmemb\("[^"]*' + re.escape(fname) + r'",'
+```
+Check for success: output should say "Replaced $readmemb symbol0 → NNN assignments"
+(not "Updated inline … was already-patched"). Verify with `grep -c readmemb sapphire.v`
+→ must be 0 after patch.
+
+**Run from ~/church_project/SoC/ with symbol bin files in the same dir.**
 
 ## efx_pgm: the correct bitstream generation command
 
@@ -94,7 +113,10 @@ over the 115200-baud character time (86.8 µs). The UART FIFO never overflows.
 
 - UART base: 0xF8010000 (from BSP soc.h). DATA=+0x00, STATUS=+0x04, CLOCKDIV=+0x08
 - CLOCKDIV=26 → 25 MHz / (8×27) = 115,741 baud ≈ 115200 ✓
-- ttyUSB2 = Sapphire SoC UART (GPIOL_02), ttyUSB3 = CM debug UART (GPIOL_P_03)
-- ttyUSB3 emits 2 null bytes (0x00 0x00) on port-open — this is an FTDI glitch, not CM output
-- ttyUSB2 produces 0 bytes at any baud when uart_putc spins (confirmed)
-- flash command: `sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex`
+- UART port mapping is NOT fixed — depends on how many other USB devices are connected.
+  The Ti60F225 FTDI FT2232H creates 2 channels: channel A = JTAG, channel B = Sapphire UART.
+  After a fresh flash+reset, the two fresh ttyUSB* entries (newest mtime) are the Ti60 ports.
+  Channel B (higher ttyUSB number of the two) = Sapphire SoC UART.
+  `ls -lt /dev/ttyUSB*` after flash to identify which are fresh.
+- flash command: `sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex`
+  (`~/oss-cad-suite/bin/openFPGALoader` does NOT exist on Penguin)
