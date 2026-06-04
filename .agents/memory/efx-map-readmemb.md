@@ -1,9 +1,29 @@
 ---
 name: EFX_MAP $readmemb and system_ramA on Ti60
-description: Definitive confirmed findings — how to embed Sapphire SoC firmware into a Ti60F225 bitstream using Efinity 2025.2. Covers $readmemb, optimize-zero-init-rom, the inline-initial-block approach, efx_pgm syntax, and uart_putc pitfalls.
+description: Definitive confirmed findings — how to embed Sapphire SoC firmware into a Ti60F225 bitstream using Efinity 2026.1. Covers $readmemb, optimize-zero-init-rom, the inline-initial-block approach, efx_pgm syntax, and uart_putc pitfalls.
 ---
 
-## Confirmed working flow (June 2026, Efinity 2025.2, Ti60F225)
+## CRITICAL: Must use Efinity 2026.1, NOT 2025.2
+
+The project XML has `sw_version="2026.1.132"`. Efinity 2025.2's efx_map silently
+skips BRAM initial-block extraction — NO "extracting RAM for identifier 'ram_symbol0'"
+log line appears, and the BRAM ends up with zero content. CPU never executes.
+
+Efinity 2026.1 correctly extracts the initial block values:
+```
+INFO: /...sapphire.v(4868): extracting RAM for identifier 'ram_symbol0' [VERI-2571]
+```
+
+**Always source 2026.1:**
+```bash
+source ~/efinity/2026.1/bin/setup.sh
+# NOT: source ~/efinity/2025.2/bin/setup.sh
+```
+
+Both 2025.2 and 2026.1 are installed on Penguin at ~/efinity/. Only 2026.1 works
+for BRAM init. The ldd warning about libstdc++ is harmless — ignore it.
+
+## Confirmed working flow (June 2026, Efinity 2026.1, Ti60F225)
 
 ```bash
 # From ~/church_project/SoC/
