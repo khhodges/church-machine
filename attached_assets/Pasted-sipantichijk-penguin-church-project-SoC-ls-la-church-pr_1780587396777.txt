@@ -1,0 +1,28 @@
+sipantichijk@penguin:~/church_project/SoC$ ls -la ~/church_project/SoC/work_syn/synthesis*.log
+grep -i "INIT\|init_\|EFX_RAM10\|ram_symbol\|bram\|memory" ~/church_project/SoC/work_syn/synthesis.log | head -20
+-rw-r--r-- 1 sipantichijk sipantichijk 72272 Jun  2 17:43 /home/sipantichijk/church_project/SoC/work_syn/synthesis.log
+-rw-r--r-- 1 sipantichijk sipantichijk 74021 Jun  2 17:30 /home/sipantichijk/church_project/SoC/work_syn/synthesis2.log
+-rw-r--r-- 1 sipantichijk sipantichijk 72692 Jun  2 17:43 /home/sipantichijk/church_project/SoC/work_syn/synthesis3.log
+-rw-r--r-- 1 sipantichijk sipantichijk 78782 Jun  3 06:29 /home/sipantichijk/church_project/SoC/work_syn/synthesis_2025.log
+-rw-r--r-- 1 sipantichijk sipantichijk 78817 Jun  3 09:06 /home/sipantichijk/church_project/SoC/work_syn/synthesis_v4.log
+INFO     : default VHDL library search path is now "/home/sipantichijk/efinity/2026.1/sim_models/vhdl/packages/vhdl_2008" [VHDL-1504]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/perilib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/maplib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Analysis virtual memory usage: begin = 150.264 MB, end = 164.6 MB, delta = 14.336 MB [FlowMsg::VMUsage]
+INFO     : Analysis resident set memory usage: begin = 81.664 MB, end = 99.712 MB, delta = 18.048 MB [FlowMsg::RSSUsage]
+INFO     :     Analysis peak resident set memory usage = 99.712 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ../../vdb/src/efinix_maplib.v(653): compiling module 'EFX_RAM10' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4868): extracting RAM for identifier 'ram_symbol0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4869): extracting RAM for identifier 'ram_symbol1' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4870): extracting RAM for identifier 'ram_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/sapphire.v(4871): extracting RAM for identifier 'ram_symbol3' [VERI-2571]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7): using initial value of '$auto$verilog_backend.cc:2355:dump_module$41' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7089): using initial value of '$auto$verilog_backend.cc:2355:dump_module$42' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(7502): using initial value of '$auto$verilog_backend.cc:2355:dump_module$43' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(15839): using initial value of '$auto$verilog_backend.cc:2355:dump_module$44' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(18300): using initial value of '$auto$verilog_backend.cc:2355:dump_module$45' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(20056): using initial value of '$auto$verilog_backend.cc:2355:dump_module$46' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21244): using initial value of '$auto$verilog_backend.cc:2355:dump_module$47' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(21616): using initial value of '$auto$verilog_backend.cc:2355:dump_module$48' since it is never assigned [VERI-1220]
+WARNING  : /home/sipantichijk/church_project/SoC/church_ti60_f225.v(22370): using initial value of '$auto$verilog_backend.cc:2355:dump_module$49' since it is never assigned [VERI-1220]
+sipantichijk@penguin:~/church_project/SoC$ 
