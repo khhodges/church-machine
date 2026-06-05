@@ -1,0 +1,59 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# 1. Confirm pgm generated a fresh .hex (timestamp should be recent)
+ls -la outflow/church_soc_cm.hex work_pnr/church_soc_cm.lbf
+
+# 2. Check ALL PCR values for CLKMUX_L — look for anything ENABLE
+grep -A 80 'id="CLKMUX_L"' outflow/church_soc_cm.lpf | grep -E "PCR_|ENABLE|DISABLE" | head -30
+
+# 3. Check ALL 4 ttyUSB ports at 230400 (maybe wrong port)
+for dev in /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyUSB2 /dev/ttyUSB3; do
+  echo "--- $dev ---"
+  stty -F $dev 230400 raw 2>/dev/null && timeout 3 cat $dev 2>/dev/null | xxd | head -3 || echo "no device/no data"
+done
+-rw-r--r-- 1 sipantichijk sipantichijk 2157519 Jun  5 09:44 outflow/church_soc_cm.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 1216793 Jun  5 09:38 work_pnr/church_soc_cm.lbf
+    <efxpt:parameter name="PCR_BOT_EN_0" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_1" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_2" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_3" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_4" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_5" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_6" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_7" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_SEL_0" value="ST_TOP0"/>
+    <efxpt:parameter name="PCR_BOT_SEL_1" value="TOP3"/>
+    <efxpt:parameter name="PCR_BOT_SEL_2" value="TOP2"/>
+    <efxpt:parameter name="PCR_BOT_SEL_3" value="TOP1"/>
+    <efxpt:parameter name="PCR_BOT_SEL_4" value="TOP5"/>
+    <efxpt:parameter name="PCR_BOT_SEL_5" value="TOP6"/>
+    <efxpt:parameter name="PCR_BOT_SEL_6" value="TOP7"/>
+    <efxpt:parameter name="PCR_BOT_SEL_7" value="ST_TOP4"/>
+    <efxpt:parameter name="PCR_TOP_EN_0" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_1" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_2" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_3" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_4" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_5" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_6" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_7" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_SEL_0" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_1" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_2" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_3" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_4" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_5" value="GPIO"/>
+--- /dev/ttyUSB0 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB1 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB2 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB3 ---
+Terminated
+no device/no data
+sipantichijk@penguin:~/church_project/SoC$ 
