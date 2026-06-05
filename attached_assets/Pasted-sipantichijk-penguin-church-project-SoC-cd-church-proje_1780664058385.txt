@@ -1,0 +1,49 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# See the full interface log
+cat outflow/church_soc_cm.log 2>/dev/null | tail -40
+
+# Run interface with FULL output (not tail)
+$EFINITY/bin/efx_run --flow interface --prj church_soc_cm.xml 2>&1 | grep -v "^$" | tail -30
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+/home/sipantichijk/efinity/2026.1/bin/efx_pgm --interface_designer_settings outflow/church_soc_cm_or.ini --periph outflow/church_soc_cm.lpf --family Titanium --device Ti60F225 --source /home/sipantichijk/church_project/SoC/work_pnr/church_soc_cm.lbf --dest outflow/church_soc_cm.hex --mode=active --width=1 --enable_roms=smart --spi_low_power_mode=on --io_weak_pullup=on --oscillator_clock_divider=DIV8 --bitstream_compression=on --enable_external_master_clock=off --active_capture_clk_edge=posedge --jtag_usercode=0xFFFFFFFF --release_tri_then_reset=on
+INFO     : Efinix FPGA Bitstream Generator.
+INFO     : Version: 2026.1.132 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+INFO     : Compiled: May 29 2026.
+INFO     : Using source file "/home/sipantichijk/church_project/SoC/work_pnr/church_soc_cm.lbf"
+INFO     : Generating HEX programming file for device "Ti60F225", family "Titanium"
+INFO     : Using periphery source file "outflow/church_soc_cm.lpf"
+INFO     : Generating bit file: "outflow/church_soc_cm.bit"
+INFO     : HEX Generation Options Summary:
+INFO     :      Listing options specified to bitstream generation:
+INFO     :      bitstream_compression                    = on
+INFO     :      oscillator_clock_divider                 = DIV8
+INFO     :      enable_external_master_clock             = off
+INFO     :      spi_low_power_mode                       = on
+INFO     :      active_capture_clk_edge                  = posedge
+INFO     :      enable_remote_update                     = off
+INFO     :      release_tri_then_reset                   = on
+INFO     :      enable_seu_crc_check                     = off
+INFO     :      seu_mode                                 = automatic
+INFO     :      seu_wait_interval                        = 0xFFFFFF
+INFO     :      jtag_usercode                            = 0xFFFFFFFF
+INFO     :      io_weak_pullup                           = on
+INFO     : Finished generating "outflow/church_soc_cm.hex"
+INFO     : Efinix Bitstream Generator took 2.139902301 seconds [FlowMsg::StageDuration]
+INFO     :     Efinix Bitstream Generator took 1.72 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Efinix Bitstream Generator virtual memory usage: begin = 35.272 MB, end = 174.672 MB, delta = 139.4 MB [FlowMsg::VMUsage]
+INFO     : Efinix Bitstream Generator resident set memory usage: begin = 15.744 MB, end = 160.128 MB, delta = 144.384 MB [FlowMsg::RSSUsage]
+INFO     :     Efinix Bitstream Generator peak resident set memory usage = 160.128 MB [FlowMsg::RSSUsage::Peak]
+Stage completed: pgm
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+Running: efx_run_pt_unified.py church_soc_cm Titanium Ti60F225 --output_dir outflow --timing_model C3 --project_xml church_soc_cm.xml
+   ERROR: Design file has error : church_soc_cm.peri.xml
+
+   ERROR: Fail to load design from church_soc_cm.peri.xml
+
+   ERROR encountered running Interface Designer
+
+   interface :  FAIL 
+sipantichijk@penguin:~/church_project/SoC$ 
