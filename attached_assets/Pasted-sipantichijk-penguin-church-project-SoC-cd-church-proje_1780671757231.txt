@@ -1,0 +1,48 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+# (env vars already set from before — if new shell, re-export them first)
+
+# Synthesis = 'map'
+$EFINITY_HOME/bin/efx_run -f map church_soc_cm.xml 2>&1 | tail -20
+
+# P&R = 'pnr'  
+$EFINITY_HOME/bin/efx_run -f pnr church_soc_cm.xml 2>&1 | tail -20
+
+# Bitstream = 'pgm' — unset env first
+unset EFINITY_HOME PYTHONHOME EFINITY_USER_DIR_INI EFXPT_HOME
+/home/sipantichijk/efinity/2026.1/bin/efx_run -f pgm church_soc_cm.xml 2>&1 | tail -10
+
+# Flash
+sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+
+# UART check
+stty -F /dev/ttyUSB2 230400 raw && timeout 10 cat /dev/ttyUSB2 | cat -v
+-bash: /bin/efx_run: No such file or directory
+-bash: /bin/efx_run: No such file or directory
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+Terminated
+sipantichijk@penguin:~/church_project/SoC$ 
