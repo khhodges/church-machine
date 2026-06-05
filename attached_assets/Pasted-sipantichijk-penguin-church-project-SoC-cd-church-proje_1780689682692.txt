@@ -1,0 +1,147 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Step 1: Patch sapphire.v with firmware data
+python3 patch_sapphire_init.py sapphire.v \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+
+# Step 2: Synthesise the patched sapphire.v
+export EFINITY_HOME=/home/sipantichijk/efinity/2025.2
+export PYTHONHOME=$EFINITY_HOME
+export EFINITY_USER_DIR_INI=/home/sipantichijk/.local/share/efinity/user_dir.ini
+export EFXPT_HOME=$EFINITY_HOME/pt
+source $EFINITY_HOME/bin/setup.sh
+
+python3 $EFINITY_HOME/scripts/efx_run.py --flow map --work_dir work_syn --prj church_soc_cm.xml 2>&1 | tail -3
+
+# Step 3: PNR
+/home/sipantichijk/efinity/2025.2/bin/efx_pnr \
+  --circuit church_soc_cm --family Titanium --device Ti60F225 \
+  --operating_conditions C3 \
+  --vdb_file outflow/church_soc_cm.vdb --use_vdb_file on \
+  --prj church_soc_cm.xml --output_dir outflow --work_dir work_pnr \
+  --place_file outflow/church_soc_cm.place --route_file outflow/church_soc_cm.route \
+  --sdc_file church_soc_cm.sdc \
+  --sync_file outflow/church_soc_cm.interface.csv 2>&1 | tail -3
+
+# Step 4: Generate hex
+python3 $EFINITY_HOME/scripts/efx_run.py --flow pgm --prj church_soc_cm.xml 2>&1 | tail -3
+
+ls -la outflow/church_soc_cm.hexcd ~/church_project/SoC
+
+# Step 1: Patch sapphire.v with firmware data
+python3 patch_sapphire_init.py sapphire.v \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+ls -la outflow/church_soc_cm.hexx_run.py --flow pgm --prj church_soc_cm.xml 2>&1 
+  File "/home/sipantichijk/church_project/SoC/patch_sapphire_init.py", line 1
+    Script written OKcat
+           ^^^^^^^
+SyntaxError: invalid syntax
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+^C
+INFO     : Packing resident set memory usage: begin = 111.104 MB, end = 113.408 MB, delta = 2.304 MB [FlowMsg::RSSUsage]
+INFO     :     Packing peak resident set memory usage = 113.408 MB [FlowMsg::RSSUsage::Peak]
+ERROR    : VDB file 'outflow/church_soc_cm.vdb' does not exist or is inaccessible.
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+ls: cannot access 'outflow/church_soc_cm.hexcd': No such file or directory
+/home/sipantichijk/church_project/SoC:
+total 15596
+drwxr-xr-x 1 sipantichijk sipantichijk    2734 Jun  5 11:39 .
+drwxr-xr-x 1 sipantichijk sipantichijk     292 May 30 13:55 ..
+-rw-r--r-- 1 sipantichijk sipantichijk       0 Jun  4 08:02 4
+-rw-r--r-- 1 sipantichijk sipantichijk   15672 May 29 20:13 BUILD_SOC_CM.md
+-rw-r--r-- 1 sipantichijk sipantichijk    4198 Jun  5 06:07 EFX.err.log
+-rw-r--r-- 1 sipantichijk sipantichijk 1770894 Jun  5 06:10 EFX.info.log
+-rw-r--r-- 1 sipantichijk sipantichijk  421478 Jun  5 06:10 EFX.warn.log
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+-rw-r--r-- 1 sipantichijk sipantichijk     818 May 25 18:01 Makefile
+-rw-r--r-- 1 sipantichijk sipantichijk    6684 May 24 17:36 apb3_cm_bridge.v
+-rwxr-xr-x 1 sipantichijk sipantichijk    4551 May 24 17:21 bridge.sh
+-rwxr-xr-x 1 sipantichijk sipantichijk    4975 May 29 19:35 build_soc_cm.sh
+-rw-r--r-- 1 sipantichijk sipantichijk   13754 Jun  4 10:35 church_soc_cm-hierarchical_stats.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk     291 Jun  4 12:10 church_soc_cm.cdc.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   58574 Jun  4 12:04 church_soc_cm.clstdb
+-rw-r--r-- 1 sipantichijk sipantichijk  614219 Jun  4 10:35 church_soc_cm.clstmap
+-rw-r--r-- 1 sipantichijk sipantichijk      30 Jun  4 12:04 church_soc_cm.cnst
+-rw-r--r-- 1 sipantichijk sipantichijk  156453 Jun  4 12:05 church_soc_cm.gplace
+-rw-r--r-- 1 sipantichijk sipantichijk   14661 Jun  4 12:04 church_soc_cm.hier_util.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  204414 Jun  4 12:04 church_soc_cm.htree
+-rw-r--r-- 1 sipantichijk sipantichijk 1209658 Jun  4 12:04 church_soc_cm.netlist
+-rw-r--r-- 1 sipantichijk sipantichijk   11419 Jun  5 10:39 church_soc_cm.peri.xml
+-rw-r--r-- 1 sipantichijk sipantichijk   13135 Jun  4 12:09 church_soc_cm.place.out
+-rw-r--r-- 1 sipantichijk sipantichijk    2022 Jun  4 12:09 church_soc_cm.place.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   15024 Jun  4 12:09 church_soc_cm.place.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk     936 Jun  2 14:14 church_soc_cm.pnr.out
+-rw-r--r-- 1 sipantichijk sipantichijk     277 Jun  2 14:14 church_soc_cm.pnr.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk    9686 Jun  4 12:10 church_soc_cm.route.out
+-rw-r--r-- 1 sipantichijk sipantichijk     625 Jun  4 12:10 church_soc_cm.route.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk    2102 Jun  4 12:10 church_soc_cm.route.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk     244 Jun  4 12:04 church_soc_cm.rs
+-rw-r--r-- 1 sipantichijk sipantichijk      51 Jun  5 10:39 church_soc_cm.sdc
+-rw-r--r-- 1 sipantichijk sipantichijk   14280 Jun  4 12:10 church_soc_cm.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk    3838 Jun  5 15:59 church_soc_cm.xml
+-rw-r--r-- 1 sipantichijk sipantichijk 1766298 May 29 14:40 church_ti60_f225.v
+-rw-r--r-- 1 sipantichijk sipantichijk      73 Jun  3 16:30 cpu0.yaml
+-rw-r--r-- 1 sipantichijk sipantichijk     304 Jun  5 06:07 debug_profile.mark_debug.json
+drwxr-xr-x 1 sipantichijk sipantichijk     640 Jun  5 14:51 firmware
+-rw-r--r-- 1 sipantichijk sipantichijk       0 Jun  4 08:02 firmware.hex
+drwxr-xr-x 1 sipantichijk sipantichijk      18 May 30 13:55 good-builds
+-rw-r--r-- 1 sipantichijk sipantichijk     164 Jun  5 02:48 interface10.log
+-rw-r--r-- 1 sipantichijk sipantichijk   11064 May 26 11:34 local_bridge.py
+drwxr-xr-x 1 sipantichijk sipantichijk    2942 Jun  5 15:59 outflow
+-rw-r--r-- 1 sipantichijk sipantichijk      21 Jun  5 15:57 patch_sapphire_init.py
+-rw-r--r-- 1 sipantichijk sipantichijk     394 Jun  5 03:23 pgm10.log
+-rw-r--r-- 1 sipantichijk sipantichijk     258 Jun  5 02:35 pnr10.log
+-rw-r--r-- 1 sipantichijk sipantichijk   25541 Jun  5 02:46 pnr10_direct.log
+-rw-r--r-- 1 sipantichijk sipantichijk   25540 Jun  5 02:49 pnr11.log
+-rw-r--r-- 1 sipantichijk sipantichijk 1677125 Jun  5 03:06 pnr12.log
+-rw-r--r-- 1 sipantichijk sipantichijk   22948 Jun  5 03:16 pnr13.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20099 Jun  4 07:22 pnr2.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20099 Jun  4 07:51 pnr3.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20119 Jun  4 08:28 pnr4.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20108 Jun  4 09:26 pnr7.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20137 Jun  4 10:41 pnr8.log
+-rw-r--r-- 1 sipantichijk sipantichijk   23042 Jun  4 12:10 pnr9.log
+-rw-r--r-- 1 sipantichijk sipantichijk   20096 Jun  4 06:40 pnr_fixed.log
+-rwxr-xr-x 1 sipantichijk sipantichijk     931 Jun  2 17:37 run_efx_map.sh
+-rwxr-xr-x 1 sipantichijk sipantichijk    3357 Jun  2 17:37 run_efx_pgm.sh
+-rwxr-xr-x 1 sipantichijk sipantichijk    2597 Jun  2 14:01 run_efx_pnr.sh
+-rw-r--r-- 1 sipantichijk sipantichijk  931568 Jun  4 16:57 sapphire.v
+-rw-r--r-- 1 sipantichijk sipantichijk    2920 Jun  2 13:37 sapphire_define.vh
+drwxr-xr-x 1 sipantichijk sipantichijk      44 Jun  3 08:27 scripts
+-rw-r--r-- 1 sipantichijk sipantichijk     241 Jun  4 17:07 synth10.log
+-rw-r--r-- 1 sipantichijk sipantichijk   79732 Jun  4 07:06 synth2.log
+-rw-r--r-- 1 sipantichijk sipantichijk   78805 Jun  4 07:42 synth3.log
+-rw-r--r-- 1 sipantichijk sipantichijk   78803 Jun  4 08:05 synth4.log
+-rw-r--r-- 1 sipantichijk sipantichijk  486127 Jun  4 08:15 synth4.vdb
+-rw-r--r-- 1 sipantichijk sipantichijk   78843 Jun  4 08:29 synth5.log
+-rw-r--r-- 1 sipantichijk sipantichijk   78807 Jun  4 08:58 synth7.log
+-rw-r--r-- 1 sipantichijk sipantichijk   78794 Jun  4 10:15 synth8.log
+-rw-r--r-- 1 sipantichijk sipantichijk   72296 Jun  4 11:43 synth9.log
+-rw-r--r-- 1 sipantichijk sipantichijk     326 Jun  5 02:32 synth_efxrun.log
+-rw-r--r-- 1 sipantichijk sipantichijk   79728 Jun  3 17:25 synth_fixed.log
+-rw-r--r-- 1 sipantichijk sipantichijk   28672 Jun  5 06:10 top.map.rdb
+-rw-r--r-- 1 sipantichijk sipantichijk  160940 Jun  5 06:10 top.map.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  106192 Jun  5 06:10 top.raminfo.pb
+-rw-r--r-- 1 sipantichijk sipantichijk    8538 Jun  5 06:10 top.res.csv
+-rw-r--r-- 1 sipantichijk sipantichijk    8504 May 25 17:19 top.v
+-rw-r--r-- 1 sipantichijk sipantichijk  461977 Jun  5 06:10 top.vdb
+drwxr-xr-x 1 sipantichijk sipantichijk     978 Jun  5 15:01 work_pnr
+drwxr-xr-x 1 sipantichijk sipantichijk     662 Jun  5 14:57 work_syn
+  File "/home/sipantichijk/church_project/SoC/patch_sapphire_init.py", line 1
+    Script written OKcat
+           ^^^^^^^
+SyntaxError: invalid syntax
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
