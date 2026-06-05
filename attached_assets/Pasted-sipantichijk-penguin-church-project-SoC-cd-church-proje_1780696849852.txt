@@ -1,0 +1,49 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# Step 1: Patch sapphire.v with the compiled firmware
+python3 scripts/patch_sapphire_init.py sapphire.v \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+
+# Step 2: Re-synthesise the patched sapphire.v
+export EFINITY_HOME=/home/sipantichijk/efinity/2025.2
+export PYTHONHOME=$EFINITY_HOME
+export EFINITY_USER_DIR_INI=/home/sipantichijk/.local/share/efinity/user_dir.ini
+export EFXPT_HOME=$EFINITY_HOME/pt
+source $EFINITY_HOME/bin/setup.sh
+
+python3 $EFINITY_HOME/scripts/efx_run.py --flow map \
+  --work_dir work_syn --prj church_soc_cm.xml 2>&1 | tail -3
+
+# Step 3: PNR
+/home/sipantichijk/efinity/2025.2/bin/efx_pnr \
+  --circuit church_soc_cm --family Titanium --device Ti60F225 \
+  --operating_conditions C3 \
+  --vdb_file outflow/church_soc_cm.vdb --use_vdb_file on \
+  --prj church_soc_cm.xml --output_dir outflow --work_dir work_pnr \
+  --place_file outflow/church_soc_cm.place --route_file outflow/church_soc_cm.route \
+  --sdc_file church_soc_cm.sdc \
+  --sync_file outflow/church_soc_cm.interface.csv 2>&1 | tail -3
+
+# Step 4: Generate bitstream hex
+python3 $EFINITY_HOME/scripts/efx_run.py --flow pgm \
+  --prj church_soc_cm.xml 2>&1 | tail -3
+
+ls -la outflow/church_soc_cm.hex
+  symbol0: updated 1 block(s), 947 assignments
+  symbol1: updated 1 block(s), 895 assignments
+  symbol2: updated 1 block(s), 835 assignments
+  symbol3: updated 1 block(s), 612 assignments
+sapphire.v patched.
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+Running: efx_run_map.py church_soc_cm --family Titanium --device Ti60F225 --project_xml /home/sipantichijk/church_project/SoC/church_soc_cm.xml --output_dir outflow --work_dir work_syn --opt root=top --opt veri_options=verilog_mode=verilog_2k,vhdl_mode=vhdl_2008 work-dir=work_syn write_efx_verilog=on
+   map :        PASS 
+INFO     : The entire flow of EFX_PNR virtual memory usage: begin = 127.584 MB, end = 567.672 MB, delta = 440.088 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_PNR resident set memory usage: begin = 40.448 MB, end = 454.204 MB, delta = 413.756 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_PNR peak resident set memory usage = 454.204 MB [FlowMsg::RSSUsage::Peak]
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+-rw-r--r-- 1 sipantichijk sipantichijk 2173005 Jun  5 16:27 outflow/church_soc_cm.hex
