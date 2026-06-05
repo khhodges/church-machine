@@ -7,4 +7,6 @@
 # does not reach all quadrants → Sapphire SoC ClockDomainGenerator stalls →
 # io_systemReset never deasserts → LED0 stays OFF and UART is silent.
 
-create_clock -name clk -period 20.0 [get_ports clk]
+# OSC_0 internal oscillator — Efinix Ti60 HF OSC default ≈ 100 MHz (10 ns period).
+# Adjust if SoC boots at wrong baud rate.
+create_clock -name clk -period 10.0 [get_nets clk]
