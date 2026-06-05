@@ -249,7 +249,7 @@
     </efxpt:gpio_info>
 
     <efxpt:pll_info/>
-    <efxpt:osc_info osc_def="OSC_0" osc_used="true" clock_name="clk"/>
+    <efxpt:osc_info/>
     <efxpt:lvds_info/>
     <efxpt:jtag_info/>
     <efxpt:mipi_dphy_info/>
