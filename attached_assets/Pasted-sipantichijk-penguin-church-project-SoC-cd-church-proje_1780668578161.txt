@@ -1,0 +1,46 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# Pull updated peri.xml and top.v
+git pull
+
+# Run Interface Designer only (compile = peri.xml → LPF)
+(unset EFINITY_HOME; $EFINITY/bin/efx_run --flow compile --prj church_soc_cm.xml 2>&1 | tail -8)
+
+# Check result — we need PCR_OSC_EN=ENABLE and what PCR_OSC_DIV is set to
+echo "=== OSC_0 LPF entries ==="
+grep -A 20 'id="OSC_0"' outflow/church_soc_cm.lpf | grep -E "PCR_OSC|ENABLE|DISABLE|DIV"
+
+# Verify clk is no longer a GPIO input in LPF
+echo "=== clk GPIO entry ==="
+grep -c "GPIOL_P_18\|clk.*gpio\|gpio.*clk" outflow/church_soc_cm.lpf || echo "0 - good, clk GPIO removed"
+fatal: not a git repository (or any of the parent directories): .git
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+Running: efx_run_map.py church_soc_cm --family Titanium --device Ti60F225 --project_xml /home/sipantichijk/church_project/SoC/church_soc_cm.xml --output_dir outflow --work_dir work_syn --opt root=top --opt veri_options=verilog_mode=verilog_2k,vhdl_mode=vhdl_2008 work-dir=work_syn write_efx_verilog=on
+   map :        PASS 
+Running: efx_run_pt_unified.py church_soc_cm Titanium Ti60F225 --output_dir outflow --timing_model C3 --project_xml church_soc_cm.xml
+   interface :  PASS 
+Running: efx_run_pnr.py church_soc_cm --prj /home/sipantichijk/church_project/SoC/church_soc_cm.xml --family Titanium --device Ti60F225 --timing_model C3 --output_dir outflow --work_dir work_pnr --opt sync_file=church_soc_cm.peri.xml
+   pnr :        FAIL 
+=== OSC_0 LPF entries ===
+    <efxpt:parameter name="PCR_OSC_DIV" value="DIV1"/>
+    <efxpt:parameter name="PCR_OSC_EN" value="DISABLE"/>
+    <efxpt:parameter name="PCR_OSC_LEAK_EN" value="DISABLE"/>
+    <efxpt:parameter name="PCR_OSC_TRIM_SEL" value="EFUSE"/>
+    <efxpt:parameter name="PCR_OSC_USER" value="DISABLE"/>
+    <efxpt:parameter name="UNUSED_6" value="ENABLE"/>
+    <efxpt:parameter name="PCR_CASEN0" value="DISABLE"/>
+    <efxpt:parameter name="PCR_CASEN1" value="DISABLE"/>
+    <efxpt:parameter name="PCR_CASEN2" value="DISABLE"/>
+    <efxpt:parameter name="PCR_CASEN3" value="DISABLE"/>
+    <efxpt:parameter name="PCR_CASEN4" value="DISABLE"/>
+    <efxpt:parameter name="PCR_DIV_SEL0" value="0"/>
+    <efxpt:parameter name="PCR_DIV_SEL1" value="0"/>
+    <efxpt:parameter name="PCR_DIV_SEL2" value="0"/>
+    <efxpt:parameter name="PCR_DIV_SEL3" value="0"/>
+    <efxpt:parameter name="PCR_DIV_SEL4" value="0"/>
+=== clk GPIO entry ===
+0
+0 - good, clk GPIO removed
+sipantichijk@penguin:~/church_project/SoC$ 

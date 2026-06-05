@@ -37,6 +37,7 @@
 `default_nettype none
 
 module top (
+    input  wire clk,           // 50 MHz crystal — see peri.xml for GPIO assignment
     output wire uart_tx,       // GPIOL_02 → FT4232H interface 2 → ttyUSB2
     input  wire uart_rx,       // GPIOL_01 ← FT4232H interface 2
     output wire cm_uart_tx,    // GPIOL_P_03 → FT4232H interface 3 → ttyUSB3
@@ -50,7 +51,6 @@ module top (
     // ----------------------------------------------------------------
     // Internal signals
     // ----------------------------------------------------------------
-    wire clk;            // 50 MHz from on-chip OSC_0 (Interface Designer routes OSC_0→clk)
     wire system_reset;   // active-HIGH from Sapphire SoC
 
     // APB3 slave 0 — wired to apb3_cm_bridge
