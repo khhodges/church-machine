@@ -53,7 +53,7 @@
             </efxpt:clkmux>
             <efxpt:clkmux name="CLKMUX_L" block_def="CLKMUX_L" is_mux_bot0_dyn="false" is_mux_bot7_dyn="false">
                 <efxpt:gen_pin>
-                    <efxpt:pin name="" type_name="ROUTE0"        is_bus="false" is_clk="true" is_clk_invert="false"/>
+                    <efxpt:pin name="clk" type_name="ROUTE0"    is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name="" type_name="ROUTE1"        is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name="" type_name="ROUTE2"        is_bus="false" is_clk="true" is_clk_invert="false"/>
                     <efxpt:pin name="" type_name="ROUTE3"        is_bus="false" is_clk="true" is_clk_invert="false"/>
@@ -92,9 +92,31 @@
 
     <efxpt:gpio_info>
 
-        <!-- Clock: internal OSC_0 oscillator drives 'clk' (see osc_info in device_info above).
-             GPIOL_P_18 (B2, LEFT bank) cannot directly drive CLKMUX_T — OSC_0 bypasses
-             the GPIO-CLKMUX routing problem entirely. -->
+        <!-- Clock: GPIOL_P_18 (B2, LEFT bank) → CLKMUX_L (LEFT bank mux, distributes globally).
+             100 MHz devkit oscillator. Was previously wrong: CLKMUX_T only accepts TOP-bank
+             GPIO inputs; CLKMUX_L is the correct mux for LEFT-bank GPIOs. -->
+        <efxpt:comp_gpio name="clk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:input_config
+                name="clk"
+                name_ddio_lo=""
+                conn_type="clkin"
+                is_register="false"
+                clock_name="clk"
+                is_clock_inverted="false"
+                pull_option="none"
+                is_schmitt_trigger="false"
+                ddio_type="none"
+                is_bus_hold="false"
+                delay="0"
+                is_serial="false"
+                is_dyn_delay="false"
+                fastclk_name=""
+                pullup_ena_name="clk_PULL_UP_ENA"
+                dyn_delay_en_name="clk_DLY_ENA"
+                dyn_delay_reset_name="clk_DLY_RST"
+                dyn_delay_ctrl_name="clk_DLY_CTRL"
+                clkmux_buf_name="CLKMUX_L"/>
+        </efxpt:comp_gpio>
 
         <!-- UART TX → GPIOL_02 (SoC console, FT4232H interface 2) -->
         <efxpt:comp_gpio name="uart_tx" gpio_def="GPIOL_02" mode="output" bus_name="" io_standard="3.3 V LVCMOS">
@@ -251,9 +273,7 @@
     </efxpt:gpio_info>
 
     <efxpt:pll_info/>
-    <efxpt:osc_info>
-        <efxpt:osc name="osc_inst1" osc_def="OSC_0" clock_name="clk"/>
-    </efxpt:osc_info>
+    <efxpt:osc_info/>
     <efxpt:lvds_info/>
     <efxpt:jtag_info/>
     <efxpt:mipi_dphy_info/>

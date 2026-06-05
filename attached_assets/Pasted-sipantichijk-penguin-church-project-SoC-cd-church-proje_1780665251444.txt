@@ -1,0 +1,44 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+# Reorder: pll_info + osc_info must come BEFORE lvds/jtag/mipi (Ti60F225 schema o
+# Reorder: pll_info + osc_info must come BEFORE lvds/jtag/mipi (Ti60F225 schema order)n3 - << 'EOF'
+python3 - << 'EOF'
+import ren('church_soc_cm.peri.xml').read()
+txt = open('church_soc_cm.peri.xml').read()
+# Remove all trailing info elements and rebuild in correct order
+# Remove all trailing info elements and rebuild in correct order
+tail_start = txt.rfind('</efxpt:gpio_info>')
+if tail_start == -1:o_info close not found'); exit(1)
+    print('FAIL: gpio_info close not found'); exit(1)
+head = txt[:tail_start + len('</efxpt:gpio_info>')]
+head = txt[:tail_start + len('</efxpt:gpio_info>')]
+correct_tail = '''
+    <efxpt:pll_info/>
+    <efxpt:pll_info/>
+    <efxpt:osc_info>ame="osc_inst1" osc_def="OSC_0" clock_name="clk"/>
+        <efxpt:osc name="osc_inst1" osc_def="OSC_0" clock_name="clk"/>
+    </efxpt:osc_info>>
+    <efxpt:lvds_info/>
+    <efxpt:jtag_info/>nfo/>
+    <efxpt:mipi_dphy_info/>
+</efxpt:design_db>
+</efxpt:design_db>
+'''n('church_soc_cm.peri.xml', 'w').write(head + correct_tail)
+open('church_soc_cm.peri.xml', 'w').write(head + correct_tail)
+# Verify
+# Verifypen('church_soc_cm.peri.xml').read()
+txt2 = open('church_soc_cm.peri.xml').read():]
+tail = txt2[txt2.rfind('</efxpt:gpio_info>'):]
+print('TAIL:', repr(tail[:250]))
+EOF
+# Run interface — expect PASS
+# Run interface — expect PASSnterface --prj church_soc_cm.xml 2>&1 | grep -E "ERR
+$EFINITY/bin/efx_run --flow interface --prj church_soc_cm.xml 2>&1 | grep -E "ERROR|FAIL|PASS|Stage|interface|osc"
+# If interface passed, check the generated LPF for OSC_0 enable
+# If interface passed, check the generated LPF for OSC_0 enable.lpf 2>/dev/null |
+grep -i "OSC_0\|PCR_OSC\|clock_name\|clk" outflow/church_soc_cm.lpf 2>/dev/null | head -10
+TAIL: '</efxpt:gpio_info>\n\n    <efxpt:pll_info/>\n    <efxpt:osc_info>\n        <efxpt:osc name="osc_inst1" osc_def="OSC_0" clock_name="clk"/>\n    </efxpt:osc_info>\n    <efxpt:lvds_info/>\n    <efxpt:jtag_info/>\n    <efxpt:mipi_dphy_info/>\n\n</efxpt:design_db>\n'
+   ERROR encountered running Interface Designer
+   interface :  FAIL 
+sipantichijk@penguin:~/church_project/SoC$ 
