@@ -26,9 +26,8 @@
         <efx:top_vhdl_arch name=""/>
     </efx:design_info>
 
-    <!-- No SDC: design runs at 25 MHz directly from crystal -->
     <efx:constraint_info>
-        <efx:sdc_file name=""/>
+        <efx:sdc_file name="church_soc_cm.sdc"/>
         <efx:inter_file name="church_soc_cm.peri.xml"/>
     </efx:constraint_info>
 
