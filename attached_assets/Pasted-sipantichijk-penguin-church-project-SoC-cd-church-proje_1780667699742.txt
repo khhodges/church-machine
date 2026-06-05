@@ -1,0 +1,433 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# Verify P&R wrote a fresh .lbf
+ls -la work_pnr/church_soc_cm.lbf
+
+# Run pgm without EFINITY_HOME (it breaks pgm's embedded Python)
+(unset EFINITY_HOME; $EFINITY/bin/efx_run --flow pgm --prj church_soc_cm.xml 2>&1 | tail -5)
+
+# Flash the new hex
+sudo /usr/bin/openFPGALoader -b titanium_ti60_f225_jtag -f ~/church_project/SoC/outflow/church_soc_cm.hex
+
+# UART check
+echo "=== UART check ==="
+sleep 3
+timeout 10 cat /dev/ttyUSB2 | cat || true
+-rw-r--r-- 1 sipantichijk sipantichijk 1216793 Jun  5 09:38 work_pnr/church_soc_cm.lbf
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+=== UART check ===
+Terminated
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# 1. Confirm pgm generated a fresh .hex (timestamp should be recent)
+ls -la outflow/church_soc_cm.hex work_pnr/church_soc_cm.lbf
+
+# 2. Check ALL PCR values for CLKMUX_L — look for anything ENABLE
+grep -A 80 'id="CLKMUX_L"' outflow/church_soc_cm.lpf | grep -E "PCR_|ENABLE|DISABLE" | head -30
+
+# 3. Check ALL 4 ttyUSB ports at 230400 (maybe wrong port)
+for dev in /dev/ttyUSB0 /dev/ttyUSB1 /dev/ttyUSB2 /dev/ttyUSB3; do
+  echo "--- $dev ---"
+  stty -F $dev 230400 raw 2>/dev/null && timeout 3 cat $dev 2>/dev/null | xxd | head -3 || echo "no device/no data"
+done
+-rw-r--r-- 1 sipantichijk sipantichijk 2157519 Jun  5 09:44 outflow/church_soc_cm.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 1216793 Jun  5 09:38 work_pnr/church_soc_cm.lbf
+    <efxpt:parameter name="PCR_BOT_EN_0" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_1" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_2" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_3" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_4" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_5" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_6" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_EN_7" value="DISABLE"/>
+    <efxpt:parameter name="PCR_BOT_SEL_0" value="ST_TOP0"/>
+    <efxpt:parameter name="PCR_BOT_SEL_1" value="TOP3"/>
+    <efxpt:parameter name="PCR_BOT_SEL_2" value="TOP2"/>
+    <efxpt:parameter name="PCR_BOT_SEL_3" value="TOP1"/>
+    <efxpt:parameter name="PCR_BOT_SEL_4" value="TOP5"/>
+    <efxpt:parameter name="PCR_BOT_SEL_5" value="TOP6"/>
+    <efxpt:parameter name="PCR_BOT_SEL_6" value="TOP7"/>
+    <efxpt:parameter name="PCR_BOT_SEL_7" value="ST_TOP4"/>
+    <efxpt:parameter name="PCR_TOP_EN_0" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_1" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_2" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_3" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_4" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_5" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_6" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_EN_7" value="DISABLE"/>
+    <efxpt:parameter name="PCR_TOP_SEL_0" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_1" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_2" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_3" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_4" value="GPIO"/>
+    <efxpt:parameter name="PCR_TOP_SEL_5" value="GPIO"/>
+--- /dev/ttyUSB0 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB1 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB2 ---
+Terminated
+no device/no data
+--- /dev/ttyUSB3 ---
+Terminated
+no device/no data
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+EFINITY=/home/sipantichijk/efinity/2026.1
+
+# Find the Titanium oscillator primitive definition
+find $EFINITY -name "*.v" 2>/dev/null | xargs grep -l "OSCI\|EFX_OSC\|HF_CLK_OUT\|HF_CLK_DIV" 2>/dev/null | head -5
+
+# Look for Titanium primitive library
+find $EFINITY -name "prim*" -o -name "*primitive*" -o -name "*titan*.v" 2>/dev/null | grep -i "\.v$\|lib$" | head -10
+
+# Check if OSCI is in synthesis library
+grep -r "OSCI\|EFX_OSC" $EFINITY/lib/ $EFINITY/db/ $EFINITY/pt/ 2>/dev/null | grep -i "module\|primitive\|HF_CLK" | head -10
+/home/sipantichijk/efinity/2026.1/sim_models/maplib/efinix_peri_lib.v
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V1.v
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V2.v
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V3.v
+/home/sipantichijk/efinity/2026.1/ipm/ip/efx_hard_soc/testbench/Testbench/verilog_rtl/source_synopsys/EfxSapphireSoc.v
+/home/sipantichijk/efinity/2026.1/ipm/ip/efx_bram/source/bram_primitive.v
+/home/sipantichijk/efinity/2026.1/ipm/ip/efx_bram/source/dpram_primitive.v
+/home/sipantichijk/efinity/2026.1/ipm/ip/efx_bram/source_exp/bram_primitive.v
+/home/sipantichijk/efinity/2026.1/ipm/ip/efx_bram/source_exp/dpram_top_titanium.v
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V1.py:    assert view.module_name.startswith("EFX_OSC_V1")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V2.py:    assert view.module_name.startswith("EFX_OSC_V2")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V3.py:    assert view.module_name.startswith("EFX_OSC_V3")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/isf_converter.py:            elif module_name in set(['EFX_PLL_V2', 'EFX_PLL_V3', 'EFX_FPLL_V1', 'EFX_FPLL_V2', 'EFX_OSC_V1', 'EFX_OSC_V2', 'EFX_OSC_V3']):
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V1.v:module EFX_OSC_V1(CLKOUT);
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V2.v:module EFX_OSC_V2(CLKOUT);
+/home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V3.v:module EFX_OSC_V3(CLKOUT, ENA);
+sipantichijk@penguin:~/church_project/SoC$ # Read the 3 OSC sim models (which version does Ti60F225 use?)
+cat /home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V1.v
+echo "---V2---"
+cat /home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V2.v
+echo "---V3---"
+cat /home/sipantichijk/efinity/2026.1/pt/sim_models/verilog/EFX_OSC_V3.v
+
+# Which version does Ti60F225 specifically use?
+grep -r "Ti60\|titanium\|ti60f225\|EFX_OSC_V" \
+  /home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/ \
+  2>/dev/null | grep -i "ti60\|OSC_V" | head -10
+
+# Also check peri_lib.v for any OSCI or EFX_OSC module declarations
+grep -n "module EFX_OSC\|module OSCI\|HF_CLK\|CLKOUT\|parameter" \
+  /home/sipantichijk/efinity/2026.1/sim_models/maplib/efinix_peri_lib.v | head -30
+/////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (C) 2017 Efinix Inc. All rights reserved.
+//
+// Efinix On-Chip Oscillator: (version 1)
+//
+// Simple 10 KHz oscillator
+//
+// *******************************
+// Revisions:
+// 0.0 Initial rev
+// *******************************
+/////////////////////////////////////////////////////////////////////////////
+
+`timescale 1ns/10ps
+module EFX_OSC_V1(CLKOUT);
+   output reg CLKOUT;
+
+   initial CLKOUT = 0;
+
+   always #50000 CLKOUT = ~CLKOUT;
+endmodule
+
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2013-2018 Efinix Inc. All rights reserved.
+//
+// This   document  contains  proprietary information  which   is
+// protected by  copyright. All rights  are reserved.  This notice
+// refers to original work by Efinix, Inc. which may be derivitive
+// of other work distributed under license of the authors.  In the
+// case of derivative work, nothing in this notice overrides the
+// original author's license agreement.  Where applicable, the 
+// original license agreement is included in it's original 
+// unmodified form immediately below this header.
+//
+// WARRANTY DISCLAIMER.  
+//     THE  DESIGN, CODE, OR INFORMATION ARE PROVIDED "AS IS" AND 
+//     EFINIX MAKES NO WARRANTIES, EXPRESS OR IMPLIED WITH 
+//     RESPECT THERETO, AND EXPRESSLY DISCLAIMS ANY IMPLIED WARRANTIES, 
+//     INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF 
+//     MERCHANTABILITY, NON-INFRINGEMENT AND FITNESS FOR A PARTICULAR 
+//     PURPOSE.  SOME STATES DO NOT ALLOW EXCLUSIONS OF AN IMPLIED 
+//     WARRANTY, SO THIS DISCLAIMER MAY NOT APPLY TO LICENSEE.
+//
+// LIMITATION OF LIABILITY.  
+//     NOTWITHSTANDING ANYTHING TO THE CONTRARY, EXCEPT FOR BODILY 
+//     INJURY, EFINIX SHALL NOT BE LIABLE WITH RESPECT TO ANY SUBJECT 
+//     MATTER OF THIS AGREEMENT UNDER TORT, CONTRACT, STRICT LIABILITY 
+//     OR ANY OTHER LEGAL OR EQUITABLE THEORY (I) FOR ANY INDIRECT, 
+//     SPECIAL, INCIDENTAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES OF ANY 
+//     CHARACTER INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF 
+//     GOODWILL, DATA OR PROFIT, WORK STOPPAGE, OR COMPUTER FAILURE OR 
+//     MALFUNCTION, OR IN ANY EVENT (II) FOR ANY AMOUNT IN EXCESS, IN 
+//     THE AGGREGATE, OF THE FEE PAID BY LICENSEE TO EFINIX HEREUNDER 
+//     (OR, IF THE FEE HAS BEEN WAIVED, $100), EVEN IF EFINIX SHALL HAVE 
+//     BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGES.  SOME STATES DO 
+//     NOT ALLOW THE EXCLUSION OR LIMITATION OF INCIDENTAL OR 
+//     CONSEQUENTIAL DAMAGES, SO THIS LIMITATION AND EXCLUSION MAY NOT 
+//     APPLY TO LICENSEE.
+//
+/////////////////////////////////////////////////////////////////////////////
+---V2---
+/////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (C) 2017 Efinix Inc. All rights reserved.
+//
+// Efinix On-Chip Oscillator: (version 2)
+//
+// Simple oscillator FREQ determines the frequency in MHz
+// Legal values 10, 20, 40 & 80
+//
+// *******************************
+// Revisions:
+// 0.0 Initial rev
+// *******************************
+/////////////////////////////////////////////////////////////////////////////
+
+`timescale 1ns/10ps
+
+`define VERBOSE
+
+module EFX_OSC_V2(CLKOUT);
+   parameter FREQ = 10;
+   
+   output reg CLKOUT;
+
+//   localparam MHZ = 1000 * 1000 * 1000 ;
+//   localparam NS = 1 * 1000 * 1000 ;
+   localparam MHZ = 1000 ;
+   localparam NS = 1  ;
+   realtime  OSC_period = 0;
+
+   initial begin
+          CLKOUT = 0;
+          case (FREQ)
+                10: OSC_period = 100;
+                20: OSC_period = 50;
+                40: OSC_period = 25;
+                80: OSC_period = 12.5;
+                default : begin
+                   $display("ERROR: Illegal FREQ value %s", FREQ);
+                   #1 $finish;
+                end
+          endcase // case (FREQ)
+`ifdef VERBOSE
+          $display("OSC period = %4.2f ns (%4.2f MHz)", (OSC_period / NS), (MHZ/OSC_period));
+`endif
+          forever # (OSC_period / 2) CLKOUT = ~CLKOUT;
+   end
+
+endmodule
+
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2013-2018 Efinix Inc. All rights reserved.
+//
+// This   document  contains  proprietary information  which   is
+// protected by  copyright. All rights  are reserved.  This notice
+// refers to original work by Efinix, Inc. which may be derivitive
+// of other work distributed under license of the authors.  In the
+// case of derivative work, nothing in this notice overrides the
+// original author's license agreement.  Where applicable, the 
+// original license agreement is included in it's original 
+// unmodified form immediately below this header.
+//
+// WARRANTY DISCLAIMER.  
+//     THE  DESIGN, CODE, OR INFORMATION ARE PROVIDED "AS IS" AND 
+//     EFINIX MAKES NO WARRANTIES, EXPRESS OR IMPLIED WITH 
+//     RESPECT THERETO, AND EXPRESSLY DISCLAIMS ANY IMPLIED WARRANTIES, 
+//     INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF 
+//     MERCHANTABILITY, NON-INFRINGEMENT AND FITNESS FOR A PARTICULAR 
+//     PURPOSE.  SOME STATES DO NOT ALLOW EXCLUSIONS OF AN IMPLIED 
+//     WARRANTY, SO THIS DISCLAIMER MAY NOT APPLY TO LICENSEE.
+//
+// LIMITATION OF LIABILITY.  
+//     NOTWITHSTANDING ANYTHING TO THE CONTRARY, EXCEPT FOR BODILY 
+//     INJURY, EFINIX SHALL NOT BE LIABLE WITH RESPECT TO ANY SUBJECT 
+//     MATTER OF THIS AGREEMENT UNDER TORT, CONTRACT, STRICT LIABILITY 
+//     OR ANY OTHER LEGAL OR EQUITABLE THEORY (I) FOR ANY INDIRECT, 
+//     SPECIAL, INCIDENTAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES OF ANY 
+//     CHARACTER INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF 
+//     GOODWILL, DATA OR PROFIT, WORK STOPPAGE, OR COMPUTER FAILURE OR 
+//     MALFUNCTION, OR IN ANY EVENT (II) FOR ANY AMOUNT IN EXCESS, IN 
+//     THE AGGREGATE, OF THE FEE PAID BY LICENSEE TO EFINIX HEREUNDER 
+//     (OR, IF THE FEE HAS BEEN WAIVED, $100), EVEN IF EFINIX SHALL HAVE 
+//     BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGES.  SOME STATES DO 
+//     NOT ALLOW THE EXCLUSION OR LIMITATION OF INCIDENTAL OR 
+//     CONSEQUENTIAL DAMAGES, SO THIS LIMITATION AND EXCLUSION MAY NOT 
+//     APPLY TO LICENSEE.
+//
+/////////////////////////////////////////////////////////////////////////////
+---V3---
+/////////////////////////////////////////////////////////////////////////////
+//
+// Copyright (C) 2017 Efinix Inc. All rights reserved.
+//
+// Efinix On-Chip Oscillator: (version 3)
+//
+// Simple oscillator FREQ determines the frequency in MHz
+// Legal values 10, 20, 40 & 80
+//
+// *******************************
+// Revisions:
+// 0.0 Initial rev
+// *******************************
+/////////////////////////////////////////////////////////////////////////////
+
+`timescale 1ns/10ps
+
+`define VERBOSE
+
+module EFX_OSC_V3(CLKOUT, ENA);
+   parameter FREQ = 10;
+   
+   output CLKOUT;
+   input  ENA;
+
+//   localparam MHZ = 1000 * 1000 * 1000 ;
+//   localparam NS = 1 * 1000 * 1000 ;
+   localparam MHZ = 1000 ;
+   localparam NS = 1  ;
+   realtime  OSC_period = 0;
+
+   reg           OSC;
+   
+   initial begin
+          OSC = 0;
+          case (FREQ)
+                10: OSC_period = 100;
+                20: OSC_period = 50;
+                40: OSC_period = 25;
+                80: OSC_period = 12.5;
+                default : begin
+                   $display("ERROR: Illegal FREQ value %s", FREQ);
+                   #1 $finish;
+                end
+          endcase // case (FREQ)
+`ifdef VERBOSE
+          $display("OSC period = %4.2f ns (%4.2f MHz)", (OSC_period / NS), (MHZ/OSC_period));
+`endif
+          forever # (OSC_period / 2) OSC = ~OSC;
+   end // initial begin
+
+   assign CLKOUT = ENA ? OSC : 1'b0;
+   
+
+endmodule
+
+//////////////////////////////////////////////////////////////////////////////
+// Copyright (C) 2013-2018 Efinix Inc. All rights reserved.
+//
+// This   document  contains  proprietary information  which   is
+// protected by  copyright. All rights  are reserved.  This notice
+// refers to original work by Efinix, Inc. which may be derivitive
+// of other work distributed under license of the authors.  In the
+// case of derivative work, nothing in this notice overrides the
+// original author's license agreement.  Where applicable, the 
+// original license agreement is included in it's original 
+// unmodified form immediately below this header.
+//
+// WARRANTY DISCLAIMER.  
+//     THE  DESIGN, CODE, OR INFORMATION ARE PROVIDED "AS IS" AND 
+//     EFINIX MAKES NO WARRANTIES, EXPRESS OR IMPLIED WITH 
+//     RESPECT THERETO, AND EXPRESSLY DISCLAIMS ANY IMPLIED WARRANTIES, 
+//     INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF 
+//     MERCHANTABILITY, NON-INFRINGEMENT AND FITNESS FOR A PARTICULAR 
+//     PURPOSE.  SOME STATES DO NOT ALLOW EXCLUSIONS OF AN IMPLIED 
+//     WARRANTY, SO THIS DISCLAIMER MAY NOT APPLY TO LICENSEE.
+//
+// LIMITATION OF LIABILITY.  
+//     NOTWITHSTANDING ANYTHING TO THE CONTRARY, EXCEPT FOR BODILY 
+//     INJURY, EFINIX SHALL NOT BE LIABLE WITH RESPECT TO ANY SUBJECT 
+//     MATTER OF THIS AGREEMENT UNDER TORT, CONTRACT, STRICT LIABILITY 
+//     OR ANY OTHER LEGAL OR EQUITABLE THEORY (I) FOR ANY INDIRECT, 
+//     SPECIAL, INCIDENTAL, EXEMPLARY OR CONSEQUENTIAL DAMAGES OF ANY 
+//     CHARACTER INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF 
+//     GOODWILL, DATA OR PROFIT, WORK STOPPAGE, OR COMPUTER FAILURE OR 
+//     MALFUNCTION, OR IN ANY EVENT (II) FOR ANY AMOUNT IN EXCESS, IN 
+//     THE AGGREGATE, OF THE FEE PAID BY LICENSEE TO EFINIX HEREUNDER 
+//     (OR, IF THE FEE HAS BEEN WAIVED, $100), EVEN IF EFINIX SHALL HAVE 
+//     BEEN INFORMED OF THE POSSIBILITY OF SUCH DAMAGES.  SOME STATES DO 
+//     NOT ALLOW THE EXCLUSION OR LIMITATION OF INCIDENTAL OR 
+//     CONSEQUENTIAL DAMAGES, SO THIS LIMITATION AND EXCLUSION MAY NOT 
+//     APPLY TO LICENSEE.
+//
+/////////////////////////////////////////////////////////////////////////////
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V1.py:    assert view.module_name.startswith("EFX_OSC_V1")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V1.py:    view.cell_name = 'EFX_OSC_V1'
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V1.py:        Path(os.environ['EFXPT_HOME']) / 'sim_models' / 'verilog' / 'EFX_OSC_V1.v')
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V2.py:    assert view.module_name.startswith("EFX_OSC_V2")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V2.py:    view.cell_name = 'EFX_OSC_V2'
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V2.py:        Path(os.environ['EFXPT_HOME']) / 'sim_models' / 'verilog' / 'EFX_OSC_V2.v')
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V3.py:    assert view.module_name.startswith("EFX_OSC_V3")
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V3.py:    view.cell_name = 'EFX_OSC_V3'
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/EFX_OSC_V3.py:        Path(os.environ['EFXPT_HOME']) / 'sim_models' / 'verilog' / 'EFX_OSC_V3.v')
+/home/sipantichijk/efinity/2026.1/pt/bin/api_service/unified_netlist/peri_library/__init__.py:from .EFX_OSC_V1 import EfxOscV1, validate as validateEfxOscV1
+9:    parameter PULL_OPTION = "NONE";
+24:    parameter PULL_OPTION = "NONE";
+33:module EFX_CLKOUT(CLK, CLKOUT);
+34:    parameter IS_CLK_INVERTED = 0;
+35:    input CLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+36:    output CLKOUT /* verific EFX_ATTRIBUTE_PORT__IO_EXTERNAL_PIN=TRUE */;
+42:    parameter PULL_OPTION = "NONE";
+43:    parameter IS_CLK_INVERTED = 0;
+45:    input CLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+52:    parameter IS_CLK_INVERTED = 0;
+54:    input CLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+61:    parameter IS_INCLK_INVERTED = 0;
+62:    parameter IS_OUTCLK_INVERTED = 0;
+63:    parameter PULL_OPTION = "NONE";
+65:    input INCLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+68:    input OUTCLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+76:    parameter IS_CLK_INVERTED = 0;
+77:    parameter MODE = "DDIO";
+78:    parameter PULL_OPTION = "NONE";
+79:    input CLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+88:    parameter IS_CLK_INVERTED = 0;
+89:    parameter MODE = "DDIO";
+90:    input CLK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+100:   parameter MODE = "INPUT";
+101:   parameter OUT_REG = "BYPASS";
+102:   parameter IN_REG = "BYPASS";
+103:   parameter OE_REG = "BYPASS";
+104:   parameter PULL_OPTION = "NONE";
+105:   parameter IS_OUTCLK_INVERTED = 0;
+106:   parameter IS_INCLK_INVERTED = 0;
+grep: write error: Broken pipe
+sipantichijk@penguin:~/church_project/SoC$ 
