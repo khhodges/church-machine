@@ -2,7 +2,7 @@
 # bridge.sh — Church Machine Ti60 Call-Home Bridge launcher
 #
 # Auto-detects the Sapphire SoC UART (FT4232H interface 2, typically ttyUSB2),
-# validates that pyserial is installed, then launches local_bridge.py.
+# validates that pyserial is installed, then launches callhome_bridge.py.
 #
 # Usage:
 #   ./hardware/soc_combined/bridge.sh [--ide=URL] [--port=PATH] [extra args…]
@@ -21,7 +21,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BRIDGE_PY="$SCRIPT_DIR/local_bridge.py"
+BRIDGE_PY="$SCRIPT_DIR/callhome_bridge.py"
 
 # ---------------------------------------------------------------------------
 # Banner
@@ -40,9 +40,9 @@ if ! python3 -c "import serial" 2>/dev/null; then
     echo "ERROR: pyserial is not installed."
     echo ""
     echo "  Install it with:"
+    echo "    sudo apt-get install -y python3-serial"
+    echo "  or with pip:"
     echo "    pip3 install pyserial"
-    echo "  or on a Chromebook Penguin container:"
-    echo "    pip3 install --user pyserial"
     echo ""
     exit 1
 fi

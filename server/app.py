@@ -2393,9 +2393,15 @@ def download_build_file(filename):
     return resp
 
 @app.route("/local_bridge.py")
+@app.route("/webserial_bridge.py")
 @app.route("/download/local_bridge.py")
+@app.route("/download/webserial_bridge.py")
 def download_local_bridge():
-    """Serve the local serial bridge script for download."""
+    """Serve the WebSerial HTTP bridge (server/local_bridge.py) for download.
+    This bridge speaks the binary CALLHOME protocol and acts as a local HTTP
+    proxy so Chrome's WebSerial API can reach the Ti60 over USB.
+    For the ASCII CALLHOME bridge (Penguin / headless use) see /callhome_bridge.py.
+    """
     bridge_path = os.path.join(os.path.dirname(__file__), "local_bridge.py")
     if not os.path.isfile(bridge_path):
         return make_response("Not found", 404)
@@ -2403,14 +2409,14 @@ def download_local_bridge():
         data = f.read()
     resp = make_response(data, 200)
     resp.headers["Content-Type"] = "text/plain"
-    resp.headers["Content-Disposition"] = 'attachment; filename="local_bridge.py"'
+    resp.headers["Content-Disposition"] = 'attachment; filename="webserial_bridge.py"'
     return resp
 
 @app.route("/callhome_bridge.py")
 @app.route("/download/callhome_bridge.py")
 def download_callhome_bridge():
-    """Serve the ASCII CALLHOME bridge for Ti60 SoC (hardware/soc_combined/local_bridge.py)."""
-    bridge_path = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "local_bridge.py")
+    """Serve the ASCII CALLHOME bridge for Ti60 SoC (hardware/soc_combined/callhome_bridge.py)."""
+    bridge_path = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "callhome_bridge.py")
     bridge_path = os.path.normpath(bridge_path)
     if not os.path.isfile(bridge_path):
         return make_response("Not found", 404)

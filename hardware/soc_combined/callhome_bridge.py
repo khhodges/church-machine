@@ -13,7 +13,7 @@ The Ti60 FT4232H USB-UART mapping:
   ttyUSB3  — Church Machine debug UART
 
 Usage:
-    python3 hardware/soc_combined/local_bridge.py [--port=/dev/ttyUSB2] [--ide=URL]
+    python3 hardware/soc_combined/callhome_bridge.py [--port=/dev/ttyUSB2] [--ide=URL]
 
 Flags:
     --port=PATH    Serial port to open (default: /dev/ttyUSB2)
