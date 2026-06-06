@@ -47,13 +47,25 @@ _IDE_SERVER_URL = None
 _AUTO_RECONNECT = True
 _REPORT_LAUNCH = False
 
-for _a in sys.argv[1:]:
-    if _a.startswith('--port='):
-        _SERIAL_PORT = _a[7:]
-    elif _a.startswith('--baud='):
-        _BAUD = int(_a[7:])
-    elif _a.startswith('--ide='):
-        _IDE_SERVER_URL = _a[6:].rstrip('/')
+_argv = sys.argv[1:]
+_i = 0
+while _i < len(_argv):
+    _a = _argv[_i]
+    def _next_val(flag):
+        global _i
+        if '=' in flag:
+            return flag.split('=', 1)[1]
+        _i += 1
+        if _i >= len(_argv):
+            print(f"ERROR: {flag} requires a value", file=sys.stderr)
+            sys.exit(1)
+        return _argv[_i]
+    if _a.startswith('--port'):
+        _SERIAL_PORT = _next_val(_a)
+    elif _a.startswith('--baud'):
+        _BAUD = int(_next_val(_a))
+    elif _a.startswith('--ide'):
+        _IDE_SERVER_URL = _next_val(_a).rstrip('/')
     elif _a == '--no-reconnect':
         _AUTO_RECONNECT = False
     elif _a == '--reconnect':
@@ -62,6 +74,7 @@ for _a in sys.argv[1:]:
         _REPORT_LAUNCH = True
     elif _a.startswith('--'):
         print(f"WARNING: unknown flag {_a!r} ignored", file=sys.stderr)
+    _i += 1
 
 # ---------------------------------------------------------------------------
 # Globals
