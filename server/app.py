@@ -2406,6 +2406,21 @@ def download_local_bridge():
     resp.headers["Content-Disposition"] = 'attachment; filename="local_bridge.py"'
     return resp
 
+@app.route("/callhome_bridge.py")
+@app.route("/download/callhome_bridge.py")
+def download_callhome_bridge():
+    """Serve the ASCII CALLHOME bridge for Ti60 SoC (hardware/soc_combined/local_bridge.py)."""
+    bridge_path = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_combined", "local_bridge.py")
+    bridge_path = os.path.normpath(bridge_path)
+    if not os.path.isfile(bridge_path):
+        return make_response("Not found", 404)
+    with open(bridge_path, "rb") as f:
+        data = f.read()
+    resp = make_response(data, 200)
+    resp.headers["Content-Type"] = "text/plain"
+    resp.headers["Content-Disposition"] = 'attachment; filename="callhome_bridge.py"'
+    return resp
+
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "")
 GITHUB_LIBRARY_REPO = os.environ.get("GITHUB_LIBRARY_REPO", "khhodges/cloomc-project")
 GITHUB_FOUNDATION_REPO = "khhodges/cloomc-foundation"
