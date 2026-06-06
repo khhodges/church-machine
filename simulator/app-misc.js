@@ -2525,13 +2525,14 @@ function _refreshMachineDropdown() {
             var stillExists = Array.from(sel.options).some(function(o) { return o.value === current; });
             sel.value = stillExists ? current : '';
             if (!stillExists) _selectedMachineUid = '';
+            else _selectedMachineUid = sel.value.toUpperCase();
         })
         .catch(function() {});
 }
 
 function _onMachineSelectChange() {
     var sel = document.getElementById('callhomeMachineSelect');
-    _selectedMachineUid = sel ? sel.value : '';
+    _selectedMachineUid = (sel ? sel.value : '').toUpperCase();
 
     // Reset counters and wipe rows so the next poll fetches full history
     // for the newly selected machine (or all machines) from since=0.
@@ -2615,9 +2616,8 @@ function _pollCallhomeLog() {
                     var insertAfter = colHeads ? colHeads.nextSibling : panel.firstChild;
                     panel.insertBefore(row, insertAfter);
                     _callhomeLogRowCount++;
-                    _refreshMachineDropdown();
-                    while (panel.children.length > 100) panel.removeChild(panel.lastChild);
                 });
+                while (panel.children.length > 600) panel.removeChild(panel.lastChild);
             }
             _updateLogSubtitle();
         })
