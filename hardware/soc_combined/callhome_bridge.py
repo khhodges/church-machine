@@ -136,10 +136,16 @@ def _post_callhome(payload):
         resp = urllib.request.urlopen(req, timeout=10)
         result = json.loads(resp.read())
         if result.get("ok"):
-            ack_str = "  [CALL HOME] ACK received from IDE"
+            ack_str = "[CALL HOME] ACK received from IDE"
             if result.get("boot_count"):
                 ack_str += f" — boot #{result['boot_count']}"
-            print(ack_str)
+            print(f"  {ack_str}")
+            with _uart_buffer_lock:
+                _uart_buffer.append({
+                    "ts":   time.time(),
+                    "line": ack_str,
+                    "uid":  _last_uid or "unknown",
+                })
         else:
             print(f"  [CALL HOME] IDE responded: {result}")
     except Exception as e:
