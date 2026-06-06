@@ -2477,6 +2477,7 @@ var _callhomeLogSince = 0;
 var _callhomeLogTimer = null;
 var _callhomeLogRowCount = 0;
 var _selectedMachineUid = '';
+var _deviceLabelCache = {};   // uid.toUpperCase() → pet name || board_name
 
 function _startCallhomeLog() {
     if (_callhomeLogTimer) return;
@@ -2494,11 +2495,12 @@ function _refreshMachineDropdown() {
             var current = sel.value;
             while (sel.options.length > 1) sel.remove(1);
             data.devices.forEach(function(dev) {
+                var uidKey = (dev.device_uid || '').toUpperCase();
+                _deviceLabelCache[uidKey] = dev.label || dev.board_name || uidKey.slice(-8);
                 var opt = document.createElement('option');
                 opt.value = dev.device_uid;
-                var shortUid = (dev.device_uid || '').toUpperCase().slice(-8);
                 var dot = dev.status === 'online' ? '● ' : '○ ';
-                opt.textContent = dot + (dev.label || dev.board_name || shortUid);
+                opt.textContent = dot + _deviceLabelCache[uidKey];
                 opt.dataset.status = dev.status;
                 sel.appendChild(opt);
             });
@@ -2563,12 +2565,11 @@ function _pollCallhomeLog() {
                     row.setAttribute('data-cr14', e.cr14 != null ? String(e.cr14) : 'null');
                     row.setAttribute('data-cr12', e.cr12 != null ? String(e.cr12) : 'null');
                     row.setAttribute('data-cr15', e.cr15 != null ? String(e.cr15) : 'null');
+                    var machineLabel = _deviceLabelCache[uid] || e.board || '?';
                     row.innerHTML =
                         '<span class="chlog-time">' + timeStr + '</span>' +
                         '<span class="' + dotCls + '">●</span>' +
-                        '<span class="chlog-board">' + _escHtml(e.board || '?') + '</span>' +
-                        '<span class="chlog-uid">' + _escHtml(uid) + '</span>' +
-                        '<span class="chlog-nia">' + _escHtml(e.nia || '?') + '</span>' +
+                        '<span class="chlog-board">' + _escHtml(machineLabel) + '</span>' +
                         '<span class="chlog-fw">' + (e.fw_major||1) + '.' + (e.fw_minor||0) + '</span>' +
                         '<span class="chlog-boot">' + _escHtml(String(e.boot_count || 1)) + '</span>' +
                         '<span class="chlog-fault">' + faultDisp + '</span>' +

@@ -2012,7 +2012,7 @@
 /* Column header row */
 .callhome-log-col-heads {
     display: grid;
-    grid-template-columns: 24ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
+    grid-template-columns: 24ch 1.2ch 16ch 5ch 6ch 6ch 9ch;
     gap: 0.6rem;
     padding: 0.25rem 0.8rem;
     background: #111118;
@@ -2048,7 +2048,7 @@
 }
 .callhome-log-row {
     display: grid;
-    grid-template-columns: 24ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
+    grid-template-columns: 24ch 1.2ch 16ch 5ch 6ch 6ch 9ch;
     gap: 0.6rem;
     align-items: center;
     padding: 0.2rem 0.8rem;
@@ -2076,7 +2076,7 @@
 /* Plain UART text lines interleaved in the callhome log — same grid as callhome rows */
 .callhome-uart-row {
     display: grid;
-    grid-template-columns: 24ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
+    grid-template-columns: 24ch 1.2ch 16ch 5ch 6ch 6ch 9ch;
     gap: 0.6rem;
     align-items: center;
     padding: 0.2rem 0.8rem;
