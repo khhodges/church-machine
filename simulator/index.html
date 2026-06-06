@@ -1852,25 +1852,6 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
 
     <div id="devices" class="view">
         <div class="devices-layout">
-            <div class="dev-header">
-                <div class="dev-header-left">
-                    <div class="gc-title">Hardware</div>
-                    <div class="dev-view-tabs">
-                        <button class="dev-view-tab active" id="devTabDevices" onclick="switchDevicesTab('devices')">FPGA Devices</button>
-                        <button class="dev-view-tab" id="devTabLaunch" onclick="switchDevicesTab('launch')">Launch Readiness</button>
-                    </div>
-                </div>
-                <span id="devTabActionsDevices">
-                    <button class="dev-deploy-all-btn" onclick="deployAll()" title="Deploy current program to all online IoT boards">Deploy All</button>
-                    <button class="dev-fault-log-btn" onclick="showDeviceFaultLog()" title="View fault log and MTBF per instruction">Fault Log</button>
-                    <button class="gh-refresh-btn" onclick="loadDeviceList()" title="Refresh device list">&#x21BB;</button>
-                </span>
-                <span id="devTabActionsLaunch" style="display:none;">
-                    <button class="dev-launch-reset-btn" onclick="confirmResetLaunchTests()" title="Reset all tests to not-run">Reset All</button>
-                    <button class="gh-refresh-btn" onclick="loadLaunchTests()" title="Refresh launch test status">&#x21BB;</button>
-                </span>
-            </div>
-            <div id="devPaneDevices">
                 <div class="callhome-log-panel" id="callhomeLogPanel">
                     <div class="callhome-log-header">
                         <span class="callhome-log-title">&#x1F4E1; Call-Home Log</span>
@@ -1892,6 +1873,25 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                         <div class="callhome-log-empty">Waiting for boards to call home&hellip;</div>
                     </div>
                 </div>
+            <div class="dev-header">
+                <div class="dev-header-left">
+                    <div class="gc-title">Hardware</div>
+                    <div class="dev-view-tabs">
+                        <button class="dev-view-tab active" id="devTabDevices" onclick="switchDevicesTab('devices')">FPGA Devices</button>
+                        <button class="dev-view-tab" id="devTabLaunch" onclick="switchDevicesTab('launch')">Launch Readiness</button>
+                    </div>
+                </div>
+                <span id="devTabActionsDevices">
+                    <button class="dev-deploy-all-btn" onclick="deployAll()" title="Deploy current program to all online IoT boards">Deploy All</button>
+                    <button class="dev-fault-log-btn" onclick="showDeviceFaultLog()" title="View fault log and MTBF per instruction">Fault Log</button>
+                    <button class="gh-refresh-btn" onclick="loadDeviceList()" title="Refresh device list">&#x21BB;</button>
+                </span>
+                <span id="devTabActionsLaunch" style="display:none;">
+                    <button class="dev-launch-reset-btn" onclick="confirmResetLaunchTests()" title="Reset all tests to not-run">Reset All</button>
+                    <button class="gh-refresh-btn" onclick="loadLaunchTests()" title="Refresh launch test status">&#x21BB;</button>
+                </span>
+            </div>
+            <div id="devPaneDevices">
                 <div class="dev-grid" id="devGrid">
                     <div class="dev-empty">No devices registered. Connect a board via the local bridge to see it here.</div>
                 </div>
