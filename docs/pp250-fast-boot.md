@@ -247,15 +247,281 @@ manual pulse needed.
 
 ---
 
+## Track 4 — GT Fault Telemetry: Full Diagnostics to the IDE
+
+### Why this matters
+
+Golden Tokens are the performance and security primitive of the Church Machine.
+Every capability violation is a GT event.  The simulator fault popup already
+shows the full story — which instruction faulted, which GT was involved, which
+pipeline stage caught it, which abstraction was active — but **none of that
+reaches the IDE from real hardware today**.
+
+The board currently sends only a 5-bit fault code.  The IDE receives:
+
+```json
+{"board":"Ti60F225", "uid":"...", "nia":"0x00000008",
+ "boot_ok":1, "fault":1, "fault_code":7, "fw_major":1, "fw_minor":0}
+```
+
+`fault_code: 7` is `NULL_CAP`.  The IDE has no idea which instruction caused
+it, which GT was the empty capability, or which abstraction was running.
+
+### What the simulator fault popup already computes
+
+```javascript
+{
+  type:                   'NULL_CAP',       // fault type string
+  faultCode:              0x07,             // numeric hardware code
+  faultingMnemonic:       'CALL',           // which ISA instruction faulted
+  involvedGT:             0x01800003,       // GT word0 that caused the violation
+  pipelineStage:          'ELOADCALL',      // which pipeline unit caught it
+  faultingAbstractionSlot: 3,              // CR14[15:0] — active abstraction NS slot
+  faultingAbstractionLabel: 'Boot.Abstr',  // pet name from nsLabels[]
+  tier:                   1,               // recovery tier attempted
+  catchInvoked:           false,
+  irqInvoked:             false,
+  tier3Recovery:          false
+}
+```
+
+Every field maps to a hardware signal that exists in the core but is not
+yet exposed over APB3.
+
+---
+
+### Current APB3 Register Map (Ti60 hardware today)
+
+```
+Offset  Name        Access   Width  Contents
++0x00   CTRL        W/R      1 bit  cm_pb (0=pressed/boot_start, 1=released)
++0x04   STATUS      RO       3 bit  boot_complete | fault_valid | fault_latched
++0x08   NIA         RO      32 bit  next instruction address at last fault
++0x0C   FAULT       RO       5 bit  fault code (FaultType enum, 32 values)
++0x10   UID_LO      RO      32 bit  board UID low word
++0x14   UID_HI      RO      32 bit  board UID high word
+```
+
+Nothing above `+0x14` exists.  The fault GT, the faulting instruction word,
+the active CR14, and the pipeline stage are all visible inside the Amaranth
+core but have no APB3 window.
+
+---
+
+### Hardware Fault Code Mapping (already canonical in simulator)
+
+`ChurchSimulator.FAULT_CODES` in `simulator/simulator.js` is the single source
+of truth for fault code numbers.  The same table must live in the bridge and
+firmware so that `fault_code: 7` → `"NULL_CAP"` without IDE involvement.
+
+```
+0x01 PERM_R       0x02 PERM_W       0x03 PERM_X
+0x04 PERM_L       0x05 PERM_S       0x06 PERM_E
+0x07 NULL_CAP     0x08 BOUNDS       0x09 VERSION
+0x0A SEAL         0x0B INVALID_OP   0x0C TPERM_RSV
+0x0D DOMAIN_PURITY  0x0E BIND       0x0F F_BIT
+0x10 STACK_OVERFLOW 0x11 ABSENT_OUTFORM 0x12 STACK_CORRUPT
+0x13 STACK_UNDERFLOW 0x15 OUTFORM_CRC 0x16 OUTFORM_ALLOC
+0x17 OUTFORM_MINT    0x18 OUTFORM_HDR
+```
+
+---
+
+### Four-Layer Enrichment Plan
+
+#### Layer A — Bridge (Python, no firmware change, no bitstream)
+
+**File:** `hardware/soc_combined/callhome_bridge.py`
+
+Add `fault_name` to the POST payload by looking up `fault_code` in a local
+copy of the fault code table:
+
+```python
+_FAULT_NAMES = {
+    0x01:"PERM_R", 0x02:"PERM_W", 0x03:"PERM_X",
+    0x04:"PERM_L", 0x05:"PERM_S", 0x06:"PERM_E",
+    0x07:"NULL_CAP", 0x08:"BOUNDS", 0x09:"VERSION",
+    0x0A:"SEAL", 0x0B:"INVALID_OP", 0x0C:"TPERM_RSV",
+    0x0D:"DOMAIN_PURITY", 0x0E:"BIND", 0x0F:"F_BIT",
+    0x10:"STACK_OVERFLOW", 0x11:"ABSENT_OUTFORM",
+    0x12:"STACK_CORRUPT", 0x13:"STACK_UNDERFLOW",
+    0x15:"OUTFORM_CRC", 0x16:"OUTFORM_ALLOC",
+    0x17:"OUTFORM_MINT", 0x18:"OUTFORM_HDR",
+}
+
+# In _handle_callhome_json():
+payload["fault_name"] = _FAULT_NAMES.get(fault_code, f"FAULT_0x{fault_code:02X}")
+```
+
+The bridge also decodes the `fault_gt` field (when firmware provides it —
+see Layer B) into human-readable form for the console summary line:
+
+```
+[CALL HOME] Ti60F225  UID=...  NIA=0x00000008  FAULT=NULL_CAP
+            GT=0x01800003  type=Abstract  perm=E  slot=3 (Boot.Abstr)
+```
+
+**No bitstream needed.  Deploy by copying updated bridge to the Penguin.**
+
+---
+
+#### Layer B — Firmware (no new bitstream if APB3 registers absent; full if present)
+
+**File:** `hardware/soc_combined/firmware/main.c`
+
+When the Track 4 APB3 registers exist (Layer C below), the firmware reads
+them at fault time and adds them to the CALLHOME JSON:
+
+```c
+/* Extended CALLHOME — fields added when Track 4 APB3 registers are present */
+uart_puts(",\"fault_name\":\"");
+uart_puts(fault_code_name(fault_code));          /* lookup table */
+uart_puts("\",\"fault_gt\":\"0x");
+uart_puthex32(CM_FAULT_GT);                      /* +0x18 — see Layer C */
+uart_puts("\",\"fault_instr\":\"0x");
+uart_puthex32(CM_FAULT_INSTR);                   /* +0x1C */
+uart_puts("\",\"fault_cr14\":\"0x");
+uart_puthex32(CM_FAULT_CR14);                    /* +0x20 */
+uart_puts("\",\"fault_stage\":");
+uart_putdec(CM_FAULT_STAGE & 0xFu);              /* +0x24 */
+```
+
+Before Layer C is ready, the firmware emits `fault_name` only (derived from
+the existing `CM_FAULT` register — no new hardware needed).
+
+**Firmware-only CALLHOME after Layer A + B (no new bitstream):**
+
+```json
+{
+  "board":"Ti60F225", "uid":"...", "nia":"0x00000008",
+  "boot_ok":1, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
+  "fw_major":1, "fw_minor":0
+}
+```
+
+**Full CALLHOME after Layer C (new bitstream):**
+
+```json
+{
+  "board":"Ti60F225", "uid":"...", "nia":"0x00000008",
+  "boot_ok":1, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
+  "fault_gt":"0x01800003", "fault_instr":"0xD8000000",
+  "fault_cr14":"0x01C00003", "fault_stage":3,
+  "fw_major":1, "fw_minor":0
+}
+```
+
+---
+
+#### Layer C — New APB3 Fault Registers (new bitstream)
+
+**Files:** `hardware/core.py` + APB3 bridge module
+
+Four new read-only registers, latched at the moment `fault_valid` fires and
+held until the next `boot_start` pulse (i.e. stable for firmware to read
+during the monitor loop):
+
+```
+Offset   Name           Width   Contents
++0x18    FAULT_GT       32 bit  GT word0 of the capability that caused the fault
+                                (from mLoad/perm pipeline; latched on fault_valid)
++0x1C    FAULT_INSTR    32 bit  instruction word at the faulting NIA
+                                (from fetch stage; latched on fault_valid)
++0x20    FAULT_CR14     32 bit  CR14 word0 at fault time
+                                (active abstraction GT → bits[15:0] = NS slot)
++0x24    FAULT_STAGE    4 bit   pipeline stage that raised fault_valid:
+                                0=DECODE  1=PERM  2=MWIN  3=ELOADCALL
+                                4=LAMBDA  5=RETURN  6=BOUNDS  7=DREAD/DWRITE
+```
+
+Amaranth HDL pattern (inside the APB3 bridge module):
+
+```python
+fault_gt_latch    = Signal(32)
+fault_instr_latch = Signal(32)
+fault_cr14_latch  = Signal(32)
+fault_stage_latch = Signal(4)
+
+with m.If(u_core.fault_valid & u_core.boot_complete):
+    m.d.sync += [
+        fault_gt_latch.eq(u_core.fault_gt),        # new output signal on core
+        fault_instr_latch.eq(u_core.fault_instr),  # new output signal on core
+        fault_cr14_latch.eq(u_core.fault_cr14),    # new output signal on core
+        fault_stage_latch.eq(u_core.fault_stage),  # new output signal on core
+    ]
+
+# APB3 read mux (existing pattern):
+with m.Case(0x18 >> 2):
+    m.d.comb += apb_prdata.eq(fault_gt_latch)
+with m.Case(0x1C >> 2):
+    m.d.comb += apb_prdata.eq(fault_instr_latch)
+with m.Case(0x20 >> 2):
+    m.d.comb += apb_prdata.eq(fault_cr14_latch)
+with m.Case(0x24 >> 2):
+    m.d.comb += apb_prdata.eq(Cat(fault_stage_latch, Const(0, 28)))
+```
+
+New output signals on `hardware/core.py` (`ChurchMachineCore`):
+
+```python
+self.fault_gt    = Signal(32)   # GT word0 involved in fault (from perm/mLoad units)
+self.fault_instr = Signal(32)   # instruction word at fault NIA
+self.fault_cr14  = Signal(32)   # CR14 word0 at fault time
+self.fault_stage = Signal(4)    # which pipeline stage raised fault_valid
+```
+
+**Requires:** Re-synthesis in Efinix Efinity → new `.bit` → flash Ti60.
+
+---
+
+#### Layer D — IDE Devices Panel (JavaScript, no bitstream)
+
+**File:** `simulator/index.html` + Devices panel JS
+
+The bridge already POSTs to the IDE `/callhome` endpoint.  The server stores
+the payload in `_latest_callhome_data`.  The Devices panel JS reads it on
+each poll.
+
+Additions:
+
+1. **Fault name badge** — replace raw `fault_code: 7` with `NULL_CAP` in the
+   panel's fault line.  Derived from `fault_name` field (available after
+   Layer A — no bitstream needed).
+
+2. **GT detail row** — when `fault_gt` is present (Layer C onwards), decode
+   the 32-bit word inline using the same GT field layout as the simulator:
+   - `bits[24:23]` → GT type (Null / Inform / Outform / Abstract)
+   - `dom[27]` + `perm[30:28]` → permission string (E / S / L / X / W / R)
+   - `bits[15:0]` → slot index → look up pet name from last-known namespace
+
+3. **Abstraction label** — `fault_cr14[15:0]` gives the NS slot of the
+   abstraction that was running when the fault fired.  Display as pet name
+   (e.g. "Boot.Abstr", "Math.Add") never as a raw slot number.
+
+4. **Pipeline stage** — `fault_stage` int → human string using a small map:
+   ```javascript
+   const STAGE_NAMES = ['Decode','Permission','M-Window','ELOAD/CALL',
+                         'Lambda','Return','Bounds','Data R/W'];
+   ```
+
+**Display principle:** GT hex words are never shown raw to the user.
+Every GT field is translated to a pet name, permission label, or type badge.
+
+---
+
 ## Files Changed Per Track
 
-| File | Track 1 | Track 2 | Track 3 |
-|------|:-------:|:-------:|:-------:|
-| `hardware/soc_combined/firmware/main.c` | ✓ | — | ✓ (simplify Change 3) |
-| `simulator/simulator.js` | — | ✓ | — |
-| `simulator/test_fault_recovery.js` | — | ✓ | — |
-| `hardware/core.py` | — | — | ✓ |
-| `docs/instruction-set.md` | — | ✓ | ✓ |
+| File | T1 | T2 | T3 | T4-A | T4-B | T4-C | T4-D |
+|------|:--:|:--:|:--:|:----:|:----:|:----:|:----:|
+| `hardware/soc_combined/firmware/main.c` | ✓ | — | ✓ | — | ✓ | ✓ | — |
+| `hardware/soc_combined/callhome_bridge.py` | — | — | — | ✓ | — | — | — |
+| `simulator/simulator.js` | — | ✓ | — | — | — | — | — |
+| `simulator/test_fault_recovery.js` | — | ✓ | — | — | — | — | — |
+| `hardware/core.py` | — | — | ✓ | — | — | ✓ | — |
+| APB3 bridge HDL module | — | — | — | — | — | ✓ | — |
+| `simulator/index.html` + Devices JS | — | — | — | — | — | — | ✓ |
+| `server/app.py` | — | — | — | — | — | — | ✓ |
+| `docs/instruction-set.md` | — | ✓ | ✓ | — | — | — | — |
 
 ---
 
@@ -264,22 +530,35 @@ manual pulse needed.
 1. **Track 1** — firmware only; recompile and flash today.
    Confirm cold boot ≤ 0.5 s and fault recovery ≤ 10 ms over UART at 57600 baud.
 
-2. **Track 2** — simulator matches firmware; run `fault-recovery-tests` and
+2. **Track 4-A** — bridge Python change; deploy to Penguin by copying file.
+   Confirm `fault_name` appears in Devices panel on next CALLHOME.
+
+3. **Track 4-B (partial)** — firmware emits `fault_name` field; no new registers yet.
+   Verify end-to-end: board faults → terminal shows `NULL_CAP` → IDE Devices panel shows it.
+
+4. **Track 2** — simulator matches firmware; run `fault-recovery-tests` and
    update Tier 3 assertions.
 
-3. **Track 3** — schedule Efinity synthesis run.  Test on hardware.
-   Simplify firmware fault handler to log-only (hardware self-recovers).
+5. **Track 3 + Track 4-C** — both require a new bitstream; do them in the
+   same synthesis run.  Hardware auto-reboots on fault; APB3 exposes GT,
+   instruction, CR14, pipeline stage.
+
+6. **Track 4-B (full)** — firmware reads the four new APB3 registers and
+   emits the complete CALLHOME fault payload.
+
+7. **Track 4-D** — IDE Devices panel decodes GT fields and shows pet names.
+   `fault_code: 7` is gone; the panel shows `NULL_CAP — CALL — Boot.Abstr`.
 
 ---
 
 ## Timing Summary
 
-| Phase | Cold boot to CALLHOME | Fault recovery |
-|-------|-----------------------|----------------|
-| Today (pre-change) | ≥ 14 s | power-cycle required |
-| After Track 1 (firmware) | ≤ 0.5 s | ≤ 10 ms |
-| After Track 3 (hardware) | ≤ 0.5 s | 240 ns (6 cycles at 25 MHz) |
-| PP250 original | — | nanoseconds |
+| Phase | Cold boot to CALLHOME | Fault recovery | GT in CALLHOME |
+|-------|-----------------------|----------------|----------------|
+| Today (pre-change) | ≥ 14 s | power-cycle required | No |
+| After T1 + T4-A/B | ≤ 0.5 s | ≤ 10 ms | Name only |
+| After T3 + T4-C/D | ≤ 0.5 s | 240 ns (6 cycles) | Full GT + stage |
+| PP250 original | — | nanoseconds | N/A |
 
 ---
 
@@ -292,5 +571,8 @@ manual pulse needed.
 - `CM_CTRL_PRESSED = 0`, `CM_CTRL_RELEASED = 1` (active-low push_button).
 - The three boot instructions (`LOAD`, `CHANGE`, `CALL`) are fixed in
   `hardware/boot_rom.py`; they do not change across any of the three tracks.
-- The CALLHOME JSON packet already carries `fault` and `fault_code` fields;
-  no new packet fields are needed.
+- GT hex words must **never** be shown raw in the IDE.  Every GT field is
+  decoded to a type badge, permission label, or pet name before display.
+- `ChurchSimulator.FAULT_CODES` in `simulator/simulator.js` is the single
+  authoritative source for fault code numbers.  The bridge lookup table
+  (`_FAULT_NAMES`) and any firmware lookup must stay in sync with it.
