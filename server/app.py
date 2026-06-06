@@ -6865,12 +6865,85 @@ _uart_log = []                   # rolling list of last 500 plain-text UART line
 _uart_log_lock = threading.Lock()
 _UART_LOG_MAX = 500
 
+def _write_fault_event_from_callhome(entry):
+    """Write a FaultEvent row from a callhome/register entry for MTBF analytics.
+
+    Called when boot_ok==0, fault_code!=0, or event_type=='register'.
+    Must be called with an active Flask app context and inside a db.session.
+    """
+    if FaultEvent is None:
+        return
+    try:
+        nia_str = entry.get("nia", "0x00000000")
+        try:
+            nia_int = int(str(nia_str), 16)
+        except (ValueError, TypeError):
+            nia_int = 0
+        fe = FaultEvent(
+            device_uid=entry.get("uid", ""),
+            fault_type=int(entry.get("fault_code", 0)),
+            fault_nia=nia_int,
+            boot_reason=0 if entry.get("boot_ok", 1) else 2,
+            timestamp=entry.get("ts", 0.0),
+            fault_code=str(entry.get("fault_code", 0)),
+            mnemonic="",
+            board_name=entry.get("board", ""),
+            ns_slot=None,
+            abstraction_label="",
+            nia_hex=str(nia_str),
+            cr12=str(entry.get("cr12") or ""),
+            cr14=str(entry.get("cr14") or ""),
+            cr15=str(entry.get("cr15") or ""),
+            boot_count_at_fault=int(entry.get("boot_count", 0)),
+            raw_type=entry.get("type", "callhome"),
+        )
+        db.session.add(fe)
+    except Exception as _fe_err:
+        logging.warning("FaultEvent DB write error from callhome: %s", _fe_err)
+
+
 def _append_callhome_log(entry):
-    """Append a CALLHOME event to the rolling log under _latest_callhome_lock."""
+    """Append a CALLHOME event to the rolling log under _latest_callhome_lock.
+
+    Also writes through to CallhomeLog (7-day rolling) and conditionally to
+    FaultEvent (permanent MTBF store) when the event represents a fault or restart.
+    """
     global _callhome_log
     _callhome_log.append(entry)
     if len(_callhome_log) > _CALLHOME_LOG_MAX:
         _callhome_log = _callhome_log[-_CALLHOME_LOG_MAX:]
+    if CallhomeLog is None:
+        return
+    try:
+        row = CallhomeLog(
+            ts=float(entry.get("ts", 0.0)),
+            uid=str(entry.get("uid", "")),
+            board=str(entry.get("board", "")),
+            nia=str(entry.get("nia", "0x00000000")),
+            boot_ok=1 if entry.get("boot_ok", 1) else 0,
+            fault=int(entry.get("fault", 0)),
+            fault_code=int(entry.get("fault_code", 0)),
+            fw_major=int(entry.get("fw_major", 1)),
+            fw_minor=int(entry.get("fw_minor", 0)),
+            boot_count=int(entry.get("boot_count", 0)),
+            event_type=str(entry.get("type", "callhome")),
+            cr12=str(entry.get("cr12") or ""),
+            cr14=str(entry.get("cr14") or ""),
+            cr15=str(entry.get("cr15") or ""),
+        )
+        db.session.add(row)
+        boot_ok = entry.get("boot_ok", 1)
+        fault_code = int(entry.get("fault_code", 0))
+        raw_type = entry.get("type", "callhome")
+        if (not boot_ok) or fault_code or raw_type == "register":
+            _write_fault_event_from_callhome(entry)
+        db.session.commit()
+    except Exception as _cl_err:
+        logging.warning("CallhomeLog DB write error: %s", _cl_err)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 
 @app.route("/api/device/register", methods=["POST"])
@@ -7208,7 +7281,10 @@ def boot_lump_words():
 
 @app.route("/api/device/callhome-log")
 def device_callhome_log():
-    """Return recent CALLHOME/register events newer than ?since=<unix_ts>, newest first."""
+    """Return recent CALLHOME/register events newer than ?since=<unix_ts>, newest first.
+
+    Queries CallhomeLog (DB) for historical records; falls back to in-memory list.
+    """
     try:
         since = float(request.args.get("since") or 0)
     except (ValueError, TypeError):
@@ -7217,6 +7293,32 @@ def device_callhome_log():
         limit = min(int(request.args.get("limit") or 100), 200)
     except (ValueError, TypeError):
         limit = 100
+    if CallhomeLog is not None:
+        try:
+            rows = (CallhomeLog.query
+                    .filter(CallhomeLog.ts > since)
+                    .order_by(CallhomeLog.ts.desc())
+                    .limit(limit)
+                    .all())
+            entries = [{
+                "ts":         r.ts,
+                "uid":        r.uid,
+                "board":      r.board,
+                "nia":        r.nia,
+                "boot_ok":    r.boot_ok,
+                "fault":      r.fault,
+                "fault_code": r.fault_code,
+                "fw_major":   r.fw_major,
+                "fw_minor":   r.fw_minor,
+                "boot_count": r.boot_count,
+                "type":       r.event_type,
+                "cr12":       r.cr12,
+                "cr14":       r.cr14,
+                "cr15":       r.cr15,
+            } for r in rows]
+            return jsonify({"ok": True, "entries": entries})
+        except Exception as _db_err:
+            logging.warning("callhome-log DB query failed, falling back: %s", _db_err)
     with _latest_callhome_lock:
         entries = [e for e in _callhome_log if e.get("ts", 0) > since]
     entries_out = entries[-limit:]
@@ -7242,6 +7344,21 @@ def device_uart_log():
                     })
                 if len(_uart_log) > _UART_LOG_MAX:
                     _uart_log = _uart_log[-_UART_LOG_MAX:]
+            if UartLog is not None:
+                try:
+                    for entry in lines:
+                        db.session.add(UartLog(
+                            ts=float(entry.get("ts", 0)),
+                            uid=str(entry.get("uid", "unknown")),
+                            line=str(entry.get("line", "")),
+                        ))
+                    db.session.commit()
+                except Exception as _ul_err:
+                    logging.warning("UartLog DB write error: %s", _ul_err)
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
         return jsonify({"ok": True, "added": len(lines)})
     # GET
     try:
@@ -7252,11 +7369,105 @@ def device_uart_log():
         limit = min(int(request.args.get("limit") or 200), 500)
     except (ValueError, TypeError):
         limit = 200
+    if UartLog is not None:
+        try:
+            rows = (UartLog.query
+                    .filter(UartLog.ts > since)
+                    .order_by(UartLog.ts.desc())
+                    .limit(limit)
+                    .all())
+            out = [{"ts": r.ts, "uid": r.uid, "line": r.line} for r in rows]
+            return jsonify({"ok": True, "entries": out})
+        except Exception as _ul_get_err:
+            logging.warning("UartLog DB query failed, falling back: %s", _ul_get_err)
     with _uart_log_lock:
         entries = [e for e in _uart_log if e.get("ts", 0) > since]
     out = entries[-limit:]
     out = list(reversed(out))   # newest first
     return jsonify({"ok": True, "entries": out})
+
+
+@app.route("/api/device/mtbf")
+def device_mtbf():
+    """Return MTBF (mean time between failures) in hours, broken down by machine,
+    abstraction, and instruction.
+
+    Optional query parameters to filter/group:
+      ?uid=<device_uid>    — filter to a specific machine
+      ?ns_slot=<int>       — filter to a specific namespace slot
+      ?mnemonic=<str>      — filter to a specific instruction mnemonic
+
+    Response: { "ok": true, "rows": [ { "machine_uid", "board_name",
+      "ns_slot", "abstraction_label", "mnemonic", "fault_count",
+      "first_fault_ts", "last_fault_ts", "mtbf_hours" }, ... ] }
+
+    Rows are sorted by mtbf_hours ascending (least reliable first).
+    Groups with fewer than 2 events have mtbf_hours of null.
+    """
+    uid_filter = request.args.get("uid", "").strip()
+    try:
+        ns_slot_filter = int(request.args.get("ns_slot", ""))
+        has_ns_slot = True
+    except (ValueError, TypeError):
+        ns_slot_filter = None
+        has_ns_slot = False
+    mnemonic_filter = request.args.get("mnemonic", "").strip()
+
+    if FaultEvent is None:
+        return jsonify({"ok": False, "error": "model not ready"}), 503
+
+    try:
+        from sqlalchemy import func as _sqlfunc
+        q = FaultEvent.query
+        if uid_filter:
+            q = q.filter(FaultEvent.device_uid == uid_filter)
+        if has_ns_slot:
+            q = q.filter(FaultEvent.ns_slot == ns_slot_filter)
+        if mnemonic_filter:
+            q = q.filter(FaultEvent.mnemonic == mnemonic_filter)
+
+        events = q.all()
+
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for ev in events:
+            key = (
+                ev.device_uid or "",
+                ev.board_name or "",
+                ev.ns_slot,
+                ev.abstraction_label or "",
+                ev.mnemonic or "",
+            )
+            groups[key].append(ev.timestamp or 0.0)
+
+        rows = []
+        for (machine_uid, board_name, ns_slot, abstraction_label, mnemonic), tss in groups.items():
+            tss_sorted = sorted(t for t in tss if t)
+            fault_count = len(tss_sorted)
+            first_ts = tss_sorted[0] if tss_sorted else None
+            last_ts = tss_sorted[-1] if tss_sorted else None
+            if fault_count >= 2 and first_ts is not None and last_ts is not None:
+                span_hours = (last_ts - first_ts) / 3600.0
+                mtbf_hours = span_hours / (fault_count - 1) if fault_count > 1 else None
+            else:
+                mtbf_hours = None
+            rows.append({
+                "machine_uid":       machine_uid,
+                "board_name":        board_name,
+                "ns_slot":           ns_slot,
+                "abstraction_label": abstraction_label,
+                "mnemonic":          mnemonic,
+                "fault_count":       fault_count,
+                "first_fault_ts":    first_ts,
+                "last_fault_ts":     last_ts,
+                "mtbf_hours":        mtbf_hours,
+            })
+
+        rows.sort(key=lambda r: (r["mtbf_hours"] is None, r["mtbf_hours"] or 0))
+        return jsonify({"ok": True, "rows": rows})
+    except Exception as _mtbf_err:
+        logging.warning("MTBF query error: %s", _mtbf_err)
+        return jsonify({"ok": False, "error": str(_mtbf_err)}), 500
 
 
 @app.route("/api/device/latest-callhome")
@@ -8015,6 +8226,8 @@ Project = None
 TutorialProgress = None
 FaultEvent = None
 LaunchTest = None
+CallhomeLog = None
+UartLog = None
 
 LAUNCH_TESTS_SEED = [
     ("TEST-01", "Boot.NS",
@@ -8062,7 +8275,7 @@ with app.app_context():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from server.models import register_models, BOARD_TYPES, PROFILE_NAMES
-    Project, TutorialProgress, Device, FaultEvent, LaunchTest = register_models(db)
+    Project, TutorialProgress, Device, FaultEvent, LaunchTest, CallhomeLog, UartLog = register_models(db)
     db.create_all()
 
     from sqlalchemy import inspect as _sa_inspect, text as _sa_text
@@ -8091,13 +8304,22 @@ with app.app_context():
 
     _existing_fe_cols = {c["name"] for c in _inspector.get_columns("fault_events")}
     for _fe_col, _fe_def in [
-        ("lump_token",     "VARCHAR(16) DEFAULT NULL"),
-        ("lump_version",   "INTEGER DEFAULT 0"),
-        ("fault_code",     "VARCHAR(32) DEFAULT ''"),
-        ("mnemonic",       "VARCHAR(32) DEFAULT ''"),
-        ("pipeline_stage", "VARCHAR(32) DEFAULT ''"),
-        ("recovery_tier",  "INTEGER DEFAULT 0"),
-        ("step_count",     "INTEGER DEFAULT 0"),
+        ("lump_token",        "VARCHAR(16) DEFAULT NULL"),
+        ("lump_version",      "INTEGER DEFAULT 0"),
+        ("fault_code",        "VARCHAR(32) DEFAULT ''"),
+        ("mnemonic",          "VARCHAR(32) DEFAULT ''"),
+        ("pipeline_stage",    "VARCHAR(32) DEFAULT ''"),
+        ("recovery_tier",     "INTEGER DEFAULT 0"),
+        ("step_count",        "INTEGER DEFAULT 0"),
+        ("board_name",        "VARCHAR(32) DEFAULT ''"),
+        ("ns_slot",           "INTEGER DEFAULT NULL"),
+        ("abstraction_label", "VARCHAR(128) DEFAULT ''"),
+        ("nia_hex",           "VARCHAR(12) DEFAULT ''"),
+        ("cr12",              "VARCHAR(32) DEFAULT ''"),
+        ("cr14",              "VARCHAR(32) DEFAULT ''"),
+        ("cr15",              "VARCHAR(32) DEFAULT ''"),
+        ("boot_count_at_fault", "INTEGER DEFAULT 0"),
+        ("raw_type",          "VARCHAR(16) DEFAULT ''"),
     ]:
         if _fe_col not in _existing_fe_cols:
             db.session.execute(_sa_text(f"ALTER TABLE fault_events ADD COLUMN {_fe_col} {_fe_def}"))
@@ -8165,6 +8387,45 @@ with app.app_context():
             _preload_count += 1
     if _preload_count:
         logging.info("Tunnel: pre-loaded %d device(s) into latest-callhome cache", _preload_count)
+
+    # Warm in-memory rolling caches from DB so the first IDE poll hits instantly.
+    try:
+        _warm_ch_rows = (CallhomeLog.query
+                         .order_by(CallhomeLog.ts.asc())
+                         .limit(200)
+                         .all())
+        with _latest_callhome_lock:
+            _callhome_log = [{
+                "ts":         r.ts,
+                "uid":        r.uid,
+                "board":      r.board,
+                "nia":        r.nia,
+                "boot_ok":    r.boot_ok,
+                "fault":      r.fault,
+                "fault_code": r.fault_code,
+                "fw_major":   r.fw_major,
+                "fw_minor":   r.fw_minor,
+                "boot_count": r.boot_count,
+                "type":       r.event_type,
+                "cr12":       r.cr12,
+                "cr14":       r.cr14,
+                "cr15":       r.cr15,
+            } for r in _warm_ch_rows]
+        logging.info("Warmed callhome in-memory cache: %d row(s) from DB", len(_warm_ch_rows))
+    except Exception as _wc_err:
+        logging.warning("Could not warm callhome cache from DB: %s", _wc_err)
+
+    try:
+        _warm_ul_rows = (UartLog.query
+                         .order_by(UartLog.ts.asc())
+                         .limit(500)
+                         .all())
+        with _uart_log_lock:
+            _uart_log = [{"ts": r.ts, "uid": r.uid, "line": r.line}
+                         for r in _warm_ul_rows]
+        logging.info("Warmed UART in-memory cache: %d row(s) from DB", len(_warm_ul_rows))
+    except Exception as _wu_err:
+        logging.warning("Could not warm UART cache from DB: %s", _wu_err)
 
     logging.info("Database tables created")
 

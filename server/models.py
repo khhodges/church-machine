@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, func
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, Index, func
 
 
 BOARD_TYPES = {
@@ -66,7 +66,7 @@ def register_models(db):
         fault_type = Column(Integer, nullable=False, default=0)
         fault_nia = Column(Integer, nullable=False, default=0)
         boot_reason = Column(Integer, default=0)
-        timestamp = Column(Float, default=0.0)
+        timestamp = Column(Float, default=0.0, index=True)
         lump_token = Column(String(16), default=None)
         lump_version = Column(Integer, default=0)
         fault_code = Column(String(32), default="")
@@ -74,6 +74,15 @@ def register_models(db):
         pipeline_stage = Column(String(32), default="")
         recovery_tier = Column(Integer, default=0)
         step_count = Column(Integer, default=0)
+        board_name = Column(String(32), default="")
+        ns_slot = Column(Integer, default=None)
+        abstraction_label = Column(String(128), default="")
+        nia_hex = Column(String(12), default="")
+        cr12 = Column(String(32), default="")
+        cr14 = Column(String(32), default="")
+        cr15 = Column(String(32), default="")
+        boot_count_at_fault = Column(Integer, default=0)
+        raw_type = Column(String(16), default="")
 
     class LaunchTest(db.Model):
         __tablename__ = "launch_tests"
@@ -87,4 +96,31 @@ def register_models(db):
         updated_at = Column(Float, default=0.0)
         notes = Column(Text, default="")
 
-    return Project, TutorialProgress, Device, FaultEvent, LaunchTest
+    class CallhomeLog(db.Model):
+        __tablename__ = "callhome_log"
+
+        id = Column(Integer, primary_key=True)
+        ts = Column(Float, nullable=False, default=0.0, index=True)
+        uid = Column(String(16), default="")
+        board = Column(String(32), default="")
+        nia = Column(String(12), default="0x00000000")
+        boot_ok = Column(Integer, default=1)
+        fault = Column(Integer, default=0)
+        fault_code = Column(Integer, default=0)
+        fw_major = Column(Integer, default=1)
+        fw_minor = Column(Integer, default=0)
+        boot_count = Column(Integer, default=0)
+        event_type = Column(String(16), default="callhome")
+        cr12 = Column(String(32), default="")
+        cr14 = Column(String(32), default="")
+        cr15 = Column(String(32), default="")
+
+    class UartLog(db.Model):
+        __tablename__ = "uart_log"
+
+        id = Column(Integer, primary_key=True)
+        ts = Column(Float, nullable=False, default=0.0, index=True)
+        uid = Column(String(16), default="")
+        line = Column(Text, default="")
+
+    return Project, TutorialProgress, Device, FaultEvent, LaunchTest, CallhomeLog, UartLog

@@ -1039,8 +1039,53 @@ def run_lfs_backup():
         log.error("Nightly LFS backup job failed: %s", exc)
 
 
+def prune_short_term_logs(db_path):
+    """Delete CallhomeLog and UartLog rows older than 7 days and enforce row-count caps.
+
+    CallhomeLog: keep newest 1 000 rows AND rows within 7 days.
+    UartLog:     keep newest 5 000 rows AND rows within 7 days.
+
+    FaultEvent is never pruned — it is a permanent store for MTBF analytics.
+    """
+    cutoff = time.time() - 7 * 86400
+    try:
+        conn = sqlite3.connect(db_path)
+
+        # --- callhome_log ---
+        try:
+            conn.execute("DELETE FROM callhome_log WHERE ts < ?", (cutoff,))
+            # Row-count cap: delete oldest rows beyond 1000
+            conn.execute("""
+                DELETE FROM callhome_log WHERE id IN (
+                    SELECT id FROM callhome_log ORDER BY ts DESC LIMIT -1 OFFSET 1000
+                )
+            """)
+            conn.commit()
+            log.info("Pruned callhome_log: removed rows older than 7 days / beyond 1000 row cap")
+        except Exception as _cl_err:
+            log.warning("Could not prune callhome_log: %s", _cl_err)
+
+        # --- uart_log ---
+        try:
+            conn.execute("DELETE FROM uart_log WHERE ts < ?", (cutoff,))
+            conn.execute("""
+                DELETE FROM uart_log WHERE id IN (
+                    SELECT id FROM uart_log ORDER BY ts DESC LIMIT -1 OFFSET 5000
+                )
+            """)
+            conn.commit()
+            log.info("Pruned uart_log: removed rows older than 7 days / beyond 5000 row cap")
+        except Exception as _ul_err:
+            log.warning("Could not prune uart_log: %s", _ul_err)
+
+        conn.close()
+    except Exception as exc:
+        log.warning("prune_short_term_logs: could not open DB: %s", exc)
+
+
 def send_daily_report(db_path):
     """Generate and send the daily report via Resend. Returns (success, message)."""
+    prune_short_term_logs(db_path)
     api_key, from_email = _get_resend_credentials()
     if not api_key:
         msg = "Resend API key not available — email not sent"
