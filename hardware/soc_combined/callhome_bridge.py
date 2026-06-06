@@ -247,6 +247,12 @@ def _flush_uart_buffer():
             urllib.request.urlopen(req, timeout=5)
         except Exception as e:
             print(f"  [bridge] uart-log POST failed: {e}")
+            # Re-queue the failed batch so messages are not silently dropped.
+            # Cap at 500 to avoid unbounded growth if the server is down.
+            with _uart_buffer_lock:
+                combined = batch + list(_uart_buffer)
+                _uart_buffer.clear()
+                _uart_buffer.extend(combined[-500:])
 
 
 def _process_line(line):
