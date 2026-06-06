@@ -2520,16 +2520,25 @@ function _refreshMachineDropdown() {
 function _onMachineSelectChange() {
     var sel = document.getElementById('callhomeMachineSelect');
     _selectedMachineUid = sel ? sel.value : '';
+
+    // Reset counters and wipe rows so the next poll fetches full history
+    // for the newly selected machine (or all machines) from since=0.
+    _callhomeLogSince = 0;
+    _uartLogSince = 0;
+    _callhomeLogRowCount = 0;
+
     var panel = document.getElementById('callhomeLogEntries');
-    if (!panel) return;
-    panel.querySelectorAll('.callhome-log-row, .callhome-uart-row').forEach(function(row) {
-        if (!_selectedMachineUid) {
-            row.style.display = '';
-        } else {
-            var uid = row.dataset.uid || '';
-            row.style.display = (!uid || uid === _selectedMachineUid) ? '' : 'none';
-        }
-    });
+    if (panel) {
+        var header = panel.querySelector('.callhome-log-col-heads');
+        panel.innerHTML = '';
+        if (header) panel.appendChild(header);
+    }
+
+    // Cancel any pending poll and fire immediately.
+    if (_callhomeLogTimer) { clearTimeout(_callhomeLogTimer); _callhomeLogTimer = null; }
+    if (_uartLogTimer)     { clearTimeout(_uartLogTimer);     _uartLogTimer = null; }
+    _pollCallhomeLog();
+    _pollUartLog();
 }
 
 function _stopCallhomeLog() {
