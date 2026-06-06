@@ -1893,7 +1893,7 @@
 /* Column header row */
 .callhome-log-col-heads {
     display: grid;
-    grid-template-columns: 7ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
+    grid-template-columns: 12ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
     gap: 0.6rem;
     padding: 0.25rem 0.8rem;
     background: #111118;
@@ -1929,7 +1929,7 @@
 }
 .callhome-log-row {
     display: grid;
-    grid-template-columns: 7ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
+    grid-template-columns: 12ch 1.2ch 9ch 19ch 12ch 5ch 6ch 6ch 9ch;
     gap: 0.6rem;
     align-items: center;
     padding: 0.2rem 0.8rem;
