@@ -1898,11 +1898,11 @@
     padding: 0.25rem 0.8rem;
     background: #111118;
     border-bottom: 1px solid #2a2a3a;
-    font-size: 0.62rem;
+    font-size: 0.72rem;
     font-family: 'Courier New', Courier, monospace;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #4b5563;
+    letter-spacing: 0.08em;
+    color: #374151;
     position: sticky;
     top: 0;
     z-index: 1;
