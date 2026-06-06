@@ -2336,7 +2336,9 @@ function _pollCallhomeLog() {
                             '<span class="chlog-boot">' + _escHtml(String(e.boot_count || 1)) + '</span>' +
                             '<span class="chlog-fault">' + faultDisp + '</span>' +
                             '<span class="chlog-type">' + typeDisp + '</span>';
-                        panel.insertBefore(row, panel.firstChild);
+                        var colHeads = panel.querySelector('.callhome-log-col-heads');
+                        var insertAfter = colHeads ? colHeads.nextSibling : panel.firstChild;
+                        panel.insertBefore(row, insertAfter);
                         _callhomeLogRowCount++;
                         while (panel.children.length > 100) panel.removeChild(panel.lastChild);
                     });
@@ -2357,7 +2359,15 @@ function clearCallhomeLog() {
     _callhomeLogSince = 0;
     _callhomeLogRowCount = 0;
     var panel = document.getElementById('callhomeLogEntries');
-    if (panel) panel.innerHTML = '<div class="callhome-log-empty">Cleared — waiting for next call-home&hellip;</div>';
+    if (panel) {
+        var header = panel.querySelector('.callhome-log-col-heads');
+        panel.innerHTML = '';
+        if (header) panel.appendChild(header);
+        var empty = document.createElement('div');
+        empty.className = 'callhome-log-empty';
+        empty.textContent = 'Cleared \u2014 waiting for next call-home\u2026';
+        panel.appendChild(empty);
+    }
     var sub = document.getElementById('callhomeLogSubtitle');
     if (sub) sub.textContent = 'live · polling every 3 s';
 }
