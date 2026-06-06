@@ -308,22 +308,115 @@ core but have no APB3 window.
 
 ---
 
-### Hardware Fault Code Mapping (already canonical in simulator)
+### Hardware Fault Code Mapping (authoritative table)
 
 `ChurchSimulator.FAULT_CODES` in `simulator/simulator.js` is the single source
-of truth for fault code numbers.  The same table must live in the bridge and
-firmware so that `fault_code: 7` → `"NULL_CAP"` without IDE involvement.
+of truth for fault code numbers.  The bridge lookup table, firmware lookup
+table, and IDE decoder **must all stay in sync with this table**.
 
-```
-0x01 PERM_R       0x02 PERM_W       0x03 PERM_X
-0x04 PERM_L       0x05 PERM_S       0x06 PERM_E
-0x07 NULL_CAP     0x08 BOUNDS       0x09 VERSION
-0x0A SEAL         0x0B INVALID_OP   0x0C TPERM_RSV
-0x0D DOMAIN_PURITY  0x0E BIND       0x0F F_BIT
-0x10 STACK_OVERFLOW 0x11 ABSENT_OUTFORM 0x12 STACK_CORRUPT
-0x13 STACK_UNDERFLOW 0x15 OUTFORM_CRC 0x16 OUTFORM_ALLOC
-0x17 OUTFORM_MINT    0x18 OUTFORM_HDR
-```
+Fault codes fall into three categories:
+
+**Hardware faults** — assigned numeric codes; detected and latched by the FPGA;
+carried verbatim in `CM_FAULT[4:0]` and in the `fault_code` CALLHOME field.
+
+**Logic / arithmetic errors** — some have hardware codes (range check, stack),
+others are software-detected in the simulator execution model.
+
+**Software-originated faults** — fired from `.catch` handler escalation, Tier 2
+IRQ, or explicit `fault()` calls in system abstractions.  These have `null`
+hardware codes and can never appear in `CM_FAULT`; they are simulator-only.
+
+---
+
+#### Category 1 — Permission & Capability Faults (hardware codes 0x01–0x0F)
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0x01 | `PERM_R` | Capability lacks Read permission |
+| 0x02 | `PERM_W` | Capability lacks Write permission |
+| 0x03 | `PERM_X` | Capability lacks Execute permission |
+| 0x04 | `PERM_L` | Capability lacks Lambda permission |
+| 0x05 | `PERM_S` | Capability lacks Save permission |
+| 0x06 | `PERM_E` | Capability lacks Enter permission |
+| 0x07 | `NULL_CAP` | CR holds a null (zero) Golden Token |
+| 0x08 | `BOUNDS` | Access outside lump bounds |
+| 0x09 | `VERSION` | GT version field does not match NS entry |
+| 0x0A | `SEAL` | GT CRC seal is invalid (tampered or corrupt) |
+| 0x0B | `INVALID_OP` | Opcode is reserved or not implemented |
+| 0x0C | `TPERM_RSV` | TPERM preset index is reserved (10–12 or out of range) |
+| 0x0D | `DOMAIN_PURITY` | Church/Turing domain boundary violated |
+| 0x0E | `BIND` / `PERM_B` | B (Bind) bit = 0; GT is not bindable to a C-list. Fires from mLoad bind check — same family as PERM_R…PERM_E. `PERM_B` is the preferred display name. |
+| 0x0F | `F_BIT` | Far-capability (F=1) used locally — requires HTTP tunnel |
+
+#### Category 2 — Stack, Range, and Logic Errors (hardware codes 0x10–0x18)
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0x10 | `STACK_OVERFLOW` / `RANGE` | Stack grew past `sp_max`, **or** address fell outside valid lump range. These share one hardware code. Display as `STACK_OVERFLOW` when the NIA is inside a CALL/RETURN sequence; display as `RANGE` otherwise. |
+| 0x11 | `ABSENT_OUTFORM` | Outform slot is null at RETURN time |
+| 0x12 | `STACK_CORRUPT` | Stack sentinel word has been overwritten |
+| 0x13 | `STACK_UNDERFLOW` | RETURN attempted with empty call stack |
+| 0x14 | *(unassigned)* | Reserved for future use |
+| 0x15 | `OUTFORM_CRC` | Outform lump CRC failed |
+| 0x16 | `OUTFORM_ALLOC` | Outform allocation failed (out of memory) |
+| 0x17 | `OUTFORM_MINT` | Outform MINT (mint new GT) operation failed |
+| 0x18 | `OUTFORM_HDR` | Outform header word malformed |
+| 0x19 | `INT_OVERFLOW` | **(proposed — unassigned today)** Integer arithmetic overflow from IADD/ISUB when the result exceeds the 32-bit signed range. Currently undetected in hardware; should be added to `ChurchSimulator.FAULT_CODES` and the hardware mALU unit. |
+| 0x1A–0x1F | *(unassigned)* | Reserved for future logic-error codes |
+
+#### Category 3 — Software-Originated Faults (no hardware code; simulator only)
+
+These fire via `this.fault(type, msg)` inside the simulator execution model.
+They cannot appear in `CM_FAULT` — they have `null` in `FAULT_CODES`.  When
+they appear in a fault log entry forwarded to the IDE, `fault_code` is 0 and
+`fault_name` is the string below.
+
+| Name | When it fires |
+|------|---------------|
+| `HANDLER` | `DWRITE` / `DREAD` MMIO dispatch hit an unrecognised handler name |
+| `MATH_ERROR` | Division by zero, NaN, or Infinity from a Pure Math / Symbolic front-end expression |
+| `CATCH_ESCALATE` | `.catch` handler **threw** an exception internally; fault escalates past Tier 1. The fault log records `catchInvoked=true` and `catchThrew=true`. **(Add this name to `FAULT_CODES` as `null`.)** |
+| `CATCH_FAULT` | `.catch` handler **explicitly called** `fault()` to signal that it cannot handle the condition and wants Tier 2 / Tier 3 to take over. Distinct from `CATCH_ESCALATE` (handler crash) vs a deliberate escalation request. **(Add to `FAULT_CODES` as `null`.)** |
+| `BOOT` | Boot-time invariant violated (missing NS slot, null thread, etc.) |
+| `DOMAIN_ERROR` | Operand type incompatible with the current execution domain |
+| `LUMP_MAGIC` | Lump header magic byte wrong (lump not installed or memory zeroed) |
+| `LUMP_SIZE` | Lump size field inconsistent with allocation |
+| `LUMP_LAYOUT` | Lump internal layout invalid |
+| `LUMP_OOM` | Lump allocator out of memory |
+| `CODE_NOT_RESIDENT` | CALL target lump is absent and the Loader is not available |
+| `LAZY_RESOLVE_PENDING` | GT slot is a pending sentinel (0xFEEDxxxx) — lazy-load in progress |
+| `PRIVATE_METHOD` | Method called on an abstraction that does not export it |
+| `TYPE` | Operand type mismatch in a typed-dispatch operation |
+| `THREAD` | Thread-table corruption or invalid thread index |
+| `PRIV_REG` | Access to a privileged register outside M-elevation |
+
+---
+
+#### Notes on specific codes
+
+**`PERM_B` / `BIND` (0x0E):** The B (Bind) bit sits at GT word0 bit 31, separate
+from the 3-bit permission field.  A GT with `B=0` cannot be written into a C-list.
+`PERM_B` is the display name the Devices panel and fault popup should show — it is
+consistent with `PERM_R` through `PERM_E`.  The code stays 0x0E; only the label
+shown to users changes.
+
+**`STACK_OVERFLOW` / `RANGE` (0x10 shared):** Both names are registered to 0x10 in
+`ChurchSimulator.FAULT_CODES`.  The bridge and IDE should disambiguate using
+`fault_instr` (from Layer C APB3 register): if the faulting instruction is `CALL`
+or `RETURN`, display `STACK_OVERFLOW`; otherwise display `RANGE`.  Without Layer C
+(no new bitstream), display both: `STACK_OVERFLOW / RANGE`.
+
+**`INT_OVERFLOW` (0x19 proposed):** IADD and ISUB can silently wrap today.  Adding
+a hardware overflow check and fault code 0x19 requires:
+1. Add `INT_OVERFLOW: 0x19` to `ChurchSimulator.FAULT_CODES`.
+2. Add overflow detection to the mALU unit in `hardware/core.py`.
+3. Add `INT_OVERFLOW` to the bridge lookup table and firmware table.
+This is a Track 3 (bitstream) change.
+
+**`CATCH_ESCALATE` and `CATCH_FAULT`:** Both are simulator-only today; they will
+never appear in `CM_FAULT`.  They must appear in `fault_name` in the CALLHOME
+payload when the simulator's fault log is forwarded to the IDE (Track 4-D IDE
+panel should show the tier and whether a catch handler was involved).
 
 ---
 
