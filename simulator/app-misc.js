@@ -2658,8 +2658,11 @@ function _pollUartLog() {
                         String(d.getUTCHours()).padStart(2, '0') + ':' +
                         String(d.getUTCMinutes()).padStart(2, '0') + ':' +
                         String(d.getUTCSeconds()).padStart(2, '0') + ' UTC';
+                    var rowUid = (e.uid || '').toUpperCase();
                     var row = document.createElement('div');
                     row.className = 'callhome-uart-row';
+                    row.dataset.uid = rowUid;
+                    if (_selectedMachineUid && rowUid !== _selectedMachineUid) row.style.display = 'none';
                     row.innerHTML =
                         '<span class="uart-ts">' + _escHtml(dateStr) + '</span>' +
                         '<span class="uart-text">' + _escHtml(e.line) + '</span>';
