@@ -54,10 +54,15 @@
 #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
 #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
 #define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
-/* Ti60F225 devkit crystal: 50 MHz at GPIOL_P_18.
- * Sapphire SoC PLL doubles this to 100 MHz (confirmed by UART baud measurement).
+/* Ti60F225 devkit: 25 MHz crystal → GPIOL_P_18_PLLIN0.
+ * The sapphire.v in this project has NO internal PLL; io_systemClk is passed
+ * straight through.  When peri.xml has no <efxpt:pll_info> for PLL_TL0, the
+ * FPGA runs on the raw 25 MHz crystal.
  * CLOCKDIV must be written explicitly — hardware resets it to 0x00.
- * 100 MHz / (8 × 54) = 231,481 baud ≈ 230,400.  Write CLOCKDIV=53. */
+ * Formula: baudRate = clkFreq / (8 × (clockDivider + 1))
+ *   25 MHz clock, CLOCKDIV=53  →  25_000_000 / (8×54) = 57,870 ≈ 57,600 baud
+ *   50 MHz clock, CLOCKDIV=53  → 115,200 baud  (if PLL_TL0 ×2 is configured)
+ * CONFIRMED WORKING: 57,600 baud on /dev/ttyUSB2, full boot + CALLHOME seen. */
 
 /* ── Church Machine APB3 bridge registers ─────────────────────────────────── */
 /* IO_APB_SLAVE_0_INPUT = 0xF8100000 per generated soc.h (Sapphire SoC). */
