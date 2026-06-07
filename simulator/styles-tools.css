@@ -2021,7 +2021,7 @@
     font-family: 'Courier New', Courier, monospace;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #c9d0db;
+    color: #eceef3;
     position: sticky;
     top: 0;
     z-index: 1;
@@ -2057,15 +2057,15 @@
 }
 .callhome-log-row:hover { background: #161622; }
 
-.chlog-time      { color: #c8cdd8; }
+.chlog-time      { color: #eceef3; }
 .chlog-dot-ok    { color: #22c55e; }
 .chlog-dot-fault { color: #ef4444; }
 .chlog-board     { color: #c8a84b; font-weight: 600; }
-.chlog-ctx       { color: #c8cdd8; font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chlog-ctx       { color: #eceef3; font-size: 0.68rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chlog-uid       { color: #818cf8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chlog-nia       { color: #c8cdd8; }
-.chlog-fw        { color: #c8cdd8; }
-.chlog-boot      { color: #c8cdd8; text-align: right; }
+.chlog-nia       { color: #eceef3; }
+.chlog-fw        { color: #eceef3; }
+.chlog-boot      { color: #eceef3; text-align: right; }
 .chlog-fault     { }
 .chlog-fault-val    { color: #ef4444; }
 .chlog-ok-dash      { color: #6b7280; }
@@ -2100,10 +2100,10 @@
     background: #080810;
 }
 .callhome-uart-row:hover { background: #0f0f1a; }
-.callhome-uart-row .uart-ts   { color: #c8cdd8; }
+.callhome-uart-row .uart-ts   { color: #eceef3; }
 .callhome-uart-row .uart-text {
     grid-column: 2 / -1;
-    color: #6b7280;
+    color: #eceef3;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
