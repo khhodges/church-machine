@@ -328,6 +328,14 @@ hardware codes and can never appear in `CM_FAULT`; they are simulator-only.
 
 ---
 
+#### Special Codes
+
+| Code | Name | Meaning |
+|------|------|---------|
+| 0x00 | `UNKNOWN` | No fault code assigned, or code not recognised. Sentinel value — `CM_FAULT` reads 0 when `fault_valid=0` (normal running). When `fault=1` arrives in a CALLHOME packet with `fault_code=0`, display as `UNKNOWN` rather than silently suppressing. Bridge: `_FAULT_NAMES.get(fault_code, "UNKNOWN")` — fall back to `UNKNOWN`, not `"FAULT_0xNN"`. |
+
+---
+
 #### Category 1 — Permission & Capability Faults (hardware codes 0x01–0x0F)
 
 | Code | Name | Meaning |
@@ -386,6 +394,9 @@ they appear in a fault log entry forwarded to the IDE, `fault_code` is 0 and
 | `CODE_NOT_RESIDENT` | CALL target lump is absent and the Loader is not available |
 | `LAZY_RESOLVE_PENDING` | GT slot is a pending sentinel (0xFEEDxxxx) — lazy-load in progress |
 | `PRIVATE_METHOD` | Method called on an abstraction that does not export it |
+| `NO_CODE` | Abstraction or method body is empty / zero-length |
+| `PERM` | Generic permission failure (composite; not tied to a single PERM_* code) |
+| `PERMISSION` | Alias for `PERM`; used by older internal paths — normalise to `PERM` in the IDE display |
 | `TYPE` | Operand type mismatch in a typed-dispatch operation |
 | `THREAD` | Thread-table corruption or invalid thread index |
 | `PRIV_REG` | Access to a privileged register outside M-elevation |
@@ -431,20 +442,27 @@ copy of the fault code table:
 
 ```python
 _FAULT_NAMES = {
-    0x01:"PERM_R", 0x02:"PERM_W", 0x03:"PERM_X",
-    0x04:"PERM_L", 0x05:"PERM_S", 0x06:"PERM_E",
+    0x00:"UNKNOWN",                                        # sentinel / unrecognised
+    0x01:"PERM_R",  0x02:"PERM_W",  0x03:"PERM_X",
+    0x04:"PERM_L",  0x05:"PERM_S",  0x06:"PERM_E",
     0x07:"NULL_CAP", 0x08:"BOUNDS", 0x09:"VERSION",
-    0x0A:"SEAL", 0x0B:"INVALID_OP", 0x0C:"TPERM_RSV",
-    0x0D:"DOMAIN_PURITY", 0x0E:"BIND", 0x0F:"F_BIT",
+    0x0A:"SEAL",    0x0B:"INVALID_OP", 0x0C:"TPERM_RSV",
+    0x0D:"DOMAIN_PURITY", 0x0E:"PERM_B", 0x0F:"F_BIT",   # 0x0E: display as PERM_B
     0x10:"STACK_OVERFLOW", 0x11:"ABSENT_OUTFORM",
-    0x12:"STACK_CORRUPT", 0x13:"STACK_UNDERFLOW",
-    0x15:"OUTFORM_CRC", 0x16:"OUTFORM_ALLOC",
-    0x17:"OUTFORM_MINT", 0x18:"OUTFORM_HDR",
+    0x12:"STACK_CORRUPT",  0x13:"STACK_UNDERFLOW",
+    0x15:"OUTFORM_CRC",    0x16:"OUTFORM_ALLOC",
+    0x17:"OUTFORM_MINT",   0x18:"OUTFORM_HDR",
+    0x19:"INT_OVERFLOW",                                   # proposed — add when Track 3 lands
 }
 
 # In _handle_callhome_json():
-payload["fault_name"] = _FAULT_NAMES.get(fault_code, f"FAULT_0x{fault_code:02X}")
+payload["fault_name"] = _FAULT_NAMES.get(fault_code, "UNKNOWN")  # never raw hex
 ```
+
+> **`cr14` field:** `callhome_bridge.py` already contains
+> `cr14 = pkt.get("cr14", None)` in `_handle_callhome_json()` — it is
+> already forwarded in the POST payload when present.  The bridge requires no
+> change for this field.  Only the firmware (Layer B) needs updating to emit it.
 
 The bridge also decodes the `fault_gt` field (when firmware provides it —
 see Layer B) into human-readable form for the console summary line:
@@ -487,7 +505,7 @@ the existing `CM_FAULT` register — no new hardware needed).
 ```json
 {
   "board":"Ti60F225", "uid":"...", "nia":"0x00000008",
-  "boot_ok":1, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
+  "boot_ok":1, "boot_reason":2, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
   "fw_major":1, "fw_minor":0
 }
 ```
@@ -497,12 +515,18 @@ the existing `CM_FAULT` register — no new hardware needed).
 ```json
 {
   "board":"Ti60F225", "uid":"...", "nia":"0x00000008",
-  "boot_ok":1, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
+  "boot_ok":1, "boot_reason":2, "fault":1, "fault_code":7, "fault_name":"NULL_CAP",
   "fault_gt":"0x01800003", "fault_instr":"0xD8000000",
   "fault_cr14":"0x01C00003", "fault_stage":3,
   "fw_major":1, "fw_minor":0
 }
 ```
+
+> **`boot_reason` field:** The simulator already computes this in `_bootStep` B:00
+> (`boot_reason=0` cold, `boot_reason=2` fault-recovery) and sends it via
+> `Tunnel.Register`.  The hardware firmware must emit the same field so the IDE
+> can show "Fault recovery boot" vs "Cold boot" in the Devices panel without
+> having to infer it from `fault` alone.  Firmware logic: `boot_reason = (fault_latched_at_boot) ? 2 : 0`.
 
 ---
 
@@ -669,3 +693,51 @@ Every GT field is translated to a pet name, permission label, or type badge.
 - `ChurchSimulator.FAULT_CODES` in `simulator/simulator.js` is the single
   authoritative source for fault code numbers.  The bridge lookup table
   (`_FAULT_NAMES`) and any firmware lookup must stay in sync with it.
+
+---
+
+## Confirmed Operational Gotchas
+
+These were confirmed against the real Ti60 hardware during development.
+They apply to every session connecting the bridge to the board.
+
+### Baud rate is 57600 — firmware comment is wrong
+
+The `main.c` header comment says **"115200 baud"** but the Ti60 SoC UART
+runs at **57600 baud** (25 MHz crystal, `UART_CLOCKDIV = 53`).  Connecting
+at 115200 produces garbage or silence.
+
+Correct bridge command:
+```
+python3 ~/church_project/SoC/callhome_bridge.py \
+  --port /dev/ttyUSB2 --baud 57600 \
+  --ide "https://<replit-dev-url>"
+```
+
+The Sapphire SoC UART resets `UART_CLOCKDIV` to `0x00` on power-up (not to
+any sensible default).  The firmware writes `UART_CLOCKDIV = 53` (`0x35`)
+immediately on startup — before the first `uart_puts` — to establish 57600
+baud.  If the firmware ever forgets this write the UART is silent.
+
+The header comment in `main.c` incorrectly states "115200 baud".  Ignore it.
+**Confirmed working value: `UART_CLOCKDIV = 53` → 57600 baud at 25 MHz.**
+Do not change the baud rate without also reflashing firmware with a matching
+`UART_CLOCKDIV` value.
+
+### Bridge `--flag VALUE` and `--flag=VALUE` are both accepted
+
+The original arg parser only accepted `--flag=VALUE` (equals form).
+`--ide https://...` (space-separated) was silently ignored, leaving
+`_IDE_SERVER_URL = None` — CALLHOME packets arrived at the bridge but were
+never forwarded to the IDE.
+
+The parser was fixed: both forms now work for `--port`, `--baud`, and
+`--ide`.  Either of the following is valid:
+
+```
+--ide "https://..."          # space form — now works
+--ide="https://..."          # equals form — always worked
+```
+
+If CALLHOME packets appear in the terminal but the Devices panel in the IDE
+stays blank, re-check the `--ide` argument — it is the most likely culprit.
