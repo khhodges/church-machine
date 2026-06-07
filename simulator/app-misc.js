@@ -2680,8 +2680,9 @@ function _openCallhomeModal(row) {
         var descAttr = (plainEngRow && !isCurrent)
             ? ' data-desc="' + plainEngRow.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"'
             : '';
+        var addrAttr = ' data-addr="' + entry.wordAddr + '"';
         rowsHtml +=
-            '<div class="' + rowCls + '"' + descAttr + '>' +
+            '<div class="' + rowCls + '"' + descAttr + addrAttr + '>' +
                 '<span class="nia-col-rel">'  + _escHtml(relStr)       + '</span>' +
                 '<span class="nia-col-addr">' + _escHtml(addrStr)      + '</span>' +
                 '<span class="nia-col-hex">'  + _escHtml(decoded.hex)  + '</span>' +
@@ -2750,11 +2751,24 @@ function _openCallhomeModal(row) {
         e.stopPropagation();
         modal.remove();
         row.classList.remove('nia-row-active');
+        _disasmPinnedAddr = null;
     });
 
     // Click-to-expand: any non-current disassembly row with a description
     var disasmBody = modal.querySelector('.nia-disasm-body');
     if (disasmBody) {
+        // Auto-restore pinned row if present in this render
+        if (_disasmPinnedAddr !== null) {
+            var pinnedRow = disasmBody.querySelector('.nia-disasm-row[data-addr="' + _disasmPinnedAddr + '"]');
+            if (pinnedRow && !pinnedRow.classList.contains('nia-disasm-current') && pinnedRow.dataset.desc) {
+                var autoDesc = document.createElement('div');
+                autoDesc.className = 'nia-disasm-desc';
+                autoDesc.textContent = pinnedRow.dataset.desc;
+                pinnedRow.insertAdjacentElement('afterend', autoDesc);
+                pinnedRow.classList.add('nia-row-expanded');
+            }
+        }
+
         disasmBody.addEventListener('click', function(e) {
             var clickedRow = e.target.closest('.nia-disasm-row');
             if (!clickedRow || clickedRow.classList.contains('nia-disasm-current') || !clickedRow.dataset.desc) return;
@@ -2772,6 +2786,10 @@ function _openCallhomeModal(row) {
                 descEl.textContent = clickedRow.dataset.desc;
                 clickedRow.insertAdjacentElement('afterend', descEl);
                 clickedRow.classList.add('nia-row-expanded');
+                _disasmPinnedAddr = parseInt(clickedRow.dataset.addr, 10);
+            } else {
+                // User toggled the same row off — clear the pin
+                _disasmPinnedAddr = null;
             }
         });
     }
@@ -2782,6 +2800,9 @@ function _openCallhomeModal(row) {
         modal.style.zIndex = '10000';
     });
 }
+
+// ── Disassembly pinned-row state ────────────────────────────────────────────
+var _disasmPinnedAddr = null; // address (integer) of the user-expanded row; null = none
 
 // ── Live Call-Home Log ─────────────────────────────────────────────────────
 var _callhomeLogSince = 0;
