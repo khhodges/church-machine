@@ -2851,7 +2851,10 @@ function _pollUartLog() {
                     row.innerHTML =
                         '<span class="uart-ts">' + _escHtml(dateStr) + '</span>' +
                         '<span class="' + uartTextCls + '">' + _escHtml(e.line) + '</span>';
-                    if (_callhomeFilter === 'cloomc') row.style.display = 'none';
+                    // Boot-marker rows (CHURCH…) always visible — used for MTBF calculation
+                    if (_callhomeFilter === 'cloomc' && uartTextCls !== 'uart-text uart-text-boot') {
+                        row.style.display = 'none';
+                    }
                     var colHeads = panel.querySelector('.callhome-log-col-heads');
                     panel.insertBefore(row, colHeads ? colHeads.nextSibling : panel.firstChild);
                     while (panel.children.length > 600) panel.removeChild(panel.lastChild);
