@@ -2349,6 +2349,108 @@ function _cmDecodeWord(word, wordAddr) {
     return { addr: wordAddr, hex: hexStr, mnemonic: mnemonic, cond: condStr, condSuffix: condSuffix, dst: dst, src: src, imm: imm15, text: text };
 }
 
+// ── CR Role Names ─────────────────────────────────────────────────────────
+// Maps CR register indices to their Church Machine ABI roles.
+// Derived from the callhome data attributes: data-cr12 (Return),
+// data-cr14 (Active LUMP), data-cr15 (Namespace).
+function _crRoleName(n) {
+    var ROLES = {
+        0:  'Result',
+        1:  'Arg\u202f1',
+        2:  'Heap',
+        3:  'C-List',
+        4:  'Services',
+        5:  'Thread',
+        6:  'IRQ',
+        12: 'Return',
+        14: 'Active\u202fLUMP',
+        15: 'Namespace'
+    };
+    if (n in ROLES) return ROLES[n];
+    return 'Local\u202f#' + n;
+}
+
+// ── Plain-English Instruction Description ─────────────────────────────────
+// Mnemonic set (opcode 0–19 + HALT for word=0):
+//   0 LOAD  1 SAVE  2 CALL  3 RETURN  4 CHANGE  5 SWITCH  6 TPERM  7 LAMBDA
+//   8 ELOADCALL  9 XLOADLAMBDA  10 DREAD  11 DWRITE  12 BFEXT  13 BFINS
+//   14 MCMP  15 IADD  16 ISUB  17 BRANCH  18 SHL  19 SHR  (word=0 → HALT)
+function _instrPlainEnglish(decoded) {
+    if (!decoded || !decoded.mnemonic) return '';
+    var m   = decoded.mnemonic;
+    var dst = decoded.dst;
+    var src = decoded.src;
+    var imm = decoded.imm;
+    var dn  = (dst !== null && dst !== undefined) ? _crRoleName(dst) : '';
+    var sn  = (src !== null && src !== undefined) ? _crRoleName(src) : '';
+    switch (m) {
+        case 'LOAD':
+            return 'Load namespace slot #' + imm + ' from ' + sn + ' into ' + dn + '.';
+        case 'SAVE':
+            return 'Save ' + dn + ' into namespace slot #' + imm + ' of ' + sn + '.';
+        case 'CALL':
+            return 'Call the capability held in ' + sn + (imm ? ', entry #' + imm : '') + '.';
+        case 'RETURN':
+            return 'Return to caller' + (imm ? ' with status 0x' + imm.toString(16).toUpperCase() : '') + '.';
+        case 'CHANGE':
+            return 'Replace ' + dn + ' with the capability at slot #' + imm + ' from ' + sn + '.';
+        case 'SWITCH':
+            return 'Switch context: hand control from ' + dn + ' to ' + sn + '.';
+        case 'TPERM':
+            return 'Test permission bit #' + imm + ' in ' + sn + '; store result into ' + dn + '.';
+        case 'LAMBDA':
+            return 'Create a lambda closure from ' + dn + '.';
+        case 'ELOADCALL':
+            return 'Extended-load slot #' + imm + ' from ' + sn + ' and call it; result into ' + dn + '.';
+        case 'XLOADLAMBDA':
+            return 'Cross-load lambda slot #' + imm + ' from ' + sn + ' into ' + dn + '.';
+        case 'DREAD':
+            return 'Read word at offset #' + imm + ' from capability ' + sn + ' into data register DR' + dst + '.';
+        case 'DWRITE':
+            return 'Write data register DR' + src + ' to the address pointed by ' + dn + ' + #' + imm + '.';
+        case 'BFEXT':
+            return 'Extract bit-field #' + imm + ' from DR' + src + ' into DR' + dst + '.';
+        case 'BFINS':
+            return 'Insert bit-field #' + imm + ' from DR' + src + ' into DR' + dst + '.';
+        case 'MCMP':
+            return 'Compare DR' + dst + ' with DR' + src + '; set condition flags.';
+        case 'IADD':
+            return 'Add DR' + src + ' and #' + imm + '; store result in DR' + dst + '.';
+        case 'ISUB':
+            return 'Subtract DR' + src + ' from DR' + dst + '; store result in DR' + dst + '.';
+        case 'SHL':
+            return 'Shift DR' + dst + ' left by #' + imm + ' bits; store in DR' + dst + '.';
+        case 'SHR':
+            return 'Shift DR' + dst + ' right by #' + imm + ' bits; store in DR' + dst + '.';
+        case 'BRANCH': {
+            var signedOff = (imm !== null && (imm & 0x4000)) ? (imm - 0x8000) : (imm || 0);
+            return 'Branch ' + (signedOff >= 0 ? '+' : '') + signedOff + ' instructions if condition holds.';
+        }
+        case 'HALT':
+            return 'Stop execution and halt the processor.';
+        default:
+            return '';
+    }
+}
+
+// Returns a compact "dst role · src role" annotation string for CR operands in
+// the disassembly role column. Returns '' when no CR operands are relevant.
+// CR operand map (matches _cmDecodeWord operand encoding):
+//   dst is CR: LOAD, SAVE, CHANGE, SWITCH, TPERM, LAMBDA, ELOADCALL, XLOADLAMBDA, DWRITE
+//   src is CR: LOAD, SAVE, CALL, CHANGE, SWITCH, TPERM, ELOADCALL, XLOADLAMBDA, DREAD
+function _instrRoleAnnotation(decoded) {
+    if (!decoded || !decoded.mnemonic) return '';
+    var m   = decoded.mnemonic;
+    var dst = decoded.dst;
+    var src = decoded.src;
+    var dstIsCR = ['LOAD','SAVE','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DWRITE'].indexOf(m) >= 0;
+    var srcIsCR = ['LOAD','SAVE','CALL','CHANGE','SWITCH','TPERM','ELOADCALL','XLOADLAMBDA','DREAD'].indexOf(m) >= 0;
+    var parts = [];
+    if (dstIsCR && dst !== null && dst !== undefined) parts.push(_crRoleName(dst));
+    if (srcIsCR && src !== null && src !== undefined && src !== dst) parts.push(_crRoleName(src));
+    return parts.join('\u2009\u00b7\u2009');
+}
+
 // ── Boot ROM / Boot.Abstr Word Cache ─────────────────────────────────────
 var _cmRomCache  = null;   // flat array of 32-bit words, index = word address
 var _cmLumpCache = null;   // { lump_base: N, code: [...] }
@@ -2542,25 +2644,62 @@ function _openCallhomeModal(row) {
 
     var RADIUS = 8;
     var words = _cmWordsAround(niaInt, RADIUS);
+
+    // Collapse leading no-data rows into a single separator line
+    var firstRealIdx = 0;
+    while (firstRealIdx < words.length && words[firstRealIdx].word === null && words[firstRealIdx].wordAddr < niaInt) {
+        firstRealIdx++;
+    }
+    var hasLeadingNoData = (firstRealIdx > 0);
+
+    // Find decoded current instruction for spotlight
+    var currentEntry = null;
+    words.forEach(function(entry) { if (entry.wordAddr === niaInt && entry.word !== null) currentEntry = entry; });
+    var currentDecoded = currentEntry ? _cmDecodeWord(currentEntry.word, niaInt) : null;
+
     var rowsHtml = '<div class="nia-disasm-body">';
-    words.forEach(function(entry) {
+    if (hasLeadingNoData) {
+        rowsHtml += '<div class="nia-nodata-sep">\u2500\u2500 nothing before this address \u2500\u2500</div>';
+    }
+    words.forEach(function(entry, idx) {
+        if (entry.word === null && entry.wordAddr < niaInt) return; // collapsed above
         var rel = entry.wordAddr - niaInt;
         var isCurrent = (rel === 0);
         var relStr = rel === 0 ? '\u25b6' : (rel > 0 ? '+' + rel : String(rel));
         var rowCls = 'nia-disasm-row' + (isCurrent ? ' nia-disasm-current' : '');
         var decoded = (entry.word === null)
-            ? { hex: '????????', text: '(no data)' }
+            ? { hex: '????????', text: '(no data)', mnemonic: null, dst: null, src: null, imm: null }
             : _cmDecodeWord(entry.word, entry.wordAddr);
+        if (entry.word === null && !isCurrent) {
+            rowCls += ' nia-no-data';
+        }
         var addrStr = '0x' + entry.wordAddr.toString(16).toUpperCase().padStart(4, '0');
+        var roleStr = decoded.mnemonic ? _instrRoleAnnotation(decoded) : '';
         rowsHtml +=
             '<div class="' + rowCls + '">' +
                 '<span class="nia-col-rel">'  + _escHtml(relStr)       + '</span>' +
                 '<span class="nia-col-addr">' + _escHtml(addrStr)      + '</span>' +
                 '<span class="nia-col-hex">'  + _escHtml(decoded.hex)  + '</span>' +
                 '<span class="nia-col-text">' + _escHtml(decoded.text) + '</span>' +
+                '<span class="nia-col-role">' + _escHtml(roleStr)      + '</span>' +
             '</div>';
     });
     rowsHtml += '</div>';
+
+    // Spotlight block (shown when current instruction word is known)
+    var spotlightHtml = '';
+    if (currentDecoded && currentDecoded.mnemonic) {
+        var roleAnnot = _instrRoleAnnotation(currentDecoded);
+        var plainEng  = _instrPlainEnglish(currentDecoded);
+        spotlightHtml =
+            '<div class="chlog-modal-spotlight">' +
+                '<div class="chlog-modal-spotlight-mnemonic">' +
+                    _escHtml(currentDecoded.text) +
+                    (roleAnnot ? '<span class="chlog-modal-spotlight-role">\u2002' + _escHtml(roleAnnot) + '</span>' : '') +
+                '</div>' +
+                (plainEng ? '<div class="chlog-modal-spotlight-english">' + _escHtml(plainEng) + '</div>' : '') +
+            '</div>';
+    }
 
     modal.innerHTML =
         '<div class="chlog-modal-header">' +
@@ -2572,12 +2711,21 @@ function _openCallhomeModal(row) {
         '</div>' +
         '<div class="chlog-modal-body">' +
             '<div class="chlog-modal-petname">' + _escHtml(petName) + '</div>' +
-            '<div class="chlog-modal-regs">' +
-                'At&nbsp;<span class="nia-val">0x' + niaInt.toString(16).toUpperCase().padStart(4,'0') + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;\u26a1&nbsp;<span class="nia-val">' + _escHtml(cr14Name) + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Return\u202f<span class="nia-val">' + _escHtml(cr12Name) + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Data\u202f<span class="nia-val">' + _escHtml(cr15Name) + '</span>' +
+            '<div class="chlog-modal-ctx-card">' +
+                '<div class="chlog-modal-ctx-cell">' +
+                    '<div class="chlog-modal-ctx-label">Active\u202fLUMP</div>' +
+                    '<div class="chlog-modal-ctx-val">' + _escHtml(cr14Name) + '</div>' +
+                '</div>' +
+                '<div class="chlog-modal-ctx-cell">' +
+                    '<div class="chlog-modal-ctx-label">Return\u202fto</div>' +
+                    '<div class="chlog-modal-ctx-val">' + _escHtml(cr12Name) + '</div>' +
+                '</div>' +
+                '<div class="chlog-modal-ctx-cell">' +
+                    '<div class="chlog-modal-ctx-label">Namespace</div>' +
+                    '<div class="chlog-modal-ctx-val">' + _escHtml(cr15Name) + '</div>' +
+                '</div>' +
             '</div>' +
+            spotlightHtml +
             '<div class="chlog-modal-fw">FW\u2009' + _escHtml(fwStr) + '\u2002\u00b7\u2002Boot\u202f#' + _escHtml(bootStr) + '</div>' +
             faultHtml +
         '</div>' +

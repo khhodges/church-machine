@@ -2186,8 +2186,8 @@
 .chlog-modal {
     position: fixed;
     z-index: 9999;
-    min-width: 440px;
-    max-width: 640px;
+    min-width: 520px;
+    max-width: 700px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
@@ -2276,13 +2276,66 @@
     letter-spacing: 0.01em;
     margin-bottom: 0.3rem;
 }
-.chlog-modal-regs {
-    color: #eceef3;
-    font-size: 0.68rem;
-    margin-bottom: 0.2rem;
+.chlog-modal-ctx-card {
+    display: flex;
+    gap: 0.6rem;
+    margin-bottom: 0.45rem;
+}
+.chlog-modal-ctx-cell {
+    flex: 1;
+    background: #111820;
+    border: 1px solid #1e2535;
+    border-radius: 5px;
+    padding: 0.25rem 0.5rem;
+    min-width: 0;
+}
+.chlog-modal-ctx-label {
+    color: #6b7280;
+    font-size: 0.59rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 0.12rem;
+    white-space: nowrap;
+}
+.chlog-modal-ctx-val {
+    color: #c8a84b;
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chlog-modal-spotlight {
+    background: #1a1200;
+    border: 1px solid #c8a84b44;
+    border-left: 3px solid #c8a84b;
+    border-radius: 4px;
+    padding: 0.35rem 0.6rem;
+    margin-bottom: 0.45rem;
+}
+.chlog-modal-spotlight-mnemonic {
+    color: #daa520;
+    font-size: 0.73rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chlog-modal-spotlight-role {
+    color: #8a6e1a;
+    font-size: 0.67rem;
+    font-weight: 400;
+}
+.chlog-modal-spotlight-english {
+    color: #9ca3af;
+    font-size: 0.67rem;
+    margin-top: 0.18rem;
+    line-height: 1.45;
+    white-space: normal;
 }
 .chlog-modal-fw {
-    color: #eceef3;
+    color: #6b7280;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 0.64rem;
 }
 .chlog-modal-fault {
@@ -2331,7 +2384,7 @@
 .nia-disasm-body { padding: 0.2rem 0; }
 .nia-disasm-row {
     display: grid;
-    grid-template-columns: 2.5ch 6ch 9ch 1fr;
+    grid-template-columns: 2.5ch 6ch 9ch 1fr auto;
     gap: 0.5rem;
     padding: 0.12rem 0.8rem;
     color: #4b5563;
@@ -2347,9 +2400,21 @@
     font-weight: 600;
 }
 .nia-disasm-current:hover { background: #2f2200; }
+.nia-no-data { opacity: 0.38; }
+.nia-nodata-sep {
+    text-align: center;
+    color: #374151;
+    font-size: 0.63rem;
+    padding: 0.18rem 0.8rem;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #1e2535;
+    margin-bottom: 0.1rem;
+}
 .nia-col-rel   { color: inherit; text-align: right; }
 .nia-col-addr  { color: #374151; }
 .nia-disasm-current .nia-col-addr { color: #b8860b; }
 .nia-col-hex   { color: #334155; letter-spacing: 0.04em; }
 .nia-disasm-current .nia-col-hex  { color: #92681a; }
 .nia-col-text  { color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nia-col-role  { color: #5a4a1a; font-size: 0.63rem; white-space: nowrap; align-self: center; }
+.nia-disasm-current .nia-col-role { color: #8a6e1a; }
