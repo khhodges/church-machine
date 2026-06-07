@@ -2418,3 +2418,18 @@
 .nia-col-text  { color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nia-col-role  { color: #5a4a1a; font-size: 0.63rem; white-space: nowrap; align-self: center; }
 .nia-disasm-current .nia-col-role { color: #8a6e1a; }
+
+/* ── Callhome popup — narrow-screen (parent mode on phone) ──────────────── */
+@media (max-width: 540px) {
+    .chlog-modal {
+        min-width: min(96vw, 520px);
+        max-width: 96vw;
+    }
+    .chlog-modal-ctx-card {
+        flex-direction: column;
+    }
+    .nia-disasm-row {
+        grid-template-columns: 2.5ch 9ch 1fr auto;
+    }
+    .nia-col-hex { display: none; }
+}
