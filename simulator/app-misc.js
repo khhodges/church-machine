@@ -2391,85 +2391,181 @@ function _cmWordsAround(centreNia, radius) {
 }
 
 // ── Disassembly Panel ─────────────────────────────────────────────────────
-var _niaPanelOpenRow = null;
+// ── Callhome Row Detail Modals (floating, draggable, multiple) ─────────────
+var _chlogModalSeq = 0;
+var _chlogModalBaseLeft = 80;
+var _chlogModalBaseTop  = 90;
 
-function _openNiaPanel(row, nia, cr14, cr12, cr15) {
-    var container = document.getElementById('callhomeLogEntries');
-    if (!container) return;
-
-    var existing = container.querySelector('.nia-disasm-panel');
-    if (existing) existing.remove();
-
-    if (_niaPanelOpenRow === row) {
-        _niaPanelOpenRow = null;
-        row.classList.remove('nia-row-active');
-        return;
+function _chlogPetNameFromContext(niaInt, niaLabel) {
+    // 1. Server-supplied human label wins
+    if (niaLabel && niaLabel !== ('0x' + niaInt.toString(16).toUpperCase().padStart(4,'0'))) return niaLabel;
+    // 2. Exact zero → boot entry
+    if (niaInt === 0) return 'Boot ROM \u00b7 entry point';
+    // 3. Inside boot ROM cache
+    if (_cmRomCache && niaInt > 0 && niaInt < _cmRomCache.length) {
+        var romOff = niaInt;
+        // NS slot table occupies ROM from word 1: each slot = 4 words, so slot N starts at 1+N*4
+        if (romOff >= 1) {
+            var slotIdx = Math.floor((romOff - 1) / 4);
+            var slotOff = (romOff - 1) % 4;
+            var SLOT_NAMES = { 0:'Boot.ROM', 1:'Boot.NS', 2:'Boot.GT', 3:'Boot.Abstr',
+                               4:'Locator', 5:'Scheduler', 6:'Navana', 7:'TrustKernel',
+                               8:'Scheduler.IRQ' };
+            var wordRole = ['ns-entry', 'limit/cc', 'token', 'padding'][slotOff] || '';
+            var slotName = SLOT_NAMES[slotIdx] || ('NS#' + slotIdx);
+            return 'Boot ROM \u00b7 ' + slotName + ' (' + wordRole + ')';
+        }
+        return 'Boot ROM \u00b7 offset +' + niaInt;
     }
-    if (_niaPanelOpenRow) _niaPanelOpenRow.classList.remove('nia-row-active');
-    _niaPanelOpenRow = row;
-    row.classList.add('nia-row-active');
+    // 4. Inside Boot.Abstr lump code area
+    if (_cmLumpCache) {
+        var base = _cmLumpCache.lump_base;
+        var end  = base + 1 + _cmLumpCache.code.length;
+        if (niaInt >= base + 1 && niaInt < end) {
+            return 'Boot.Abstr \u00b7 instruction +'  + (niaInt - base - 1);
+        }
+        if (niaInt === base) return 'Boot.Abstr \u00b7 lump header';
+    }
+    // 5. Extended-code area (loaded program)
+    if (niaInt >= 0x0400 && niaInt < 0x8000) return 'Program code \u00b7 0x' + niaInt.toString(16).toUpperCase().padStart(4,'0');
+    // 6. High address space
+    if (niaInt >= 0x8000) return 'Data space \u00b7 0x' + niaInt.toString(16).toUpperCase().padStart(4,'0');
+    return '0x' + niaInt.toString(16).toUpperCase().padStart(4,'0');
+}
+
+function _chlogMakeDraggable(modal) {
+    var header = modal.querySelector('.chlog-modal-header');
+    if (!header) return;
+    var dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', function(e) {
+        if (e.target.classList.contains('chlog-modal-close')) return;
+        dragging = true;
+        ox = e.clientX - modal.offsetLeft;
+        oy = e.clientY - modal.offsetTop;
+        modal.style.transition = 'none';
+        e.preventDefault();
+    });
+    var moveHandler = function(e) {
+        if (!dragging) return;
+        modal.style.left = Math.max(0, e.clientX - ox) + 'px';
+        modal.style.top  = Math.max(0, e.clientY - oy) + 'px';
+    };
+    var upHandler = function() { dragging = false; };
+    document.addEventListener('mousemove', moveHandler);
+    document.addEventListener('mouseup',   upHandler);
+    // Clean up listeners when modal is removed
+    var obs = new MutationObserver(function(_, o) {
+        if (!document.body.contains(modal)) {
+            document.removeEventListener('mousemove', moveHandler);
+            document.removeEventListener('mouseup',   upHandler);
+            o.disconnect();
+        }
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+}
+
+function _openCallhomeModal(row) {
+    var nia         = row.getAttribute('data-nia') || '0x0';
+    var cr14        = row.getAttribute('data-cr14') || 'null';
+    var cr12        = row.getAttribute('data-cr12') || 'null';
+    var cr15        = row.getAttribute('data-cr15') || 'null';
+    var niaLabel    = row.dataset.niaLabel  || '';
+    var faultName   = row.dataset.faultName || '';
+    var machLabel   = row.dataset.machineLabel || '?';
+    var timeStr     = row.dataset.timeStr   || '';
+    var fwStr       = row.dataset.fwStr     || '';
+    var bootStr     = row.dataset.bootStr   || '';
 
     var niaInt = parseInt(nia, 16);
     if (isNaN(niaInt)) niaInt = 0;
 
-    var cr14Str = (cr14 !== null && cr14 !== undefined && cr14 !== 'null') ? String(cr14) : 'n/a';
-    var cr12Str = (cr12 !== null && cr12 !== undefined && cr12 !== 'null') ? String(cr12) : 'n/a';
-    var cr15Str = (cr15 !== null && cr15 !== undefined && cr15 !== 'null') ? String(cr15) : 'n/a';
+    var cr14Str = (cr14 !== 'null' && cr14 !== '') ? cr14 : 'n/a';
+    var cr12Str = (cr12 !== 'null' && cr12 !== '') ? cr12 : 'n/a';
+    var cr15Str = (cr15 !== 'null' && cr15 !== '') ? cr15 : 'n/a';
 
-    var RADIUS = 6;
+    var petName = _chlogPetNameFromContext(niaInt, niaLabel);
+
+    var seq  = ++_chlogModalSeq;
+    var step = (seq - 1) % 8;
+    var left = _chlogModalBaseLeft + step * 22;
+    var top  = _chlogModalBaseTop  + step * 22;
+
+    var modal = document.createElement('div');
+    modal.className = 'chlog-modal';
+    modal.id = 'chlog-modal-' + seq;
+    modal.style.left = left + 'px';
+    modal.style.top  = top  + 'px';
+
+    var faultHtml = '';
+    if (faultName) {
+        faultHtml =
+            '<div class="chlog-modal-fault">' +
+                '<span class="chlog-fault-val">' + _escHtml(faultName) + '</span>' +
+                ' <span class="chlog-recovery-tag">RECOVERY</span>' +
+            '</div>';
+    }
+
+    var RADIUS = 8;
     var words = _cmWordsAround(niaInt, RADIUS);
-
-    var panel = document.createElement('div');
-    panel.className = 'nia-disasm-panel';
-
-    var headerHtml =
-        '<div class="nia-disasm-header">' +
-            '<span class="nia-disasm-triple">NIA=<span class="nia-val">0x' + niaInt.toString(16).toUpperCase().padStart(4,'0') + '</span>' +
-            '&nbsp;&nbsp;CR14=<span class="nia-val">' + _escHtml(cr14Str) + '</span>' +
-            '&nbsp;&nbsp;CR12=<span class="nia-val">' + _escHtml(cr12Str) + '</span>' +
-            '&nbsp;&nbsp;CR15=<span class="nia-val">' + _escHtml(cr15Str) + '</span>' +
-            '</span>' +
-            '<button class="nia-disasm-close" title="Close">✕</button>' +
-        '</div>';
-
     var rowsHtml = '<div class="nia-disasm-body">';
     words.forEach(function(entry) {
         var rel = entry.wordAddr - niaInt;
         var isCurrent = (rel === 0);
-        var relStr = rel === 0 ? '▶' : (rel > 0 ? '+' + rel : String(rel));
+        var relStr = rel === 0 ? '\u25b6' : (rel > 0 ? '+' + rel : String(rel));
         var rowCls = 'nia-disasm-row' + (isCurrent ? ' nia-disasm-current' : '');
-
-        var decoded;
-        if (entry.word === null) {
-            decoded = { hex: '????????', text: '(no data)' };
-        } else {
-            decoded = _cmDecodeWord(entry.word, entry.wordAddr);
-        }
-
+        var decoded = (entry.word === null)
+            ? { hex: '????????', text: '(no data)' }
+            : _cmDecodeWord(entry.word, entry.wordAddr);
         var addrStr = '0x' + entry.wordAddr.toString(16).toUpperCase().padStart(4, '0');
-
         rowsHtml +=
             '<div class="' + rowCls + '">' +
-                '<span class="nia-col-rel">' + _escHtml(relStr) + '</span>' +
-                '<span class="nia-col-addr">' + _escHtml(addrStr) + '</span>' +
-                '<span class="nia-col-hex">' + _escHtml(decoded.hex) + '</span>' +
+                '<span class="nia-col-rel">'  + _escHtml(relStr)       + '</span>' +
+                '<span class="nia-col-addr">' + _escHtml(addrStr)      + '</span>' +
+                '<span class="nia-col-hex">'  + _escHtml(decoded.hex)  + '</span>' +
                 '<span class="nia-col-text">' + _escHtml(decoded.text) + '</span>' +
             '</div>';
     });
     rowsHtml += '</div>';
 
-    panel.innerHTML = headerHtml + rowsHtml;
+    modal.innerHTML =
+        '<div class="chlog-modal-header">' +
+            '<div class="chlog-modal-title">' +
+                '<span class="chlog-modal-machine">' + _escHtml(machLabel) + '</span>' +
+                '<span class="chlog-modal-ts">' + _escHtml(timeStr) + '</span>' +
+            '</div>' +
+            '<button class="chlog-modal-close" title="Close">\u2715</button>' +
+        '</div>' +
+        '<div class="chlog-modal-body">' +
+            '<div class="chlog-modal-petname">' + _escHtml(petName) + '</div>' +
+            '<div class="chlog-modal-regs">' +
+                'NIA=<span class="nia-val">0x' + niaInt.toString(16).toUpperCase().padStart(4,'0') + '</span>' +
+                '&nbsp;&nbsp;CR14=<span class="nia-val">' + _escHtml(cr14Str) + '</span>' +
+                '&nbsp;&nbsp;CR12=<span class="nia-val">' + _escHtml(cr12Str) + '</span>' +
+                '&nbsp;&nbsp;CR15=<span class="nia-val">' + _escHtml(cr15Str) + '</span>' +
+            '</div>' +
+            '<div class="chlog-modal-fw">FW\u2009' + _escHtml(fwStr) + '\u2002\u00b7\u2002Boot\u202f#' + _escHtml(bootStr) + '</div>' +
+            faultHtml +
+        '</div>' +
+        rowsHtml;
 
-    var closeBtn = panel.querySelector('.nia-disasm-close');
-    if (closeBtn) {
-        closeBtn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            panel.remove();
-            if (_niaPanelOpenRow) { _niaPanelOpenRow.classList.remove('nia-row-active'); _niaPanelOpenRow = null; }
-        });
-    }
+    document.body.appendChild(modal);
+    _chlogMakeDraggable(modal);
 
-    row.parentNode.insertBefore(panel, row.nextSibling);
+    // Highlight source row
+    row.classList.add('nia-row-active');
+
+    // Close button
+    modal.querySelector('.chlog-modal-close').addEventListener('click', function(e) {
+        e.stopPropagation();
+        modal.remove();
+        row.classList.remove('nia-row-active');
+    });
+
+    // Bring to front on mousedown
+    modal.addEventListener('mousedown', function() {
+        document.querySelectorAll('.chlog-modal').forEach(function(m) { m.style.zIndex = '9999'; });
+        modal.style.zIndex = '10000';
+    });
 }
 
 // ── Live Call-Home Log ─────────────────────────────────────────────────────
@@ -2586,36 +2682,36 @@ function _pollCallhomeLog() {
                           + (isRecovery ? ' <span class="chlog-recovery-tag">RECOVERY</span>' : '')
                         : '<span class="chlog-ok-dash">—</span>';
                     var typeDisp = (e.type === 'register') ? '<span class="chlog-type-reg">register</span>' : '<span class="chlog-type-ch">callhome</span>';
+                    var machineLabel = _deviceLabelCache[uid] || e.board || '?';
+                    var ctxLabel = _niaPetName(e.nia, e.nia_label || e.abstraction_label || '');
+                    var fwStr = (e.fw_major||1) + '.' + (e.fw_minor||0);
+                    var bootStr = String(e.boot_count || 1);
                     var row = document.createElement('div');
                     row.className = 'callhome-log-row';
-                    row.dataset.uid = uid;
-                    row.title = 'Click to disassemble';
+                    row.dataset.uid          = uid;
+                    row.dataset.niaLabel     = ctxLabel;
+                    row.dataset.faultName    = faultName;
+                    row.dataset.machineLabel = machineLabel;
+                    row.dataset.timeStr      = timeStr;
+                    row.dataset.fwStr        = fwStr;
+                    row.dataset.bootStr      = bootStr;
+                    row.title = 'Click for details';
                     row.style.cursor = 'pointer';
                     if (_selectedMachineUid && uid !== _selectedMachineUid) row.style.display = 'none';
                     row.setAttribute('data-nia',  e.nia  || '0x0');
                     row.setAttribute('data-cr14', e.cr14 != null ? String(e.cr14) : 'null');
                     row.setAttribute('data-cr12', e.cr12 != null ? String(e.cr12) : 'null');
                     row.setAttribute('data-cr15', e.cr15 != null ? String(e.cr15) : 'null');
-                    var machineLabel = _deviceLabelCache[uid] || e.board || '?';
-                    var ctxLabel = _niaPetName(e.nia, e.nia_label || e.abstraction_label || '');
                     row.innerHTML =
                         '<span class="chlog-time">' + timeStr + '</span>' +
-                        '<span class="' + dotCls + '">●</span>' +
+                        '<span class="' + dotCls + '">\u25cf</span>' +
                         '<span class="chlog-board">' + _escHtml(machineLabel) + '</span>' +
                         '<span class="chlog-ctx">' + _escHtml(ctxLabel) + '</span>' +
-                        '<span class="chlog-fw">' + (e.fw_major||1) + '.' + (e.fw_minor||0) + '</span>' +
-                        '<span class="chlog-boot">' + _escHtml(String(e.boot_count || 1)) + '</span>' +
+                        '<span class="chlog-fw">' + _escHtml(fwStr) + '</span>' +
+                        '<span class="chlog-boot">' + _escHtml(bootStr) + '</span>' +
                         '<span class="chlog-fault">' + faultDisp + '</span>' +
                         '<span class="chlog-type">' + typeDisp + '</span>';
-                    row.addEventListener('click', function() {
-                        _openNiaPanel(
-                            this,
-                            this.getAttribute('data-nia'),
-                            this.getAttribute('data-cr14'),
-                            this.getAttribute('data-cr12'),
-                            this.getAttribute('data-cr15')
-                        );
-                    });
+                    row.addEventListener('click', function() { _openCallhomeModal(this); });
                     var colHeads = panel.querySelector('.callhome-log-col-heads');
                     var insertAfter = colHeads ? colHeads.nextSibling : panel.firstChild;
                     panel.insertBefore(row, insertAfter);

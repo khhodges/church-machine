@@ -2179,6 +2179,93 @@
 .uart-text { color: #c9d0db; flex: 1; overflow: hidden; text-overflow: ellipsis; }
 
 /* ── NIA Disassembly Panel ───────────────────────────────────────────────── */
+/* ── Callhome Row Detail Modals ────────────────────────────────────────── */
+.chlog-modal {
+    position: fixed;
+    z-index: 9999;
+    min-width: 440px;
+    max-width: 640px;
+    background: #0d1117;
+    border: 1px solid #c8a84b55;
+    border-radius: 7px;
+    box-shadow: 0 10px 40px #00000099, 0 0 0 1px #c8a84b1a;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.71rem;
+    overflow: hidden;
+    animation: chlog-modal-in 0.14s ease;
+}
+@keyframes chlog-modal-in {
+    from { opacity: 0; transform: scale(0.96) translateY(-6px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+.chlog-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.65rem 0.35rem 0.85rem;
+    background: #161d2a;
+    border-bottom: 1px solid #c8a84b44;
+    cursor: grab;
+    user-select: none;
+}
+.chlog-modal-header:active { cursor: grabbing; }
+.chlog-modal-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+.chlog-modal-machine {
+    color: #c8a84b;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.chlog-modal-ts {
+    color: #6b7280;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+.chlog-modal-close {
+    background: none;
+    border: 1px solid #374151;
+    border-radius: 3px;
+    color: #eceef3;
+    font-size: 0.65rem;
+    padding: 0.05rem 0.35rem;
+    cursor: pointer;
+    margin-left: 0.55rem;
+    flex-shrink: 0;
+    transition: color 0.12s, border-color 0.12s;
+}
+.chlog-modal-close:hover { color: #fff; border-color: #c8a84b; }
+.chlog-modal-body {
+    padding: 0.55rem 0.85rem 0.45rem;
+    border-bottom: 1px solid #1e2535;
+}
+.chlog-modal-petname {
+    color: #eceef3;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin-bottom: 0.3rem;
+}
+.chlog-modal-regs {
+    color: #94a3b8;
+    font-size: 0.68rem;
+    margin-bottom: 0.2rem;
+}
+.chlog-modal-fw {
+    color: #6b7280;
+    font-size: 0.64rem;
+}
+.chlog-modal-fault {
+    margin-top: 0.3rem;
+}
+
 .nia-disasm-panel {
     background: #111820;
     border-left: 3px solid #c8a84b44;
