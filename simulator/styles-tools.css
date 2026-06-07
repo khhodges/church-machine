@@ -2431,6 +2431,28 @@
     border-bottom: 1px solid #2a1e00;
     line-height: 1.45;
 }
+.nia-row-has-desc {
+    cursor: pointer;
+}
+.nia-row-has-desc:hover {
+    background: #1a1200;
+}
+.nia-row-expanded {
+    background: #1a1200;
+}
+.nia-row-has-desc::after {
+    content: '\25b8';
+    float: right;
+    color: #5a4010;
+    font-size: 0.6rem;
+    margin-right: 0.3rem;
+    align-self: center;
+    line-height: 1;
+}
+.nia-row-expanded::after {
+    content: '\25be';
+    color: #a07830;
+}
 
 /* ── Callhome popup — narrow-screen (parent mode on phone) ──────────────── */
 @media (max-width: 540px) {

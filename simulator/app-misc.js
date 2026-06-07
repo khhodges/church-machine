@@ -2675,19 +2675,21 @@ function _openCallhomeModal(row) {
         }
         var addrStr = '0x' + entry.wordAddr.toString(16).toUpperCase().padStart(4, '0');
         var roleStr = decoded.mnemonic ? _instrRoleAnnotation(decoded) : '';
+        var plainEngRow = decoded.mnemonic ? (_instrPlainEnglish(decoded) || '') : '';
+        if (plainEngRow && !isCurrent) rowCls += ' nia-row-has-desc';
+        var descAttr = (plainEngRow && !isCurrent)
+            ? ' data-desc="' + plainEngRow.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"'
+            : '';
         rowsHtml +=
-            '<div class="' + rowCls + '">' +
+            '<div class="' + rowCls + '"' + descAttr + '>' +
                 '<span class="nia-col-rel">'  + _escHtml(relStr)       + '</span>' +
                 '<span class="nia-col-addr">' + _escHtml(addrStr)      + '</span>' +
                 '<span class="nia-col-hex">'  + _escHtml(decoded.hex)  + '</span>' +
                 '<span class="nia-col-text">' + _escHtml(decoded.text) + '</span>' +
                 '<span class="nia-col-role">' + _escHtml(roleStr)      + '</span>' +
             '</div>';
-        if (isCurrent && decoded.mnemonic) {
-            var plainEng = _instrPlainEnglish(decoded);
-            if (plainEng) {
-                rowsHtml += '<div class="nia-disasm-desc">' + _escHtml(plainEng) + '</div>';
-            }
+        if (isCurrent && plainEngRow) {
+            rowsHtml += '<div class="nia-disasm-desc nia-disasm-desc-current">' + _escHtml(plainEngRow) + '</div>';
         }
     });
     rowsHtml += '</div>';
@@ -2749,6 +2751,30 @@ function _openCallhomeModal(row) {
         modal.remove();
         row.classList.remove('nia-row-active');
     });
+
+    // Click-to-expand: any non-current disassembly row with a description
+    var disasmBody = modal.querySelector('.nia-disasm-body');
+    if (disasmBody) {
+        disasmBody.addEventListener('click', function(e) {
+            var clickedRow = e.target.closest('.nia-disasm-row');
+            if (!clickedRow || clickedRow.classList.contains('nia-disasm-current') || !clickedRow.dataset.desc) return;
+
+            var next = clickedRow.nextElementSibling;
+            var isExpanded = next && next.classList.contains('nia-disasm-desc') && !next.classList.contains('nia-disasm-desc-current');
+
+            // Collapse any previously-opened non-current description
+            disasmBody.querySelectorAll('.nia-disasm-desc:not(.nia-disasm-desc-current)').forEach(function(d) { d.remove(); });
+            disasmBody.querySelectorAll('.nia-disasm-row.nia-row-expanded').forEach(function(r) { r.classList.remove('nia-row-expanded'); });
+
+            if (!isExpanded) {
+                var descEl = document.createElement('div');
+                descEl.className = 'nia-disasm-desc';
+                descEl.textContent = clickedRow.dataset.desc;
+                clickedRow.insertAdjacentElement('afterend', descEl);
+                clickedRow.classList.add('nia-row-expanded');
+            }
+        });
+    }
 
     // Bring to front on mousedown
     modal.addEventListener('mousedown', function() {
