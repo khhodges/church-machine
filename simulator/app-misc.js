@@ -2396,6 +2396,37 @@ var _chlogModalSeq = 0;
 var _chlogModalBaseLeft = 80;
 var _chlogModalBaseTop  = 90;
 
+// Fixed boot-image NS slot table — slot index → human pet name.
+// Used to resolve CR14 (⚡ abstraction), CR12 (return), CR15 (data) values
+// which are raw NS slot indices into the GT > CR6 > Namespace table.
+var _CHLOG_NS_SLOT_NAMES = {
+    0: 'Boot.ROM',
+    1: 'Boot.NS',
+    2: 'Boot.GT',
+    3: 'Boot.Abstr',
+    4: 'Locator',
+    5: 'Scheduler',
+    6: 'Navana',
+    7: 'TrustKernel',
+    8: 'Scheduler.IRQ',
+    50: 'Scheduler.IRQ.Thread',
+    51: 'Scheduler.IRQ.Thread.Alt'
+};
+
+function _chlogNsSlotName(rawStr) {
+    if (!rawStr || rawStr === 'n/a' || rawStr === 'null' || rawStr === '') return 'n/a';
+    var idx = parseInt(rawStr, 10);
+    if (isNaN(idx)) return rawStr;
+    // 1. Fixed boot-image table
+    if (_CHLOG_NS_SLOT_NAMES[idx]) return _CHLOG_NS_SLOT_NAMES[idx];
+    // 2. Live simulator namespace labels (if simulator is loaded)
+    if (typeof sim !== 'undefined' && sim && sim.nsLabels && sim.nsLabels[idx]) {
+        return sim.nsLabels[idx];
+    }
+    // 3. Numeric fallback
+    return 'NS\u202f#' + idx;
+}
+
 function _chlogPetNameFromContext(niaInt, niaLabel) {
     // 1. Server-supplied human label wins
     if (niaLabel && niaLabel !== ('0x' + niaInt.toString(16).toUpperCase().padStart(4,'0'))) return niaLabel;
@@ -2482,6 +2513,10 @@ function _openCallhomeModal(row) {
     var cr14Str = (cr14 !== 'null' && cr14 !== '') ? cr14 : 'n/a';
     var cr12Str = (cr12 !== 'null' && cr12 !== '') ? cr12 : 'n/a';
     var cr15Str = (cr15 !== 'null' && cr15 !== '') ? cr15 : 'n/a';
+    // Resolve NS slot indices → human pet names (GT > CR6 > Namespace table)
+    var cr14Name = _chlogNsSlotName(cr14Str);   // ⚡ abstraction cap
+    var cr12Name = _chlogNsSlotName(cr12Str);   // return cap
+    var cr15Name = _chlogNsSlotName(cr15Str);   // data cap
 
     var petName = _chlogPetNameFromContext(niaInt, niaLabel);
 
@@ -2539,9 +2574,9 @@ function _openCallhomeModal(row) {
             '<div class="chlog-modal-petname">' + _escHtml(petName) + '</div>' +
             '<div class="chlog-modal-regs">' +
                 'At&nbsp;<span class="nia-val">0x' + niaInt.toString(16).toUpperCase().padStart(4,'0') + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Abstr&nbsp;cap&nbsp;<span class="nia-val">' + _escHtml(cr14Str) + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Return&nbsp;cap&nbsp;<span class="nia-val">' + _escHtml(cr12Str) + '</span>' +
-                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Data&nbsp;cap&nbsp;<span class="nia-val">' + _escHtml(cr15Str) + '</span>' +
+                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;\u26a1&nbsp;<span class="nia-val">' + _escHtml(cr14Name) + '</span>' +
+                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Return\u202f<span class="nia-val">' + _escHtml(cr12Name) + '</span>' +
+                '&nbsp;&nbsp;\u00b7&nbsp;&nbsp;Data\u202f<span class="nia-val">' + _escHtml(cr15Name) + '</span>' +
             '</div>' +
             '<div class="chlog-modal-fw">FW\u2009' + _escHtml(fwStr) + '\u2002\u00b7\u2002Boot\u202f#' + _escHtml(bootStr) + '</div>' +
             faultHtml +
