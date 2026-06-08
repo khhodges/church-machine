@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # JavaScript test suites
+  # ---------------------------------------------------------------------------
+  js-tests:
+    name: JS Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Assembler tests
+        run: npm test
+
+      - name: Fault recovery tests
+        run: node simulator/test_fault_recovery.js
+
+      - name: LUMP roundtrip
+        run: node simulator/test_lump_roundtrip.js
+
+      - name: LUMP binary tests
+        run: node simulator/test_load_lump_binary.js
+
+      - name: Catalog compile tests
+        run: node simulator/test_catalog_compile.js
+
+      - name: Boot entry sync tests
+        run: node simulator/test_boot_entry_sync.js
+
+      - name: Warning panel tests
+        run: node simulator/test_asm_warning_panel.js
+
+      - name: Disasm panel tests
+        run: node simulator/disasm_panel_test.js
+
+      - name: RCI threading tests
+        run: node simulator/test_rci_threading.js
+
+      - name: Pending GT tests
+        run: node simulator/test_lazy_resolve_pending.js
+
+      - name: Pet name memory tests (short)
+        run: node simulator/test_pet_name_mem.js
+
+      - name: Pet name memory tests (full)
+        run: node simulator/test_pet_name_memory.js
+
+      - name: Sync guard tests
+        run: node scripts/test_sync_guard.js
+
+      - name: Port collision test
+        run: node scripts/test_port_collision.js
+
+      - name: Playwright port wiring
+        run: node scripts/test_playwright_port_wiring.js
+
+  # ---------------------------------------------------------------------------
+  # Python test suites
+  # ---------------------------------------------------------------------------
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up Node.js (required by Python boot tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: LUMP consistency
+        run: python -m pytest tests/lump/test_lump_consistency.py -v
+
+      - name: Boot image matches simulator
+        run: python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v
+
+      - name: Boot image loads and boots
+        run: python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v
+
+      - name: Boot image upload endpoint
+        run: python -m pytest tests/boot/test_boot_image_upload_endpoint.py -v
+
+      - name: Boot image serve endpoints
+        run: python -m pytest tests/boot/test_boot_image_serve_endpoints.py -v
+
+      - name: Boot layout regression
+        run: python -m pytest tests/boot/test_boot_layout_no_null_slot2.py -v
+
+      - name: Selftest LUMP runs
+        run: python -m pytest tests/simulator/test_selftest_lump_runs.py tests/simulator/test_run_lump_boots_slot3.py -v
+
+      - name: Version telemetry tests
+        run: python3 -m pytest tests/server/test_version_telemetry.py -v
+
+  # ---------------------------------------------------------------------------
+  # Stale / consistency checks
+  # ---------------------------------------------------------------------------
+  checks:
+    name: Stale & Consistency Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check stale CR7
+        run: bash scripts/check_stale_cr7.sh
+
+      - name: Check selftest LUMP stale
+        run: node scripts/check_selftest_lump_stale.js
+
+      - name: Check capabilities blocks
+        run: node scripts/check-capabilities-blocks.js
+
+      - name: Check API reference stale
+        run: node scripts/gen-api-reference.js --check
+
+      - name: Ti60 utilisation check
+        run: python scripts/check_ti60_utilisation.py --missing-ok
+
+      - name: Ti60 UART dry-run
+        run: python3 scripts/test_ti60_uart.py --dry-run
+
+  # ---------------------------------------------------------------------------
+  # End-to-end (Playwright) — runs against a live server
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install JS dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npx playwright test

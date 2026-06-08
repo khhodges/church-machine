@@ -1,5 +1,7 @@
 # Church Machine
 
+[![CI](https://github.com/khhodges/church-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/khhodges/church-machine/actions/workflows/ci.yml)
+
 A capability-secured processor architecture with an educational IDE, targeting the Tang Nano 20K FPGA. The Church Machine implements Golden Token (GT) security — every memory access is validated through unforgeable capability tokens, eliminating entire classes of vulnerabilities by construction.
 
 ## What Is This?
