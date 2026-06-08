@@ -2,5 +2,5 @@
 - [Startup Wizard E2E setup](wizard-e2e-setup.md) — wizard is in #builder>#ti60ConnectPanel; needs switchView+switchBuilderViewTab; display:'' vs 'block' matters; use defer not async
 - [CLOOMC detection ordering](cloomc-detection-order.md) — _detectCLOOMC() matches keywords (abstraction, method, capabilities) that overlap all CLOOMC++ variants; must run AFTER specific detectors (Symbolic, Lambda, Haskell) or those languages break
 - [Ti60 SoC UART clockDivider](ti60-uart-clockdiv.md) — Sapphire SoC UART resets clockDivider to 0x00 (not 0x35); firmware MUST write UART_CLOCKDIV=53 before first uart_puts or output is 6.25 Mbaud silence
-- [Efinity version split](efinity-version-split.md) — EFX_MAP needs 2025.2 (2026.1 segfaults); EFX_PNR+efx_pgm need 2026.1 (2025.2 segfaults); openFPGALoader at /usr/bin not oss-cad-suite
+- [Efinity version split](efinity-version-split.md) — ALL three tools need 2026.1; MUST source setup.sh first or efx_map segfaults; 2025.2 efx_map silently zeros BRAM
 - [Ti60F225 hardware facts](ti60f225-hardware.md) — board has exactly 3 user LEDs; top.v debug ports were unconnected causing wrong boot/NIA/fault signals
