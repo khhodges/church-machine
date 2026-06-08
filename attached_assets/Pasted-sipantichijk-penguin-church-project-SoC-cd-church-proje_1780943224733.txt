@@ -1,0 +1,102 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+source ~/efinity/2026.1/bin/setup.sh && export EFINITY_HOME=~/efinity/2026.1 && EFX=~/efinity/2026.1
+
+# ── Check if interface.csv already exists (from earlier Interface Designer run) ─
+echo "=== interface.csv candidates ==="
+ls -la outflow/*.csv outflow/*.interface.csv 2>/dev/null || echo "no CSV in outflow/"
+ls -la work_pnr/*.csv 2>/dev/null || echo "no CSV in work_pnr/"
+
+# ── Run Interface Designer to (re)generate it ─────────────────────────────────
+echo "=== Interface Designer ==="
+$EFX/bin/python3 $EFX/scripts/efx_run_pt_unified.py \
+    church_soc_cm Titanium Ti60F225 \
+    --output_dir outflow --timing_model C3 \
+    --project_xml church_soc_cm.xml 2>&1 | tail -6
+
+echo "=== outflow/ after Interface Designer ==="
+ls -la outflow/*.csv outflow/*.interface.csv 2>/dev/null || echo "still no CSV"
+ls -la outflow/*.lpf 2>/dev/null || echo "no LPF"
+
+# ── Run efx_pnr with interface.csv as --sync_file ────────────────────────────
+IFACE=$(ls outflow/church_soc_cm.interface.csv outflow/*.interface.csv outflow/*.csv 2>/dev/null | head -1)
+echo "Using sync_file: $IFACE"
+
+echo "=== efx_pnr DIRECT (~11 min) ==="
+time $EFX/bin/efx_pnr \
+  --circuit church_soc_cm --family Titanium --device Ti60F225 \
+  --operating_conditions C3 \
+  --vdb_file outflow/church_soc_cm.vdb --use_vdb_file on \
+  --prj /home/sipantichijk/church_project/SoC/church_soc_cm.xml \
+  --output_dir outflow --work_dir work_pnr \
+  sleep 3 && stty -F /dev/ttyUSB1 57600 raw -echo && timeout 5 cat /dev/ttyUSB1 | cat -v || true
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+=== interface.csv candidates ===
+-rw-r--r-- 1 sipantichijk sipantichijk   594 Jun  8 14:01 outflow/church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk   594 Jun  8 14:01 outflow/church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk 10609 Jun  8 14:01 outflow/church_soc_cm.pinout.csv
+-rw-r--r-- 1 sipantichijk sipantichijk  9223 Jun  7 17:27 outflow/church_soc_cm.res.csv
+no CSV in work_pnr/
+=== Interface Designer ===
+Writing out timing related file
+Writing out verilog template file
+Writing out option register file
+Writing out boundary scan description file
+Writing out LPF
+Unified Timing supported
+=== outflow/ after Interface Designer ===
+-rw-r--r-- 1 sipantichijk sipantichijk   535 Jun  8 14:20 outflow/church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk   535 Jun  8 14:20 outflow/church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk 10609 Jun  8 14:20 outflow/church_soc_cm.pinout.csv
+-rw-r--r-- 1 sipantichijk sipantichijk  9223 Jun  7 17:27 outflow/church_soc_cm.res.csv
+-rw-r--r-- 1 sipantichijk sipantichijk 527050 Jun  8 14:20 outflow/church_soc_cm.lpf
+Using sync_file: outflow/church_soc_cm.interface.csv
+=== efx_pnr DIRECT (~11 min) ===
+INFO     : The entire flow of EFX_PNR took 188.554884702 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_PNR took 316.82 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_PNR virtual memory usage: begin = 133.496 MB, end = 554.184 MB, delta = 420.688 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_PNR resident set memory usage: begin = 42.752 MB, end = 438.412 MB, delta = 395.66 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_PNR peak resident set memory usage = 438.412 MB [FlowMsg::RSSUsage::Peak]
+
+real    3m8.738s
+user    5m16.936s
+sys     0m12.631s
+      clk              clk             0.000            0.179            (R-R)
+INFO     : CSS improved CPD of clock clk by 0.00% (from 10644ps to 10644ps)
+INFO     : CSS improved CPD of clock clk by 0.00% (from 14253ps to 14253ps)
+INFO     : SDC file '/home/sipantichijk/church_project/SoC/church_soc_cm.sdc' parsed successfully.
+    clk         14.379        69.546         (R-R)
+Geomean max period: 14.379
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             40.000           25.621           (R-R)
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             0.000            0.027            (R-R)
+-rw-r--r-- 1 sipantichijk sipantichijk 1.2M Jun  8 14:23 work_pnr/church_soc_cm.lbf
+work_pnr/church_soc_cm.lbf
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1M Jun  8 14:23 outflow/church_soc_cm.hex
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000c0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [==================================================] 100.00%
+Done
+Reset DONE
+Terminated
+sipantichijk@penguin:~/church_project/SoC$ 
