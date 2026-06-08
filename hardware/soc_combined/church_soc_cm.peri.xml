@@ -241,7 +241,7 @@
                 <efxpt:pin name="" type_name="SHIFT" is_bus="true"/>
                 <efxpt:pin name="" type_name="SHIFT_SEL" is_bus="true"/>
             </efxpt:gen_pin>
-            <efxpt:comp_output_clock name="clk" number="0" out_divider="10" is_dyn_phase="false" phase_setting="0" is_inverted="false">
+            <efxpt:comp_output_clock name="clk" number="0" out_divider="20" is_dyn_phase="false" phase_setting="0" is_inverted="false">
                 <efxpt:gen_pin/>
             </efxpt:comp_output_clock>
             <efxpt:comp_prop/>

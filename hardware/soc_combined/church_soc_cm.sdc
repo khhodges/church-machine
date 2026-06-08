@@ -7,7 +7,8 @@
 # does not reach all quadrants → Sapphire SoC ClockDomainGenerator stalls →
 # io_systemReset never deasserts → LED0 stays OFF and UART is silent.
 
-# PLL_TL0: 25 MHz → VCO 500 MHz → 50 MHz output (period 20 ns).
-# The Sapphire SoC's internal PLL doubles this to 100 MHz for the CPU.
-# CLOCKDIV=53 in firmware → 230400 baud at 100 MHz CPU clock.
-create_clock -name clk -period 20.0 [get_nets clk]
+# PLL_TL0: 25 MHz crystal → VCO 500 MHz → 25 MHz output (out_divider=20, period 40 ns).
+# At 25 MHz system clock, CLOCKDIV=53 in firmware → 57600 baud (25MHz / (8×54)).
+# Timing violations at 50 MHz (out_divider=10) caused Sapphire SoC ClockDomainGenerator
+# to stall — io_systemReset never deasserted, LED0 stayed OFF. Fixed by halving PLL output.
+create_clock -name clk -period 40.0 [get_nets clk]
