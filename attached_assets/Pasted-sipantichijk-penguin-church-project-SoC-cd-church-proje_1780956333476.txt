@@ -1,0 +1,25 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+cp church_soc_cm.peri.xml.bak2 church_soc_cm.peri.xml
+python3 - <<'PYEOF'
+f='church_soc_cm.peri.xml'
+s=open(f).read()
+assert 'name="clk"' not in s, 'clk unexpectedly present in .bak2'
+g='''        <efxpt:comp_gpio name="clk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+            <efxpt:input_config name="clk" name_ddio_lo="" conn_type="normal" is_register="false" clock_name="" is_clock_inverted="false" pull_option="none" is_schmitt_trigger="false" ddio_type="none" is_bus_hold="false" delay="0" is_serial="false" is_dyn_delay="false" fastclk_name="" pullup_ena_name="clk_PULL_UP_ENA" dyn_delay_en_name="clk_DLY_ENA" dyn_delay_reset_name="clk_DLY_RST" dyn_delay_ctrl_name="clk_DLY_CTRL" clkmux_buf_name=""/>
+        </efxpt:comp_gpio>
+'''
+a='        <efxpt:comp_gpio name="cm_uart_tx"'
+assert a in s, 'anchor missing'
+s=s.replace(a,g+a,1)
+open(f,'w').write(s)
+print('OK: clk added as DIRECT global-clock input (conn_type=normal, NO clkmux)')
+PYEOF
+echo "=== expect 8 ==="; grep -c '<efxpt:comp_gpio' church_soc_cm.peri.xml
+echo "=== expect 2 clk lines (comp_gpio + input_config), NO ROUTE0 ==="; grep -n 'name="clk"' church_soc_cm.peri.xml
+OK: clk added as DIRECT global-clock input (conn_type=normal, NO clkmux)
+=== expect 8 ===
+8
+=== expect 2 clk lines (comp_gpio + input_config), NO ROUTE0 ===
+85:        <efxpt:comp_gpio name="clk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+86:            <efxpt:input_config name="clk" name_ddio_lo="" conn_type="normal" is_register="false" clock_name="" is_clock_inverted="false" pull_option="none" is_schmitt_trigger="false" ddio_type="none" is_bus_hold="false" delay="0" is_serial="false" is_dyn_delay="false" fastclk_name="" pullup_ena_name="clk_PULL_UP_ENA" dyn_delay_en_name="clk_DLY_ENA" dyn_delay_reset_name="clk_DLY_RST" dyn_delay_ctrl_name="clk_DLY_CTRL" clkmux_buf_name=""/>
+sipantichijk@penguin:~/church_project/SoC$ 
