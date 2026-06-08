@@ -101,7 +101,7 @@
              CLKMUX_L ROUTE0 is wired to net "clk" in the clkmux_info below. -->
         <efxpt:comp_gpio name="clk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
             <efxpt:input_config
-                name="clk"
+                name=""
                 name_ddio_lo=""
                 conn_type="clkin"
                 is_register="false"
