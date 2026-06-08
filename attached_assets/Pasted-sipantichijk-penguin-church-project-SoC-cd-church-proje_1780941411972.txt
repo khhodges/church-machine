@@ -1,0 +1,118 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+source ~/efinity/2026.1/bin/setup.sh && export EFINITY_HOME=~/efinity/2026.1
+EFX=~/efinity/2026.1
+
+# ── Diagnostic: see int_design.py lines 1244-1270 and church_soc_cm.xml SDC ──
+echo "=== int_design.py lines 1244-1270 ==="
+sed -n '1244,1270p' $EFX/pt/bin/api_service/internal/int_design.py
+
+echo "=== church_soc_cm.xml SDC/timing section ==="
+grep -i "sdc\|timing\|constraint" church_soc_cm.xml
+
+echo "=== efx_run_pnr.py sdc handling ==="
+grep -n "sdc_file\|sdc\|SDC" $EFX/bin/efx_run_pnr.py | head -20
+
+echo "=== LBF vs HEX timestamps ==="
+ls -la work_pnr/*.lbf outflow/*.hex 2>/dev/null
+
+# ── Patch int_design.py lines 1249 + 1259 by line number (Patch 6) ──────────
+python3 << 'ENDPY'
+import pathlib
+
+p = pathlib.Path('/home/sipantichijk/efinity/2026.1/pt/bin/api_service/internal/int_design.py')
+lines = p.read_text().splitlines(keepends=True)
+
+def suppress_raise_at(lines, target_line_1indexed):
+    """Replace the multi-line raise at target_line_1indexed with a print."""
+    i = target_line_1indexed - 1  # 0-indexed
+    if i >= len(lines) or 'raise' not in lines[i]:
+        print(f"  Line {target_line_1indexed}: not a raise statement: {lines[i].rstrip()}")
+        return False
+echo "=== LED state? ==="0 raw -echo && timeout 5 cat /dev/ttyUSB1 | cat -v || true'
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+=== int_design.py lines 1244-1270 ===
+
+        :param outflow_dir: Output directory to store file
+        """
+
+        if self.__design is None:
+            raise pte.PTDsgGenConstException(
+                "Design is empty. Fail to generate verilog template file", MsgLevel.warning)
+
+        try:
+            from writer.verilog_template import VerilogTemplate
+            vgen = VerilogTemplate(self.__design, icfg_store)
+            vgen_template_file = Path(outflow_dir) / f'{self.__design.name}_template.v'
+            vgen.write(vgen_template_file)
+
+        except Exception as exc:
+            raise pte.PTDsgGenConstException(
+                "Fail to generate verilog template file", MsgLevel.warning, exc)
+
+    def is_post_config_bsdl_supported(self) -> bool:
+        from writer.bsdl_writer import BSDLWriter
+        bsdl_writer = BSDLWriter(self.__design.device_db, self.__design)
+        return bsdl_writer.is_supported()
+
+    def gen_post_config_bsdl(self, outflow_dir):
+        """
+        Generate boundary scan description file
+
+=== church_soc_cm.xml SDC/timing section ===
+        <efx:timing_model name="C3" />
+    <efx:constraint_info>
+        <efx:sdc_file name="/home/sipantichijk/church_project/SoC/church_soc_cm.sdc" />
+    </efx:constraint_info>
+=== efx_run_pnr.py sdc handling ===
+grep: /home/sipantichijk/efinity/2026.1/bin/efx_run_pnr.py: No such file or directory
+=== LBF vs HEX timestamps ===
+-rw-r--r-- 1 sipantichijk sipantichijk 2233077 Jun  8 13:14 outflow/church_soc_cm.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 2415975 Jun  3 14:38 outflow/church_soc_cm_church.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 2405505 Jun  3 06:09 outflow/church_soc_cm_new.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 2180394 Jun  3 13:36 outflow/church_soc_cm_test.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 2416272 Jun  3 07:23 outflow/church_soc_cm_v3.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 2157249 Jun  3 13:23 outflow/church_soc_cm_v4.hex
+-rw-r--r-- 1 sipantichijk sipantichijk 1251753 Jun  8 11:42 work_pnr/church_soc_cm.lbf
+  Patched lines 1259-1260 → print
+  Patched lines 1249-1250 → print
+int_design.py saved with Patch 6
+=== INTERFACE DESIGNER ===
+Writing out verilog template file
+Writing out option register file
+Writing out routing trace
+Writing out boundary scan description file
+WARNING: Fail to generate Timing file
+Fail to generate outputs
+LPF STILL MISSING
+=== DIRECT PGM from current LBF ===
+-rw-r--r-- 1 sipantichijk sipantichijk 1251753 Jun  8 11:42 work_pnr/church_soc_cm.lbf
+/home/sipantichijk/efinity/2026.1/bin/python3: can't open file '/home/sipantichijk/efinity/2026.1/pt/bin/efx_run_pgm.py': [Errno 2] No such file or directory
+-rw-r--r-- 1 sipantichijk sipantichijk 2.2M Jun  8 13:14 outflow/church_soc_cm.hex
+=== FLASH ===
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000c0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [===================================================] 100.00%
+Done
+Reset DONE
+=== UART check ttyUSB1 (5s) ===
+Terminated
+=== LED state? ===
+sipantichijk@penguin:~/church_project/SoC$ 
