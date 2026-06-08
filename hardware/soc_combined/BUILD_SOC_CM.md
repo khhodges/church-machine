@@ -6,13 +6,15 @@ A combined Efinix Ti60F225 bitstream that places the Sapphire RISC-V SoC and the
 Church Machine RTL side-by-side in a single Efinity project.
 
 On power-on:
-- The Sapphire SoC boots its firmware and sends `CHURCH Ti60 SoC+CM v1.1\r\n`
-  over **ttyUSB2** (230400 baud, GPIOL_02 → FT4232H interface 2).
-- The Church Machine streams NIA traces, fault codes, and call-home packets.
-- LED0 lights when the SoC is out of reset.
-- LED1 lights when the CM completes its boot sequence.
-- LED2 lights if the CM raises a fault.
-- LED3 shows the CM heartbeat (1 Hz blink while halted and healthy).
+- The Sapphire SoC boots its firmware and sends `CHURCH Ti60 SoC+CM v1.3\r\n`
+  over **ttyUSB2** (57600 baud, GPIOL_02 → FT4232H interface 2).
+- The Church Machine streams NIA traces, fault codes, and call-home packets
+  over **ttyUSB3** (115200 baud, GPIOL_P_03 → FT4232H interface 3).
+
+**The Ti60F225 devkit has exactly 3 user LEDs (not 4):**
+- LED0 (GPIOR_P_07) — ON when SoC is out of reset
+- LED1 (GPIOR_P_08) — ON within ~1 ms when CM boot ROM completes (sticky)
+- LED2 (GPIOR_P_09) — Turns ON ~3 s after power-on when CM banner is sent; also ON on fault
 
 The SoC firmware controls the CM via an APB3 register bridge.
 See **APB3 register map** below.

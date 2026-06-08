@@ -29,11 +29,10 @@
 //   0x20  FAULT_CR14  [31:0]=CR14 word0 at fault time (Track 4-C, reserved=0)
 //   0x24  FAULT_STAGE [3:0]=pipeline stage index (Track 4-C)
 //
-// LED assignment
-//   led0 — SoC out-of-reset (mirrors soc_minimal behaviour)
-//   led1 — CM boot complete
-//   led2 — CM fault latched
-//   led3 — heartbeat (from CM module)
+// LED assignment  (Ti60F225 devkit has exactly 3 user LEDs)
+//   led0 — SoC out-of-reset (GPIOR_P_07)
+//   led1 — CM boot complete (GPIOR_P_08)
+//   led2 — CM fault / banner  (GPIOR_P_09)
 //
 // NOTE: sapphire.v, sapphire_define.vh, and church_ti60_f225.v must be
 //       copied into this directory before synthesis — see BUILD_SOC_CM.md.
@@ -48,8 +47,7 @@ module top (
     input  wire push_button,   // GPIOT_N_06, active-low, weak pull-up (to SoC GPIO)
     output wire led0,          // GPIOR_P_07  SoC out of reset
     output wire led1,          // GPIOR_P_08  CM boot complete
-    output wire led2,          // GPIOR_P_09  CM fault latched
-    output wire led3            // GPIOR_P_10  CM heartbeat (led3 from CM module)
+    output wire led2           // GPIOR_P_09  CM fault / banner
 );
 
     // ----------------------------------------------------------------
@@ -242,16 +240,17 @@ module top (
     assign cm_fault_stage   = 4'b0;
 
     // ----------------------------------------------------------------
-    // LED logic
-    //   led0 — SoC out of reset (same visual as soc_minimal)
-    //   led1 — CM boot complete
-    //   led2 — CM fault latched (sticky; stays on after any fault)
-    //   led3 — CM led3 (heartbeat + boot-state from CM module)
+    // LED logic  (Ti60F225 devkit: 3 user LEDs only)
+    //   led0 — SoC out of reset         (GPIOR_P_07, active-HIGH)
+    //   led1 — CM boot complete          (GPIOR_P_08, active-HIGH)
+    //   led2 — CM fault / banner sent    (GPIOR_P_09, active-HIGH)
+    //
+    // cm_led3 (CM heartbeat) has no physical LED on this board — left
+    // unconnected; synthesis will optimise it away.
     // ----------------------------------------------------------------
     assign led0 = ~system_reset;
     assign led1 = cm_boot_complete;
-    assign led2 = cm_led2;   // CM drives fault/banner on its led2
-    assign led3 = cm_led3;   // CM drives heartbeat/status on its led3
+    assign led2 = cm_led2;
 
 endmodule
 
