@@ -1,0 +1,43 @@
+sipantichijk@penguin:~/church_project/SoC$ cp ~/church-machine/hardware/soc_combined/apb3_cm_bridge.v ~/church_project/SoC/
+~/efinity/2025.2/bin/efx_map --project-xml ~/church_project/SoC/church_soc_cm.xml 2>&1 | grep -E "^(INFO|ERROR|WARNING)" | head -40
+INFO     : Efinix FPGA Synthesis.
+INFO     : Version: 2025.2.288.4.15
+INFO     : Compiled: Mar 30 2026.
+INFO     : 
+INFO     : Copyright (C) 2013 - 2025 Efinix, Inc. All rights reserved.
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Analyzing Verilog file '/home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v' [VERI-1482]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(8): compiling module 'EFX_IBUF' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(16): compiling module 'EFX_OBUF' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(23): compiling module 'EFX_IO_BUF' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(33): compiling module 'EFX_CLKOUT' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(41): compiling module 'EFX_IREG' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(51): compiling module 'EFX_OREG' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(60): compiling module 'EFX_IOREG' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(75): compiling module 'EFX_IDDIO' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(87): compiling module 'EFX_ODDIO' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(99): compiling module 'EFX_GPIO_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(124): compiling module 'EFX_GPIO_V2' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(149): compiling module 'EFX_GPIO_V3' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(186): compiling module 'EFX_PLL_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(205): compiling module 'EFX_PLL_V2' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(231): compiling module 'EFX_PLL_V3' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(279): compiling module 'EFX_OSC_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(285): compiling module 'EFX_OSC_V3' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(294): compiling module 'EFX_FPLL_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(348): compiling module 'EFX_JTAG_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(357): compiling module 'EFX_JTAG_CTRL' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(364): compiling module 'EFX_LVDS_RX_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(381): compiling module 'EFX_LVDS_TX_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(399): compiling module 'EFX_LVDS_RX_V2' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(426): compiling module 'EFX_LVDS_TX_V2' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(446): compiling module 'EFX_LVDS_BIDIR_V2' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(485): compiling module 'EFX_MIPI_TX_LN_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(508): compiling module 'EFX_MIPI_RX_LN_V1' [VERI-1018]
+INFO     : /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v(543): compiling module 'EFX_MIPI_RX_CLK_LN_V1' [VERI-1018]
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : ***** Beginning Analysis ... *****
+INFO     : default VHDL library search path is now "/home/sipantichijk/efinity/2025.2/sim_models/vhdl/packages/vhdl_2008" [VHDL-1504]
+INFO     : Analyzing Verilog file '/home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_maplib.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v' [VERI-1482]
+grep: write error: Broken pipe
