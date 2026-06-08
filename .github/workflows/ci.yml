@@ -30,62 +30,175 @@ jobs:
 
       # --- JS simulator tests ---
       - name: Assembler tests
+        id: assembler_tests
+        continue-on-error: true
         run: npm test
 
       - name: Fault recovery tests
+        id: fault_recovery
+        continue-on-error: true
         run: node simulator/test_fault_recovery.js
 
       - name: LUMP roundtrip
+        id: lump_roundtrip
+        continue-on-error: true
         run: node simulator/test_lump_roundtrip.js
 
       - name: LUMP binary tests
+        id: lump_binary
+        continue-on-error: true
         run: node simulator/test_load_lump_binary.js
 
       - name: Catalog compile tests
+        id: catalog_compile
+        continue-on-error: true
         run: node simulator/test_catalog_compile.js
 
       - name: Boot entry sync tests
+        id: boot_entry_sync
+        continue-on-error: true
         run: node simulator/test_boot_entry_sync.js
 
       - name: Warning panel tests
+        id: warning_panel
+        continue-on-error: true
         run: node simulator/test_asm_warning_panel.js
 
       - name: Disasm panel tests
+        id: disasm_panel
+        continue-on-error: true
         run: node simulator/disasm_panel_test.js
 
       - name: RCI threading tests
+        id: rci_threading
+        continue-on-error: true
         run: node simulator/test_rci_threading.js
 
       - name: Pending GT tests
+        id: pending_gt
+        continue-on-error: true
         run: node simulator/test_lazy_resolve_pending.js
 
       - name: Pet name memory tests (short)
+        id: pet_name_short
+        continue-on-error: true
         run: node simulator/test_pet_name_mem.js
 
       - name: Pet name memory tests (full)
+        id: pet_name_full
+        continue-on-error: true
         run: node simulator/test_pet_name_memory.js
 
       - name: Sync guard tests
+        id: sync_guard
+        continue-on-error: true
         run: node scripts/test_sync_guard.js
 
       - name: Port collision test
+        id: port_collision
+        continue-on-error: true
         run: node scripts/test_port_collision.js
 
       - name: Playwright port wiring
+        id: playwright_port_wiring
+        continue-on-error: true
         run: node scripts/test_playwright_port_wiring.js
 
       # --- Stale / consistency checks (JS + bash only; no Python required) ---
       - name: Check stale CR7
+        id: check_stale_cr7
+        continue-on-error: true
         run: bash scripts/check_stale_cr7.sh
 
       - name: Check selftest LUMP stale
+        id: check_selftest_lump
+        continue-on-error: true
         run: node scripts/check_selftest_lump_stale.js
 
       - name: Check capabilities blocks
+        id: check_capabilities
+        continue-on-error: true
         run: node scripts/check-capabilities-blocks.js
 
       - name: Check API reference stale
+        id: check_api_reference
+        continue-on-error: true
         run: node scripts/gen-api-reference.js --check
+
+      # --- Write per-step results JSON and upload as artifact ---
+      - name: Write step results
+        if: always()
+        run: |
+          cat > /tmp/fast-results.json << 'ENDJSON'
+          {
+            "job": "fast",
+            "steps": [
+              {"name": "Assembler tests",              "outcome": "${{ steps.assembler_tests.outcome }}"},
+              {"name": "Fault recovery tests",         "outcome": "${{ steps.fault_recovery.outcome }}"},
+              {"name": "LUMP roundtrip",               "outcome": "${{ steps.lump_roundtrip.outcome }}"},
+              {"name": "LUMP binary tests",            "outcome": "${{ steps.lump_binary.outcome }}"},
+              {"name": "Catalog compile tests",        "outcome": "${{ steps.catalog_compile.outcome }}"},
+              {"name": "Boot entry sync tests",        "outcome": "${{ steps.boot_entry_sync.outcome }}"},
+              {"name": "Warning panel tests",          "outcome": "${{ steps.warning_panel.outcome }}"},
+              {"name": "Disasm panel tests",           "outcome": "${{ steps.disasm_panel.outcome }}"},
+              {"name": "RCI threading tests",          "outcome": "${{ steps.rci_threading.outcome }}"},
+              {"name": "Pending GT tests",             "outcome": "${{ steps.pending_gt.outcome }}"},
+              {"name": "Pet name memory tests (short)","outcome": "${{ steps.pet_name_short.outcome }}"},
+              {"name": "Pet name memory tests (full)", "outcome": "${{ steps.pet_name_full.outcome }}"},
+              {"name": "Sync guard tests",             "outcome": "${{ steps.sync_guard.outcome }}"},
+              {"name": "Port collision test",          "outcome": "${{ steps.port_collision.outcome }}"},
+              {"name": "Playwright port wiring",       "outcome": "${{ steps.playwright_port_wiring.outcome }}"},
+              {"name": "Check stale CR7",              "outcome": "${{ steps.check_stale_cr7.outcome }}"},
+              {"name": "Check selftest LUMP stale",    "outcome": "${{ steps.check_selftest_lump.outcome }}"},
+              {"name": "Check capabilities blocks",    "outcome": "${{ steps.check_capabilities.outcome }}"},
+              {"name": "Check API reference stale",    "outcome": "${{ steps.check_api_reference.outcome }}"}
+            ]
+          }
+          ENDJSON
+
+      - name: Upload fast results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-results-fast
+          path: /tmp/fast-results.json
+          retention-days: 7
+
+      # --- Fail the job if any test step failed ---
+      - name: Assert all steps passed
+        if: always()
+        run: |
+          outcomes=(
+            "${{ steps.assembler_tests.outcome }}"
+            "${{ steps.fault_recovery.outcome }}"
+            "${{ steps.lump_roundtrip.outcome }}"
+            "${{ steps.lump_binary.outcome }}"
+            "${{ steps.catalog_compile.outcome }}"
+            "${{ steps.boot_entry_sync.outcome }}"
+            "${{ steps.warning_panel.outcome }}"
+            "${{ steps.disasm_panel.outcome }}"
+            "${{ steps.rci_threading.outcome }}"
+            "${{ steps.pending_gt.outcome }}"
+            "${{ steps.pet_name_short.outcome }}"
+            "${{ steps.pet_name_full.outcome }}"
+            "${{ steps.sync_guard.outcome }}"
+            "${{ steps.port_collision.outcome }}"
+            "${{ steps.playwright_port_wiring.outcome }}"
+            "${{ steps.check_stale_cr7.outcome }}"
+            "${{ steps.check_selftest_lump.outcome }}"
+            "${{ steps.check_capabilities.outcome }}"
+            "${{ steps.check_api_reference.outcome }}"
+          )
+          failed=0
+          for o in "${outcomes[@]}"; do
+            if [[ "$o" == "failure" ]]; then
+              failed=1
+            fi
+          done
+          if [[ $failed -eq 1 ]]; then
+            echo "One or more steps failed — see above for details."
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   # SLOW tier — Python pytest suites, Python checks, and Playwright E2E.
@@ -118,34 +231,54 @@ jobs:
 
       # --- Python test suites ---
       - name: LUMP consistency
+        id: lump_consistency
+        continue-on-error: true
         run: python -m pytest tests/lump/test_lump_consistency.py -v
 
       - name: Boot image matches simulator
+        id: boot_image_matches
+        continue-on-error: true
         run: python3 -m pytest tests/boot/test_boot_image_matches_simulator.py -v
 
       - name: Boot image loads and boots
+        id: boot_image_loads
+        continue-on-error: true
         run: python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v
 
       - name: Boot image upload endpoint
+        id: boot_image_upload
+        continue-on-error: true
         run: python -m pytest tests/boot/test_boot_image_upload_endpoint.py -v
 
       - name: Boot image serve endpoints
+        id: boot_image_serve
+        continue-on-error: true
         run: python -m pytest tests/boot/test_boot_image_serve_endpoints.py -v
 
       - name: Boot layout regression
+        id: boot_layout
+        continue-on-error: true
         run: python -m pytest tests/boot/test_boot_layout_no_null_slot2.py -v
 
       - name: Selftest LUMP runs
+        id: selftest_lump
+        continue-on-error: true
         run: python -m pytest tests/simulator/test_selftest_lump_runs.py tests/simulator/test_run_lump_boots_slot3.py -v
 
       - name: Version telemetry tests
+        id: version_telemetry
+        continue-on-error: true
         run: python3 -m pytest tests/server/test_version_telemetry.py -v
 
       # --- Python stale / hardware checks ---
       - name: Ti60 utilisation check
+        id: ti60_utilisation
+        continue-on-error: true
         run: python scripts/check_ti60_utilisation.py --missing-ok
 
       - name: Ti60 UART dry-run
+        id: ti60_uart
+        continue-on-error: true
         run: python3 scripts/test_ti60_uart.py --dry-run
 
       # --- End-to-end (Playwright) — runs against a live server ---
@@ -153,25 +286,101 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
+        id: e2e_tests
+        continue-on-error: true
         run: npx playwright test
 
+      # --- Write per-step results JSON and upload as artifact ---
+      - name: Write step results
+        if: always()
+        run: |
+          cat > /tmp/slow-results.json << 'ENDJSON'
+          {
+            "job": "slow",
+            "steps": [
+              {"name": "LUMP consistency",             "outcome": "${{ steps.lump_consistency.outcome }}"},
+              {"name": "Boot image matches simulator", "outcome": "${{ steps.boot_image_matches.outcome }}"},
+              {"name": "Boot image loads and boots",   "outcome": "${{ steps.boot_image_loads.outcome }}"},
+              {"name": "Boot image upload endpoint",   "outcome": "${{ steps.boot_image_upload.outcome }}"},
+              {"name": "Boot image serve endpoints",   "outcome": "${{ steps.boot_image_serve.outcome }}"},
+              {"name": "Boot layout regression",       "outcome": "${{ steps.boot_layout.outcome }}"},
+              {"name": "Selftest LUMP runs",           "outcome": "${{ steps.selftest_lump.outcome }}"},
+              {"name": "Version telemetry tests",      "outcome": "${{ steps.version_telemetry.outcome }}"},
+              {"name": "Ti60 utilisation check",       "outcome": "${{ steps.ti60_utilisation.outcome }}"},
+              {"name": "Ti60 UART dry-run",            "outcome": "${{ steps.ti60_uart.outcome }}"},
+              {"name": "Run E2E tests",                "outcome": "${{ steps.e2e_tests.outcome }}"}
+            ]
+          }
+          ENDJSON
+
+      - name: Upload slow results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-results-slow
+          path: /tmp/slow-results.json
+          retention-days: 7
+
+      # --- Fail the job if any test step failed ---
+      - name: Assert all steps passed
+        if: always()
+        run: |
+          outcomes=(
+            "${{ steps.lump_consistency.outcome }}"
+            "${{ steps.boot_image_matches.outcome }}"
+            "${{ steps.boot_image_loads.outcome }}"
+            "${{ steps.boot_image_upload.outcome }}"
+            "${{ steps.boot_image_serve.outcome }}"
+            "${{ steps.boot_layout.outcome }}"
+            "${{ steps.selftest_lump.outcome }}"
+            "${{ steps.version_telemetry.outcome }}"
+            "${{ steps.ti60_utilisation.outcome }}"
+            "${{ steps.ti60_uart.outcome }}"
+            "${{ steps.e2e_tests.outcome }}"
+          )
+          failed=0
+          for o in "${outcomes[@]}"; do
+            if [[ "$o" == "failure" ]]; then
+              failed=1
+            fi
+          done
+          if [[ $failed -eq 1 ]]; then
+            echo "One or more steps failed — see above for details."
+            exit 1
+          fi
+
   # ---------------------------------------------------------------------------
-  # PR summary comment — posts (or updates) a Markdown table of suite results
-  # Only runs on pull_request events; skipped for direct pushes to main
+  # PR summary comment — posts (or updates) a Markdown table of suite results.
+  # Only runs on pull_request events; skipped for direct pushes to main.
   # ---------------------------------------------------------------------------
   pr-comment:
     name: PR Status Summary
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'pull_request'
-    needs: [js-tests, python-tests, checks, e2e]
+    needs: [fast, slow]
     permissions:
       pull-requests: write
       issues: write
     steps:
+      - name: Download fast results
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-results-fast
+          path: /tmp/ci-results
+        continue-on-error: true
+
+      - name: Download slow results
+        uses: actions/download-artifact@v4
+        with:
+          name: ci-results-slow
+          path: /tmp/ci-results
+        continue-on-error: true
+
       - name: Post or update CI summary comment
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
             const marker = '<!-- ci-status-summary -->';
 
             function icon(result) {
@@ -181,27 +390,55 @@ jobs:
               return '⏭️ Skipped';
             }
 
+            // Load per-step results from uploaded artifacts (if present)
+            function loadResults(filename) {
+              try {
+                const raw = fs.readFileSync(`/tmp/ci-results/${filename}`, 'utf8');
+                return JSON.parse(raw);
+              } catch {
+                return null;
+              }
+            }
+
+            const fastResults = loadResults('fast-results.json');
+            const slowResults = loadResults('slow-results.json');
+
             const suites = [
-              { name: 'JS Tests',                   result: '${{ needs.js-tests.result }}' },
-              { name: 'Python Tests',               result: '${{ needs.python-tests.result }}' },
-              { name: 'Stale & Consistency Checks', result: '${{ needs.checks.result }}' },
-              { name: 'E2E Tests',                  result: '${{ needs.e2e.result }}' },
+              {
+                name: 'Fast (JS + checks)',
+                result: '${{ needs.fast.result }}',
+                stepData: fastResults,
+              },
+              {
+                name: 'Slow (Python + E2E)',
+                result: '${{ needs.slow.result }}',
+                stepData: slowResults,
+              },
             ];
 
             const allPassed = suites.every(s => s.result === 'success');
             const overallIcon = allPassed ? '✅ All suites passed' : '❌ One or more suites failed';
 
-            const rows = suites
-              .map(s => `| ${icon(s.result)} | **${s.name}** | \`${s.result}\` |`)
-              .join('\n');
+            // Build the summary rows, expanding failed suites with per-step detail
+            const rows = [];
+            for (const suite of suites) {
+              rows.push(`| ${icon(suite.result)} | **${suite.name}** | \`${suite.result}\` |`);
+
+              if (suite.result !== 'success' && suite.stepData && suite.stepData.steps) {
+                for (const step of suite.stepData.steps) {
+                  const stepIcon = step.outcome === 'success' ? '✅' : step.outcome === 'failure' ? '❌' : '⏭️';
+                  rows.push(`| ${stepIcon} | &nbsp;&nbsp;&nbsp;&nbsp;↳ ${step.name} | \`${step.outcome}\` |`);
+                }
+              }
+            }
 
             const body = [
               marker,
               `## CI Status — ${overallIcon}`,
               '',
-              '| | Suite | Result |',
+              '| | Suite / Step | Result |',
               '|---|---|---|',
-              rows,
+              rows.join('\n'),
               '',
               `_Updated for commit ${context.sha.slice(0, 7)} · [View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})_`,
             ].join('\n');
