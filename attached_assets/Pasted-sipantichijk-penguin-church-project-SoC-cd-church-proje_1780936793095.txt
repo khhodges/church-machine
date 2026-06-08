@@ -1,0 +1,105 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+source ~/efinity/2026.1/bin/setup.sh && export EFINITY_HOME=~/efinity/2026.1
+EFX=~/efinity/2026.1
+
+# ── Diagnose why LPF has no clk assignment ────────────────────────────────
+echo "=== clk in LPF ==="
+grep -i "clk\|B2\|GPIOL_P_18" outflow/church_soc_cm.lpf | head -10
+
+echo "=== church_soc_cm.xml references to lpf/interface ==="
+grep -i "lpf\|peri\|interface" church_soc_cm.xml | head -10
+
+# ── Re-run synthesis (fresh top.vdb needed after last PnR consumed it) ─────
+echo "=== SYNTHESIS ==="
+$EFX/bin/efx_map --project-xml church_soc_cm.xml 2>&1 | tail -3
+ls -lh top.vdb || { echo "SYNTHESIS FAILED"; exit 1; }
+
+# ── Re-run Interface Designer ─────────────────────────────────────────────
+echo "=== INTERFACE DESIGNER ==="
+$EFX/bin/python3 $EFX/scripts/efx_run_pt_unified.py \
+    church_soc_cm Titanium Ti60F225 \
+    --output_dir outflow --timing_model C3 \
+    --project_xml church_soc_cm.xml 2>&1 | tail -4
+echo "clk lines in LPF after regen:"
+grep -i "clk" outflow/church_soc_cm.lpf | head -5
+
+# ── PnR via efx_run --flow pnr (uses LPF automatically like --flow pgm does)
+echo "=== PNR via efx_run ==="
+$EFX/bin/efx_run church_soc_cm --prj \
+    --flow pnr --family Titanium --device Ti60F225 \
+    2>&1 | tail -8
+openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex──────d -10
+/usr/bin/ldd: line 41: printf: write error: Broken pipe
+/usr/bin/ldd: line 43: printf: write error: Broken pipe
+WARNING: Failed to determine system libstdc++ version. The Efinity software may not function correctly on this system.
+
+=== clk in LPF ===
+    <efxpt:instance id="CLKMUX_L" index="10" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_T" index="40" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_R" index="73" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_B" index="105" type="clkmux"/>
+      <efxpt:parameter index="8" name="PCR_CLK_OUT"/>
+    <efxpt:parameter bitsize="1" name="PCR_CLK_OUT">
+      <efxpt:value name="CLKOUT" setting="1"/>
+  <efxpt:block_def bitsize="64" name="clkmux" paramsize="33">
+      <efxpt:value name="MIPI_CLK" setting="10"/>
+      <efxpt:value name="MIPI_CLK" setting="10"/>
+=== church_soc_cm.xml references to lpf/interface ===
+        <efx:inter_file name="church_soc_cm.peri.xml" />
+=== SYNTHESIS ===
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.964 MB, end = 500.96 MB, delta = 392.996 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.176 MB, end = 293.104 MB, delta = 258.928 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 372.792 MB [FlowMsg::RSSUsage::Peak]
+-rw-r--r-- 1 sipantichijk sipantichijk 479K Jun  8 12:17 top.vdb
+=== INTERFACE DESIGNER ===
+Writing out option register file
+Writing out boundary scan description file
+Writing out LPF
+Unified Timing supported
+clk lines in LPF after regen:
+    <efxpt:instance id="CLKMUX_L" index="10" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_T" index="40" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_R" index="73" type="clkmux"/>
+    <efxpt:instance id="CLKMUX_B" index="105" type="clkmux"/>
+      <efxpt:parameter index="8" name="PCR_CLK_OUT"/>
+=== PNR via efx_run ===
+Running: efx_run_pnr.py church_soc_cm --prj /home/sipantichijk/church_project/SoC/church_soc_cm.xml --family Titanium --device Ti60F225 --timing_model C3 --output_dir outflow --work_dir work_pnr --opt sdc_file=/home/sipantichijk/church_project/SoC/church_soc_cm.sdc --opt sync_file=church_soc_cm.peri.xml
+   pnr :        FAIL 
+WARNING  : IO cell "clk" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "cm_uart_tx" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "led0" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "led1" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "led2" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "uart_rx" has no assigned placement; it will be placed randomly
+WARNING  : IO cell "uart_tx" has no assigned placement; it will be placed randomly
+INFO     : 7 IO cells will have random placement
+    clk         6.185        161.681         (R-R)
+      clk              clk             1.000            -5.185           (R-R)
+=== BITSTREAM ===
+Running: efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 --output_dir outflow --work_dir work_pnr --opt mode=active width=1 enable_roms=smart spi_low_power_mode=on io_weak_pullup=on oscillator_clock_divider=DIV8 bitstream_compression=on enable_external_master_clock=off active_capture_clk_edge=posedge jtag_usercode=0xFFFFFFFF release_tri_then_reset=on
+   pgm :        PASS 
+-rw-r--r-- 1 sipantichijk sipantichijk 2.2M Jun  8 12:18 outflow/church_soc_cm.hex
+=== FLASH ===
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000c0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [===================================================] 100.00%
+Done
+Reset DONE
+sipantichijk@penguin:~/church_project/SoC$ 
