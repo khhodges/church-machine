@@ -7,11 +7,9 @@
 # does not reach all quadrants → Sapphire SoC ClockDomainGenerator stalls →
 # io_systemReset never deasserts → LED0 stays OFF and UART is silent.
 
-# PLL_TL0: 25 MHz crystal → VCO 250 MHz (multiplier=10) → 25 MHz output (out_divider=10).
-# At 25 MHz system clock, CLOCKDIV=53 in firmware → 57600 baud (25MHz / (8×54)).
-# Timing violations at 50 MHz (multiplier=20, VCO=500 MHz) caused Sapphire SoC
-# ClockDomainGenerator to stall — io_systemReset never deasserted, LED0 stayed OFF.
-# Fixed by halving the PLL multiplier (20→10). out_divider must stay at 10;
-# changing it (e.g. to 20) causes AssertionError in Efinity PLL summary writer
-# (efx_run_pt_unified.py pll/writer/summary.py) and prevents LPF generation.
+# No PLL. Clock = 25 MHz crystal direct from GPIOL_P_18 (period 40 ns).
+# CLOCKDIV=53 in firmware → 57600 baud (25 MHz / (8×54) ≈ 57870 baud).
+# Any PLL entry in peri.xml causes AssertionError in Efinity 2026.1 Interface
+# Designer (pll/writer/summary.py assert reg is not None) → LPF never written
+# → efx_pgm fails. Solution: remove PLL, use direct GPIO clock input.
 create_clock -name clk -period 40.0 [get_nets clk]
