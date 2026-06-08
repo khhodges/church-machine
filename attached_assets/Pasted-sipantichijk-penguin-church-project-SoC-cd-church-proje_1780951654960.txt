@@ -1,0 +1,46 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+ls -lt work_pnr/ outflow/ 2>/dev/null | head -15
+echo "=== PnR error lines ==="
+grep -rhiE "error|fatal|assert|traceback|not assigned|unroutable|illegal|cannot" work_pnr/ outflow/ 2>/dev/null | grep -viE "warning|0 error" | tail -25
+outflow/:
+total 53556
+-rw-r--r-- 1 sipantichijk sipantichijk      140 Jun  8 16:31 church_soc_cm.proj_state.ini
+-rw-r--r-- 1 sipantichijk sipantichijk     2924 Jun  8 16:31 church_soc_cm.log
+-rw-r--r-- 1 sipantichijk sipantichijk     1979 Jun  8 16:31 church_soc_cm.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  2165451 Jun  8 16:31 church_soc_cm.hex
+-rw-r--r-- 1 sipantichijk sipantichijk  2165391 Jun  8 16:31 church_soc_cm.bit
+-rw-r--r-- 1 sipantichijk sipantichijk    24004 Jun  8 16:31 church_soc_cm.place.out
+-rw-r--r-- 1 sipantichijk sipantichijk      277 Jun  8 16:31 church_soc_cm.place.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk        0 Jun  8 16:31 church_soc_cm.peri.cdo
+-rw-r--r-- 1 sipantichijk sipantichijk     1533 Jun  8 16:31 church_soc_cm.peri.csi
+-rw-r--r-- 1 sipantichijk sipantichijk     3451 Jun  8 16:31 church_soc_cm.peri.qdelay
+-rw-r--r-- 1 sipantichijk sipantichijk    13239 Jun  8 16:31 church_soc_cm.peri.pbn
+-rw-r--r-- 1 sipantichijk sipantichijk   527050 Jun  8 16:31 church_soc_cm.lpf
+-rw-r--r-- 1 sipantichijk sipantichijk    47804 Jun  8 16:31 church_soc_cm-post.bsd
+=== PnR error lines ===
+           .Q(\u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError )) /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_FF, CLK_POLARITY=1'b1, D_POLARITY=1'b1, CE_POLARITY=1'b1, SR_SYNC=1'b1, SR_SYNC_PRIORITY=1'b1, SR_VALUE=1'b0, SR_POLARITY=1'b1 */ ;   // /home/sipantichijk/church_project/SoC/sapphire.v(4010)
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .CLK_POLARITY = 1'b1;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .CE_POLARITY = 1'b1;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .SR_POLARITY = 1'b1;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .D_POLARITY = 1'b1;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .SR_SYNC = 1'b1;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .SR_VALUE = 1'b0;
+    defparam \u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError~FF .SR_SYNC_PRIORITY = 1'b1;
+            \u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dataCache_1/tagsWriteCmd_payload_data_error , 
+            \u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_write_tag_0_payload_data_error , 
+            .I1(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dBus_rsp_regNext_payload_error ), 
+    EFX_LUT4 LUT__44494 (.I0(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dataCache_1/stageB_tagsReadRsp_0_error ), 
+    EFX_LUT4 LUT__44559 (.I0(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/decodeStage_hit_error ), 
+    EFX_LUT4 LUT__44703 (.I0(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dataCache_1/loader_error ), 
+            .I1(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dBus_rsp_regNext_payload_error ), 
+            .I1(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dBus_rsp_regNext_payload_error ), 
+            .I2(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dataCache_1/loader_error ), 
+            .O(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/dataCache_1/tagsWriteCmd_payload_data_error )) /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_LUT4, LUTMASK=16'hf8f8 */ ;   // /home/sipantichijk/church_project/SoC/sapphire.v(17316)
+            .I1(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_hadError ), 
+            .O(\u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_write_tag_0_payload_data_error )) /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_LUT4, LUTMASK=16'heeee */ ;   // /home/sipantichijk/church_project/SoC/sapphire.v(17980)
+            .I1(n26356), .I2(\u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readError ), 
+            .O(\u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/uartCtrl_1_io_readError )) /* verific EFX_ATTRIBUTE_CELL_NAME=EFX_LUT4, LUTMASK=16'h030a */ ;   // /home/sipantichijk/church_project/SoC/sapphire.v(18223)
+            .I2(\u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/uartCtrl_1_io_readError ), 
+            .I1(n26356), .I2(\u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/bridge_misc_readOverflowError ), 
+    <efx:group_data name="Unassigned Core Pins" severity="error" value="1"/>
+sipantichijk@penguin:~/church_project/SoC$ 
