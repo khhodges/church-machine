@@ -1,0 +1,86 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church_project/SoC
+
+# 1. Pull latest
+git pull
+
+# 2. Copy from the repo's hardware subdir into the Efinity project root
+cp hardware/soc_combined/top.v                  ./
+cp hardware/soc_combined/church_soc_cm.peri.xml ./
+cp hardware/soc_combined/firmware/main.c        ./firmware/
+
+# Verify the right versions landed
+grep "FW_MINOR" firmware/main.c        # should print: #define FW_MINOR 3
+grep "3 user LEDs" top.v               # should find the comment
+
+# 3. Build firmware
+make -C firmware
+
+# 4. Patch sapphire.v (uses the fresh .bin files)
+python3 scripts/patch_sapphire_init.py \
+  sapphire.v \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+  EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+
+# 5. Synthesise (~4 min)
+bash hardware/soc_combined/run_efx_map.sh 2>&1 | tail -10
+
+# 6. BRAM sanity check — all 4 must be non-empty
+for sym in 0 1 2 3; do
+  LN=$(grep -n "EFX_RAM10" outflow/church_soc_cm.map.v \
+       | grep "ram_symbol${sym}__D\$g1" | head -1 | cut -d: -f1)
+  echo "sym${sym}: $(sed -n "${LN},$((LN+3))p" outflow/church_soc_cm.map.v | grep INIT_0)"
+done
+
+# 7. Place & Route (~5 min)
+bash hardware/soc_combined/run_efx_pnr.sh 2>&1 | tail -5
+
+# 8. Bitstream (~30 s)
+bash hardware/soc_combined/run_efx_pgm.sh 2>&1 | tail -5
+
+sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+fatal: not a git repository (or any of the parent directories): .git
+cp: cannot stat 'hardware/soc_combined/top.v': No such file or directory
+cp: cannot stat 'hardware/soc_combined/church_soc_cm.peri.xml': No such file or directory
+cp: cannot stat 'hardware/soc_combined/firmware/main.c': No such file or directory
+#define FW_MINOR 0
+ *   fw_minor   — firmware minor version (FW_MINOR)
+    uart_putc('0' + FW_MINOR);
+make: Entering directory '/home/sipantichijk/church_project/SoC/firmware'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/home/sipantichijk/church_project/SoC/firmware'
+  symbol0: updated 1 block(s), 879 assignments
+  symbol1: updated 1 block(s), 830 assignments
+  symbol2: updated 1 block(s), 774 assignments
+  symbol3: updated 1 block(s), 563 assignments
+sapphire.v patched.
+bash: hardware/soc_combined/run_efx_map.sh: No such file or directory
+sym0: 
+sym1: 
+sym2: 
+sym3: 
+bash: hardware/soc_combined/run_efx_pnr.sh: No such file or directory
+bash: hardware/soc_combined/run_efx_pgm.sh: No such file or directory
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Parse file DONE
+use: /usr/share/openFPGALoader/spiOverJtag_efinix_ti60f225.bit.gz
+Load SRAM: [==================================================] 100.00%
+Done
+097f0000
+Detail: 
+Jedec ID          : ef
+memory type       : 60
+memory capacity   : 17
+flash chip unknown: use basic protection detection
+start addr: 00000000, end_addr: 000b0000
+Erasing: [==================================================] 100.00%
+Done
+Writing: [===================================================] 100.00%
+Done
+Reset DONE
