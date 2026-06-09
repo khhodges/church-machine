@@ -52,20 +52,12 @@
 
 #define UART_DIV_115200  26u
 
-/* ------------------------------------------------------------------ */
-/* GPIO                                                                */
-/* ------------------------------------------------------------------ */
-#define GPIO_BASE      0xF8020000UL
-#define GPIO_INPUT     (*(volatile unsigned int *)(GPIO_BASE + 0x00))
-
-#define BUTTON_BIT     (1u << 6)
-#define BUTTON_PRESSED (!(GPIO_INPUT & BUTTON_BIT))
+/* GPIO is not wired in soc_minimal — no button support */
 
 /* ------------------------------------------------------------------ */
 /* Timing                                                              */
 /* 25 MHz; volatile-loop + nop ≈ 23 cycles → 1,000,000 iters ≈ 0.92s */
 /* ------------------------------------------------------------------ */
-#define DEBOUNCE_CYCLES  250000u
 #define LOOPS_PER_SECOND 1000000u
 
 /* ------------------------------------------------------------------ */
@@ -96,20 +88,6 @@ static void uart_putdec1(unsigned int v)
     /* emit up to 2 decimal digits (0–99) */
     if (v >= 10u) uart_putc((char)('0' + v / 10u));
     uart_putc((char)('0' + v % 10u));
-}
-
-static int debounce_pressed(void)
-{
-    unsigned int i;
-    for (i = 0; i < DEBOUNCE_CYCLES; i++) {
-        if (!BUTTON_PRESSED) return 0;
-    }
-    return 1;
-}
-
-static void wait_for_release(void)
-{
-    while (BUTTON_PRESSED) ;
 }
 
 static void delay_loops(unsigned int loops)
@@ -169,17 +147,9 @@ int main(void)
         uart_puts("NIA=0x00000000\r\n");
         uart_emit_callhome(boot_reason);
 
-        /* Re-send banner every 20 seconds */
+        /* Re-send banner every 20 seconds (~20 × 1s heartbeats) */
         if ((iter % 20u) == 0u)
             uart_puts("CHURCH Ti60 v1.0\r\n");
-
-        /* Button: re-send banner on press */
-        if (BUTTON_PRESSED && debounce_pressed()) {
-            uart_puts("CHURCH Ti60 v1.0\r\n");
-            uart_emit_callhome(1u);   /* boot_reason 1 = warm */
-            boot_reason = 1u;
-            wait_for_release();
-        }
     }
 
     return 0;
