@@ -3424,8 +3424,22 @@ function _showDeviceToast(evt) {
     var container = document.getElementById('deviceToastContainer');
     if (!container) return;
 
-    var isNew    = !!evt.is_new;
-    var name     = evt.board_name || 'Ti60 F225';
+    var isNew = !!evt.is_new;
+    var name  = evt.board_name || 'Ti60 F225';
+
+    // For reconnect toasts, reuse any existing one rather than stacking
+    if (!isNew) {
+        var existing = container.querySelector('.device-toast:not(.device-toast-new)');
+        if (existing) {
+            // Refresh the auto-dismiss timer stored on the element
+            if (existing._dismissTimer) clearTimeout(existing._dismissTimer);
+            existing._dismissTimer = setTimeout(function() {
+                existing.classList.remove('device-toast-visible');
+                setTimeout(function() { if (existing.parentNode) existing.remove(); }, 350);
+            }, 9000);
+            return;
+        }
+    }
 
     var toast = document.createElement('div');
     toast.className = 'device-toast' + (isNew ? ' device-toast-new' : '');
@@ -3458,6 +3472,7 @@ function _showDeviceToast(evt) {
         toast.classList.remove('device-toast-visible');
         setTimeout(function() { if (toast.parentNode) toast.remove(); }, 350);
     }, 9000);
+    toast._dismissTimer = timer;
 
     toast.querySelector('.device-toast-close').addEventListener('click', function() {
         clearTimeout(timer);
