@@ -59,7 +59,8 @@
         <efx:param name="use_cpe_for_const_1"  value="0"         value_type="e_bool"/>
         <efx:param name="split_input_buf"      value="0"         value_type="e_bool"/>
         <efx:param name="calc_mcw"             value="0"         value_type="e_bool"/>
-        <efx:param name="optimize-zero-init-rom" value="0"      value_type="e_bool"/>
+        <efx:param name="optimize-zero-init-rom"   value="0"  value_type="e_bool"/>
+        <efx:param name="peri_syn_instantiation"   value="on" value_type="e_bool"/>
     </efx:synthesis>
 
     <efx:place_and_route tool_name="efx_pnr">
