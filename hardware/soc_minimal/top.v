@@ -61,7 +61,7 @@ module top (
         .system_spi_0_io_data_3_write       (),
         .system_spi_0_io_data_3_writeEnable (),
         .system_spi_0_io_sclk_write         (),
-        .system_spi_0_io_ss                 (1'b1),   // deselect (active-low)
+        .system_spi_0_io_ss                 (),       // SPI not used — leave unconnected
 
         // APB slave 0 — not used; always-ready, no error, no read data
         .io_apbSlave_0_PADDR    (),
