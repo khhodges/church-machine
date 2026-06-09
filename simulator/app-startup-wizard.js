@@ -216,6 +216,22 @@ const StartupWizard = (function () {
         if (_currentStep === 1 && _choiceMade === 'prepackaged') _checkBitstream();
     }
 
+    // jumpToFlash — called by the "Flash via Wizard" button on the download card.
+    // Unlike goToStep, this is allowed to move forward: it sets the prepackaged
+    // path (the user already has a bitstream), opens the wizard if collapsed,
+    // then jumps straight to step 1 (Flash).
+    function jumpToFlash() {
+        if (_choiceMade === null) {
+            _choiceMade = 'prepackaged';
+            try { localStorage.setItem(LS_CHOICE, 'prepackaged'); } catch (_) {}
+        }
+        open(); // ensure wizard is visible
+        _currentStep = 1;
+        _save();
+        _renderProgress();
+        _checkBitstream();
+    }
+
     function reset() {
         for (let i = 0; i < TOTAL; i++) {
             try { localStorage.removeItem(LS_FAIL + i); } catch (_) {}
@@ -558,5 +574,5 @@ const StartupWizard = (function () {
         init();
     }
 
-    return { advance, back, goToStep, reset, toggle, open, clickConnect, clickDirect, clickBridge, markStepDone, markStepFail, toggleTrouble, confirmStep, retryStep, startDemo, exitDemo, demoSimulate, choicePrepackaged, choiceScratch };
+    return { advance, back, goToStep, jumpToFlash, reset, toggle, open, clickConnect, clickDirect, clickBridge, markStepDone, markStepFail, toggleTrouble, confirmStep, retryStep, startDemo, exitDemo, demoSimulate, choicePrepackaged, choiceScratch };
 })();
