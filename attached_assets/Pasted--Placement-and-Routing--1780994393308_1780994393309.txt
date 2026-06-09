@@ -1,0 +1,37 @@
+-------------------------------------------------------------------------
+Placement and Routing
+-------------------------------------------------------------------------
+Tue June 9 26 04:39:28 - Placement and routing flow working directory is /home/sipantichijk/Downloads/church_ti60_f225_project/hardware/soc_minimal/work_pnr
+
+INFO     : Reading project database "/home/sipantichijk/Downloads/church_ti60_f225_project/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+Tue June 9 26 04:39:30 - /home/sipantichijk/efinity/2025.2/bin/python3  "/home/sipantichijk/efinity/2025.2/scripts/efx_run_pt_unified.py"  "church_soc"  "Titanium"  "Ti60F225"
+Tue June 9 26 04:39:30 - Running /home/sipantichijk/efinity/2025.2/bin/python3...
+Load design file church_soc.peri.xml
+ERROR: Design name mismatched detected, Efinity project name is church_soc, periphery design name is church_soc_cm
+ERROR: Fail to load design from church_soc.peri.xml
+Design name mismatched detected, Efinity project name is church_soc, periphery design name is church_soc_cm
+Fail to load design from church_soc.peri.xml
+Source exception : msg_level:MsgLevel.error msg:Design name mismatched detected, Efinity project name is church_soc, periphery design name is church_soc_cm src_excp:None
+Traceback (most recent call last):
+  File "/home/sipantichijk/efinity/2025.2/pt/bin/api_service/internal/int_design.py", line 180, in load
+    self.check_efx_project_sync()
+  File "/home/sipantichijk/efinity/2025.2/pt/bin/api_service/internal/int_design.py", line 249, in check_efx_project_sync
+    raise pte.PTDsgLoadException(msg, MsgLevel.error)
+api_service.excp.design_excp.PTDsgLoadException: msg_level:MsgLevel.error msg:Design name mismatched detected, Efinity project name is church_soc, periphery design name is church_soc_cm src_excp:None
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/home/sipantichijk/efinity/2025.2/scripts/efx_run_pt_unified.py", line 377, in <module>
+    ret = runner()
+          ^^^^^^^^
+  File "/home/sipantichijk/efinity/2025.2/scripts/efx_run_pt_unified.py", line 198, in __call__
+    design_api.load(str(design_file))
+  File "/home/sipantichijk/efinity/2025.2/pt/bin/api_service/design.py", line 120, in load
+    self.__idesign.load(design_file)
+  File "/home/sipantichijk/efinity/2025.2/pt/bin/api_service/internal/int_design.py", line 194, in load
+    raise pte.PTDsgLoadException(msg, MsgLevel.error, excp)
+api_service.excp.design_excp.PTDsgLoadException: msg_level:MsgLevel.error msg:Fail to load design from church_soc.peri.xml src_excp:msg_level:MsgLevel.error msg:Design name mismatched detected, Efinity project name is church_soc, periphery design name is church_soc_cm src_excp:None
+Tue June 9 26 04:39:31 - /home/sipantichijk/efinity/2025.2/bin/python3 finished. Exit code = 1 Exit status : Normal
+ERROR: Interface Designer constraint generation was not successful, will not proceed to efx_pnr...
+Running placement and routing flow fail. See exit code and exit status.
+Tue June 9 26 04:39:31 - Running automated flow starting from synthesis done. Total duration = 0m 16.680s
