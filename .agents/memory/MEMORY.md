@@ -7,3 +7,6 @@
 - [Sapphire SoC jtagCtrl_reset polarity](sapphire-jtag-reset.md) — jtagCtrl_reset=0 keeps debug domain in permanent reset → io_systemReset stuck HIGH → LED0 OFF; must tie to 1'b1
 - [Ti60 headless build — IO placement and LPF](ti60-headless-lpf.md) — 5-patch Efinity flow: Patch4 must CALL check_design() (ignore return) not bypass it; efx_run --flow pgm/pnr not efx_pgm/efx_pnr direct; peri.xml must have clk GPIO or IO pins all randomly placed
 - [Ti60 clk peri.xml + unassigned-pin phantom](efinity-clkin-duplicate-net.md) — authoritative clk = conn_type="normal"+clkmux_buf_name=""+ROUTE0 name=""; clkin/CLKMUX_L is the DISPROVEN fix; route.rpt.xml counts can be stale phantoms
+- [Sapphire SoC memory map](sapphire-soc-memory-map.md) — ROM=0xF9000000, UART=0xF8010000, GPIO=0xF8020000; sapphire_define.vh is empty in 2026.1; grep sapphire.v for addresses
+- [Sapphire POR asyncReset pulse required](sapphire-por-asyncreset.md) — io_asyncReset=1'b0 constant leaves io_systemReset stuck HIGH forever; must use 8-bit shift-reg POR (init=0xFF) to pulse it
+- [Efinity 2026.1 illegal synthesis params](efinity-2026-synth-params.md) — infer_set_reset/infer_clk_enable cause EFX-0002; Efinity re-injects them on every save; strip with sed before each compile
