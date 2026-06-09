@@ -1901,6 +1901,12 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
 
     <div id="devices" class="view">
         <div class="devices-layout">
+            <div class="gh-sync-status-bar" id="ghSyncStatusBar">
+                <span class="gh-sync-label">&#x1F4E4; GitHub sync:</span>
+                <span class="gh-sync-badge" id="ghSyncBadge">&#x23F3; loading…</span>
+                <span class="gh-sync-meta" id="ghSyncMeta"></span>
+                <button class="gh-refresh-btn gh-sync-refresh-btn" onclick="loadGithubSyncStatus()" title="Refresh sync status">&#x21BB;</button>
+            </div>
                 <div class="callhome-log-panel" id="callhomeLogPanel">
                     <div class="callhome-log-header">
                         <span class="callhome-log-title">&#x1F4E1;</span>
@@ -2395,7 +2401,7 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
     <script src="app-run.js?v=20260606a"></script>
     <script src="app-source-library.js?v=20260509d"></script>
     <script src="app-invoke.js?v=20260521a"></script>
-    <script src="app-misc.js?v=20260607f"></script>
+    <script src="app-misc.js?v=20260609a"></script>
     <script src="asm-instruction-picker.js?v=20260602e"></script>
     <script src="asm-method-popup.js?v=20260518b"></script>
     <script src="clist-viewer.js?v=20260602c"></script>

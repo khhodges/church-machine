@@ -1179,6 +1179,45 @@
     z-index: 1;
 }
 
+.gh-sync-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.9rem;
+    background: #0d0d12;
+    border: 1px solid #2a2a3a;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+}
+.gh-sync-label {
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+}
+.gh-sync-badge {
+    font-weight: 700;
+    padding: 0.15rem 0.55rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+.gh-sync-badge.ok     { background: #1a3a1a; color: #4caf50; border: 1px solid #2d5a2d; }
+.gh-sync-badge.fail   { background: #3a1a1a; color: #ef5350; border: 1px solid #5a2d2d; }
+.gh-sync-badge.unknown{ background: #2a2a1a; color: #aaa;    border: 1px solid #3a3a2a; }
+.gh-sync-meta {
+    color: var(--text-secondary, #888);
+    font-family: monospace;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.gh-sync-refresh-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
 .devices-layout {
     padding: 1.2rem;
     max-width: 900px;

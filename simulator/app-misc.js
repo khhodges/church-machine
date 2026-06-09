@@ -1473,7 +1473,47 @@ function setDeviceLabelAndSync(deviceId, label) {
     }
 }
 
+function loadGithubSyncStatus() {
+    const badge = document.getElementById('ghSyncBadge');
+    const meta  = document.getElementById('ghSyncMeta');
+    const btn   = document.querySelector('.gh-sync-refresh-btn');
+    if (!badge) return;
+    badge.textContent = '⏳ loading…';
+    badge.className = 'gh-sync-badge unknown';
+    if (meta) meta.textContent = '';
+    if (btn) btn.classList.add('spinning');
+    fetch('/api/github/sync-status')
+        .then(r => r.json())
+        .then(d => {
+            const ok = d.status === 'ok';
+            const unknown = !d.status || d.status === 'unknown';
+            badge.className = 'gh-sync-badge ' + (unknown ? 'unknown' : ok ? 'ok' : 'fail');
+            badge.textContent = unknown ? '⚪ unknown' : ok ? '✔ ok' : '✖ failed';
+            if (meta) {
+                const parts = [];
+                if (d.branch) parts.push(d.branch);
+                if (d.sha)    parts.push(d.sha);
+                if (d.timestamp) {
+                    const dt = new Date(d.timestamp * 1000);
+                    parts.push(dt.toLocaleString(undefined, {
+                        month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    }));
+                }
+                if (!ok && d.error) parts.push('— ' + d.error);
+                meta.textContent = parts.join(' · ');
+            }
+        })
+        .catch(() => {
+            badge.className = 'gh-sync-badge fail';
+            badge.textContent = '✖ unreachable';
+            if (meta) meta.textContent = '/api/github/sync-status did not respond';
+        })
+        .finally(() => { if (btn) btn.classList.remove('spinning'); });
+}
+
 function loadDeviceList() {
+    loadGithubSyncStatus();
     const grid = document.getElementById('devGrid');
     if (!grid) return;
     grid.innerHTML = '<div class="dev-empty">Loading...</div>';

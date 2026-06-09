@@ -2712,6 +2712,19 @@ def github_api_public(path, repo):
     except Exception as e:
         return None, str(e)
 
+@app.route("/api/github/sync-status")
+def github_sync_status():
+    """Return the last GitHub auto-sync result from server/github-sync-status.json."""
+    status_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "github-sync-status.json")
+    try:
+        with open(status_path, "r") as f:
+            data = json.load(f)
+        return jsonify(data)
+    except FileNotFoundError:
+        return jsonify({"status": "unknown", "branch": "", "sha": "", "error": "No sync recorded yet", "timestamp": None})
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc), "branch": "", "sha": "", "timestamp": None}), 500
+
 @app.route("/api/github/community")
 def github_community():
     repos_info = []
