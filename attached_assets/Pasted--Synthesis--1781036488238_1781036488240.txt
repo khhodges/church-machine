@@ -1,0 +1,102 @@
+-------------------------------------------------------------------------
+Synthesis
+-------------------------------------------------------------------------
+Tue June 9 26 16:20:08 - Synthesis flow working directory is /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/work_syn
+
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+Tue June 9 26 16:20:08 - /home/sipantichijk/efinity/2026.1/bin/efx_map --project "church_soc" --root "top" --write-efx-verilog "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.map.v" --write-premap-module "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.elab.vdb" --binary-db "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.vdb" --device "Ti60F225" --family "Titanium" --veri_option "verilog_mode=verilog_2k,vhdl_mode=vhdl_2008" --work-dir "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/work_syn" --output-dir "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow" --prj "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" --I "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal"
+Tue June 9 26 16:20:08 - Running /home/sipantichijk/efinity/2026.1/bin/efx_map...
+INFO     : Efinix FPGA Synthesis.
+INFO     : Version: 2026.1.132
+INFO     : Compiled: May 29 2026.
+INFO     : 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : ***** Beginning Analysis ... *****
+INFO     : default VHDL library search path is now "/home/sipantichijk/efinity/2026.1/sim_models/vhdl/packages/vhdl_2008" [VHDL-1504]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/perilib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/maplib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v' [VERI-1482]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire_define.vh' [VERI-1482]
+INFO     : Analysis took 0.124794383 seconds [FlowMsg::StageDuration]
+INFO     :     Analysis took 0.11 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Analysis virtual memory usage: begin = 150.268 MB, end = 151.292 MB, delta = 1.024 MB [FlowMsg::VMUsage]
+INFO     : Analysis resident set memory usage: begin = 81.792 MB, end = 86.016 MB, delta = 4.224 MB [FlowMsg::RSSUsage]
+INFO     :     Analysis peak resident set memory usage = 193.38 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Analysis ... *****
+INFO     : ***** Beginning Elaboration ... *****
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(18): compiling module 'top' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(49): compiling module 'sapphire' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(131): compiling module 'EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(11064): compiling module 'BufferCC_2_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(11040): compiling module 'BufferCC_3_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5942): compiling module 'VexRiscv_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(7245): extracting RAM for identifier 'RegFilePlugin_regFile' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(13351): compiling module 'InstructionCache_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(13457): extracting RAM for identifier 'banks_0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(13458): extracting RAM for identifier 'ways_0_tags' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12510): compiling module 'DataCache_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12723): extracting RAM for identifier 'ways_0_tags' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12724): extracting RAM for identifier 'ways_0_data_symbol0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12725): extracting RAM for identifier 'ways_0_data_symbol1' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12726): extracting RAM for identifier 'ways_0_data_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12727): extracting RAM for identifier 'ways_0_data_symbol3' [VERI-2571]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(13323): system task 'display' is ignored for synthesis [VERI-1142]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6008): net 'IBusCachedPlugin_cache_io_cpu_fetch_isRemoved' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6021): net 'dataCache_1_io_cpu_writeBack_fence_SW' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6022): net 'dataCache_1_io_cpu_writeBack_fence_SR' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6023): net 'dataCache_1_io_cpu_writeBack_fence_SO' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6024): net 'dataCache_1_io_cpu_writeBack_fence_SI' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6025): net 'dataCache_1_io_cpu_writeBack_fence_PW' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6026): net 'dataCache_1_io_cpu_writeBack_fence_PR' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6027): net 'dataCache_1_io_cpu_writeBack_fence_PO' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6028): net 'dataCache_1_io_cpu_writeBack_fence_PI' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6029): net 'dataCache_1_io_cpu_writeBack_fence_FM[3]' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6534): net 'IBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6549): net 'DBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6656): net 'IBusCachedPlugin_iBusRsp_output_payload_rsp_error' does not have a driver [VDB-1002]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(6658): net 'IBusCachedPlugin_iBusRsp_output_payload_isRvc' does not have a driver [VDB-1002]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5731): compiling module 'JtagBridgeNoTap_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12438): compiling module 'FlowCCByToggle_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12471): system function call 'urandom' is not supported [VERI-1141]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12472): system function call 'urandom' is not supported [VERI-1141]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(14170): compiling module 'BufferCC_1_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(14182): system function call 'urandom' is not supported [VERI-1141]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(14183): system function call 'urandom' is not supported [VERI-1141]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5644): compiling module 'SystemDebugger_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5620): compiling module 'BufferCC_4_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5454): compiling module 'BmbDecoder_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5402): compiling module 'BmbExclusiveMonitor_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5362): compiling module 'BmbDecoder_1_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(5226): compiling module 'BmbArbiter_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(12334): compiling module 'StreamArbiter_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4940): compiling module 'BmbDecoder_2_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4840): compiling module 'BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b' [VERI-1018]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4868): extracting RAM for identifier 'ram_symbol0' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4869): extracting RAM for identifier 'ram_symbol1' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4870): extracting RAM for identifier 'ram_symbol2' [VERI-2571]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4871): extracting RAM for identifier 'ram_symbol3' [VERI-2571]
+ERROR    : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4878): cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' [VERI-1012]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(4840): module 'BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b' remains a black box due to errors in its contents [VERI-1073]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(131): module 'EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b' remains a black box due to errors in its contents [VERI-1073]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v(49): module 'sapphire' remains a black box due to errors in its contents [VERI-1073]
+INFO     : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(18): module 'top' remains a black box due to errors in its contents [VERI-1073]
+INFO     : Elaboration took 0.496138322 seconds [FlowMsg::StageDuration]
+INFO     :     Elaboration took 0.37 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Elaboration virtual memory usage: begin = 151.292 MB, end = 179.964 MB, delta = 28.672 MB [FlowMsg::VMUsage]
+INFO     : Elaboration resident set memory usage: begin = 86.272 MB, end = 116.736 MB, delta = 30.464 MB [FlowMsg::RSSUsage]
+INFO     :     Elaboration peak resident set memory usage = 193.38 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Elaboration ... *****
+ERROR    : Elaboration of module 'top' failed. Please check previous error messages. [EFX-0021]
+INFO     : The entire flow of EFX_MAP took 1.519569103 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_MAP took 1.19 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.964 MB, end = 179.964 MB, delta = 72 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.304 MB, end = 116.736 MB, delta = 82.432 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 193.38 MB [FlowMsg::RSSUsage::Peak]
+Tue June 9 26 16:20:10 - /home/sipantichijk/efinity/2026.1/bin/efx_map finished. Exit code = 5 Exit status : Normal
+Running synthesis flow failed. See exit code and exit status.
+Tue June 9 26 16:20:10 - Running automated flow starting from synthesis done. Total duration = 0m 1.876s
