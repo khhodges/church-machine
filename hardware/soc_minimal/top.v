@@ -37,14 +37,16 @@ module top (
     // HIGH then LOW to start its internal countdown.  Without this,
     // io_systemReset stays stuck HIGH indefinitely (SoC never boots).
     //
-    // An 8-bit shift register (initialized 0xFF) shifts in 0s on each
-    // rising clock edge.  bit[7] is HIGH for exactly 8 cycles (~320 ns
-    // at 25 MHz), then goes LOW permanently.  Efinity efx_map honours
-    // the Verilog initial value for fabric FFs on Titanium devices.
+    // IMPORTANT: Efinity Ti60 fabric FFs power up at 0, regardless of
+    // the Verilog initial value.  We therefore count UP from 0 and
+    // hold por_reset HIGH (asserted) until the counter saturates at
+    // bit[7].  After 128 cycles (~5 µs at 25 MHz) por_reset goes LOW
+    // and stays LOW.  Counter freezes when bit[7] sets.
     // ----------------------------------------------------------------
-    (* keep = "true" *) reg [7:0] por_sr = 8'hFF;
-    always @(posedge clk) por_sr <= {por_sr[6:0], 1'b0};
-    wire por_reset = por_sr[7];   // HIGH for first 8 cycles, then LOW
+    (* keep = "true" *) reg [7:0] por_cnt = 8'h00;
+    always @(posedge clk)
+        if (!por_cnt[7]) por_cnt <= por_cnt + 1'b1;
+    wire por_reset = ~por_cnt[7];  // HIGH until 128 cycles, then LOW
 
     // 25-bit blink counter: at 25 MHz, bit[24] toggles at ~0.75 Hz
     reg [24:0] blink_cnt;
