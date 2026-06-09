@@ -63,14 +63,15 @@ This is not an add-on. It is the protocol's reason for existing.
 │                                                                  │
 │  Each abstraction has an encryption service (firmware-private):  │
 │                                                                  │
-│   label            │ token_32  │ K_enc │ K_mac │ nonce_ctr       │
-│  ──────────────────┼───────────┼───────┼───────┼────────────     │
-│   Board.Identity   │ SHA32(uid)│  ●    │  ●    │     n           │
-│   Fault.Reporter   │ 0xA3F1…  │  ●    │  ●    │     n           │
-│   Lump.Loader      │ 0x7B2E…  │  ●    │  ●    │     n           │
-│   mymother         │ 0xDEAD…  │  ●    │  ●    │     n           │
-│   …                │  …       │  ●    │  ●    │     n           │
+│   OGT (global.namespace.abstraction.instance)  │ K_enc │ K_mac │ nonce_ctr  │
+│  ──────────────────────────────────────────────┼───────┼───────┼──────────  │
+│   global.Core.BoardIdentity.boot               │  ●    │  ●    │     n      │
+│   global.Core.FaultReporter.boot               │  ●    │  ●    │     n      │
+│   global.Core.LumpLoader.boot                  │  ●    │  ●    │     n      │
+│   global.Telecommunications.mymother.family-hub│  ●    │  ●    │     n      │
+│   …                                            │  …    │  …    │     n      │
 │                                                                  │
+│  token_32 = SHA32(ogt) — hardware register value, derived only  │
 │  Slot numbers: firmware-private BRAM addressing. Never in wire.  │
 │                                                                  │
 │  CALLHOME (0x01): board_uid + fpga_nonce + ns_manifest           │
@@ -158,70 +159,70 @@ The namespace IS the trust domain. The board UID is routing infrastructure only.
 ### 2.1 FPGA-side abstractions (NS slot entries)
 
 The board reports its **NS manifest** in every CALLHOME — the list of abstractions
-present, their namespace type, instance, label, and token. The bridge validates the
-manifest against its global abstraction registry (Section 2.7) and builds the
-`msg_type → token_32` lookup for the session.
+present on this board, each identified by its OGT. The bridge validates the manifest
+against its global abstraction registry (Section 2.7) and builds the
+`msg_type → ogt` lookup for the session.
 
-Each manifest entry has four fields. **Slot numbers are not in the manifest** —
-they are firmware-private BRAM addresses and are never exposed to the protocol.
+**The `token` field is the OGT** — the full hierarchical capability path:
+`global.namespace.abstraction.instance`. It is a name, not a number.
+The 32-bit hardware register value `token_32 = SHA32(ogt)` — derived from the
+name, never invented.  **Slot numbers are not in the manifest** — firmware-private.
 
 ```json
 {
-  "ns_type":     "Core",
-  "ns_instance": "boot",
-  "label":       "Fault.Reporter",
-  "token":       "0xA3F1C28E",
-  "mobile":      false
+  "token":   "global.Core.FaultReporter.boot",
+  "label":   "Fault.Reporter",
+  "mobile":  false
 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `ns_type` | Application namespace type — `"Core"`, `"Telecommunications"`, `"Education"`, … |
-| `ns_instance` | Specific instance — `"boot"`, `"family-hub"`, `"myphone"`, … |
-| `label` | The abstraction — `"Fault.Reporter"`, `"mymother"`, … |
-| `token` | 32-bit GT token — permanent, portable identity. The bridge keys everything here. |
+| `token` | The OGT — `global.<ns_type>.<abstraction>.<ns_instance>`. This is the identity. The bridge keys everything by this value. |
+| `label` | Human-readable display form — `"Fault.Reporter"`, `"mymother"`, … Used only for UI; never for crypto or routing. |
 | `mobile` | `true` = this abstraction can migrate to another board |
 
-Each entry announces: *"This abstraction is present on this board, holds this token,
-and has an encryption service active."* The bridge never needs to know which BRAM
-slot it lives in.
+`ns_type` and `ns_instance` are encoded in the OGT path and need not be separate
+manifest fields — the bridge parses them from position 1 and 3 of the OGT.
 
-**Core abstractions** (ns_type=`"Core"`, always present in every board's manifest):
+Each entry announces: *"This abstraction is present on this board and has an active
+encryption service."* The bridge never needs to know which BRAM slot it occupies.
 
-| Label | Perms | msg_types | Description |
-|-------|-------|-----------|-------------|
-| `Board.Identity` | E | `0x01` | Board routing identity; token = SHA32(board_uid) |
-| `Heartbeat` | E | `0x06` | Lowest privilege — PING only |
-| `Fault.Reporter` | E | `0x02 0x07` | FAULT + BOOT_LOG emission |
-| `Perf.Reporter` | E | `0x08` | PERF counter emission |
-| `Lump.Loader` | E | `0x04` | LUMP_REQ Lazy-Load access to IDE store |
-| `Trace.Emitter` | E | `0x03` | Instruction TRACE streaming (debug builds) |
-| `NS.Inspector` | R | `0x05` | Read-only namespace dump (admin grant) |
-| `Media.Consumer` | E | `0x09 0x0A` | Media asset fetch |
-| `Browse.Client` | E | `0x10–0x14` | Web browsing; domain C-list inside the abstraction |
+**Core abstractions** (ns_type=`Core`, always present in every board's manifest):
 
-**Application namespace abstractions** (ns_type = application domain; as many
-instances as needed; abstractions may be mobile):
+| OGT | Label | Perms | msg_types | Description |
+|-----|-------|-------|-----------|-------------|
+| `global.Core.BoardIdentity.boot` | `Board.Identity` | E | `0x01` | Board routing identity |
+| `global.Core.Heartbeat.boot` | `Heartbeat` | E | `0x06` | Lowest privilege — PING only |
+| `global.Core.FaultReporter.boot` | `Fault.Reporter` | E | `0x02 0x07` | FAULT + BOOT_LOG |
+| `global.Core.PerfReporter.boot` | `Perf.Reporter` | E | `0x08` | PERF counter emission |
+| `global.Core.LumpLoader.boot` | `Lump.Loader` | E | `0x04` | LUMP_REQ Lazy-Load |
+| `global.Core.TraceEmitter.boot` | `Trace.Emitter` | E | `0x03` | Instruction TRACE (debug) |
+| `global.Core.NSInspector.boot` | `NS.Inspector` | R | `0x05` | Read-only namespace dump |
+| `global.Core.MediaConsumer.boot` | `Media.Consumer` | E | `0x09 0x0A` | Media asset fetch |
+| `global.Core.BrowseClient.boot` | `Browse.Client` | E | `0x10–0x14` | Web browsing |
+
+**Application namespace abstractions** — OGT encodes the full hierarchy:
 
 ```
 ns_type="Telecommunications", ns_instance="family-hub":
-  label="mymother",    token=0xDEAD1234,  mobile=true
-  label="workoffice",  token=0xBEEF5678,  mobile=true
-  label="CallHistory", token=0xCAFE9ABC,  mobile=false
+  token="global.Telecommunications.mymother.family-hub",    label="mymother",    mobile=true
+  token="global.Telecommunications.workoffice.family-hub",  label="workoffice",  mobile=true
+  token="global.Telecommunications.CallHistory.family-hub", label="CallHistory", mobile=false
 
 ns_type="Telecommunications", ns_instance="mums-mobile":
-  label="mymother",    token=0xDEAD1234,  mobile=true  ← same token, different board
-  label="workoffice",  token=0xBEEF5678,  mobile=true
+  token="global.Telecommunications.mymother.mums-mobile",   label="mymother",    mobile=true
+  token="global.Telecommunications.workoffice.mums-mobile", label="workoffice",  mobile=true
 ```
 
-The same token (`0xDEAD1234` for "mymother") can appear in manifests from multiple
-boards (replicated presence) or one board at a time (exclusive residency). Both are
-valid; the global registry tracks which board is currently authoritative.
+The OGT `global.Telecommunications.mymother.family-hub` is stable and globally
+unique. When "mymother" migrates to a new board, the OGT path is unchanged — only
+the deployment (board_uid, K_enc, K_mac) changes. This is why OGT is the identity
+and not any derived hardware value.
 
-**Encryption service per abstraction** — every entry has its own `K_enc`, `K_mac`,
-and `nonce_ctr` keyed by `(board_uid, token_32)`. No two abstractions share a key.
-The keystore LUMP (Section 2.6) is indexed by token, not by slot.
+**Encryption service per abstraction** — every OGT has its own `K_enc`, `K_mac`,
+and `nonce_ctr`. No two abstractions share a key. The keystore LUMP (Section 2.6)
+is indexed by OGT path.
 
 ### 2.2 IDE-side GTs (held by bridge/server)
 
@@ -376,29 +377,31 @@ not to any physical slot in the namespace table.
 
 ```
 ABSTRACTION_ENC = {
-    token_32:  0xA3F1C28E,                // permanent identity — follows the abstraction
-    label:     "Fault.Reporter",          // human-readable name
-    K_enc:     <128-bit secret>,          // ChaCha20 key — this abstraction only
-    K_mac:     <128-bit secret>,          // HMAC key — this abstraction only
-    nonce_ctr: 0,                         // monotonic counter, per-token, per-session
-    msg_types: [0x02, 0x07],              // FAULT + BOOT_LOG
+    ogt:       "global.Core.FaultReporter.boot",  // THE identity — name, not a number
+    token_32:  SHA32(ogt),                        // hardware register value, derived only
+    label:     "Fault.Reporter",                  // display name (UI only)
+    K_enc:     <128-bit secret>,                  // ChaCha20 key — this OGT only
+    K_mac:     <128-bit secret>,                  // HMAC key — this OGT only
+    nonce_ctr: 0,                                 // monotonic counter, per-OGT, per-session
+    msg_types: [0x02, 0x07],                      // FAULT + BOOT_LOG
     // ns_slot: firmware-private BRAM address — never present at protocol layer
 }
 ```
 
-No abstraction can read or forge frames belonging to another. Slot numbers are
-an internal firmware concern — the FPGA uses them to address BRAM; the bridge
-and the wire have no knowledge of them.
+No abstraction can read or forge frames belonging to another. The OGT path is the
+source of truth — `token_32` is a convenience hash for the hardware capability
+registers, not an identity in its own right. Slot numbers are internal firmware
+addressing; the bridge and the wire never see them.
 
 **Key derivation** (at abstraction grant time, server-side only):
 
-The IKM is bound to two factors: the board and the abstraction's token. Both must
-match. The slot number is absent — it is a firmware implementation detail.
+The IKM binds the board to the OGT — the full canonical name, not a derived hash.
+Slot numbers are absent. `token_32` is absent from the IKM — it is a hash of the
+OGT and carries no additional information.
 
 When a **mobile abstraction migrates** to a new board, `mint_abstraction_keys` is
-called with the new `board_uid`. The keys change (per-deployment), but `token_32`
-is unchanged — that is the portable identity. The slot the abstraction occupies on
-the new board is irrelevant to the key and irrelevant to the bridge.
+called with the new `board_uid`. The keys change (per-deployment), but the OGT is
+unchanged — that is the portable identity.
 
 ```python
 import hashlib
@@ -406,17 +409,21 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
 def mint_abstraction_keys(board_uid: bytes,
-                          token_32: int) -> tuple[bytes, bytes]:
-    # IKM binds board + token. Slot is absent — it is firmware-private.
-    ikm = hashlib.sha256(
-        board_uid
-        + token_32.to_bytes(4, "little")
-    ).digest()
-    token_info = token_32.to_bytes(4, "little")
+                          ogt: str) -> tuple[bytes, bytes]:
+    """
+    Derive K_enc and K_mac for one abstraction on one board.
+    ogt  = full OGT path, e.g. "global.Core.FaultReporter.boot"
+           = global.namespace.abstraction.instance
+    IKM  = SHA256(board_uid || ogt_bytes)
+    Slot is absent — firmware-private BRAM addressing, never used here.
+    token_32 = SHA32(ogt) is the hardware register value; it is NOT the IKM.
+    """
+    ogt_bytes = ogt.encode("utf-8")
+    ikm = hashlib.sha256(board_uid + ogt_bytes).digest()
     K_enc = HKDF(hashes.SHA256(), 16,
-                 salt=b"CM_ENC_v3", info=token_info).derive(ikm)
+                 salt=b"CM_ENC_v3", info=ogt_bytes).derive(ikm)
     K_mac = HKDF(hashes.SHA256(), 16,
-                 salt=b"CM_MAC_v3", info=token_info).derive(ikm)
+                 salt=b"CM_MAC_v3", info=ogt_bytes).derive(ikm)
     return K_enc, K_mac
 ```
 
@@ -426,32 +433,32 @@ invalidates only its keys — all other abstractions on the same board are unaff
 **Key deployment** — the NS keystore LUMP:
 
 The IDE packages all active abstraction keys for a board into a protected LUMP
-(type=`ns_keystore`, NULL policy, never callable). The keystore is indexed by
-`token_32` — slot numbers are absent from the protocol-level keystore format.
+(type=`ns_keystore`, NULL policy, never callable). The keystore is indexed by the
+full OGT path — not by slot, not by opaque hex.
 
 ```json
 {
   "type": "ns_keystore",
   "board_uid": "c0ffee0100000001",
   "abstractions": {
-    "0xC0FFEE01": { "ns_type": "Core",              "ns_instance": "boot",       "label": "Board.Identity", "K_enc": "…", "K_mac": "…" },
-    "0xA3F1C28E": { "ns_type": "Core",              "ns_instance": "boot",       "label": "Fault.Reporter", "K_enc": "…", "K_mac": "…" },
-    "0x7B2E91F4": { "ns_type": "Core",              "ns_instance": "boot",       "label": "Lump.Loader",    "K_enc": "…", "K_mac": "…" },
-    "0xCC9144D0": { "ns_type": "Core",              "ns_instance": "boot",       "label": "Browse.Client",  "K_enc": "…", "K_mac": "…",
-                    "browse_domains": ["bbc.co.uk", "wikipedia.org"] },
-    "0xDEAD1234": { "ns_type": "Telecommunications","ns_instance": "family-hub", "label": "mymother",       "K_enc": "…", "K_mac": "…", "mobile": true },
-    "0xBEEF5678": { "ns_type": "Telecommunications","ns_instance": "family-hub", "label": "workoffice",     "K_enc": "…", "K_mac": "…", "mobile": true },
-    "0xCAFE9ABC": { "ns_type": "Telecommunications","ns_instance": "family-hub", "label": "CallHistory",    "K_enc": "…", "K_mac": "…", "mobile": false }
+    "global.Core.BoardIdentity.boot":                        { "label": "Board.Identity", "K_enc": "…", "K_mac": "…" },
+    "global.Core.FaultReporter.boot":                        { "label": "Fault.Reporter", "K_enc": "…", "K_mac": "…" },
+    "global.Core.LumpLoader.boot":                           { "label": "Lump.Loader",    "K_enc": "…", "K_mac": "…" },
+    "global.Core.BrowseClient.boot":                         { "label": "Browse.Client",  "K_enc": "…", "K_mac": "…",
+                                                               "browse_domains": ["bbc.co.uk", "wikipedia.org"] },
+    "global.Telecommunications.mymother.family-hub":         { "label": "mymother",       "K_enc": "…", "K_mac": "…", "mobile": true },
+    "global.Telecommunications.workoffice.family-hub":       { "label": "workoffice",     "K_enc": "…", "K_mac": "…", "mobile": true },
+    "global.Telecommunications.CallHistory.family-hub":      { "label": "CallHistory",    "K_enc": "…", "K_mac": "…", "mobile": false }
   }
 }
 ```
 
-The FPGA firmware receives this LUMP and maps each token to its internal BRAM slot.
-That mapping is entirely private to the firmware — the bridge never sees slot
-numbers and does not need them.
+The FPGA firmware receives this LUMP and maps each OGT to its internal BRAM slot.
+`token_32 = SHA32(ogt)` is computed locally — it never travels in the keystore.
+That mapping is entirely private to the firmware; the bridge never sees slot numbers.
 
 The keystore LUMP is transmitted as a `LUMP_DATA (0x80)` frame encrypted with
-`CM.IDE.Deployer`'s key. Firmware reads keys from BRAM via `cm_get_key(token_32)`.
+`CM.IDE.Deployer`'s key. Firmware reads keys from BRAM via `cm_get_key(ogt)`.
 
 **Session nonce handshake** (on every bridge connect):
 
@@ -528,17 +535,16 @@ The token is the portable identity. The keys are ephemeral per deployment.
 The bridge maintains one registry entry **per token** (not per board+slot):
 
 ```python
-# Global registry — keyed by token_32 (int)
-ABSTRACTION_REGISTRY: dict[int, AbstractionRecord] = {}
+# Global registry — keyed by OGT string (the canonical name)
+ABSTRACTION_REGISTRY: dict[str, AbstractionRecord] = {}
 
 @dataclass
 class AbstractionRecord:
-    token_32:     int           # permanent identity — never changes, never a slot
-    ns_type:      str           # "Telecommunications", "Education", "Core", …
-    ns_instance:  str           # "family-hub", "alice-year3", …
-    label:        str           # "mymother", "Fault.Reporter", …
+    ogt:          str    # global.namespace.abstraction.instance — THE identity
+    token_32:     int    # SHA32(ogt) — hardware register value, derived, never stored as identity
+    label:        str    # human-readable display form — UI only, never used for routing or crypto
     mobile:       bool
-    residency:    str           # "exclusive" or "replicated"
+    residency:    str    # "exclusive" or "replicated"
 
     # Current deployment(s) — updated on every CALLHOME
     deployments:  list[Deployment]
@@ -546,21 +552,21 @@ class AbstractionRecord:
 @dataclass
 class Deployment:
     board_uid:  bytes
-    K_enc:      bytes   # 128-bit, derived from (board_uid, token_32)
+    K_enc:      bytes   # 128-bit — mint_abstraction_keys(board_uid, ogt)
     K_mac:      bytes   # 128-bit
     active:     bool    # False once abstraction has migrated away
     # ns_slot is firmware-private — not stored here, not sent over the wire
 ```
 
-Bridge operations — all keyed directly by `(board_uid, token_32)`:
+Bridge operations — all keyed directly by OGT:
 
 | Operation | Key used |
 |-----------|----------|
-| Verify HMAC on incoming frame | `msg_type` → token → load K_mac for (board_uid, token) |
+| Verify HMAC on incoming frame | `msg_type` → ogt → load K_mac for (board_uid, ogt) |
 | Decrypt payload | Same → load K_enc |
-| Route to handler | token → label → ns_type → handler |
-| Track migration | token seen on new board → new Deployment(board_uid, fresh keys) |
-| Revoke abstraction | token blacklisted → all Deployments `active=False` |
+| Route to handler | ogt → label → ns_type (ogt[1]) → handler |
+| Track migration | ogt seen on new board → new Deployment with fresh keys |
+| Revoke abstraction | ogt blacklisted → all its Deployments set `active=False` |
 
 #### Namespace instance management in the IDE
 
@@ -586,23 +592,24 @@ target board, then revoking the slot on the source board.
 
 #### Key invariants for mobile abstractions
 
-1. **Token permanence** — `token_32` is minted once and never changes. It is the
-   global identity of the abstraction across all substrates, all time, and all slot
-   assignments. Slot numbers are implementation details; the token is the fact.
+1. **OGT permanence** — `global.namespace.abstraction.instance` is minted once and
+   never changes. It is the global identity of the abstraction across all substrates,
+   all time, and all slot assignments. The OGT is the fact. `token_32 = SHA32(ogt)` is
+   a derived hardware convenience value — it is not the identity.
 2. **Per-deployment keys** — `K_enc` and `K_mac` are derived from
-   `SHA256(board_uid || token_32)`. They are specific to one board. Migrating =
-   re-deriving on the new substrate with the new `board_uid`. The slot the
-   abstraction occupies on either board is irrelevant to the key.
+   `SHA256(board_uid || ogt_bytes)`. They are specific to one board. Migrating =
+   re-deriving on the new substrate with the new `board_uid`. Slot assignments on
+   either board are irrelevant.
 3. **No key reuse across deployments** — if a mobile abstraction returns to a board
-   it previously inhabited, `mint_abstraction_keys` is called fresh. No stale keys
-   are ever reused regardless of whether the slot assignment matches.
+   it previously inhabited, `mint_abstraction_keys(board_uid, ogt)` is called fresh.
+   No stale keys are ever reused.
 4. **Exclusive vs. replicated** — the IDE declares residency policy at grant time.
    Exclusive: only one active deployment at a time; migration is atomic.
    Replicated: multiple simultaneous deployments; bridge routes by `board_uid`.
 5. **Non-mobile abstractions are board-resident** — `"mobile": false` means the
    abstraction's state is inherently tied to this board+instance combination.
    `CallHistory` is an example — its data is local; migrating it would be a copy,
-   not a move. The token remains unique but the IDE won't move it.
+   not a move. The OGT remains unique but the IDE will not migrate it.
 
 ---
 
@@ -740,45 +747,47 @@ STATIC_MSG_LABELS = {
     0x14: "Browse.Client",
 }
 
-def build_msg_token_map(ns_manifest: list[dict]) -> dict[int, int]:
+def build_msg_token_map(ns_manifest: list[dict]) -> dict[int, str]:
     """
-    Build msg_type → token_32 from the ns_manifest agreed in CALLHOME.
-    ns_manifest entries: { "ns_type", "ns_instance", "label", "token", "mobile" }
-    No "slot" field — slots are firmware-private and never appear here.
+    Build msg_type → ogt from the ns_manifest agreed in CALLHOME.
+    ns_manifest entries: { "token": "global.ns.abstraction.instance",
+                           "label": "Fault.Reporter", "mobile": false }
+    "token" IS the OGT — the full hierarchical capability path.
+    "label" is UI-only. No "slot" field — firmware-private.
     Called once per CALLHOME; stored on the board session object.
     """
-    label_to_token = {
-        entry["label"]: int(entry["token"], 16)
+    label_to_ogt = {
+        entry["label"]: entry["token"]   # token field is the OGT string
         for entry in ns_manifest
     }
-    msg_token_map = {}
+    msg_token_map: dict[int, str] = {}
     for msg_type, label in STATIC_MSG_LABELS.items():
-        token = label_to_token.get(label)
-        if token is not None:
-            msg_token_map[msg_type] = token
+        ogt = label_to_ogt.get(label)
+        if ogt is not None:
+            msg_token_map[msg_type] = ogt
         # Label absent from manifest → abstraction not loaded on this board.
         # Frames of that type → GT_NOT_HELD (Step 4).
     return msg_token_map
 ```
 
-The session's `msg_token_map` replaces the old `CM_MSG_TYPE_GT` dict.
-In `on_raw_frame`, Step 2 becomes:
+The session's `msg_token_map` (type `dict[int, str]`) replaces the old
+`CM_MSG_TYPE_GT` dict. In `on_raw_frame`, Step 2 becomes:
 
 ```python
-    # Step 2: resolve source token from the session's msg_token_map
-    token_32 = session.msg_token_map.get(msg_type)
-    if token_32 is None:
+    # Step 2: resolve source OGT from the session's msg_token_map
+    ogt = session.msg_token_map.get(msg_type)
+    if ogt is None:
         _silent_drop(board_uid, "GT_UNKNOWN", msg_type)  # abstraction not in manifest
         return
 
-    # Steps 3–5: HMAC, replay, decrypt — all keyed by (board_uid, token_32)
-    # Step 6: validate_gt uses (board_uid, token_32)
+    # Steps 3–5: HMAC, replay, decrypt — all keyed by (board_uid, ogt)
+    # Step 6: validate_gt uses ogt directly
 ```
 
-`last_nonce` keyed by `(board_uid, token_32)` — per-abstraction, portable:
+`last_nonce` keyed by `(board_uid, ogt)` — per-abstraction, portable across boots:
 
 ```python
-    last_nonce[(board_uid, token_32)] = nonce
+    last_nonce[(board_uid, ogt)] = nonce
 ```
 
 CM_HANDLERS = {
