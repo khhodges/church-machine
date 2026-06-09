@@ -30,6 +30,11 @@ module top (
     // ----------------------------------------------------------------
     wire system_reset;         // active-HIGH reset driven by Sapphire SoC
 
+    // 25-bit blink counter: at 25 MHz, bit[24] toggles at ~0.75 Hz
+    // LED0 blinks while SoC is in reset, stays solid ON when running.
+    reg [24:0] blink_cnt;
+    always @(posedge clk) blink_cnt <= blink_cnt + 1'b1;
+
     // ----------------------------------------------------------------
     // Sapphire SoC instantiation
     //
@@ -86,12 +91,18 @@ module top (
 
     // ----------------------------------------------------------------
     // LED logic
-    //   led0 = on when the SoC is out of reset (confirms boot)
-    //   led1, led2 = reserved, off
+    //   led0 = solid ON when SoC is running; fast-blink when in reset
+    //   led1 = slow blink (independent clock test — always runs)
+    //   led2 = solid ON (always-on test)
+    //
+    // Diagnostic legend (look for ANY movement):
+    //   led2 solid ON  → GPIOR_P_09 pin assignment is correct
+    //   led1 blinking  → GPIOR_P_08 pin assignment is correct + clock running
+    //   led0 solid ON  → SoC is out of reset and running firmware
     // ----------------------------------------------------------------
-    assign led0 = ~system_reset;
-    assign led1 = 1'b0;
-    assign led2 = 1'b0;
+    assign led0 = ~system_reset;           // ON when SoC running
+    assign led1 = blink_cnt[24];           // slow blink ~0.75 Hz — clock alive
+    assign led2 = 1'b1;                    // always ON — pin test
 
 endmodule
 
