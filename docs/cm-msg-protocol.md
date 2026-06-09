@@ -1,6 +1,6 @@
 # CM_MSG — Church Machine UART Messaging Protocol
 
-**Status:** Design specification — v0.3  
+**Status:** Design specification — v0.4  
 **Date:** 2026-06-09  
 **Scope:** Ti60 F225 (initial target); architecture applies to all CM-connected boards
 
@@ -8,20 +8,32 @@
 
 ## Guiding Principle
 
-**No message is trusted unless it is authorized, authenticated, and encrypted by a Golden Token pair.**
+**Identity belongs to the abstraction — not the hardware.**
 
-The Church Machine is built on capability-based security. Every memory access is
-GT-validated in hardware. Every call is GT-validated in the ISA. This protocol
-extends that same guarantee to the UART channel — with encryption as a first-class
-property, not an afterthought:
+The Church Machine executes abstractions. An abstraction is a functional object
+in a namespace slot: it has behaviour, a capability token, and a unique identity.
+The hardware is the substrate it runs on. This protocol extends that model to the
+UART channel: every message is sent by a named **abstraction** (a namespace entry),
+received by a named **abstraction** (an IDE-side service), and secured by that
+abstraction's own encryption service.
 
-- **Authorization** — A board that does not hold a GT for a capability cannot exercise
-  it, even over UART. The bridge enforces this on every frame.
-- **Authentication** — Every frame carries an HMAC tag derived from the GT key pair.
-  A forged or tampered frame is rejected before any handler is called.
-- **Encryption** — Every payload is encrypted with a session key derived from the
-  OGT key pair. A message in transit reveals nothing about its content to an
-  observer on the wire.
+A `Fault.Reporter` abstraction in NS slot 2 has the same cryptographic identity
+whether it is running on board `c0ffee01` or board `deadbeef`. A `Browse.Client`
+abstraction carries its own domain C-list, its own keys, and its own permission set
+— independently of the board it inhabits.
+
+**No message is trusted unless it is authorized, authenticated, and encrypted
+by the Outform Golden Token pair of its source and destination abstractions.**
+
+- **Authorization** — The source abstraction must hold an OGT that names the
+  destination service. No OGT = no capability, even over UART.
+- **Authentication** — Every frame carries an HMAC-8 tag keyed by the source
+  abstraction's `K_mac`. Forgeries are rejected before any handler is invoked.
+- **Encryption** — Every payload is ChaCha20-encrypted with the source
+  abstraction's `K_enc`. The wire reveals nothing about content or identity.
+- **Encryption service in every namespace entry** — Each NS slot carries its own
+  `K_enc`, `K_mac`, and nonce counter. There is no shared board-level key.
+  Revoking one abstraction's keys leaves all others intact.
 
 This is not an add-on. It is the protocol's reason for existing.
 
@@ -32,99 +44,131 @@ This is not an add-on. It is the protocol's reason for existing.
 ### 1.1 The chain of trust
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    FPGA Board (Ti60 F225)                     │
-│                                                              │
-│  GT bundle in protected BRAM:                                │
-│    { gt_name → (token_32, K_enc_128, K_mac_128, nonce_ctr) } │
-│                                                              │
-│  CALLHOME (0x01): board_uid + fpga_nonce + gt_manifest       │
-│  All subsequent frames: OGT-encrypted + HMAC-authenticated   │
-└──────────────────────────┬───────────────────────────────────┘
-                           │  UART
-                           │  [0xCE][0xAA][type][seq][flags][len]
-                           │  [nonce:4][ChaCha20(payload)][HMAC-8]
-                           ▼
-┌──────────────────────────────────────────────────────────────┐
-│                  Bridge (callhome_bridge.py)                  │
-│                                                              │
-│  1. Parse frame header — verify magic                        │
-│  2. Look up board's GT record by board_uid                   │
-│  3. Verify HMAC tag  (reject + log on failure)               │
-│  4. Verify nonce > last_seen  (replay protection)            │
-│  5. Decrypt payload using K_enc for this GT pair             │
-│  6. Validate Source GT for msg.type                          │
-│  7. On pass → route to handler                               │
-│  8. On fail → send ACK(GT_ERROR) + log rejection             │
-└──────────────────────────┬───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    FPGA Board (Ti60 F225)                         │
+│                                                                  │
+│  Namespace table (each slot = one abstraction):                  │
+│                                                                  │
+│   slot │ label            │ token_32 │ K_enc │ K_mac │ nonce_ctr │
+│  ──────┼──────────────────┼──────────┼───────┼───────┼───────────│
+│     0  │ Board.Identity   │ SHA32(uid)│  ●   │  ●    │     n     │
+│     2  │ Fault.Reporter   │ 0xA3F1…  │  ●   │  ●    │     n     │
+│     4  │ Lump.Loader      │ 0x7B2E…  │  ●   │  ●    │     n     │
+│     …  │ …                │  …       │  ●   │  ●    │     n     │
+│    15  │ Browse.Client    │ 0xCC91…  │  ●   │  ●    │     n     │
+│                                                                  │
+│  CALLHOME (0x01): board_uid + fpga_nonce + ns_manifest           │
+│  All subsequent frames: encrypted by the SOURCE ABSTRACTION      │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │  UART  [0xCE][0xAA][type][seq][flags][len]
+                           │         [nonce:4][ChaCha20(payload)][HMAC-8]
+                           ▼         ↑ keyed by SOURCE ABSTRACTION's slot
+┌──────────────────────────────────────────────────────────────────┐
+│                  Bridge (callhome_bridge.py)                      │
+│                                                                  │
+│  1. Verify magic                                                 │
+│  2. Map msg.type → source NS slot (via ns_manifest)              │
+│  3. Load K_mac for that slot → verify HMAC (silent drop on fail) │
+│  4. Verify nonce > last_seen[slot]  (silent drop on replay)      │
+│  5. Decrypt with K_enc for that slot                             │
+│  6. Validate source abstraction holds OGT for destination        │
+│  7. On pass → route to handler                                   │
+│  8. On protocol failure → ACK(err) to board                      │
+└──────────────────────────┬───────────────────────────────────────┘
                            │  HTTP POST / SSE  (plaintext inside server)
                            ▼
-┌──────────────────────────────────────────────────────────────┐
-│                  IDE Server (app.py)                         │
-│                                                              │
-│  Mints GT records with keys:  token_32 + K_enc + K_mac       │
-│  Deploys key bundles to FPGA via LUMP_DATA (0x80)            │
-│  Revokes GTs + keys server-side; no FPGA reflash needed      │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                  IDE Server (app.py)                             │
+│                                                                  │
+│  Authoritative NS manifest per board                             │
+│  Mints per-slot keys:  token_32 + K_enc + K_mac per NS entry     │
+│  Deploys NS keystore LUMP → FPGA protected BRAM                  │
+│  Revokes per-slot keys; all other slots unaffected               │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2 GT validation and encryption at the bridge
 
 GT validation and decryption are intentionally in the bridge, not the firmware. This is by design:
 
-- **Firmware stays frozen.** New GT types, new revocations, new domain rules, new
-  cipher algorithms — all applied on the IDE side. The FPGA never needs reflashing
-  to change permissions or upgrade crypto.
-- **Point-to-point channel.** The UART bridge is a 1:1 connection to one board. Once
-  CALLHOME establishes the board's identity and completes the nonce handshake, every
-  subsequent message is decrypted and validated against that board's GT record.
+- **Firmware stays frozen.** New abstraction types, new revocations, new domain
+  rules, new cipher algorithms — all applied on the IDE side. The FPGA never needs
+  reflashing to change permissions or upgrade crypto.
+- **Point-to-point channel.** The UART bridge is a 1:1 connection to one board.
+  Once CALLHOME establishes the NS manifest and completes the nonce handshake, every
+  subsequent message is decrypted and validated against the source abstraction's
+  per-slot key pair.
 - **Keys, not tokens, in the wire.** The 32-bit GT token is a hardware capability
-  handle — too short for cryptography. Each GT is extended with a 128-bit `K_enc`
-  and `K_mac`. These keys live in the FPGA's protected BRAM and the IDE's GT record.
-  The wire carries the encrypted payload and HMAC tag, not the token itself. The
-  bridge recovers the plaintext and then validates the GT type map.
+  handle — too short for cryptography. Each NS slot is extended with a 128-bit
+  `K_enc` and `K_mac` that belong exclusively to that abstraction. These keys live
+  in the FPGA's protected BRAM and the IDE's NS keystore. The wire carries ciphertext
+  and an HMAC tag. The bridge uses the `msg.type` → NS slot mapping from the
+  ns_manifest to select the right key pair before decryption.
+- **Abstraction identity is portable.** The same abstraction (same label, same
+  token) can be deployed to multiple boards. Each board gets its own key pair for
+  that slot (derived from `board_uid + ns_slot + token_32`), but the identity and
+  permission model of the abstraction are identical. Migrating an abstraction to a
+  new board means deploying its LUMP and its keystore entry — no protocol change.
 
 ### 1.3 Trust states
 
 | State | Description | Allowed message types |
 |-------|-------------|----------------------|
-| **Unregistered** | CALLHOME not yet received | `0x01 CALLHOME`, `0x06 PING` only |
-| **Registered** | CALLHOME received, GT record loaded | All types for which board holds GT |
+| **Unregistered** | CALLHOME not yet received; ns_manifest unknown | `0x01 CALLHOME`, `0x06 PING` only |
+| **Registered** | ns_manifest loaded; per-slot keys active | All types for which source abstraction holds an OGT |
 | **Suspended** | Admin-suspended board | `0x01 CALLHOME` only (re-registration) |
-| **Revoked GT** | Specific GT removed from record | All other GTs still valid |
+| **Revoked slot** | Specific NS slot's keys removed | All other slots still valid and independent |
 
 ### 1.4 Security properties guaranteed by this protocol
 
-1. **Identity** — Every board is identified by a unique SHA-32 of its UID, minted once at registration.
-2. **Confidentiality** — Every payload is ChaCha20-encrypted using a per-GT-pair 128-bit key. An observer on the UART wire sees only ciphertext.
-3. **Integrity + Authentication** — Every frame carries an 8-byte HMAC-SHA256 tag keyed with `K_mac`. A tampered frame is rejected before decryption.
-4. **Replay protection** — Every frame includes a 32-bit monotonic nonce counter per GT pair. The bridge rejects any frame whose nonce ≤ `last_seen_nonce`.
-5. **Least privilege** — Each capability is a separate GT with its own key pair. A board doing callhome cannot browse unless `Browse.Client` was explicitly granted — and its key was deployed.
-6. **Capability confinement** — `CM.Browse.Client` confines browsing to a parent-approved domain C-list. The hardware token IS the permission list.
-7. **Revocability** — Any GT and its associated keys are removed server-side. Takes effect on next bridge connect. No FPGA reflash needed.
-8. **Unforgeability** — GT tokens are SHA-32 hashes; GT keys are 128-bit secrets. A board cannot fabricate a GT it was not granted, nor derive a key it was not deployed.
-9. **Non-escalation** — A board cannot request a GT it doesn't hold. The bridge never grants on demand — only the admin/family panel mints GTs.
+1. **Abstraction identity** — Every capability is identified by its NS slot token (`token_32`), not the board UID. The board is the execution substrate; the abstraction is the identity. A `Fault.Reporter` on any board has the same semantic identity and permission model.
+2. **Encryption service per namespace entry** — Every NS slot has its own `K_enc` and `K_mac`. There is no shared board-level key. Slot 2 cannot read or forge frames from Slot 15. Revoking one slot leaves all others intact.
+3. **Confidentiality** — Every payload is ChaCha20-encrypted using the source abstraction's 128-bit `K_enc`. An observer on the UART wire sees only ciphertext.
+4. **Integrity + Authentication** — Every frame carries an 8-byte HMAC-SHA256 tag keyed with the source abstraction's `K_mac`. A tampered frame is silently dropped before decryption.
+5. **Replay protection** — Every frame includes a 32-bit monotonic nonce counter per NS slot. The bridge rejects any frame whose nonce ≤ `last_seen_nonce[slot]`.
+6. **Least privilege** — Each capability is a separate NS slot with its own key pair and its own OGT. A board doing callhome cannot browse unless the `Browse.Client` abstraction was granted and its key bundle was deployed.
+7. **Capability confinement** — `CM.Browse.Client` confines browsing to a parent-approved domain C-list carried inside the abstraction itself. The token IS the permission list.
+8. **Revocability** — Any NS slot and its keys are removed server-side. Takes effect on next bridge connect. No FPGA reflash needed.
+9. **Unforgeability** — GT tokens are SHA-32 hashes; slot keys are 128-bit secrets derived from `board_uid + ns_slot + token_32`. A board cannot fabricate a slot it was not granted, nor derive a key it was not deployed.
 
 ---
 
-## 2. Golden Token Registry
+## 2. Abstraction Identity & Namespace Encryption Services
 
-### 2.1 FPGA-side GTs (held by the board)
+Every UART-capable capability is a **namespace entry** — a functional object in the
+NS table with its own token, its own permission set, and its own encryption service.
+The namespace IS the trust domain. The board UID is routing infrastructure only.
 
-The board reports its GT manifest in every CALLHOME. The bridge validates the manifest
-against the server's authoritative GT record and loads the intersection.
+### 2.1 FPGA-side abstractions (NS slot entries)
 
-| Global Name | Perms | Default | Description |
-|-------------|-------|---------|-------------|
-| `CM.Board.Identity` | E | Always | Minted at first registration; token = SHA32(board_uid) |
-| `CM.Heartbeat` | E | Always | Lowest privilege — PING only |
-| `CM.Fault.Reporter` | E | Always | FAULT + BOOT_LOG emission |
-| `CM.Perf.Reporter` | E | Always | PERF counter emission |
-| `CM.Lump.Loader` | E | Always | LUMP_REQ Lazy-Load access to IDE store |
-| `CM.Trace.Emitter` | E | Debug builds | Instruction TRACE streaming |
-| `CM.NS.Inspector` | R | Admin grant | Read-only namespace dump |
-| `CM.Media.Consumer` | E | On request | Media asset fetch (images, audio, documents) |
-| `CM.Browse.Client` | E | Family panel | Web browsing; C-list = approved domain GTs |
+The board reports its **NS manifest** in every CALLHOME — the list of loaded NS slots
+with their labels, tokens, and the message types each slot emits or receives. The
+bridge validates the manifest against the server's authoritative NS record and builds
+the `msg_type → ns_slot` lookup table for the session.
+
+Each entry in the manifest implicitly announces: *"This abstraction is present,
+holds this token, and has an encryption service active for these message types."*
+
+| Label | Perms | Default | msg_types | Description |
+|-------|-------|---------|-----------|-------------|
+| `Board.Identity` | E | Always | `0x01` | Minted at first registration; token = SHA32(board_uid + slot) |
+| `Heartbeat` | E | Always | `0x06` | Lowest privilege — PING only |
+| `Fault.Reporter` | E | Always | `0x02 0x07` | FAULT + BOOT_LOG emission |
+| `Perf.Reporter` | E | Always | `0x08` | PERF counter emission |
+| `Lump.Loader` | E | Always | `0x04` | LUMP_REQ Lazy-Load access to IDE store |
+| `Trace.Emitter` | E | Debug builds | `0x03` | Instruction TRACE streaming |
+| `NS.Inspector` | R | Admin grant | `0x05` | Read-only namespace dump |
+| `Media.Consumer` | E | On request | `0x09 0x0A` | Media asset fetch (images, audio, documents) |
+| `Browse.Client` | E | Family panel | `0x10–0x14` | Web browsing; domain C-list inside the abstraction |
+
+**NS slot assignment** is determined at boot time from the board's LUMP image.
+Slot numbers are reported in the CALLHOME `ns_manifest` array and agreed with the
+IDE. The bridge never hardcodes slot numbers — it always reads them from the manifest.
+
+**Encryption service per entry** — every row in the table above has its own
+`K_enc`, `K_mac`, and `nonce_ctr` stored in the FPGA's protected BRAM.
+No two abstractions share a key. The keystore LUMP (Section 2.6) is indexed by
+NS slot, not by GT global name.
 
 ### 2.2 IDE-side GTs (held by bridge/server)
 
@@ -214,20 +258,28 @@ the index of the first bad byte, enabling byte-at-a-time key recovery.
 | `0x06` | `GT_TYPE_MISMATCH` | GT type wrong for msg type | Log + firmware bug report |
 | `0x0A` | `GT_NO_KEY` | GT held but key bundle pending | Wait for next LUMP_DATA deploy |
 
-### 2.5 GT lifecycle
+### 2.5 Abstraction lifecycle
 
 ```
 REGISTRATION (first CALLHOME from new board)
-  Bridge receives CALLHOME with board_uid + fpga_nonce_32
-  → Server mints CM.Board.Identity:
-       token_32  = SHA32(uid)
-       K_enc_128 = HKDF-SHA256(IKM=SHA256(uid), salt="CM_ENC_v1", info=gt_name)
-       K_mac_128 = HKDF-SHA256(IKM=SHA256(uid), salt="CM_MAC_v1", info=gt_name)
-  → Server grants default set with keys:
-       CM.Heartbeat, CM.Fault.Reporter, CM.Perf.Reporter, CM.Lump.Loader
-  → GT record + keys persisted in church_machine.db (keys stored encrypted at rest)
-  → Bridge sends ACK with ide_nonce_32 + HMAC(K_mac, ide_nonce || fpga_nonce)
-  → From this point all frames are OGT-encrypted
+  Bridge receives CALLHOME with board_uid + fpga_nonce_32 + ns_manifest[]
+  ns_manifest = [{ slot: N, label: "...", token: "0x..." }, ...]
+
+  → Server registers each NS slot entry from the manifest:
+       For each { slot, label, token_32 } in ns_manifest:
+         K_enc = HKDF-SHA256(IKM=SHA256(uid||slot||token), salt="CM_ENC_v2", info=slot_info)
+         K_mac = HKDF-SHA256(IKM=SHA256(uid||slot||token), salt="CM_MAC_v2", info=slot_info)
+
+  → Default set of abstractions activated (all must be in manifest):
+       Board.Identity, Heartbeat, Fault.Reporter, Perf.Reporter, Lump.Loader
+
+  → NS keystore LUMP built: per-slot { K_enc, K_mac } for every slot in manifest
+  → All records persisted in church_machine.db (keys encrypted at rest)
+  → Bridge sends ACK with ide_nonce_32 + HMAC(K_mac[Board.Identity slot],
+       ide_nonce || fpga_nonce)
+  → Bridge builds session msg_slot_map via build_msg_slot_map(ns_manifest)
+  → NS keystore LUMP deployed to FPGA as LUMP_DATA(0x80)
+  → From this point all frames are keyed per source abstraction's NS slot
 
 CAPABILITY EXPANSION (admin panel)
   Admin enables tracing  → mints CM.Trace.Emitter (new K_enc, K_mac)
@@ -248,42 +300,82 @@ REVOCATION
   → No firmware change, no reflash required
 ```
 
-### 2.6 OGT-Encryption — key structure
+### 2.6 OGT-Encryption — encryption service per namespace slot
 
-Each GT is a **triple**: the hardware token, an encryption key, and an authentication key.
+Each NS slot is a **quad**: the hardware token, an encryption key, an
+authentication key, and a nonce counter. This is the slot's **encryption service** —
+its private, dedicated cryptographic identity on the UART channel.
 
 ```
-OGT = {
-    gt_name:   "CM.Fault.Reporter",       // global human-readable name
+NS_SLOT_ENC = {
+    ns_slot:   2,                         // namespace table index (runtime-assigned)
+    label:     "Fault.Reporter",          // human-readable abstraction name
     token_32:  0xA3F1C28E,                // 32-bit hardware capability handle
-    K_enc:     <128-bit secret>,          // ChaCha20 stream cipher key
-    K_mac:     <128-bit secret>,          // HMAC-SHA256 authentication key
-    nonce_ctr: 0,                         // monotonic per-GT-pair counter
+    K_enc:     <128-bit secret>,          // ChaCha20 stream cipher key (this slot only)
+    K_mac:     <128-bit secret>,          // HMAC-SHA256 authentication key (this slot only)
+    nonce_ctr: 0,                         // monotonic counter, per-slot, per-session
+    msg_types: [0x02, 0x07],              // FAULT + BOOT_LOG
 }
 ```
 
-**Key derivation** (at GT mint time, server-side only):
+No slot shares a key with any other slot. No slot can read or forge frames
+belonging to a different slot. The slot number is known to both FPGA and bridge
+via the ns_manifest agreed in CALLHOME; it never appears in the frame itself.
+
+**Key derivation** (at NS slot grant time, server-side only):
+
+The IKM is bound to three factors: the board, the slot's position in the namespace,
+and the slot's token. All three must match for a key to be valid.
 
 ```python
-import hashlib, hmac
+import hashlib
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
 
-def mint_ogt_keys(board_uid: bytes, gt_name: str) -> tuple[bytes, bytes]:
-    ikm = hashlib.sha256(board_uid).digest()
-    K_enc = HKDF(hashes.SHA256(), 16, salt=b"CM_ENC_v1", info=gt_name.encode()).derive(ikm)
-    K_mac = HKDF(hashes.SHA256(), 16, salt=b"CM_MAC_v1", info=gt_name.encode()).derive(ikm)
+def mint_slot_keys(board_uid: bytes,
+                   ns_slot: int,
+                   token_32: int) -> tuple[bytes, bytes]:
+    # IKM binds board + slot position + token — all three factors required
+    ikm = hashlib.sha256(
+        board_uid
+        + ns_slot.to_bytes(2, "little")
+        + token_32.to_bytes(4, "little")
+    ).digest()
+    slot_info = f"slot{ns_slot}".encode()
+    K_enc = HKDF(hashes.SHA256(), 16,
+                 salt=b"CM_ENC_v2", info=slot_info).derive(ikm)
+    K_mac = HKDF(hashes.SHA256(), 16,
+                 salt=b"CM_MAC_v2", info=slot_info).derive(ikm)
     return K_enc, K_mac
 ```
 
-Every GT for a given board gets a unique key pair. Revoking a GT invalidates only
-that GT's keys — other capabilities on the same board are unaffected.
+Every NS slot for a given board gets a unique key pair. Revoking a slot
+invalidates only that slot's keys — all other abstractions on the same board
+are completely unaffected.
 
-**Key deployment**: The IDE packages all active GT keys for a board into a
-protected LUMP (type=keystore, NULL policy, no NS slot). This LUMP is
-transmitted as a `LUMP_DATA (0x80)` frame — which is itself encrypted with
-`CM.IDE.Deployer`'s key before the key bundle is inside. The FPGA writes the
-bundle to protected BRAM. Firmware reads keys from BRAM via `cm_get_key()`.
+**Key deployment** — the NS keystore LUMP:
+
+The IDE packages all active NS slot keys for a board into a protected LUMP
+(type=`ns_keystore`, NULL policy, no NS slot of its own — it is never callable).
+The keystore is indexed by slot number:
+
+```json
+{
+  "type": "ns_keystore",
+  "board_uid": "c0ffee0100000001",
+  "slots": {
+    "0":  { "label": "Board.Identity",  "token": "0xC0FFEE01", "K_enc": "…", "K_mac": "…" },
+    "2":  { "label": "Fault.Reporter",  "token": "0xA3F1C28E", "K_enc": "…", "K_mac": "…" },
+    "4":  { "label": "Lump.Loader",     "token": "0x7B2E91F4", "K_enc": "…", "K_mac": "…" },
+    "15": { "label": "Browse.Client",   "token": "0xCC9144D0", "K_enc": "…", "K_mac": "…",
+            "browse_domains": ["bbc.co.uk", "wikipedia.org"] }
+  }
+}
+```
+
+The keystore LUMP is transmitted as a `LUMP_DATA (0x80)` frame encrypted
+with `CM.IDE.Deployer`'s key. The FPGA writes the bundle to protected BRAM.
+Firmware reads per-slot keys from BRAM via `cm_get_key(ns_slot)`.
 
 **Session nonce handshake** (on every bridge connect):
 
@@ -423,25 +515,68 @@ to application code in the Church Machine ISA.
 IDE server without passing through its full verification pipeline:
 **magic → HMAC → replay → decrypt → GT check → handler**.
 
+The bridge no longer hardcodes slot numbers. Instead, it builds the
+`msg_type → ns_slot` map dynamically from the ns_manifest received in CALLHOME.
+The `STATIC_MSG_LABELS` dict maps message type bytes to their canonical abstraction
+label — the bridge uses this to look up the slot number from the manifest.
+
 ```python
-# Maps message type → required Source GT global name
-CM_MSG_TYPE_GT = {
-    0x01: "CM.Board.Identity",
-    0x02: "CM.Fault.Reporter",
-    0x03: "CM.Trace.Emitter",
-    0x04: "CM.Lump.Loader",
-    0x05: "CM.NS.Inspector",
-    0x06: "CM.Heartbeat",
-    0x07: "CM.Fault.Reporter",
-    0x08: "CM.Perf.Reporter",
-    0x09: "CM.Media.Consumer",
-    0x0A: "CM.Media.Consumer",
-    0x10: "CM.Browse.Client",
-    0x11: "CM.Browse.Client",
-    0x12: "CM.Browse.Client",
-    0x13: "CM.Browse.Client",
-    0x14: "CM.Browse.Client",
+# Maps message type → canonical abstraction label (never hardcoded slot numbers)
+# Slot numbers come from the ns_manifest in CALLHOME and are per-board, per-boot.
+STATIC_MSG_LABELS = {
+    0x01: "Board.Identity",
+    0x02: "Fault.Reporter",
+    0x03: "Trace.Emitter",
+    0x04: "Lump.Loader",
+    0x05: "NS.Inspector",
+    0x06: "Heartbeat",
+    0x07: "Fault.Reporter",   # BOOT_LOG shares the Fault.Reporter slot
+    0x08: "Perf.Reporter",
+    0x09: "Media.Consumer",
+    0x0A: "Media.Consumer",
+    0x10: "Browse.Client",
+    0x11: "Browse.Client",
+    0x12: "Browse.Client",
+    0x13: "Browse.Client",
+    0x14: "Browse.Client",
 }
+
+def build_msg_slot_map(ns_manifest: list[dict]) -> dict[int, int]:
+    """
+    Build msg_type → ns_slot from the ns_manifest agreed in CALLHOME.
+    ns_manifest is a list of { "slot": N, "label": "...", "token": "0x..." }.
+    Called once per CALLHOME; result stored on the board session object.
+    """
+    label_to_slot = {entry["label"]: entry["slot"] for entry in ns_manifest}
+    msg_slot_map = {}
+    for msg_type, label in STATIC_MSG_LABELS.items():
+        slot = label_to_slot.get(label)
+        if slot is not None:
+            msg_slot_map[msg_type] = slot
+        # If label not in manifest: abstraction not loaded on this board.
+        # Frames of that type will fail GT authorization (GT_NOT_HELD).
+    return msg_slot_map
+```
+
+The session's `msg_slot_map` replaces the old `CM_MSG_TYPE_GT` dict.
+In `on_raw_frame`, Step 2 becomes:
+
+```python
+    # Step 2: resolve source NS slot from the session's msg_slot_map
+    ns_slot = session.msg_slot_map.get(msg_type)
+    if ns_slot is None:
+        _silent_drop(board_uid, "GT_UNKNOWN", msg_type)  # abstraction not in manifest
+        return
+
+    # Steps 3–5: HMAC, replay, decrypt — all keyed by (board_uid, ns_slot)
+    # Step 6: validate_gt uses (board_uid, ns_slot) not (board_uid, gt_name)
+```
+
+And last_nonce tracking changes from `(board_uid, gt_name)` → `(board_uid, ns_slot)`:
+
+```python
+    last_nonce[(board_uid, ns_slot)] = nonce   # per-abstraction, not per-board
+```
 
 CM_HANDLERS = {
     0x01: handle_callhome,
@@ -557,7 +692,7 @@ revealing anything to a potential attacker on the wire.
 
 | Type | Name | Source GT | Destination GT | Priority | Payload |
 |------|------|-----------|----------------|----------|---------|
-| `0x01` | `CALLHOME` | `CM.Board.Identity` | `CM.IDE.CallhomeService` | ✅ Done | JSON: board, uid, nia, fw, boot_ok, fault, gt_manifest |
+| `0x01` | `CALLHOME` | `Board.Identity` | `CM.IDE.CallhomeService` | ✅ Done | JSON: board, uid, nia, fw, boot_ok, fault, proto, enc, ns_manifest[{slot,label,token}] |
 | `0x02` | `FAULT` | `CM.Fault.Reporter` | `CM.IDE.FaultReceiver` | P1 | JSON: code, mnemonic, nia, gt, stage, tier, catch_invoked |
 | `0x03` | `TRACE` | `CM.Trace.Emitter` | `CM.IDE.TraceReceiver` | P2 | Binary: nia(4)+opcode(1)+dr0(4)+dr1(4) |
 | `0x04` | `LUMP_REQ` | `CM.Lump.Loader` | `CM.IDE.LumpServer` | P2 | token(8)+hint_ns_slot(2) |
@@ -748,12 +883,24 @@ firmware changes.
 
 ## 10. Versioning
 
-Protocol version is carried in the `CALLHOME` payload as `"proto":1`. Old bridges
-receiving unknown type bytes skip the frame (log + continue). Old FPGA firmware
-receiving unknown IDE→FPGA types calls `cm_on_msg` which is a no-op by default.
+Protocol version is carried in the `CALLHOME` payload as `"proto":N`.
 
-**Protocol version 1** covers all types in this document.  
-Future versions increment `proto`; firmware never changes.
+| proto | Key changes |
+|-------|-------------|
+| 1 | Initial Tier 0 (CRC only); `gt_manifest` = list of GT global name strings |
+| 2 | Tier 1/2 (HMAC + ChaCha20); **`gt_manifest` replaced by `ns_manifest`** — list of `{slot, label, token}` objects; per-slot encryption services; key derivation upgraded from `CM_ENC/MAC_v1` → `v2` (IKM now binds `board_uid + ns_slot + token_32`); `last_nonce` keyed by `(board_uid, ns_slot)` not `(board_uid, gt_name)` |
+
+Boards on proto=1 send `gt_manifest` (list of strings); the bridge falls back to
+the old `CM_MSG_TYPE_GT` lookup for those sessions and does not attempt OGT-encryption.
+Boards on proto=2 send `ns_manifest` (list of objects); the bridge builds
+`msg_slot_map` via `build_msg_slot_map()` and enforces per-slot encryption.
+
+Old bridges receiving `proto:2` see an unknown `ns_manifest` key — they log and
+fall back to `proto:1` behaviour (Tier 0, name-based GT lookup). This preserves
+interoperability during the transition window.
+
+Old FPGA firmware receiving unknown IDE→FPGA types calls `cm_on_msg` which is a
+no-op by default. Firmware never changes for protocol updates.
 
 ---
 
