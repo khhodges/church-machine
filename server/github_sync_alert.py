@@ -127,7 +127,7 @@ def send_failure_alert(branch: str, sha: str, error: str) -> None:
         f"Branch : {branch}\n"
         f"HEAD   : {sha}\n"
         f"Error  : {error or '(no details captured)'}\n\n"
-        f"The mirror at khhodges/cloomc-project may be behind.\n"
+        f"The mirror at khhodges/church-machine may be behind.\n"
         f"Check that the GITHUB_PAT secret is valid and has not expired.\n"
     )
 
@@ -154,7 +154,7 @@ def send_failure_alert(branch: str, sha: str, error: str) -> None:
   <tr><td class="label">Error</td>
       <td><pre style="white-space:pre-wrap;margin:0">{error or '(no details captured)'}</pre></td></tr>
 </table>
-<p>The mirror at <strong>khhodges/cloomc-project</strong> may be behind.<br>
+<p>The mirror at <strong>khhodges/church-machine</strong> may be behind.<br>
 Check that the <code>GITHUB_PAT</code> Replit secret is valid and has not expired.</p>
 <div class="footer">Sent automatically by Church Machine post-merge hook.</div>
 </body>

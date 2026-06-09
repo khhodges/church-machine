@@ -585,6 +585,57 @@ def report_sync_lfs_now():
         logging.exception("Error in /report/sync-lfs-now")
         return jsonify({"success": False, "message": str(exc)}), 500
 
+@app.route("/internal/git-sync")
+def internal_git_sync():
+    """Trigger an immediate code push to GitHub (non-LFS).
+
+    Requires Authorization: Bearer <REPORT_TOKEN> header or ?token=<REPORT_TOKEN>.
+
+    Returns JSON: {success, returncode, output, sha, branch}
+    """
+    import subprocess
+    from daily_report import check_report_auth as _check_auth
+    if not _check_auth(request):
+        return jsonify({"error": "Unauthorized — supply token via Authorization header or ?token="}), 401
+
+    pat = os.environ.get("GITHUB_PAT", "").strip()
+    if not pat:
+        return jsonify({"success": False, "message": "GITHUB_PAT secret is not set"}), 503
+
+    script = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "scripts", "sync-to-github.sh",
+    )
+    if not os.path.isfile(script):
+        return jsonify({"success": False, "message": "sync-to-github.sh not found"}), 500
+
+    try:
+        result = subprocess.run(
+            ["bash", script],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={**os.environ, "GITHUB_PAT": pat},
+        )
+        output = (result.stdout + result.stderr).strip()
+        success = result.returncode == 0
+        sha    = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
+        branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
+        logging.info("Manual git-sync triggered: success=%s sha=%s", success, sha)
+        return jsonify({
+            "success": success,
+            "returncode": result.returncode,
+            "output": output[-2000:],
+            "sha": sha,
+            "branch": branch,
+        })
+    except Exception as exc:
+        logging.exception("Error in /internal/git-sync")
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
 @app.route("/report/task-run", methods=["POST"])
 def report_task_run():
     """Record a task agent run for cost tracking. POST {task_id, note?}.
@@ -8636,7 +8687,8 @@ with app.app_context():
         }
         _scheduler = BackgroundScheduler(jobstores=_jobstores, timezone="UTC")
 
-        from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup
+        from apscheduler.triggers.interval import IntervalTrigger
+        from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup, run_code_sync as _run_code_sync
 
         _scheduler.add_job(
             _send_report,
@@ -8654,9 +8706,18 @@ with app.app_context():
             replace_existing=True,
             name="Nightly LFS backup to GitHub",
         )
+
+        _scheduler.add_job(
+            _run_code_sync,
+            IntervalTrigger(minutes=30),
+            id="periodic_code_sync",
+            replace_existing=True,
+            name="Periodic code sync to GitHub (every 30 min)",
+        )
         _scheduler.start()
         logging.info(
-            "APScheduler started — daily report at 05:00 UTC, LFS backup at 03:00 UTC"
+            "APScheduler started — daily report at 05:00 UTC, LFS backup at 03:00 UTC, "
+            "code sync every 30 min"
         )
     except Exception as _sched_exc:
         logging.warning("APScheduler could not start: %s", _sched_exc)

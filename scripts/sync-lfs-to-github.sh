@@ -1,5 +1,5 @@
 #!/bin/bash
-# sync-lfs-to-github.sh — Upload Git LFS objects to GitHub for khhodges/cloomc-project.
+# sync-lfs-to-github.sh — Upload Git LFS objects to GitHub for khhodges/church-machine.
 #
 # Designed for scheduled (e.g. nightly) use so large binary assets (.lump files,
 # FPGA bitstreams) are kept in the GitHub LFS store as a complete backup, without
@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-REPO="khhodges/cloomc-project"
+REPO="khhodges/church-machine"
 REMOTE_NAME="github-sync"
 REMOTE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO}.git"
 

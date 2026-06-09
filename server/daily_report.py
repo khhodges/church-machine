@@ -125,7 +125,7 @@ def check_github_pat_lfs_scope() -> None:
         log.warning(
             "GITHUB_PAT X-OAuth-Scopes header is absent. "
             "This is normal for fine-grained PATs, but verify that the token has "
-            "Contents read/write permission for khhodges/cloomc-project (which "
+            "Contents read/write permission for khhodges/church-machine (which "
             "covers LFS). Classic PATs must include the 'lfs' scope."
         )
         return
@@ -1146,6 +1146,44 @@ This report is sent automatically at 05:00 UTC every day.
 </html>"""
 
     return plain, html, cost_today
+
+
+def run_code_sync():
+    """Push current HEAD to GitHub (code only, no LFS). Module-level so APScheduler can serialize it.
+
+    Runs scripts/sync-to-github.sh every 30 minutes so the GitHub mirror stays
+    current regardless of whether a task merge just happened.  Failures are
+    non-fatal: the error is logged and recorded via github_sync_alert.py but
+    the server continues running normally.
+    """
+    import subprocess
+    script = os.path.join(_BASE_DIR, "scripts", "sync-to-github.sh")
+    if not os.path.isfile(script):
+        log.warning("run_code_sync: sync-to-github.sh not found at %s — skipping", script)
+        return
+    pat = os.environ.get("GITHUB_PAT", "").strip()
+    if not pat:
+        log.warning("run_code_sync: GITHUB_PAT secret not set — skipping periodic code sync")
+        return
+    try:
+        result = subprocess.run(
+            ["bash", script],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            env={**os.environ, "GITHUB_PAT": pat},
+        )
+        output = (result.stdout + result.stderr).strip()
+        if result.returncode == 0:
+            log.info("Periodic code sync succeeded: %s", output[-200:] if output else "(no output)")
+        else:
+            log.warning(
+                "Periodic code sync exited %d: %s",
+                result.returncode,
+                output[-500:],
+            )
+    except Exception as exc:
+        log.error("Periodic code sync job failed: %s", exc)
 
 
 def run_lfs_backup():
