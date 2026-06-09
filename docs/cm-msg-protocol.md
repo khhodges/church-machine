@@ -170,9 +170,16 @@ name, never invented.  **Slot numbers are not in the manifest** — firmware-pri
 
 ```json
 {
-  "token":   "global.Core.FaultReporter.boot",
-  "label":   "Fault.Reporter",
-  "mobile":  false
+  "token":    "global.Core.FaultReporter.boot",
+  "label":    "Fault.Reporter"
+}
+```
+
+```json
+{
+  "token":    "global.Telecommunications.CallHistory.family-hub",
+  "label":    "CallHistory",
+  "resident": true
 }
 ```
 
@@ -180,7 +187,7 @@ name, never invented.  **Slot numbers are not in the manifest** — firmware-pri
 |-------|---------|
 | `token` | The OGT — `global.<ns_type>.<canonical_name>.<ns_instance>`. Permanent global identity. The bridge keys everything by this value. |
 | `label` | **Local pet name** — the user's personal name for this abstraction. Can differ between users, can be renamed without affecting the OGT. Never used for routing or crypto. |
-| `mobile` | `true` = this abstraction can migrate to another board |
+| `resident` | `true` = this deployment is fixed to this board; the IDE will not migrate it. Absent or `false` = roaming. **All abstractions are mobile by nature** — `resident` is a deployment policy, not a capability limit. |
 
 **Labels are pet names. OGTs use canonical names.**
 The same Contact abstraction might be labelled `"mymother"` by one user, `"wife"`
@@ -216,24 +223,30 @@ encryption service."* The bridge never needs to know which BRAM slot it occupies
 ns_type="Telecommunications", ns_instance="family-hub":
 
   token="global.Telecommunications.MargaretHodges.family-hub"
-    label="mymother"      ← one user's pet name for MargaretHodges
-    label="Mum"           ← another user's pet name for the SAME OGT
-    label="wife"          ← yet another — same OGT, different label
-    mobile=true
+    label="mymother"       ← one user's pet name for MargaretHodges
+    label="Mum"            ← another user's pet name for the SAME OGT
+    label="wife"           ← yet another — same OGT, different label
+    (roaming — no resident flag)
 
   token="global.Telecommunications.GlobalWorkspaceLtd.family-hub"
-    label="workoffice"    ← pet name for the canonical GlobalWorkspaceLtd contact
-    mobile=true
+    label="workoffice"     ← pet name for the canonical GlobalWorkspaceLtd contact
+    (roaming)
 
   token="global.Telecommunications.CallHistory.family-hub"
-    label="CallHistory"   ← here canonical name and label happen to match
-    mobile=false
+    label="CallHistory"    ← canonical name and label happen to match here
+    resident=true          ← fixed to this board; IDE will not migrate it
+                             (its state is local — moving would be a copy, not a move)
 
 ns_type="Telecommunications", ns_instance="mums-mobile":
   token="global.Telecommunications.MargaretHodges.mums-mobile"
-    label="mymother"      ← same canonical person, different board instance
-    mobile=true
+    label="mymother"       ← same canonical person, different namespace instance
+    (roaming)
 ```
+
+**All abstractions are mobile.** The OGT identity survives any substrate migration.
+`resident: true` is a deployment policy annotation, not a capability limit. A
+resident abstraction can still be migrated by an authorised administrator — `resident`
+simply tells the IDE not to do so automatically.
 
 The OGT `global.Telecommunications.MargaretHodges.family-hub` is stable and globally
 unique. It uses `MargaretHodges` — her real name — not any single user's pet name
@@ -461,14 +474,14 @@ full OGT path — not by slot, not by opaque hex.
   "type": "ns_keystore",
   "board_uid": "c0ffee0100000001",
   "abstractions": {
-    "global.Core.BoardIdentity.boot":                        { "label": "Board.Identity", "K_enc": "…", "K_mac": "…" },
-    "global.Core.FaultReporter.boot":                        { "label": "Fault.Reporter", "K_enc": "…", "K_mac": "…" },
-    "global.Core.LumpLoader.boot":                           { "label": "Lump.Loader",    "K_enc": "…", "K_mac": "…" },
-    "global.Core.BrowseClient.boot":                         { "label": "Browse.Client",  "K_enc": "…", "K_mac": "…",
-                                                               "browse_domains": ["bbc.co.uk", "wikipedia.org"] },
-    "global.Telecommunications.mymother.family-hub":         { "label": "mymother",       "K_enc": "…", "K_mac": "…", "mobile": true },
-    "global.Telecommunications.workoffice.family-hub":       { "label": "workoffice",     "K_enc": "…", "K_mac": "…", "mobile": true },
-    "global.Telecommunications.CallHistory.family-hub":      { "label": "CallHistory",    "K_enc": "…", "K_mac": "…", "mobile": false }
+    "global.Core.BoardIdentity.boot":                              { "label": "Board.Identity", "K_enc": "…", "K_mac": "…" },
+    "global.Core.FaultReporter.boot":                              { "label": "Fault.Reporter", "K_enc": "…", "K_mac": "…" },
+    "global.Core.LumpLoader.boot":                                 { "label": "Lump.Loader",    "K_enc": "…", "K_mac": "…" },
+    "global.Core.BrowseClient.boot":                               { "label": "Browse.Client",  "K_enc": "…", "K_mac": "…",
+                                                                     "browse_domains": ["bbc.co.uk", "wikipedia.org"] },
+    "global.Telecommunications.MargaretHodges.family-hub":         { "label": "mymother",       "K_enc": "…", "K_mac": "…" },
+    "global.Telecommunications.GlobalWorkspaceLtd.family-hub":     { "label": "workoffice",     "K_enc": "…", "K_mac": "…" },
+    "global.Telecommunications.CallHistory.family-hub":            { "label": "CallHistory",    "K_enc": "…", "K_mac": "…", "resident": true }
   }
 }
 ```
@@ -532,9 +545,11 @@ Each instance has independent state, independent keys, and independent capabilit
 grants. Adding a second `Telecommunications` instance never affects the first.
 The IDE treats each `(ns_type, ns_instance)` pair as a distinct managed entity.
 
-#### Mobile abstract instances
+#### Roaming and resident deployments
 
-Within an instance, individual abstractions may be **mobile** (`"mobile": true`).
+All abstractions are mobile — the OGT identity is substrate-independent by design.
+Within an instance, individual deployments may be **roaming** (the default) or
+**resident** (`"resident": true` in the manifest).
 A mobile abstraction carries its `token_32` identity with it when it moves:
 
 ```
@@ -563,8 +578,9 @@ class AbstractionRecord:
     ogt:          str    # global.namespace.abstraction.instance — THE identity
     token_32:     int    # SHA32(ogt) — hardware register value, derived, never stored as identity
     label:        str    # local pet name — user-specific, changeable, never used for routing or crypto
-    mobile:       bool
-    residency:    str    # "exclusive" or "replicated"
+    resident:     bool   # True = fixed to one board; IDE will not auto-migrate
+                         # False (default) = roaming. All OGTs are mobile by nature.
+    spread:       str    # "exclusive" (one board at a time) or "replicated" (many boards)
 
     # Current deployment(s) — updated on every CALLHOME
     deployments:  list[Deployment]
@@ -606,11 +622,12 @@ deadbeef  (mum's phone)          ├─ Lesson-04     [static] ● here
   └─ Core/boot
 ```
 
-An abstraction shown as `[mobile]` can be dragged from one board to another in the
-IDE — the IDE triggers a migration by deploying the LUMP and updated keystore to the
-target board, then revoking the slot on the source board.
+Any roaming abstraction (no `resident` flag) can be dragged from one board to another
+in the IDE — the IDE deploys the LUMP and updated keystore to the target board and
+revokes the source board's deployment. Resident abstractions show a lock icon; they
+require explicit administrator action to migrate.
 
-#### Key invariants for mobile abstractions
+#### Key invariants — all abstractions are mobile
 
 1. **OGT permanence** — `global.namespace.abstraction.instance` is minted once and
    never changes. The `abstraction` segment is the canonical formal name — never a
@@ -622,16 +639,17 @@ target board, then revoking the slot on the source board.
    `SHA256(board_uid || ogt_bytes)`. They are specific to one board. Migrating =
    re-deriving on the new substrate with the new `board_uid`. Slot assignments on
    either board are irrelevant.
-3. **No key reuse across deployments** — if a mobile abstraction returns to a board
-   it previously inhabited, `mint_abstraction_keys(board_uid, ogt)` is called fresh.
+3. **No key reuse across deployments** — if an abstraction returns to a board it
+   previously inhabited, `mint_abstraction_keys(board_uid, ogt)` is called fresh.
    No stale keys are ever reused.
-4. **Exclusive vs. replicated** — the IDE declares residency policy at grant time.
-   Exclusive: only one active deployment at a time; migration is atomic.
-   Replicated: multiple simultaneous deployments; bridge routes by `board_uid`.
-5. **Non-mobile abstractions are board-resident** — `"mobile": false` means the
-   abstraction's state is inherently tied to this board+instance combination.
-   `CallHistory` is an example — its data is local; migrating it would be a copy,
-   not a move. The OGT remains unique but the IDE will not migrate it.
+4. **Exclusive vs. replicated spread** — the IDE declares spread policy at grant time.
+   Exclusive: one active deployment at a time; migration is atomic.
+   Replicated: simultaneous deployments on multiple boards; bridge routes by `board_uid`.
+5. **Resident is a deployment policy, not a capability limit** — `resident: true`
+   means the IDE will not automatically migrate this abstraction. The OGT is still a
+   full mobile identity. `CallHistory` is a typical example: its state is board-local,
+   so moving it would produce a copy, not a migration. An authorised admin can still
+   explicitly migrate it if needed.
 
 ---
 
