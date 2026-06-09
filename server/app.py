@@ -301,6 +301,38 @@ def download_ti60_hex():
         mimetype="application/octet-stream"
     )
 
+@app.route("/upload/ti60-hex", methods=["POST"])
+def upload_ti60_hex():
+    """Accept a new Ti60 F225 hex bitstream upload and save it to bitstreams/.
+
+    Usage from Chromebook:
+      curl -X POST <ide-url>/upload/ti60-hex -F "file=@outflow/church_soc.hex"
+    """
+    import datetime as _dt
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file field in request"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "Empty filename"}), 400
+    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
+    os.makedirs(bitstreams_dir, exist_ok=True)
+    hex_path = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
+    f.save(hex_path)
+    size = os.path.getsize(hex_path)
+    built_at = _dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    json_path = os.path.join(bitstreams_dir, "church_ti60_f225.json")
+    try:
+        with open(json_path) as _jf:
+            meta = json.load(_jf)
+    except Exception:
+        meta = {}
+    meta["built_at"] = built_at
+    meta["size_bytes"] = size
+    with open(json_path, "w") as _jf:
+        json.dump(meta, _jf, indent=2)
+    app.logger.info("Ti60 hex uploaded: %d bytes at %s", size, built_at)
+    return jsonify({"ok": True, "size_bytes": size, "built_at": built_at})
+
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
     """Return metadata about the pre-built Ti60 hex file for the IDE panel."""
