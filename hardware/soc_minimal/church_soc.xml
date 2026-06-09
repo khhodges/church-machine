@@ -52,7 +52,6 @@
         <efx:param name="fanout_limit"         value="100"       value_type="e_integer"/>
         <efx:param name="seq_opt"              value="1"         value_type="e_integer"/>
         <efx:param name="get_names_method"     value="0"         value_type="e_integer"/>
-        <efx:param name="logic_opting"         value="1"         value_type="e_bool"/>
         <efx:param name="pack_lut_into_ram"    value="1"         value_type="e_bool"/>
         <efx:param name="cpe_ins_register"     value="0"         value_type="e_bool"/>
         <efx:param name="use_cpe_for_const_0"  value="0"         value_type="e_bool"/>
