@@ -41,7 +41,7 @@
     <link rel="stylesheet" href="styles-lumps.css?v=20260601b">
     <link rel="stylesheet" href="styles-gatelog.css?v=20260513a">
     <link rel="stylesheet" href="styles-fault.css?v=20260527a">
-    <link rel="stylesheet" href="styles-tools.css?v=20260607e">
+    <link rel="stylesheet" href="styles-tools.css?v=20260609a">
     <style>
         .app-loading {
             position: fixed; inset: 0; z-index: 99999;
@@ -872,6 +872,55 @@
         <div id="lumpNSPanel"       style="display:none;" class="lump-editor-wrap"></div>
         <div id="lumpResidentPanel" style="display:none;" class="lump-editor-wrap"></div>
         <div id="ti60ConnectPanel" style="display:none;" class="ti60-connect-panel">
+
+            <!-- ── Download & Flash card ──────────────────────────────── -->
+            <div id="ti60DlFlashCard" class="ti60-dl-flash-card">
+                <div class="ti60-dl-flash-loading" id="ti60DlFlashLoading">
+                    <span class="ti60-dl-flash-spinner">&#x231B;</span> Checking bitstream&hellip;
+                </div>
+                <div class="ti60-dl-flash-present" id="ti60DlFlashPresent" style="display:none;">
+                    <span class="ti60-dl-flash-badge">&#x2705;</span>
+                    <div class="ti60-dl-flash-info">
+                        <div class="ti60-dl-flash-title">Pre-built bitstream ready</div>
+                        <div class="ti60-dl-flash-meta" id="ti60DlFlashMeta"></div>
+                    </div>
+                    <div class="ti60-dl-flash-btns">
+                        <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/ti60-hex" download="church_ti60_f225.hex">&#x2B07; Download .hex</a>
+                        <button class="ti60-dl-flash-btn ti60-dl-flash-btn-flash" onclick="switchBuilderViewTab('ti60-connect');StartupWizard.goToStep(1);" title="Opens the Flash step in the Startup Wizard">&#x26A1; Flash via Wizard</button>
+                    </div>
+                </div>
+                <div class="ti60-dl-flash-absent" id="ti60DlFlashAbsent" style="display:none;">
+                    <span class="ti60-dl-flash-badge ti60-dl-flash-badge-grey">&#x23F3;</span>
+                    <div class="ti60-dl-flash-info">
+                        <div class="ti60-dl-flash-title" style="color:var(--text-secondary,#9ca3af)">Bitstream not yet built</div>
+                        <div class="ti60-dl-flash-meta" style="color:#4a5568">Run <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd;font-size:.78rem">make bitstream</code> from the repo root (Efinity required) — see <a href="/dl/build-soc-cm-md" style="color:#a78bfa">BUILD_SOC_CM.md</a>.</div>
+                    </div>
+                    <div class="ti60-dl-flash-btns">
+                        <button class="ti60-dl-flash-btn" disabled style="opacity:.4;cursor:not-allowed;">&#x2B07; Download .hex</button>
+                        <button class="ti60-dl-flash-btn" disabled style="opacity:.4;cursor:not-allowed;" title="No bitstream available">&#x26A1; Flash via Wizard</button>
+                    </div>
+                </div>
+            </div>
+            <script>
+            (function(){
+                var card = document.getElementById('ti60DlFlashCard');
+                fetch('/api/bitstream-status').then(function(r){return r.json();}).then(function(d){
+                    document.getElementById('ti60DlFlashLoading').style.display = 'none';
+                    if(d.present){
+                        var meta = [];
+                        if(d.size_bytes) meta.push((d.size_bytes/1048576).toFixed(1)+' MB');
+                        if(d.firmware_version) meta.push('fw ' + d.firmware_version);
+                        if(d.built_at) meta.push('built ' + d.built_at.replace('T',' ').replace('Z',' UTC'));
+                        document.getElementById('ti60DlFlashMeta').textContent = meta.join(' \xb7 ');
+                        document.getElementById('ti60DlFlashPresent').style.display = '';
+                    } else {
+                        document.getElementById('ti60DlFlashAbsent').style.display = '';
+                    }
+                }).catch(function(){
+                    document.getElementById('ti60DlFlashLoading').textContent = 'Could not check bitstream status.';
+                });
+            })();
+            </script>
 
             <!-- ── Startup Wizard ─────────────────────────────────────── -->
             <div class="sw-panel" id="swPanel">

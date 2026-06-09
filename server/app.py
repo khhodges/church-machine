@@ -266,6 +266,71 @@ def download_soc_fw_make():
     p = os.path.join(os.path.dirname(__file__), "..", "hardware", "soc_minimal", "firmware", "Makefile")
     return send_file(os.path.abspath(p), as_attachment=True, download_name="Makefile", mimetype="text/plain")
 
+@app.route("/dl/ti60-hex")
+def download_ti60_hex():
+    """Serve the pre-built Ti60 F225 bitstream hex as a binary download.
+    Returns 404 with a plain message if the file is absent."""
+    hex_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams", "church_ti60_f225.hex"))
+    if not os.path.isfile(hex_path):
+        resp = make_response(
+            "Pre-built bitstream not available yet.\n"
+            "Run: make bitstream  (requires Efinity — see hardware/soc_combined/BUILD_SOC_CM.md)",
+            404
+        )
+        resp.headers["Content-Type"] = "text/plain"
+        return resp
+    return send_file(
+        hex_path,
+        as_attachment=True,
+        download_name="church_ti60_f225.hex",
+        mimetype="application/octet-stream"
+    )
+
+@app.route("/api/bitstream-status")
+def api_bitstream_status():
+    """Return metadata about the pre-built Ti60 hex file for the IDE panel."""
+    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
+    hex_path = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
+    json_path = os.path.join(bitstreams_dir, "church_ti60_f225.json")
+    present = os.path.isfile(hex_path)
+    meta = {}
+    if present:
+        try:
+            with open(json_path) as _f:
+                meta = json.load(_f)
+        except Exception:
+            stat = os.stat(hex_path)
+            import datetime as _dt
+            meta = {
+                "built_at": _dt.datetime.utcfromtimestamp(stat.st_mtime).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "firmware_version": "unknown",
+                "size_bytes": stat.st_size,
+            }
+    return jsonify({
+        "ok": True,
+        "present": present,
+        "built_at": meta.get("built_at"),
+        "firmware_version": meta.get("firmware_version"),
+        "size_bytes": meta.get("size_bytes"),
+    })
+
+@app.route("/dl/build-soc-cm-md")
+def download_build_soc_cm_md():
+    """Serve hardware/soc_combined/BUILD_SOC_CM.md as a plain-text response."""
+    md_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
+                                            "hardware", "soc_combined", "BUILD_SOC_CM.md"))
+    if not os.path.isfile(md_path):
+        resp = make_response("BUILD_SOC_CM.md not found.", 404)
+        resp.headers["Content-Type"] = "text/plain"
+        return resp
+    with open(md_path, "r") as f:
+        content = f.read()
+    resp = make_response(content, 200)
+    resp.headers["Content-Type"] = "text/plain; charset=utf-8"
+    resp.headers["Content-Disposition"] = 'inline; filename="BUILD_SOC_CM.md"'
+    return resp
+
+
 @app.route("/dl/ti60zip")
 def download_ti60zip():
     import zipfile, io, re as _re
@@ -305,8 +370,15 @@ def download_ti60zip():
         # Pre-built bitstream — user can flash immediately without synthesising
         bitstreams = os.path.abspath(os.path.join(base, "..", "bitstreams"))
         hex_src = os.path.join(bitstreams, "church_ti60_f225.hex")
-        if os.path.exists(hex_src):
+        _hex_included = os.path.exists(hex_src)
+        if _hex_included:
             zf.write(hex_src, "outflow/church_ti60_f225.hex")
+        else:
+            zf.comment = (
+                b"NOTE: outflow/church_ti60_f225.hex is NOT included in this ZIP.\n"
+                b"Run 'make bitstream' from the repo root (requires Efinity) to build it.\n"
+                b"See SoC/BUILD_SOC_CM.md for full instructions."
+            )
         zf.writestr("BUILD.md", BUILD_MD_TI60)
         # Serial bridge script (needed to connect the board to the IDE)
         bridge = os.path.join(base, "local_bridge.py")
@@ -1980,6 +2052,31 @@ def release_r12_index():
   <div class="hero-meta">Includes Verilog source &middot; Efinity project &middot; pre-built .hex &middot; Makefile &middot; PDFs</div>
 </div>
 
+<div id="r12BitstreamCard" style="margin-bottom:1.6rem"></div>
+<script>
+(function(){
+  var card = document.getElementById('r12BitstreamCard');
+  fetch('/api/bitstream-status').then(function(r){return r.json();}).then(function(d){
+    if(d.present){
+      var sz = d.size_bytes ? (d.size_bytes/1048576).toFixed(1)+' MB' : '';
+      var dt = d.built_at ? d.built_at.replace('T',' ').replace('Z',' UTC') : '';
+      var fw = d.firmware_version || '';
+      card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:14px;margin-bottom:0">'
+        +'<span style="font-size:1.5rem">✅</span>'
+        +'<div style="flex:1"><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
+        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+(fw?' &middot; fw '+fw:'')+(dt?' &middot; built '+dt:'')+'</div></div>'
+        +'<a href="/dl/ti60-hex" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .hex</a>'
+        +'</div>';
+    } else {
+      card.innerHTML = '<div style="background:#1a0e0e;border:1px solid #4a1212;border-radius:8px;padding:12px 16px;font-size:.8rem;color:#9ca3af">'
+        +'<span style="color:#f87171;font-weight:700">Bitstream not yet built.</span> '
+        +'Run <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd">make bitstream</code> from the repo root (requires Efinity). '
+        +'See <a href="/dl/build-soc-cm-md" style="color:#a78bfa">BUILD_SOC_CM.md</a> for instructions.'
+        +'</div>';
+    }
+  }).catch(function(){});
+})();
+</script>
 <div class="box-title">&#x1F4E6; What&rsquo;s inside the ZIP</div>
 <div class="contents-grid">
   <div class="highlight"><span class="file">outflow/church_ti60_f225.hex</span><span class="note"> — pre-built bitstream ✓</span></div>

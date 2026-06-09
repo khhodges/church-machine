@@ -1,5 +1,21 @@
 # BUILD_SOC_CM.md — Sapphire SoC + Church Machine Combined Bitstream
 
+## Quick build (one command)
+
+```bash
+# Full pipeline: firmware → patch → synth → P&R → pgm → copy to bitstreams/
+make bitstream
+
+# Same, plus automatic flash and UART smoke-test at the end:
+make bitstream-flash
+```
+
+See `scripts/build_ti60_bitstream.sh` for details.  The resulting hex lands in
+`bitstreams/church_ti60_f225.hex` and is immediately served by the IDE at
+`/dl/ti60-hex`.
+
+---
+
 ## What this builds
 
 A combined Efinix Ti60F225 bitstream that places the Sapphire RISC-V SoC and the

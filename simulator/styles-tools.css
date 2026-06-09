@@ -2475,3 +2475,93 @@
     }
     .nia-col-hex { display: none; }
 }
+
+/* ── Download & Flash card (ti60ConnectPanel) ───────────────────────────── */
+.ti60-dl-flash-card {
+    background: #0b1320;
+    border: 1px solid #1e3a5f;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    font-size: .82rem;
+}
+.ti60-dl-flash-loading {
+    color: #64748b;
+    font-size: .8rem;
+}
+.ti60-dl-flash-spinner {
+    margin-right: 4px;
+}
+.ti60-dl-flash-present,
+.ti60-dl-flash-absent {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.ti60-dl-flash-badge {
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+.ti60-dl-flash-badge-grey {
+    filter: grayscale(1) opacity(.6);
+}
+.ti60-dl-flash-info {
+    flex: 1;
+    min-width: 0;
+}
+.ti60-dl-flash-title {
+    color: #4ade80;
+    font-weight: 700;
+    font-size: .85rem;
+    line-height: 1.3;
+}
+.ti60-dl-flash-meta {
+    color: #64748b;
+    font-size: .74rem;
+    margin-top: 2px;
+}
+.ti60-dl-flash-btns {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+.ti60-dl-flash-btn {
+    padding: .35rem .85rem;
+    border-radius: 5px;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-block;
+    color: #c4b5fd;
+    background: #1e1a40;
+    transition: background .15s;
+}
+.ti60-dl-flash-btn:hover:not([disabled]) {
+    background: #2d2760;
+}
+.ti60-dl-flash-btn-dl {
+    background: #166534;
+    color: #4ade80;
+}
+.ti60-dl-flash-btn-dl:hover {
+    background: #1a7a3e;
+}
+.ti60-dl-flash-btn-flash {
+    background: #1a2a50;
+    color: #93c5fd;
+}
+.ti60-dl-flash-btn-flash:hover {
+    background: #243566;
+}
+@media (max-width: 540px) {
+    .ti60-dl-flash-present,
+    .ti60-dl-flash-absent {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
