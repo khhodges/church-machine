@@ -1,0 +1,64 @@
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_minimal$ cd ~/church_project/SoC/church-machine
+
+# Stash the local top.v change, pull, restore
+git stash push -m "local top.v" -- hardware/soc_minimal/top.v
+git pull --ff-only
+git stash pop
+Saved working directory and index state On main: local top.v
+Updating eeda2ce2..0cb8f897
+Fast-forward
+ .agents/memory/MEMORY.md                                                                         |  3 ++
+ .agents/memory/efinity-2026-synth-params.md                                                      | 22 +++++++++++++
+ .agents/memory/sapphire-por-asyncreset.md                                                        | 33 ++++++++++++++++++++
+ .agents/memory/sapphire-soc-memory-map.md                                                        | 25 +++++++++++++++
+ attached_assets/Pasted--Synthesis--1781016812132_1781016812137.txt                               | 43 +++++++++++++++++++++++++
+ attached_assets/Pasted-sipantichijk-penguin-church-project-SoC-church-machine-_1781016609070.txt | 38 ++++++++++++++++++++++
+ attached_assets/Pasted-sipantichijk-penguin-church-project-SoC-church-machine-_1781020503747.txt | 90 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ hardware/soc_minimal/top.v                                                                       | 21 +++++++++++--
+ 8 files changed, 273 insertions(+), 2 deletions(-)
+ create mode 100644 .agents/memory/efinity-2026-synth-params.md
+ create mode 100644 .agents/memory/sapphire-por-asyncreset.md
+ create mode 100644 .agents/memory/sapphire-soc-memory-map.md
+ create mode 100644 attached_assets/Pasted--Synthesis--1781016812132_1781016812137.txt
+ create mode 100644 attached_assets/Pasted-sipantichijk-penguin-church-project-SoC-church-machine-_1781016609070.txt
+ create mode 100644 attached_assets/Pasted-sipantichijk-penguin-church-project-SoC-church-machine-_1781020503747.txt
+Auto-merging hardware/soc_minimal/top.v
+CONFLICT (content): Merge conflict in hardware/soc_minimal/top.v
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+        both modified:   hardware/soc_minimal/top.v
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   hardware/soc_minimal/church_soc.peri.xml
+        modified:   hardware/soc_minimal/church_soc.xml
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        hardware/soc_minimal/.lock
+        hardware/soc_minimal/church_soc.err.log
+        hardware/soc_minimal/church_soc.info.log
+        hardware/soc_minimal/church_soc.map.rdb
+        hardware/soc_minimal/church_soc.map.rpt
+        hardware/soc_minimal/church_soc.raminfo.pb
+        hardware/soc_minimal/church_soc.res.csv
+        hardware/soc_minimal/church_soc.warn.log
+        hardware/soc_minimal/debug_profile.mark_debug.json
+        hardware/soc_minimal/firmware/firmware.elf
+        hardware/soc_minimal/firmware/firmware.hex
+        hardware/soc_minimal/firmware/firmware.raw
+        hardware/soc_minimal/outflow/
+        hardware/soc_minimal/sapphire.v
+        hardware/soc_minimal/sapphire.v.bak
+        hardware/soc_minimal/sapphire_define.vh
+        hardware/soc_minimal/work_pnr/
+        hardware/soc_minimal/work_syn/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+The stash entry is kept in case you need it again.
+sipantichijk@penguin:~/church_project/SoC/church-machine$ 
