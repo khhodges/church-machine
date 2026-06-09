@@ -1,0 +1,150 @@
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_minimal$ find ~/church_project/SoC/church-machine/hardware/soc_minimal -name "*.log" -newer firmware/firmware.raw 2>/dev/null
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.err.log
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.warn.log
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.info.log
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_minimal$ cat ~/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.err.log
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 08:07:12
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 09:03:53
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 09:49:54
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 10:33:28
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 10:52:59
+///////////////////////////////////
+
+[EFX-0010 VERI-ERROR] missing compiler directive (VERI-1068) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v:6)
+[EFX-0010 VERI-ERROR] syntax error near '>' (VERI-1137) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v:7)
+[EFX-0010 VERI-ERROR] syntax error near 'always' (VERI-1137) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v:42)
+[EFX-0010 VERI-ERROR] Verilog 2000 keyword 'always' used in incorrect context (VERI-2344) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v:42)
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 10:58:33
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 11:08:45
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 12:04:19
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 12:40:46
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 12:50:06
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 13:30:51
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 13:35:45
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 14:00:29
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 14:25:29
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 14:36:30
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 15:04:41
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 15:30:41
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 15:45:50
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 16:20:09
+///////////////////////////////////
+
+[EFX-0010 VERI-ERROR] cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' (VERI-1012) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v:4878)
+[EFX-0021 ERROR] Elaboration of module 'top' failed. Please check previous error messages.
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 16:23:26
+///////////////////////////////////
+
+[EFX-0010 VERI-ERROR] cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' (VERI-1012) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v:4878)
+[EFX-0021 ERROR] Elaboration of module 'top' failed. Please check previous error messages.
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 16:27:14
+///////////////////////////////////
+
+[EFX-0010 VERI-ERROR] cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' (VERI-1012) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v:4878)
+[EFX-0021 ERROR] Elaboration of module 'top' failed. Please check previous error messages.
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 09, 2026 16:27:19
+///////////////////////////////////
+
+[EFX-0010 VERI-ERROR] cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' (VERI-1012) (/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/sapphire.v:4878)
+[EFX-0021 ERROR] Elaboration of module 'top' failed. Please check previous error messages.
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_minimal$ 
