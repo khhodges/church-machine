@@ -13,7 +13,7 @@
 `default_nettype none
 
 module top (
-    // clk provided by PLL_TL0 in church_soc.peri.xml — not an IO port
+    input  wire pll_refclk,    // 25 MHz crystal — GPIOL_P_18, conn_type=pll_clkin
     output wire uart_tx,       // GPIOL_02 → FT4232H interface 2 → ttyUSB2
     input  wire uart_rx,       // GPIOL_01 ← FT4232H interface 2
     input  wire push_button,   // GPIOT_N_06, active-low, weak pull-up
@@ -25,8 +25,31 @@ module top (
     // ----------------------------------------------------------------
     // Internal signals
     // ----------------------------------------------------------------
-    wire clk;                  // 25 MHz — driven by PLL_TL0 output in peri.xml
+    wire clk;                  // 25 MHz — CLKOUT0 of EFX_PLL_V1 below
+    wire pll_locked;           // not used for gating — is_bypass_lock=true
     wire system_reset;         // active-HIGH reset driven by Sapphire SoC
+
+    // ----------------------------------------------------------------
+    // PLL: 25 MHz crystal → 25 MHz fabric clock
+    //   CLKIN  = pll_refclk (GPIOL_P_18, pll_clkin in peri.xml)
+    //   VCO    = 25 MHz × M/N = 25 × 10/1 = 250 MHz
+    //   CLKOUT0= VCO / O / CLKOUT0_DIV = 250 / 1 / 10 = 25 MHz
+    //   RSTN   = 1 (active-LOW; 1 = PLL running)
+    // ----------------------------------------------------------------
+    EFX_PLL_V1 #(
+        .N          (1),
+        .M          (10),
+        .O          (1),
+        .CLKOUT0_DIV(10),
+        .REFCLK_FREQ(25.0)
+    ) pll_inst (
+        .CLKIN  (pll_refclk),
+        .CLKOUT0(clk),
+        .CLKOUT1(),
+        .CLKOUT2(),
+        .LOCKED (pll_locked),
+        .RSTN   (1'b1)
+    );
 
     // ----------------------------------------------------------------
     // Sapphire SoC instantiation

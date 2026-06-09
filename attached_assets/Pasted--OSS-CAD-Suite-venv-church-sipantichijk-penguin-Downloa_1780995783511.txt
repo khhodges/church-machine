@@ -1,0 +1,100 @@
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ # Show just the last 60 lines where errors/success appears
+tail -60 ~/Downloads/church_ti60_f225_project/hardware/soc_minimal/work_syn/*.log 2>/dev/null || \
+tail -60 ~/Downloads/church_ti60_f225_project/hardware/soc_minimal/work_pnr/*.log 2>/dev/null
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ sed -n '186,280p' /home/sipantichijk/efinity/2025.2/sim_models/maplib/efinix_peri_lib.v
+module EFX_PLL_V1(CLKOUT0, CLKOUT1, CLKOUT2, LOCKED, RSTN, CLKIN);
+    parameter integer N = 1;
+    parameter integer M = 1;
+    parameter integer O = 1;
+    parameter integer CLKOUT0_DIV = 2;
+    parameter integer CLKOUT1_DIV = 2;
+    parameter integer CLKOUT2_DIV = 2;
+    parameter real REFCLK_FREQ = 25.0;
+
+    output CLKOUT0;
+    output CLKOUT1;
+    output CLKOUT2;
+    output LOCKED;
+    input   RSTN;
+    input CLKIN /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+endmodule
+`endcelldefine
+
+`celldefine
+module EFX_PLL_V2(CLKOUT0, CLKOUT1, CLKOUT2, LOCKED, RSTN, CLKIN, CLKSEL, FBK);
+   parameter integer N = 1;
+   parameter integer M = 1;
+   parameter integer O = 1;
+   parameter integer CLKOUT0_DIV = 1;
+   parameter integer CLKOUT1_DIV = 1;
+   parameter integer CLKOUT2_DIV = 1;
+   parameter integer CLKOUT0_PHASE = 0;
+   parameter integer CLKOUT1_PHASE = 0;
+   parameter integer CLKOUT2_PHASE = 0;
+   parameter FEEDBACK_CLK = "INTERNAL";
+   parameter FEEDBACK_MODE = "INTERNAL";
+   parameter real REFCLK_FREQ = 25.0;
+
+   output CLKOUT0;
+   output CLKOUT1;
+   output CLKOUT2;
+   output LOCKED;
+   input RSTN;
+   input FBK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+   input [3:0] CLKIN /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+   input [1:0] CLKSEL;
+endmodule
+`endcelldefine
+
+`celldefine
+module EFX_PLL_V3(CLKOUT0, CLKOUT1, CLKOUT2, CLKOUT3, CLKOUT4, LOCKED, RSTN, CLKIN, CLKSEL, SHIFT, SHIFT_SEL, SHIFT_ENA, FBK, DESKEWED);
+   parameter integer N = 1;
+   parameter integer M = 1;
+   parameter integer O = 1;
+   parameter integer CLKOUT0_DIV = 1;
+   parameter integer CLKOUT1_DIV = 1;
+   parameter integer CLKOUT2_DIV = 1;
+   parameter integer CLKOUT3_DIV = 1;
+   parameter integer CLKOUT4_DIV = 1;
+   parameter [2:0]   CLKOUT0_PHASE_STEP = 0;
+   parameter [2:0]   CLKOUT1_PHASE_STEP = 0;
+   parameter [2:0]   CLKOUT2_PHASE_STEP = 0;
+   parameter [2:0]   CLKOUT3_PHASE_STEP = 0;
+   parameter [2:0]   CLKOUT4_PHASE_STEP = 0;
+   parameter FEEDBACK_CLK = "CLK0";
+   parameter FEEDBACK_MODE = "LOCAL";
+   parameter real REFCLK_FREQ = 25.0;
+   parameter IS_CLKOUT0_INVERTED = 0;
+   parameter IS_CLKOUT1_INVERTED = 0;
+   parameter IS_CLKOUT2_INVERTED = 0;
+   parameter IS_CLKOUT3_INVERTED = 0;
+   parameter IS_CLKOUT4_INVERTED = 0;
+   parameter CLKOUT3_CONN_TYPE = "GCLK";
+   parameter CLKOUT4_CONN_TYPE = "GCLK";
+   parameter CLKOUT0_DYNPHASE_EN = 0;
+   parameter CLKOUT1_DYNPHASE_EN = 0;
+   parameter CLKOUT2_DYNPHASE_EN = 0;
+   parameter CLKOUT3_DYNPHASE_EN = 0;
+   parameter CLKOUT4_DYNPHASE_EN = 0;
+
+   output CLKOUT0;
+   output CLKOUT1;
+   output CLKOUT2;
+   output CLKOUT3;
+   output CLKOUT4;
+   output LOCKED;
+   input RSTN;
+   input FBK /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+   input SHIFT_ENA;
+   input [3:0] CLKIN /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+   input [1:0] CLKSEL;
+   input [2:0] SHIFT /* verific EFX_ATTRIBUTE_PORT__CAN_DRIVEN_BY_CORE_CONST=TRUE */;
+   input [4:0] SHIFT_SEL /* verific EFX_ATTRIBUTE_PORT__CAN_DRIVEN_BY_CORE_CONST=TRUE */;
+   output DESKEWED;
+endmodule
+`endcelldefine
+
+`celldefine
+module EFX_OSC_V1(CLKOUT);
+   output CLKOUT /* verific EFX_ATTRIBUTE_PORT__IS_CLKOUT_PIN=TRUE */;
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/Downloads/church_ti60_f225_project$ 
