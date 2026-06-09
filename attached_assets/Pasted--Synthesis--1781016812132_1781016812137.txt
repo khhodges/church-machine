@@ -1,0 +1,43 @@
+-------------------------------------------------------------------------
+Synthesis
+-------------------------------------------------------------------------
+Tue June 9 26 10:52:58 - Synthesis flow working directory is /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/work_syn
+
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+Tue June 9 26 10:52:58 - /home/sipantichijk/efinity/2026.1/bin/efx_map --project "church_soc" --root "top" --write-efx-verilog "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.map.v" --write-premap-module "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.elab.vdb" --binary-db "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow/church_soc.vdb" --device "Ti60F225" --family "Titanium" --veri_option "verilog_mode=verilog_2k,vhdl_mode=vhdl_2008" --work-dir "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/work_syn" --output-dir "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/outflow" --prj "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" --I "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal"
+Tue June 9 26 10:52:58 - Running /home/sipantichijk/efinity/2026.1/bin/efx_map...
+INFO     : Efinix FPGA Synthesis.
+INFO     : Version: 2026.1.132
+INFO     : Compiled: May 29 2026.
+INFO     : 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : ***** Beginning Analysis ... *****
+INFO     : default VHDL library search path is now "/home/sipantichijk/efinity/2026.1/sim_models/vhdl/packages/vhdl_2008" [VHDL-1504]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/perilib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Restoring all Verilog modules from file '/home/sipantichijk/efinity/2026.1/sim_models/maplib/maplib_efxlib_parsetree.vdb' [VERI-2484]
+INFO     : Analyzing Verilog file '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v' [VERI-1482]
+ERROR    : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(6): missing compiler directive [VERI-1068]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(6): use of undefined macro 'bash' [VERI-1158]
+ERROR    : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(7): syntax error near '>' [VERI-1137]
+WARNING  : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(41): root scope declaration is not allowed in Verilog 95/2K mode [VERI-1791]
+ERROR    : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(42): syntax error near 'always' [VERI-1137]
+ERROR    : /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v(42): Verilog 2000 keyword 'always' used in incorrect context [VERI-2344]
+INFO     : Verilog file '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/top.v' ignored due to errors [VERI-1483]
+INFO     : Analysis took 0.061635236 seconds [FlowMsg::StageDuration]
+INFO     :     Analysis took 0.04 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Analysis virtual memory usage: begin = 150.264 MB, end = 150.264 MB, delta = 0 MB [FlowMsg::VMUsage]
+INFO     : Analysis resident set memory usage: begin = 81.536 MB, end = 85.248 MB, delta = 3.712 MB [FlowMsg::RSSUsage]
+INFO     :     Analysis peak resident set memory usage = 193.38 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Analysis ... *****
+INFO     : The entire flow of EFX_MAP took 0.910090924 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_MAP took 0.72 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.96 MB, end = 150.264 MB, delta = 42.304 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.048 MB, end = 85.504 MB, delta = 51.456 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 193.38 MB [FlowMsg::RSSUsage::Peak]
+Tue June 9 26 10:52:59 - /home/sipantichijk/efinity/2026.1/bin/efx_map finished. Exit code = 3 Exit status : Normal
+Running synthesis flow failed. See exit code and exit status.
+Tue June 9 26 10:52:59 - Running automated flow starting from synthesis done. Total duration = 0m 1.218s
