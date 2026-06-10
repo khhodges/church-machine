@@ -17,6 +17,7 @@ dependencies = [
     "apscheduler>=3.11.2",
     "resend>=2.21.0",
     "fpdf2>=2.8.0",
+    "pycryptodome>=3.23.0",
 ]
 
 [tool.pytest.ini_options]

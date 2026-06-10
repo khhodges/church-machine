@@ -38,18 +38,20 @@ IMPORTANT — confirmed hardware gotchas
 """
 
 import sys
+import os
 import json
 import time
 import threading
 import ssl
+import sqlite3 as _sqlite3
 import hashlib
 import hmac as _hmac_mod
 
 try:
     import serial
+    _SERIAL_AVAILABLE = True
 except ImportError:
-    print("ERROR: pyserial not installed.  Run:  pip3 install pyserial")
-    sys.exit(1)
+    _SERIAL_AVAILABLE = False
 
 # ---------------------------------------------------------------------------
 # Argument parsing
@@ -146,6 +148,212 @@ def hkdf_sha256(ikm: bytes, salt: bytes, info: bytes, length: int) -> bytes:
         t = _hmac_mod.new(prk, t + info + bytes([i]), hashlib.sha256).digest()
         okm += t
     return okm[:length]
+
+
+def derive_keys(uid_hi: int, uid_lo: int, ogt: str) -> "tuple[bytes, bytes]":
+    """
+    Per-abstraction key derivation — T0.4, CM_MSG Protocol Section 2.6.
+
+    Formula (CM_ENC_v3 / CM_MAC_v3 — spec-authoritative):
+        preimage = uid_hi_BE4 || uid_lo_BE4 || ogt_utf8
+        IKM      = SHA256(preimage)
+        K_enc    = HKDF-SHA256(IKM, salt="CM_ENC_v3", info=ogt_bytes, len=16)
+        K_mac    = HKDF-SHA256(IKM, salt="CM_MAC_v3", info=ogt_bytes, len=16)
+
+    Matches hardware/sha256.h cm_derive_keys() exactly.
+    Keys are never printed or logged.
+
+    Returns (k_enc_16_bytes, k_mac_16_bytes).
+    """
+    uid_bytes = uid_hi.to_bytes(4, "big") + uid_lo.to_bytes(4, "big")
+    ogt_bytes = ogt.encode("utf-8")
+    ikm = hashlib.sha256(uid_bytes + ogt_bytes).digest()
+    k_enc = hkdf_sha256(ikm, b"CM_ENC_v3", ogt_bytes, 16)
+    k_mac = hkdf_sha256(ikm, b"CM_MAC_v3", ogt_bytes, 16)
+    return k_enc, k_mac
+
+
+# ---------------------------------------------------------------------------
+# NS keystore persistence — AES-256-GCM encrypted at rest in church_machine.db
+#
+# KEK derivation:
+#   KEK = HKDF-SHA256(IKM=REPORT_TOKEN.encode(), salt="CM_KEK_v1",
+#                     info=b"ns_keystore", length=32)
+#
+# Each row: (uid, ogt, nonce_hex, k_enc_ct_hex, k_mac_ct_hex)
+# On bridge restart: re-derive KEK, decrypt rows for reconnected board UID.
+# ---------------------------------------------------------------------------
+
+# Path to the IDE server's SQLite database (relative from hardware/soc_combined/).
+_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
+_DB_PATH = os.path.join(_BRIDGE_DIR, "..", "..", "server", "church_machine.db")
+
+try:
+    from Crypto.Cipher import AES as _AES_Cipher
+    _AES_GCM_AVAILABLE = True
+except ImportError:
+    _AES_GCM_AVAILABLE = False
+
+
+def _get_kek() -> bytes:
+    """
+    Derive the 32-byte key-encryption-key from REPORT_TOKEN.
+
+    Fail-closed: raises RuntimeError if REPORT_TOKEN is absent.
+    This ensures the keystore is never encrypted with a predictable
+    fallback value — callers catch the error and skip persistence.
+    """
+    report_token = os.environ.get("REPORT_TOKEN", "")
+    if not report_token:
+        raise RuntimeError(
+            "[keystore] REPORT_TOKEN env var is unset — "
+            "key persistence requires a secret token.  "
+            "Set REPORT_TOKEN in the environment or as a Replit secret."
+        )
+    return hkdf_sha256(
+        report_token.encode("utf-8"),
+        b"CM_KEK_v1",
+        b"ns_keystore",
+        32,
+    )
+
+
+# Serialize all SQLite keystore writes through a single lock so concurrent
+# background threads cannot produce "database is locked" errors.
+_KEYSTORE_WRITE_LOCK = threading.Lock()
+
+
+def _keystore_db_conn():
+    """Open the keystore DB and ensure the ns_keystore table exists."""
+    db_path = os.path.abspath(_DB_PATH)
+    if not os.path.exists(db_path):
+        return None
+    try:
+        conn = _sqlite3.connect(db_path, timeout=10)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ns_keystore (
+                uid        TEXT NOT NULL,
+                ogt        TEXT NOT NULL,
+                ns_slot    INTEGER,
+                nonce_hex  TEXT NOT NULL,
+                k_enc_ct   TEXT NOT NULL,
+                k_mac_ct   TEXT NOT NULL,
+                PRIMARY KEY (uid, ogt)
+            )
+        """)
+        # Add ns_slot column to older databases that were created without it.
+        try:
+            conn.execute("ALTER TABLE ns_keystore ADD COLUMN ns_slot INTEGER")
+            conn.commit()
+        except _sqlite3.OperationalError:
+            pass   # Column already exists — normal case.
+        conn.commit()
+        return conn
+    except Exception as e:
+        print(f"  [keystore] DB open error: {e}", file=sys.stderr)
+        return None
+
+
+def _store_keys_encrypted(uid: str, ogt: str, k_enc: bytes, k_mac: bytes,
+                          ns_slot: "int | None" = None) -> None:
+    """
+    Encrypt K_enc and K_mac with AES-256-GCM (KEK-derived) and persist
+    to ns_keystore table.
+
+    - Skips silently if AES-GCM is unavailable (pycryptodome not installed).
+    - Skips silently if REPORT_TOKEN is unset (fail-closed KEK).
+    - Serialised through _KEYSTORE_WRITE_LOCK to prevent SQLite contention.
+    - `ns_slot` is the firmware-side BRAM slot index — stored as informational
+      only.  The key derivation formula never uses slot numbers (per spec §2.6).
+    """
+    if not _AES_GCM_AVAILABLE:
+        return
+    with _KEYSTORE_WRITE_LOCK:
+        try:
+            kek = _get_kek()
+            nonce = os.urandom(12)
+            cipher = _AES_Cipher.new(kek, _AES_Cipher.MODE_GCM, nonce=nonce)
+            plaintext = k_enc + k_mac          # 32 bytes total
+            ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+            payload = ciphertext + tag         # append 16-byte GCM tag
+            nonce_hex = nonce.hex()
+            ct_hex = payload.hex()
+            conn = _keystore_db_conn()
+            if conn is None:
+                return
+            conn.execute(
+                """INSERT OR REPLACE INTO ns_keystore
+                   (uid, ogt, ns_slot, nonce_hex, k_enc_ct, k_mac_ct)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (uid, ogt, ns_slot, nonce_hex, ct_hex[:64], ct_hex[64:]),
+            )
+            conn.commit()
+            conn.close()
+        except RuntimeError as rte:
+            # REPORT_TOKEN absent — fail-closed, log once per OGT
+            print(f"  [keystore] skip persist for {ogt!r}: {rte}", file=sys.stderr)
+        except Exception as e:
+            print(f"  [keystore] store error for {ogt!r}: {e}", file=sys.stderr)
+
+
+# Set of board UIDs for which we have already attempted a keystore load in
+# this process session.  Prevents repeated DB queries on every CALLHOME.
+_keystore_loaded_uids: set = set()
+
+
+def _load_keys_for_board(uid: str) -> None:
+    """
+    Decrypt and repopulate _ogt_to_keys for all OGTs belonging to `uid`.
+
+    Called at the start of the first CALLHOME from a new or reconnecting
+    board, before key re-derivation overwrites in-memory state.  This restores
+    keys from a previous session so the bridge can process binary frames that
+    arrive between CALLHOME packets on reconnect.
+
+    Skips silently if REPORT_TOKEN is absent (fail-closed) or pycryptodome
+    is not installed.  Never blocks the CALLHOME handler — errors are logged
+    and ignored.
+    """
+    global _ogt_to_keys
+    if not _AES_GCM_AVAILABLE:
+        return
+    try:
+        conn = _keystore_db_conn()
+        if conn is None:
+            return
+        rows = conn.execute(
+            "SELECT ogt, nonce_hex, k_enc_ct, k_mac_ct "
+            "FROM ns_keystore WHERE uid=?",
+            (uid,),
+        ).fetchall()
+        conn.close()
+        if not rows:
+            return
+        kek = _get_kek()
+        loaded = 0
+        for ogt, nonce_hex, k_enc_ct_hex, k_mac_ct_hex in rows:
+            try:
+                nonce = bytes.fromhex(nonce_hex)
+                full_payload = bytes.fromhex(k_enc_ct_hex + k_mac_ct_hex)
+                ciphertext = full_payload[:32]
+                tag        = full_payload[32:48]
+                cipher = _AES_Cipher.new(kek, _AES_Cipher.MODE_GCM, nonce=nonce)
+                plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+                _ogt_to_keys[ogt] = {
+                    "k_enc": plaintext[:16],
+                    "k_mac": plaintext[16:32],
+                }
+                loaded += 1
+            except Exception as inner_e:
+                print(f"  [keystore] decrypt error for {ogt!r}: {inner_e}",
+                      file=sys.stderr)
+        if loaded:
+            print(f"  [keystore] Loaded {loaded} key(s) for UID={uid} from DB")
+    except RuntimeError as rte:
+        # REPORT_TOKEN absent — skip silently (fail-closed)
+        print(f"  [keystore] skip load for UID={uid}: {rte}", file=sys.stderr)
+    except Exception as e:
+        print(f"  [keystore] load error for UID={uid}: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -307,16 +515,32 @@ def _handle_callhome_json(line):
     fault_stage = pkt.get("fault_stage", None)   # int 0-7 pipeline stage
 
     # NS manifest — present from firmware v1.2+ (Task #1766)
-    # Each entry: {"ogt": str, "token_32": "0x...", "label": str, "resident": bool}
+    # Each entry: {"slot": int, "ogt": str, "token_32": "0x...", "label": str, "resident": bool}
     ns_manifest = pkt.get("ns_manifest", None)
     if ns_manifest is not None:
+        # Load any persisted keys for this board from a previous session
+        # before re-deriving.  This populates _ogt_to_keys for binary frames
+        # that may arrive before the next CALLHOME on reconnect.
+        if uid not in _keystore_loaded_uids:
+            _keystore_loaded_uids.add(uid)
+            _load_keys_for_board(uid)
+
         _token32_to_ogt.clear()
         collision_count = 0
+        keys_derived = 0
+        # Parse board UID into hi/lo halves for key derivation.
+        uid_hex = uid.zfill(16)
+        try:
+            _uid_hi = int(uid_hex[:8], 16)
+            _uid_lo = int(uid_hex[8:], 16)
+        except ValueError:
+            _uid_hi, _uid_lo = 0, 0
         for entry in ns_manifest:
             ogt       = entry.get("ogt", "")
             t32_str   = entry.get("token_32", "0x0")
             t32_fw    = int(t32_str, 16)
             t32_local = sha32(ogt)
+            entry_slot = entry.get("slot", None)   # informational — never in derivation
             if t32_fw != t32_local:
                 print(f"  [CALLHOME] WARN token_32 mismatch for {ogt!r}: "
                       f"fw={t32_fw:#010x} local={t32_local:#010x}")
@@ -328,7 +552,31 @@ def _handle_callhome_json(line):
                     collision_count += 1
             else:
                 _token32_to_ogt[t32_local] = ogt
-        print(f"  [CALLHOME] ns_manifest: {len(_token32_to_ogt)} abstractions registered"
+            # T0.4 key derivation — populate _ogt_to_keys (never printed/logged)
+            if ogt:
+                try:
+                    k_enc, k_mac = derive_keys(_uid_hi, _uid_lo, ogt)
+                    _ogt_to_keys[ogt] = {"k_enc": k_enc, "k_mac": k_mac}
+                    keys_derived += 1
+                    # Persist encrypted to DB in a background thread.
+                    # _store_keys_encrypted is serialised through
+                    # _KEYSTORE_WRITE_LOCK so concurrent threads are safe.
+                    _uid_str  = uid
+                    _ogt_str  = ogt
+                    _k_enc    = k_enc
+                    _k_mac    = k_mac
+                    _ns_slot  = entry_slot
+                    threading.Thread(
+                        target=_store_keys_encrypted,
+                        args=(_uid_str, _ogt_str, _k_enc, _k_mac),
+                        kwargs={"ns_slot": _ns_slot},
+                        daemon=True,
+                    ).start()
+                except Exception as _kd_err:
+                    print(f"  [CALLHOME] key derivation error for {ogt!r}: {_kd_err}",
+                          file=sys.stderr)
+        print(f"  [CALLHOME] ns_manifest: {len(_token32_to_ogt)} abstractions registered, "
+              f"{keys_derived} key(s) derived"
               + (f"  WARN {collision_count} collision(s)" if collision_count else ""))
 
     _last_uid = uid

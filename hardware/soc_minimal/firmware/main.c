@@ -166,10 +166,25 @@ static void uart_emit_callhome(unsigned int boot_reason)
 }
 
 /* ------------------------------------------------------------------ */
+/* Per-abstraction key table (T0.4)                                   */
+/*                                                                     */
+/* Populated once after boot_complete + ns_manifest emission.        */
+/* Lives entirely in RISC-V private RAM — inaccessible to CM core.   */
+/* 9 Core OGTs × 32 bytes = 288 bytes total.                          */
+/* ------------------------------------------------------------------ */
+typedef struct {
+    uint8_t k_enc[16];   /* ChaCha20 key — CM_ENC_v3 derivation */
+    uint8_t k_mac[16];   /* HMAC-SHA256 key — CM_MAC_v3 derivation */
+} cm_key_entry_t;
+
+static cm_key_entry_t cm_key_table[9];  /* zero-initialised at reset */
+
+/* ------------------------------------------------------------------ */
 /* Main                                                                */
 /* ------------------------------------------------------------------ */
 int main(void)
 {
+    unsigned int i;
     unsigned int boot_reason = 0u;   /* 0 = cold boot */
 
     /* Baud rate — MUST write before any uart_puts */
@@ -182,8 +197,22 @@ int main(void)
     uart_puthex32_lower(BOARD_UID_LO);
     uart_puts("\r\n");
 
-    /* Initial call-home */
+    /* Initial call-home — emits ns_manifest with all 9 Core OGTs */
     uart_emit_callhome(boot_reason);
+
+    /* T0.4 key derivation — one key pair per Core OGT.
+     * Formula: IKM = SHA256(uid_hi_BE4 || uid_lo_BE4 || ogt_utf8)
+     *          K_enc = HKDF(IKM, "CM_ENC_v3", ogt, 16)
+     *          K_mac = HKDF(IKM, "CM_MAC_v3", ogt, 16)
+     * Matches callhome_bridge.py derive_keys() exactly.
+     * Keys remain in private RISC-V RAM; never copied to CM-core BRAM.
+     */
+    for (i = 0u; i < 9u; i++) {
+        cm_derive_keys(BOARD_UID_HI, BOARD_UID_LO,
+                       _NS_MANIFEST[i].ogt,
+                       cm_key_table[i].k_enc,
+                       cm_key_table[i].k_mac);
+    }
 
     for (;;) {
         /* Periodic NIA heartbeat + call-home every ~1 second */

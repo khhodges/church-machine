@@ -8624,6 +8624,27 @@ with app.app_context():
     db.session.commit()
     logging.info("device_lump_versions table ready")
 
+    db.session.execute(_sa_text("""
+        CREATE TABLE IF NOT EXISTS ns_keystore (
+            uid        TEXT NOT NULL,
+            ogt        TEXT NOT NULL,
+            ns_slot    INTEGER,
+            nonce_hex  TEXT NOT NULL,
+            k_enc_ct   TEXT NOT NULL,
+            k_mac_ct   TEXT NOT NULL,
+            PRIMARY KEY (uid, ogt)
+        )
+    """))
+    db.session.commit()
+    try:
+        db.session.execute(_sa_text(
+            "ALTER TABLE ns_keystore ADD COLUMN ns_slot INTEGER"
+        ))
+        db.session.commit()
+    except Exception:
+        pass
+    logging.info("ns_keystore table ready")
+
     _existing_launch = {t.test_id: t for t in LaunchTest.query.all()}
     for seed_id, seed_name, seed_desc, _auto in LAUNCH_TESTS_SEED:
         if seed_id not in _existing_launch:

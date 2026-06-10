@@ -1,4 +1,4 @@
-.PHONY: check-util check-util-ci patch_sapphire firmware
+.PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive
 
 SCRIPTS_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null)/scripts
 ifeq ($(SCRIPTS_DIR),/scripts)
@@ -25,3 +25,23 @@ patch_sapphire: $(SYM_PREFIX)0.bin
 		$(SYM_PREFIX)3.bin
 
 $(SYM_PREFIX)0.bin: firmware
+
+# ---------------------------------------------------------------------------
+# test-key-derive — compile and run the host-side C key derivation test.
+#
+# Uses the local host GCC (not the RISC-V cross-compiler).
+# No hardware required.  Verifies cm_derive_keys() byte-for-byte against
+# the canonical vectors in hardware/key_derive_vectors.h.
+#
+# Source file is hardware/key_derive_test.c; sha256.h and key_derive_vectors.h
+# are both in hardware/ so GCC's source-relative search finds them without -I.
+#
+# Usage:
+#   make test-key-derive           (from hardware/soc_combined/)
+#   make -C hardware/soc_combined test-key-derive   (from repo root)
+# ---------------------------------------------------------------------------
+test-key-derive:
+	gcc -O2 -Wall -Wextra \
+		-o /tmp/key_derive_test \
+		../key_derive_test.c \
+		&& /tmp/key_derive_test
