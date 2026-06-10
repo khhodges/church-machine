@@ -7,11 +7,16 @@ Verifies the Ti60 Sapphire SoC firmware is running correctly by checking
 for expected output on the SoC UART (ttyUSB2 / FT4232H interface 2).
 
 Checks performed:
-  1. GREETING    — "CHURCH Ti60 SoC+CM" present in first output
-  2. BOOT_COMPLETE — "CM boot_complete: 1" line seen
-  3. NIA_LINES   — At least one "NIA=0x..." line seen
-  4. CALLHOME    — At least one valid CALLHOME:{...} JSON line seen
-  5. ACK (optional) — IDE call-home ACK received (requires --ide=URL)
+  1. GREETING      — "CHURCH Ti60 SoC+CM" present in first output
+  2. BOOT_COMPLETE — "CM boot_complete: 1" line seen (or inferred from CALLHOME)
+  3. NIA_LINES     — At least one "NIA=0x..." line seen
+  4. CALLHOME_JSON — At least one valid CALLHOME:{...} JSON line seen
+  5. FW_V2         — Firmware reports fw_major >= 2 (mandatory, v2.0+)
+  6. NS_MANIFEST   — ns_manifest field present in CALLHOME (mandatory, v2.0+)
+  7. TRACE         — At least one valid TRACE:[...] line seen (optional)
+  8. FAULT_EVENT   — At least one valid FAULT_EVENT:{...} line seen (optional)
+  9. HUNG          — At least one valid HUNG:{...} line seen (optional)
+ 10. ACK           — IDE call-home ACK received (optional, requires --ide=URL)
 
 Exit codes:
   0 — all mandatory checks pass
@@ -75,18 +80,33 @@ for _a in sys.argv[1:]:
 # Canned transcript used by --dry-run
 # ---------------------------------------------------------------------------
 DRY_RUN_TRANSCRIPT = [
-    "CHURCH Ti60 SoC+CM v1.1",
+    # Boot banner and UID (firmware v2.0)
+    "CHURCH Ti60 SoC+CM v2.0",
     "UID=c0ffee0100000001",
-    "Waiting for CM boot...",
-    "CM boot_complete: 1",
-    "CM fault at boot! code=0x00",
-    "Asserting CM free-run kick...",
-    "CM free-run kick released.",
-    "Monitoring CM NIA (Ctrl+C to stop host terminal):",
-    "NIA=0x00000010",
-    'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000010","boot_ok":1,"fault":0,"fault_code":0,"fw_major":1,"fw_minor":0}',
-    "NIA=0x00000014",
-    'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000014","boot_ok":1,"fault":0,"fault_code":0,"fw_major":1,"fw_minor":0}',
+    "Waiting for CM boot_complete...",
+    # First CALLHOME — live NIA + ns_manifest (token_32 = sha32(ogt), real values)
+    'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000042",'
+    '"boot_ok":1,"boot_reason":0,"fault":0,"fault_code":0,"fault_name":"UNKNOWN",'
+    '"fw_major":2,"fw_minor":0,"ns_manifest":['
+    '{"ogt":"global.Core.BoardIdentity.boot","token_32":"0x68706247","label":"Board.Identity","resident":true},'
+    '{"ogt":"global.Core.Heartbeat.boot","token_32":"0x416d6848","label":"Heartbeat","resident":true}'
+    ']}',
+    # Live NIA line from APB3 register
+    "NIA=0x00000042",
+    # 10-Hz NIA trace buffer (10 samples, 1-second window)
+    'TRACE:["0x00000042","0x00000043","0x00000044","0x00000045","0x00000046",'
+    '"0x00000047","0x00000048","0x00000049","0x0000004a","0x0000004b"]',
+    # Second heartbeat CALLHOME (no ns_manifest — bridge re-sync only on first boot)
+    'CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x0000004c",'
+    '"boot_ok":1,"boot_reason":0,"fault":0,"fault_code":0,"fault_name":"UNKNOWN",'
+    '"fw_major":2,"fw_minor":0}',
+    "NIA=0x0000004c",
+    # Fault event — CM raised PERM_X; firmware reads APB3 GT/INSTR/CR14/STAGE
+    'FAULT_EVENT:{"uid":"c0ffee0100000001","nia":"0x0000004c","fault_code":3,'
+    '"fault_name":"PERM_X","fault_gt":"0x01800003","fault_instr":"0x12345678",'
+    '"fault_cr14":"0x00000010","fault_stage":2}',
+    # Hung watchdog — NIA unchanged for 3 consecutive 1-second samples → CM reset
+    'HUNG:{"uid":"c0ffee0100000001","nia":"0x0000abcd","loops":3}',
 ]
 
 # ---------------------------------------------------------------------------
@@ -134,6 +154,59 @@ def validate_callhome(pkt):
         errors.append(f"fw_minor must be a non-negative integer, got {pkt.get('fw_minor')!r}")
     return errors
 
+
+def parse_fault_event(line):
+    """
+    Parse a FAULT_EVENT:{...} line (firmware v2.0+).
+    Returns a dict on success, None on parse failure or missing required fields.
+    """
+    if not line.startswith("FAULT_EVENT:"):
+        return None
+    json_str = line[len("FAULT_EVENT:"):]
+    try:
+        pkt = json.loads(json_str)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    required = ("uid", "nia", "fault_code", "fault_name")
+    if not all(k in pkt for k in required):
+        return None
+    return pkt
+
+
+def parse_hung(line):
+    """
+    Parse a HUNG:{...} line (firmware v2.0+ hung-CM watchdog).
+    Returns a dict on success, None on parse failure or missing required fields.
+    """
+    if not line.startswith("HUNG:"):
+        return None
+    json_str = line[len("HUNG:"):]
+    try:
+        pkt = json.loads(json_str)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    required = ("uid", "nia", "loops")
+    if not all(k in pkt for k in required):
+        return None
+    return pkt
+
+
+def parse_trace(line):
+    """
+    Parse a TRACE:[...] line (firmware v2.0+ 10-Hz NIA sampler).
+    Returns a non-empty list of NIA strings on success, None otherwise.
+    """
+    if not line.startswith("TRACE:"):
+        return None
+    array_str = line[len("TRACE:"):]
+    try:
+        entries = json.loads(array_str)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(entries, list) or not entries:
+        return None
+    return entries
+
 # ---------------------------------------------------------------------------
 # Check results tracker
 # ---------------------------------------------------------------------------
@@ -163,10 +236,15 @@ class CheckResult:
 def _make_checks():
     return [
         CheckResult("GREETING",      "SoC boot greeting present"),
-        CheckResult("BOOT_COMPLETE", "CM boot_complete: 1 line seen"),
+        CheckResult("BOOT_COMPLETE", "CM boot_complete line seen (or inferred)"),
         CheckResult("NIA_LINES",     "At least one NIA=0x... line seen"),
         CheckResult("CALLHOME_JSON", "At least one valid CALLHOME JSON line seen"),
-        CheckResult("ACK",           "IDE call-home ACK received", mandatory=False),
+        CheckResult("FW_V2",         "Firmware reports fw_major >= 2"),
+        CheckResult("NS_MANIFEST",   "ns_manifest field present in CALLHOME"),
+        CheckResult("TRACE",         "At least one valid TRACE line seen",       mandatory=False),
+        CheckResult("FAULT_EVENT",   "At least one valid FAULT_EVENT line seen", mandatory=False),
+        CheckResult("HUNG",          "At least one valid HUNG line seen",         mandatory=False),
+        CheckResult("ACK",           "IDE call-home ACK received",               mandatory=False),
     ]
 
 # ---------------------------------------------------------------------------
@@ -227,6 +305,39 @@ def process_lines(lines, checks, verbose=False):
                     checks_by_name["CALLHOME_JSON"].mark_pass(
                         f"{callhome_seen} valid packet(s); last board={pkt['board']}{fw_str} nia={pkt['nia']}"
                     )
+                    # FW_V2: firmware reports fw_major >= 2 (v2.0+)
+                    if pkt.get("fw_major", 0) >= 2:
+                        checks_by_name["FW_V2"].mark_pass(
+                            f"fw_major={pkt['fw_major']}"
+                        )
+                    # NS_MANIFEST: non-empty ns_manifest array present
+                    manifest = pkt.get("ns_manifest")
+                    if isinstance(manifest, list) and manifest:
+                        checks_by_name["NS_MANIFEST"].mark_pass(
+                            f"{len(manifest)} abstraction(s)"
+                        )
+
+        # TRACE:[...] — firmware v2.0 10-Hz NIA sampler
+        if line.startswith("TRACE:"):
+            t = parse_trace(line)
+            if t is not None:
+                checks_by_name["TRACE"].mark_pass(f"{len(t)} NIA sample(s)")
+
+        # FAULT_EVENT:{...} — firmware v2.0 structured fault record
+        if line.startswith("FAULT_EVENT:"):
+            fe = parse_fault_event(line)
+            if fe is not None:
+                checks_by_name["FAULT_EVENT"].mark_pass(
+                    f"fault_name={fe.get('fault_name')!r} nia={fe.get('nia')}"
+                )
+
+        # HUNG:{...} — firmware v2.0 hung-CM watchdog
+        if line.startswith("HUNG:"):
+            h = parse_hung(line)
+            if h is not None:
+                checks_by_name["HUNG"].mark_pass(
+                    f"nia={h.get('nia')} loops={h.get('loops')}"
+                )
 
     # Report any CALLHOME parse/validation failures
     if callhome_errors and not checks_by_name["CALLHOME_JSON"].passed:
