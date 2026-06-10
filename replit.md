@@ -79,6 +79,34 @@ An automated daily report emails `sipanticinc@gmail.com` at **05:00 UTC** every 
 - **GitHub sync alert opt-out:** Set `GITHUB_SYNC_ALERT_EMAIL=0` (or `false`) to suppress the immediate failure-alert email; sync status is still written to `server/github-sync-status.json` and included in the daily digest. Omitting the var (default) keeps alerts enabled.
 - **Six report sections:** tasks merged today, in progress, queued next, test suite status, Ti60 call-home status, cost summary with billing link
 
+## Sapphire SoC — Trusted Security Base & APB3 Bridge
+
+The Sapphire SoC (RISC-V rv32im soft-core, 16 KB ROM / 16 KB RAM) runs alongside
+the Church Machine core on the Ti60. Its private RAM is inaccessible to the CM
+core — making it the natural hardware security module for CM_MSG keys.
+
+**APB3 bridge registers** (firmware address base: Sapphire APB slave 0):
+
+| Offset | Name | What the firmware can do |
+|---|---|---|
+| `0x00` | CTRL | Write 0 to pulse CM push_button (reset/single-step) |
+| `0x04` | STATUS | Poll `boot_complete`, `fault_latched` |
+| `0x08` | NIA | Read live CM program counter (hung-program detection) |
+| `0x0C` | FAULT | Read fault code [4:0] |
+| `0x10/14` | UID_LO/HI | Written by firmware at boot; echoed in CALLHOME |
+| `0x18` | FAULT_GT | GT word0 of faulting capability (latched on fault) |
+| `0x1C` | FAULT_INSTR | Instruction word at fault NIA |
+| `0x20` | FAULT_CR14 | Active abstraction slot at fault |
+| `0x24` | FAULT_STAGE | Pipeline stage: 0=Fetch 1=Decode 2=Perm 3=Lambda 4=TPERM 5=Call 6=Return 7=DataRW |
+
+**Key architectural decisions:**
+- FAULT_GT / FAULT_INSTR / FAULT_CR14 / FAULT_STAGE are already latched in hardware on every fault but the current `uart_emit_callhome()` never reads them — adding ~20 lines emits full telemetry with no FPGA changes.
+- `fault_latched` is sticky and not software-clearable. A `FAULT_RST` write-1-to-clear register in `apb3_cm_bridge.v` (~10 lines Verilog) would complete hardware 3-tier fault recovery.
+- NIA sampled at 10 Hz gives a free TraceEmitter (T2.3) with no LUMP binary.
+- K_enc/K_mac from HKDF must live in RISC-V private RAM — the CM core never reads them.
+
+**ROM budget:** 16 KB. Current firmware uses ~1.6 KB. SHA32+HMAC+HKDF adds ~3 KB. 72% free. No FP coprocessor needed — SlideRule trig is a CLOOMC abstraction, not RISC-V firmware.
+
 ## Gotchas / Known Traps
 
 ### Adding a new Assembly example tab (MUST DO BOTH steps)

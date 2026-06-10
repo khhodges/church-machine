@@ -179,3 +179,82 @@ the firmware LUMP, not after.
 5. **T1.2 FaultReporter CLOOMC source** — write the `.cloomc` file; the fault
    logging logic already exists in `simulator.js`, it just needs to become a
    formal abstraction with an OGT.
+
+---
+
+## Sapphire SoC as Trusted Security Base
+
+*Architectural note — does not require FPGA changes.*
+
+The Sapphire SoC (RISC-V rv32im soft-core) is already the physical Trusted Security
+Base for the CM_MSG protocol. Its RAM (`0xF9004000–0xF9007FFF`) is private — the
+Church Machine core has no bus path to read it. This makes it the correct and
+natural home for K_enc/K_mac secrets derived by HKDF after each CALLHOME.
+
+### APB3 bridge register map (already wired in hardware)
+
+| Offset | Name | Access | What it provides |
+|---|---|---|---|
+| `0x00` | `CTRL` | R/W | Drive CM push_button from software (brief pulse = single-step; hold ≥1s = free-run) |
+| `0x04` | `STATUS` | RO | `boot_complete`, `fault_valid`, `fault_latched` |
+| `0x08` | `NIA` | RO | Live CM program counter — every cycle |
+| `0x0C` | `FAULT` | RO | Fault code [4:0] |
+| `0x10/14` | `UID_LO/HI` | R/W | 64-bit device UID (firmware writes at boot) |
+| `0x18` | `FAULT_GT` | RO | GT word0 of faulting capability (latched on fault) |
+| `0x1C` | `FAULT_INSTR` | RO | Instruction word at fault NIA |
+| `0x20` | `FAULT_CR14` | RO | Active abstraction slot at fault time |
+| `0x24` | `FAULT_STAGE` | RO | Pipeline stage [3:0]: Fetch/Decode/Perm/Lambda/TPERM/Call/Return/DataRW |
+
+### Five capabilities available now — no FPGA changes needed
+
+**1. Hardware watchdog for hung programs**
+`fault_valid` only fires on capability violations. An infinite loop or deadlock
+produces silence. The RISC-V can poll NIA every 100 ms; if it hasn't changed in
+3 seconds, emit a `HUNG` CALLHOME and pulse CTRL to reset the CM core.
+
+**2. Keystore custodian**
+K_enc/K_mac live in RISC-V private RAM. The CM core never touches them. The
+RISC-V is the hardware security module — this is the physical realisation of the
+TSB described in `docs/cm-msg-protocol.md` Section 1.
+
+**3. Full fault telemetry already latched — just not emitted**
+On every fault, `FAULT_GT`, `FAULT_INSTR`, `FAULT_CR14`, `FAULT_STAGE` are
+latched in bridge hardware. The current `uart_emit_callhome()` reads none of them.
+Adding ~20 lines to read and JSON-format those four registers gives the IDE
+complete fault telemetry with zero FPGA changes.
+
+**4. NIA as a free TraceEmitter**
+NIA is live and readable every cycle. The RISC-V can sample it at 10 Hz, buffer
+10 samples, and emit `TRACE:[0x0012,0x0014,...]` to the bridge. This is T2.3
+(TraceEmitter) at hardware cost zero — no LUMP binary required.
+
+**5. Software-controlled CM reset**
+`CTRL[0]` drives the CM push_button. The bridge can send `RESET\r\n` over UART;
+the RISC-V writes `CTRL=0` for 1 second, triggering a clean CM reboot. No power
+cycle needed for remote fault recovery.
+
+### One gap: `fault_latched` is not software-clearable
+
+Once faulted, `fault_latched` is sticky until hardware reset. Adding a
+`FAULT_RST` register to `apb3_cm_bridge.v` (one write-1-to-clear bit, ~10 lines
+of Verilog) would allow the RISC-V to clear the latch after logging the fault and
+attempting recovery — completing the 3-tier fault recovery model at hardware level.
+
+### FP coprocessor verdict
+
+Not needed, not recommended for the Ti60 UART starter kit. SHA-256 is pure integer
+arithmetic (no FP). SlideRule trig runs on the CM core via CLOOMC methods, not the
+RISC-V. If MTBF averaging ever needs FP in firmware, a software CORDIC
+implementation fits in ~500 bytes of the 14+ KB of headroom remaining after SHA32.
+A hardware FPU would require Sapphire SoC regeneration with `rv32imf`, full
+resynthesis, and an ABI change — not justified for the current use case.
+
+### SHA32 commissioning impact
+
+Commissioning steps are identical (same `efx_pgm`, same `make`, same bridge
+command line). The firmware grows from ~1.6 KB to ~4.6 KB (28% of 16 KB ROM).
+Boot time adds ~100 ms for 9× SHA256 computations at startup. The CALLHOME JSON
+grows by ~700 chars (ns_manifest array); at 57600 baud this adds ~120 ms to the
+first transmission. No new manual steps. The SHA32 cross-check in the bridge makes
+commissioning self-verifying: a misconfigured firmware is detected on first
+CALLHOME before any keys are derived.
