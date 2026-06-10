@@ -1,0 +1,62 @@
+⦗OSS CAD Suite⦘ (venv-church) sipantichijk@penguin:~/church-machine$ # Drop the Efinity project files and test script (accept Replit's versions)
+git checkout -- hardware/soc_combined/church_soc_cm.xml
+git checkout -- hardware/soc_combined/church_soc_cm.peri.xml
+git checkout -- scripts/test_ti60_uart.py
+
+# For main.c and top.v — review the diff first, then decide
+git diff HEAD hardware/soc_combined/firmware/main.c
+git diff HEAD hardware/soc_combined/top.v
+git diff HEAD hardware/soc_combined/firmware/link.ld
+diff --git a/hardware/soc_combined/firmware/main.c b/hardware/soc_combined/firmware/main.c
+index cfd5697b..93854ece 100644
+--- a/hardware/soc_combined/firmware/main.c
++++ b/hardware/soc_combined/firmware/main.c
+@@ -11,7 +11,7 @@
+  *   4. Triggers CM free-run by asserting push_button LOW for 1 second.
+  *   5. Loops, printing the CM NIA every second via UART.
+  *
+- * UART:    Sapphire UART0 at 0xF0010000, 115200 baud, 25 MHz clock.
++ * UART:    Sapphire UART0 at 0xF8010000, 115200 baud, 25 MHz clock.
+  * APB3:    Church Machine bridge at APB_SLAVE_0_BASE (0xF0040000).
+  *
+  * APB3 CM bridge register map:
+@@ -49,13 +49,17 @@
+ #endif
+ 
+ /* ── Sapphire UART0 registers ─────────────────────────────────────────────── */
+-#define UART_BASE       0xF0010000UL
++#define UART_BASE       0xF8010000UL
+ #define UART_DATA       (*(volatile uint32_t *)(UART_BASE + 0x00))
+ #define UART_STATUS     (*(volatile uint32_t *)(UART_BASE + 0x04))
+-#define UART_TX_EMPTY   (1u << 0)   /* bit 0 of STATUS: TX FIFO has space */
++#define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
++#define UART_CLOCKDIV_115200  26u
++#define UART_CLOCKDIV   (*(volatile uint32_t *)(UART_BASE + 0x08))
++/* UART_CLOCKDIV = clk_hz / baud - 1; for 115200 @ 25 MHz = 216 (0xD8) */
++#define UART_CLOCKDIV_115200  26u
+ 
+ /* ── Church Machine APB3 bridge registers ─────────────────────────────────── */
+-#define CM_APB_BASE     0xF0040000UL
++#define CM_APB_BASE     0xF8100000UL
+ #define CM_CTRL         (*(volatile uint32_t *)(CM_APB_BASE + 0x00))
+ #define CM_STATUS       (*(volatile uint32_t *)(CM_APB_BASE + 0x04))
+ #define CM_NIA          (*(volatile uint32_t *)(CM_APB_BASE + 0x08))
+@@ -81,9 +85,8 @@
+ 
+ static void uart_putc(char c)
+ {
+-    while (!(UART_STATUS & UART_TX_EMPTY))
+-        ;
+     UART_DATA = (uint32_t)(unsigned char)c;
++    for (volatile uint32_t i = 0; i < 3000u; i++) __asm__("nop");
+ }
+ 
+ static void uart_puts(const char *s)
+@@ -169,32 +172,23 @@ static void uart_emit_callhome(uint32_t nia, uint32_t status,
+ 
+ void main(void)
+ {
+-    /*
+-     * Step 1 — Write the compile-time board UID into the APB3 bridge.
+-     * Write LO before HI; order does not matter to the hardware but
+:
