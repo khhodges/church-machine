@@ -37,6 +37,9 @@
 //  0x24    FAULT_STAGE RO      [3:0] pipeline stage that detected the fault:
 //                              0=Fetch/BOUNDS 1=Decode 2=PermCheck 3=Lambda
 //                              4=TPERM 5=Call 6=Return 7=DataRW/Other.
+//  0x28    FAULT_RST   WO      Write 1 to clear fault_latched and all fault
+//                              capture registers atomically.  Used by firmware
+//                              after logging a fault to re-arm fault detection.
 //
 // Together UID_HI:UID_LO form a 64-bit value printed as 16 hex digits in every
 // CALLHOME JSON packet so the IDE can distinguish multiple boards of the same
@@ -104,22 +107,26 @@ module apb3_cm_bridge #(
     wire [3:0] reg_idx = PADDR[5:2];
 
     // ----------------------------------------------------------------
-    // Sticky fault latch — set on any fault_valid pulse, cleared only
-    // by reset (not software-clearable in this revision).
+    // Sticky fault latch — set on any fault_valid pulse, cleared by
+    // reset or by a write-1-to-clear to FAULT_RST (offset 0x28).
     // ----------------------------------------------------------------
     reg fault_latched;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             fault_latched <= 1'b0;
+        else if (apb_write && reg_idx == 4'hA && PWDATA[0])
+            fault_latched <= 1'b0;       // FAULT_RST write-1-to-clear
         else if (cm_fault_valid)
             fault_latched <= 1'b1;
     end
 
-    // Latch fault code at the moment of fault
+    // Latch fault code at the moment of fault; cleared by FAULT_RST
     reg [4:0] fault_code_r;
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             fault_code_r <= 5'h0;
+        else if (apb_write && reg_idx == 4'hA && PWDATA[0])
+            fault_code_r <= 5'h0;        // FAULT_RST write-1-to-clear
         else if (cm_fault_valid)
             fault_code_r <= cm_fault;
     end
@@ -137,6 +144,11 @@ module apb3_cm_bridge #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             fault_gt_r    <= 32'h0;
+            fault_instr_r <= 32'h0;
+            fault_cr14_r  <= 32'h0;
+            fault_stage_r <= 4'h0;
+        end else if (apb_write && reg_idx == 4'hA && PWDATA[0]) begin
+            fault_gt_r    <= 32'h0;       // FAULT_RST clears all capture regs
             fault_instr_r <= 32'h0;
             fault_cr14_r  <= 32'h0;
             fault_stage_r <= 4'h0;

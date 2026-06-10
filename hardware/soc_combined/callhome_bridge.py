@@ -665,10 +665,199 @@ def _flush_uart_buffer():
                 _uart_buffer.extend(combined[-500:])
 
 
+def _post_fault_event(payload: dict):
+    """POST a FAULT_EVENT payload to /api/device/fault on the IDE server."""
+    if not _IDE_SERVER_URL:
+        return
+    import urllib.request
+    try:
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{_IDE_SERVER_URL}/api/device/fault",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=10, context=_ssl_ctx())
+        result = json.loads(resp.read())
+        if result.get("ok"):
+            print(f"  [FAULT EVENT] ACK received from IDE — fault_code={payload.get('fault_code')} ({payload.get('fault_name')})")
+        else:
+            print(f"  [FAULT EVENT] IDE responded: {result}")
+    except Exception as e:
+        print(f"  [FAULT EVENT] POST failed: {e}")
+
+
+def _post_hung_event(payload: dict):
+    """POST a HUNG watchdog event to /api/device/call-home (with hung:true)."""
+    if not _IDE_SERVER_URL:
+        return
+    import urllib.request
+    try:
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{_IDE_SERVER_URL}/api/device/call-home",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        resp = urllib.request.urlopen(req, timeout=10, context=_ssl_ctx())
+        result = json.loads(resp.read())
+        if result.get("ok"):
+            print(f"  [HUNG] ACK from IDE — nia={payload.get('nia')}")
+        else:
+            print(f"  [HUNG] IDE responded: {result}")
+    except Exception as e:
+        print(f"  [HUNG] POST failed: {e}")
+
+
+def _post_trace_event(payload: dict):
+    """POST a TRACE record to /api/device/trace on the IDE server (best-effort)."""
+    if not _IDE_SERVER_URL:
+        return
+    import urllib.request
+    try:
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{_IDE_SERVER_URL}/api/device/trace",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req, timeout=5, context=_ssl_ctx())
+    except Exception:
+        pass   # Trace endpoint is best-effort; silently drop on failure
+
+
+def _handle_fault_event_line(line: str):
+    """
+    Parse a FAULT_EVENT:{...} line and forward to the IDE fault endpoint.
+
+    JSON fields:
+        uid          str   16-hex device UID
+        nia          str   faulting NIA, e.g. "0x00000042"
+        fault_code   int   fault code 0-31
+        fault_name   str   human-readable name
+        fault_gt     str   GT word0 hex, e.g. "0x01800003"
+        fault_instr  str   instruction word hex
+        fault_cr14   str   CR14 word0 hex
+        fault_stage  int   pipeline stage 0-7
+        ts           int   loop counter (proxy timestamp)
+    """
+    json_str = line[len("FAULT_EVENT:"):].strip()
+    try:
+        pkt = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        print(f"  [FAULT EVENT] JSON parse error: {e}  raw={json_str!r}")
+        return
+
+    uid         = pkt.get("uid", "0" * 16)
+    nia         = pkt.get("nia", "0x0")
+    fault_code  = int(pkt.get("fault_code", 0))
+    fault_name  = pkt.get("fault_name") or _fault_name(fault_code)
+    fault_gt    = pkt.get("fault_gt", "0x0")
+    fault_instr = pkt.get("fault_instr", "0x0")
+    fault_cr14  = pkt.get("fault_cr14", "0x0")
+    fault_stage = int(pkt.get("fault_stage", 0))
+    ts          = int(pkt.get("ts", 0))
+
+    stage_names = ("Fetch", "Decode", "Perm", "Lambda", "TPERM", "Call", "Return", "DataRW")
+    stage_label = stage_names[fault_stage] if fault_stage < len(stage_names) else str(fault_stage)
+
+    print(f"  [FAULT EVENT] UID={uid}  NIA={nia}  code={fault_code} ({fault_name})"
+          f"  GT={fault_gt}  INSTR={fault_instr}  CR14={fault_cr14}  stage={stage_label}"
+          f"  ts={ts}")
+
+    payload = {
+        "device_uid":   uid,
+        "nia":          nia,
+        "fault_code":   fault_code,
+        "fault_name":   fault_name,
+        "fault_gt":     fault_gt,
+        "fault_instr":  fault_instr,
+        "fault_cr14":   fault_cr14,
+        "fault_stage":  fault_stage,
+        "ts":           ts,
+        "fault_latched": 1,
+    }
+    threading.Thread(target=_post_fault_event, args=(payload,), daemon=True).start()
+
+
+def _handle_hung_line(line: str):
+    """
+    Parse a HUNG:{...} line and forward to the IDE as a callhome with hung:true.
+
+    JSON fields:
+        uid    str   16-hex device UID
+        nia    str   NIA that was frozen, e.g. "0x00000100"
+        loops  int   number of consecutive unchanged-NIA samples
+    """
+    json_str = line[len("HUNG:"):].strip()
+    try:
+        pkt = json.loads(json_str)
+    except json.JSONDecodeError as e:
+        print(f"  [HUNG] JSON parse error: {e}  raw={json_str!r}")
+        return
+
+    uid   = pkt.get("uid", "0" * 16)
+    nia   = pkt.get("nia", "0x0")
+    loops = int(pkt.get("loops", 0))
+
+    print(f"  [HUNG] UID={uid}  NIA={nia}  loops={loops} — watchdog triggered, CM reset")
+
+    payload = {
+        "board_type":    "Ti60F225",
+        "device_uid":    uid,
+        "nia":           nia,
+        "boot_complete": 0,
+        "fault_latched": 0,
+        "hung":          True,
+        "hung_loops":    loops,
+        "fault_code":    0,
+        "fault_name":    "",
+    }
+    threading.Thread(target=_post_hung_event, args=(payload,), daemon=True).start()
+
+
+def _handle_trace_line(line: str):
+    """
+    Parse a TRACE:[0x...,0x...,...] line and forward to the IDE trace endpoint.
+
+    The line contains a JSON array of hex address strings, e.g.:
+        TRACE:[0x00000001,0x00000002,...,0x0000000A]
+    """
+    array_str = line[len("TRACE:"):].strip()
+    try:
+        # The array may contain bare hex strings without JSON quoting —
+        # wrap each element in quotes if needed, or parse directly.
+        # Firmware v2.0 emits: TRACE:[0x...,0x...] — valid JSON array of strings.
+        addresses = json.loads(array_str)
+    except json.JSONDecodeError:
+        # Fallback: split manually on comma/brackets
+        inner = array_str.strip("[]")
+        addresses = [a.strip() for a in inner.split(",") if a.strip()]
+
+    uid = _last_uid or "unknown"
+    print(f"  [TRACE] UID={uid}  {len(addresses)} NIA entries: {addresses[:3]}{'...' if len(addresses) > 3 else ''}")
+
+    payload = {
+        "device_uid": uid,
+        "nia_trace":  addresses,
+        "ts":         time.time(),
+    }
+    threading.Thread(target=_post_trace_event, args=(payload,), daemon=True).start()
+
+
 def _process_line(line):
     """Route a decoded text line to the appropriate handler."""
     if line.startswith("CALLHOME:"):
         _handle_callhome_json(line)
+    elif line.startswith("FAULT_EVENT:"):
+        _handle_fault_event_line(line)
+    elif line.startswith("HUNG:"):
+        _handle_hung_line(line)
+    elif line.startswith("TRACE:"):
+        _handle_trace_line(line)
     else:
         print(f"  {line}")
         if _IDE_SERVER_URL:

@@ -233,12 +233,16 @@ NIA is live and readable every cycle. The RISC-V can sample it at 10 Hz, buffer
 the RISC-V writes `CTRL=0` for 1 second, triggering a clean CM reboot. No power
 cycle needed for remote fault recovery.
 
-### One gap: `fault_latched` is not software-clearable
+### Gap resolved: `FAULT_RST` register added in firmware v2.0
 
-Once faulted, `fault_latched` is sticky until hardware reset. Adding a
-`FAULT_RST` register to `apb3_cm_bridge.v` (one write-1-to-clear bit, ~10 lines
-of Verilog) would allow the RISC-V to clear the latch after logging the fault and
-attempting recovery — completing the 3-tier fault recovery model at hardware level.
+`fault_latched` was sticky until hardware reset. In firmware v2.0 a `FAULT_RST`
+register was added to `apb3_cm_bridge.v` at offset `0x28` (write-1-to-clear).
+Writing `1` to this register atomically clears `fault_latched`, `fault_code_r`,
+`fault_gt_r`, `fault_instr_r`, `fault_cr14_r`, and `fault_stage_r`, re-arming
+fault detection so the next fault is independently detectable. The firmware v2.0
+fault-recovery path reads all six telemetry registers, emits a `FAULT_EVENT:{...}`
+JSON record, writes `FAULT_RST=1`, then pulses `CTRL=0` to reboot the CM core.
+This completes the 3-tier fault recovery model at hardware level.
 
 ### FP coprocessor verdict
 
