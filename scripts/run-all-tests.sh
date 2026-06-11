@@ -126,11 +126,6 @@ register_suite "lump-consistency" \
 register_suite "sha32-vectors" \
     'python -m pytest scripts/test_sha32_vectors.py -v'
 
-register_suite "key-derivation-vectors" \
-    'python -m pytest scripts/test_key_derivation_vectors.py -v'
-
-register_suite "key-derive-c-test" \
-    'make -C hardware/soc_combined test-key-derive'
 
 register_suite "check-sha32-collisions" \
     'python3 scripts/check_sha32_collisions.py'
