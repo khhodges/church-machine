@@ -1,0 +1,124 @@
+sipantichijk@penguin:~/church-machine$ bash hardware/soc_combined/run_efx_map.sh ~/church_project/SoC_minimal/church_soc.xml
+==> Synthesising /home/sipantichijk/church_project/SoC_minimal/church_soc.xml with EFX_MAP...
+    EFX_MAP: /home/sipantichijk/efinity/2026.1/bin/efx_map
+    Project: /home/sipantichijk/church_project/SoC_minimal/church_soc.xml
+
+INFO     : Efinix FPGA Synthesis.
+INFO     : Version: 2026.1.132
+INFO     : Compiled: May 29 2026.
+INFO     : 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+INFO     : Reading project database "/home/sipantichijk/church_project/SoC_minimal/church_soc.xml" [FlowMsg::ProjectDatabaseReading]
+unrecognised option '--split_input_buf'
+ERROR    : Illegal command line. [EFX-0002]
+Synthesis Options:
+  --help                                Prints EFX technology map executable 
+                                        options help message.
+  --max_threads arg                     Specifies the number of threads to use.
+  --family arg                          Specifies the Efinix family name.
+  --device arg                          Specifies the Efinix device name.
+  --v arg                               HDL source files.
+  --I arg                               Manage directories where `include 
+                                        directive will search (-incdir option 
+                                        in Verilog XL and also is used for 
+                                        memories hex init file path resolving.)
+  --f arg                               Verilog-XL -f option to specify text 
+                                        file containing source file absolute 
+                                        names.
+  --settings_file arg                   Specifies a file with settings instead 
+                                        of listing all the command line options
+                                        one after another.
+  --binary-db arg                       Specifies Verific binary DB name to 
+                                        dump mapped netlist.
+  --top-params arg                      Top module parameters list.
+  --verilog-macros arg                  Verilog Macro definition list.
+  --max_mult arg (=-1)                  Specifies maximum number of 
+                                        DSP/Multipliers to be inferred.
+  --max_ram arg (=-1)                   Specifies maximum number of Blockrams 
+                                        to be inferred.
+  --mode arg (=speed)                   Synthesis optimization mode.
+  --prj arg                             Specify the project xml file to use. 
+                                        (Alias of --project-xml)
+  --allow-const-ram-index arg (=0)      Allow constant index in ram net usage.
+  --arch arg                            Specifies the architecture name to be 
+                                        used in top level VHDL entity.
+  --blackbox-error arg (=1)             Issue error for undefined blackbox in 
+                                        elaboration.
+  --blast_const_operand_adders arg (=1) Blast Constant Operands Adders to 
+                                        logic.
+  --bram-push-tco-outreg arg (=0)       push BRAM tco outreg backward when 
+                                        doing address decomposition for outreg 
+                                        packing.
+  --bram_output_regs_packing arg (=1)   Enable BRAM output register packing.
+  --create-onehot-fsms arg (=0)         Create one-hot FSM is possible.
+  --dsp-input-regs-packing arg (=1)     Enable DSP input register packing.
+  --dsp-mac-packing arg (=1)            Enable DSP MAC packing.
+  --dsp-output-regs-packing arg (=1)    Enable DSP output register packing.
+  --enable-mark-debug arg (=1)          Support mark-debug attribute.
+  --fanout-limit arg (=0)               Set maximum signal fanout limit. 
+                                        (0:unlimited)
+  --gated-clk-to-ce arg (=1)            Convert gated clock to enable.
+  --hdl-compile-unit arg (=1)           Set SystemVerilog compile unit 
+                                        (0:Multi-file, 1:Single-file).
+  --hdl-loop-limit arg (=20000)         Loop size limit in HDL parser.
+  --infer-clk-enable arg (=3)           Infer FF's CE from control logic. 
+                                        (0:disabled, 1,2,3:effort levels.
+  --infer-sync-set-reset arg (=1)       Infer sync. set and reset signal to 
+                                        FFs.
+  --insert-carry-skip arg (=0)          Enable carry-skip optimization for long
+                                        adders.
+  --max-bit-blast-mem-size arg (=10240) Maximum memory size allowed for 
+                                        bit-blasting.
+  --message-verbosity arg (=0)          Message verbosity.
+  --min-ce-fanout arg (=0)              Set minimum fanout for FF CE synthesis.
+  --min-sr-fanout arg (=0)              Specifies the minimum fanout of SR 
+                                        signal to be inferred.
+  --msg_config_file arg                 Compiler configuration settings file.
+  --mult-auto-pipeline arg (=0)         perform auto pipelining for wide 
+                                        multipliers after decomposition to 
+                                        improve performance.
+  --mult-decomp-retime arg (=1)         perform retiming for wide multiplier 
+                                        after decomposition to improve 
+                                        performance.
+  --mult_input_regs_packing arg (=1)    Enable input register packing to 
+                                        multipliers.
+  --mult_output_regs_packing arg (=1)   Enable output register packing to 
+                                        multipliers.
+  --operator-sharing arg (=0)           Resource sharing of arithmetic and mux 
+                                        operators.
+  --optimize-adder-tree arg (=0)        Optimize skewed adder trees.
+  --optimize-zero-init-rom arg (=1)     Optimize zero initialized ROM.
+  --output-dir arg                      Specifies output directory. (default is
+                                        the current directory)
+  --pack-luts-to-comb4 arg (=0)         Pack compatible LUTs to COMB4 
+                                        primitives. (0:disabled,1,2:effort 
+                                        levels).
+  --peri-syn-inference arg (=0)         Enable periphery module synthesis 
+                                        inference flow.
+  --peri-syn-instantiation arg (=0)     Enable periphery module synthesis 
+                                        instantiation flow.
+  --project arg (=EFX)                  Specifies the project name. If empty 
+                                        the top level module name will be set 
+                                        as project name.
+  --project-xml arg                     Specify the project xml file to use.
+  --ram-decomp-mode arg (=0)            Default memory decomposition mode (0: 
+                                        speed, 1: area, 2: power).
+  --retiming arg (=2)                   perform register retiming. (0:disabled,
+                                        1:enabled, 2:adv.mode)
+  --root arg                            Specifies the root module.
+  --seq-opt-sync-only arg (=0)          Perform sequential synthesis only on 
+                                        synchronous set/reset logic.
+  --seq_opt arg (=1)                    Sequential Optimization.
+  --suppress_info_msgs arg (=0)         Suppress all info messages.
+  --suppress_warning_msgs arg (=0)      Suppress all warning messages.
+  --use-logic-for-small-mem arg (=64)   Set limit of small rams implemented in 
+                                        LE. (0:disabled).
+  --use-logic-for-small-rom arg (=64)   Set limit of small roms implemented in 
+                                        LE. (0:disabled).
+  --work-dir arg                        Specifies work directory. (default is 
+                                        the current directory)
+  --write-efx-verilog arg               Specifies output verilog file for 
+                                        mapped netlist.
+
+sipantichijk@penguin:~/church-machine$ 

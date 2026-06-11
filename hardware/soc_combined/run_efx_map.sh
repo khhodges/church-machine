@@ -9,7 +9,7 @@
 # strips them automatically before invoking efx_map.
 #
 # Known banned params (cause EFX-0002 in 2026.1):
-#   infer_clk_enable, infer_set_reset, calc_mcw
+#   infer_clk_enable, infer_set_reset, calc_mcw, split_input_buf
 
 set -euo pipefail
 
@@ -28,6 +28,7 @@ echo "==> Stripping banned XML params from $PROJECT ..."
 sed -i '/<efx:param name="infer_clk_enable"/d' "$PROJECT"
 sed -i '/<efx:param name="infer_set_reset"/d'  "$PROJECT"
 sed -i '/<efx:param name="calc_mcw"/d'         "$PROJECT"
+sed -i '/<efx:param name="split_input_buf"/d'  "$PROJECT"
 echo "    Done."
 echo ""
 
