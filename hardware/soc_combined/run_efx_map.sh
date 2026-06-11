@@ -4,15 +4,16 @@
 # Usage (from any directory):
 #   bash ~/church-machine/hardware/soc_combined/run_efx_map.sh [PROJECT_XML]
 #
-# PROJECT_XML defaults to ~/church_project/SoC/church_soc_cm.xml.
-# EFX_MAP uses Efinity 2025.2 (2026.1 segfaults on efx_map).
+# PROJECT_XML defaults to ~/church_project/SoC_minimal/church_soc.xml.
+# Efinity re-injects banned params into the XML on every GUI save; this script
+# strips them automatically before invoking efx_map.
 #
-# The script sources Efinity's setup.sh so efx_map can find its shared
-# libraries — without this it crashes with SIGSEGV immediately.
+# Known banned params (cause EFX-0002 in 2026.1):
+#   infer_clk_enable, infer_set_reset, calc_mcw
 
 set -euo pipefail
 
-EFINITY="${EFINITY_HOME:-$HOME/efinity/2025.2}"
+EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_MAP="$EFINITY/bin/efx_map"
 
 # Source Efinity environment so efx_map can find libefx.so etc.
@@ -22,6 +23,13 @@ source "$EFINITY/bin/setup.sh" 2>/dev/null || true
 # Default project: actual Efinity project in church_project/SoC_minimal/
 PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc.xml}"
 SOC_DIR="$(dirname "$PROJECT")"
+
+echo "==> Stripping banned XML params from $PROJECT ..."
+sed -i '/<efx:param name="infer_clk_enable"/d' "$PROJECT"
+sed -i '/<efx:param name="infer_set_reset"/d'  "$PROJECT"
+sed -i '/<efx:param name="calc_mcw"/d'         "$PROJECT"
+echo "    Done."
+echo ""
 
 echo "==> Synthesising $PROJECT with EFX_MAP..."
 echo "    EFX_MAP:    $EFX_MAP"
@@ -35,4 +43,4 @@ cd "$SOC_DIR"
 echo ""
 echo "==> Synthesis complete. Output in $SOC_DIR/work_syn/"
 echo "    Verify firmware embedded in BRAM:"
-echo "    grep 'ram_symbol0__D\$g1' $SOC_DIR/work_syn/church_soc_cm.map.v | head -1"
+echo "    grep 'ram_symbol0__D\$g1' $SOC_DIR/work_syn/church_soc.map.v | head -1"
