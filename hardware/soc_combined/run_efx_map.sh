@@ -11,7 +11,8 @@
 # Known banned params (cause EFX-0002 in 2026.1):
 #   infer_clk_enable, infer_set_reset, calc_mcw, split_input_buf,
 #   no_fanout_override, get_names_method, logic_opting, pack_lut_into_ram,
-#   cpe_ins_register, use_cpe_for_const_0, use_cpe_for_const_1
+#   cpe_ins_register, use_cpe_for_const_0, use_cpe_for_const_1,
+#   fanout_limit (renamed to --fanout-limit with hyphens)
 
 set -euo pipefail
 
@@ -38,6 +39,7 @@ sed -i '/<efx:param name="pack_lut_into_ram"/d'   "$PROJECT"
 sed -i '/<efx:param name="cpe_ins_register"/d'    "$PROJECT"
 sed -i '/<efx:param name="use_cpe_for_const_0"/d' "$PROJECT"
 sed -i '/<efx:param name="use_cpe_for_const_1"/d' "$PROJECT"
+sed -i '/<efx:param name="fanout_limit"/d'        "$PROJECT"
 echo "    Done."
 echo ""
 
