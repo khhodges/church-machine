@@ -20,8 +20,12 @@ EFINITY="${EFINITY_HOME:-$HOME/efinity/2026.1}"
 EFX_MAP="$EFINITY/bin/efx_map"
 
 # Source Efinity environment so efx_map can find libefx.so etc.
+# Temporarily disable set -e so a failing command inside setup.sh
+# does not kill this script before the first echo.
 # shellcheck disable=SC1091
-source "$EFINITY/bin/setup.sh" 2>/dev/null || true
+set +e
+source "$EFINITY/bin/setup.sh" 2>/dev/null
+set -e
 
 # Default project: actual Efinity project in church_project/SoC_minimal/
 PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc.xml}"
