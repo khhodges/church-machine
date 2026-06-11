@@ -26,9 +26,9 @@ fi
 source "$EFINITY/bin/setup.sh" 2>/dev/null || true
 
 # Default project: actual Efinity project in church_project/SoC_minimal/
-PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc_cm.xml}"
+PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc.xml}"
 SOC_DIR="$(dirname "$PROJECT")"
-CIRCUIT="church_soc_cm"
+CIRCUIT="church_soc"
 FAMILY="Titanium"
 DEVICE="Ti60F225"
 LBF_FILE="$SOC_DIR/work_pnr/${CIRCUIT}.lbf"
