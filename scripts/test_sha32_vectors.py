@@ -63,7 +63,11 @@ SHA32_VECTORS = [
     # Edge cases
     ("",   0xe3b0c442),  # SHA256("") first 4 bytes
     ("a",  0xca978112),
-    ("x" * 63, 0x75220b47),  # 63-byte OGT (near block-size boundary)
+    ("x" * 63,  0x75220b47),  # 63-byte OGT (near SHA-256 block-size boundary)
+    ("x" * 255, 0xd22609da),  # 255-char OGT — exercises multi-block SHA-256
+    # Unicode OGT — Ñ and ñ are 2-byte UTF-8 sequences (0xC3 0x91 and 0xC3 0xB1)
+    # sha32("global.Core.Ñoño.boot") — verifies UTF-8 encoding, not Latin-1
+    ("global.Core.\u00d1o\u00f1o.boot", 0x219e9c32),
 ]
 
 

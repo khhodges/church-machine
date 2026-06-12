@@ -267,8 +267,18 @@ Machine uses to match a LUMP or C-list entry to a namespace slot. It is
 
 ```
 sha32("global.Core.FaultReporter.boot")
-  = SHA-256("global.Core.FaultReporter.boot")[0:4]
-  = 0x677d36a7
+
+  Step 1 — encode OGT to raw UTF-8 bytes (30 bytes):
+    67 6c 6f 62 61 6c 2e 43 6f 72 65 2e
+    46 61 75 6c 74 52 65 70 6f 72 74 65
+    72 2e 62 6f 6f 74
+
+  Step 2 — SHA-256 over those 30 bytes (full 32-byte digest):
+    677d36a7 dfccf13f ecfd1c4e 15ffadf1
+    bc48b352 c01296a5 9ac4684b db680b40
+
+  Step 3 — take first 4 bytes, interpret big-endian:
+    token_32 = 0x677d36a7
 ```
 
 Full ns_manifest CALLHOME JSON fragment (firmware v1.2+):

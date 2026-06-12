@@ -1,4 +1,4 @@
-.PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive
+.PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive test-sha32
 
 SCRIPTS_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null)/scripts
 ifeq ($(SCRIPTS_DIR),/scripts)
@@ -45,3 +45,20 @@ test-key-derive:
 		-o /tmp/key_derive_test \
 		../key_derive_test.c \
 		&& /tmp/key_derive_test
+
+# ---------------------------------------------------------------------------
+# test-sha32 — run the cross-language sha32/HKDF vector suite.
+#
+# Verifies that the Python reference implementation and the callhome_bridge
+# implementation agree with all hard-coded vectors in
+# scripts/test_sha32_vectors.py, including Core OGT vectors, edge cases,
+# and Unicode/255-char inputs.
+#
+# No hardware required.
+#
+# Usage:
+#   make test-sha32                        (from hardware/soc_combined/)
+#   make -C hardware/soc_combined test-sha32   (from repo root)
+# ---------------------------------------------------------------------------
+test-sha32:
+	python3 -m pytest $(SCRIPTS_DIR)/test_sha32_vectors.py -v
