@@ -1,0 +1,49 @@
+sipantichijk@penguin:~/church_project/SoC_minimal$ # Look for all BRAM/ROM-related patterns
+grep -n "readmem\|symbol0\|ramA\|\.bin\|INIT_\|hexfile\|logic_ram" ~/church_project/SoC_minimal/sapphire.v | head -20
+
+echo "---"
+
+# Show what's at the second initial begin block (line 4877)
+sed -n '4877,4895p' ~/church_project/SoC_minimal/sapphire.v
+291:  wire                system_ramA_logic_io_bus_cmd_ready;
+292:  wire                system_ramA_logic_io_bus_rsp_valid;
+293:  wire                system_ramA_logic_io_bus_rsp_payload_last;
+294:  wire       [0:0]    system_ramA_logic_io_bus_rsp_payload_fragment_opcode;
+295:  wire       [31:0]   system_ramA_logic_io_bus_rsp_payload_fragment_data;
+296:  wire       [3:0]    system_ramA_logic_io_bus_rsp_payload_fragment_context;
+863:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_valid;
+864:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_ready;
+865:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_last;
+866:  wire       [0:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_opcode;
+867:  wire       [14:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_address;
+868:  wire       [1:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_length;
+869:  wire       [31:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_data;
+870:  wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_mask;
+871:  wire       [3:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_cmd_payload_fragment_context;
+872:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_valid;
+873:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_ready;
+874:  wire                system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_payload_last;
+875:  wire       [0:0]    system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_payload_fragment_opcode;
+876:  wire       [31:0]   system_ramA_ctrl_slaveModel_arbiterGen_oneToOne_arbiter_rsp_payload_fragment_data;
+grep: write error: Broken pipe
+---
+  initial begin
+        ram_symbol0[0] = 8'h17;
+        ram_symbol0[1] = 8'h13;
+        ram_symbol0[2] = 8'h97;
+        ram_symbol0[3] = 8'h93;
+        ram_symbol0[4] = 8'h17;
+        ram_symbol0[5] = 8'h13;
+        ram_symbol0[6] = 8'h63;
+        ram_symbol0[7] = 8'h23;
+        ram_symbol0[8] = 8'h93;
+        ram_symbol0[9] = 8'h6F;
+        ram_symbol0[10] = 8'h97;
+        ram_symbol0[11] = 8'h93;
+        ram_symbol0[12] = 8'h17;
+        ram_symbol0[13] = 8'h13;
+        ram_symbol0[14] = 8'h97;
+        ram_symbol0[15] = 8'h93;
+        ram_symbol0[16] = 8'h63;
+        ram_symbol0[17] = 8'h03;
+sipantichijk@penguin:~/church_project/SoC_minimal$ 
