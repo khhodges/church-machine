@@ -1,0 +1,52 @@
+sipantichijk@penguin:~/church_project/SoC_minimal$ # Check Efinity 2026.1 example projects for correct HSIO gpio_def naming
+find ~/efinity/2026.1 -name "*.peri.xml" 2>/dev/null | head -3
+cat $(find ~/efinity/2026.1 -name "*.peri.xml" 2>/dev/null | head -1) 2>/dev/null | grep "gpio_def" | head -10
+
+# What does top.v say about cm_uart_tx pin?
+grep -iE "cm_uart|GPIOL|pin|channel" ~/church-machine/hardware/soc_combined/top.v | head -20
+
+# Also grep synthesis warn log for any IO/placement hints
+grep -iE "GPIOL_P|GPIOR_P|unrecog|warning.*io|gpio_def" ~/church_project/SoC_minimal/outflow/church_soc.warn.log 2>/dev/null | head -20
+/home/sipantichijk/efinity/2026.1/examples/helloworld-dbg_MULTI_USERS/helloworld.peri.xml
+/home/sipantichijk/efinity/2026.1/examples/helloworld-dbg/helloworld.peri.xml
+/home/sipantichijk/efinity/2026.1/examples/helloworld-unified/helloworld.peri.xml
+        <efxpt:comp_gpio name="led[0]" gpio_def="GPIOR_P_07" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="led[1]" gpio_def="GPIOR_P_09" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="led[2]" gpio_def="GPIOR_P_08" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="led[3]" gpio_def="GPIOR_N_07" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="led[4]" gpio_def="GPIOR_N_09" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="led[5]" gpio_def="GPIOR_N_08" mode="output" bus_name="led" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="pll_refclk" gpio_def="GPIOL_P_18" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="reverse" gpio_def="GPIOR_P_06" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+        <efxpt:comp_gpio name="rstn" gpio_def="GPIOR_N_06" mode="input" bus_name="" io_standard="1.8 V LVCMOS">
+//   clk        — 25 MHz raw crystal (GPIOL_P_18_PLLIN0); NO PLL configured.
+//   uart_tx / uart_rx — GPIOL_02 / GPIOL_01 → FT4232H interface 2 (ttyUSB2)
+//   cm_uart_tx        — Church Machine UART debug output (NIA, fault codes,
+//                       call-home packets) → GPIOL_P_03 → FT4232H interface 3
+    output wire uart_tx,       // GPIOL_02 → FT4232H interface 2 → ttyUSB2
+    input  wire uart_rx,       // GPIOL_01 ← FT4232H interface 2
+    output wire cm_uart_tx,    // GPIOL_P_03 → FT4232H interface 3 → ttyUSB3
+    // cm_uart_tx is a top-level output port (GPIOL_P_03 → ttyUSB3)
+    // The CM UART debug port is pinned out to GPIOL_P_03 → FT4232H
+        .uart_tx          (cm_uart_tx),          // CM debug UART → GPIOL_P_03 → ttyUSB3
+[EFX-0011 VERI-WARNING] net 'IBusCachedPlugin_cache_io_cpu_fetch_isRemoved' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10446)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_SW' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10459)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_SR' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10460)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_SO' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10461)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_SI' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10462)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_PW' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10463)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_PR' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10464)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_PO' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10465)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_PI' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10466)
+[EFX-0011 VERI-WARNING] net 'dataCache_1_io_cpu_writeBack_fence_FM[3]' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10467)
+[EFX-0011 VERI-WARNING] net 'IBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10972)
+[EFX-0011 VERI-WARNING] net 'DBusCachedPlugin_mmuBus_rsp_bypassTranslation' does not have a driver (VDB-1002) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:10987)
+[EFX-0011 VERI-WARNING] system function call 'urandom' is not supported (VERI-1141) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:16909)
+[EFX-0011 VERI-WARNING] system function call 'urandom' is not supported (VERI-1141) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:16910)
+[EFX-0011 VERI-WARNING] system function call 'urandom' is not supported (VERI-1141) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:18620)
+[EFX-0011 VERI-WARNING] system function call 'urandom' is not supported (VERI-1141) (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:18621)
+[EFX-0011 VERI-WARNING] actual bit length 32 differs from formal bit length 16 for port 'io_apbSlave_0_PADDR' (VERI-1330) (/home/sipantichijk/church_project/SoC_minimal/top.v:128)
+[EFX-0011 VERI-WARNING] expression size 15 truncated to fit in target size 1 (VERI-1209) (/home/sipantichijk/church_project/SoC_minimal/church_ti60_f225.v:18856)
+[EFX-0200 WARNING] Removing redundant signal : io_cpu_prefetch_isValid. (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:17791)
+[EFX-0200 WARNING] Removing redundant signal : io_cpu_fetch_isRemoved. (/home/sipantichijk/church_project/SoC_minimal/sapphire.v:17796)
+sipantichijk@penguin:~/church_project/SoC_minimal$ 
