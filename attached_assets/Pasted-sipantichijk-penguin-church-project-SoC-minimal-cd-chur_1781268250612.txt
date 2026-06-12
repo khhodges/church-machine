@@ -1,0 +1,33 @@
+sipantichijk@penguin:~/church_project/SoC_minimal$ cd ~/church_project/SoC_minimal
+
+# Strip illegal params again (they get re-injected)
+sed -i '/infer_set_reset\|infer_clk_enable/d' church_soc.xml
+
+# Synthesize using correct flag name
+~/efinity/2026.1/bin/efx_map --project-xml church_soc.xml --work_dir work_syn --output_dir outflow --family Titanium --device Ti60F225 2>&1 | tail -25
+  --peri-syn-instantiation arg (=0)     Enable periphery module synthesis 
+                                        instantiation flow.
+  --project arg (=EFX)                  Specifies the project name. If empty 
+                                        the top level module name will be set 
+                                        as project name.
+  --project-xml arg                     Specify the project xml file to use.
+  --ram-decomp-mode arg (=0)            Default memory decomposition mode (0: 
+                                        speed, 1: area, 2: power).
+  --retiming arg (=2)                   perform register retiming. (0:disabled,
+                                        1:enabled, 2:adv.mode)
+  --root arg                            Specifies the root module.
+  --seq-opt-sync-only arg (=0)          Perform sequential synthesis only on 
+                                        synchronous set/reset logic.
+  --seq_opt arg (=1)                    Sequential Optimization.
+  --suppress_info_msgs arg (=0)         Suppress all info messages.
+  --suppress_warning_msgs arg (=0)      Suppress all warning messages.
+  --use-logic-for-small-mem arg (=64)   Set limit of small rams implemented in 
+                                        LE. (0:disabled).
+  --use-logic-for-small-rom arg (=64)   Set limit of small roms implemented in 
+                                        LE. (0:disabled).
+  --work-dir arg                        Specifies work directory. (default is 
+                                        the current directory)
+  --write-efx-verilog arg               Specifies output verilog file for 
+                                        mapped netlist.
+
+sipantichijk@penguin:~/church_project/SoC_minimal$ 
