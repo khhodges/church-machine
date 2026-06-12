@@ -6,6 +6,21 @@
 
 ---
 
+### Firmware version compatibility
+
+| Firmware | Wire protocol | Bridge mode | Encrypted frames |
+|---|---|---|---|
+| **FW=2.0** (stable, June 2026 — June 2027+) | Plaintext ASCII JSON over UART | `--insecure` **(correct stable mode)** | **No** — key material derived in private RISC-V RAM but never used on the wire |
+| **FW=3.0** (planned) | Framed binary: ChaCha20 payload + HMAC-8 tag + nonce | *(default, no flag needed)* | Yes — full per-abstraction encryption |
+
+> **FW=2.0 is frozen for ≥12 months.** The plaintext UART protocol is not a temporary
+> limitation — it is the stable, documented interface for this version. The encrypted
+> frame layer described in Sections 1–4 and Section 8 is the **target architecture
+> for FW=3.0+**. Do not expect HMAC tags or ciphertext from any FW=2.0 board.
+> The physical UART cable is the security boundary for FW=2.0 deployments.
+
+---
+
 ## Guiding Principle
 
 **Identity belongs to the abstraction — not the hardware.**
@@ -50,6 +65,11 @@ by the Outform Golden Token pair of its source and destination abstractions.**
   Revoking one abstraction's keys leaves all others intact.
 
 This is not an add-on. It is the protocol's reason for existing.
+
+> **FW=2.0 note:** The above describes the full target security model (FW=3.0+).
+> FW=2.0 implements key derivation (K_enc/K_mac stored in private RISC-V RAM)
+> but does not apply encryption or HMAC on the wire. All FW=2.0 frames are
+> plaintext ASCII. Use `callhome_bridge.py --insecure` with FW=2.0 boards.
 
 ---
 
@@ -1213,10 +1233,16 @@ firmware changes.
 
 Protocol version is carried in the `CALLHOME` payload as `"proto":N`.
 
-| proto | Key changes |
-|-------|-------------|
-| 1 | Initial Tier 0 (CRC only); `gt_manifest` = list of GT global name strings |
-| 2 | Tier 1/2 (HMAC + ChaCha20); **`gt_manifest` replaced by `ns_manifest`** — list of `{slot, label, token}` objects; per-slot encryption services; key derivation upgraded from `CM_ENC/MAC_v1` → `v2` (IKM now binds `board_uid + ns_slot + token_32`); `last_nonce` keyed by `(board_uid, ns_slot)` not `(board_uid, gt_name)` |
+| proto | Firmware | Wire format | Key changes |
+|-------|----------|-------------|-------------|
+| **0** | **FW=2.0 (stable, ≥12 months)** | **Plaintext ASCII JSON** | **No framing, no HMAC, no encryption. `ns_manifest` present. Bridge: `--insecure`. Physical UART cable = security boundary.** |
+| 1 | FW=1.x | Tier 0 (CRC only) | `gt_manifest` = list of GT global name strings |
+| 2 | FW=3.0 (planned) | Tier 1/2 (HMAC + ChaCha20) | **`gt_manifest` replaced by `ns_manifest`** — list of `{slot, label, token}` objects; per-slot encryption services; key derivation upgraded from `CM_ENC/MAC_v1` → `v3` (IKM now binds `board_uid + ogt_bytes`); `last_nonce` keyed by `(board_uid, token_32)` |
+
+**FW=2.0 (proto=0):** Bridge runs with `--insecure`. All messages are plaintext.
+`ns_manifest` is present and verified locally by the bridge (sha32 recomputed, no
+wire authentication). Key material (K_enc, K_mac) is derived in firmware and held
+in private RISC-V RAM but never transmitted.
 
 Boards on proto=1 send `gt_manifest` (list of strings); the bridge falls back to
 the old `CM_MSG_TYPE_GT` lookup for those sessions and does not attempt OGT-encryption.
