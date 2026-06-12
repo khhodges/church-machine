@@ -26,7 +26,37 @@ if True:  # always generate constraint
     self.__gen_constraint(enable_bitstream, outdir)
 ```
 
-## Use efx_run wrappers, not bare efx_pnr/efx_pgm
+## Complete 4-step headless build flow (SoC_minimal project)
+
+```
+# Step 1 — write BRAM symbol files from firmware BEFORE synthesis
+python3 -c "fw=open('firmware.bin','rb').read();fw+=b'\x00'*(8192*4-len(fw));base='work_syn/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol';[open(base+str(l)+'.bin','wb').write(bytes(fw[i*4+l] for i in range(8192))) for l in range(4)]"
+
+# Step 2 — synthesis (reads symbol files for BRAM init; initial begin blocks are IGNORED)
+rm -f work_syn/top.vdb outflow/church_soc.vdb
+sed -i '/infer_set_reset\|infer_clk_enable/d' church_soc.xml
+python3 ~/efinity/2026.1/scripts/efx_run.py --prj church_soc.xml -f map
+
+# Step 3 — place and route
+~/efinity/2026.1/bin/efx_pnr --prj church_soc.xml --circuit church_soc \
+  --family Titanium --device Ti60F225 --operating_conditions C3 \
+  --pack --place --route \
+  --vdb_file outflow/church_soc.vdb --sync_file outflow/church_soc.interface.csv \
+  --work_dir work_pnr --output_dir outflow
+
+# Step 4 — bitstream generation (REQUIRED — efx_pnr does NOT write the hex/bit files)
+python3 ~/efinity/2026.1/scripts/efx_run.py --prj church_soc.xml -f pgm
+```
+
+**Why:** `efx_pnr` only does pack/place/route — it does NOT generate the `.hex`/`.bit` files. A separate `efx_run.py -f pgm` step is mandatory. Without it, `openFPGALoader` silently flashes the old bitstream. This caused persistent FW=1.3 even after correct synthesis.
+
+## Symbol file rule
+Synthesis READS `work_syn/EfxSapphireSoc.v_..._symbol{0-3}.bin` as BRAM init input. The `initial begin` blocks in `sapphire.v` are **ignored by synthesis** — they are simulation-only. Always pre-write symbol files from `firmware.bin` before running `efx_map`. If files are absent, BRAM is zero-initialized.
+
+## Checking a specific byte (not just byte 0)
+`match=True` on sym[0]==fw[0] is misleading — byte 0 is the same in all firmware versions (RISC-V AUIPC opcode). Always check a version-specific byte, e.g. the '2' vs '3' at `fw.find(b'v2.0')+1`.
+
+## Use efx_run wrappers, not bare efx_pnr/efx_pgm (for other projects)
 - `efx_run church_soc_cm --prj --flow pnr --family Titanium --device Ti60F225` (NOT bare efx_pnr)
 - `efx_run church_soc_cm --prj --flow pgm --family Titanium --device Ti60F225` (NOT efx_pgm --source)
 
