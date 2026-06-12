@@ -333,6 +333,27 @@ def upload_ti60_hex():
     app.logger.info("Ti60 hex uploaded: %d bytes at %s", size, built_at)
     return jsonify({"ok": True, "size_bytes": size, "built_at": built_at})
 
+@app.route("/upload/ti60-bit", methods=["POST"])
+def upload_ti60_bit():
+    """Accept a new Ti60 F225 raw bitstream upload and save it to bitstreams/.
+
+    Usage from Chromebook:
+      curl -X POST <ide-url>/upload/ti60-bit -F "file=@outflow/church_soc.bit"
+    """
+    if "file" not in request.files:
+        return jsonify({"ok": False, "error": "No file field in request"}), 400
+    f = request.files["file"]
+    if not f.filename:
+        return jsonify({"ok": False, "error": "Empty filename"}), 400
+    bitstreams_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "bitstreams"))
+    os.makedirs(bitstreams_dir, exist_ok=True)
+    bit_path = os.path.join(bitstreams_dir, "church_ti60_f225.bit")
+    f.save(bit_path)
+    size = os.path.getsize(bit_path)
+    app.logger.info("Ti60 bit uploaded: %d bytes", size)
+    return jsonify({"ok": True, "size_bytes": size})
+
+
 @app.route("/api/bitstream-status")
 def api_bitstream_status():
     """Return metadata about the pre-built Ti60 hex file for the IDE panel."""
