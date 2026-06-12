@@ -1,0 +1,63 @@
+sipantichijk@penguin:~$ # Update version defines and strings
+sed -i 's/#define FW_MAJOR 1/#define FW_MAJOR 2/' ~/church-machine/hardware/soc_combined/firmware/main.c
+sed -i 's/#define FW_MINOR 3.*/#define FW_MINOR 0   \/* v2.0: IO placement fixed *\//' ~/church-machine/hardware/soc_combined/firmware/main.c
+sed -i 's/CHURCH Ti60 SoC+CM v1\.3/CHURCH Ti60 SoC+CM v2.0/g' ~/church-machine/hardware/soc_combined/firmware/main.c
+
+# Verify
+grep -n "FW_MAJOR\|FW_MINOR\|v2\." ~/church-machine/hardware/soc_combined/firmware/main.c | head -10
+
+echo "---"
+
+# Check firmware build system
+ls ~/church-machine/hardware/soc_combined/firmware/
+cat ~/church-machine/hardware/soc_combined/firmware/Makefile 2>/dev/null | head -40
+5: * bitstream on the Ti60F225 devkit.  Redesigned v2.0.
+105:#define FW_MAJOR 2
+106:#define FW_MINOR 0   /* v2.0: IO placement fixed */
+192:    uart_putc('0' + FW_MAJOR);
+194:    uart_putc('0' + FW_MINOR);
+249:    uart_puts("CHURCH Ti60 SoC+CM v2.0\r\n");
+313:            uart_puts("CHURCH Ti60 SoC+CM v2.0\r\n");
+---
+Makefile  crt0.S  firmware.bin  firmware.elf  firmware.hex  full_uart.c  link.ld  main.c
+# hardware/soc_combined/firmware/Makefile
+#
+# Build bare-metal RISC-V firmware for the combined Sapphire SoC + Church
+# Machine bitstream on the Ti60F225.
+#
+# Produces:
+#   firmware.hex   — plain 32-bit word-per-line hex (kept for reference)
+#   firmware.bin   — raw binary
+#   ../EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol{0..3}.bin
+#                  — byte-lane split $readmemb files consumed by sapphire.v
+#
+# sapphire.v uses $readmemb (NOT $readmemh / FIRMWARE_INIT_FILE) to
+# initialise the on-chip ROM.  The four symbol files must sit in the same
+# directory as sapphire.v (hardware/soc_combined/) when Efinity synthesises.
+#
+# Toolchain:
+#   riscv-none-embed-gcc from the Efinity RISC-V IDE 2025.2 installation.
+#   Override TOOLCHAIN on the command line if installed elsewhere, e.g.:
+#     make TOOLCHAIN=/opt/riscv/bin
+
+TOOLCHAIN ?= $(HOME)/efinity/efinity-riscv-ide-2025.2/toolchain/bin
+CC        := $(TOOLCHAIN)/riscv-none-embed-gcc
+OBJCOPY   := $(TOOLCHAIN)/riscv-none-embed-objcopy
+
+CFLAGS := -march=rv32im -mabi=ilp32 -O2 -nostdlib -ffreestanding \
+          -Wall -Wextra
+
+SRCS   := crt0.S main.c
+TARGET := firmware
+
+# Directory that contains sapphire.v — the symbol files go here
+DESTDIR := ..
+
+# Sapphire ROM depth: 512 KB / 4 bytes = 131072 words
+ROM_WORDS := 131072
+
+SYM_PREFIX := $(DESTDIR)/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol
+SYM0 := $(SYM_PREFIX)0.bin
+SYM1 := $(SYM_PREFIX)1.bin
+SYM2 := $(SYM_PREFIX)2.bin
+sipantichijk@penguin:~$ 
