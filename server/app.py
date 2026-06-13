@@ -9213,6 +9213,22 @@ def api_generate_method_available():
     return jsonify(resp)
 
 
+@app.route("/internal/download-verilog")
+def internal_download_verilog():
+    """Temporary endpoint — serve the generated Ti60 Verilog so the Chromebook can wget it."""
+    import glob as _glob
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "church_ti60_f225.v"),
+        os.path.join(os.path.dirname(__file__), "..", "build", "church_ti60_f225.v"),
+    ]
+    for path in candidates:
+        path = os.path.normpath(path)
+        if os.path.isfile(path):
+            return send_file(path, as_attachment=True, download_name="church_ti60_f225.v",
+                             mimetype="text/plain")
+    return jsonify({"error": "church_ti60_f225.v not found — run gen_verilog first"}), 404
+
+
 if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
     _free_port(_port)
