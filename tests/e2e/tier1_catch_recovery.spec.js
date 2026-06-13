@@ -180,6 +180,13 @@ test.describe('Tier 1 (.catch) fault recovery — live IDE', () => {
     test('Fault Popup shows Tier 1 recovery; machine not halted; state survives reload', async ({ page }) => {
         test.setTimeout(60000); // extra headroom for reload + Gate Log navigation
 
+        // ── Suppress What's New modal and any other auto-opening popups ─────
+        // Runs before page scripts execute, so showWhatsNew() sees the flag
+        // and returns immediately without making the modal visible.
+        await page.addInitScript(() => {
+            localStorage.setItem('church_whatsnew_dismissed_perm', '1');
+        });
+
         // ── Load the simulator ──────────────────────────────────────────────
         await page.goto('/simulator/');
         await page.waitForLoadState('networkidle');

@@ -34,7 +34,8 @@ fi
 # Default project: actual Efinity project in church_project/SoC_minimal/
 PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc.xml}"
 SOC_DIR="$(dirname "$PROJECT")"
-CIRCUIT="church_soc"
+# Derive circuit name from the project XML filename (strip directory + .xml)
+CIRCUIT="$(basename "$PROJECT" .xml)"
 FAMILY="Titanium"
 DEVICE="Ti60F225"
 OPCOND="C3"

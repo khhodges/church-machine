@@ -109,10 +109,10 @@ _info "Step 3/7: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
 EFINITY_HOME="$EFINITY_MAP" bash "$HW/run_efx_map.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_map.log | tail -8
 
 # Auto-detect circuit name from the .map.v file efx_map produced.
-# The circuit name comes from inside the project XML, not the XML filename.
-MAP_V="$(ls "$SOC_DIR/work_syn/"*.map.v 2>/dev/null | head -1)"
+# Efinity 2025.2 writes it to outflow/; older versions used work_syn/.
+MAP_V="$(ls "$SOC_DIR/outflow/"*.map.v "$SOC_DIR/work_syn/"*.map.v 2>/dev/null | head -1)"
 if [ -z "$MAP_V" ] || [ ! -f "$MAP_V" ]; then
-    _fail "No *.map.v found in $SOC_DIR/work_syn/ — synthesis may have failed. Check /tmp/build_map.log"
+    _fail "No *.map.v found in $SOC_DIR/outflow/ or $SOC_DIR/work_syn/ — synthesis may have failed. Check /tmp/build_map.log"
 fi
 CIRCUIT="$(basename "$MAP_V" .map.v)"
 _ok "  Detected circuit name: $CIRCUIT (from $MAP_V)"
