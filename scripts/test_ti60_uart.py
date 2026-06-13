@@ -24,13 +24,15 @@ Exit codes:
 
 Usage:
     python3 scripts/test_ti60_uart.py --dry-run
-    python3 scripts/test_ti60_uart.py [--port=/dev/ttyUSB2] [--timeout=10] [--ide=URL]
+    python3 scripts/test_ti60_uart.py [--port=auto] [--baud=57600] [--timeout=10] [--ide=URL]
 
 Flags:
     --dry-run              Run parser logic against canned transcript; no serial
                            port required.  Suitable for CI.
-    --port=PATH            Serial port to open (default: /dev/ttyUSB2)
-    --baud=N               Baud rate (default: 115200)
+    --port=PATH            Serial port to open (default: auto — scans ttyUSB0–7 for
+                           the first port that produces output at the configured baud rate).
+                           Pass --port=/dev/ttyUSBN to override.
+    --baud=N               Baud rate (default: 57600 — matches UART_CLOCKDIV=53 at 25 MHz)
     --timeout=N            Seconds to wait for output in live mode (default: 10)
     --ide=URL              Check for a call-home ACK from the IDE server at URL
                            (optional; skipped if not provided)
@@ -48,8 +50,8 @@ import time
 # Argument parsing
 # ---------------------------------------------------------------------------
 _DRY_RUN = False
-_SERIAL_PORT = '/dev/ttyUSB2'
-_BAUD = 115200
+_SERIAL_PORT = 'auto'
+_BAUD = 57600
 _TIMEOUT = 10.0
 _IDE_SERVER_URL = None
 _REPORT_LAUNCH_ID = None
@@ -403,6 +405,47 @@ def run_dry_run():
 # Live mode
 # ---------------------------------------------------------------------------
 
+def _auto_detect_port(serial_mod, baud):
+    """
+    Scan /dev/ttyUSB0–7 at the given baud and return the first port that
+    receives at least one byte within a 2-second window.  Returns None if
+    no port responds.
+    """
+    import glob as _glob
+    candidates = sorted(_glob.glob('/dev/ttyUSB[0-9]') + _glob.glob('/dev/ttyUSB[0-9][0-9]'))
+    if not candidates:
+        return None
+    print(f"  [auto] Scanning {len(candidates)} ttyUSB port(s) at {baud} baud…")
+    for port in candidates:
+        try:
+            s = serial_mod.Serial(port, baud, timeout=0)
+            s.setRTS(False)
+            s.setDTR(False)
+        except Exception:
+            print(f"  [auto]   {port}: busy/unavailable")
+            continue
+        deadline = time.monotonic() + 2.0
+        got = b""
+        while time.monotonic() < deadline:
+            try:
+                waiting = s.in_waiting
+            except Exception:
+                waiting = 0
+            if waiting:
+                got = s.read(waiting)
+                break
+            time.sleep(0.05)
+        try:
+            s.close()
+        except Exception:
+            pass
+        if got:
+            print(f"  [auto]   {port}: got {len(got)} byte(s) ← selected")
+            return port
+        print(f"  [auto]   {port}: silent")
+    return None
+
+
 def run_live():
     try:
         import serial as _serial
@@ -410,29 +453,46 @@ def run_live():
         print("ERROR: pyserial not installed.  Run:  pip3 install pyserial")
         sys.exit(1)
 
+    port = _SERIAL_PORT
+    if port == 'auto':
+        port = _auto_detect_port(_serial, _BAUD)
+        if port is None:
+            print("ERROR: auto-detect found no active ttyUSB port at "
+                  f"{_BAUD} baud.")
+            print()
+            print("Diagnostics:")
+            print("  • All ttyUSB ports were silent — firmware may not be running.")
+            print("  • Most common cause: BRAM zero-initialised during synthesis.")
+            print("    Check: grep -c 'ram_symbol0\\[0\\] = 8' "
+                  "~/church_project/SoC/outflow/*.map.v")
+            print("    If 0 → re-run patch_sapphire_init.py then re-synthesise.")
+            print("  • Also check: ls /dev/ttyUSB* (no ports = driver not loaded)")
+            print("  • Run: lsmod | grep ftdi")
+            sys.exit(1)
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("  Ti60 UART Smoke-test  —  LIVE MODE")
-    print(f"  Port: {_SERIAL_PORT}  Baud: {_BAUD}  Timeout: {_TIMEOUT}s")
+    print(f"  Port: {port}  Baud: {_BAUD}  Timeout: {_TIMEOUT}s")
     if _IDE_SERVER_URL:
         print(f"  IDE:  {_IDE_SERVER_URL}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print()
 
     try:
-        s = _serial.Serial(_SERIAL_PORT, _BAUD, timeout=0)
+        s = _serial.Serial(port, _BAUD, timeout=0)
         s.setRTS(False)
         s.setDTR(False)
     except Exception as e:
-        print(f"ERROR: could not open {_SERIAL_PORT}: {e}")
+        print(f"ERROR: could not open {port}: {e}")
         print()
         print("Diagnostics:")
-        print("  • The Ti60 FT4232H maps four interfaces to ttyUSB0–ttyUSB3.")
-        print("  • The Sapphire SoC UART is on ttyUSB2 (interface 2).")
+        print("  • The Ti60 FT4232H creates up to four ttyUSB entries.")
+        print("  • The Sapphire SoC UART maps to one of them (varies by system).")
         print("  • Run: ls /dev/ttyUSB* to list available ports.")
         print("  • Run: lsmod | grep ftdi to verify the FT4232H driver is loaded.")
         sys.exit(1)
 
-    print(f"  Opened {_SERIAL_PORT}.  Waiting up to {_TIMEOUT:.0f}s for firmware output…")
+    print(f"  Opened {port}.  Waiting up to {_TIMEOUT:.0f}s for firmware output…")
     print()
 
     lines_received = []

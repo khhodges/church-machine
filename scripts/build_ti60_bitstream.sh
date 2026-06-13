@@ -215,7 +215,7 @@ if [ "$DO_FLASH" -eq 1 ]; then
         _info "  Waiting 5 s for board to boot..."
         sleep 5
         _info "  Running UART smoke-test..."
-        python3 "$SCRIPTS/test_ti60_uart.py" --port=/dev/ttyUSB2 --timeout=30 --verbose
+        python3 "$SCRIPTS/test_ti60_uart.py" --port=auto --baud=57600 --timeout=30 --verbose
     fi
 else
     _info "Step 7/7: Flash skipped (pass --flash to flash + smoke-test automatically)"

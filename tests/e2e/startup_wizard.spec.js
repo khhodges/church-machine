@@ -71,6 +71,10 @@ async function loadFreshWizard(page) {
  * is checked (e.g. Group 5 checks swBody2 after a reload, not swBody0).
  */
 async function navigateToConnect(page) {
+    await page.waitForFunction(
+        () => typeof switchView === 'function' && typeof switchBuilderViewTab === 'function',
+        { timeout: 8000 }
+    );
     await page.evaluate(() => {
         switchView('builder');
         switchBuilderViewTab('ti60-connect');
