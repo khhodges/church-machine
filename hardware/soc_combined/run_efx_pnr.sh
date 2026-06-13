@@ -24,13 +24,12 @@ EFX_RUN="$EFINITY/bin/efx_run"
 # efx_pnr checks EFINITY_HOME at startup — must be exported
 export EFINITY_HOME="$EFINITY"
 
-# Source Efinity environment so efx_pnr can find its shared libraries
-# set -e temporarily disabled so a failing command inside setup.sh
-# does not kill this script silently.
-# shellcheck disable=SC1091
-set +e
-source "$EFINITY/bin/setup.sh" 2>/dev/null
-set -e
+# Do NOT source setup.sh — it calls `exit` in non-interactive shells and
+# silently kills this script before it prints anything.  Add paths directly.
+export PATH="$EFINITY/bin:${PATH:-}"
+if [ -d "$EFINITY/lib" ]; then
+    export LD_LIBRARY_PATH="$EFINITY/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 
 # Default project: actual Efinity project in church_project/SoC_minimal/
 PROJECT="${1:-$HOME/church_project/SoC_minimal/church_soc.xml}"
