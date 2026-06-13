@@ -94,6 +94,12 @@ _ok "Firmware built — symbol files in $HW/"
 echo ""
 
 # ── Step 2: Patch sapphire.v ────────────────────────────────────────────────
+# patch_sapphire_init.py writes firmware BRAM init-data into the repo copy
+# ($HW/sapphire.v).  After patching we MUST also copy it to $SOC_DIR because
+# Efinity's church_soc_cm.xml references sapphire.v relative to the project
+# directory (~/church_project/SoC/), NOT the repo directory.  Without this
+# copy step synthesis silently re-uses the old version from $SOC_DIR and
+# the flashed bitstream carries the previous firmware version.
 _info "Step 2/8: Patch sapphire.v (embed firmware into BRAM init blocks)"
 python3 "$SCRIPTS/patch_sapphire_init.py" \
     "$SAPPHIRE_V" \
@@ -101,7 +107,10 @@ python3 "$SCRIPTS/patch_sapphire_init.py" \
     "$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin" \
     "$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin" \
     "$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin"
-_ok "sapphire.v patched"
+_ok "sapphire.v patched (repo copy: $SAPPHIRE_V)"
+# Deploy patched sapphire.v to the Efinity project directory
+cp "$SAPPHIRE_V" "$SOC_DIR/sapphire.v"
+_ok "sapphire.v deployed to $SOC_DIR/sapphire.v"
 echo ""
 
 # ── Step 2.5: Copy CM Verilog (stripped of zero-init noise) ─────────────────
