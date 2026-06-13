@@ -1,0 +1,100 @@
+sipantichijk@penguin:~/church-machine$ make bitstream          # or: bash scripts/build_ti60_bitstream.sh
+make bitstream --flash  # also flashes and smoke-tests at 57,600 baud
+bash scripts/build_ti60_bitstream.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Ti60 F225 Bitstream Build Pipeline
+  Repo:    /home/sipantichijk/church-machine
+  SoC dir: /home/sipantichijk/church_project/SoC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[..]  Step 0/7: Pre-flight checks
+[OK]  Pre-flight checks passed
+
+[..]  Step 1/7: Build SoC firmware
+make[1]: Entering directory '/home/sipantichijk/church-machine/hardware/soc_combined/firmware'
+make[1]: Nothing to be done for 'all'.
+make[1]: Leaving directory '/home/sipantichijk/church-machine/hardware/soc_combined/firmware'
+[OK]  Firmware built — symbol files in /home/sipantichijk/church-machine/hardware/soc_combined/
+
+[..]  Step 2/7: Patch sapphire.v (embed firmware into BRAM init blocks)
+  Reading symbol0: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin ... 131072 entries, 1284 non-zero
+  Reading symbol1: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin ... 131072 entries, 1221 non-zero
+  Reading symbol2: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin ... 131072 entries, 1105 non-zero
+  Reading symbol3: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin ... 131072 entries, 830 non-zero
+  Updated inline symbol0 → 1284 assignments  (was already-patched)
+  Updated inline symbol1 → 1221 assignments  (was already-patched)
+  Updated inline symbol2 → 1106 assignments  (was already-patched)
+  Updated inline symbol3 → 831 assignments  (was already-patched)
+
+Patched /home/sipantichijk/church-machine/hardware/soc_combined/sapphire.v  (+0 chars, 985,228 total)
+
+Next steps:
+  1. bash work_syn/run_efx_map.sh   (re-synthesise)
+  2. bash work_pnr/run_efx_pnr.sh   (place & route — generates .hex)
+  3. sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+
+[OK]  sapphire.v patched
+
+[..]  Step 3/7: Synthesis (efx_map — Efinity 2025.2, ~4 min)
+INFO     :     The entire flow of EFX_MAP took 315.55 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 94.388 MB, end = 490.692 MB, delta = 396.304 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 29.952 MB, end = 289.896 MB, delta = 259.944 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 367.856 MB [FlowMsg::RSSUsage::Peak]
+
+==> Synthesis complete. Output in /home/sipantichijk/church_project/SoC/work_syn/
+    Verify firmware embedded in BRAM:
+    grep 'ram_symbol0__D$g1' /home/sipantichijk/church_project/SoC/work_syn/church_soc_cm.map.v | head -1
+[..]    Verifying BRAM INIT_0 lanes are non-zero...
+[FAIL] Map output not found: /home/sipantichijk/church_project/SoC/work_syn/church_soc_cm.map.v — synthesis may have failed. Check /tmp/build_map.log
+make: *** [Makefile:4: bitstream] Error 1
+make: unrecognized option '--flash'
+Usage: make [options] [target] ...
+Options:
+  -b, -m                      Ignored for compatibility.
+  -B, --always-make           Unconditionally make all targets.
+  -C DIRECTORY, --directory=DIRECTORY
+                              Change to DIRECTORY before doing anything.
+  -d                          Print lots of debugging information.
+  --debug[=FLAGS]             Print various types of debugging information.
+  -e, --environment-overrides
+                              Environment variables override makefiles.
+  -E STRING, --eval=STRING    Evaluate STRING as a makefile statement.
+  -f FILE, --file=FILE, --makefile=FILE
+                              Read FILE as a makefile.
+  -h, --help                  Print this message and exit.
+  -i, --ignore-errors         Ignore errors from recipes.
+  -I DIRECTORY, --include-dir=DIRECTORY
+                              Search DIRECTORY for included makefiles.
+  -j [N], --jobs[=N]          Allow N jobs at once; infinite jobs with no arg.
+  --jobserver-style=STYLE     Select the style of jobserver to use.
+  -k, --keep-going            Keep going when some targets can't be made.
+  -l [N], --load-average[=N], --max-load[=N]
+                              Don't start multiple jobs unless load is below N.
+  -L, --check-symlink-times   Use the latest mtime between symlinks and target.
+  -n, --just-print, --dry-run, --recon
+                              Don't actually run any recipe; just print them.
+  -o FILE, --old-file=FILE, --assume-old=FILE
+                              Consider FILE to be very old and don't remake it.
+  -O[TYPE], --output-sync[=TYPE]
+                              Synchronize output of parallel jobs by TYPE.
+  -p, --print-data-base       Print make's internal database.
+  -q, --question              Run no recipe; exit status says if up to date.
+  -r, --no-builtin-rules      Disable the built-in implicit rules.
+  -R, --no-builtin-variables  Disable the built-in variable settings.
+  --shuffle[={SEED|random|reverse|none}]
+                              Perform shuffle of prerequisites and goals.
+  -s, --silent, --quiet       Don't echo recipes.
+  --no-silent                 Echo recipes (disable --silent mode).
+  -S, --no-keep-going, --stop
+                              Turns off -k.
+  -t, --touch                 Touch targets instead of remaking them.
+  --trace                     Print tracing information.
+  -v, --version               Print the version number of make and exit.
+  -w, --print-directory       Print the current directory.
+  --no-print-directory        Turn off -w, even if it was turned on implicitly.
+  -W FILE, --what-if=FILE, --new-file=FILE, --assume-new=FILE
+                              Consider FILE to be infinitely new.
+  --warn-undefined-variables  Warn when an undefined variable is referenced.
+
+This program built for x86_64-pc-linux-gnu
+Report bugs to <bug-make@gnu.org>

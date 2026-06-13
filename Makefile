@@ -1,4 +1,4 @@
-.PHONY: bitstream
+.PHONY: bitstream bitstream-flash
 
 bitstream:
 	bash scripts/build_ti60_bitstream.sh
