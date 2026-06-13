@@ -1,0 +1,295 @@
+sipantichijk@penguin:~/church-machine$ cd ~/church_project/SoC
+~/efinity/2026.1/bin/efx_pnr \
+    --prj            church_soc_cm.xml \
+    --circuit        church_soc_cm \
+    --family         Titanium \
+    --device         Ti60F225 \
+    --operating_conditions C3 \
+    --pack --place --route \
+    --vdb_file       outflow/church_soc_cm.vdb \
+    --sync_file      outflow/church_soc_cm.interface.csv \
+    --work_dir       work_pnr \
+    --output_dir     outflow \
+    2>&1 | tee /tmp/pnr2.log
+INFO     : Reading project database "church_soc_cm.xml" [FlowMsg::ProjectDatabaseReading]
+INFO     : Maximum concurrency has been set to 4 [FlowMsg::MaxThreads]
+           
+           Efinix FPGA Placement and Routing.
+           Version: 2026.1.132 
+           Compiled: May 29 2026.
+           
+           Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+
+           
+           The Tool Is Based on VPR of University of Toronto,
+           a free open source code under MIT license.
+           
+WARNING  : Found 7 warnings in the post-synthesis netlist.
+INFO     : Reading core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileReading]
+INFO     : Successfully read core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileLoadSuccess]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[0]~FF #21420 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[1]~FF #21421 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[2]~FF #21422 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[3]~FF #21423 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[4]~FF #21424 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[5]~FF #21425 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[0]~FF #21420 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[1]~FF #21421 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[2]~FF #21422 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[3]~FF #21423 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[4]~FF #21424 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+WARNING  : logical_block u_sapphire/u_EfxSapphireSoc/system_cores_0_logic_cpu/IBusCachedPlugin_cache/lineLoader_address[5]~FF #21425 has no fanout [DBMsg::NetlistLogicalBlockNoFanout]
+INFO     : Reading core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileReading]
+INFO     : Successfully read core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileLoadSuccess]
+WARNING  : Clock source "clk" does not use a dedicated clock pad, extra clock insertion delay will been added
+INFO     : Counting 1 clocks that are not assigned to clock resources as global clocks.
+INFO     : XLR count after merging: 19527
+INFO     : Netlist has 14138 luts, 8191 ffs and 1395 adders [PackerMsg::NetlistStatistics]
+INFO     : Packed into 19527 clusters with 2.7556205(1.0315973) inputs(outputs) per cluster for a total of 53809(20144) inputs(outputs) [PackerMsg::ClusterPackingStatistics]
+INFO     : Packed into 19527 xlrs with 2.7556205(1.0315973) inputs(outputs) per xlr for a total of 53809(20144) inputs(outputs) [PackerMsg::XLRPackingStatistics]
+INFO     : Packed 1 fracturable DSPs into 1 clusters [PackerMsg::DSPPackingStatistics]
+INFO     : Packing took 10.515648572 seconds [FlowMsg::StageDuration]
+INFO     :     Packing took 15.13 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Packing virtual memory usage: begin = 175.928 MB, end = 298.7 MB, delta = 122.772 MB [FlowMsg::VMUsage]
+INFO     : Packing resident set memory usage: begin = 86.144 MB, end = 199.296 MB, delta = 113.152 MB [FlowMsg::RSSUsage]
+INFO     :     Packing peak resident set memory usage = 199.296 MB [FlowMsg::RSSUsage::Peak]
+INFO     : No SDC file found.  Using default timing constraint of 1 ns.
+INFO     : NOTE:  Use --sdc_file <SDC_FILE> to override this behavior.
+INFO     : Creating clock 'clk' with 1 sources
+INFO     : Reading core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileReading]
+INFO     : Successfully read core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileLoadSuccess]
+INFO     : Counting 1 clocks that are not assigned to clock resources as global clocks.
+WARNING  : Synchronizer chain starting at cell u_sapphire/u_EfxSapphireSoc/bufferCC_5/i7_2 is driven by a non-sequential source GND:O [FlowMsg::SyncHeadDrivenByNonSeq]
+WARNING  : Synchronizer chain starting at cell u_sapphire/u_EfxSapphireSoc/bufferCC_6/buffers_0~FF is driven by a non-sequential source GND:O [FlowMsg::SyncHeadDrivenByNonSeq]
+WARNING  : Synchronizer chain starting at cell u_sapphire/u_EfxSapphireSoc/bufferCC_7/buffers_0~FF is driven by a non-sequential source GND:O [FlowMsg::SyncHeadDrivenByNonSeq]
+WARNING  : Synchronizer chain starting at cell u_sapphire/u_EfxSapphireSoc/system_uart_0_io_logic/uartCtrl_1/rx/io_rxd_buffercc/buffers_0~FF is driven by a non-sequential source uart_rx:inpad [FlowMsg::SyncHeadDrivenByNonSeq]
+INFO     : Starting Global Placer with 4 threads ...
+            ----------     -------  --------------     -------
+             Iteration       WHPWL Worst Slack (ps) Convergence
+            ----------     -------  --------------     -------
+INFO     :           1     7476194           -4952         0.7%
+INFO     :           2     6124349           -4956         0.8%
+INFO     :           3     4954106           -4882         1.2%
+INFO     :           4     3766712           -4927         2.0%
+INFO     :           5     2954395           -4840         3.8%
+INFO     :           6     2177402           -5150        10.9%
+INFO     :           7     1550998           -6393        29.9%
+INFO     :           8     1295744           -7064        53.6%
+INFO     :           9     1251126           -7135        60.0%
+INFO     :          10     1241406           -6955        68.0%
+INFO     :          11     1255802           -7137        68.0%
+INFO     :          12     1260135           -7115        68.0%
+INFO     :          13     1253392           -7186        70.8%
+INFO     :          14     1265937           -7123        73.6%
+INFO     :          15     1287599           -7042        73.6%
+INFO     :          16     1266059           -7501        73.6%
+INFO     :          17     1247746           -7322        75.2%
+INFO     :          18     1252838           -7703        77.0%
+INFO     :          19     1256421           -7688        77.2%
+INFO     :          20     1244953           -7320        77.2%
+INFO     :          21     1236031           -7657        80.6%
+INFO     :          22     1224613           -8133        82.8%
+INFO     :          23     1226455           -7624        82.8%
+INFO     :          24     1220372           -7470        83.4%
+INFO     :          25     1217096           -7549        86.9%
+INFO     :          26     1223564           -8158        86.9%
+INFO     :          27     1220281           -7909        86.9%
+INFO     :          28     1210126           -8269        89.3%
+INFO     :          29     1217815           -8197        89.3%
+INFO     :          30     1203270           -7769        89.8%
+INFO     :          31     1209660           -7982        91.1%
+INFO     :          32     1213254           -7604        91.1%
+INFO     :          33     1220353           -7650        91.1%
+INFO     :          34     1207946           -8141        91.4%
+INFO     :          35     1210719           -8394        91.4%
+INFO     :          36     1207809           -8391        92.1%
+INFO     :          37     1211212           -8134        92.1%
+INFO     :          38     1203319           -7847        94.9%
+INFO     :          39     1207247           -8435        94.9%
+INFO     :          40     1206111           -8198        95.1%
+INFO     :          41     1190089           -8428        95.1%
+INFO     :          42     1185640           -8548        96.5%
+INFO     :          43     1185593           -8938        96.5%
+INFO     :          44     1186254           -9025        96.5%
+INFO     :          45     1185498           -8471        96.8%
+INFO     :          46     1188950           -8937        97.7%
+INFO     :          47     1190302           -9278        98.2%
+INFO     : GP: best_placement: wpd: 7964.14
+INFO     : Starting Annealer
+            ----------     -------  --------------     -------
+             Iteration       WHPWL  Delay Max (ps)     R Limit
+            ----------     -------  --------------     -------
+INFO     :           0      652543           10038        30.0
+INFO     :           1      627856            8428        28.8
+INFO     :           2      589631            8040        27.1
+INFO     :           3      566493            7793        25.3
+INFO     :           4      550702            7617        23.3
+INFO     :           5      540798            7245        21.5
+INFO     :           6      530065            7166        19.7
+INFO     :           7      521217            7077        18.0
+INFO     :           8      514671            6828        16.4
+INFO     :           9      507529            6814        14.9
+INFO     :          10      502429            6732        13.5
+INFO     :          11      497572            6496        12.3
+INFO     :          12      494828            6463        11.1
+INFO     :          13      491901            6354        10.1
+INFO     :          14      489032            6326         9.1
+INFO     :          15      486228            6305         8.2
+INFO     :          16      483592            6360         7.4
+INFO     :          17      480629            6293         6.7
+INFO     :          18      477929            6286         6.1
+INFO     :          19      475767            6286         5.5
+INFO     :          20      472711            6286         4.9
+INFO     :          21      470783            6244         4.5
+INFO     :          22      468022            6215         4.0
+INFO     :          23      463824            6300         3.6
+INFO     :          24      461319            6285         3.2
+INFO     : DP: best_placement: wpd: 3467.5
+INFO     : Placement successful: 19592 cells are placed
+INFO     : Peak congestion smeared over 4x4 of the chip is 1.40652 at 103,203
+INFO     : Peak congestion smeared over 1/16 of the chip is 0.883823 at 117,202
+INFO     : Peak congestion smeared over 1/4 of the chip is 0.58098 at 96,146
+INFO     : Congestion-weighted HPWL per net: 35.9351
+INFO     : Post-placement cluster-level checks is successful
+INFO     : Post-placement primitive-level checks is successful
+INFO     : Placement took 214.119669392 seconds [FlowMsg::StageDuration]
+INFO     :     Placement took 375.83 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Placement virtual memory usage: begin = 298.7 MB, end = 402.688 MB, delta = 103.988 MB [FlowMsg::VMUsage]
+INFO     : Placement resident set memory usage: begin = 116.024 MB, end = 237.316 MB, delta = 121.292 MB [FlowMsg::RSSUsage]
+INFO     :     Placement peak resident set memory usage = 302.46 MB [FlowMsg::RSSUsage::Peak]
+INFO     : No SDC file found.  Using default timing constraint of 1 ns.
+INFO     : NOTE:  Use --sdc_file <SDC_FILE> to override this behavior.
+INFO     : Creating clock 'clk' with 1 sources
+Maximum possible analyzed clocks frequency
+ Clock Name  Period (ns)  Frequency (MHz)     Edge
+    clk         6.341        157.704         (R-R)
+
+Geomean max period: 6.341
+
+Setup (Max) Clock Relationship
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             1.000            -5.341           (R-R)
+
+Hold (Min) Clock Relationship
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             0.000            -0.800           (R-R)
+
+WARNING  : Clock domain between clk (rising) and clk (rising) may not meet (slack: -5.341 ns) the setup (max) timing requirement
+WARNING  : Clock domain between clk (rising) and clk (rising) may not meet (slack: -0.800 ns) the hold (min) timing requirement
+INFO     : Write Timing Report to "outflow/church_soc_cm.place.timing.rpt" ...
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Router Setup
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : [Setup Parallel Routing Scheduler]
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Route Circuit with 4 threads
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Beneficial skew enabled! Optimizing clock skews ... 
+INFO     : Non-legalized beneficial skew improved geomean CPD by 11.65% (from 6800ps to 6008ps)
+INFO     : CSS improved CPD of clock clk by 10.43% (from 6800ps to 6091ps)
+INFO     : Discretized beneficial skew improved geomean CPD by 10.43% (from 6800ps to 6091ps in 8 iterations and 3.8 sec)
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Overridding delay budgets for 4 synchronizer-related pins
+INFO     : Iter  1: overlap=55212   heapops=5834398    (0%) cpd=6091  frr=1.00  msec=12036
+INFO     : [Setup Delay Budgets | 2211.8 ms]
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Hold Fixing
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Total min wire delay:   7033598
+INFO     : Hold fix wire delay:       1599
+INFO     : Hold fix delay ratio:     0.02%
+INFO     : Pins requiring hold fix:  0.07%
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Iter  2: overlap=29334   heapops=4905664    (20%) cpd=6062  frr=1.00  msec=5397
+INFO     : Iter  3: overlap=19608   heapops=4430400    (36%) cpd=6060  frr=0.99  msec=6692
+INFO     : Iter  4: overlap=12256   heapops=3918856    (48%) cpd=6064  frr=1.00  msec=3779
+INFO     : Iter  5: overlap=7187    heapops=3240544    (62%) cpd=6071  frr=1.00  msec=3070
+INFO     : Iter  6: overlap=4072    heapops=2479105    (71%) cpd=6069  frr=1.00  msec=3814
+INFO     : Iter  7: overlap=2578    heapops=1919131    (79%) cpd=6071  frr=1.00  msec=2228
+INFO     : Iter  8: overlap=1752    heapops=1475133    (83%) cpd=6068  frr=1.00  msec=2016
+INFO     : Iter  9: overlap=1452    heapops=1132545    (85%) cpd=6073  frr=1.00  msec=1548
+INFO     : Iter 10: overlap=1049    heapops=1326449    (86%) cpd=6068  frr=1.00  msec=2008
+INFO     : Iter 11: overlap=850     heapops=922302     (87%) cpd=6094  frr=1.00  msec=1485
+INFO     : Iter 12: overlap=609     heapops=766436     (88%) cpd=6084  frr=1.00  msec=1249
+INFO     : Iter 13: overlap=520     heapops=1058342    (88%) cpd=6088  frr=1.00  msec=2017
+INFO     : Iter 14: overlap=337     heapops=945176     (88%) cpd=6189  frr=1.02  msec=2105
+INFO     : Iter 15: overlap=296     heapops=1127006    (89%) cpd=6170  frr=1.01  msec=2330
+INFO     : Iter 16: overlap=237     heapops=993399     (89%) cpd=6301  frr=1.03  msec=2528
+INFO     : [Rebuild Parallel Routing Scheduler]
+INFO     : Iter 17: overlap=168     heapops=589291     (89%) cpd=6305  frr=1.04  msec=1416
+INFO     : Iter 18: overlap=101     heapops=641542     (89%) cpd=6261  frr=1.03  msec=1278
+INFO     : Iter 19: overlap=95      heapops=594952     (89%) cpd=6324  frr=1.04  msec=1393
+INFO     : Iter 20: overlap=52      heapops=504056     (89%) cpd=6317  frr=1.04  msec=998
+INFO     : Iter 21: overlap=35      heapops=464864     (89%) cpd=6321  frr=1.04  msec=1021
+INFO     : Iter 22: overlap=23      heapops=542558     (89%) cpd=6218  frr=1.02  msec=1506
+INFO     : Iter 23: overlap=29      heapops=366125     (89%) cpd=6250  frr=1.03  msec=956
+INFO     : Iter 24: overlap=30      heapops=419420     (89%) cpd=6254  frr=1.03  msec=957
+INFO     : Iter 25: overlap=13      heapops=684159     (89%) cpd=6509  frr=1.07  msec=1356
+INFO     : Iter 26: overlap=9       heapops=358884     (89%) cpd=6462  frr=1.06  msec=1140
+INFO     : Iter 27: overlap=8       heapops=379585     (89%) cpd=6367  frr=1.05  msec=904
+INFO     : Iter 28: overlap=7       heapops=383239     (89%) cpd=6442  frr=1.06  msec=928
+INFO     : Iter 29: overlap=2       heapops=369120     (89%) cpd=6440  frr=1.06  msec=935
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Beneficial skew enabled! Optimizing clock skews ... 
+INFO     : Non-legalized beneficial skew improved geomean CPD by 0.00% (from 6440ps to 6440ps)
+INFO     : CSS improved CPD of clock clk by 0.90% (from 6440ps to 6382ps)
+INFO     : Discretized beneficial skew improved geomean CPD by 0.90% (from 6440ps to 6382ps in 1 iterations and 4.6 sec)
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Iter 30: overlap=0       heapops=345181     (89%) cpd=6382  frr=1.05  msec=5663
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Routing Result
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Routing Succeeded in 78.33 seconds taking 30 iterations! 
+INFO     : 
+INFO     : First iteration critical path delay = 6.091 ns 
+INFO     : Last iteration critical path delay  = 6.382 ns (ratio = 1.05)
+INFO     : Max Routing Heap Size = 100,003
+INFO     : Routing trace written to file 'work_pnr/church_soc_cm.troutingtraces' 
+INFO     : ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+INFO     : Routing took 85.032877236 seconds [FlowMsg::StageDuration]
+INFO     :     Routing took 121.16 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Routing virtual memory usage: begin = 402.688 MB, end = 571.488 MB, delta = 168.8 MB [FlowMsg::VMUsage]
+INFO     : Routing resident set memory usage: begin = 176.824 MB, end = 369.36 MB, delta = 192.536 MB [FlowMsg::RSSUsage]
+INFO     :     Routing peak resident set memory usage = 427.78 MB [FlowMsg::RSSUsage::Peak]
+           ***** Beginning stage final timing analysis ... *****
+INFO     : No SDC file found.  Using default timing constraint of 1 ns.
+INFO     : NOTE:  Use --sdc_file <SDC_FILE> to override this behavior.
+INFO     : Creating clock 'clk' with 1 sources
+Maximum possible analyzed clocks frequency
+ Clock Name  Period (ns)  Frequency (MHz)     Edge
+    clk         6.508        153.657         (R-R)
+
+Geomean max period: 6.508
+
+Setup (Max) Clock Relationship
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             1.000            -5.508           (R-R)
+
+Hold (Min) Clock Relationship
+  Launch Clock    Capture Clock   Constraint (ns)     Slack (ns)          Edge
+      clk              clk             0.000            0.019            (R-R)
+
+WARNING  : Clock domain between clk (rising) and clk (rising) may not meet (slack: -5.508 ns) the setup (max) timing requirement
+INFO     : Write Timing Report to "outflow/church_soc_cm.timing.rpt" ...
+INFO     : final timing analysis took 1.28414163 seconds [FlowMsg::StageDuration]
+INFO     :     final timing analysis took 1.49 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : final timing analysis virtual memory usage: begin = 571.488 MB, end = 571.488 MB, delta = 0 MB [FlowMsg::VMUsage]
+INFO     : final timing analysis resident set memory usage: begin = 338.392 MB, end = 381.016 MB, delta = 42.624 MB [FlowMsg::RSSUsage]
+INFO     :     final timing analysis peak resident set memory usage = 427.78 MB [FlowMsg::RSSUsage::Peak]
+           ***** Ending stage final timing analysis *****
+           
+           ***** Beginning stage bitstream generation ... *****
+INFO     : Reading core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileReading]
+INFO     : Successfully read core interface constraints file "outflow/church_soc_cm.interface.csv" [DBMsg::CoreInterfaceConstraintsFileLoadSuccess]
+INFO     : Finished writing bitstream file work_pnr/church_soc_cm.lbf.
+INFO     : Bitstream generation took 4.446361981 seconds [FlowMsg::StageDuration]
+INFO     :     Bitstream generation took 4.17 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Bitstream generation virtual memory usage: begin = 571.488 MB, end = 571.488 MB, delta = 0 MB [FlowMsg::VMUsage]
+INFO     : Bitstream generation resident set memory usage: begin = 322.436 MB, end = 437.892 MB, delta = 115.456 MB [FlowMsg::RSSUsage]
+INFO     :     Bitstream generation peak resident set memory usage = 437.892 MB [FlowMsg::RSSUsage::Peak]
+INFO     : The entire flow of EFX_PNR took 317.789007044 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_PNR took 519.78 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_PNR virtual memory usage: begin = 133.488 MB, end = 571.488 MB, delta = 438 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_PNR resident set memory usage: begin = 42.752 MB, end = 437.892 MB, delta = 395.14 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_PNR peak resident set memory usage = 437.892 MB [FlowMsg::RSSUsage::Peak]
+sipantichijk@penguin:~/church_project/SoC$ 
