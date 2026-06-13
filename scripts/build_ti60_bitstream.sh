@@ -13,7 +13,7 @@
 #   Efinity 2025.2 (synthesis)   — $EFINITY_MAP_HOME  or ~/efinity/2025.2
 #   Efinity 2026.1 (P&R + pgm)  — $EFINITY_HOME      or ~/efinity/2026.1
 #   Efinity RISC-V IDE 2025.2   — toolchain at ~/efinity/efinity-riscv-ide-2025.2/toolchain/bin
-#   openFPGALoader               — ~/oss-cad-suite/bin/openFPGALoader
+#   openFPGALoader               — /usr/bin/openFPGALoader  (apt)  OR  ~/oss-cad-suite/bin/openFPGALoader
 #   pyserial                     — pip install pyserial (for smoke-test when --flash is used)
 #
 # Notes:
