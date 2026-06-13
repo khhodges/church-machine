@@ -1,0 +1,117 @@
+━
+  Ti60 F225 Bitstream Build Pipeline
+  Repo:    /home/sipantichijk/church-machine
+  SoC dir: /home/sipantichijk/church_project/SoC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[..]  Step 0/7: Pre-flight checks
+[OK]  Pre-flight checks passed
+
+[..]  Step 1/7: Build SoC firmware
+make[1]: Entering directory '/home/sipantichijk/church-machine/hardware/soc_combined/firmware'
+make[1]: Nothing to be done for 'all'.
+make[1]: Leaving directory '/home/sipantichijk/church-machine/hardware/soc_combined/firmware'
+[OK]  Firmware built — symbol files in /home/sipantichijk/church-machine/hardware/soc_combined/
+
+[..]  Step 2/7: Patch sapphire.v (embed firmware into BRAM init blocks)
+  Reading symbol0: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin ... 131072 entries, 1284 non-zero
+  Reading symbol1: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin ... 131072 entries, 1221 non-zero
+  Reading symbol2: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin ... 131072 entries, 1105 non-zero
+  Reading symbol3: /home/sipantichijk/church-machine/hardware/soc_combined/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin ... 131072 entries, 830 non-zero
+  Updated inline symbol0 → 1284 assignments  (was already-patched)
+  Updated inline symbol1 → 1221 assignments  (was already-patched)
+  Updated inline symbol2 → 1106 assignments  (was already-patched)
+  Updated inline symbol3 → 831 assignments  (was already-patched)
+
+Patched /home/sipantichijk/church-machine/hardware/soc_combined/sapphire.v  (+0 chars, 985,228 total)
+
+Next steps:
+  1. bash work_syn/run_efx_map.sh   (re-synthesise)
+  2. bash work_pnr/run_efx_pnr.sh   (place & route — generates .hex)
+  3. sudo ~/oss-cad-suite/bin/openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+
+[OK]  sapphire.v patched
+
+[..]  Step 3/7: Synthesis (efx_map — Efinity 2025.2, ~4 min)
+INFO     :     The entire flow of EFX_MAP took 1873.7 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 94.384 MB, end = 486.636 MB, delta = 392.252 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 30.08 MB, end = 289.548 MB, delta = 259.468 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 364.984 MB [FlowMsg::RSSUsage::Peak]
+
+==> Synthesis complete. Output in /home/sipantichijk/church_project/SoC/work_syn/
+    Verify firmware embedded in BRAM:
+    grep 'ram_symbol0__D$g1' /home/sipantichijk/church_project/SoC/work_syn/church_soc_cm.map.v | head -1
+[..]    Verifying BRAM INIT_0 lanes are non-zero...
+[FAIL] Map output not found: /home/sipantichijk/church_project/SoC/work_syn/church_soc_cm.map.v — synthesis may have failed. Check /tmp/build_map.log
+make: *** [Makefile:7: bitstream-flash] Error 1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Ti60 UART Smoke-test  —  LIVE MODE
+  Port: /dev/ttyUSB2  Baud: 57600  Timeout: 30.0s
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Opened /dev/ttyUSB2.  Waiting up to 30s for firmware output…
+
+  [212806.42s] M] Button released — waiting for CM banner + free-run restart
+  [212806.42s] [CM] boot_complete restored after recovery
+  [212806.71s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212807.12s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212807.56s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212808.91s] [CM] Button released — waiting for CM banner + free-run restart
+  [212808.96s] [CM] boot_complete restored after recovery
+  [212809.77s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212810.15s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212810.27s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212811.64s] [CM] Button released — waiting for CM banner + free-run restart
+  [212811.77s] [CM] boot_complete restored after recovery
+  [212812.66s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212813.11s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212813.43s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212814.89s] [CM] Button released — waiting for CM banner + free-run restart
+  [212814.89s] [CM] boot_complete restored after recovery
+  [212815.80s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212816.21s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212816.37s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212817.77s] [CM] Button released — waiting for CM banner + free-run restart
+  [212817.84s] [CM] boot_complete restored after recovery
+  [212818.63s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212819.06s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212819.21s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212820.59s] [CM] Button released — waiting for CM banner + free-run restart
+  [212820.78s] [CM] boot_complete restored after recovery
+  [212821.62s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212822.04s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212822.31s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212823.58s] [CM] Button released — waiting for CM banner + free-run restart
+  [212823.68s] [CM] boot_complete restored after recovery
+  [212824.59s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212825.11s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212825.24s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212826.56s] [CM] Button released — waiting for CM banner + free-run restart
+  [212826.71s] [CM] boot_complete restored after recovery
+  [212827.56s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212828.01s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212828.18s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212829.52s] [CM] Button released — waiting for CM banner + free-run restart
+  [212829.63s] [CM] boot_complete restored after recovery
+  [212830.54s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212830.98s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212831.13s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212832.58s] [CM] Button released — waiting for CM banner + free-run restart
+  [212832.69s] [CM] boot_complete restored after recovery
+  [212833.65s] NIA=0x00000004 FAULT=0x00000005 (PERM_S)
+  [212834.06s] CALLHOME:{"board":"Ti60F225","uid":"c0ffee0100000001","nia":"0x00000004","boot_ok":1,"boot_reason":2,"fault":1,"fault_code":5,"fault_name":"PERM_S","fw_major":1,"fw_minor":3}
+  [212834.41s] [CM] FAULT — holding push_button for 1.5 s (btn_hold_done)
+  [212835.72s] [CM] Button released — waiting for CM banner + free-run restart
+  [212835.82s] [CM] boot_complete restored after recovery
+  Received 52 line(s).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESULTS (live):
+
+  [PASS]  GREETING: SoC boot greeting present  (inferred from CALLHOME board='Ti60F225')
+  [PASS]  BOOT_COMPLETE: CM boot_complete: 1 line seen  (inferred from CALLHOME boot_ok:1)
+  [PASS]  NIA_LINES: At least one NIA=0x... line seen  (first: 'NIA=0x00000004 FAULT=0x00000005 (PERM_S)')
+  [PASS]  CALLHOME_JSON: At least one valid CALLHOME JSON line seen  (10 valid packet(s); last board=Ti60F225 fw=1.3 nia=0x00000004)
+  [SKIP]  ACK: IDE call-home ACK received  (no --ide=URL provided (optional check skipped))
+
+  OVERALL: PASS

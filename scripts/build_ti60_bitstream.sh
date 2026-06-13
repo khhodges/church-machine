@@ -56,7 +56,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 # ── Step 0: Pre-flight checks ──────────────────────────────────────────────
-_info "Step 0/7: Pre-flight checks"
+_info "Step 0/8: Pre-flight checks"
 
 if [ ! -x "$EFINITY_MAP/bin/efx_map" ]; then
     _fail "Efinity 2025.2 (efx_map) not found at $EFINITY_MAP/bin/efx_map
@@ -84,7 +84,7 @@ _ok "Pre-flight checks passed"
 echo ""
 
 # ── Step 1: Build firmware ──────────────────────────────────────────────────
-_info "Step 1/7: Build SoC firmware"
+_info "Step 1/8: Build SoC firmware"
 make -C "$HW/firmware" 2>&1 | tee /tmp/build_fw.log | tail -5
 SYM0="$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"
 if [ ! -f "$SYM0" ]; then
@@ -94,7 +94,7 @@ _ok "Firmware built — symbol files in $HW/"
 echo ""
 
 # ── Step 2: Patch sapphire.v ────────────────────────────────────────────────
-_info "Step 2/7: Patch sapphire.v (embed firmware into BRAM init blocks)"
+_info "Step 2/8: Patch sapphire.v (embed firmware into BRAM init blocks)"
 python3 "$SCRIPTS/patch_sapphire_init.py" \
     "$SAPPHIRE_V" \
     "$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin" \
@@ -104,8 +104,25 @@ python3 "$SCRIPTS/patch_sapphire_init.py" \
 _ok "sapphire.v patched"
 echo ""
 
+# ── Step 2.5: Copy CM Verilog (stripped of zero-init noise) ─────────────────
+# build/church_ti60_f225.v has 16K dmem[] entries but ~99% are zero.
+# Zero assignments are stripped at commit time → only ~93 non-zero lines remain.
+# This makes EFX_MAP synthesis 20–50× faster and prevents OOM hangs on
+# resource-limited machines.  The stripped copy is kept in build/ (canonical);
+# here we deploy it into the Efinity project directory before synthesis runs.
+_info "Step 2.5/8: Deploy CM Verilog to SoC project"
+CM_V_SRC="$REPO_ROOT/build/church_ti60_f225.v"
+CM_V_DST="$SOC_DIR/church_ti60_f225.v"
+if [ ! -f "$CM_V_SRC" ]; then
+    _fail "church_ti60_f225.v not found at $CM_V_SRC — regenerate with hardware/gen_verilog.py"
+fi
+cp "$CM_V_SRC" "$CM_V_DST"
+NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
+_ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
+echo ""
+
 # ── Step 3: Synthesis (EFX_MAP, Efinity 2025.2) ─────────────────────────────
-_info "Step 3/7: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
+_info "Step 3/8: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
 EFINITY_HOME="$EFINITY_MAP" bash "$HW/run_efx_map.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_map.log | tail -8
 
 # Auto-detect circuit name from the .map.v file efx_map produced.
@@ -149,7 +166,7 @@ _ok "All 4 BRAM INIT_0 lanes non-zero — firmware embedded"
 echo ""
 
 # ── Step 4: Place & Route (EFX_PNR, Efinity 2026.1) ────────────────────────
-_info "Step 4/7: Place & Route (efx_pnr — Efinity 2026.1, ~5 min)"
+_info "Step 4/8: Place & Route (efx_pnr — Efinity 2026.1, ~5 min)"
 bash "$HW/run_efx_pnr.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pnr.log | tail -8
 LBF="$SOC_DIR/work_pnr/${CIRCUIT}.lbf"
 if [ ! -f "$LBF" ]; then
@@ -159,7 +176,7 @@ _ok "Place & Route complete"
 echo ""
 
 # ── Step 5: Generate SPI flash hex (efx_pgm) ────────────────────────────────
-_info "Step 5/7: Generate SPI flash hex (efx_pgm, ~30 s)"
+_info "Step 5/8: Generate SPI flash hex (efx_pgm, ~30 s)"
 bash "$HW/run_efx_pgm.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pgm.log | tail -5
 HEX_SRC="$SOC_DIR/outflow/${CIRCUIT}.hex"
 if [ ! -f "$HEX_SRC" ]; then
@@ -169,7 +186,7 @@ _ok "Hex generated: $HEX_SRC ($(du -h "$HEX_SRC" | cut -f1))"
 echo ""
 
 # ── Step 6: Copy to bitstreams/ ─────────────────────────────────────────────
-_info "Step 6/7: Copy output to $BITSTREAMS/"
+_info "Step 6/8: Copy output to $BITSTREAMS/"
 mkdir -p "$BITSTREAMS"
 cp "$HEX_SRC" "$BITSTREAMS/church_ti60_f225.hex"
 if [ -f "$SOC_DIR/outflow/${CIRCUIT}.bit" ]; then
@@ -208,7 +225,7 @@ echo ""
 
 # ── Step 7: Flash + smoke-test (optional, --flash flag) ─────────────────────
 if [ "$DO_FLASH" -eq 1 ]; then
-    _info "Step 7/7: Flash board with openFPGALoader"
+    _info "Step 7/8: Flash board with openFPGALoader"
     # Find openFPGALoader: prefer oss-cad-suite bundle, fall back to system install
     OFLPGM="${OSS_CAD_SUITE:-$HOME/oss-cad-suite}/bin/openFPGALoader"
     if [ ! -x "$OFLPGM" ]; then
@@ -227,7 +244,7 @@ if [ "$DO_FLASH" -eq 1 ]; then
         python3 "$SCRIPTS/test_ti60_uart.py" --port=auto --baud=57600 --timeout=30 --verbose
     fi
 else
-    _info "Step 7/7: Flash skipped (pass --flash to flash + smoke-test automatically)"
+    _info "Step 7/8: Flash skipped (pass --flash to flash + smoke-test automatically)"
 fi
 
 echo ""
