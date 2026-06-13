@@ -709,10 +709,14 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
     # ----- Foundational lump headers -------------------------------------
     # Thread lump (NS slot 1): cw=32, cc=12, typ=2.
     # cc=12: c-list spans words +244..+255 (256-12=244=THREAD_CAPS_OFFSET).
-    # thread[+244] = CR0 home slot for the programmable Entry E-GT (Task #651).
-    # This word is NULL (0x00000000) at boot — written only via setBootEntrySlot() in the IDE.
+    # thread[+244] = CR0 home slot — E-GT for boot_entry_slot (default: slot 3, LED flash).
+    # Pre-set here so the board boots into LED flash standalone without needing
+    # setBootEntrySlot() from the IDE.  The IDE overwrites this when the user
+    # chooses a different entry point; the simulator's "if empty" guard is a no-op
+    # when loading a boot image that already carries this word.
     thread_loc = locations[1]
     mem[thread_loc] = pack_lump_header(_ns_n_minus_6(thread_size), 32, 12, 2)
+    mem[thread_loc + 244] = create_gt(0, boot_entry_slot, {"E": 1}, 1)
 
     # Hardware device GTs (clist slots 8..18) — match simulator.js HW_DEVICE_SLOTS.
     # Slots 8–13: Abstract LED GTs (Task #406) — type=0b11, no NS slot, no lump.
@@ -805,7 +809,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None):
 
     # Slot 2 freed — Startup.Config removed. The hardware ISA owns M-state per CR register;
     # CALL through a non-M E-GT (BOOT_ROM_WORDS[2]) drops M automatically.
-    # Thread.CR[0] entry E-GT is written by setBootEntrySlot(); no intermediary lump needed.
+    # Thread.CR[0] entry E-GT is pre-set to boot_entry_slot above; IDE overwrites on connect.
 
 
     # ----- Service abstraction c-lists (Task #971) --------------------------------
