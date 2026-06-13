@@ -108,12 +108,17 @@ echo ""
 _info "Step 3/7: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
 EFINITY_HOME="$EFINITY_MAP" bash "$HW/run_efx_map.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_map.log | tail -8
 
+# Auto-detect circuit name from the .map.v file efx_map produced.
+# The circuit name comes from inside the project XML, not the XML filename.
+MAP_V="$(ls "$SOC_DIR/work_syn/"*.map.v 2>/dev/null | head -1)"
+if [ -z "$MAP_V" ] || [ ! -f "$MAP_V" ]; then
+    _fail "No *.map.v found in $SOC_DIR/work_syn/ — synthesis may have failed. Check /tmp/build_map.log"
+fi
+CIRCUIT="$(basename "$MAP_V" .map.v)"
+_ok "  Detected circuit name: $CIRCUIT (from $MAP_V)"
+
 # Verify firmware baked in
 _info "  Verifying BRAM INIT_0 lanes are non-zero..."
-MAP_V="$SOC_DIR/work_syn/church_soc_cm.map.v"
-if [ ! -f "$MAP_V" ]; then
-    _fail "Map output not found: $MAP_V — synthesis may have failed. Check /tmp/build_map.log"
-fi
 
 ALL_NONZERO=1
 for SYM in 0 1 2 3; do
@@ -141,7 +146,7 @@ echo ""
 # ── Step 4: Place & Route (EFX_PNR, Efinity 2026.1) ────────────────────────
 _info "Step 4/7: Place & Route (efx_pnr — Efinity 2026.1, ~5 min)"
 bash "$HW/run_efx_pnr.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pnr.log | tail -8
-LBF="$SOC_DIR/work_pnr/church_soc_cm.lbf"
+LBF="$SOC_DIR/work_pnr/${CIRCUIT}.lbf"
 if [ ! -f "$LBF" ]; then
     _fail "P&R output not found: $LBF — P&R may have failed. Check /tmp/build_pnr.log"
 fi
@@ -151,7 +156,7 @@ echo ""
 # ── Step 5: Generate SPI flash hex (efx_pgm) ────────────────────────────────
 _info "Step 5/7: Generate SPI flash hex (efx_pgm, ~30 s)"
 bash "$HW/run_efx_pgm.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_pgm.log | tail -5
-HEX_SRC="$SOC_DIR/outflow/church_soc_cm.hex"
+HEX_SRC="$SOC_DIR/outflow/${CIRCUIT}.hex"
 if [ ! -f "$HEX_SRC" ]; then
     _fail "Hex output not found: $HEX_SRC — efx_pgm may have failed. Check /tmp/build_pgm.log"
 fi
@@ -162,8 +167,8 @@ echo ""
 _info "Step 6/7: Copy output to $BITSTREAMS/"
 mkdir -p "$BITSTREAMS"
 cp "$HEX_SRC" "$BITSTREAMS/church_ti60_f225.hex"
-if [ -f "$SOC_DIR/outflow/church_soc_cm.bit" ]; then
-    cp "$SOC_DIR/outflow/church_soc_cm.bit" "$BITSTREAMS/church_ti60_f225.bit"
+if [ -f "$SOC_DIR/outflow/${CIRCUIT}.bit" ]; then
+    cp "$SOC_DIR/outflow/${CIRCUIT}.bit" "$BITSTREAMS/church_ti60_f225.bit"
 fi
 
 # Detect firmware version from firmware.hex word at offset 0 or banner string
