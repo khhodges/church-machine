@@ -8897,16 +8897,11 @@ with app.app_context():
 
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
         from apscheduler.triggers.cron import CronTrigger
-
-        _sched_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scheduler.db")
-        _jobstores = {
-            "default": SQLAlchemyJobStore(url=f"sqlite:///{_sched_db}")
-        }
-        _scheduler = BackgroundScheduler(jobstores=_jobstores, timezone="UTC")
-
         from apscheduler.triggers.interval import IntervalTrigger
+
+        _scheduler = BackgroundScheduler(timezone="UTC")
+
         from daily_report import send_daily_report as _send_report, run_lfs_backup as _run_lfs_backup, run_code_sync as _run_code_sync
 
         _scheduler.add_job(
