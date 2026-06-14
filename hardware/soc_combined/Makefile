@@ -49,16 +49,23 @@ test-key-derive:
 # ---------------------------------------------------------------------------
 # test-sha32 — run the cross-language sha32/HKDF vector suite.
 #
-# Verifies that the Python reference implementation and the callhome_bridge
-# implementation agree with all hard-coded vectors in
-# scripts/test_sha32_vectors.py, including Core OGT vectors, edge cases,
-# and Unicode/255-char inputs.
+# Two steps:
+#   1. Host C: compiles hardware/sha32_test.c with GCC and runs it.  Verifies
+#      the C sha32() and hkdf_sha256() implementations against all shared
+#      vectors (9 Core OGTs + 5 edge cases including 255-char and Unicode).
+#   2. Python: runs scripts/test_sha32_vectors.py with pytest.  Verifies the
+#      Python reference implementation and callhome_bridge.sha32() against the
+#      same table.
 #
-# No hardware required.
+# Both must pass.  No hardware required.
 #
 # Usage:
 #   make test-sha32                        (from hardware/soc_combined/)
 #   make -C hardware/soc_combined test-sha32   (from repo root)
 # ---------------------------------------------------------------------------
 test-sha32:
+	gcc -O2 -Wall \
+		-o /tmp/sha32_test \
+		../sha32_test.c \
+		&& /tmp/sha32_test
 	python3 -m pytest $(SCRIPTS_DIR)/test_sha32_vectors.py -v
