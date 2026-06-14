@@ -1,0 +1,25 @@
+sipantichijk@penguin:~/church_project/SoC$ cd ~/church-machine/hardware/soc_combined/firmware
+
+# 1. Version numbers
+sed -i 's/#define FW_MAJOR 1$/#define FW_MAJOR 2/' main.c
+sed -i 's/#define FW_MINOR 3.*/#define FW_MINOR 0  \/* v2.0 *\//' main.c
+
+# 2. Banner (both occurrences)
+sed -i 's/CHURCH Ti60 SoC+CM v1\.3/CHURCH Ti60 SoC+CM v2.0/g' main.c
+
+# 3. Five APB3 macros after CM_UID_HI (line 85)
+sed -i '/^#define CM_UID_HI/a #define CM_FAULT_GT      (*(volatile uint32_t *)(CM_APB_BASE + 0x18))\n#define CM_FAULT_INSTR   (*(volatile uint32_t *)(CM_APB_BASE + 0x1C))\n#define CM_FAULT_CR14    (*(volatile uint32_t *)(CM_APB_BASE + 0x20))\n#define CM_FAULT_STAGE   (*(volatile uint32_t *)(CM_APB_BASE + 0x24))\n#define CM_FAULT_RST     (*(volatile uint32_t *)(CM_APB_BASE + 0x28))' main.c
+
+# 4+5. Add function + call — write script to /tmp then run (avoids heredoc)
+printf '%s\n' 'import re,os' 'f=os.path.expanduser("~/church-machine/hardware/soc_combined/firmware/main.c")' 'src=open(f).read()' 'FE="""static void uart_emit_fault_event(uint32_t ts){uint32_t nia=CM_NIA,fc=CM_FAULT&0x1Fu,gt=CM_FAULT_GT,instr=CM_FAULT_INSTR,cr14=CM_FAULT_CR14,stage=CM_FAULT_STAGE&0xFu;uart_puts(\"FAULT_EVENT:{\\\"uid\\\":\\\"\");emit_uid();uart_puts(\"\\\",\\\"nia\\\":\\\"0x\");uart_puthex32_lower(nia);uart_puts(\"\\\",\\\"fault_code\\\":\");uart_putdec(fc);uart_puts(\",\\\"fault_name\\\":\\\"\");uart_puts(fault_code_name(fc));uart_puts(\"\\\",\\\"fault_gt\\\":\\\"0x\");uart_puthex32_lower(gt);uart_puts(\"\\\",\\\"fault_instr\\\":\\\"0x\");uart_puthex32_lower(instr);uart_puts(\"\\\",\\\"fault_cr14\\\":\\\"0x\");uart_puthex32_lower(cr14);uart_puts(\"\\\",\\\"fault_stage\\\":\");uart_putdec(stage);uart_puts(\",\\\"ts\\\":\");uart_putdec(ts);uart_puts(\"}\\\\r\\\\n\");}"""' 'FE=FE.replace(";",";\\n    ').replace("{","\\n{\\n    ").replace("}","\\n}\\n")' 'target="static void uart_emit_callhome"' 'if "uart_emit_fault_event" not in src and target in src:' '    src=src.replace(target, FE+"\\n"+target); print("[OK] function added")' 'old="        uint32_t fc = CM_FAULT & 0x1Fu;"' 'if old in src and "uart_emit_fault_event(0)" not in src:' '    src=src.replace(old,old+"\\n        uart_emit_fault_event(0);",1); print("[OK] call added")' 'open(f,"wemit_fault_event" main.c | head -12|FAULT_GT\|uart_
+bash: syntax error near unexpected token `)'
+python3: can't open file '/tmp/fe.py': [Errno 2] No such file or directory
+5: * bitstream on the Ti60F225 devkit.  Redesigned v2.0.
+86:#define CM_FAULT_GT      (*(volatile uint32_t *)(CM_APB_BASE + 0x18))
+110:#define FW_MAJOR 2
+111:#define FW_MINOR 0  /* v2.0 */
+197:    uart_putc('0' + FW_MAJOR);
+199:    uart_putc('0' + FW_MINOR);
+254:    uart_puts("CHURCH Ti60 SoC+CM v2.0\r\n");
+318:            uart_puts("CHURCH Ti60 SoC+CM v2.0\r\n");
+sipantichijk@penguin:~/church-machine/hardware/soc_combined/firmware$ 
