@@ -1,0 +1,34 @@
+sipantichijk@penguin:~$ ls ~/church_project/SoC/church-machine/hardware/
+find ~/church_project/SoC/church-machine -name "church_ti60*" 2>/dev/null
+Makefile              key_derive_vectors.h  switch.py
+Makefile.ti60         lambda_unit.py        tang_nano_20k.cst
+__init__.py           layouts.py            tang_nano_20k.py
+boot_rom.py           load.py               test_irq_dispatch.py
+build_sig.py          mload.py              test_mwin_seal.py
+call.py               mload_seq.py          test_outform_fault.py
+change.py             msave.py              test_outform_mode2.py
+church_outform.py     ns_gate.py            test_pet_name_mem.py
+cload.py              outform.py            test_shift_ops.py
+core.py               outform_iot.py        ti60_f225.isf
+decoder.py            perm_check.py         ti60_f225.peri.xml
+dread.py              pet_name_mem.py       ti60_f225.py
+dwrite.py             registers.py          ti60_f225.sdc
+ethernet_xc7a100t.py  ret.py                ti60_f225_project.xml
+fused_unit.py         rgmii_mac.py          tperm.py
+gc_unit.py            save.py               uart_crc16.py
+gen_rtlil.py          setup_ti60_peri.py    uart_rx.py
+gen_verilog.py        sha256.h              uart_tx.py
+hw_types.py           sha32_test.c          wukong_xc7a100t.py
+integrity32.py        soc_combined          wukong_xc7a100t.tcl
+irq_dispatch.py       soc_minimal           wukong_xc7a100t.xdc
+key_derive_test.c     stack_frame.py
+/home/sipantichijk/church_project/SoC/church-machine/attached_assets/church_ti60_f225_1779989924712.hex
+/home/sipantichijk/church_project/SoC/church-machine/bitstreams/church_ti60_f225.bit
+/home/sipantichijk/church_project/SoC/church-machine/bitstreams/church_ti60_f225.hex
+/home/sipantichijk/church_project/SoC/church-machine/bitstreams/church_ti60_f225.json
+/home/sipantichijk/church_project/SoC/church-machine/build/church_ti60_f225.edif
+/home/sipantichijk/church_project/SoC/church-machine/build/church_ti60_f225.il
+/home/sipantichijk/church_project/SoC/church-machine/build/church_ti60_f225.v
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/church_ti60_f225.v
+/home/sipantichijk/church_project/SoC/church-machine/church_ti60_f225.v
+sipantichijk@penguin:~$ 

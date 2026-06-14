@@ -1,0 +1,62 @@
+sipantichijk@penguin:~$ # 1. Pull latest code to get v2.0 main.c
+cd ~/church_project/SoC/church-machine
+git pull
+
+# 2. Compile the firmware
+make -C hardware/soc_minimal/firmware
+
+# 3. Extract raw binary and split into 4 byte-lane files for Efinity
+TOOLCHAIN=~/efinity/efinity-riscv-ide-2025.2/toolchain/bin
+$TOOLCHAIN/riscv-none-embed-objcopy \
+    -O binary hardware/soc_minimal/firmware/firmware.elf \
+    hardware/soc_minimal/firmware/firmware.raw
+
+python3 -c "
+import os
+data = open('hardware/soc_minimal/firmware/firmware.raw','rb').read()
+data = data.ljust(8192*4, b'\x00')
+dest = 'hardware/soc_minimal/work_syn'
+os.makedirs(dest, exist_ok=True)
+for lane in range(4):
+    fname = f'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol{lane}.bin'
+    with open(os.path.join(dest, fname), 'w') as f:
+        for i in range(8192):
+            f.write(format(data[i*4+lane], '08b') + '\n')
+    print('Written', fname)
+"
+
+# 4. Restore sapphire.v from backup, then patch firmware in
+cd hardware/soc_minimal
+cp sapphire.v.bak sapphire.v
+python3 scripts/patch_sapphire_init.py sapphire.v work_syn
+
+# Verify — must print 0
+grep -c readmemb sapphire.v
+Updating 67964cfe..9fd3f6d9
+error: Your local changes to the following files would be overwritten by merge:
+        hardware/soc_minimal/firmware/main.c
+Please commit your changes or stash them before you merge.
+Aborting
+make: Entering directory '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/firmware'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/firmware'
+Written EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+Written EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
+Written EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
+Written EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+  Loaded EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin: 8192 entries
+  Loaded EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin: 8192 entries
+  Loaded EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin: 8192 entries
+  Loaded EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin: 8192 entries
+  Backup already exists: sapphire.v.bak (not overwritten)
+  Replaced $readmemb ram_symbol0 → 8192 assignments
+  Replaced $readmemb ram_symbol1 → 8192 assignments
+  Replaced $readmemb ram_symbol2 → 8192 assignments
+  Replaced $readmemb ram_symbol3 → 8192 assignments
+
+Done — 4 $readmemb call(s) replaced.
+Confirmed: 0 $readmemb calls remain in sapphire.v.
+
+Next: source ~/efinity/2026.1/bin/setup.sh, then Clean All → Compile in Efinity.
+0
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_minimal$ 
