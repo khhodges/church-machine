@@ -1,0 +1,135 @@
+sipantichijk@penguin:~/church_project/SoC/church-machine$ cat hardware/soc_combined/outflow/church_soc_cm_or.ini
+cat hardware/soc_combined/outflow/church_soc_cm.pgm.out
+ls hardware/soc_combined/work_pnr/church_soc_cm.lbf 2>/dev/null && echo "LBF EXISTS" || echo "LBF MISSING"
+
+# Efinity Option Register
+# Version: 2026.1.132
+# Date: 2026-06-14 20:35
+
+# Copyright (C) 2013 - 2026 Efinix Inc. All rights reserved.
+
+enable_remote_update=off
+seu_wait_interval=0xffffff
+enable_seu_crc_check=off
+seu_mode=automatic
+INFO     : Efinix FPGA Bitstream Generator.
+INFO     : Version: 2026.1.132 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+INFO     : Compiled: May 29 2026.
+INFO     : Using source file "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf"
+INFO     : Missing Interface Designer LPF constraint file, no programming file will be generated.
+INFO     : Open Interface Designer to create a project.
+hardware/soc_combined/work_pnr/church_soc_cm.lbf
+LBF EXISTS
+sipantichijk@penguin:~/church_project/SoC/church-machine$ cat hardware/soc_combined/outflow/church_soc_cm.peri.csi
+ls hardware/soc_combined/outflow/*.peri* hardware/soc_combined/outflow/*.ifd* 2>/dev/null
+cat hardware/soc_combined/outflow/church_soc_cm.err.log
+CellSiteInst {
+  cell: ""
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOL_P_18_PLLIN0"
+}
+CellSiteInst {
+  cell: "cm_uart_tx"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOL_P_03_CDI0"
+}
+CellSiteInst {
+  cell: "led0"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOR_P_07"
+}
+CellSiteInst {
+  cell: "led1"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOR_P_08_CLK11_P"
+}
+CellSiteInst {
+  cell: "led2"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOR_P_09_CLK10_P"
+}
+CellSiteInst {
+  cell: "push_button"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOT_N_06"
+}
+CellSiteInst {
+  cell: "uart_rx"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOL_01"
+}
+CellSiteInst {
+  cell: "uart_tx"
+  block_and_site_inst: "PKG_PIN/PKG_PIN_INOUT"
+  block_inst: "GPIOL_02"
+}
+CellSiteInst {
+  cell: "clk~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT0"
+  block_inst: "GPIOL_PN_18"
+}
+CellSiteInst {
+  cell: "cm_uart_tx~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT0"
+  block_inst: "GPIOL_PN_03"
+}
+CellSiteInst {
+  cell: "led0~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT0"
+  block_inst: "GPIOR_PN_07"
+}
+CellSiteInst {
+  cell: "led1~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT0"
+  block_inst: "GPIOR_PN_08"
+}
+CellSiteInst {
+  cell: "led2~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT0"
+  block_inst: "GPIOR_PN_09"
+}
+CellSiteInst {
+  cell: "push_button~GPIO"
+  block_and_site_inst: "HSIO/HSIO_SLOT1"
+  block_inst: "GPIOT_PN_06"
+}
+CellSiteInst {
+  cell: "uart_rx~GPIO"
+  block_and_site_inst: "HVIO/HVIO_SLOT0"
+  block_inst: "GPIOL_01"
+}
+CellSiteInst {
+  cell: "uart_tx~GPIO"
+  block_and_site_inst: "HVIO/HVIO_SLOT0"
+  block_inst: "GPIOL_02"
+}
+ hardware/soc_combined/outflow/church_soc_cm.peri.cdo
+ hardware/soc_combined/outflow/church_soc_cm.peri.csi
+ hardware/soc_combined/outflow/church_soc_cm.peri.pbn
+ hardware/soc_combined/outflow/church_soc_cm.peri.qdelay
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 14, 2026 13:49:13
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 14, 2026 14:39:34
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 14, 2026 20:03:16
+///////////////////////////////////
+
+
+///////////////////////////////////
+// Efinity Synthesis Started 
+// Jun 14, 2026 20:30:56
+///////////////////////////////////
+
+sipantichijk@penguin:~/church_project/SoC/church-machine$ 

@@ -1,0 +1,42 @@
+sipantichijk@penguin:~/church_project/SoC/church-machine$ head -30 ~/efinity/2026.1/scripts/efx_generate_if_files.py
+#!/usr/bin/env python3
+ 
+"""
+Module efx_generate_if_files.py
+
+This file processes IP interface CSV file, and generates verilog
+wrapper files.
+"""
+
+import sys
+import os
+
+from veriloggen import *
+
+BYPASS = '__bypass__'
+INCLUDE_FLAG = 'ENABLE_SYNC'
+
+
+# main parsing routine
+def parse_cmdline_options():
+
+        import argparse
+        parser = argparse.ArgumentParser(description='EFX IP interface processor')
+
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument('--project', default='', help='XML project file')
+        group.add_argument('--top', dest='top_level_entity', default='', help='Efinity project top-level entity')
+
+        parser.add_argument('interface', help='CSV project interface file')
+        #parser.add_argument('--action', choices=['sim'], default='sim', help='Task to be completed')
+sipantichijk@penguin:~/church_project/SoC/church-machine$ cd hardware/soc_combined && python3 ~/efinity/2026.1/scripts/efx_run_pgm.py church_soc_cm --family Titanium --device Ti60F225 2>&1 | tail -30
+cd ~/church_project/SoC/church-machine
+/home/sipantichijk/efinity/2026.1/bin/efx_pgm --interface_designer_settings outflow/church_soc_cm_or.ini --family Titanium --device Ti60F225 --source /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf --dest outflow/church_soc_cm.hex
+INFO     : Efinix FPGA Bitstream Generator.
+INFO     : Version: 2026.1.132 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+INFO     : Compiled: May 29 2026.
+INFO     : Using source file "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf"
+INFO     : Missing Interface Designer LPF constraint file, no programming file will be generated.
+INFO     : Open Interface Designer to create a project.
+sipantichijk@penguin:~/church_project/SoC/church-machine$ 

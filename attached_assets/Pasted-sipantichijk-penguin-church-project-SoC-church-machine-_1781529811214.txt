@@ -1,0 +1,24 @@
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_combined$ python3 ~/efinity/2026.1/scripts/efx_run_pgm.py church_soc_cm \
+  --family Titanium --device Ti60F225 2>&1
+/home/sipantichijk/efinity/2026.1/bin/efx_pgm --interface_designer_settings outflow/church_soc_cm_or.ini --periph outflow/church_soc_cm.lpf --family Titanium --device Ti60F225 --source /home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf --dest outflow/church_soc_cm.hex
+INFO     : Efinix FPGA Bitstream Generator.
+INFO     : Version: 2026.1.132 
+INFO     : Copyright (C) 2013 - 2026 Efinix, Inc. All rights reserved.
+INFO     : Compiled: May 29 2026.
+INFO     : Using source file "/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf"
+INFO     : Generating HEX programming file for device "Ti60F225", family "Titanium"
+INFO     : Using periphery source file "outflow/church_soc_cm.lpf"
+INFO     : Generating bit file: "outflow/church_soc_cm.bit"
+INFO     : HEX Generation Options Summary:
+INFO     :      Listing options specified to bitstream generation:
+INFO     :      enable_remote_update                     = off
+INFO     :      enable_seu_crc_check                     = off
+INFO     :      seu_mode                                 = automatic
+INFO     :      seu_wait_interval                        = 0xFFFFFF
+INFO     : Finished generating "outflow/church_soc_cm.hex"
+INFO     : Efinix Bitstream Generator took 2.503080949 seconds [FlowMsg::StageDuration]
+INFO     :     Efinix Bitstream Generator took 1.8 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Efinix Bitstream Generator virtual memory usage: begin = 35.272 MB, end = 174.672 MB, delta = 139.4 MB [FlowMsg::VMUsage]
+INFO     : Efinix Bitstream Generator resident set memory usage: begin = 15.488 MB, end = 159.232 MB, delta = 143.744 MB [FlowMsg::RSSUsage]
+INFO     :     Efinix Bitstream Generator peak resident set memory usage = 159.232 MB [FlowMsg::RSSUsage::Peak]
+sipantichijk@penguin:~/church_project/SoC/church-machine/hardware/soc_combined$ 
