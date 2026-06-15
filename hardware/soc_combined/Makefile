@@ -1,4 +1,5 @@
-.PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive test-sha32
+.PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive test-sha32 \
+        bitstream bitstream-flash
 
 SCRIPTS_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null)/scripts
 ifeq ($(SCRIPTS_DIR),/scripts)
@@ -25,6 +26,67 @@ patch_sapphire: $(SYM_PREFIX)0.bin
 		$(SYM_PREFIX)3.bin
 
 $(SYM_PREFIX)0.bin: firmware
+
+# ---------------------------------------------------------------------------
+# bitstream — full safe build sequence for the Ti60 SoC+CM bitstream.
+#
+# Runs every step in order; aborts immediately on any error (set -euo pipefail
+# is already in each shell script, and make exits on non-zero recipe status).
+#
+# Steps:
+#   1. firmware      — cross-compile RISC-V firmware; generates symbol .bin files
+#   2. prep_syn.sh   — copy symbol .bin files into work_syn/ for EFX_MAP
+#   3. patch_sapphire — embed firmware bytes into sapphire.v initial-blocks
+#   4. run_efx_map.sh  — strip banned XML params + synthesise (efx_map)
+#   5. run_efx_pnr.sh  — Interface Designer IO placement + Place & Route (efx_pnr)
+#   6. run_efx_pgm.sh  — bitstream hex generation (efx_pgm)
+#
+# Usage (from hardware/soc_combined/ or repo root):
+#   make bitstream
+#   make -C hardware/soc_combined bitstream
+# ---------------------------------------------------------------------------
+bitstream:
+	@echo "========================================"
+	@echo "make bitstream — full Ti60 build sequence"
+	@echo "========================================"
+	@echo ""
+	@echo "==> Step 1/6: Firmware build ..."
+	$(MAKE) firmware
+	@echo ""
+	@echo "==> Step 2/6: prep_syn.sh — copy BRAM symbol files to work_syn/ ..."
+	bash scripts/prep_syn.sh
+	@echo ""
+	@echo "==> Step 3/6: patch_sapphire_init.py — embed firmware into sapphire.v ..."
+	$(MAKE) patch_sapphire
+	@echo ""
+	@echo "==> Step 4/6: Synthesis (efx_map) ..."
+	bash run_efx_map.sh
+	@echo ""
+	@echo "==> Step 5/6: Place & Route (efx_pnr) ..."
+	bash run_efx_pnr.sh
+	@echo ""
+	@echo "==> Step 6/6: Bitstream generation (efx_pgm) ..."
+	bash run_efx_pgm.sh
+	@echo ""
+	@echo "========================================"
+	@echo "make bitstream COMPLETE"
+	@echo "Flash with:  make bitstream-flash"
+	@echo "========================================"
+
+# ---------------------------------------------------------------------------
+# bitstream-flash — flash the generated hex to the Ti60 via JTAG.
+#
+# Depends on bitstream so a plain 'make bitstream-flash' always rebuilds first.
+# Override PROJECT to point at a different Efinity project XML if needed.
+# ---------------------------------------------------------------------------
+PROJECT ?= $(HOME)/church_project/SoC_minimal/church_soc.xml
+CIRCUIT := $(basename $(notdir $(PROJECT)))
+HEX     := $(dir $(PROJECT))outflow/$(CIRCUIT).hex
+
+bitstream-flash: bitstream
+	@echo "==> Flashing $(HEX) to Ti60F225 ..."
+	sudo openFPGALoader -b titanium_ti60_f225_jtag -f "$(HEX)"
+	@echo "==> Flash complete."
 
 # ---------------------------------------------------------------------------
 # test-key-derive — compile and run the host-side C key derivation test.
