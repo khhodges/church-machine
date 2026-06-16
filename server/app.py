@@ -8219,6 +8219,67 @@ def device_trace_submit():
     return jsonify({"ok": True, "id": row.id})
 
 
+@app.route("/api/device/faults/rich")
+def device_faults_rich():
+    """Return last N fault events with full telemetry fields for the live panel.
+
+    Query params:
+      device_uid — filter to this device (optional; omit for all devices)
+      limit      — max results, capped at 100 (default 20)
+    """
+    uid = request.args.get("device_uid", "").strip()
+    try:
+        limit = min(int(request.args.get("limit", 20)), 100)
+    except (ValueError, TypeError):
+        limit = 20
+    q = FaultEvent.query
+    if uid:
+        q = q.filter_by(device_uid=uid)
+    events = q.order_by(FaultEvent.timestamp.desc()).limit(limit).all()
+    result = []
+    for e in events:
+        result.append({
+            "id": e.id,
+            "ts": e.timestamp,
+            "nia_hex": e.nia_hex or ("0x" + format(e.fault_nia, "08X")),
+            "fault_name": e.mnemonic or "",
+            "fault_code": str(e.fault_code or ""),
+            "pipeline_stage": e.pipeline_stage or "",
+            "fault_gt": e.fault_gt or "",
+            "fault_instr": e.fault_instr or "",
+            "raw_type": e.raw_type or "fault",
+        })
+    return jsonify({"ok": True, "events": result})
+
+
+@app.route("/api/device/traces")
+def device_traces_get():
+    """Return last N NIA trace records for a device (for sparkline display).
+
+    Query params:
+      device_uid — required
+      limit      — max records, capped at 50 (default 10)
+    """
+    import json as _json
+    uid = request.args.get("device_uid", "").strip()
+    if not uid:
+        return jsonify({"ok": False, "error": "missing device_uid"}), 400
+    try:
+        limit = min(int(request.args.get("limit", 10)), 50)
+    except (ValueError, TypeError):
+        limit = 10
+    rows = NiaTrace.query.filter_by(device_uid=uid) \
+        .order_by(NiaTrace.ts.desc()).limit(limit).all()
+    result = []
+    for r in rows:
+        try:
+            nia_trace = _json.loads(r.nia_trace)
+        except Exception:
+            nia_trace = []
+        result.append({"ts": r.ts, "nia_trace": nia_trace})
+    return jsonify({"ok": True, "traces": result})
+
+
 @app.route("/api/device/lump-versions", methods=["POST"])
 def device_lump_versions_update():
     """Record the currently deployed LUMP token+version for each abstraction on a device.

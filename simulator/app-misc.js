@@ -1603,7 +1603,43 @@ function loadDeviceList() {
                         '</label>' +
                         '<div class="dev-deploy-status" id="devDeployStatus_' + dev.id + '" style="display:none;"></div>' +
                         '<button class="dev-action-btn' + (isOnline ? '' : ' dev-action-disabled') + '" onclick="deviceDeploy(' + dev.id + ')" title="Deploy bitstream to this device"' + (isOnline ? '' : ' disabled') + '>Deploy</button>' +
+                    '</div>' +
+                    '<div class="dev-live-section">' +
+                        '<div class="dev-live-section-hdr">Recent Faults' +
+                            ((dev.fw_major || 1) >= 2 && isOnline ? ' <span class="dev-live-badge">Live</span>' : '') +
+                        '</div>' +
+                        '<div class="dev-live-faults-body" id="devLiveFaults_' + dev.id + '">' +
+                            '<div class="dev-live-empty">Expand to load\u2026</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="dev-live-section">' +
+                        '<div class="dev-live-section-hdr">NIA Trace</div>' +
+                        '<div class="dev-nia-trace-wrap">' +
+                            '<canvas class="dev-nia-sparkline" id="devNiaSparkline_' + dev.id + '" height="48"></canvas>' +
+                            '<div class="dev-nia-tooltip" id="devNiaTooltip_' + dev.id + '" style="display:none;"></div>' +
+                        '</div>' +
                     '</div>';
+
+                (function(cnv, ttId) {
+                    if (!cnv) return;
+                    cnv.addEventListener('mousemove', function(e) {
+                        var samples = cnv._niaSamples;
+                        if (!samples || !samples.length) return;
+                        var rect = cnv.getBoundingClientRect();
+                        var xFrac = (e.clientX - rect.left) / Math.max(rect.width, 1);
+                        var idx = Math.round(xFrac * (samples.length - 1));
+                        idx = Math.max(0, Math.min(samples.length - 1, idx));
+                        var tt = document.getElementById(ttId);
+                        if (!tt) return;
+                        tt.style.display = 'block';
+                        tt.style.left = Math.round(e.clientX - rect.left) + 'px';
+                        tt.textContent = '0x' + samples[idx].toString(16).toUpperCase().padStart(8, '0');
+                    });
+                    cnv.addEventListener('mouseleave', function() {
+                        var tt = document.getElementById(ttId);
+                        if (tt) tt.style.display = 'none';
+                    });
+                })(detail.querySelector('.dev-nia-sparkline'), 'devNiaTooltip_' + dev.id);
 
                 detail.style.display = 'none';
                 var faultCountBtn = detail.querySelector('.dev-fault-count-link');
@@ -1614,12 +1650,14 @@ function loadDeviceList() {
                     });
                 }
                 row.addEventListener('click', function() {
-                    const isOpen = row.classList.contains('dev-row-open');
-                    document.querySelectorAll('.dev-detail').forEach(d => { d.style.display = 'none'; });
-                    document.querySelectorAll('.dev-row').forEach(r => r.classList.remove('dev-row-open'));
+                    var isOpen = row.classList.contains('dev-row-open');
+                    document.querySelectorAll('.dev-detail').forEach(function(d) { d.style.display = 'none'; });
+                    document.querySelectorAll('.dev-row').forEach(function(r) { r.classList.remove('dev-row-open'); });
+                    Object.keys(_devLivePollers).forEach(function(pid) { _stopDeviceLivePolling(pid); });
                     if (!isOpen) {
                         detail.style.display = 'block';
                         row.classList.add('dev-row-open');
+                        _startDeviceLivePolling(dev.device_uid, dev.id, dev.fw_major || 1);
                     }
                 });
 
@@ -1675,6 +1713,7 @@ function _tunnelBadgeHtml(ts, id) {
 var _deviceTunnelTimer = null;
 var _deviceRelTimeTimer = null;
 var _devLastSeenMap = {};
+var _devLivePollers = {};
 
 function startDeviceTunnelPolling() {
     stopDeviceTunnelPolling();
@@ -1692,6 +1731,124 @@ function stopDeviceTunnelPolling() {
         clearInterval(_deviceRelTimeTimer);
         _deviceRelTimeTimer = null;
     }
+}
+
+// === Live telemetry polling (per-device, active only while panel is open) ===
+
+function _startDeviceLivePolling(uid, devId, fwMajor) {
+    _stopDeviceLivePolling(devId);
+    var faultDivId = 'devLiveFaults_' + devId;
+    var canvasId   = 'devNiaSparkline_' + devId;
+    var tooltipId  = 'devNiaTooltip_' + devId;
+
+    function fetchFaults() {
+        fetch('/api/device/faults/rich?device_uid=' + encodeURIComponent(uid) + '&limit=8')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var el = document.getElementById(faultDivId);
+                if (!el) return;
+                var events = (data.ok && data.events) ? data.events : [];
+                if (events.length === 0) {
+                    el.innerHTML = '<div class="dev-live-empty">No fault events recorded.</div>';
+                    return;
+                }
+                var html = '<table class="dev-live-faults-table"><thead><tr>' +
+                    '<th>Time</th><th>Fault</th><th>NIA</th><th>Stage</th><th>GT</th>' +
+                    '</tr></thead><tbody>';
+                events.forEach(function(ev) {
+                    var ts    = ev.ts ? _devRelativeTime(ev.ts) : '\u2014';
+                    var name  = _escHtml(ev.fault_name || ev.fault_code || '?');
+                    var nia   = _escHtml(ev.nia_hex || '\u2014');
+                    var stage = _escHtml(ev.pipeline_stage || '\u2014');
+                    var gt    = _escHtml((ev.fault_gt || '').slice(0, 12));
+                    var isHw  = ev.raw_type === 'FAULT_EVENT';
+                    html += '<tr class="dev-live-fault-row' + (isHw ? ' dev-live-fault-hw' : '') + '">' +
+                        '<td class="dev-live-fault-ts">' + ts + '</td>' +
+                        '<td><span class="dev-live-fault-name">' + name + '</span></td>' +
+                        '<td class="dev-live-fault-nia">' + nia + '</td>' +
+                        '<td class="dev-live-fault-stage">' + stage + '</td>' +
+                        '<td class="dev-live-fault-gt">' + gt + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+                el.innerHTML = html;
+            })
+            .catch(function() {});
+    }
+
+    function fetchTraces() {
+        fetch('/api/device/traces?device_uid=' + encodeURIComponent(uid) + '&limit=5')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                var rows = (data.ok && data.traces) ? data.traces : [];
+                _renderNiaSparkline(canvas, rows, tooltipId);
+            })
+            .catch(function() {});
+    }
+
+    fetchFaults();
+    fetchTraces();
+    var faultTimer = setInterval(fetchFaults, 3000);
+    var traceTimer = setInterval(function() { setTimeout(fetchTraces, 1500); }, 3000);
+    _devLivePollers[devId] = [faultTimer, traceTimer];
+}
+
+function _stopDeviceLivePolling(devId) {
+    var handles = _devLivePollers[devId];
+    if (handles) {
+        handles.forEach(function(h) { clearInterval(h); });
+        delete _devLivePollers[devId];
+    }
+}
+
+function _renderNiaSparkline(canvas, rows, tooltipId) {
+    var samples = [];
+    var sorted = rows.slice().reverse();
+    sorted.forEach(function(r) {
+        (r.nia_trace || []).forEach(function(v) {
+            try { samples.push(parseInt(v, 16) >>> 0); } catch(e) {}
+        });
+    });
+
+    var ctx = canvas.getContext('2d');
+    var W = canvas.offsetWidth || (canvas.parentElement ? canvas.parentElement.clientWidth : 0) || 200;
+    var H = canvas.height || 48;
+    canvas.width = W;
+    ctx.clearRect(0, 0, W, H);
+
+    if (samples.length === 0) {
+        ctx.fillStyle = '#888';
+        ctx.font = '10px monospace';
+        ctx.fillText('Awaiting trace data\u2026', 8, H / 2 + 4);
+        canvas._niaSamples = null;
+        return;
+    }
+
+    var minV = Math.min.apply(null, samples);
+    var maxV = Math.max.apply(null, samples);
+    var isFlat = (minV === maxV);
+    var range  = isFlat ? 1 : (maxV - minV);
+
+    ctx.strokeStyle = isFlat ? '#D97706' : '#D4A017';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    var n = samples.length;
+    samples.forEach(function(v, i) {
+        var x = (n > 1 ? i / (n - 1) : 0) * (W - 4) + 2;
+        var y = H - 4 - ((v - minV) / range) * (H - 8);
+        if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+    });
+    ctx.stroke();
+
+    if (isFlat) {
+        ctx.fillStyle = '#D97706';
+        ctx.font = '9px monospace';
+        ctx.fillText('stuck @ 0x' + minV.toString(16).toUpperCase().padStart(8, '0'), 4, H - 6);
+    }
+
+    canvas._niaSamples = samples;
 }
 
 function _refreshOfflineChipTimes() {
