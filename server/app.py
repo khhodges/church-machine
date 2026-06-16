@@ -640,11 +640,16 @@ def report_sync_lfs_now():
 
 @app.route("/internal/git-sync")
 def internal_git_sync():
-    """Trigger an immediate code push to GitHub (non-LFS).
+    """Trigger an immediate code push to both GitHub repos (non-LFS).
+
+    Pushes to:
+      • khhodges/s-ide-v1      (S-IDE v1 simplified entry-point IDE)
+      • khhodges/church-machine (full Church Machine source)
 
     Requires Authorization: Bearer <REPORT_TOKEN> header or ?token=<REPORT_TOKEN>.
 
-    Returns JSON: {success, returncode, output, sha, branch}
+    Returns JSON: {success, returncode, output, sha, branch, repos}
+      repos: {"s-ide-v1": "ok"|"fail", "church-machine": "ok"|"fail"}
     """
     import subprocess
     from daily_report import check_report_auth as _check_auth
@@ -667,7 +672,7 @@ def internal_git_sync():
             ["bash", script],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
             env={**os.environ, "GITHUB_PAT": pat},
         )
         output = (result.stdout + result.stderr).strip()
@@ -676,13 +681,32 @@ def internal_git_sync():
                                 capture_output=True, text=True).stdout.strip()
         branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
                                 capture_output=True, text=True).stdout.strip()
-        logging.info("Manual git-sync triggered: success=%s sha=%s", success, sha)
+
+        # Parse per-repo outcomes from script output lines.
+        # The script emits "push to <repo> succeeded." or "push to <repo> FAILED".
+        def _repo_status(repo_path):
+            if f"push to {repo_path} succeeded" in output:
+                return "ok"
+            if f"push to {repo_path} FAILED" in output:
+                return "fail"
+            return "unknown"
+
+        repos = {
+            "s-ide-v1":       _repo_status("khhodges/s-ide-v1"),
+            "church-machine": _repo_status("khhodges/church-machine"),
+        }
+
+        logging.info(
+            "Manual git-sync triggered: success=%s sha=%s repos=%s",
+            success, sha, repos,
+        )
         return jsonify({
             "success": success,
             "returncode": result.returncode,
             "output": output[-2000:],
             "sha": sha,
             "branch": branch,
+            "repos": repos,
         })
     except Exception as exc:
         logging.exception("Error in /internal/git-sync")

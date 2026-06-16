@@ -1,5 +1,8 @@
 #!/bin/bash
-# sync-to-github.sh — Push current HEAD to khhodges/s-ide-v1 on GitHub.
+# sync-to-github.sh — Push current HEAD to BOTH GitHub repos:
+#   • khhodges/s-ide-v1     (S-IDE v1 simplified entry-point IDE)
+#   • khhodges/church-machine (full Church Machine source)
+#
 # Called automatically by scripts/post-merge.sh after every Replit task merge.
 # Requires the GITHUB_PAT secret to be set in Replit Secrets (no expiry, repo scope).
 #
@@ -18,9 +21,10 @@ for arg in "$@"; do
     esac
 done
 
-REPO="khhodges/s-ide-v1"
-REMOTE_NAME="github-sync"
-REMOTE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO}.git"
+REPO_SIDE="khhodges/s-ide-v1"
+REPO_CM="khhodges/church-machine"
+REMOTE_SIDE="github-sync"
+REMOTE_CM="github-sync-cm"
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
 HEAD_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -84,7 +88,7 @@ _require_pat_scope() {
 
     if [ -z "$scopes" ]; then
         echo "${script_name}: WARNING — X-OAuth-Scopes header absent (fine-grained PAT or GitHub Apps token)."
-        echo "  Ensure the token has the appropriate permissions for ${REPO}."
+        echo "  Ensure the token has the appropriate permissions for both repos."
         return 0
     fi
 
@@ -99,67 +103,126 @@ _require_pat_scope() {
     fi
 }
 
-# Add or update the github-sync remote (safe to re-run)
-if git remote get-url "$REMOTE_NAME" &>/dev/null; then
-    git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
-else
-    git remote add "$REMOTE_NAME" "$REMOTE_URL"
-fi
+# ---------------------------------------------------------------------------
+# Helper: push one remote (code only, no LFS).
+# Usage: _push_code <remote-name> <repo> <remote-url>
+# Returns exit code of git push.
+# ---------------------------------------------------------------------------
+_push_code() {
+    local remote_name="$1"
+    local repo="$2"
+    local remote_url="$3"
+
+    # Add or update the remote (safe to re-run)
+    if git remote get-url "$remote_name" &>/dev/null; then
+        git remote set-url "$remote_name" "$remote_url"
+    else
+        git remote add "$remote_name" "$remote_url"
+    fi
+
+    # Disable LFS for this remote so we only push regular git objects.
+    git config "remote.${remote_name}.lfsurl" "https://github.com/${repo}.git/info/lfs" 2>/dev/null || true
+    git config "lfs.${remote_url}/info/lfs.locksverify" "false" 2>/dev/null || true
+
+    echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) → github.com/${repo} (LFS skipped) ..."
+
+    local push_output push_exit
+    push_output=$(
+        GIT_LFS_SKIP_PUSH=1 \
+        GIT_TRACE=0 \
+            git -c "lfs.${remote_url}.locksverify=false" \
+                push "$remote_name" "HEAD:refs/heads/${BRANCH}" --force 2>&1
+    )
+    push_exit=$?
+
+    echo "$push_output"
+
+    if [ "$push_exit" -ne 0 ]; then
+        echo "sync-to-github: push to ${repo} FAILED (exit ${push_exit})."
+    else
+        echo "sync-to-github: push to ${repo} succeeded."
+    fi
+
+    return "$push_exit"
+}
+
+# ---------------------------------------------------------------------------
+# Helper: push one remote (code + LFS).
+# Usage: _push_with_lfs <remote-name> <repo> <remote-url>
+# Returns exit code (0 only if both code push and LFS upload succeeded).
+# ---------------------------------------------------------------------------
+_push_with_lfs() {
+    local remote_name="$1"
+    local repo="$2"
+    local remote_url="$3"
+
+    # Add or update the remote
+    if git remote get-url "$remote_name" &>/dev/null; then
+        git remote set-url "$remote_name" "$remote_url"
+    else
+        git remote add "$remote_name" "$remote_url"
+    fi
+
+    echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) + LFS objects → github.com/${repo} ..."
+
+    local push_output push_exit
+    push_output=$(GIT_LFS_SKIP_PUSH=1 GIT_TRACE=0 \
+        git push "$remote_name" "HEAD:refs/heads/${BRANCH}" --force 2>&1)
+    push_exit=$?
+    echo "$push_output"
+
+    if [ "$push_exit" -ne 0 ]; then
+        echo "sync-to-github: push to ${repo} FAILED (exit ${push_exit})."
+        return "$push_exit"
+    fi
+
+    echo "sync-to-github: uploading LFS objects to ${repo} ..."
+    local lfs_output lfs_exit
+    lfs_output=$(GIT_TRACE=0 git lfs push "$remote_name" "HEAD" 2>&1)
+    lfs_exit=$?
+    echo "$lfs_output"
+
+    if [ "$lfs_exit" -ne 0 ]; then
+        echo "sync-to-github: LFS upload to ${repo} FAILED (exit ${lfs_exit})."
+        return "$lfs_exit"
+    fi
+
+    echo "sync-to-github: push + LFS upload to ${repo} succeeded."
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Main: push to both remotes, track per-repo results, record combined status.
+# ---------------------------------------------------------------------------
+SIDE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO_SIDE}.git"
+CM_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO_CM}.git"
+
+SIDE_EXIT=0
+CM_EXIT=0
 
 if [ "$WITH_LFS" -eq 1 ]; then
     _require_pat_scope "lfs" "sync-to-github"
-    echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) + LFS objects → github.com/${REPO} ..."
 
-    # Push regular git objects first
-    PUSH_OUTPUT=$(GIT_LFS_SKIP_PUSH=1 GIT_TRACE=0 \
-        git push "$REMOTE_NAME" "HEAD:refs/heads/${BRANCH}" --force 2>&1)
-    PUSH_EXIT=$?
-    echo "$PUSH_OUTPUT"
+    _push_with_lfs "$REMOTE_SIDE" "$REPO_SIDE" "$SIDE_URL"
+    SIDE_EXIT=$?
 
-    if [ "$PUSH_EXIT" -ne 0 ]; then
-        echo "sync-to-github: push FAILED (exit $PUSH_EXIT)."
-        _record_status "fail" "$PUSH_OUTPUT"
-        exit "$PUSH_EXIT"
-    fi
-
-    echo "sync-to-github: uploading LFS objects ..."
-    LFS_OUTPUT=$(GIT_TRACE=0 git lfs push "$REMOTE_NAME" "HEAD" 2>&1)
-    LFS_EXIT=$?
-    echo "$LFS_OUTPUT"
-
-    if [ "$LFS_EXIT" -ne 0 ]; then
-        echo "sync-to-github: LFS upload FAILED (exit $LFS_EXIT)."
-        _record_status "fail" "$LFS_OUTPUT"
-        exit "$LFS_EXIT"
-    fi
-
-    echo "sync-to-github: push + LFS upload succeeded."
-    _record_status "ok" ""
+    _push_with_lfs "$REMOTE_CM" "$REPO_CM" "$CM_URL"
+    CM_EXIT=$?
 else
-    # Disable LFS for this remote so we only push regular git objects.
-    # LFS binaries are large; routine code sync doesn't need them.
-    git config "remote.${REMOTE_NAME}.lfsurl" "https://github.com/${REPO}.git/info/lfs" 2>/dev/null || true
-    git config "lfs.${REMOTE_URL}/info/lfs.locksverify" "false" 2>/dev/null || true
+    _push_code "$REMOTE_SIDE" "$REPO_SIDE" "$SIDE_URL"
+    SIDE_EXIT=$?
 
-    echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) → github.com/${REPO} (LFS skipped) ..."
-
-    # Capture both stdout+stderr and exit code from the push.
-    PUSH_OUTPUT=$(
-        GIT_LFS_SKIP_PUSH=1 \
-        GIT_TRACE=0 \
-            git -c "lfs.${REMOTE_URL}.locksverify=false" \
-                push "$REMOTE_NAME" "HEAD:refs/heads/${BRANCH}" --force 2>&1
-    )
-    PUSH_EXIT=$?
-
-    echo "$PUSH_OUTPUT"
-
-    if [ "$PUSH_EXIT" -ne 0 ]; then
-        echo "sync-to-github: push FAILED (exit $PUSH_EXIT)."
-        _record_status "fail" "$PUSH_OUTPUT"
-        exit "$PUSH_EXIT"
-    fi
-
-    echo "sync-to-github: push succeeded (LFS objects not uploaded; run with --with-lfs to include them)."
-    _record_status "ok" ""
+    _push_code "$REMOTE_CM" "$REPO_CM" "$CM_URL"
+    CM_EXIT=$?
 fi
+
+# Record combined status
+if [ "$SIDE_EXIT" -ne 0 ] || [ "$CM_EXIT" -ne 0 ]; then
+    FAIL_REPOS=""
+    [ "$SIDE_EXIT" -ne 0 ] && FAIL_REPOS="${FAIL_REPOS} ${REPO_SIDE}"
+    [ "$CM_EXIT" -ne 0 ]   && FAIL_REPOS="${FAIL_REPOS} ${REPO_CM}"
+    _record_status "fail" "Push failed for:${FAIL_REPOS}"
+    exit 1
+fi
+
+_record_status "ok" ""

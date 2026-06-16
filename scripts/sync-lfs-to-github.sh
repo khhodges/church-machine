@@ -1,5 +1,7 @@
 #!/bin/bash
-# sync-lfs-to-github.sh — Upload Git LFS objects to GitHub for khhodges/church-machine.
+# sync-lfs-to-github.sh — Upload Git LFS objects to BOTH GitHub repos:
+#   • khhodges/s-ide-v1       (S-IDE v1 simplified entry-point IDE)
+#   • khhodges/church-machine (full Church Machine source)
 #
 # Designed for scheduled (e.g. nightly) use so large binary assets (.lump files,
 # FPGA bitstreams) are kept in the GitHub LFS store as a complete backup, without
@@ -17,12 +19,13 @@
 
 set -euo pipefail
 
-REPO="khhodges/church-machine"
-REMOTE_NAME="github-sync"
-REMOTE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO}.git"
+REPO_SIDE="khhodges/s-ide-v1"
+REPO_CM="khhodges/church-machine"
+REMOTE_SIDE="github-sync"
+REMOTE_CM="github-sync-cm"
 
 TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-echo "[$TIMESTAMP] sync-lfs-to-github: starting LFS object upload for ${REPO} ..."
+echo "[$TIMESTAMP] sync-lfs-to-github: starting LFS object upload for ${REPO_SIDE} and ${REPO_CM} ..."
 
 if [ -z "${GITHUB_PAT:-}" ]; then
     echo "sync-lfs-to-github: GITHUB_PAT secret is not set — aborting."
@@ -72,7 +75,7 @@ _check_pat_lfs_scope() {
 
     if [ -z "$scopes" ]; then
         echo "sync-lfs-to-github: WARNING — X-OAuth-Scopes header absent (fine-grained PAT or GitHub Apps token)."
-        echo "  Ensure the token has Contents read/write permission (which covers LFS) for ${REPO}."
+        echo "  Ensure the token has Contents read/write permission (which covers LFS) for both repos."
         return 0
     fi
 
@@ -98,26 +101,58 @@ if ! command -v git-lfs &>/dev/null && ! git lfs version &>/dev/null 2>&1; then
     exit 1
 fi
 
-# Ensure the github-sync remote exists and points at the right URL
-if git remote get-url "$REMOTE_NAME" &>/dev/null; then
-    git remote set-url "$REMOTE_NAME" "$REMOTE_URL"
-else
-    git remote add "$REMOTE_NAME" "$REMOTE_URL"
-fi
-
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
 HEAD_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
 echo "sync-lfs-to-github: HEAD=${HEAD_SHA} branch=${BRANCH}"
 
-# Count how many LFS objects are tracked so we can report progress
 LFS_OBJECT_COUNT=$(git lfs ls-files 2>/dev/null | wc -l | tr -d ' ')
 echo "sync-lfs-to-github: ${LFS_OBJECT_COUNT} LFS-tracked file(s) in working tree"
 
-# git lfs push uploads all LFS objects reachable from HEAD that the remote
-# does not already have. --all uploads every object across all refs.
-GIT_TRACE=0 \
-    git lfs push "$REMOTE_NAME" HEAD 2>&1
+# ---------------------------------------------------------------------------
+# Helper: push LFS objects to one remote.
+# Usage: _lfs_push_one <remote-name> <repo>
+# Returns exit code of git lfs push.
+# ---------------------------------------------------------------------------
+_lfs_push_one() {
+    local remote_name="$1"
+    local repo="$2"
+    local remote_url="https://x-access-token:${GITHUB_PAT}@github.com/${repo}.git"
+
+    if git remote get-url "$remote_name" &>/dev/null; then
+        git remote set-url "$remote_name" "$remote_url"
+    else
+        git remote add "$remote_name" "$remote_url"
+    fi
+
+    echo "sync-lfs-to-github: uploading LFS objects → github.com/${repo} ..."
+    GIT_TRACE=0 git lfs push "$remote_name" HEAD 2>&1
+    local exit_code=$?
+
+    if [ "$exit_code" -ne 0 ]; then
+        echo "sync-lfs-to-github: LFS upload to ${repo} FAILED (exit ${exit_code})."
+    else
+        echo "sync-lfs-to-github: LFS upload to ${repo} succeeded."
+    fi
+
+    return "$exit_code"
+}
+
+# Push to both repos; collect exit codes so we can report combined status.
+SIDE_EXIT=0
+CM_EXIT=0
+
+_lfs_push_one "$REMOTE_SIDE" "$REPO_SIDE" || SIDE_EXIT=$?
+_lfs_push_one "$REMOTE_CM"   "$REPO_CM"   || CM_EXIT=$?
 
 DONE_TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-echo "[$DONE_TIMESTAMP] sync-lfs-to-github: LFS upload complete."
+
+if [ "$SIDE_EXIT" -ne 0 ] || [ "$CM_EXIT" -ne 0 ]; then
+    FAIL_REPOS=""
+    [ "$SIDE_EXIT" -ne 0 ] && FAIL_REPOS="${FAIL_REPOS} ${REPO_SIDE}"
+    [ "$CM_EXIT" -ne 0 ]   && FAIL_REPOS="${FAIL_REPOS} ${REPO_CM}"
+    echo "[$DONE_TIMESTAMP] sync-lfs-to-github: LFS upload FAILED for:${FAIL_REPOS}"
+    exit 1
+fi
+
+echo "[$DONE_TIMESTAMP] sync-lfs-to-github: LFS upload complete for both repos."
