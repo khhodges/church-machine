@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Church Machine IDE — Capability-Based Secure Computing</title>
-    <meta name="description" content="Church Machine IDE: a browser-based simulator and assembler for learning capability-based secure computing, Golden Token security, and the CLOOMC ISA. Targets Tang Nano 20K, Efinix Ti60, and Artix-7 FPGAs.">
+    <title>S-IDE v1 — Church Machine Capability-Secured Computing</title>
+    <meta name="description" content="S-IDE v1: simplified Church Machine IDE for learning capability-based secure computing with the Ti60 FPGA. Flash, connect, and run your first CLOOMC program in three steps.">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="/simulator/">
     <meta property="og:title" content="Church Machine IDE — Capability-Based Secure Computing">
@@ -71,20 +71,13 @@
         }
         @keyframes app-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
         @keyframes app-slide { 0%{transform:translateX(-200%)} 100%{transform:translateX(450%)} }
-        /* hamburger mega-menu — inline to bypass CSS file cache */
-        #hamDropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:9999; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:0.35rem 0; grid-template-columns:repeat(4,max-content); max-height:calc(100vh - 60px); overflow-y:auto; }
-        #hamDropdown.ham-open { display:grid !important; }
-        .ham-group { display:flex; flex-direction:column; border-right:1px solid var(--border,#2a2a4a); padding:0.2rem 0; }
-        .ham-group:last-child { border-right:none; }
-        #ham-grp-develop  { grid-column:1; grid-row:2; }
-        #ham-grp-review   { grid-column:2; grid-row:2/span 2; }
-        #ham-grp-hardware { grid-column:3; grid-row:2/span 2; }
-        #ham-grp-configure { grid-column:4; grid-row:2; border-right:none; }
-        #ham-grp-inspect  { grid-column:1; grid-row:3; }
-        #ham-grp-install  { grid-column:4; grid-row:3; border-right:none; }
+        /* hamburger menu — S-IDE v1 flat list */
+        #hamDropdown { display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:9999; background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.5); padding:0.35rem 0; min-width:200px; max-height:calc(100vh - 60px); overflow-y:auto; }
+        #hamDropdown.ham-open { display:flex !important; flex-direction:column; }
+        .ham-group { display:flex; flex-direction:column; padding:0.2rem 0; }
         .ham-item { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
         .ham-kbd { font-family:'Courier New',monospace; font-size:0.62rem; color:#555577; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:3px; padding:1px 4px; letter-spacing:0.2px; flex-shrink:0; }
-        .ham-bolt-row { grid-column:1/-1; padding:0.35rem 0.75rem 0.3rem; border-bottom:1px solid var(--border,#2a2a4a); display:flex; align-items:center; gap:0.5rem; }
+        .ham-bolt-row { padding:0.35rem 0.75rem 0.3rem; border-bottom:1px solid var(--border,#2a2a4a); display:flex; align-items:center; gap:0.5rem; }
         .ham-bolt-drag { font-size:1.05rem; cursor:grab; user-select:none; color:#daa520; padding:0.1rem 0.4rem; border:1px dashed rgba(218,165,32,0.4); border-radius:4px; transition:background 0.15s; }
         .ham-bolt-drag:hover { background:rgba(218,165,32,0.15); }
         .ham-bolt-drag:active { cursor:grabbing; }
@@ -94,12 +87,27 @@
         .ham-item.ham-drop-active { background:rgba(218,165,32,0.12) !important; outline:1px solid rgba(218,165,32,0.6); }
         .ham-item.ham-is-default { color:#daa520; }
         .ham-item.ham-is-default::after { content:'⚡'; font-size:0.7rem; margin-left:auto; color:#daa520; flex-shrink:0; }
-        @media (max-width:640px) {
-            #hamDropdown.ham-open { grid-template-columns:1fr; max-height:calc(100vh - 60px); overflow-y:auto; }
-            .ham-group { border-right:none; border-bottom:1px solid var(--border,#2a2a4a); }
-            .ham-group:last-child { border-bottom:none; }
-            .ham-item { padding-top:0.55rem; padding-bottom:0.55rem; width:100%; }
-        }
+        .ham-separator { height:1px; background:var(--border,#2a2a4a); margin:0.3rem 0; }
+        .ham-debug-section { display:none; flex-direction:column; }
+        body.r1-debug-mode .ham-debug-section { display:flex; }
+        /* S-IDE v1: 3-step tutorial cards */
+        .r1-tutorial-wrap { padding:1.5rem; max-width:720px; margin:0 auto; }
+        .r1-tutorial-heading { font-family:Georgia,serif; font-size:1.4rem; color:#daa520; margin-bottom:0.4rem; }
+        .r1-tutorial-sub { color:#888; font-size:0.9rem; margin-bottom:1.8rem; }
+        .r1-steps-grid { display:flex; flex-direction:column; gap:1rem; }
+        .r1-step-card { background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-radius:8px; padding:1.2rem 1.4rem; display:flex; align-items:flex-start; gap:1.2rem; transition:border-color 0.2s; }
+        .r1-step-card.r1-done { border-color:#3fb950; }
+        .r1-step-num { font-family:Georgia,serif; font-size:1.8rem; color:#daa520; min-width:2rem; line-height:1; }
+        .r1-step-body { flex:1; }
+        .r1-step-title { font-weight:700; font-size:1rem; color:#e0e0f0; margin-bottom:0.3rem; }
+        .r1-step-desc { font-size:0.85rem; color:#888; line-height:1.5; }
+        .r1-step-badge { font-size:0.78rem; font-weight:700; margin-top:0.5rem; display:inline-block; padding:0.15rem 0.55rem; border-radius:4px; }
+        .r1-step-badge-done { background:#1a3a1a; color:#3fb950; }
+        .r1-step-badge-waiting { background:#1a1a2e; color:#555577; }
+        .r1-step-action { flex-shrink:0; }
+        .r1-step-btn { background:#C89B3C; color:#141414; border:none; border-radius:5px; padding:0.45rem 1rem; font-size:0.85rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .r1-step-btn:hover { background:#daa520; }
+        @media (max-width:600px) { .r1-step-card { flex-direction:column; } .r1-step-action { width:100%; } .r1-step-btn { width:100%; text-align:center; } }
     </style>
 </head>
 <body>
@@ -125,60 +133,43 @@
                                 <span class="ham-bolt-hint">Drag to set default page</span>
                                 <button id="hamDefaultClear" class="ham-bolt-clear" style="display:none;" onclick="_clearDefaultView()" data-tooltip="Remove default page — next load will resume the last visited page">✕ clear default</button>
                             </div>
-                            <div class="ham-group" id="ham-grp-develop">
-                                <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'develop','Open Programs')">Develop</div>
+                            <!-- S-IDE v1 flat menu — always visible -->
+                            <div class="ham-group" id="ham-grp-main">
                                 <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Programs</button>
-                                <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math<kbd class="ham-kbd">C+M</kbd></button>
-                                <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace<kbd class="ham-kbd">C+N</kbd></button>
-                                <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Hello Mum</button>
-                                <button class="ham-item" id="hamItem-abstraction" onclick="window.location='/start?abstraction=1';closeHamburger()" data-tooltip="Abstraction — Open the Create Abstraction planning form (Lesson 5) and restore any saved draft">&#x03BB; Abstraction</button>
-                                <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()" data-tooltip="Resume Draft — Return to your Lesson 5 abstraction draft">&#x270F;&#xFE0F; Resume Draft</button>
+                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Ti60</button>
+                                <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');switchDevicesTab('devices');closeHamburger()">Devices</button>
+                                <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial</button>
                             </div>
-                            <div class="ham-group" id="ham-grp-inspect">
-                                <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'test','Open Inspect Panel')">Inspect</div>
-                                <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Cap Registers<kbd class="ham-kbd">C+D</kbd></button>
-                                <button class="ham-item" id="hamItem-dashboard-dr" onclick="switchView('dashboard');switchDashTab('dr');closeHamburger()">Data Registers</button>
-                                <button class="ham-item" id="hamItem-dashboard-memstats" onclick="switchView('dashboard');switchDashTab('memstats');closeHamburger()">Memory Layers</button>
-                                <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
-                                <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
-                                <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
-                                <button class="ham-item" id="hamItem-gt-view" onclick="switchView('gt-view');closeHamburger()">GT Inspector</button>
+                            <div class="ham-separator"></div>
+                            <div class="ham-group">
+                                <button class="ham-item" onclick="openDocAnchor('quick-start.md');closeHamburger()">About</button>
                             </div>
-                            <div class="ham-group" id="ham-grp-review">
-                                <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'review','Open Logic Catalog')">Review</div>
-                                <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Logic Catalog<kbd class="ham-kbd">C+A</kbd></button>
-                                <button class="ham-item" id="hamItem-source-library" onclick="switchView('abstractions');switchAbsSubtab('sources');closeHamburger()">Source Library<kbd class="ham-kbd">C+⇧+L</kbd></button>
-                                <button class="ham-item" id="hamItem-tutorial" onclick="switchView('tutorial');closeHamburger()">Tutorial<kbd class="ham-kbd">C+U</kbd></button>
-                                <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference<kbd class="ham-kbd">C+F</kbd></button>
-                                <button class="ham-item" id="hamItem-docs" onclick="openDocAnchor('quick-start.md');closeHamburger()">Docs<kbd class="ham-kbd">C+Y</kbd></button>
-                                <button class="ham-item" id="hamItem-docs-qs" onclick="openDocAnchor('quick-start.md');closeHamburger()">Quick Start</button>
-                                <button class="ham-item" id="hamItem-docs-gs" onclick="openDocAnchor('getting-started.md');closeHamburger()">Getting Started</button>
-                                <button class="ham-item" id="hamItem-docs-arch" onclick="openDocAnchor('architecture.md');closeHamburger()">Architecture</button>
-                                <button class="ham-item" id="hamItem-docs-isa" onclick="openDocAnchor('instruction-set.md');closeHamburger()">Instruction Set</button>
-                                <button class="ham-item" id="hamItem-docs-api" onclick="openDocAnchor('api-reference.md');closeHamburger()">API Reference</button>
-                                <button class="ham-item" id="hamItem-sitemap" onclick="switchView('sitemap');closeHamburger()">Site Map</button>
-                            </div>
-                            <div class="ham-group" id="ham-grp-hardware">
-                                <div class="ham-group-title" title="Click to open" onclick="switchView('memory');closeHamburger()" oncontextmenu="showHamCtxMenu(event,'hardware','Open Memory Dump')">Hardware</div>
-                                <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle()" data-tooltip="FPGA — Click to connect or reconnect hardware via WebSerial">FPGA</button>
-                                <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()" data-tooltip="FPGA Bridge — Connect via local bridge script (use this on ChromeOS)">Bridge</button>
-                                <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()" data-tooltip="Read BRAM — Dump words from FPGA BRAM over UART (0xBEAD)">BRAM</button>
-                                <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()" data-tooltip="Connect Ti60 — Open the Ti60 USB/UART connection panel">&#x1F50C; Connect Ti60</button>
-
-                                <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
-                            </div>
-                            <div class="ham-group" id="ham-grp-configure">
-                                <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'configure','Open Devices')">Configure</div>
-                                <button class="ham-item" id="hamItem-devices" onclick="switchView('devices');switchDevicesTab('devices');closeHamburger()">Devices<kbd class="ham-kbd">C+V</kbd></button>
-                                <button class="ham-item" id="hamItem-launch" onclick="switchView('devices');switchDevicesTab('launch');closeHamburger()">Launch Readiness</button>
-                                <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub</button>
-                            </div>
-                            <div class="ham-group" id="ham-grp-install">
-                                <div class="ham-group-title" title="Click to open" onclick="showHamCtxMenu(event,'install','Open Builder')">Install</div>
-                                <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
-                                <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">LUMP<kbd class="ham-kbd">C+L</kbd></button>
-                <button class="ham-item" id="hamItem-lumps-import" onclick="switchView('lumps');closeHamburger();setTimeout(showLumpImportModal,150)">Import LUMP</button>
-                                <button class="ham-item" id="hamItem-bitstreams" onclick="switchView('builder');switchBuilderViewTab('cyberspace');closeHamburger()">Bitstreams</button>
+                            <!-- Debug section — shown only when ?debug=1 -->
+                            <div class="ham-debug-section">
+                                <div class="ham-separator"></div>
+                                <div class="ham-group">
+                                    <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math<kbd class="ham-kbd">C+M</kbd></button>
+                                    <button class="ham-item" id="hamItem-namespace" onclick="switchView('namespace');closeHamburger()">Namespace<kbd class="ham-kbd">C+N</kbd></button>
+                                    <button class="ham-item" id="hamItem-hello-mum" onclick="switchView('hello-mum');closeHamburger()">Hello Mum</button>
+                                    <button class="ham-item" id="hamItem-dashboard" onclick="openSimulatorFromMenu()">Cap Registers<kbd class="ham-kbd">C+D</kbd></button>
+                                    <button class="ham-item" id="hamItem-pipeline" onclick="switchView('pipeline');closeHamburger()">Pipeline<kbd class="ham-kbd">C+P</kbd></button>
+                                    <button class="ham-item" id="hamItem-trace" onclick="switchView('trace');closeHamburger()">Trace<kbd class="ham-kbd">C+T</kbd></button>
+                                    <button class="ham-item" id="hamItem-gc" onclick="switchView('gc');closeHamburger()">GC<kbd class="ham-kbd">C+G</kbd></button>
+                                    <button class="ham-item" id="hamItem-abstractions" onclick="switchView('abstractions');closeHamburger()">Logic Catalog<kbd class="ham-kbd">C+A</kbd></button>
+                                    <button class="ham-item" id="hamItem-reference" onclick="switchView('reference');closeHamburger()">Reference<kbd class="ham-kbd">C+F</kbd></button>
+                                    <button class="ham-item" id="hamItem-docs" onclick="openDocAnchor('quick-start.md');closeHamburger()">Docs<kbd class="ham-kbd">C+Y</kbd></button>
+                                    <button class="ham-item" id="hamItem-lumps" onclick="switchView('lumps');closeHamburger()">LUMP<kbd class="ham-kbd">C+L</kbd></button>
+                                    <button class="ham-item" id="hamItem-github" onclick="switchView('github');closeHamburger()">GitHub</button>
+                                    <button class="ham-item" id="hamItem-memory" onclick="switchView('memory');closeHamburger()">Memory Dump</button>
+                                    <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
+                                    <button class="ham-item" id="hamItem-abstraction" onclick="window.location='/start?abstraction=1';closeHamburger()">&#x03BB; Abstraction</button>
+                                    <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()">&#x270F;&#xFE0F; Resume Draft</button>
+                                    <button class="ham-item" id="fpgaConnBtn" onclick="fpgaConnectToggle()">FPGA</button>
+                                    <button class="ham-item" id="fpgaBridgeBtn" onclick="fpgaBridgeConnect()">Bridge</button>
+                                    <button class="ham-item" id="fpgaReadBRAMBtn" onclick="fpgaReadBRAM()">BRAM</button>
+                                    <button class="ham-item" id="hamItem-launch" onclick="switchView('devices');switchDevicesTab('launch');closeHamburger()">Launch Readiness</button>
+                                    <button class="ham-item" id="hamItem-github2" onclick="switchView('github');closeHamburger()">GitHub Community</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -820,20 +811,50 @@
     </div>
 
     <div id="tutorial" class="view">
-        <div class="tutorial-selector" style="margin: 0.25rem 0.5rem 0;">
-            <button class="btn-tut-select active" id="tutSelect-sliderule" onclick="selectTutorial('sliderule')" data-tooltip="Church Machine Study — Multi-language compilation and universal target">Church Machine Study</button>
-            <button class="btn-tut-select" id="tutSelect-cloomc" onclick="selectTutorial('cloomc')" data-tooltip="CLOOMC++ Language Tutorial — SlideRule abstraction in all six front-ends: English, JavaScript, Haskell, Symbolic Math, Lambda Calculus, Machine Code">CLOOMC++ Languages</button>
-            <button class="btn-tut-select" id="tutSelect-security" onclick="selectTutorial('security')" data-tooltip="Security — Capability tokens, hardware enforcement, zero trust architecture">Security</button>
-            <button class="btn-tut-select" id="tutSelect-bernoulli" onclick="selectTutorial('bernoulli')" data-tooltip="Discovery Path — Follow Bernoulli's journey to learn Church Machine concepts">Discovery Path (Bernoulli)</button>
-            <button class="btn-tut-select" id="tutSelect-thread" onclick="selectTutorial('thread')" data-tooltip="Thread Abstraction — Memory layout: capabilities, LIFO stack, freespace, heap, data registers">Thread Abstraction</button>
-            <button class="btn-tut-select" id="tutSelect-abstraction" onclick="selectTutorial('abstraction')" data-tooltip="Programmed Abstractions — Code region, C-List, E-GT, CALL/RETURN, three method-access paths">Programmed Abstractions</button>
-            <button class="btn-tut-select" id="tutSelect-namespace" onclick="selectTutorial('namespace')" data-tooltip="Namespace Abstraction — Physical memory layout, Slot 0 root, NS Table, entry format, CR15, version and seal">Namespace</button>
-            <button class="btn-tut-select" id="tutSelect-secureboot" onclick="selectTutorial('secureboot')" data-tooltip="Secure Boot — CLOOMC assembly listing: LOAD_NS, GT seal validation, C-List wiring, CALL into user code">Secure Boot</button>
-            <button class="btn-tut-select" id="tutSelect-englishloops" onclick="selectTutorial('englishloops')" data-tooltip="English Loops — While loops (BRANCH) vs recursive repeat (CALL CR6) in plain English">English Loops</button>
-            <button class="btn-tut-select" id="tutSelect-englishstring" onclick="selectTutorial('englishstring')" data-tooltip="English Strings — Pack4, Unpack, classification, case conversion, and word operations on integer-only hardware">English Strings</button>
-            <button class="btn-tut-select" id="tutSelect-englishcontact" onclick="selectTutorial('englishcontact')" data-tooltip="English Contact — Stage 3 vocabulary, public/private method split, and three-selector dispatch table">English Contact</button>
+        <div class="r1-tutorial-wrap">
+            <div class="r1-tutorial-heading">Get Started with the Church Machine</div>
+            <div class="r1-tutorial-sub">Three steps to run your first capability-secured program on real hardware.</div>
+            <div class="r1-steps-grid">
+                <!-- Step 1 -->
+                <div class="r1-step-card" id="r1StepCard1">
+                    <div class="r1-step-num">1</div>
+                    <div class="r1-step-body">
+                        <div class="r1-step-title">Flash Your Ti60</div>
+                        <div class="r1-step-desc">Download the pre-built bitstream and program it onto your Ti60 F225 FPGA board. The board will boot the Church Machine kernel automatically.</div>
+                        <div id="r1StepBadge1" class="r1-step-badge r1-step-badge-waiting">Waiting</div>
+                    </div>
+                    <div class="r1-step-action">
+                        <button class="r1-step-btn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">Flash Now &rarr;</button>
+                    </div>
+                </div>
+                <!-- Step 2 -->
+                <div class="r1-step-card" id="r1StepCard2">
+                    <div class="r1-step-num">2</div>
+                    <div class="r1-step-body">
+                        <div class="r1-step-title">Connect &amp; Verify</div>
+                        <div class="r1-step-desc">Plug in your Ti60 over USB and verify it calls home. The board will appear in your Devices list once registered.</div>
+                        <div id="r1StepBadge2" class="r1-step-badge r1-step-badge-waiting">Waiting</div>
+                    </div>
+                    <div class="r1-step-action">
+                        <button class="r1-step-btn" onclick="switchView('builder');switchBuilderViewTab('ti60-connect')">Connect &rarr;</button>
+                    </div>
+                </div>
+                <!-- Step 3 -->
+                <div class="r1-step-card" id="r1StepCard3">
+                    <div class="r1-step-num">3</div>
+                    <div class="r1-step-body">
+                        <div class="r1-step-title">Write &amp; Run a Program</div>
+                        <div class="r1-step-desc">Open Programs, write a CLOOMC assembly program, assemble it and run it in the simulator. Every instruction is capability-checked by the hardware.</div>
+                        <div id="r1StepBadge3" class="r1-step-badge r1-step-badge-waiting">Waiting</div>
+                    </div>
+                    <div class="r1-step-action">
+                        <button class="r1-step-btn" onclick="switchView('editor');closeHamburger()">Write Code &rarr;</button>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div id="tutorialView"></div>
+        <!-- legacy tutorial engine hidden — accessible via ?debug=1 -->
+        <div id="tutorialView" style="display:none;"></div>
     </div>
 
     <div id="builder" class="view">
@@ -860,12 +881,12 @@
             </div>
         </div>
         <div class="builder-view-tab-row">
-            <button class="builder-view-tab active" id="builderViewTab-cyberspace" onclick="switchBuilderViewTab('cyberspace')">&#x2B21; Topology</button>
-            <button class="builder-view-tab" id="builderViewTab-buildlog" onclick="switchBuilderViewTab('buildlog')">&#x1F9F1; Details</button>
-            <button class="builder-view-tab" id="builderViewTab-lump-thread" onclick="switchBuilderViewTab('lump-thread')">&#x1F9F5; Threads</button>
-            <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')">&#x1F9E9; Namespace</button>
-            <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')">&#x1F3E0; Resident</button>
-            <button class="builder-view-tab" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
+            <button class="builder-view-tab" id="builderViewTab-cyberspace" onclick="switchBuilderViewTab('cyberspace')" style="display:none;">&#x2B21; Topology</button>
+            <button class="builder-view-tab" id="builderViewTab-buildlog" onclick="switchBuilderViewTab('buildlog')">&#x1F9F1; Log</button>
+            <button class="builder-view-tab" id="builderViewTab-lump-thread" onclick="switchBuilderViewTab('lump-thread')" style="display:none;">&#x1F9F5; Threads</button>
+            <button class="builder-view-tab" id="builderViewTab-lump-ns" onclick="switchBuilderViewTab('lump-ns')" style="display:none;">&#x1F9E9; Namespace</button>
+            <button class="builder-view-tab" id="builderViewTab-lump-resident" onclick="switchBuilderViewTab('lump-resident')" style="display:none;">&#x1F3E0; Resident</button>
+            <button class="builder-view-tab active" id="builderViewTab-ti60-connect" onclick="switchBuilderViewTab('ti60-connect')">&#x1F50C; Connect</button>
         </div>
         <div id="builderView"></div>
         <div id="lumpThreadPanel"   style="display:none;" class="lump-editor-wrap"></div>

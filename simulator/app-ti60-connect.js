@@ -223,6 +223,8 @@ window.Ti60Connect = (function () {
             _setStep('callhome', 'fail', 'boot_ok=' + pkt.boot_ok + '  fault_code=' + pkt.fault_code + ' — firmware booted with fault');
             return;
         }
+        // S-IDE v1 auto-progress: Step 1 — board connected and CALLHOME received
+        if (typeof window._r1SetStep === 'function') window._r1SetStep(1);
         _setStep('callhome', 'pass',
             'CALLHOME valid: board=' + pkt.board +
             ' fw=' + (pkt.fw_major || 1) + '.' + (pkt.fw_minor || 0) +
@@ -240,6 +242,8 @@ window.Ti60Connect = (function () {
             if (reg.ok) {
                 const bootNum = reg.boot_count != null ? '  boot #' + reg.boot_count : '';
                 _setStep('register', 'pass', 'Device registered in IDE (uid=' + pkt.uid + ')' + bootNum);
+                // S-IDE v1 auto-progress: Step 2 — device registered
+                if (typeof window._r1SetStep === 'function') window._r1SetStep(2);
                 const sBanner = document.getElementById('ti60SuccessBanner');
                 if (sBanner) sBanner.style.display = '';
                 _setStep('release', 'active');

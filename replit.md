@@ -1,7 +1,7 @@
-# Church Machine Educational Platform
+# S-IDE v1 — Church Machine Simplified IDE
 
 ## Overview
-The Church Machine is an educational platform providing a web-based IDE for learning programming, computer architecture, and secure computing using capability-based security with Golden Tokens. It targets the Tang Nano 20K FPGA and supports the Efinix Ti60 F225 and QMTECH Wukong Artix-7 XC7A100T, aiming to make advanced computational concepts accessible to children and various educational contexts through hands-on experience. The project envisions a future where capability-secured processor architectures become mainstream, making this platform a foundational tool for training future developers in secure computing.
+S-IDE v1 is a simplified entry-point IDE built on the Church Machine codebase, published to **khhodges/s-ide-v1** on GitHub. It presents a focused, three-step onboarding experience: Flash the Ti60 FPGA, Connect and verify the board calls home, then Write and run a CLOOMC program. Advanced views (Math REPL, Namespace, Pipeline, Trace, GC, etc.) are hidden by default and accessible with `?debug=1` in the URL. The full Church Machine IDE source continues to live in **khhodges/church-machine** (unchanged).
 
 ## User Preferences
 - **Core design principle**: Every improvement must logically abstract implementation details — hide complexity, expose only what matters, make the system easy to understand and use. Raw technical values (addresses, hex words, register numbers) should always be translated into human-readable pet names, labels, or plain-English descriptions wherever they appear in the UI.

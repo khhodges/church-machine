@@ -1624,6 +1624,10 @@ function runSim() {
         // Clean HALT (no faults, boot complete) → open LUMP page for save workflow.
         // faultFreeLimit: go to editor first, then render Next Steps so lumpBtn sees >= 1000.
         // Faults, errors, breakpoints, maxSteps, and userStopped stay on dashboard.
+        // S-IDE v1 auto-progress: Step 3 — successful build+run
+        if (ranClean && sim.bootComplete) {
+            if (typeof window._r1SetStep === 'function') window._r1SetStep(3);
+        }
         if (stopReason === 'faultFreeLimit') {
             switchView('editor');
             if (typeof showNextSteps === 'function') showNextSteps('ran-clean');

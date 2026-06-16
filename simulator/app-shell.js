@@ -1,6 +1,30 @@
 // =============================================================================
 // app.js — Church Machine IDE Front-End
 // =============================================================================
+// S-IDE v1: debug mode — add ?debug=1 to URL to reveal advanced views
+(function() {
+    window._r1DebugMode = (new URLSearchParams(window.location.search).get('debug') === '1');
+    if (window._r1DebugMode) document.documentElement.classList.add('r1-debug-mode');
+    // Views only reachable in debug mode
+    window._r1DebugViews = new Set([
+        'repl','namespace','hello-mum','memory','abstractions','lumps',
+        'pipeline','trace','gc','gt-view','reference','docs','github','sitemap',
+        'dashboard'
+    ]);
+})();
+// S-IDE v1 auto-progress helpers
+window._r1SetStep = function(step) {
+    try { localStorage.setItem('r1_step' + step + '_done', '1'); } catch(e) {}
+    var card = document.getElementById('r1StepCard' + step);
+    var badge = document.getElementById('r1StepBadge' + step);
+    if (card) card.classList.add('r1-done');
+    if (badge) { badge.className = 'r1-step-badge r1-step-badge-done'; badge.textContent = 'Done ✓'; }
+};
+window._r1CheckSteps = function() {
+    for (var i = 1; i <= 3; i++) {
+        try { if (localStorage.getItem('r1_step' + i + '_done') === '1') window._r1SetStep(i); } catch(e) {}
+    }
+};
 //
 // This is the browser-side controller for the Church Machine IDE.  It wires
 // together the simulator, assembler, tutorials, and all UI panels into a
@@ -1123,6 +1147,12 @@ function selectLumpType(type) {
 let _viewLocked = false;
 function switchView(viewId) {
     if (_viewLocked) return;
+    // S-IDE v1: guard — redirect debug-only views to tutorial unless ?debug=1
+    if (window._r1DebugViews && window._r1DebugViews.has(viewId) && !window._r1DebugMode) {
+        var _el = document.getElementById(viewId);
+        if (!_el) { viewId = 'tutorial'; }
+        // views exist in DOM but are only shown in debug mode — allow if element present
+    }
     // _startupDefaultView GUARD: while the boot animation is running,
     // block any redirect to a non-default view (dashboard from resetSim,
     // pipeline from slowBoot) so the user always lands on their chosen page.
@@ -1179,11 +1209,14 @@ function switchView(viewId) {
     }
     if (viewId === 'gt-view') renderGTView();
     if (viewId === 'pipeline' && pipelineViz) pipelineViz.render();
+    if (viewId === 'tutorial') {
+        if (typeof window._r1CheckSteps === 'function') window._r1CheckSteps();
+    }
     if (viewId === 'builder' && typeof initBuilder === 'function') initBuilder();
     if (viewId === 'builder') {
         initHardwareBuildPanel();
         var _savedBuilderTab = (function(){ try { return localStorage.getItem('church_builderTab'); } catch(e) { return null; } })();
-        if (typeof switchBuilderViewTab === 'function') switchBuilderViewTab(_savedBuilderTab || 'cyberspace');
+        if (typeof switchBuilderViewTab === 'function') switchBuilderViewTab(_savedBuilderTab || 'ti60-connect');
         var _bns = document.getElementById('buildNextSteps');
         var _bnc = document.getElementById('buildNextStepsChevron');
         if (_bns) _bns.classList.add('collapsed');

@@ -1,5 +1,5 @@
 #!/bin/bash
-# sync-to-github.sh — Push current HEAD to khhodges/church-machine on GitHub.
+# sync-to-github.sh — Push current HEAD to khhodges/s-ide-v1 on GitHub.
 # Called automatically by scripts/post-merge.sh after every Replit task merge.
 # Requires the GITHUB_PAT secret to be set in Replit Secrets (no expiry, repo scope).
 #
@@ -18,7 +18,7 @@ for arg in "$@"; do
     esac
 done
 
-REPO="khhodges/church-machine"
+REPO="khhodges/s-ide-v1"
 REMOTE_NAME="github-sync"
 REMOTE_URL="https://x-access-token:${GITHUB_PAT}@github.com/${REPO}.git"
 
