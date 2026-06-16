@@ -1,0 +1,46 @@
+sipantichijk@penguin:~/church-machine/hardware/soc_combined$ cd ~/church_project
+
+# Fresh clone of the v2.2 codebase
+git clone https://github.com/khhodges/church-machine soc_combined22
+cd soc_combined22/hardware/soc_combined
+
+# Verify v2.2 landed
+grep NUC_CODE firmware/main.c
+# should show: 0x000 and 0x044
+
+# Build firmware + patch sapphire.v
+make firmware
+python3 ../../scripts/patch_sapphire_init.py sapphire.v \
+    EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
+    EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
+    EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
+    EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+
+# Full synthesis (efx_map is the slow one ~15-30 min)
+bash run_efx_map.sh
+bash run_efx_pnr.sh
+bash run_efx_pgm.sh
+
+# Flash — outflow is right here in the new clone
+sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+Cloning into 'soc_combined22'...
+Username for 'https://github.com': ken@sipantic.com
+Password for 'https://ken%40sipantic.com@github.com': 
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/khhodges/church-machine/'
+-bash: cd: soc_combined22/hardware/soc_combined: No such file or directory
+grep: firmware/main.c: No such file or directory
+make: *** No rule to make target 'firmware'.  Stop.
+python3: can't open file '/home/sipantichijk/church_project/../../scripts/patch_sapphire_init.py': [Errno 2] No such file or directory
+bash: run_efx_map.sh: No such file or directory
+bash: run_efx_pnr.sh: No such file or directory
+bash: run_efx_pgm.sh: No such file or directory
+empty
+write to flash
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+Can't read iSerialNumber field from FTDI: considered as empty string
+Jtag frequency : requested 6.00MHz   -> real 6.00MHz  
+FAIL: Error: fail to open outflow/church_soc_cm.hex
+Error: Failed to program FPGA: Error: fail to open outflow/church_soc_cm.hex
+sipantichijk@penguin:~/church_project$ 

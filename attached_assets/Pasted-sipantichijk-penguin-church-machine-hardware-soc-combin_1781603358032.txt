@@ -1,0 +1,62 @@
+sipantichijk@penguin:~/church-machine/hardware/soc_combined$ pwd
+echo "---"
+ls -lh outflow/ 2>/dev/null || echo "no outflow/ here"
+echo "---"
+ls -lh ~/church_project/SoC/church-machine/hardware/soc_combined/outflow/ 2>/dev/null
+/home/sipantichijk/church-machine/hardware/soc_combined
+---
+no outflow/ here
+---
+total 30M
+-rw-r--r-- 1 sipantichijk sipantichijk  47K Jun 15 14:28 church_soc_cm-post.bsd
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1M Jun 15 14:32 church_soc_cm.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  292 Jun 15 14:32 church_soc_cm.cdc.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  63K Jun 15 14:29 church_soc_cm.clstdb
+-rw-r--r-- 1 sipantichijk sipantichijk   30 Jun 15 14:29 church_soc_cm.cnst
+-rw-r--r-- 1 sipantichijk sipantichijk  448 Jun 15 14:28 church_soc_cm.dbg.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk 2.8M Jun 15 14:24 church_soc_cm.elab.vdb
+-rw-r--r-- 1 sipantichijk sipantichijk 1.2K Jun 15 14:24 church_soc_cm.err.log
+-rw-r--r-- 1 sipantichijk sipantichijk 165K Jun 15 14:29 church_soc_cm.gplace
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1M Jun 15 14:32 church_soc_cm.hex
+-rw-r--r-- 1 sipantichijk sipantichijk  16K Jun 15 14:29 church_soc_cm.hier_util.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  208 Jun 15 14:32 church_soc_cm.hold_fixing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 217K Jun 15 14:29 church_soc_cm.htree
+-rw-r--r-- 1 sipantichijk sipantichijk 636K Jun 15 14:28 church_soc_cm.info.log
+-rw-r--r-- 1 sipantichijk sipantichijk  569 Jun 15 14:28 church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk 515K Jun 15 14:28 church_soc_cm.lpf
+-rw-r--r-- 1 sipantichijk sipantichijk  74K Jun 15 14:28 church_soc_cm.map.out
+-rw-r--r-- 1 sipantichijk sipantichijk  28K Jun 15 14:28 church_soc_cm.map.rdb
+-rw-r--r-- 1 sipantichijk sipantichijk 177K Jun 15 14:28 church_soc_cm.map.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  16M Jun 15 14:28 church_soc_cm.map.v
+-rw-r--r-- 1 sipantichijk sipantichijk 1.3M Jun 15 14:29 church_soc_cm.netlist
+-rw-r--r-- 1 sipantichijk sipantichijk    0 Jun 15 14:28 church_soc_cm.peri.cdo
+-rw-r--r-- 1 sipantichijk sipantichijk 1.8K Jun 15 14:28 church_soc_cm.peri.csi
+-rw-r--r-- 1 sipantichijk sipantichijk  15K Jun 15 14:28 church_soc_cm.peri.pbn
+-rw-r--r-- 1 sipantichijk sipantichijk 3.9K Jun 15 14:28 church_soc_cm.peri.qdelay
+-rw-r--r-- 1 sipantichijk sipantichijk 2.2K Jun 15 14:32 church_soc_cm.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  11K Jun 15 14:28 church_soc_cm.pinout.csv
+-rw-r--r-- 1 sipantichijk sipantichijk  44K Jun 15 14:28 church_soc_cm.pinout.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 164K Jun 15 14:31 church_soc_cm.place
+-rw-r--r-- 1 sipantichijk sipantichijk  13K Jun 15 14:31 church_soc_cm.place.out
+-rw-r--r-- 1 sipantichijk sipantichijk 1.8K Jun 15 14:31 church_soc_cm.place.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 208K Jun 15 14:31 church_soc_cm.place.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  134 Jun 15 14:32 church_soc_cm.proj_state.ini
+-rw-r--r-- 1 sipantichijk sipantichijk  10K Jun 15 14:28 church_soc_cm.pt.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  678 Jun 15 14:28 church_soc_cm.pt.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk 2.2K Jun 15 14:28 church_soc_cm.pt.sdc
+-rw-r--r-- 1 sipantichijk sipantichijk 1.6K Jun 15 14:28 church_soc_cm.pt_timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 104K Jun 15 14:28 church_soc_cm.raminfo.pb
+-rw-r--r-- 1 sipantichijk sipantichijk 9.1K Jun 15 14:28 church_soc_cm.res.csv
+-rw-r--r-- 1 sipantichijk sipantichijk 7.4K Jun 15 14:32 church_soc_cm.route.out
+-rw-r--r-- 1 sipantichijk sipantichijk  625 Jun 15 14:32 church_soc_cm.route.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 2.1K Jun 15 14:32 church_soc_cm.route.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk  244 Jun 15 14:29 church_soc_cm.rs
+-rw-r--r-- 1 sipantichijk sipantichijk  660 Jun 15 14:32 church_soc_cm.tcl.out
+-rw-r--r-- 1 sipantichijk sipantichijk 130K Jun 15 14:32 church_soc_cm.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 2.6M Jun 15 14:32 church_soc_cm.troutingtraces
+-rw-r--r-- 1 sipantichijk sipantichijk 502K Jun 15 14:28 church_soc_cm.vdb
+-rw-r--r-- 1 sipantichijk sipantichijk 182K Jun 15 14:28 church_soc_cm.warn.log
+-rw-r--r-- 1 sipantichijk sipantichijk  233 Jun 15 14:28 church_soc_cm_or.ini
+-rw-r--r-- 1 sipantichijk sipantichijk 1.1K Jun 15 14:28 church_soc_cm_template.v
+-rw-r--r-- 1 sipantichijk sipantichijk  304 Jun 15 14:24 debug_profile.mark_debug.json
+sipantichijk@penguin:~/church-machine/hardware/soc_combined$ 

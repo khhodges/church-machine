@@ -19,7 +19,7 @@
  *   CALLHOME:{"board":"Ti60F225","uid":"<16 hex>","nia":"0x<8 hex>",
  *             "boot_ok":<0|1>,"boot_reason":<0|2>,"fault":<0|1>,
  *             "fault_code":<0-31>,"fault_name":"<str>",
- *             "fw_major":2,"fw_minor":0,
+ *             "fw_major":2,"fw_minor":2,
  *             "ns_manifest":[...]}\r\n
  *
  *   FAULT_EVENT:{"uid":"<16hex>","nia":"0x<8hex>","fault_code":<N>,
@@ -110,7 +110,7 @@
 /* Firmware version                                                    */
 /* ------------------------------------------------------------------ */
 #define FW_MAJOR  2u
-#define FW_MINOR  0u
+#define FW_MINOR  2u
 
 /* ------------------------------------------------------------------ */
 /* Sapphire UART0 registers                                            */

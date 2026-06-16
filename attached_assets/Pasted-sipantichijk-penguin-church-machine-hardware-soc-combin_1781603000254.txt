@@ -1,0 +1,118 @@
+sipantichijk@penguin:~/church-machine/hardware/soc_combined$ # Where are the actual output files?
+find ~/church_project/SoC -name "*.bit" -o -name "*.hex" -o -name "*.lbf" 2>/dev/null
+
+# Does outflow exist at all?
+ls -la ~/church_project/SoC/outflow/ 2>/dev/null || echo "NO outflow dir"
+ls -la ~/church_project/SoC/work_pnr/ 2>/dev/null | head -20
+/home/sipantichijk/church_project/SoC/firmware/firmware.hex
+/home/sipantichijk/church_project/SoC/work_pnr/church_soc_cm.lbf
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_new.bit
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_new.hex
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_v3.bit
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_v3.hex
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_v4.hex
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_v4.bit
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_test.bit
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_test.hex
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_church.bit
+/home/sipantichijk/church_project/SoC/outflow/church_soc_cm_church.hex
+/home/sipantichijk/church_project/SoC/firmware.hex
+/home/sipantichijk/church_project/SoC/church-machine/attached_assets/church_ti60_f225_1779989924712.hex
+/home/sipantichijk/church_project/SoC/church-machine/bitstreams/church_ti60_f225.bit
+/home/sipantichijk/church_project/SoC/church-machine/bitstreams/church_ti60_f225.hex
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/firmware/firmware.hex
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/outflow/church_soc_cm.bit
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/outflow/church_soc_cm.hex
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_combined/work_pnr/church_soc_cm.lbf
+/home/sipantichijk/church_project/SoC/church-machine/hardware/soc_minimal/firmware/firmware.hex
+total 53088
+drwxr-xr-x 1 sipantichijk sipantichijk     3060 Jun 16 05:33 .
+drwxr-xr-x 1 sipantichijk sipantichijk     2514 Jun 16 05:29 ..
+-rw-r--r-- 1 sipantichijk dialout         13821 Jun 13 21:59 church_soc_cm-hierarchical_stats.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk    47812 Jun 14 09:13 church_soc_cm-post.bsd
+-rw-r--r-- 1 sipantichijk sipantichijk      419 Jun 16 05:33 church_soc_cm.cdc.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk    64265 Jun 16 05:29 church_soc_cm.clstdb
+-rw-r--r-- 1 sipantichijk dialout        630733 Jun 13 21:59 church_soc_cm.clstmap
+-rw-r--r-- 1 sipantichijk sipantichijk       30 Jun 16 05:29 church_soc_cm.cnst
+-rw-r--r-- 1 sipantichijk sipantichijk      448 Jun 14 09:13 church_soc_cm.dbg.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk  2883366 Jun 14 09:09 church_soc_cm.elab.vdb
+-rw-r--r-- 1 sipantichijk sipantichijk  2922868 Jun  2 14:54 church_soc_cm.elab.vdb.bak
+-rw-r--r-- 1 sipantichijk sipantichijk     2967 Jun 14 09:09 church_soc_cm.err.log
+-rw-r--r-- 1 sipantichijk sipantichijk   169810 Jun 16 05:30 church_soc_cm.gplace
+-rw-r--r-- 1 sipantichijk sipantichijk    15764 Jun 16 05:29 church_soc_cm.hier_util.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk      208 Jun 16 05:32 church_soc_cm.hold_fixing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   223297 Jun 16 05:29 church_soc_cm.htree
+-rw-r--r-- 1 sipantichijk sipantichijk  1435623 Jun 14 09:13 church_soc_cm.info.log
+-rw-r--r-- 1 sipantichijk sipantichijk      535 Jun 14 09:13 church_soc_cm.interface.csv
+-rw-r--r-- 1 sipantichijk sipantichijk     2919 Jun 13 11:35 church_soc_cm.log
+-rw-r--r-- 1 sipantichijk sipantichijk    69480 Jun 14 09:13 church_soc_cm.map.out
+-rw-r--r-- 1 sipantichijk sipantichijk    28672 Jun 14 09:13 church_soc_cm.map.rdb
+-rw-r--r-- 1 sipantichijk sipantichijk   180878 Jun 14 09:13 church_soc_cm.map.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk 16499378 Jun 14 09:13 church_soc_cm.map.v
+-rw-r--r-- 1 sipantichijk sipantichijk  1374865 Jun 16 05:29 church_soc_cm.netlist
+-rw-r--r-- 1 sipantichijk sipantichijk        0 Jun 14 09:13 church_soc_cm.peri.cdo
+-rw-r--r-- 1 sipantichijk sipantichijk     1747 Jun 14 09:13 church_soc_cm.peri.csi
+-rw-r--r-- 1 sipantichijk sipantichijk    14816 Jun 14 09:13 church_soc_cm.peri.pbn
+-rw-r--r-- 1 sipantichijk sipantichijk     3740 Jun 14 09:13 church_soc_cm.peri.qdelay
+-rw-r--r-- 1 sipantichijk sipantichijk      431 Jun 14 09:18 church_soc_cm.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk    10631 Jun 14 09:13 church_soc_cm.pinout.csv
+-rw-r--r-- 1 sipantichijk sipantichijk    44734 Jun 14 09:13 church_soc_cm.pinout.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   166039 Jun 14 09:17 church_soc_cm.place
+-rw-r--r-- 1 sipantichijk sipantichijk    11976 Jun 16 05:32 church_soc_cm.place.out
+-rw-r--r-- 1 sipantichijk sipantichijk     1992 Jun 16 05:32 church_soc_cm.place.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   139247 Jun 16 05:32 church_soc_cm.place.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk      134 Jun 14 09:18 church_soc_cm.proj_state.ini
+-rw-r--r-- 1 sipantichijk sipantichijk    10706 Jun 14 09:13 church_soc_cm.pt.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk      678 Jun 14 09:13 church_soc_cm.pt.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk     1957 Jun 14 09:13 church_soc_cm.pt.sdc
+-rw-r--r-- 1 sipantichijk sipantichijk      822 Jun 14 09:13 church_soc_cm.pt_timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk   258817 Jun 14 09:13 church_soc_cm.raminfo.pb
+-rw-r--r-- 1 sipantichijk sipantichijk     9223 Jun 14 09:13 church_soc_cm.res.csv
+-rw-r--r-- 1 sipantichijk sipantichijk     9008 Jun 16 05:33 church_soc_cm.route.out
+-rw-r--r-- 1 sipantichijk sipantichijk      625 Jun 16 05:33 church_soc_cm.route.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk     2103 Jun 16 05:33 church_soc_cm.route.rpt.xml
+-rw-r--r-- 1 sipantichijk sipantichijk      244 Jun 16 05:29 church_soc_cm.rs
+-rw-r--r-- 1 sipantichijk sipantichijk      771 Jun 14 12:40 church_soc_cm.tcl.out
+-rw-r--r-- 1 sipantichijk sipantichijk   139457 Jun 16 05:33 church_soc_cm.timing.rpt
+-rw-r--r-- 1 sipantichijk sipantichijk  2767454 Jun 14 09:18 church_soc_cm.troutingtraces
+-rw-r--r-- 1 sipantichijk sipantichijk   513850 Jun 14 09:13 church_soc_cm.vdb
+-rw-r--r-- 1 sipantichijk sipantichijk   373349 Jun 14 09:13 church_soc_cm.warn.log
+-rw-r--r-- 1 sipantichijk sipantichijk  2415915 Jun  3 14:38 church_soc_cm_church.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  2415975 Jun  3 14:38 church_soc_cm_church.hex
+-rw-r--r-- 1 sipantichijk sipantichijk     1236 Jun  3 14:38 church_soc_cm_church.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  2405445 Jun  3 06:09 church_soc_cm_new.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  2405505 Jun  3 06:09 church_soc_cm_new.hex
+-rw-r--r-- 1 sipantichijk sipantichijk     1992 Jun  3 06:09 church_soc_cm_new.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk      233 Jun 14 09:13 church_soc_cm_or.ini
+-rw-r--r-- 1 sipantichijk sipantichijk     1052 Jun 14 09:13 church_soc_cm_template.v
+-rw-r--r-- 1 sipantichijk sipantichijk  2180334 Jun  3 13:36 church_soc_cm_test.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  2180394 Jun  3 13:36 church_soc_cm_test.hex
+-rw-r--r-- 1 sipantichijk sipantichijk     1953 Jun  3 13:36 church_soc_cm_test.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  2416212 Jun  3 07:23 church_soc_cm_v3.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  2416272 Jun  3 07:23 church_soc_cm_v3.hex
+-rw-r--r-- 1 sipantichijk sipantichijk     1989 Jun  3 07:23 church_soc_cm_v3.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  2157189 Jun  3 13:23 church_soc_cm_v4.bit
+-rw-r--r-- 1 sipantichijk sipantichijk  2157249 Jun  3 13:23 church_soc_cm_v4.hex
+-rw-r--r-- 1 sipantichijk sipantichijk     1949 Jun  3 13:23 church_soc_cm_v4.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk      304 Jun 14 09:09 debug_profile.mark_debug.json
+total 9644
+drwxr-xr-x 1 sipantichijk sipantichijk    1006 Jun 16 05:33 .
+drwxr-xr-x 1 sipantichijk sipantichijk    2514 Jun 16 05:29 ..
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin
+-rw-r--r-- 1 sipantichijk sipantichijk 1179648 Jun  5 14:51 EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
+-rw-r--r-- 1 sipantichijk sipantichijk     466 Jun  8 18:52 RUNPNR_church_soc_cm
+-rw-r--r-- 1 sipantichijk sipantichijk      74 Jun 16 05:29 church_soc_cm.io_place
+-rw-r--r-- 1 sipantichijk sipantichijk 1284617 Jun 16 05:33 church_soc_cm.lbf
+-rw-r--r-- 1 sipantichijk sipantichijk   96420 Jun 16 05:29 church_soc_cm.net_proto
+-rw-r--r-- 1 sipantichijk sipantichijk     393 Jun  8 11:09 church_soc_cm.pgm.out
+-rw-r--r-- 1 sipantichijk sipantichijk  165920 Jun 16 05:32 church_soc_cm.place
+-rw-r--r-- 1 sipantichijk sipantichijk  152175 Jun 16 05:32 church_soc_cm.primplace
+-rw-r--r-- 1 sipantichijk sipantichijk 2872278 Jun 16 05:33 church_soc_cm.troutingtraces
+-rw-r--r-- 1 sipantichijk sipantichijk  490541 Jun  8 14:06 church_soc_cm.vdb
+drwxr-xr-x 1 sipantichijk sipantichijk      92 Jun  5 03:58 outflow
+-rw-r--r-- 1 sipantichijk sipantichijk   21183 Jun 16 05:33 pnr.log
+-rw-r--r-- 1 sipantichijk sipantichijk   19565 Jun  8 14:23 pnr_direct.log
+-rw-r--r-- 1 sipantichijk sipantichijk    9946 Jun  8 15:20 pnr_fixed.log
+sipantichijk@penguin:~/church-machine/hardware/soc_combined$ 
