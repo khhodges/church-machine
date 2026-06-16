@@ -1,10 +1,25 @@
 #!/usr/bin/env python3
 """
-Church Machine Ti60 Call-Home Bridge
-======================================
-Reads the Sapphire SoC UART on ttyUSB2 (FT4232H interface 2), extracts
-CALLHOME JSON lines emitted by the firmware, and forwards them to the
-Church Machine IDE server via /api/device/call-home.
+Church Machine Ti60 Call-Home Bridge  —  Protocol v2.0
+=======================================================
+Reads the Sapphire SoC UART on ttyUSB2 (FT4232H interface 2), parses all
+firmware v2.0 record types, and forwards them to the Church Machine IDE server.
+
+Protocol v2.0 record types (all terminated with \\r\\n):
+  CALLHOME:{...}      — periodic heartbeat; forwarded to /api/device/call-home
+  FAULT_EVENT:{...}   — structured fault record (6 telemetry fields);
+                        forwarded to /api/device/fault
+  HUNG:{...}          — hung-program watchdog (NIA frozen ≥ 3 s, no fault);
+                        forwarded to /api/device/call-home with hung:true
+  TRACE:[0x...,...]   — 10-entry NIA circular buffer emitted every ~1 s;
+                        forwarded (best-effort) to /api/device/trace
+
+IDE endpoints used:
+  POST /api/device/call-home   — CALLHOME heartbeats and HUNG events
+  POST /api/device/fault       — FAULT_EVENT records
+  POST /api/device/trace       — TRACE records (best-effort; silently dropped on failure)
+  POST /api/device/uart-log    — raw non-protocol UART lines (batched, 500 ms)
+  PUT  /api/launch-tests/{id}  — optional launch-test reporting (--report-launch)
 
 The Ti60 FT4232H USB-UART mapping:
   ttyUSB0  — JTAG (interface 0)
@@ -37,9 +52,10 @@ Flags:
 
 IMPORTANT — confirmed hardware gotchas
 ---------------------------------------
-  Baud rate: ALWAYS use --baud 57600.  The firmware header comment says
-  115200 but the actual working rate is 57600 (25 MHz crystal, CLOCKDIV=53).
-  Connecting at 115200 produces garbage or silence.
+  Baud rate: ALWAYS use --baud 57600.  The soc_combined firmware uses
+  CLOCKDIV=53 at 25 MHz → 57,870 ≈ 57,600 baud on ttyUSB2.  Connecting
+  at 115200 produces garbage or silence on the call-home port.
+  (The CM debug UART on ttyUSB3 is a separate port and uses 115200 baud.)
 
   --ide flag: both --ide=URL (equals) and --ide URL (space) are accepted.
   The original parser only accepted the equals form; space form was silently
