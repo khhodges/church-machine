@@ -1,3 +1,4 @@
 fpga_output/build/rv32_cap_fpga_top.json filter=lfs diff=lfs merge=lfs -text
 hardware/soc_combined/outflow/church_soc_cm.hex filter=lfs diff=lfs merge=lfs -text
 hardware/soc_combined/outflow/church_soc_cm.bit filter=lfs diff=lfs merge=lfs -text
+project.zip filter=lfs diff=lfs merge=lfs -text
