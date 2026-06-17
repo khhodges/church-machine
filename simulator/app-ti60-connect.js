@@ -341,6 +341,35 @@ window.Ti60Connect = (function () {
                                 _fetchBootLump();
                                 _fetchBootRom();
                             }
+                        } else if (line.startsWith('HUNG:') && !registered) {
+                            // Board already running — CALLHOME was sent before we connected.
+                            // Parse the HUNG packet to get uid/nia and register now.
+                            try {
+                                const h = JSON.parse(line.slice('HUNG:'.length));
+                                if (h && h.uid) {
+                                    if (!greetingSeen) {
+                                        greetingSeen = true;
+                                        _setStep('uart', 'pass',
+                                            'Board detected (already running, uid=' + h.uid + ')');
+                                        _setStep('callhome', 'active');
+                                    }
+                                    registered = true;
+                                    _log('Board was already booted — registering via HUNG packet ' +
+                                         '(CALLHOME sent before IDE connected)', 'log-warn');
+                                    const syntheticPkt = {
+                                        uid:        h.uid,
+                                        board:      h.board || 'Ti60',
+                                        nia:        h.nia   || '0x0',
+                                        boot_ok:    1,
+                                        fault:      0,
+                                        fault_code: 0,
+                                    };
+                                    await _finishSteps(syntheticPkt, true);
+                                    _showStreamPanel();
+                                    _fetchBootLump();
+                                    _fetchBootRom();
+                                }
+                            } catch (_e) {}
                         } else if (registered) {
                             const niaMatch = line.match(/\bNIA=0x([0-9A-Fa-f]+)/i);
                             if (niaMatch) {
