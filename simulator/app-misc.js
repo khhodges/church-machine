@@ -3166,10 +3166,9 @@ function _pollCallhomeLog() {
                     if (e.ts > _callhomeLogSince) _callhomeLogSince = e.ts;
                     if (e.ts > _callhomeLatestTs) _callhomeLatestTs = e.ts;
                     var d = new Date(e.ts * 1000);
-                    var hh = String(d.getUTCHours()).padStart(2,'0');
-                    var mm = String(d.getUTCMinutes()).padStart(2,'0');
-                    var ss = String(d.getUTCSeconds()).padStart(2,'0');
-                    var timeStr = mm + ':' + ss;
+                    var hh = String(d.getHours()).padStart(2,'0');
+                    var mm = String(d.getMinutes()).padStart(2,'0');
+                    var timeStr = hh + ':' + mm;
                     var ok = e.boot_ok === 1 || e.boot_ok === true;
                     var dotCls = ok ? 'chlog-dot-ok' : 'chlog-dot-fault';
                     var uid = (e.uid || '').toUpperCase();
@@ -3277,8 +3276,8 @@ function _pollUartLog() {
                     // Drop firmware countdown ticks — T-1 … T-N are internal noise
                     if (/^T-\d+\s*$/.test(e.line)) return;
                     var d = new Date(e.ts * 1000);
-                    var dateStr = String(d.getUTCMinutes()).padStart(2,'0') + ':' +
-                        String(d.getUTCSeconds()).padStart(2,'0');
+                    var dateStr = String(d.getHours()).padStart(2,'0') + ':' +
+                        String(d.getMinutes()).padStart(2,'0');
                     var rowUid = (e.uid || '').toUpperCase();
                     // Classify line: boot marker (red), recovery/init context (orange), normal
                     var uartTextCls = 'uart-text';
