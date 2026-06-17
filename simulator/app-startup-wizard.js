@@ -260,9 +260,11 @@ const StartupWizard = (function () {
     }
 
     function open() {
+        const panel = _el('swPanel');
         const body = _el('swWizardBody');
         const chev = _el('swChevron');
         if (!body) return;
+        if (panel) panel.style.display = '';
         _open = true;
         body.style.display = '';
         if (chev) chev.textContent = '▾';
