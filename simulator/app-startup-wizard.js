@@ -280,11 +280,8 @@ const StartupWizard = (function () {
     }
 
     function clickConnect() {
-        const menu = document.getElementById('ti60ConnectMenu');
-        if (!menu) return;
-        const toggle = menu.querySelector('.ti60-connect-menu-toggle');
-        if (toggle) toggle.click();
         _scrollToConnect();
+        if (typeof Ti60Connect !== 'undefined') Ti60Connect.connect();
     }
 
     function clickDirect() {
