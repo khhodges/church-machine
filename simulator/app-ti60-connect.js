@@ -164,7 +164,7 @@ window.Ti60Connect = (function () {
         const btn  = document.getElementById('ti60ConnectBtn');
         const bBtn = document.getElementById('ti60BridgeBtn');
         const tBtn = document.getElementById('ti60TestBridgeBtn');
-        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect USB'; }
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect Board'; }
         if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         if (tBtn) { tBtn.disabled = false; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
@@ -290,7 +290,7 @@ window.Ti60Connect = (function () {
         }
 
         const btn = document.getElementById('ti60ConnectBtn');
-        if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
+        if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
     }
 
     async function _readLoop() {
@@ -379,13 +379,16 @@ window.Ti60Connect = (function () {
         }
     }
 
+    const _isCrOS = /CrOS/.test(navigator.userAgent);
+    let _crosPickerTipShown = false;
+
     async function connect() {
         if (_isIframe()) {
             _showIframeBanner();
             const log = document.getElementById('ti60ConnectLog');
             if (!log || !log.textContent.includes('not available inside a preview')) {
                 _log('WebSerial is not available inside a preview iframe.', 'log-warn');
-                _log('Open the IDE in its own tab at /simulator/ and click Connect there, or use 🌉 Via Bridge instead.', 'log-warn');
+                _log('Click "Open in full tab →" above for direct USB, or expand Advanced / Troubleshooting to connect via Bridge.', 'log-warn');
             }
             return;
         }
@@ -394,11 +397,19 @@ window.Ti60Connect = (function () {
         const btn = document.getElementById('ti60ConnectBtn');
         if (btn) { btn.disabled = true; btn.textContent = 'Connecting…'; }
 
+        if (_isCrOS && !_crosPickerTipShown) {
+            _crosPickerTipShown = true;
+            _log('💡 Tip: if the picker is empty, go to Chrome Settings → Linux → USB devices → FT4232H → turn OFF sharing, then try again.', 'log-warn');
+        }
+
         try {
             _port = await navigator.serial.requestPort({});
         } catch (e) {
             _log('Port selection cancelled.', 'log-fail');
-            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
+            if (_isCrOS) {
+                _log('💡 Nothing visible in picker? Settings → Linux → USB devices → FT4232H → toggle OFF, then retry.', 'log-warn');
+            }
+            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
             return;
         }
 
@@ -407,7 +418,7 @@ window.Ti60Connect = (function () {
         } catch (e) {
             _log('Failed to open port: ' + e.message, 'log-fail');
             _setStep('uart', 'fail', 'Port open failed: ' + e.message);
-            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
+            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
             return;
         }
 
@@ -454,7 +465,7 @@ window.Ti60Connect = (function () {
         }
         const btn  = document.getElementById('ti60ConnectBtn');
         const bBtn = document.getElementById('ti60BridgeBtn');
-        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect USB'; }
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect Board'; }
         if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
@@ -782,6 +793,12 @@ window.Ti60Connect = (function () {
             if (el) el.textContent = origin;
         });
 
+        // Show ChromeOS setup card on first visit (not dismissed, not in iframe)
+        if (_isCrOS && !localStorage.getItem('ti60ChromeosCardDismissed') && !_isIframe()) {
+            const card = document.getElementById('ti60ChromeosCard');
+            if (card) card.style.display = '';
+        }
+
         // Apply iframe-aware button states and show the open-tab link
         if (_isIframe()) {
             const connectBtn = document.getElementById('ti60ConnectBtn');
@@ -796,8 +813,8 @@ window.Ti60Connect = (function () {
             if (log && log.children.length === 0) {
                 _logHtml(
                     '&#x26A0;&#xFE0F; <strong>Preview pane detected.</strong> ' +
-                    'Use <strong>&#x1F309; Via Bridge</strong> to connect, or ' +
-                    '<strong>Open in full tab &#x2192;</strong> to enable direct USB.'
+                    'Click <strong>Open in full tab &#x2192;</strong> for direct USB, or ' +
+                    'expand <strong>Advanced / Troubleshooting</strong> below to connect via Bridge.'
                 );
             }
         }

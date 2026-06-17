@@ -358,18 +358,22 @@ header h1 a:hover {
 }
 
 .ti60-connect-btn {
-    font-size: 0.9rem;
-    padding: 0.45rem 1rem;
-    background: var(--accent);
-    color: #fff;
-    border: 1px solid transparent;
-    border-radius: 6px;
+    font-size: 1rem;
+    padding: 0.6rem 1.6rem;
+    background: var(--church-gold, #fbbf24);
+    color: #1a1200;
+    border: 2px solid transparent;
+    border-radius: 7px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, box-shadow 0.2s;
+    box-shadow: 0 0 0 0 rgba(251,191,36,0);
 }
-.ti60-connect-btn:hover { opacity: 0.85; }
+.ti60-connect-btn:hover {
+    opacity: 0.9;
+    box-shadow: 0 0 14px rgba(251,191,36,0.35);
+}
 .ti60-connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ti60-btn-disabled-iframe {
@@ -692,6 +696,139 @@ header h1 a:hover {
     border-color: rgba(248,113,113,0.65);
     color: rgba(248,113,113,1);
 }
+
+/* ── ChromeOS setup card ───────────────────────────────────────────────── */
+.ti60-chromeos-card {
+    margin-bottom: 0.9rem;
+    border-left: 3px solid var(--church-gold, #fbbf24);
+    background: rgba(251,191,36,0.06);
+    border-radius: 0 7px 7px 0;
+    padding: 0.7rem 1rem;
+}
+.ti60-chromeos-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+.ti60-chromeos-card-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--church-gold, #fbbf24);
+}
+.ti60-chromeos-card-dismiss {
+    font-size: 0.72rem;
+    padding: 0.18rem 0.55rem;
+    background: transparent;
+    border: 1px solid rgba(251,191,36,0.35);
+    color: rgba(251,191,36,0.7);
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ti60-chromeos-card-dismiss:hover {
+    background: rgba(251,191,36,0.1);
+    border-color: rgba(251,191,36,0.7);
+    color: var(--church-gold, #fbbf24);
+}
+.ti60-chromeos-card-steps {
+    margin: 0 0 0 1.1rem;
+    padding: 0;
+    font-size: 0.83rem;
+    color: var(--text-secondary, #a0a0a0);
+    line-height: 1.7;
+}
+.ti60-chromeos-card-steps li { margin: 0.1rem 0; }
+.ti60-chromeos-card-steps strong { color: var(--text-primary, #eaeaea); }
+.ti60-chromeos-card-steps code {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--church-gold, #fbbf24);
+    background: rgba(251,191,36,0.1);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+
+/* ── Advanced / Troubleshooting details ────────────────────────────────── */
+.ti60-advanced-details {
+    margin-top: 1rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px;
+    overflow: hidden;
+}
+.ti60-advanced-summary {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary, #a0a0a0);
+    padding: 0.5rem 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.15s, background 0.15s;
+}
+.ti60-advanced-summary::-webkit-details-marker { display: none; }
+.ti60-advanced-summary::before {
+    content: '▸';
+    font-size: 0.7rem;
+    color: rgba(156,163,175,0.6);
+    transition: transform 0.2s;
+    display: inline-block;
+}
+details[open] .ti60-advanced-summary::before { transform: rotate(90deg); }
+.ti60-advanced-summary:hover {
+    color: var(--text-primary, #eaeaea);
+    background: rgba(255,255,255,0.04);
+}
+.ti60-adv-body {
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+.ti60-adv-hint-heading {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--church-gold, #fbbf24);
+    margin: 0 0 0.4rem;
+}
+.ti60-adv-port-hint {
+    font-size: 0.81rem;
+    color: var(--text-secondary, #a0a0a0);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+}
+.ti60-adv-port-hint p { margin: 0.2rem 0; }
+.ti60-adv-port-hint code {
+    font-family: monospace;
+    font-size: 0.79rem;
+    color: var(--church-gold, #fbbf24);
+    background: rgba(251,191,36,0.1);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+.ti60-adv-bridge-section {
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.07);
+}
+.ti60-adv-bridge-desc, .ti60-adv-bridge-note {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #a0a0a0);
+    line-height: 1.55;
+    margin: 0.4rem 0;
+}
+.ti60-adv-bridge-note code {
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: var(--church-gold, #fbbf24);
+    background: rgba(251,191,36,0.08);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+.ti60-adv-btn-row { margin: 0.55rem 0; }
 
 /* ── Active port indicator ─────────────────────────────────────────────── */
 .ti60-active-port-row {
