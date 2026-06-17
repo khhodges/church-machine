@@ -164,7 +164,7 @@ window.Ti60Connect = (function () {
         const btn  = document.getElementById('ti60ConnectBtn');
         const bBtn = document.getElementById('ti60BridgeBtn');
         const tBtn = document.getElementById('ti60TestBridgeBtn');
-        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect'; }
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect USB'; }
         if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         if (tBtn) { tBtn.disabled = false; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
@@ -290,7 +290,7 @@ window.Ti60Connect = (function () {
         }
 
         const btn = document.getElementById('ti60ConnectBtn');
-        if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+        if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
     }
 
     async function _readLoop() {
@@ -398,7 +398,7 @@ window.Ti60Connect = (function () {
             _port = await navigator.serial.requestPort({});
         } catch (e) {
             _log('Port selection cancelled.', 'log-fail');
-            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
             return;
         }
 
@@ -407,7 +407,7 @@ window.Ti60Connect = (function () {
         } catch (e) {
             _log('Failed to open port: ' + e.message, 'log-fail');
             _setStep('uart', 'fail', 'Port open failed: ' + e.message);
-            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect'; }
+            if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect USB'; }
             return;
         }
 
@@ -454,7 +454,7 @@ window.Ti60Connect = (function () {
         }
         const btn  = document.getElementById('ti60ConnectBtn');
         const bBtn = document.getElementById('ti60BridgeBtn');
-        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect'; }
+        if (btn)  { btn.disabled  = false; btn.textContent  = '🔌 Connect USB'; }
         if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
@@ -749,6 +749,25 @@ window.Ti60Connect = (function () {
         if (dBtn) dBtn.style.display = 'none';
     }
 
+    function copyBridgeCmd() {
+        const pre = document.getElementById('ti60BridgeCmd');
+        if (!pre) return;
+        const text = pre.textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                const btn = document.querySelector('.ti60-bridge-cmd-copy');
+                if (btn) {
+                    const orig = btn.textContent;
+                    btn.textContent = '&#x2713; Copied';
+                    btn.innerHTML = '&#x2713; Copied';
+                    setTimeout(function () { btn.innerHTML = '&#x1F4CB; Copy'; }, 1800);
+                }
+            }).catch(function () { _log('Copy failed — select the command and copy manually.', 'log-warn'); });
+        } else {
+            _log('Clipboard API not available — select the command and copy manually.', 'log-warn');
+        }
+    }
+
     function onTabOpen() {
         _updateForgetBtnVisibility();
 
@@ -763,15 +782,22 @@ window.Ti60Connect = (function () {
             if (el) el.textContent = origin;
         });
 
-        // Show the persistent banner and a log hint when inside an iframe
+        // Apply iframe-aware button states and show the open-tab link
         if (_isIframe()) {
+            const connectBtn = document.getElementById('ti60ConnectBtn');
+            if (connectBtn) {
+                connectBtn.classList.add('ti60-btn-disabled-iframe');
+                connectBtn.setAttribute('data-iframe-tip', 'Requires full browser tab');
+            }
+            const bridgeBtn = document.getElementById('ti60BridgeBtn');
+            if (bridgeBtn) bridgeBtn.classList.add('ti60-btn-primary');
             _showIframeBanner();
             const log = document.getElementById('ti60ConnectLog');
             if (log && log.children.length === 0) {
                 _logHtml(
                     '&#x26A0;&#xFE0F; <strong>Preview pane detected.</strong> ' +
-                    'Use <strong>&#x1F309; Via Bridge</strong> below, or click ' +
-                    '<strong>Open in full browser tab</strong> above to use USB Connect directly.'
+                    'Use <strong>&#x1F309; Via Bridge</strong> to connect, or ' +
+                    '<strong>Open in full tab &#x2192;</strong> to enable direct USB.'
                 );
             }
         }
@@ -789,5 +815,5 @@ window.Ti60Connect = (function () {
         _log('Bridge cert memory cleared — setup guide will reappear on next connection attempt.');
     }
 
-    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, hideBridgeSetup: _hideBridgeSetup, resetBridgeCert, get _streamLineCount() { return _streamLineCount; }, set _streamLineCount(v) { _streamLineCount = v; } };
+    return { connect, connectViaBridge, testBridge, retryBridge, disconnect, onTabOpen, copyBridgeCmd, hideBridgeSetup: _hideBridgeSetup, resetBridgeCert, get _streamLineCount() { return _streamLineCount; }, set _streamLineCount(v) { _streamLineCount = v; } };
 })();

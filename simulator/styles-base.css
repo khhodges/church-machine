@@ -364,66 +364,107 @@ header h1 a:hover {
     flex-wrap: wrap;
 }
 
-/* ── Connect hamburger ─────────────────────────────────────────────────── */
-.ti60-connect-menu {
-    position: relative;
-    flex-shrink: 0;
+/* ── Flat action button row ────────────────────────────────────────────── */
+.ti60-btn-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
 }
 
-.ti60-connect-menu-toggle {
+.ti60-connect-btn {
+    font-size: 0.9rem;
+    padding: 0.45rem 1rem;
     background: var(--accent);
-    color: white;
-    border: none;
+    color: #fff;
+    border: 1px solid transparent;
     border-radius: 6px;
-    padding: 0.38rem 0.85rem;
-    font-size: 0.85rem;
-    font-weight: 600;
     cursor: pointer;
+    font-weight: 600;
     white-space: nowrap;
     transition: opacity 0.2s;
 }
-.ti60-connect-menu-toggle:hover { opacity: 0.85; }
+.ti60-connect-btn:hover { opacity: 0.85; }
+.ti60-connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.ti60-connect-dropdown {
+.ti60-btn-disabled-iframe {
+    opacity: 0.38 !important;
+    cursor: not-allowed !important;
+    position: relative;
+}
+.ti60-btn-disabled-iframe::after {
+    content: attr(data-iframe-tip);
     display: none;
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    z-index: 9000;
-    background: var(--bg-panel);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 7px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.55);
-    min-width: 180px;
-    overflow: hidden;
-}
-.ti60-connect-dropdown.open { display: block; }
-
-.ti60-connect-dropdown button {
-    display: block;
-    width: 100%;
-    text-align: left;
-    border: none;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    background: transparent;
-    color: var(--text-primary);
-    padding: 0.5rem 0.9rem;
-    font-size: 0.85rem;
-    cursor: pointer;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1200;
+    color: var(--church-gold, #daa520);
+    border: 1px solid rgba(218,165,32,0.45);
+    border-radius: 5px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.72rem;
     white-space: nowrap;
-    transition: background 0.12s;
+    pointer-events: none;
+    z-index: 9100;
 }
-.ti60-connect-dropdown button:last-child { border-bottom: none; }
-.ti60-connect-dropdown button:hover { background: rgba(255,255,255,0.07); }
-.ti60-connect-dropdown button:disabled { opacity: 0.45; cursor: not-allowed; }
+.ti60-btn-disabled-iframe:hover::after { display: block; }
 
-/* keep individual button colours inside the dropdown */
-.ti60-connect-dropdown .ti60-connect-btn    { color: #fff; }
-.ti60-connect-dropdown .ti60-bridge-btn     { color: var(--church-blue, #60a5fa); }
-.ti60-connect-dropdown .ti60-test-bridge-btn { color: #a78bfa; }
-.ti60-connect-dropdown .ti60-disconnect-btn { color: var(--error, #f87171); }
+.ti60-btn-primary.ti60-bridge-btn {
+    border-color: var(--church-gold, #daa520);
+    box-shadow: 0 0 0 1px rgba(218,165,32,0.35);
+    font-weight: 700;
+}
 
-.ti60-connect-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* ── Always-visible bridge command block ───────────────────────────────── */
+.ti60-bridge-cmd-block {
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(218,165,32,0.25);
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    margin-bottom: 0.6rem;
+}
+.ti60-bridge-cmd-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+.ti60-bridge-cmd-label {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.ti60-bridge-cmd-copy {
+    font-size: 0.72rem;
+    padding: 0.18rem 0.5rem;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.ti60-bridge-cmd-copy:hover {
+    background: rgba(218,165,32,0.12);
+    color: var(--church-gold, #daa520);
+    border-color: rgba(218,165,32,0.4);
+}
+.ti60-bridge-cmd-pre {
+    margin: 0;
+    font-family: 'Cascadia Code', 'Fira Mono', monospace;
+    font-size: 0.76rem;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+    user-select: all;
+}
 
 .ti60-steps {
     display: grid;

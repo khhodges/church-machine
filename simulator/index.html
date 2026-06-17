@@ -44,7 +44,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
-    <link rel="stylesheet" href="styles-base.css?v=20260531d">
+    <link rel="stylesheet" href="styles-base.css?v=20260617b">
     <link rel="stylesheet" href="styles-toolbar.css?v=20260526c">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260616b">
@@ -1488,27 +1488,29 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                             <div class="ti60-help-section">
                                 <div class="ti60-help-section-title">&#x1F309; Using Via Bridge</div>
                                 <p>Works on ChromeOS and from <strong>lab.cloomcy.org</strong>. Run in your Linux terminal:</p>
-                                <pre class="ti60-help-pre" id="ti60BridgeCmd">cd ~/church_project/SoC/church-machine
+                                <pre class="ti60-help-pre">cd ~/church_project/SoC/church-machine
 python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
                                 <p>The <code>--ide=</code> flag tells the bridge where to forward UART packets. The <code>--insecure</code> flag is needed on ChromeOS because the Linux container can't verify external certificates. First time only: open <code>https://penguin.linux.test:8766/status</code> in Chrome → <em>Advanced → Proceed</em>. Then click <strong>&#x1F309; Via Bridge</strong>.</p>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div id="ti60IframeBanner" class="ti60-iframe-banner" style="display:none;">
-                    <span>&#x26A0;&#xFE0F; <strong>USB WebSerial requires a full browser tab.</strong> It is blocked inside the Replit preview pane.</span>
-                    <a href="/simulator/" target="_blank" class="ti60-open-tab-btn">Open in full browser tab &#x2192;</a>
-                </div>
                 <div class="ti60-action-row">
                     <div class="ti60-action-bar">
-                        <div class="ti60-connect-menu" id="ti60ConnectMenu">
-                            <button class="ti60-connect-menu-toggle" onclick="(function(b){document.getElementById('ti60ConnectDropdown').classList.toggle('open');})(this)">&#x2630; Connect &#x25BE;</button>
-                            <div class="ti60-connect-dropdown" id="ti60ConnectDropdown">
-                                <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect();document.getElementById('ti60ConnectDropdown').classList.remove('open')">&#x1F50C; Connect</button>
-                                <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge();document.getElementById('ti60ConnectDropdown').classList.remove('open')">&#x1F309; Via Bridge</button>
-                                <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge();document.getElementById('ti60ConnectDropdown').classList.remove('open')" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
-                                <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect();document.getElementById('ti60ConnectDropdown').classList.remove('open')" style="display:none;">&#x2715; Stop</button>
+                        <div class="ti60-btn-row">
+                            <button id="ti60ConnectBtn" class="ti60-connect-btn" onclick="Ti60Connect.connect()">&#x1F50C; Connect USB</button>
+                            <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
+                            <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge()" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
+                            <button id="ti60DisconnectBtn" class="ti60-disconnect-btn" onclick="Ti60Connect.disconnect()" style="display:none;">&#x2715; Stop</button>
+                            <a id="ti60IframeBanner" href="/simulator/" target="_blank" class="ti60-open-tab-btn" style="display:none;">Open in full tab &#x2192;</a>
+                        </div>
+                        <div class="ti60-bridge-cmd-block">
+                            <div class="ti60-bridge-cmd-header">
+                                <span class="ti60-bridge-cmd-label">Bridge command</span>
+                                <button class="ti60-bridge-cmd-copy" onclick="Ti60Connect.copyBridgeCmd()" title="Copy to clipboard">&#x1F4CB; Copy</button>
                             </div>
+                            <pre class="ti60-bridge-cmd-pre" id="ti60BridgeCmd">cd ~/church_project/SoC/church-machine
+python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
                         </div>
                         <div class="ti60-bridge-url-row">
                             <label class="ti60-bridge-url-label">Bridge URL</label>
@@ -2443,7 +2445,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
-    <script async src="app-ti60-connect.js?v=20260617a"></script>
+    <script async src="app-ti60-connect.js?v=20260617b"></script>
     <script defer src="app-startup-wizard.js?v=20260617b"></script>
     <script src="app-shell.js?v=20260617a"></script>
     <script src="app-tools.js?v=20260521a"></script>
