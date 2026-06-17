@@ -1,16 +1,10 @@
 // =============================================================================
 // app.js — Church Machine IDE Front-End
 // =============================================================================
-// S-IDE v1: debug mode — add ?debug=1 to URL to reveal advanced views
 (function() {
-    window._r1DebugMode = (new URLSearchParams(window.location.search).get('debug') === '1');
-    if (window._r1DebugMode) document.documentElement.classList.add('r1-debug-mode');
-    // Views only reachable in debug mode
-    window._r1DebugViews = new Set([
-        'repl','namespace','hello-mum','memory','abstractions','lumps',
-        'pipeline','trace','gc','gt-view','reference','docs','github','sitemap',
-        'dashboard'
-    ]);
+    window._r1DebugMode = true;
+    document.documentElement.classList.add('r1-debug-mode');
+    window._r1DebugViews = new Set();
 })();
 // S-IDE v1 auto-progress helpers
 window._r1SetStep = function(step) {

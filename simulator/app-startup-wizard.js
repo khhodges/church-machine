@@ -566,6 +566,12 @@ const StartupWizard = (function () {
         _watchTi60Steps();
         // If restored into step 1 on the prepackaged path, check bitstream now
         if (_currentStep === 1 && _choiceMade === 'prepackaged') _checkBitstream();
+
+        // Wizard hidden by default — full IDE mode.
+        // jumpToFlash() calls open() to reveal it when explicitly invoked.
+        const panel = _el('swPanel');
+        if (panel) panel.style.display = 'none';
+        _open = false;
     }
 
     if (document.readyState === 'loading') {
