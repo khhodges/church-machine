@@ -44,7 +44,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="32x32" href="favicon.svg">
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
-    <link rel="stylesheet" href="styles-base.css?v=20260617e">
+    <link rel="stylesheet" href="styles-base.css?v=20260618a">
     <link rel="stylesheet" href="styles-toolbar.css?v=20260526c">
     <link rel="stylesheet" href="styles-editor.css?v=20260521a">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260616b">
@@ -1497,51 +1497,6 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                     </div>
                     <div id="ti60ConnectLog" class="ti60-connect-log"></div>
                 </div>
-                <details id="ti60AdvancedSection" class="ti60-advanced-details">
-                    <summary class="ti60-advanced-summary">Advanced / Troubleshooting</summary>
-                    <div class="ti60-adv-body">
-                        <div class="ti60-adv-port-hint">
-                            <p class="ti60-adv-hint-heading">&#x1F4CC; Port selection</p>
-                            <p>The FT4232H exposes <strong>4 ports</strong> &mdash; you want the <strong>3rd one</strong> (SoC UART, interface&nbsp;2):</p>
-                            <ul class="ti60-port-os-list">
-                                <li><strong>Linux:</strong> <code>/dev/ttyUSB2</code> &mdash; confirm with <code>ls /dev/ttyUSB*</code> (should show 0&ndash;3)</li>
-                                <li><strong>Windows:</strong> look for <em>USB Serial Port (COM&thinsp;N)</em> &mdash; the 3rd entry in Device Manager under FT4232H</li>
-                                <li><strong>Mac:</strong> <code>/dev/cu.usbserial-&lt;id&gt;2</code></li>
-                            </ul>
-                            <p>If nothing appears in the browser picker:</p>
-                            <ul class="ti60-port-os-list">
-                                <li><strong>ChromeOS / Crostini:</strong> go to <em>Settings &rarr; Linux &rarr; USB devices</em> and <strong>turn off</strong> sharing for the FT4232H &mdash; Chrome needs exclusive access; once Linux claims the device, Chrome WebSerial can&apos;t see it.</li>
-                                <li><strong>Linux desktop:</strong> run <code>sudo chmod a+rw /dev/ttyUSB2</code> then refresh.</li>
-                                <li>Try a different USB cable or port, then power-cycle the board and refresh.</li>
-                            </ul>
-                        </div>
-                        <div class="ti60-adv-bridge-section">
-                            <p class="ti60-adv-hint-heading">&#x1F309; Via Bridge (Chromebook Crostini / headless)</p>
-                            <p class="ti60-adv-bridge-desc">If WebSerial still can&apos;t reach the board, run the bridge in your Linux terminal and connect via it instead:</p>
-                            <div class="ti60-btn-row ti60-adv-btn-row">
-                                <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
-                                <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge()" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
-                            </div>
-                            <div class="ti60-bridge-cmd-block">
-                                <div class="ti60-bridge-cmd-header">
-                                    <span class="ti60-bridge-cmd-label">Bridge command</span>
-                                    <button class="ti60-bridge-cmd-copy" onclick="Ti60Connect.copyBridgeCmd()" title="Copy to clipboard">&#x1F4CB; Copy</button>
-                                </div>
-                                <pre class="ti60-bridge-cmd-pre" id="ti60BridgeCmd">cd ~/church_project/SoC/church-machine
-python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
-                            </div>
-                            <div class="ti60-bridge-url-row">
-                                <label class="ti60-bridge-url-label">Bridge URL</label>
-                                <input id="ti60BridgeUrl" class="ti60-bridge-url-input" type="text"
-                                    value="https://penguin.linux.test:8766"
-                                    placeholder="https://penguin.linux.test:8766"
-                                    title="Edit if your bridge runs on a different port or host" />
-                                <button class="ti60-forget-bridge-btn" onclick="Ti60Connect.resetBridgeCert()" title="Clears the remembered cert-accepted flag so the setup guide reappears on the next connection attempt">&#x1F504; Re-run setup</button>
-                            </div>
-                            <p class="ti60-adv-bridge-note">The <code>--ide=</code> flag tells the bridge where to forward UART packets. The <code>--insecure</code> flag is needed on ChromeOS because the Linux container can&apos;t verify external certificates. First time only: open <code>https://penguin.linux.test:8766/status</code> in Chrome &rarr; <em>Advanced &rarr; Proceed</em>.</p>
-                        </div>
-                    </div>
-                </details>
                 <div id="ti60NiaStreamPanel" class="ti60-nia-stream-panel" style="display:none;">
                     <div class="ti60-nia-stream-header">
                         <span class="ti60-nia-stream-title">&#x1F4E1; Live UART Stream</span>
@@ -1604,6 +1559,51 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                         <div class="ti60-step-status" id="ti60StepStatus-release">&#x2014;</div>
                     </div>
                 </div>
+                <details id="ti60AdvancedSection" class="ti60-advanced-details">
+                    <summary class="ti60-advanced-summary">Advanced / Troubleshooting</summary>
+                    <div class="ti60-adv-body">
+                        <div class="ti60-adv-port-hint">
+                            <p class="ti60-adv-hint-heading">&#x1F4CC; Port selection</p>
+                            <p>The FT4232H exposes <strong>4 ports</strong> &mdash; you want the <strong>3rd one</strong> (SoC UART, interface&nbsp;2):</p>
+                            <ul class="ti60-port-os-list">
+                                <li><strong>Linux:</strong> <code>/dev/ttyUSB2</code> &mdash; confirm with <code>ls /dev/ttyUSB*</code> (should show 0&ndash;3)</li>
+                                <li><strong>Windows:</strong> look for <em>USB Serial Port (COM&thinsp;N)</em> &mdash; the 3rd entry in Device Manager under FT4232H</li>
+                                <li><strong>Mac:</strong> <code>/dev/cu.usbserial-&lt;id&gt;2</code></li>
+                            </ul>
+                            <p>If nothing appears in the browser picker:</p>
+                            <ul class="ti60-port-os-list">
+                                <li><strong>ChromeOS / Crostini:</strong> go to <em>Settings &rarr; Linux &rarr; USB devices</em> and <strong>turn off</strong> sharing for the FT4232H &mdash; Chrome needs exclusive access; once Linux claims the device, Chrome WebSerial can&apos;t see it.</li>
+                                <li><strong>Linux desktop:</strong> run <code>sudo chmod a+rw /dev/ttyUSB2</code> then refresh.</li>
+                                <li>Try a different USB cable or port, then power-cycle the board and refresh.</li>
+                            </ul>
+                        </div>
+                        <div class="ti60-adv-bridge-section">
+                            <p class="ti60-adv-hint-heading">&#x1F309; Via Bridge (Chromebook Crostini / headless)</p>
+                            <p class="ti60-adv-bridge-desc">If WebSerial still can&apos;t reach the board, run the bridge in your Linux terminal and connect via it instead:</p>
+                            <div class="ti60-btn-row ti60-adv-btn-row">
+                                <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
+                                <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge()" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
+                            </div>
+                            <div class="ti60-bridge-cmd-block">
+                                <div class="ti60-bridge-cmd-header">
+                                    <span class="ti60-bridge-cmd-label">Bridge command</span>
+                                    <button class="ti60-bridge-cmd-copy" onclick="Ti60Connect.copyBridgeCmd()" title="Copy to clipboard">&#x1F4CB; Copy</button>
+                                </div>
+                                <pre class="ti60-bridge-cmd-pre" id="ti60BridgeCmd">cd ~/church_project/SoC/church-machine
+python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
+                            </div>
+                            <div class="ti60-bridge-url-row">
+                                <label class="ti60-bridge-url-label">Bridge URL</label>
+                                <input id="ti60BridgeUrl" class="ti60-bridge-url-input" type="text"
+                                    value="https://penguin.linux.test:8766"
+                                    placeholder="https://penguin.linux.test:8766"
+                                    title="Edit if your bridge runs on a different port or host" />
+                                <button class="ti60-forget-bridge-btn" onclick="Ti60Connect.resetBridgeCert()" title="Clears the remembered cert-accepted flag so the setup guide reappears on the next connection attempt">&#x1F504; Re-run setup</button>
+                            </div>
+                            <p class="ti60-adv-bridge-note">The <code>--ide=</code> flag tells the bridge where to forward UART packets. The <code>--insecure</code> flag is needed on ChromeOS because the Linux container can&apos;t verify external certificates. First time only: open <code>https://penguin.linux.test:8766/status</code> in Chrome &rarr; <em>Advanced &rarr; Proceed</em>.</p>
+                        </div>
+                    </div>
+                </details>
                 <div id="ti60SuccessBanner" class="ti60-success-banner" style="display:none;">
                     <span class="ti60-success-icon">&#x2705;</span>
                     <div class="ti60-success-text">
@@ -2460,7 +2460,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
-    <script async src="app-ti60-connect.js?v=20260617f"></script>
+    <script async src="app-ti60-connect.js?v=20260618a"></script>
     <script defer src="app-startup-wizard.js?v=20260617b"></script>
     <script src="app-shell.js?v=20260617a"></script>
     <script src="app-tools.js?v=20260521a"></script>

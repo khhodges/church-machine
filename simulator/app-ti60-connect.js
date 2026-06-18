@@ -875,17 +875,14 @@ window.Ti60Connect = (function () {
         if (_isIframe()) {
             const connectBtn = document.getElementById('ti60ConnectBtn');
             if (connectBtn) {
-                connectBtn.classList.add('ti60-btn-disabled-iframe');
-                connectBtn.setAttribute('data-iframe-tip', 'Requires full browser tab');
+                connectBtn.style.display = 'none';
             }
-            const bridgeBtn = document.getElementById('ti60BridgeBtn');
-            if (bridgeBtn) bridgeBtn.classList.add('ti60-btn-primary');
             _showIframeBanner();
             const log = document.getElementById('ti60ConnectLog');
             if (log && log.children.length === 0) {
                 _logHtml(
-                    '&#x26A0;&#xFE0F; <strong>Preview pane detected.</strong> ' +
-                    'Click <strong>Open in full tab &#x2192;</strong> for direct USB, or ' +
+                    '<strong>USB connect requires a full browser tab.</strong> ' +
+                    'Click <strong>Open in full tab &#x2192;</strong> above, or ' +
                     'expand <strong>Advanced / Troubleshooting</strong> below to connect via Bridge.'
                 );
             }
