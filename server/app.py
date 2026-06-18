@@ -3408,35 +3408,34 @@ Connect to the IDE:
 
 ---
 
-## Case 2 — Full rebuild from source (Efinity 2026.1 + RISC-V toolchain required)
+## Case 2 — Synthesise from Efinity IDE (RISC-V toolchain required)
 
-### Prerequisites
-
-- **Efinity 2026.1** at `~/efinity/2026.1`
-- **RISC-V toolchain** at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin`
-- **Sapphire SoC IP files** — copy from your Efinity install:
+`sapphire.v` in this package has placeholder BRAM initialisation (all zeros) so
+that Efinity IDE can open the project immediately.  To produce a bitstream with
+real firmware you must patch `sapphire.v` first — one terminal command:
 
 ```bash
-cp ~/efinity/2026.1/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire.v .
-cp ~/efinity/2026.1/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire_define.vh .
+bash prep_ide_synthesis.sh
 ```
 
-> If that path does not exist: `find ~/efinity -name "sapphire.v" 2>/dev/null`
+This compiles the RISC-V firmware (`~/efinity/efinity-riscv-ide-2025.2/`) and
+embeds the resulting bytes into `sapphire.v`.  After it finishes, click
+**Run Synthesis** in Efinity IDE as normal.
 
-### Build
+> If you see **no USB2 messages** after flashing, your bitstream was built
+> without running `prep_ide_synthesis.sh` first — the Sapphire RISC-V core
+> is executing zero firmware.  Re-run `prep_ide_synthesis.sh`, re-synthesise,
+> and reflash.  Or just use Case 1 (pre-built hex already has real firmware).
+
+---
+
+## Case 3 — Full command-line rebuild (Efinity 2026.1 + RISC-V toolchain)
 
 ```bash
 make bitstream
 ```
 
-Runs 6 steps automatically:
-1. Compile RISC-V firmware
-2. Copy BRAM symbol files to `work_syn/`
-3. Embed firmware into `sapphire.v` BRAM init blocks
-4. Synthesise — `run_efx_map.sh` (strips banned params, calls `efx_map`)
-5. Place & Route — `run_efx_pnr.sh`
-6. Generate hex — `run_efx_pgm.sh`
-
+Runs all 6 steps automatically (firmware → BRAM patch → synth → PnR → hex).
 Output: `outflow/church_soc_cm.hex` and `outflow/church_soc_cm.bit`
 
 Full step-by-step guide and troubleshooting: **`BUILD_SOC_CM.md`**
