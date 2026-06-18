@@ -1,0 +1,20 @@
+ERROR    : /home/sipantichijk/Downloads/church-ti60-package/sapphire.v(4878): cannot open file 'EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin' [VERI-1012]
+INFO     : /home/sipantichijk/Downloads/church-ti60-package/sapphire.v(4840): module 'BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b' remains a black box due to errors in its contents [VERI-1073]
+INFO     : /home/sipantichijk/Downloads/church-ti60-package/sapphire.v(131): module 'EfxSapphireSoc_b62b14ffe6bb44e5a817b8d08e286c6b' remains a black box due to errors in its contents [VERI-1073]
+INFO     : /home/sipantichijk/Downloads/church-ti60-package/sapphire.v(49): module 'sapphire' remains a black box due to errors in its contents [VERI-1073]
+WARNING  : /home/sipantichijk/Downloads/church-ti60-package/top.v(141): actual bit length 32 differs from formal bit length 16 for port 'io_apbSlave_0_PADDR' [VERI-1330]
+INFO     : /home/sipantichijk/Downloads/church-ti60-package/top.v(42): module 'top' remains a black box due to errors in its contents [VERI-1073]
+INFO     : Elaboration took 0.555999992 seconds [FlowMsg::StageDuration]
+INFO     :     Elaboration took 0.42 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : Elaboration virtual memory usage: begin = 207.608 MB, end = 237.304 MB, delta = 29.696 MB [FlowMsg::VMUsage]
+INFO     : Elaboration resident set memory usage: begin = 143.36 MB, end = 173.696 MB, delta = 30.336 MB [FlowMsg::RSSUsage]
+INFO     :     Elaboration peak resident set memory usage = 193.324 MB [FlowMsg::RSSUsage::Peak]
+INFO     : ***** Ending Elaboration ... *****
+ERROR    : Elaboration of module 'top' failed. Please check previous error messages. [EFX-0021]
+INFO     : The entire flow of EFX_MAP took 3.603514306 seconds [FlowMsg::StageDuration]
+INFO     :     The entire flow of EFX_MAP took 3.03 seconds (approximately) in total CPU time [FlowMsg::StageDuration::CPUTime]
+INFO     : The entire flow of EFX_MAP virtual memory usage: begin = 107.96 MB, end = 237.304 MB, delta = 129.344 MB [FlowMsg::VMUsage]
+INFO     : The entire flow of EFX_MAP resident set memory usage: begin = 34.304 MB, end = 173.696 MB, delta = 139.392 MB [FlowMsg::RSSUsage]
+INFO     :     The entire flow of EFX_MAP peak resident set memory usage = 193.324 MB [FlowMsg::RSSUsage::Peak]
+Thu June 18 26 16:18:35 - /home/sipantichijk/efinity/2026.1/bin/efx_map finished. Exit code = 5 Exit status : Normal
+Running synthesis flow failed. See exit code and exit status

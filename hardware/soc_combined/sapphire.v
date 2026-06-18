@@ -4875,10 +4875,10 @@ module BmbOnChipRam_b62b14ffe6bb44e5a817b8d08e286c6b (
   reg [7:0] _zz_ramsymbol_read_3;
 
   initial begin
-    $readmemb("EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin",ram_symbol0);
-    $readmemb("EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin",ram_symbol1);
-    $readmemb("EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin",ram_symbol2);
-    $readmemb("EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin",ram_symbol3);
+            ram_symbol0[0] = 8'h00;
+            ram_symbol1[0] = 8'h00;
+            ram_symbol2[0] = 8'h00;
+            ram_symbol3[0] = 8'h00;
   end
   always @(*) begin
     _zz_ram_port0 = {_zz_ramsymbol_read_3, _zz_ramsymbol_read_2, _zz_ramsymbol_read_1, _zz_ramsymbol_read};
