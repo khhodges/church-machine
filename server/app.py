@@ -3360,7 +3360,28 @@ black-box wrapper in the Amaranth Verilog; Vivado infers and constrains it from 
 
 BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225  SoC+CM Build Package
 
-## What\'s Inside
+---
+
+## ⚠️  BEFORE YOU BEGIN — Get the Sapphire SoC IP files
+
+`sapphire.v` and `sapphire_define.vh` come from your **Efinity Sapphire SoC IP
+installation** and cannot be included in this package.
+
+**Run this first (Case 2 / full rebuild only):**
+
+```bash
+bash get_sapphire_ip.sh
+```
+
+This auto-detects your Efinity install and copies both files here.
+If it can't find Efinity, follow the prompt it prints.
+
+> **Case 1 (flash pre-built hex) does not need these files — skip straight to
+> Case 1 below if you just want to flash and connect.**
+
+---
+
+## What's Inside
 
 This package contains the **Sapphire RISC-V SoC + Church Machine (ECO-001B)**
 combined source for the Efinix Ti60F225 development board.
@@ -3376,13 +3397,12 @@ combined source for the Efinix Ti60F225 development board.
 - `run_efx_map.sh`            — Synthesis (strips EFX-0002 banned params, calls efx_map)
 - `run_efx_pnr.sh`            — Place & Route
 - `run_efx_pgm.sh`            — Bitstream generation
+- `get_sapphire_ip.sh`        — **Run first** — copies sapphire.v from your Efinity install
 - `Makefile`                  — `make bitstream` runs all 6 steps in order
 - `BUILD_SOC_CM.md`           — Authoritative step-by-step build guide
 - `local_bridge.py`           — Serial bridge to connect the board to the IDE
 - `bridge.sh`                 — Auto-detects port and launches local_bridge.py
 - `outflow/church_soc_cm.hex` — **Pre-built bitstream** (flash immediately, no toolchain)
-
----
 
 ## Case 1 — Flash the pre-built bitstream (no toolchain needed)
 

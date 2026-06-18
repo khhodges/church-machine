@@ -9,21 +9,21 @@ endif
 SYM_PREFIX := EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol
 
 check-util:
-	python $(SCRIPTS_DIR)/check_ti60_utilisation.py --report-dir work_syn
+        python $(SCRIPTS_DIR)/check_ti60_utilisation.py --report-dir work_syn
 
 check-util-ci:
-	python $(SCRIPTS_DIR)/check_ti60_utilisation.py --report-dir work_syn --missing-ok
+        python $(SCRIPTS_DIR)/check_ti60_utilisation.py --report-dir work_syn --missing-ok
 
 firmware:
-	$(MAKE) -C firmware clean
-	$(MAKE) -C firmware
+        $(MAKE) -C firmware clean
+        $(MAKE) -C firmware
 
 patch_sapphire: $(SYM_PREFIX)0.bin
-	python3 $(SCRIPTS_DIR)/patch_sapphire_init.py sapphire.v \
-		$(SYM_PREFIX)0.bin \
-		$(SYM_PREFIX)1.bin \
-		$(SYM_PREFIX)2.bin \
-		$(SYM_PREFIX)3.bin
+        python3 $(SCRIPTS_DIR)/patch_sapphire_init.py sapphire.v \
+                $(SYM_PREFIX)0.bin \
+                $(SYM_PREFIX)1.bin \
+                $(SYM_PREFIX)2.bin \
+                $(SYM_PREFIX)3.bin
 
 $(SYM_PREFIX)0.bin: firmware
 
@@ -46,32 +46,46 @@ $(SYM_PREFIX)0.bin: firmware
 #   make -C hardware/soc_combined bitstream
 # ---------------------------------------------------------------------------
 bitstream:
-	@echo "========================================"
-	@echo "make bitstream — full Ti60 build sequence"
-	@echo "========================================"
-	@echo ""
-	@echo "==> Step 1/6: Firmware build ..."
-	$(MAKE) firmware
-	@echo ""
-	@echo "==> Step 2/6: prep_syn.sh — copy BRAM symbol files to work_syn/ ..."
-	bash scripts/prep_syn.sh
-	@echo ""
-	@echo "==> Step 3/6: patch_sapphire_init.py — embed firmware into sapphire.v ..."
-	$(MAKE) patch_sapphire
-	@echo ""
-	@echo "==> Step 4/6: Synthesis (efx_map) ..."
-	bash run_efx_map.sh
-	@echo ""
-	@echo "==> Step 5/6: Place & Route (efx_pnr) ..."
-	bash run_efx_pnr.sh
-	@echo ""
-	@echo "==> Step 6/6: Bitstream generation (efx_pgm) ..."
-	bash run_efx_pgm.sh
-	@echo ""
-	@echo "========================================"
-	@echo "make bitstream COMPLETE"
-	@echo "Flash with:  make flash"
-	@echo "========================================"
+        @if [ ! -f sapphire.v ] || [ ! -f sapphire_define.vh ]; then \
+            echo ""; \
+            echo "ERROR: sapphire.v and/or sapphire_define.vh not found."; \
+            echo ""; \
+            echo "These files come from your Efinity Sapphire SoC IP installation"; \
+            echo "and cannot be included in this package."; \
+            echo ""; \
+            echo "Run this first:"; \
+            echo "  bash get_sapphire_ip.sh"; \
+            echo ""; \
+            echo "Then retry:  make bitstream"; \
+            echo ""; \
+            exit 1; \
+        fi
+        @echo "========================================"
+        @echo "make bitstream — full Ti60 build sequence"
+        @echo "========================================"
+        @echo ""
+        @echo "==> Step 1/6: Firmware build ..."
+        $(MAKE) firmware
+        @echo ""
+        @echo "==> Step 2/6: prep_syn.sh — copy BRAM symbol files to work_syn/ ..."
+        bash scripts/prep_syn.sh
+        @echo ""
+        @echo "==> Step 3/6: patch_sapphire_init.py — embed firmware into sapphire.v ..."
+        $(MAKE) patch_sapphire
+        @echo ""
+        @echo "==> Step 4/6: Synthesis (efx_map) ..."
+        bash run_efx_map.sh
+        @echo ""
+        @echo "==> Step 5/6: Place & Route (efx_pnr) ..."
+        bash run_efx_pnr.sh
+        @echo ""
+        @echo "==> Step 6/6: Bitstream generation (efx_pgm) ..."
+        bash run_efx_pgm.sh
+        @echo ""
+        @echo "========================================"
+        @echo "make bitstream COMPLETE"
+        @echo "Flash with:  make flash"
+        @echo "========================================"
 
 # ---------------------------------------------------------------------------
 # bitstream-flash — rebuild the bitstream then flash to Ti60 via JTAG.
@@ -85,9 +99,9 @@ CIRCUIT    := $(basename $(notdir $(PROJECT)))
 HEX        := $(dir $(PROJECT))outflow/$(CIRCUIT).hex
 
 bitstream-flash: bitstream
-	@echo "==> Flashing $(HEX) to Ti60F225 ..."
-	sudo openFPGALoader -b titanium_ti60_f225_jtag -f "$(HEX)"
-	@echo "==> Flash complete."
+        @echo "==> Flashing $(HEX) to Ti60F225 ..."
+        sudo openFPGALoader -b titanium_ti60_f225_jtag -f "$(HEX)"
+        @echo "==> Flash complete."
 
 # ---------------------------------------------------------------------------
 # flash — flash the pre-built outflow/church_soc_cm.hex without rebuilding.
@@ -96,9 +110,9 @@ bitstream-flash: bitstream
 # or after running 'make bitstream' yourself.
 # ---------------------------------------------------------------------------
 flash:
-	@echo "==> Flashing pre-built outflow/church_soc_cm.hex to Ti60F225 ..."
-	sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
-	@echo "==> Flash complete."
+        @echo "==> Flashing pre-built outflow/church_soc_cm.hex to Ti60F225 ..."
+        sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
+        @echo "==> Flash complete."
 
 # ---------------------------------------------------------------------------
 # test-key-derive — compile and run the host-side C key derivation test.
@@ -115,10 +129,10 @@ flash:
 #   make -C hardware/soc_combined test-key-derive   (from repo root)
 # ---------------------------------------------------------------------------
 test-key-derive:
-	gcc -O2 -Wall -Wextra \
-		-o /tmp/key_derive_test \
-		../key_derive_test.c \
-		&& /tmp/key_derive_test
+        gcc -O2 -Wall -Wextra \
+                -o /tmp/key_derive_test \
+                ../key_derive_test.c \
+                && /tmp/key_derive_test
 
 # ---------------------------------------------------------------------------
 # test-sha32 — run the cross-language sha32/HKDF vector suite.
@@ -138,8 +152,8 @@ test-key-derive:
 #   make -C hardware/soc_combined test-sha32   (from repo root)
 # ---------------------------------------------------------------------------
 test-sha32:
-	gcc -O2 -Wall \
-		-o /tmp/sha32_test \
-		../sha32_test.c \
-		&& /tmp/sha32_test
-	python3 -m pytest $(SCRIPTS_DIR)/test_sha32_vectors.py -v
+        gcc -O2 -Wall \
+                -o /tmp/sha32_test \
+                ../sha32_test.c \
+                && /tmp/sha32_test
+        python3 -m pytest $(SCRIPTS_DIR)/test_sha32_vectors.py -v
