@@ -927,7 +927,7 @@
                         <div class="ti60-dl-flash-meta" id="ti60DlFlashMeta"></div>
                     </div>
                     <div class="ti60-dl-flash-btns">
-                        <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/ti60-hex" download="church_ti60_f225.hex">&#x2B07; Download .hex</a>
+                        <a id="ti60DlHexBtn" class="ti60-dl-flash-btn ti60-dl-flash-btn-dl" href="/dl/ti60-hex" download="church_soc_cm.hex">&#x2B07; Download .hex</a>
                         <button class="ti60-dl-flash-btn ti60-dl-flash-btn-flash" onclick="switchBuilderViewTab('ti60-connect');StartupWizard.jumpToFlash();" title="Opens the Flash step in the Startup Wizard">&#x26A1; Flash via Wizard</button>
                     </div>
                 </div>
@@ -1017,7 +1017,7 @@
                     <!-- ── Step 0: Get Bitstream ── -->
                     <div class="sw-body-step" id="swBody0">
                         <div class="sw-step-heading">📦 Download the Project <span class="sw-time-badge">~1 min</span></div>
-                        <p class="sw-step-desc">Download the full Church Machine project for your board. The ZIP already contains a <strong>pre-built bitstream</strong> (<code>outflow/church_ti60_f225.hex</code>) — ready to flash, no synthesis needed. The Efinity project is also inside if you ever want to rebuild from source.</p>
+                        <p class="sw-step-desc">Download the full Church Machine project for your board. The ZIP already contains a <strong>pre-built bitstream</strong> (<code>outflow/church_soc_cm.hex</code>) — ready to flash, no synthesis needed. The Efinity project is also inside if you ever want to rebuild from source.</p>
                         <div class="sw-led-guide">
                             <span class="sw-led-label">LEDs right now:</span>
                             <span class="sw-led sw-led-off" title="LED0">0</span>
@@ -1029,10 +1029,10 @@
                         <div style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:0.6rem;">
                             <div>
                                 <a id="swZipBtn" class="sw-btn sw-btn-primary" href="/dl/ti60zip">📦 Full project (.zip)</a>
-                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Everything in one download: the <strong>pre-built bitstream</strong> (<code>outflow/church_ti60_f225.hex</code>), a <code>Makefile</code> with <code>make flash</code>, plus the full Efinity project for rebuilding.</p>
+                                <p style="margin:0.2rem 0 0 0.1rem;font-size:0.78rem;color:var(--text-secondary,#9ca3af);">Everything in one download: the <strong>pre-built bitstream</strong> (<code>outflow/church_soc_cm.hex</code>), a <code>Makefile</code> with <code>make flash</code>, plus the full Efinity project for rebuilding.</p>
                             </div>
                         </div>
-                        <div class="sw-release-note" id="swReleaseNote">The ready-to-flash programming file is already inside the ZIP at <code>outflow/church_ti60_f225.hex</code> — go straight to the next step. (Rebuilding from source is optional and takes ~30 min.)</div>
+                        <div class="sw-release-note" id="swReleaseNote">The ready-to-flash programming file is already inside the ZIP at <code>outflow/church_soc_cm.hex</code> — go straight to the next step. (Rebuilding from source is optional and takes ~30 min.)</div>
                         <div class="sw-trouble-panel" id="swTrouble0">
                             <div class="sw-trouble-title">⚠ Common problems — Get Bitstream</div>
                             <ul class="sw-trouble-list">
@@ -1072,8 +1072,8 @@
                         <div id="swFlashPrepack" style="display:none;">
                             <div class="sw-step-heading">⚡ Step 2 — Flash the Pre-built Bitstream <span class="sw-time-badge">~3 min</span></div>
 
-                            <p class="sw-step-desc sw-os-win">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_ti60_f225.hex</code> — no separate download. Just unzip and load it in Efinity Programmer.</p>
-                            <p class="sw-step-desc sw-os-linux" style="display:none;">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_ti60_f225.hex</code> — no separate download. Just unzip and run <code>make flash</code>.</p>
+                            <p class="sw-step-desc sw-os-win">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_soc_cm.hex</code> — no separate download. Just unzip and load it in Efinity Programmer.</p>
+                            <p class="sw-step-desc sw-os-linux" style="display:none;">The pre-built bitstream is <strong>already inside the ZIP</strong> at <code>outflow/church_soc_cm.hex</code> — no separate download. Just unzip and run <code>make flash</code>.</p>
                             <div class="sw-prepack-dl-row">
                                 <span id="swBitstreamStatus" class="sw-bitstream-status sw-bitstream-checking">checking…</span>
                             </div>
@@ -1088,7 +1088,7 @@
                                     <li>Cable dropdown: select <strong>Efinix USB2.0 Device</strong></li>
                                     <li>Mode: <strong>JTAG</strong> &nbsp;·&nbsp; Operation: <strong>Active Serial Programming</strong><br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(Active Serial writes to SPI flash — the board keeps it after power-off)</span></li>
-                                    <li>Click <strong>Open Bit File</strong> → select the bundled <code>outflow/church_ti60_f225.hex</code> from the unzipped folder</li>
+                                    <li>Click <strong>Open Bit File</strong> → select the bundled <code>outflow/church_soc_cm.hex</code> from the unzipped folder</li>
                                     <li>Click <strong>Start</strong> and wait for <em>"Programming Done"</em> (~30 s)</li>
                                 </ol>
                             </div>
@@ -1100,7 +1100,7 @@
                                     <li>Activate OSS CAD Suite:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
                                     <li>Flash the bundled bitstream:<br><code>make flash</code><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Runs <code>openFPGALoader</code> on the included <code>outflow/church_ti60_f225.hex</code> — nothing else to download.</span></li>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Runs <code>openFPGALoader</code> on the included <code>outflow/church_soc_cm.hex</code> — nothing else to download.</span></li>
                                     <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
                                 </ol>
                             </div>
@@ -1135,9 +1135,9 @@ python setup_ti60_peri.py</pre>
                                     <li><strong>Enable SoC / UART</strong> &mdash; open <code>church_ti60_f225.sdc</code> in any text editor and switch from Phase A to Phase B by following the comments inside the file:<br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Phase A = 25 MHz (safe default). Phase B = 50 MHz with SoC/UART enabled. The comments tell you exactly which lines to swap.</span></li>
                                     <li>Launch <strong>Efinity IDE</strong> from the Start menu (Windows) or Applications (Mac)</li>
-                                    <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
+                                    <li><strong>File → Open Project</strong> → select <code>church_soc_cm.xml</code></li>
                                     <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_ti60_f225.hex</code> is the programming file.</span></li>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_soc_cm.hex</code> is the programming file.</span></li>
                                 </ol>
                             </div>
 
@@ -1158,9 +1158,9 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Comment out the Phase A line and uncomment Phase B exactly as the comments direct.</span></li>
                                     <li>Launch Efinity IDE:<br>
 <pre style="margin:0.3rem 0 0.2rem;">QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &amp;</pre></li>
-                                    <li><strong>File → Open Project</strong> → select <code>church_ti60_f225.xml</code></li>
+                                    <li><strong>File → Open Project</strong> → select <code>church_soc_cm.xml</code></li>
                                     <li>Run <strong>Synthesis → Place &amp; Route → Generate Bitstream</strong><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_ti60_f225.hex</code> is the programming file.</span></li>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">Takes ~30 min. When done, <code>outflow/church_soc_cm.hex</code> is the programming file.</span></li>
                                 </ol>
                             </div>
 
@@ -1180,7 +1180,7 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                                     <li>Cable dropdown: select <strong>Efinix USB2.0 Device</strong></li>
                                     <li>Mode: <strong>JTAG</strong> &nbsp;·&nbsp; Operation: <strong>Active Serial Programming</strong><br>
                                         <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(Active Serial writes to SPI flash — the board keeps it after power-off)</span></li>
-                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_ti60_f225.hex</code></li>
+                                    <li>Click <strong>Open Bit File</strong> → navigate to <code>outflow/church_soc_cm.hex</code></li>
                                     <li>Click <strong>Start</strong> and wait for <em>"Programming Done"</em> (~30 s)</li>
                                 </ol>
                             </div>
@@ -1190,7 +1190,7 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                                     <li>Activate OSS CAD Suite in your terminal:<br><code>source ~/oss-cad-suite/environment</code></li>
                                     <li>Confirm the JTAG cable is visible:<br><code>ls /dev/ttyUSB*</code> — expect <code>/dev/ttyUSB0</code></li>
                                     <li>Flash the built bitstream to the board:<br><code>make flash</code><br>
-                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(equivalent to <code>openFPGALoader -b titanium_ti60_f225 outflow/church_ti60_f225.hex</code>)</span></li>
+                                        <span style="font-size:0.82em;color:var(--text-secondary,#9ca3af);">(equivalent to <code>openFPGALoader -b titanium_ti60_f225 outflow/church_soc_cm.hex</code>)</span></li>
                                     <li>Wait for <strong>"Programming done"</strong> — about 30 seconds</li>
                                 </ol>
                             </div>
@@ -1430,7 +1430,7 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                         <div class="sw-tour-complete-body">
                             <p class="sw-tour-complete-intro">You've walked through all 6 setup steps. Here's a quick summary of what the real flow involves:</p>
                             <ol class="sw-tour-summary">
-                                <li><strong>Download the Project</strong> — Grab the one ZIP, which already contains a pre-built bitstream (<code>outflow/church_ti60_f225.hex</code>) plus a <code>Makefile</code> — no synthesis needed.</li>
+                                <li><strong>Download the Project</strong> — Grab the one ZIP, which already contains a pre-built bitstream (<code>outflow/church_soc_cm.hex</code>) plus a <code>Makefile</code> — no synthesis needed.</li>
                                 <li><strong>Flash</strong> — Unzip, then run <code>make flash</code> (or load the bundled hex in Efinity Programmer over JTAG) onto the Ti60 F225 board.</li>
                                 <li><strong>Power Cycle</strong> — Unplug and replug the board; the LED pattern confirms the Church Machine core is healthy and waiting.</li>
                                 <li><strong>Connect</strong> — Click "Connect" in the IDE; the board's CALLHOME greeting is automatically detected and the wizard advances.</li>

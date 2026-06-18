@@ -402,81 +402,62 @@ def download_build_soc_cm_md():
 @app.route("/dl/ti60zip")
 def download_ti60zip():
     import zipfile, io, re as _re
-    base = os.path.dirname(__file__)
-    hw   = os.path.abspath(os.path.join(base, "..", "hardware"))
-    bld  = os.path.abspath(os.path.join(base, "..", "build"))
-    docs = os.path.abspath(os.path.join(base, "..", "docs"))
+    BASE = os.path.dirname(__file__)
+    HW   = os.path.abspath(os.path.join(BASE, "..", "hardware"))
+    DOCS = os.path.abspath(os.path.join(BASE, "..", "docs"))
+    SOC  = os.path.join(HW, "soc_combined")
+    BITS = os.path.abspath(os.path.join(BASE, "..", "bitstreams"))
+    _SKIP = {"outflow", "work_syn", "work_pnr", "work_dbg", "good-builds", "__pycache__"}
+    _BANNED = _re.compile(
+        r'[ \t]*<efx:param name="(?:'
+        r'infer_clk_enable|infer_set_reset|calc_mcw|split_input_buf|'
+        r'no_fanout_override|get_names_method|logic_opting|pack_lut_into_ram|'
+        r'cpe_ins_register|use_cpe_for_const_0|use_cpe_for_const_1|fanout_limit'
+        r')"[^>]*/>\n?'
+    )
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        # Verilog source
-        v = os.path.join(bld, "church_ti60_f225.v")
-        if os.path.exists(v):
-            zf.write(v, "church_ti60_f225.v")
-        # Project XML — fix path so .v sits flat alongside .xml
-        xml_path = os.path.join(hw, "ti60_f225_project.xml")
-        if os.path.exists(xml_path):
-            with open(xml_path) as f:
-                xml = f.read()
-            xml = xml.replace("../build/church_ti60_f225.v", "church_ti60_f225.v")
-            xml = _re.sub(r'<efx:inter_file name="[^"]*"/>',
-                          '<efx:inter_file name="church_ti60_f225.peri.xml"/>', xml)
-            zf.writestr("church_ti60_f225.xml", xml)
-        # Constraints + periphery
-        for src, arc in [
-            (os.path.join(hw, "ti60_f225.sdc"),      "church_ti60_f225.sdc"),
-            (os.path.join(hw, "ti60_f225.peri.xml"), "church_ti60_f225.peri.xml"),
-        ]:
-            if os.path.exists(src):
-                zf.write(src, arc)
-        # DesignAPI PLL script, Makefile, and build instructions
-        setup = os.path.join(hw, "setup_ti60_peri.py")
-        if os.path.exists(setup):
-            zf.write(setup, "setup_ti60_peri.py")
-        makefile = os.path.join(hw, "Makefile.ti60")
-        if os.path.exists(makefile):
-            zf.write(makefile, "Makefile")
-        # Pre-built bitstream — user can flash immediately without synthesising
-        bitstreams = os.path.abspath(os.path.join(base, "..", "bitstreams"))
-        hex_src = os.path.join(bitstreams, "church_ti60_f225.hex")
-        _hex_included = os.path.exists(hex_src)
-        if _hex_included:
-            zf.write(hex_src, "outflow/church_ti60_f225.hex")
-        else:
-            zf.comment = (
-                b"NOTE: outflow/church_ti60_f225.hex is NOT included in this ZIP.\n"
-                b"Run 'make bitstream' from the repo root (requires Efinity) to build it.\n"
-                b"See SoC/BUILD_SOC_CM.md for full instructions."
-            )
-        zf.writestr("BUILD.md", BUILD_MD_TI60)
-        # Serial bridge script (needed to connect the board to the IDE)
-        bridge = os.path.join(base, "local_bridge.py")
-        if os.path.exists(bridge):
-            zf.write(bridge, "local_bridge.py")
-        # Patch script (needed for SoC+CM firmware embedding)
-        patch_script = os.path.join(base, "..", "scripts", "patch_sapphire_init.py")
-        if os.path.exists(patch_script):
-            zf.write(patch_script, "scripts/patch_sapphire_init.py")
-        # SoC+CM combined source (full rebuild path — see Case 3 in BUILD.md)
-        soc_combined = os.path.join(hw, "soc_combined")
-        if os.path.isdir(soc_combined):
-            for root, _dirs, files in os.walk(soc_combined):
+        if os.path.isdir(SOC):
+            for root, dirs, files in os.walk(SOC):
+                dirs[:] = [d for d in dirs if d not in _SKIP]
                 for fn in files:
+                    if fn.endswith(".pyc"):
+                        continue
                     full = os.path.join(root, fn)
-                    arc = os.path.join("SoC", os.path.relpath(full, soc_combined))
-                    zf.write(full, arc)
-        # PDFs
+                    arc  = os.path.relpath(full, SOC)
+                    if arc == "church_soc_cm.xml":
+                        with open(full, "r") as xf:
+                            xml = xf.read()
+                        zf.writestr(arc, _BANNED.sub("", xml))
+                    elif arc == "Makefile":
+                        with open(full, "r") as mf:
+                            mk = mf.read()
+                        mk = mk.replace("SCRIPTS_DIR := ../../scripts", "SCRIPTS_DIR := scripts")
+                        zf.writestr(arc, mk)
+                    else:
+                        zf.write(full, arc)
+        patch = os.path.join(BASE, "..", "scripts", "patch_sapphire_init.py")
+        if os.path.exists(patch):
+            zf.write(os.path.abspath(patch), "scripts/patch_sapphire_init.py")
+        hex_src = os.path.join(BITS, "church_ti60_f225.hex")
+        bit_src = os.path.join(BITS, "church_ti60_f225.bit")
+        if os.path.exists(hex_src):
+            zf.write(hex_src, "outflow/church_soc_cm.hex")
+        if os.path.exists(bit_src):
+            zf.write(bit_src, "outflow/church_soc_cm.bit")
+        zf.writestr("BUILD.md", BUILD_MD_TI60)
         for pdf, arc in [
             ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
             ("hardware-ti60-f225.pdf",  "docs/Ti60 Hardware Guide.pdf"),
             ("cloomc-foundation.pdf",   "docs/Architecture Reference.pdf"),
             ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
         ]:
-            src = os.path.join(docs, pdf)
-            if os.path.exists(src):
-                zf.write(src, arc)
+            src_path = os.path.join(DOCS, pdf)
+            if os.path.exists(src_path):
+                zf.write(src_path, arc)
     buf.seek(0)
     return send_file(buf, as_attachment=True,
-                     download_name="church_ti60_f225_project.zip",
+                     download_name="church-ti60-package.zip",
                      mimetype="application/zip")
 
 @app.route("/dl/ti60peri")
@@ -3377,309 +3358,119 @@ black-box wrapper in the Amaranth Verilog; Vivado infers and constrains it from 
 """
 
 
-BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225 Build Package
+BUILD_MD_TI60 = """# Church Machine — Efinix Ti60 F225  SoC+CM Build Package
 
-## What's Inside
+## What\'s Inside
 
-### Quick-start (CM-only, no toolchain needed)
-- `outflow/church_ti60_f225.hex` — **Pre-built bitstream** (flash immediately with `make flash`)
-- `Makefile`                  — `make flash` runs openFPGALoader; `make clean` removes outflow
+This package contains the **Sapphire RISC-V SoC + Church Machine (ECO-001B)**
+combined source for the Efinix Ti60F225 development board.
 
-### Full rebuild (CM-only, Efinity toolchain required)
-- `church_ti60_f225.xml`      — Efinity project file (open this in Efinity IDE)
-- `church_ti60_f225.v`        — RTL Verilog (Yosys from Amaranth RTLIL, no vendor cells)
-- `church_ti60_f225.sdc`      — Timing constraints (see Phase A / Phase B notes inside)
-- `church_ti60_f225.peri.xml` — Periphery I/O configuration (GPIO banks, UART pins)
-- `setup_ti60_peri.py`        — Efinity DesignAPI script to add the PLL (run once before first build)
+### Files
+- `church_soc_cm.xml`         — Efinity project — **open this in Efinity IDE**
+- `church_ti60_f225.v`        — Church Machine RTL (ECO-001B, Amaranth/Yosys)
+- `top.v`                     — Top-level SoC+CM wrapper
+- `apb3_cm_bridge.v`          — APB3 register bridge (Sapphire SoC ↔ Church Machine)
+- `church_soc_cm.sdc`         — Timing constraints
+- `church_soc_cm.peri.xml`    — Periphery I/O pin assignments
+- `firmware/`                 — Sapphire RISC-V firmware (main.c, crt0.S, Makefile)
+- `run_efx_map.sh`            — Synthesis (strips EFX-0002 banned params, calls efx_map)
+- `run_efx_pnr.sh`            — Place & Route
+- `run_efx_pgm.sh`            — Bitstream generation
+- `Makefile`                  — `make bitstream` runs all 6 steps in order
+- `BUILD_SOC_CM.md`           — Authoritative step-by-step build guide
 - `local_bridge.py`           — Serial bridge to connect the board to the IDE
-
-### SoC+CM combined rebuild (SoC firmware + Efinity toolchain required)
-- `SoC/`                      — Full source for the Sapphire RISC-V SoC + Church Machine combined bitstream
-  - `church_soc_cm.xml`       — Efinity project for the combined SoC+CM build
-  - `top.v`                   — Top-level wrapper (SoC + CM + APB3 bridge)
-  - `apb3_cm_bridge.v`        — APB3 register bridge (SoC firmware controls CM)
-  - `firmware/`               — RISC-V firmware source (`main.c`, `crt0.S`, `link.ld`, `Makefile`)
-  - `BUILD_SOC_CM.md`         — Authoritative step-by-step SoC+CM build guide
-  - `local_bridge.py`         — Alternative bridge for the SoC+CM configuration
-  - `bridge.sh`               — Auto-detects port and launches `local_bridge.py`
-  - `Makefile`                — `make firmware` builds the RISC-V firmware
-  - `build_soc_cm.sh`         — **One-step script** for Steps 1–5 (IP copy, firmware build, patch)
-  - `run_efx_map.sh`          — Run synthesis (`efx_map`) with `work_syn/` auto-created
-  - `run_efx_pnr.sh`          — Run place & route (`efx_pnr`) with `work_pnr/` auto-created
-
-### Documentation
-- `BUILD.md`                  — This file (you are reading it)
-- `docs/`                     — PDF documentation bundle
+- `bridge.sh`                 — Auto-detects port and launches local_bridge.py
+- `outflow/church_soc_cm.hex` — **Pre-built bitstream** (flash immediately, no toolchain)
 
 ---
 
 ## Case 1 — Flash the pre-built bitstream (no toolchain needed)
 
-The official bitstream is already included in this ZIP at `outflow/church_ti60_f225.hex`.
-No synthesis required — just extract the ZIP and flash:
-
-### Step 1 — Extract the ZIP and open a terminal in the folder
+The official SoC+CM bitstream is at `outflow/church_soc_cm.hex`.
 
 ```bash
-cd /path/to/church_ti60_f225_project
+sudo ~/oss-cad-suite/bin/openFPGALoader \\\\
+  -b titanium_ti60_f225_jtag \\\\
+  -f outflow/church_soc_cm.hex
 ```
 
-### Step 2 — Flash the board
+Or via Efinity IDE: **Tool → Programmer** → JTAG → load `outflow/church_soc_cm.hex` → Program.
 
+On boot the board sends two serial streams:
+- **ttyUSB2** (57600 baud): `CHURCH Ti60 SoC+CM v2.0\\r\\n`  ← Sapphire SoC greeting + call-home
+- **ttyUSB3** (115200 baud): NIA trace + CALLHOME JSON packets ← Church Machine
+
+Connect to the IDE:
 ```bash
-make flash
+./bridge.sh --ide=http://localhost:5000
 ```
-
-This runs `openFPGALoader` from `~/oss-cad-suite/bin/` using the included
-`outflow/church_ti60_f225.hex`.
-
-Alternatively, via Efinity IDE: **Tool → Programmer**, select
-**Efinix USB2.0 Device**, JTAG mode, load `outflow/church_ti60_f225.hex`,
-click **Program**.
 
 ---
 
-## Case 2 — Rebuild the CM-only bitstream from this ZIP (Efinity toolchain required)
-
-### Step 1 — Extract the ZIP
-
-Unzip `church-ti60-package.zip` into a working folder.
-
-### Step 2 — Run `setup_ti60_peri.py` (required once before first build)
-
-The included `church_ti60_f225.peri.xml` is a placeholder.  Efinity's Interface
-Designer requires a file generated by its own DesignAPI — hand-crafted XML is always
-rejected.  Run `setup_ti60_peri.py` once from the extracted project folder:
-
-```bash
-cd /path/to/church-ti60-package
-
-PYTHONPATH=$HOME/efinity/2025.2/lib:$HOME/efinity/2025.2/pt/bin \\
-EFXPT_HOME=$HOME/efinity/2025.2/pt \\
-  $HOME/efinity/2025.2/bin/python3.11 setup_ti60_peri.py
-```
-
-You should see **SUCCESS — church_ti60_f225.peri.xml written**.
-
-### Step 3 — Launch Efinity IDE
-
-```bash
-QT_QPA_PLATFORM=xcb LIBGL_ALWAYS_SOFTWARE=1 ~/efinity/2025.2/bin/efinity &
-```
-
-### Step 4 — Open the project
-
-**File → Open Project → `church_ti60_f225.xml`**
-
-### Step 5 — Build the bitstream
-
-Run **Synthesis → Place & Route → Generate Bitstream**.
-
-Efinity writes the output to the `outflow/` folder:
-
-- `outflow/church_ti60_f225.hex` — Intel HEX format (use this for flashing)
-- `outflow/church_ti60_f225.bit` — raw bitstream (SPI active-serial format)
-
-### Step 6 — Flash the board
-
-Go to **Tool → Programmer**.
-Select **Efinix USB2.0 Device**, JTAG mode.
-Load `outflow/church_ti60_f225.hex` and click **Program**.
-
----
-
-## Case 3 — Rebuild the SoC+CM combined bitstream from source (Efinity + RISC-V toolchain required)
-
-This produces a combined bitstream that includes the Sapphire RISC-V SoC
-running firmware alongside the Church Machine.  On boot, the SoC sends
-`CHURCH Ti60 SoC+CM v1.1` over **ttyUSB2** (115200 baud) and the CM streams
-NIA traces over **ttyUSB3**.
-
-The full authoritative guide is **`SoC/BUILD_SOC_CM.md`** inside this ZIP.
-A condensed summary follows:
+## Case 2 — Full rebuild from source (Efinity 2026.1 + RISC-V toolchain required)
 
 ### Prerequisites
 
-- Efinity 2025.2 (installed at `~/efinity/2025.2`)
-- Efinity RISC-V IDE 2025.2 (toolchain at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin`)
-- Sapphire SoC IP (ships with Efinity)
-- Python 3 + Amaranth (to generate CM RTL)
-- `pyserial` (`pip install pyserial`)
-- `openFPGALoader` (`~/oss-cad-suite/bin/openFPGALoader`)
-
-### Quick Start — Run the all-in-one script
-
-The ZIP includes a convenience script that does Steps 1–5 in one command:
+- **Efinity 2026.1** at `~/efinity/2026.1`
+- **RISC-V toolchain** at `~/efinity/efinity-riscv-ide-2025.2/toolchain/bin`
+- **Sapphire SoC IP files** — copy from your Efinity install:
 
 ```bash
-cd /path/to/church_ti60_f225_project
-bash SoC/build_soc_cm.sh
+cp ~/efinity/2026.1/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire.v .
+cp ~/efinity/2026.1/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire_define.vh .
 ```
 
-This copies IP files, builds the firmware, patches `sapphire.v`, and verifies
-`optimize-zero-init-rom`. After it finishes, continue with Step 6 below.
+> If that path does not exist: `find ~/efinity -name "sapphire.v" 2>/dev/null`
+
+### Build
+
+```bash
+make bitstream
+```
+
+Runs 6 steps automatically:
+1. Compile RISC-V firmware
+2. Copy BRAM symbol files to `work_syn/`
+3. Embed firmware into `sapphire.v` BRAM init blocks
+4. Synthesise — `run_efx_map.sh` (strips banned params, calls `efx_map`)
+5. Place & Route — `run_efx_pnr.sh`
+6. Generate hex — `run_efx_pgm.sh`
+
+Output: `outflow/church_soc_cm.hex` and `outflow/church_soc_cm.bit`
+
+Full step-by-step guide and troubleshooting: **`BUILD_SOC_CM.md`**
+
+### Flash
+
+```bash
+sudo ~/oss-cad-suite/bin/openFPGALoader \\\\
+  -b titanium_ti60_f225_jtag \\\\
+  -f outflow/church_soc_cm.hex
+```
 
 ---
 
-### Manual Steps (for reference or debugging)
+## Resource Usage
 
-#### Step 1 — Copy the Sapphire SoC IP files
+- ~24%% of Ti60F225 logic (SoC + Church Machine core + APB3 bridge)
+- `win_mem` (16 KB) and `dmem` (64 KB) map to EBR block RAM
 
-```bash
-cp ~/efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire.v \
-   SoC/
-cp ~/efinity/2025.2/ipm/ip/efx_tsemac/fpga/Ti60F225_devkit/ip/sapphire/sapphire_define.vh \
-   SoC/
-```
+## LED Pinout (Ti60 F225 Dev Board, active-high)
 
-> If the path does not exist: `find ~/efinity -name "sapphire.v" 2>/dev/null`
+| LED | Ball | Signal           |
+|-----|------|------------------|
+| 0   | K14  | Boot in progress |
+| 1   | J15  | Running          |
+| 2   | H10  | Fault            |
 
-### Step 2 — Generate the Church Machine RTL
+## UART Pinout
 
-```bash
-python hardware/gen_verilog.py --ti60
-cp build/church_ti60_f225.v SoC/
-```
-
-### Step 3 — Build the SoC firmware
-
-```bash
-make -C SoC/firmware
-```
-
-Produces four byte-lane symbol files in `SoC/`:
-```
-EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol{0,1,2,3}.bin
-```
-
-### Step 4 — Patch `sapphire.v` with firmware (MUST re-run on every firmware change)
-
-```bash
-cd /path/to/church_ti60_f225_project
-python3 ../../scripts/patch_sapphire_init.py \
-  SoC/sapphire.v \
-  SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin \
-  SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol1.bin \
-  SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol2.bin \
-  SoC/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol3.bin
-```
-
-Expected output:
-```
-symbol0: 131072 entries, NNN non-zero, [0]=0xXX
-  -> replaced $readmemb          ← first run
-  OR
-  -> updated N inline block(s)   ← subsequent runs
-...
-sapphire.v OK (+N chars, M total)
-```
-
-### Step 5 — Ensure `optimize-zero-init-rom` is off
-
-```bash
-grep "optimize-zero-init-rom" SoC/church_soc_cm.xml
-# Must show value="0"
-```
-
-If it shows `value="1"`:
-```bash
-sed -i 's/optimize-zero-init-rom" value="1"/optimize-zero-init-rom" value="0"/' \
-  SoC/church_soc_cm.xml
-```
-
-### Step 6 — Synthesise
-
-```bash
-cd /path/to/church_ti60_f225_project
-bash SoC/run_efx_map.sh
-```
-
-This runs `~/efinity/2025.2/bin/efx_map --project-xml SoC/church_soc_cm.xml` and creates `work_syn/` automatically.
-
-Verify all 4 BRAM lanes have non-zero `INIT_0` (firmware confirmed embedded):
-```bash
-for sym in 0 1 2 3; do
-  LINENUM=$(grep -n "EFX_RAM10" SoC/outflow/church_soc_cm.map.v \\
-    | grep "ram_symbol${sym}__D\\$g1" | head -1 | cut -d: -f1)
-  echo "symbol${sym}: $(sed -n "${LINENUM},$((LINENUM+3))p" \\
-    SoC/outflow/church_soc_cm.map.v | grep INIT_0)"
-done
-# All four must show non-zero hex strings
-```
-
-### Step 7 — Place & Route
-
-```bash
-cd /path/to/church_ti60_f225_project
-bash SoC/run_efx_pnr.sh
-```
-
-This runs `~/efinity/2025.2/bin/efx_pnr SoC/church_soc_cm.xml` (from the `SoC/` directory) and creates `work_pnr/` automatically.
-
-### Step 8 — Generate the SPI flash hex (`efx_pgm`)
-
-```bash
-cd SoC
-~/efinity/2025.2/bin/efx_pgm church_soc_cm.xml 2>&1 | tail -5
-ls -lh outflow/church_soc_cm.hex outflow/church_soc_cm.bit
-# Timestamps must be NEWER than the P&R run above
-```
-
-> **Note:** P&R does **not** generate the hex; `efx_pgm` does. The `church_soc_cm.xml` already references `church_soc_cm.peri.xml` for pin constraints — open the Efinity GUI once to generate the LPF file if needed.
-
-### Step 9 — Flash and test
-
-```bash
-cd /path/to/church_ti60_f225_project
-sudo ~/oss-cad-suite/bin/openFPGALoader \
-  -b titanium_ti60_f225_jtag \
-  -f SoC/outflow/church_soc_cm.hex
-
-sleep 5 && python3 scripts/test_ti60_uart.py \
-  --port=/dev/ttyUSB2 --timeout=30 --verbose
-```
-
-If the SoC boots correctly, the test script will show:
-```
-Connected to /dev/ttyUSB2 @ 115200 baud
-Waiting for greeting...
-← CHURCH Ti60 SoC+CM v1.1
-Greeting received!
-```
-
-### Step 10 — Connect the board to the IDE
-
-```bash
-./SoC/bridge.sh --ide=http://localhost:5000
-```
-
-The Ti60 will appear in the Dashboard device list as **Ti60F225**.
-
----
-
-## Resource Usage (CM-only synthesis result)
-
-- **10,269 LUTs + 5,686 FFs + 970 adders** → **14,323 XLRs placed** (~24% of Ti60)
-- `win_mem` (16 KB DEFLATE history window) → EBR block RAM ✓
-- `dmem` (64 KB data memory) → EBR block RAM ✓
-- Routing converged in 32 iterations
-
-## LED Pinout (active-high, Ti60 F225 Dev Board)
-
-| LED | Ball | Signal            |
-|-----|------|-------------------|
-| 0   | K14  | Boot in progress  |
-| 1   | J15  | Running           |
-| 2   | H10  | Fault             |
-| 3   | J14  | Boot complete     |
-
-## Device
-
-- **FPGA**: Efinix Titanium Ti60F225 (60,800 LEs, F225 FBGA)
-- **Clock**: 25 MHz crystal at ball B2 → PLL_TL0 (M=4 N=1 O=2) → 50 MHz GCLK
-- **UART**: 115200 baud — external USB-UART adapter on balls H14 (TX) and M14 (RX)
-            (The FT4232H on the Ti60 devkit is JTAG-only; no built-in USB-UART path)
+| Port    | Baud   | Content                                 |
+|---------|--------|-----------------------------------------|
+| ttyUSB2 | 57600  | Sapphire SoC greeting + CALLHOME JSON   |
+| ttyUSB3 | 115200 | Church Machine NIA trace / fault events |
 """
+
 
 
 def _fpga_paths(board):
@@ -3744,7 +3535,7 @@ def _fpga_paths(board):
 
 
 def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
-    """Zip up already-built FPGA artifacts and return (BytesIO, zip_name, warnings)."""
+    """Zip up FPGA artifacts and return (BytesIO, zip_name, warnings)."""
     hw_dir = os.path.join(BASE_DIR, "hardware")
     buf = io.BytesIO()
     warnings = []
@@ -3760,39 +3551,24 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
             if os.path.isfile(bridge_path):
                 zf.write(bridge_path, "local_bridge.py")
             else:
-                msg = "local_bridge.py not found — bridge.sh will not work until this file is present on the server"
+                msg = "local_bridge.py not found"
                 logging.warning("FPGA zip: %s", msg)
                 warnings.append(msg)
             zf.writestr("BUILD.md", build_md)
         return buf, zip_name, warnings
     if is_ti60:
-        with open(paths["project"], 'r') as f:
-            project_xml = f.read()
-        # Fix path so all files sit in the same flat directory
-        project_xml = project_xml.replace(
-            '../build/church_ti60_f225.v', 'church_ti60_f225.v'
-        )
-        # Inject peri.xml reference so Efinity can find the periphery configuration.
-        # Use regex so this works whether the source XML has name="" or a dev path.
-        project_xml = re.sub(
-            r'<efx:inter_file name="[^"]*"/>',
-            '<efx:inter_file name="church_ti60_f225.peri.xml"/>',
-            project_xml
-        )
-        # Strip synthesis params that cause EFX-0002 in Efinity 2026.1.
-        # Efinity GUI re-injects these on every save; remove them here so the
-        # downloaded XML works whether the user opens it in the GUI or runs
-        # efx_map directly.  run_efx_map.sh does the same via sed for the
-        # soc_combined path.
-        project_xml = re.sub(
+        _SKIP_DIRS = {
+            'outflow', 'work_syn', 'work_pnr', 'work_dbg',
+            'good-builds', '__pycache__',
+        }
+        _BANNED_EFX = re.compile(
             r'[ \t]*<efx:param name="(?:'
             r'infer_clk_enable|infer_set_reset|calc_mcw|split_input_buf|'
             r'no_fanout_override|get_names_method|logic_opting|pack_lut_into_ram|'
             r'cpe_ins_register|use_cpe_for_const_0|use_cpe_for_const_1|fanout_limit'
-            r')"[^>]*/>\n?',
-            '',
-            project_xml
+            r')"[^>]*/>' '\n?'
         )
+        soc_combined = os.path.join(hw_dir, "soc_combined")
         docs_dir = os.path.join(BASE_DIR, "docs")
         _doc_pdfs = [
             ("introducing-cloomc.pdf",  "docs/Introducing CLOOMC.pdf"),
@@ -3801,47 +3577,44 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
             ("instruction-set.pdf",     "docs/Instruction Set Reference.pdf"),
         ]
         with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-            zf.write(paths["verilog"], "church_ti60_f225.v")
-            zf.writestr("church_ti60_f225.xml",      project_xml)
-            zf.write(paths["sdc"],     "church_ti60_f225.sdc")
-            zf.write(paths["peri"],    "church_ti60_f225.peri.xml")
-            zf.write(paths["setup"],   "setup_ti60_peri.py")
-            makefile_ti60 = os.path.join(hw_dir, "Makefile.ti60")
-            if os.path.isfile(makefile_ti60):
-                zf.write(makefile_ti60, "Makefile")
-            zf.writestr("BUILD.md", build_md)
-            # SoC+CM combined source (full rebuild path)
-            soc_combined = os.path.join(hw_dir, "soc_combined")
             if os.path.isdir(soc_combined):
-                for root, _dirs, files in os.walk(soc_combined):
+                for root, dirs, files in os.walk(soc_combined):
+                    dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
                     for fn in files:
+                        if fn.endswith('.pyc'):
+                            continue
                         full = os.path.join(root, fn)
-                        arc = os.path.join("SoC", os.path.relpath(full, soc_combined))
-                        zf.write(full, arc)
-            # Pre-built bitstream — quick flash without synthesis
+                        arc  = os.path.relpath(full, soc_combined)
+                        if arc == 'church_soc_cm.xml':
+                            with open(full, 'r') as xf:
+                                xml_content = xf.read()
+                            xml_content = _BANNED_EFX.sub('', xml_content)
+                            zf.writestr(arc, xml_content)
+                        elif arc == 'Makefile':
+                            with open(full, 'r') as mf:
+                                mk = mf.read()
+                            mk = mk.replace(
+                                'SCRIPTS_DIR := ../../scripts',
+                                'SCRIPTS_DIR := scripts'
+                            )
+                            zf.writestr(arc, mk)
+                        else:
+                            zf.write(full, arc)
+            patch_script = os.path.join(BASE_DIR, "scripts", "patch_sapphire_init.py")
+            if os.path.isfile(patch_script):
+                zf.write(patch_script, "scripts/patch_sapphire_init.py")
             bitstreams_dir = os.path.join(BASE_DIR, "bitstreams")
             hex_src = os.path.join(bitstreams_dir, "church_ti60_f225.hex")
             bit_src = os.path.join(bitstreams_dir, "church_ti60_f225.bit")
             if os.path.isfile(hex_src):
-                zf.write(hex_src, "outflow/church_ti60_f225.hex")
+                zf.write(hex_src, "outflow/church_soc_cm.hex")
             if os.path.isfile(bit_src):
-                zf.write(bit_src, "outflow/church_ti60_f225.bit")
-            # Serial bridge script (needed to connect the board to the IDE)
-            bridge_path = os.path.join(BASE_DIR, "server", "local_bridge.py")
-            if os.path.isfile(bridge_path):
-                zf.write(bridge_path, "local_bridge.py")
-            else:
-                msg = "local_bridge.py not found — bridge.sh will not work until this file is present on the server"
-                logging.warning("FPGA zip: %s", msg)
-                warnings.append(msg)
-            # Patch script (needed for SoC+CM firmware embedding)
-            patch_script = os.path.join(BASE_DIR, "scripts", "patch_sapphire_init.py")
-            if os.path.isfile(patch_script):
-                zf.write(patch_script, "scripts/patch_sapphire_init.py")
+                zf.write(bit_src, "outflow/church_soc_cm.bit")
+            zf.writestr("BUILD.md", build_md)
             for src_name, arc_name in _doc_pdfs:
-                src = os.path.join(docs_dir, src_name)
-                if os.path.isfile(src):
-                    zf.write(src, arc_name)
+                src_path = os.path.join(docs_dir, src_name)
+                if os.path.isfile(src_path):
+                    zf.write(src_path, arc_name)
     else:
         json_path = paths["json"]
         has_json = os.path.isfile(json_path)
@@ -3871,7 +3644,7 @@ def _make_fpga_zip(board, is_ti60, paths, zip_name, build_md):
             bridge_info.external_attr = 0o755 << 16
             zf.writestr(bridge_info, BRIDGE_SH.lstrip('\n'))
             if not os.path.isfile(bridge_path):
-                msg = "local_bridge.py not found — bridge.sh will not work until this file is present on the server"
+                msg = "local_bridge.py not found"
                 logging.warning("FPGA zip: %s", msg)
                 warnings.append(msg)
             else:
@@ -3945,8 +3718,13 @@ def download_fpga_zip():
     board = request.args.get("board", "tang-nano-20k-iot").strip().lower()
     is_ti60, paths, zip_name, build_md, _, _ = _fpga_paths(board)
 
-    if not os.path.isfile(paths["verilog"]):
-        return jsonify({"error": "No build found for this board. Run Build first."}), 404
+    if is_ti60:
+        soc_dir = os.path.join(BASE_DIR, "hardware", "soc_combined")
+        if not os.path.isdir(soc_dir):
+            return jsonify({"error": "SoC combined source directory not found."}), 404
+    else:
+        if not os.path.isfile(paths["verilog"]):
+            return jsonify({"error": "No build found for this board. Run Build first."}), 404
 
     try:
         buf, zip_name, zip_warnings = _make_fpga_zip(board, is_ti60, paths, zip_name, build_md)

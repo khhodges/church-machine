@@ -1,9 +1,9 @@
 .PHONY: check-util check-util-ci patch_sapphire firmware test-key-derive test-sha32 \
-        bitstream bitstream-flash
+        bitstream bitstream-flash flash
 
 SCRIPTS_DIR := $(shell git rev-parse --show-toplevel 2>/dev/null)/scripts
 ifeq ($(SCRIPTS_DIR),/scripts)
-SCRIPTS_DIR := ../../scripts
+SCRIPTS_DIR := scripts
 endif
 
 SYM_PREFIX := EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol
@@ -70,16 +70,14 @@ bitstream:
 	@echo ""
 	@echo "========================================"
 	@echo "make bitstream COMPLETE"
-	@echo "Flash with:  make bitstream-flash"
+	@echo "Flash with:  make flash"
 	@echo "========================================"
 
 # ---------------------------------------------------------------------------
-# bitstream-flash — flash the generated hex to the Ti60 via JTAG.
+# bitstream-flash — rebuild the bitstream then flash to Ti60 via JTAG.
 #
 # Depends on bitstream so a plain 'make bitstream-flash' always rebuilds first.
-# PROJECT defaults to church_soc_cm.xml in this directory (soc_combined).
-# Override on the command line:
-#   make bitstream-flash PROJECT=/path/to/other/church_soc_cm.xml
+# To flash the pre-built hex without rebuilding, use:  make flash
 # ---------------------------------------------------------------------------
 SCRIPT_DIR := $(shell cd "$(dir $(abspath $(lastword $(MAKEFILE_LIST))))" && pwd)
 PROJECT    ?= $(SCRIPT_DIR)/church_soc_cm.xml
@@ -89,6 +87,17 @@ HEX        := $(dir $(PROJECT))outflow/$(CIRCUIT).hex
 bitstream-flash: bitstream
 	@echo "==> Flashing $(HEX) to Ti60F225 ..."
 	sudo openFPGALoader -b titanium_ti60_f225_jtag -f "$(HEX)"
+	@echo "==> Flash complete."
+
+# ---------------------------------------------------------------------------
+# flash — flash the pre-built outflow/church_soc_cm.hex without rebuilding.
+#
+# Use this after downloading the ZIP package (which includes a pre-built hex)
+# or after running 'make bitstream' yourself.
+# ---------------------------------------------------------------------------
+flash:
+	@echo "==> Flashing pre-built outflow/church_soc_cm.hex to Ti60F225 ..."
+	sudo openFPGALoader -b titanium_ti60_f225_jtag -f outflow/church_soc_cm.hex
 	@echo "==> Flash complete."
 
 # ---------------------------------------------------------------------------
