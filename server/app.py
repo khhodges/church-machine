@@ -9108,30 +9108,40 @@ def internal_download_verilog():
 
 @app.route("/api/compile", methods=["POST"])
 def api_compile():
-    """CLOOMC++ Compiler API — compile source text to a Lump binary.
+    """CLOOMC++ Compiler API — compile source text to a Lump binary (ECO-002).
 
     POST /api/compile
     Content-Type: application/json
 
-    Request body:
+    Request body (source and language are required; all other fields optional;
+    unknown fields are silently ignored):
       {
-        "source":           "<raw .cloomc source text>",   // required
+        "source":           "<raw .cloomc source text>",
         "language":         "english" | "javascript" | "haskell" |
-                            "symbolic" | "lambda" | "assembly",  // optional — auto-detected
-        "abstraction_name": "MyAbstraction",               // optional override
-        "namespace_hint":   {                              // optional
+                            "symbolic" | "lambda" | "assembly",
+        "abstraction_name": "MyAbstraction",   // optional override
+        "namespace_hint":   {                  // optional
           "gt_type":          "inform",
           "allocation_words": 64,
           "clist_slots":      4
         }
       }
 
-    Response (HTTP 200 always — check the `ok` field):
-      Success:
-        { "ok": true,  "language": "assembly",
-          "words": [uint32, ...], "lump_binary": "<base64>", "warnings": [] }
-      Failure:
-        { "ok": false, "language": "assembly", "error": "<description>" }
+    Response — success (HTTP 200):
+      {
+        "ok":          true,
+        "language":    "assembly",
+        "words":       [ ... ],      // raw uint32 lump word array
+        "lump_binary": "...",        // base64-encoded binary (same data as words)
+        "warnings":    [ ... ]       // soft warnings; [] when none
+      }
+
+    Response — failure (HTTP 200, check ok field):
+      {
+        "ok":       false,
+        "language": "assembly",
+        "error":    "human-readable compile error"
+      }
 
     Auth: if the COMPILE_API_TOKEN environment variable / secret is set,
     callers must supply it via:
@@ -9155,11 +9165,11 @@ def api_compile():
         return jsonify({'error': 'Request body must be application/json'}), 400
 
     source   = body.get('source',   '')
-    language = body.get('language', '') or ''
+    language = body.get('language', '')
 
     if not isinstance(source, str) or not source.strip():
         return jsonify({'error': '`source` is required and must be a non-empty string'}), 400
-    if language and language not in VALID_LANGUAGES:
+    if language not in VALID_LANGUAGES:
         return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
 
     result = run_compile(body)

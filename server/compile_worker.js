@@ -12,30 +12,32 @@
  * Request fields
  * --------------
  *   source           string   required  Raw source text
- *   language         string   optional  One of the 6 canonical values;
- *                                       auto-detected by the compiler when absent
- *   abstraction_name string   optional  Overrides the name detected from source
+ *   language         string   required  One of: english | javascript | haskell |
+ *                                       symbolic | lambda | assembly
+ *   abstraction_name string   optional  Overrides name detected from source
  *   namespace_hint   object   optional  {gt_type, allocation_words, clist_slots}
+ *   (any extra fields are silently ignored)
  *
- * Response (success)
- * ------------------
+ * Response fields — success
+ * -------------------------
  *   ok           true
- *   language     string    detected or supplied language
- *   words        number[]  uint32 array — LUMP binary (big-endian words)
- *   lump_binary  string    base64-encoded LUMP binary (same data as words)
- *   warnings     string[]  soft / lazy-resolve messages; empty array when none
+ *   language     string    detected/normalised language name
+ *   words        number[]  raw uint32 lump word array
+ *   lump_binary  string    base64 of the same binary (for clients that prefer bytes)
+ *   warnings     object[]  present when there are soft warnings (may be [])
  *
- * Response (failure)
- * ------------------
+ * Response fields — failure
+ * -------------------------
  *   ok       false
- *   language string    detected or supplied language; '' when detection is impossible
- *   error    string    human-readable error description
+ *   language string   (echo of request language, or "")
+ *   error    string   human-readable compile error
  */
 
 const path = require('path');
 
 // ChurchAssembler must be a global before requiring the compiler so that
 // compileAssembly()'s `typeof ChurchAssembler !== 'undefined'` guard passes.
+// (The browser loads it as a <script> global; Node needs this explicit shim.)
 global.ChurchAssembler = require(path.join(__dirname, '..', 'simulator', 'assembler.js'));
 
 const CLOOMCCompiler = require(path.join(__dirname, '..', 'simulator', 'cloomc_compiler.js'));
@@ -71,6 +73,10 @@ function wordsToBase64(words) {
     return buf.toString('base64');
 }
 
+function failResp(language, message) {
+    return { ok: false, language: language || '', error: message };
+}
+
 function run(req) {
     const source          = req.source          || '';
     const language        = req.language         || '';
@@ -88,45 +94,49 @@ function run(req) {
             result = compiler.compile(source, []);
         }
     } catch (ex) {
-        const msg = `Internal compiler error: ${ex.message}`;
-        return { ok: false, language: language || '', error: msg };
+        return failResp(language, `Internal compiler error: ${ex.message}`);
     }
 
-    const detectedLang = result.language || language || 'assembly';
-    const allErrors    = [...(result.errors   || [])];
-    const allWarnings  = [...(result.warnings || [])];
+    const allErrors   = result.errors   || [];
+    const allWarnings = result.warnings  || [];
 
     const hardErrors   = [];
-    const warnMessages = [];
+    const softWarnings = [];
 
     for (const err of allErrors) {
         if (isUnresolvedError(err)) {
-            warnMessages.push(err.message);
+            softWarnings.push({
+                line:        err.line    || null,
+                message:     err.message,
+                severity:    'warning',
+                resolve_via: 'lazy_resolve',
+            });
         } else {
             hardErrors.push(err);
         }
     }
     for (const w of allWarnings) {
-        warnMessages.push(w.message != null ? w.message : String(w));
+        softWarnings.push({ line: w.line || null, message: w.message, severity: 'warning' });
     }
 
     if (hardErrors.length > 0) {
-        const msg = hardErrors
-            .map(e => `Line ${e.line != null ? e.line : '?'}: ${e.message}`)
-            .join('; ');
-        return { ok: false, language: detectedLang, error: msg };
+        const first = hardErrors[0].message;
+        return failResp(language, first || 'Compile failed');
     }
 
     const { words } = buildLump(result, {
         allocationWords: namespaceHint.allocation_words,
     });
 
+    const detectedLang = result.language || language || 'assembly';
+    const lump_binary  = wordsToBase64(words);
+
     return {
         ok:          true,
         language:    detectedLang,
-        words:       Array.from(words),
-        lump_binary: wordsToBase64(words),
-        warnings:    warnMessages,
+        words:       Array.from(words.map(w => w >>> 0)),
+        lump_binary,
+        warnings:    softWarnings,
     };
 }
 
@@ -138,11 +148,9 @@ process.stdin.on('end', () => {
     try {
         req = JSON.parse(inputData);
     } catch (ex) {
-        process.stdout.write(JSON.stringify({
-            ok:       false,
-            language: '',
-            error:    'Invalid JSON request',
-        }) + '\n');
+        process.stdout.write(JSON.stringify(
+            failResp('', 'Invalid JSON request')
+        ) + '\n');
         process.exit(0);
     }
     const resp = run(req);

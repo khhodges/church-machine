@@ -1,7 +1,7 @@
 """
 tests/server/test_compile_api.py
 
-Test suite for the CLOOMC++ Compiler API:
+Test suite for the CLOOMC++ Compiler API (ECO-002 spec):
   POST /api/compile
 
 Covers (ECO-002 shape: ok bool, flat words/lump_binary, 6 languages, no target):
@@ -10,6 +10,7 @@ Covers (ECO-002 shape: ok bool, flat words/lump_binary, 6 languages, no target):
   CA-3  Unresolved symbols (lazy-resolve)    → ok: true (xfail if behaviour changes)
   CA-5  Missing / invalid request fields     → HTTP 400
   CA-6  Invalid language value               → HTTP 400
+  CA-6b Unknown extra fields silently ignored
   CA-8  Auth token enforcement               → HTTP 401
   CA-9  compile_api.run_compile unit tests   → correct dict shape
   CA-10 compile_worker.js direct invocation  → correct dict shape
@@ -84,7 +85,6 @@ def test_ca1_success_assembly(client):
     assert isinstance(data.get('words'), list)
     assert len(data['words']) >= 64
     assert isinstance(data.get('lump_binary'), str)
-    # lump_binary must be valid base64 and decode to words×4 bytes
     decoded = base64.b64decode(data['lump_binary'])
     assert len(decoded) == len(data['words']) * 4
     assert isinstance(data.get('warnings'), list)
@@ -113,8 +113,8 @@ def test_ca2_compile_failed_syntax_error(client):
 # CA-3: Unresolved symbols (lazy-resolve) → ok: true with non-empty warnings
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=False, reason="unresolved-symbol behaviour depends on assembler version")
-def test_ca3_unresolved_lazy_resolve(client):
+@pytest.mark.xfail(strict=False, reason="unresolved-symbol behavior not yet confirmed")
+def test_ca3_unresolved_symbols(client):
     resp = _post(client, {
         'source':   _ASM_UNRESOLVED,
         'language': 'assembly',
@@ -126,13 +126,17 @@ def test_ca3_unresolved_lazy_resolve(client):
 
 
 # ---------------------------------------------------------------------------
-# CA-5: Missing / invalid required fields → HTTP 400
+# CA-5: Missing / empty required fields → HTTP 400
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize('body, expected_fragment', [
     (
         {'language': 'assembly'},
         'source',
+    ),
+    (
+        {'source': _ASM_OK},
+        'language',
     ),
     (
         {'source': '', 'language': 'assembly'},
@@ -158,6 +162,22 @@ def test_ca6_invalid_language(client):
     assert resp.status_code == 400
     data = resp.get_json()
     assert 'language' in data.get('error', '')
+
+
+# ---------------------------------------------------------------------------
+# CA-6b: Unknown extra fields are silently ignored (target, options)
+# ---------------------------------------------------------------------------
+
+def test_ca6b_unknown_fields_ignored(client):
+    resp = _post(client, {
+        'source':   _ASM_OK,
+        'language': 'assembly',
+        'target':   'simulator',
+        'options':  {'strict_mode': True},
+    })
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert isinstance(data.get('ok'), bool), "response must have ok bool field"
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +234,7 @@ def test_ca9_run_compile_bad_json():
     with patch('server.compile_api.subprocess.run', return_value=mock_proc):
         result = run_compile({'source': _ASM_OK, 'language': 'assembly'})
     assert result.get('ok') is False
+    assert result.get('error')
 
 
 def test_ca9_run_compile_empty_stdout():
@@ -224,6 +245,7 @@ def test_ca9_run_compile_empty_stdout():
     with patch('server.compile_api.subprocess.run', return_value=mock_proc):
         result = run_compile({'source': _ASM_OK, 'language': 'assembly'})
     assert result.get('ok') is False
+    assert result.get('error')
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +286,7 @@ def test_ca10_worker_header_word():
         'language': 'assembly',
     })
     assert result.get('ok') is True, result
-    header = result['words'][0]
+    header = result['words'][0] & 0xFFFFFFFF
     cw = (header >> 10) & 0x1FFF
     cc = header & 0xFF
     assert cw >= 0

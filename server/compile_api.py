@@ -35,7 +35,7 @@ def run_compile(payload: dict) -> dict:
     ----------
     payload:
         Dict matching the compile request schema (source, language, …).
-        ``language`` is optional; the compiler auto-detects when absent.
+        Unknown fields are passed through to the worker and silently ignored.
 
     Returns
     -------
@@ -44,6 +44,7 @@ def run_compile(payload: dict) -> dict:
         Failure: ``{ok: False, language, error}``.
         On internal subprocess failures the ``language`` key is ``''``.
     """
+    language = payload.get('language', '')
     try:
         input_json = json.dumps(payload).encode('utf-8')
         proc = subprocess.run(
@@ -56,22 +57,22 @@ def run_compile(payload: dict) -> dict:
         if not stdout:
             stderr = proc.stderr.decode('utf-8', errors='replace').strip()
             log.error('compile_worker produced no stdout. stderr: %s', stderr)
-            return _fail(f'Compiler returned no output. stderr: {stderr[:500]}')
+            return _fail(language, f'Compiler returned no output. stderr: {stderr[:500]}')
         return json.loads(stdout)
     except subprocess.TimeoutExpired:
         log.warning('compile_worker timed out after %ds', _COMPILE_TIMEOUT)
-        return _fail(f'Compile timed out after {_COMPILE_TIMEOUT}s — reduce source complexity or try again')
+        return _fail(language, f'Compile timed out after {_COMPILE_TIMEOUT}s — reduce source complexity or try again')
     except json.JSONDecodeError as exc:
         log.error('compile_worker output was not valid JSON: %s', exc)
-        return _fail(f'Compiler output was not valid JSON: {exc}')
+        return _fail(language, f'Compiler output was not valid JSON: {exc}')
     except Exception as exc:
         log.error('compile_worker unexpected error: %s', exc, exc_info=True)
-        return _fail(str(exc))
+        return _fail(language, str(exc))
 
 
-def _fail(message: str) -> dict:
+def _fail(language: str, message: str) -> dict:
     return {
         'ok':       False,
-        'language': '',
+        'language': language or '',
         'error':    message,
     }

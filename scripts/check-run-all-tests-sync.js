@@ -55,6 +55,7 @@ const DEFAULT_INFRASTRUCTURE_WORKFLOWS = [
 const DEFAULT_SCRIPT_ONLY_SUITES = [
     'sha32-vectors',
     'check-sha32-collisions',
+    'compile-api-tests',
 ];
 
 const configPath = path.join(__dirname, 'test-workflow-config.json');
