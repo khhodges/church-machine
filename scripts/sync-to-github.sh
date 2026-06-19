@@ -155,18 +155,17 @@ _push_with_lfs() {
         git remote add "$remote_name" "$remote_url"
     fi
 
-    echo "sync-to-github: uploading LFS objects to ${repo} (must happen before code push) ..."
-    local lfs_output lfs_exit
-    lfs_output=$(GIT_TRACE=0 git lfs push "$remote_name" "HEAD" 2>&1)
-    lfs_exit=$?
-    echo "$lfs_output"
+    echo "sync-to-github: uploading LFS objects to ${repo} (this may take several minutes for large files) ..."
+    # Stream progress live — do NOT buffer in a subshell; project.zip is ~1.3 GB.
+    GIT_TRACE=0 git lfs push "$remote_name" "HEAD"
+    local lfs_exit=$?
 
     if [ "$lfs_exit" -ne 0 ]; then
         echo "sync-to-github: LFS upload to ${repo} FAILED (exit ${lfs_exit})."
         return "$lfs_exit"
     fi
 
-    echo "sync-to-github: pushing ${BRANCH} (${HEAD_SHA}) → github.com/${repo} ..."
+    echo "sync-to-github: LFS upload done — now pushing ${BRANCH} (${HEAD_SHA}) → github.com/${repo} ..."
     local push_output push_exit
     push_output=$(GIT_TRACE=0 \
         git push "$remote_name" "HEAD:refs/heads/${BRANCH}" --force 2>&1)
