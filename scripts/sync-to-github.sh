@@ -197,7 +197,8 @@ CM_EXIT=0
 _require_pat_scope "repo" "sync-to-github"
 
 if [ "$WITH_LFS" -eq 1 ]; then
-    _require_pat_scope "lfs" "sync-to-github"
+    # 'lfs' is not a separate classic-PAT scope — LFS access is covered by 'repo'.
+    # The repo scope check above is sufficient.
 
     _push_with_lfs "$REMOTE_SIDE" "$REPO_SIDE" "$SIDE_URL"
     SIDE_EXIT=$?

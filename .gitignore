@@ -31,3 +31,6 @@ server/github-sync-status.json
 
 # Agent screenshot attachments — LFS-tracked by Replit internally; exclude from pushes
 attached_assets/
+
+# FPGA build artifact — large generated ZIP; tracked by LFS but too big to push via Replit
+project.zip
