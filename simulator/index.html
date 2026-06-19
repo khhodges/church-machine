@@ -1295,17 +1295,12 @@ EFXPT_HOME=$HOME/efinity/2025.2/pt \
                         </div>
                         <div class="sw-connect-2btn">
                             <button class="sw-btn sw-btn-connect-direct" onclick="StartupWizard.clickDirect()">
-                                <span class="sw-c2b-icon">🖥️</span>
-                                <span class="sw-c2b-main">Connect</span>
-                                <span class="sw-c2b-sub">Windows · Mac · Linux</span>
-                            </button>
-                            <button class="sw-btn sw-btn-connect-bridge" onclick="StartupWizard.clickBridge()">
-                                <span class="sw-c2b-icon">🔵</span>
-                                <span class="sw-c2b-main">Via Bridge</span>
-                                <span class="sw-c2b-sub">Chromebook only</span>
+                                <span class="sw-c2b-icon">🔌</span>
+                                <span class="sw-c2b-main">Connect Board</span>
+                                <span class="sw-c2b-sub">Chrome or Edge · USB WebSerial</span>
                             </button>
                         </div>
-                        <div class="sw-choice-footer">Both need Chrome or Edge. Not sure which? Try Connect first — if the board doesn't appear, use Via Bridge.</div>
+                        <div class="sw-choice-footer">Needs Chrome or Edge 89+. On ChromeOS: Settings → Linux → USB devices → FT4232H → turn OFF before connecting.</div>
                         <div class="sw-auto-note">This step advances automatically when the board is detected.</div>
                         <div class="sw-trouble-panel" id="swTrouble3">
                             <div class="sw-trouble-title">⚠ Common problems — Connect</div>
@@ -1505,26 +1500,6 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                     </div>
                     <div id="ti60NiaStreamBody" class="ti60-nia-stream-body"></div>
                 </div>
-                <div id="ti60BridgeSetupPanel" class="ti60-bridge-setup-panel" style="display:none;">
-                    <div class="ti60-bridge-setup-header">
-                        <span class="ti60-bridge-setup-title">🔧 Bridge not running — setup guide</span>
-                        <button class="ti60-bridge-setup-close" onclick="Ti60Connect.hideBridgeSetup()" title="Dismiss">✕</button>
-                    </div>
-                    <ol class="ti60-bridge-setup-steps">
-                        <li>
-                            <strong>Download the bridge script</strong> — <a href="/local_bridge.py" download="local_bridge.py" style="color:#daa520;">local_bridge.py &#x2193;</a> — then run it in your Linux terminal (<code>--ide=</code> is required for UART traffic to appear in the IDE):
-                            <pre class="ti60-help-pre" id="ti60SetupBridgeCmd">python3 local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
-                        </li>
-                        <li>
-                            <strong>Accept the self-signed cert</strong> — open this URL in Chrome and click <em>Advanced&nbsp;→&nbsp;Proceed</em>:
-                            <pre class="ti60-help-pre"><a id="ti60SetupCertLink" href="https://penguin.linux.test:8766/status" target="_blank" style="color:#a0d4a0;">https://penguin.linux.test:8766/status</a></pre>
-                        </li>
-                        <li class="ti60-bridge-setup-retry-row">
-                            <button class="ti60-bridge-retry-btn" onclick="Ti60Connect.retryBridge()">🔁 Retry</button>
-                            <span>Re-runs the bridge test when you're ready.</span>
-                        </li>
-                    </ol>
-                </div>
                 <div class="ti60-steps">
                     <div class="ti60-step ti60-step-pending" id="ti60Step-uart">
                         <div class="ti60-step-icon">&#x26A1;</div>
@@ -1576,31 +1551,6 @@ CALLHOME:{"board":"ti60-f225","uid":"AABBCCDD","nia":0,"boot_ok":1,"fault":0,"fa
                                 <li><strong>Linux desktop:</strong> run <code>sudo chmod a+rw /dev/ttyUSB2</code> then refresh.</li>
                                 <li>Try a different USB cable or port, then power-cycle the board and refresh.</li>
                             </ul>
-                        </div>
-                        <div class="ti60-adv-bridge-section">
-                            <p class="ti60-adv-hint-heading">&#x1F309; Via Bridge (Chromebook Crostini / headless)</p>
-                            <p class="ti60-adv-bridge-desc">If WebSerial still can&apos;t reach the board, run the bridge in your Linux terminal and connect via it instead:</p>
-                            <div class="ti60-btn-row ti60-adv-btn-row">
-                                <button id="ti60BridgeBtn" class="ti60-bridge-btn" onclick="Ti60Connect.connectViaBridge()">&#x1F309; Via Bridge</button>
-                                <button id="ti60TestBridgeBtn" class="ti60-test-bridge-btn" onclick="Ti60Connect.testBridge()" title="Check if the bridge is reachable and the cert is accepted">&#x1F50D; Test Bridge</button>
-                            </div>
-                            <div class="ti60-bridge-cmd-block">
-                                <div class="ti60-bridge-cmd-header">
-                                    <span class="ti60-bridge-cmd-label">Bridge command</span>
-                                    <button class="ti60-bridge-cmd-copy" onclick="Ti60Connect.copyBridgeCmd()" title="Copy to clipboard">&#x1F4CB; Copy</button>
-                                </div>
-                                <pre class="ti60-bridge-cmd-pre" id="ti60BridgeCmd">cd ~/church_project/SoC/church-machine
-python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.org --insecure</pre>
-                            </div>
-                            <div class="ti60-bridge-url-row">
-                                <label class="ti60-bridge-url-label">Bridge URL</label>
-                                <input id="ti60BridgeUrl" class="ti60-bridge-url-input" type="text"
-                                    value="https://penguin.linux.test:8766"
-                                    placeholder="https://penguin.linux.test:8766"
-                                    title="Edit if your bridge runs on a different port or host" />
-                                <button class="ti60-forget-bridge-btn" onclick="Ti60Connect.resetBridgeCert()" title="Clears the remembered cert-accepted flag so the setup guide reappears on the next connection attempt">&#x1F504; Re-run setup</button>
-                            </div>
-                            <p class="ti60-adv-bridge-note">The <code>--ide=</code> flag tells the bridge where to forward UART packets. The <code>--insecure</code> flag is needed on ChromeOS because the Linux container can&apos;t verify external certificates. First time only: open <code>https://penguin.linux.test:8766/status</code> in Chrome &rarr; <em>Advanced &rarr; Proceed</em>.</p>
                         </div>
                     </div>
                 </details>
@@ -2019,7 +1969,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
             </div>
             <div id="devPaneDevices">
                 <div class="dev-grid" id="devGrid">
-                    <div class="dev-empty">No devices registered. Connect a board via the local bridge to see it here.</div>
+                    <div class="dev-empty">No devices registered. Connect a board via WebSerial to see it here.</div>
                 </div>
             </div>
             <div id="devPaneLaunch" style="display:none;">
@@ -2460,8 +2410,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="english_string_tutorial.js"></script>
     <script async src="english_contact_tutorial.js"></script>
     <script async src="builder.js"></script>
-    <script async src="app-ti60-connect.js?v=20260618a"></script>
-    <script defer src="app-startup-wizard.js?v=20260617b"></script>
+    <script async src="app-ti60-connect.js?v=20260619a"></script>
+    <script defer src="app-startup-wizard.js?v=20260619a"></script>
     <script src="app-shell.js?v=20260617a"></script>
     <script src="app-tools.js?v=20260521a"></script>
     <script src="app-cr-display.js?v=20260521a"></script>

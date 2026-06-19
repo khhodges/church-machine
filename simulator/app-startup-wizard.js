@@ -289,11 +289,6 @@ const StartupWizard = (function () {
         if (typeof Ti60Connect !== 'undefined') Ti60Connect.connect();
     }
 
-    function clickBridge() {
-        _scrollToConnect();
-        if (typeof Ti60Connect !== 'undefined') Ti60Connect.connectViaBridge();
-    }
-
     // ── Release version check ────────────────────────────────────────────────
 
     async function _loadRelease() {
@@ -579,5 +574,5 @@ const StartupWizard = (function () {
         init();
     }
 
-    return { advance, back, goToStep, jumpToFlash, reset, toggle, open, clickConnect, clickDirect, clickBridge, markStepDone, markStepFail, toggleTrouble, confirmStep, retryStep, startDemo, exitDemo, demoSimulate, choicePrepackaged, choiceScratch };
+    return { advance, back, goToStep, jumpToFlash, reset, toggle, open, clickConnect, clickDirect, markStepDone, markStepFail, toggleTrouble, confirmStep, retryStep, startDemo, exitDemo, demoSimulate, choicePrepackaged, choiceScratch };
 })();
