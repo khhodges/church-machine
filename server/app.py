@@ -41,6 +41,7 @@ from flask import Flask, jsonify, send_from_directory, send_file, redirect, make
 # Per-process session token for the /api/generate-method endpoint.
 # Generated fresh on every server start so external callers cannot reuse a leaked token.
 _GENERATE_SESSION_TOKEN = secrets.token_urlsafe(32)
+_COMPILE_API_TOKEN = os.environ.get('COMPILE_API_TOKEN', '')
 
 _SERVER_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SERVER_DIR not in sys.path:
@@ -9099,6 +9100,81 @@ def internal_download_verilog():
             return send_file(path, as_attachment=True, download_name="church_ti60_f225.v",
                              mimetype="text/plain")
     return jsonify({"error": "church_ti60_f225.v not found — run gen_verilog first"}), 404
+
+
+# ---------------------------------------------------------------------------
+# Compile API — POST /api/compile
+# ---------------------------------------------------------------------------
+
+@app.route("/api/compile", methods=["POST"])
+def api_compile():
+    """CLOOMC++ Compiler API — compile source text to a Lump binary.
+
+    POST /api/compile
+    Content-Type: application/json
+
+    Request body (all fields except source/language/target are optional):
+      {
+        "source":           "<raw .cloomc source text>",
+        "language":         "assembly" | "cloomc++" | "english" | "symbolic_math" |
+                            "js_cloomc++" | "haskell_cloomc++" | "lambda_calculus" |
+                            "abstraction",
+        "target":           "simulator" | "ti60_f225" | "wukong_xc7a100t" | "tang_nano_20k",
+        "abstraction_name": "MyAbstraction",          // optional override
+        "namespace_hint":   {                          // optional
+          "gt_type":          "inform",
+          "allocation_words": 64,
+          "clist_slots":      4
+        },
+        "options": {                                   // optional
+          "strict_mode":   false,   // default: false
+          "warn_as_error": false    // default: false
+        }
+      }
+
+    Response (status always 200 even on compile_failed — check JSON status field):
+      {
+        "status":         "ok" | "ok_with_warnings" | "compile_failed",
+        "lump":           { ... },     // absent on compile_failed
+        "console_output": [ ... ],
+        "warnings":       [ ... ],     // present when ok_with_warnings
+        "errors":         [ ... ]      // present when compile_failed
+      }
+
+    Auth: if the COMPILE_API_TOKEN environment variable / secret is set,
+    callers must supply it via:
+      Authorization: Bearer <token>
+    or:
+      ?token=<token>
+    If COMPILE_API_TOKEN is unset the endpoint is open (no auth required),
+    matching the IDE's own no-login default.
+    """
+    from compile_api import run_compile, VALID_LANGUAGES, VALID_TARGETS
+
+    if _COMPILE_API_TOKEN:
+        auth_header  = request.headers.get('Authorization', '')
+        token_param  = request.args.get('token', '')
+        supplied     = auth_header[len('Bearer '):] if auth_header.startswith('Bearer ') else token_param
+        if supplied != _COMPILE_API_TOKEN:
+            return jsonify({'error': 'Unauthorized — supply COMPILE_API_TOKEN via Authorization: Bearer <token>'}), 401
+
+    body = request.get_json(silent=True)
+    if not body:
+        return jsonify({'error': 'Request body must be application/json'}), 400
+
+    source   = body.get('source',   '')
+    language = body.get('language', '')
+    target   = body.get('target',   '')
+
+    if not isinstance(source, str) or not source.strip():
+        return jsonify({'error': '`source` is required and must be a non-empty string'}), 400
+    if language not in VALID_LANGUAGES:
+        return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
+    if target not in VALID_TARGETS:
+        return jsonify({'error': f'`target` must be one of: {", ".join(sorted(VALID_TARGETS))}'}), 400
+
+    result = run_compile(body)
+    return jsonify(result), 200
 
 
 if __name__ == "__main__":

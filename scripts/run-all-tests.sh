@@ -184,6 +184,9 @@ register_suite "boot-layout-regression" \
 register_suite "version-telemetry-tests" \
     'python3 -m pytest tests/server/test_version_telemetry.py -v'
 
+register_suite "compile-api-tests" \
+    'python3 -m pytest tests/server/test_compile_api.py -v'
+
 register_suite "hardware-sim" \
     'python -m ctmm_cap_amaranth.testbench && python -m hardware.test_mwin_seal && python -m hardware.test_outform_mode2 && python -m hardware.test_shift_ops && python -m hardware.test_irq_dispatch'
 
