@@ -1,10 +1,15 @@
 window.Ti60Connect = (function () {
-    const BAUD  = 57600;
-    const STEPS = ['uart', 'callhome', 'register', 'release'];
+    const BAUD           = 57600;
+    const STEPS          = ['uart', 'callhome', 'register', 'release'];
+    const DEFAULT_BRIDGE = 'https://penguin.linux.test:8766';
 
     let _port    = null;
     let _reader  = null;
     let _running = false;
+    let _bridgeRunning = false;
+    let _tunnelMode    = false;
+    let _bridgeEverConfirmed = localStorage.getItem('ti60BridgeCertAccepted') === '1';
+    let _detectedPort  = null;
     let _streamLineCount = 0;
     let _bootLump = null;
     let _bootRom  = null;
@@ -102,8 +107,60 @@ window.Ti60Connect = (function () {
         _hideStreamPanel();
         const btn  = document.getElementById('ti60ConnectBtn');
         if (btn)  { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
+    }
+
+    // ── Bridge helpers ─────────────────────────────────────────────────────
+    async function _fetchPorts(url) {
+        try {
+            const r = await fetch(url + '/ports', { signal: AbortSignal.timeout(3000) });
+            const d = await r.json();
+            if (d.ok && Array.isArray(d.ports) && d.ports.length > 0) return d.ports;
+        } catch (_e) {}
+        return null;
+    }
+
+    function _pickBestPort(ports) {
+        if (!ports || ports.length === 0) return null;
+        return ports.find(p => p === '/dev/ttyUSB2') || ports[0];
+    }
+
+    function _updateRunCmds(port) {
+        const p   = port || '/dev/ttyUSB2';
+        const ide = window.location.origin;
+        const cmd = 'cd ~/church_project/SoC/church-machine\npython3 server/local_bridge.py ' + p + ' 57600 8766 --ide=' + ide + ' --insecure';
+        ['ti60SetupBridgeCmd', 'ti60BridgeCmd'].forEach(function (id) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = cmd;
+        });
+    }
+
+    function _showBridgeSetup() {
+        const panel = document.getElementById('ti60BridgeSetupPanel');
+        if (!panel) return;
+        const url  = _bridgeUrl();
+        const link = document.getElementById('ti60SetupCertLink');
+        if (link) { link.href = url + '/status'; link.textContent = url + '/status'; }
+        panel.style.display = '';
+    }
+
+    function _hideBridgeSetup() {
+        const panel = document.getElementById('ti60BridgeSetupPanel');
+        if (panel) panel.style.display = 'none';
+    }
+
+    function _bridgeUrl() {
+        const inp = document.getElementById('ti60BridgeUrl');
+        const v   = (inp ? inp.value : '').trim();
+        return v || DEFAULT_BRIDGE;
+    }
+
+    function _updateForgetBtnVisibility() {
+        const btn = document.querySelector('.ti60-forget-bridge-btn');
+        if (btn) btn.style.display = _bridgeEverConfirmed ? '' : 'none';
     }
 
     // ── Server forwarding (WebSerial → IDE server) ─────────────────────────
@@ -522,6 +579,9 @@ window.Ti60Connect = (function () {
             _port = await navigator.serial.requestPort({});
         } catch (e) {
             _log('Port selection cancelled.', 'log-fail');
+            if (_isCrOS) {
+                _log('💡 ChromeOS: make sure the FT4232H is NOT shared with Linux (Settings → Linux → USB devices → turn OFF). Or use 🌉 Via Bridge in Advanced / Troubleshooting below.', 'log-warn');
+            }
             if (btn) { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
             return;
         }
@@ -549,7 +609,9 @@ window.Ti60Connect = (function () {
     }
 
     async function disconnect() {
-        _running = false;
+        _running       = false;
+        _bridgeRunning = false;
+        _tunnelMode    = false;
         try { if (_reader) await _reader.cancel(); } catch (e) {}
         _reader = null;
         try { if (_port)   await _port.close();   } catch (e) {}
@@ -558,9 +620,198 @@ window.Ti60Connect = (function () {
         _log('Disconnected.');
         const btn  = document.getElementById('ti60ConnectBtn');
         if (btn)  { btn.disabled = false; btn.textContent = '🔌 Connect Board'; }
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
         const dBtn = document.getElementById('ti60DisconnectBtn');
         if (dBtn) dBtn.style.display = 'none';
         _hideStreamPanel();
+    }
+
+    // ── Bridge diagnostics ─────────────────────────────────────────────────
+    async function testBridge() {
+        const tBtn = document.getElementById('ti60TestBridgeBtn');
+        if (tBtn) tBtn.disabled = true;
+        if (!_bridgeEverConfirmed) _showBridgeSetup();
+        const url = _bridgeUrl();
+        _log('Testing bridge at ' + url + ' …');
+        try {
+            const r = await fetch(url + '/status', { signal: AbortSignal.timeout(5000) });
+            const d = await r.json();
+            if (d.ok) {
+                _bridgeEverConfirmed = true;
+                localStorage.setItem('ti60BridgeCertAccepted', '1');
+                localStorage.setItem('ti60BridgeUrl', url);
+                _updateForgetBtnVisibility();
+                const ports = await _fetchPorts(url);
+                const best  = _pickBestPort(ports);
+                if (best) { _detectedPort = best; _updateRunCmds(best); }
+                _hideBridgeSetup();
+                _log('✓ Bridge is reachable. Port open: ' + d.open +
+                     (d.port ? '  (' + d.port + ')' : ''), 'log-pass');
+                if (ports && ports.length > 0) {
+                    _log('Available serial ports: ' + ports.join(', ') +
+                         (best ? '  → will use ' + best : ''), '');
+                }
+                if (!d.open) {
+                    _log('Port is not open — bridge will try to open it when you click Via Bridge.', '');
+                }
+            } else {
+                _log('Bridge responded but ok=false: ' + JSON.stringify(d), 'log-fail');
+                _showBridgeSetup();
+            }
+        } catch (e) {
+            _log('✗ Bridge not reachable: ' + (e.message || String(e)), 'log-fail');
+            _showBridgeSetup();
+        }
+        if (tBtn) tBtn.disabled = false;
+    }
+
+    async function retryBridge() {
+        await testBridge();
+    }
+
+    // ── Bridge tunnel mode ─────────────────────────────────────────────────
+    async function connectViaBridge() {
+        _reset();
+        _tunnelMode    = true;
+        _bridgeRunning = true;
+        const bBtn = document.getElementById('ti60BridgeBtn');
+        const dBtn = document.getElementById('ti60DisconnectBtn');
+        if (bBtn) { bBtn.disabled = true; bBtn.textContent = 'Waiting…'; }
+        if (dBtn) dBtn.style.display = '';
+
+        _setStep('uart', 'active');
+        _log('Waiting for board to call home via the bridge tunnel…');
+        _log('(If the board has already booted, power-cycle it now to resend CALLHOME)');
+
+        let pkt = null;
+        try {
+            const r = await fetch('/api/device/latest-callhome?since=0');
+            const d = await r.json();
+            if (d.ok && d.callhome) {
+                pkt = d.callhome;
+                const age    = Math.round((Date.now() / 1000) - (pkt.ts || 0));
+                const ageStr = age < 60 ? age + ' s' : Math.round(age / 60) + ' min';
+                _log('✓ Board already registered — last CALLHOME ' + ageStr + ' ago (uid=' + pkt.uid + ')');
+            }
+        } catch (_e) {}
+
+        const deadline = Date.now() + 90000;
+        if (!pkt) _log('No existing registration — waiting for board to send CALLHOME (power-cycle the board)…');
+        while (_bridgeRunning && Date.now() < deadline && !pkt) {
+            await new Promise(r => setTimeout(r, 500));
+            try {
+                const r = await fetch('/api/device/latest-callhome?since=0');
+                const d = await r.json();
+                if (d.ok && d.callhome) pkt = d.callhome;
+            } catch (e) {
+                if (_bridgeRunning) _log('⚠ Server poll error: ' + e.message, 'log-warn');
+            }
+        }
+
+        if (!_bridgeRunning) return;
+
+        if (!pkt) {
+            _setStep('callhome', 'fail', 'No CALLHOME received in 90 s — is the bridge running with --ide=<URL>?');
+            _log('Start the bridge with:', 'log-warn');
+            _log('  python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=' + window.location.origin, 'log-warn');
+            _bridgeRunning = false;
+            if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+            if (dBtn) dBtn.style.display = 'none';
+            return;
+        }
+
+        _setStep('uart', 'pass', 'Bridge tunnel active — board=' + pkt.board + '  uid=' + pkt.uid);
+        await _finishSteps(pkt, /*greetingSeen=*/true, /*skipRegister=*/true);
+        await _niaTunnelStream(pkt.uid, bBtn, dBtn);
+    }
+
+    async function _niaTunnelStream(uid, bBtn, dBtn) {
+        let buf     = '';
+        let lastNia = null;
+        _log('— Live NIA stream active via server tunnel — (Disconnect to stop)', 'log-pass');
+        _log('💡 No output yet? Power-cycle the board (unplug/replug USB) to capture the boot stream.', 'log-warn');
+        _fetchBootLump();
+        _fetchBootRom();
+        _showStreamPanel();
+        while (_bridgeRunning) {
+            await new Promise(r => setTimeout(r, 400));
+            try {
+                const dr = await fetch('/api/device/pull-drain/' + uid,
+                    { signal: AbortSignal.timeout(10000) });
+                const dd = await dr.json();
+                if (dd.bytes && dd.bytes.length) {
+                    buf += String.fromCharCode(...dd.bytes);
+                    const lines = buf.split('\n');
+                    buf = lines.pop();
+                    for (const raw of lines) {
+                        const line = raw.replace(/\r$/, '').trim();
+                        if (!line) continue;
+                        const niaMatch = line.match(/\bNIA=0x([0-9A-Fa-f]+)/i);
+                        if (niaMatch) {
+                            const nia    = '0x' + niaMatch[1].toUpperCase().padStart(8, '0');
+                            const niaNum = parseInt(niaMatch[1], 16);
+                            const anno   = _decodeNIA(niaNum, _bootRom, _bootLump);
+                            const label  = anno ? 'NIA → ' + nia + '  ' + anno : 'NIA → ' + nia;
+                            _streamLog(label, 'sl-nia');
+                            if (nia !== lastNia) {
+                                lastNia = nia;
+                                _log('NIA → ' + nia + (anno ? '  ' + anno : ''), 'log-nia');
+                            }
+                            continue;
+                        }
+                        if (line.startsWith('CALLHOME:')) {
+                            const newPkt = _parseCallhome(line);
+                            if (newPkt) {
+                                _log('⟳ Board reboot detected', 'log-warn');
+                                _streamLog('── REBOOT ──', 'sl-boot');
+                                lastNia = null;
+                                await _finishSteps(newPkt, true, true);
+                            }
+                        } else {
+                            _streamLog('← ' + line);
+                            _log('← ' + line);
+                        }
+                    }
+                }
+            } catch (e) {
+                if (!_bridgeRunning) break;
+                const transient = e.name === 'TimeoutError' || e.name === 'AbortError' ||
+                                  e.name === 'TypeError'    || e.name === 'NetworkError';
+                if (transient) { await new Promise(r => setTimeout(r, 1000)); continue; }
+                _log('⚠ Stream stopped: ' + e.message, 'log-warn');
+                break;
+            }
+        }
+        _bridgeRunning = false;
+        _tunnelMode    = false;
+        _hideStreamPanel();
+        if (bBtn) { bBtn.disabled = false; bBtn.textContent = '🌉 Via Bridge'; }
+        if (dBtn) dBtn.style.display = 'none';
+    }
+
+    function copyBridgeCmd() {
+        const pre = document.getElementById('ti60BridgeCmd');
+        if (!pre) return;
+        const text = pre.textContent;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                const btn = document.querySelector('.ti60-bridge-cmd-copy');
+                if (btn) {
+                    btn.innerHTML = '&#x2713; Copied';
+                    setTimeout(function () { btn.innerHTML = '&#x1F4CB; Copy'; }, 1800);
+                }
+            }).catch(function () { _log('Copy failed — select the command and copy manually.', 'log-warn'); });
+        } else {
+            _log('Clipboard API not available — select the command and copy manually.', 'log-warn');
+        }
+    }
+
+    function resetBridgeCert() {
+        localStorage.removeItem('ti60BridgeCertAccepted');
+        _bridgeEverConfirmed = false;
+        _updateForgetBtnVisibility();
+        _log('Bridge cert memory cleared — setup guide will reappear on next connection attempt.');
     }
 
     // ── Boot LUMP disassembler helpers ─────────────────────────────────────
@@ -654,6 +905,12 @@ window.Ti60Connect = (function () {
     }
 
     function onTabOpen() {
+        _updateForgetBtnVisibility();
+
+        const savedUrl = localStorage.getItem('ti60BridgeUrl');
+        const inp = document.getElementById('ti60BridgeUrl');
+        if (inp && savedUrl) inp.value = savedUrl;
+
         const origin = window.location.origin;
         ['ti60PolUrl', 'ti60PolUrl2'].forEach(id => {
             const el = document.getElementById(id);
@@ -673,7 +930,8 @@ window.Ti60Connect = (function () {
             if (log && log.children.length === 0) {
                 _logHtml(
                     '<strong>USB connect requires a full browser tab.</strong> ' +
-                    'Click <strong>Open in full tab →</strong> above.'
+                    'Click <strong>Open in full tab →</strong> above, or ' +
+                    'expand <strong>Advanced / Troubleshooting</strong> below to connect via Bridge.'
                 );
             }
         }
@@ -681,8 +939,14 @@ window.Ti60Connect = (function () {
 
     return {
         connect,
+        connectViaBridge,
+        testBridge,
+        retryBridge,
         disconnect,
         onTabOpen,
+        copyBridgeCmd,
+        hideBridgeSetup: _hideBridgeSetup,
+        resetBridgeCert,
         get _streamLineCount() { return _streamLineCount; },
         set _streamLineCount(v) { _streamLineCount = v; },
     };
