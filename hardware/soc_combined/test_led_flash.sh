@@ -2,8 +2,9 @@
 # test_led_flash.sh — LED Flash LUMP hardware test (Ti60 F225)
 #
 # Uploads the current boot image from the IDE to the Church Machine's BRAM via
-# the PATCH_LUMP (0xBEEF) protocol, then stays connected as the call-home
-# bridge so you can watch CALLHOME + HUNG events in real time.
+# the PATCH_LUMP (0xBEEF) protocol, then exits after the ACK is received.
+# Use --no-reconnect so the bridge quits immediately after upload rather than
+# looping back into call-home polling mode.
 #
 # ============================================================================
 # FULL PROCEDURE — run these steps from the Chromebook repo root
@@ -99,6 +100,7 @@ BRIDGE_ARGS=(
     "--ide=$IDE_URL"
     "--insecure"
     "--upload"
+    "--no-reconnect"
     "--upload-port=$UPLOAD_PORT"
 )
 

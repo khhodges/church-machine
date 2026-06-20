@@ -15,14 +15,15 @@ python3 hardware/soc_combined/callhome_bridge.py \
 
 **Production IDE URL is https://lab.cloomc.org** (old dev URL was the long replit.dev string — no longer valid).
 
-## LED flash LUMP test convenience script (Task #1870)
+## LED flash LUMP test convenience script
 
 ```bash
 ./hardware/soc_combined/test_led_flash.sh
 ```
 
-This auto-detects ports, adds `--insecure`, and runs `--upload` mode.
+Wraps bridge.sh with `--upload --no-reconnect --insecure`. Exits after ACK.
 Pre-requisite: generate boot-image.bin first via IDE Builder → Step 1 → Generate.
+After ACK: hold Ti60 push button ~1 s → CM reboots → LED0 blinks at ~1 Hz.
 
 **Why no --baud:** The bridge defaults to 57600 (hardcoded `_BAUD = 57600`). Do NOT pass `--baud=115200` — the soc_combined firmware uses CLOCKDIV=53 → 57,870 ≈ 57,600 baud at 25 MHz. Connecting at 115200 produces garbage or silence.
 
@@ -39,7 +40,7 @@ Pre-requisite: generate boot-image.bin first via IDE Builder → Step 1 → Gene
 ```bash
 python3 hardware/soc_combined/callhome_bridge.py \
     --port=/dev/ttyUSB2 \
-    --ide=https://31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt.kirk.replit.dev \
+    --ide=https://lab.cloomc.org \
     --insecure --upload
 ```
 

@@ -461,6 +461,11 @@ def _upload_boot_image() -> bool:
         img_bytes = resp.read()
     except Exception as e:
         print(f"ERROR: could not fetch boot image: {e}", file=sys.stderr)
+        print("  The server may not have a boot image yet, or it may be stale.",
+              file=sys.stderr)
+        print("  Fix: open the IDE → Builder tab → Step 1 (Ti60 F225) → Generate Boot Image,",
+              file=sys.stderr)
+        print("       then re-run --upload.", file=sys.stderr)
         return False
 
     if len(img_bytes) == 0:
