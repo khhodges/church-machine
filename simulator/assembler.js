@@ -1039,7 +1039,7 @@ class ChurchAssembler {
             const rawImm = w & 0x7FFF;
             const signedOffset = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
             const target = i + signedOffset;
-            if (target < 0 || target >= totalWords) {
+            if (target < 0 || target > totalWords) {
                 const condCode = (w >>> 23) & 0xF;
                 const mnemonic = 'BRANCH' + _condNames[condCode];
                 const _rawBranchLine = this._rawLines && this._rawLines[lineNums[i] - 1];
@@ -1566,8 +1566,28 @@ class ChurchAssembler {
                 break;
             }
             case 14: {
-                crDst = this._parseDR(parts[1], lineNum);
-                crSrc = this._parseDR(parts[2], lineNum);
+                const _drDst14 = this._parseDR(parts[1], lineNum);
+                const _p2_14 = (parts[2] || '').replace(/,/g, '').trim();
+                const _p2isImm14 = parts[3] === undefined && _p2_14 !== '' && (
+                    _p2_14.startsWith('#') ||
+                    /^-?\d+$/.test(_p2_14) ||
+                    /^0[xX][0-9a-fA-F]+$/.test(_p2_14) ||
+                    /^0[bB][01]+$/.test(_p2_14)
+                );
+                if (_p2isImm14) {
+                    opcode = 16;
+                    crDst = 15;
+                    crSrc = _drDst14;
+                    const _immStr14 = _p2_14.startsWith('#') ? _p2_14.substring(1) : _p2_14;
+                    let _immVal14;
+                    if (_immStr14.startsWith('0x') || _immStr14.startsWith('0X')) _immVal14 = parseInt(_immStr14, 16);
+                    else if (_immStr14.startsWith('0b') || _immStr14.startsWith('0B')) _immVal14 = parseInt(_immStr14.substring(2), 2);
+                    else _immVal14 = parseInt(_immStr14, 10);
+                    imm = 0x4000 | ((isNaN(_immVal14) ? 0 : _immVal14) & 0x3FFF);
+                } else {
+                    crDst = _drDst14;
+                    crSrc = this._parseDR(parts[2], lineNum);
+                }
                 break;
             }
             case 15: {

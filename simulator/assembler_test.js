@@ -8960,6 +8960,150 @@ Add a method called Run
         dis.includes('DR1, DR2, #7'), 'got: ' + dis);
 }
 
+// ── BRANCH one-past-end target (SYN4) ────────────────────────────────────────
+
+// SYN4-a: BRANCH EQ to a label one-past-end of the code body must assemble without error.
+//   The canonical "branch to exit" pattern: endLabel is placed after the last instruction.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble(
+        'IADD DR0, DR1, DR2\n' +
+        'BRANCH EQ, done\n' +
+        'ISUB DR0, DR1, DR2\n' +
+        'done:'
+    );
+    assert('SYN4-a BRANCH EQ to one-past-end label: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN4-a BRANCH EQ to one-past-end label: 3 words emitted',
+        r.words.length === 3, 'got ' + r.words.length);
+    // The BRANCH is at word index 1; done: is at index 3 (== totalWords).
+    // signed offset = 3 - 1 = +2. Verify the encoded offset.
+    const branchWord = r.words[1];
+    const rawImm = branchWord & 0x7FFF;
+    const signedOffset = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
+    assert('SYN4-a BRANCH offset = +2 (one-past-end)', signedOffset === 2,
+        'got offset ' + signedOffset);
+}
+
+// SYN4-b: BRANCH NE to one-past-end also assembles without error.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble(
+        'NOP\n' +
+        'BRANCH NE, exit\n' +
+        'exit:'
+    );
+    assert('SYN4-b BRANCH NE to one-past-end: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN4-b word count = 2', r.words.length === 2, 'got ' + r.words.length);
+}
+
+// SYN4-c: BRANCH LT to one-past-end also assembles without error.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble(
+        'MCMP DR0, DR1\n' +
+        'BRANCH LT, done\n' +
+        'done:'
+    );
+    assert('SYN4-c BRANCH LT to one-past-end: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN4-c word count = 2', r.words.length === 2, 'got ' + r.words.length);
+}
+
+// SYN4-d: BRANCH to two-past-end must still be an error (genuine out-of-range).
+{
+    const a = new ChurchAssembler();
+    a.assemble(
+        'NOP\n' +
+        'BRANCH EQ, toofar\n' +
+        'NOP\n' +
+        'toofar:'   // index 3 = totalWords (3); +2 past word 1 → index 3 OK
+        // Actually this is ALSO at totalWords (3 words, label at 3), so it's valid.
+        // Use an explicit numeric offset to force an over-bounds jump.
+    );
+    // Numeric offset that overshoots by 1: from word 1, offset +3 → target 4, but totalWords=3
+    const b = new ChurchAssembler();
+    b.assemble('NOP\nNOP\nNOP\nBRANCH EQ, +999\n');
+    assert('SYN4-d BRANCH to far-out-of-range target: error', b.errors.length > 0,
+        'expected at least one error');
+}
+
+// ── MCMP immediate synthesis (SYN5) ──────────────────────────────────────────
+
+// SYN5-a: MCMP DR0, #5 assembles without error and synthesizes as ISUB DR15, DR0, #5.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('MCMP DR0, #5');
+    assert('SYN5-a MCMP DR0, #5: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN5-a MCMP DR0, #5: exactly 1 word emitted', r.words.length === 1,
+        'got ' + r.words.length);
+    // Synthesized as ISUB DR15, DR0, #5 — opcode=15, crDst=15, crSrc=0, imm=0x4005
+    const w = r.words[0];
+    const opcode = (w >>> 27) & 0x1F;
+    const crDst  = (w >>> 19) & 0xF;
+    const crSrc  = (w >>> 15) & 0xF;
+    const imm    = w & 0x7FFF;
+    assert('SYN5-a opcode = 16 (ISUB)', opcode === 16, 'got opcode ' + opcode);
+    assert('SYN5-a crDst = 15 (scratch DR15)', crDst === 15, 'got crDst ' + crDst);
+    assert('SYN5-a crSrc = 0 (DR0)', crSrc === 0, 'got crSrc ' + crSrc);
+    assert('SYN5-a imm = 0x4005 (immediate flag + 5)', imm === 0x4005,
+        'got imm 0x' + imm.toString(16));
+}
+
+// SYN5-b: MCMP DR0, #5 produces the same word as ISUB DR15, DR0, #5 (explicit).
+{
+    const a1 = new ChurchAssembler();
+    const r1 = a1.assemble('MCMP DR0, #5');
+
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('ISUB DR15, DR0, #5');
+
+    assert('SYN5-b MCMP DR0, #5 === ISUB DR15, DR0, #5',
+        r1.words[0] === r2.words[0],
+        `mcmp=0x${(r1.words[0]>>>0).toString(16)} isub=0x${(r2.words[0]>>>0).toString(16)}`);
+}
+
+// SYN5-c: MCMP DR3, #0 (zero immediate) assembles correctly.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('MCMP DR3, #0');
+    assert('SYN5-c MCMP DR3, #0: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const w = r.words[0];
+    const crSrc = (w >>> 15) & 0xF;
+    assert('SYN5-c MCMP DR3, #0: crSrc = 3 (DR3)', crSrc === 3, 'got crSrc ' + crSrc);
+}
+
+// SYN5-d: MCMP DR0, #5 bare decimal (no # prefix) also works.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('MCMP DR0, 5');
+    assert('SYN5-d MCMP DR0, 5 (bare decimal): no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('MCMP DR0, #5');
+    assert('SYN5-d MCMP DR0, 5 === MCMP DR0, #5',
+        r.words[0] === r2.words[0],
+        `bare=0x${(r.words[0]>>>0).toString(16)} hash=0x${(r2.words[0]>>>0).toString(16)}`);
+}
+
+// SYN5-e: 2-arg register form MCMP DR0, DR1 is not broken (no regression).
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('MCMP DR0, DR1');
+    assert('SYN5-e MCMP DR0, DR1 (register form): no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    const w = r.words[0];
+    const opcode = (w >>> 27) & 0x1F;
+    const crDst  = (w >>> 19) & 0xF;
+    const crSrc  = (w >>> 15) & 0xF;
+    assert('SYN5-e register form opcode = 14 (MCMP)', opcode === 14, 'got opcode ' + opcode);
+    assert('SYN5-e register form crDst = 0 (DR0)', crDst === 0, 'got crDst ' + crDst);
+    assert('SYN5-e register form crSrc = 1 (DR1)', crSrc === 1, 'got crSrc ' + crSrc);
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
