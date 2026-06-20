@@ -215,8 +215,9 @@ DEFAULT_ABSTRACTION_CATALOG = [
     ("ChurchMemory",  {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False),   # NS[49] — abstract handle allocator (Task #760 Stage 1)
     ("Scheduler.IRQ.Thread", {"R":0,"W":0,"X":0,"L":0,"S":0,"E":0}, False), # NS[50] — fixed boot-image IRQ thread; zero perms, authority via M-register on CHANGE (Task #1077)
     ("Ethernet",             {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False), # NS[51] — Ethernet MMIO abstraction (token 00003300, v1.1.0)
+    ("EventRouter",          {"R":0,"W":0,"X":0,"L":0,"S":0,"E":1}, False), # NS[52] — event-to-handler routing table (token b3076308, v1.0.0)
 ]
-assert len(DEFAULT_ABSTRACTION_CATALOG) == 52, "catalog drift vs simulator.js"
+assert len(DEFAULT_ABSTRACTION_CATALOG) == 53, "catalog drift vs simulator.js"
 
 # Service abstraction c-list capability table (Task #971).
 # Single-authority model:

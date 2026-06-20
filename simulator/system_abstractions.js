@@ -138,6 +138,7 @@ class SystemAbstractions {
         this._bindConstants();
         this._bindTunnel();
         this._initKeystone();
+        this._bindEventRouter();
     }
 
     getMemoryStats() {
@@ -2910,6 +2911,114 @@ class SystemAbstractions {
                 ok: true,
                 result: GREET_RESPONSE,
                 message: `Tunnel.Call: GTKN forwarded to Mum.Greet() \u2192 0x${hex} (\u2018HELL\u2019) \u2014 live bridge online`
+            };
+        });
+    }
+
+    // ── NS slot 52: EventRouter ────────────────────────────────────────────────
+    // Maps event Golden Tokens to handler capabilities.
+    //
+    // Public interface:
+    //   Add(eventGT, handlerGT) → 0=ok / 1=table_full
+    //   Remove(eventGT)         → 0=ok / 1=not_found
+    //   Resolve(eventGT)        → handlerGT or 0 if not registered
+    //   List()                  → count of registered events
+    //   Methods()               → 5
+    //
+    // Internal state is held in a JS Map on the singleton routingTable object,
+    // which is allocated once when SystemAbstractions is constructed.
+    //
+    // The LUMP binary (token b3076308) is compiled from
+    // simulator/cloomc/EventRouter.cloomc and is loaded at boot as a
+    // resident abstraction at NS slot 52 via server/lumps/manifest.json.
+    _bindEventRouter() {
+        const EVENT_ROUTER_NS = 52;
+        const TABLE_MAX = 64;  // maximum concurrent event registrations
+
+        const routingTable = new Map();  // eventGT (number) → handlerGT (number)
+
+        this.registry.bindMethod(EVENT_ROUTER_NS, 'Add', function(sim, args) {
+            const eventGT   = (args && args.dr0 !== undefined) ? (args.dr0 >>> 0) : 0;
+            const handlerGT = (args && args.dr1 !== undefined) ? (args.dr1 >>> 0) : 0;
+
+            if (!eventGT) {
+                return {
+                    ok: true,
+                    result: 1,
+                    message: 'EventRouter.Add: eventGT is NULL — rejected'
+                };
+            }
+            if (routingTable.size >= TABLE_MAX && !routingTable.has(eventGT)) {
+                return {
+                    ok: true,
+                    result: 1,
+                    message: `EventRouter.Add: routing table full (${TABLE_MAX} entries) — DR0=1 (table_full)`
+                };
+            }
+            routingTable.set(eventGT, handlerGT);
+            const eHex = eventGT.toString(16).toUpperCase().padStart(8, '0');
+            const hHex = handlerGT.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: 0,
+                message: `EventRouter.Add: registered event 0x${eHex} → handler 0x${hHex} (${routingTable.size} entries total)`
+            };
+        });
+
+        this.registry.bindMethod(EVENT_ROUTER_NS, 'Remove', function(sim, args) {
+            const eventGT = (args && args.dr0 !== undefined) ? (args.dr0 >>> 0) : 0;
+
+            if (!routingTable.has(eventGT)) {
+                const eHex = eventGT.toString(16).toUpperCase().padStart(8, '0');
+                return {
+                    ok: true,
+                    result: 1,
+                    message: `EventRouter.Remove: event 0x${eHex} not registered — DR0=1 (not_found)`
+                };
+            }
+            routingTable.delete(eventGT);
+            const eHex = eventGT.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: 0,
+                message: `EventRouter.Remove: unregistered event 0x${eHex} (${routingTable.size} entries remain)`
+            };
+        });
+
+        this.registry.bindMethod(EVENT_ROUTER_NS, 'Resolve', function(sim, args) {
+            const eventGT = (args && args.dr0 !== undefined) ? (args.dr0 >>> 0) : 0;
+
+            const handlerGT = routingTable.get(eventGT);
+            if (handlerGT === undefined) {
+                const eHex = eventGT.toString(16).toUpperCase().padStart(8, '0');
+                return {
+                    ok: true,
+                    result: 0,
+                    message: `EventRouter.Resolve: event 0x${eHex} not registered — DR0=0`
+                };
+            }
+            const eHex = eventGT.toString(16).toUpperCase().padStart(8, '0');
+            const hHex = handlerGT.toString(16).toUpperCase().padStart(8, '0');
+            return {
+                ok: true,
+                result: handlerGT,
+                message: `EventRouter.Resolve: event 0x${eHex} → handler 0x${hHex}`
+            };
+        });
+
+        this.registry.bindMethod(EVENT_ROUTER_NS, 'List', function(sim, args) {
+            return {
+                ok: true,
+                result: routingTable.size,
+                message: `EventRouter.List: ${routingTable.size} event(s) registered`
+            };
+        });
+
+        this.registry.bindMethod(EVENT_ROUTER_NS, 'Methods', function(sim, args) {
+            return {
+                ok: true,
+                result: 5,
+                message: 'EventRouter.Methods: 5 public methods (Add, Remove, Resolve, List, Methods)'
             };
         });
     }

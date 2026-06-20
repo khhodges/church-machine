@@ -34,7 +34,8 @@ LUMPS_DIR = os.path.join(ROOT, "server", "lumps")
 @pytest.mark.parametrize("ns_slots_max,expected_reserve", [
     (16,   64),    # minimum clamp: 16 * 4 = 64 → 64
     (1,    64),    # below minimum: 1 * 4 = 4 → clamp to 64
-    (52,  256),    # catalog size: 52 * 4 = 208 → 256
+    (52,  256),    # math test: 52 * 4 = 208 → 256 (kept; catalog is now 53 entries)
+    (53,  256),    # catalog size: 53 * 4 = 212 → 256
     (64,  256),    # 64 * 4 = 256 → 256
     (65,  512),    # 65 * 4 = 260 → 512
     (102, 512),    # real case: 102 * 4 = 408 → 512

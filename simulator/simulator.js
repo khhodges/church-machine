@@ -1066,6 +1066,7 @@ class ChurchSimulator {
             { label: 'ChurchMemory',     perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false },   // NS[49] — abstract handle allocator (Task #760 Stage 1)
             { label: 'Scheduler.IRQ.Thread', perms: {R:0,W:0,X:0,L:0,S:0,E:0}, chainable: false }, // NS[50] — fixed boot-image IRQ thread; zero perms, authority via M-register on CHANGE (Task #1077)
             { label: 'Ethernet',             perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false }, // NS[51] — Ethernet MMIO abstraction (token 00003300, v1.1.0)
+            { label: 'EventRouter',          perms: {R:0,W:0,X:0,L:0,S:0,E:1}, chainable: false }, // NS[52] — event-to-handler routing table (token b3076308, v1.0.0)
         ];
     }
 
