@@ -416,6 +416,46 @@ class CLOOMCCompiler {
                 continue;
             }
 
+            // Bare lambda abstraction: λx.body or \x.body (no 'method' keyword, no name).
+            // Desugar to method run(params...) = body so that anonymous lambda probes
+            // (Identity: λx.x, Constant: λx.λy.x, Two-terms: λf.λx.f x, …) compile
+            // rather than silently falling through to produce cw=0.
+            {
+                const _bareLambdaParams = [];
+                let _bareLambdaExpr = cleanLine;
+                let _blm;
+                while ((_blm = _bareLambdaExpr.match(/^(?:λ|\\)(\w+)\.\s*([\s\S]*)/))) {
+                    _bareLambdaParams.push(_blm[1]);
+                    _bareLambdaExpr = _blm[2].trim();
+                }
+                if (_bareLambdaParams.length > 0) {
+                    const _rawLine0 = lines[i];
+                    const _ls0 = _rawLine0.length - _rawLine0.trimStart().length;
+                    const method = {
+                        name: 'run',
+                        params: _bareLambdaParams,
+                        expr: _bareLambdaExpr,
+                        exprOffset: _ls0,
+                        startLine: i,
+                        isLambda: true,
+                        visibility,
+                        explicitVisibility,
+                    };
+                    i++;
+                    while (i < lines.length) {
+                        const contLine = lines[i].trim();
+                        if (!contLine || contLine.startsWith('--') ||
+                            contLine.match(/^(?:public\s+|private\s+)?method\s+/) ||
+                            contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/) ||
+                            contLine === '}') break;
+                        method.expr += ' ' + contLine;
+                        i++;
+                    }
+                    result.methods.push(method);
+                    continue;
+                }
+            }
+
             i++;
         }
         for (let _mi = 0; _mi < result.methods.length; _mi++) {

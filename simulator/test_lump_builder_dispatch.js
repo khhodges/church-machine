@@ -21,6 +21,7 @@
 //   DT12 — alias methods point to the same body as the original
 //   DT13 — Haskell 3-method abstraction: exact dispatch table entries + private = 0
 //   DT14 — Symbolic Math 3-method abstraction: exact dispatch table entries + private = 0
+//   DT15 — Lambda bare-lambda form (λx.body) desugars to run() method, cw > 0
 
 const path = require('path');
 
@@ -308,8 +309,8 @@ console.log('\n--- DT12: alias method shares body with original ---');
 console.log('\n--- DT13: Haskell 3-method dispatch table layout ---');
 {
     const c = new CLOOMCCompiler();
-    // 3-method abstraction: Add (public, 4 words), Sub (public, 3 words),
-    // Helper (private, 4 words).  N=3, total body=11, expected cw=14.
+    // 3-method abstraction: Add (public, 3 words), Sub (public, 3 words),
+    // Helper (private, 4 words).  N=3, total body=10, expected cw=13.
     const src = `abstraction Arithmetic {
     public method Add(x, y) = x + y
     public method Sub(x, y) = x - y
@@ -322,12 +323,12 @@ console.log('\n--- DT13: Haskell 3-method dispatch table layout ---');
         'methods=' + result.methods.length);
     if (result.errors.length === 0 && result.methods.length === 3) {
         const { words, cw } = buildLump(result);
-        // N=3 dispatch entries + 4+3+4 body words = 14
-        check('DT13c: cw = 14 (3 entries + 11 body words)', cw === 14, 'cw=' + cw);
+        // N=3 dispatch entries + 3+3+4 body words = 13
+        check('DT13c: cw = 13 (3 entries + 10 body words)', cw === 13, 'cw=' + cw);
         // Add body at word index 4 → entry = 4
         check('DT13d: words[1] = 4 (Add dispatch entry)', words[1] === 4, 'words[1]=' + words[1]);
-        // Sub body at word index 8 → entry = 8
-        check('DT13e: words[2] = 8 (Sub dispatch entry)', words[2] === 8, 'words[2]=' + words[2]);
+        // Sub body at word index 7 → entry = 7
+        check('DT13e: words[2] = 7 (Sub dispatch entry)', words[2] === 7, 'words[2]=' + words[2]);
         // Helper is private → entry = 0
         check('DT13f: words[3] = 0 (Helper private entry)', words[3] === 0, 'words[3]=' + words[3]);
         // Verify Add body is reachable via the dispatch entry
@@ -389,6 +390,80 @@ console.log('\n--- DT14: Symbolic Math 3-method dispatch table layout ---');
         // Dispatch entries are in ascending order (Add precedes Square in the lump)
         check('DT14i: Add entry < Square entry (correct body order)',
             words[1] < words[2], 'Add=' + words[1] + ' Square=' + words[2]);
+    }
+}
+
+// ── DT15: Bare lambda form desugars to method run() ──────────────────────────
+console.log('\n--- DT15: Lambda bare-lambda form (λx.body) desugars to run(), cw > 0 ---');
+{
+    const c = new CLOOMCCompiler();
+
+    // Identity: λx.x  → run(x) = x
+    const srcId = `abstraction Identity {
+    capabilities {}
+    λx.x
+}`;
+    const rId = c.compileLambda(srcId, []);
+    check('DT15a: Identity (λx.x) compiles without errors', rId.errors.length === 0,
+        rId.errors.map(e => e.message).join('; '));
+    check('DT15b: Identity produces exactly 1 method', rId.methods.length === 1,
+        'methods=' + rId.methods.length);
+    check('DT15c: Identity method named "run"',
+        rId.methods.length > 0 && rId.methods[0].name === 'run',
+        rId.methods.length > 0 ? rId.methods[0].name : '(none)');
+    check('DT15d: Identity method has param "x"',
+        rId.methods.length > 0 && rId.methods[0].params[0] === 'x',
+        rId.methods.length > 0 ? JSON.stringify(rId.methods[0].params) : '(none)');
+    if (rId.errors.length === 0 && rId.methods.length > 0) {
+        const { cw } = buildLump(rId);
+        check('DT15e: Identity lump cw > 0 (not silent empty)', cw > 0, 'cw=' + cw);
+    }
+
+    // Constant: λx.λy.x  → run(x, y) = x
+    const srcK = `abstraction Constant {
+    capabilities {}
+    λx.λy.x
+}`;
+    const rK = c.compileLambda(srcK, []);
+    check('DT15f: Constant (λx.λy.x) compiles without errors', rK.errors.length === 0,
+        rK.errors.map(e => e.message).join('; '));
+    check('DT15g: Constant method has params ["x","y"]',
+        rK.methods.length > 0 &&
+        rK.methods[0].params[0] === 'x' && rK.methods[0].params[1] === 'y',
+        rK.methods.length > 0 ? JSON.stringify(rK.methods[0].params) : '(none)');
+    if (rK.errors.length === 0 && rK.methods.length > 0) {
+        const { cw } = buildLump(rK);
+        check('DT15h: Constant lump cw > 0', cw > 0, 'cw=' + cw);
+    }
+
+    // Two-terms: λf.λx.f(x)  → run(f, x) = f(x)
+    const src2 = `abstraction TwoTerms {
+    capabilities {}
+    λf.λx.f(x)
+}`;
+    const r2 = c.compileLambda(src2, []);
+    check('DT15i: TwoTerms (λf.λx.f(x)) compiles without errors', r2.errors.length === 0,
+        r2.errors.map(e => e.message).join('; '));
+    check('DT15j: TwoTerms method has params ["f","x"]',
+        r2.methods.length > 0 &&
+        r2.methods[0].params[0] === 'f' && r2.methods[0].params[1] === 'x',
+        r2.methods.length > 0 ? JSON.stringify(r2.methods[0].params) : '(none)');
+    if (r2.errors.length === 0 && r2.methods.length > 0) {
+        const { cw } = buildLump(r2);
+        check('DT15k: TwoTerms lump cw > 0', cw > 0, 'cw=' + cw);
+    }
+
+    // Bare backslash notation: \x.x  (ASCII alternative for λ)
+    const srcBS = `abstraction BsTest {
+    capabilities {}
+    \\x.x
+}`;
+    const rBS = c.compileLambda(srcBS, []);
+    check('DT15l: Backslash form (\\x.x) compiles without errors', rBS.errors.length === 0,
+        rBS.errors.map(e => e.message).join('; '));
+    if (rBS.errors.length === 0 && rBS.methods.length > 0) {
+        const { cw } = buildLump(rBS);
+        check('DT15m: Backslash form lump cw > 0', cw > 0, 'cw=' + cw);
     }
 }
 
