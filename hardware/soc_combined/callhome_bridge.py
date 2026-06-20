@@ -482,9 +482,9 @@ def _upload_boot_image() -> bool:
 
     # ── Pre-flight validation ────────────────────────────────────────────────
     # word[0] must have LUMP magic: bits[31:27] == 0x1F.
-    # decode word[0] big-endian (LUMP binaries are big-endian on the wire)
+    # Boot images are raw little-endian memory dumps — decode word[0] accordingly.
     import struct as _struct
-    w0 = _struct.unpack_from(">I", img_bytes, 0)[0]
+    w0 = _struct.unpack_from("<I", img_bytes, 0)[0]
     _magic   = (w0 >> 27) & 0x1F
     _nm6     = (w0 >> 23) & 0x0F          # n_minus_6: alloc = 2^(n+6) words
     _alloc   = 1 << (_nm6 + 6)
