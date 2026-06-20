@@ -9134,6 +9134,68 @@ Add a method called Run
         'bin=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
 }
 
+// ── IADD / ISUB hex and binary immediate literals (SYN6) ─────────────────────
+
+// SYN6-a: IADD DR0, #0x0A (hex literal) assembles and equals IADD DR0, #10.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('IADD DR0, #0x0A');
+    assert('SYN6-a IADD DR0, #0x0A: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN6-a IADD DR0, #0x0A: exactly 1 word emitted', r.words.length === 1,
+        'got ' + r.words.length + ' words');
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('IADD DR0, #10');
+    assert('SYN6-a IADD DR0, #0x0A === IADD DR0, #10',
+        r.words[0] === r2.words[0],
+        'hex=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
+}
+
+// SYN6-b: IADD DR0, #0b1010 (binary literal) assembles and equals IADD DR0, #10.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('IADD DR0, #0b1010');
+    assert('SYN6-b IADD DR0, #0b1010: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN6-b IADD DR0, #0b1010: exactly 1 word emitted', r.words.length === 1,
+        'got ' + r.words.length + ' words');
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('IADD DR0, #10');
+    assert('SYN6-b IADD DR0, #0b1010 === IADD DR0, #10',
+        r.words[0] === r2.words[0],
+        'bin=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
+}
+
+// SYN6-c: ISUB DR0, #0x0A (hex literal) assembles and equals ISUB DR0, #10.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('ISUB DR0, #0x0A');
+    assert('SYN6-c ISUB DR0, #0x0A: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN6-c ISUB DR0, #0x0A: exactly 1 word emitted', r.words.length === 1,
+        'got ' + r.words.length + ' words');
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('ISUB DR0, #10');
+    assert('SYN6-c ISUB DR0, #0x0A === ISUB DR0, #10',
+        r.words[0] === r2.words[0],
+        'hex=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
+}
+
+// SYN6-d: ISUB DR0, #0b1010 (binary literal) assembles and equals ISUB DR0, #10.
+{
+    const a = new ChurchAssembler();
+    const r = a.assemble('ISUB DR0, #0b1010');
+    assert('SYN6-d ISUB DR0, #0b1010: no errors', a.errors.length === 0,
+        a.errors.map(e => e.message).join('; '));
+    assert('SYN6-d ISUB DR0, #0b1010: exactly 1 word emitted', r.words.length === 1,
+        'got ' + r.words.length + ' words');
+    const a2 = new ChurchAssembler();
+    const r2 = a2.assemble('ISUB DR0, #10');
+    assert('SYN6-d ISUB DR0, #0b1010 === ISUB DR0, #10',
+        r.words[0] === r2.words[0],
+        'bin=0x' + r.words[0].toString(16) + ' dec=0x' + r2.words[0].toString(16));
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 if (failed > 0) process.exit(1);
