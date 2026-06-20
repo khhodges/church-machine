@@ -350,6 +350,7 @@ class CLOOMCCompiler {
                 while (i < lines.length) {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--') || contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
+                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/)) break;
                     method.expr += ' ' + contLine;
                     i++;
                 }
@@ -374,7 +375,37 @@ class CLOOMCCompiler {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--')) { i++; continue; }
                     if (contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
+                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/)) break;
                     method.expr += (method.expr ? ' ' : '') + contLine;
+                    i++;
+                }
+                result.methods.push(method);
+                continue;
+            }
+
+            // Native Lambda form: Name(params) = expr  (no 'method' keyword)
+            const nativeLambdaMatch = cleanLine.match(/^(\w+)\s*\(([^)]*)\)\s*=\s*(.+)$/);
+            if (nativeLambdaMatch) {
+                const _rawLine0 = lines[i];
+                const _ls0 = _rawLine0.length - _rawLine0.trimStart().length;
+                const method = {
+                    name: nativeLambdaMatch[1],
+                    params: nativeLambdaMatch[2] ? nativeLambdaMatch[2].split(',').map(p => p.trim()).filter(Boolean) : [],
+                    expr: nativeLambdaMatch[3].trim(),
+                    exprOffset: _ls0 + (line.length - nativeLambdaMatch[3].length),
+                    startLine: i,
+                    isLambda: true,
+                    visibility,
+                    explicitVisibility
+                };
+                i++;
+                while (i < lines.length) {
+                    const contLine = lines[i].trim();
+                    if (!contLine || contLine.startsWith('--') ||
+                        contLine.match(/^(?:public\s+|private\s+)?method\s+/) ||
+                        contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/) ||
+                        contLine === '}') break;
+                    method.expr += ' ' + contLine;
                     i++;
                 }
                 result.methods.push(method);
@@ -927,8 +958,82 @@ class CLOOMCCompiler {
                 if (methodMatch[2] && methodMatch[2].trim()) {
                     method.params = methodMatch[2].split(',').map(p => p.trim()).filter(Boolean);
                 }
+                // Extract inline content after the opening brace on the declaration line
+                const _mOpenBrace = cleanLine.indexOf('{');
+                const _mInline = cleanLine.slice(_mOpenBrace + 1).trim();
                 i++;
                 let braceDepth = 1;
+                if (_mInline) {
+                    let _d = braceDepth;
+                    for (const ch of _mInline) { if (ch === '{') _d++; else if (ch === '}') _d--; }
+                    if (_d <= 0) {
+                        const _ci = _mInline.lastIndexOf('}');
+                        const _bt = _mInline.slice(0, _ci).trim();
+                        if (_bt) method.body.push({ text: _bt, lineNum: i - 1, rawLine: lines[i - 1] });
+                        braceDepth = _d;
+                    } else {
+                        method.body.push({ text: _mInline, lineNum: i - 1, rawLine: lines[i - 1] });
+                        braceDepth = _d;
+                    }
+                }
+                while (i < lines.length && braceDepth > 0) {
+                    const trimmed = lines[i].trim();
+                    if (trimmed === '}') {
+                        braceDepth--;
+                        if (braceDepth === 0) { i++; break; }
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
+                        i++;
+                        continue;
+                    }
+                    if (trimmed === '{') {
+                        braceDepth++;
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
+                        i++;
+                        continue;
+                    }
+                    for (const ch of trimmed) {
+                        if (ch === '{') braceDepth++;
+                        else if (ch === '}') braceDepth--;
+                    }
+                    if (braceDepth > 0) {
+                        method.body.push({ text: trimmed, lineNum: i, rawLine: lines[i] });
+                    } else {
+                        const beforeClose = trimmed.replace(/\}$/, '').trim();
+                        if (beforeClose) method.body.push({ text: beforeClose, lineNum: i, rawLine: lines[i] });
+                    }
+                    i++;
+                }
+                method.sourceLines = lines.slice(_srcStart, i).join('\n');
+                result.methods.push(method);
+                continue;
+            }
+
+            // Name(params) { ... }  (JS class-method style, no 'method' keyword)
+            const keywordlessMatch = cleanLine.match(/^(\w+)\s*\(([^)]*)\)\s*\{/);
+            if (keywordlessMatch) {
+                const _srcStart = _commentBlockStart >= 0 ? _commentBlockStart : i;
+                _commentBlockStart = -1;
+                const method = { name: keywordlessMatch[1], params: [], body: [], startLine: i, visibility, explicitVisibility };
+                if (keywordlessMatch[2] && keywordlessMatch[2].trim()) {
+                    method.params = keywordlessMatch[2].split(',').map(p => p.trim()).filter(Boolean);
+                }
+                const _klOpenBrace = cleanLine.indexOf('{');
+                const _klInline = cleanLine.slice(_klOpenBrace + 1).trim();
+                i++;
+                let braceDepth = 1;
+                if (_klInline) {
+                    let _d = braceDepth;
+                    for (const ch of _klInline) { if (ch === '{') _d++; else if (ch === '}') _d--; }
+                    if (_d <= 0) {
+                        const _ci = _klInline.lastIndexOf('}');
+                        const _bt = _klInline.slice(0, _ci).trim();
+                        if (_bt) method.body.push({ text: _bt, lineNum: i - 1, rawLine: lines[i - 1] });
+                        braceDepth = _d;
+                    } else {
+                        method.body.push({ text: _klInline, lineNum: i - 1, rawLine: lines[i - 1] });
+                        braceDepth = _d;
+                    }
+                }
                 while (i < lines.length && braceDepth > 0) {
                     const trimmed = lines[i].trim();
                     if (trimmed === '}') {
@@ -1903,6 +2008,8 @@ class CLOOMCCompiler {
                 while (i < lines.length) {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--') || contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
+                    if (contLine.match(/^\w+(?:\s+\w+)*\s*=\s/)) break;
+                    if (contLine.match(/^\w+\s*::/)) break;
                     method.expr += ' ' + contLine;
                     i++;
                 }
@@ -1927,11 +2034,50 @@ class CLOOMCCompiler {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--')) { i++; continue; }
                     if (contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
+                    if (contLine.match(/^\w+(?:\s+\w+)*\s*=\s/)) break;
+                    if (contLine.match(/^\w+\s*::/)) break;
                     method.expr += (method.expr ? ' ' : '') + contLine;
                     i++;
                 }
                 result.methods.push(method);
                 continue;
+            }
+
+            // Haskell type signature: name :: type  (skip silently, no method push)
+            const haskellTypeSig = cleanLine.match(/^(\w+)\s*::\s*.+$/);
+            if (haskellTypeSig) {
+                i++;
+                continue;
+            }
+
+            // Native Haskell function definition: name params = expr  (no 'method' keyword)
+            if (!/^method\s/.test(cleanLine)) {
+                const nativeHaskellMatch = cleanLine.match(/^(\w+)((?:\s+\w+)*)\s*=\s*(.+)$/);
+                if (nativeHaskellMatch) {
+                    const paramStr = nativeHaskellMatch[2].trim();
+                    const method = {
+                        name: nativeHaskellMatch[1],
+                        params: paramStr ? paramStr.split(/\s+/).filter(Boolean) : [],
+                        expr: nativeHaskellMatch[3].trim(),
+                        exprOffset: 0,
+                        startLine: i,
+                        isLambda: true,
+                        visibility,
+                        explicitVisibility
+                    };
+                    i++;
+                    while (i < lines.length) {
+                        const contLine = lines[i].trim();
+                        if (!contLine || contLine.startsWith('--') || contLine === '}') break;
+                        if (contLine.match(/^(?:public\s+|private\s+)?method\s+/)) break;
+                        if (contLine.match(/^\w+(?:\s+\w+)*\s*=\s/)) break;
+                        if (contLine.match(/^\w+\s*::/)) break;
+                        method.expr += ' ' + contLine;
+                        i++;
+                    }
+                    result.methods.push(method);
+                    continue;
+                }
             }
 
             i++;

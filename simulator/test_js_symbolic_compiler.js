@@ -532,6 +532,172 @@ console.log('\n--- JS13: let binding inside a while block (method-scoped) ---');
     }
 }
 
+// ── LC1: Lambda native two-method abstraction ─────────────────────────────────
+console.log('\n--- LC1: Lambda native Name(params) = expr (two methods) ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Ping {
+  A(x) = x
+  B(x) = 1
+}`;
+    const result = c.compileLambda(src, []);
+    check('LC1a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('LC1b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { words, cw } = buildLump(result);
+        check('LC1c: cw > 0', cw > 0, 'cw=' + cw);
+        check('LC1d: both dispatch entries non-zero', words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+        check('LC1e: dispatch entries ascending', words[1] < words[2],
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
+// ── LC2: Lambda native zero-param method B() = 1 ─────────────────────────────
+console.log('\n--- LC2: Lambda native zero-param B() = 1 ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Const {
+  B() = 1
+}`;
+    const result = c.compileLambda(src, []);
+    check('LC2a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('LC2b: exactly 1 method', result.methods.length === 1, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 1) {
+        check('LC2c: method name is B', result.methods[0].name === 'B', 'name=' + result.methods[0].name);
+        check('LC2d: params are empty', result.methods[0].params.length === 0, 'params=' + result.methods[0].params.length);
+        const { cw } = buildLump(result);
+        check('LC2e: cw > 0', cw > 0, 'cw=' + cw);
+    }
+}
+
+// ── LC3: Lambda mixed method + native in same abstraction ─────────────────────
+console.log('\n--- LC3: Lambda mixed method keyword and native form ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Mixed {
+  method A(x) = x
+  B(y) = y
+}`;
+    const result = c.compileLambda(src, []);
+    check('LC3a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('LC3b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { words, cw } = buildLump(result);
+        check('LC3c: cw > 0', cw > 0, 'cw=' + cw);
+        check('LC3d: both dispatch entries non-zero (identical bodies may share offset)',
+            words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
+// ── HS1: Haskell type-sig skip + native two-method ───────────────────────────
+console.log('\n--- HS1: Haskell type-sig skip + native two-method ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Ping {
+  ping :: Int -> Int
+  ping x = x
+  pong :: Int
+  pong = 1
+}`;
+    const result = c.compileHaskell(src, []);
+    check('HS1a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('HS1b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { words, cw } = buildLump(result);
+        check('HS1c: cw > 0', cw > 0, 'cw=' + cw);
+        check('HS1d: both dispatch entries non-zero', words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+        check('HS1e: dispatch entries ascending', words[1] < words[2],
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
+// ── HS2: Haskell native two-method (no type sigs) ────────────────────────────
+console.log('\n--- HS2: Haskell native two-method without type sigs ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Arith {
+  add x y = x
+  sub x y = x
+}`;
+    const result = c.compileHaskell(src, []);
+    check('HS2a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('HS2b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { cw } = buildLump(result);
+        check('HS2c: cw > 0', cw > 0, 'cw=' + cw);
+        check('HS2d: method names correct',
+            result.methods[0].name === 'add' && result.methods[1].name === 'sub',
+            'names=' + result.methods.map(m => m.name).join(','));
+    }
+}
+
+// ── HS3: Haskell mixed method keyword + native ────────────────────────────────
+console.log('\n--- HS3: Haskell mixed method keyword and native form ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Mixed {
+  method A(x) = x
+  helper y = y
+}`;
+    const result = c.compileHaskell(src, []);
+    check('HS3a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('HS3b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { words, cw } = buildLump(result);
+        check('HS3c: cw > 0', cw > 0, 'cw=' + cw);
+        check('HS3d: both dispatch entries non-zero', words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
+// ── JSN1: JS keywordless two-method ──────────────────────────────────────────
+console.log('\n--- JSN1: JS keywordless two-method (no method keyword) ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Ping {
+  A(x) { return x; }
+  B() { return 1; }
+}`;
+    const result = c.compileJS(src, []);
+    check('JSN1a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('JSN1b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        const { words, cw } = buildLump(result);
+        check('JSN1c: cw > 0', cw > 0, 'cw=' + cw);
+        check('JSN1d: both dispatch entries non-zero', words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+        check('JSN1e: dispatch entries ascending', words[1] < words[2],
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
+// ── JSN2: JS single-line method body (method keyword form) ────────────────────
+console.log('\n--- JSN2: JS single-line method body (method keyword, inline {…}) ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction Ping {
+  method A(x) { return x; }
+  method B() { return 1; }
+}`;
+    const result = c.compileJS(src, []);
+    check('JSN2a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('JSN2b: exactly 2 methods', result.methods.length === 2, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 2) {
+        check('JSN2c: both methods have non-empty code',
+            result.methods[0].code.length > 0 && result.methods[1].code.length > 0,
+            'codes=' + result.methods.map(m => m.code.length).join(','));
+        const { words, cw } = buildLump(result);
+        check('JSN2d: cw > 0', cw > 0, 'cw=' + cw);
+        check('JSN2e: both dispatch entries non-zero', words[1] !== 0 && words[2] !== 0,
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+        check('JSN2f: dispatch entries ascending', words[1] < words[2],
+            'words[1]=' + words[1] + ' words[2]=' + words[2]);
+    }
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════════');
 console.log('Results: ' + pass + ' passed, ' + fail + ' failed');
