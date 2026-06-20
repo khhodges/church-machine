@@ -1280,10 +1280,11 @@ class CLOOMCCompiler {
         const text = stmt.text.trim().replace(/;$/, '');
         if (!text || text.startsWith('//')) return;
 
-        const returnMatch = text.match(/^(?:RETURN|return)\s*(?:\(\s*(.*?)\s*\))?$/);
+        const returnMatch = text.match(/^(?:RETURN|return)(?:\s*\(\s*(.*?)\s*\)|\s+(.+))?$/);
         if (returnMatch) {
-            if (returnMatch[1]) {
-                const parts = returnMatch[1].split(',').map(s => s.trim());
+            const _returnExpr = returnMatch[1] !== undefined ? returnMatch[1] : (returnMatch[2] ? returnMatch[2].trim() : undefined);
+            if (_returnExpr) {
+                const parts = _returnExpr.split(',').map(s => s.trim());
                 for (let i = 0; i < parts.length && i + this.DR_ARGS_START <= this.DR_ARGS_END; i++) {
                     const targetDR = i + this.DR_ARGS_START;
                     const valDR = this._resolveExpr(parts[i], code, locals, rom, errors, stmt.lineNum, method, stmt.rawLine);
@@ -2691,8 +2692,16 @@ class CLOOMCCompiler {
             if (absMatch) {
                 result.name = absMatch[1];
                 hasAbstraction = true;
+                const _inlineAfterBrace = line.replace(/^abstraction\s+\w+\s*\{/i, '').trim();
+                let _bodyLines = lines;
+                if (_inlineAfterBrace) {
+                    const _inlineParts = _inlineAfterBrace.endsWith('}')
+                        ? [_inlineAfterBrace.slice(0, -1).trim(), '}']
+                        : [_inlineAfterBrace];
+                    _bodyLines = [...lines.slice(0, i + 1), ..._inlineParts, ...lines.slice(i + 1)];
+                }
                 i++;
-                i = this._parseSymbolicBody(lines, i, result, errors);
+                i = this._parseSymbolicBody(_bodyLines, i, result, errors);
                 break;
             }
             i++;
@@ -2765,6 +2774,24 @@ class CLOOMCCompiler {
                     i++;
                 }
                 result.methods.push(method);
+                continue;
+            }
+
+            const letMatch = cleanLine.match(/^let\s+(\w+)((?:\s+\w+)*)\s*=\s*(.+)$/);
+            if (letMatch) {
+                const letName = letMatch[1];
+                const letParams = letMatch[2].trim().split(/\s+/).filter(Boolean);
+                const letExpr = letMatch[3].trim();
+                const letVis = (!explicitVisibility && letName.startsWith('_')) ? 'private' : visibility;
+                const syntheticMethod = {
+                    name: letName,
+                    params: letParams,
+                    body: [{ line: i + 1, text: `return ${letExpr}`, rawLine: lines[i] }],
+                    visibility: letVis,
+                    explicitVisibility,
+                };
+                result.methods.push(syntheticMethod);
+                i++;
                 continue;
             }
 
