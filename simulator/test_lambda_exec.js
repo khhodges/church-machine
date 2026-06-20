@@ -25,6 +25,8 @@ const SOURCE = `-- LAMBDA CALCULUS
 abstraction RationalArithmetic {
     method addDen(d1, d2) = d1 * d2
     method mulNum(n1, n2) = n1 * n2
+    method divNum(n, d) = n / d
+    method divDen(a, b) = b / a
     method isEqual(n1, d1, n2, d2) =
         if (n1 * d2) == (n2 * d1) then 1 else 0
 }`;
@@ -137,6 +139,16 @@ assert('COMP4 isEqual method compiled',
         return m.name === 'isEqual' && m.code && m.code.length > 0;
     })));
 
+assert('COMP5 divNum method compiled',
+    !!(compiled.methods && compiled.methods.find(function (m) {
+        return m.name === 'divNum' && m.code && m.code.length > 0;
+    })));
+
+assert('COMP6 divDen method compiled',
+    !!(compiled.methods && compiled.methods.find(function (m) {
+        return m.name === 'divDen' && m.code && m.code.length > 0;
+    })));
+
 // ── Runtime: addDen ───────────────────────────────────────────────────────────
 console.log('\n--- Runtime: addDen ---');
 {
@@ -155,20 +167,38 @@ console.log('\n--- Runtime: mulNum ---');
         'got ' + r.result + ' in ' + r.steps + ' steps');
 }
 
+// ── Runtime: divNum ───────────────────────────────────────────────────────────
+console.log('\n--- Runtime: divNum ---');
+{
+    const r = runMethod('divNum', [30, 5]);
+    assert('EXEC5 divNum(30,5) runs without error', !r.error, r.error);
+    assert('EXEC6 divNum(30,5) = 6', !r.error && r.result === 6,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
+// ── Runtime: divDen ───────────────────────────────────────────────────────────
+console.log('\n--- Runtime: divDen ---');
+{
+    const r = runMethod('divDen', [3, 6]);
+    assert('EXEC7 divDen(3,6) runs without error', !r.error, r.error);
+    assert('EXEC8 divDen(3,6) = 2', !r.error && r.result === 2,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
 // ── Runtime: isEqual — equal fractions ───────────────────────────────────────
 console.log('\n--- Runtime: isEqual ---');
 {
     const r = runMethod('isEqual', [1, 2, 2, 4]);
-    assert('EXEC5 isEqual(1,2,2,4) runs without error', !r.error, r.error);
-    assert('EXEC6 isEqual(1,2,2,4) = 1', !r.error && r.result === 1,
+    assert('EXEC9 isEqual(1,2,2,4) runs without error', !r.error, r.error);
+    assert('EXEC10 isEqual(1,2,2,4) = 1', !r.error && r.result === 1,
         'got ' + r.result + ' in ' + r.steps + ' steps');
 }
 
 // ── Runtime: isEqual — unequal fractions ─────────────────────────────────────
 {
     const r = runMethod('isEqual', [1, 2, 1, 3]);
-    assert('EXEC7 isEqual(1,2,1,3) runs without error', !r.error, r.error);
-    assert('EXEC8 isEqual(1,2,1,3) = 0', !r.error && r.result === 0,
+    assert('EXEC11 isEqual(1,2,1,3) runs without error', !r.error, r.error);
+    assert('EXEC12 isEqual(1,2,1,3) = 0', !r.error && r.result === 0,
         'got ' + r.result + ' in ' + r.steps + ' steps');
 }
 
