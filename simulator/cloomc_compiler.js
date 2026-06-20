@@ -2124,8 +2124,11 @@ class CLOOMCCompiler {
                 tokens.push({ type: 'op', value: '-', pos: i }); i++; continue;
             }
             if (input[i] === '*') { tokens.push({ type: 'op', value: '*', pos: i }); i++; continue; }
+            if (input[i] === '%') { tokens.push({ type: 'op', value: '%', pos: i }); i++; continue; }
+            if (input.substring(i, i + 2) === '//') { tokens.push({ type: 'op', value: '//', pos: i }); i += 2; continue; }
             if (input.substring(i, i + 2) === '==') { tokens.push({ type: 'op', value: '==', pos: i }); i += 2; continue; }
             if (input.substring(i, i + 2) === '/=') { tokens.push({ type: 'op', value: '/=', pos: i }); i += 2; continue; }
+            if (input[i] === '/') { tokens.push({ type: 'op', value: '/', pos: i }); i++; continue; }
             if (input.substring(i, i + 2) === '<=') { tokens.push({ type: 'op', value: '<=', pos: i }); i += 2; continue; }
             if (input.substring(i, i + 2) === '>=') { tokens.push({ type: 'op', value: '>=', pos: i }); i += 2; continue; }
             if (input[i] === '<') { tokens.push({ type: 'op', value: '<', pos: i }); i++; continue; }

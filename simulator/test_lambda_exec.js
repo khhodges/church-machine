@@ -238,6 +238,146 @@ console.log('\n--- Runtime: isEqual ---');
         'got ' + r.result + ' in ' + r.steps + ' steps');
 }
 
+// ── Haskell front-end: modulo, integer division, plain division ───────────────
+
+const HASKELL_SOURCE = `abstraction HaskellArith {
+    method hmodNum(a, b) = a % b
+    method hidivNum(a, b) = a // b
+    method hdivNum(n, d) = n / d
+}`;
+
+const haskellCompiler = new CLOOMCCompiler();
+const haskellCompiled = haskellCompiler.compile(HASKELL_SOURCE, []);
+
+function runHaskellMethod(methodName, args) {
+    const method = haskellCompiled.methods && haskellCompiled.methods.find(m => m.name === methodName);
+    if (!method) {
+        return { error: 'Method ' + methodName + ' not found' };
+    }
+    const words = method.code;
+    if (!words || words.length === 0) {
+        return { error: 'Method ' + methodName + ' has no compiled code' };
+    }
+
+    const sim = new ChurchSimulator();
+    sim.bootComplete = true;
+
+    for (let i = 0; i < words.length; i++) {
+        sim.memory[CODE_BASE + 1 + i] = words[i] >>> 0;
+    }
+
+    const cr14GT = sim.createGT(0, 3, { R: 1, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
+    sim.cr[14] = { word0: cr14GT, word1: CODE_BASE, word2: 0, word3: 0, m: 0 };
+
+    sim.mLoad = function (gt, perm, crIdx, addr) {
+        if (!gt || gt === 0) {
+            return { ok: false, fault: 'NULL_CAP', message: 'null GT' };
+        }
+        return {
+            ok: true,
+            parsed: { index: 3, gt_seq: 0, permissions: { R: 1, X: 1 } },
+            entry: { word0_location: CODE_BASE, word1_limit: CODE_BASE + 0x1000 },
+            index: 3,
+        };
+    };
+
+    sim.dr.fill(0);
+    for (let i = 0; i < args.length; i++) {
+        sim.dr[1 + i] = args[i] | 0;
+    }
+    sim.pc = 0;
+    sim.halted = false;
+
+    sim.callStack.push({
+        sentinel: false,
+        sz: 1,
+        returnPC: 0xFFF0,
+        savedCRs: null,
+        savedDRs: null,
+        savedFlags: null,
+    });
+    const targetDepth = sim.callStack.length;
+
+    let steps = 0;
+    while (!sim.halted && sim.callStack.length >= targetDepth && steps < MAX_STEPS) {
+        sim.step();
+        steps++;
+    }
+
+    if (steps >= MAX_STEPS) {
+        return { error: 'exceeded ' + MAX_STEPS + ' steps — possible infinite loop', steps };
+    }
+    if (sim.halted) {
+        const faultMsg = sim.faultLog && sim.faultLog.length
+            ? sim.faultLog[sim.faultLog.length - 1].message
+            : 'unknown';
+        return { error: 'simulator halted: ' + faultMsg, steps };
+    }
+
+    return { result: sim.dr[1] | 0, steps };
+}
+
+console.log('\n--- Haskell front-end compilation ---');
+
+assert('HCOMP1 Haskell source detected as haskell language',
+    haskellCompiled.language === 'haskell',
+    'got language: ' + haskellCompiled.language);
+
+assert('HCOMP2 haskellCompiled produces no errors',
+    haskellCompiled.errors.length === 0,
+    haskellCompiled.errors.map(function (e) { return e.message; }).join('; '));
+
+assert('HCOMP3 hmodNum method compiled',
+    !!(haskellCompiled.methods && haskellCompiled.methods.find(function (m) {
+        return m.name === 'hmodNum' && m.code && m.code.length > 0;
+    })));
+
+assert('HCOMP4 hidivNum method compiled',
+    !!(haskellCompiled.methods && haskellCompiled.methods.find(function (m) {
+        return m.name === 'hidivNum' && m.code && m.code.length > 0;
+    })));
+
+assert('HCOMP5 hdivNum method compiled',
+    !!(haskellCompiled.methods && haskellCompiled.methods.find(function (m) {
+        return m.name === 'hdivNum' && m.code && m.code.length > 0;
+    })));
+
+console.log('\n--- Haskell runtime: hmodNum (%) ---');
+{
+    const r = runHaskellMethod('hmodNum', [10, 3]);
+    assert('HEXEC1 hmodNum(10,3) runs without error', !r.error, r.error);
+    assert('HEXEC2 hmodNum(10,3) = 1', !r.error && r.result === 1,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+{
+    const r = runHaskellMethod('hmodNum', [9, 3]);
+    assert('HEXEC3 hmodNum(9,3) runs without error', !r.error, r.error);
+    assert('HEXEC4 hmodNum(9,3) = 0', !r.error && r.result === 0,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
+console.log('\n--- Haskell runtime: hidivNum (//) ---');
+{
+    const r = runHaskellMethod('hidivNum', [10, 3]);
+    assert('HEXEC5 hidivNum(10,3) runs without error', !r.error, r.error);
+    assert('HEXEC6 hidivNum(10,3) = 3', !r.error && r.result === 3,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+{
+    const r = runHaskellMethod('hidivNum', [12, 4]);
+    assert('HEXEC7 hidivNum(12,4) runs without error', !r.error, r.error);
+    assert('HEXEC8 hidivNum(12,4) = 3', !r.error && r.result === 3,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
+console.log('\n--- Haskell runtime: hdivNum (/) ---');
+{
+    const r = runHaskellMethod('hdivNum', [20, 4]);
+    assert('HEXEC9 hdivNum(20,4) runs without error', !r.error, r.error);
+    assert('HEXEC10 hdivNum(20,4) = 5', !r.error && r.result === 5,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 console.log('\n--- Summary ---');
 console.log(passed + ' passed, ' + failed + ' failed');
