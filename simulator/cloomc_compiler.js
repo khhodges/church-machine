@@ -2537,6 +2537,7 @@ class CLOOMCCompiler {
                 const leftReg = this._emitHaskellExpr(node.left, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
                 const rightReg = this._emitHaskellExpr(node.right, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
                 const dr = this._allocTemp(locals);
+                locals[`_t${dr}`] = dr;
 
                 switch (node.op) {
                     case '+':
@@ -2568,20 +2569,24 @@ class CLOOMCCompiler {
                             code.push(this.encode(this.opcodes.ISUB, 14, dr, leftReg, 0));
                         }
                         break;
-                    case '*':
+                    case '*': {
+                        const cntReg = this._allocTemp(locals);
+                        locals[`_t${cntReg}`] = cntReg;
                         manifest.push({ src: lineNum, addr: code.length, desc: 'multiply (iterative add)' });
+                        code.push(this.encode(this.opcodes.IADD, 14, cntReg, rightReg, 0));
                         code.push(this.encode(this.opcodes.IADD, 14, dr, 0, 0));
                         const loopAddr = code.length;
-                        code.push(this.encode(this.opcodes.MCMP, 14, rightReg, 0, 0));
+                        code.push(this.encode(this.opcodes.MCMP, 14, cntReg, 0, 0));
                         const exitAddr = code.length;
                         code.push(this.encode(this.opcodes.BRANCH, this.conditions.EQ, 0, 0, 0));
-                        code.push(this.encode(this.opcodes.IADD, 14, dr, dr, 0));
-                        code.push(this.encode(this.opcodes.ISUB, 14, rightReg, rightReg, 1));
+                        code.push(this.encode(this.opcodes.IADD, 14, dr, dr, leftReg));
+                        code.push(this.encode(this.opcodes.ISUB, 14, cntReg, cntReg, 1));
                         code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, loopAddr & 0x7FFF));
                         const exitTarget = code.length;
                         code[exitAddr] = (code[exitAddr] & ~0x7FFF) | (exitTarget & 0x7FFF);
                         code[exitAddr] = code[exitAddr] >>> 0;
                         break;
+                    }
                     case '/': {
                         manifest.push({ src: lineNum, addr: code.length, desc: 'divide (repeated subtraction)' });
                         const remDR = this._allocTemp(locals);
