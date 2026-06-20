@@ -465,6 +465,8 @@ def _upload_boot_image() -> bool:
 
     if len(img_bytes) == 0:
         print("ERROR: boot image is empty — generate it first via the IDE", file=sys.stderr)
+        print("  Hint: open the IDE → Builder tab → Step 1 (Ti60 F225) → Generate Boot Image",
+              file=sys.stderr)
         return False
     if len(img_bytes) % 4 != 0:
         print(f"ERROR: boot image size {len(img_bytes)} is not a multiple of 4",
@@ -472,7 +474,32 @@ def _upload_boot_image() -> bool:
         return False
 
     n_words = len(img_bytes) // 4
-    print(f"  [upload] {n_words} words ({len(img_bytes)} bytes), CRC computing …")
+
+    # ── Pre-flight validation ────────────────────────────────────────────────
+    # word[0] must have LUMP magic: bits[31:27] == 0x1F.
+    # decode word[0] big-endian (LUMP binaries are big-endian on the wire)
+    import struct as _struct
+    w0 = _struct.unpack_from(">I", img_bytes, 0)[0]
+    _magic   = (w0 >> 27) & 0x1F
+    _nm6     = (w0 >> 23) & 0x0F          # n_minus_6: alloc = 2^(n+6) words
+    _alloc   = 1 << (_nm6 + 6)
+    _cw      = (w0 >> 10) & 0x1FFF
+    _cc      = w0 & 0xFF
+    _magic_ok = (_magic == 0x1F)
+    print(f"  [upload] image: {n_words} words ({len(img_bytes)} bytes), "
+          f"word[0]=0x{w0:08X}, magic={'OK' if _magic_ok else 'BAD (expected 0x1F)'}, "
+          f"alloc={_alloc} words, cw={_cw}, cc={_cc}")
+    if not _magic_ok:
+        print("ERROR: boot image word[0] does not have LUMP magic (bits[31:27] != 0x1F).",
+              file=sys.stderr)
+        print("  The cached boot-image.bin on the server is stale or was not generated.",
+              file=sys.stderr)
+        print("  Fix: open the IDE → Builder tab → Step 1 (Ti60 F225) → Generate Boot Image,",
+              file=sys.stderr)
+        print("       then re-run --upload.", file=sys.stderr)
+        return False
+
+    print(f"  [upload] pre-flight OK — sending {n_words} words, CRC computing …")
 
     crc  = _crc16_ccitt(img_bytes)
     addr = 0x0000

@@ -110,8 +110,43 @@ fi
 
 echo "  Bridge : $BRIDGE_PY"
 echo ""
-echo "  Tip: Run this in the background, then open the IDE."
-echo "       The Ti60 will appear in the Dashboard device list as Ti60F225."
-echo ""
+
+# ---------------------------------------------------------------------------
+# --upload mode extra instructions
+# ---------------------------------------------------------------------------
+_UPLOAD_MODE=0
+for _a in "$@"; do
+    if [[ "$_a" == "--upload" ]]; then
+        _UPLOAD_MODE=1
+        break
+    fi
+done
+
+if [ "$_UPLOAD_MODE" = "1" ]; then
+    echo "  ┌─────────────────────────────────────────────────────────────┐"
+    echo "  │  UPLOAD MODE — PATCH_LUMP via CM debug UART (ttyUSB3)      │"
+    echo "  ├─────────────────────────────────────────────────────────────┤"
+    echo "  │  Pre-requisite: boot-image.bin must be freshly generated.   │"
+    echo "  │    → IDE Builder tab → Step 1 (Ti60 F225) → Generate        │"
+    echo "  │                                                              │"
+    echo "  │  After the ✓ ACK message:                                   │"
+    echo "  │    → Hold the Ti60 push button for ~1 second, then release. │"
+    echo "  │    → CM reboots from NIA=0 with the new boot image.         │"
+    echo "  │    → LED0 should start blinking at ~1 Hz.                   │"
+    echo "  │                                                              │"
+    echo "  │  Expected bridge output (healthy):                          │"
+    echo "  │    [CALL HOME] Ti60F225  UID=...  NIA=0x...  boot_ok=1      │"
+    echo "  │    [CALL HOME] ACK received from IDE                         │"
+    echo "  │    (no HUNG lines = LED blink is running correctly)          │"
+    echo "  └─────────────────────────────────────────────────────────────┘"
+    echo ""
+else
+    echo "  Tip: Run this in the background, then open the IDE."
+    echo "       The Ti60 will appear in the Dashboard device list as Ti60F225."
+    echo ""
+    echo "  To upload a new boot image to CM BRAM, add --upload:"
+    echo "    $0 --ide=<URL> --insecure --upload"
+    echo ""
+fi
 
 exec python3 "$BRIDGE_PY" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
