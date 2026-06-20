@@ -350,7 +350,7 @@ class CLOOMCCompiler {
                 while (i < lines.length) {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--') || contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
-                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/)) break;
+                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/)) break;
                     method.expr += ' ' + contLine;
                     i++;
                 }
@@ -375,7 +375,7 @@ class CLOOMCCompiler {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--')) { i++; continue; }
                     if (contLine.match(/^(?:public\s+|private\s+)?method\s+/) || contLine === '}') break;
-                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/)) break;
+                    if (contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/)) break;
                     method.expr += (method.expr ? ' ' : '') + contLine;
                     i++;
                 }
@@ -384,8 +384,10 @@ class CLOOMCCompiler {
             }
 
             // Native Lambda form: Name(params) = expr  (no 'method' keyword)
-            const nativeLambdaMatch = cleanLine.match(/^(\w+)\s*\(([^)]*)\)\s*=\s*(.+)$/);
-            if (nativeLambdaMatch) {
+            // Requires a plain = (not ==) and excludes language keywords as method names.
+            const _LAMBDA_KEYWORDS = new Set(['if', 'else', 'then', 'let', 'in']);
+            const nativeLambdaMatch = cleanLine.match(/^(\w+)\s*\(([^)]*)\)\s*=(?!=)\s*(.+)$/);
+            if (nativeLambdaMatch && !_LAMBDA_KEYWORDS.has(nativeLambdaMatch[1])) {
                 const _rawLine0 = lines[i];
                 const _ls0 = _rawLine0.length - _rawLine0.trimStart().length;
                 const method = {
@@ -403,7 +405,7 @@ class CLOOMCCompiler {
                     const contLine = lines[i].trim();
                     if (!contLine || contLine.startsWith('--') ||
                         contLine.match(/^(?:public\s+|private\s+)?method\s+/) ||
-                        contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=/) ||
+                        contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/) ||
                         contLine === '}') break;
                     method.expr += ' ' + contLine;
                     i++;
