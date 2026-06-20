@@ -279,6 +279,15 @@ class CLOOMCCompiler {
                 i = this._parseLambdaBody(lines, i, result, errors);
                 break;
             }
+            // No-braces form: "abstraction Name" on its own line — treat the
+            // rest of the source as the body (no closing } required).
+            const absNobraceMatch = line.match(/^abstraction\s+(\w+)\s*$/i);
+            if (absNobraceMatch) {
+                result.name = absNobraceMatch[1];
+                i++;
+                i = this._parseLambdaBody(lines, i, result, errors);
+                break;
+            }
             i++;
         }
 
@@ -414,6 +423,88 @@ class CLOOMCCompiler {
                 }
                 result.methods.push(method);
                 continue;
+            }
+
+            // Named lambda form: Name = λx.body / Name = lambda x. body
+            // Covers Church booleans (TRUE = λx.λy.x), numerals (ZERO = λf.λx.x),
+            // combinators (I = λx.x, S = λx.λy.λz.x z(y z)), and textbook λ-style.
+            // Name becomes the method name; params extracted by stripping leading λ's.
+            {
+                const _namedLambdaMatch = cleanLine.match(/^(\w+)\s*=(?!=)\s*([\s\S]+)$/);
+                if (_namedLambdaMatch && !_LAMBDA_KEYWORDS.has(_namedLambdaMatch[1])) {
+                    const _nlName = _namedLambdaMatch[1];
+                    let _nlExpr = _namedLambdaMatch[2].trim();
+                    const _nlIsLambda = /^(?:λ|\\)[\s\S]/.test(_nlExpr) || /^lambda\s+\w/i.test(_nlExpr);
+                    if (_nlIsLambda) {
+                        const _nlParams = [];
+                        let _nlm;
+                        while ((_nlm = _nlExpr.match(/^(?:λ|\\)(\w+)\.\s*([\s\S]*)$/)) ||
+                               (_nlm = _nlExpr.match(/^lambda\s+(\w+)\s*\.\s*([\s\S]*)$/i))) {
+                            _nlParams.push(_nlm[1]);
+                            _nlExpr = _nlm[2].trim();
+                        }
+                        const _rawLine0 = lines[i];
+                        const _ls0 = _rawLine0.length - _rawLine0.trimStart().length;
+                        const method = {
+                            name: _nlName,
+                            params: _nlParams,
+                            expr: _nlExpr,
+                            exprOffset: _ls0,
+                            startLine: i,
+                            isLambda: true,
+                            visibility,
+                            explicitVisibility,
+                        };
+                        i++;
+                        while (i < lines.length) {
+                            const contLine = lines[i].trim();
+                            if (!contLine || contLine.startsWith('--') ||
+                                contLine.match(/^(?:public\s+|private\s+)?method\s+/) ||
+                                contLine.match(/^(?:public\s+|private\s+)?\w+\s*=(?!=)\s*(?:λ|\\|lambda\s)/) ||
+                                contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/) ||
+                                contLine === '}') break;
+                            method.expr += ' ' + contLine;
+                            i++;
+                        }
+                        result.methods.push(method);
+                        continue;
+                    }
+                }
+            }
+
+            // Arrow notation: Name = (params) => expr
+            // Covers JS-style lambda: Apply = (x) => x, Compose = (f, g) => f(g x)
+            {
+                const _arrowMatch = cleanLine.match(/^(\w+)\s*=(?!=)\s*\(([^)]*)\)\s*=>\s*(.+)$/);
+                if (_arrowMatch && !_LAMBDA_KEYWORDS.has(_arrowMatch[1])) {
+                    const _rawLine0 = lines[i];
+                    const _ls0 = _rawLine0.length - _rawLine0.trimStart().length;
+                    const method = {
+                        name: _arrowMatch[1],
+                        params: _arrowMatch[2]
+                            ? _arrowMatch[2].split(',').map(p => p.trim()).filter(Boolean)
+                            : [],
+                        expr: _arrowMatch[3].trim(),
+                        exprOffset: _ls0,
+                        startLine: i,
+                        isLambda: true,
+                        visibility,
+                        explicitVisibility,
+                    };
+                    i++;
+                    while (i < lines.length) {
+                        const contLine = lines[i].trim();
+                        if (!contLine || contLine.startsWith('--') ||
+                            contLine.match(/^(?:public\s+|private\s+)?method\s+/) ||
+                            contLine.match(/^(?:public\s+|private\s+)?\w+\s*=(?!=)\s*(?:λ|\\|lambda\s|\()/) ||
+                            contLine.match(/^(?:public\s+|private\s+)?\w+\s*\([^)]*\)\s*=(?!=)/) ||
+                            contLine === '}') break;
+                        method.expr += ' ' + contLine;
+                        i++;
+                    }
+                    result.methods.push(method);
+                    continue;
+                }
             }
 
             // Bare lambda abstraction: λx.body or \x.body (no 'method' keyword, no name).
