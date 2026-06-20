@@ -11,6 +11,11 @@
 //   JS6  — JS method body: single let binding (let r = x + x)
 //   JS7  — JS method body: multiple let bindings chained, then return
 //   JS8  — JS method body: let binding and bare assignment coexist in same body
+//   JS9  — JS method body: const binding (single)
+//   JS10 — JS method body: multiple const bindings chained, then return
+//   JS11 — JS method body: const, let, and var bindings coexist in same body
+//   JS12 — JS method body: let binding inside an if block compiles without error (method-scoped)
+//   JS13 — JS method body: let binding inside a while block compiles without error (method-scoped)
 //   SY1  — Symbolic let-form: single let binding (one-liner abstraction)
 //   SY2  — Symbolic let-form: multi-line abstraction with several let bindings
 //   SY3  — Symbolic let-form: private let (name starts with _)
@@ -473,6 +478,57 @@ console.log('\n--- JS11: const, let, and var bindings coexist in same body ---')
             'code.length=' + result.methods[0].code.length);
         const { cw } = buildLump(result);
         check('JS11d: cw > 0', cw > 0, 'cw=' + cw);
+    }
+}
+
+// ── JS12: let binding inside an if block ─────────────────────────────────────
+// let-bindings are method-scoped (not block-scoped): the variable declared
+// inside the if body lives for the lifetime of the method, not just the block.
+console.log('\n--- JS12: let binding inside an if block (method-scoped) ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction LetInIf {
+    public method Run(x) {
+        if (x > 0) {
+            let y = x + 1
+        }
+        return x
+    }
+}`;
+    const result = c.compileJS(src, []);
+    check('JS12a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('JS12b: exactly 1 method', result.methods.length === 1, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 1) {
+        check('JS12c: method code is non-empty', result.methods[0].code.length > 0,
+            'code.length=' + result.methods[0].code.length);
+        const { cw } = buildLump(result);
+        check('JS12d: cw > 0', cw > 0, 'cw=' + cw);
+    }
+}
+
+// ── JS13: let binding inside a while block ───────────────────────────────────
+// Same method-scoped rule applies for while bodies: the bound register persists
+// across loop iterations and is visible after the loop ends.
+console.log('\n--- JS13: let binding inside a while block (method-scoped) ---');
+{
+    const c = new CLOOMCCompiler();
+    const src = `abstraction LetInWhile {
+    public method Run(x) {
+        while (x > 0) {
+            let y = x + 1
+            x = y - 2
+        }
+        return x
+    }
+}`;
+    const result = c.compileJS(src, []);
+    check('JS13a: compiles without errors', result.errors.length === 0, errMsg(result));
+    check('JS13b: exactly 1 method', result.methods.length === 1, 'methods=' + result.methods.length);
+    if (result.errors.length === 0 && result.methods.length === 1) {
+        check('JS13c: method code is non-empty', result.methods[0].code.length > 0,
+            'code.length=' + result.methods[0].code.length);
+        const { cw } = buildLump(result);
+        check('JS13d: cw > 0', cw > 0, 'cw=' + cw);
     }
 }
 

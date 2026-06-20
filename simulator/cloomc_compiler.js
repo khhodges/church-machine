@@ -1053,6 +1053,12 @@ class CLOOMCCompiler {
         return this.DR_TEMP_START;
     }
 
+    // NOTE: let-bindings are method-scoped, not block-scoped. A variable
+    // declared with `let x = ...` inside an if or while body occupies the same
+    // register slot for the lifetime of the enclosing method — the Church
+    // Machine ISA has no stack frame, so block-level scoping cannot be enforced
+    // here. Callers must not rely on a binding being restricted to the block in
+    // which it first appears.
     _allocLocal(name, locals, errors, lineNum) {
         if (locals[name] !== undefined) return locals[name];
         for (let r = this.DR_LOCALS_START; r <= this.DR_LOCALS_END; r++) {
