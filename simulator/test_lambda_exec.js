@@ -29,6 +29,7 @@ abstraction RationalArithmetic {
     method divDen(a, b) = b / a
     method modNum(a, b) = a % b
     method idivNum(a, b) = a // b
+    method gcd(a, b) = if b == 0 then a else gcd b (a % b)
     method isEqual(n1, d1, n2, d2) =
         if (n1 * d2) == (n2 * d1) then 1 else 0
 }`;
@@ -161,6 +162,11 @@ assert('COMP8 idivNum method compiled',
         return m.name === 'idivNum' && m.code && m.code.length > 0;
     })));
 
+assert('COMP9 gcd method compiled',
+    !!(compiled.methods && compiled.methods.find(function (m) {
+        return m.name === 'gcd' && m.code && m.code.length > 0;
+    })));
+
 // ── Runtime: addDen ───────────────────────────────────────────────────────────
 console.log('\n--- Runtime: addDen ---');
 {
@@ -218,6 +224,21 @@ console.log('\n--- Runtime: idivNum ---');
     const r = runMethod('idivNum', [10, 3]);
     assert('EXEC17 idivNum(10,3) runs without error', !r.error, r.error);
     assert('EXEC18 idivNum(10,3) = 3', !r.error && r.result === 3,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
+// ── Runtime: gcd ──────────────────────────────────────────────────────────────
+console.log('\n--- Runtime: gcd ---');
+{
+    const r = runMethod('gcd', [12, 8]);
+    assert('EXEC19 gcd(12,8) runs without error', !r.error, r.error);
+    assert('EXEC20 gcd(12,8) = 4', !r.error && r.result === 4,
+        'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+{
+    const r = runMethod('gcd', [7, 3]);
+    assert('EXEC21 gcd(7,3) runs without error', !r.error, r.error);
+    assert('EXEC22 gcd(7,3) = 1', !r.error && r.result === 1,
         'got ' + r.result + ' in ' + r.steps + ' steps');
 }
 
@@ -376,6 +397,24 @@ console.log('\n--- Haskell runtime: hdivNum (/) ---');
     assert('HEXEC9 hdivNum(20,4) runs without error', !r.error, r.error);
     assert('HEXEC10 hdivNum(20,4) = 5', !r.error && r.result === 5,
         'got ' + r.result + ' in ' + r.steps + ' steps');
+}
+
+// ── Regression: non-tail self-calls must not be silently miscompiled ──────────
+// A self-call that is NOT in tail position (i.e. the result feeds into another
+// operation, like (f (n-1)) + 1) cannot be compiled by the tail-loop mechanism.
+// The compiler should report an error rather than emit a silently wrong result.
+console.log('\n--- Regression: non-tail recursion rejected ---');
+{
+    const ntSrc = `-- LAMBDA CALCULUS
+abstraction NonTailTest {
+    method f(n) = if n == 0 then 0 else (f (n - 1)) + 1
+}`;
+    const ntCompiler = new CLOOMCCompiler();
+    const ntResult = ntCompiler.compileLambda(ntSrc);
+    assert('COMP10 non-tail self-call produces compile error (not silent miscompilation)',
+        ntResult.errors && ntResult.errors.length > 0,
+        'expected compile error for non-tail recursion, got none; methods: ' +
+            JSON.stringify((ntResult.methods || []).map(function(m) { return m.name; })));
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

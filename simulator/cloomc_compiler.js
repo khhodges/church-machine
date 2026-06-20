@@ -663,20 +663,31 @@ class CLOOMCCompiler {
         const locals = {};
         let nextLocal = this.DR_LOCALS_START;
 
+        const paramRegs = [];
         for (let pi = 0; pi < method.params.length; pi++) {
             if (pi + this.DR_ARGS_START <= this.DR_ARGS_END) {
                 locals[method.params[pi]] = pi + this.DR_ARGS_START;
+                paramRegs.push(pi + this.DR_ARGS_START);
             } else {
                 if (nextLocal > this.DR_LOCALS_END) {
                     errors.push({ line: method.startLine, message: 'Too many parameters' });
                     return { code: [], errors, manifest: [] };
                 }
-                locals[method.params[pi]] = nextLocal++;
+                locals[method.params[pi]] = nextLocal;
+                paramRegs.push(nextLocal);
+                nextLocal++;
             }
         }
 
+        const prevSelfCtx = this._selfTailCallCtx;
+        this._selfTailCallCtx = method.params.length > 0
+            ? { name: method.name, params: paramRegs }
+            : null;
+
         const ast = this._parseLambdaExpr(method.expr);
         const resultReg = this._emitHaskellExpr(ast, code, locals, rom, capNames, errors, manifest, method.startLine, method.exprOffset || 0);
+
+        this._selfTailCallCtx = prevSelfCtx;
 
         if (errors.length > 0) {
             return { code: [], errors, manifest: [] };
@@ -2445,7 +2456,11 @@ class CLOOMCCompiler {
                 const bodyStart = code.length;
                 manifest.push({ src: lineNum, addr: bodyStart, desc: `lambda \\${node.params.join(' ')} -> ...` });
 
+                // A lambda body is a different function scope — self-tail-calls do not apply here.
+                const _lambdaSavedCtx = this._selfTailCallCtx;
+                this._selfTailCallCtx = null;
                 const resultReg = this._emitHaskellExpr(node.body, code, lambdaLocals, rom, capNames, errors, manifest, lineNum, exprOffset);
+                this._selfTailCallCtx = _lambdaSavedCtx;
 
                 if (resultReg !== this.DR_ARGS_START) {
                     code.push(this.encode(this.opcodes.IADD, 14, this.DR_ARGS_START, resultReg, 0));
@@ -2461,6 +2476,47 @@ class CLOOMCCompiler {
             }
 
             case 'app': {
+                // Self-tail-call: gcd(b, a%b) → compute new args into fresh regs, set params, BRANCH back to start.
+                // Detects complete self-calls (all params supplied) and converts them to tail loops.
+                if (this._selfTailCallCtx) {
+                    const ctx = this._selfTailCallCtx;
+                    const selfArgs = [];
+                    let n = node;
+                    while (n.type === 'app') { selfArgs.unshift(n.arg); n = n.func; }
+                    if (n.type === 'var' && n.name === ctx.name && selfArgs.length === ctx.params.length) {
+                        // Disable self-ctx during arg evaluation to prevent nested self-call confusion
+                        const savedCtx = this._selfTailCallCtx;
+                        this._selfTailCallCtx = null;
+                        const tempRegs = selfArgs.map(arg =>
+                            this._emitHaskellExpr(arg, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset)
+                        );
+                        this._selfTailCallCtx = savedCtx;
+                        // Force each result into a fresh temp if it overlaps a param reg (prevents aliasing)
+                        const safeTemps = tempRegs.map((reg, i) => {
+                            if (ctx.params.indexOf(reg) !== -1) {
+                                const fresh = this._allocTemp(locals);
+                                manifest.push({ src: lineNum, addr: code.length, desc: `self-tail: save arg${i} to DR${fresh}` });
+                                code.push(this.encode(this.opcodes.IADD, 14, fresh, reg, 0));
+                                return fresh;
+                            }
+                            return reg;
+                        });
+                        // Assign safe temps back to the param registers
+                        for (let i = 0; i < ctx.params.length; i++) {
+                            if (safeTemps[i] !== ctx.params[i]) {
+                                manifest.push({ src: lineNum, addr: code.length, desc: `self-tail: param${i} = DR${safeTemps[i]}` });
+                                code.push(this.encode(this.opcodes.IADD, 14, ctx.params[i], safeTemps[i], 0));
+                            }
+                        }
+                        // Backward branch to the start of this method's code (index 0 in the code array)
+                        const branchPos = code.length;
+                        const soff = -branchPos;  // target=0, this.pc=branchPos at execution
+                        manifest.push({ src: lineNum, addr: code.length, desc: `BRANCH AL (self-tail-call → ${ctx.name})` });
+                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, soff & 0x7FFF));
+                        return ctx.params[0];  // dummy result; branch diverges so this value is dead
+                    }
+                }
+
                 if (node.func.type === 'var' && node.func.name.includes('.')) {
                     const parts = node.func.name.split('.');
                     const absName = parts[0].toUpperCase();
@@ -2539,8 +2595,12 @@ class CLOOMCCompiler {
             }
 
             case 'binop': {
+                // Operands of a binary operation are never in tail position.
+                const _binopSavedCtx = this._selfTailCallCtx;
+                this._selfTailCallCtx = null;
                 const leftReg = this._emitHaskellExpr(node.left, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
                 const rightReg = this._emitHaskellExpr(node.right, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
+                this._selfTailCallCtx = _binopSavedCtx;
                 const dr = this._allocTemp(locals);
                 locals[`_t${dr}`] = dr;
 
@@ -2647,6 +2707,9 @@ class CLOOMCCompiler {
 
             case 'let': {
                 const letLocals = { ...locals };
+                // Binding values are not in tail position; only the body is.
+                const _letSavedCtx = this._selfTailCallCtx;
+                this._selfTailCallCtx = null;
                 for (const binding of node.bindings) {
                     const valReg = this._emitHaskellExpr(binding.value, code, letLocals, rom, capNames, errors, manifest, lineNum, exprOffset);
                     const dr = this._allocLocal(binding.name, letLocals, errors, lineNum);
@@ -2655,6 +2718,7 @@ class CLOOMCCompiler {
                     }
                     manifest.push({ src: lineNum, addr: code.length - 1, desc: `let ${binding.name}` });
                 }
+                this._selfTailCallCtx = _letSavedCtx;
                 return this._emitHaskellExpr(node.body, code, letLocals, rom, capNames, errors, manifest, lineNum, exprOffset);
             }
 
@@ -2743,8 +2807,12 @@ class CLOOMCCompiler {
             }
 
             case 'pair': {
+                // Pair components are never in tail position.
+                const _pairSavedCtx = this._selfTailCallCtx;
+                this._selfTailCallCtx = null;
                 const fstReg = this._emitHaskellExpr(node.fst, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
                 const sndReg = this._emitHaskellExpr(node.snd, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
+                this._selfTailCallCtx = _pairSavedCtx;
                 const dr = this._allocTemp(locals);
                 manifest.push({ src: lineNum, addr: code.length, desc: 'pair (fst, snd)' });
                 code.push(this.encode(this.opcodes.SHL, 14, dr, fstReg, 16));

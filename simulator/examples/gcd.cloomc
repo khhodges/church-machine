@@ -1,0 +1,10 @@
+-- LAMBDA CALCULUS
+-- GCD via Euclidean algorithm using modulo
+-- Demonstrates self-tail-call recursion compiled to a backward-branch loop.
+--
+-- gcd(12, 8) = 4   (used for rational simplification: 3/4)
+-- gcd(7,  3) = 1   (already in lowest terms: 7/3)
+--
+abstraction GCD {
+    method gcd(a, b) = if b == 0 then a else gcd b (a % b)
+}
