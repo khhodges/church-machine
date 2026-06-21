@@ -132,6 +132,15 @@ echo ""
 
 # ── Step 3: Synthesis (EFX_MAP, Efinity 2025.2) ─────────────────────────────
 _info "Step 3/8: Synthesis (efx_map — Efinity 2025.2, ~4 min)"
+
+# Efinity GUI re-injects infer_set_reset / infer_clk_enable into the local
+# project XML whenever the project is opened.  These params crash efx_map
+# (hard STACK TRACE exit) on 2025.2.  Strip them every time before synthesis.
+sed -i \
+    -e '/<efx:param name="infer_set_reset"/d' \
+    -e '/<efx:param name="infer_clk_enable"/d' \
+    "$SOC_DIR/church_soc_cm.xml"
+
 EFINITY_HOME="$EFINITY_MAP" bash "$HW/run_efx_map.sh" "$SOC_DIR/church_soc_cm.xml" 2>&1 | tee /tmp/build_map.log | tail -8
 
 # Derive circuit name from the project XML filename — same convention used by
