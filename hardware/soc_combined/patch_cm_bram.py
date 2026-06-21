@@ -110,7 +110,10 @@ def main():
         print('       Pass the directory that contains church_ti60_f225.v.')
         sys.exit(1)
 
-    work_syn_dir = os.path.join(project_dir, 'work_syn')
+    # EFX_MAP resolves bare $readmemb filenames relative to the project root
+    # (the CWD when run_efx_map.sh executes), NOT relative to work_syn/.
+    # Write bin files to the project root so they are found at elaboration.
+    bin_dir = project_dir
 
     print(f'Reading {vpath} ...')
     src = open(vpath).read()
@@ -167,21 +170,28 @@ def main():
     nonzero = sum(1 for v in vals.values() if v)
     print(f'  Initial block: {len(vals)} entries, {nonzero} non-zero')
 
-    # ── Step 3: write .bin files to work_syn/ ───────────────────────────────
-    print(f'  Writing bin files to {work_syn_dir}/ ...')
-    write_bin_files(vals, depth, work_syn_dir)
+    # ── Step 3: write .bin files to project root (EFX_MAP CWD) ─────────────
+    print(f'  Writing bin files to {bin_dir}/ ...')
+    write_bin_files(vals, depth, bin_dir)
 
     # ── Build replacement strings ─────────────────────────────────────────────
 
+    # EFX_MAP requires ABSOLUTE paths in $readmemb — bare filenames fail with
+    # VERI-1012 regardless of where the file is placed (work_syn/, project root,
+    # or both).  Confirmed by previous Sapphire ROM firmware update session.
+    b0 = os.path.join(bin_dir, 'cm_dmem_b0.bin')
+    b1 = os.path.join(bin_dir, 'cm_dmem_b1.bin')
+    b2 = os.path.join(bin_dir, 'cm_dmem_b2.bin')
+    b3 = os.path.join(bin_dir, 'cm_dmem_b3.bin')
     new_decls = (
         f'  reg [7:0] dmem_b0 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b1 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b2 [0:{depth_idx}];\n'
         f'  reg [7:0] dmem_b3 [0:{depth_idx}];\n'
-        f'  initial $readmemb("cm_dmem_b0.bin", dmem_b0);\n'
-        f'  initial $readmemb("cm_dmem_b1.bin", dmem_b1);\n'
-        f'  initial $readmemb("cm_dmem_b2.bin", dmem_b2);\n'
-        f'  initial $readmemb("cm_dmem_b3.bin", dmem_b3);\n'
+        f'  initial $readmemb("{b0}", dmem_b0);\n'
+        f'  initial $readmemb("{b1}", dmem_b1);\n'
+        f'  initial $readmemb("{b2}", dmem_b2);\n'
+        f'  initial $readmemb("{b3}", dmem_b3);\n'
     )
 
     new_init = ''

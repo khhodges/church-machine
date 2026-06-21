@@ -1,23 +1,25 @@
 ---
 name: EFX_MAP $readmemb path resolution
-description: Where Efinity EFX_MAP looks for $readmemb binary files when synthesising the Sapphire SoC BRAM — and the confirmed firmware update workflow.
+description: Where Efinity EFX_MAP looks for $readmemb binary files — only ABSOLUTE paths work; bare filenames always fail with VERI-1012 regardless of where the file is placed.
 ---
 
 ## CRITICAL: $readmemb REQUIRES ABSOLUTE PATHS
 
-EFX_MAP does NOT resolve `$readmemb` relative to `work_syn/` despite the log
-saying "Synthesis flow working directory is .../work_syn". It also does NOT
-resolve relative to the Verilog source file directory.
+EFX_MAP does NOT resolve `$readmemb` with bare filenames regardless of where
+the file is placed — not `work_syn/`, not project root, not both.
 
-**Confirmed working fix: use ABSOLUTE PATHS in the `$readmemb` calls in sapphire.v.**
+**Confirmed working fix: use ABSOLUTE PATHS in the `$readmemb` calls.**
 
-Tested and failed:
-- Symbol files in `work_syn/` only → VERI-1012 cannot open file
-- Symbol files in project root only → VERI-1012 cannot open file
-- Symbol files in both locations → VERI-1012 cannot open file
+Tested and failed (VERI-1012 "cannot open file"):
+- Bare filename, files in `work_syn/` only
+- Bare filename, files in project root only
+- Bare filename, files in both locations
 
 Tested and worked:
-- Patch `$readmemb("EfxSapphireSoc...symbol0.bin",...)` → `$readmemb("/home/sipantichijk/.../EfxSapphireSoc...symbol0.bin",...)` → synthesis passes, BRAM initialised with firmware ✓
+- `$readmemb("/home/sipantichijk/church_project/SoC/cm_dmem_b0.bin", dmem_b0)` ✓
+
+`patch_cm_bram.py` now uses `project_dir` as the absolute path prefix so the
+generated `$readmemb` lines contain the full path.
 
 ## Firmware update workflow (Efinity GUI on Chromebook)
 
