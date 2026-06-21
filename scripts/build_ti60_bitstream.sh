@@ -83,13 +83,24 @@ _ok "Pre-flight checks passed"
 echo ""
 
 # ── Step 1: Build firmware ──────────────────────────────────────────────────
+# Always clean-build: make -C firmware without clean can silently reuse stale
+# .elf/.bin (touch main.c is unreliable across git stash/pull cycles) so the
+# board ends up running old firmware bytes and shows the wrong FW= version.
 _info "Step 1/8: Build SoC firmware"
-make -C "$HW/firmware" 2>&1 | tee /tmp/build_fw.log | tail -5
+make -C "$HW/firmware" clean 2>&1 | tail -2
+make -C "$HW/firmware" 2>&1 | tee /tmp/build_fw.log | grep -E "gcc|riscv|Wrote|error|Error" | head -20
 SYM0="$HW/EfxSapphireSoc.v_toplevel_system_ramA_logic_ram_symbol0.bin"
 if [ ! -f "$SYM0" ]; then
     _fail "Firmware build failed: symbol0.bin not found. Check /tmp/build_fw.log"
 fi
-_ok "Firmware built — symbol files in $HW/"
+# Show the firmware version string that was compiled in
+FW_BANNER=$(python3 -c "
+import re, pathlib
+mc = pathlib.Path('$HW/firmware/main.c').read_text()
+m = re.search(r'uart_puts\(\"([^\"]+)\"', mc)
+print(m.group(1).strip() if m else 'unknown')
+" 2>/dev/null || echo "unknown")
+_ok "Firmware built — banner: $FW_BANNER  symbol files in $HW/"
 echo ""
 
 # ── Step 2: Patch sapphire.v ────────────────────────────────────────────────
@@ -131,6 +142,23 @@ fi
 cp "$CM_V_SRC" "$CM_V_DST"
 NON_ZERO=$(grep -c "dmem\[" "$CM_V_DST" || true)
 _ok "church_ti60_f225.v deployed ($NON_ZERO non-zero dmem[] lines)"
+
+# ── patch_cm_bram: convert initial begin → $readmemh ────────────────────────
+# EFX_MAP ignores Verilog `initial begin` blocks when inferring BRAM content.
+# Without this patch the CM BRAM is all-zeros after synthesis → NIA stays
+# stuck at 0x00000000 → NULL_CAP fault on every boot.
+# patch_cm_bram.py writes work_syn/church_dmem.mem and replaces the initial
+# begin block with a $readmemh line that EFX_MAP correctly processes.
+PATCH_CM_BRAM="$HW/patch_cm_bram.py"
+if [ ! -f "$PATCH_CM_BRAM" ]; then
+    _fail "patch_cm_bram.py not found at $PATCH_CM_BRAM"
+fi
+python3 "$PATCH_CM_BRAM" "$SOC_DIR" 2>&1 | grep -E "Written|Patched|already|ERROR"
+if grep -q 'readmemh' "$CM_V_DST" 2>/dev/null; then
+    _ok "church_ti60_f225.v CM BRAM patched (initial begin → \$readmemh)"
+else
+    _warn "patch_cm_bram.py did not produce \$readmemh — check output above"
+fi
 
 PERI_SRC="$HW/church_soc_cm.peri.xml"
 PERI_DST="$SOC_DIR/church_soc_cm.peri.xml"
