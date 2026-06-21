@@ -253,7 +253,7 @@ class ChurchTi60F225(Elaboratable):
         m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
         m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
 
-        halted = Signal(init=1)
+        halted = Signal(init=0)
         stepping = Signal()
         fault_latched = Signal()  # sticky: set on any fault_valid, cleared only by reset
 
