@@ -86,6 +86,9 @@
  *   +0x24 FAULT_STAGE RO   Pipeline stage: 0=Fetch 1=Decode 2=Perm 3=Lambda
  *                                          4=TPERM 5=Call 6=Return 7=DataRW
  *   +0x28 FAULT_RST   WO   Write 1 to clear fault_latched and all capture regs
+ *   +0x2C RELAY_DATA  WO   Write byte to shift it out on relay_tx at 57,600 baud
+ *                          (silently dropped while busy — check RELAY_READY first)
+ *   +0x30 RELAY_READY RO   [0]=1 when idle/ready for next byte, 0 while transmitting
  *
  * Target: Efinix Ti60F225, Sapphire SoC, 25 MHz, no libc, no OS.
  */
@@ -141,6 +144,8 @@
 #define CM_FAULT_CR14    (*(volatile uint32_t *)(CM_APB_BASE + 0x20))
 #define CM_FAULT_STAGE   (*(volatile uint32_t *)(CM_APB_BASE + 0x24))
 #define CM_FAULT_RST     (*(volatile uint32_t *)(CM_APB_BASE + 0x28))
+#define CM_RELAY_DATA    (*(volatile uint32_t *)(CM_APB_BASE + 0x2C))
+#define CM_RELAY_READY   (*(volatile uint32_t *)(CM_APB_BASE + 0x30))
 
 /* NUC_CODE_START / NUC_CODE_END: exempt the NUC_PROGRAM inner delay loop
  * from the hung-program watchdog.  The inner delay keeps NIA at one hot

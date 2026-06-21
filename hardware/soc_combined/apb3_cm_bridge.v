@@ -40,6 +40,12 @@
 //  0x28    FAULT_RST   WO      Write 1 to clear fault_latched and all fault
 //                              capture registers atomically.  Used by firmware
 //                              after logging a fault to re-arm fault detection.
+//  0x2C    RELAY_DATA  WO      Write a byte (bits[7:0]) to begin serialising
+//                              it on relay_tx at 57,600 baud (434 cycles/bit
+//                              at 25 MHz).  Silently dropped while relay is
+//                              busy — always check RELAY_READY first.
+//  0x30    RELAY_READY RO      [0] = 1 when shift register is idle and ready
+//                              for the next byte.  0 while transmitting.
 //
 // Together UID_HI:UID_LO form a 64-bit value printed as 16 hex digits in every
 // CALLHOME JSON packet so the IDE can distinguish multiple boards of the same
@@ -90,7 +96,10 @@ module apb3_cm_bridge #(
     input  wire [31:0] cm_fault_gt,    // +0x18 FAULT_GT
     input  wire [31:0] cm_fault_instr, // +0x1C FAULT_INSTR
     input  wire [31:0] cm_fault_cr14,  // +0x20 FAULT_CR14
-    input  wire [3:0]  cm_fault_stage  // +0x24 FAULT_STAGE
+    input  wire [3:0]  cm_fault_stage, // +0x24 FAULT_STAGE
+
+    // UART-TX relay (internal — OR-gated with cm_uart_rx in top.v)
+    output wire        relay_tx        // serialised lump bytes at 57,600 baud
 );
 
     // ----------------------------------------------------------------
@@ -191,6 +200,49 @@ module apb3_cm_bridge #(
     end
 
     // ----------------------------------------------------------------
+    // UART-TX relay — streams bytes to cm_uart_rx at 57,600 baud
+    //
+    // 10-bit frame: start(0) + data[7:0] LSB-first + stop(1)
+    // Bit period = CLK_FREQ / 57_600 = 434 cycles at 25 MHz
+    // relay_tx idles HIGH; OR-gated with cm_uart_rx pin in top.v
+    // ----------------------------------------------------------------
+    localparam BAUD_DIV = CLK_FREQ / 57_600;   // 434 at 25 MHz
+
+    reg [9:0]  relay_shift;      // {stop=1, data[7:0], start=0}, shift right
+    reg [8:0]  relay_baud_cnt;   // 0 .. BAUD_DIV-1 (needs 9 bits for 434)
+    reg [3:0]  relay_bit_cnt;    // 0 .. 9 (10 bits per frame)
+    reg        relay_busy;
+
+    assign relay_tx = relay_busy ? relay_shift[0] : 1'b1;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            relay_shift    <= 10'h3FF;
+            relay_baud_cnt <= 9'h0;
+            relay_bit_cnt  <= 4'h0;
+            relay_busy     <= 1'b0;
+        end else if (apb_write && reg_idx == 4'hB && !relay_busy) begin
+            // RELAY_DATA write — load 10-bit frame and begin transmission
+            relay_shift    <= {1'b1, PWDATA[7:0], 1'b0};
+            relay_baud_cnt <= 9'h0;
+            relay_bit_cnt  <= 4'h0;
+            relay_busy     <= 1'b1;
+        end else if (relay_busy) begin
+            if (relay_baud_cnt == BAUD_DIV - 1) begin
+                relay_baud_cnt <= 9'h0;
+                relay_shift    <= {1'b1, relay_shift[9:1]};   // shift right, fill 1
+                if (relay_bit_cnt == 4'd9) begin
+                    relay_busy <= 1'b0;                        // stop bit done
+                end else begin
+                    relay_bit_cnt <= relay_bit_cnt + 4'h1;
+                end
+            end else begin
+                relay_baud_cnt <= relay_baud_cnt + 9'h1;
+            end
+        end
+    end
+
+    // ----------------------------------------------------------------
     // Read path
     // ----------------------------------------------------------------
     always @(*) begin
@@ -206,6 +258,7 @@ module apb3_cm_bridge #(
             4'h7: PRDATA = fault_instr_r;                             // FAULT_INSTR (+0x1C)
             4'h8: PRDATA = fault_cr14_r;                              // FAULT_CR14  (+0x20)
             4'h9: PRDATA = {28'h0, fault_stage_r};                   // FAULT_STAGE (+0x24)
+            4'hC: PRDATA = {31'h0, ~relay_busy};                     // RELAY_READY (+0x30)
             default: PRDATA = 32'h0;
         endcase
     end

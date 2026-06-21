@@ -91,6 +91,13 @@ module top (
 
     // cm_uart_tx is a top-level output port (GPIOL_P_03 → ttyUSB3)
 
+    // UART-TX relay — SoC firmware serialises LUMP bytes via APB3 bridge
+    // and drives them into the CM's UART_RX input (OR-gated with the pin).
+    // ttyUSB3 pin input is preserved for future direct-flash use.
+    wire relay_tx;
+    wire cm_uart_rx_int;
+    assign cm_uart_rx_int = relay_tx | cm_uart_rx;
+
     // ----------------------------------------------------------------
     // Power-on reset — counter counts UP from 0 (Efinity Ti60 FFs
     // power up to 0 on silicon, ignoring RTL initial values).
@@ -192,7 +199,10 @@ module top (
         .cm_fault_gt     (cm_fault_gt),
         .cm_fault_instr  (cm_fault_instr),
         .cm_fault_cr14   (cm_fault_cr14),
-        .cm_fault_stage  (cm_fault_stage)
+        .cm_fault_stage  (cm_fault_stage),
+
+        // UART-TX relay output
+        .relay_tx        (relay_tx)
     );
 
     // ----------------------------------------------------------------
@@ -207,15 +217,15 @@ module top (
     // Holding LOW for ≥ 25 000 000 cycles (1 s @ 25 MHz) enters free-run.
     // A brief LOW pulse (< 1 s) triggers single-step.
     //
-    // The CM UART debug port is pinned out to GPIOL_P_03 → FT4232H
-    // interface 3 (ttyUSB3) so that NIA traces, fault codes, and
-    // call-home packets are observable without competing with the
-    // Sapphire SoC console on ttyUSB2.  115200 baud, 3.3 V LVCMOS.
+    // The CM UART port runs at 57,600 baud, 3.3 V LVCMOS.
+    // TX (cm_uart_tx) goes to GPIOL_P_03 → ttyUSB3 for call-home/NIA.
+    // RX (cm_uart_rx_int) is OR-gated: relay_tx (APB3 bridge) | cm_uart_rx pin
+    // so the SoC firmware can push LUMPs directly without needing ttyUSB3.
     // ----------------------------------------------------------------
     church_ti60_f225 u_cm (
         .clk              (clk),
-        .uart_tx          (cm_uart_tx),          // CM debug UART → GPIOL_P_03 → ttyUSB3
-        .uart_rx          (cm_uart_rx),          // CM debug UART ← GPIOL_N_03 ← ttyUSB3 (PATCH_LUMP)
+        .uart_tx          (cm_uart_tx),          // CM UART TX → GPIOL_P_03 → ttyUSB3
+        .uart_rx          (cm_uart_rx_int),       // relay_tx | GPIOL_N_03 ← ttyUSB3
         .push_button      (cm_push_button_driven),
 
         // CM LEDs — individual 1-bit outputs from generated Verilog
